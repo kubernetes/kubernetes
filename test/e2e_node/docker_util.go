@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	"github.com/blang/semver"
-	systemdutil "github.com/coreos/go-systemd/util"
+	systemdutil "github.com/coreos/go-systemd/v22/util"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 )

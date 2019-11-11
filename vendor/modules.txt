@@ -183,13 +183,14 @@ github.com/coreos/go-oidc
 # github.com/coreos/go-semver v0.3.0 => github.com/coreos/go-semver v0.3.0
 github.com/coreos/go-semver/semver
 # github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e => github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
-github.com/coreos/go-systemd/daemon
 github.com/coreos/go-systemd/dbus
 github.com/coreos/go-systemd/journal
-github.com/coreos/go-systemd/util
+# github.com/coreos/go-systemd/v22 v22.0.0 => github.com/coreos/go-systemd/v22 v22.0.0
+github.com/coreos/go-systemd/v22/daemon
+github.com/coreos/go-systemd/v22/internal/dlopen
+github.com/coreos/go-systemd/v22/util
 # github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea => github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea
 github.com/coreos/pkg/capnslog
-github.com/coreos/pkg/dlopen
 # github.com/cpuguy83/go-md2man v1.0.10 => github.com/cpuguy83/go-md2man v1.0.10
 github.com/cpuguy83/go-md2man/md2man
 # github.com/cyphar/filepath-securejoin v0.2.2 => github.com/cyphar/filepath-securejoin v0.2.2

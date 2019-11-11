@@ -2,13 +2,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "sdnotify.go",
-        "watchdog.go",
-    ],
-    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/go-systemd/daemon",
-    importpath = "github.com/coreos/go-systemd/daemon",
-    visibility = ["//visibility:public"],
+    srcs = ["dlopen.go"],
+    cgo = True,
+    clinkopts = ["-ldl"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/go-systemd/v22/internal/dlopen",
+    importpath = "github.com/coreos/go-systemd/v22/internal/dlopen",
+    visibility = ["//vendor/github.com/coreos/go-systemd/v22:__subpackages__"],
 )
 
 filegroup(

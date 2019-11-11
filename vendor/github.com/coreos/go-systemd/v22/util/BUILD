@@ -3,14 +3,15 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "dlopen.go",
-        "dlopen_example.go",
+        "util.go",
+        "util_cgo.go",
+        "util_stub.go",
     ],
     cgo = True,
-    clinkopts = ["-ldl"],
-    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/pkg/dlopen",
-    importpath = "github.com/coreos/pkg/dlopen",
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/go-systemd/v22/util",
+    importpath = "github.com/coreos/go-systemd/v22/util",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/coreos/go-systemd/v22/internal/dlopen:go_default_library"],
 )
 
 filegroup(
