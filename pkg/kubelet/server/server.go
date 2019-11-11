@@ -36,7 +36,6 @@ import (
 	cadvisormetrics "github.com/google/cadvisor/container"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/metrics"
-	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"k8s.io/klog"
 
@@ -302,7 +301,7 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 	s.restfulCont.Handle(metricsPath, legacyregistry.Handler())
 
 	// cAdvisor metrics are exposed under the secured handler as well
-	r := prometheus.NewRegistry()
+	r := compbasemetrics.NewKubeRegistry()
 
 	includedMetrics := cadvisormetrics.MetricSet{
 		cadvisormetrics.CpuUsageMetrics:         struct{}{},
@@ -315,13 +314,13 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 		cadvisormetrics.AppMetrics:              struct{}{},
 		cadvisormetrics.ProcessMetrics:          struct{}{},
 	}
-	r.MustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics))
+	r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics))
 	s.restfulCont.Handle(cadvisorMetricsPath,
 		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
 
-	v1alpha1ResourceRegistry := prometheus.NewRegistry()
-	v1alpha1ResourceRegistry.MustRegister(stats.NewPrometheusResourceMetricCollector(s.resourceAnalyzer, v1alpha1.Config()))
+	v1alpha1ResourceRegistry := compbasemetrics.NewKubeRegistry()
+	v1alpha1ResourceRegistry.CustomMustRegister(stats.NewPrometheusResourceMetricCollector(s.resourceAnalyzer, v1alpha1.Config()))
 	s.restfulCont.Handle(path.Join(resourceMetricsPathPrefix, v1alpha1.Version),
 		compbasemetrics.HandlerFor(v1alpha1ResourceRegistry, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)

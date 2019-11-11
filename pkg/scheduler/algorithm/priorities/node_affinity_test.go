@@ -168,8 +168,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			snapshot := nodeinfosnapshot.NewSnapshot(nil, test.nodes)
-			nap := priorityFunction(CalculateNodeAffinityPriorityMap, CalculateNodeAffinityPriorityReduce, nil)
-			list, err := nap(test.pod, snapshot, test.nodes)
+			list, err := runMapReducePriority(CalculateNodeAffinityPriorityMap, CalculateNodeAffinityPriorityReduce, nil, test.pod, snapshot, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

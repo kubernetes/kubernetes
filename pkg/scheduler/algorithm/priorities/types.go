@@ -38,11 +38,6 @@ type PriorityReduceFunction func(pod *v1.Pod, meta interface{}, sharedLister sch
 // is now used for only for priority functions. For predicates please use PredicateMetadataProducer.
 type PriorityMetadataProducer func(pod *v1.Pod, filteredNodes []*v1.Node, sharedLister schedulerlisters.SharedLister) interface{}
 
-// PriorityFunction is a function that computes scores for all nodes.
-// DEPRECATED
-// Use Map-Reduce pattern for priority functions.
-type PriorityFunction func(pod *v1.Pod, sharedLister schedulerlisters.SharedLister, nodes []*v1.Node) (framework.NodeScoreList, error)
-
 // PriorityConfig is a config used for a priority function.
 type PriorityConfig struct {
 	Name   string

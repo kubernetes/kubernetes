@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
@@ -144,14 +144,12 @@ func TestResourceLimitsPriority(t *testing.T) {
 			}
 
 			for _, hasMeta := range []bool{true, false} {
-				var function PriorityFunction
-				if hasMeta {
-					function = priorityFunction(ResourceLimitsPriorityMap, nil, metadata)
-				} else {
-					function = priorityFunction(ResourceLimitsPriorityMap, nil, nil)
+				meta := metadata
+				if !hasMeta {
+					meta = nil
 				}
 
-				list, err := function(test.pod, snapshot, test.nodes)
+				list, err := runMapReducePriority(ResourceLimitsPriorityMap, nil, meta, test.pod, snapshot, test.nodes)
 
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
