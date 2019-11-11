@@ -343,7 +343,8 @@ func TestNodeResourcesFit(t *testing.T) {
 
 	for _, test := range enoughPodsTests {
 		t.Run(test.name, func(t *testing.T) {
-			meta := predicates.GetPredicateMetadata(test.pod, nil)
+			factory := &predicates.MetadataProducerFactory{}
+			meta := factory.GetPredicateMetadata(test.pod, nil)
 			state := framework.NewCycleState()
 			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 
@@ -396,7 +397,8 @@ func TestNodeResourcesFit(t *testing.T) {
 	}
 	for _, test := range notEnoughPodsTests {
 		t.Run(test.name, func(t *testing.T) {
-			meta := predicates.GetPredicateMetadata(test.pod, nil)
+			factory := &predicates.MetadataProducerFactory{}
+			meta := factory.GetPredicateMetadata(test.pod, nil)
 			state := framework.NewCycleState()
 			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 
@@ -447,7 +449,8 @@ func TestNodeResourcesFit(t *testing.T) {
 
 	for _, test := range storagePodsTests {
 		t.Run(test.name, func(t *testing.T) {
-			meta := predicates.GetPredicateMetadata(test.pod, nil)
+			factory := &predicates.MetadataProducerFactory{}
+			meta := factory.GetPredicateMetadata(test.pod, nil)
 			state := framework.NewCycleState()
 			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 

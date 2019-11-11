@@ -165,7 +165,7 @@ func TestPriorityMetadata(t *testing.T) {
 	client := clientsetfake.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-	metaDataProducer := NewPriorityMetadataFactory(
+	metaDataProducer := NewMetadataFactory(
 		informerFactory.Core().V1().Services().Lister(),
 		informerFactory.Core().V1().ReplicationControllers().Lister(),
 		informerFactory.Apps().V1().ReplicaSets().Lister(),

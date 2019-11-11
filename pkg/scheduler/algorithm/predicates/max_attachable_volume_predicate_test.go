@@ -858,7 +858,8 @@ func TestVolumeCountConflicts(t *testing.T) {
 			getFakePVLister(test.filterName),
 			getFakePVCLister(test.filterName))
 
-		fits, reasons, err := pred(test.newPod, GetPredicateMetadata(test.newPod, nil), node)
+		factory := &MetadataProducerFactory{}
+		fits, reasons, err := pred(test.newPod, factory.GetPredicateMetadata(test.newPod, nil), node)
 		if err != nil {
 			t.Errorf("[%s]%s: unexpected error: %v", test.filterName, test.test, err)
 		}
@@ -880,7 +881,8 @@ func TestVolumeCountConflicts(t *testing.T) {
 			getFakeStorageClassLister(test.filterName),
 			getFakePVLister(test.filterName),
 			getFakePVCLister(test.filterName))
-		fits, reasons, err := pred(test.newPod, GetPredicateMetadata(test.newPod, nil), node)
+		factory := &MetadataProducerFactory{}
+		fits, reasons, err := pred(test.newPod, factory.GetPredicateMetadata(test.newPod, nil), node)
 		if err != nil {
 			t.Errorf("Using allocatable [%s]%s: unexpected error: %v", test.filterName, test.test, err)
 		}

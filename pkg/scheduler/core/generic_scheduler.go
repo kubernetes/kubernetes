@@ -133,7 +133,7 @@ type ScheduleAlgorithm interface {
 	// GetPredicateMetadataProducer returns the predicate metadata producer. This is needed
 	// for cluster autoscaler integration.
 	// TODO(ahg-g): remove this once CA migrates to creating a Framework instead of a full scheduler.
-	PredicateMetadataProducer() predicates.PredicateMetadataProducer
+	PredicateMetadataProducer() predicates.MetadataProducer
 }
 
 // ScheduleResult represents the result of one pod scheduled. It will contain
@@ -151,8 +151,8 @@ type genericScheduler struct {
 	cache                    internalcache.Cache
 	schedulingQueue          internalqueue.SchedulingQueue
 	predicates               map[string]predicates.FitPredicate
-	priorityMetaProducer     priorities.PriorityMetadataProducer
-	predicateMetaProducer    predicates.PredicateMetadataProducer
+	priorityMetaProducer     priorities.MetadataProducer
+	predicateMetaProducer    predicates.MetadataProducer
 	prioritizers             []priorities.PriorityConfig
 	framework                framework.Framework
 	extenders                []algorithm.SchedulerExtender
@@ -176,7 +176,7 @@ func (g *genericScheduler) snapshot() error {
 
 // GetPredicateMetadataProducer returns the predicate metadata producer. This is needed
 // for cluster autoscaler integration.
-func (g *genericScheduler) PredicateMetadataProducer() predicates.PredicateMetadataProducer {
+func (g *genericScheduler) PredicateMetadataProducer() predicates.MetadataProducer {
 	return g.predicateMetaProducer
 }
 
@@ -578,8 +578,8 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 // addNominatedPods adds pods with equal or greater priority which are nominated
 // to run on the node given in nodeInfo to meta and nodeInfo. It returns 1) whether
 // any pod was added, 2) augmented metadata, 3) augmented CycleState 4) augmented nodeInfo.
-func (g *genericScheduler) addNominatedPods(ctx context.Context, pod *v1.Pod, meta predicates.PredicateMetadata, state *framework.CycleState,
-	nodeInfo *schedulernodeinfo.NodeInfo) (bool, predicates.PredicateMetadata,
+func (g *genericScheduler) addNominatedPods(ctx context.Context, pod *v1.Pod, meta predicates.Metadata, state *framework.CycleState,
+	nodeInfo *schedulernodeinfo.NodeInfo) (bool, predicates.Metadata,
 	*framework.CycleState, *schedulernodeinfo.NodeInfo, error) {
 	if g.schedulingQueue == nil || nodeInfo == nil || nodeInfo.Node() == nil {
 		// This may happen only in tests.
@@ -590,7 +590,7 @@ func (g *genericScheduler) addNominatedPods(ctx context.Context, pod *v1.Pod, me
 		return false, meta, state, nodeInfo, nil
 	}
 	nodeInfoOut := nodeInfo.Clone()
-	var metaOut predicates.PredicateMetadata
+	var metaOut predicates.Metadata
 	if meta != nil {
 		metaOut = meta.ShallowCopy()
 	}
@@ -629,7 +629,7 @@ func (g *genericScheduler) podFitsOnNode(
 	ctx context.Context,
 	state *framework.CycleState,
 	pod *v1.Pod,
-	meta predicates.PredicateMetadata,
+	meta predicates.Metadata,
 	info *schedulernodeinfo.NodeInfo,
 	alwaysCheckAllPredicates bool,
 ) (bool, []predicates.PredicateFailureReason, *framework.Status, error) {
@@ -1012,7 +1012,7 @@ func (g *genericScheduler) selectNodesForPreemption(
 			return
 		}
 		nodeInfoCopy := g.nodeInfoSnapshot.NodeInfoMap[nodeName].Clone()
-		var metaCopy predicates.PredicateMetadata
+		var metaCopy predicates.Metadata
 		if meta != nil {
 			metaCopy = meta.ShallowCopy()
 		}
@@ -1091,7 +1091,7 @@ func (g *genericScheduler) selectVictimsOnNode(
 	ctx context.Context,
 	state *framework.CycleState,
 	pod *v1.Pod,
-	meta predicates.PredicateMetadata,
+	meta predicates.Metadata,
 	nodeInfo *schedulernodeinfo.NodeInfo,
 	pdbs []*policy.PodDisruptionBudget,
 ) ([]*v1.Pod, int, bool) {
@@ -1268,9 +1268,9 @@ func NewGenericScheduler(
 	cache internalcache.Cache,
 	podQueue internalqueue.SchedulingQueue,
 	predicates map[string]predicates.FitPredicate,
-	predicateMetaProducer predicates.PredicateMetadataProducer,
+	predicateMetaProducer predicates.MetadataProducer,
 	prioritizers []priorities.PriorityConfig,
-	priorityMetaProducer priorities.PriorityMetadataProducer,
+	priorityMetaProducer priorities.MetadataProducer,
 	nodeInfoSnapshot *nodeinfosnapshot.Snapshot,
 	framework framework.Framework,
 	extenders []algorithm.SchedulerExtender,

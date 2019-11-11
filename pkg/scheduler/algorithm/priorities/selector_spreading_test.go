@@ -346,7 +346,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				statefulSetLister: fakelisters.StatefulSetLister(test.sss),
 			}
 
-			metaDataProducer := NewPriorityMetadataFactory(
+			metaDataProducer := NewMetadataFactory(
 				fakelisters.ServiceLister(test.services),
 				fakelisters.ControllerLister(test.rcs),
 				fakelisters.ReplicaSetLister(test.rss),
@@ -584,7 +584,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				statefulSetLister: fakelisters.StatefulSetLister(test.sss),
 			}
 
-			metaDataProducer := NewPriorityMetadataFactory(
+			metaDataProducer := NewMetadataFactory(
 				fakelisters.ServiceLister(test.services),
 				fakelisters.ControllerLister(test.rcs),
 				fakelisters.ReplicaSetLister(test.rss),
@@ -773,7 +773,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, nodes)
 			zoneSpread := ServiceAntiAffinity{podLister: snapshot.Pods(), serviceLister: fakelisters.ServiceLister(test.services), labels: []string{"zone"}}
 
-			metaDataProducer := NewPriorityMetadataFactory(
+			metaDataProducer := NewMetadataFactory(
 				fakelisters.ServiceLister(test.services),
 				fakelisters.ControllerLister(rcs),
 				fakelisters.ReplicaSetLister(rss),
