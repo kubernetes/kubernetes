@@ -32,6 +32,7 @@ import (
 	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
 	validatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
 	apiserverapi "k8s.io/apiserver/pkg/apis/apiserver"
+	apiserverapiv1 "k8s.io/apiserver/pkg/apis/apiserver/v1"
 	apiserverapiv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/informers"
@@ -44,6 +45,7 @@ var configScheme = runtime.NewScheme()
 func init() {
 	utilruntime.Must(apiserverapi.AddToScheme(configScheme))
 	utilruntime.Must(apiserverapiv1alpha1.AddToScheme(configScheme))
+	utilruntime.Must(apiserverapiv1.AddToScheme(configScheme))
 }
 
 // AdmissionOptions holds the admission options
