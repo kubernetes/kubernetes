@@ -68,6 +68,7 @@ func TestCommonAttachDisk(t *testing.T) {
 			resourceGroup:         testCloud.ResourceGroup,
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
+			vmLockMap:             newLockMap(),
 		}
 		diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/disk-name",
 			testCloud.SubscriptionID, testCloud.ResourceGroup)
@@ -116,6 +117,7 @@ func TestCommonDetachDisk(t *testing.T) {
 			resourceGroup:         testCloud.ResourceGroup,
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
+			vmLockMap:             newLockMap(),
 		}
 		diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/disk-name",
 			testCloud.SubscriptionID, testCloud.ResourceGroup)
@@ -156,6 +158,7 @@ func TestGetDiskLun(t *testing.T) {
 			resourceGroup:         testCloud.ResourceGroup,
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
+			vmLockMap:             newLockMap(),
 		}
 		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 
@@ -194,6 +197,7 @@ func TestGetNextDiskLun(t *testing.T) {
 			resourceGroup:         testCloud.ResourceGroup,
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
+			vmLockMap:             newLockMap(),
 		}
 		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, test.isDataDisksFull)
 
@@ -235,6 +239,7 @@ func TestDisksAreAttached(t *testing.T) {
 			resourceGroup:         testCloud.ResourceGroup,
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
+			vmLockMap:             newLockMap(),
 		}
 		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 
