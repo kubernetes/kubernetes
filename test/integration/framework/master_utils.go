@@ -19,6 +19,7 @@ package framework
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -141,10 +142,14 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 	stopCh := make(chan struct{})
 	closeFn := func() {
+		fmt.Printf("Inside closeFn\n")
 		if m != nil {
+			fmt.Printf("Before m.GenericAPIServer.RunPreShutdownHooks()\n")
 			m.GenericAPIServer.RunPreShutdownHooks()
 		}
+		fmt.Printf("Before close(stopCh)\n")
 		close(stopCh)
+		fmt.Printf("Before s.Close()\n")
 		s.Close()
 	}
 
@@ -204,7 +209,9 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	// TODO have this start method actually use the normal start sequence for the API server
 	// this method never actually calls the `Run` method for the API server
 	// fire the post hooks ourselves
+	fmt.Printf("Before m.GenericAPIServer.PrepareRun()\n")
 	m.GenericAPIServer.PrepareRun()
+	fmt.Printf("Before m.GenericAPIServer.RunPostStartHooks(stopCh)\n")
 	m.GenericAPIServer.RunPostStartHooks(stopCh)
 
 	cfg := *masterConfig.GenericConfig.LoopbackClientConfig
@@ -215,6 +222,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		klog.Fatal(err)
 	}
 	var lastHealthContent []byte
+	fmt.Printf("Before PollImmediate\n")
 	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
 		result := privilegedClient.Get().AbsPath("/healthz").Do()
 		status := 0
@@ -225,6 +233,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		lastHealthContent, _ = result.Raw()
 		return false, nil
 	})
+	fmt.Printf("Before PollImmediate err: %v\n", err)
 	if err != nil {
 		closeFn()
 		klog.Errorf("last health content: %q", string(lastHealthContent))

@@ -22,7 +22,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Give integration tests longer to run by default.
-KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout=600s}
+KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout=1000s}
 KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
 LOG_LEVEL=${LOG_LEVEL:-2}
 KUBE_TEST_ARGS=${KUBE_TEST_ARGS:-}

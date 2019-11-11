@@ -175,7 +175,9 @@ func (s *GenericAPIServer) RunPreShutdownHooks() error {
 	s.preShutdownHooksCalled = true
 
 	for hookName, hookEntry := range s.preShutdownHooks {
+		fmt.Printf("About to run %q PreShutDownHook\n", hookName)
 		if err := runPreShutdownHook(hookName, hookEntry); err != nil {
+			fmt.Printf("PreShutDownHook %q error: %v\n", hookName, err)
 			errorList = append(errorList, err)
 		}
 	}

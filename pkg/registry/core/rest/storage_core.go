@@ -112,9 +112,9 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		PrioritizedVersions:          legacyscheme.Scheme.PrioritizedVersionsForGroup(""),
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
-		Scheme:                       legacyscheme.Scheme,
-		ParameterCodec:               legacyscheme.ParameterCodec,
-		NegotiatedSerializer:         legacyscheme.Codecs,
+		Scheme:               legacyscheme.Scheme,
+		ParameterCodec:       legacyscheme.ParameterCodec,
+		NegotiatedSerializer: legacyscheme.Codecs,
 	}
 
 	var podDisruptionClient policyclient.PodDisruptionBudgetsGetter
@@ -335,11 +335,30 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	}
 	apiGroupInfo.VersionedResourcesStorageMap["v1"] = restStorageMap
 
+	restStorage.destroyFuncs = append(restStorage.destroyFuncs, restStorageMap["namespaces"].(registryrest.Destroyable).Destroy)
+	restStorage.destroyFuncs = append(restStorage.destroyFuncs, restStorageMap["podTemplates"].(registryrest.Destroyable).Destroy)
+	restStorage.destroyFuncs = append(restStorage.destroyFuncs, restStorageMap["replicationControllers"].(registryrest.Destroyable).Destroy)
+	restStorage.destroyFuncs = append(restStorage.destroyFuncs, restStorageMap["nodes"].(registryrest.Destroyable).Destroy)
+	// restStorage.destroyFuncs = append(restStorage.destroyFuncs, restStorageMap["configMaps"].(registryrest.Destroyable).Destroy)
+	restStorage.destroyFuncs = append(restStorage.destroyFuncs, configMapStorage.DestroyFunc)
+	restStorage.destroyFuncs = append(restStorage.destroyFuncs, restStorageMap["limitRanges"].(registryrest.Destroyable).Destroy)
+	restStorage.destroyFuncs = append(restStorage.destroyFuncs, restStorageMap["events"].(registryrest.Destroyable).Destroy)
+
+	restStorage.destroyFuncs = append(restStorage.destroyFuncs, restStorageMap["secrets"].(registryrest.Destroyable).Destroy)
+	restStorage.destroyFuncs = append(restStorage.destroyFuncs, restStorageMap["endpoints"].(registryrest.Destroyable).Destroy)
+	restStorage.destroyFuncs = append(restStorage.destroyFuncs, restStorageMap["resourceQuotas"].(registryrest.Destroyable).Destroy)
+	restStorage.destroyFuncs = append(restStorage.destroyFuncs, restStorageMap["serviceAccounts"].(registryrest.Destroyable).Destroy)
+	restStorage.destroyFuncs = append(restStorage.destroyFuncs, restStorageMap["pods"].(registryrest.Destroyable).Destroy)
+	restStorage.destroyFuncs = append(restStorage.destroyFuncs, restStorageMap["persistentVolumes"].(registryrest.Destroyable).Destroy)
+	restStorage.destroyFuncs = append(restStorage.destroyFuncs, restStorageMap["persistentVolumeClaims"].(registryrest.Destroyable).Destroy)
+
 	restStorage.destroyFuncs = append(restStorage.destroyFuncs, serviceRESTStorage.Store.DestroyFunc)
-	for _, storage := range restStorageMap {
+
+	for name, storage := range restStorageMap {
 		destroyable, ok := storage.(registryrest.Destroyable)
 		if ok {
-			restStorage.destroyFuncs = append(restStorage.destroyFuncs, destroyable.Destroy)
+			// restStorage.destroyFuncs = append(restStorage.destroyFuncs, destroyable.Destroy)
+			fmt.Printf("Jo: (%v) %#v\n", name, destroyable)
 		}
 	}
 
