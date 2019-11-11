@@ -598,6 +598,7 @@ func initDiskControllers(az *Cloud) error {
 		resourceGroup:         az.ResourceGroup,
 		subscriptionID:        az.SubscriptionID,
 		cloud:                 az,
+		vmLockMap:             newLockMap(),
 	}
 
 	az.BlobDiskController = &BlobDiskController{common: common}
