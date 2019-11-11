@@ -19,6 +19,7 @@ package images
 import (
 	"fmt"
 
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -32,7 +33,8 @@ func GetGenericImage(prefix, image, tag string) string {
 // GetKubernetesImage generates and returns the image for the components managed in the Kubernetes main repository,
 // including the control-plane components and kube-proxy. If specified, the HyperKube image will be used.
 func GetKubernetesImage(image string, cfg *kubeadmapi.ClusterConfiguration) string {
-	if cfg.UseHyperKubeImage {
+	if cfg.UseHyperKubeImage && image != constants.HyperKube {
+		klog.Warningf(`WARNING: DEPRECATED use of the "hyperkube" image in place of %q`, image)
 		image = constants.HyperKube
 	}
 	repoPrefix := cfg.GetControlPlaneImageRepository()
@@ -91,6 +93,7 @@ func GetControlPlaneImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 
 	// start with core kubernetes images
 	if cfg.UseHyperKubeImage {
+		klog.Warningln(`WARNING: DEPRECATED use of the "hyperkube" image for the Kubernetes control plane`)
 		imgs = append(imgs, GetKubernetesImage(constants.HyperKube, cfg))
 	} else {
 		imgs = append(imgs, GetKubernetesImage(constants.KubeAPIServer, cfg))
