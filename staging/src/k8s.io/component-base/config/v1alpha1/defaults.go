@@ -62,6 +62,9 @@ func RecommendedDefaultLeaderElectionConfiguration(obj *LeaderElectionConfigurat
 // be no easy way to opt-out. Instead, if you want to use this defaulting method
 // run it in your wrapper struct of this type in its `SetDefaults_` method.
 func RecommendedDefaultClientConnectionConfiguration(obj *ClientConnectionConfiguration) {
+	if len(obj.AcceptContentTypes) == 0 {
+		obj.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
+	}
 	if len(obj.ContentType) == 0 {
 		obj.ContentType = "application/vnd.kubernetes.protobuf"
 	}

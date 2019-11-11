@@ -128,6 +128,9 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubeschedulerconfigv1alpha1.Kub
 		obj.LeaderElection.LockObjectName = kubeschedulerconfigv1alpha1.SchedulerDefaultLockObjectName
 	}
 
+	if len(obj.ClientConnection.AcceptContentTypes) == 0 {
+		obj.ClientConnection.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
+	}
 	if len(obj.ClientConnection.ContentType) == 0 {
 		obj.ClientConnection.ContentType = "application/vnd.kubernetes.protobuf"
 	}

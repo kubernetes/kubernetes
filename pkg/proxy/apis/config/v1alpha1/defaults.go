@@ -110,6 +110,9 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 		obj.ConfigSyncPeriod.Duration = 15 * time.Minute
 	}
 
+	if len(obj.ClientConnection.AcceptContentTypes) == 0 {
+		obj.ClientConnection.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
+	}
 	if len(obj.ClientConnection.ContentType) == 0 {
 		obj.ClientConnection.ContentType = "application/vnd.kubernetes.protobuf"
 	}
