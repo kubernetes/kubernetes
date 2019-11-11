@@ -31,6 +31,13 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
+const (
+	// AuthenticationMethod defines the authentication type implemented by the password-file authenticator (used in metrics).
+	AuthenticationMethod = "username-password"
+	// AuthenticatorName uniquely identifies this authenticator (used in metrics).
+	AuthenticatorName = "password-file"
+)
+
 type PasswordAuthenticator struct {
 	users map[string]*userPasswordInfo
 }
@@ -89,5 +96,5 @@ func (a *PasswordAuthenticator) AuthenticatePassword(ctx context.Context, userna
 	if subtle.ConstantTimeCompare([]byte(user.password), []byte(password)) == 0 {
 		return nil, false, nil
 	}
-	return &authenticator.Response{User: user.info}, true, nil
+	return &authenticator.Response{User: user.info, AuthMethod: AuthenticationMethod, AuthenticatorName: AuthenticatorName}, true, nil
 }

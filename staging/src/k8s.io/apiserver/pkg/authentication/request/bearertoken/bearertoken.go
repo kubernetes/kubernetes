@@ -17,7 +17,6 @@ limitations under the License.
 package bearertoken
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 
@@ -25,14 +24,23 @@ import (
 )
 
 type Authenticator struct {
-	auth authenticator.Token
+	auth       authenticator.Token
+	name       string
+	authMethod string
 }
+
+const (
+	invalidBearerTokenMsg = "invalid bearer token"
+
+	// AuthenticationMethod defines the authentication type implemented by the bearer-token authenticator (used in metrics).
+	AuthenticationMethod = "header"
+	// AuthenticatorName uniquely identifies this authenticator (used in metrics).
+	AuthenticatorName = "bearer-token"
+)
 
 func New(auth authenticator.Token) *Authenticator {
-	return &Authenticator{auth}
+	return &Authenticator{auth: auth, name: AuthenticatorName, authMethod: AuthenticationMethod}
 }
-
-var invalidToken = errors.New("invalid bearer token")
 
 func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
 	auth := strings.TrimSpace(req.Header.Get("Authorization"))
@@ -58,9 +66,16 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 		req.Header.Del("Authorization")
 	}
 
+	if resp != nil {
+		resp.AuthMethod = a.authMethod
+		if resp.AuthenticatorName == "" {
+			resp.AuthenticatorName = a.name
+		}
+	}
+
 	// If the token authenticator didn't error, provide a default error
 	if !ok && err == nil {
-		err = invalidToken
+		err = authenticator.Errorf(a.authMethod, a.name, invalidBearerTokenMsg)
 	}
 
 	return resp, ok, err

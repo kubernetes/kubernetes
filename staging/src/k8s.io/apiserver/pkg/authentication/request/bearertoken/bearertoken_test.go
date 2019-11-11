@@ -21,6 +21,7 @@ import (
 	"errors"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -52,7 +53,7 @@ func TestAuthenticateRequestTokenInvalid(t *testing.T) {
 	if ok || resp != nil {
 		t.Errorf("expected not authenticated user")
 	}
-	if err != invalidToken {
+	if err == nil || !strings.Contains(err.Error(), invalidBearerTokenMsg) {
 		t.Errorf("expected invalidToken error, got %v", err)
 	}
 }

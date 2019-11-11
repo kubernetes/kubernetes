@@ -18,7 +18,6 @@ package websocket
 
 import (
 	"encoding/base64"
-	"errors"
 	"net/http"
 	"net/textproto"
 	"strings"
@@ -28,21 +27,29 @@ import (
 	"k8s.io/apiserver/pkg/util/wsstream"
 )
 
-const bearerProtocolPrefix = "base64url.bearer.authorization.k8s.io."
+const (
+	bearerProtocolPrefix = "base64url.bearer.authorization.k8s.io."
+	invalidTokenMsg      = "invalid bearer token"
+
+	// AuthenticationMethod defines the authentication type implemented by the websocket authenticator (used in metrics).
+	AuthenticationMethod = "token"
+	// AuthenticatorName uniquely identifies this authenticator (used in metrics).
+	AuthenticatorName = "websocket"
+)
 
 var protocolHeader = textproto.CanonicalMIMEHeaderKey("Sec-WebSocket-Protocol")
-
-var errInvalidToken = errors.New("invalid bearer token")
 
 // ProtocolAuthenticator allows a websocket connection to provide a bearer token as a subprotocol
 // in the format "base64url.bearer.authorization.<base64url-without-padding(bearer-token)>"
 type ProtocolAuthenticator struct {
 	// auth is the token authenticator to use to validate the token
-	auth authenticator.Token
+	auth       authenticator.Token
+	name       string
+	authMethod string
 }
 
 func NewProtocolAuthenticator(auth authenticator.Token) *ProtocolAuthenticator {
-	return &ProtocolAuthenticator{auth}
+	return &ProtocolAuthenticator{auth: auth, authMethod: AuthenticationMethod, name: AuthenticatorName}
 }
 
 func (a *ProtocolAuthenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
@@ -64,17 +71,17 @@ func (a *ProtocolAuthenticator) AuthenticateRequest(req *http.Request) (*authent
 			}
 
 			if sawTokenProtocol {
-				return nil, false, errors.New("multiple base64.bearer.authorization tokens specified")
+				return nil, false, a.errorf("multiple base64.bearer.authorization tokens specified")
 			}
 			sawTokenProtocol = true
 
 			encodedToken := strings.TrimPrefix(protocol, bearerProtocolPrefix)
 			decodedToken, err := base64.RawURLEncoding.DecodeString(encodedToken)
 			if err != nil {
-				return nil, false, errors.New("invalid base64.bearer.authorization token encoding")
+				return nil, false, a.errorf("invalid base64.bearer.authorization token encoding")
 			}
 			if !utf8.Valid(decodedToken) {
-				return nil, false, errors.New("invalid base64.bearer.authorization token")
+				return nil, false, a.errorf("invalid base64.bearer.authorization token")
 			}
 			token = string(decodedToken)
 		}
@@ -83,7 +90,7 @@ func (a *ProtocolAuthenticator) AuthenticateRequest(req *http.Request) (*authent
 	// Must pass at least one other subprotocol so that we can remove the one containing the bearer token,
 	// and there is at least one to echo back to the client
 	if len(token) > 0 && len(filteredProtocols) == 0 {
-		return nil, false, errors.New("missing additional subprotocol")
+		return nil, false, a.errorf("missing additional subprotocol")
 	}
 
 	if len(token) == 0 {
@@ -101,8 +108,19 @@ func (a *ProtocolAuthenticator) AuthenticateRequest(req *http.Request) (*authent
 
 	// If the token authenticator didn't error, provide a default error
 	if !ok && err == nil {
-		err = errInvalidToken
+		err = a.errorf(invalidTokenMsg)
+	}
+
+	if resp != nil {
+		resp.AuthMethod = AuthenticationMethod
+		if resp.AuthenticatorName == "" {
+			resp.AuthenticatorName = AuthenticatorName
+		}
 	}
 
 	return resp, ok, err
+}
+
+func (a *ProtocolAuthenticator) errorf(fmt string, args ...interface{}) error {
+	return authenticator.Errorf(a.authMethod, a.name, fmt, args...)
 }

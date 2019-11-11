@@ -31,6 +31,13 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
+const (
+	// AuthenticationMethod defines the authentication type implemented by the x509 authenticator (used in metrics).
+	AuthenticationMethod = "client-ca-file"
+	// AuthenticatorName uniquely identifies this authenticator (used in metrics).
+	AuthenticatorName = "x509"
+)
+
 /*
  * By default, the following metric is defined as falling under
  * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
@@ -92,6 +99,8 @@ type VerifyOptionFunc func() (x509.VerifyOptions, bool)
 type Authenticator struct {
 	verifyOptionsFn VerifyOptionFunc
 	user            UserConversion
+	name            string
+	authMethod      string
 }
 
 // New returns a request.Authenticator that verifies client certificates using the provided
@@ -103,7 +112,7 @@ func New(opts x509.VerifyOptions, user UserConversion) *Authenticator {
 // NewDynamic returns a request.Authenticator that verifies client certificates using the provided
 // VerifyOptionFunc (which may be dynamic), and converts valid certificate chains into user.Info using the provided UserConversion
 func NewDynamic(verifyOptionsFn VerifyOptionFunc, user UserConversion) *Authenticator {
-	return &Authenticator{verifyOptionsFn, user}
+	return &Authenticator{verifyOptionsFn: verifyOptionsFn, user: user, name: AuthenticatorName, authMethod: AuthenticationMethod}
 }
 
 // AuthenticateRequest authenticates the request using presented client certificates
@@ -129,22 +138,28 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 	clientCertificateExpirationHistogram.Observe(remaining.Seconds())
 	chains, err := req.TLS.PeerCertificates[0].Verify(optsCopy)
 	if err != nil {
-		return nil, false, err
+		return nil, false, a.error(err)
 	}
 
 	var errlist []error
 	for _, chain := range chains {
-		user, ok, err := a.user.User(chain)
+		resp, ok, err := a.user.User(chain)
 		if err != nil {
 			errlist = append(errlist, err)
 			continue
 		}
 
 		if ok {
-			return user, ok, err
+			resp.AuthMethod = a.name
+			resp.AuthenticatorName = a.authMethod
+			return resp, ok, err
 		}
 	}
-	return nil, false, utilerrors.NewAggregate(errlist)
+	return nil, false, a.error(utilerrors.NewAggregate(errlist))
+}
+
+func (a *Authenticator) error(err error) error {
+	return authenticator.NewError(a.authMethod, a.name, err)
 }
 
 // Verifier implements request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth

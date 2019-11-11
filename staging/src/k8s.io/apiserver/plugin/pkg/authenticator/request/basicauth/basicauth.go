@@ -17,10 +17,16 @@ limitations under the License.
 package basicauth
 
 import (
-	"errors"
 	"net/http"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+)
+
+const (
+	// AuthenticationMethod defines the authentication type implemented by the basic-auth authenticator (used in metrics).
+	AuthenticationMethod = "username-password"
+	// AuthenticatorName uniquely identifies this authenticator (used in metrics).
+	AuthenticatorName = "basic-auth"
 )
 
 // Authenticator authenticates requests using basic auth
@@ -33,7 +39,7 @@ func New(auth authenticator.Password) *Authenticator {
 	return &Authenticator{auth}
 }
 
-var errInvalidAuth = errors.New("invalid username/password combination")
+var errInvalidAuth = authenticator.Errorf(AuthenticationMethod, AuthenticatorName, "invalid username/password combination")
 
 // AuthenticateRequest authenticates the request using the "Authorization: Basic" header in the request
 func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
@@ -47,6 +53,12 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 	// If the password authenticator didn't error, provide a default error
 	if !ok && err == nil {
 		err = errInvalidAuth
+	}
+	if resp != nil {
+		resp.AuthMethod = AuthenticationMethod
+		if resp.AuthenticatorName == "" {
+			resp.AuthenticatorName = AuthenticatorName
+		}
 	}
 
 	return resp, ok, err

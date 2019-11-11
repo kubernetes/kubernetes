@@ -35,7 +35,14 @@ import (
 	"k8s.io/klog"
 )
 
-const retryBackoff = 500 * time.Millisecond
+const (
+	retryBackoff = 500 * time.Millisecond
+
+	// AuthenticationMethod defines the authentication type implemented by the webhook authenticator (used in metrics).
+	AuthenticationMethod = "token"
+	// AuthenticatorName uniquely identifies this authenticator (used in metrics).
+	AuthenticatorName = "webhook"
+)
 
 // Ensure WebhookTokenAuthenticator implements the authenticator.Token interface.
 var _ authenticator.Token = (*WebhookTokenAuthenticator)(nil)
@@ -48,6 +55,8 @@ type WebhookTokenAuthenticator struct {
 	tokenReview    tokenReviewer
 	initialBackoff time.Duration
 	implicitAuds   authenticator.Audiences
+	name           string
+	authMethod     string
 }
 
 // NewFromInterface creates a webhook authenticator using the given tokenReview
@@ -72,7 +81,7 @@ func New(kubeConfigFile string, version string, implicitAuds authenticator.Audie
 
 // newWithBackoff allows tests to skip the sleep.
 func newWithBackoff(tokenReview tokenReviewer, initialBackoff time.Duration, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
-	return &WebhookTokenAuthenticator{tokenReview, initialBackoff, implicitAuds}, nil
+	return &WebhookTokenAuthenticator{tokenReview: tokenReview, initialBackoff: initialBackoff, implicitAuds: implicitAuds, name: "webhook", authMethod: "token"}, nil
 }
 
 // AuthenticateToken implements the authenticator.Token interface.
@@ -107,7 +116,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 	if err != nil {
 		// An error here indicates bad configuration or an outage. Log for debugging.
 		klog.Errorf("Failed to make webhook authenticator request: %v", err)
-		return nil, false, err
+		return nil, false, authenticator.NewError(AuthenticationMethod, AuthenticatorName, err)
 	}
 
 	if checkAuds {
@@ -125,7 +134,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 	if !r.Status.Authenticated {
 		var err error
 		if len(r.Status.Error) != 0 {
-			err = errors.New(r.Status.Error)
+			err = authenticator.NewError(w.authMethod, w.name, errors.New(r.Status.Error))
 		}
 		return nil, false, err
 	}
@@ -139,6 +148,8 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 	}
 
 	return &authenticator.Response{
+		AuthMethod:        w.authMethod,
+		AuthenticatorName: w.name,
 		User: &user.DefaultInfo{
 			Name:   r.Status.User.Username,
 			UID:    r.Status.User.UID,

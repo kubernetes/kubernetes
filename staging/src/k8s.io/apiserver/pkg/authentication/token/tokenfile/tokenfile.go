@@ -29,6 +29,13 @@ import (
 	"k8s.io/klog"
 )
 
+const (
+	// AuthenticationMethod defines the authentication type implemented by the token-file authenticator (used in metrics).
+	AuthenticationMethod = "token"
+	// AuthenticatorName uniquely identifies this authenticator (used in metrics).
+	AuthenticatorName = "token-file"
+)
+
 type TokenAuthenticator struct {
 	tokens map[string]*user.DefaultInfo
 }
@@ -95,5 +102,5 @@ func (a *TokenAuthenticator) AuthenticateToken(ctx context.Context, value string
 	if !ok {
 		return nil, false, nil
 	}
-	return &authenticator.Response{User: user}, true, nil
+	return &authenticator.Response{User: user, AuthMethod: AuthenticationMethod, AuthenticatorName: AuthenticatorName}, true, nil
 }

@@ -27,6 +27,11 @@ const (
 	anonymousUser = user.Anonymous
 
 	unauthenticatedGroup = user.AllUnauthenticated
+
+	// AuthenticationMethod defines the authentication type implemented by the anonymous authenticator (used in metrics).
+	AuthenticationMethod = "username-password"
+	// AuthenticatorName uniquely identifies this authenticator (used in metrics).
+	AuthenticatorName = "anonymous"
 )
 
 func NewAuthenticator() authenticator.Request {
@@ -37,7 +42,9 @@ func NewAuthenticator() authenticator.Request {
 				Name:   anonymousUser,
 				Groups: []string{unauthenticatedGroup},
 			},
-			Audiences: auds,
+			Audiences:         auds,
+			AuthMethod:        AuthenticationMethod,
+			AuthenticatorName: AuthenticatorName,
 		}, true, nil
 	})
 }

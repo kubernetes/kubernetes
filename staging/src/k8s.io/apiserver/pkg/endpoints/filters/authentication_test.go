@@ -18,13 +18,14 @@ package filters
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"net/http"
-	"net/http/httptest"
-	"testing"
 )
 
 func TestAuthenticateRequestWithAud(t *testing.T) {

@@ -30,6 +30,13 @@ import (
 	utilcert "k8s.io/client-go/util/cert"
 )
 
+const (
+	// AuthenticationMethod defines the authentication type implemented by the request-header authenticator (used in metrics).
+	AuthenticationMethod = "token"
+	// AuthenticatorName uniquely identifies this authenticator (used in metrics).
+	AuthenticatorName = "request-header"
+)
+
 // StringSliceProvider is a way to get a string slice value.  It is heavily used for authentication headers among other places.
 type StringSliceProvider interface {
 	// Value returns the current string slice.  Callers should never mutate the returned value.
@@ -176,6 +183,8 @@ func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request)
 	}
 
 	return &authenticator.Response{
+		AuthenticatorName: AuthenticatorName,
+		AuthMethod:        AuthenticationMethod,
 		User: &user.DefaultInfo{
 			Name:   name,
 			Groups: groups,

@@ -52,6 +52,13 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 )
 
+const (
+	// AuthenticationMethod defines the authentication type implemented by the oidc authenticator (used in metrics).
+	AuthenticationMethod = "token"
+	// AuthenticatorName uniquely identifies this authenticator (used in metrics).
+	AuthenticatorName = "oidc"
+)
+
 var (
 	// synchronizeTokenIDVerifierForTest should be set to true to force a
 	// wait until the token ID verifiers are ready.
@@ -204,7 +211,9 @@ type Authenticator struct {
 	cancel context.CancelFunc
 
 	// resolver is used to resolve distributed claims.
-	resolver *claimResolver
+	resolver   *claimResolver
+	name       string
+	authMethod string
 }
 
 func (a *Authenticator) setVerifier(v *oidc.IDTokenVerifier) {
@@ -329,6 +338,8 @@ func newAuthenticator(opts Options, initVerifier func(ctx context.Context, a *Au
 		apiAudiences:   opts.APIAudiences,
 		cancel:         cancel,
 		resolver:       resolver,
+		name:           AuthenticatorName,
+		authMethod:     AuthenticationMethod,
 	}
 
 	initVerifier(ctx, authenticator, verifierConfig)
@@ -553,27 +564,27 @@ func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*a
 
 	verifier, ok := a.idTokenVerifier()
 	if !ok {
-		return nil, false, fmt.Errorf("oidc: authenticator not initialized")
+		return nil, false, a.errorf("authenticator not initialized")
 	}
 
 	idToken, err := verifier.Verify(ctx, token)
 	if err != nil {
-		return nil, false, fmt.Errorf("oidc: verify token: %v", err)
+		return nil, false, a.errorf("verify token: %v", err)
 	}
 
 	var c claims
 	if err := idToken.Claims(&c); err != nil {
-		return nil, false, fmt.Errorf("oidc: parse claims: %v", err)
+		return nil, false, a.errorf("parse claims: %v", err)
 	}
 	if a.resolver != nil {
 		if err := a.resolver.expand(c); err != nil {
-			return nil, false, fmt.Errorf("oidc: could not expand distributed claims: %v", err)
+			return nil, false, a.errorf("could not expand distributed claims: %v", err)
 		}
 	}
 
 	var username string
 	if err := c.unmarshalClaim(a.usernameClaim, &username); err != nil {
-		return nil, false, fmt.Errorf("oidc: parse username claims %q: %v", a.usernameClaim, err)
+		return nil, false, a.errorf("parse username claims %q: %v", a.usernameClaim, err)
 	}
 
 	if a.usernameClaim == "email" {
@@ -582,12 +593,12 @@ func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*a
 		if hasEmailVerified := c.hasClaim("email_verified"); hasEmailVerified {
 			var emailVerified bool
 			if err := c.unmarshalClaim("email_verified", &emailVerified); err != nil {
-				return nil, false, fmt.Errorf("oidc: parse 'email_verified' claim: %v", err)
+				return nil, false, a.errorf("parse 'email_verified' claim: %v", err)
 			}
 
 			// If the email_verified claim is present we have to verify it is set to `true`.
 			if !emailVerified {
-				return nil, false, fmt.Errorf("oidc: email not verified")
+				return nil, false, a.errorf("email not verified")
 			}
 		}
 	}
@@ -605,7 +616,7 @@ func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*a
 			// See: https://github.com/kubernetes/kubernetes/issues/33290
 			var groups stringOrArray
 			if err := c.unmarshalClaim(a.groupsClaim, &groups); err != nil {
-				return nil, false, fmt.Errorf("oidc: parse groups claim %q: %v", a.groupsClaim, err)
+				return nil, false, a.errorf("parse groups claim %q: %v", a.groupsClaim, err)
 			}
 			info.Groups = []string(groups)
 		}
@@ -620,20 +631,24 @@ func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*a
 	// check to ensure all required claims are present in the ID token and have matching values.
 	for claim, value := range a.requiredClaims {
 		if !c.hasClaim(claim) {
-			return nil, false, fmt.Errorf("oidc: required claim %s not present in ID token", claim)
+			return nil, false, a.errorf("required claim %s not present in ID token", claim)
 		}
 
 		// NOTE: Only string values are supported as valid required claim values.
 		var claimValue string
 		if err := c.unmarshalClaim(claim, &claimValue); err != nil {
-			return nil, false, fmt.Errorf("oidc: parse claim %s: %v", claim, err)
+			return nil, false, a.errorf("parse claim %s: %v", claim, err)
 		}
 		if claimValue != value {
-			return nil, false, fmt.Errorf("oidc: required claim %s value does not match. Got = %s, want = %s", claim, claimValue, value)
+			return nil, false, a.errorf("required claim %s value does not match. Got = %s, want = %s", claim, claimValue, value)
 		}
 	}
 
-	return &authenticator.Response{User: info}, true, nil
+	return &authenticator.Response{User: info, AuthMethod: a.authMethod, AuthenticatorName: a.name}, true, nil
+}
+
+func (a *Authenticator) errorf(fmt string, args ...interface{}) error {
+	return authenticator.Errorf(a.authMethod, a.name, fmt, args)
 }
 
 // getClaimJWT gets a distributed claim JWT from url, using the supplied access

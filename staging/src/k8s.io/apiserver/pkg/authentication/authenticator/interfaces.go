@@ -18,6 +18,7 @@ package authenticator
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -77,4 +78,50 @@ type Response struct {
 	Audiences Audiences
 	// User is the UserInfo associated with the authentication context.
 	User user.Info
+	// AuthMethod identifies the method used to authenticate the request (ex. token or x509).
+	// This field is intended for grouping (via a label) authentication metrics, thus allowing
+	// aggregation of metrics based on the authentication method.
+	// It is intended to be visible to to metrics consumers only, and should remain stable
+	// over time. Therefore, it does not need to be human readable.
+	// Its value should not affect the result of authentication in any way.
+	// This field should neither be logged nor passed to the authorization layer.
+	AuthMethod string
+	// AuthenticatorName identifies the authenticator that authenticated the request.
+	// This field is intended for grouping (via a label) authentication metrics, thus allowing
+	// aggregation of metrics based on the authenticator.
+	// It is intended to be visible to to metrics consumers only, and should remain stable
+	// over time. Therefore, it does not need to be human readable.
+	// Its value should not affect the result of authentication in any way.
+	// This field should neither be logged nor passed to the authorization layer.
+	AuthenticatorName string
+}
+
+// Error is the error returned by an authenticator upon failures.
+type Error struct {
+	// Err is the error produced by an authenticator.
+	Err error
+	// AuthMethod identifies the method used to authenticate the request (ex. token or x509).
+	AuthMethod string
+	// AuthenticatorName identifies the authenticator that failed an authentication request.
+	AuthenticatorName string
+}
+
+// Error implements the errors.Error interface.
+func (a Error) Error() string {
+	return fmt.Sprintf("authentcation method: %q by authenticator: %q failed to process authentication request: %v", a.AuthMethod, a.AuthenticatorName, a.Err)
+}
+
+// Unwrap unpacks the wrapped error.
+func (a Error) Unwrap() error {
+	return a.Err
+}
+
+// NewError constructs Error.
+func NewError(authMethod, authenticatorName string, err error) error {
+	return &Error{AuthenticatorName: authenticatorName, AuthMethod: authMethod, Err: err}
+}
+
+// Errorf constructs Error.
+func Errorf(authMethod, authenticatorName, format string, a ...interface{}) error {
+	return &Error{AuthenticatorName: authenticatorName, AuthMethod: authMethod, Err: fmt.Errorf(format, a...)}
 }
