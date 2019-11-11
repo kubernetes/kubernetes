@@ -16,8 +16,6 @@ pkg/controller/podgc
 pkg/controller/replicaset
 pkg/controller/resourcequota
 pkg/controller/statefulset
-pkg/credentialprovider
-pkg/credentialprovider/aws
 pkg/kubeapiserver/admission
 pkg/kubectl/cmd/get
 pkg/kubelet/apis/podresources

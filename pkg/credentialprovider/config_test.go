@@ -29,7 +29,6 @@ import (
 func TestReadDockerConfigFile(t *testing.T) {
 	configJsonFileName := "config.json"
 	var fileInfo *os.File
-	preferredPaths := []string{}
 
 	//test dockerconfig json
 	inputDockerconfigJsonFile := "{ \"auths\": { \"http://foo.example.com\":{\"auth\":\"Zm9vOmJhcgo=\",\"email\":\"foo@example.com\"}}}"
@@ -40,7 +39,6 @@ func TestReadDockerConfigFile(t *testing.T) {
 		return
 	}
 	defer os.RemoveAll(preferredPath)
-	preferredPaths = append(preferredPaths, preferredPath)
 	absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(preferredPath, configJsonFileName))
 	if err != nil {
 		t.Fatalf("While trying to canonicalize %s: %v", preferredPath, err)
