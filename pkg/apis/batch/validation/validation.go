@@ -29,11 +29,11 @@ import (
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
-// TODO: generalize for other controller objects that will follow the same pattern, such as ReplicaSet and DaemonSet, and
-// move to new location.  Replace batch.Job with an interface.
-//
 // ValidateGeneratedSelector validates that the generated selector on a controller object match the controller object
 // metadata, and the labels on the pod template are as generated.
+//
+// TODO: generalize for other controller objects that will follow the same pattern, such as ReplicaSet and DaemonSet, and
+// move to new location.  Replace batch.Job with an interface.
 func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if obj.Spec.ManualSelector != nil && *obj.Spec.ManualSelector {
@@ -75,6 +75,7 @@ func ValidateGeneratedSelector(obj *batch.Job) field.ErrorList {
 	return allErrs
 }
 
+// ValidateJob validates a Job and returns an ErrorList with any errors.
 func ValidateJob(job *batch.Job) field.ErrorList {
 	// Jobs and rcs have the same name validation
 	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
@@ -83,6 +84,7 @@ func ValidateJob(job *batch.Job) field.ErrorList {
 	return allErrs
 }
 
+// ValidateJobSpec validates a JobSpec and returns an ErrorList with any errors.
 func ValidateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := validateJobSpec(spec, fldPath)
 
@@ -130,6 +132,7 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// ValidateJobStatus validates a JobStatus and returns an ErrorList with any errors.
 func ValidateJobStatus(status *batch.JobStatus, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.Active), fldPath.Child("active"))...)
@@ -138,18 +141,21 @@ func ValidateJobStatus(status *batch.JobStatus, fldPath *field.Path) field.Error
 	return allErrs
 }
 
+// ValidateJobUpdate validates an update to a Job and returns an ErrorList with any errors.
 func ValidateJobUpdate(job, oldJob *batch.Job) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateJobSpecUpdate(job.Spec, oldJob.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
+// ValidateJobUpdateStatus validates an update to the status of a Job and returns an ErrorList with any errors.
 func ValidateJobUpdateStatus(job, oldJob *batch.Job) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateJobStatusUpdate(job.Status, oldJob.Status)...)
 	return allErrs
 }
 
+// ValidateJobSpecUpdate validates an update to a JobSpec and returns an ErrorList with any errors.
 func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateJobSpec(&spec, fldPath)...)
@@ -159,12 +165,14 @@ func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path) fie
 	return allErrs
 }
 
+// ValidateJobStatusUpdate validates an update to a JobStatus and returns an ErrorList with any errors.
 func ValidateJobStatusUpdate(status, oldStatus batch.JobStatus) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateJobStatus(&status, field.NewPath("status"))...)
 	return allErrs
 }
 
+// ValidateCronJob validates a CronJob and returns an ErrorList with any errors.
 func ValidateCronJob(scheduledJob *batch.CronJob) field.ErrorList {
 	// CronJobs and rcs have the same name validation
 	allErrs := apivalidation.ValidateObjectMeta(&scheduledJob.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
@@ -179,6 +187,7 @@ func ValidateCronJob(scheduledJob *batch.CronJob) field.ErrorList {
 	return allErrs
 }
 
+// ValidateCronJobUpdate validates an update to a CronJob and returns an ErrorList with any errors.
 func ValidateCronJobUpdate(job, oldJob *batch.CronJob) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateCronJobSpec(&job.Spec, field.NewPath("spec"))...)
@@ -187,6 +196,7 @@ func ValidateCronJobUpdate(job, oldJob *batch.CronJob) field.ErrorList {
 	return allErrs
 }
 
+// ValidateCronJobSpec validates a CronJobSpec and returns an ErrorList with any errors.
 func ValidateCronJobSpec(spec *batch.CronJobSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -237,6 +247,7 @@ func validateScheduleFormat(schedule string, fldPath *field.Path) field.ErrorLis
 	return allErrs
 }
 
+// ValidateJobTemplate validates a JobTemplate and returns an ErrorList with any errors.
 func ValidateJobTemplate(job *batch.JobTemplate) field.ErrorList {
 	// this method should be identical to ValidateJob
 	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
@@ -244,6 +255,7 @@ func ValidateJobTemplate(job *batch.JobTemplate) field.ErrorList {
 	return allErrs
 }
 
+// ValidateJobTemplateSpec validates a JobTemplateSpec and returns an ErrorList with any errors.
 func ValidateJobTemplateSpec(spec *batch.JobTemplateSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := validateJobSpec(&spec.Spec, fldPath.Child("spec"))
 
