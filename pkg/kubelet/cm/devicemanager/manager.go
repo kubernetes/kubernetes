@@ -277,7 +277,7 @@ func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
 }
 
 // ValidatePlugin validates a plugin if the version is correct and the name has the format of an extended resource
-func (m *ManagerImpl) ValidatePlugin(pluginName string, endpoint string, versions []string, foundInDeprecatedDir bool) error {
+func (m *ManagerImpl) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
 	klog.V(2).Infof("Got Plugin %s at endpoint %s with versions %v", pluginName, endpoint, versions)
 
 	if !m.isVersionCompatibleWithPlugin(versions) {

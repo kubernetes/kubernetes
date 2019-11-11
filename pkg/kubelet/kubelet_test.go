@@ -331,7 +331,6 @@ func newTestKubeletWithImageList(
 
 	kubelet.pluginManager = pluginmanager.NewPluginManager(
 		kubelet.getPluginsRegistrationDir(), /* sockDir */
-		kubelet.getPluginsDir(),             /* deprecatedSockDir */
 		kubelet.recorder,
 	)
 	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()

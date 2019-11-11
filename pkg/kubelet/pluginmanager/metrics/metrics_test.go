@@ -27,11 +27,10 @@ func TestMetricCollection(t *testing.T) {
 	dsw := cache.NewDesiredStateOfWorld()
 	asw := cache.NewActualStateOfWorld()
 	fakePlugin := cache.PluginInfo{
-		SocketPath:           fmt.Sprintf("fake/path/plugin.sock"),
-		FoundInDeprecatedDir: false,
+		SocketPath: fmt.Sprintf("fake/path/plugin.sock"),
 	}
 	// Add one plugin to DesiredStateOfWorld
-	err := dsw.AddOrUpdatePlugin(fakePlugin.SocketPath, fakePlugin.FoundInDeprecatedDir)
+	err := dsw.AddOrUpdatePlugin(fakePlugin.SocketPath)
 	if err != nil {
 		t.Fatalf("AddOrUpdatePlugin failed. Expected: <no error> Actual: <%v>", err)
 	}
