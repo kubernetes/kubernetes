@@ -131,7 +131,6 @@ filegroup(
         "//pkg/scheduler/apis/config:all-srcs",
         "//pkg/scheduler/apis/extender/v1:all-srcs",
         "//pkg/scheduler/core:all-srcs",
-        "//pkg/scheduler/factory:all-srcs",
         "//pkg/scheduler/framework:all-srcs",
         "//pkg/scheduler/internal/cache:all-srcs",
         "//pkg/scheduler/internal/heap:all-srcs",
