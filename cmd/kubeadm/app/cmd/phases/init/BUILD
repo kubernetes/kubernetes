@@ -30,6 +30,7 @@ go_library(
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/phases/addons/dns:go_default_library",
+        "//cmd/kubeadm/app/phases/addons/installer:go_default_library",
         "//cmd/kubeadm/app/phases/addons/proxy:go_default_library",
         "//cmd/kubeadm/app/phases/bootstraptoken/clusterinfo:go_default_library",
         "//cmd/kubeadm/app/phases/bootstraptoken/node:go_default_library",
@@ -55,7 +56,6 @@ go_library(
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
-        "//vendor/sigs.k8s.io/addon-operators/installer/install:go_default_library",
     ],
 )
 

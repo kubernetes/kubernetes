@@ -26,5 +26,17 @@ type AddonInstallerConfiguration struct {
 	// DryRun indicates whether or not to actually install the listed addons
 	DryRun bool
 	// Addons is a list of addons to install
-	Addons []string
+	Addons []Addon
+}
+
+// Addon names and references an addon to be installed.
+// Only one of `KustomizeRef` or `ManifestRef` should be provided.
+type Addon struct {
+	// Name provides the name of the addon.
+	// It is used for detecting upgrades and uninstalls as the AddonInstallerConfiguration changes.
+	Name string
+	// KustomizeRef may be a folder-path or git URL /w optional subpath
+	KustomizeRef string
+	// ManifestRef may be a file-path or HTTP/S served YAML file
+	ManifestRef string
 }

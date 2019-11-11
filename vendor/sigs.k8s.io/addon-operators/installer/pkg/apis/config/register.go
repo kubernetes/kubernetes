@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-const GroupName = "addons.config.k8s.io"
+const GroupName = "addons.config.x-k8s.io"
 
 var (
 	SchemeBuilder = runtime.NewSchemeBuilder(

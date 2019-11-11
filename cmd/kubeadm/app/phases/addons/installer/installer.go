@@ -80,5 +80,7 @@ func ApplyAddonConfiguration(cfg *kubeadmapi.InitConfiguration, dryRun bool, kub
 		return err
 	}
 
+	// TODO: Upload AddonInstallerConfig to Cluster
+
 	return nil
 }

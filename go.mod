@@ -164,7 +164,7 @@ require (
 	k8s.io/sample-apiserver v0.0.0
 	k8s.io/system-validators v1.0.4
 	k8s.io/utils v0.0.0-20191030222137-2b95a09bc58d
-	sigs.k8s.io/addon-operators/installer v0.0.0-20190720181930-201f9679dfe0
+	sigs.k8s.io/addon-operators/installer v0.0.0-20191113004717-dda92d69a31f
 	sigs.k8s.io/kustomize v2.0.3+incompatible
 	sigs.k8s.io/yaml v1.1.0
 )
@@ -560,7 +560,7 @@ replace (
 	mvdan.cc/interfacer => mvdan.cc/interfacer v0.0.0-20180901003855-c20040233aed
 	mvdan.cc/lint => mvdan.cc/lint v0.0.0-20170908181259-adc824a0674b
 	mvdan.cc/unparam => mvdan.cc/unparam v0.0.0-20190209190245-fbb59629db34
-	sigs.k8s.io/addon-operators/installer => github.com/stealthybox/addon-operators/installer v0.0.0-20191108222945-639654db632d
+	sigs.k8s.io/addon-operators/installer => github.com/stealthybox/addon-operators/installer v0.0.0-20191113004717-dda92d69a31f
 	sigs.k8s.io/kustomize => sigs.k8s.io/kustomize v2.0.3+incompatible
 	sigs.k8s.io/structured-merge-diff => sigs.k8s.io/structured-merge-diff v1.0.1-0.20191108220359-b1b620dd3f06
 	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.1.0

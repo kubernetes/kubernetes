@@ -37,6 +37,7 @@ filegroup(
         "//cmd/kubeadm/app/features:all-srcs",
         "//cmd/kubeadm/app/images:all-srcs",
         "//cmd/kubeadm/app/phases/addons/dns:all-srcs",
+        "//cmd/kubeadm/app/phases/addons/installer:all-srcs",
         "//cmd/kubeadm/app/phases/addons/proxy:all-srcs",
         "//cmd/kubeadm/app/phases/bootstraptoken/clusterinfo:all-srcs",
         "//cmd/kubeadm/app/phases/bootstraptoken/node:all-srcs",
