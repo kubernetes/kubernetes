@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -359,8 +360,8 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected error: %v \n", err)
 			}
-			if !reflect.DeepEqual(test.expectedList, list) {
-				t.Errorf("expected %#v, got %#v", test.expectedList, list)
+			if diff := cmp.Diff(test.expectedList, list); diff != "" {
+				t.Errorf("wrong priorities produced (-want, +got): %s", diff)
 			}
 		})
 	}
