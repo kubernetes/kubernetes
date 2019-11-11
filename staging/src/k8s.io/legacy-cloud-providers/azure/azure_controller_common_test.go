@@ -32,6 +32,7 @@ func TestAttachDisk(t *testing.T) {
 		resourceGroup:         c.ResourceGroup,
 		subscriptionID:        c.SubscriptionID,
 		cloud:                 c,
+		vmLockMap:             newLockMap(),
 	}
 
 	diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/disk-name", c.SubscriptionID, c.ResourceGroup)
@@ -53,6 +54,7 @@ func TestDetachDisk(t *testing.T) {
 		resourceGroup:         c.ResourceGroup,
 		subscriptionID:        c.SubscriptionID,
 		cloud:                 c,
+		vmLockMap:             newLockMap(),
 	}
 
 	diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/disk-name", c.SubscriptionID, c.ResourceGroup)

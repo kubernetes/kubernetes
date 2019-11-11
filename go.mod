@@ -14,8 +14,8 @@ require (
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
 	github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
 	github.com/Microsoft/go-winio v0.4.11
-	github.com/PuerkitoBio/purell v1.1.0
 	github.com/Microsoft/hcsshim v0.0.0-20190417211021-672e52e9209d
+	github.com/PuerkitoBio/purell v1.1.0
 	github.com/Rican7/retry v0.1.0 // indirect
 	github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
 	github.com/auth0/go-jwt-middleware v0.0.0-20170425171159-5493cabe49f7 // indirect
