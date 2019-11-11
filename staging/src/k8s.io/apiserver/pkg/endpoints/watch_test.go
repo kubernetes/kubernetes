@@ -34,7 +34,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -659,38 +658,20 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 		watchServer.ServeHTTP(w, req)
 	}))
 	defer s.Close()
+	defer s.CloseClientConnections()
 
 	client := dynamic.NewForConfigOrDie(&restclient.Config{
 		Host:    s.URL,
 		APIPath: "/" + prefix,
 	}).Resource(newGroupVersion.WithResource("simple"))
 
-	w, err := client.Watch(metav1.ListOptions{})
-	if err != nil {
+	_, err := client.Watch(metav1.ListOptions{})
+	if err == nil {
 		t.Fatal(err)
 	}
-
-	errStatus := errors.NewInternalError(fmt.Errorf("we got an error")).Status()
-	watcher.Error(&errStatus)
-	watcher.Stop()
-
-	got := <-w.ResultChan()
-	if got.Type != watch.Error {
-		t.Fatalf("unexpected watch type: %#v", got)
+	if err.Error() != "no stream serializers registered for testcase/json" {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	obj, ok := got.Object.(*unstructured.Unstructured)
-	if !ok {
-		t.Fatalf("not the correct object type: %#v", got)
-	}
-
-	status := &metav1.Status{}
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), status); err != nil {
-		t.Fatal(err)
-	}
-	if status.Kind != "Status" || status.APIVersion != "v1" || status.Code != 500 || status.Status != "Failure" || !strings.Contains(status.Message, "we got an error") {
-		t.Fatalf("error: %#v", status)
-	}
-	t.Logf("status: %#v", status)
 }
 
 func TestWatchHTTPTimeout(t *testing.T) {
