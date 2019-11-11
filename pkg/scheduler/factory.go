@@ -42,7 +42,6 @@ import (
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
 	storagelistersv1beta1 "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/events"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
@@ -68,46 +67,6 @@ const (
 // Binder knows how to write a binding.
 type Binder interface {
 	Bind(binding *v1.Binding) error
-}
-
-// Config is an implementation of the Scheduler's configured input data.
-// TODO over time we should make this struct a hidden implementation detail of the scheduler.
-type Config struct {
-	SchedulerCache internalcache.Cache
-
-	Algorithm core.ScheduleAlgorithm
-	GetBinder func(pod *v1.Pod) Binder
-	// Framework runs scheduler plugins at configured extension points.
-	Framework framework.Framework
-
-	// NextPod should be a function that blocks until the next pod
-	// is available. We don't use a channel for this, because scheduling
-	// a pod may take some amount of time and we don't want pods to get
-	// stale while they sit in a channel.
-	NextPod func() *framework.PodInfo
-
-	// Error is called if there is an error. It is passed the pod in
-	// question, and the error
-	Error func(*framework.PodInfo, error)
-
-	// Recorder is the EventRecorder to use
-	Recorder events.EventRecorder
-
-	// Close this to shut down the scheduler.
-	StopEverything <-chan struct{}
-
-	// VolumeBinder handles PVC/PV binding for the pod.
-	VolumeBinder *volumebinder.VolumeBinder
-
-	// Disable pod preemption or not.
-	DisablePreemption bool
-
-	// SchedulingQueue holds pods to be scheduled
-	SchedulingQueue internalqueue.SchedulingQueue
-
-	// The final configuration of the framework.
-	Plugins      schedulerapi.Plugins
-	PluginConfig []schedulerapi.PluginConfig
 }
 
 // Configurator defines I/O, caching, and other functionality needed to

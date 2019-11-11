@@ -405,24 +405,6 @@ func initPolicyFromConfigMap(client clientset.Interface, policyRef *schedulerapi
 	return nil
 }
 
-// NewFromConfig returns a new scheduler using the provided Config.
-func NewFromConfig(config *Config) *Scheduler {
-	metrics.Register()
-	return &Scheduler{
-		SchedulerCache:    config.SchedulerCache,
-		Algorithm:         config.Algorithm,
-		GetBinder:         config.GetBinder,
-		Framework:         config.Framework,
-		NextPod:           config.NextPod,
-		Error:             config.Error,
-		Recorder:          config.Recorder,
-		StopEverything:    config.StopEverything,
-		VolumeBinder:      config.VolumeBinder,
-		DisablePreemption: config.DisablePreemption,
-		SchedulingQueue:   config.SchedulingQueue,
-	}
-}
-
 // Run begins watching and scheduling. It waits for cache to be synced, then starts scheduling and blocked until the context is done.
 func (sched *Scheduler) Run(ctx context.Context) {
 	if !cache.WaitForCacheSync(ctx.Done(), sched.scheduledPodsHasSynced) {
