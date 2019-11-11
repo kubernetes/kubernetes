@@ -86,23 +86,24 @@ func NewAddonPhase() workflow.Phase {
 	}
 }
 
-func getInitData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, bool, error) {
+func getInitData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, bool, string, error) {
 	data, ok := c.(InitData)
 	if !ok {
-		return nil, nil, true, errors.New("addon phase invoked with an invalid data struct")
+		return nil, nil, true, "", errors.New("addon phase invoked with an invalid data struct")
 	}
 	cfg := data.Cfg()
 	dryRun := data.DryRun()
+	kubeConfigPath := data.KubeConfigPath()
 	client, err := data.Client()
 	if err != nil {
-		return nil, nil, dryRun, err
+		return nil, nil, dryRun, kubeConfigPath, err
 	}
-	return cfg, client, dryRun, err
+	return cfg, client, dryRun, kubeConfigPath, err
 }
 
 // runCoreDNSAddon installs CoreDNS addon to a Kubernetes cluster
 func runCoreDNSAddon(c workflow.RunData) error {
-	cfg, client, _, err := getInitData(c)
+	cfg, client, _, _, err := getInitData(c)
 	if err != nil {
 		return err
 	}
@@ -114,7 +115,7 @@ func runCoreDNSAddon(c workflow.RunData) error {
 
 // runKubeProxyAddon installs KubeProxy addon to a Kubernetes cluster
 func runKubeProxyAddon(c workflow.RunData) error {
-	cfg, client, _, err := getInitData(c)
+	cfg, client, _, _, err := getInitData(c)
 	if err != nil {
 		return err
 	}
@@ -126,12 +127,12 @@ func runKubeProxyAddon(c workflow.RunData) error {
 
 // runAddonInstaller executes the addon-installer
 func runAddonInstaller(c workflow.RunData) error {
-	cfg, _, dryRun, err := getInitData(c)
+	cfg, _, dryRun, kubeConfigPath, err := getInitData(c)
 	if err != nil {
 		return err
 	}
 	if features.Enabled(cfg.ClusterConfiguration.FeatureGates, features.AddonInstaller) {
-		return installeraddon.ApplyAddonConfiguration(cfg, dryRun)
+		return installeraddon.ApplyAddonConfiguration(cfg, dryRun, kubeConfigPath)
 	}
 	return nil
 }

@@ -29,7 +29,7 @@ import (
 	addoninstall "sigs.k8s.io/addon-operators/installer/install"
 )
 
-func ApplyAddonConfiguration(cfg *kubeadmapi.InitConfiguration, dryRun bool) (err error) {
+func ApplyAddonConfiguration(cfg *kubeadmapi.InitConfiguration, dryRun bool, kubeConfigPath string) (err error) {
 	installCfg := cfg.ClusterConfiguration.ComponentConfigs.AddonInstaller
 	if installCfg == nil {
 		return errors.New("addoninstaller phase invoked with nil AddonInstaller ComponentConfig")
@@ -48,10 +48,16 @@ func ApplyAddonConfiguration(cfg *kubeadmapi.InitConfiguration, dryRun bool) (er
 	// TODO: diff addons and prune ones that are no longer declared
 
 	r := addoninstall.Runtime{
-		Config: installCfg,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
+		Config:         installCfg,
+		Stdout:         os.Stdout,
+		Stderr:         os.Stderr,
+		KubeConfigPath: kubeConfigPath,
 	}
+	fmt.Println("kubeConfigPath", kubeConfigPath)
+	if _, err := os.Stat(kubeConfigPath); err != nil {
+		r.ServerDryRun = true
+	}
+
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
