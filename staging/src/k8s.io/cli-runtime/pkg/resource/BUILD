@@ -44,7 +44,7 @@ go_library(
         "//staging/src/k8s.io/client-go/restmapper:go_default_library",
         "//vendor/golang.org/x/text/encoding/unicode:go_default_library",
         "//vendor/golang.org/x/text/transform:go_default_library",
-        "//vendor/sigs.k8s.io/kustomize/pkg/fs:go_default_library",
+        "//vendor/sigs.k8s.io/kustomize/api/filesys:go_default_library",
     ],
 )
 

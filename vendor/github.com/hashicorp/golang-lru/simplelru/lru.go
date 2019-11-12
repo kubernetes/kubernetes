@@ -73,6 +73,9 @@ func (c *LRU) Add(key, value interface{}) (evicted bool) {
 func (c *LRU) Get(key interface{}) (value interface{}, ok bool) {
 	if ent, ok := c.items[key]; ok {
 		c.evictList.MoveToFront(ent)
+		if ent.Value.(*entry) == nil {
+			return nil, false
+		}
 		return ent.Value.(*entry).value, true
 	}
 	return
@@ -140,6 +143,19 @@ func (c *LRU) Keys() []interface{} {
 // Len returns the number of items in the cache.
 func (c *LRU) Len() int {
 	return c.evictList.Len()
+}
+
+// Resize changes the cache size.
+func (c *LRU) Resize(size int) (evicted int) {
+	diff := c.Len() - size
+	if diff < 0 {
+		diff = 0
+	}
+	for i := 0; i < diff; i++ {
+		c.removeOldest()
+	}
+	c.size = size
+	return diff
 }
 
 // removeOldest removes the oldest item from the cache.

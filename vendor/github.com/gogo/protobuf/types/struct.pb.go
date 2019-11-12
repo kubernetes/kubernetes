@@ -26,7 +26,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 // `NullValue` is a singleton enumeration to represent the null value for the
 // `Value` type union.
@@ -173,25 +173,26 @@ type isValue_Kind interface {
 	Equal(interface{}) bool
 	MarshalTo([]byte) (int, error)
 	Size() int
+	Compare(interface{}) int
 }
 
 type Value_NullValue struct {
-	NullValue NullValue `protobuf:"varint,1,opt,name=null_value,json=nullValue,proto3,enum=google.protobuf.NullValue,oneof"`
+	NullValue NullValue `protobuf:"varint,1,opt,name=null_value,json=nullValue,proto3,enum=google.protobuf.NullValue,oneof" json:"null_value,omitempty"`
 }
 type Value_NumberValue struct {
-	NumberValue float64 `protobuf:"fixed64,2,opt,name=number_value,json=numberValue,proto3,oneof"`
+	NumberValue float64 `protobuf:"fixed64,2,opt,name=number_value,json=numberValue,proto3,oneof" json:"number_value,omitempty"`
 }
 type Value_StringValue struct {
-	StringValue string `protobuf:"bytes,3,opt,name=string_value,json=stringValue,proto3,oneof"`
+	StringValue string `protobuf:"bytes,3,opt,name=string_value,json=stringValue,proto3,oneof" json:"string_value,omitempty"`
 }
 type Value_BoolValue struct {
-	BoolValue bool `protobuf:"varint,4,opt,name=bool_value,json=boolValue,proto3,oneof"`
+	BoolValue bool `protobuf:"varint,4,opt,name=bool_value,json=boolValue,proto3,oneof" json:"bool_value,omitempty"`
 }
 type Value_StructValue struct {
-	StructValue *Struct `protobuf:"bytes,5,opt,name=struct_value,json=structValue,proto3,oneof"`
+	StructValue *Struct `protobuf:"bytes,5,opt,name=struct_value,json=structValue,proto3,oneof" json:"struct_value,omitempty"`
 }
 type Value_ListValue struct {
-	ListValue *ListValue `protobuf:"bytes,6,opt,name=list_value,json=listValue,proto3,oneof"`
+	ListValue *ListValue `protobuf:"bytes,6,opt,name=list_value,json=listValue,proto3,oneof" json:"list_value,omitempty"`
 }
 
 func (*Value_NullValue) isValue_Kind()   {}
@@ -250,9 +251,9 @@ func (m *Value) GetListValue() *ListValue {
 	return nil
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*Value) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _Value_OneofMarshaler, _Value_OneofUnmarshaler, _Value_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*Value) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*Value_NullValue)(nil),
 		(*Value_NumberValue)(nil),
 		(*Value_StringValue)(nil),
@@ -260,129 +261,6 @@ func (*Value) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, 
 		(*Value_StructValue)(nil),
 		(*Value_ListValue)(nil),
 	}
-}
-
-func _Value_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*Value)
-	// kind
-	switch x := m.Kind.(type) {
-	case *Value_NullValue:
-		_ = b.EncodeVarint(1<<3 | proto.WireVarint)
-		_ = b.EncodeVarint(uint64(x.NullValue))
-	case *Value_NumberValue:
-		_ = b.EncodeVarint(2<<3 | proto.WireFixed64)
-		_ = b.EncodeFixed64(math.Float64bits(x.NumberValue))
-	case *Value_StringValue:
-		_ = b.EncodeVarint(3<<3 | proto.WireBytes)
-		_ = b.EncodeStringBytes(x.StringValue)
-	case *Value_BoolValue:
-		t := uint64(0)
-		if x.BoolValue {
-			t = 1
-		}
-		_ = b.EncodeVarint(4<<3 | proto.WireVarint)
-		_ = b.EncodeVarint(t)
-	case *Value_StructValue:
-		_ = b.EncodeVarint(5<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.StructValue); err != nil {
-			return err
-		}
-	case *Value_ListValue:
-		_ = b.EncodeVarint(6<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.ListValue); err != nil {
-			return err
-		}
-	case nil:
-	default:
-		return fmt.Errorf("Value.Kind has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _Value_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*Value)
-	switch tag {
-	case 1: // kind.null_value
-		if wire != proto.WireVarint {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeVarint()
-		m.Kind = &Value_NullValue{NullValue(x)}
-		return true, err
-	case 2: // kind.number_value
-		if wire != proto.WireFixed64 {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeFixed64()
-		m.Kind = &Value_NumberValue{math.Float64frombits(x)}
-		return true, err
-	case 3: // kind.string_value
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeStringBytes()
-		m.Kind = &Value_StringValue{x}
-		return true, err
-	case 4: // kind.bool_value
-		if wire != proto.WireVarint {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeVarint()
-		m.Kind = &Value_BoolValue{x != 0}
-		return true, err
-	case 5: // kind.struct_value
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(Struct)
-		err := b.DecodeMessage(msg)
-		m.Kind = &Value_StructValue{msg}
-		return true, err
-	case 6: // kind.list_value
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(ListValue)
-		err := b.DecodeMessage(msg)
-		m.Kind = &Value_ListValue{msg}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _Value_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*Value)
-	// kind
-	switch x := m.Kind.(type) {
-	case *Value_NullValue:
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(x.NullValue))
-	case *Value_NumberValue:
-		n += 1 // tag and wire
-		n += 8
-	case *Value_StringValue:
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(len(x.StringValue)))
-		n += len(x.StringValue)
-	case *Value_BoolValue:
-		n += 1 // tag and wire
-		n += 1
-	case *Value_StructValue:
-		s := proto.Size(x.StructValue)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *Value_ListValue:
-		s := proto.Size(x.ListValue)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 func (*Value) XXX_MessageName() string {
@@ -454,37 +332,392 @@ func init() {
 func init() { proto.RegisterFile("google/protobuf/struct.proto", fileDescriptor_df322afd6c9fb402) }
 
 var fileDescriptor_df322afd6c9fb402 = []byte{
-	// 439 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x74, 0x91, 0xc1, 0x6b, 0xd4, 0x40,
-	0x14, 0xc6, 0xf3, 0xb2, 0xdd, 0xe0, 0xbe, 0x48, 0x2d, 0x23, 0xe8, 0x52, 0x65, 0x5c, 0xb6, 0x97,
-	0x45, 0x24, 0x85, 0xf5, 0x22, 0xae, 0x17, 0x17, 0x6a, 0x0b, 0x86, 0x12, 0xa3, 0xad, 0xe0, 0x65,
-	0x31, 0x69, 0xba, 0x84, 0x4e, 0x67, 0x4a, 0x32, 0xa3, 0xec, 0x4d, 0xff, 0x0b, 0xcf, 0x9e, 0xc4,
-	0xa3, 0x7f, 0x85, 0x47, 0x8f, 0x1e, 0xdd, 0x78, 0xf1, 0xd8, 0x63, 0x8f, 0x32, 0x33, 0x49, 0x94,
-	0x2e, 0xbd, 0xe5, 0x7d, 0xf3, 0x7b, 0xdf, 0x7b, 0xdf, 0x0b, 0xde, 0x9d, 0x0b, 0x31, 0x67, 0xd9,
-	0xf6, 0x59, 0x21, 0xa4, 0x48, 0xd4, 0xf1, 0x76, 0x29, 0x0b, 0x95, 0xca, 0xc0, 0xd4, 0xe4, 0x86,
-	0x7d, 0x0d, 0x9a, 0xd7, 0xe1, 0x27, 0x40, 0xef, 0xa5, 0x21, 0xc8, 0x04, 0xbd, 0xe3, 0x3c, 0x63,
-	0x47, 0x65, 0x1f, 0x06, 0x9d, 0x91, 0x3f, 0xde, 0x0a, 0x2e, 0xc1, 0x81, 0x05, 0x83, 0x67, 0x86,
-	0xda, 0xe1, 0xb2, 0x58, 0xc4, 0x75, 0xcb, 0xe6, 0x0b, 0xf4, 0xff, 0x93, 0xc9, 0x06, 0x76, 0x4e,
-	0xb2, 0x45, 0x1f, 0x06, 0x30, 0xea, 0xc5, 0xfa, 0x93, 0x3c, 0xc0, 0xee, 0xbb, 0xb7, 0x4c, 0x65,
-	0x7d, 0x77, 0x00, 0x23, 0x7f, 0x7c, 0x6b, 0xc5, 0xfc, 0x50, 0xbf, 0xc6, 0x16, 0x7a, 0xec, 0x3e,
-	0x82, 0xe1, 0x37, 0x17, 0xbb, 0x46, 0x24, 0x13, 0x44, 0xae, 0x18, 0x9b, 0x59, 0x03, 0x6d, 0xba,
-	0x3e, 0xde, 0x5c, 0x31, 0xd8, 0x57, 0x8c, 0x19, 0x7e, 0xcf, 0x89, 0x7b, 0xbc, 0x29, 0xc8, 0x16,
-	0x5e, 0xe7, 0xea, 0x34, 0xc9, 0x8a, 0xd9, 0xbf, 0xf9, 0xb0, 0xe7, 0xc4, 0xbe, 0x55, 0x5b, 0xa8,
-	0x94, 0x45, 0xce, 0xe7, 0x35, 0xd4, 0xd1, 0x8b, 0x6b, 0xc8, 0xaa, 0x16, 0xba, 0x87, 0x98, 0x08,
-	0xd1, 0xac, 0xb1, 0x36, 0x80, 0xd1, 0x35, 0x3d, 0x4a, 0x6b, 0x16, 0x78, 0x62, 0x5c, 0x54, 0x2a,
-	0x6b, 0xa4, 0x6b, 0xa2, 0xde, 0xbe, 0xe2, 0x8e, 0xb5, 0xbd, 0x4a, 0x65, 0x9b, 0x92, 0xe5, 0x65,
-	0xd3, 0xeb, 0x99, 0xde, 0xd5, 0x94, 0x61, 0x5e, 0xca, 0x36, 0x25, 0x6b, 0x8a, 0xa9, 0x87, 0x6b,
-	0x27, 0x39, 0x3f, 0x1a, 0x4e, 0xb0, 0xd7, 0x12, 0x24, 0x40, 0xcf, 0x98, 0x35, 0x7f, 0xf4, 0xaa,
-	0xa3, 0xd7, 0xd4, 0xfd, 0x3b, 0xd8, 0x6b, 0x8f, 0x48, 0xd6, 0x11, 0xf7, 0x0f, 0xc2, 0x70, 0x76,
-	0xf8, 0x34, 0x3c, 0xd8, 0xd9, 0x70, 0xa6, 0x1f, 0xe1, 0xe7, 0x92, 0x3a, 0xe7, 0x4b, 0x0a, 0x17,
-	0x4b, 0x0a, 0x1f, 0x2a, 0x0a, 0x5f, 0x2a, 0x0a, 0xdf, 0x2b, 0x0a, 0x3f, 0x2a, 0x0a, 0xbf, 0x2a,
-	0x0a, 0x7f, 0x2a, 0xea, 0x9c, 0x6b, 0xed, 0x37, 0x05, 0xbc, 0x99, 0x8a, 0xd3, 0xcb, 0xe3, 0xa6,
-	0xbe, 0x4d, 0x1e, 0xe9, 0x3a, 0x82, 0x37, 0x5d, 0xb9, 0x38, 0xcb, 0xca, 0x0b, 0x80, 0xcf, 0x6e,
-	0x67, 0x37, 0x9a, 0x7e, 0x75, 0xe9, 0xae, 0x6d, 0x88, 0x9a, 0xfd, 0x5e, 0x67, 0x8c, 0x3d, 0xe7,
-	0xe2, 0x3d, 0x7f, 0xa5, 0xc9, 0xc4, 0x33, 0x4e, 0x0f, 0xff, 0x06, 0x00, 0x00, 0xff, 0xff, 0xad,
-	0x84, 0x08, 0xae, 0xe5, 0x02, 0x00, 0x00,
+	// 443 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x74, 0x91, 0xb1, 0x6f, 0xd3, 0x40,
+	0x14, 0xc6, 0xfd, 0x9c, 0xc6, 0x22, 0xcf, 0xa8, 0x54, 0x87, 0x04, 0x51, 0x41, 0x47, 0x94, 0x2e,
+	0x11, 0x42, 0xae, 0x14, 0x16, 0x44, 0x58, 0x88, 0x54, 0x5a, 0x89, 0xa8, 0x32, 0x86, 0x16, 0x89,
+	0x25, 0xc2, 0xae, 0x1b, 0x59, 0xbd, 0xde, 0x55, 0xf6, 0x1d, 0x28, 0x1b, 0x0b, 0xff, 0x03, 0x33,
+	0x13, 0x62, 0xe4, 0xaf, 0xe8, 0xc8, 0xc8, 0x48, 0xdc, 0x85, 0xb1, 0x63, 0x47, 0x74, 0x77, 0xb6,
+	0x41, 0x8d, 0xb2, 0xf9, 0x7d, 0xf7, 0x7b, 0xdf, 0x7b, 0xdf, 0x33, 0xde, 0x9f, 0x09, 0x31, 0x63,
+	0xe9, 0xf6, 0x59, 0x2e, 0xa4, 0x88, 0xd5, 0xf1, 0x76, 0x21, 0x73, 0x95, 0xc8, 0xc0, 0xd4, 0xe4,
+	0x96, 0x7d, 0x0d, 0xea, 0xd7, 0xfe, 0x17, 0x40, 0xef, 0xb5, 0x21, 0xc8, 0x08, 0xbd, 0xe3, 0x2c,
+	0x65, 0x47, 0x45, 0x17, 0x7a, 0xad, 0x81, 0x3f, 0xdc, 0x0a, 0xae, 0xc1, 0x81, 0x05, 0x83, 0x17,
+	0x86, 0xda, 0xe1, 0x32, 0x9f, 0x47, 0x55, 0xcb, 0xe6, 0x2b, 0xf4, 0xff, 0x93, 0xc9, 0x06, 0xb6,
+	0x4e, 0xd2, 0x79, 0x17, 0x7a, 0x30, 0xe8, 0x44, 0xfa, 0x93, 0x3c, 0xc2, 0xf6, 0x87, 0xf7, 0x4c,
+	0xa5, 0x5d, 0xb7, 0x07, 0x03, 0x7f, 0x78, 0x67, 0xc9, 0xfc, 0x50, 0xbf, 0x46, 0x16, 0x7a, 0xea,
+	0x3e, 0x81, 0xfe, 0x0f, 0x17, 0xdb, 0x46, 0x24, 0x23, 0x44, 0xae, 0x18, 0x9b, 0x5a, 0x03, 0x6d,
+	0xba, 0x3e, 0xdc, 0x5c, 0x32, 0xd8, 0x57, 0x8c, 0x19, 0x7e, 0xcf, 0x89, 0x3a, 0xbc, 0x2e, 0xc8,
+	0x16, 0xde, 0xe4, 0xea, 0x34, 0x4e, 0xf3, 0xe9, 0xbf, 0xf9, 0xb0, 0xe7, 0x44, 0xbe, 0x55, 0x1b,
+	0xa8, 0x90, 0x79, 0xc6, 0x67, 0x15, 0xd4, 0xd2, 0x8b, 0x6b, 0xc8, 0xaa, 0x16, 0x7a, 0x80, 0x18,
+	0x0b, 0x51, 0xaf, 0xb1, 0xd6, 0x83, 0xc1, 0x0d, 0x3d, 0x4a, 0x6b, 0x16, 0x78, 0x66, 0x5c, 0x54,
+	0x22, 0x2b, 0xa4, 0x6d, 0xa2, 0xde, 0x5d, 0x71, 0xc7, 0xca, 0x5e, 0x25, 0xb2, 0x49, 0xc9, 0xb2,
+	0xa2, 0xee, 0xf5, 0x4c, 0xef, 0x72, 0xca, 0x49, 0x56, 0xc8, 0x26, 0x25, 0xab, 0x8b, 0xb1, 0x87,
+	0x6b, 0x27, 0x19, 0x3f, 0xea, 0x8f, 0xb0, 0xd3, 0x10, 0x24, 0x40, 0xcf, 0x98, 0xd5, 0x7f, 0x74,
+	0xd5, 0xd1, 0x2b, 0xea, 0xe1, 0x3d, 0xec, 0x34, 0x47, 0x24, 0xeb, 0x88, 0xfb, 0x07, 0x93, 0xc9,
+	0xf4, 0xf0, 0xf9, 0xe4, 0x60, 0x67, 0xc3, 0x19, 0x7f, 0x86, 0x5f, 0x0b, 0xea, 0x5c, 0x2e, 0x28,
+	0x5c, 0x2d, 0x28, 0x7c, 0x2a, 0x29, 0x7c, 0x2b, 0x29, 0x9c, 0x97, 0x14, 0x7e, 0x96, 0x14, 0x7e,
+	0x97, 0x14, 0xfe, 0x94, 0xd4, 0xb9, 0xd4, 0xfa, 0x05, 0x85, 0xf3, 0x0b, 0x0a, 0x78, 0x3b, 0x11,
+	0xa7, 0xd7, 0x47, 0x8e, 0x7d, 0x9b, 0x3e, 0xd4, 0x75, 0x08, 0xef, 0xda, 0x72, 0x7e, 0x96, 0x16,
+	0x57, 0x00, 0x5f, 0xdd, 0xd6, 0x6e, 0x38, 0xfe, 0xee, 0xd2, 0x5d, 0xdb, 0x10, 0xd6, 0x3b, 0xbe,
+	0x4d, 0x19, 0x7b, 0xc9, 0xc5, 0x47, 0xfe, 0x46, 0x93, 0xb1, 0x67, 0x9c, 0x1e, 0xff, 0x0d, 0x00,
+	0x00, 0xff, 0xff, 0x26, 0x30, 0xdb, 0xbe, 0xe9, 0x02, 0x00, 0x00,
 }
 
+func (this *Struct) Compare(that interface{}) int {
+	if that == nil {
+		if this == nil {
+			return 0
+		}
+		return 1
+	}
+
+	that1, ok := that.(*Struct)
+	if !ok {
+		that2, ok := that.(Struct)
+		if ok {
+			that1 = &that2
+		} else {
+			return 1
+		}
+	}
+	if that1 == nil {
+		if this == nil {
+			return 0
+		}
+		return 1
+	} else if this == nil {
+		return -1
+	}
+	if len(this.Fields) != len(that1.Fields) {
+		if len(this.Fields) < len(that1.Fields) {
+			return -1
+		}
+		return 1
+	}
+	for i := range this.Fields {
+		if c := this.Fields[i].Compare(that1.Fields[i]); c != 0 {
+			return c
+		}
+	}
+	if c := bytes.Compare(this.XXX_unrecognized, that1.XXX_unrecognized); c != 0 {
+		return c
+	}
+	return 0
+}
+func (this *Value) Compare(that interface{}) int {
+	if that == nil {
+		if this == nil {
+			return 0
+		}
+		return 1
+	}
+
+	that1, ok := that.(*Value)
+	if !ok {
+		that2, ok := that.(Value)
+		if ok {
+			that1 = &that2
+		} else {
+			return 1
+		}
+	}
+	if that1 == nil {
+		if this == nil {
+			return 0
+		}
+		return 1
+	} else if this == nil {
+		return -1
+	}
+	if that1.Kind == nil {
+		if this.Kind != nil {
+			return 1
+		}
+	} else if this.Kind == nil {
+		return -1
+	} else {
+		thisType := -1
+		switch this.Kind.(type) {
+		case *Value_NullValue:
+			thisType = 0
+		case *Value_NumberValue:
+			thisType = 1
+		case *Value_StringValue:
+			thisType = 2
+		case *Value_BoolValue:
+			thisType = 3
+		case *Value_StructValue:
+			thisType = 4
+		case *Value_ListValue:
+			thisType = 5
+		default:
+			panic(fmt.Sprintf("compare: unexpected type %T in oneof", this.Kind))
+		}
+		that1Type := -1
+		switch that1.Kind.(type) {
+		case *Value_NullValue:
+			that1Type = 0
+		case *Value_NumberValue:
+			that1Type = 1
+		case *Value_StringValue:
+			that1Type = 2
+		case *Value_BoolValue:
+			that1Type = 3
+		case *Value_StructValue:
+			that1Type = 4
+		case *Value_ListValue:
+			that1Type = 5
+		default:
+			panic(fmt.Sprintf("compare: unexpected type %T in oneof", that1.Kind))
+		}
+		if thisType == that1Type {
+			if c := this.Kind.Compare(that1.Kind); c != 0 {
+				return c
+			}
+		} else if thisType < that1Type {
+			return -1
+		} else if thisType > that1Type {
+			return 1
+		}
+	}
+	if c := bytes.Compare(this.XXX_unrecognized, that1.XXX_unrecognized); c != 0 {
+		return c
+	}
+	return 0
+}
+func (this *Value_NullValue) Compare(that interface{}) int {
+	if that == nil {
+		if this == nil {
+			return 0
+		}
+		return 1
+	}
+
+	that1, ok := that.(*Value_NullValue)
+	if !ok {
+		that2, ok := that.(Value_NullValue)
+		if ok {
+			that1 = &that2
+		} else {
+			return 1
+		}
+	}
+	if that1 == nil {
+		if this == nil {
+			return 0
+		}
+		return 1
+	} else if this == nil {
+		return -1
+	}
+	if this.NullValue != that1.NullValue {
+		if this.NullValue < that1.NullValue {
+			return -1
+		}
+		return 1
+	}
+	return 0
+}
+func (this *Value_NumberValue) Compare(that interface{}) int {
+	if that == nil {
+		if this == nil {
+			return 0
+		}
+		return 1
+	}
+
+	that1, ok := that.(*Value_NumberValue)
+	if !ok {
+		that2, ok := that.(Value_NumberValue)
+		if ok {
+			that1 = &that2
+		} else {
+			return 1
+		}
+	}
+	if that1 == nil {
+		if this == nil {
+			return 0
+		}
+		return 1
+	} else if this == nil {
+		return -1
+	}
+	if this.NumberValue != that1.NumberValue {
+		if this.NumberValue < that1.NumberValue {
+			return -1
+		}
+		return 1
+	}
+	return 0
+}
+func (this *Value_StringValue) Compare(that interface{}) int {
+	if that == nil {
+		if this == nil {
+			return 0
+		}
+		return 1
+	}
+
+	that1, ok := that.(*Value_StringValue)
+	if !ok {
+		that2, ok := that.(Value_StringValue)
+		if ok {
+			that1 = &that2
+		} else {
+			return 1
+		}
+	}
+	if that1 == nil {
+		if this == nil {
+			return 0
+		}
+		return 1
+	} else if this == nil {
+		return -1
+	}
+	if this.StringValue != that1.StringValue {
+		if this.StringValue < that1.StringValue {
+			return -1
+		}
+		return 1
+	}
+	return 0
+}
+func (this *Value_BoolValue) Compare(that interface{}) int {
+	if that == nil {
+		if this == nil {
+			return 0
+		}
+		return 1
+	}
+
+	that1, ok := that.(*Value_BoolValue)
+	if !ok {
+		that2, ok := that.(Value_BoolValue)
+		if ok {
+			that1 = &that2
+		} else {
+			return 1
+		}
+	}
+	if that1 == nil {
+		if this == nil {
+			return 0
+		}
+		return 1
+	} else if this == nil {
+		return -1
+	}
+	if this.BoolValue != that1.BoolValue {
+		if !this.BoolValue {
+			return -1
+		}
+		return 1
+	}
+	return 0
+}
+func (this *Value_StructValue) Compare(that interface{}) int {
+	if that == nil {
+		if this == nil {
+			return 0
+		}
+		return 1
+	}
+
+	that1, ok := that.(*Value_StructValue)
+	if !ok {
+		that2, ok := that.(Value_StructValue)
+		if ok {
+			that1 = &that2
+		} else {
+			return 1
+		}
+	}
+	if that1 == nil {
+		if this == nil {
+			return 0
+		}
+		return 1
+	} else if this == nil {
+		return -1
+	}
+	if c := this.StructValue.Compare(that1.StructValue); c != 0 {
+		return c
+	}
+	return 0
+}
+func (this *Value_ListValue) Compare(that interface{}) int {
+	if that == nil {
+		if this == nil {
+			return 0
+		}
+		return 1
+	}
+
+	that1, ok := that.(*Value_ListValue)
+	if !ok {
+		that2, ok := that.(Value_ListValue)
+		if ok {
+			that1 = &that2
+		} else {
+			return 1
+		}
+	}
+	if that1 == nil {
+		if this == nil {
+			return 0
+		}
+		return 1
+	} else if this == nil {
+		return -1
+	}
+	if c := this.ListValue.Compare(that1.ListValue); c != 0 {
+		return c
+	}
+	return 0
+}
+func (this *ListValue) Compare(that interface{}) int {
+	if that == nil {
+		if this == nil {
+			return 0
+		}
+		return 1
+	}
+
+	that1, ok := that.(*ListValue)
+	if !ok {
+		that2, ok := that.(ListValue)
+		if ok {
+			that1 = &that2
+		} else {
+			return 1
+		}
+	}
+	if that1 == nil {
+		if this == nil {
+			return 0
+		}
+		return 1
+	} else if this == nil {
+		return -1
+	}
+	if len(this.Values) != len(that1.Values) {
+		if len(this.Values) < len(that1.Values) {
+			return -1
+		}
+		return 1
+	}
+	for i := range this.Values {
+		if c := this.Values[i].Compare(that1.Values[i]); c != 0 {
+			return c
+		}
+	}
+	if c := bytes.Compare(this.XXX_unrecognized, that1.XXX_unrecognized); c != 0 {
+		return c
+	}
+	return 0
+}
 func (x NullValue) String() string {
 	s, ok := NullValue_name[int32(x)]
 	if ok {
@@ -934,7 +1167,8 @@ func (m *Value) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 }
 
 func (m *Value_NullValue) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *Value_NullValue) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -945,7 +1179,8 @@ func (m *Value_NullValue) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *Value_NumberValue) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *Value_NumberValue) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -957,7 +1192,8 @@ func (m *Value_NumberValue) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *Value_StringValue) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *Value_StringValue) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -970,7 +1206,8 @@ func (m *Value_StringValue) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *Value_BoolValue) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *Value_BoolValue) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -986,7 +1223,8 @@ func (m *Value_BoolValue) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *Value_StructValue) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *Value_StructValue) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1006,7 +1244,8 @@ func (m *Value_StructValue) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 func (m *Value_ListValue) MarshalTo(dAtA []byte) (int, error) {
-	return m.MarshalToSizedBuffer(dAtA[:m.Size()])
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
 func (m *Value_ListValue) MarshalToSizedBuffer(dAtA []byte) (int, error) {
@@ -1958,6 +2197,7 @@ func (m *ListValue) Unmarshal(dAtA []byte) error {
 func skipStruct(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0
+	depth := 0
 	for iNdEx < l {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
@@ -1989,10 +2229,8 @@ func skipStruct(dAtA []byte) (n int, err error) {
 					break
 				}
 			}
-			return iNdEx, nil
 		case 1:
 			iNdEx += 8
-			return iNdEx, nil
 		case 2:
 			var length int
 			for shift := uint(0); ; shift += 7 {
@@ -2013,55 +2251,30 @@ func skipStruct(dAtA []byte) (n int, err error) {
 				return 0, ErrInvalidLengthStruct
 			}
 			iNdEx += length
-			if iNdEx < 0 {
-				return 0, ErrInvalidLengthStruct
-			}
-			return iNdEx, nil
 		case 3:
-			for {
-				var innerWire uint64
-				var start int = iNdEx
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return 0, ErrIntOverflowStruct
-					}
-					if iNdEx >= l {
-						return 0, io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					innerWire |= (uint64(b) & 0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				innerWireType := int(innerWire & 0x7)
-				if innerWireType == 4 {
-					break
-				}
-				next, err := skipStruct(dAtA[start:])
-				if err != nil {
-					return 0, err
-				}
-				iNdEx = start + next
-				if iNdEx < 0 {
-					return 0, ErrInvalidLengthStruct
-				}
-			}
-			return iNdEx, nil
+			depth++
 		case 4:
-			return iNdEx, nil
+			if depth == 0 {
+				return 0, ErrUnexpectedEndOfGroupStruct
+			}
+			depth--
 		case 5:
 			iNdEx += 4
-			return iNdEx, nil
 		default:
 			return 0, fmt.Errorf("proto: illegal wireType %d", wireType)
 		}
+		if iNdEx < 0 {
+			return 0, ErrInvalidLengthStruct
+		}
+		if depth == 0 {
+			return iNdEx, nil
+		}
 	}
-	panic("unreachable")
+	return 0, io.ErrUnexpectedEOF
 }
 
 var (
-	ErrInvalidLengthStruct = fmt.Errorf("proto: negative length found during unmarshaling")
-	ErrIntOverflowStruct   = fmt.Errorf("proto: integer overflow")
+	ErrInvalidLengthStruct        = fmt.Errorf("proto: negative length found during unmarshaling")
+	ErrIntOverflowStruct          = fmt.Errorf("proto: integer overflow")
+	ErrUnexpectedEndOfGroupStruct = fmt.Errorf("proto: unexpected end of group")
 )

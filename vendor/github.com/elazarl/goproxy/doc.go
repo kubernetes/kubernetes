@@ -60,7 +60,7 @@ Finally, we have convenience function to throw a quick response
 
 	proxy.OnResponse(hasGoProxyHeader).DoFunc(func(r*http.Response,ctx *goproxy.ProxyCtx)*http.Response {
 		r.Body.Close()
-		return goproxy.ForbiddenTextResponse(ctx.Req,"Can't see response with X-GoProxy header!")
+		return goproxy.NewResponse(ctx.Req, goproxy.ContentTypeText, http.StatusForbidden, "Can't see response with X-GoProxy header!")
 	})
 
 we close the body of the original repsonse, and return a new 403 response with a short message.

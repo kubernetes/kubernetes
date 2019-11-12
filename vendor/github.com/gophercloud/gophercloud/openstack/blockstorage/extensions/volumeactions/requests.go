@@ -267,3 +267,34 @@ func ForceDelete(client *gophercloud.ServiceClient, id string) (r ForceDeleteRes
 	_, r.Err = client.Post(actionURL(client, id), map[string]interface{}{"os-force_delete": ""}, nil, nil)
 	return
 }
+
+// ImageMetadataOptsBuilder allows extensions to add additional parameters to the
+// ImageMetadataRequest request.
+type ImageMetadataOptsBuilder interface {
+	ToImageMetadataMap() (map[string]interface{}, error)
+}
+
+// ImageMetadataOpts contains options for setting image metadata to a volume.
+type ImageMetadataOpts struct {
+	// The image metadata to add to the volume as a set of metadata key and value pairs.
+	Metadata map[string]string `json:"metadata"`
+}
+
+// ToImageMetadataMap assembles a request body based on the contents of a
+// ImageMetadataOpts.
+func (opts ImageMetadataOpts) ToImageMetadataMap() (map[string]interface{}, error) {
+	return gophercloud.BuildRequestBody(opts, "os-set_image_metadata")
+}
+
+// SetImageMetadata will set image metadata on a volume based on the values in ImageMetadataOptsBuilder.
+func SetImageMetadata(client *gophercloud.ServiceClient, id string, opts ImageMetadataOptsBuilder) (r SetImageMetadataResult) {
+	b, err := opts.ToImageMetadataMap()
+	if err != nil {
+		r.Err = err
+		return
+	}
+	_, r.Err = client.Post(actionURL(client, id), b, &r.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
+	})
+	return
+}

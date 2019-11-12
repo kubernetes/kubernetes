@@ -144,6 +144,15 @@ func (r commonResult) ExtractProject() (*Project, error) {
 	return s.Project, err
 }
 
+// ExtractDomain returns Domain to which User is authorized.
+func (r commonResult) ExtractDomain() (*Domain, error) {
+	var s struct {
+		Domain *Domain `json:"domain"`
+	}
+	err := r.ExtractInto(&s)
+	return s.Domain, err
+}
+
 // CreateResult is the response from a Create request. Use ExtractToken()
 // to interpret it as a Token, or ExtractServiceCatalog() to interpret it
 // as a service catalog.

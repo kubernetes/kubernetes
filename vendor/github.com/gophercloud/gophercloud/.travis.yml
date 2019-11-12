@@ -7,9 +7,9 @@ install:
 - GO111MODULE=off go get github.com/mattn/goveralls
 - GO111MODULE=off go get golang.org/x/tools/cmd/goimports
 go:
-- "1.10"
 - "1.11"
 - "1.12"
+- "1.13"
 - "tip"
 env:
   global:

@@ -1,6 +1,9 @@
 package groups
 
 import (
+	"encoding/json"
+	"time"
+
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
@@ -25,11 +28,54 @@ type SecGroup struct {
 	// TenantID is the project owner of the security group.
 	TenantID string `json:"tenant_id"`
 
+	// UpdatedAt and CreatedAt contain ISO-8601 timestamps of when the state of the
+	// security group last changed, and when it was created.
+	UpdatedAt time.Time `json:"-"`
+	CreatedAt time.Time `json:"-"`
+
 	// ProjectID is the project owner of the security group.
 	ProjectID string `json:"project_id"`
 
 	// Tags optionally set via extensions/attributestags
 	Tags []string `json:"tags"`
+}
+
+func (r *SecGroup) UnmarshalJSON(b []byte) error {
+	type tmp SecGroup
+
+	// Support for older neutron time format
+	var s1 struct {
+		tmp
+		CreatedAt gophercloud.JSONRFC3339NoZ `json:"created_at"`
+		UpdatedAt gophercloud.JSONRFC3339NoZ `json:"updated_at"`
+	}
+
+	err := json.Unmarshal(b, &s1)
+	if err == nil {
+		*r = SecGroup(s1.tmp)
+		r.CreatedAt = time.Time(s1.CreatedAt)
+		r.UpdatedAt = time.Time(s1.UpdatedAt)
+
+		return nil
+	}
+
+	// Support for newer neutron time format
+	var s2 struct {
+		tmp
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+	}
+
+	err = json.Unmarshal(b, &s2)
+	if err != nil {
+		return err
+	}
+
+	*r = SecGroup(s2.tmp)
+	r.CreatedAt = time.Time(s2.CreatedAt)
+	r.UpdatedAt = time.Time(s2.UpdatedAt)
+
+	return nil
 }
 
 // SecGroupPage is the page returned by a pager when traversing over a

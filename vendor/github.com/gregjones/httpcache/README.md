@@ -7,6 +7,8 @@ Package httpcache provides a http.RoundTripper implementation that works as a mo
 
 It is only suitable for use as a 'private' cache (i.e. for a web-browser or an API-client and not for a shared proxy).
 
+This project isn't actively maintained; it works for what I, and seemingly others, want to do with it, and I consider it "done". That said, if you find any issues, please open a Pull Request and I will try to review it. Any changes now that change the public API won't be considered.
+
 Cache Backends
 --------------
 
@@ -18,6 +20,8 @@ Cache Backends
 - [`github.com/die-net/lrucache`](https://github.com/die-net/lrucache) provides an in-memory cache that will evict least-recently used entries.
 - [`github.com/die-net/lrucache/twotier`](https://github.com/die-net/lrucache/tree/master/twotier) allows caches to be combined, for example to use lrucache above with a persistent disk-cache.
 - [`github.com/birkelund/boltdbcache`](https://github.com/birkelund/boltdbcache) provides a BoltDB implementation (based on the [bbolt](https://github.com/coreos/bbolt) fork).
+
+If you implement any other backend and wish it to be linked here, please send a PR editing this file.
 
 License
 -------

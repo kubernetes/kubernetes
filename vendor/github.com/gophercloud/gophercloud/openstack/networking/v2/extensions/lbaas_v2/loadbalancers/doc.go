@@ -29,7 +29,7 @@ Example to Create a Load Balancer
 		AdminStateUp: gophercloud.Enabled,
 		VipSubnetID:  "9cedb85d-0759-4898-8a4b-fa5a5ea10086",
 		VipAddress:   "10.30.176.48",
-		Flavor:       "medium",
+		FlavorID:     "60df399a-ee85-11e9-81b4-2a2ae2dbcce4",
 		Provider:     "haproxy",
 	}
 

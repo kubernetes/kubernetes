@@ -1010,7 +1010,12 @@ func (p *marshalto) Generate(file *generator.FileDescriptor) {
 			ccTypeName := p.OneOfTypeName(message, field)
 			p.P(`func (m *`, ccTypeName, `) MarshalTo(dAtA []byte) (int, error) {`)
 			p.In()
-			p.P(`return m.MarshalToSizedBuffer(dAtA[:m.Size()])`)
+			if gogoproto.IsProtoSizer(file.FileDescriptorProto, message.DescriptorProto) {
+				p.P(`size := m.ProtoSize()`)
+			} else {
+				p.P(`size := m.Size()`)
+			}
+			p.P(`return m.MarshalToSizedBuffer(dAtA[:size])`)
 			p.Out()
 			p.P(`}`)
 			p.P(``)

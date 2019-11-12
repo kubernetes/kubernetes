@@ -20,6 +20,6 @@ func memberRootURL(c *gophercloud.ServiceClient, poolId string) string {
 	return c.ServiceURL(rootPath, resourcePath, poolId, memberPath)
 }
 
-func memberResourceURL(c *gophercloud.ServiceClient, poolID string, memeberID string) string {
-	return c.ServiceURL(rootPath, resourcePath, poolID, memberPath, memeberID)
+func memberResourceURL(c *gophercloud.ServiceClient, poolID string, memberID string) string {
+	return c.ServiceURL(rootPath, resourcePath, poolID, memberPath, memberID)
 }

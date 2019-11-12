@@ -21,6 +21,7 @@ func NewResponse(r *http.Request, contentType string, status int, body string) *
 	resp.Header = make(http.Header)
 	resp.Header.Add("Content-Type", contentType)
 	resp.StatusCode = status
+	resp.Status = http.StatusText(status)
 	buf := bytes.NewBufferString(body)
 	resp.ContentLength = int64(buf.Len())
 	resp.Body = ioutil.NopCloser(buf)

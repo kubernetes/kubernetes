@@ -12,12 +12,12 @@ github.com/Azure/azure-sdk-for-go/version
 # github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 => github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78
 github.com/Azure/go-ansiterm
 github.com/Azure/go-ansiterm/winterm
-# github.com/Azure/go-autorest/autorest v0.9.0 => github.com/Azure/go-autorest/autorest v0.9.0
+# github.com/Azure/go-autorest/autorest v0.9.2 => github.com/Azure/go-autorest/autorest v0.9.2
 github.com/Azure/go-autorest/autorest
-# github.com/Azure/go-autorest/autorest/adal v0.5.0 => github.com/Azure/go-autorest/autorest/adal v0.5.0
+# github.com/Azure/go-autorest/autorest/adal v0.8.0 => github.com/Azure/go-autorest/autorest/adal v0.8.0
 github.com/Azure/go-autorest/autorest/adal
 github.com/Azure/go-autorest/autorest/azure
-# github.com/Azure/go-autorest/autorest/date v0.1.0 => github.com/Azure/go-autorest/autorest/date v0.1.0
+# github.com/Azure/go-autorest/autorest/date v0.2.0 => github.com/Azure/go-autorest/autorest/date v0.1.0
 github.com/Azure/go-autorest/autorest/date
 # github.com/Azure/go-autorest/autorest/to v0.2.0 => github.com/Azure/go-autorest/autorest/to v0.2.0
 github.com/Azure/go-autorest/autorest/to
@@ -240,19 +240,19 @@ github.com/docker/go-connections/tlsconfig
 github.com/docker/go-units
 # github.com/docker/libnetwork v0.0.0-20180830151422-a9cd636e3789 => github.com/docker/libnetwork v0.0.0-20180830151422-a9cd636e3789
 github.com/docker/libnetwork/ipvs
-# github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96 => github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
+# github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c => github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c
 github.com/docker/spdystream
 github.com/docker/spdystream/spdy
 # github.com/dustin/go-humanize v1.0.0 => github.com/dustin/go-humanize v1.0.0
 github.com/dustin/go-humanize
-# github.com/elazarl/goproxy v0.0.0-20170405201442-c4fc26588b6e => github.com/elazarl/goproxy v0.0.0-20170405201442-c4fc26588b6e
+# github.com/elazarl/goproxy v0.0.0-20191011121108-aa519ddbe484 => github.com/elazarl/goproxy v0.0.0-20191011121108-aa519ddbe484
 github.com/elazarl/goproxy
-# github.com/emicklei/go-restful v2.9.5+incompatible => github.com/emicklei/go-restful v2.9.5+incompatible
+# github.com/emicklei/go-restful v2.9.6+incompatible => github.com/emicklei/go-restful v2.9.6+incompatible
 github.com/emicklei/go-restful
 github.com/emicklei/go-restful/log
 # github.com/euank/go-kmsg-parser v2.0.0+incompatible => github.com/euank/go-kmsg-parser v2.0.0+incompatible
 github.com/euank/go-kmsg-parser/kmsgparser
-# github.com/evanphx/json-patch v4.2.0+incompatible => github.com/evanphx/json-patch v4.2.0+incompatible
+# github.com/evanphx/json-patch v4.5.0+incompatible => github.com/evanphx/json-patch v4.5.0+incompatible
 github.com/evanphx/json-patch
 # github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d => github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
 github.com/exponent-io/jsonpath
@@ -283,7 +283,7 @@ github.com/go-openapi/jsonreference
 github.com/go-openapi/loads
 # github.com/go-openapi/runtime v0.19.0 => github.com/go-openapi/runtime v0.19.0
 github.com/go-openapi/runtime
-# github.com/go-openapi/spec v0.19.2 => github.com/go-openapi/spec v0.19.2
+# github.com/go-openapi/spec v0.19.4 => github.com/go-openapi/spec v0.19.4
 github.com/go-openapi/spec
 # github.com/go-openapi/strfmt v0.19.0 => github.com/go-openapi/strfmt v0.19.0
 github.com/go-openapi/strfmt
@@ -296,7 +296,7 @@ github.com/go-ozzo/ozzo-validation
 github.com/go-ozzo/ozzo-validation/is
 # github.com/godbus/dbus v0.0.0-20181101234600-2ff6f7ffd60f => github.com/godbus/dbus v0.0.0-20181101234600-2ff6f7ffd60f
 github.com/godbus/dbus
-# github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d => github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
+# github.com/gogo/protobuf v1.3.1 => github.com/gogo/protobuf v1.3.1
 github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/plugin/compare
 github.com/gogo/protobuf/plugin/defaultcheck
@@ -324,7 +324,7 @@ github.com/gogo/protobuf/sortkeys
 github.com/gogo/protobuf/types
 github.com/gogo/protobuf/vanity
 github.com/gogo/protobuf/vanity/command
-# github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903 => github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
+# github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9 => github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9
 github.com/golang/groupcache/lru
 # github.com/golang/mock v1.2.0 => github.com/golang/mock v1.2.0
 github.com/golang/mock/gomock
@@ -384,7 +384,7 @@ github.com/google/cadvisor/utils/sysinfo
 github.com/google/cadvisor/version
 github.com/google/cadvisor/watcher
 github.com/google/cadvisor/zfs
-# github.com/google/go-cmp v0.3.0 => github.com/google/go-cmp v0.3.0
+# github.com/google/go-cmp v0.3.1 => github.com/google/go-cmp v0.3.1
 github.com/google/go-cmp/cmp
 github.com/google/go-cmp/cmp/cmpopts
 github.com/google/go-cmp/cmp/internal/diff
@@ -395,11 +395,11 @@ github.com/google/go-cmp/cmp/internal/value
 github.com/google/gofuzz
 # github.com/google/uuid v1.1.1 => github.com/google/uuid v1.1.1
 github.com/google/uuid
-# github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d => github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
+# github.com/googleapis/gnostic v0.3.0 => github.com/googleapis/gnostic v0.3.0
 github.com/googleapis/gnostic/OpenAPIv2
 github.com/googleapis/gnostic/compiler
 github.com/googleapis/gnostic/extensions
-# github.com/gophercloud/gophercloud v0.1.0 => github.com/gophercloud/gophercloud v0.1.0
+# github.com/gophercloud/gophercloud v0.6.0 => github.com/gophercloud/gophercloud v0.6.0
 github.com/gophercloud/gophercloud
 github.com/gophercloud/gophercloud/openstack
 github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions
@@ -433,7 +433,7 @@ github.com/gophercloud/gophercloud/openstack/utils
 github.com/gophercloud/gophercloud/pagination
 # github.com/gorilla/websocket v1.4.0 => github.com/gorilla/websocket v1.4.0
 github.com/gorilla/websocket
-# github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7 => github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7
+# github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 => github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
 github.com/gregjones/httpcache
 github.com/gregjones/httpcache/diskcache
 # github.com/grpc-ecosystem/go-grpc-middleware v1.0.1-0.20190118093823-f849b5445de4 => github.com/grpc-ecosystem/go-grpc-middleware v1.0.1-0.20190118093823-f849b5445de4
@@ -444,7 +444,7 @@ github.com/grpc-ecosystem/go-grpc-prometheus
 github.com/grpc-ecosystem/grpc-gateway/internal
 github.com/grpc-ecosystem/grpc-gateway/runtime
 github.com/grpc-ecosystem/grpc-gateway/utilities
-# github.com/hashicorp/golang-lru v0.5.1 => github.com/hashicorp/golang-lru v0.5.1
+# github.com/hashicorp/golang-lru v0.5.3 => github.com/hashicorp/golang-lru v0.5.3
 github.com/hashicorp/golang-lru
 github.com/hashicorp/golang-lru/simplelru
 # github.com/hashicorp/hcl v1.0.0 => github.com/hashicorp/hcl v1.0.0
@@ -500,7 +500,7 @@ github.com/magiconair/properties
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
-# github.com/mattn/go-colorable v0.0.9 => github.com/mattn/go-colorable v0.0.9
+# github.com/mattn/go-colorable v0.1.2 => github.com/mattn/go-colorable v0.0.9
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.9 => github.com/mattn/go-isatty v0.0.9
 github.com/mattn/go-isatty
@@ -633,12 +633,14 @@ github.com/quobyte/api
 github.com/robfig/cron
 # github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c => github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c
 github.com/rubiojr/go-vhd/vhd
-# github.com/russross/blackfriday v1.5.2 => github.com/russross/blackfriday v1.5.2
+# github.com/russross/blackfriday v2.0.0+incompatible => github.com/russross/blackfriday v2.0.0+incompatible
 github.com/russross/blackfriday
 # github.com/satori/go.uuid v1.2.0 => github.com/satori/go.uuid v1.2.0
 github.com/satori/go.uuid
 # github.com/seccomp/libseccomp-golang v0.9.1 => github.com/seccomp/libseccomp-golang v0.9.1
 github.com/seccomp/libseccomp-golang
+# github.com/shurcooL/sanitized_anchor_name v1.0.0 => github.com/shurcooL/sanitized_anchor_name v1.0.0
+github.com/shurcooL/sanitized_anchor_name
 # github.com/sirupsen/logrus v1.4.2 => github.com/sirupsen/logrus v1.4.2
 github.com/sirupsen/logrus
 # github.com/soheilhy/cmux v0.1.4 => github.com/soheilhy/cmux v0.1.4
@@ -655,7 +657,7 @@ github.com/spf13/cobra/doc
 github.com/spf13/jwalterweatherman
 # github.com/spf13/pflag v1.0.5 => github.com/spf13/pflag v1.0.5
 github.com/spf13/pflag
-# github.com/spf13/viper v1.3.2 => github.com/spf13/viper v1.3.2
+# github.com/spf13/viper v1.4.0 => github.com/spf13/viper v1.3.2
 github.com/spf13/viper
 # github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc => github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc
 github.com/storageos/go-api
@@ -664,7 +666,7 @@ github.com/storageos/go-api/serror
 github.com/storageos/go-api/types
 # github.com/stretchr/objx v0.2.0 => github.com/stretchr/objx v0.2.0
 github.com/stretchr/objx
-# github.com/stretchr/testify v1.3.0 => github.com/stretchr/testify v1.3.0
+# github.com/stretchr/testify v1.4.0 => github.com/stretchr/testify v1.3.0
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/mock
 github.com/stretchr/testify/require
@@ -830,7 +832,7 @@ go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586 => golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
+# golang.org/x/crypto v0.0.0-20190911031432-227b76d455e7 => golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/cryptobyte
@@ -879,7 +881,7 @@ golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e => golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456 => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a
+# golang.org/x/sys v0.0.0-20190911201528-7ad0cfa0b7b5 => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows
@@ -908,7 +910,7 @@ golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
 golang.org/x/text/width
-# golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 => golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
+# golang.org/x/time v0.0.0-20191024005414-555d28b269f0 => golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 golang.org/x/time/rate
 # golang.org/x/tools v0.0.0-20190920225731-5eefd052ad72 => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7
 golang.org/x/tools/benchmark/parse
@@ -1061,7 +1063,7 @@ gotest.tools
 gotest.tools/gotestsum
 gotest.tools/gotestsum/internal/junitxml
 gotest.tools/gotestsum/testjson
-# honnef.co/go/tools v0.0.1-2019.2.2 => honnef.co/go/tools v0.0.1-2019.2.2
+# honnef.co/go/tools v0.0.1-2019.2.3 => honnef.co/go/tools v0.0.1-2019.2.2
 honnef.co/go/tools/arg
 honnef.co/go/tools/cmd/staticcheck
 honnef.co/go/tools/config
@@ -1901,6 +1903,36 @@ k8s.io/utils/pointer
 k8s.io/utils/strings
 k8s.io/utils/trace
 # sigs.k8s.io/kustomize v2.0.3+incompatible => sigs.k8s.io/kustomize v2.0.3+incompatible
+# sigs.k8s.io/kustomize/api v0.2.0 => sigs.k8s.io/kustomize/api v0.2.0
+sigs.k8s.io/kustomize/api/builtins
+sigs.k8s.io/kustomize/api/filesys
+sigs.k8s.io/kustomize/api/hasher
+sigs.k8s.io/kustomize/api/ifc
+sigs.k8s.io/kustomize/api/internal/accumulator
+sigs.k8s.io/kustomize/api/internal/accumulator/expansion
+sigs.k8s.io/kustomize/api/internal/git
+sigs.k8s.io/kustomize/api/internal/k8sdeps/configmapandsecret
+sigs.k8s.io/kustomize/api/internal/k8sdeps/transformer
+sigs.k8s.io/kustomize/api/internal/k8sdeps/transformer/patch
+sigs.k8s.io/kustomize/api/internal/kusterr
+sigs.k8s.io/kustomize/api/internal/plugins/builtinconfig
+sigs.k8s.io/kustomize/api/internal/plugins/builtinhelpers
+sigs.k8s.io/kustomize/api/internal/plugins/execplugin
+sigs.k8s.io/kustomize/api/internal/plugins/loader
+sigs.k8s.io/kustomize/api/internal/target
+sigs.k8s.io/kustomize/api/inventory
+sigs.k8s.io/kustomize/api/k8sdeps/kunstruct
+sigs.k8s.io/kustomize/api/k8sdeps/validator
+sigs.k8s.io/kustomize/api/konfig
+sigs.k8s.io/kustomize/api/konfig/builtinpluginconsts
+sigs.k8s.io/kustomize/api/krusty
+sigs.k8s.io/kustomize/api/kv
+sigs.k8s.io/kustomize/api/loader
+sigs.k8s.io/kustomize/api/resid
+sigs.k8s.io/kustomize/api/resmap
+sigs.k8s.io/kustomize/api/resource
+sigs.k8s.io/kustomize/api/transform
+sigs.k8s.io/kustomize/api/types
 sigs.k8s.io/kustomize/pkg/commands/build
 sigs.k8s.io/kustomize/pkg/constants
 sigs.k8s.io/kustomize/pkg/expansion
@@ -1923,6 +1955,82 @@ sigs.k8s.io/kustomize/pkg/transformers
 sigs.k8s.io/kustomize/pkg/transformers/config
 sigs.k8s.io/kustomize/pkg/transformers/config/defaultconfig
 sigs.k8s.io/kustomize/pkg/types
+# sigs.k8s.io/kustomize/pseudo/k8s v0.1.0 => sigs.k8s.io/kustomize/pseudo/k8s v0.1.0
+sigs.k8s.io/kustomize/pseudo/k8s/api/admissionregistration/v1
+sigs.k8s.io/kustomize/pseudo/k8s/api/admissionregistration/v1beta1
+sigs.k8s.io/kustomize/pseudo/k8s/api/apps/v1
+sigs.k8s.io/kustomize/pseudo/k8s/api/apps/v1beta1
+sigs.k8s.io/kustomize/pseudo/k8s/api/apps/v1beta2
+sigs.k8s.io/kustomize/pseudo/k8s/api/auditregistration/v1alpha1
+sigs.k8s.io/kustomize/pseudo/k8s/api/authentication/v1
+sigs.k8s.io/kustomize/pseudo/k8s/api/authentication/v1beta1
+sigs.k8s.io/kustomize/pseudo/k8s/api/authorization/v1
+sigs.k8s.io/kustomize/pseudo/k8s/api/authorization/v1beta1
+sigs.k8s.io/kustomize/pseudo/k8s/api/autoscaling/v1
+sigs.k8s.io/kustomize/pseudo/k8s/api/autoscaling/v2beta1
+sigs.k8s.io/kustomize/pseudo/k8s/api/autoscaling/v2beta2
+sigs.k8s.io/kustomize/pseudo/k8s/api/batch/v1
+sigs.k8s.io/kustomize/pseudo/k8s/api/batch/v1beta1
+sigs.k8s.io/kustomize/pseudo/k8s/api/batch/v2alpha1
+sigs.k8s.io/kustomize/pseudo/k8s/api/certificates/v1beta1
+sigs.k8s.io/kustomize/pseudo/k8s/api/coordination/v1
+sigs.k8s.io/kustomize/pseudo/k8s/api/coordination/v1beta1
+sigs.k8s.io/kustomize/pseudo/k8s/api/core/v1
+sigs.k8s.io/kustomize/pseudo/k8s/api/discovery/v1alpha1
+sigs.k8s.io/kustomize/pseudo/k8s/api/events/v1beta1
+sigs.k8s.io/kustomize/pseudo/k8s/api/extensions/v1beta1
+sigs.k8s.io/kustomize/pseudo/k8s/api/networking/v1
+sigs.k8s.io/kustomize/pseudo/k8s/api/networking/v1beta1
+sigs.k8s.io/kustomize/pseudo/k8s/api/node/v1alpha1
+sigs.k8s.io/kustomize/pseudo/k8s/api/node/v1beta1
+sigs.k8s.io/kustomize/pseudo/k8s/api/policy/v1beta1
+sigs.k8s.io/kustomize/pseudo/k8s/api/rbac/v1
+sigs.k8s.io/kustomize/pseudo/k8s/api/rbac/v1alpha1
+sigs.k8s.io/kustomize/pseudo/k8s/api/rbac/v1beta1
+sigs.k8s.io/kustomize/pseudo/k8s/api/scheduling/v1
+sigs.k8s.io/kustomize/pseudo/k8s/api/scheduling/v1alpha1
+sigs.k8s.io/kustomize/pseudo/k8s/api/scheduling/v1beta1
+sigs.k8s.io/kustomize/pseudo/k8s/api/settings/v1alpha1
+sigs.k8s.io/kustomize/pseudo/k8s/api/storage/v1
+sigs.k8s.io/kustomize/pseudo/k8s/api/storage/v1alpha1
+sigs.k8s.io/kustomize/pseudo/k8s/api/storage/v1beta1
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/api/equality
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/api/meta
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/api/resource
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/api/validation
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/apis/meta/v1
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/apis/meta/v1/unstructured
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/apis/meta/v1/validation
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/conversion
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/conversion/queryparams
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/fields
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/labels
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/runtime
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/runtime/schema
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/runtime/serializer
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/runtime/serializer/json
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/runtime/serializer/protobuf
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/runtime/serializer/recognizer
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/runtime/serializer/versioning
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/selection
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/types
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/util/errors
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/util/framer
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/util/intstr
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/util/json
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/util/mergepatch
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/util/naming
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/util/net
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/util/runtime
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/util/sets
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/util/strategicpatch
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/util/validation
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/util/validation/field
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/util/yaml
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/pkg/watch
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/third_party/forked/golang/json
+sigs.k8s.io/kustomize/pseudo/k8s/apimachinery/third_party/forked/golang/reflect
+sigs.k8s.io/kustomize/pseudo/k8s/client-go/kubernetes/scheme
 # sigs.k8s.io/structured-merge-diff v0.0.0-20190817042607-6149e4549fca => sigs.k8s.io/structured-merge-diff v0.0.0-20190817042607-6149e4549fca
 sigs.k8s.io/structured-merge-diff/fieldpath
 sigs.k8s.io/structured-merge-diff/merge

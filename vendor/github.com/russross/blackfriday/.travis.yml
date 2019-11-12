@@ -1,17 +1,18 @@
-sudo: false
+# Travis CI (http://travis-ci.org/) is a continuous integration service for
+# open source projects. This file configures it to run unit tests for
+# blackfriday.
+
 language: go
+
 go:
-  - "1.9.x"
-  - "1.10.x"
-  - tip
-matrix:
-  fast_finish: true
-  allow_failures:
-    - go: tip
+    - 1.5
+    - 1.6
+    - 1.7
+
 install:
-  - # Do nothing. This is needed to prevent default install action "go get -t -v ./..." from happening here (we want it to happen inside script step).
+    - go get -d -t -v ./...
+    - go build -v ./...
+
 script:
-  - go get -t -v ./...
-  - diff -u <(echo -n) <(gofmt -d -s .)
-  - go tool vet .
-  - go test -v -race ./...
+    - go test -v ./...
+    - go test -run=^$ -bench=BenchmarkReference -benchmem

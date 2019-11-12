@@ -289,10 +289,6 @@ func doRetryForStatusCodesImpl(s Sender, r *http.Request, count429 bool, attempt
 			return
 		}
 		resp, err = s.Do(rr.Request())
-		// if the error isn't temporary don't bother retrying
-		if err != nil && !IsTemporaryNetworkError(err) {
-			return
-		}
 		// we want to retry if err is not nil (e.g. transient network failure).  note that for failed authentication
 		// resp and err will both have a value, so in this case we don't want to retry as it will never succeed.
 		if err == nil && !ResponseHasStatusCode(resp, codes...) || IsTokenRefreshError(err) {

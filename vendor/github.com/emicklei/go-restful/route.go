@@ -67,17 +67,6 @@ func (r *Route) wrapRequestResponse(httpWriter http.ResponseWriter, httpRequest 
 	return wrappedRequest, wrappedResponse
 }
 
-// dispatchWithFilters call the function after passing through its own filters
-func (r *Route) dispatchWithFilters(wrappedRequest *Request, wrappedResponse *Response) {
-	if len(r.Filters) > 0 {
-		chain := FilterChain{Filters: r.Filters, Target: r.Function}
-		chain.ProcessFilter(wrappedRequest, wrappedResponse)
-	} else {
-		// unfiltered
-		r.Function(wrappedRequest, wrappedResponse)
-	}
-}
-
 func stringTrimSpaceCutset(r rune) bool {
 	return r == ' '
 }

@@ -8,6 +8,10 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/cli-runtime/pkg/kustomize/k8sdeps:go_default_library",
+        "//vendor/sigs.k8s.io/kustomize/api/filesys:go_default_library",
+        "//vendor/sigs.k8s.io/kustomize/api/konfig:go_default_library",
+        "//vendor/sigs.k8s.io/kustomize/api/krusty:go_default_library",
+        "//vendor/sigs.k8s.io/kustomize/api/types:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/commands/build:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/fs:go_default_library",
     ],
@@ -34,5 +38,5 @@ go_test(
     name = "go_default_test",
     srcs = ["builder_test.go"],
     embed = [":go_default_library"],
-    deps = ["//vendor/sigs.k8s.io/kustomize/pkg/fs:go_default_library"],
+    deps = ["//vendor/sigs.k8s.io/kustomize/api/filesys:go_default_library"],
 )

@@ -3,6 +3,7 @@ package goproxy
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -21,8 +22,12 @@ func NewCounterEncryptorRandFromKey(key interface{}, seed []byte) (r CounterEncr
 	switch key := key.(type) {
 	case *rsa.PrivateKey:
 		keyBytes = x509.MarshalPKCS1PrivateKey(key)
+	case *ecdsa.PrivateKey:
+		if keyBytes, err = x509.MarshalECPrivateKey(key); err != nil {
+			return
+		}
 	default:
-		err = errors.New("only RSA keys supported")
+		err = errors.New("only RSA and ECDSA keys supported")
 		return
 	}
 	h := sha256.New()
