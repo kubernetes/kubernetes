@@ -34,14 +34,13 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/featuregate"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -92,11 +91,12 @@ type Plugin struct {
 
 	generateName func(string) string
 
-	featureGate featuregate.FeatureGate
+	boundServiceAccountTokenVolume bool
 }
 
 var _ admission.MutationInterface = &Plugin{}
 var _ admission.ValidationInterface = &Plugin{}
+var _ genericadmissioninitializer.WantsFeatures = &Plugin{}
 var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&Plugin{})
 var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Plugin{})
 
@@ -117,9 +117,12 @@ func NewServiceAccount() *Plugin {
 		RequireAPIToken: true,
 
 		generateName: names.SimpleNameGenerator.GenerateName,
-
-		featureGate: utilfeature.DefaultFeatureGate,
 	}
+}
+
+// InspectFeatureGates allows setting bools without taking a dep on a global variable
+func (s *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
+	s.boundServiceAccountTokenVolume = featureGates.Enabled(features.BoundServiceAccountTokenVolume)
 }
 
 // SetExternalKubeClientSet sets the client for the plugin
@@ -443,8 +446,8 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 	allVolumeNames := sets.NewString()
 	for _, volume := range pod.Spec.Volumes {
 		allVolumeNames.Insert(volume.Name)
-		if (!s.featureGate.Enabled(kubefeatures.BoundServiceAccountTokenVolume) && volume.Secret != nil && volume.Secret.SecretName == serviceAccountToken) ||
-			(s.featureGate.Enabled(kubefeatures.BoundServiceAccountTokenVolume) && strings.HasPrefix(volume.Name, ServiceAccountVolumeName+"-")) {
+		if (!s.boundServiceAccountTokenVolume && volume.Secret != nil && volume.Secret.SecretName == serviceAccountToken) ||
+			(s.boundServiceAccountTokenVolume && strings.HasPrefix(volume.Name, ServiceAccountVolumeName+"-")) {
 			tokenVolumeName = volume.Name
 			hasTokenVolume = true
 			break
@@ -453,7 +456,7 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 
 	// Determine a volume name for the ServiceAccountTokenSecret in case we need it
 	if len(tokenVolumeName) == 0 {
-		if s.featureGate.Enabled(kubefeatures.BoundServiceAccountTokenVolume) {
+		if s.boundServiceAccountTokenVolume {
 			tokenVolumeName = s.generateName(ServiceAccountVolumeName + "-")
 		} else {
 			// Try naming the volume the same as the serviceAccountToken, and uniquify if needed
@@ -510,7 +513,7 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 }
 
 func (s *Plugin) createVolume(tokenVolumeName, secretName string) api.Volume {
-	if s.featureGate.Enabled(kubefeatures.BoundServiceAccountTokenVolume) {
+	if s.boundServiceAccountTokenVolume {
 		return api.Volume{
 			Name: tokenVolumeName,
 			VolumeSource: api.VolumeSource{

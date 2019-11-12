@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/component-base/featuregate"
 )
 
 var configScheme = runtime.NewScheme()
@@ -117,6 +118,7 @@ func (a *AdmissionOptions) ApplyTo(
 	c *server.Config,
 	informers informers.SharedInformerFactory,
 	kubeAPIServerClientConfig *rest.Config,
+	features featuregate.FeatureGate,
 	pluginInitializers ...admission.PluginInitializer,
 ) error {
 	if a == nil {
@@ -139,7 +141,7 @@ func (a *AdmissionOptions) ApplyTo(
 	if err != nil {
 		return err
 	}
-	genericInitializer := initializer.New(clientset, informers, c.Authorization.Authorizer)
+	genericInitializer := initializer.New(clientset, informers, c.Authorization.Authorizer, features)
 	initializersChain := admission.PluginInitializers{}
 	pluginInitializers = append(pluginInitializers, genericInitializer)
 	initializersChain = append(initializersChain, pluginInitializers...)
