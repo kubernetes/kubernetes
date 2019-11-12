@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -51,7 +51,6 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
-	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/clock"
 )
@@ -79,9 +78,6 @@ type NodeStatusManager struct {
 	// should manage attachment/detachment of volumes scheduled to this node,
 	// and disable kubelet from executing any attach/detach operations
 	enableControllerAttachDetach bool
-
-	// Volume plugins.
-	volumePluginMgr *volume.VolumePluginMgr
 
 	// Manager of non-Runtime containers.
 	containerManager cm.ContainerManager
@@ -182,7 +178,6 @@ func NewNodeStatusManager(
 	providerID string,
 	onRepeatedHeartbeatFailure func(),
 	nodeLabels map[string]string,
-	volumePluginMgr *volume.VolumePluginMgr,
 	volumeManager volumemanager.VolumeManager,
 	setNodeStatusFuncs []func(*v1.Node) error,
 	updatePodCIDR func(cidr string) (bool, error),
@@ -194,7 +189,6 @@ func NewNodeStatusManager(
 		kubeClient:                   kubeClient,
 		keepTerminatedPodVolumes:     keepTerminatedPodVolumes, // DEPRECATED
 		enableControllerAttachDetach: enableControllerAttachDetach,
-		volumePluginMgr:              volumePluginMgr,
 		containerManager:             containerManager,
 		evictionManager:              evictionManager,
 		imageManager:                 imageManager,

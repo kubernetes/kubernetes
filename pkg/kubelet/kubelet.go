@@ -909,7 +909,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		providerID,
 		kubeDeps.OnHeartbeatFailure,
 		nodeLabels,
-		klet.volumePluginMgr,
 		klet.volumeManager,
 		klet.defaultNodeStatusFuncs(),
 		klet.updatePodCIDR,
@@ -917,6 +916,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if err != nil {
 		return nil, err
 	}
+
+	klet.nodeStatusManger = nodeStatusManager
 
 	return klet, nil
 }
@@ -1252,6 +1253,8 @@ type Kubelet struct {
 
 	// Handles RuntimeClass objects for the Kubelet.
 	runtimeClassManager *runtimeclass.Manager
+
+	nodeStatusManger *nodestatusmanager.NodeStatusManager
 }
 
 // setupDataDirs creates:
