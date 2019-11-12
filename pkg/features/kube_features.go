@@ -432,7 +432,9 @@ const (
 	CSIMigrationOpenStack featuregate.Feature = "CSIMigrationOpenStack"
 
 	// owner: @MrHohn
-	// beta: v1.16
+	// alpha: v1.15
+	// beta:  v1.16
+	// GA: v1.17
 	//
 	// Enables Finalizer Protection for Service LoadBalancers.
 	ServiceLoadBalancerFinalizer featuregate.Feature = "ServiceLoadBalancerFinalizer"
@@ -568,7 +570,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletPodResources:            {Default: true, PreRelease: featuregate.Beta},
 	WindowsGMSA:                    {Default: true, PreRelease: featuregate.Beta},
 	WindowsRunAsUserName:           {Default: true, PreRelease: featuregate.Beta},
-	ServiceLoadBalancerFinalizer:   {Default: true, PreRelease: featuregate.Beta},
+	ServiceLoadBalancerFinalizer:   {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: false, PreRelease: featuregate.Alpha},
 	VolumePVCDataSource:                            {Default: true, PreRelease: featuregate.Beta},
