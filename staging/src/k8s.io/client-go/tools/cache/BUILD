@@ -21,6 +21,7 @@ go_test(
         "reflector_test.go",
         "shared_informer_test.go",
         "store_test.go",
+        "thread_safe_store_test.go",
         "undelta_store_test.go",
     ],
     embed = [":go_default_library"],
