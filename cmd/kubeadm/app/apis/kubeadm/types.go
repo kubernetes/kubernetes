@@ -19,8 +19,8 @@ package kubeadm
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -182,9 +182,9 @@ type ImageMeta struct {
 // ComponentConfigs holds known internal ComponentConfig types for other components
 type ComponentConfigs struct {
 	// Kubelet holds the ComponentConfiguration for the kubelet
-	Kubelet *kubeletconfig.KubeletConfiguration
+	Kubelet *kubeletconfigv1beta1.KubeletConfiguration
 	// KubeProxy holds the ComponentConfiguration for the kube-proxy
-	KubeProxy *kubeproxyconfig.KubeProxyConfiguration
+	KubeProxy *kubeproxyconfigv1alpha1.KubeProxyConfiguration
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
