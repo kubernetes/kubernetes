@@ -17,7 +17,6 @@ limitations under the License.
 package create
 
 import (
-	"strings"
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
@@ -84,44 +83,6 @@ func TestValidateCreateJob(t *testing.T) {
 				t.Errorf("expected error but validation passed")
 			}
 			if !test.expectErr && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-		})
-	}
-}
-
-func TestCreateJobValidation(t *testing.T) {
-	tests := map[string]struct {
-		image    string
-		command  []string
-		from     string
-		expected string
-	}{
-		"empty flags": {
-			expected: "--image or --from must be specified",
-		},
-		"both image and from specified": {
-			image:    "my-image",
-			from:     "cronjob/xyz",
-			expected: "--image or --from must be specified",
-		},
-		"from and command specified": {
-			from:     "cronjob/xyz",
-			command:  []string{"test", "command"},
-			expected: "cannot specify --from and command",
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			o := &CreateJobOptions{
-				Image:   tc.image,
-				From:    tc.from,
-				Command: tc.command,
-			}
-
-			err := o.Validate()
-			if err != nil && !strings.Contains(err.Error(), tc.expected) {
 				t.Errorf("unexpected error: %v", err)
 			}
 		})
