@@ -23,12 +23,13 @@ import (
 	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 
 	"k8s.io/klog"
 )
@@ -39,10 +40,19 @@ type topologyPair struct {
 }
 
 type podTopologySpreadMap struct {
+	constraints []topologySpreadConstraint
 	// nodeNameSet is a string set holding all node names which have all constraints[*].topologyKey present.
 	nodeNameSet map[string]struct{}
 	// topologyPairToPodCounts is keyed with topologyPair, and valued with the number of matching pods.
 	topologyPairToPodCounts map[topologyPair]*int64
+}
+
+// topologySpreadConstraint is an internal version for a soft (ScheduleAnyway
+// unsatisfiable constraint action) v1.TopologySpreadConstraint and where the
+// selector is parsed.
+type topologySpreadConstraint struct {
+	topologyKey string
+	selector    labels.Selector
 }
 
 func newTopologySpreadConstraintsMap() *podTopologySpreadMap {
@@ -54,19 +64,22 @@ func newTopologySpreadConstraintsMap() *podTopologySpreadMap {
 
 // buildPodTopologySpreadMap prepares necessary data (podTopologySpreadMap) for incoming pod on the filteredNodes.
 // Later Priority function will use 'podTopologySpreadMap' to perform the Scoring calculations.
-func buildPodTopologySpreadMap(pod *v1.Pod, filteredNodes []*v1.Node, allNodes []*schedulernodeinfo.NodeInfo) *podTopologySpreadMap {
-	// return if incoming pod doesn't have soft topology spread constraints.
-	constraints := getSoftTopologySpreadConstraints(pod)
-	if len(constraints) == 0 || len(filteredNodes) == 0 || len(allNodes) == 0 {
-		return nil
+func buildPodTopologySpreadMap(pod *v1.Pod, filteredNodes []*v1.Node, allNodes []*schedulernodeinfo.NodeInfo) (*podTopologySpreadMap, error) {
+	if len(filteredNodes) == 0 || len(allNodes) == 0 {
+		return nil, nil
 	}
 
 	// initialize podTopologySpreadMap which will be used in Score plugin.
 	m := newTopologySpreadConstraintsMap()
-	m.initialize(pod, filteredNodes)
+	err := m.initialize(pod, filteredNodes)
+	if err != nil {
+		return nil, err
+	}
+	// return if incoming pod doesn't have soft topology spread constraints.
+	if m.constraints == nil {
+		return nil, nil
+	}
 
-	errCh := schedutil.NewErrorChannel()
-	ctx, cancel := context.WithCancel(context.Background())
 	processAllNode := func(i int) {
 		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
@@ -76,12 +89,12 @@ func buildPodTopologySpreadMap(pod *v1.Pod, filteredNodes []*v1.Node, allNodes [
 		// (1) `node` should satisfy incoming pod's NodeSelector/NodeAffinity
 		// (2) All topologyKeys need to be present in `node`
 		if !predicates.PodMatchesNodeSelectorAndAffinityTerms(pod, node) ||
-			!predicates.NodeLabelsMatchSpreadConstraints(node.Labels, constraints) {
+			!nodeLabelsMatchSpreadConstraints(node.Labels, m.constraints) {
 			return
 		}
 
-		for _, constraint := range constraints {
-			pair := topologyPair{key: constraint.TopologyKey, value: node.Labels[constraint.TopologyKey]}
+		for _, c := range m.constraints {
+			pair := topologyPair{key: c.topologyKey, value: node.Labels[c.topologyKey]}
 			// If current topology pair is not associated with any candidate node,
 			// continue to avoid unnecessary calculation.
 			if m.topologyPairToPodCounts[pair] == nil {
@@ -91,39 +104,37 @@ func buildPodTopologySpreadMap(pod *v1.Pod, filteredNodes []*v1.Node, allNodes [
 			// <matchSum> indicates how many pods (on current node) match the <constraint>.
 			matchSum := int64(0)
 			for _, existingPod := range nodeInfo.Pods() {
-				match, err := predicates.PodMatchesSpreadConstraint(existingPod.Labels, constraint)
-				if err != nil {
-					errCh.SendErrorWithCancel(err, cancel)
-					return
-				}
-				if match {
+				if c.selector.Matches(labels.Set(existingPod.Labels)) {
 					matchSum++
 				}
 			}
 			atomic.AddInt64(m.topologyPairToPodCounts[pair], matchSum)
 		}
 	}
-	workqueue.ParallelizeUntil(ctx, 16, len(allNodes), processAllNode)
-	if err := errCh.ReceiveError(); err != nil {
-		klog.Error(err)
-		return nil
-	}
+	workqueue.ParallelizeUntil(context.Background(), 16, len(allNodes), processAllNode)
 
-	return m
+	return m, nil
 }
 
 // initialize iterates "filteredNodes" to filter out the nodes which don't have required topologyKey(s),
 // and initialize two maps:
 // 1) m.topologyPairToPodCounts: keyed with both eligible topology pair and node names.
 // 2) m.nodeNameSet: keyed with node name, and valued with a *int64 pointer for eligible node only.
-func (m *podTopologySpreadMap) initialize(pod *v1.Pod, filteredNodes []*v1.Node) {
-	constraints := getSoftTopologySpreadConstraints(pod)
+func (m *podTopologySpreadMap) initialize(pod *v1.Pod, filteredNodes []*v1.Node) error {
+	constraints, err := filterSoftTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints)
+	if err != nil {
+		return err
+	}
+	if constraints == nil {
+		return nil
+	}
+	m.constraints = constraints
 	for _, node := range filteredNodes {
-		if !predicates.NodeLabelsMatchSpreadConstraints(node.Labels, constraints) {
+		if !nodeLabelsMatchSpreadConstraints(node.Labels, m.constraints) {
 			continue
 		}
-		for _, constraint := range constraints {
-			pair := topologyPair{key: constraint.TopologyKey, value: node.Labels[constraint.TopologyKey]}
+		for _, constraint := range m.constraints {
+			pair := topologyPair{key: constraint.topologyKey, value: node.Labels[constraint.topologyKey]}
 			if m.topologyPairToPodCounts[pair] == nil {
 				m.topologyPairToPodCounts[pair] = new(int64)
 			}
@@ -132,6 +143,7 @@ func (m *podTopologySpreadMap) initialize(pod *v1.Pod, filteredNodes []*v1.Node)
 		// For those nodes which don't have all required topologyKeys present, it's intentional to leave
 		// their entries absent in nodeNameSet, so that we're able to score them to 0 afterwards.
 	}
+	return nil
 }
 
 // CalculateEvenPodsSpreadPriorityMap calculate the number of matching pods on the passed-in "node",
@@ -155,13 +167,12 @@ func CalculateEvenPodsSpreadPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo 
 		return framework.NodeScore{Name: node.Name, Score: 0}, nil
 	}
 
-	constraints := getSoftTopologySpreadConstraints(pod)
 	// For each present <pair>, current node gets a credit of <matchSum>.
 	// And we sum up <matchSum> and return it as this node's score.
 	var score int64
-	for _, constraint := range constraints {
-		if tpVal, ok := node.Labels[constraint.TopologyKey]; ok {
-			pair := topologyPair{key: constraint.TopologyKey, value: tpVal}
+	for _, c := range m.constraints {
+		if tpVal, ok := node.Labels[c.topologyKey]; ok {
+			pair := topologyPair{key: c.topologyKey, value: tpVal}
 			matchSum := *m.topologyPairToPodCounts[pair]
 			score += matchSum
 		}
@@ -228,14 +239,29 @@ func CalculateEvenPodsSpreadPriorityReduce(pod *v1.Pod, meta interface{}, shared
 	return nil
 }
 
-// TODO(Huang-Wei): combine this with getHardTopologySpreadConstraints() in predicates package
-func getSoftTopologySpreadConstraints(pod *v1.Pod) (constraints []v1.TopologySpreadConstraint) {
-	if pod != nil {
-		for _, constraint := range pod.Spec.TopologySpreadConstraints {
-			if constraint.WhenUnsatisfiable == v1.ScheduleAnyway {
-				constraints = append(constraints, constraint)
+func filterSoftTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint) ([]topologySpreadConstraint, error) {
+	var r []topologySpreadConstraint
+	for _, c := range constraints {
+		if c.WhenUnsatisfiable == v1.ScheduleAnyway {
+			selector, err := metav1.LabelSelectorAsSelector(c.LabelSelector)
+			if err != nil {
+				return nil, err
 			}
+			r = append(r, topologySpreadConstraint{
+				topologyKey: c.TopologyKey,
+				selector:    selector,
+			})
 		}
 	}
-	return
+	return r, nil
+}
+
+// nodeLabelsMatchSpreadConstraints checks if ALL topology keys in spread constraints are present in node labels.
+func nodeLabelsMatchSpreadConstraints(nodeLabels map[string]string, constraints []topologySpreadConstraint) bool {
+	for _, c := range constraints {
+		if _, ok := nodeLabels[c.topologyKey]; !ok {
+			return false
+		}
+	}
+	return true
 }
