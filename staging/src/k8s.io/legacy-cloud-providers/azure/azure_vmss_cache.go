@@ -115,6 +115,7 @@ func (ss *scaleSet) newVMSSVirtualMachinesCache() (*timedCache, error) {
 func (ss *scaleSet) deleteCacheForNode(nodeName string) error {
 	cached, err := ss.vmssVMCache.Get(vmssVirtualMachinesKey, cacheReadTypeUnsafe)
 	if err != nil {
+		klog.Errorf("deleteCacheForNode(%s) failed with error: %v", nodeName, err)
 		return err
 	}
 
