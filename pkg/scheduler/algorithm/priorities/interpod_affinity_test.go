@@ -515,7 +515,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			allNodes := append([]*v1.Node{}, test.nodes...)
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 
 			meta := &priorityMetadata{
 				topologyScore: buildTopologyPairToScore(test.pod, snapshot, allNodes, v1.DefaultHardPodAffinitySymmetricWeight),
@@ -611,7 +611,7 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			allNodes := append([]*v1.Node{}, test.nodes...)
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 
 			meta := &priorityMetadata{
 				topologyScore: buildTopologyPairToScore(test.pod, snapshot, allNodes, test.hardPodAffinityWeight),
@@ -675,7 +675,7 @@ func BenchmarkInterPodAffinityPriority(b *testing.B) {
 	for _, test := range tests {
 		b.Run(test.name, func(b *testing.B) {
 			existingPods, allNodes := test.prepFunc(test.existingPodsNum, test.allNodesNum)
-			snapshot := nodeinfosnapshot.NewSnapshot(existingPods, allNodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(existingPods, allNodes))
 
 			meta := &priorityMetadata{
 				topologyScore: buildTopologyPairToScore(test.pod, snapshot, allNodes, v1.DefaultHardPodAffinitySymmetricWeight),

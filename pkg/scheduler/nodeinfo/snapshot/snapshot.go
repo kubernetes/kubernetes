@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package nodeinfo
+package snapshot
 
 import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -47,10 +48,9 @@ func NewEmptySnapshot() *Snapshot {
 }
 
 // NewSnapshot initializes a Snapshot struct and returns it.
-func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
-	nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(pods, nodes)
-	nodeInfoList := make([]*schedulernodeinfo.NodeInfo, 0, len(nodes))
-	havePodsWithAffinityNodeInfoList := make([]*schedulernodeinfo.NodeInfo, 0, len(nodes))
+func NewSnapshot(nodeInfoMap map[string]*schedulernodeinfo.NodeInfo) *Snapshot {
+	nodeInfoList := make([]*schedulernodeinfo.NodeInfo, 0, len(nodeInfoMap))
+	havePodsWithAffinityNodeInfoList := make([]*schedulernodeinfo.NodeInfo, 0, len(nodeInfoMap))
 	for _, v := range nodeInfoMap {
 		nodeInfoList = append(nodeInfoList, v)
 		if len(v.PodsWithAffinity()) > 0 {
@@ -64,6 +64,62 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 	s.HavePodsWithAffinityNodeInfoList = havePodsWithAffinityNodeInfoList
 
 	return s
+}
+
+// CreateNodeInfoMap obtains a list of pods and pivots that list into a map where the keys are node names
+// and the values are the aggregated information for that node.
+func CreateNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*schedulernodeinfo.NodeInfo {
+	nodeNameToInfo := make(map[string]*schedulernodeinfo.NodeInfo)
+	for _, pod := range pods {
+		nodeName := pod.Spec.NodeName
+		if _, ok := nodeNameToInfo[nodeName]; !ok {
+			nodeNameToInfo[nodeName] = schedulernodeinfo.NewNodeInfo()
+		}
+		nodeNameToInfo[nodeName].AddPod(pod)
+	}
+	imageExistenceMap := createImageExistenceMap(nodes)
+
+	for _, node := range nodes {
+		if _, ok := nodeNameToInfo[node.Name]; !ok {
+			nodeNameToInfo[node.Name] = schedulernodeinfo.NewNodeInfo()
+		}
+		nodeInfo := nodeNameToInfo[node.Name]
+		nodeInfo.SetNode(node)
+		nodeInfo.SetImageStates(getNodeImageStates(node, imageExistenceMap))
+	}
+	return nodeNameToInfo
+}
+
+// getNodeImageStates returns the given node's image states based on the given imageExistence map.
+func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.String) map[string]*schedulernodeinfo.ImageStateSummary {
+	imageStates := make(map[string]*schedulernodeinfo.ImageStateSummary)
+
+	for _, image := range node.Status.Images {
+		for _, name := range image.Names {
+			imageStates[name] = &schedulernodeinfo.ImageStateSummary{
+				Size:     image.SizeBytes,
+				NumNodes: len(imageExistenceMap[name]),
+			}
+		}
+	}
+	return imageStates
+}
+
+// createImageExistenceMap returns a map recording on which nodes the images exist, keyed by the images' names.
+func createImageExistenceMap(nodes []*v1.Node) map[string]sets.String {
+	imageExistenceMap := make(map[string]sets.String)
+	for _, node := range nodes {
+		for _, image := range node.Status.Images {
+			for _, name := range image.Names {
+				if _, ok := imageExistenceMap[name]; !ok {
+					imageExistenceMap[name] = sets.NewString(node.Name)
+				} else {
+					imageExistenceMap[name].Insert(node.Name)
+				}
+			}
+		}
+	}
+	return imageExistenceMap
 }
 
 // Pods returns a PodLister
