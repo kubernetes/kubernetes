@@ -886,6 +886,7 @@ golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e => golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/errgroup
+golang.org/x/sync/singleflight
 # golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456 => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a
 golang.org/x/sys/cpu
 golang.org/x/sys/unix

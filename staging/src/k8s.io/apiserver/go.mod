@@ -38,6 +38,7 @@ require (
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
 	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
+	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	google.golang.org/genproto v0.0.0-20190502173448-54afdca5d873 // indirect
 	google.golang.org/grpc v1.23.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
