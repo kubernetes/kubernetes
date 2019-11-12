@@ -12,6 +12,9 @@ metadata:
   name: csi-gce-pd-provisioner-role
 rules:
   - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
     resources: ["persistentvolumes"]
     verbs: ["get", "list", "watch", "create", "delete"]
   - apiGroups: [""]
@@ -29,6 +32,12 @@ rules:
   - apiGroups: [""]
     resources: ["nodes"]
     verbs: ["get", "list", "watch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots"]
+    verbs: ["get", "list"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotcontents"]
+    verbs: ["get", "list"]
 
 ---
 
@@ -39,11 +48,12 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: csi-gce-pd-controller-sa
+    namespace: default
 roleRef:
   kind: ClusterRole
   name: csi-gce-pd-provisioner-role
   apiGroup: rbac.authorization.k8s.io
-  
+
 ---
 # xref: https://github.com/kubernetes-csi/external-attacher/blob/master/deploy/kubernetes/rbac.yaml
 kind: ClusterRole
@@ -73,6 +83,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: csi-gce-pd-controller-sa
+    namespace: default
 roleRef:
   kind: ClusterRole
   name: csi-gce-pd-attacher-role
@@ -107,9 +118,47 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: csi-gce-pd-controller-sa
+    namespace: default
 roleRef:
   kind: ClusterRole
   name: csi-gce-pd-resizer-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# xref: https://github.com/kubernetes-csi/external-snapshotter/blob/master/deploy/kubernetes/csi-snapshotter/rbac-csi-snapshotter.yaml
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-gce-pd-snapshotter-role
+rules:
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list", "watch", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotcontents"]
+    verbs: ["create", "get", "list", "watch", "update", "delete"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotcontents/status"]
+    verbs: ["update"]
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-gce-pd-controller-snapshotter-binding
+subjects:
+  - kind: ServiceAccount
+    name: csi-gce-pd-controller-sa
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: csi-gce-pd-snapshotter-role
   apiGroup: rbac.authorization.k8s.io
 
 ---
