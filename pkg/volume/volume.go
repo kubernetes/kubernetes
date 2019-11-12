@@ -170,7 +170,7 @@ type CustomBlockVolumeMapper interface {
 	// Unique device path across kubelet node reboot is required to avoid
 	// unexpected block volume destruction.
 	// If empty string is returned, the path retuned by attacher.Attach() and
-	// attacher.WaitForAttach() will be sued.
+	// attacher.WaitForAttach() will be used.
 	MapPodDevice() (string, error)
 }
 

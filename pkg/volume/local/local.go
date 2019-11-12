@@ -619,7 +619,7 @@ func (m *localVolumeMapper) SetUpDevice() error {
 	return nil
 }
 
-// SetUpDevice provides physical device path for the local PV.
+// MapPodDevice provides physical device path for the local PV.
 func (m *localVolumeMapper) MapPodDevice() (string, error) {
 	globalPath := util.MakeAbsolutePath(runtime.GOOS, m.globalPath)
 	klog.V(4).Infof("MapPodDevice returning path %s", globalPath)

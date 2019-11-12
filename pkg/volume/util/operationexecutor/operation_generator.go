@@ -1065,8 +1065,9 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		}
 
 		// Update actual state of world to reflect volume is globally mounted
+		markedDevicePath := devicePath
 		markDeviceMappedErr := actualStateOfWorld.MarkDeviceAsMounted(
-			volumeToMount.VolumeName, devicePath, globalMapPath)
+			volumeToMount.VolumeName, markedDevicePath, globalMapPath)
 		if markDeviceMappedErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateError("MapVolume.MarkDeviceAsMounted failed", markDeviceMappedErr)
@@ -1103,6 +1104,17 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		devicePath, err = hu.EvalHostSymlinks(devicePath)
 		if err != nil {
 			return volumeToMount.GenerateError("MapVolume.EvalHostSymlinks failed", err)
+		}
+
+		// Update actual state of world with the devicePath again, if devicePath has changed from markedDevicePath
+		// TODO: This can be improved after #82492 is merged and ASW has state.
+		if markedDevicePath != devicePath {
+			markDeviceMappedErr := actualStateOfWorld.MarkDeviceAsMounted(
+				volumeToMount.VolumeName, devicePath, globalMapPath)
+			if markDeviceMappedErr != nil {
+				// On failure, return error. Caller will log and retry.
+				return volumeToMount.GenerateError("MapVolume.MarkDeviceAsMounted failed", markDeviceMappedErr)
+			}
 		}
 
 		// Execute common map
