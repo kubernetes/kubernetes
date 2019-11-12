@@ -155,7 +155,7 @@ func TestCreateRole(t *testing.T) {
 	}
 }
 
-func TestValidate(t *testing.T) {
+func TestValidateCreateRole(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
@@ -356,7 +356,7 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func TestComplete(t *testing.T) {
+func TestCompleteCreateRole(t *testing.T) {
 	roleName := "my-role"
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
