@@ -1039,7 +1039,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			blockVolumeMapper.GetGlobalMapPath(volumeToMount.VolumeSpec)
 		if err != nil {
 			// On failure, return error. Caller will log and retry.
-			return volumeToMount.GenerateError("MapVolume.GetDeviceMountPath failed", err)
+			return volumeToMount.GenerateError("MapVolume.GetGlobalMapPath failed", err)
 		}
 		if volumeAttacher != nil {
 			// Wait for attachable volumes to finish attaching
@@ -1059,7 +1059,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		pluginDevicePath, mapErr := blockVolumeMapper.SetUpDevice()
 		if mapErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return volumeToMount.GenerateError("MapVolume.SetUp failed", mapErr)
+			return volumeToMount.GenerateError("MapVolume.SetUpDevice failed", mapErr)
 		}
 
 		// if pluginDevicePath is provided, assume attacher may not provide device
@@ -1090,14 +1090,14 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		mapErr = blockVolumeMapper.MapDevice(devicePath, globalMapPath, volumeMapPath, volName, volumeToMount.Pod.UID)
 		if mapErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return volumeToMount.GenerateError("MapVolume.MapPodDevice failed", mapErr)
+			return volumeToMount.GenerateError("MapVolume.MapDevice failed", mapErr)
 		}
 
 		// Execute common map
 		mapErr = ioutil.MapBlockVolume(og.blkUtil, devicePath, globalMapPath, volumeMapPath, volName, volumeToMount.Pod.UID)
 		if mapErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return volumeToMount.GenerateError("MapVolume.MapDevice failed", mapErr)
+			return volumeToMount.GenerateError("MapVolume.MapBlockVolume failed", mapErr)
 		}
 
 		// Update actual state of world to reflect volume is globally mounted
