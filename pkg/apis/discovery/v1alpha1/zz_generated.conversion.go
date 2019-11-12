@@ -147,6 +147,7 @@ func autoConvert_v1alpha1_EndpointPort_To_discovery_EndpointPort(in *v1alpha1.En
 	out.Name = (*string)(unsafe.Pointer(in.Name))
 	out.Protocol = (*core.Protocol)(unsafe.Pointer(in.Protocol))
 	out.Port = (*int32)(unsafe.Pointer(in.Port))
+	out.AppProtocol = (*string)(unsafe.Pointer(in.AppProtocol))
 	return nil
 }
 
@@ -159,6 +160,7 @@ func autoConvert_discovery_EndpointPort_To_v1alpha1_EndpointPort(in *discovery.E
 	out.Name = (*string)(unsafe.Pointer(in.Name))
 	out.Protocol = (*v1.Protocol)(unsafe.Pointer(in.Protocol))
 	out.Port = (*int32)(unsafe.Pointer(in.Port))
+	out.AppProtocol = (*string)(unsafe.Pointer(in.AppProtocol))
 	return nil
 }
 

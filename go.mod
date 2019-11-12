@@ -63,7 +63,6 @@ require (
 	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
 	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/mock v1.2.0
-	github.com/golang/protobuf v1.3.2
 	github.com/google/cadvisor v0.34.0
 	github.com/google/go-cmp v0.3.0
 	github.com/google/gofuzz v1.0.0

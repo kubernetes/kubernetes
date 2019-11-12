@@ -58,7 +58,10 @@ func TestNewEndpointSlice(t *testing.T) {
 
 	expectedSlice := discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:          map[string]string{discovery.LabelServiceName: service.Name},
+			Labels: map[string]string{
+				discovery.LabelServiceName: service.Name,
+				discovery.LabelManagedBy:   controllerName,
+			},
 			GenerateName:    fmt.Sprintf("%s-", service.Name),
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Namespace:       service.Namespace,

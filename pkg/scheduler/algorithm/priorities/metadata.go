@@ -26,8 +26,8 @@ import (
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
-// PriorityMetadataFactory is a factory to produce PriorityMetadata.
-type PriorityMetadataFactory struct {
+// MetadataFactory is a factory to produce PriorityMetadata.
+type MetadataFactory struct {
 	serviceLister         corelisters.ServiceLister
 	controllerLister      corelisters.ReplicationControllerLister
 	replicaSetLister      appslisters.ReplicaSetLister
@@ -35,15 +35,15 @@ type PriorityMetadataFactory struct {
 	hardPodAffinityWeight int32
 }
 
-// NewPriorityMetadataFactory creates a PriorityMetadataFactory.
-func NewPriorityMetadataFactory(
+// NewMetadataFactory creates a MetadataFactory.
+func NewMetadataFactory(
 	serviceLister corelisters.ServiceLister,
 	controllerLister corelisters.ReplicationControllerLister,
 	replicaSetLister appslisters.ReplicaSetLister,
 	statefulSetLister appslisters.StatefulSetLister,
 	hardPodAffinityWeight int32,
-) PriorityMetadataProducer {
-	factory := &PriorityMetadataFactory{
+) MetadataProducer {
+	factory := &MetadataFactory{
 		serviceLister:         serviceLister,
 		controllerLister:      controllerLister,
 		replicaSetLister:      replicaSetLister,
@@ -66,8 +66,8 @@ type priorityMetadata struct {
 	topologyScore           topologyPairToScore
 }
 
-// PriorityMetadata is a PriorityMetadataProducer.  Node info can be nil.
-func (pmf *PriorityMetadataFactory) PriorityMetadata(
+// PriorityMetadata is a MetadataProducer.  Node info can be nil.
+func (pmf *MetadataFactory) PriorityMetadata(
 	pod *v1.Pod,
 	filteredNodes []*v1.Node,
 	sharedLister schedulerlisters.SharedLister,

@@ -85,9 +85,9 @@ func (pl *ServiceAffinity) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *ServiceAffinity) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
-	meta, ok := migration.PredicateMetadata(cycleState).(predicates.PredicateMetadata)
+	meta, ok := migration.PredicateMetadata(cycleState).(predicates.Metadata)
 	if !ok {
-		return framework.NewStatus(framework.Error, "looking up PredicateMetadata")
+		return framework.NewStatus(framework.Error, "looking up Metadata")
 	}
 	_, reasons, err := pl.predicate(pod, meta, nodeInfo)
 	return migration.PredicateResultToFrameworkStatus(reasons, err)

@@ -34,15 +34,15 @@ import (
 	"text/template"
 	"time"
 
-	"k8s.io/api/authorization/v1beta1"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/client-go/tools/clientcmd/api/v1"
+	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
-func TestNewFromConfig(t *testing.T) {
+func TestV1NewFromConfig(t *testing.T) {
 	dir, err := ioutil.TempDir("", "")
 	if err != nil {
 		t.Fatal(err)
@@ -186,7 +186,7 @@ current-context: default
 				return fmt.Errorf("failed to execute test template: %v", err)
 			}
 			// Create a new authorizer
-			sarClient, err := subjectAccessReviewInterfaceFromKubeconfig(p)
+			sarClient, err := subjectAccessReviewInterfaceFromKubeconfig(p, "v1")
 			if err != nil {
 				return fmt.Errorf("error building sar client: %v", err)
 			}
@@ -202,14 +202,14 @@ current-context: default
 	}
 }
 
-// Service mocks a remote service.
-type Service interface {
-	Review(*v1beta1.SubjectAccessReview)
+// V1Service mocks a remote service.
+type V1Service interface {
+	Review(*authorizationv1.SubjectAccessReview)
 	HTTPStatusCode() int
 }
 
-// NewTestServer wraps a Service as an httptest.Server.
-func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error) {
+// NewV1TestServer wraps a V1Service as an httptest.Server.
+func NewV1TestServer(s V1Service, cert, key, caCert []byte) (*httptest.Server, error) {
 	const webhookPath = "/testserver"
 	var tlsConfig *tls.Config
 	if cert != nil {
@@ -240,7 +240,7 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 			return
 		}
 
-		var review v1beta1.SubjectAccessReview
+		var review authorizationv1.SubjectAccessReview
 		bodyData, _ := ioutil.ReadAll(r.Body)
 		if err := json.Unmarshal(bodyData, &review); err != nil {
 			http.Error(w, fmt.Sprintf("failed to decode body: %v", err), http.StatusBadRequest)
@@ -248,7 +248,7 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 		}
 
 		// ensure we received the serialized review as expected
-		if review.APIVersion != "authorization.k8s.io/v1beta1" {
+		if review.APIVersion != "authorization.k8s.io/v1" {
 			http.Error(w, fmt.Sprintf("wrong api version: %s", string(bodyData)), http.StatusBadRequest)
 			return
 		}
@@ -267,7 +267,7 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 			APIVersion string `json:"apiVersion"`
 			Status     status `json:"status"`
 		}{
-			APIVersion: v1beta1.SchemeGroupVersion.String(),
+			APIVersion: authorizationv1.SchemeGroupVersion.String(),
 			Status:     status{review.Status.Allowed, review.Status.Reason, review.Status.EvaluationError},
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -287,23 +287,23 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 }
 
 // A service that can be set to allow all or deny all authorization requests.
-type mockService struct {
+type mockV1Service struct {
 	allow      bool
 	statusCode int
 	called     int
 }
 
-func (m *mockService) Review(r *v1beta1.SubjectAccessReview) {
+func (m *mockV1Service) Review(r *authorizationv1.SubjectAccessReview) {
 	m.called++
 	r.Status.Allowed = m.allow
 }
-func (m *mockService) Allow()              { m.allow = true }
-func (m *mockService) Deny()               { m.allow = false }
-func (m *mockService) HTTPStatusCode() int { return m.statusCode }
+func (m *mockV1Service) Allow()              { m.allow = true }
+func (m *mockV1Service) Deny()               { m.allow = false }
+func (m *mockV1Service) HTTPStatusCode() int { return m.statusCode }
 
-// newAuthorizer creates a temporary kubeconfig file from the provided arguments and attempts to load
+// newV1Authorizer creates a temporary kubeconfig file from the provided arguments and attempts to load
 // a new WebhookAuthorizer from it.
-func newAuthorizer(callbackURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration) (*WebhookAuthorizer, error) {
+func newV1Authorizer(callbackURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration) (*WebhookAuthorizer, error) {
 	tempfile, err := ioutil.TempFile("", "")
 	if err != nil {
 		return nil, err
@@ -325,14 +325,14 @@ func newAuthorizer(callbackURL string, clientCert, clientKey, ca []byte, cacheTi
 	if err := json.NewEncoder(tempfile).Encode(config); err != nil {
 		return nil, err
 	}
-	sarClient, err := subjectAccessReviewInterfaceFromKubeconfig(p)
+	sarClient, err := subjectAccessReviewInterfaceFromKubeconfig(p, "v1")
 	if err != nil {
 		return nil, fmt.Errorf("error building sar client: %v", err)
 	}
 	return newWithBackoff(sarClient, cacheTime, cacheTime, 0)
 }
 
-func TestTLSConfig(t *testing.T) {
+func TestV1TLSConfig(t *testing.T) {
 	tests := []struct {
 		test                            string
 		clientCert, clientKey, clientCA []byte
@@ -378,17 +378,17 @@ func TestTLSConfig(t *testing.T) {
 	for _, tt := range tests {
 		// Use a closure so defer statements trigger between loop iterations.
 		func() {
-			service := new(mockService)
+			service := new(mockV1Service)
 			service.statusCode = 200
 
-			server, err := NewTestServer(service, tt.serverCert, tt.serverKey, tt.serverCA)
+			server, err := NewV1TestServer(service, tt.serverCert, tt.serverKey, tt.serverCA)
 			if err != nil {
 				t.Errorf("%s: failed to create server: %v", tt.test, err)
 				return
 			}
 			defer server.Close()
 
-			wh, err := newAuthorizer(server.URL, tt.clientCert, tt.clientKey, tt.clientCA, 0)
+			wh, err := newV1Authorizer(server.URL, tt.clientCert, tt.clientKey, tt.clientCA, 0)
 			if err != nil {
 				t.Errorf("%s: failed to create client: %v", tt.test, err)
 				return
@@ -427,62 +427,62 @@ func TestTLSConfig(t *testing.T) {
 	}
 }
 
-// recorderService records all access review requests.
-type recorderService struct {
-	last v1beta1.SubjectAccessReview
+// recorderV1Service records all access review requests.
+type recorderV1Service struct {
+	last authorizationv1.SubjectAccessReview
 	err  error
 }
 
-func (rec *recorderService) Review(r *v1beta1.SubjectAccessReview) {
-	rec.last = v1beta1.SubjectAccessReview{}
+func (rec *recorderV1Service) Review(r *authorizationv1.SubjectAccessReview) {
+	rec.last = authorizationv1.SubjectAccessReview{}
 	rec.last = *r
 	r.Status.Allowed = true
 }
 
-func (rec *recorderService) Last() (v1beta1.SubjectAccessReview, error) {
+func (rec *recorderV1Service) Last() (authorizationv1.SubjectAccessReview, error) {
 	return rec.last, rec.err
 }
 
-func (rec *recorderService) HTTPStatusCode() int { return 200 }
+func (rec *recorderV1Service) HTTPStatusCode() int { return 200 }
 
-func TestWebhook(t *testing.T) {
-	serv := new(recorderService)
-	s, err := NewTestServer(serv, serverCert, serverKey, caCert)
+func TestV1Webhook(t *testing.T) {
+	serv := new(recorderV1Service)
+	s, err := NewV1TestServer(serv, serverCert, serverKey, caCert)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer s.Close()
 
-	wh, err := newAuthorizer(s.URL, clientCert, clientKey, caCert, 0)
+	wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	expTypeMeta := metav1.TypeMeta{
-		APIVersion: "authorization.k8s.io/v1beta1",
+		APIVersion: "authorization.k8s.io/v1",
 		Kind:       "SubjectAccessReview",
 	}
 
 	tests := []struct {
 		attr authorizer.Attributes
-		want v1beta1.SubjectAccessReview
+		want authorizationv1.SubjectAccessReview
 	}{
 		{
 			attr: authorizer.AttributesRecord{User: &user.DefaultInfo{}},
-			want: v1beta1.SubjectAccessReview{
+			want: authorizationv1.SubjectAccessReview{
 				TypeMeta: expTypeMeta,
-				Spec: v1beta1.SubjectAccessReviewSpec{
-					NonResourceAttributes: &v1beta1.NonResourceAttributes{},
+				Spec: authorizationv1.SubjectAccessReviewSpec{
+					NonResourceAttributes: &authorizationv1.NonResourceAttributes{},
 				},
 			},
 		},
 		{
 			attr: authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "jane"}},
-			want: v1beta1.SubjectAccessReview{
+			want: authorizationv1.SubjectAccessReview{
 				TypeMeta: expTypeMeta,
-				Spec: v1beta1.SubjectAccessReviewSpec{
+				Spec: authorizationv1.SubjectAccessReviewSpec{
 					User:                  "jane",
-					NonResourceAttributes: &v1beta1.NonResourceAttributes{},
+					NonResourceAttributes: &authorizationv1.NonResourceAttributes{},
 				},
 			},
 		},
@@ -503,13 +503,13 @@ func TestWebhook(t *testing.T) {
 				ResourceRequest: true,
 				Path:            "/foo",
 			},
-			want: v1beta1.SubjectAccessReview{
+			want: authorizationv1.SubjectAccessReview{
 				TypeMeta: expTypeMeta,
-				Spec: v1beta1.SubjectAccessReviewSpec{
+				Spec: authorizationv1.SubjectAccessReviewSpec{
 					User:   "jane",
 					UID:    "1",
 					Groups: []string{"group1", "group2"},
-					ResourceAttributes: &v1beta1.ResourceAttributes{
+					ResourceAttributes: &authorizationv1.ResourceAttributes{
 						Verb:        "GET",
 						Namespace:   "kittensandponies",
 						Group:       "group3",
@@ -546,16 +546,16 @@ func TestWebhook(t *testing.T) {
 
 // TestWebhookCache verifies that error responses from the server are not
 // cached, but successful responses are.
-func TestWebhookCache(t *testing.T) {
-	serv := new(mockService)
-	s, err := NewTestServer(serv, serverCert, serverKey, caCert)
+func TestV1WebhookCache(t *testing.T) {
+	serv := new(mockV1Service)
+	s, err := NewV1TestServer(serv, serverCert, serverKey, caCert)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer s.Close()
 
 	// Create an authorizer that caches successful responses "forever" (100 days).
-	wh, err := newAuthorizer(s.URL, clientCert, clientKey, caCert, 2400*time.Hour)
+	wh, err := newV1Authorizer(s.URL, clientCert, clientKey, caCert, 2400*time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}

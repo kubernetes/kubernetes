@@ -87,7 +87,7 @@ func getVolumeLimits(nodeInfo *schedulernodeinfo.NodeInfo, csiNode *storagev1bet
 }
 
 func (c *CSIMaxVolumeLimitChecker) attachableLimitPredicate(
-	pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+	pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
 	// If the new pod doesn't have any volume attached to it, the predicate will always be true
 	if len(pod.Spec.Volumes) == 0 {
 		return true, nil, nil

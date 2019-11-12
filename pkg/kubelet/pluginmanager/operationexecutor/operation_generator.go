@@ -61,7 +61,6 @@ type OperationGenerator interface {
 	// Generates the RegisterPlugin function needed to perform the registration of a plugin
 	GenerateRegisterPluginFunc(
 		socketPath string,
-		foundInDeprecatedDir bool,
 		timestamp time.Time,
 		pluginHandlers map[string]cache.PluginHandler,
 		actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error
@@ -75,7 +74,6 @@ type OperationGenerator interface {
 
 func (og *operationGenerator) GenerateRegisterPluginFunc(
 	socketPath string,
-	foundInDeprecatedDir bool,
 	timestamp time.Time,
 	pluginHandlers map[string]cache.PluginHandler,
 	actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error {
@@ -106,7 +104,7 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 		if infoResp.Endpoint == "" {
 			infoResp.Endpoint = socketPath
 		}
-		if err := handler.ValidatePlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions, foundInDeprecatedDir); err != nil {
+		if err := handler.ValidatePlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions); err != nil {
 			if err = og.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- plugin validation failed with err: %v", err)); err != nil {
 				return fmt.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %v", socketPath, err)
 			}
@@ -115,9 +113,8 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 		// We add the plugin to the actual state of world cache before calling a plugin consumer's Register handle
 		// so that if we receive a delete event during Register Plugin, we can process it as a DeRegister call.
 		err = actualStateOfWorldUpdater.AddPlugin(cache.PluginInfo{
-			SocketPath:           socketPath,
-			FoundInDeprecatedDir: foundInDeprecatedDir,
-			Timestamp:            timestamp,
+			SocketPath: socketPath,
+			Timestamp:  timestamp,
 		})
 		if err != nil {
 			klog.Errorf("RegisterPlugin error -- failed to add plugin at socket %s, err: %v", socketPath, err)

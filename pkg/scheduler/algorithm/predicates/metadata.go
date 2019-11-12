@@ -35,15 +35,15 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-// PredicateMetadata interface represents anything that can access a predicate metadata.
-type PredicateMetadata interface {
-	ShallowCopy() PredicateMetadata
+// Metadata interface represents anything that can access a predicate metadata.
+type Metadata interface {
+	ShallowCopy() Metadata
 	AddPod(addedPod *v1.Pod, node *v1.Node) error
 	RemovePod(deletedPod *v1.Pod, node *v1.Node) error
 }
 
-// PredicateMetadataProducer is a function that computes predicate metadata for a given pod.
-type PredicateMetadataProducer func(pod *v1.Pod, sharedLister schedulerlisters.SharedLister) PredicateMetadata
+// MetadataProducer is a function that computes predicate metadata for a given pod.
+type MetadataProducer func(pod *v1.Pod, sharedLister schedulerlisters.SharedLister) Metadata
 
 // AntiAffinityTerm's topology key value used in predicate metadata
 type topologyPair struct {
@@ -300,27 +300,27 @@ type predicateMetadata struct {
 	podFitsHostPortsMetadata *podFitsHostPortsMetadata
 }
 
-// Ensure that predicateMetadata implements algorithm.PredicateMetadata.
-var _ PredicateMetadata = &predicateMetadata{}
+// Ensure that predicateMetadata implements algorithm.Metadata.
+var _ Metadata = &predicateMetadata{}
 
 // predicateMetadataProducer function produces predicate metadata. It is stored in a global variable below
-// and used to modify the return values of PredicateMetadataProducer
+// and used to modify the return values of MetadataProducer
 type predicateMetadataProducer func(pm *predicateMetadata)
 
 var predicateMetadataProducers = make(map[string]predicateMetadataProducer)
 
-// RegisterPredicateMetadataProducer registers a PredicateMetadataProducer.
+// RegisterPredicateMetadataProducer registers a MetadataProducer.
 func RegisterPredicateMetadataProducer(predicateName string, precomp predicateMetadataProducer) {
 	predicateMetadataProducers[predicateName] = precomp
 }
 
-// EmptyPredicateMetadataProducer returns a no-op MetadataProducer type.
-func EmptyPredicateMetadataProducer(pod *v1.Pod, sharedLister schedulerlisters.SharedLister) PredicateMetadata {
+// EmptyMetadataProducer returns a no-op MetadataProducer type.
+func EmptyMetadataProducer(pod *v1.Pod, sharedLister schedulerlisters.SharedLister) Metadata {
 	return nil
 }
 
 // RegisterPredicateMetadataProducerWithExtendedResourceOptions registers a
-// PredicateMetadataProducer that creates predicate metadata with the provided
+// MetadataProducer that creates predicate metadata with the provided
 // options for extended resources.
 //
 // See the comments in "predicateMetadata" for the explanation of the options.
@@ -330,8 +330,11 @@ func RegisterPredicateMetadataProducerWithExtendedResourceOptions(ignoredExtende
 	})
 }
 
+// MetadataProducerFactory is a factory to produce Metadata.
+type MetadataProducerFactory struct{}
+
 // GetPredicateMetadata returns the predicateMetadata which will be used by various predicates.
-func GetPredicateMetadata(pod *v1.Pod, sharedLister schedulerlisters.SharedLister) PredicateMetadata {
+func (f *MetadataProducerFactory) GetPredicateMetadata(pod *v1.Pod, sharedLister schedulerlisters.SharedLister) Metadata {
 	// If we cannot compute metadata, just return nil
 	if pod == nil {
 		return nil
@@ -675,7 +678,7 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, node *v1.Node) error {
 
 // ShallowCopy copies a metadata struct into a new struct and creates a copy of
 // its maps and slices, but it does not copy the contents of pointer values.
-func (meta *predicateMetadata) ShallowCopy() PredicateMetadata {
+func (meta *predicateMetadata) ShallowCopy() Metadata {
 	newPredMeta := &predicateMetadata{
 		pod:           meta.pod,
 		podBestEffort: meta.podBestEffort,
@@ -685,7 +688,7 @@ func (meta *predicateMetadata) ShallowCopy() PredicateMetadata {
 	newPredMeta.evenPodsSpreadMetadata = meta.evenPodsSpreadMetadata.clone()
 	newPredMeta.serviceAffinityMetadata = meta.serviceAffinityMetadata.clone()
 	newPredMeta.podFitsResourcesMetadata = meta.podFitsResourcesMetadata.clone()
-	return (PredicateMetadata)(newPredMeta)
+	return (Metadata)(newPredMeta)
 }
 
 type affinityTermProperties struct {

@@ -18,7 +18,6 @@ go_library(
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/volume:go_default_library",
-        "//pkg/volume/csi/csiv0:go_default_library",
         "//pkg/volume/csi/nodeinfomanager:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -97,7 +96,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/volume/csi/csiv0:all-srcs",
         "//pkg/volume/csi/fake:all-srcs",
         "//pkg/volume/csi/nodeinfomanager:all-srcs",
         "//pkg/volume/csi/testing:all-srcs",

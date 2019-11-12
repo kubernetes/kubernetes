@@ -28,8 +28,8 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	clientset "k8s.io/client-go/kubernetes"
-	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
-	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
+	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1"
+	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1"
 
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/server"
@@ -43,8 +43,8 @@ func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubel
 		sarClient   authorizationclient.SubjectAccessReviewInterface
 	)
 	if client != nil && !reflect.ValueOf(client).IsNil() {
-		tokenClient = client.AuthenticationV1beta1().TokenReviews()
-		sarClient = client.AuthorizationV1beta1().SubjectAccessReviews()
+		tokenClient = client.AuthenticationV1().TokenReviews()
+		sarClient = client.AuthorizationV1().SubjectAccessReviews()
 	}
 
 	authenticator, err := BuildAuthn(tokenClient, config.Authentication)

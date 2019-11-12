@@ -33,6 +33,7 @@ type BuiltInAuthorizationOptions struct {
 	Modes                       []string
 	PolicyFile                  string
 	WebhookConfigFile           string
+	WebhookVersion              string
 	WebhookCacheAuthorizedTTL   time.Duration
 	WebhookCacheUnauthorizedTTL time.Duration
 }
@@ -40,6 +41,7 @@ type BuiltInAuthorizationOptions struct {
 func NewBuiltInAuthorizationOptions() *BuiltInAuthorizationOptions {
 	return &BuiltInAuthorizationOptions{
 		Modes:                       []string{authzmodes.ModeAlwaysAllow},
+		WebhookVersion:              "v1beta1",
 		WebhookCacheAuthorizedTTL:   5 * time.Minute,
 		WebhookCacheUnauthorizedTTL: 30 * time.Second,
 	}
@@ -98,6 +100,9 @@ func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.WebhookConfigFile, "authorization-webhook-config-file", s.WebhookConfigFile, ""+
 		"File with webhook configuration in kubeconfig format, used with --authorization-mode=Webhook. "+
 		"The API server will query the remote service to determine access on the API server's secure port.")
+
+	fs.StringVar(&s.WebhookVersion, "authorization-webhook-version", s.WebhookVersion, ""+
+		"The API version of the authorization.k8s.io SubjectAccessReview to send to and expect from the webhook.")
 
 	fs.DurationVar(&s.WebhookCacheAuthorizedTTL, "authorization-webhook-cache-authorized-ttl",
 		s.WebhookCacheAuthorizedTTL,

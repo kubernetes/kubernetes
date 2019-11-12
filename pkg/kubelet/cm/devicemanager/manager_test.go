@@ -257,7 +257,6 @@ func setupDevicePlugin(t *testing.T, devs []*pluginapi.Device, pluginSocketName 
 func setupPluginManager(t *testing.T, pluginSocketName string, m Manager) pluginmanager.PluginManager {
 	pluginManager := pluginmanager.NewPluginManager(
 		filepath.Dir(pluginSocketName), /* sockDir */
-		"",                             /* deprecatedSockDir */
 		&record.FakeRecorder{},
 	)
 

@@ -793,7 +793,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	klet.pluginManager = pluginmanager.NewPluginManager(
 		klet.getPluginsRegistrationDir(), /* sockDir */
-		klet.getPluginsDir(),             /* deprecatedSockDir */
 		kubeDeps.Recorder,
 	)
 

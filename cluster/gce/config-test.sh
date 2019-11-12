@@ -444,6 +444,9 @@ SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"
 # Optional: install a default StorageClass
 ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-true}"
 
+# Optional: install volume snapshot CRDs
+ENABLE_VOLUME_SNAPSHOTS="${ENABLE_VOLUME_SNAPSHOTS:-true}"
+
 # Optional: Enable legacy ABAC policy that makes all service accounts superusers.
 # Disabling this by default in tests ensures default RBAC policies are sufficient from 1.6+
 # Upgrade test jobs that go from a version < 1.6 to a version >= 1.6 should override this to be true.

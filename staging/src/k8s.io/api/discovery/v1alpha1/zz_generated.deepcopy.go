@@ -103,6 +103,11 @@ func (in *EndpointPort) DeepCopyInto(out *EndpointPort) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.AppProtocol != nil {
+		in, out := &in.AppProtocol, &out.AppProtocol
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 
