@@ -63,11 +63,7 @@ func NewExampleHandler(supportedVersions []string, permitDeprecatedDir bool) *ex
 	}
 }
 
-func (p *exampleHandler) ValidatePlugin(pluginName string, endpoint string, versions []string, foundInDeprecatedDir bool) error {
-	if foundInDeprecatedDir && !p.permitDeprecatedDir {
-		return fmt.Errorf("device plugin socket was found in a directory that is no longer supported and this test does not permit plugins from deprecated dir")
-	}
-
+func (p *exampleHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
 	p.SendEvent(pluginName, exampleEventValidate)
 
 	n, ok := p.DecreasePluginCount(pluginName)

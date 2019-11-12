@@ -160,7 +160,7 @@ func TestPluginGetVolumeName(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Logf("testing: %s", tc.name)
-		registerFakePlugin(tc.driverName, "endpoint", []string{"0.3.0"}, t)
+		registerFakePlugin(tc.driverName, "endpoint", []string{"1.3.0"}, t)
 		name, err := plug.GetVolumeName(tc.spec)
 		if tc.shouldFail != (err != nil) {
 			t.Fatal("shouldFail does match expected error")
@@ -214,7 +214,7 @@ func TestPluginGetVolumeNameWithInline(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Logf("testing: %s", tc.name)
-		registerFakePlugin(tc.driverName, "endpoint", []string{"0.3.0"}, t)
+		registerFakePlugin(tc.driverName, "endpoint", []string{"1.3.0"}, t)
 		name, err := plug.GetVolumeName(tc.spec)
 		if tc.shouldFail != (err != nil) {
 			t.Fatal("shouldFail does match expected error")
@@ -1307,206 +1307,94 @@ func TestPluginConstructBlockVolumeSpec(t *testing.T) {
 
 func TestValidatePlugin(t *testing.T) {
 	testCases := []struct {
-		pluginName           string
-		endpoint             string
-		versions             []string
-		foundInDeprecatedDir bool
-		shouldFail           bool
+		pluginName string
+		endpoint   string
+		versions   []string
+		shouldFail bool
 	}{
 		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions:             []string{"v1.0.0"},
-			foundInDeprecatedDir: false,
-			shouldFail:           false,
+			pluginName: "test.plugin",
+			endpoint:   "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:   []string{"v1.0.0"},
+			shouldFail: false,
 		},
 		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions:             []string{"0.3.0"},
-			foundInDeprecatedDir: false,
-			shouldFail:           false,
+			pluginName: "test.plugin",
+			endpoint:   "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:   []string{"0.3.0"},
+			shouldFail: true,
 		},
 		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions:             []string{"0.2.0"},
-			foundInDeprecatedDir: false,
-			shouldFail:           false,
+			pluginName: "test.plugin",
+			endpoint:   "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:   []string{"0.2.0"},
+			shouldFail: true,
 		},
 		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions:             []string{"v1.0.0"},
-			foundInDeprecatedDir: true,
-			shouldFail:           true,
+			pluginName: "test.plugin",
+			endpoint:   "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:   []string{"0.2.0", "v0.3.0"},
+			shouldFail: true,
 		},
 		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions:             []string{"v0.3.0"},
-			foundInDeprecatedDir: true,
-			shouldFail:           false,
+			pluginName: "test.plugin",
+			endpoint:   "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:   []string{"0.2.0", "v1.0.0"},
+			shouldFail: false,
 		},
 		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions:             []string{"0.2.0"},
-			foundInDeprecatedDir: true,
-			shouldFail:           false,
+			pluginName: "test.plugin",
+			endpoint:   "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:   []string{"0.2.0", "v1.2.3"},
+			shouldFail: false,
 		},
 		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions:             []string{"0.2.0", "v0.3.0"},
-			foundInDeprecatedDir: false,
-			shouldFail:           false,
+			pluginName: "test.plugin",
+			endpoint:   "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:   []string{"v1.2.3", "v0.3.0"},
+			shouldFail: false,
 		},
 		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions:             []string{"0.2.0", "v0.3.0"},
-			foundInDeprecatedDir: true,
-			shouldFail:           false,
+			pluginName: "test.plugin",
+			endpoint:   "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:   []string{"v1.2.3", "v0.3.0", "2.0.1"},
+			shouldFail: false,
 		},
 		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions:             []string{"0.2.0", "v1.0.0"},
-			foundInDeprecatedDir: false,
-			shouldFail:           false,
+			pluginName: "test.plugin",
+			endpoint:   "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:   []string{"v1.2.3", "4.9.12", "v0.3.0", "2.0.1"},
+			shouldFail: false,
 		},
 		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions:             []string{"0.2.0", "v1.0.0"},
-			foundInDeprecatedDir: true,
-			shouldFail:           false,
+			pluginName: "test.plugin",
+			endpoint:   "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:   []string{"v1.2.3", "boo", "v0.3.0", "2.0.1"},
+			shouldFail: false,
 		},
 		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions:             []string{"0.2.0", "v1.2.3"},
-			foundInDeprecatedDir: false,
-			shouldFail:           false,
+			pluginName: "test.plugin",
+			endpoint:   "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:   []string{"4.9.12", "2.0.1"},
+			shouldFail: true,
 		},
 		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions:             []string{"0.2.0", "v1.2.3"},
-			foundInDeprecatedDir: true,
-			shouldFail:           false,
+			pluginName: "test.plugin",
+			endpoint:   "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:   []string{},
+			shouldFail: true,
 		},
 		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions:             []string{"v1.2.3", "v0.3.0"},
-			foundInDeprecatedDir: false,
-			shouldFail:           false,
-		},
-		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions:             []string{"v1.2.3", "v0.3.0"},
-			foundInDeprecatedDir: true,
-			shouldFail:           false,
-		},
-		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions:             []string{"v1.2.3", "v0.3.0", "2.0.1"},
-			foundInDeprecatedDir: false,
-			shouldFail:           false,
-		},
-		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions:             []string{"v1.2.3", "v0.3.0", "2.0.1"},
-			foundInDeprecatedDir: true,
-			shouldFail:           false,
-		},
-		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions:             []string{"v0.3.0", "2.0.1"},
-			foundInDeprecatedDir: true,
-			shouldFail:           false,
-		},
-		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions:             []string{"v1.2.3", "4.9.12", "v0.3.0", "2.0.1"},
-			foundInDeprecatedDir: false,
-			shouldFail:           false,
-		},
-		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions:             []string{"v1.2.3", "4.9.12", "v0.3.0", "2.0.1"},
-			foundInDeprecatedDir: true,
-			shouldFail:           false,
-		},
-		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions:             []string{"v1.2.3", "boo", "v0.3.0", "2.0.1"},
-			foundInDeprecatedDir: false,
-			shouldFail:           false,
-		},
-		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions:             []string{"v1.2.3", "boo", "v0.3.0", "2.0.1"},
-			foundInDeprecatedDir: true,
-			shouldFail:           false,
-		},
-		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions:             []string{"4.9.12", "2.0.1"},
-			foundInDeprecatedDir: false,
-			shouldFail:           true,
-		},
-		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions:             []string{"4.9.12", "2.0.1"},
-			foundInDeprecatedDir: true,
-			shouldFail:           true,
-		},
-		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions:             []string{},
-			foundInDeprecatedDir: false,
-			shouldFail:           true,
-		},
-		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions:             []string{},
-			foundInDeprecatedDir: true,
-			shouldFail:           true,
-		},
-		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions:             []string{"var", "boo", "foo"},
-			foundInDeprecatedDir: false,
-			shouldFail:           true,
-		},
-		{
-			pluginName:           "test.plugin",
-			endpoint:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions:             []string{"var", "boo", "foo"},
-			foundInDeprecatedDir: true,
-			shouldFail:           true,
+			pluginName: "test.plugin",
+			endpoint:   "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions:   []string{"var", "boo", "foo"},
+			shouldFail: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		// Arrange & Act
-		err := PluginHandler.ValidatePlugin(tc.pluginName, tc.endpoint, tc.versions, tc.foundInDeprecatedDir)
+		err := PluginHandler.ValidatePlugin(tc.pluginName, tc.endpoint, tc.versions)
 
 		// Assert
 		if tc.shouldFail && err == nil {
@@ -1520,84 +1408,40 @@ func TestValidatePlugin(t *testing.T) {
 
 func TestValidatePluginExistingDriver(t *testing.T) {
 	testCases := []struct {
-		pluginName1           string
-		endpoint1             string
-		versions1             []string
-		pluginName2           string
-		endpoint2             string
-		versions2             []string
-		foundInDeprecatedDir2 bool
-		shouldFail            bool
+		pluginName1 string
+		endpoint1   string
+		versions1   []string
+		pluginName2 string
+		endpoint2   string
+		versions2   []string
+		shouldFail  bool
 	}{
 		{
-			pluginName1:           "test.plugin",
-			endpoint1:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions1:             []string{"v1.0.0"},
-			pluginName2:           "test.plugin2",
-			endpoint2:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions2:             []string{"v1.0.0"},
-			foundInDeprecatedDir2: false,
-			shouldFail:            false,
+			pluginName1: "test.plugin",
+			endpoint1:   "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions1:   []string{"v1.0.0"},
+			pluginName2: "test.plugin2",
+			endpoint2:   "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions2:   []string{"v1.0.0"},
+			shouldFail:  false,
 		},
 		{
-			pluginName1:           "test.plugin",
-			endpoint1:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions1:             []string{"v1.0.0"},
-			pluginName2:           "test.plugin2",
-			endpoint2:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions2:             []string{"v1.0.0"},
-			foundInDeprecatedDir2: true,
-			shouldFail:            true,
+			pluginName1: "test.plugin",
+			endpoint1:   "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions1:   []string{"v1.0.0"},
+			pluginName2: "test.plugin",
+			endpoint2:   "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions2:   []string{"v1.0.0"},
+			shouldFail:  true,
 		},
 		{
-			pluginName1:           "test.plugin",
-			endpoint1:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions1:             []string{"v1.0.0"},
-			pluginName2:           "test.plugin",
-			endpoint2:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions2:             []string{"v1.0.0"},
-			foundInDeprecatedDir2: false,
-			shouldFail:            true,
-		},
-		{
-			pluginName1:           "test.plugin",
-			endpoint1:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions1:             []string{"v1.0.0"},
-			pluginName2:           "test.plugin",
-			endpoint2:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions2:             []string{"v1.0.0"},
-			foundInDeprecatedDir2: false,
-			shouldFail:            true,
-		},
-		{
-			pluginName1:           "test.plugin",
-			endpoint1:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions1:             []string{"v1.0.0"},
-			pluginName2:           "test.plugin",
-			endpoint2:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions2:             []string{"v1.0.0"},
-			foundInDeprecatedDir2: true,
-			shouldFail:            true,
-		},
-		{
-			pluginName1:           "test.plugin",
-			endpoint1:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions1:             []string{"v0.3.0", "0.2.0"},
-			pluginName2:           "test.plugin",
-			endpoint2:             "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
-			versions2:             []string{"1.0.0"},
-			foundInDeprecatedDir2: false,
-			shouldFail:            false,
-		},
-		{
-			pluginName1:           "test.plugin",
-			endpoint1:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions1:             []string{"v0.3.0", "0.2.0"},
-			pluginName2:           "test.plugin",
-			endpoint2:             "/var/log/kubelet/plugins/myplugin/csi.sock",
-			versions2:             []string{"1.0.0"},
-			foundInDeprecatedDir2: true,
-			shouldFail:            true,
+			pluginName1: "test.plugin",
+			endpoint1:   "/var/log/kubelet/plugins/myplugin/csi.sock",
+			versions1:   []string{"v0.3.0", "v0.2.0", "v1.0.0"},
+			pluginName2: "test.plugin",
+			endpoint2:   "/var/log/kubelet/plugins_registry/myplugin/csi.sock",
+			versions2:   []string{"v1.0.1"},
+			shouldFail:  false,
 		},
 	}
 
@@ -1605,7 +1449,7 @@ func TestValidatePluginExistingDriver(t *testing.T) {
 		// Arrange & Act
 		highestSupportedVersions1, err := highestSupportedVersion(tc.versions1)
 		if err != nil {
-			t.Fatalf("unexpected error parsing version for testcase: %#v", tc)
+			t.Fatalf("unexpected error parsing version for testcase: %#v: %v", tc, err)
 		}
 
 		csiDrivers.Clear()
@@ -1615,7 +1459,7 @@ func TestValidatePluginExistingDriver(t *testing.T) {
 		})
 
 		// Arrange & Act
-		err = PluginHandler.ValidatePlugin(tc.pluginName2, tc.endpoint2, tc.versions2, tc.foundInDeprecatedDir2)
+		err = PluginHandler.ValidatePlugin(tc.pluginName2, tc.endpoint2, tc.versions2)
 
 		// Assert
 		if tc.shouldFail && err == nil {
@@ -1639,14 +1483,12 @@ func TestHighestSupportedVersion(t *testing.T) {
 			shouldFail:                      false,
 		},
 		{
-			versions:                        []string{"0.3.0"},
-			expectedHighestSupportedVersion: "0.3.0",
-			shouldFail:                      false,
+			versions:   []string{"0.3.0"},
+			shouldFail: true,
 		},
 		{
-			versions:                        []string{"0.2.0"},
-			expectedHighestSupportedVersion: "0.2.0",
-			shouldFail:                      false,
+			versions:   []string{"0.2.0"},
+			shouldFail: true,
 		},
 		{
 			versions:                        []string{"1.0.0"},
@@ -1654,19 +1496,16 @@ func TestHighestSupportedVersion(t *testing.T) {
 			shouldFail:                      false,
 		},
 		{
-			versions:                        []string{"v0.3.0"},
-			expectedHighestSupportedVersion: "0.3.0",
-			shouldFail:                      false,
+			versions:   []string{"v0.3.0"},
+			shouldFail: true,
 		},
 		{
-			versions:                        []string{"0.2.0"},
-			expectedHighestSupportedVersion: "0.2.0",
-			shouldFail:                      false,
+			versions:   []string{"0.2.0"},
+			shouldFail: true,
 		},
 		{
-			versions:                        []string{"0.2.0", "v0.3.0"},
-			expectedHighestSupportedVersion: "0.3.0",
-			shouldFail:                      false,
+			versions:   []string{"0.2.0", "v0.3.0"},
+			shouldFail: true,
 		},
 		{
 			versions:                        []string{"0.2.0", "v1.0.0"},
