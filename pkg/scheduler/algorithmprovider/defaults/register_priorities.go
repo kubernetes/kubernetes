@@ -26,7 +26,11 @@ func init() {
 	// Register functions that extract metadata used by priorities computations.
 	scheduler.RegisterPriorityMetadataProducerFactory(
 		func(args scheduler.PluginFactoryArgs) priorities.MetadataProducer {
-			return priorities.NewMetadataFactory(args.ServiceLister, args.ControllerLister, args.ReplicaSetLister, args.StatefulSetLister, args.HardPodAffinitySymmetricWeight)
+			serviceLister := args.InformerFactory.Core().V1().Services().Lister()
+			controllerLister := args.InformerFactory.Core().V1().ReplicationControllers().Lister()
+			replicaSetLister := args.InformerFactory.Apps().V1().ReplicaSets().Lister()
+			statefulSetLister := args.InformerFactory.Apps().V1().StatefulSets().Lister()
+			return priorities.NewMetadataFactory(serviceLister, controllerLister, replicaSetLister, statefulSetLister, args.HardPodAffinitySymmetricWeight)
 		})
 
 	// ServiceSpreadingPriority is a priority config factory that spreads pods by minimizing
@@ -37,7 +41,8 @@ func init() {
 		priorities.ServiceSpreadingPriority,
 		scheduler.PriorityConfigFactory{
 			MapReduceFunction: func(args scheduler.PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
-				return priorities.NewSelectorSpreadPriority(args.ServiceLister, algorithm.EmptyControllerLister{}, algorithm.EmptyReplicaSetLister{}, algorithm.EmptyStatefulSetLister{})
+				serviceLister := args.InformerFactory.Core().V1().Services().Lister()
+				return priorities.NewSelectorSpreadPriority(serviceLister, algorithm.EmptyControllerLister{}, algorithm.EmptyReplicaSetLister{}, algorithm.EmptyStatefulSetLister{})
 			},
 			Weight: 1,
 		},
@@ -54,7 +59,11 @@ func init() {
 		priorities.SelectorSpreadPriority,
 		scheduler.PriorityConfigFactory{
 			MapReduceFunction: func(args scheduler.PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
-				return priorities.NewSelectorSpreadPriority(args.ServiceLister, args.ControllerLister, args.ReplicaSetLister, args.StatefulSetLister)
+				serviceLister := args.InformerFactory.Core().V1().Services().Lister()
+				controllerLister := args.InformerFactory.Core().V1().ReplicationControllers().Lister()
+				replicaSetLister := args.InformerFactory.Apps().V1().ReplicaSets().Lister()
+				statefulSetLister := args.InformerFactory.Apps().V1().StatefulSets().Lister()
+				return priorities.NewSelectorSpreadPriority(serviceLister, controllerLister, replicaSetLister, statefulSetLister)
 			},
 			Weight: 1,
 		},

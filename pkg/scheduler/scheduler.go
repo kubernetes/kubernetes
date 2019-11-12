@@ -32,8 +32,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	policyv1beta1informers "k8s.io/client-go/informers/policy/v1beta1"
-	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
@@ -47,6 +45,7 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
@@ -264,12 +263,17 @@ func New(client clientset.Interface,
 	stopCh <-chan struct{},
 	opts ...Option) (*Scheduler, error) {
 
+	stopEverything := stopCh
+	if stopEverything == nil {
+		stopEverything = wait.NeverStop
+	}
+
 	options := defaultSchedulerOptions
 	for _, opt := range opts {
 		opt(&options)
 	}
 
-	schedulerCache := internalcache.New(30*time.Second, stopCh)
+	schedulerCache := internalcache.New(30*time.Second, stopEverything)
 	volumeBinder := volumebinder.NewVolumeBinder(
 		client,
 		informerFactory.Core().V1().Nodes(),
@@ -287,44 +291,36 @@ func New(client clientset.Interface,
 	}
 	registry.Merge(options.frameworkOutOfTreeRegistry)
 
-	var pdbInformer policyv1beta1informers.PodDisruptionBudgetInformer
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodDisruptionBudget) {
-		pdbInformer = informerFactory.Policy().V1beta1().PodDisruptionBudgets()
+	snapshot := nodeinfosnapshot.NewEmptySnapshot()
+
+	configurator := &Configurator{
+		client:                         client,
+		informerFactory:                informerFactory,
+		podInformer:                    podInformer,
+		volumeBinder:                   volumeBinder,
+		schedulerCache:                 schedulerCache,
+		StopEverything:                 stopEverything,
+		hardPodAffinitySymmetricWeight: options.hardPodAffinitySymmetricWeight,
+		disablePreemption:              options.disablePreemption,
+		percentageOfNodesToScore:       options.percentageOfNodesToScore,
+		bindTimeoutSeconds:             options.bindTimeoutSeconds,
+		podInitialBackoffSeconds:       options.podInitialBackoffSeconds,
+		podMaxBackoffSeconds:           options.podMaxBackoffSeconds,
+		enableNonPreempting:            utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NonPreemptingPriority),
+		registry:                       registry,
+		plugins:                        options.frameworkPlugins,
+		pluginConfig:                   options.frameworkPluginConfig,
+		pluginConfigProducerRegistry:   options.frameworkConfigProducerRegistry,
+		nodeInfoSnapshot:               snapshot,
+		factoryArgs: PluginFactoryArgs{
+			SharedLister:                   snapshot,
+			InformerFactory:                informerFactory,
+			VolumeBinder:                   volumeBinder,
+			HardPodAffinitySymmetricWeight: options.hardPodAffinitySymmetricWeight,
+		},
+		configProducerArgs: &frameworkplugins.ConfigProducerArgs{},
 	}
 
-	var csiNodeInformer storageinformers.CSINodeInformer
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CSINodeInfo) {
-		csiNodeInformer = informerFactory.Storage().V1().CSINodes()
-	}
-
-	// Set up the configurator which can create schedulers from configs.
-	configurator := NewConfigFactory(&ConfigFactoryArgs{
-		Client:                         client,
-		InformerFactory:                informerFactory,
-		PodInformer:                    podInformer,
-		NodeInformer:                   informerFactory.Core().V1().Nodes(),
-		PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),
-		PvcInformer:                    informerFactory.Core().V1().PersistentVolumeClaims(),
-		ReplicationControllerInformer:  informerFactory.Core().V1().ReplicationControllers(),
-		ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
-		StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
-		ServiceInformer:                informerFactory.Core().V1().Services(),
-		PdbInformer:                    pdbInformer,
-		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
-		CSINodeInformer:                csiNodeInformer,
-		VolumeBinder:                   volumeBinder,
-		SchedulerCache:                 schedulerCache,
-		HardPodAffinitySymmetricWeight: options.hardPodAffinitySymmetricWeight,
-		DisablePreemption:              options.disablePreemption,
-		PercentageOfNodesToScore:       options.percentageOfNodesToScore,
-		BindTimeoutSeconds:             options.bindTimeoutSeconds,
-		PodInitialBackoffSeconds:       options.podInitialBackoffSeconds,
-		PodMaxBackoffSeconds:           options.podMaxBackoffSeconds,
-		Registry:                       registry,
-		PluginConfigProducerRegistry:   options.frameworkConfigProducerRegistry,
-		Plugins:                        options.frameworkPlugins,
-		PluginConfig:                   options.frameworkPluginConfig,
-	})
 	var sched *Scheduler
 	source := schedulerAlgorithmSource
 	switch {
@@ -360,7 +356,7 @@ func New(client clientset.Interface,
 	// Additional tweaks to the config produced by the configurator.
 	sched.Recorder = recorder
 	sched.DisablePreemption = options.disablePreemption
-	sched.StopEverything = stopCh
+	sched.StopEverything = stopEverything
 	sched.podConditionUpdater = &podConditionUpdaterImpl{client}
 	sched.podPreemptor = &podPreemptorImpl{client}
 	sched.scheduledPodsHasSynced = podInformer.Informer().HasSynced
@@ -581,11 +577,11 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	fwk := sched.Framework
 
 	podInfo := sched.NextPod()
-	pod := podInfo.Pod
 	// pod could be nil when schedulerQueue is closed
-	if pod == nil {
+	if podInfo == nil || podInfo.Pod == nil {
 		return
 	}
+	pod := podInfo.Pod
 	if pod.DeletionTimestamp != nil {
 		sched.Recorder.Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", "skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
 		klog.V(3).Infof("Skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
