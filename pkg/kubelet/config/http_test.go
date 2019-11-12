@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -293,12 +292,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		var versionedPods runtime.Object
-		err := legacyscheme.Scheme.Convert(&testCase.pods, &versionedPods, nil)
-		if err != nil {
-			t.Fatalf("%s: error in versioning the pods: %s", testCase.desc, err)
-		}
-		data, err := runtime.Encode(testapi.Default.Codec(), versionedPods)
+		data, err := runtime.Encode(testapi.Default.Codec(), testCase.pods)
 		if err != nil {
 			t.Fatalf("%s: error in encoding the pod: %v", testCase.desc, err)
 		}
