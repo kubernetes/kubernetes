@@ -1264,7 +1264,6 @@ func DumpNodeDebugInfo(c clientset.Interface, nodeNames []string, logFunc func(f
 
 // getKubeletPods retrieves the list of pods on the kubelet.
 func getKubeletPods(c clientset.Interface, node string) (*v1.PodList, error) {
-	var result *v1.PodList
 	var client restclient.Result
 	finished := make(chan struct{}, 1)
 	go func() {
@@ -1280,6 +1279,7 @@ func getKubeletPods(c clientset.Interface, node string) (*v1.PodList, error) {
 	}()
 	select {
 	case <-finished:
+		result := &v1.PodList{}
 		if err := client.Into(result); err != nil {
 			return &v1.PodList{}, err
 		}
