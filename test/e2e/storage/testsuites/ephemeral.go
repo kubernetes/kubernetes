@@ -107,10 +107,9 @@ func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns
 	}
 
 	cleanup := func() {
-		if l.driverCleanup != nil {
-			l.driverCleanup()
-			l.driverCleanup = nil
-		}
+		err := tryFunc(l.driverCleanup)
+		framework.ExpectNoError(err, "while cleaning up driver")
+		l.driverCleanup = nil
 	}
 
 	ginkgo.It("should create read-only inline ephemeral volume", func() {
