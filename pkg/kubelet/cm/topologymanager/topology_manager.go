@@ -202,26 +202,28 @@ func (m *manager) RemoveContainer(containerID string) error {
 }
 
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	klog.Infof("[topologymanager] Topology Admit Handler")
+	// Short circuit to unconditionally admit the pod if the policy is 'none'.
 	if m.policy.Name() == "none" {
-		klog.Infof("[topologymanager] Skipping calculate topology affinity as policy: none")
 		return lifecycle.PodAdmitResult{
 			Admit: true,
 		}
 	}
-	pod := attrs.Pod
-	c := make(map[string]TopologyHint)
 
+	pod := attrs.Pod
+
+	// Otherwise, gather hints from all hint providers and admit based on policy.
+	hints := make(map[string]TopologyHint)
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		result, admitPod := m.calculateAffinity(*pod, container)
+		hint, admitPod := m.calculateAffinity(*pod, container)
 		if !admitPod.Admit {
+			klog.Infof("[topologymanager] Rejecting pod %v, unable to find alignment for container %v", pod.UID, container.Name)
 			return admitPod
 		}
-		c[container.Name] = result
+		hints[container.Name] = hint
 	}
-	m.podTopologyHints[string(pod.UID)] = c
-	klog.Infof("[topologymanager] Topology Affinity for Pod: %v are %v", pod.UID, m.podTopologyHints[string(pod.UID)])
+	m.podTopologyHints[string(pod.UID)] = hints
 
+	klog.Infof("[topologymanager] Admitting pod %v with TopologyHints: %v", pod.UID, m.podTopologyHints[string(pod.UID)])
 	return lifecycle.PodAdmitResult{
 		Admit: true,
 	}
