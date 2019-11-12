@@ -337,6 +337,10 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 			return nil, err
 		}
 
+		if err := c.reconcileELBv2Tags(*loadBalancer.LoadBalancerArn, tags); err != nil {
+			return nil, err
+		}
+
 		// Subnets cannot be modified on NLBs
 		if dirty {
 			loadBalancers, err := c.elbv2.DescribeLoadBalancers(
@@ -353,6 +357,50 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 		}
 	}
 	return loadBalancer, nil
+}
+
+func (c *Cloud) reconcileELBv2Tags(arn string, tags map[string]string) error {
+	elbv2Tags, err := c.elbv2.DescribeTags(&elbv2.DescribeTagsInput{ResourceArns: []*string{aws.String(arn)}})
+	if err != nil {
+		return err
+	}
+
+	existingTags := mapFromELBv2Tags(elbv2Tags.TagDescriptions[0].Tags)
+
+	var removal []*string
+	var additions []*elbv2.Tag
+
+	for k, v := range existingTags {
+		if newValue, ok := tags[k]; ok {
+			if v != newValue {
+				additions = append(additions, &elbv2.Tag{Key: aws.String(k), Value: aws.String(newValue)})
+			}
+		} else {
+			removal = append(removal, aws.String(k))
+		}
+	}
+
+	for k, v := range tags {
+		if _, ok := existingTags[k]; !ok {
+			additions = append(additions, &elbv2.Tag{Key: aws.String(k), Value: aws.String(v)})
+		}
+	}
+
+	if len(removal) != 0 {
+		klog.V(2).Infof("Removing tags from %q", arn)
+		if _, err := c.elbv2.RemoveTags(&elbv2.RemoveTagsInput{ResourceArns: []*string{aws.String(arn)}, TagKeys: removal}); err != nil {
+			return err
+		}
+	}
+
+	if len(additions) != 0 {
+		klog.V(2).Infof("Adding tags to %q", arn)
+		if _, err := c.elbv2.AddTags(&elbv2.AddTagsInput{ResourceArns: []*string{aws.String(arn)}, Tags: additions}); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (c *Cloud) reconcileLBAttributes(loadBalancerArn string, annotations map[string]string) error {
@@ -561,12 +609,7 @@ func (c *Cloud) ensureTargetGroup(targetGroup *elbv2.TargetGroup, serviceName ty
 		}
 
 		if len(tags) != 0 {
-			targetGroupTags := make([]*elbv2.Tag, 0, len(tags))
-			for k, v := range tags {
-				targetGroupTags = append(targetGroupTags, &elbv2.Tag{
-					Key: aws.String(k), Value: aws.String(v),
-				})
-			}
+			targetGroupTags := mapToELBv2Tags(tags)
 			tgArn := aws.StringValue(result.TargetGroups[0].TargetGroupArn)
 			if _, err := c.elbv2.AddTags(&elbv2.AddTagsInput{
 				ResourceArns: []*string{aws.String(tgArn)},
@@ -655,6 +698,10 @@ func (c *Cloud) ensureTargetGroup(targetGroup *elbv2.TargetGroup, serviceName ty
 			}
 			dirty = true
 		}
+	}
+
+	if err := c.reconcileELBv2Tags(aws.StringValue(targetGroup.TargetGroupArn), tags); err != nil {
+		return nil, err
 	}
 
 	// ensure the health check is correct

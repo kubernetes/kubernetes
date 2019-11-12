@@ -307,7 +307,14 @@ func (ec2i *FakeEC2Impl) ModifyInstanceAttribute(request *ec2.ModifyInstanceAttr
 
 // DescribeVpcs returns fake VPC descriptions
 func (ec2i *FakeEC2Impl) DescribeVpcs(request *ec2.DescribeVpcsInput) (*ec2.DescribeVpcsOutput, error) {
-	return &ec2.DescribeVpcsOutput{Vpcs: []*ec2.Vpc{{CidrBlock: aws.String("172.20.0.0/16")}}}, nil
+	return &ec2.DescribeVpcsOutput{Vpcs: []*ec2.Vpc{{
+		CidrBlock: aws.String("172.20.0.0/16"),
+		CidrBlockAssociationSet: []*ec2.VpcCidrBlockAssociation{
+			{
+				CidrBlock: aws.String("172.20.0.0/16"),
+			},
+		},
+	}}}, nil
 }
 
 // FakeMetadata is a fake EC2 metadata service client used for testing
@@ -611,6 +618,16 @@ func (elb *FakeELBV2) ModifyListener(*elbv2.ModifyListenerInput) (*elbv2.ModifyL
 // WaitUntilLoadBalancersDeleted is not implemented but is required for
 // interface conformance
 func (elb *FakeELBV2) WaitUntilLoadBalancersDeleted(*elbv2.DescribeLoadBalancersInput) error {
+	panic("Not implemented")
+}
+
+// DescribeTags is not implemented but is required for interface conformance
+func (elb *FakeELBV2) DescribeTags(*elbv2.DescribeTagsInput) (*elbv2.DescribeTagsOutput, error) {
+	panic("Not implemented")
+}
+
+// RemoveTags is not implemented but is required for interface conformance
+func (elb *FakeELBV2) RemoveTags(*elbv2.RemoveTagsInput) (*elbv2.RemoveTagsOutput, error) {
 	panic("Not implemented")
 }
 

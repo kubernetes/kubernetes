@@ -30,6 +30,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
+	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -61,6 +63,20 @@ func (m *MockedFakeEC2) expectDescribeSecurityGroups(clusterID, groupName string
 		newEc2Filter("group-name", groupName),
 		newEc2Filter("vpc-id", ""),
 	}}).Return([]*ec2.SecurityGroup{{Tags: tags}})
+}
+
+func (m *MockedFakeEC2) expectDescribeSecurityGroupsWithoutFilters(clusterID, groupID string, ingress ...*ec2.IpPermission) {
+	tags := []*ec2.Tag{
+		{Key: aws.String(TagNameKubernetesClusterLegacy), Value: aws.String(clusterID)},
+		{Key: aws.String(fmt.Sprintf("%s%s", TagNameKubernetesClusterPrefix, clusterID)), Value: aws.String(ResourceLifecycleOwned)},
+	}
+
+	m.On("DescribeSecurityGroups", &ec2.DescribeSecurityGroupsInput{}).
+		Return([]*ec2.SecurityGroup{{
+			GroupId:       aws.String(groupID),
+			IpPermissions: ingress,
+			Tags:          tags,
+		}})
 }
 
 func (m *MockedFakeEC2) DescribeVolumes(request *ec2.DescribeVolumesInput) ([]*ec2.Volume, error) {
@@ -134,6 +150,89 @@ func (m *MockedFakeELB) expectConfigureHealthCheck(loadBalancerName *string, exp
 	} else {
 		call.Return(&elb.ConfigureHealthCheckOutput{}, nil)
 	}
+}
+
+type MockedFakeELBv2 struct {
+	*FakeELBV2
+	mock.Mock
+}
+
+func (m *MockedFakeELBv2) AddTags(input *elbv2.AddTagsInput) (*elbv2.AddTagsOutput, error) {
+	args := m.Called(input)
+	return args.Get(0).(*elbv2.AddTagsOutput), args.Error(1)
+}
+
+func (m *MockedFakeELBv2) expectAddTags(arn string, tags map[string]string) {
+	m.On("AddTags", &elbv2.AddTagsInput{ResourceArns: []*string{aws.String(arn)}, Tags: mapToELBv2Tags(tags)}).
+		Return(&elbv2.AddTagsOutput{}, nil)
+}
+
+func (m *MockedFakeELBv2) DescribeListeners(input *elbv2.DescribeListenersInput) (*elbv2.DescribeListenersOutput, error) {
+	args := m.Called(input)
+	return args.Get(0).(*elbv2.DescribeListenersOutput), args.Error(1)
+}
+
+func (m *MockedFakeELBv2) expectDescribeListeners(lbArn string, listeners ...*elbv2.Listener) {
+	m.On("DescribeListeners", &elbv2.DescribeListenersInput{LoadBalancerArn: aws.String(lbArn)}).
+		Return(&elbv2.DescribeListenersOutput{Listeners: listeners}, nil)
+}
+
+func (m *MockedFakeELBv2) DescribeLoadBalancers(input *elbv2.DescribeLoadBalancersInput) (*elbv2.DescribeLoadBalancersOutput, error) {
+	args := m.Called(input)
+	return args.Get(0).(*elbv2.DescribeLoadBalancersOutput), args.Error(1)
+}
+
+func (m *MockedFakeELBv2) expectDescribeLoadBalancersByName(lbName string, detail *elbv2.LoadBalancer) {
+	m.On("DescribeLoadBalancers", &elbv2.DescribeLoadBalancersInput{Names: []*string{aws.String(lbName)}}).
+		Return(&elbv2.DescribeLoadBalancersOutput{LoadBalancers: []*elbv2.LoadBalancer{detail}}, nil)
+}
+
+func (m *MockedFakeELBv2) expectDescribeLoadBalancersByArn(arn string, detail *elbv2.LoadBalancer) {
+	m.On("DescribeLoadBalancers", &elbv2.DescribeLoadBalancersInput{LoadBalancerArns: []*string{aws.String(arn)}}).
+		Return(&elbv2.DescribeLoadBalancersOutput{LoadBalancers: []*elbv2.LoadBalancer{detail}}, nil)
+}
+
+func (m *MockedFakeELBv2) DescribeLoadBalancerAttributes(input *elbv2.DescribeLoadBalancerAttributesInput) (*elbv2.DescribeLoadBalancerAttributesOutput, error) {
+	args := m.Called(input)
+	return args.Get(0).(*elbv2.DescribeLoadBalancerAttributesOutput), args.Error(1)
+}
+
+func (m *MockedFakeELBv2) expectDescribeLoadBalancerAttributes(lbName string, attributes ...*elbv2.LoadBalancerAttribute) {
+	m.On("DescribeLoadBalancerAttributes", &elbv2.DescribeLoadBalancerAttributesInput{LoadBalancerArn: aws.String(lbName)}).
+		Return(&elbv2.DescribeLoadBalancerAttributesOutput{Attributes: attributes}, nil)
+}
+
+func (m *MockedFakeELBv2) DescribeTargetGroups(input *elbv2.DescribeTargetGroupsInput) (*elbv2.DescribeTargetGroupsOutput, error) {
+	args := m.Called(input)
+	return args.Get(0).(*elbv2.DescribeTargetGroupsOutput), args.Error(1)
+}
+
+func (m *MockedFakeELBv2) expectDescribeTargetGroups(lbName string, targetGroups ...*elbv2.TargetGroup) {
+	m.On("DescribeTargetGroups", &elbv2.DescribeTargetGroupsInput{LoadBalancerArn: aws.String(lbName)}).
+		Return(&elbv2.DescribeTargetGroupsOutput{TargetGroups: targetGroups}, nil)
+}
+
+func (m *MockedFakeELBv2) DescribeTags(input *elbv2.DescribeTagsInput) (*elbv2.DescribeTagsOutput, error) {
+	args := m.Called(input)
+	return args.Get(0).(*elbv2.DescribeTagsOutput), args.Error(1)
+}
+
+func (m *MockedFakeELBv2) expectDescribeTags(arn string, tags map[string]string) {
+	m.On("DescribeTags", &elbv2.DescribeTagsInput{ResourceArns: []*string{aws.String(arn)}}).
+		Return(&elbv2.DescribeTagsOutput{TagDescriptions: []*elbv2.TagDescription{{
+			ResourceArn: aws.String(arn),
+			Tags:        mapToELBv2Tags(tags),
+		}}}, nil)
+}
+
+func (m *MockedFakeELBv2) DescribeTargetHealth(input *elbv2.DescribeTargetHealthInput) (*elbv2.DescribeTargetHealthOutput, error) {
+	args := m.Called(input)
+	return args.Get(0).(*elbv2.DescribeTargetHealthOutput), args.Error(1)
+}
+
+func (m *MockedFakeELBv2) expectDescribeTargetHealth(targetGroupArn string, targetHealths ...*elbv2.TargetHealthDescription) {
+	m.On("DescribeTargetHealth", &elbv2.DescribeTargetHealthInput{TargetGroupArn: aws.String(targetGroupArn)}).
+		Return(&elbv2.DescribeTargetHealthOutput{TargetHealthDescriptions: targetHealths}, nil)
 }
 
 func TestReadAWSCloudConfig(t *testing.T) {
@@ -1966,6 +2065,123 @@ func TestNodeNameToProviderID(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestCloud_EnsureLoadBalancer_TagAddedToNLB(t *testing.T) {
+	fakeAWS := newMockedFakeAWSServices(TestClusterID)
+	c, err := newAWSCloud(CloudConfig{}, fakeAWS)
+	require.NoError(t, err)
+
+	fakeAWS.instances = append(fakeAWS.instances, &ec2.Instance{
+		InstanceId:     aws.String("i-02bce90670bb0c7cd"),
+		SecurityGroups: []*ec2.GroupIdentifier{{GroupId: aws.String("k8s-elb-aid")}},
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(TagNameKubernetesClusterLegacy),
+				Value: aws.String(TestClusterID),
+			},
+		},
+	})
+	_, err = fakeAWS.ec2.CreateSubnet(constructSubnet("first-subnet", "eu-west-1a"))
+	require.NoError(t, err)
+	_, err = fakeAWS.ec2.CreateRouteTable(constructRouteTable("first-subnet", true))
+	require.NoError(t, err)
+
+	fakeAWS.elbv2.(*MockedFakeELBv2).expectDescribeLoadBalancersByName("aid", &elbv2.LoadBalancer{
+		LoadBalancerArn: aws.String("expected-lb-arn"),
+		Type:            aws.String(elbv2.LoadBalancerTypeEnumNetwork),
+		VpcId:           aws.String("vpc-id"),
+	})
+	fakeAWS.elbv2.(*MockedFakeELBv2).expectDescribeListeners("expected-lb-arn", &elbv2.Listener{
+		Port:     aws.Int64(53),
+		Protocol: aws.String("TCP"),
+	})
+	fakeAWS.elbv2.(*MockedFakeELBv2).expectDescribeTargetGroups("expected-lb-arn", &elbv2.TargetGroup{
+		TargetGroupArn:      aws.String("expected-tg-arn"),
+		Port:                aws.Int64(31456),
+		HealthCheckProtocol: aws.String("TCP"),
+		HealthCheckPort:     aws.String("31456"),
+		Protocol:            aws.String("TCP"),
+	})
+	fakeAWS.elbv2.(*MockedFakeELBv2).expectDescribeTargetHealth("expected-tg-arn", &elbv2.TargetHealthDescription{
+		HealthCheckPort: nil,
+		Target:          &elbv2.TargetDescription{Id: aws.String("i-02bce90670bb0c7cd")},
+		TargetHealth:    &elbv2.TargetHealth{Reason: aws.String("healthy")},
+	})
+	fakeAWS.elbv2.(*MockedFakeELBv2).expectDescribeTags("expected-tg-arn", map[string]string{
+		"kubernetes.io/service-name":           "/myservice",
+		"KubernetesCluster":                    "clusterid.test",
+		"kubernetes.io/cluster/clusterid.test": "owned",
+	})
+	fakeAWS.elbv2.(*MockedFakeELBv2).expectDescribeTags("expected-lb-arn", map[string]string{
+		"kubernetes.io/service-name":           "/myservice",
+		"KubernetesCluster":                    "clusterid.test",
+		"kubernetes.io/cluster/clusterid.test": "owned",
+	})
+	fakeAWS.elbv2.(*MockedFakeELBv2).expectAddTags("expected-tg-arn", map[string]string{
+		"Key1": "Value1",
+	})
+	fakeAWS.elbv2.(*MockedFakeELBv2).expectAddTags("expected-lb-arn", map[string]string{
+		"Key1": "Value1",
+	})
+	fakeAWS.elbv2.(*MockedFakeELBv2).expectDescribeLoadBalancerAttributes("expected-lb-arn", &elbv2.LoadBalancerAttribute{
+		Key:   aws.String("load_balancing.cross_zone.enabled"),
+		Value: aws.String("false"),
+	}, &elbv2.LoadBalancerAttribute{
+		Key:   aws.String("access_logs.s3.enabled"),
+		Value: aws.String("false"),
+	})
+	fakeAWS.elbv2.(*MockedFakeELBv2).expectDescribeLoadBalancersByArn("expected-lb-arn", &elbv2.LoadBalancer{
+		LoadBalancerArn: aws.String("expected-lb-arn"),
+		Type:            aws.String(elbv2.LoadBalancerTypeEnumNetwork),
+		VpcId:           aws.String("vpc-id"),
+		DNSName:         aws.String("lb-dns-name"),
+		State:           &elbv2.LoadBalancerState{Code: aws.String(elbv2.LoadBalancerStateEnumActive)},
+	})
+	fakeAWS.ec2.(*MockedFakeEC2).expectDescribeSecurityGroupsWithoutFilters(TestClusterID, "k8s-elb-aid", &ec2.IpPermission{
+		FromPort:   aws.Int64(31456),
+		ToPort:     aws.Int64(31456),
+		IpProtocol: aws.String("tcp"),
+		IpRanges: []*ec2.IpRange{
+			{CidrIp: aws.String("172.20.0.0/16"), Description: aws.String("kubernetes.io/rule/nlb/health=aid")},
+			{CidrIp: aws.String("0.0.0.0/0"), Description: aws.String("kubernetes.io/rule/nlb/client=aid")},
+		},
+	})
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "myservice",
+			UID:  "id",
+			Annotations: map[string]string{
+				ServiceAnnotationLoadBalancerType:           "nlb",
+				ServiceAnnotationLoadBalancerAdditionalTags: "Key1=Value1",
+			},
+		},
+		Spec: v1.ServiceSpec{
+			SessionAffinity: v1.ServiceAffinityNone,
+			Ports: []v1.ServicePort{
+				{
+					Name:       "dns-tcp",
+					Protocol:   "TCP",
+					Port:       53,
+					TargetPort: intstr.IntOrString{IntVal: 9153},
+					NodePort:   31456,
+				},
+			},
+		},
+	}
+
+	status, err := c.EnsureLoadBalancer(context.TODO(), TestClusterID, svc, []*v1.Node{{
+		ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: "id1"},
+		Spec: v1.NodeSpec{
+			ProviderID: "aws:///eu-west-1a/i-02bce90670bb0c7cd",
+		},
+	}})
+
+	assert.NoError(t, err)
+	assert.Equal(t, "lb-dns-name", status.Ingress[0].Hostname)
+
+	fakeAWS.elbv2.(*MockedFakeELBv2).AssertExpectations(t)
+}
+
 func informerSynced() bool {
 	return true
 }
@@ -1978,5 +2194,6 @@ func newMockedFakeAWSServices(id string) *FakeAWSServices {
 	s := NewFakeAWSServices(id)
 	s.ec2 = &MockedFakeEC2{FakeEC2Impl: s.ec2.(*FakeEC2Impl)}
 	s.elb = &MockedFakeELB{FakeELB: s.elb.(*FakeELB)}
+	s.elbv2 = &MockedFakeELBv2{FakeELBV2: s.elbv2.(*FakeELBV2)}
 	return s
 }

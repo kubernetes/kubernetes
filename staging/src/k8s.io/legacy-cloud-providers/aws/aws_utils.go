@@ -20,6 +20,7 @@ package aws
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/elbv2"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -44,4 +45,24 @@ func stringSetFromPointers(in []*string) sets.String {
 		out.Insert(aws.StringValue(in[i]))
 	}
 	return out
+}
+
+func mapToELBv2Tags(in map[string]string) []*elbv2.Tag {
+	targetGroupTags := make([]*elbv2.Tag, 0, len(in))
+	for k, v := range in {
+		targetGroupTags = append(targetGroupTags, &elbv2.Tag{
+			Key: aws.String(k), Value: aws.String(v),
+		})
+	}
+
+	return targetGroupTags
+}
+
+func mapFromELBv2Tags(in []*elbv2.Tag) map[string]string {
+	tags := map[string]string{}
+	for _, v := range in {
+		tags[*v.Key] = *v.Value
+	}
+
+	return tags
 }
