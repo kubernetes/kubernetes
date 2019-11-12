@@ -179,7 +179,19 @@ func unmapBindMountDevice(v VolumePathHandler, mapPath string, linkName string) 
 		return checkErr
 	} else if !isMountExist {
 		klog.Warningf("Warning: Unmap skipped because bind mount does not exist on the path: %v", linkPath)
-		// TODO: consider deleting empty file if it exists
+
+		// Check if linkPath still exists
+		if _, err := os.Stat(linkPath); err != nil {
+			if !os.IsNotExist(err) {
+				return fmt.Errorf("failed to check if path %s exists: %v", linkPath, err)
+			}
+			// linkPath has already been removed
+			return nil
+		}
+		// Remove file
+		if err := os.Remove(linkPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to remove file %s: %v", linkPath, err)
+		}
 		return nil
 	}
 
