@@ -42,6 +42,8 @@ func (t *testInitData) CertificateWriteDir() string          { return "" }
 func (t *testInitData) CertificateDir() string               { return "" }
 func (t *testInitData) KubeConfigDir() string                { return "" }
 func (t *testInitData) KubeConfigPath() string               { return "" }
+func (t *testInitData) RealKubeConfigDir() string            { return "" }
+func (t *testInitData) RealKubeConfigPath() string           { return "" }
 func (t *testInitData) ManifestDir() string                  { return "" }
 func (t *testInitData) KubeletDir() string                   { return "" }
 func (t *testInitData) ExternalCA() bool                     { return false }

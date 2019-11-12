@@ -39,6 +39,8 @@ type InitData interface {
 	CertificateDir() string
 	KubeConfigDir() string
 	KubeConfigPath() string
+	RealKubeConfigDir() string
+	RealKubeConfigPath() string
 	ManifestDir() string
 	KubeletDir() string
 	ExternalCA() bool

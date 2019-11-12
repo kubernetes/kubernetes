@@ -112,6 +112,8 @@ type initData struct {
 	dryRun                  bool
 	kubeconfigDir           string
 	kubeconfigPath          string
+	realkubeconfigDir       string
+	realkubeconfigPath      string
 	ignorePreflightErrors   sets.String
 	certificatesDir         string
 	dryRunDir               string
@@ -404,6 +406,8 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		dryRunDir:               dryRunDir,
 		kubeconfigDir:           options.kubeconfigDir,
 		kubeconfigPath:          options.kubeconfigPath,
+		realkubeconfigDir:       options.kubeconfigDir,
+		realkubeconfigPath:      options.kubeconfigPath,
 		ignorePreflightErrors:   ignorePreflightErrorsSet,
 		externalCA:              externalCA,
 		outputWriter:            out,
@@ -480,6 +484,18 @@ func (d *initData) KubeConfigPath() string {
 		d.kubeconfigPath = filepath.Join(d.dryRunDir, kubeadmconstants.AdminKubeConfigFileName)
 	}
 	return d.kubeconfigPath
+}
+
+// RealKubeConfigDir returns the path of the non-dryRun Kubernetes configuration folder or the temporary folder path in case of DryRun.
+// This is useful if you would like to determine if it may be possible to connect to an apiserver during a dryRun.
+func (d *initData) RealKubeConfigDir() string {
+	return d.realkubeconfigDir
+}
+
+// RealKubeConfigPath returns the path to the non-dryRun kubeconfig file to use for connecting to Kubernetes
+// This is useful if you would like to determine if it may be possible to connect to an apiserver during a dryRun.
+func (d *initData) RealKubeConfigPath() string {
+	return d.realkubeconfigPath
 }
 
 // ManifestDir returns the path where manifest should be stored or the temporary folder path in case of DryRun.

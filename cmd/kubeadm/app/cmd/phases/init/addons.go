@@ -86,24 +86,22 @@ func NewAddonPhase() workflow.Phase {
 	}
 }
 
-func getInitData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, bool, string, error) {
+func getInitData(c workflow.RunData) (InitData, *kubeadmapi.InitConfiguration, clientset.Interface, error) {
 	data, ok := c.(InitData)
 	if !ok {
-		return nil, nil, true, "", errors.New("addon phase invoked with an invalid data struct")
+		return data, nil, nil, errors.New("addon phase invoked with an invalid data struct")
 	}
 	cfg := data.Cfg()
-	dryRun := data.DryRun()
-	kubeConfigPath := data.KubeConfigPath()
 	client, err := data.Client()
 	if err != nil {
-		return nil, nil, dryRun, kubeConfigPath, err
+		return data, nil, nil, err
 	}
-	return cfg, client, dryRun, kubeConfigPath, err
+	return data, cfg, client, err
 }
 
 // runCoreDNSAddon installs CoreDNS addon to a Kubernetes cluster
 func runCoreDNSAddon(c workflow.RunData) error {
-	cfg, client, _, _, err := getInitData(c)
+	_, cfg, client, err := getInitData(c)
 	if err != nil {
 		return err
 	}
@@ -115,7 +113,7 @@ func runCoreDNSAddon(c workflow.RunData) error {
 
 // runKubeProxyAddon installs KubeProxy addon to a Kubernetes cluster
 func runKubeProxyAddon(c workflow.RunData) error {
-	cfg, client, _, _, err := getInitData(c)
+	_, cfg, client, err := getInitData(c)
 	if err != nil {
 		return err
 	}
@@ -125,14 +123,14 @@ func runKubeProxyAddon(c workflow.RunData) error {
 	return proxyaddon.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client)
 }
 
-// runAddonInstaller executes the addon-installer
+// runAddonInstaller executes the addon-installer to apply the default or user-configured addons
 func runAddonInstaller(c workflow.RunData) error {
-	cfg, _, dryRun, kubeConfigPath, err := getInitData(c)
+	initData, cfg, _, err := getInitData(c)
 	if err != nil {
 		return err
 	}
 	if features.Enabled(cfg.ClusterConfiguration.FeatureGates, features.AddonInstaller) {
-		return installeraddon.ApplyAddonConfiguration(cfg, dryRun, kubeConfigPath)
+		return installeraddon.ApplyAddonConfiguration(cfg, initData.DryRun(), initData.RealKubeConfigPath())
 	}
 	return nil
 }

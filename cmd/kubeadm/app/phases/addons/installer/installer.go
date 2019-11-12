@@ -29,7 +29,11 @@ import (
 	addoninstall "sigs.k8s.io/addon-operators/installer/install"
 )
 
-func ApplyAddonConfiguration(cfg *kubeadmapi.InitConfiguration, dryRun bool, kubeConfigPath string) (err error) {
+// ApplyAddonConfiguration invokes the sigs.k8s.io/addon-operators/installer library to apply addons to the cluster.
+// It fetches the AddonInstallerConfiguration component config from the InitConfiguration.
+// `realKubeConfigPath` should be the path of a potential kubeconfig for an APIServer.
+// If `realKubeConfigPath` does not stat, the installer's runtime.ServerDryRun will not be enabled.
+func ApplyAddonConfiguration(cfg *kubeadmapi.InitConfiguration, dryRun bool, realKubeConfigPath string) (err error) {
 	installCfg := cfg.ClusterConfiguration.ComponentConfigs.AddonInstaller
 	if installCfg == nil {
 		return errors.New("addoninstaller phase invoked with nil AddonInstaller ComponentConfig")
@@ -48,13 +52,12 @@ func ApplyAddonConfiguration(cfg *kubeadmapi.InitConfiguration, dryRun bool, kub
 	// TODO: diff addons and prune ones that are no longer declared
 
 	r := addoninstall.Runtime{
-		Config:         installCfg,
-		Stdout:         os.Stdout,
-		Stderr:         os.Stderr,
-		KubeConfigPath: kubeConfigPath,
+		Config: installCfg,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
 	}
-	fmt.Println("kubeConfigPath", kubeConfigPath)
-	if _, err := os.Stat(kubeConfigPath); err != nil {
+	if _, err := os.Stat(realKubeConfigPath); err == nil {
+		r.KubeConfigPath = realKubeConfigPath
 		r.ServerDryRun = true
 	}
 
