@@ -67,9 +67,11 @@ func (s *storageLeases) ListLeases() ([]string, error) {
 		return nil, err
 	}
 
-	ipList := make([]string, len(ipInfoList.Items))
-	for i, ip := range ipInfoList.Items {
-		ipList[i] = ip.Subsets[0].Addresses[0].IP
+	ipList := make([]string, 0, len(ipInfoList.Items))
+	for _, ip := range ipInfoList.Items {
+		if len(ip.Subsets) > 0 && len(ip.Subsets[0].Addresses) > 0 && len(ip.Subsets[0].Addresses[0].IP) > 0 {
+			ipList = append(ipList, ip.Subsets[0].Addresses[0].IP)
+		}
 	}
 
 	klog.V(6).Infof("Current master IPs listed in storage are %v", ipList)
