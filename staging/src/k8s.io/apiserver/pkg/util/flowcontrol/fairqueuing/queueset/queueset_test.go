@@ -32,16 +32,24 @@ import (
 type uniformScenario []uniformClient
 
 type uniformClient struct {
-	hash          uint64
-	nThreads      int
-	nCalls        int
-	execDuration  time.Duration
+	hash     uint64
+	nThreads int
+	nCalls   int
+	// duration for a simulated synchronous call
+	execDuration time.Duration
+	// duration for simulated "other work"
 	thinkDuration time.Duration
 }
 
-// exerciseQueueSetUniformScenario.  Simple logic, only works if each
-// client's offered load is at least as large as its fair share of
-// capacity.
+// exerciseQueueSetUniformScenario runs a scenario based on the given set of uniform clients.
+// Each uniform client specifies a number of threads, each of which alternates between thinking
+// and making a synchronous request through the QueueSet.
+// This function measures how much concurrency each client got, on average, over
+// the intial totalDuration and tests to see whether they all got about the same amount.
+// Each client needs to be demanding enough to use this amount, otherwise the fair result
+// is not equal amounts and the simple test in this function would not accurately test fairness.
+// expectPass indicates whether the QueueSet is expected to be fair.
+// expectedAllRequests indicates whether all requests are expected to get dispatched.
 func exerciseQueueSetUniformScenario(t *testing.T, qs fq.QueueSet, sc uniformScenario,
 	totalDuration time.Duration, expectPass bool, expectedAllRequests bool,
 	clk *clock.FakeEventClock, counter counter.GoRoutineCounter) {
@@ -109,6 +117,18 @@ func exerciseQueueSetUniformScenario(t *testing.T, qs fq.QueueSet, sc uniformSce
 		t.Errorf("Expected all requests to be successful but got %v failed requests", failedCount)
 	} else if !expectedAllRequests && failedCount == 0 {
 		t.Errorf("Expected failed requests but all requests succeeded")
+	}
+}
+
+func ClockWait(clk *clock.FakeEventClock, counter counter.GoRoutineCounter, duration time.Duration) {
+	dunch := make(chan struct{})
+	clk.EventAfterDuration(func(time.Time) {
+		counter.Add(1)
+		close(dunch)
+	}, duration)
+	counter.Add(-1)
+	select {
+	case <-dunch:
 	}
 }
 
@@ -197,16 +217,4 @@ func TestTimeout(t *testing.T) {
 	exerciseQueueSetUniformScenario(t, qs, []uniformClient{
 		{1001001001, 5, 100, time.Second, time.Second},
 	}, time.Second*10, true, false, clk, counter)
-}
-
-func ClockWait(clk *clock.FakeEventClock, counter counter.GoRoutineCounter, duration time.Duration) {
-	dunch := make(chan struct{})
-	clk.EventAfterDuration(func(time.Time) {
-		counter.Add(1)
-		close(dunch)
-	}, duration)
-	counter.Add(-1)
-	select {
-	case <-dunch:
-	}
 }
