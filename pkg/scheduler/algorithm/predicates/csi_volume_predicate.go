@@ -20,16 +20,13 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
-	v1beta1storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -46,7 +43,7 @@ type InTreeToCSITranslator interface {
 
 // CSIMaxVolumeLimitChecker defines predicate needed for counting CSI volumes
 type CSIMaxVolumeLimitChecker struct {
-	csiNodeLister v1beta1storagelisters.CSINodeLister
+	csiNodeLister storagelisters.CSINodeLister
 	pvLister      corelisters.PersistentVolumeLister
 	pvcLister     corelisters.PersistentVolumeClaimLister
 	scLister      storagelisters.StorageClassLister
@@ -58,7 +55,7 @@ type CSIMaxVolumeLimitChecker struct {
 
 // NewCSIMaxVolumeLimitPredicate returns a predicate for counting CSI volumes
 func NewCSIMaxVolumeLimitPredicate(
-	csiNodeLister v1beta1storagelisters.CSINodeLister, pvLister corelisters.PersistentVolumeLister, pvcLister corelisters.PersistentVolumeClaimLister, scLister storagelisters.StorageClassLister) FitPredicate {
+	csiNodeLister storagelisters.CSINodeLister, pvLister corelisters.PersistentVolumeLister, pvcLister corelisters.PersistentVolumeClaimLister, scLister storagelisters.StorageClassLister) FitPredicate {
 	c := &CSIMaxVolumeLimitChecker{
 		csiNodeLister:        csiNodeLister,
 		pvLister:             pvLister,
@@ -70,7 +67,7 @@ func NewCSIMaxVolumeLimitPredicate(
 	return c.attachableLimitPredicate
 }
 
-func getVolumeLimits(nodeInfo *schedulernodeinfo.NodeInfo, csiNode *storagev1beta1.CSINode) map[v1.ResourceName]int64 {
+func getVolumeLimits(nodeInfo *schedulernodeinfo.NodeInfo, csiNode *storagev1.CSINode) map[v1.ResourceName]int64 {
 	// TODO: stop getting values from Node object in v1.18
 	nodeVolumeLimits := nodeInfo.VolumeLimits()
 	if csiNode != nil {
@@ -90,10 +87,6 @@ func (c *CSIMaxVolumeLimitChecker) attachableLimitPredicate(
 	pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
 	// If the new pod doesn't have any volume attached to it, the predicate will always be true
 	if len(pod.Spec.Volumes) == 0 {
-		return true, nil, nil
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
 		return true, nil, nil
 	}
 
@@ -160,7 +153,7 @@ func (c *CSIMaxVolumeLimitChecker) attachableLimitPredicate(
 }
 
 func (c *CSIMaxVolumeLimitChecker) filterAttachableVolumes(
-	csiNode *storagev1beta1.CSINode, volumes []v1.Volume, namespace string, result map[string]string) error {
+	csiNode *storagev1.CSINode, volumes []v1.Volume, namespace string, result map[string]string) error {
 	for _, vol := range volumes {
 		// CSI volumes can only be used as persistent volumes
 		if vol.PersistentVolumeClaim == nil {
@@ -195,7 +188,7 @@ func (c *CSIMaxVolumeLimitChecker) filterAttachableVolumes(
 // getCSIDriverInfo returns the CSI driver name and volume ID of a given PVC.
 // If the PVC is from a migrated in-tree plugin, this function will return
 // the information of the CSI driver that the plugin has been migrated to.
-func (c *CSIMaxVolumeLimitChecker) getCSIDriverInfo(csiNode *storagev1beta1.CSINode, pvc *v1.PersistentVolumeClaim) (string, string) {
+func (c *CSIMaxVolumeLimitChecker) getCSIDriverInfo(csiNode *storagev1.CSINode, pvc *v1.PersistentVolumeClaim) (string, string) {
 	pvName := pvc.Spec.VolumeName
 	namespace := pvc.Namespace
 	pvcName := pvc.Name
@@ -250,7 +243,7 @@ func (c *CSIMaxVolumeLimitChecker) getCSIDriverInfo(csiNode *storagev1beta1.CSIN
 }
 
 // getCSIDriverInfoFromSC returns the CSI driver name and a random volume ID of a given PVC's StorageClass.
-func (c *CSIMaxVolumeLimitChecker) getCSIDriverInfoFromSC(csiNode *storagev1beta1.CSINode, pvc *v1.PersistentVolumeClaim) (string, string) {
+func (c *CSIMaxVolumeLimitChecker) getCSIDriverInfoFromSC(csiNode *storagev1.CSINode, pvc *v1.PersistentVolumeClaim) (string, string) {
 	namespace := pvc.Namespace
 	pvcName := pvc.Name
 	scName := v1helper.GetPersistentVolumeClaimClass(pvc)

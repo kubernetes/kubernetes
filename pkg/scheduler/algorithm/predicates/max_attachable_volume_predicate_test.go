@@ -19,18 +19,14 @@ package predicates
 import (
 	"os"
 	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
-	"k8s.io/kubernetes/pkg/features"
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -848,31 +844,6 @@ func TestVolumeCountConflicts(t *testing.T) {
 
 	expectedFailureReasons := []PredicateFailureReason{ErrMaxVolumeCountExceeded}
 
-	// running attachable predicate tests without feature gate and no limit present on nodes
-	for _, test := range tests {
-		os.Setenv(KubeMaxPDVols, strconv.Itoa(test.maxVols))
-		node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
-		pred := NewMaxPDVolumeCountPredicate(test.filterName,
-			getFakeCSINodeLister(csiNode),
-			getFakeStorageClassLister(test.filterName),
-			getFakePVLister(test.filterName),
-			getFakePVCLister(test.filterName))
-
-		factory := &MetadataProducerFactory{}
-		fits, reasons, err := pred(test.newPod, factory.GetPredicateMetadata(test.newPod, nil), node)
-		if err != nil {
-			t.Errorf("[%s]%s: unexpected error: %v", test.filterName, test.test, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("[%s]%s: unexpected failure reasons: %v, want: %v", test.filterName, test.test, reasons, expectedFailureReasons)
-		}
-		if fits != test.fits {
-			t.Errorf("[%s]%s: expected %v, got %v", test.filterName, test.test, test.fits, fits)
-		}
-	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()
-
 	// running attachable predicate tests with feature gate and limit present on nodes
 	for _, test := range tests {
 		node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
@@ -1104,7 +1075,7 @@ func TestMaxVolumeFuncM4WithBothBetaAndStableLabels(t *testing.T) {
 	}
 }
 
-func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int64, driverNames ...string) (*schedulernodeinfo.NodeInfo, *v1beta1.CSINode) {
+func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int64, driverNames ...string) (*schedulernodeinfo.NodeInfo, *storagev1.CSINode) {
 	nodeInfo := schedulernodeinfo.NewNodeInfo(pods...)
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "node-for-max-pd-test-1"},
@@ -1112,7 +1083,7 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 			Allocatable: v1.ResourceList{},
 		},
 	}
-	var csiNode *v1beta1.CSINode
+	var csiNode *storagev1.CSINode
 
 	addLimitToNode := func() {
 		for _, driver := range driverNames {
@@ -1121,10 +1092,10 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 	}
 
 	initCSINode := func() {
-		csiNode = &v1beta1.CSINode{
+		csiNode = &storagev1.CSINode{
 			ObjectMeta: metav1.ObjectMeta{Name: "csi-node-for-max-pd-test-1"},
-			Spec: v1beta1.CSINodeSpec{
-				Drivers: []v1beta1.CSINodeDriver{},
+			Spec: storagev1.CSINodeSpec{
+				Drivers: []storagev1.CSINodeDriver{},
 			},
 		}
 	}
@@ -1132,12 +1103,12 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 	addDriversCSINode := func(addLimits bool) {
 		initCSINode()
 		for _, driver := range driverNames {
-			driver := v1beta1.CSINodeDriver{
+			driver := storagev1.CSINodeDriver{
 				Name:   driver,
 				NodeID: "node-for-max-pd-test-1",
 			}
 			if addLimits {
-				driver.Allocatable = &v1beta1.VolumeNodeResources{
+				driver.Allocatable = &storagev1.VolumeNodeResources{
 					Count: utilpointer.Int32Ptr(int32(limit)),
 				}
 			}

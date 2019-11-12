@@ -552,7 +552,7 @@ func newConfigFactoryWithFrameworkRegistry(
 		ServiceInformer:                informerFactory.Core().V1().Services(),
 		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
-		CSINodeInformer:                informerFactory.Storage().V1beta1().CSINodes(),
+		CSINodeInformer:                informerFactory.Storage().V1().CSINodes(),
 		HardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
 		DisablePreemption:              disablePodPreemption,
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,

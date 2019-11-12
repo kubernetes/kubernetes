@@ -106,6 +106,7 @@ func InitHostPathCSIDriver() testsuites.TestDriver {
 		testsuites.CapPVCDataSource:       true,
 		testsuites.CapControllerExpansion: true,
 		testsuites.CapSingleNodeVolume:    true,
+		testsuites.CapVolumeLimits:        true,
 	}
 	return initHostPathCSIDriver("csi-hostpath",
 		capabilities,

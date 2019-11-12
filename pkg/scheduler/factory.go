@@ -34,13 +34,11 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
 	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
-	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
-	storagelistersv1beta1 "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
@@ -93,7 +91,7 @@ type Configurator struct {
 	// a means to list all StorageClasses
 	storageClassLister storagelistersv1.StorageClassLister
 	// a means to list all CSINodes
-	csiNodeLister storagelistersv1beta1.CSINodeLister
+	csiNodeLister storagelistersv1.CSINodeLister
 	// a means to list all Nodes
 	nodeLister corelisters.NodeLister
 	// a means to list all Pods
@@ -154,7 +152,7 @@ type ConfigFactoryArgs struct {
 	ServiceInformer                coreinformers.ServiceInformer
 	PdbInformer                    policyinformers.PodDisruptionBudgetInformer
 	StorageClassInformer           storageinformersv1.StorageClassInformer
-	CSINodeInformer                storageinformersv1beta1.CSINodeInformer
+	CSINodeInformer                storageinformersv1.CSINodeInformer
 	VolumeBinder                   *volumebinder.VolumeBinder
 	SchedulerCache                 internalcache.Cache
 	HardPodAffinitySymmetricWeight int32
@@ -184,7 +182,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
 		storageClassLister = args.StorageClassInformer.Lister()
 	}
 
-	var csiNodeLister storagelistersv1beta1.CSINodeLister
+	var csiNodeLister storagelistersv1.CSINodeLister
 	if args.CSINodeInformer != nil {
 		csiNodeLister = args.CSINodeInformer.Lister()
 	}
