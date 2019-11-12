@@ -252,11 +252,15 @@ func (tc *Controller) processTTL(job *batch.Job) (expired bool, err error) {
 	}
 
 	// TTL has expired
-	if *t <= 0 {
+	if *t < 0 {
 		return true, nil
 	}
-
-	tc.enqueueAfter(job, *t)
+	if *t == 0 {
+		klog.Infof("enqueuing job %v", job)
+		tc.enqueue(job)
+	} else {
+		tc.enqueueAfter(job, *t)
+	}
 	return false, nil
 }
 
