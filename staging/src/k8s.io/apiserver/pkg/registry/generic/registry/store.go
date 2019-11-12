@@ -933,7 +933,7 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 		if err == nil && deleteImmediately && preconditions.ResourceVersion != nil {
 			accessor, err = meta.Accessor(out)
 			if err != nil {
-				return out, false, kubeerr.NewInternalError(err)
+				return out, false, apierrors.NewInternalError(err)
 			}
 			resourceVersion := accessor.GetResourceVersion()
 			preconditions.ResourceVersion = &resourceVersion

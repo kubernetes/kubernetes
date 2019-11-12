@@ -27,7 +27,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -277,7 +277,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				attachmentName := fmt.Sprintf("csi-%x", attachmentHash)
 				_, err = m.cs.StorageV1().VolumeAttachments().Get(attachmentName, metav1.GetOptions{})
 				if err != nil {
-					if errors.IsNotFound(err) {
+					if apierrors.IsNotFound(err) {
 						if !test.disableAttach {
 							framework.ExpectNoError(err, "Expected VolumeAttachment but none was found")
 						}
@@ -618,7 +618,7 @@ func checkCSINodeForLimits(nodeName string, driverName string, cs clientset.Inte
 
 	waitErr := wait.PollImmediate(10*time.Second, csiNodeLimitUpdateTimeout, func() (bool, error) {
 		csiNode, err := cs.StorageV1().CSINodes().Get(nodeName, metav1.GetOptions{})
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
 		attachLimit = getVolumeLimitFromCSINode(csiNode, driverName)
@@ -809,7 +809,7 @@ func waitForCSIDriver(cs clientset.Interface, driverName string) error {
 	framework.Logf("waiting up to %v for CSIDriver %q", timeout, driverName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(framework.Poll) {
 		_, err := cs.StorageV1beta1().CSIDrivers().Get(driverName, metav1.GetOptions{})
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			return err
 		}
 	}

@@ -26,7 +26,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -79,7 +79,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		var err error
 		for _, pair := range priorityPairs {
 			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: pair.name}, Value: pair.value})
-			framework.ExpectEqual(err == nil || errors.IsAlreadyExists(err), true)
+			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 		}
 
 		e2enode.WaitForTotalHealthy(cs, time.Minute)
@@ -143,7 +143,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		})
 		// Make sure that the lowest priority pod is deleted.
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(pods[0].Name, metav1.GetOptions{})
-		podDeleted := (err != nil && errors.IsNotFound(err)) ||
+		podDeleted := (err != nil && apierrors.IsNotFound(err)) ||
 			(err == nil && preemptedPod.DeletionTimestamp != nil)
 		framework.ExpectEqual(podDeleted, true)
 		// Other pods (mid priority ones) should be present.
@@ -198,7 +198,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			// Clean-up the critical pod
 			// Always run cleanup to make sure the pod is properly cleaned up.
 			err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete("critical-pod", metav1.NewDeleteOptions(0))
-			if err != nil && !errors.IsNotFound(err) {
+			if err != nil && !apierrors.IsNotFound(err) {
 				framework.Failf("Error cleanup pod `%s/%s`: %v", metav1.NamespaceSystem, "critical-pod", err)
 			}
 		}()
@@ -212,7 +212,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		})
 		// Make sure that the lowest priority pod is deleted.
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(pods[0].Name, metav1.GetOptions{})
-		podDeleted := (err != nil && errors.IsNotFound(err)) ||
+		podDeleted := (err != nil && apierrors.IsNotFound(err)) ||
 			(err == nil && preemptedPod.DeletionTimestamp != nil)
 		framework.ExpectEqual(podDeleted, true)
 		// Other pods (mid priority ones) should be present.
@@ -301,9 +301,9 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			_, err := cs.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: priorityName}, Value: priorityVal})
 			if err != nil {
 				framework.Logf("Failed to create priority '%v/%v': %v", priorityName, priorityVal, err)
-				framework.Logf("Reason: %v. Msg: %v", errors.ReasonForError(err), err)
+				framework.Logf("Reason: %v. Msg: %v", apierrors.ReasonForError(err), err)
 			}
-			framework.ExpectEqual(err == nil || errors.IsAlreadyExists(err), true)
+			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 		}
 	})
 

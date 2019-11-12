@@ -2660,7 +2660,7 @@ func waitForRCToStabilize(c clientset.Interface, ns, name string, timeout time.D
 	_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
 		switch event.Type {
 		case watch.Deleted:
-			return false, apierrs.NewNotFound(schema.GroupResource{Resource: "replicationcontrollers"}, "")
+			return false, apierrors.NewNotFound(schema.GroupResource{Resource: "replicationcontrollers"}, "")
 		}
 		switch rc := event.Object.(type) {
 		case *v1.ReplicationController:

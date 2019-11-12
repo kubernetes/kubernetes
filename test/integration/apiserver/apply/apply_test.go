@@ -28,7 +28,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -276,7 +276,7 @@ func TestCreateOnApplyFailsWithUID(t *testing.T) {
 		}`)).
 		Do().
 		Get()
-	if !errors.IsConflict(err) {
+	if !apierrors.IsConflict(err) {
 		t.Fatalf("Expected conflict error but got: %v", err)
 	}
 }
@@ -348,7 +348,7 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Expecting to get conflicts when applying object")
 	}
-	status, ok := err.(*errors.StatusError)
+	status, ok := err.(*apierrors.StatusError)
 	if !ok {
 		t.Fatalf("Expecting to get conflicts as API error")
 	}
@@ -849,7 +849,7 @@ func TestApplyFailsWithVersionMismatch(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Expecting to get version mismatch when applying object")
 	}
-	status, ok := err.(*errors.StatusError)
+	status, ok := err.(*apierrors.StatusError)
 	if !ok {
 		t.Fatalf("Expecting to get version mismatch as API error")
 	}

@@ -40,7 +40,7 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -678,7 +678,7 @@ func testResourceDelete(c *testContext) {
 	// wait for the item to be gone
 	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
 		obj, err := c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Get(obj.GetName(), metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		if err == nil {
@@ -753,7 +753,7 @@ func testResourceDelete(c *testContext) {
 	// wait for the item to be gone
 	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
 		obj, err := c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Get(obj.GetName(), metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		if err == nil {
@@ -801,7 +801,7 @@ func testResourceDeletecollection(c *testContext) {
 	// wait for the item to be gone
 	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
 		obj, err := c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Get(obj.GetName(), metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		if err == nil {
@@ -943,7 +943,7 @@ func testNamespaceDelete(c *testContext) {
 	}
 	// verify namespace is gone
 	obj, err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Get(obj.GetName(), metav1.GetOptions{})
-	if err == nil || !errors.IsNotFound(err) {
+	if err == nil || !apierrors.IsNotFound(err) {
 		c.t.Errorf("expected namespace to be gone, got %#v, %v", obj, err)
 	}
 }
@@ -1048,7 +1048,7 @@ func testPodBindingEviction(c *testContext) {
 	forceDelete := &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background}
 	defer func() {
 		err := c.clientset.CoreV1().Pods(pod.GetNamespace()).Delete(pod.GetName(), forceDelete)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			c.t.Error(err)
 			return
 		}
@@ -1414,7 +1414,7 @@ func createOrGetResource(client dynamic.Interface, gvr schema.GroupVersionResour
 	if err == nil {
 		return obj, nil
 	}
-	if !errors.IsNotFound(err) {
+	if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 	return client.Resource(gvr).Namespace(ns).Create(stubObj, metav1.CreateOptions{})

@@ -21,7 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
@@ -85,7 +85,7 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 			})
 
 			_, err = f.ClientSet.SchedulingV1().PriorityClasses().Create(systemCriticalPriority)
-			framework.ExpectEqual(err == nil || errors.IsAlreadyExists(err), true, "failed to create PriorityClasses with an error: %v", err)
+			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true, "failed to create PriorityClasses with an error: %v", err)
 
 			// Create pods, starting with non-critical so that the critical preempts the other pods.
 			f.PodClient().CreateBatch([]*v1.Pod{nonCriticalBestEffort, nonCriticalBurstable, nonCriticalGuaranteed})

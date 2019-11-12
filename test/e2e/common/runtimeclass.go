@@ -21,7 +21,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -72,7 +71,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 			ginkgo.By("Waiting for the RuntimeClass to disappear")
 			framework.ExpectNoError(wait.PollImmediate(framework.Poll, time.Minute, func() (bool, error) {
 				_, err := rcClient.Get(rcName, metav1.GetOptions{})
-				if errors.IsNotFound(err) {
+				if apierrors.IsNotFound(err) {
 					return true, nil // done
 				}
 				if err != nil {

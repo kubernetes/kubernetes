@@ -23,7 +23,7 @@ import (
 
 	coordinationv1 "k8s.io/api/coordination/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -154,6 +154,6 @@ var _ = framework.KubeDescribe("Lease", func() {
 		framework.ExpectNoError(err, "deleting Lease failed")
 
 		_, err = leaseClient.Get(name, metav1.GetOptions{})
-		framework.ExpectEqual(errors.IsNotFound(err), true)
+		framework.ExpectEqual(apierrors.IsNotFound(err), true)
 	})
 })

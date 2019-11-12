@@ -31,7 +31,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -1476,7 +1476,7 @@ func makeNodeUnschedulable(c clientset.Interface, node *v1.Node) error {
 		if err == nil {
 			return nil
 		}
-		if !errors.IsConflict(err) {
+		if !apierrors.IsConflict(err) {
 			return err
 		}
 		klog.Warningf("Got 409 conflict when trying to taint node, retries left: %v", 3-j)
@@ -1517,7 +1517,7 @@ func makeNodeSchedulable(c clientset.Interface, node *v1.Node, failOnCriticalAdd
 		if err == nil {
 			return nil
 		}
-		if !errors.IsConflict(err) {
+		if !apierrors.IsConflict(err) {
 			return err
 		}
 		klog.Warningf("Got 409 conflict when trying to taint node, retries left: %v", 3-j)
@@ -1692,7 +1692,7 @@ func runReplicatedPodOnEachNode(f *framework.Framework, nodes []v1.Node, namespa
 			if err == nil {
 				break
 			}
-			if !errors.IsConflict(err) {
+			if !apierrors.IsConflict(err) {
 				return err
 			}
 			klog.Warningf("Got 409 conflict when trying to scale RC, retries left: %v", 3-j)
@@ -1936,7 +1936,7 @@ func createPriorityClasses(f *framework.Framework) func() {
 		if err != nil {
 			klog.Errorf("Error creating priority class: %v", err)
 		}
-		framework.ExpectEqual(err == nil || errors.IsAlreadyExists(err), true)
+		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 	}
 
 	return func() {

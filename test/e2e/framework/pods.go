@@ -23,7 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -115,7 +115,7 @@ func (c *PodClient) CreateBatch(pods []*v1.Pod) []*v1.Pod {
 }
 
 // Update updates the pod object. It retries if there is a conflict, throw out error if
-// there is any other errors. name is the pod name, updateFn is the function updating the
+// there is any other apierrors. name is the pod name, updateFn is the function updating the
 // pod object.
 func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 	ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
@@ -129,7 +129,7 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 			Logf("Successfully updated pod %q", name)
 			return true, nil
 		}
-		if errors.IsConflict(err) {
+		if apierrors.IsConflict(err) {
 			Logf("Conflicting update to pod %q, re-get and re-update: %v", name, err)
 			return false, nil
 		}
@@ -147,7 +147,7 @@ func (c *PodClient) DeleteSync(name string, options *metav1.DeleteOptions, timeo
 // disappear before the timeout, it will fail the test.
 func (c *PodClient) DeleteSyncInNamespace(name string, namespace string, options *metav1.DeleteOptions, timeout time.Duration) {
 	err := c.Delete(name, options)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		Failf("Failed to delete pod %q: %v", name, err)
 	}
 	gomega.Expect(e2epod.WaitForPodToDisappear(c.f.ClientSet, namespace, name, labels.Everything(),

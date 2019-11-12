@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -60,7 +60,7 @@ func TestMaxJSONPatchOperations(t *testing.T) {
 	if err == nil {
 		t.Fatalf("unexpected no error")
 	}
-	if !errors.IsRequestEntityTooLargeError(err) {
+	if !apierrors.IsRequestEntityTooLargeError(err) {
 		t.Errorf("expected requested entity too large err, got %v", err)
 	}
 	if !strings.Contains(err.Error(), "The allowed maximum operations in a JSON patch is") {

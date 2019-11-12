@@ -29,7 +29,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -206,7 +206,7 @@ func stopDeployment(c clientset.Interface, ns, deploymentName string) {
 	framework.Logf("Ensuring deployment %s was deleted", deploymentName)
 	_, err = c.AppsV1().Deployments(ns).Get(deployment.Name, metav1.GetOptions{})
 	framework.ExpectError(err)
-	framework.ExpectEqual(errors.IsNotFound(err), true)
+	framework.ExpectEqual(apierrors.IsNotFound(err), true)
 	framework.Logf("Ensuring deployment %s's RSes were deleted", deploymentName)
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	framework.ExpectNoError(err)
@@ -615,7 +615,7 @@ func testIterativeDeployments(f *framework.Framework) {
 				name := podList.Items[p].Name
 				framework.Logf("%02d: deleting deployment pod %q", i, name)
 				err := c.CoreV1().Pods(ns).Delete(name, nil)
-				if err != nil && !errors.IsNotFound(err) {
+				if err != nil && !apierrors.IsNotFound(err) {
 					framework.ExpectNoError(err)
 				}
 			}
