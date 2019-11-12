@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"os/exec"
 	"regexp"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -32,11 +33,13 @@ type DockerValidator struct {
 }
 
 // dockerInfo holds a local subset of the Info struct from
-// github.com/docker/docker/api/types.
+// https://github.com/docker/cli/blob/master/cli/command/system/info.go
+// and https://github.com/moby/moby/blob/master/api/types/types.go
 // The JSON output from 'docker info' should map to this struct.
 type dockerInfo struct {
-	Driver        string `json:"Driver"`
-	ServerVersion string `json:"ServerVersion"`
+	Driver        string   `json:"Driver"`
+	ServerVersion string   `json:"ServerVersion"`
+	ServerErrors  []string `json:",omitempty"`
 }
 
 // Name is part of the system.Validator interface.
@@ -81,6 +84,10 @@ func (d *DockerValidator) unmarshalDockerInfo(b []byte, info *dockerInfo) error 
 
 func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info dockerInfo) ([]error, []error) {
 	// Validate docker version.
+	if info.ServerErrors != nil {
+		return nil, []error{errors.Errorf("error verifying Docker info: %q", strings.Join(info.ServerErrors, `", "`))}
+	}
+
 	matched := false
 	for _, v := range spec.Version {
 		r := regexp.MustCompile(v)

@@ -210,7 +210,6 @@ go_test(
         "//vendor/k8s.io/klog:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
-            "//cmd/kubeadm/app/util/system:go_default_library",
             "//pkg/kubelet/stats/pidlimit:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -224,9 +223,9 @@ go_test(
             "//vendor/github.com/onsi/ginkgo/config:go_default_library",
             "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
             "//vendor/github.com/spf13/pflag:go_default_library",
+            "//vendor/k8s.io/system-validators/validators:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
-            "//cmd/kubeadm/app/util/system:go_default_library",
             "//pkg/kubelet/stats/pidlimit:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -240,6 +239,7 @@ go_test(
             "//vendor/github.com/onsi/ginkgo/config:go_default_library",
             "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
             "//vendor/github.com/spf13/pflag:go_default_library",
+            "//vendor/k8s.io/system-validators/validators:go_default_library",
         ],
         "//conditions:default": [],
     }),
