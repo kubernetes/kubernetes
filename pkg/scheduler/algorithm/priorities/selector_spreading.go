@@ -66,7 +66,7 @@ func NewSelectorSpreadPriority(
 // i.e. it pushes the scheduler towards a node where there's the smallest number of
 // pods which match the same service, RC,RSs or StatefulSets selectors as the pod being scheduled.
 func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
-	var selectors []labels.Selector
+	var selector labels.Selector
 	node := nodeInfo.Node()
 	if node == nil {
 		return framework.NodeScore{}, fmt.Errorf("node not found")
@@ -74,20 +74,12 @@ func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{
 
 	priorityMeta, ok := meta.(*priorityMetadata)
 	if ok {
-		selectors = priorityMeta.podSelectors
+		selector = priorityMeta.podSelector
 	} else {
-		selectors = getSelectors(pod, s.serviceLister, s.controllerLister, s.replicaSetLister, s.statefulSetLister)
+		selector = getSelector(pod, s.serviceLister, s.controllerLister, s.replicaSetLister, s.statefulSetLister)
 	}
 
-	if len(selectors) == 0 {
-		return framework.NodeScore{
-			Name:  node.Name,
-			Score: 0,
-		}, nil
-	}
-
-	count := countMatchingPods(pod.Namespace, selectors, nodeInfo)
-
+	count := countMatchingPods(pod.Namespace, selector, nodeInfo)
 	return framework.NodeScore{
 		Name:  node.Name,
 		Score: int64(count),
@@ -179,9 +171,9 @@ func NewServiceAntiAffinityPriority(podLister schedulerlisters.PodLister, servic
 	return antiAffinity.CalculateAntiAffinityPriorityMap, antiAffinity.CalculateAntiAffinityPriorityReduce
 }
 
-// countMatchingPods cout pods based on namespace and matching all selectors
-func countMatchingPods(namespace string, selectors []labels.Selector, nodeInfo *schedulernodeinfo.NodeInfo) int {
-	if nodeInfo.Pods() == nil || len(nodeInfo.Pods()) == 0 || len(selectors) == 0 {
+// countMatchingPods counts pods based on namespace and matching all selectors
+func countMatchingPods(namespace string, selector labels.Selector, nodeInfo *schedulernodeinfo.NodeInfo) int {
+	if nodeInfo.Pods() == nil || len(nodeInfo.Pods()) == 0 || selector.Empty() {
 		return 0
 	}
 	count := 0
@@ -189,14 +181,7 @@ func countMatchingPods(namespace string, selectors []labels.Selector, nodeInfo *
 		// Ignore pods being deleted for spreading purposes
 		// Similar to how it is done for SelectorSpreadPriority
 		if namespace == pod.Namespace && pod.DeletionTimestamp == nil {
-			matches := true
-			for _, selector := range selectors {
-				if !selector.Matches(labels.Set(pod.Labels)) {
-					matches = false
-					break
-				}
-			}
-			if matches {
+			if selector.Matches(labels.Set(pod.Labels)) {
 				count++
 			}
 		}
@@ -219,12 +204,14 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityMap(pod *v1.Pod, meta
 	} else {
 		firstServiceSelector = getFirstServiceSelector(pod, s.serviceLister)
 	}
-	//pods matched namespace,selector on current node
-	var selectors []labels.Selector
+	// Pods matched namespace,selector on current node.
+	var selector labels.Selector
 	if firstServiceSelector != nil {
-		selectors = append(selectors, firstServiceSelector)
+		selector = firstServiceSelector
+	} else {
+		selector = labels.NewSelector()
 	}
-	score := countMatchingPods(pod.Namespace, selectors, nodeInfo)
+	score := countMatchingPods(pod.Namespace, selector, nodeInfo)
 
 	return framework.NodeScore{
 		Name:  node.Name,
