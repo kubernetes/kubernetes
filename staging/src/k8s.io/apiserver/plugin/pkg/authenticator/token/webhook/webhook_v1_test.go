@@ -31,26 +31,24 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/authentication/v1beta1"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/token/cache"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/client-go/tools/clientcmd/api/v1"
+	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
-var apiAuds = authenticator.Audiences{"api"}
-
-// Service mocks a remote authentication service.
-type Service interface {
+// V1Service mocks a remote authentication service.
+type V1Service interface {
 	// Review looks at the TokenReviewSpec and provides an authentication
 	// response in the TokenReviewStatus.
-	Review(*v1beta1.TokenReview)
+	Review(*authenticationv1.TokenReview)
 	HTTPStatusCode() int
 }
 
-// NewTestServer wraps a Service as an httptest.Server.
-func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error) {
+// NewV1TestServer wraps a V1Service as an httptest.Server.
+func NewV1TestServer(s V1Service, cert, key, caCert []byte) (*httptest.Server, error) {
 	const webhookPath = "/testserver"
 	var tlsConfig *tls.Config
 	if cert != nil {
@@ -81,14 +79,14 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 			return
 		}
 
-		var review v1beta1.TokenReview
+		var review authenticationv1.TokenReview
 		bodyData, _ := ioutil.ReadAll(r.Body)
 		if err := json.Unmarshal(bodyData, &review); err != nil {
 			http.Error(w, fmt.Sprintf("failed to decode body: %v", err), http.StatusBadRequest)
 			return
 		}
 		// ensure we received the serialized tokenreview as expected
-		if review.APIVersion != "authentication.k8s.io/v1beta1" {
+		if review.APIVersion != "authentication.k8s.io/v1" {
 			http.Error(w, fmt.Sprintf("wrong api version: %s", string(bodyData)), http.StatusBadRequest)
 			return
 		}
@@ -124,7 +122,7 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 			Status     status `json:"status"`
 		}{
 			Kind:       "TokenReview",
-			APIVersion: v1beta1.SchemeGroupVersion.String(),
+			APIVersion: authenticationv1.SchemeGroupVersion.String(),
 			Status: status{
 				review.Status.Authenticated,
 				userInfo{
@@ -153,26 +151,26 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 }
 
 // A service that can be set to say yes or no to authentication requests.
-type mockService struct {
+type mockV1Service struct {
 	allow      bool
 	statusCode int
 	called     int
 }
 
-func (m *mockService) Review(r *v1beta1.TokenReview) {
+func (m *mockV1Service) Review(r *authenticationv1.TokenReview) {
 	m.called++
 	r.Status.Authenticated = m.allow
 	if m.allow {
 		r.Status.User.Username = "realHooman@email.com"
 	}
 }
-func (m *mockService) Allow()              { m.allow = true }
-func (m *mockService) Deny()               { m.allow = false }
-func (m *mockService) HTTPStatusCode() int { return m.statusCode }
+func (m *mockV1Service) Allow()              { m.allow = true }
+func (m *mockV1Service) Deny()               { m.allow = false }
+func (m *mockV1Service) HTTPStatusCode() int { return m.statusCode }
 
-// newTokenAuthenticator creates a temporary kubeconfig file from the provided
+// newV1TokenAuthenticator creates a temporary kubeconfig file from the provided
 // arguments and attempts to load a new WebhookTokenAuthenticator from it.
-func newTokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration, implicitAuds authenticator.Audiences) (authenticator.Token, error) {
+func newV1TokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration, implicitAuds authenticator.Audiences) (authenticator.Token, error) {
 	tempfile, err := ioutil.TempFile("", "")
 	if err != nil {
 		return nil, err
@@ -195,7 +193,7 @@ func newTokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, c
 		return nil, err
 	}
 
-	c, err := tokenReviewInterfaceFromKubeconfig(p)
+	c, err := tokenReviewInterfaceFromKubeconfig(p, "v1")
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +206,7 @@ func newTokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, c
 	return cache.New(authn, false, cacheTime, cacheTime), nil
 }
 
-func TestTLSConfig(t *testing.T) {
+func TestV1TLSConfig(t *testing.T) {
 	tests := []struct {
 		test                            string
 		clientCert, clientKey, clientCA []byte
@@ -251,17 +249,17 @@ func TestTLSConfig(t *testing.T) {
 	for _, tt := range tests {
 		// Use a closure so defer statements trigger between loop iterations.
 		func() {
-			service := new(mockService)
+			service := new(mockV1Service)
 			service.statusCode = 200
 
-			server, err := NewTestServer(service, tt.serverCert, tt.serverKey, tt.serverCA)
+			server, err := NewV1TestServer(service, tt.serverCert, tt.serverKey, tt.serverCA)
 			if err != nil {
 				t.Errorf("%s: failed to create server: %v", tt.test, err)
 				return
 			}
 			defer server.Close()
 
-			wh, err := newTokenAuthenticator(server.URL, tt.clientCert, tt.clientKey, tt.clientCA, 0, nil)
+			wh, err := newV1TokenAuthenticator(server.URL, tt.clientCert, tt.clientKey, tt.clientCA, 0, nil)
 			if err != nil {
 				t.Errorf("%s: failed to create client: %v", tt.test, err)
 				return
@@ -293,47 +291,47 @@ func TestTLSConfig(t *testing.T) {
 	}
 }
 
-// recorderService records all token review requests, and responds with the
+// recorderV1Service records all token review requests, and responds with the
 // provided TokenReviewStatus.
-type recorderService struct {
-	lastRequest v1beta1.TokenReview
-	response    v1beta1.TokenReviewStatus
+type recorderV1Service struct {
+	lastRequest authenticationv1.TokenReview
+	response    authenticationv1.TokenReviewStatus
 }
 
-func (rec *recorderService) Review(r *v1beta1.TokenReview) {
+func (rec *recorderV1Service) Review(r *authenticationv1.TokenReview) {
 	rec.lastRequest = *r
 	r.Status = rec.response
 }
 
-func (rec *recorderService) HTTPStatusCode() int { return 200 }
+func (rec *recorderV1Service) HTTPStatusCode() int { return 200 }
 
-func TestWebhookTokenAuthenticator(t *testing.T) {
-	serv := &recorderService{}
+func TestV1WebhookTokenAuthenticator(t *testing.T) {
+	serv := &recorderV1Service{}
 
-	s, err := NewTestServer(serv, serverCert, serverKey, caCert)
+	s, err := NewV1TestServer(serv, serverCert, serverKey, caCert)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer s.Close()
 
 	expTypeMeta := metav1.TypeMeta{
-		APIVersion: "authentication.k8s.io/v1beta1",
+		APIVersion: "authentication.k8s.io/v1",
 		Kind:       "TokenReview",
 	}
 
 	tests := []struct {
 		description           string
 		implicitAuds, reqAuds authenticator.Audiences
-		serverResponse        v1beta1.TokenReviewStatus
+		serverResponse        authenticationv1.TokenReviewStatus
 		expectedAuthenticated bool
 		expectedUser          *user.DefaultInfo
 		expectedAuds          authenticator.Audiences
 	}{
 		{
 			description: "successful response should pass through all user info.",
-			serverResponse: v1beta1.TokenReviewStatus{
+			serverResponse: authenticationv1.TokenReviewStatus{
 				Authenticated: true,
-				User: v1beta1.UserInfo{
+				User: authenticationv1.UserInfo{
 					Username: "somebody",
 				},
 			},
@@ -344,13 +342,13 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 		},
 		{
 			description: "successful response should pass through all user info.",
-			serverResponse: v1beta1.TokenReviewStatus{
+			serverResponse: authenticationv1.TokenReviewStatus{
 				Authenticated: true,
-				User: v1beta1.UserInfo{
+				User: authenticationv1.UserInfo{
 					Username: "person@place.com",
 					UID:      "abcd-1234",
 					Groups:   []string{"stuff-dev", "main-eng"},
-					Extra:    map[string]v1beta1.ExtraValue{"foo": {"bar", "baz"}},
+					Extra:    map[string]authenticationv1.ExtraValue{"foo": {"bar", "baz"}},
 				},
 			},
 			expectedAuthenticated: true,
@@ -363,9 +361,9 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 		},
 		{
 			description: "unauthenticated shouldn't even include extra provided info.",
-			serverResponse: v1beta1.TokenReviewStatus{
+			serverResponse: authenticationv1.TokenReviewStatus{
 				Authenticated: false,
-				User: v1beta1.UserInfo{
+				User: authenticationv1.UserInfo{
 					Username: "garbage",
 					UID:      "abcd-1234",
 					Groups:   []string{"not-actually-used"},
@@ -376,7 +374,7 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 		},
 		{
 			description: "unauthenticated shouldn't even include extra provided info.",
-			serverResponse: v1beta1.TokenReviewStatus{
+			serverResponse: authenticationv1.TokenReviewStatus{
 				Authenticated: false,
 			},
 			expectedAuthenticated: false,
@@ -386,9 +384,9 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 			description:  "good audience",
 			implicitAuds: apiAuds,
 			reqAuds:      apiAuds,
-			serverResponse: v1beta1.TokenReviewStatus{
+			serverResponse: authenticationv1.TokenReviewStatus{
 				Authenticated: true,
-				User: v1beta1.UserInfo{
+				User: authenticationv1.UserInfo{
 					Username: "somebody",
 				},
 			},
@@ -402,9 +400,9 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 			description:  "good audience",
 			implicitAuds: append(apiAuds, "other"),
 			reqAuds:      apiAuds,
-			serverResponse: v1beta1.TokenReviewStatus{
+			serverResponse: authenticationv1.TokenReviewStatus{
 				Authenticated: true,
-				User: v1beta1.UserInfo{
+				User: authenticationv1.UserInfo{
 					Username: "somebody",
 				},
 			},
@@ -418,7 +416,7 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 			description:  "bad audiences",
 			implicitAuds: apiAuds,
 			reqAuds:      authenticator.Audiences{"other"},
-			serverResponse: v1beta1.TokenReviewStatus{
+			serverResponse: authenticationv1.TokenReviewStatus{
 				Authenticated: false,
 			},
 			expectedAuthenticated: false,
@@ -428,9 +426,9 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 			implicitAuds: apiAuds,
 			reqAuds:      authenticator.Audiences{"other"},
 			// webhook authenticator hasn't been upgraded to support audience.
-			serverResponse: v1beta1.TokenReviewStatus{
+			serverResponse: authenticationv1.TokenReviewStatus{
 				Authenticated: true,
-				User: v1beta1.UserInfo{
+				User: authenticationv1.UserInfo{
 					Username: "somebody",
 				},
 			},
@@ -440,9 +438,9 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 			description:  "audience aware backend",
 			implicitAuds: apiAuds,
 			reqAuds:      apiAuds,
-			serverResponse: v1beta1.TokenReviewStatus{
+			serverResponse: authenticationv1.TokenReviewStatus{
 				Authenticated: true,
-				User: v1beta1.UserInfo{
+				User: authenticationv1.UserInfo{
 					Username: "somebody",
 				},
 				Audiences: []string(apiAuds),
@@ -455,9 +453,9 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 		},
 		{
 			description: "audience aware backend",
-			serverResponse: v1beta1.TokenReviewStatus{
+			serverResponse: authenticationv1.TokenReviewStatus{
 				Authenticated: true,
-				User: v1beta1.UserInfo{
+				User: authenticationv1.UserInfo{
 					Username: "somebody",
 				},
 				Audiences: []string(apiAuds),
@@ -471,9 +469,9 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 			description:  "audience aware backend",
 			implicitAuds: apiAuds,
 			reqAuds:      apiAuds,
-			serverResponse: v1beta1.TokenReviewStatus{
+			serverResponse: authenticationv1.TokenReviewStatus{
 				Authenticated: true,
-				User: v1beta1.UserInfo{
+				User: authenticationv1.UserInfo{
 					Username: "somebody",
 				},
 				Audiences: []string{"other"},
@@ -484,7 +482,7 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 	token := "my-s3cr3t-t0ken"
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			wh, err := newTokenAuthenticator(s.URL, clientCert, clientKey, caCert, 0, tt.implicitAuds)
+			wh, err := newV1TokenAuthenticator(s.URL, clientCert, clientKey, caCert, 0, tt.implicitAuds)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -523,13 +521,13 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 	}
 }
 
-type authenticationUserInfo v1beta1.UserInfo
+type authenticationV1UserInfo authenticationv1.UserInfo
 
-func (a *authenticationUserInfo) GetName() string     { return a.Username }
-func (a *authenticationUserInfo) GetUID() string      { return a.UID }
-func (a *authenticationUserInfo) GetGroups() []string { return a.Groups }
+func (a *authenticationV1UserInfo) GetName() string     { return a.Username }
+func (a *authenticationV1UserInfo) GetUID() string      { return a.UID }
+func (a *authenticationV1UserInfo) GetGroups() []string { return a.Groups }
 
-func (a *authenticationUserInfo) GetExtra() map[string][]string {
+func (a *authenticationV1UserInfo) GetExtra() map[string][]string {
 	if a.Extra == nil {
 		return nil
 	}
@@ -541,23 +539,23 @@ func (a *authenticationUserInfo) GetExtra() map[string][]string {
 	return ret
 }
 
-// Ensure v1beta1.UserInfo contains the fields necessary to implement the
+// Ensure authenticationv1.UserInfo contains the fields necessary to implement the
 // user.Info interface.
-var _ user.Info = (*authenticationUserInfo)(nil)
+var _ user.Info = (*authenticationV1UserInfo)(nil)
 
 // TestWebhookCache verifies that error responses from the server are not
 // cached, but successful responses are. It also ensures that the webhook
 // call is retried on 429 and 500+ errors
-func TestWebhookCacheAndRetry(t *testing.T) {
-	serv := new(mockService)
-	s, err := NewTestServer(serv, serverCert, serverKey, caCert)
+func TestV1WebhookCacheAndRetry(t *testing.T) {
+	serv := new(mockV1Service)
+	s, err := NewV1TestServer(serv, serverCert, serverKey, caCert)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer s.Close()
 
 	// Create an authenticator that caches successful responses "forever" (100 days).
-	wh, err := newTokenAuthenticator(s.URL, clientCert, clientKey, caCert, 2400*time.Hour, nil)
+	wh, err := newV1TokenAuthenticator(s.URL, clientCert, clientKey, caCert, 2400*time.Hour, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

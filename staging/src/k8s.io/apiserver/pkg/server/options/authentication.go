@@ -248,7 +248,7 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 
 	// configure token review
 	if client != nil {
-		cfg.TokenAccessReviewClient = client.AuthenticationV1beta1().TokenReviews()
+		cfg.TokenAccessReviewClient = client.AuthenticationV1().TokenReviews()
 	}
 
 	// look into configmaps/external-apiserver-authentication for missing authn info
