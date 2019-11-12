@@ -50,16 +50,19 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/controller"
 	commonutils "k8s.io/kubernetes/test/e2e/common"
@@ -1690,7 +1693,7 @@ metadata:
 			if checkContainersImage(containers, httpdImage) {
 				framework.Failf("Failed creating rc %s for 1 pod with expected image %s", rcName, httpdImage)
 			}
-			framework.WaitForRCToStabilize(c, ns, rcName, framework.PodStartTimeout)
+			waitForRCToStabilize(c, ns, rcName, framework.PodStartTimeout)
 
 			ginkgo.By("rolling-update to same image controller")
 
@@ -2605,4 +2608,36 @@ func createObjValidateOutputAndCleanup(client dynamic.ResourceInterface, obj *un
 	} else {
 		framework.ExpectNotEqual(fields, []string{"NAME", "AGE"}, fmt.Sprintf("expected non-default fields for resource: %s", resource.Name))
 	}
+}
+
+// waitForRCToStabilize waits till the RC has a matching generation/replica count between spec and status.
+func waitForRCToStabilize(c clientset.Interface, ns, name string, timeout time.Duration) error {
+	options := metav1.ListOptions{FieldSelector: fields.Set{
+		"metadata.name":      name,
+		"metadata.namespace": ns,
+	}.AsSelector().String()}
+	w, err := c.CoreV1().ReplicationControllers(ns).Watch(options)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+	defer cancel()
+	_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
+		switch event.Type {
+		case watch.Deleted:
+			return false, apierrs.NewNotFound(schema.GroupResource{Resource: "replicationcontrollers"}, "")
+		}
+		switch rc := event.Object.(type) {
+		case *v1.ReplicationController:
+			if rc.Name == name && rc.Namespace == ns &&
+				rc.Generation <= rc.Status.ObservedGeneration &&
+				*(rc.Spec.Replicas) == rc.Status.Replicas {
+				return true, nil
+			}
+			framework.Logf("Waiting for rc %s to stabilize, generation %v observed generation %v spec.replicas %d status.replicas %d",
+				name, rc.Generation, rc.Status.ObservedGeneration, *(rc.Spec.Replicas), rc.Status.Replicas)
+		}
+		return false, nil
+	})
+	return err
 }

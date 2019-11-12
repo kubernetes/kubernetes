@@ -33,6 +33,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/version"
 	commontest "k8s.io/kubernetes/test/e2e/common"
@@ -160,6 +161,40 @@ func getDefaultClusterIPFamily(c clientset.Interface) string {
 	return "ipv4"
 }
 
+// waitForDaemonSets for all daemonsets in the given namespace to be ready
+// (defined as all but 'allowedNotReadyNodes' pods associated with that
+// daemonset are ready).
+func waitForDaemonSets(c clientset.Interface, ns string, allowedNotReadyNodes int32, timeout time.Duration) error {
+	start := time.Now()
+	framework.Logf("Waiting up to %v for all daemonsets in namespace '%s' to start",
+		timeout, ns)
+
+	return wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+		dsList, err := c.AppsV1().DaemonSets(ns).List(metav1.ListOptions{})
+		if err != nil {
+			framework.Logf("Error getting daemonsets in namespace: '%s': %v", ns, err)
+			if testutils.IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		var notReadyDaemonSets []string
+		for _, ds := range dsList.Items {
+			framework.Logf("%d / %d pods ready in namespace '%s' in daemonset '%s' (%d seconds elapsed)", ds.Status.NumberReady, ds.Status.DesiredNumberScheduled, ns, ds.ObjectMeta.Name, int(time.Since(start).Seconds()))
+			if ds.Status.DesiredNumberScheduled-ds.Status.NumberReady > allowedNotReadyNodes {
+				notReadyDaemonSets = append(notReadyDaemonSets, ds.ObjectMeta.Name)
+			}
+		}
+
+		if len(notReadyDaemonSets) > 0 {
+			framework.Logf("there are not ready daemonsets: %v", notReadyDaemonSets)
+			return false, nil
+		}
+
+		return true, nil
+	})
+}
+
 // setupSuite is the boilerplate that can be used to setup ginkgo test suites, on the SynchronizedBeforeSuite step.
 // There are certain operations we only want to run once per overall test invocation
 // (such as deleting old namespaces, or verifying that all system pods are running.
@@ -229,7 +264,7 @@ func setupSuite() {
 		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 
-	if err := framework.WaitForDaemonSets(c, metav1.NamespaceSystem, int32(framework.TestContext.AllowedNotReadyNodes), framework.TestContext.SystemDaemonsetStartupTimeout); err != nil {
+	if err := waitForDaemonSets(c, metav1.NamespaceSystem, int32(framework.TestContext.AllowedNotReadyNodes), framework.TestContext.SystemDaemonsetStartupTimeout); err != nil {
 		framework.Logf("WARNING: Waiting for all daemonsets to be ready failed: %v", err)
 	}
 
