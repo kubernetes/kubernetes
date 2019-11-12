@@ -29,7 +29,7 @@ const (
 	// When these values are updated, also update test/e2e/framework/util.go
 	defaultPodSandboxImageName    = "k8s.gcr.io/pause"
 	defaultPodSandboxImageVersion = "3.1"
-	defaultPodSandboxSeccomp      = `{"defaultAction":"SCMP_ACT_ERRNO","architectures":["SCMP_ARCH_X86_64","SCMP_ARCH_X86","SCMP_ARCH_X32"],"syscalls":[{"names":["arch_prctl","brk","close","execve","exit_group","futex","mprotect","nanosleep","stat","write","uname","pause","rt_sigaction","getpid","wait4","waitid","fork","getppid"],"action": "SCMP_ACT_ALLOW"}]}`
+	defaultPodSandboxSeccomp      = `{"defaultAction":"SCMP_ACT_ERRNO","archMap":[{"architecture":"SCMP_ARCH_X86_64","subArchitectures":["SCMP_ARCH_X86","SCMP_ARCH_X32"]},{"architecture":"SCMP_ARCH_AARCH64","subArchitectures":["SCMP_ARCH_ARM"]},{"architecture":"SCMP_ARCH_MIPS64","subArchitectures":["SCMP_ARCH_MIPS","SCMP_ARCH_MIPS64N32"]},{"architecture":"SCMP_ARCH_MIPS64N32","subArchitectures":["SCMP_ARCH_MIPS","SCMP_ARCH_MIPS64"]},{"architecture":"SCMP_ARCH_MIPSEL64","subArchitectures":["SCMP_ARCH_MIPSEL","SCMP_ARCH_MIPSEL64N32"]},{"architecture":"SCMP_ARCH_MIPSEL64N32","subArchitectures":["SCMP_ARCH_MIPSEL","SCMP_ARCH_MIPSEL64"]},{"architecture":"SCMP_ARCH_S390X","subArchitectures":["SCMP_ARCH_S390"]}],"syscalls":[{"names":["arch_prctl","brk","close","execve","exit_group","futex","mprotect","nanosleep","stat","write","uname","pause","rt_sigaction","getpid","wait4","waitid","fork","getppid"],"action":"SCMP_ACT_ALLOW"}]}`
 )
 
 var (
