@@ -46,7 +46,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -346,7 +346,7 @@ func WaitForPersistentVolumeDeleted(c clientset.Interface, pvName string, Poll, 
 			Logf("PersistentVolume %s found and phase=%s (%v)", pvName, pv.Status.Phase, time.Since(start))
 			continue
 		}
-		if apierrs.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			Logf("PersistentVolume %s was removed", pvName)
 			return nil
 		}
@@ -365,7 +365,7 @@ func findAvailableNamespaceName(baseName string, c clientset.Interface) (string,
 			// Already taken
 			return false, nil
 		}
-		if apierrs.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		Logf("Unexpected error while getting namespace: %v", err)
@@ -470,7 +470,7 @@ func WaitForService(c clientset.Interface, namespace, name string, exist bool, i
 		case err == nil:
 			Logf("Service %s in namespace %s found.", name, namespace)
 			return exist, nil
-		case apierrs.IsNotFound(err):
+		case apierrors.IsNotFound(err):
 			Logf("Service %s in namespace %s disappeared.", name, namespace)
 			return !exist, nil
 		case !testutils.IsRetryableAPIError(err):
@@ -1190,7 +1190,7 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 
 	rtObject, err := e2eresource.GetRuntimeObjectForKind(c, kind, ns, name)
 	if err != nil {
-		if apierrs.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			Logf("%v %s not found: %v", kind, name, err)
 			return nil
 		}

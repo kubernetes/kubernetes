@@ -25,7 +25,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -193,7 +193,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		testFlexVolume(driverInstallAs, config, f)
 
 		ginkgo.By("waiting for flex client pod to terminate")
-		if err := f.WaitForPodTerminated(config.Prefix+"-client", ""); !apierrs.IsNotFound(err) {
+		if err := f.WaitForPodTerminated(config.Prefix+"-client", ""); !apierrors.IsNotFound(err) {
 			framework.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
 		}
 
@@ -213,7 +213,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		testFlexVolume(driverInstallAs, config, f)
 
 		ginkgo.By("waiting for flex client pod to terminate")
-		if err := f.WaitForPodTerminated(config.Prefix+"-client", ""); !apierrs.IsNotFound(err) {
+		if err := f.WaitForPodTerminated(config.Prefix+"-client", ""); !apierrors.IsNotFound(err) {
 			framework.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
 		}
 

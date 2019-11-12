@@ -22,8 +22,8 @@ import (
 	"errors"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -139,7 +139,7 @@ func WaitForBootstrapTokenSecretToDisappear(c clientset.Interface, tokenID strin
 
 	return wait.Poll(framework.Poll, 1*time.Minute, func() (bool, error) {
 		_, err := c.CoreV1().Secrets(metav1.NamespaceSystem).Get(bootstrapapi.BootstrapTokenSecretPrefix+tokenID, metav1.GetOptions{})
-		if apierrs.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		return false, nil
@@ -150,7 +150,7 @@ func WaitForBootstrapTokenSecretToDisappear(c clientset.Interface, tokenID strin
 func WaitForBootstrapTokenSecretNotDisappear(c clientset.Interface, tokenID string, t time.Duration) error {
 	err := wait.Poll(framework.Poll, t, func() (bool, error) {
 		secret, err := c.CoreV1().Secrets(metav1.NamespaceSystem).Get(bootstrapapi.BootstrapTokenSecretPrefix+tokenID, metav1.GetOptions{})
-		if apierrs.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, errors.New("secret not exists")
 		}
 		if secret != nil {

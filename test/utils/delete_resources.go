@@ -21,7 +21,7 @@ package utils
 import (
 	"fmt"
 
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
@@ -59,7 +59,7 @@ func deleteResource(c clientset.Interface, kind schema.GroupKind, namespace, nam
 func DeleteResourceWithRetries(c clientset.Interface, kind schema.GroupKind, namespace, name string, options *metav1.DeleteOptions) error {
 	deleteFunc := func() (bool, error) {
 		err := deleteResource(c, kind, namespace, name, options)
-		if err == nil || apierrs.IsNotFound(err) {
+		if err == nil || apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		if IsRetryableAPIError(err) {

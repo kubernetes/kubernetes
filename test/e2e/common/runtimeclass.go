@@ -22,7 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -124,7 +124,7 @@ func expectPodRejection(f *framework.Framework, pod *v1.Pod) {
 	} else {
 		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		framework.ExpectError(err, "should be forbidden")
-		framework.ExpectEqual(apierrs.IsForbidden(err), true, "should be forbidden error")
+		framework.ExpectEqual(apierrors.IsForbidden(err), true, "should be forbidden error")
 	}
 }
 

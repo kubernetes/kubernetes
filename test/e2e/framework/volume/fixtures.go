@@ -46,7 +46,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
@@ -372,7 +372,7 @@ func StartVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 	serverPod, err := podClient.Create(serverPod)
 	// ok if the server pod already exists. TODO: make this controllable by callers
 	if err != nil {
-		if apierrs.IsAlreadyExists(err) {
+		if apierrors.IsAlreadyExists(err) {
 			framework.Logf("Ignore \"already-exists\" error, re-get pod...")
 			ginkgo.By(fmt.Sprintf("re-getting the %q server pod", serverPodName))
 			serverPod, err = podClient.Get(serverPodName, metav1.GetOptions{})

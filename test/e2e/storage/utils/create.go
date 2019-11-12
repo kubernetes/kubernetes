@@ -29,7 +29,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -155,7 +155,7 @@ func CreateItems(f *framework.Framework, items ...interface{}) (func(), error) {
 		// command line flags, because they would also start to apply
 		// to non-namespaced items.
 		for _, destructor := range destructors {
-			if err := destructor(); err != nil && !apierrs.IsNotFound(err) {
+			if err := destructor(); err != nil && !apierrors.IsNotFound(err) {
 				framework.Logf("deleting failed: %s", err)
 			}
 		}

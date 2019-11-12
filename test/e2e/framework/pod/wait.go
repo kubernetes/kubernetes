@@ -27,7 +27,7 @@ import (
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -213,7 +213,7 @@ func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeou
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
 		if err != nil {
-			if apierrs.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				e2elog.Logf("Pod %q in namespace %q not found. Error: %v", podName, ns, err)
 				return err
 			}
@@ -387,7 +387,7 @@ func WaitForPodSuccessInNamespaceSlow(c clientset.Interface, podName string, nam
 func WaitForPodNotFoundInNamespace(c clientset.Interface, podName, ns string, timeout time.Duration) error {
 	return wait.PollImmediate(poll, timeout, func() (bool, error) {
 		_, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
-		if apierrs.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, nil // done
 		}
 		if err != nil {
