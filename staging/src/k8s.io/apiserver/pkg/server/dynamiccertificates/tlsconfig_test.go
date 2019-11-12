@@ -100,12 +100,6 @@ func TestNewStaticCertKeyContent(t *testing.T) {
 			},
 		},
 		{
-			name:        "missingCA",
-			clientCA:    &staticCAContent{name: "test-ca", caBundle: &caBundleAndVerifier{caBundle: []byte("")}},
-			expected:    nil,
-			expectedErr: `not loading an empty client ca bundle from "test-ca"`,
-		},
-		{
 			name:     "nil",
 			expected: &dynamicCertificateContent{clientCA: caBundleContent{}, servingCert: certKeyContent{}},
 		},
