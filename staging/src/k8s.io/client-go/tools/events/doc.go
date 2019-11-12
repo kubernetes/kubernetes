@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package record has all client logic for recording and reporting
-// "k8s.io/api/core/v1".Event events.
-package record // import "k8s.io/client-go/tools/record"
+// Package events has all client logic for recording and reporting
+// "k8s.io/api/events/v1beta1".Event events.
+package events // import "k8s.io/client-go/tools/events"
