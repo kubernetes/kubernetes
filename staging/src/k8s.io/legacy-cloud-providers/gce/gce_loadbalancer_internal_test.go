@@ -813,25 +813,48 @@ func TestEnsureInternalInstanceGroupsReuseGroups(t *testing.T) {
 	require.NoError(t, err)
 	gce.externalInstanceGroupsPrefix = "pre-existing"
 
-	_, err = createAndInsertNodes(gce, []string{"test-node-1", "test-node-2"}, vals.ZoneName)
+	igName := makeInstanceGroupName(vals.ClusterID)
+	nodesA, err := createAndInsertNodes(gce, []string{"test-node-1", "test-node-2"}, vals.ZoneName)
+	require.NoError(t, err)
+	nodesB, err := createAndInsertNodes(gce, []string{"test-node-3"}, vals.SecondaryZoneName)
 	require.NoError(t, err)
 
 	preIGName := "pre-existing-ig"
-	igName := makeInstanceGroupName(vals.ClusterID)
 	err = gce.CreateInstanceGroup(&compute.InstanceGroup{Name: preIGName}, vals.ZoneName)
 	require.NoError(t, err)
-	gce.AddInstancesToInstanceGroup(preIGName, vals.ZoneName, gce.ToInstanceReferences(vals.ZoneName, []string{"test-node-1"}))
+	err = gce.CreateInstanceGroup(&compute.InstanceGroup{Name: preIGName}, vals.SecondaryZoneName)
+	require.NoError(t, err)
+	err = gce.AddInstancesToInstanceGroup(preIGName, vals.ZoneName, gce.ToInstanceReferences(vals.ZoneName, []string{"test-node-1"}))
+	require.NoError(t, err)
+	err = gce.AddInstancesToInstanceGroup(preIGName, vals.SecondaryZoneName, gce.ToInstanceReferences(vals.SecondaryZoneName, []string{"test-node-3"}))
+	require.NoError(t, err)
+
+	anotherPreIGName := "another-existing-ig"
+	err = gce.CreateInstanceGroup(&compute.InstanceGroup{Name: anotherPreIGName}, vals.ZoneName)
+	require.NoError(t, err)
+	err = gce.AddInstancesToInstanceGroup(anotherPreIGName, vals.ZoneName, gce.ToInstanceReferences(vals.ZoneName, []string{"test-node-2"}))
+	require.NoError(t, err)
 
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	_, err = createInternalLoadBalancer(gce, svc, nil, []string{"test-node-1", "test-node-2"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+	assert.NoError(t, err)
+	_, err = gce.ensureInternalLoadBalancer(
+		vals.ClusterName, vals.ClusterID,
+		svc,
+		nil,
+		append(nodesA, nodesB...),
+	)
 	assert.NoError(t, err)
 
 	backendServiceName := makeBackendServiceName(gce.GetLoadBalancerName(context.TODO(), "", svc), vals.ClusterID, shareBackendService(svc), cloud.SchemeInternal, "TCP", svc.Spec.SessionAffinity)
 	bs, err := gce.GetRegionBackendService(backendServiceName, gce.region)
 	require.NoError(t, err)
-	assert.Equal(t, 2, len(bs.Backends), "Want two backends referencing two instances groups")
+	assert.Equal(t, 3, len(bs.Backends), "Want three backends referencing three instances groups")
 
-	for _, name := range []string{preIGName, igName} {
+	igRef := func(zone, name string) string {
+		return fmt.Sprintf("zones/%s/instanceGroups/%s", zone, name)
+	}
+	for _, name := range []string{igRef(vals.ZoneName, preIGName), igRef(vals.SecondaryZoneName, preIGName), igRef(vals.ZoneName, igName)} {
 		var found bool
 		for _, be := range bs.Backends {
 			if strings.Contains(be.Group, name) {
