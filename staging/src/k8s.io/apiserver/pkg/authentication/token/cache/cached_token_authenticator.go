@@ -22,15 +22,25 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
+	"errors"
 	"hash"
 	"io"
+	"runtime"
 	"sync"
 	"time"
 	"unsafe"
 
+	"golang.org/x/sync/singleflight"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/klog"
 )
+
+var errAuthnCrash = apierrors.NewInternalError(errors.New("authentication failed unexpectedly"))
+
+const sharedLookupTimeout = 30 * time.Second
 
 // cacheRecord holds the three return values of the authenticator.Token AuthenticateToken method
 type cacheRecord struct {
@@ -47,6 +57,7 @@ type cachedTokenAuthenticator struct {
 	failureTTL time.Duration
 
 	cache cache
+	group singleflight.Group
 
 	// hashPool is a per authenticator pool of hash.Hash (to avoid allocations from building the Hash)
 	// HMAC with SHA-256 and a random key is used to prevent precomputation and length extension attacks
@@ -98,26 +109,71 @@ func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL,
 
 // AuthenticateToken implements authenticator.Token
 func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
-	auds, _ := authenticator.AudiencesFrom(ctx)
+	auds, audsOk := authenticator.AudiencesFrom(ctx)
 
 	key := keyFunc(a.hashPool, auds, token)
 	if record, ok := a.cache.get(key); ok {
 		return record.resp, record.ok, record.err
 	}
 
-	resp, ok, err := a.authenticator.AuthenticateToken(ctx, token)
-	if !a.cacheErrs && err != nil {
-		return resp, ok, err
+	type lookup struct {
+		resp *authenticator.Response
+		ok   bool
 	}
 
-	switch {
-	case ok && a.successTTL > 0:
-		a.cache.set(key, &cacheRecord{resp: resp, ok: ok, err: err}, a.successTTL)
-	case !ok && a.failureTTL > 0:
-		a.cache.set(key, &cacheRecord{resp: resp, ok: ok, err: err}, a.failureTTL)
-	}
+	c := a.group.DoChan(key, func() (val interface{}, err error) {
+		// We're leaving the request handling stack so we need to handle crashes
+		// ourselves. Log a stack trace and return a 500 if something panics.
+		defer func() {
+			if r := recover(); r != nil {
+				err = errAuthnCrash
+				// Same as stdlib http server code. Manually allocate stack
+				// trace buffer size to prevent excessively large logs
+				const size = 64 << 10
+				buf := make([]byte, size)
+				buf = buf[:runtime.Stack(buf, false)]
+				klog.Errorf("%v\n%s", r, buf)
+			}
+		}()
 
-	return resp, ok, err
+		// Check again for a cached record. We may have raced with a fetch.
+		if record, ok := a.cache.get(key); ok {
+			return lookup{record.resp, record.ok}, record.err
+		}
+
+		// Detach the context because the lookup may be shared by multiple callers,
+		// however propagate the audience.
+		ctx, cancel := context.WithTimeout(context.Background(), sharedLookupTimeout)
+		defer cancel()
+
+		if audsOk {
+			ctx = authenticator.WithAudiences(ctx, auds)
+		}
+
+		resp, ok, err := a.authenticator.AuthenticateToken(ctx, token)
+		if !a.cacheErrs && err != nil {
+			return nil, err
+		}
+
+		switch {
+		case ok && a.successTTL > 0:
+			a.cache.set(key, &cacheRecord{resp: resp, ok: ok, err: err}, a.successTTL)
+		case !ok && a.failureTTL > 0:
+			a.cache.set(key, &cacheRecord{resp: resp, ok: ok, err: err}, a.failureTTL)
+		}
+		return lookup{resp, ok}, err
+	})
+
+	select {
+	case result := <-c:
+		if result.Err != nil {
+			return nil, false, result.Err
+		}
+		lookup := result.Val.(lookup)
+		return lookup.resp, lookup.ok, nil
+	case <-ctx.Done():
+		return nil, false, ctx.Err()
+	}
 }
 
 // keyFunc generates a string key by hashing the inputs.
