@@ -60,11 +60,12 @@ type CreateCronJobOptions struct {
 	Command  []string
 	Restart  string
 
-	Namespace string
-	Client    batchv1beta1client.BatchV1beta1Interface
-	DryRun    bool
-	Builder   *resource.Builder
-	Cmd       *cobra.Command
+	Namespace        string
+	EnforceNamespace bool
+	Client           batchv1beta1client.BatchV1beta1Interface
+	DryRun           bool
+	Builder          *resource.Builder
+	Cmd              *cobra.Command
 
 	genericclioptions.IOStreams
 }
@@ -126,7 +127,7 @@ func (o *CreateCronJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 		return err
 	}
 
-	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -161,6 +162,10 @@ func (o *CreateCronJobOptions) Validate() error {
 func (o *CreateCronJobOptions) Run() error {
 	var cronjob *batchv1beta1.CronJob
 	cronjob = o.createCronJob()
+	if o.EnforceNamespace {
+		cronjob.Namespace = o.Namespace
+		cronjob.Spec.JobTemplate.Namespace = o.Namespace
+	}
 
 	if !o.DryRun {
 		var err error
