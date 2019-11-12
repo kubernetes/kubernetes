@@ -243,7 +243,7 @@ func (km *Manager) Kustomize(data []byte) ([]byte, error) {
 
 	// Finally customize the target resource
 	var out bytes.Buffer
-	if err := kustomize.RunKustomizeBuild(&out, memFS, fakeDir); err != nil {
+	if err := kustomize.LegacyRunKustomizeBuild(&out, memFS, fakeDir); err != nil {
 		return nil, err
 	}
 
