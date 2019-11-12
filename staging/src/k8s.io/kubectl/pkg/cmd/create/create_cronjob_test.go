@@ -127,9 +127,6 @@ func TestCreateCronJob(t *testing.T) {
 }
 
 func TestValidateCreateCronJob(t *testing.T) {
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-
 	tests := map[string]struct {
 		options   *CreateCronJobOptions
 		expectErr bool
