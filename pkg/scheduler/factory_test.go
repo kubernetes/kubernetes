@@ -109,7 +109,7 @@ func TestCreateFromConfig(t *testing.T) {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 
-	conf, err := factory.CreateFromConfig(policy)
+	sched, err := factory.CreateFromConfig(policy)
 	if err != nil {
 		t.Fatalf("CreateFromConfig failed: %v", err)
 	}
@@ -120,15 +120,15 @@ func TestCreateFromConfig(t *testing.T) {
 
 	// Verify that node label predicate/priority are converted to framework plugins.
 	wantArgs := `{"Name":"NodeLabel","Args":{"presentLabels":["zone"],"absentLabels":["foo"],"presentLabelsPreference":["l1"],"absentLabelsPreference":["l2"]}}`
-	verifyPluginConvertion(t, nodelabel.Name, []string{"FilterPlugin", "ScorePlugin"}, conf, 6, wantArgs)
+	verifyPluginConvertion(t, nodelabel.Name, []string{"FilterPlugin", "ScorePlugin"}, sched, 6, wantArgs)
 	// Verify that service affinity custom predicate/priority is converted to framework plugin.
 	wantArgs = `{"Name":"ServiceAffinity","Args":{"labels":["zone","foo"],"antiAffinityLabelsPreference":["rack","zone"]}}`
-	verifyPluginConvertion(t, serviceaffinity.Name, []string{"FilterPlugin", "ScorePlugin"}, conf, 6, wantArgs)
+	verifyPluginConvertion(t, serviceaffinity.Name, []string{"FilterPlugin", "ScorePlugin"}, sched, 6, wantArgs)
 }
 
-func verifyPluginConvertion(t *testing.T, name string, extentionPoints []string, conf *Config, wantWeight int32, wantArgs string) {
+func verifyPluginConvertion(t *testing.T, name string, extentionPoints []string, sched *Scheduler, wantWeight int32, wantArgs string) {
 	for _, extensionPoint := range extentionPoints {
-		plugin, ok := findPlugin(name, extensionPoint, conf)
+		plugin, ok := findPlugin(name, extensionPoint, sched)
 		if !ok {
 			t.Fatalf("%q plugin does not exist in framework.", name)
 		}
@@ -138,7 +138,7 @@ func verifyPluginConvertion(t *testing.T, name string, extentionPoints []string,
 			}
 		}
 		// Verify that the policy config is converted to plugin config.
-		pluginConfig := findPluginConfig(name, conf)
+		pluginConfig := findPluginConfig(name, sched)
 		encoding, err := json.Marshal(pluginConfig)
 		if err != nil {
 			t.Errorf("Failed to marshal %+v: %v", pluginConfig, err)
@@ -149,8 +149,8 @@ func verifyPluginConvertion(t *testing.T, name string, extentionPoints []string,
 	}
 }
 
-func findPlugin(name, extensionPoint string, schedConf *Config) (schedulerapi.Plugin, bool) {
-	for _, pl := range schedConf.Framework.ListPlugins()[extensionPoint] {
+func findPlugin(name, extensionPoint string, sched *Scheduler) (schedulerapi.Plugin, bool) {
+	for _, pl := range sched.Framework.ListPlugins()[extensionPoint] {
 		if pl.Name == name {
 			return pl, true
 		}
@@ -158,8 +158,8 @@ func findPlugin(name, extensionPoint string, schedConf *Config) (schedulerapi.Pl
 	return schedulerapi.Plugin{}, false
 }
 
-func findPluginConfig(name string, schedConf *Config) schedulerapi.PluginConfig {
-	for _, c := range schedConf.PluginConfig {
+func findPluginConfig(name string, sched *Scheduler) schedulerapi.PluginConfig {
+	for _, c := range sched.PluginConfig {
 		if c.Name == name {
 			return c
 		}

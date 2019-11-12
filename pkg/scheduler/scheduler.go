@@ -119,6 +119,10 @@ type Scheduler struct {
 	SchedulingQueue internalqueue.SchedulingQueue
 
 	scheduledPodsHasSynced func() bool
+
+	// The final configuration of the framework.
+	Plugins      schedulerapi.Plugins
+	PluginConfig []schedulerapi.PluginConfig
 }
 
 // Cache returns the cache in scheduler for test to check the data in scheduler.
@@ -321,7 +325,7 @@ func New(client clientset.Interface,
 		Plugins:                        options.frameworkPlugins,
 		PluginConfig:                   options.frameworkPluginConfig,
 	})
-	var config *Config
+	var sched *Scheduler
 	source := schedulerAlgorithmSource
 	switch {
 	case source.Provider != nil:
@@ -330,7 +334,7 @@ func New(client clientset.Interface,
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler using provider %q: %v", *source.Provider, err)
 		}
-		config = sc
+		sched = sc
 	case source.Policy != nil:
 		// Create the config from a user specified policy source.
 		policy := &schedulerapi.Policy{}
@@ -348,17 +352,15 @@ func New(client clientset.Interface,
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler from policy: %v", err)
 		}
-		config = sc
+		sched = sc
 	default:
 		return nil, fmt.Errorf("unsupported algorithm source: %v", source)
 	}
+	metrics.Register()
 	// Additional tweaks to the config produced by the configurator.
-	config.Recorder = recorder
-	config.DisablePreemption = options.disablePreemption
-	config.StopEverything = stopCh
-
-	// Create the scheduler.
-	sched := NewFromConfig(config)
+	sched.Recorder = recorder
+	sched.DisablePreemption = options.disablePreemption
+	sched.StopEverything = stopCh
 	sched.podConditionUpdater = &podConditionUpdaterImpl{client}
 	sched.podPreemptor = &podPreemptorImpl{client}
 	sched.scheduledPodsHasSynced = podInformer.Informer().HasSynced
@@ -401,24 +403,6 @@ func initPolicyFromConfigMap(client clientset.Interface, policyRef *schedulerapi
 		return fmt.Errorf("invalid policy: %v", err)
 	}
 	return nil
-}
-
-// NewFromConfig returns a new scheduler using the provided Config.
-func NewFromConfig(config *Config) *Scheduler {
-	metrics.Register()
-	return &Scheduler{
-		SchedulerCache:    config.SchedulerCache,
-		Algorithm:         config.Algorithm,
-		GetBinder:         config.GetBinder,
-		Framework:         config.Framework,
-		NextPod:           config.NextPod,
-		Error:             config.Error,
-		Recorder:          config.Recorder,
-		StopEverything:    config.StopEverything,
-		VolumeBinder:      config.VolumeBinder,
-		DisablePreemption: config.DisablePreemption,
-		SchedulingQueue:   config.SchedulingQueue,
-	}
 }
 
 // Run begins watching and scheduling. It waits for cache to be synced, then starts scheduling and blocked until the context is done.
