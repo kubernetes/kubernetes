@@ -177,7 +177,7 @@ func (s *BuiltInAuthenticationOptions) Validate() []error {
 	}
 	if s.ServiceAccounts != nil && utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) || !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
-			allErrors = append(allErrors, errors.New("If the BoundServiceAccountTokenVolume feature is enabled,"+
+			allErrors = append(allErrors, errors.New("if the BoundServiceAccountTokenVolume feature is enabled,"+
 				" the TokenRequest and TokenRequestProjection features must also be enabled"))
 		}
 		if len(s.ServiceAccounts.Issuer) == 0 {
