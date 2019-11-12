@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 	"k8s.io/kubernetes/pkg/volume/validation"
 	"k8s.io/utils/keymutex"
 	utilstrings "k8s.io/utils/strings"
@@ -617,6 +618,21 @@ var _ volume.BlockVolumePublisher = &localVolumeMapper{}
 // SetUpDevice provides physical device path for the local PV.
 func (m *localVolumeMapper) MapPodDevice() (string, error) {
 	globalPath := util.MakeAbsolutePath(runtime.GOOS, m.globalPath)
+	klog.V(4).Infof("MapPodDevice returning path %s", globalPath)
+
+	// Local plugin implements MapPodDevice for returning device path.
+	// However, all plugins that implement MapPodDevice are required to map device
+	// to pod device map path by itself. Therefore, MapDevice is called here.
+	// If the symlink is created by calling MapDevice, common logic will delete the symlink
+	// on unmap, if UnmapPodDevice is not implemented.
+	// Therefore, UnmapPodDevice doesn't need to be implemented for local plugin.
+	podVolumeMapPath, volumeMapName := m.GetPodDeviceMapPath()
+	blkUtil := volumepathhandler.NewBlockVolumePathHandler()
+	mapErr := blkUtil.MapDevice(globalPath, podVolumeMapPath, volumeMapName, false /* bindMount */)
+	if mapErr != nil {
+		return "", fmt.Errorf("MapDevice failed. devicePath: %s, podVolumeMapPath:%s, volumeMapName: %s, bindMount: %v: %v", globalPath, podVolumeMapPath, volumeMapName, false, mapErr)
+	}
+
 	klog.V(4).Infof("MapPodDevice returning path %s", globalPath)
 	return globalPath, nil
 }

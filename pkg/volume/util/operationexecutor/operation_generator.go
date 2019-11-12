@@ -1107,7 +1107,12 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 
 		// Execute common map
 		volumeMapPath, volName := blockVolumeMapper.GetPodDeviceMapPath()
-		mapErr := ioutil.MapBlockVolume(og.blkUtil, devicePath, globalMapPath, volumeMapPath, volName, volumeToMount.Pod.UID)
+		needPodMap := true
+		if _, ok := blockVolumeMapper.(volume.BlockVolumePublisher); ok {
+			// BlockVolumePublisher will do it's own mapping, therefore it won't need common pod map
+			needPodMap = false
+		}
+		mapErr := ioutil.MapBlockVolume(og.blkUtil, devicePath, globalMapPath, volumeMapPath, volName, volumeToMount.Pod.UID, needPodMap)
 		if mapErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateError("MapVolume.MapBlockVolume failed", mapErr)
@@ -1217,7 +1222,12 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 		globalUnmapPath := volumeToUnmount.DeviceMountPath
 
 		// Execute common unmap
-		unmapErr := ioutil.UnmapBlockVolume(og.blkUtil, globalUnmapPath, podDeviceUnmapPath, volName, volumeToUnmount.PodUID)
+		needPodUnmap := true
+		if _, ok := blockVolumeUnmapper.(volume.BlockVolumeUnpublisher); ok {
+			// BlockVolumeUnpublisher will do it's own unmapping, therefore it won't need common pod unmap
+			needPodUnmap = false
+		}
+		unmapErr := ioutil.UnmapBlockVolume(og.blkUtil, globalUnmapPath, podDeviceUnmapPath, volName, volumeToUnmount.PodUID, needPodUnmap)
 		if unmapErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToUnmount.GenerateError("UnmapVolume.UnmapBlockVolume failed", unmapErr)
