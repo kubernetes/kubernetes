@@ -453,7 +453,7 @@ func (qs *queueSet) selectQueue() *fq.Queue {
 }
 
 // dequeue dequeues a request from the queueSet
-func (qs *queueSet) dequeue() (*fq.Request, bool) {
+func (qs *queueSet) dequeueLocked() (*fq.Request, bool) {
 	queue := qs.selectQueue()
 	if queue == nil {
 		return nil, false
@@ -491,7 +491,7 @@ func (qs *queueSet) dequeueWithChannelAsMuchAsPossible() {
 // require a message to be sent through the requests channel
 // this is a required pattern for the QueueSet the queueSet supports
 func (qs *queueSet) dequeueWithChannel() (*fq.Request, bool) {
-	req, ok := qs.dequeue()
+	req, ok := qs.dequeueLocked()
 	if !ok {
 		return nil, false
 	}
