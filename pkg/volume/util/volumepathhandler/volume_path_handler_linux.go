@@ -27,6 +27,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"golang.org/x/sys/unix"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 )
@@ -220,24 +222,20 @@ func compareBindMountAndSymlinks(global, pod string) (bool, error) {
 	return false, nil
 }
 
-// getDeviceMajorMinor returns major/minor number for the path with belwo format:
+// getDeviceMajorMinor returns major/minor number for the path with below format:
 // major:minor (in hex)
 // ex)
 //     fc:10
 func getDeviceMajorMinor(path string) (string, error) {
-	args := []string{"-c", "%t:%T", path}
-	cmd := exec.Command(statPath, args...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		klog.V(2).Infof("Failed to stat path: %s %v %s ", path, err, out)
-		return "", fmt.Errorf("stat -c %%t:%%T %s failed: %v", path, err)
+	var stat unix.Stat_t
+
+	if err := unix.Stat(path, &stat); err != nil {
+		return "", fmt.Errorf("failed to stat path %s: %v", path, err)
 	}
 
-	// stat -c "%t:%T" {path} outputs following format(major:minor in hex):
-	// fc:10
-	if len(out) == 0 {
-		return "", errors.New(ErrDeviceNotFound)
-	}
+	devNumber := uint64(stat.Rdev)
+	major := unix.Major(devNumber)
+	minor := unix.Minor(devNumber)
 
-	return strings.TrimSpace(string(out)), nil
+	return fmt.Sprintf("%x:%x", major, minor), nil
 }
