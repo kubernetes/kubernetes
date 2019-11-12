@@ -150,12 +150,18 @@ func (o *CreateCronJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 }
 
 func (o *CreateCronJobOptions) Validate() error {
+	if o.Name == "" {
+		return fmt.Errorf("name must be specified")
+	}
+
 	if len(o.Image) == 0 {
 		return fmt.Errorf("--image must be specified")
 	}
+
 	if len(o.Schedule) == 0 {
 		return fmt.Errorf("--schedule must be specified")
 	}
+
 	return nil
 }
 
