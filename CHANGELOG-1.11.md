@@ -1600,7 +1600,7 @@ You can now bind tokens to service requests. ([ref](https://github.com/kubernete
 * Fixed mounting of UNIX sockets(and other special files) in subpaths ([#61480](https://github.com/kubernetes/kubernetes/pull/61480), [@gnufscied](https://github.com/gnufied))
 * Fixed [#61123](https://github.com/kubernetes/kubernetes/pull/61123) by triggering syncer.Update on all cases including when a syncer is created ([#61124](https://github.com/kubernetes/kubernetes/pull/61124), [@satyasm](https://github.com/satyasm))
 * Fixed data race in node lifecycle controller ([#60831](https://github.com/kubernetes/kubernetes/pull/60831), [@resouer](https://github.com/resouer))
-* Fixed resultRun by resetting it to 0 on pod restart ([#62853](https://github.com/kubernetes/kubernetes/pull62853), [@tony612](https://github.com/tony612))
+* Fixed resultRun by resetting it to 0 on pod restart ([#62853](https://github.com/kubernetes/kubernetes/pull/62853), [@tony612](https://github.com/tony612))
 * Fixed the liveness probe to use `/bin/bash -c` instead of `/bin/bash c`. ([#63033](https://github.com/kubernetes/kubernetes/pull/63033), [@bmoyles0117](https://github.com/bmoyles0117))
 * Fixed scheduler informers to receive events for all the pods in the cluster. ([#63003](https://github.com/kubernetes/kubernetes/pull/63003), [@bsalamat](https://github.com/bsalamat))
 * Fixed in vSphere Cloud Provider to handle upgrades from kubernetes version less than v1.9.4 to v1.9.4 and above. ([#62919](https://github.com/kubernetes/kubernetes/pull/62919), [@abrarshivani](https://github.com/abrarshivani))
