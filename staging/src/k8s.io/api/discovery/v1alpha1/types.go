@@ -135,6 +135,13 @@ type EndpointPort struct {
 	// If this is not specified, ports are not restricted and must be
 	// interpreted in the context of the specific consumer.
 	Port *int32 `json:"port,omitempty" protobuf:"bytes,3,opt,name=port"`
+	// The application protocol for this port.
+	// This field follows standard Kubernetes label syntax.
+	// Un-prefixed names are reserved for IANA standard service names (as per
+	// RFC-6335 and http://www.iana.org/assignments/service-names).
+	// Non-standard protocols should use prefixed names.
+	// Default is empty string.
+	AppProtocol *string `json:"appProtocol,omitempty" protobuf:"bytes,4,name=appProtocol"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

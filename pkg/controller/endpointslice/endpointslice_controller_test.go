@@ -267,7 +267,7 @@ func TestSyncServiceFull(t *testing.T) {
 	slice := sliceList.Items[0]
 	assert.Len(t, slice.Endpoints, 2, "Expected 2 endpoints in first slice")
 	assert.Equal(t, slice.Annotations["endpoints.kubernetes.io/last-change-trigger-time"], serviceCreateTime.Format(time.RFC3339Nano))
-	assert.EqualValues(t, []discovery.EndpointPort{{
+	assert.ElementsMatch(t, []discovery.EndpointPort{{
 		Name:     strPtr("tcp-example"),
 		Protocol: protoPtr(v1.ProtocolTCP),
 		Port:     int32Ptr(int32(80)),

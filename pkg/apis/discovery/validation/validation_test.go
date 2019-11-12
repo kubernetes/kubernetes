@@ -88,6 +88,34 @@ func TestValidateEndpointSlice(t *testing.T) {
 				}},
 			},
 		},
+		"app-protocols": {
+			expectedErrors: 0,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: addressTypePtr(discovery.AddressTypeIP),
+				Ports: []discovery.EndpointPort{{
+					Name:        utilpointer.StringPtr("one"),
+					Protocol:    protocolPtr(api.ProtocolTCP),
+					AppProtocol: utilpointer.StringPtr("HTTP"),
+				}, {
+					Name:        utilpointer.StringPtr("two"),
+					Protocol:    protocolPtr(api.ProtocolTCP),
+					AppProtocol: utilpointer.StringPtr("https"),
+				}, {
+					Name:        utilpointer.StringPtr("three"),
+					Protocol:    protocolPtr(api.ProtocolTCP),
+					AppProtocol: utilpointer.StringPtr("my-protocol"),
+				}, {
+					Name:        utilpointer.StringPtr("four"),
+					Protocol:    protocolPtr(api.ProtocolTCP),
+					AppProtocol: utilpointer.StringPtr("example.com/custom-protocol"),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: generateIPAddresses(1),
+					Hostname:  utilpointer.StringPtr("valid-123"),
+				}},
+			},
+		},
 		"empty-port-name": {
 			expectedErrors: 0,
 			endpointSlice: &discovery.EndpointSlice{
@@ -386,6 +414,22 @@ func TestValidateEndpointSlice(t *testing.T) {
 				}},
 				Endpoints: []discovery.Endpoint{{
 					Addresses: []string{"foo.*", "FOO.example.com", "underscores_are_bad.example.com", "*.example.com"},
+					Hostname:  utilpointer.StringPtr("valid-123"),
+				}},
+			},
+		},
+		"bad-app-protocol": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: addressTypePtr(discovery.AddressTypeIP),
+				Ports: []discovery.EndpointPort{{
+					Name:        utilpointer.StringPtr("http"),
+					Protocol:    protocolPtr(api.ProtocolTCP),
+					AppProtocol: utilpointer.StringPtr("--"),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: generateIPAddresses(1),
 					Hostname:  utilpointer.StringPtr("valid-123"),
 				}},
 			},
