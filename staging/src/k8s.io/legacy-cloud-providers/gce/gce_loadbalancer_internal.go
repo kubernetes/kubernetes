@@ -640,7 +640,9 @@ func (g *Cloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node) ([]s
 				skip.Insert(groupInstances.UnsortedList()...)
 			}
 		}
-		gceZonedNodes[zone] = names.Difference(skip).UnsortedList()
+		if remaining := names.Difference(skip).UnsortedList(); len(remaining) > 0 {
+			gceZonedNodes[zone] = remaining
+		}
 	}
 	for zone, gceNodes := range gceZonedNodes {
 		igLink, err := g.ensureInternalInstanceGroup(name, zone, gceNodes)
