@@ -22,8 +22,9 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 func TestCreateCronJob(t *testing.T) {
@@ -112,9 +113,9 @@ func TestCreateCronJob(t *testing.T) {
 				Schedule: tc.schedule,
 				Restart:  tc.restart,
 			}
-			cronjob := o.createCronJob()
-			if !apiequality.Semantic.DeepEqual(cronjob, tc.expected) {
-				t.Errorf("expected:\n%#v\ngot:\n%#v", tc.expected, cronjob)
+			actual := o.createCronJob()
+			if !equality.Semantic.DeepEqual(tc.expected, actual) {
+				t.Errorf("%s", diff.ObjectReflectDiff(tc.expected, actual))
 			}
 		})
 	}
