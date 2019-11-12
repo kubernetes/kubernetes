@@ -4,9 +4,11 @@
 reviewers:
   - cheftako
   - oomichi
+  - johnbelamaric
 approvers:
   - cheftako
   - spiffxp
+  - johnbelamaric
 emeritus_approvers:
   - mml
 labels:
