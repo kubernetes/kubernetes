@@ -1860,7 +1860,7 @@ func TestServiceAffinity(t *testing.T) {
 		testIt := func(skipPrecompute bool) {
 			t.Run(fmt.Sprintf("%v/skipPrecompute/%v", test.name, skipPrecompute), func(t *testing.T) {
 				nodes := []*v1.Node{&node1, &node2, &node3, &node4, &node5}
-				s := nodeinfosnapshot.NewSnapshot(test.pods, nodes)
+				s := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
 
 				// Reimplementing the logic that the scheduler implements: Any time it makes a predicate, it registers any precomputations.
 				predicate, precompute := NewServiceAffinityPredicate(s.NodeInfos(), s.Pods(), fakelisters.ServiceLister(test.services), test.labels)
@@ -2929,7 +2929,7 @@ func TestInterPodAffinity(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			s := nodeinfosnapshot.NewSnapshot(test.pods, []*v1.Node{test.node})
+			s := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, []*v1.Node{test.node}))
 
 			fit := PodAffinityChecker{
 				nodeInfoLister: s.NodeInfos(),
@@ -4025,7 +4025,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 
 	for indexTest, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 			for indexNode, node := range test.nodes {
 				testFit := PodAffinityChecker{
 					nodeInfoLister: snapshot.NodeInfos(),
@@ -4044,7 +4044,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				}
 				affinity := test.pod.Spec.Affinity
 				if affinity != nil && affinity.NodeAffinity != nil {
-					s := nodeinfosnapshot.NewSnapshot(nil, []*v1.Node{node})
+					s := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(nil, []*v1.Node{node}))
 					factory := &MetadataProducerFactory{}
 					fits2, reasons, err := PodMatchNodeSelector(test.pod, factory.GetPredicateMetadata(test.pod, s), s.NodeInfoMap[node.Name])
 					if err != nil {
@@ -4967,7 +4967,7 @@ func TestEvenPodsSpreadPredicate_SingleConstraint(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := nodeinfosnapshot.NewSnapshot(tt.existingPods, tt.nodes)
+			s := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, tt.nodes))
 			factory := &MetadataProducerFactory{}
 			meta := factory.GetPredicateMetadata(tt.pod, s)
 			for _, node := range tt.nodes {
@@ -5161,7 +5161,7 @@ func TestEvenPodsSpreadPredicate_MultipleConstraints(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := nodeinfosnapshot.NewSnapshot(tt.existingPods, tt.nodes)
+			s := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, tt.nodes))
 			factory := &MetadataProducerFactory{}
 			meta := factory.GetPredicateMetadata(tt.pod, s)
 			for _, node := range tt.nodes {

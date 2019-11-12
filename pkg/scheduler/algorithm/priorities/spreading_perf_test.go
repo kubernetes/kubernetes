@@ -55,7 +55,7 @@ func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 				SpreadConstraint(1, v1.LabelHostname, softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				SpreadConstraint(1, v1.LabelZoneFailureDomain, softSpread, st.MakeLabelSelector().Exists("foo").Obj()).Obj()
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.allNodesNum)
-			snapshot := nodeinfosnapshot.NewSnapshot(existingPods, allNodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(existingPods, allNodes))
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
@@ -84,7 +84,7 @@ func BenchmarkTestSelectorSpreadPriority(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			pod := st.MakePod().Name("p").Label("foo", "").Obj()
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.allNodesNum)
-			snapshot := nodeinfosnapshot.NewSnapshot(existingPods, allNodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(existingPods, allNodes))
 			services := []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": ""}}}}
 			ss := SelectorSpread{
 				serviceLister:     fake.ServiceLister(services),

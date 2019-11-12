@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package nodeinfo
+package snapshot
 
 import (
 	"reflect"
@@ -23,6 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 const mb int64 = 1024 * 1024
@@ -31,7 +32,7 @@ func TestGetNodeImageStates(t *testing.T) {
 	tests := []struct {
 		node              *v1.Node
 		imageExistenceMap map[string]sets.String
-		expected          map[string]*ImageStateSummary
+		expected          map[string]*schedulernodeinfo.ImageStateSummary
 	}{
 		{
 			node: &v1.Node{
@@ -57,7 +58,7 @@ func TestGetNodeImageStates(t *testing.T) {
 				"gcr.io/10:v1":  sets.NewString("node-0", "node-1"),
 				"gcr.io/200:v1": sets.NewString("node-0"),
 			},
-			expected: map[string]*ImageStateSummary{
+			expected: map[string]*schedulernodeinfo.ImageStateSummary{
 				"gcr.io/10:v1": {
 					Size:     int64(10 * mb),
 					NumNodes: 2,
@@ -77,7 +78,7 @@ func TestGetNodeImageStates(t *testing.T) {
 				"gcr.io/10:v1":  sets.NewString("node-1"),
 				"gcr.io/200:v1": sets.NewString(),
 			},
-			expected: map[string]*ImageStateSummary{},
+			expected: map[string]*schedulernodeinfo.ImageStateSummary{},
 		},
 	}
 

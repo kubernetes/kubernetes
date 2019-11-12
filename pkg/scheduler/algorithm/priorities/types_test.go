@@ -32,7 +32,7 @@ func TestEmptyPriorityMetadataProducer(t *testing.T) {
 	fakeLabelSelector := labels.SelectorFromSet(labels.Set{"foo": "bar"})
 	fakeNodes := []*v1.Node{st.MakeNode().Name("node1").Obj(), st.MakeNode().Name("node-a").Obj()}
 
-	snapshot := nodeinfosnapshot.NewSnapshot([]*v1.Pod{fakePod}, fakeNodes)
+	snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap([]*v1.Pod{fakePod}, fakeNodes))
 	// Test EmptyMetadataProducer
 	metadata := EmptyMetadataProducer(fakePod, fakeNodes, snapshot)
 	if metadata != nil {
