@@ -23,11 +23,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
 
-func addOSSpecificLabels(n *v1.Node) error {
+func getOSSpecificLabels() (map[string]string, error) {
 	osInfo, err := winstats.GetOSInfo()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	n.Labels[v1.LabelWindowsBuild] = osInfo.GetBuild()
-	return nil
+
+	return map[string]string{v1.LabelWindowsBuild: osInfo.GetBuild()}, nil
 }

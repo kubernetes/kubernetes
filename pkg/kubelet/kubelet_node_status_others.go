@@ -18,10 +18,6 @@ limitations under the License.
 
 package kubelet
 
-import (
-	v1 "k8s.io/api/core/v1"
-)
-
-func addOSSpecificLabels(n *v1.Node) error {
-	return nil
+func getOSSpecificLabels() (map[string]string, error) {
+	return nil, nil
 }

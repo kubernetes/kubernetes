@@ -155,6 +155,7 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 		v1.LabelInstanceType,
 		v1.LabelOSStable,
 		v1.LabelArchStable,
+		v1.LabelWindowsBuild,
 		kubeletapis.LabelOS,
 		kubeletapis.LabelArch,
 	}
@@ -230,8 +231,12 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 			Unschedulable: !kl.registerSchedulable,
 		},
 	}
-	if err := addOSSpecificLabels(node); err != nil {
+	osLabels, err := getOSSpecificLabels()
+	if err != nil {
 		return nil, err
+	}
+	for label, value := range osLabels {
+		node.Labels[label] = value
 	}
 
 	nodeTaints := make([]v1.Taint, 0)
