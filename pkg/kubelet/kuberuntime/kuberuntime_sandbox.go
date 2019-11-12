@@ -22,7 +22,7 @@ import (
 	"net/url"
 	"sort"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -143,7 +143,10 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 	lc := &runtimeapi.LinuxPodSandboxConfig{
 		CgroupParent: cgroupParent,
 		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
-			Privileged:         kubecontainer.HasPrivilegedContainer(pod),
+			Privileged: kubecontainer.HasPrivilegedContainer(pod),
+
+			// Seccomp profile will be overwritten by the container runtime
+			// Leaving this here for: 1. backwards compatibility 2. ensure that at least one seccomp will be applied
 			SeccompProfilePath: m.getSeccompProfileFromAnnotations(pod.Annotations, ""),
 		},
 	}

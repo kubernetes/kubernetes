@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -152,6 +153,31 @@ func TestSandboxStatus(t *testing.T) {
 	require.NoError(t, err)
 	statusResp, err = ds.PodSandboxStatus(getTestCTX(), &runtimeapi.PodSandboxStatusRequest{PodSandboxId: id})
 	assert.Error(t, err, fmt.Sprintf("status of sandbox: %+v", statusResp))
+}
+
+// TestSandboxHasLeastPrivilegesConfig tests that the sandbox is set with no-new-privileges
+// and it has a seccomp profile.
+func TestSandboxHasLeastPrivilegesConfig(t *testing.T) {
+	ds, _, _ := newTestDockerService()
+	config := makeSandboxConfig("foo", "bar", "1", 0)
+	ds.podSandBoxSeccomp = "{defaultAction=\"SCMP_ACT_ERRNO\"}"
+
+	// test the default
+	createConfig, err := ds.makeSandboxDockerConfig(config, defaultSandboxImage)
+	assert.NoError(t, err)
+	assert.Equal(t, "no-new-privileges", createConfig.HostConfig.SecurityOpt[0], "no-new-privileges not set")
+	assert.True(t, strings.HasPrefix(createConfig.HostConfig.SecurityOpt[1], "seccomp={defaultAction=\"SCMP_ACT_ERRNO\"}"), "seccomp not set")
+
+	// test that users can't overwrite the sandboxes' seccomp
+	config.Linux = &runtimeapi.LinuxPodSandboxConfig{
+		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
+			SeccompProfilePath: "runtime/default",
+		},
+	}
+	createConfig, err = ds.makeSandboxDockerConfig(config, defaultSandboxImage)
+	assert.NoError(t, err)
+	assert.Equal(t, "no-new-privileges", createConfig.HostConfig.SecurityOpt[0], "no-new-privileges not set")
+	assert.True(t, strings.HasPrefix(createConfig.HostConfig.SecurityOpt[1], "seccomp={defaultAction=\"SCMP_ACT_ERRNO\"}"), "seccomp not set")
 }
 
 // TestSandboxStatusAfterRestart tests that retrieving sandbox status returns

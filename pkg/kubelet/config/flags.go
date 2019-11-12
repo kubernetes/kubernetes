@@ -51,6 +51,8 @@ type ContainerRuntimeOptions struct {
 	// PodSandboxImage is the image whose network/ipc namespaces
 	// containers in each pod will use.
 	PodSandboxImage string
+	// PodSandboxSeccomp defines the seccomp profile that the infrastructure container will use.
+	PodSandboxSeccomp string
 	// DockerEndpoint is the path to the docker endpoint to communicate with.
 	DockerEndpoint string
 	// If no pulling progress is made before the deadline imagePullProgressDeadline,

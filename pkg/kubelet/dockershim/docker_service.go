@@ -29,7 +29,7 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
@@ -188,8 +188,9 @@ func NewDockerClientFromConfig(config *ClientConfig) libdocker.Interface {
 
 // NewDockerService creates a new `DockerService` struct.
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
-func NewDockerService(config *ClientConfig, podSandboxImage string, streamingConfig *streaming.Config, pluginSettings *NetworkPluginSettings,
-	cgroupsName string, kubeCgroupDriver string, dockershimRootDir string, startLocalStreamingServer bool) (DockerService, error) {
+func NewDockerService(config *ClientConfig, podSandboxImage string, podSandboxSeccomp string, streamingConfig *streaming.Config,
+	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, dockershimRootDir string,
+	startLocalStreamingServer bool) (DockerService, error) {
 
 	client := NewDockerClientFromConfig(config)
 
@@ -284,11 +285,12 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 }
 
 type dockerService struct {
-	client           libdocker.Interface
-	os               kubecontainer.OSInterface
-	podSandboxImage  string
-	streamingRuntime *streamingRuntime
-	streamingServer  streaming.Server
+	client            libdocker.Interface
+	os                kubecontainer.OSInterface
+	podSandboxImage   string
+	podSandBoxSeccomp string
+	streamingRuntime  *streamingRuntime
+	streamingServer   streaming.Server
 
 	network *network.PluginManager
 	// Map of podSandboxID :: network-is-ready

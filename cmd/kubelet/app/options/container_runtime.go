@@ -29,6 +29,7 @@ const (
 	// When these values are updated, also update test/e2e/framework/util.go
 	defaultPodSandboxImageName    = "k8s.gcr.io/pause"
 	defaultPodSandboxImageVersion = "3.1"
+	defaultPodSandboxSeccomp      = `{"defaultAction":"SCMP_ACT_ERRNO","architectures":["SCMP_ARCH_X86_64","SCMP_ARCH_X86","SCMP_ARCH_X32"],"syscalls":[{"names":["arch_prctl","brk","close","execve","exit_group","futex","mprotect","nanosleep","stat","write","uname","pause","rt_sigaction","getpid","wait4","waitid","fork","getppid"],"action": "SCMP_ACT_ALLOW"}]}`
 )
 
 var (
@@ -50,6 +51,7 @@ func NewContainerRuntimeOptions() *config.ContainerRuntimeOptions {
 		DockerEndpoint:             dockerEndpoint,
 		DockershimRootDirectory:    "/var/lib/dockershim",
 		PodSandboxImage:            defaultPodSandboxImage,
+		PodSandboxSeccomp:          defaultPodSandboxSeccomp,
 		ImagePullProgressDeadline:  metav1.Duration{Duration: 1 * time.Minute},
 		ExperimentalDockershim:     false,
 
