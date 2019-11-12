@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -127,7 +127,7 @@ func (c *Controller) processPV(pvName string) error {
 	}()
 
 	pv, err := c.pvLister.Get(pvName)
-	if apierrs.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		klog.V(4).Infof("PV %s not found, ignoring", pvName)
 		return nil
 	}

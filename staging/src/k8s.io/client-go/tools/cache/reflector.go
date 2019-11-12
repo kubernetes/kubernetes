@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -375,7 +375,7 @@ loop:
 				break loop
 			}
 			if event.Type == watch.Error {
-				return apierrs.FromObject(event.Object)
+				return apierrors.FromObject(event.Object)
 			}
 			if r.expectedType != nil {
 				if e, a := r.expectedType, reflect.TypeOf(event.Object); e != a {
@@ -479,9 +479,9 @@ func (r *Reflector) setIsLastSyncResourceVersionExpired(isExpired bool) {
 }
 
 func isExpiredError(err error) bool {
-	// In Kubernetes 1.17 and earlier, the api server returns both apierrs.StatusReasonExpired and
-	// apierrs.StatusReasonGone for HTTP 410 (Gone) status code responses. In 1.18 the kube server is more consistent
-	// and always returns apierrs.StatusReasonExpired. For backward compatibility we can only remove the apierrs.IsGone
+	// In Kubernetes 1.17 and earlier, the api server returns both apierrors.StatusReasonExpired and
+	// apierrors.StatusReasonGone for HTTP 410 (Gone) status code responses. In 1.18 the kube server is more consistent
+	// and always returns apierrors.StatusReasonExpired. For backward compatibility we can only remove the apierrors.IsGone
 	// check when we fully drop support for Kubernetes 1.17 servers from reflectors.
-	return apierrs.IsResourceExpired(err) || apierrs.IsGone(err)
+	return apierrors.IsResourceExpired(err) || apierrors.IsGone(err)
 }

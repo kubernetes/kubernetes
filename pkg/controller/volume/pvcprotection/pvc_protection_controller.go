@@ -21,7 +21,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -150,7 +150,7 @@ func (c *Controller) processPVC(pvcNamespace, pvcName string) error {
 	}()
 
 	pvc, err := c.pvcLister.PersistentVolumeClaims(pvcNamespace).Get(pvcName)
-	if apierrs.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		klog.V(4).Infof("PVC %s/%s not found, ignoring", pvcNamespace, pvcName)
 		return nil
 	}

@@ -23,7 +23,7 @@ import (
 	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -58,8 +58,8 @@ var (
 )
 
 func TestReplicationControllerScaleRetry(t *testing.T) {
-	verbsOnError := map[string]*kerrors.StatusError{
-		"patch": kerrors.NewConflict(api.Resource("Status"), "foo", nil),
+	verbsOnError := map[string]*apierrors.StatusError{
+		"patch": apierrors.NewConflict(api.Resource("Status"), "foo", nil),
 	}
 	scaleClientExpectedAction := []string{"patch", "get"}
 	scaleClient := createFakeScaleClient("replicationcontrollers", "foo-v1", 2, verbsOnError)
@@ -94,8 +94,8 @@ func TestReplicationControllerScaleRetry(t *testing.T) {
 }
 
 func TestReplicationControllerScaleInvalid(t *testing.T) {
-	verbsOnError := map[string]*kerrors.StatusError{
-		"patch": kerrors.NewInvalid(api.Kind("Status"), "foo", nil),
+	verbsOnError := map[string]*apierrors.StatusError{
+		"patch": apierrors.NewInvalid(api.Kind("Status"), "foo", nil),
 	}
 	scaleClientExpectedAction := []string{"patch"}
 	scaleClient := createFakeScaleClient("replicationcontrollers", "foo-v1", 1, verbsOnError)
@@ -168,8 +168,8 @@ func TestReplicationControllerScaleFailsPreconditions(t *testing.T) {
 }
 
 func TestDeploymentScaleRetry(t *testing.T) {
-	verbsOnError := map[string]*kerrors.StatusError{
-		"patch": kerrors.NewConflict(api.Resource("Status"), "foo", nil),
+	verbsOnError := map[string]*apierrors.StatusError{
+		"patch": apierrors.NewConflict(api.Resource("Status"), "foo", nil),
 	}
 	scaleClientExpectedAction := []string{"patch", "get"}
 	scaleClient := createFakeScaleClient("deployments", "foo", 2, verbsOnError)
@@ -226,8 +226,8 @@ func TestDeploymentScale(t *testing.T) {
 
 func TestDeploymentScaleInvalid(t *testing.T) {
 	scaleClientExpectedAction := []string{"patch"}
-	verbsOnError := map[string]*kerrors.StatusError{
-		"patch": kerrors.NewInvalid(api.Kind("Status"), "foo", nil),
+	verbsOnError := map[string]*apierrors.StatusError{
+		"patch": apierrors.NewInvalid(api.Kind("Status"), "foo", nil),
 	}
 	scaleClient := createFakeScaleClient("deployments", "foo", 2, verbsOnError)
 	scaler := NewScaler(scaleClient)
@@ -299,8 +299,8 @@ func TestStatefulSetScale(t *testing.T) {
 
 func TestStatefulSetScaleRetry(t *testing.T) {
 	scaleClientExpectedAction := []string{"patch", "get"}
-	verbsOnError := map[string]*kerrors.StatusError{
-		"patch": kerrors.NewConflict(api.Resource("Status"), "foo", nil),
+	verbsOnError := map[string]*apierrors.StatusError{
+		"patch": apierrors.NewConflict(api.Resource("Status"), "foo", nil),
 	}
 	scaleClient := createFakeScaleClient("statefulsets", "foo", 2, verbsOnError)
 	scaler := NewScaler(scaleClient)
@@ -335,8 +335,8 @@ func TestStatefulSetScaleRetry(t *testing.T) {
 
 func TestStatefulSetScaleInvalid(t *testing.T) {
 	scaleClientExpectedAction := []string{"patch"}
-	verbsOnError := map[string]*kerrors.StatusError{
-		"patch": kerrors.NewInvalid(api.Kind("Status"), "foo", nil),
+	verbsOnError := map[string]*apierrors.StatusError{
+		"patch": apierrors.NewInvalid(api.Kind("Status"), "foo", nil),
 	}
 	scaleClient := createFakeScaleClient("statefulsets", "foo", 2, verbsOnError)
 	scaler := NewScaler(scaleClient)
@@ -407,8 +407,8 @@ func TestReplicaSetScale(t *testing.T) {
 }
 
 func TestReplicaSetScaleRetry(t *testing.T) {
-	verbsOnError := map[string]*kerrors.StatusError{
-		"patch": kerrors.NewConflict(api.Resource("Status"), "foo", nil),
+	verbsOnError := map[string]*apierrors.StatusError{
+		"patch": apierrors.NewConflict(api.Resource("Status"), "foo", nil),
 	}
 	scaleClientExpectedAction := []string{"patch", "get"}
 	scaleClient := createFakeScaleClient("replicasets", "foo", 2, verbsOnError)
@@ -443,8 +443,8 @@ func TestReplicaSetScaleRetry(t *testing.T) {
 }
 
 func TestReplicaSetScaleInvalid(t *testing.T) {
-	verbsOnError := map[string]*kerrors.StatusError{
-		"patch": kerrors.NewInvalid(api.Kind("Status"), "foo", nil),
+	verbsOnError := map[string]*apierrors.StatusError{
+		"patch": apierrors.NewInvalid(api.Kind("Status"), "foo", nil),
 	}
 	scaleClientExpectedAction := []string{"patch"}
 	scaleClient := createFakeScaleClient("replicasets", "foo", 2, verbsOnError)
@@ -688,12 +688,12 @@ func TestGenericScale(t *testing.T) {
 	}
 }
 
-func createFakeScaleClient(resource string, resourceName string, replicas int, errorsOnVerb map[string]*kerrors.StatusError) *fakescale.FakeScaleClient {
-	shouldReturnAnError := func(verb string) (*kerrors.StatusError, bool) {
+func createFakeScaleClient(resource string, resourceName string, replicas int, errorsOnVerb map[string]*apierrors.StatusError) *fakescale.FakeScaleClient {
+	shouldReturnAnError := func(verb string) (*apierrors.StatusError, bool) {
 		if anError, anErrorExists := errorsOnVerb[verb]; anErrorExists {
 			return anError, true
 		}
-		return &kerrors.StatusError{}, false
+		return &apierrors.StatusError{}, false
 	}
 	newReplicas := int32(replicas)
 	scaleClient := &fakescale.FakeScaleClient{}

@@ -28,7 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -83,7 +83,7 @@ func markVolumeAttached(t *testing.T, client clientset.Interface, watch *watch.R
 	for i := 0; i < 100; i++ {
 		attach, err = client.StorageV1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 		if err != nil {
-			if apierrs.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				<-ticker.C
 				continue
 			}
@@ -225,7 +225,7 @@ func TestAttacherAttach(t *testing.T) {
 				status.AttachError = &storage.VolumeError{
 					Message: "attacher error",
 				}
-				errStatus := apierrs.NewInternalError(fmt.Errorf("we got an error")).Status()
+				errStatus := apierrors.NewInternalError(fmt.Errorf("we got an error")).Status()
 				fakeWatcher.Error(&errStatus)
 			} else {
 				status.Attached = true
@@ -921,7 +921,7 @@ func TestAttacherDetach(t *testing.T) {
 			reactor: func(action core.Action) (handled bool, ret runtime.Object, err error) {
 				// return Forbidden to all DELETE requests
 				if action.Matches("delete", "volumeattachments") {
-					return true, nil, apierrs.NewForbidden(action.GetResource().GroupResource(), action.GetNamespace(), fmt.Errorf("mock error"))
+					return true, nil, apierrors.NewForbidden(action.GetResource().GroupResource(), action.GetNamespace(), fmt.Errorf("mock error"))
 				}
 				return false, nil, nil
 			},
@@ -971,7 +971,7 @@ func TestAttacherDetach(t *testing.T) {
 			csiAttacher.waitSleepTime = 100 * time.Millisecond
 			go func() {
 				if watchError {
-					errStatus := apierrs.NewInternalError(fmt.Errorf("we got an error")).Status()
+					errStatus := apierrors.NewInternalError(fmt.Errorf("we got an error")).Status()
 					fakeWatcher.Error(&errStatus)
 					return
 				}
@@ -986,7 +986,7 @@ func TestAttacherDetach(t *testing.T) {
 			}
 			attach, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Get(tc.attachID, meta.GetOptions{})
 			if err != nil {
-				if !apierrs.IsNotFound(err) {
+				if !apierrors.IsNotFound(err) {
 					t.Fatalf("unexpected err: %v", err)
 				}
 			} else {

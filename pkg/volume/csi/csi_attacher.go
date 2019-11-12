@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -108,7 +108,7 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 	_, err = c.k8s.StorageV1().VolumeAttachments().Create(attachment)
 	alreadyExist := false
 	if err != nil {
-		if !apierrs.IsAlreadyExists(err) {
+		if !apierrors.IsAlreadyExists(err) {
 			return "", errors.New(log("attacher.Attach failed: %v", err))
 		}
 		alreadyExist = true
@@ -388,7 +388,7 @@ func (c *csiAttacher) Detach(volumeName string, nodeName types.NodeName) error {
 	}
 
 	if err := c.k8s.StorageV1().VolumeAttachments().Delete(attachID, nil); err != nil {
-		if apierrs.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			// object deleted or never existed, done
 			klog.V(4).Info(log("VolumeAttachment object [%v] for volume [%v] not found, object deleted", attachID, volID))
 			return nil
@@ -415,7 +415,7 @@ func (c *csiAttacher) waitForVolumeDetachmentInternal(volumeHandle, attachID str
 	klog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
 	attach, err := c.k8s.StorageV1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 	if err != nil {
-		if apierrs.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			//object deleted or never existed, done
 			klog.V(4).Info(log("VolumeAttachment object [%v] for volume [%v] not found, object deleted", attachID, volumeHandle))
 			return nil
