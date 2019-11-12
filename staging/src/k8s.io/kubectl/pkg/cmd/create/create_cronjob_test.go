@@ -166,7 +166,7 @@ func TestValidateCreateCronJob(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			err := test.options.Validate()
 			if test.expectErr && err == nil {
-				t.Errorf("expected error but but validation passed.")
+				t.Errorf("expected error but validation passed")
 			}
 			if !test.expectErr && err != nil {
 				t.Errorf("unexpected error: %v", err)
