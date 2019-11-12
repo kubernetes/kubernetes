@@ -1158,7 +1158,7 @@ func (fv *FakeVolumePathHandler) IsSymlinkExist(mapPath string) (bool, error) {
 	return true, nil
 }
 
-func (fv *FakeVolumePathHandler) IsBindMountExist(mapPath string) (bool, error) {
+func (fv *FakeVolumePathHandler) IsDeviceBindMountExist(mapPath string) (bool, error) {
 	// nil is success, else error
 	return true, nil
 }

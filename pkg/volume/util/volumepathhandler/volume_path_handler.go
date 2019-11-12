@@ -45,8 +45,8 @@ type BlockVolumePathHandler interface {
 	RemoveMapPath(mapPath string) error
 	// IsSymlinkExist retruns true if specified symbolic link exists
 	IsSymlinkExist(mapPath string) (bool, error)
-	// IsBindMountExist retruns true if specified bind mount exists
-	IsBindMountExist(mapPath string) (bool, error)
+	// IsDeviceBindMountExist retruns true if specified bind mount exists
+	IsDeviceBindMountExist(mapPath string) (bool, error)
 	// GetDeviceBindMountRefs searches bind mounts under global map path
 	GetDeviceBindMountRefs(devPath string, mapPath string) ([]string, error)
 	// FindGlobalMapPathUUIDFromPod finds {pod uuid} symbolic link under globalMapPath
@@ -119,7 +119,6 @@ func mapBindMountDevice(v VolumePathHandler, devicePath string, mapPath string, 
 			return fmt.Errorf("failed to stat file %s: %v", linkPath, err)
 		}
 
-		klog.Warningf("Warning: Path to bind mount %v has not yet been created", linkPath)
 		// Create file
 		newFile, err := os.OpenFile(linkPath, os.O_CREATE|os.O_RDWR, 0750)
 		if err != nil {
@@ -176,7 +175,7 @@ func (v VolumePathHandler) UnmapDevice(mapPath string, linkName string, bindMoun
 func unmapBindMountDevice(v VolumePathHandler, mapPath string, linkName string) error {
 	// Check bind mount exists
 	linkPath := filepath.Join(mapPath, string(linkName))
-	if isMountExist, checkErr := v.IsBindMountExist(linkPath); checkErr != nil {
+	if isMountExist, checkErr := v.IsDeviceBindMountExist(linkPath); checkErr != nil {
 		return checkErr
 	} else if !isMountExist {
 		klog.Warningf("Warning: Unmap skipped because bind mount does not exist on the path: %v", linkPath)
@@ -244,10 +243,10 @@ func (v VolumePathHandler) IsSymlinkExist(mapPath string) (bool, error) {
 	return false, nil
 }
 
-// IsBindMountExist returns true if specified file exists and the type is device.
+// IsDeviceBindMountExist returns true if specified file exists and the type is device.
 // If file doesn't exist, or file exists but not device, return false with no error.
 // On other cases, return false with error from Lstat().
-func (v VolumePathHandler) IsBindMountExist(mapPath string) (bool, error) {
+func (v VolumePathHandler) IsDeviceBindMountExist(mapPath string) (bool, error) {
 	fi, err := os.Lstat(mapPath)
 	if err != nil {
 		// If file doesn't exist, return false and no error
