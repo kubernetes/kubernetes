@@ -204,8 +204,8 @@ func TestAdmit(t *testing.T) {
 
 	tcases := []struct {
 		name     string
-		result   lifecycle.PodAdmitResult
 		qosClass v1.PodQOSClass
+		podPhase v1.PodPhase
 		policy   Policy
 		hp       []HintProvider
 		expected bool
@@ -222,6 +222,65 @@ func TestAdmit(t *testing.T) {
 			qosClass: v1.PodQOSGuaranteed,
 			policy:   NewNonePolicy(),
 			hp:       []HintProvider{},
+			expected: true,
+		},
+		{
+			name:     "QOSClass set as Burstable. SingleNumaNode Policy. Pod already running. No Hints",
+			qosClass: v1.PodQOSBurstable,
+			podPhase: v1.PodRunning,
+			policy:   NewSingleNumaNodePolicy(numaNodes),
+			hp: []HintProvider{
+				&mockHintProvider{},
+			},
+			expected: true,
+		},
+		{
+			name:     "QOSClass set as Burstable. Restricted Policy. Pod already running. No Hints",
+			qosClass: v1.PodQOSBurstable,
+			podPhase: v1.PodRunning,
+			policy:   NewRestrictedPolicy(numaNodes),
+			hp: []HintProvider{
+				&mockHintProvider{},
+			},
+			expected: true,
+		},
+		{
+			name:     "QOSClass set as Burstable. BestEffort Policy. Pod already running. No Hints",
+			qosClass: v1.PodQOSBurstable,
+			podPhase: v1.PodRunning,
+			policy:   NewBestEffortPolicy(numaNodes),
+			hp: []HintProvider{
+				&mockHintProvider{},
+			},
+			expected: true,
+		},
+		{
+			name:     "QOSClass set as Guaranteed. SingleNumaNode Policy. Pod already running. No Hints",
+			qosClass: v1.PodQOSGuaranteed,
+			podPhase: v1.PodRunning,
+			policy:   NewSingleNumaNodePolicy(numaNodes),
+			hp: []HintProvider{
+				&mockHintProvider{},
+			},
+			expected: true,
+		},
+		{
+			name:     "QOSClass set as Guaranteed. Restricted Policy. Pod already running. No Hints",
+			qosClass: v1.PodQOSGuaranteed,
+			podPhase: v1.PodRunning,
+			policy:   NewRestrictedPolicy(numaNodes),
+			hp: []HintProvider{
+				&mockHintProvider{},
+			},
+			expected: true,
+		},
+		{
+			name:     "QOSClass set as Guaranteed. BestEffort Policy. Pod already running. No Hints",
+			qosClass: v1.PodQOSGuaranteed,
+			policy:   NewBestEffortPolicy(numaNodes),
+			hp: []HintProvider{
+				&mockHintProvider{},
+			},
 			expected: true,
 		},
 		{
@@ -484,6 +543,7 @@ func TestAdmit(t *testing.T) {
 			},
 			Status: v1.PodStatus{
 				QOSClass: tc.qosClass,
+				Phase:    tc.podPhase,
 			},
 		}
 

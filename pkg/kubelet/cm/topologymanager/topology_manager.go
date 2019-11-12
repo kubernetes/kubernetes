@@ -211,6 +211,15 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 
 	pod := attrs.Pod
 
+	// Short circuit to unconditionally admit the pod if it is already running.
+	// This can happen after a kubelet restart, for example.
+	if pod.Status.Phase == v1.PodRunning && pod.DeletionTimestamp == nil {
+		klog.Infof("[topologymanager] Skipping ToplogyHint generation since pod already running")
+		return lifecycle.PodAdmitResult{
+			Admit: true,
+		}
+	}
+
 	// Otherwise, gather hints from all hint providers and admit based on policy.
 	hints := make(map[string]TopologyHint)
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
