@@ -1964,7 +1964,7 @@ filename | sha256 hash
 * kubeadm: Add a new `kubeadm upgrade node config` command ([#64624](https://github.com/kubernetes/kubernetes/pull/64624), [@luxas](https://github.com/luxas))
 * Orphan delete is now supported for custom resources ([#63386](https://github.com/kubernetes/kubernetes/pull/63386), [@roycaihw](https://github.com/roycaihw))
 * Update version of Istio addon from 0.6.0 to 0.8.0. ([#64537](https://github.com/kubernetes/kubernetes/pull/64537), [@ostromart](https://github.com/ostromart))
-    * See https://istio.io/about/notes/0.8.html for full Isto release notes.
+    * See https://istio.io/news/2018/announcing-0.8/  for full Isto release notes.
 * Provides API support for external CSI storage drivers to support block volumes. ([#64723](https://github.com/kubernetes/kubernetes/pull/64723), [@vladimirvivien](https://github.com/vladimirvivien))
 * kubectl will list all allowed print formats when an invalid format is passed. ([#64371](https://github.com/kubernetes/kubernetes/pull/64371), [@CaoShuFeng](https://github.com/CaoShuFeng))
 * Use IONice to reduce IO priority of du and find ([#64800](https://github.com/kubernetes/kubernetes/pull/64800), [@dashpole](https://github.com/dashpole))
