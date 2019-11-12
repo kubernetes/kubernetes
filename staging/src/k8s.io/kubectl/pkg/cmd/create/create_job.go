@@ -150,12 +150,18 @@ func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 
 // Validate makes sure provided values and valid Job options
 func (o *CreateJobOptions) Validate() error {
+	if len(o.Name) == 0 {
+		return fmt.Errorf("name must be specified")
+	}
+
 	if (len(o.Image) == 0 && len(o.From) == 0) || (len(o.Image) != 0 && len(o.From) != 0) {
 		return fmt.Errorf("either --image or --from must be specified")
 	}
+
 	if o.Command != nil && len(o.Command) != 0 && len(o.From) != 0 {
 		return fmt.Errorf("cannot specify --from and command")
 	}
+
 	return nil
 }
 

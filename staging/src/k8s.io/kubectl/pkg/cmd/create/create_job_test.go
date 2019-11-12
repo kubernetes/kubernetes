@@ -28,6 +28,68 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+func TestValidateCreateJob(t *testing.T) {
+	defaultTestName := "my-job"
+	defaultTestImage := "busybox"
+	defaultTestFrom := "cronjob/my-cronjob"
+	defaultTestCommand := []string{"my", "command"}
+
+	tests := map[string]struct {
+		options   *CreateJobOptions
+		expectErr bool
+	}{
+		"test-no-image-no-from": {
+			options: &CreateJobOptions{
+				Name: defaultTestName,
+			},
+			expectErr: true,
+		},
+		"test-both-image-and-from": {
+			options: &CreateJobOptions{
+				Name:  defaultTestName,
+				Image: defaultTestImage,
+				From:  defaultTestFrom,
+			},
+			expectErr: true,
+		},
+		"test-both-from-and-command": {
+			options: &CreateJobOptions{
+				Name:    defaultTestName,
+				From:    defaultTestFrom,
+				Command: defaultTestCommand,
+			},
+			expectErr: true,
+		},
+		"test-valid-case-with-image": {
+			options: &CreateJobOptions{
+				Name:    defaultTestName,
+				Image:   defaultTestImage,
+				Command: defaultTestCommand,
+			},
+			expectErr: false,
+		},
+		"test-valid-case-with-from": {
+			options: &CreateJobOptions{
+				Name: defaultTestName,
+				From: defaultTestFrom,
+			},
+			expectErr: false,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := test.options.Validate()
+			if test.expectErr && err == nil {
+				t.Errorf("expected error but validation passed")
+			}
+			if !test.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
 func TestCreateJobValidation(t *testing.T) {
 	tests := map[string]struct {
 		image    string
