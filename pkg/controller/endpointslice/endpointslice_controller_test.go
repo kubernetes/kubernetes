@@ -18,6 +18,7 @@ package endpointslice
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
@@ -100,7 +102,7 @@ func TestSyncServiceWithSelector(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	serviceName := "testing-1"
 	client, esController := newController([]string{"node-1"})
-	standardSyncService(t, esController, ns, serviceName)
+	standardSyncService(t, esController, ns, serviceName, "true")
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
 
 	sliceList, err := client.DiscoveryV1alpha1().EndpointSlices(ns).List(metav1.ListOptions{})
@@ -166,7 +168,7 @@ func TestSyncServicePodSelection(t *testing.T) {
 	pod2.Labels["foo"] = "boo"
 	esController.podStore.Add(pod2)
 
-	standardSyncService(t, esController, ns, "testing-1")
+	standardSyncService(t, esController, ns, "testing-1", "true")
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
 
 	// an endpoint slice should be created, it should only reference pod1 (not pod2)
@@ -180,40 +182,89 @@ func TestSyncServicePodSelection(t *testing.T) {
 	assert.EqualValues(t, endpoint.TargetRef, &v1.ObjectReference{Kind: "Pod", Namespace: ns, Name: pod1.Name})
 }
 
-// Ensure SyncService correctly selects EndpointSlices.
-func TestSyncServiceEndpointSliceSelection(t *testing.T) {
+// Ensure SyncService correctly selects and labels EndpointSlices.
+func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 	client, esController := newController([]string{"node-1"})
 	ns := metav1.NamespaceDefault
 	serviceName := "testing-1"
 
-	// 3 slices, 2 with matching labels for our service
+	// 5 slices, 3 with matching labels for our service
 	endpointSlices := []*discovery.EndpointSlice{{
-		ObjectMeta: metav1.ObjectMeta{Name: "matching-1", Namespace: ns, Labels: map[string]string{discovery.LabelServiceName: serviceName}},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "matching-1",
+			Namespace: ns,
+			Labels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				discovery.LabelManagedBy:   controllerName,
+			},
+		},
 	}, {
-		ObjectMeta: metav1.ObjectMeta{Name: "matching-2", Namespace: ns, Labels: map[string]string{discovery.LabelServiceName: serviceName}},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "matching-2",
+			Namespace: ns,
+			Labels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				discovery.LabelManagedBy:   controllerName,
+			},
+		},
 	}, {
-		ObjectMeta: metav1.ObjectMeta{Name: "not-matching-1", Namespace: ns, Labels: map[string]string{discovery.LabelServiceName: "something-else"}},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "partially-matching-1",
+			Namespace: ns,
+			Labels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+			},
+		},
+	}, {
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "not-matching-1",
+			Namespace: ns,
+			Labels: map[string]string{
+				discovery.LabelServiceName: "something-else",
+				discovery.LabelManagedBy:   controllerName,
+			},
+		},
+	}, {
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "not-matching-2",
+			Namespace: ns,
+			Labels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				discovery.LabelManagedBy:   "something-else",
+			},
+		},
 	}}
 
 	// need to add them to both store and fake clientset
 	for _, endpointSlice := range endpointSlices {
-		addErr := esController.endpointSliceStore.Add(endpointSlice)
-		assert.Nil(t, addErr, "Expected no error adding EndpointSlice")
-		_, err := client.DiscoveryV1alpha1().EndpointSlices(ns).Create(endpointSlice)
-		assert.Nil(t, err, "Expected no error creating EndpointSlice")
+		err := esController.endpointSliceStore.Add(endpointSlice)
+		if err != nil {
+			t.Fatalf("Expected no error adding EndpointSlice: %v", err)
+		}
+		_, err = client.DiscoveryV1alpha1().EndpointSlices(ns).Create(endpointSlice)
+		if err != nil {
+			t.Fatalf("Expected no error creating EndpointSlice: %v", err)
+		}
 	}
 
-	numActionsBefore := len(client.Actions())
-	standardSyncService(t, esController, ns, serviceName)
+	// +1 for extra action involved in Service creation before syncService call.
+	numActionsBefore := len(client.Actions()) + 1
+	standardSyncService(t, esController, ns, serviceName, "false")
 
-	// should only have 2 additional actions
-	assert.Len(t, client.Actions(), numActionsBefore+2)
+	if len(client.Actions()) != numActionsBefore+5 {
+		t.Errorf("Expected 5 more actions, got %d", len(client.Actions())-numActionsBefore)
+	}
 
-	// only 2 slices should match, 1 of those should be deleted, 1 should be updated as a placeholder
-	assert.Equal(t, "update", client.Actions()[numActionsBefore].GetVerb())
-	assert.Equal(t, client.Actions()[numActionsBefore].GetResource().Resource, "endpointslices")
-	assert.Equal(t, "delete", client.Actions()[numActionsBefore+1].GetVerb())
-	assert.Equal(t, client.Actions()[numActionsBefore+1].GetResource().Resource, "endpointslices")
+	// endpointslice should have LabelsManagedBy set as part of update.
+	expectAction(t, client.Actions(), numActionsBefore, "update", "endpointslices")
+
+	// service should have managedBySetupAnnotation set as part of update.
+	expectAction(t, client.Actions(), numActionsBefore+1, "update", "services")
+
+	// only 3 slices should match, 2 of those should be deleted, 1 should be updated as a placeholder
+	expectAction(t, client.Actions(), numActionsBefore+2, "update", "endpointslices")
+	expectAction(t, client.Actions(), numActionsBefore+3, "delete", "endpointslices")
+	expectAction(t, client.Actions(), numActionsBefore+4, "delete", "endpointslices")
 }
 
 // Ensure SyncService handles a variety of protocols and IPs appropriately.
@@ -236,7 +287,7 @@ func TestSyncServiceFull(t *testing.T) {
 
 	// create service with all protocols and multiple ports
 	serviceCreateTime := time.Now()
-	esController.serviceStore.Add(&v1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              serviceName,
 			Namespace:         namespace,
@@ -250,14 +301,16 @@ func TestSyncServiceFull(t *testing.T) {
 			},
 			Selector: map[string]string{"foo": "bar"},
 		},
-	})
+	}
+	esController.serviceStore.Add(service)
+	_, err := esController.client.CoreV1().Services(namespace).Create(service)
+	assert.Nil(t, err, "Expected no error creating service")
 
 	// run through full sync service loop
-	err := esController.syncService(fmt.Sprintf("%s/%s", namespace, serviceName))
+	err = esController.syncService(fmt.Sprintf("%s/%s", namespace, serviceName))
 	assert.Nil(t, err)
 
-	// should only have 1 action - to create endpoint slice
-	assert.Len(t, client.Actions(), 1)
+	// last action should be to create endpoint slice
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
 	sliceList, err := client.DiscoveryV1alpha1().EndpointSlices(namespace).List(metav1.ListOptions{})
 	assert.Nil(t, err, "Expected no error fetching endpoint slices")
@@ -294,23 +347,150 @@ func TestSyncServiceFull(t *testing.T) {
 	}}, slice.Endpoints)
 }
 
+func TestEnsureSetupManagedByAnnotation(t *testing.T) {
+	serviceName := "testing-1"
+
+	testCases := map[string]struct {
+		serviceAnnotation   string
+		startingSliceLabels map[string]string
+		expectedSliceLabels map[string]string
+	}{
+		"already-labeled": {
+			serviceAnnotation: "foo",
+			startingSliceLabels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				discovery.LabelManagedBy:   controllerName,
+			},
+			expectedSliceLabels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				discovery.LabelManagedBy:   controllerName,
+			},
+		},
+		"already-annotated": {
+			serviceAnnotation: managedBySetupCompleteValue,
+			startingSliceLabels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				discovery.LabelManagedBy:   "other-controller",
+			},
+			expectedSliceLabels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				discovery.LabelManagedBy:   "other-controller",
+			},
+		},
+		"missing-and-extra-label": {
+			serviceAnnotation: "foo",
+			startingSliceLabels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				"foo":                      "bar",
+			},
+			expectedSliceLabels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				discovery.LabelManagedBy:   controllerName,
+				"foo":                      "bar",
+			},
+		},
+		"different-service": {
+			serviceAnnotation: "foo",
+			startingSliceLabels: map[string]string{
+				discovery.LabelServiceName: "something-else",
+			},
+			expectedSliceLabels: map[string]string{
+				discovery.LabelServiceName: "something-else",
+			},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			client, esController := newController([]string{"node-1"})
+			ns := metav1.NamespaceDefault
+			service := createService(t, esController, ns, serviceName, testCase.serviceAnnotation)
+
+			endpointSlice := &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "testing",
+					Namespace: ns,
+					Labels:    testCase.startingSliceLabels,
+				},
+			}
+
+			err := esController.endpointSliceStore.Add(endpointSlice)
+			if err != nil {
+				t.Fatalf("Expected no error adding EndpointSlice: %v", err)
+			}
+
+			_, err = client.DiscoveryV1alpha1().EndpointSlices(ns).Create(endpointSlice)
+			if err != nil {
+				t.Fatalf("Expected no error creating EndpointSlice: %v", err)
+			}
+
+			esController.ensureSetupManagedByAnnotation(service)
+
+			updatedService, err := client.CoreV1().Services(ns).Get(service.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Expected no error getting Service: %v", err)
+			}
+
+			if updatedService.Annotations[managedBySetupAnnotation] != managedBySetupCompleteValue {
+				t.Errorf("Expected managedBySetupAnnotation: %+v, got: %+v", managedBySetupCompleteValue, updatedService.Annotations[managedBySetupAnnotation])
+			}
+
+			updatedSlice, err := client.DiscoveryV1alpha1().EndpointSlices(ns).Get(endpointSlice.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Expected no error getting EndpointSlice: %v", err)
+			}
+
+			if !reflect.DeepEqual(updatedSlice.Labels, testCase.expectedSliceLabels) {
+				t.Errorf("Expected labels: %+v, got: %+v", updatedSlice.Labels, testCase.expectedSliceLabels)
+			}
+		})
+	}
+}
+
 // Test helpers
 
-func standardSyncService(t *testing.T, esController *endpointSliceController, namespace, serviceName string) {
-	esController.serviceStore.Add(&v1.Service{
+func standardSyncService(t *testing.T, esController *endpointSliceController, namespace, serviceName, managedBySetup string) {
+	t.Helper()
+	createService(t, esController, namespace, serviceName, managedBySetup)
+
+	err := esController.syncService(fmt.Sprintf("%s/%s", namespace, serviceName))
+	assert.Nil(t, err, "Expected no error syncing service")
+}
+
+func createService(t *testing.T, esController *endpointSliceController, namespace, serviceName, managedBySetup string) *v1.Service {
+	t.Helper()
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              serviceName,
 			Namespace:         namespace,
 			CreationTimestamp: metav1.NewTime(time.Now()),
+			Annotations:       map[string]string{managedBySetupAnnotation: managedBySetup},
 		},
 		Spec: v1.ServiceSpec{
 			Ports:    []v1.ServicePort{{TargetPort: intstr.FromInt(80)}},
 			Selector: map[string]string{"foo": "bar"},
 		},
-	})
+	}
+	esController.serviceStore.Add(service)
+	_, err := esController.client.CoreV1().Services(namespace).Create(service)
+	assert.Nil(t, err, "Expected no error creating service")
+	return service
+}
 
-	err := esController.syncService(fmt.Sprintf("%s/%s", namespace, serviceName))
-	assert.Nil(t, err, "Expected no error syncing service")
+func expectAction(t *testing.T, actions []k8stesting.Action, index int, verb, resource string) {
+	t.Helper()
+	if len(actions) <= index {
+		t.Fatalf("Expected at least %d actions, got %d", index+1, len(actions))
+	}
+
+	action := actions[index]
+	if action.GetVerb() != verb {
+		t.Errorf("Expected action %d verb to be %s, got %s", index, verb, action.GetVerb())
+	}
+
+	if action.GetResource().Resource != resource {
+		t.Errorf("Expected action %d resource to be %s, got %s", index, resource, action.GetResource().Resource)
+	}
 }
 
 func strPtr(str string) *string {
