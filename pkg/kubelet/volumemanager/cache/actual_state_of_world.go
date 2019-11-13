@@ -369,6 +369,34 @@ func (asw *actualStateOfWorld) MarkDeviceAsUnmounted(
 	return asw.SetDeviceMountState(volumeName, operationexecutor.DeviceNotMounted, "", "")
 }
 
+func (asw *actualStateOfWorld) GetDeviceMountState(volumeName v1.UniqueVolumeName) operationexecutor.DeviceMountState {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+	if !volumeExists {
+		return operationexecutor.DeviceNotMounted
+	}
+
+	return volumeObj.deviceMountState
+}
+
+func (asw *actualStateOfWorld) GetVolumeMountState(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) operationexecutor.VolumeMountState {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
+	if !volumeExists {
+		return operationexecutor.VolumeNotMounted
+	}
+
+	podObj, podExists := volumeObj.mountedPods[podName]
+	if !podExists {
+		return operationexecutor.VolumeNotMounted
+	}
+	return podObj.volumeMountStateForPod
+}
+
 // addVolume adds the given volume to the cache indicating the specified
 // volume is attached to this node. If no volume name is supplied, a unique
 // volume name is generated from the volumeSpec and returned on success. If a

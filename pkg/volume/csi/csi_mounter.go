@@ -100,16 +100,16 @@ func (c *csiMountMgr) CanMount() error {
 }
 
 func (c *csiMountMgr) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	opExitStatus, err := c.setupUtil(c.GetPath(), mounterArgs)
+	opExitStatus, err := c.setupInternal(c.GetPath(), mounterArgs)
 	return opExitStatus, err
 }
 
 func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
-	_, err := c.setupUtil(dir, mounterArgs)
+	_, err := c.setupInternal(dir, mounterArgs)
 	return err
 }
 
-func (c *csiMountMgr) setupUtil(dir string, mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+func (c *csiMountMgr) setupInternal(dir string, mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
 	klog.V(4).Infof(log("Mounter.SetUpAt(%s)", dir))
 	// default to finished operation status
 	opExitStatus := volumetypes.OperationFinished

@@ -69,12 +69,25 @@ const (
 	MultiAttachNode = "multi-attach-node"
 	// TimeoutOnSetupVolumeName will cause Setup call to timeout but volume will finish mounting.
 	TimeoutOnSetupVolumeName = "timeout-setup-volume"
+	// FailOnSetupVolumeName will cause setup call to fail
+	FailOnSetupVolumeName = "fail-setup-volume"
+	//TimeoutAndFailOnSetupVolumeName will first timeout and then fail the setup
+	TimeoutAndFailOnSetupVolumeName = "timeout-and-fail-setup-volume"
+	// SuccessAndTimeoutSetupVolumeName will cause first mount operation to succeed but subsequent attempts to timeout
+	SuccessAndTimeoutSetupVolumeName = "success-and-timeout-setup-volume-name"
+	// SuccessAndFailOnSetupVolumeName will cause first mount operation to succeed but subsequent attempts to fail
+	SuccessAndFailOnSetupVolumeName = "success-and-failed-setup-device-name"
+
 	// TimeoutOnMountDeviceVolumeName will cause MountDevice call to timeout but Setup will finish.
 	TimeoutOnMountDeviceVolumeName = "timeout-mount-device-volume"
 	// TimeoutAndFailOnMountDeviceVolumeName will cause first MountDevice call to timeout but second call will fail
 	TimeoutAndFailOnMountDeviceVolumeName = "timeout-and-fail-mount-device-name"
 	// FailMountDeviceVolumeName will cause MountDevice operation on volume to fail
 	FailMountDeviceVolumeName = "fail-mount-device-volume-name"
+	// SuccessAndTimeoutDeviceName will cause first mount operation to succeed but subsequent attempts to timeout
+	SuccessAndTimeoutDeviceName = "success-and-timeout-device-name"
+	// SuccessAndFailOnMountDeviceName will cause first mount operation to succeed but subsequent attempts to fail
+	SuccessAndFailOnMountDeviceName = "success-and-failed-mount-device-name"
 )
 
 // fakeVolumeHost is useful for testing volume plugins.
@@ -354,6 +367,7 @@ type FakeVolumePlugin struct {
 	VolumeLimitsError      error
 	LimitKey               string
 	ProvisionDelaySeconds  int
+	SupportsRemount        bool
 
 	// Add callbacks as needed
 	WaitForAttachHook func(spec *Spec, devicePath string, pod *v1.Pod, spectimeout time.Duration) (string, error)
@@ -393,6 +407,7 @@ func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 	}
 	volume.VolumesAttached = make(map[string]types.NodeName)
 	volume.DeviceMountState = make(map[string]volumetypes.OperationStatus)
+	volume.VolumeMountState = make(map[string]volumetypes.OperationStatus)
 	*list = append(*list, volume)
 	return volume
 }
@@ -430,7 +445,7 @@ func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
 }
 
 func (plugin *FakeVolumePlugin) RequiresRemount() bool {
-	return false
+	return plugin.SupportsRemount
 }
 
 func (plugin *FakeVolumePlugin) SupportsMountOption() bool {
@@ -796,6 +811,7 @@ type FakeVolume struct {
 	MetricsNil
 	VolumesAttached  map[string]types.NodeName
 	DeviceMountState map[string]volumetypes.OperationStatus
+	VolumeMountState map[string]volumetypes.OperationStatus
 
 	// Add callbacks as needed
 	WaitForAttachHook func(spec *Spec, devicePath string, pod *v1.Pod, spectimeout time.Duration) (string, error)
@@ -844,20 +860,56 @@ func (fv *FakeVolume) CanMount() error {
 }
 
 func (fv *FakeVolume) SetUp(mounterArgs MounterArgs) (volumetypes.OperationStatus, error) {
-	internalSetup := func() error {
-		fv.Lock()
-		defer fv.Unlock()
-		if fv.VolName == TimeoutOnSetupVolumeName {
-			return volumetypes.NewOperationTimedOutError("time out on setup")
-		}
-		fv.SetUpCallCount++
-		return fv.SetUpAt(fv.getPath(), mounterArgs)
-	}
-	err := internalSetup()
+	fv.Lock()
+	defer fv.Unlock()
+	err := fv.setupInternal(mounterArgs)
+	fv.SetUpCallCount++
 	if volumetypes.IsOperationTimeOutError(err) {
 		return volumetypes.OperationInProgress, err
 	}
 	return volumetypes.OperationFinished, err
+}
+
+func (fv *FakeVolume) setupInternal(mounterArgs MounterArgs) error {
+	if fv.VolName == TimeoutOnSetupVolumeName {
+		fv.VolumeMountState[fv.VolName] = volumetypes.OperationInProgress
+		return volumetypes.NewOperationTimedOutError("time out on setup")
+	}
+
+	if fv.VolName == FailOnSetupVolumeName {
+		return fmt.Errorf("mounting volume failed")
+	}
+
+	if fv.VolName == TimeoutAndFailOnSetupVolumeName {
+		_, ok := fv.VolumeMountState[fv.VolName]
+		if !ok {
+			fv.VolumeMountState[fv.VolName] = volumetypes.OperationInProgress
+			return volumetypes.NewOperationTimedOutError("time out on setup")
+		}
+		fv.VolumeMountState[fv.VolName] = volumetypes.OperationFinished
+		return fmt.Errorf("mounting volume failed")
+
+	}
+
+	if fv.VolName == SuccessAndFailOnSetupVolumeName {
+		_, ok := fv.VolumeMountState[fv.VolName]
+		if ok {
+			fv.VolumeMountState[fv.VolName] = volumetypes.OperationFinished
+			return fmt.Errorf("mounting volume failed")
+		}
+	}
+
+	if fv.VolName == SuccessAndTimeoutSetupVolumeName {
+		_, ok := fv.VolumeMountState[fv.VolName]
+		if ok {
+			fv.VolumeMountState[fv.VolName] = volumetypes.OperationInProgress
+			return volumetypes.NewOperationTimedOutError("time out on setup")
+		}
+	}
+
+	fv.VolumeMountState[fv.VolName] = volumetypes.OperationFinished
+
+	return fv.SetUpAt(fv.getPath(), mounterArgs)
 }
 
 func (fv *FakeVolume) GetSetUpCallCount() int {
@@ -1071,16 +1123,30 @@ func (fv *FakeVolume) mountDeviceInternal(spec *Spec, devicePath string, deviceM
 	}
 
 	if spec.Name() == TimeoutAndFailOnMountDeviceVolumeName {
-		oldState, ok := fv.DeviceMountState[spec.Name()]
+		_, ok := fv.DeviceMountState[spec.Name()]
 		if !ok {
+			fv.DeviceMountState[spec.Name()] = volumetypes.OperationInProgress
+			return volumetypes.NewOperationTimedOutError("timed out mounting error")
+		}
+		fv.DeviceMountState[spec.Name()] = volumetypes.OperationFinished
+		return fmt.Errorf("error mounting disk: %s", devicePath)
+	}
+
+	if spec.Name() == SuccessAndTimeoutDeviceName {
+		_, ok := fv.DeviceMountState[spec.Name()]
+		if ok {
 			fv.DeviceMountState[spec.Name()] = volumetypes.OperationInProgress
 			return volumetypes.NewOperationTimedOutError("error mounting state")
 		}
-		if oldState == volumetypes.OperationInProgress {
-			fv.DeviceMountState[spec.Name()] = volumetypes.OperationFinished
+	}
+
+	if spec.Name() == SuccessAndFailOnMountDeviceName {
+		_, ok := fv.DeviceMountState[spec.Name()]
+		if ok {
 			return fmt.Errorf("error mounting disk: %s", devicePath)
 		}
 	}
+	fv.DeviceMountState[spec.Name()] = volumetypes.OperationFinished
 	fv.MountDeviceCallCount++
 	return nil
 }
@@ -1361,16 +1427,25 @@ func VerifyMountDeviceCallCount(
 }
 
 func VerifyUnmountDeviceCallCount(expectedCallCount int, fakeVolumePlugin *FakeVolumePlugin) error {
-	for _, attacher := range fakeVolumePlugin.GetAttachers() {
-		actualCallCount := attacher.GetUnmountDeviceCallCount()
-		if actualCallCount >= expectedCallCount {
+	detachers := fakeVolumePlugin.GetDetachers()
+	if len(detachers) == 0 && (expectedCallCount == 0) {
+		return nil
+	}
+	actualCallCount := 0
+	for _, detacher := range detachers {
+		actualCallCount = detacher.GetUnmountDeviceCallCount()
+		if expectedCallCount == 0 && actualCallCount == expectedCallCount {
+			return nil
+		}
+
+		if (expectedCallCount > 0) && (actualCallCount >= expectedCallCount) {
 			return nil
 		}
 	}
 
 	return fmt.Errorf(
-		"No Attachers have expected MountunDeviceCallCount. Expected: <%v>.",
-		expectedCallCount)
+		"Expected DeviceUnmount Call %d, got %d",
+		expectedCallCount, actualCallCount)
 }
 
 // VerifyZeroMountDeviceCallCount ensures that all Attachers for this plugin
@@ -1427,9 +1502,18 @@ func VerifyZeroSetUpCallCount(fakeVolumePlugin *FakeVolumePlugin) error {
 func VerifyTearDownCallCount(
 	expectedTearDownCallCount int,
 	fakeVolumePlugin *FakeVolumePlugin) error {
-	for _, unmounter := range fakeVolumePlugin.GetUnmounters() {
+	unmounters := fakeVolumePlugin.GetUnmounters()
+	if len(unmounters) == 0 && (expectedTearDownCallCount == 0) {
+		return nil
+	}
+
+	for _, unmounter := range unmounters {
 		actualCallCount := unmounter.GetTearDownCallCount()
-		if actualCallCount >= expectedTearDownCallCount {
+		if expectedTearDownCallCount == 0 && actualCallCount == expectedTearDownCallCount {
+			return nil
+		}
+
+		if (expectedTearDownCallCount > 0) && (actualCallCount >= expectedTearDownCallCount) {
 			return nil
 		}
 	}

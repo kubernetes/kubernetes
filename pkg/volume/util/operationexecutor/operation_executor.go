@@ -196,6 +196,12 @@ type ActualStateOfWorldMounterUpdater interface {
 
 	// Marks the specified volume's file system resize request is finished.
 	MarkVolumeAsResized(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error
+
+	// GetDeviceMountState returns mount state of the device in global path
+	GetDeviceMountState(volumeName v1.UniqueVolumeName) DeviceMountState
+
+	// GetVolumeMountState returns mount state of the volume for the Pod
+	GetVolumeMountState(volumName v1.UniqueVolumeName, podName volumetypes.UniquePodName) VolumeMountState
 }
 
 // ActualStateOfWorldAttacherUpdater defines a set of operations updating the
@@ -397,6 +403,9 @@ const (
 
 	// VolumeMountUncertain means volume may or may not be mounted in pods' local path
 	VolumeMountUncertain VolumeMountState = "VolumeMountUncertain"
+
+	// VolumeNotMounted means volume has not be mounted in pod's local path
+	VolumeNotMounted VolumeMountState = "VolumeNotMounted"
 )
 
 // GenerateMsgDetailed returns detailed msgs for volumes to mount

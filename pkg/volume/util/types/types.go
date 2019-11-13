@@ -60,7 +60,7 @@ const (
 
 	// OperationInProgress means volume operation has been started and
 	// is in-progress. This state does not indicate if operation will succeed or fail but
-	// merely it has been started and in in-progress.
+	// merely it has been started and is in-progress.
 	OperationInProgress OperationStatus = "InProgress"
 
 	// OperationStateNoChange indicates it is unchanged from previous state.
