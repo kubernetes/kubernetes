@@ -10,7 +10,6 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/framework/replicaset",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/controller/deployment/util:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
