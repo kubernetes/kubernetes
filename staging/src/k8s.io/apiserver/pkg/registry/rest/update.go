@@ -178,11 +178,18 @@ func (i *defaultUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
 
 	// If empty, no preconditions needed
 	uid := accessor.GetUID()
-	if len(uid) == 0 {
+	rv := accessor.GetResourceVersion()
+	if len(uid) == 0 && len(rv) == 0 {
 		return nil
 	}
-
-	return &metav1.Preconditions{UID: &uid}
+	p := &metav1.Preconditions{}
+	if len(uid) > 0 {
+		p.UID = &uid
+	}
+	if len(rv) > 0 {
+		p.ResourceVersion = &rv
+	}
+	return p
 }
 
 // UpdatedObject satisfies the UpdatedObjectInfo interface.
