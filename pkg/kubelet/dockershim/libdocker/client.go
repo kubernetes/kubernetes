@@ -29,7 +29,7 @@ import (
 const (
 	// MinimumDockerAPIVersion is the lower docker version acceptable
 	// https://docs.docker.com/engine/reference/api/docker_remote_api/
-	// docker version should be at least this high
+	// Docker API version should be at least 1.26.0 (the API version for minimum docker version of 1.13.1)
 	MinimumDockerAPIVersion = "1.26.0"
 
 	// Constants for the prefix for a status of a container returned by ListContainers.

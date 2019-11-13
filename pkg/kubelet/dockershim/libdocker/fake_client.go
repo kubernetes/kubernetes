@@ -783,7 +783,7 @@ func (f *FakeDockerClient) StartExec(startExec string, opts dockertypes.ExecStar
 	return nil
 }
 
-// AttachToContainer is a fake implemenattion of the call in the real client, the call is stored in the fake with the name "attach"
+// AttachToContainer is a fake implementation of the call in the real client, the call is stored in the fake with the name "attach"
 func (f *FakeDockerClient) AttachToContainer(id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions) error {
 	f.Lock()
 	defer f.Unlock()
@@ -791,12 +791,12 @@ func (f *FakeDockerClient) AttachToContainer(id string, opts dockertypes.Contain
 	return nil
 }
 
-// InspectExec is a fake implemenattion of the same call in the real client
+// InspectExec is a fake implementation of the same call in the real client
 func (f *FakeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecInspect, error) {
 	return f.ExecInspect, f.popError("inspect_exec")
 }
 
-// ListImages is a fake implemenattion of the call in the real client, the call is stored in the fake with the name "list_images"
+// ListImages is a fake implementation of the call in the real client, the call is stored in the fake with the name "list_images"
 func (f *FakeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.ImageSummary, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -805,7 +805,7 @@ func (f *FakeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dock
 	return f.Images, err
 }
 
-// RemoveImage is a fake implemenattion of the call in the real client, the call is stored in the fake with the name "remove_image"
+// RemoveImage is a fake implementation of the call in the real client, the call is stored in the fake with the name "remove_image"
 func (f *FakeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDeleteResponseItem, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -868,7 +868,7 @@ func (f *FakeDockerClient) updateContainerStatus(id, status string) {
 	}
 }
 
-// ResizeExecTTY is a fake implemenattion of the call in the real client, the call is stored in the fake with the name "resize_exec"
+// ResizeExecTTY is a fake implementation of the call in the real client, the call is stored in the fake with the name "resize_exec"
 func (f *FakeDockerClient) ResizeExecTTY(id string, height, width uint) error {
 	f.Lock()
 	defer f.Unlock()
@@ -876,7 +876,7 @@ func (f *FakeDockerClient) ResizeExecTTY(id string, height, width uint) error {
 	return nil
 }
 
-// ResizeContainerTTY is a fake implemenattion of the call in the real client, the call is stored in the fake with the name "resize_container"
+// ResizeContainerTTY is a fake implementation of the call in the real client, the call is stored in the fake with the name "resize_container"
 func (f *FakeDockerClient) ResizeContainerTTY(id string, height, width uint) error {
 	f.Lock()
 	defer f.Unlock()
@@ -943,7 +943,7 @@ type FakeDockerPuller struct {
 	client Interface
 }
 
-// Pull pulls\ an image from the fake client that stored in the fake puller
+// Pull pulls an image from the fake client that stored in the fake puller
 func (f *FakeDockerPuller) Pull(image string, _ []v1.Secret) error {
 	return f.client.PullImage(image, dockertypes.AuthConfig{}, dockertypes.ImagePullOptions{})
 }
