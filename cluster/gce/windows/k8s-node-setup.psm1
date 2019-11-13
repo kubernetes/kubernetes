@@ -1098,12 +1098,25 @@ function Start-WorkerServices {
   # TODO(pjh): still getting errors like these in kube-proxy log:
   # E1023 04:03:58.143449    4840 reflector.go:205] k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/factory.go:129: Failed to list *core.Endpoints: Get https://35.239.84.171/api/v1/endpoints?limit=500&resourceVersion=0: dial tcp 35.239.84.171:443: connectex: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond.
   # E1023 04:03:58.150266    4840 reflector.go:205] k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/factory.go:129: Failed to list *core.Service: Get https://35.239.84.171/api/v1/services?limit=500&resourceVersion=0: dial tcp 35.239.84.171:443: connectex: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond.
-
-  Log_Todo ("verify that jobs are still running; print more details about " +
-            "the background jobs.")
-  Log-Output "$(Get-Service kube* | Out-String)"
+  WaitFor_KubeletAndKubeProxyReady
   Verify_GceMetadataServerRouteIsPresent
   Log-Output "Kubernetes components started successfully"
+}
+
+# Wait for kubelet & kube-proxy to be ready within 10s.
+function WaitFor_KubeletAndKubeProxyReady {
+  $waited = 0
+  $timeout = 10
+  while (((Get-Service kube-proxy).Status -ne 'Running' -or (Get-Service kubelet).Status -ne 'Running') -and $waited -lt $timeout) {
+    Start-Sleep 1
+    $waited++
+  }
+
+  # Timeout occurred
+  if ($waited -ge $timeout) {
+    Log-Output "$(Get-Service kube* | Out-String)"
+    Throw ("Timeout while waiting ${timeout} seconds for kubelet & kube-proxy services to start")
+  }
 }
 
 # Runs 'kubectl get nodes'.
