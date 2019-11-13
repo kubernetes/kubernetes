@@ -340,11 +340,10 @@ kube::log::status "vendor: updating LICENSES file"
 hack/update-vendor-licenses.sh >>"${LOG_FILE}" 2>&1
 
 kube::log::status "vendor: creating OWNERS file"
-rm -f "Godeps/OWNERS" "vendor/OWNERS"
-cat <<__EOF__ > "Godeps/OWNERS"
+rm -f "vendor/OWNERS"
+cat <<__EOF__ > "vendor/OWNERS"
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
 - dep-approvers
 __EOF__
-cp "Godeps/OWNERS" "vendor/OWNERS"
