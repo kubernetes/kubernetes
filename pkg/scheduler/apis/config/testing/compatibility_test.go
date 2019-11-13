@@ -1239,8 +1239,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				informerFactory,
 				informerFactory.Core().V1().Pods(),
 				nil,
-				algorithmSrc,
 				make(chan struct{}),
+				scheduler.WithAlgorithmSource(algorithmSrc),
 			)
 
 			if err != nil {

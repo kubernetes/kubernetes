@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler"
-	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/test/integration/framework"
 
 	// Install "DefaultProvider" algorithprovider
@@ -142,16 +141,11 @@ func createSchedulerWithPodInformer(
 	recorder events.EventRecorder,
 	stopCh <-chan struct{},
 ) (*scheduler.Scheduler, error) {
-	defaultProviderName := schedulerconfig.SchedulerDefaultProviderName
-
 	return scheduler.New(
 		clientSet,
 		informerFactory,
 		podInformer,
 		recorder,
-		schedulerconfig.SchedulerAlgorithmSource{
-			Provider: &defaultProviderName,
-		},
 		stopCh,
 	)
 }

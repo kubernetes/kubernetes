@@ -181,14 +181,8 @@ func initTestSchedulerWithOptions(
 		legacyscheme.Scheme,
 		v1.DefaultSchedulerName,
 	)
-	var algorithmSrc schedulerapi.SchedulerAlgorithmSource
 	if policy != nil {
-		algorithmSrc = createAlgorithmSourceFromPolicy(policy, context.clientSet)
-	} else {
-		provider := schedulerapi.SchedulerDefaultProviderName
-		algorithmSrc = schedulerapi.SchedulerAlgorithmSource{
-			Provider: &provider,
-		}
+		opts = append(opts, scheduler.WithAlgorithmSource(createAlgorithmSourceFromPolicy(policy, context.clientSet)))
 	}
 	opts = append([]scheduler.Option{scheduler.WithBindTimeoutSeconds(600)}, opts...)
 	context.scheduler, err = scheduler.New(
@@ -196,7 +190,6 @@ func initTestSchedulerWithOptions(
 		context.informerFactory,
 		podInformer,
 		recorder,
-		algorithmSrc,
 		context.ctx.Done(),
 		opts...,
 	)
