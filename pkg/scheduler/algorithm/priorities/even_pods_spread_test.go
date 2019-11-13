@@ -83,7 +83,9 @@ func Test_podTopologySpreadMap_initialize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := newTopologySpreadConstraintsMap()
-			m.initialize(tt.pod, tt.nodes)
+			if err := m.initialize(tt.pod, tt.nodes); err != nil {
+				t.Fatal(err)
+			}
 			if !reflect.DeepEqual(m.nodeNameSet, tt.wantNodeNameSet) {
 				t.Errorf("initilize().nodeNameSet = %#v, want %#v", m.nodeNameSet, tt.wantNodeNameSet)
 			}
@@ -436,8 +438,12 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 			allNodes = append(allNodes, tt.failedNodes...)
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, allNodes))
 
+			tpSpreadMap, err := buildPodTopologySpreadMap(tt.pod, tt.nodes, snapshot.NodeInfoList)
+			if err != nil {
+				t.Fatal(err)
+			}
 			meta := &priorityMetadata{
-				podTopologySpreadMap: buildPodTopologySpreadMap(tt.pod, tt.nodes, snapshot.NodeInfoList),
+				podTopologySpreadMap: tpSpreadMap,
 			}
 			var gotList framework.NodeScoreList
 			for _, n := range tt.nodes {
@@ -449,7 +455,10 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 				gotList = append(gotList, nodeScore)
 			}
 
-			CalculateEvenPodsSpreadPriorityReduce(tt.pod, meta, snapshot, gotList)
+			err = CalculateEvenPodsSpreadPriorityReduce(tt.pod, meta, snapshot, gotList)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if !reflect.DeepEqual(gotList, tt.want) {
 				t.Errorf("CalculateEvenPodsSpreadPriorityReduce() = %#v, want %#v", gotList, tt.want)
 			}
@@ -498,8 +507,12 @@ func BenchmarkTestCalculateEvenPodsSpreadPriority(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(existingPods, allNodes))
+			tpSpreadMap, err := buildPodTopologySpreadMap(tt.pod, filteredNodes, snapshot.NodeInfoList)
+			if err != nil {
+				b.Fatal(err)
+			}
 			meta := &priorityMetadata{
-				podTopologySpreadMap: buildPodTopologySpreadMap(tt.pod, filteredNodes, snapshot.NodeInfoList),
+				podTopologySpreadMap: tpSpreadMap,
 			}
 			b.ResetTimer()
 
@@ -510,7 +523,10 @@ func BenchmarkTestCalculateEvenPodsSpreadPriority(b *testing.B) {
 					nodeScore, _ := CalculateEvenPodsSpreadPriorityMap(tt.pod, meta, snapshot.NodeInfoMap[nodeName])
 					gotList = append(gotList, nodeScore)
 				}
-				CalculateEvenPodsSpreadPriorityReduce(tt.pod, meta, snapshot, gotList)
+				err := CalculateEvenPodsSpreadPriorityReduce(tt.pod, meta, snapshot, gotList)
+				if err != nil {
+					b.Fatal(err)
+				}
 			}
 		})
 	}
