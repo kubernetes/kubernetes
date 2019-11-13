@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -204,7 +205,7 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 func rcByNamePort(name string, replicas int32, image string, containerArgs []string, port int, protocol v1.Protocol,
 	labels map[string]string, gracePeriod *int64) *v1.ReplicationController {
 
-	return framework.RcByNameContainer(name, replicas, image, labels, v1.Container{
+	return e2erc.ByNameContainer(name, replicas, image, labels, v1.Container{
 		Name:  name,
 		Image: image,
 		Args:  containerArgs,

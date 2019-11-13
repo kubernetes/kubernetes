@@ -26,6 +26,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -33,7 +34,7 @@ import (
 func RunReplicaSet(config testutils.ReplicaSetConfig) error {
 	ginkgo.By(fmt.Sprintf("creating replicaset %s in namespace %s", config.Name, config.Namespace))
 	config.NodeDumpFunc = framework.DumpNodeDebugInfo
-	config.ContainerDumpFunc = framework.LogFailedContainers
+	config.ContainerDumpFunc = e2ekubectl.LogFailedContainers
 	return testutils.RunReplicaSet(config)
 }
 

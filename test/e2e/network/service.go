@@ -43,6 +43,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -1417,7 +1418,7 @@ var _ = SIGDescribe("Services", func() {
 				PublishNotReadyAddresses: true,
 			},
 		}
-		rcSpec := framework.RcByNameContainer(t.Name, 1, t.Image, t.Labels, v1.Container{
+		rcSpec := e2erc.ByNameContainer(t.Name, 1, t.Image, t.Labels, v1.Container{
 			Args:  []string{"netexec", fmt.Sprintf("--http-port=%d", port)},
 			Name:  t.Name,
 			Image: t.Image,
@@ -1470,7 +1471,7 @@ var _ = SIGDescribe("Services", func() {
 		}
 
 		ginkgo.By("Scaling down replication controller to zero")
-		framework.ScaleRC(f.ClientSet, f.ScalesGetter, t.Namespace, rcSpec.Name, 0, false)
+		e2erc.ScaleRC(f.ClientSet, f.ScalesGetter, t.Namespace, rcSpec.Name, 0, false)
 
 		ginkgo.By("Update service to not tolerate unready services")
 		_, err = e2eservice.UpdateService(f.ClientSet, t.Namespace, t.ServiceName, func(s *v1.Service) {
@@ -2254,7 +2255,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 				err := e2eservice.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, path, e2eservice.KubeProxyEndpointLagTimeout, expectedSuccess, threshold)
 				framework.ExpectNoError(err)
 			}
-			framework.ExpectNoError(framework.DeleteRCAndWaitForGC(f.ClientSet, namespace, serviceName))
+			framework.ExpectNoError(e2erc.DeleteRCAndWaitForGC(f.ClientSet, namespace, serviceName))
 		}
 	})
 

@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2esecurity "k8s.io/kubernetes/test/e2e/framework/security"
 
 	"github.com/onsi/ginkgo"
@@ -79,7 +80,7 @@ func (t *AppArmorUpgradeTest) Test(f *framework.Framework, done <-chan struct{},
 func (t *AppArmorUpgradeTest) Teardown(f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
 	ginkgo.By("Logging container failures")
-	framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
+	e2ekubectl.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
 }
 
 func (t *AppArmorUpgradeTest) verifyPodStillUp(f *framework.Framework) {

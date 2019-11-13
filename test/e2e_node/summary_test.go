@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 
 	systemdutil "github.com/coreos/go-systemd/util"
@@ -45,7 +46,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				return
 			}
 			if framework.TestContext.DumpLogsOnFailure {
-				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
+				e2ekubectl.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
 			}
 			ginkgo.By("Recording processes in system cgroups")
 			recordSystemCgroupProcesses()

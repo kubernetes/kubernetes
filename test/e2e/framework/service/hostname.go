@@ -31,6 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -60,7 +61,7 @@ func StartServeHostnameService(c clientset.Interface, svc *v1.Service, ns string
 		CreatedPods:          &createdPods,
 		MaxContainerFailures: &maxContainerFailures,
 	}
-	err = framework.RunRC(config)
+	err = e2erc.RunRC(config)
 	if err != nil {
 		return podNames, "", err
 	}
@@ -87,7 +88,7 @@ func StartServeHostnameService(c clientset.Interface, svc *v1.Service, ns string
 
 // StopServeHostnameService stops the given service.
 func StopServeHostnameService(clientset clientset.Interface, ns, name string) error {
-	if err := framework.DeleteRCAndWaitForGC(clientset, ns, name); err != nil {
+	if err := e2erc.DeleteRCAndWaitForGC(clientset, ns, name); err != nil {
 		return err
 	}
 	if err := clientset.CoreV1().Services(ns).Delete(name, nil); err != nil {

@@ -32,6 +32,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	"k8s.io/kubernetes/test/e2e/framework/replicaset"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -483,14 +485,14 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 
 	switch kind {
 	case KindRC:
-		framework.ExpectNoError(framework.RunRC(rcConfig))
+		framework.ExpectNoError(e2erc.RunRC(rcConfig))
 	case KindDeployment:
 		dpConfig := testutils.DeploymentConfig{
 			RCConfig: rcConfig,
 		}
 		ginkgo.By(fmt.Sprintf("creating deployment %s in namespace %s", dpConfig.Name, dpConfig.Namespace))
 		dpConfig.NodeDumpFunc = framework.DumpNodeDebugInfo
-		dpConfig.ContainerDumpFunc = framework.LogFailedContainers
+		dpConfig.ContainerDumpFunc = e2ekubectl.LogFailedContainers
 		framework.ExpectNoError(testutils.RunDeployment(dpConfig))
 	case KindReplicaSet:
 		rsConfig := testutils.ReplicaSetConfig{
@@ -532,7 +534,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 		Command:   []string{"/controller", "--consumer-service-name=" + name, "--consumer-service-namespace=" + ns, "--consumer-port=80"},
 		DNSPolicy: &dnsClusterFirst,
 	}
-	framework.ExpectNoError(framework.RunRC(controllerRcConfig))
+	framework.ExpectNoError(e2erc.RunRC(controllerRcConfig))
 
 	// Wait for endpoints to propagate for the controller service.
 	framework.ExpectNoError(framework.WaitForServiceEndpointsNum(

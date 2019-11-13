@@ -71,6 +71,7 @@ go_library(
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/providers/gce:go_default_library",
         "//test/e2e/framework/pv:go_default_library",
+        "//test/e2e/framework/rc:go_default_library",
         "//test/e2e/framework/ssh:go_default_library",
         "//test/e2e/framework/statefulset:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",

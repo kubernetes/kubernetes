@@ -45,6 +45,7 @@ import (
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -931,7 +932,7 @@ func (j *TestJig) CreateServicePods(replica int) error {
 		Timeout:      framework.PodReadyBeforeTimeout,
 		Replicas:     replica,
 	}
-	return framework.RunRC(config)
+	return e2erc.RunRC(config)
 }
 
 // CreateTCPUDPServicePods creates a replication controller with the label same as service. Service listens to TCP and UDP.
@@ -947,5 +948,5 @@ func (j *TestJig) CreateTCPUDPServicePods(replica int) error {
 		Timeout:      framework.PodReadyBeforeTimeout,
 		Replicas:     replica,
 	}
-	return framework.RunRC(config)
+	return e2erc.RunRC(config)
 }
