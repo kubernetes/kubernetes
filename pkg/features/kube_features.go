@@ -308,7 +308,7 @@ const (
 
 	// owner: @vikaschoudhary16
 	// beta: v1.12
-	//
+	// ga: v1.17
 	//
 	// Enable resource quota scope selectors
 	ResourceQuotaScopeSelectors featuregate.Feature = "ResourceQuotaScopeSelectors"
@@ -556,7 +556,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	VolumeSubpath:                  {Default: true, PreRelease: featuregate.GA},
 	BalanceAttachedNodeVolumes:     {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSubpathEnvExpansion:      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19,
-	ResourceQuotaScopeSelectors:    {Default: true, PreRelease: featuregate.Beta},
+	ResourceQuotaScopeSelectors:    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.18
 	CSIBlockVolume:                 {Default: true, PreRelease: featuregate.Beta},
 	CSIInlineVolume:                {Default: true, PreRelease: featuregate.Beta},
 	RuntimeClass:                   {Default: true, PreRelease: featuregate.Beta},
