@@ -119,6 +119,7 @@ type initData struct {
 	dryRunDir               string
 	externalCA              bool
 	client                  clientset.Interface
+	realReadOnlyClient      clientset.Interface
 	outputWriter            io.Writer
 	uploadCerts             bool
 	skipCertificateKeyPrint bool
@@ -356,7 +357,7 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		return nil, err
 	}
 
-	// if dry running creates a temporary folder for saving kubeadm generated files
+	// if dry-running creates a temporary folder for saving kubeadm generated files
 	dryRunDir := ""
 	if options.dryRun {
 		if dryRunDir, err = kubeadmconstants.CreateTempDirForKubeadm("", "kubeadm-init-dryrun"); err != nil {
@@ -547,6 +548,26 @@ func (d *initData) Client() (clientset.Interface, error) {
 		}
 	}
 	return d.client, nil
+}
+
+// RealReadOnlyClient returns a Kubernetes client to be used by kubeadm for connecting to a real API Server.
+// This is useful for introspecting the real apiserver during a dry-run.
+// This client can be used to implement the same read-behavior for both live and dry-runs.
+// Treat this as a read-only client. Do not mutate the API using this client.
+// It is recommended to gracefully degrade on RealReadOnlyClient failure during a dry-run
+// -- the API Server may not be created yet (dry-run init phases), or may be temporarily down (upgrades/failure-recovery).
+// TODO: Make the RealReadOnlyClient Read-only -- currently it is named for proper use but not enforced by implementation.
+// This function is implemented as a singleton, thus avoiding to recreate the client when it is used by different phases.
+// Important. This function must be called after the admin.conf kubeconfig file is created.
+func (d *initData) RealReadOnlyClient() (clientset.Interface, error) {
+	if d.realReadOnlyClient == nil {
+		var err error
+		d.realReadOnlyClient, err = kubeconfigutil.ClientSetFromFile(d.RealKubeConfigPath())
+		if err != nil {
+			return nil, err
+		}
+	}
+	return d.realReadOnlyClient, nil
 }
 
 // Tokens returns an array of token strings.

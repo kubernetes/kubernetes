@@ -24,6 +24,8 @@ import (
 
 	"github.com/pkg/errors"
 
+	"k8s.io/apimachinery/pkg/util/version"
+	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 
 	addoninstall "sigs.k8s.io/addon-operators/installer/install"
@@ -33,7 +35,7 @@ import (
 // It fetches the AddonInstallerConfiguration component config from the InitConfiguration.
 // `realKubeConfigPath` should be the path of a potential kubeconfig for an APIServer.
 // If `realKubeConfigPath` does not stat, the installer's runtime.ServerDryRun will not be enabled.
-func ApplyAddonConfiguration(cfg *kubeadmapi.InitConfiguration, dryRun bool, realKubeConfigPath string) (err error) {
+func ApplyAddonConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Interface, realReadOnlyClient clientset.Interface, dryRun bool, realKubeConfigPath string) (err error) {
 	installCfg := cfg.ClusterConfiguration.ComponentConfigs.AddonInstaller
 	if installCfg == nil {
 		return errors.New("addoninstaller phase invoked with nil AddonInstaller ComponentConfig")
@@ -48,15 +50,29 @@ func ApplyAddonConfiguration(cfg *kubeadmapi.InitConfiguration, dryRun bool, rea
 		installCfg.DryRun = dryRun
 	}
 
-	// TODO: getAddonInstallerFromConfigMap
-	// TODO: diff addons and prune ones that are no longer declared
+	realKubeConfigPathExists := false
+	if _, err := os.Stat(realKubeConfigPath); err == nil {
+		realKubeConfigPathExists = true
+	}
+
+	if !installCfg.DryRun || (realKubeConfigPathExists && realReadOnlyClient != nil) {
+		k8sVersion := version.MustParseGeneric(cfg.ClusterConfiguration.KubernetesVersion)
+		// We can use realReadOnlyClient to download the configmap from a real apiserver if it exists, even in dryRun mode
+		prevInstallCfg, err := DownloadConfiguration(realReadOnlyClient, k8sVersion)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[addon installer] ERROR: downloading previous config: %v\n", err)
+		}
+		if prevInstallCfg != nil {
+			// TODO: diff addons and prune (delete) ones that are no longer declared
+		}
+	}
 
 	r := addoninstall.Runtime{
 		Config: installCfg,
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
 	}
-	if _, err := os.Stat(realKubeConfigPath); err == nil {
+	if realKubeConfigPathExists {
 		r.KubeConfigPath = realKubeConfigPath
 		r.ServerDryRun = true
 	}
@@ -83,7 +99,7 @@ func ApplyAddonConfiguration(cfg *kubeadmapi.InitConfiguration, dryRun bool, rea
 		return err
 	}
 
-	// TODO: Upload AddonInstallerConfig to Cluster
+	uploadConfiguration(cfg.ComponentConfigs.AddonInstaller, client)
 
 	return nil
 }

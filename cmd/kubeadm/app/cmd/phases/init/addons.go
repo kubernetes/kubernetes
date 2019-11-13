@@ -125,12 +125,18 @@ func runKubeProxyAddon(c workflow.RunData) error {
 
 // runAddonInstaller executes the addon-installer to apply the default or user-configured addons
 func runAddonInstaller(c workflow.RunData) error {
-	initData, cfg, _, err := getInitData(c)
+	initData, cfg, client, err := getInitData(c)
 	if err != nil {
 		return err
 	}
+	realReadOnlyClient, err := initData.RealReadOnlyClient()
+	// If we're performing a dry-run, it's ok to ignore realReadOnlyClient's err
+	// A nil realReadOnlyClient should not be used
+	if err != nil && !initData.DryRun() {
+		return err
+	}
 	if features.Enabled(cfg.ClusterConfiguration.FeatureGates, features.AddonInstaller) {
-		return installeraddon.ApplyAddonConfiguration(cfg, initData.DryRun(), initData.RealKubeConfigPath())
+		return installeraddon.ApplyAddonConfiguration(cfg, client, realReadOnlyClient, initData.DryRun(), initData.RealKubeConfigPath())
 	}
 	return nil
 }

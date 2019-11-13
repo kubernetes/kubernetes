@@ -46,6 +46,7 @@ type InitData interface {
 	ExternalCA() bool
 	OutputWriter() io.Writer
 	Client() (clientset.Interface, error)
+	RealReadOnlyClient() (clientset.Interface, error)
 	Tokens() []string
 	KustomizeDir() string
 }

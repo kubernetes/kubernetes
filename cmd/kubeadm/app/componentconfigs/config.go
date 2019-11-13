@@ -18,8 +18,8 @@ package componentconfigs
 
 import (
 	"github.com/pkg/errors"
-	addoninstallerconfig "sigs.k8s.io/addon-operators/installer/pkg/apis/config"
 	"k8s.io/klog"
+	addoninstallerconfig "sigs.k8s.io/addon-operators/installer/pkg/apis/config"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

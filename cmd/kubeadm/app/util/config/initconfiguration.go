@@ -325,8 +325,6 @@ func documentMapToInitConfiguration(gvkmap map[schema.GroupVersionKind][]byte, a
 		}
 	}
 
-	fmt.Printf("[config] AddonInstallerConfig: %+v\n", clustercfg.ComponentConfigs.AddonInstaller)
-
 	// Applies dynamic defaults to settings not provided with flags
 	if err := SetInitDynamicDefaults(initcfg); err != nil {
 		return nil, err
