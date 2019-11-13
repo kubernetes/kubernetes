@@ -153,25 +153,47 @@ func (proxier *metaProxier) OnEndpointsSynced() {
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
 // is observed.
 func (proxier *metaProxier) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) {
-	// noop
+	switch endpointSlice.AddressType {
+	case discovery.AddressTypeIPv4:
+		proxier.ipv4Proxier.OnEndpointSliceAdd(endpointSlice)
+	case discovery.AddressTypeIPv6:
+		proxier.ipv6Proxier.OnEndpointSliceAdd(endpointSlice)
+	default:
+		klog.V(4).Infof("EndpointSlice address type not supported by kube-proxy: %s", endpointSlice.AddressType)
+	}
 }
 
 // OnEndpointSliceUpdate is called whenever modification of an existing endpoint
 // slice object is observed.
-func (proxier *metaProxier) OnEndpointSliceUpdate(_, endpointSlice *discovery.EndpointSlice) {
-	//noop
+func (proxier *metaProxier) OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice *discovery.EndpointSlice) {
+	switch newEndpointSlice.AddressType {
+	case discovery.AddressTypeIPv4:
+		proxier.ipv4Proxier.OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice)
+	case discovery.AddressTypeIPv6:
+		proxier.ipv6Proxier.OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice)
+	default:
+		klog.V(4).Infof("EndpointSlice address type not supported by kube-proxy: %s", newEndpointSlice.AddressType)
+	}
 }
 
 // OnEndpointSliceDelete is called whenever deletion of an existing endpoint slice
 // object is observed.
 func (proxier *metaProxier) OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice) {
-	//noop
+	switch endpointSlice.AddressType {
+	case discovery.AddressTypeIPv4:
+		proxier.ipv4Proxier.OnEndpointSliceDelete(endpointSlice)
+	case discovery.AddressTypeIPv6:
+		proxier.ipv6Proxier.OnEndpointSliceDelete(endpointSlice)
+	default:
+		klog.V(4).Infof("EndpointSlice address type not supported by kube-proxy: %s", endpointSlice.AddressType)
+	}
 }
 
 // OnEndpointSlicesSynced is called once all the initial event handlers were
 // called and the state is fully propagated to local cache.
 func (proxier *metaProxier) OnEndpointSlicesSynced() {
-	//noop
+	proxier.ipv4Proxier.OnEndpointSlicesSynced()
+	proxier.ipv6Proxier.OnEndpointSlicesSynced()
 }
 
 // endpointsIPFamily that returns IPFamily of endpoints or error if

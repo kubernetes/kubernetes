@@ -1431,6 +1431,9 @@ func TestLastChangeTriggerTime(t *testing.T) {
 }
 
 func TestEndpointSliceUpdate(t *testing.T) {
+	fqdnSlice := generateEndpointSlice("svc1", "ns1", 2, 5, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)})
+	fqdnSlice.AddressType = discovery.AddressTypeFQDN
+
 	testCases := map[string]struct {
 		startingSlices        []*discovery.EndpointSlice
 		endpointChangeTracker *EndpointChangeTracker
@@ -1469,6 +1472,18 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			paramRemoveSlice:      false,
+			expectedReturnVal:     false,
+			expectedCurrentChange: nil,
+		},
+		// ensure that only valide address types are processed
+		"add an FQDN slice (invalid address type)": {
+			startingSlices: []*discovery.EndpointSlice{
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			},
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			paramEndpointSlice:    fqdnSlice,
 			paramRemoveSlice:      false,
 			expectedReturnVal:     false,
 			expectedCurrentChange: nil,
