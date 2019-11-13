@@ -43,6 +43,10 @@ const (
 	pluginNotImplementingScore        = "plugin-not-implementing-score"
 	preFilterPluginName               = "prefilter-plugin"
 	preFilterWithExtensionsPluginName = "prefilter-with-extensions-plugin"
+	successFilterPlugin               = "success-filter-plugin"
+	errorFilterPlugin                 = "error-filter-pulgin"
+	unschedulableFilterPlugin         = "unschedulable-filter-plugin"
+	unscheAndUnresvFilterPlugin       = "unschedulable-unresolvable-filter-plugin"
 	duplicatePluginName               = "duplicate-plugin"
 	testPlugin                        = "test-plugin"
 	permitPlugin                      = "permit-plugin"
@@ -583,6 +587,83 @@ func TestPreFilterPlugins(t *testing.T) {
 		}
 	})
 
+}
+
+func TestFilterPlugins(t *testing.T) {
+	tests := []struct {
+		name   string
+		plugin *TestPlugin
+		want   Status
+	}{
+		{
+			name: "SuccessFilter",
+			plugin: &TestPlugin{
+				name: successFilterPlugin,
+				inj:  injectedResult{FilterStatus: int(Success)},
+			},
+			want: Status{
+				code: Success,
+			},
+		},
+		{
+			name: "ErrorFilter",
+			plugin: &TestPlugin{
+				name: errorFilterPlugin,
+				inj:  injectedResult{FilterStatus: int(Error)},
+			},
+			want: Status{
+				code: Error,
+			},
+		},
+		{
+			name: "UnschedulableFilter",
+			plugin: &TestPlugin{
+				name: unschedulableFilterPlugin,
+				inj:  injectedResult{FilterStatus: int(Unschedulable)},
+			},
+			want: Status{
+				code: Unschedulable,
+			},
+		},
+		{
+			name: "UnschedulableAndUnresolvableFilter",
+			plugin: &TestPlugin{
+				name: unscheAndUnresvFilterPlugin,
+				inj: injectedResult{
+					FilterStatus: int(UnschedulableAndUnresolvable)},
+			},
+			want: Status{
+				code: UnschedulableAndUnresolvable,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		registry := Registry{}
+		if err := registry.Register(tt.plugin.name,
+			func(_ *runtime.Unknown, _ FrameworkHandle) (Plugin, error) {
+				return tt.plugin, nil
+			}); err != nil {
+			t.Errorf("fail to register filter plugin (%s)", tt.plugin.name)
+		}
+		plugins := &config.Plugins{
+			Filter: &config.PluginSet{
+				Enabled: []config.Plugin{
+					{Name: tt.plugin.name},
+				},
+			},
+		}
+		f, err := NewFramework(registry, plugins, emptyArgs)
+		if err != nil {
+			t.Errorf("fail to create framework: %s", err)
+		}
+		status := f.RunFilterPlugins(context.TODO(), nil, pod, nil)
+		if status.Code() != tt.want.Code() {
+			t.Errorf("test(%s) failed: expect %s got %s", tt.name,
+				tt.want.Code(), status.Code())
+		}
+		t.Logf("test(%s) success", tt.name)
+	}
 }
 
 func TestRecordingMetrics(t *testing.T) {
