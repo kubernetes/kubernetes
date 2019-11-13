@@ -379,12 +379,14 @@ const (
 
 	// owner: @davidz627
 	// alpha: v1.14
+	// beta: v1.17
 	//
 	// Enables the in-tree storage to CSI Plugin migration feature.
 	CSIMigration featuregate.Feature = "CSIMigration"
 
 	// owner: @davidz627
 	// alpha: v1.14
+	// beta: v1.17
 	//
 	// Enables the GCE PD in-tree driver to GCE CSI Driver migration feature.
 	CSIMigrationGCE featuregate.Feature = "CSIMigrationGCE"
@@ -591,8 +593,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TokenRequestProjection:         {Default: true, PreRelease: featuregate.Beta},
 	BoundServiceAccountTokenVolume: {Default: false, PreRelease: featuregate.Alpha},
 	CRIContainerLogRotation:        {Default: true, PreRelease: featuregate.Beta},
-	CSIMigration:                   {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationGCE:                {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigration:                   {Default: true, PreRelease: featuregate.Beta},
+	CSIMigrationGCE:                {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires GCE PD CSI Driver)
 	CSIMigrationGCEComplete:        {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAWS:                {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAWSComplete:        {Default: false, PreRelease: featuregate.Alpha},
