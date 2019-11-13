@@ -166,3 +166,12 @@ func (v *HistogramVec) Delete(labels map[string]string) bool {
 	}
 	return v.HistogramVec.Delete(labels)
 }
+
+// Reset deletes all metrics in this vector.
+func (v *HistogramVec) Reset() {
+	if !v.IsCreated() {
+		return
+	}
+
+	v.HistogramVec.Reset()
+}
