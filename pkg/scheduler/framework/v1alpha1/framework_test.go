@@ -596,6 +596,161 @@ func TestPreFilterPlugins(t *testing.T) {
 
 }
 
+func TestFilterPlugins(t *testing.T) {
+	tests := []struct {
+		name     string
+		plugins  []*TestPlugin
+		wantCode Code
+	}{
+		{
+			name: "SuccessFilter",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin",
+					inj:  injectedResult{FilterStatus: int(Success)},
+				},
+			},
+			wantCode: Success,
+		},
+		{
+			name: "ErrorFilter",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin",
+					inj:  injectedResult{FilterStatus: int(Error)},
+				},
+			},
+			wantCode: Error,
+		},
+		{
+			name: "UnschedulableFilter",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin",
+					inj:  injectedResult{FilterStatus: int(Unschedulable)},
+				},
+			},
+			wantCode: Unschedulable,
+		},
+		{
+			name: "UnschedulableAndUnresolvableFilter",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin",
+					inj: injectedResult{
+						FilterStatus: int(UnschedulableAndUnresolvable)},
+				},
+			},
+			wantCode: UnschedulableAndUnresolvable,
+		},
+		// followings tests cover multiple-plugins scenarios
+		{
+			name: "ErrorAndErrorFilters",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{FilterStatus: int(Error)},
+				},
+
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{FilterStatus: int(Error)},
+				},
+			},
+			wantCode: Error,
+		},
+		{
+			name: "SuccessAndSuccessFilters",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{FilterStatus: int(Success)},
+				},
+
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{FilterStatus: int(Success)},
+				},
+			},
+			wantCode: Success,
+		},
+		{
+			name: "ErrorAndSuccessFilters",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{FilterStatus: int(Error)},
+				},
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{FilterStatus: int(Success)},
+				},
+			},
+			wantCode: Error,
+		},
+		{
+			name: "SuccessAndErrorFilters",
+			plugins: []*TestPlugin{
+				{
+
+					name: "TestPlugin1",
+					inj:  injectedResult{FilterStatus: int(Success)},
+				},
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{FilterStatus: int(Error)},
+				},
+			},
+			wantCode: Error,
+		},
+		{
+			name: "SuccessAndUnschedulableFilters",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{FilterStatus: int(Success)},
+				},
+
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{FilterStatus: int(Unschedulable)},
+				},
+			},
+			wantCode: Unschedulable,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			registry := Registry{}
+			cfgPls := &config.Plugins{Filter: &config.PluginSet{}}
+			for _, pl := range tt.plugins {
+				// register all plugins
+				tmpPl := pl
+				if err := registry.Register(pl.name,
+					func(_ *runtime.Unknown, _ FrameworkHandle) (Plugin, error) {
+						return tmpPl, nil
+					}); err != nil {
+					t.Fatalf("fail to register filter plugin (%s)", pl.name)
+				}
+				// append plugins to filter pluginset
+				cfgPls.Filter.Enabled = append(
+					cfgPls.Filter.Enabled,
+					config.Plugin{Name: pl.name})
+			}
+
+			f, err := NewFramework(registry, cfgPls, emptyArgs)
+			if err != nil {
+				t.Fatalf("fail to create framework: %s", err)
+			}
+			status := f.RunFilterPlugins(context.TODO(), nil, pod, nil)
+			if status.Code() != tt.wantCode {
+				t.Errorf("Wrong status code. got: %v, want:%v", status.Code(), tt.wantCode)
+			}
+		})
+	}
+}
+
 func TestRecordingMetrics(t *testing.T) {
 	state := &CycleState{recordFrameworkMetrics: true}
 	tests := []struct {
