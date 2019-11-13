@@ -28,9 +28,13 @@ import (
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/probe"
 )
 
@@ -43,6 +47,12 @@ func NewStorage(serverRetriever func() map[string]*Server) *REST {
 	return &REST{
 		GetServersToValidate: serverRetriever,
 	}
+}
+
+// ConvertToTable converts the result to the table.
+func (rs *REST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+	tableConvertor := printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)}
+	return tableConvertor.ConvertToTable(ctx, object, tableOptions)
 }
 
 func (*REST) NamespaceScoped() bool {
