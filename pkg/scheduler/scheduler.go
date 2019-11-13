@@ -276,7 +276,7 @@ func New(client clientset.Interface,
 	volumeBinder := volumebinder.NewVolumeBinder(
 		client,
 		informerFactory.Core().V1().Nodes(),
-		informerFactory.Storage().V1beta1().CSINodes(),
+		informerFactory.Storage().V1().CSINodes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Storage().V1().StorageClasses(),

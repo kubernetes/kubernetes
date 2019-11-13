@@ -23,7 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -32,7 +32,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
-	storagev1beta1informers "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	csitrans "k8s.io/csi-translation-lib"
@@ -120,7 +119,7 @@ type volumeBinder struct {
 	classLister storagelisters.StorageClassLister
 
 	nodeInformer    coreinformers.NodeInformer
-	csiNodeInformer storagev1beta1informers.CSINodeInformer
+	csiNodeInformer storageinformers.CSINodeInformer
 	pvcCache        PVCAssumeCache
 	pvCache         PVAssumeCache
 
@@ -138,7 +137,7 @@ type volumeBinder struct {
 func NewVolumeBinder(
 	kubeClient clientset.Interface,
 	nodeInformer coreinformers.NodeInformer,
-	csiNodeInformer storagev1beta1informers.CSINodeInformer,
+	csiNodeInformer storageinformers.CSINodeInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
@@ -850,7 +849,7 @@ func isCSIMigrationOnForPlugin(pluginName string) bool {
 }
 
 // isPluginMigratedToCSIOnNode checks if an in-tree plugin has been migrated to a CSI driver on the node.
-func isPluginMigratedToCSIOnNode(pluginName string, csiNode *storagev1beta1.CSINode) bool {
+func isPluginMigratedToCSIOnNode(pluginName string, csiNode *storagev1.CSINode) bool {
 	if csiNode == nil {
 		return false
 	}
@@ -873,7 +872,7 @@ func isPluginMigratedToCSIOnNode(pluginName string, csiNode *storagev1beta1.CSIN
 }
 
 // tryTranslatePVToCSI will translate the in-tree PV to CSI if it meets the criteria. If not, it returns the unmodified in-tree PV.
-func (b *volumeBinder) tryTranslatePVToCSI(pv *v1.PersistentVolume, csiNode *storagev1beta1.CSINode) (*v1.PersistentVolume, error) {
+func (b *volumeBinder) tryTranslatePVToCSI(pv *v1.PersistentVolume, csiNode *storagev1.CSINode) (*v1.PersistentVolume, error) {
 	if !b.translator.IsPVMigratable(pv) {
 		return pv, nil
 	}

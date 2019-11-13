@@ -22,7 +22,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
-	storagev1beta1informers "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
 )
@@ -36,7 +35,7 @@ type VolumeBinder struct {
 func NewVolumeBinder(
 	client clientset.Interface,
 	nodeInformer coreinformers.NodeInformer,
-	csiNodeInformer storagev1beta1informers.CSINodeInformer,
+	csiNodeInformer storageinformers.CSINodeInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
