@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/klog"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -84,6 +85,11 @@ func (pmf *MetadataFactory) PriorityMetadata(
 			allNodes = l
 		}
 	}
+	tpSpreadMap, err := buildPodTopologySpreadMap(pod, filteredNodes, allNodes)
+	if err != nil {
+		klog.Errorf("Error building podTopologySpreadMap: %v", err)
+		return nil
+	}
 	return &priorityMetadata{
 		podLimits:               getResourceLimits(pod),
 		podTolerations:          getAllTolerationPreferNoSchedule(pod.Spec.Tolerations),
@@ -92,7 +98,7 @@ func (pmf *MetadataFactory) PriorityMetadata(
 		controllerRef:           metav1.GetControllerOf(pod),
 		podFirstServiceSelector: getFirstServiceSelector(pod, pmf.serviceLister),
 		totalNumNodes:           totalNumNodes,
-		podTopologySpreadMap:    buildPodTopologySpreadMap(pod, filteredNodes, allNodes),
+		podTopologySpreadMap:    tpSpreadMap,
 		topologyScore:           buildTopologyPairToScore(pod, sharedLister, filteredNodes, pmf.hardPodAffinityWeight),
 	}
 }

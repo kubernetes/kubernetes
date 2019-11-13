@@ -1642,55 +1642,47 @@ func EvenPodsSpreadPredicate(pod *v1.Pod, meta Metadata, nodeInfo *schedulernode
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
 	}
-	constraints := getHardTopologySpreadConstraints(pod)
-	if len(constraints) == 0 {
-		return true, nil, nil
-	}
 
-	var evenPodsSpreadMetadata *evenPodsSpreadMetadata
+	var epsMeta *evenPodsSpreadMetadata
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
-		evenPodsSpreadMetadata = predicateMeta.evenPodsSpreadMetadata
+		epsMeta = predicateMeta.evenPodsSpreadMetadata
 	} else { // We don't have precomputed metadata. We have to follow a slow path to check spread constraints.
 		// TODO(autoscaler): get it implemented
 		return false, nil, errors.New("metadata not pre-computed for EvenPodsSpreadPredicate")
 	}
 
-	if evenPodsSpreadMetadata == nil || len(evenPodsSpreadMetadata.tpPairToMatchNum) == 0 {
+	if epsMeta == nil || len(epsMeta.tpPairToMatchNum) == 0 || len(epsMeta.constraints) == 0 {
 		return true, nil, nil
 	}
 
 	podLabelSet := labels.Set(pod.Labels)
-	for _, constraint := range constraints {
-		tpKey := constraint.TopologyKey
-		tpVal, ok := node.Labels[constraint.TopologyKey]
+	for _, c := range epsMeta.constraints {
+		tpKey := c.topologyKey
+		tpVal, ok := node.Labels[c.topologyKey]
 		if !ok {
 			klog.V(5).Infof("node '%s' doesn't have required label '%s'", node.Name, tpKey)
 			return false, []PredicateFailureReason{ErrTopologySpreadConstraintsNotMatch}, nil
 		}
 
-		selfMatch, err := PodMatchesSpreadConstraint(podLabelSet, constraint)
-		if err != nil {
-			return false, nil, err
-		}
 		selfMatchNum := int32(0)
-		if selfMatch {
+		if c.selector.Matches(podLabelSet) {
 			selfMatchNum = 1
 		}
 
 		pair := topologyPair{key: tpKey, value: tpVal}
-		paths, ok := evenPodsSpreadMetadata.tpKeyToCriticalPaths[tpKey]
+		paths, ok := epsMeta.tpKeyToCriticalPaths[tpKey]
 		if !ok {
 			// error which should not happen
-			klog.Errorf("internal error: get paths from key %q of %#v", tpKey, evenPodsSpreadMetadata.tpKeyToCriticalPaths)
+			klog.Errorf("internal error: get paths from key %q of %#v", tpKey, epsMeta.tpKeyToCriticalPaths)
 			continue
 		}
 		// judging criteria:
 		// 'existing matching num' + 'if self-match (1 or 0)' - 'global min matching num' <= 'maxSkew'
 		minMatchNum := paths[0].matchNum
-		matchNum := evenPodsSpreadMetadata.tpPairToMatchNum[pair]
+		matchNum := epsMeta.tpPairToMatchNum[pair]
 		skew := matchNum + selfMatchNum - minMatchNum
-		if skew > constraint.MaxSkew {
-			klog.V(5).Infof("node '%s' failed spreadConstraint[%s]: matchNum(%d) + selfMatchNum(%d) - minMatchNum(%d) > maxSkew(%d)", node.Name, tpKey, matchNum, selfMatchNum, minMatchNum, constraint.MaxSkew)
+		if skew > c.maxSkew {
+			klog.V(5).Infof("node '%s' failed spreadConstraint[%s]: matchNum(%d) + selfMatchNum(%d) - minMatchNum(%d) > maxSkew(%d)", node.Name, tpKey, matchNum, selfMatchNum, minMatchNum, c.maxSkew)
 			return false, []PredicateFailureReason{ErrTopologySpreadConstraintsNotMatch}, nil
 		}
 	}
