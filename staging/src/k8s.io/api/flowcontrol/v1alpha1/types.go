@@ -28,7 +28,7 @@ const (
 	NonResourceAll = "*"
 	NameAll        = "*"
 
-	NamespaceEvery        = "*"             // matches every particular namespace
+	NamespaceEvery = "*" // matches every particular namespace
 )
 
 // System preset priority level names
@@ -246,7 +246,7 @@ type ResourcePolicyRule struct {
 	// must contain a non-empty list.
 	// +optional
 	ClusterScope bool `json:"clusterScope,omitempty" protobuf:"varint,4,opt,name=clusterScope"`
-	
+
 	// `namespaces` is a list of target namespaces that restricts
 	// matches.  A request that specifies a target namespace matches
 	// only if either (a) this list contains that target namespace or

@@ -431,9 +431,9 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:      []string{flowcontrol.VerbAll},
-									APIGroups:  []string{flowcontrol.APIGroupAll},
-									Resources:  []string{flowcontrol.ResourceAll},
+									Verbs:        []string{flowcontrol.VerbAll},
+									APIGroups:    []string{flowcontrol.APIGroupAll},
+									Resources:    []string{flowcontrol.ResourceAll},
 									ClusterScope: true,
 								},
 							},
@@ -464,11 +464,11 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:      []string{flowcontrol.VerbAll},
-									APIGroups:  []string{flowcontrol.APIGroupAll},
-									Resources:  []string{flowcontrol.ResourceAll},
+									Verbs:        []string{flowcontrol.VerbAll},
+									APIGroups:    []string{flowcontrol.APIGroupAll},
+									Resources:    []string{flowcontrol.ResourceAll},
 									ClusterScope: true,
-									Namespaces: []string{flowcontrol.NamespaceEvery},
+									Namespaces:   []string{flowcontrol.NamespaceEvery},
 								},
 							},
 						},
