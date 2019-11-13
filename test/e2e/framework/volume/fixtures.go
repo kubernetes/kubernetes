@@ -528,7 +528,7 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 	return clientPod, nil
 }
 
-func testVolumeContent(client clientset.Interface, pod *v1.Pod, fsGroup *int64, fsType string, tests []Test) {
+func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsType string, tests []Test) {
 	ginkgo.By("Checking that text file contents are perfect.")
 	for i, test := range tests {
 		if test.Mode == v1.PersistentVolumeBlock {
@@ -539,7 +539,7 @@ func testVolumeContent(client clientset.Interface, pod *v1.Pod, fsGroup *int64, 
 			framework.ExpectNoError(err, "failed: finding the contents of the block device %s.", deviceName)
 
 			// Check that it's a real block device
-			utils.CheckVolumeModeOfPath(pod, test.Mode, deviceName)
+			utils.CheckVolumeModeOfPath(f, pod, test.Mode, deviceName)
 		} else {
 			// Filesystem: check content
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
@@ -549,7 +549,7 @@ func testVolumeContent(client clientset.Interface, pod *v1.Pod, fsGroup *int64, 
 
 			// Check that a directory has been mounted
 			dirName := filepath.Dir(fileName)
-			utils.CheckVolumeModeOfPath(pod, test.Mode, dirName)
+			utils.CheckVolumeModeOfPath(f, pod, test.Mode, dirName)
 
 			if !framework.NodeOSDistroIs("windows") {
 				// Filesystem: check fsgroup
@@ -574,32 +574,32 @@ func testVolumeContent(client clientset.Interface, pod *v1.Pod, fsGroup *int64, 
 // and check that the pod sees expected data, e.g. from the server pod.
 // Multiple Tests can be specified to mount multiple volumes to a single
 // pod.
-func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
-	clientPod, err := runVolumeTesterPod(client, config, "client", false, fsGroup, tests)
+func TestVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
+	clientPod, err := runVolumeTesterPod(f.ClientSet, config, "client", false, fsGroup, tests)
 	if err != nil {
 		framework.Failf("Failed to create client pod: %v", err)
 
 	}
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(client, clientPod))
-	testVolumeContent(client, clientPod, fsGroup, fsType, tests)
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, clientPod))
+	testVolumeContent(f, clientPod, fsGroup, fsType, tests)
 }
 
 // InjectContent inserts index.html with given content into given volume. It does so by
 // starting and auxiliary pod which writes the file there.
 // The volume must be writable.
-func InjectContent(client clientset.Interface, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
+func InjectContent(f *framework.Framework, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
 	privileged := true
 	if framework.NodeOSDistroIs("windows") {
 		privileged = false
 	}
-	injectorPod, err := runVolumeTesterPod(client, config, "injector", privileged, fsGroup, tests)
+	injectorPod, err := runVolumeTesterPod(f.ClientSet, config, "injector", privileged, fsGroup, tests)
 	if err != nil {
 		framework.Failf("Failed to create injector pod: %v", err)
 		return
 	}
 	defer func() {
-		e2epod.DeletePodOrFail(client, injectorPod.Namespace, injectorPod.Name)
-		e2epod.WaitForPodToDisappear(client, injectorPod.Namespace, injectorPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+		e2epod.DeletePodOrFail(f.ClientSet, injectorPod.Namespace, injectorPod.Name)
+		e2epod.WaitForPodToDisappear(f.ClientSet, injectorPod.Namespace, injectorPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
 	}()
 
 	ginkgo.By("Writing text file contents in the container.")
@@ -621,7 +621,7 @@ func InjectContent(client clientset.Interface, config TestConfig, fsGroup *int64
 
 	// Check that the data have been really written in this pod.
 	// This tests non-persistent volume types
-	testVolumeContent(client, injectorPod, fsGroup, fsType, tests)
+	testVolumeContent(f, injectorPod, fsGroup, fsType, tests)
 }
 
 // CreateGCEVolume creates PersistentVolumeSource for GCEVolume.

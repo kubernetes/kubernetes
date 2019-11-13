@@ -231,7 +231,9 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 	}
 
 	socketPath := filepath.Join(m.socketdir, m.socketname)
-	os.MkdirAll(m.socketdir, 0750)
+	if err = os.MkdirAll(m.socketdir, 0750); err != nil {
+		return err
+	}
 	if selinux.SELinuxEnabled() {
 		if err := selinux.SetFileLabel(m.socketdir, config.KubeletPluginsDirSELinuxLabel); err != nil {
 			klog.Warningf("Unprivileged containerized plugins might not work. Could not set selinux context on %s: %v", m.socketdir, err)
@@ -552,7 +554,9 @@ func (m *ManagerImpl) writeCheckpoint() error {
 	m.mutex.Unlock()
 	err := m.checkpointManager.CreateCheckpoint(kubeletDeviceManagerCheckpoint, data)
 	if err != nil {
-		return fmt.Errorf("failed to write checkpoint file %q: %v", kubeletDeviceManagerCheckpoint, err)
+		err2 := fmt.Errorf("failed to write checkpoint file %q: %v", kubeletDeviceManagerCheckpoint, err)
+		klog.Warning(err2)
+		return err2
 	}
 	return nil
 }
@@ -853,7 +857,9 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 	}
 	if needsReAllocate {
 		klog.V(2).Infof("needs re-allocate device plugin resources for pod %s", podUID)
-		m.allocatePodResources(pod)
+		if err := m.allocatePodResources(pod); err != nil {
+			return nil, err
+		}
 	}
 	m.mutex.Lock()
 	defer m.mutex.Unlock()

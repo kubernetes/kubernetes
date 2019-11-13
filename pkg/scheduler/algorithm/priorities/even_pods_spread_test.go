@@ -434,7 +434,7 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			allNodes := append([]*v1.Node{}, tt.nodes...)
 			allNodes = append(allNodes, tt.failedNodes...)
-			snapshot := nodeinfosnapshot.NewSnapshot(tt.existingPods, allNodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, allNodes))
 
 			meta := &priorityMetadata{
 				podTopologySpreadMap: buildPodTopologySpreadMap(tt.pod, tt.nodes, snapshot.NodeInfoList),
@@ -497,7 +497,7 @@ func BenchmarkTestCalculateEvenPodsSpreadPriority(b *testing.B) {
 	for _, tt := range tests {
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
-			snapshot := nodeinfosnapshot.NewSnapshot(existingPods, allNodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(existingPods, allNodes))
 			meta := &priorityMetadata{
 				podTopologySpreadMap: buildPodTopologySpreadMap(tt.pod, filteredNodes, snapshot.NodeInfoList),
 			}

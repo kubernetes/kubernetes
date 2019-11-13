@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -53,18 +54,19 @@ var (
 )
 
 func init() {
-	if err := trEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.TokenRequest: {Default: true}}); err != nil {
-		panic(err)
+	// all features need to be set on all featuregates for the tests.  We set everything and then then the if's below override it.
+	relevantFeatures := map[featuregate.Feature]featuregate.FeatureSpec{
+		features.TokenRequest:            {Default: false},
+		features.CSINodeInfo:             {Default: false},
+		features.ExpandPersistentVolumes: {Default: false},
 	}
-	if err := trDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.TokenRequest: {Default: false}}); err != nil {
-		panic(err)
-	}
-	if err := csiNodeInfoEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSINodeInfo: {Default: true}}); err != nil {
-		panic(err)
-	}
-	if err := csiNodeInfoDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSINodeInfo: {Default: false}}); err != nil {
-		panic(err)
-	}
+	utilruntime.Must(trEnabledFeature.Add(relevantFeatures))
+	utilruntime.Must(trDisabledFeature.Add(relevantFeatures))
+	utilruntime.Must(csiNodeInfoEnabledFeature.Add(relevantFeatures))
+	utilruntime.Must(csiNodeInfoDisabledFeature.Add(relevantFeatures))
+
+	utilruntime.Must(trEnabledFeature.SetFromMap(map[string]bool{string(features.TokenRequest): true}))
+	utilruntime.Must(csiNodeInfoEnabledFeature.SetFromMap(map[string]bool{string(features.CSINodeInfo): true}))
 }
 
 func makeTestPod(namespace, name, node string, mirror bool) (*api.Pod, *corev1.Pod) {
@@ -1233,7 +1235,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			c := NewPlugin(nodeidentifier.NewDefaultNodeIdentifier())
 			if tt.features != nil {
-				c.features = tt.features
+				c.InspectFeatureGates(tt.features)
 			}
 			c.podsGetter = tt.podsGetter
 			err := c.Admit(context.TODO(), tt.attributes, nil)

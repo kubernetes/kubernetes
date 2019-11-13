@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -338,7 +339,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeNodeList(test.nodes)
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
 			selectorSpread := SelectorSpread{
 				serviceLister:     fakelisters.ServiceLister(test.services),
 				controllerLister:  fakelisters.ControllerLister(test.rcs),
@@ -359,8 +360,8 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected error: %v \n", err)
 			}
-			if !reflect.DeepEqual(test.expectedList, list) {
-				t.Errorf("expected %#v, got %#v", test.expectedList, list)
+			if diff := cmp.Diff(test.expectedList, list); diff != "" {
+				t.Errorf("wrong priorities produced (-want, +got): %s", diff)
 			}
 		})
 	}
@@ -576,7 +577,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeLabeledNodeList(labeledNodes)
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
 			selectorSpread := SelectorSpread{
 				serviceLister:     fakelisters.ServiceLister(test.services),
 				controllerLister:  fakelisters.ControllerLister(test.rcs),
@@ -770,7 +771,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeLabeledNodeList(labeledNodes)
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
 			zoneSpread := ServiceAntiAffinity{podLister: snapshot.Pods(), serviceLister: fakelisters.ServiceLister(test.services), labels: []string{"zone"}}
 
 			metaDataProducer := NewMetadataFactory(

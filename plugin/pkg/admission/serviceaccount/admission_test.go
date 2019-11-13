@@ -33,26 +33,15 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/component-base/featuregate"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 var (
-	deprecationDisabledFeature = featuregate.NewFeatureGate()
-	deprecationEnabledFeature  = featuregate.NewFeatureGate()
+	deprecationDisabledBoundTokenVolume = false
+	deprecationEnabledBoundTokenVolume  = true
 )
-
-func init() {
-	if err := deprecationDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{kubefeatures.BoundServiceAccountTokenVolume: {Default: false}}); err != nil {
-		panic(err)
-	}
-	if err := deprecationEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{kubefeatures.BoundServiceAccountTokenVolume: {Default: true}}); err != nil {
-		panic(err)
-	}
-}
 
 func TestIgnoresNonCreate(t *testing.T) {
 	for _, op := range []admission.Operation{admission.Delete, admission.Connect} {
@@ -290,7 +279,7 @@ func TestAutomountsAPIToken(t *testing.T) {
 		serviceAccountUID := "12345"
 
 		tokenName := "token-name"
-		if admit.featureGate.Enabled(kubefeatures.BoundServiceAccountTokenVolume) {
+		if admit.boundServiceAccountTokenVolume {
 			tokenName = generatedVolumeName
 		}
 
@@ -981,7 +970,7 @@ func TestAutomountIsBackwardsCompatible(t *testing.T) {
 
 	admit := NewServiceAccount()
 	admit.generateName = testGenerateName
-	admit.featureGate = deprecationEnabledFeature
+	admit.boundServiceAccountTokenVolume = deprecationEnabledBoundTokenVolume
 
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	admit.SetExternalKubeInformerFactory(informerFactory)
@@ -1074,14 +1063,14 @@ var generatedVolumeName = testGenerateName(ServiceAccountVolumeName + "-")
 func testBoundServiceAccountTokenVolumePhases(t *testing.T, f func(*testing.T, func(*Plugin) *Plugin)) {
 	t.Run("BoundServiceAccountTokenVolume disabled", func(t *testing.T) {
 		f(t, func(s *Plugin) *Plugin {
-			s.featureGate = deprecationDisabledFeature
+			s.boundServiceAccountTokenVolume = deprecationDisabledBoundTokenVolume
 			return s
 		})
 	})
 
 	t.Run("BoundServiceAccountTokenVolume enabled", func(t *testing.T) {
 		f(t, func(s *Plugin) *Plugin {
-			s.featureGate = deprecationEnabledFeature
+			s.boundServiceAccountTokenVolume = deprecationEnabledBoundTokenVolume
 			return s
 		})
 	})

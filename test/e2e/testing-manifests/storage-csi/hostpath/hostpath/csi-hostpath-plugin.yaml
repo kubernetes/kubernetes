@@ -62,12 +62,13 @@ spec:
             name: csi-data-dir
 
         - name: hostpath
-          image: quay.io/k8scsi/hostpathplugin:v1.2.0
+          image: quay.io/k8scsi/hostpathplugin:v1.3.0-rc1
           args:
             - "--drivername=hostpath.csi.k8s.io"
             - "--v=5"
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--nodeid=$(KUBE_NODE_NAME)"
+            - "--maxvolumespernode=10"
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock

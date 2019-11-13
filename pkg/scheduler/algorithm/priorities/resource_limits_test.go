@@ -138,7 +138,7 @@ func TestResourceLimitsPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(nil, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(nil, test.nodes))
 			metadata := &priorityMetadata{
 				podLimits: getResourceLimits(test.pod),
 			}

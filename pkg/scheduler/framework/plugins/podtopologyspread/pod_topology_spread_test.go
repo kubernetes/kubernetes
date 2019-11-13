@@ -269,7 +269,7 @@ func TestPodTopologySpread_Filter_SingleConstraint(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(tt.existingPods, tt.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, tt.nodes))
 			factory := &predicates.MetadataProducerFactory{}
 			meta := factory.GetPredicateMetadata(tt.pod, snapshot)
 			state := framework.NewCycleState()
@@ -467,7 +467,7 @@ func TestPodTopologySpread_Filter_MultipleConstraints(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(tt.existingPods, tt.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, tt.nodes))
 			factory := &predicates.MetadataProducerFactory{}
 			meta := factory.GetPredicateMetadata(tt.pod, snapshot)
 			state := framework.NewCycleState()

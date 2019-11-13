@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -434,7 +434,6 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 		},
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()
 	// running attachable predicate tests with feature gate and limit present on nodes
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
@@ -547,7 +546,7 @@ func getFakeCSIPVCLister(volumeName, scName string, driverNames ...string) fakel
 	return pvcLister
 }
 
-func enableMigrationOnNode(csiNode *storagev1beta1.CSINode, pluginName string) {
+func enableMigrationOnNode(csiNode *storagev1.CSINode, pluginName string) {
 	nodeInfoAnnotations := csiNode.GetAnnotations()
 	if nodeInfoAnnotations == nil {
 		nodeInfoAnnotations = map[string]string{}
@@ -570,7 +569,7 @@ func getFakeCSIStorageClassLister(scName, provisionerName string) fakelisters.St
 	}
 }
 
-func getFakeCSINodeLister(csiNode *storagev1beta1.CSINode) fakelisters.CSINodeLister {
+func getFakeCSINodeLister(csiNode *storagev1.CSINode) fakelisters.CSINodeLister {
 	if csiNode != nil {
 		return fakelisters.CSINodeLister(*csiNode)
 	}

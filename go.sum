@@ -587,6 +587,8 @@ k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a h1:UcxjrRMyNx/i/y8G7kPvLy
 k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a/go.mod h1:1TqjTSzOxsLGIKfj0lK8EeCP7K1iUG65v09OM0/WG5E=
 k8s.io/repo-infra v0.0.1-alpha.1 h1:2us1n30u3cOcoPsacNfCvCssS9B9Yldr1ZGOdK0728U=
 k8s.io/repo-infra v0.0.1-alpha.1/go.mod h1:wO1t9WaB99V80ljbeENTnayuEEwNZt7gECYh/CEyOJ8=
+k8s.io/system-validators v1.0.4 h1:sW57tJ/ciqOVbbTLN+ZNy64MJMNqUuiwrirQv8IR2Kw=
+k8s.io/system-validators v1.0.4/go.mod h1:HgSgTg4NAGNoYYjKsUyk52gdNi2PVDswQ9Iyn66R7NI=
 k8s.io/utils v0.0.0-20191030222137-2b95a09bc58d h1:1P0iBJsBzxRmR+dIFnM+Iu4aLxnoa7lBqozW/0uHbT8=
 k8s.io/utils v0.0.0-20191030222137-2b95a09bc58d/go.mod h1:sZAwmy6armz5eXlNoLmJcl4F1QuKu7sr+mFQ0byX7Ew=
 modernc.org/cc v1.0.0/go.mod h1:1Sk4//wdnYJiUIxnW8ddKpaOJCF37yAdqYnkxUpaYxw=

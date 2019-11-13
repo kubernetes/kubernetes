@@ -1169,30 +1169,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "disable beta feature AttachVolumeLimit",
-			JSON: `{
-		  "kind": "Policy",
-		  "apiVersion": "v1",
-		  "predicates": [
-			{"name": "MaxCSIVolumeCountPred"},
-			{"name": "CheckVolumeBinding"}
-		  ],		  
-		  "priorities": [
-		  ]
-		}`,
-			featureGates: map[featuregate.Feature]bool{
-				features.AttachVolumeLimit: false,
-			},
-			wantPlugins: map[string][]config.Plugin{
-				"FilterPlugin": {
-					{Name: "NodeUnschedulable"},
-					{Name: "TaintToleration"},
-					{Name: "NodeVolumeLimits"},
-					{Name: "VolumeBinding"},
-				},
-			},
-		},
 	}
 	registeredPredicates := sets.NewString(scheduler.ListRegisteredFitPredicates()...)
 	registeredPriorities := sets.NewString(scheduler.ListRegisteredPriorityFunctions()...)

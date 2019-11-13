@@ -227,7 +227,7 @@ func TestTaintAndToleration(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(nil, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(nil, test.nodes))
 			list, err := runMapReducePriority(ComputeTaintTolerationPriorityMap, ComputeTaintTolerationPriorityReduce, nil, test.pod, snapshot, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)

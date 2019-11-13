@@ -201,7 +201,7 @@ func TestImageLocalityPriority(t *testing.T) {
 				1,
 			)
 
-			snapshot := nodeinfosnapshot.NewSnapshot(nil, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(nil, test.nodes))
 			meta := metaDataProducer(test.pod, test.nodes, snapshot)
 
 			state := framework.NewCycleState()

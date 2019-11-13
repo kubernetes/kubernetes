@@ -379,7 +379,7 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 			if len(test.pod.Spec.Volumes) > 0 {
 				maxVolumes := 5
 				nodeInfoList, _ := snapshot.NodeInfos().List()

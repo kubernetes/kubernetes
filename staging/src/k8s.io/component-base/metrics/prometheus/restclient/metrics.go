@@ -40,9 +40,10 @@ var (
 	// deprecatedRequestLatency is deprecated, please use requestLatency.
 	deprecatedRequestLatency = k8smetrics.NewHistogramVec(
 		&k8smetrics.HistogramOpts{
-			Name:    "rest_client_request_latency_seconds",
-			Help:    "(Deprecated) Request latency in seconds. Broken down by verb and URL.",
-			Buckets: k8smetrics.ExponentialBuckets(0.001, 2, 10),
+			Name:              "rest_client_request_latency_seconds",
+			Help:              "Request latency in seconds. Broken down by verb and URL.",
+			Buckets:           k8smetrics.ExponentialBuckets(0.001, 2, 10),
+			DeprecatedVersion: "1.14.0",
 		},
 		[]string{"verb", "url"},
 	)

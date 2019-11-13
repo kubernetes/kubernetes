@@ -163,7 +163,7 @@ func TestServiceAffinity(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := []*v1.Node{&node1, &node2, &node3, &node4, &node5}
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
 
 			predicate, precompute := predicates.NewServiceAffinityPredicate(snapshot.NodeInfos(), snapshot.Pods(), fakelisters.ServiceLister(test.services), test.labels)
 			predicates.RegisterPredicateMetadataProducer("ServiceAffinityMetaProducer", precompute)
@@ -390,7 +390,7 @@ func TestServiceAffinityScore(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeLabeledNodeList(test.nodes)
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
 			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 			serviceLister := fakelisters.ServiceLister(test.services)
 			priorityMapFunction, priorityReduceFunction := priorities.NewServiceAntiAffinityPriority(snapshot.Pods(), serviceLister, test.labels)

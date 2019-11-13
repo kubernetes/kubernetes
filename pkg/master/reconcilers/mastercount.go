@@ -149,6 +149,10 @@ func (r *masterCountEndpointReconciler) RemoveEndpoints(serviceName string, ip n
 		return err
 	}
 
+	if len(e.Subsets) == 0 {
+		// no action is needed to remove the endpoint
+		return nil
+	}
 	// Remove our IP from the list of addresses
 	new := []corev1.EndpointAddress{}
 	for _, addr := range e.Subsets[0].Addresses {

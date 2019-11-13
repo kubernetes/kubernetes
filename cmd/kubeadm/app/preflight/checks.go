@@ -46,7 +46,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/system"
+	system "k8s.io/system-validators/validators"
 	utilsexec "k8s.io/utils/exec"
 	utilsnet "k8s.io/utils/net"
 )

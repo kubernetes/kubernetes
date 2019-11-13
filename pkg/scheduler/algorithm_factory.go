@@ -29,7 +29,6 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
-	v1beta1storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -53,7 +52,7 @@ type PluginFactoryArgs struct {
 	ReplicaSetLister               appslisters.ReplicaSetLister
 	StatefulSetLister              appslisters.StatefulSetLister
 	PDBLister                      policylisters.PodDisruptionBudgetLister
-	CSINodeLister                  v1beta1storagelisters.CSINodeLister
+	CSINodeLister                  storagelisters.CSINodeLister
 	PVLister                       corelisters.PersistentVolumeLister
 	PVCLister                      corelisters.PersistentVolumeClaimLister
 	StorageClassLister             storagelisters.StorageClassLister

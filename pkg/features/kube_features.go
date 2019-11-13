@@ -282,6 +282,8 @@ const (
 
 	// owner: @gnufied
 	// beta : v1.12
+	// GA   : v1.17
+
 	//
 	// Add support for volume plugins to report node specific
 	// volume limits
@@ -418,6 +420,7 @@ const (
 
 	// owner: @bclau
 	// alpha: v1.16
+	// beta: v1.17
 	//
 	// Enables support for running container entrypoints as different usernames than their default ones.
 	WindowsRunAsUserName featuregate.Feature = "WindowsRunAsUserName"
@@ -523,7 +526,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExpandPersistentVolumes:        {Default: true, PreRelease: featuregate.Beta},
 	ExpandInUsePersistentVolumes:   {Default: true, PreRelease: featuregate.Beta},
 	ExpandCSIVolumes:               {Default: true, PreRelease: featuregate.Beta},
-	AttachVolumeLimit:              {Default: true, PreRelease: featuregate.Beta},
+	AttachVolumeLimit:              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
 	CPUManager:                     {Default: true, PreRelease: featuregate.Beta},
 	CPUCFSQuotaPeriod:              {Default: false, PreRelease: featuregate.Alpha},
 	TopologyManager:                {Default: false, PreRelease: featuregate.Alpha},
@@ -564,7 +567,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TTLAfterFinished:               {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:            {Default: true, PreRelease: featuregate.Beta},
 	WindowsGMSA:                    {Default: true, PreRelease: featuregate.Beta},
-	WindowsRunAsUserName:           {Default: false, PreRelease: featuregate.Alpha},
+	WindowsRunAsUserName:           {Default: true, PreRelease: featuregate.Beta},
 	ServiceLoadBalancerFinalizer:   {Default: true, PreRelease: featuregate.Beta},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: false, PreRelease: featuregate.Alpha},

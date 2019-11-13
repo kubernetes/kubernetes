@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Update the Godeps/LICENSES document.
+# Update the vendor/ALL_LICENSES document.
 # Generates a table of Godep dependencies and their license.
 #
 # Usage:
@@ -24,11 +24,14 @@
 #    additionally created files into the vendor auto-generated tree.
 #
 #    Run every time a license file is added/modified within /vendor to
-#    update /Godeps/LICENSES
+#    update /vendor/ALL_LICENSES
 
 set -o errexit
 set -o nounset
 set -o pipefail
+
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
 export LANG=C
 export LC_ALL=C
@@ -130,8 +133,6 @@ process_content () {
 #############################################################################
 # MAIN
 #############################################################################
-KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
 
 export GO111MODULE=on
 
@@ -153,8 +154,19 @@ fi
 LICENSE_ROOT="${LICENSE_ROOT:-${KUBE_ROOT}}"
 cd "${LICENSE_ROOT}"
 
-VENDOR_LICENSE_FILE="Godeps/LICENSES"
-TMP_LICENSE_FILE="/tmp/Godeps.LICENSES.$$"
+kube::util::ensure-temp-dir
+
+# Save the genreated LICENSE file for each package temporarily
+TMP_LICENSE_FILE="${KUBE_TEMP}/vendor.LICENSES.$$"
+
+# The directory to save all the LICENSE files
+VENDOR_LICENSE_DIR="${LICENSE_ROOT}/vendor/ALL_LICENSES"
+
+# The tmp directory to save all the LICENSE files, will move to VENDOR_LICENSE_DIR
+TMP_VENDOR_LICENSE_DIR="${KUBE_TEMP}/vendor.LICENSES.DIR.$$"
+
+mkdir -p "${TMP_VENDOR_LICENSE_DIR}"
+
 DEPS_DIR="vendor"
 declare -Ag CONTENT
 
@@ -167,7 +179,8 @@ cat "${LICENSE_ROOT}/LICENSE"
 echo
 echo "= LICENSE $(kube::util::md5 "${LICENSE_ROOT}/LICENSE")"
 echo "================================================================================"
-) > ${TMP_LICENSE_FILE}
+) > "${TMP_LICENSE_FILE}"
+mv "${TMP_LICENSE_FILE}" "${TMP_VENDOR_LICENSE_DIR}/LICENSE"
 
 # Loop through every vendored package
 for PACKAGE in $(go list -m -json all | jq -r .Path | sort -f); do
@@ -184,11 +197,10 @@ for PACKAGE in $(go list -m -json all | jq -r .Path | sort -f); do
   process_content "${PACKAGE}" COPYRIGHT
   process_content "${PACKAGE}" COPYING
 
-  # display content
-  echo
-  echo "================================================================================"
-  echo "= ${DEPS_DIR}/${PACKAGE} licensed under: ="
-  echo
+  # copy content and throw error message
+  {
+    echo "= ${DEPS_DIR}/${PACKAGE} licensed under: ="
+	echo
 
   file=""
   if [[ -n "${CONTENT[${PACKAGE}-LICENSE]-}" ]]; then
@@ -211,12 +223,20 @@ Options:
 __EOF__
       exit 9
   fi
-  cat "${file}"
+  
+    cat "${file}"
+    echo
+    echo "= ${file} $(kube::util::md5 "${file}")"
+  } >> "${TMP_LICENSE_FILE}"
 
-  echo
-  echo "= ${file} $(kube::util::md5 "${file}")"
-  echo "================================================================================"
-  echo
-done >> ${TMP_LICENSE_FILE}
 
-cat ${TMP_LICENSE_FILE} > ${VENDOR_LICENSE_FILE}
+  dest_dir="${TMP_VENDOR_LICENSE_DIR}/${PACKAGE}"
+  mkdir -p "${dest_dir}"
+  mv "${TMP_LICENSE_FILE}" "${dest_dir}/LICENSE"
+done
+
+if [[ -d "${VENDOR_LICENSE_DIR}" ]]; then
+  rm -r "${VENDOR_LICENSE_DIR}"
+fi
+mv "${TMP_VENDOR_LICENSE_DIR}" "${VENDOR_LICENSE_DIR}"
+

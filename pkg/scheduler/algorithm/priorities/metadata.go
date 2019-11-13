@@ -58,7 +58,7 @@ type priorityMetadata struct {
 	podLimits               *schedulernodeinfo.Resource
 	podTolerations          []v1.Toleration
 	affinity                *v1.Affinity
-	podSelectors            []labels.Selector
+	podSelector             labels.Selector
 	controllerRef           *metav1.OwnerReference
 	podFirstServiceSelector labels.Selector
 	totalNumNodes           int
@@ -88,7 +88,7 @@ func (pmf *MetadataFactory) PriorityMetadata(
 		podLimits:               getResourceLimits(pod),
 		podTolerations:          getAllTolerationPreferNoSchedule(pod.Spec.Tolerations),
 		affinity:                pod.Spec.Affinity,
-		podSelectors:            getSelectors(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister, pmf.statefulSetLister),
+		podSelector:             getSelector(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister, pmf.statefulSetLister),
 		controllerRef:           metav1.GetControllerOf(pod),
 		podFirstServiceSelector: getFirstServiceSelector(pod, pmf.serviceLister),
 		totalNumNodes:           totalNumNodes,
@@ -105,37 +105,48 @@ func getFirstServiceSelector(pod *v1.Pod, sl corelisters.ServiceLister) (firstSe
 	return nil
 }
 
-// getSelectors returns selectors of services, RCs and RSs matching the given pod.
-func getSelectors(pod *v1.Pod, sl corelisters.ServiceLister, cl corelisters.ReplicationControllerLister, rsl appslisters.ReplicaSetLister, ssl appslisters.StatefulSetLister) []labels.Selector {
-	var selectors []labels.Selector
+// getSelector returns a selector for the services, RCs, RSs, and SSs matching the given pod.
+func getSelector(pod *v1.Pod, sl corelisters.ServiceLister, cl corelisters.ReplicationControllerLister, rsl appslisters.ReplicaSetLister, ssl appslisters.StatefulSetLister) labels.Selector {
+	labelSet := make(labels.Set)
+	// Since services, RCs, RSs and SSs match the pod, they won't have conflicting
+	// labels. Merging is safe.
 
 	if services, err := sl.GetPodServices(pod); err == nil {
 		for _, service := range services {
-			selectors = append(selectors, labels.SelectorFromSet(service.Spec.Selector))
+			labelSet = labels.Merge(labelSet, service.Spec.Selector)
 		}
 	}
 
 	if rcs, err := cl.GetPodControllers(pod); err == nil {
 		for _, rc := range rcs {
-			selectors = append(selectors, labels.SelectorFromSet(rc.Spec.Selector))
+			labelSet = labels.Merge(labelSet, rc.Spec.Selector)
 		}
+	}
+
+	selector := labels.NewSelector()
+	if len(labelSet) != 0 {
+		selector = labelSet.AsSelector()
 	}
 
 	if rss, err := rsl.GetPodReplicaSets(pod); err == nil {
 		for _, rs := range rss {
-			if selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector); err == nil {
-				selectors = append(selectors, selector)
+			if other, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector); err == nil {
+				if r, ok := other.Requirements(); ok {
+					selector = selector.Add(r...)
+				}
 			}
 		}
 	}
 
 	if sss, err := ssl.GetPodStatefulSets(pod); err == nil {
 		for _, ss := range sss {
-			if selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector); err == nil {
-				selectors = append(selectors, selector)
+			if other, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector); err == nil {
+				if r, ok := other.Requirements(); ok {
+					selector = selector.Add(r...)
+				}
 			}
 		}
 	}
 
-	return selectors
+	return selector
 }

@@ -556,17 +556,15 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 		TopologyKeys: topologyKeys.List(),
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
-		if maxAttachLimit > 0 {
-			if maxAttachLimit > math.MaxInt32 {
-				klog.Warningf("Exceeded max supported attach limit value, truncating it to %d", math.MaxInt32)
-				maxAttachLimit = math.MaxInt32
-			}
-			m := int32(maxAttachLimit)
-			driverSpec.Allocatable = &storagev1.VolumeNodeResources{Count: &m}
-		} else {
-			klog.Errorf("Invalid attach limit value %d cannot be added to CSINode object for %q", maxAttachLimit, driverName)
+	if maxAttachLimit > 0 {
+		if maxAttachLimit > math.MaxInt32 {
+			klog.Warningf("Exceeded max supported attach limit value, truncating it to %d", math.MaxInt32)
+			maxAttachLimit = math.MaxInt32
 		}
+		m := int32(maxAttachLimit)
+		driverSpec.Allocatable = &storagev1.VolumeNodeResources{Count: &m}
+	} else {
+		klog.Errorf("Invalid attach limit value %d cannot be added to CSINode object for %q", maxAttachLimit, driverName)
 	}
 
 	newDriverSpecs = append(newDriverSpecs, driverSpec)

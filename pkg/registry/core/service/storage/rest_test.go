@@ -380,28 +380,28 @@ func TestServiceRegistryCreate(t *testing.T) {
 			defer server.Terminate(t)
 
 			ctx := genericapirequest.NewDefaultContext()
-			created_svc, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			createdSvc, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			created_service := created_svc.(*api.Service)
-			objMeta, err := meta.Accessor(created_service)
+			createdService := createdSvc.(*api.Service)
+			objMeta, err := meta.Accessor(createdService)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if !metav1.HasObjectMetaSystemFieldValues(objMeta) {
 				t.Errorf("storage did not populate object meta field values")
 			}
-			if created_service.Name != "foo" {
-				t.Errorf("Expected foo, but got %v", created_service.Name)
+			if createdService.Name != "foo" {
+				t.Errorf("Expected foo, but got %v", createdService.Name)
 			}
-			if created_service.CreationTimestamp.IsZero() {
-				t.Errorf("Expected timestamp to be set, got: %v", created_service.CreationTimestamp)
+			if createdService.CreationTimestamp.IsZero() {
+				t.Errorf("Expected timestamp to be set, got: %v", createdService.CreationTimestamp)
 			}
 			allocNet := ipnetGet(t, tc.useSecondary)
 
-			if !allocNet.Contains(net.ParseIP(created_service.Spec.ClusterIP)) {
-				t.Errorf("Unexpected ClusterIP: %s", created_service.Spec.ClusterIP)
+			if !allocNet.Contains(net.ParseIP(createdService.Spec.ClusterIP)) {
+				t.Errorf("Unexpected ClusterIP: %s", createdService.Spec.ClusterIP)
 			}
 			srv, err := registry.GetService(ctx, tc.svc.Name, &metav1.GetOptions{})
 			if err != nil {
@@ -552,12 +552,12 @@ func TestDryRunNodePort(t *testing.T) {
 		},
 	}
 	expectNodePorts := collectServiceNodePorts(svc)
-	created_svc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	created_service := created_svc.(*api.Service)
-	serviceNodePorts := collectServiceNodePorts(created_service)
+	createdService := createdSvc.(*api.Service)
+	serviceNodePorts := collectServiceNodePorts(createdService)
 	if !reflect.DeepEqual(serviceNodePorts, expectNodePorts) {
 		t.Errorf("Expected %v, but got %v", expectNodePorts, serviceNodePorts)
 	}
@@ -596,12 +596,12 @@ func TestDryRunNodePort(t *testing.T) {
 			},
 		},
 	}
-	created_svc, err = storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	createdSvc, err = storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	created_service = created_svc.(*api.Service)
-	serviceNodePorts = collectServiceNodePorts(created_service)
+	createdService = createdSvc.(*api.Service)
+	serviceNodePorts = collectServiceNodePorts(createdService)
 	if len(serviceNodePorts) != 2 {
 		t.Errorf("Expected service to have 2 ports, but got %v", serviceNodePorts)
 	} else if serviceNodePorts[0] == serviceNodePorts[1] {
@@ -706,22 +706,22 @@ func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 
 	ctx := genericapirequest.NewDefaultContext()
 	for _, test := range testCases {
-		created_svc, err := storage.Create(ctx, test.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+		createdSvc, err := storage.Create(ctx, test.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
-		created_service := created_svc.(*api.Service)
-		objMeta, err := meta.Accessor(created_service)
+		createdService := createdSvc.(*api.Service)
+		objMeta, err := meta.Accessor(createdService)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !metav1.HasObjectMetaSystemFieldValues(objMeta) {
 			t.Errorf("storage did not populate object meta field values")
 		}
-		if created_service.Name != test.name {
-			t.Errorf("Expected %s, but got %s", test.name, created_service.Name)
+		if createdService.Name != test.name {
+			t.Errorf("Expected %s, but got %s", test.name, createdService.Name)
 		}
-		serviceNodePorts := collectServiceNodePorts(created_service)
+		serviceNodePorts := collectServiceNodePorts(createdService)
 		if !reflect.DeepEqual(serviceNodePorts, test.expectNodePorts) {
 			t.Errorf("Expected %v, but got %v", test.expectNodePorts, serviceNodePorts)
 		}
@@ -813,7 +813,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
-	updated_svc, created, err := storage.Update(ctx, "foo", rest.DefaultUpdatedObjectInfo(&api.Service{
+	updatedSvc, created, err := storage.Update(ctx, "foo", rest.DefaultUpdatedObjectInfo(&api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
 			ResourceVersion: svc.ResourceVersion},
@@ -831,15 +831,15 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
-	if updated_svc == nil {
+	if updatedSvc == nil {
 		t.Errorf("Expected non-nil object")
 	}
 	if created {
 		t.Errorf("expected not created")
 	}
-	updated_service := updated_svc.(*api.Service)
-	if updated_service.Name != "foo" {
-		t.Errorf("Expected foo, but got %v", updated_service.Name)
+	updatedService := updatedSvc.(*api.Service)
+	if updatedService.Name != "foo" {
+		t.Errorf("Expected foo, but got %v", updatedService.Name)
 	}
 	if e, a := "foo", registry.UpdatedID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
@@ -871,7 +871,7 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 	}
 
 	// Test dry run update request external name to node port
-	updated_svc, created, err := storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(&api.Service{
+	updatedSvc, created, err := storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(&api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            svc.Name,
 			ResourceVersion: svc.ResourceVersion},
@@ -890,7 +890,7 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
-	if updated_svc == nil {
+	if updatedSvc == nil {
 		t.Errorf("Expected non-nil object")
 	}
 	if created {
@@ -1520,13 +1520,13 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 		},
 	}
 	ctx := genericapirequest.NewDefaultContext()
-	created_svc1, _ := storage.Create(ctx, svc1, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	created_service_1 := created_svc1.(*api.Service)
-	if created_service_1.Name != "foo" {
-		t.Errorf("Expected foo, but got %v", created_service_1.Name)
+	createdSvc1, _ := storage.Create(ctx, svc1, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	createdService1 := createdSvc1.(*api.Service)
+	if createdService1.Name != "foo" {
+		t.Errorf("Expected foo, but got %v", createdService1.Name)
 	}
-	if !makeIPNet(t).Contains(net.ParseIP(created_service_1.Spec.ClusterIP)) {
-		t.Errorf("Unexpected ClusterIP: %s", created_service_1.Spec.ClusterIP)
+	if !makeIPNet(t).Contains(net.ParseIP(createdService1.Spec.ClusterIP)) {
+		t.Errorf("Unexpected ClusterIP: %s", createdService1.Spec.ClusterIP)
 	}
 
 	svc2 := &api.Service{
@@ -1542,13 +1542,13 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 			}},
 		}}
 	ctx = genericapirequest.NewDefaultContext()
-	created_svc2, _ := storage.Create(ctx, svc2, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	created_service_2 := created_svc2.(*api.Service)
-	if created_service_2.Name != "bar" {
-		t.Errorf("Expected bar, but got %v", created_service_2.Name)
+	createdSvc2, _ := storage.Create(ctx, svc2, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	createdService2 := createdSvc2.(*api.Service)
+	if createdService2.Name != "bar" {
+		t.Errorf("Expected bar, but got %v", createdService2.Name)
 	}
-	if !makeIPNet(t).Contains(net.ParseIP(created_service_2.Spec.ClusterIP)) {
-		t.Errorf("Unexpected ClusterIP: %s", created_service_2.Spec.ClusterIP)
+	if !makeIPNet(t).Contains(net.ParseIP(createdService2.Spec.ClusterIP)) {
+		t.Errorf("Unexpected ClusterIP: %s", createdService2.Spec.ClusterIP)
 	}
 
 	testIPs := []string{"1.2.3.93", "1.2.3.94", "1.2.3.95", "1.2.3.96"}
@@ -1575,13 +1575,13 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 		},
 	}
 	ctx = genericapirequest.NewDefaultContext()
-	created_svc3, err := storage.Create(ctx, svc3, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	createdSvc3, err := storage.Create(ctx, svc3, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	created_service_3 := created_svc3.(*api.Service)
-	if created_service_3.Spec.ClusterIP != testIP { // specific IP
-		t.Errorf("Unexpected ClusterIP: %s", created_service_3.Spec.ClusterIP)
+	createdService3 := createdSvc3.(*api.Service)
+	if createdService3.Spec.ClusterIP != testIP { // specific IP
+		t.Errorf("Unexpected ClusterIP: %s", createdService3.Spec.ClusterIP)
 	}
 }
 
@@ -1603,16 +1603,16 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 		},
 	}
 	ctx := genericapirequest.NewDefaultContext()
-	created_svc1, _ := storage.Create(ctx, svc1, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	created_service_1 := created_svc1.(*api.Service)
-	if created_service_1.Name != "foo" {
-		t.Errorf("Expected foo, but got %v", created_service_1.Name)
+	createdSvc1, _ := storage.Create(ctx, svc1, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	createdService1 := createdSvc1.(*api.Service)
+	if createdService1.Name != "foo" {
+		t.Errorf("Expected foo, but got %v", createdService1.Name)
 	}
-	if !makeIPNet(t).Contains(net.ParseIP(created_service_1.Spec.ClusterIP)) {
-		t.Errorf("Unexpected ClusterIP: %s", created_service_1.Spec.ClusterIP)
+	if !makeIPNet(t).Contains(net.ParseIP(createdService1.Spec.ClusterIP)) {
+		t.Errorf("Unexpected ClusterIP: %s", createdService1.Spec.ClusterIP)
 	}
 
-	_, _, err := storage.Delete(ctx, created_service_1.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+	_, _, err := storage.Delete(ctx, createdService1.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
 	if err != nil {
 		t.Errorf("Unexpected error deleting service: %v", err)
 	}
@@ -1631,13 +1631,13 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 		},
 	}
 	ctx = genericapirequest.NewDefaultContext()
-	created_svc2, _ := storage.Create(ctx, svc2, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	created_service_2 := created_svc2.(*api.Service)
-	if created_service_2.Name != "bar" {
-		t.Errorf("Expected bar, but got %v", created_service_2.Name)
+	createdSvc2, _ := storage.Create(ctx, svc2, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	createdService2 := createdSvc2.(*api.Service)
+	if createdService2.Name != "bar" {
+		t.Errorf("Expected bar, but got %v", createdService2.Name)
 	}
-	if !makeIPNet(t).Contains(net.ParseIP(created_service_2.Spec.ClusterIP)) {
-		t.Errorf("Unexpected ClusterIP: %s", created_service_2.Spec.ClusterIP)
+	if !makeIPNet(t).Contains(net.ParseIP(createdService2.Spec.ClusterIP)) {
+		t.Errorf("Unexpected ClusterIP: %s", createdService2.Spec.ClusterIP)
 	}
 }
 
@@ -1659,22 +1659,22 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 		},
 	}
 	ctx := genericapirequest.NewDefaultContext()
-	created_svc, _ := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	created_service := created_svc.(*api.Service)
-	if created_service.Spec.Ports[0].Port != 6502 {
-		t.Errorf("Expected port 6502, but got %v", created_service.Spec.Ports[0].Port)
+	createdSvc, _ := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	createdService := createdSvc.(*api.Service)
+	if createdService.Spec.Ports[0].Port != 6502 {
+		t.Errorf("Expected port 6502, but got %v", createdService.Spec.Ports[0].Port)
 	}
-	if !makeIPNet(t).Contains(net.ParseIP(created_service.Spec.ClusterIP)) {
-		t.Errorf("Unexpected ClusterIP: %s", created_service.Spec.ClusterIP)
+	if !makeIPNet(t).Contains(net.ParseIP(createdService.Spec.ClusterIP)) {
+		t.Errorf("Unexpected ClusterIP: %s", createdService.Spec.ClusterIP)
 	}
 
-	update := created_service.DeepCopy()
+	update := createdService.DeepCopy()
 	update.Spec.Ports[0].Port = 6503
 
-	updated_svc, _, _ := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-	updated_service := updated_svc.(*api.Service)
-	if updated_service.Spec.Ports[0].Port != 6503 {
-		t.Errorf("Expected port 6503, but got %v", updated_service.Spec.Ports[0].Port)
+	updatedSvc, _, _ := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	updatedService := updatedSvc.(*api.Service)
+	if updatedService.Spec.Ports[0].Port != 6503 {
+		t.Errorf("Expected port 6503, but got %v", updatedService.Spec.Ports[0].Port)
 	}
 
 	testIPs := []string{"1.2.3.93", "1.2.3.94", "1.2.3.95", "1.2.3.96"}
@@ -1686,7 +1686,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 		}
 	}
 
-	update = created_service.DeepCopy()
+	update = createdService.DeepCopy()
 	update.Spec.Ports[0].Port = 6503
 	update.Spec.ClusterIP = testIP // Error: Cluster IP is immutable
 
@@ -1714,21 +1714,21 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 		},
 	}
 	ctx := genericapirequest.NewDefaultContext()
-	created_svc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if created_svc == nil || err != nil {
+	createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if createdSvc == nil || err != nil {
 		t.Errorf("Unexpected failure creating service %v", err)
 	}
 	defer releaseServiceNodePorts(t, ctx, svc.Name, storage, registry)
 
-	created_service := created_svc.(*api.Service)
-	if created_service.Spec.Ports[0].Port != 6502 {
-		t.Errorf("Expected port 6502, but got %v", created_service.Spec.Ports[0].Port)
+	createdService := createdSvc.(*api.Service)
+	if createdService.Spec.Ports[0].Port != 6502 {
+		t.Errorf("Expected port 6502, but got %v", createdService.Spec.Ports[0].Port)
 	}
-	if !makeIPNet(t).Contains(net.ParseIP(created_service.Spec.ClusterIP)) {
-		t.Errorf("Unexpected ClusterIP: %s", created_service.Spec.ClusterIP)
+	if !makeIPNet(t).Contains(net.ParseIP(createdService.Spec.ClusterIP)) {
+		t.Errorf("Unexpected ClusterIP: %s", createdService.Spec.ClusterIP)
 	}
 
-	update := created_service.DeepCopy()
+	update := createdService.DeepCopy()
 
 	_, _, err = storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if err != nil {
@@ -1775,17 +1775,17 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocation(t *testing.
 			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeLocal,
 		},
 	}
-	created_svc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if created_svc == nil || err != nil {
+	createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if createdSvc == nil || err != nil {
 		t.Errorf("Unexpected failure creating service %v", err)
 	}
 	defer releaseServiceNodePorts(t, ctx, svc.Name, storage, registry)
 
-	created_service := created_svc.(*api.Service)
-	if !service.NeedsHealthCheck(created_service) {
+	createdService := createdSvc.(*api.Service)
+	if !service.NeedsHealthCheck(createdService) {
 		t.Errorf("Expecting health check needed, returned health check not needed instead")
 	}
-	port := created_service.Spec.HealthCheckNodePort
+	port := createdService.Spec.HealthCheckNodePort
 	if port == 0 {
 		t.Errorf("Failed to allocate health check node port and set the HealthCheckNodePort")
 	} else {
@@ -1816,17 +1816,17 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *test
 			HealthCheckNodePort:   randomNodePort,
 		},
 	}
-	created_svc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if created_svc == nil || err != nil {
+	createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if createdSvc == nil || err != nil {
 		t.Fatalf("Unexpected failure creating service :%v", err)
 	}
 	defer releaseServiceNodePorts(t, ctx, svc.Name, storage, registry)
 
-	created_service := created_svc.(*api.Service)
-	if !service.NeedsHealthCheck(created_service) {
+	createdService := createdSvc.(*api.Service)
+	if !service.NeedsHealthCheck(createdService) {
 		t.Errorf("Expecting health check needed, returned health check not needed instead")
 	}
-	port := created_service.Spec.HealthCheckNodePort
+	port := createdService.Spec.HealthCheckNodePort
 	if port == 0 {
 		t.Errorf("Failed to allocate health check node port and set the HealthCheckNodePort")
 	}
@@ -1859,8 +1859,8 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortNegative(t *testing.T)
 			HealthCheckNodePort:   int32(-1),
 		},
 	}
-	created_svc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if created_svc == nil || err != nil {
+	createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if createdSvc == nil || err != nil {
 		return
 	}
 	t.Errorf("Unexpected creation of service with invalid HealthCheckNodePort specified")
@@ -1885,18 +1885,18 @@ func TestServiceRegistryExternalTrafficGlobal(t *testing.T) {
 			ExternalTrafficPolicy: api.ServiceExternalTrafficPolicyTypeCluster,
 		},
 	}
-	created_svc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	if created_svc == nil || err != nil {
+	createdSvc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if createdSvc == nil || err != nil {
 		t.Errorf("Unexpected failure creating service %v", err)
 	}
 	defer releaseServiceNodePorts(t, ctx, svc.Name, storage, registry)
 
-	created_service := created_svc.(*api.Service)
-	if service.NeedsHealthCheck(created_service) {
+	createdService := createdSvc.(*api.Service)
+	if service.NeedsHealthCheck(createdService) {
 		t.Errorf("Expecting health check not needed, returned health check needed instead")
 	}
 	// Make sure the service does not have the health check node port allocated
-	port := created_service.Spec.HealthCheckNodePort
+	port := createdService.Spec.HealthCheckNodePort
 	if port != 0 {
 		// Release the health check node port at the end of the test case.
 		storage.serviceNodePorts.Release(int(port))

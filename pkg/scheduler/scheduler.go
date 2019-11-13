@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"time"
 
@@ -33,7 +34,7 @@ import (
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	policyv1beta1informers "k8s.io/client-go/informers/policy/v1beta1"
-	storagev1beta1informers "k8s.io/client-go/informers/storage/v1beta1"
+	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
@@ -55,6 +56,8 @@ const (
 	BindTimeoutSeconds = 100
 	// SchedulerError is the reason recorded for events when an error occurs during scheduling a pod.
 	SchedulerError = "SchedulerError"
+	// Percentage of framework metrics to be sampled.
+	frameworkMetricsSamplePercent = 10
 )
 
 // podConditionUpdater updates the condition of a pod based on the passed
@@ -119,6 +122,10 @@ type Scheduler struct {
 	SchedulingQueue internalqueue.SchedulingQueue
 
 	scheduledPodsHasSynced func() bool
+
+	// The final configuration of the framework.
+	Plugins      schedulerapi.Plugins
+	PluginConfig []schedulerapi.PluginConfig
 }
 
 // Cache returns the cache in scheduler for test to check the data in scheduler.
@@ -288,9 +295,9 @@ func New(client clientset.Interface,
 		pdbInformer = informerFactory.Policy().V1beta1().PodDisruptionBudgets()
 	}
 
-	var csiNodeInformer storagev1beta1informers.CSINodeInformer
+	var csiNodeInformer storageinformers.CSINodeInformer
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CSINodeInfo) {
-		csiNodeInformer = informerFactory.Storage().V1beta1().CSINodes()
+		csiNodeInformer = informerFactory.Storage().V1().CSINodes()
 	}
 
 	// Set up the configurator which can create schedulers from configs.
@@ -321,7 +328,7 @@ func New(client clientset.Interface,
 		Plugins:                        options.frameworkPlugins,
 		PluginConfig:                   options.frameworkPluginConfig,
 	})
-	var config *Config
+	var sched *Scheduler
 	source := schedulerAlgorithmSource
 	switch {
 	case source.Provider != nil:
@@ -330,7 +337,7 @@ func New(client clientset.Interface,
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler using provider %q: %v", *source.Provider, err)
 		}
-		config = sc
+		sched = sc
 	case source.Policy != nil:
 		// Create the config from a user specified policy source.
 		policy := &schedulerapi.Policy{}
@@ -348,17 +355,15 @@ func New(client clientset.Interface,
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler from policy: %v", err)
 		}
-		config = sc
+		sched = sc
 	default:
 		return nil, fmt.Errorf("unsupported algorithm source: %v", source)
 	}
+	metrics.Register()
 	// Additional tweaks to the config produced by the configurator.
-	config.Recorder = recorder
-	config.DisablePreemption = options.disablePreemption
-	config.StopEverything = stopCh
-
-	// Create the scheduler.
-	sched := NewFromConfig(config)
+	sched.Recorder = recorder
+	sched.DisablePreemption = options.disablePreemption
+	sched.StopEverything = stopCh
 	sched.podConditionUpdater = &podConditionUpdaterImpl{client}
 	sched.podPreemptor = &podPreemptorImpl{client}
 	sched.scheduledPodsHasSynced = podInformer.Informer().HasSynced
@@ -401,24 +406,6 @@ func initPolicyFromConfigMap(client clientset.Interface, policyRef *schedulerapi
 		return fmt.Errorf("invalid policy: %v", err)
 	}
 	return nil
-}
-
-// NewFromConfig returns a new scheduler using the provided Config.
-func NewFromConfig(config *Config) *Scheduler {
-	metrics.Register()
-	return &Scheduler{
-		SchedulerCache:    config.SchedulerCache,
-		Algorithm:         config.Algorithm,
-		GetBinder:         config.GetBinder,
-		Framework:         config.Framework,
-		NextPod:           config.NextPod,
-		Error:             config.Error,
-		Recorder:          config.Recorder,
-		StopEverything:    config.StopEverything,
-		VolumeBinder:      config.VolumeBinder,
-		DisablePreemption: config.DisablePreemption,
-		SchedulingQueue:   config.SchedulingQueue,
-	}
 }
 
 // Run begins watching and scheduling. It waits for cache to be synced, then starts scheduling and blocked until the context is done.
@@ -613,6 +600,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	// Synchronously attempt to find a fit for the pod.
 	start := time.Now()
 	state := framework.NewCycleState()
+	state.SetRecordFrameworkMetrics(rand.Intn(100) < frameworkMetricsSamplePercent)
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	scheduleResult, err := sched.Algorithm.Schedule(schedulingCycleCtx, state, pod)
