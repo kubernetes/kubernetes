@@ -245,20 +245,14 @@ func ValidateFlowSchemaResourcePolicyRule(rule *flowcontrol.ResourcePolicyRule, 
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("resources"), rule.Resources, "if '*' is present, must not specify other resources"))
 	}
 
-	if len(rule.Namespaces) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("namespaces"), "resource rules must supply at least one namespace"))
-	} else if memberInList(flowcontrol.NamespaceEvery, rule.Namespaces...) {
-		for _, tgtNS := range rule.Namespaces {
-			if tgtNS != flowcontrol.NamespaceEvery && tgtNS != flowcontrol.NamespaceClusterScope {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("namespaces"), rule.Namespaces, "'*' may be accompanied only by 'Cluster Scope'"))
-				break
-			}
+	if len(rule.Namespaces) == 0 && !rule.ClusterScope {
+		allErrs = append(allErrs, field.Required(fldPath.Child("namespaces"), "resource rules that are not cluster scoped must supply at least one namespace"))
+	} else if hasWildcard(rule.Namespaces) {
+		if len(rule.Namespaces) > 1 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespaces"), rule.Namespaces, "if '*' is present, must not specify other namespaces"))
 		}
 	} else {
 		for idx, tgtNS := range rule.Namespaces {
-			if tgtNS == flowcontrol.NamespaceClusterScope {
-				continue
-			}
 			for _, msg := range apimachineryvalidation.ValidateNamespaceName(tgtNS, false) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("namespaces").Index(idx), tgtNS, nsErrIntro+msg))
 			}
@@ -268,7 +262,7 @@ func ValidateFlowSchemaResourcePolicyRule(rule *flowcontrol.ResourcePolicyRule, 
 	return allErrs
 }
 
-const nsErrIntro = "each member of this list must be '*', 'Cluster Scope', or a DNS-1123 label; "
+const nsErrIntro = "each member of this list must be '*' or a DNS-1123 label; "
 
 // ValidateFlowSchemaStatus validates status for the flow-schema.
 func ValidateFlowSchemaStatus(status *flowcontrol.FlowSchemaStatus, fldPath *field.Path) field.ErrorList {

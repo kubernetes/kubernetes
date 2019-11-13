@@ -407,11 +407,11 @@ func TestFlowSchemaValidation(t *testing.T) {
 				},
 			},
 			expectedErrors: field.ErrorList{
-				field.Required(field.NewPath("spec").Child("rules").Index(0).Child("resourceRules").Index(0).Child("namespaces"), "resource rules must supply at least one namespace"),
+				field.Required(field.NewPath("spec").Child("rules").Index(0).Child("resourceRules").Index(0).Child("namespaces"), "resource rules that are not cluster scoped must supply at least one namespace"),
 			},
 		},
 		{
-			name: "NamespaceClusterScope is allowed",
+			name: "ClusterScope is allowed, with no Namespaces",
 			flowSchema: &flowcontrol.FlowSchema{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "system-foo",
@@ -434,7 +434,7 @@ func TestFlowSchemaValidation(t *testing.T) {
 									Verbs:      []string{flowcontrol.VerbAll},
 									APIGroups:  []string{flowcontrol.APIGroupAll},
 									Resources:  []string{flowcontrol.ResourceAll},
-									Namespaces: []string{flowcontrol.NamespaceClusterScope},
+									ClusterScope: true,
 								},
 							},
 						},
@@ -444,7 +444,7 @@ func TestFlowSchemaValidation(t *testing.T) {
 			expectedErrors: field.ErrorList{},
 		},
 		{
-			name: "NamespaceClusterScope is allowed with NamespaceEvery",
+			name: "ClusterScope is allowed with NamespaceEvery",
 			flowSchema: &flowcontrol.FlowSchema{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "system-foo",
@@ -467,7 +467,8 @@ func TestFlowSchemaValidation(t *testing.T) {
 									Verbs:      []string{flowcontrol.VerbAll},
 									APIGroups:  []string{flowcontrol.APIGroupAll},
 									Resources:  []string{flowcontrol.ResourceAll},
-									Namespaces: []string{flowcontrol.NamespaceClusterScope, flowcontrol.NamespaceEvery},
+									ClusterScope: true,
+									Namespaces: []string{flowcontrol.NamespaceEvery},
 								},
 							},
 						},
@@ -508,7 +509,7 @@ func TestFlowSchemaValidation(t *testing.T) {
 				},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("rules").Index(0).Child("resourceRules").Index(0).Child("namespaces"), []string{"foo", flowcontrol.NamespaceEvery}, "'*' may be accompanied only by 'Cluster Scope'"),
+				field.Invalid(field.NewPath("spec").Child("rules").Index(0).Child("resourceRules").Index(0).Child("namespaces"), []string{"foo", flowcontrol.NamespaceEvery}, "if '*' is present, must not specify other namespaces"),
 			},
 		},
 		{

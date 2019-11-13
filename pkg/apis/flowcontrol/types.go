@@ -29,7 +29,6 @@ const (
 	NameAll        = "*"
 
 	NamespaceEvery        = "*"             // matches every particular namespace
-	NamespaceClusterScope = "Cluster Scope" // matches absence of namespace
 )
 
 // System preset priority level names
@@ -240,29 +239,23 @@ type ResourcePolicyRule struct {
 	// +listType=set
 	Resources []string
 
+	// `clusterScope` indicates whether to match requests that do not
+	// specify a namespace (which happens either because the resource
+	// is not namespaced or the request targets all namespaces).
+	// If this field is omitted or false then the `namespaces` field
+	// must contain a non-empty list.
+	// +optional
+	ClusterScope bool
+
 	// `namespaces` is a list of target namespaces that restricts
-	// matches.  A request that does not specify a target namespace
-	// (which happens both when the resource is not namespaced and
-	// when the resource is namespaced and the request is for all
-	// namespaces) matches only if this list includes "Cluster Scope"
-	// (this string is not a valid namespace and thus can not be
-	// confused with an actual namespace).  A request that specifies a
-	// target namespace matches only if either (a) this list contains
-	// that target namespace or (b) this list contains "*".
-	//
-	// This list may not be omitted or empty.  If the list contains
-	// "*" then the only other allowed member is "Cluster Scope".
-	// Without "*", it is allowed to list "Cluster Scope" along with
-	// particular namespaces.
-	//
-	// Requests will match only if the values in this list are
-	// appropriate for the resource(s) involved.  For example: for a
-	// cluster scoped resource (i.e., one not namespaced) a request
-	// can match only if this list contains "Cluster Scope".  It is
-	// entirely up to the client to populate this list with
-	// appropriate values; the server-performed validation does not
-	// (at least in this alpha) address this issue.
-	//
+	// matches.  A request that specifies a target namespace matches
+	// only if either (a) this list contains that target namespace or
+	// (b) this list contains "*".  Note that "*" matches any
+	// specified namespace but does not match a request that _does
+	// not specify_ a namespace (see the `clusterScope` field for
+	// that).
+	// This list may be empty, but only if `clusterScope` is true.
+	// +optional
 	// +listType=set
 	Namespaces []string
 }
