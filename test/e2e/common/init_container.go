@@ -150,8 +150,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 						Image: imageutils.GetPauseImageName(),
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
-								v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-								v1.ResourceMemory: *resource.NewQuantity(50*1024*1024, resource.DecimalSI),
+								v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI),
 							},
 						},
 					},
@@ -222,8 +221,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 						Image: imageutils.GetPauseImageName(),
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
-								v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-								v1.ResourceMemory: *resource.NewQuantity(50*1024*1024, resource.DecimalSI),
+								v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI),
 							},
 						},
 					},
@@ -339,8 +337,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 						Command: []string{"/bin/true"},
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
-								v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-								v1.ResourceMemory: *resource.NewQuantity(50*1024*1024, resource.DecimalSI),
+								v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI),
 							},
 						},
 					},
