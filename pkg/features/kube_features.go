@@ -398,6 +398,7 @@ const (
 
 	// owner: @leakingtapan
 	// alpha: v1.14
+	// beta: v1.17
 	//
 	// Enables the AWS EBS in-tree driver to AWS EBS CSI Driver migration feature.
 	CSIMigrationAWS featuregate.Feature = "CSIMigrationAWS"
@@ -588,7 +589,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIMigration:                   {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationGCE:                {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationGCEComplete:        {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationAWS:                {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationAWS:                {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires AWS EBS CSI driver)
 	CSIMigrationAWSComplete:        {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAzureDisk:          {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAzureDiskComplete:  {Default: false, PreRelease: featuregate.Alpha},
