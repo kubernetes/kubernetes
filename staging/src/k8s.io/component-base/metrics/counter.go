@@ -159,3 +159,12 @@ func (v *CounterVec) Delete(labels map[string]string) bool {
 	}
 	return v.CounterVec.Delete(labels)
 }
+
+// Reset deletes all metrics in this vector.
+func (v *CounterVec) Reset() {
+	if !v.IsCreated() {
+		return
+	}
+
+	v.CounterVec.Reset()
+}
