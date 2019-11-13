@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
@@ -66,7 +67,10 @@ func runPlan(flags *planFlags, userVersion string) error {
 	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never dry-run when planning.
 	klog.V(1).Infoln("[upgrade/plan] verifying health of cluster")
 	klog.V(1).Infoln("[upgrade/plan] retrieving configuration from cluster")
-	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, false, userVersion)
+	client, _, _, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, false, userVersion)
+	// TODO(stealthybox): implement addon-installer plan
+	// client, realReadOnlyClient, realKubeConfigPath, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, false, userVersion)
+
 	if err != nil {
 		return err
 	}
@@ -98,13 +102,13 @@ func runPlan(flags *planFlags, userVersion string) error {
 	}
 
 	// Tell the user which upgrades are available
-	printAvailableUpgrades(availUpgrades, os.Stdout, isExternalEtcd)
+	printAvailableUpgrades(availUpgrades, os.Stdout, isExternalEtcd, features.Enabled(cfg.FeatureGates, features.AddonInstaller))
 	return nil
 }
 
 // printAvailableUpgrades prints a UX-friendly overview of what versions are available to upgrade to
 // TODO look into columnize or some other formatter when time permits instead of using the tabwriter
-func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, isExternalEtcd bool) {
+func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, isExternalEtcd bool, isAddonInstaller bool) {
 
 	// Return quickly if no upgrades can be made
 	if len(upgrades) == 0 {
@@ -177,6 +181,11 @@ func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, isExternalE
 		printCoreDNS, printKubeDNS := false, false
 		coreDNSBeforeVersion, coreDNSAfterVersion, kubeDNSBeforeVersion, kubeDNSAfterVersion := "", "", "", ""
 
+		// TODO(stealthybox): determine plan output for AddonInstaller feature-gate usage
+		// 	Fetch AddonInstaller old config from cluster ConfigMap, print detailed diff/comparison?
+		// 	This is a nice to have.
+		// 	The previous and available versions of these addons will be correct for users looking
+		// 	for upstream version info of the default AddonInstaller addons.
 		switch upgrade.Before.DNSType {
 		case kubeadmapi.CoreDNS:
 			printCoreDNS = true
@@ -193,6 +202,12 @@ func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, isExternalE
 		case kubeadmapi.KubeDNS:
 			printKubeDNS = true
 			kubeDNSAfterVersion = upgrade.After.DNSVersion
+		}
+
+		if isAddonInstaller && (printCoreDNS || printKubeDNS) {
+			fmt.Fprintf(tabw, "\tWARNING:\n")
+			fmt.Fprintf(tabw, "\tConfig indicates DNS is managed via an AddonInstallerConfiguration.\n")
+			fmt.Fprintf(tabw, "\tThe following DNS version information may or may not apply to your cluster:\n")
 		}
 
 		if printCoreDNS {

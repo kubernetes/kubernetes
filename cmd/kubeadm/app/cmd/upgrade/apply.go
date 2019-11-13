@@ -111,7 +111,7 @@ func runApply(flags *applyFlags, userVersion string) error {
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
 	klog.V(1).Infoln("[upgrade/apply] verifying health of cluster")
 	klog.V(1).Infoln("[upgrade/apply] retrieving configuration from cluster")
-	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, flags.dryRun, userVersion)
+	client, realReadOnlyClient, realKubeConfigPath, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, flags.dryRun, userVersion)
 	if err != nil {
 		return err
 	}
@@ -167,7 +167,7 @@ func runApply(flags *applyFlags, userVersion string) error {
 
 	// Upgrade RBAC rules and addons.
 	klog.V(1).Infoln("[upgrade/postupgrade] upgrading RBAC rules and addons")
-	if err := upgrade.PerformPostUpgradeTasks(client, cfg, newK8sVersion, flags.dryRun); err != nil {
+	if err := upgrade.PerformPostUpgradeTasks(cfg, newK8sVersion, client, realReadOnlyClient, flags.dryRun, realKubeConfigPath); err != nil {
 		return errors.Wrap(err, "[upgrade/postupgrade] FATAL post-upgrade error")
 	}
 

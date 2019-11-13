@@ -69,11 +69,12 @@ func TestSortedSliceFromStringIntMap(t *testing.T) {
 // TODO Think about modifying this test to be less verbose checking b/c it can be brittle.
 func TestPrintAvailableUpgrades(t *testing.T) {
 	var tests = []struct {
-		name          string
-		upgrades      []upgrade.Upgrade
-		buf           *bytes.Buffer
-		expectedBytes []byte
-		externalEtcd  bool
+		name           string
+		upgrades       []upgrade.Upgrade
+		buf            *bytes.Buffer
+		expectedBytes  []byte
+		externalEtcd   bool
+		addonInstaller bool
 	}{
 		{
 			name:     "Up to date",
@@ -609,11 +610,62 @@ _____________________________________________________________________
 
 `),
 		},
+		{
+			name: "addon-installer enabled",
+			upgrades: []upgrade.Upgrade{
+				{
+					Description: "addon-installer enabled",
+					Before: upgrade.ClusterState{
+						KubeVersion: "v1.10.2",
+						KubeletVersions: map[string]uint16{
+							"v1.10.2": 1,
+						},
+						KubeadmVersion: "v1.11.0",
+						DNSType:        kubeadmapi.CoreDNS,
+						DNSVersion:     "1.0.6",
+						EtcdVersion:    "3.1.11",
+					},
+					After: upgrade.ClusterState{
+						KubeVersion:    "v1.11.0",
+						KubeadmVersion: "v1.11.0",
+						DNSType:        kubeadmapi.KubeDNS,
+						DNSVersion:     "1.14.9",
+						EtcdVersion:    "3.2.18",
+					},
+				},
+			},
+			addonInstaller: true,
+			expectedBytes: []byte(`Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':
+COMPONENT   CURRENT       AVAILABLE
+Kubelet     1 x v1.10.2   v1.11.0
+
+Upgrade to the latest addon-installer enabled:
+
+COMPONENT            CURRENT   AVAILABLE
+API Server           v1.10.2   v1.11.0
+Controller Manager   v1.10.2   v1.11.0
+Scheduler            v1.10.2   v1.11.0
+Kube Proxy           v1.10.2   v1.11.0
+                     WARNING:
+                     Config indicates DNS is managed via an AddonInstallerConfiguration.
+                     The following DNS version information may or may not apply to your cluster:
+CoreDNS              1.0.6     
+Kube DNS                       1.14.9
+Etcd                 3.1.11    3.2.18
+
+You can now apply the upgrade by executing the following command:
+
+	kubeadm upgrade apply v1.11.0
+
+_____________________________________________________________________
+
+`),
+		},
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
 			rt.buf = bytes.NewBufferString("")
-			printAvailableUpgrades(rt.upgrades, rt.buf, rt.externalEtcd)
+			printAvailableUpgrades(rt.upgrades, rt.buf, rt.externalEtcd, rt.addonInstaller)
 			actualBytes := rt.buf.Bytes()
 			if !bytes.Equal(actualBytes, rt.expectedBytes) {
 				t.Errorf(

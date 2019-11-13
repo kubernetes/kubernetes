@@ -139,7 +139,7 @@ func TestEnforceRequirements(t *testing.T) {
 	}
 	for _, tt := range tcases {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, _, err := enforceRequirements(&tt.flags, tt.dryRun, tt.newK8sVersion)
+			_, _, _, _, _, err := enforceRequirements(&tt.flags, tt.dryRun, tt.newK8sVersion)
 
 			if err == nil && tt.expectedErr {
 				t.Error("Expected error, but got success")

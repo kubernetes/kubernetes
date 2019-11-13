@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -75,15 +76,18 @@ func getK8sVersionFromUserInput(flags *applyPlanFlags, args []string, versionIsM
 }
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
-func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion string) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, error) {
+func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion string) (clientset.Interface, clientset.Interface, string, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, error) {
 	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
-		return nil, nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
+		return nil, nil, "", nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 	}
 
-	// Check if the cluster is self-hosted
+	realKubeConfigPath := kubeadmconstants.GetAdminKubeConfigPath()
+	realReadOnlyClient, err := kubeconfigutil.ClientSetFromFile(realKubeConfigPath)
+
+	// Check if the cluster is self-hostedclient
 	if upgrade.IsControlPlaneSelfHosted(client) {
-		return nil, nil, nil, errors.New("cannot upgrade a self-hosted control plane")
+		return nil, nil, "", nil, nil, errors.New("cannot upgrade a self-hosted control plane")
 	}
 
 	// Fetch the configuration from a file or ConfigMap and validate it
@@ -109,12 +113,12 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 			fmt.Println("")
 			err = errors.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
-		return nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
+		return nil, nil, "", nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
 	}
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, "", nil, nil, err
 	}
 	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
 	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
@@ -122,12 +126,12 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	// Ensure the user is root
 	klog.V(1).Info("running preflight checks")
 	if err := runPreflightChecks(client, ignorePreflightErrorsSet, &cfg.ClusterConfiguration); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, "", nil, nil, err
 	}
 
 	// Run healthchecks against the cluster
 	if err := upgrade.CheckClusterHealth(client, ignorePreflightErrorsSet); err != nil {
-		return nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
+		return nil, nil, "", nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
 
 	// If a new k8s version should be set, apply the change before printing the config
@@ -139,7 +143,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	if flags.featureGatesString != "" {
 		cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, flags.featureGatesString)
 		if err != nil {
-			return nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
+			return nil, nil, "", nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
 		}
 	}
 
@@ -148,7 +152,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 		for _, m := range msg {
 			fmt.Printf("[upgrade/config] %s\n", m)
 		}
-		return nil, nil, nil, errors.New("[upgrade/config] FATAL. Unable to upgrade a cluster using deprecated feature-gate flags. Please see the release notes")
+		return nil, nil, "", nil, nil, errors.New("[upgrade/config] FATAL. Unable to upgrade a cluster using deprecated feature-gate flags. Please see the release notes")
 	}
 
 	// If the user told us to print this information out; do it!
@@ -157,7 +161,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	}
 
 	// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
-	return client, upgrade.NewOfflineVersionGetter(upgrade.NewKubeVersionGetter(client, os.Stdout), newK8sVersion), cfg, nil
+	return client, realReadOnlyClient, realKubeConfigPath, upgrade.NewOfflineVersionGetter(upgrade.NewKubeVersionGetter(client, os.Stdout), newK8sVersion), cfg, nil
 }
 
 // printConfiguration prints the external version of the API to yaml
