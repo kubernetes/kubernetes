@@ -384,7 +384,13 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	})
 
 	ginkgo.Context("CSI volume limit information using mock driver", func() {
-		ginkgo.It("should report attach limit when limit is bigger than 0 [Slow]", func() {
+		/*
+		  Release : v1.19
+		  Testname: CSI volume limits should be enforced when limit is bigger than 0
+		  Description: Kubelet MUST report a CSI driver's volume limit in its CSINode object and
+		               the kube-scheduler MUST enforce the reported volume limit on that node.
+		*/
+		framework.ConformanceIt("should report attach limit when limit is bigger than 0", func() {
 			// define volume limit to be 2 for this test
 			var err error
 			init(testParameters{attachLimit: 2})
