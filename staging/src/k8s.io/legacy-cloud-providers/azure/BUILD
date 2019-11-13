@@ -73,7 +73,6 @@ go_library(
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/rubiojr/go-vhd/vhd:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
-        "//vendor/k8s.io/utils/net:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
@@ -93,6 +92,7 @@ go_test(
         "azure_storage_test.go",
         "azure_storageaccount_test.go",
         "azure_test.go",
+        "azure_utils_test.go",
         "azure_vmss_cache_test.go",
         "azure_vmss_test.go",
         "azure_wrap_test.go",

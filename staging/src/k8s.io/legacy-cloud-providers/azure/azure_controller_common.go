@@ -134,8 +134,8 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 		return -1, fmt.Errorf("failed to get azure instance id for node %q (%v)", nodeName, err)
 	}
 
-	c.vmLockMap.LockEntry(string(nodeName))
-	defer c.vmLockMap.UnlockEntry(string(nodeName))
+	c.vmLockMap.LockEntry(strings.ToLower(string(nodeName)))
+	defer c.vmLockMap.UnlockEntry(strings.ToLower(string(nodeName)))
 
 	lun, err := c.GetNextDiskLun(nodeName)
 	if err != nil {
@@ -171,20 +171,20 @@ func (c *controllerCommon) DetachDisk(diskName, diskURI string, nodeName types.N
 	klog.V(2).Infof("detach %v from node %q", diskURI, nodeName)
 
 	// make the lock here as small as possible
-	c.vmLockMap.LockEntry(string(nodeName))
+	c.vmLockMap.LockEntry(strings.ToLower(string(nodeName)))
 	c.diskAttachDetachMap.Store(strings.ToLower(diskURI), "detaching")
 	resp, err := vmset.DetachDisk(diskName, diskURI, nodeName)
 	c.diskAttachDetachMap.Delete(strings.ToLower(diskURI))
-	c.vmLockMap.UnlockEntry(string(nodeName))
+	c.vmLockMap.UnlockEntry(strings.ToLower(string(nodeName)))
 
 	if c.cloud.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
 		klog.V(2).Infof("azureDisk - update backing off: detach disk(%s, %s), err: %v", diskName, diskURI, err)
-		retryErr := kwait.ExponentialBackoff(c.cloud.RequestBackoff(), func() (bool, error) {
-			c.vmLockMap.LockEntry(string(nodeName))
+		retryErr := kwait.ExponentialBackoff(c.cloud.requestBackoff(), func() (bool, error) {
+			c.vmLockMap.LockEntry(strings.ToLower(string(nodeName)))
 			c.diskAttachDetachMap.Store(strings.ToLower(diskURI), "detaching")
 			resp, err := vmset.DetachDisk(diskName, diskURI, nodeName)
 			c.diskAttachDetachMap.Delete(strings.ToLower(diskURI))
-			c.vmLockMap.UnlockEntry(string(nodeName))
+			c.vmLockMap.UnlockEntry(strings.ToLower(string(nodeName)))
 			return c.cloud.processHTTPRetryResponse(nil, "", resp, err)
 		})
 		if retryErr != nil {
