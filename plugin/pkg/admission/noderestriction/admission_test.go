@@ -228,6 +228,32 @@ func setForbiddenUpdateLabels(node *api.Node, value string) *api.Node {
 	return node
 }
 
+type admitTestCase struct {
+	name       string
+	podsGetter corev1lister.PodLister
+	attributes admission.Attributes
+	features   featuregate.FeatureGate
+	err        string
+}
+
+func (a *admitTestCase) run(t *testing.T) {
+	t.Run(a.name, func(t *testing.T) {
+		c := NewPlugin(nodeidentifier.NewDefaultNodeIdentifier())
+		if a.features != nil {
+			c.InspectFeatureGates(a.features)
+		}
+		c.podsGetter = a.podsGetter
+		err := c.Admit(context.TODO(), a.attributes, nil)
+		if (err == nil) != (len(a.err) == 0) {
+			t.Errorf("nodePlugin.Admit() error = %v, expected %v", err, a.err)
+			return
+		}
+		if len(a.err) > 0 && !strings.Contains(err.Error(), a.err) {
+			t.Errorf("nodePlugin.Admit() error = %v, expected %v", err, a.err)
+		}
+	})
+}
+
 func Test_nodePlugin_Admit(t *testing.T) {
 	var (
 		mynode = &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
@@ -386,29 +412,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	pvcpod, _ := makeTestPod("ns", "mypvcpod", "mynode", true)
 	pvcpod.Spec.Volumes = []api.Volume{{VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{ClaimName: "foo"}}}}
 
-	orphanedPod, _ := makeTestPod("ns", "annie", "mynode", true)
-	orphanedPod.OwnerReferences = nil
-
-	invalidOwnerPod, _ := makeTestPod("ns", "alice", "mynode", true)
-	controller := true
-	invalidOwnerPod.OwnerReferences[0] = metav1.OwnerReference{
-		APIVersion: "apps/v1",
-		Kind:       "ReplicaSet",
-		Name:       "foo",
-		UID:        "foo-uid-12345",
-		Controller: &controller,
-	}
-
-	uncontrolledPod, _ := makeTestPod("ns", "billy-kid", "mynode", true)
-	uncontrolledPod.OwnerReferences[0].Controller = nil
-
-	tests := []struct {
-		name       string
-		podsGetter corev1lister.PodLister
-		attributes admission.Attributes
-		features   featuregate.FeatureGate
-		err        string
-	}{
+	tests := []admitTestCase{
 		// Mirror pods bound to us
 		{
 			name:       "allow creating a mirror pod bound to self",
@@ -469,24 +473,6 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, coremymirrorpod.Namespace, coremymirrorpod.Name, podResource, "eviction", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "",
-		},
-		{
-			name:       "forbid creating a mirror pod with a non-node owner",
-			podsGetter: noExistingPods,
-			attributes: createPodAttributes(invalidOwnerPod, mynode),
-			err:        "can only create pods with an owner reference set to itself",
-		},
-		{
-			name:       "forbid creating a mirror pod with a non-controller owner",
-			podsGetter: noExistingPods,
-			attributes: createPodAttributes(uncontrolledPod, mynode),
-			err:        "can only create pods with a controller owner reference set to itself",
-		},
-		{
-			// Note: This behavior may change with a feature roll out in the future.
-			name:       "allow creating a mirror pod without an owner",
-			podsGetter: noExistingPods,
-			attributes: createPodAttributes(orphanedPod, mynode),
 		},
 
 		// Mirror pods bound to another node
@@ -1276,21 +1262,95 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c := NewPlugin(nodeidentifier.NewDefaultNodeIdentifier())
-			if tt.features != nil {
-				c.InspectFeatureGates(tt.features)
-			}
-			c.podsGetter = tt.podsGetter
-			err := c.Admit(context.TODO(), tt.attributes, nil)
-			if (err == nil) != (len(tt.err) == 0) {
-				t.Errorf("nodePlugin.Admit() error = %v, expected %v", err, tt.err)
-				return
-			}
-			if len(tt.err) > 0 && !strings.Contains(err.Error(), tt.err) {
-				t.Errorf("nodePlugin.Admit() error = %v, expected %v", err, tt.err)
-			}
-		})
+		tt.run(t)
+	}
+}
+
+func Test_nodePlugin_Admit_OwnerReference(t *testing.T) {
+	noExistingPodsIndex := cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+	noExistingPods := corev1lister.NewPodLister(noExistingPodsIndex)
+
+	mynode := &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
+	validOwner := metav1.OwnerReference{
+		APIVersion: "v1",
+		Kind:       "Node",
+		Name:       "mynode",
+		UID:        "node-uid-12345",
+		Controller: pointer.BoolPtr(true),
+	}
+	invalidName := validOwner
+	invalidName.Name = "other"
+	invalidKind := validOwner
+	invalidKind.Kind = "Pod"
+	invalidAPI := validOwner
+	invalidAPI.APIVersion = "v2"
+	invalidControllerNil := validOwner
+	invalidControllerNil.Controller = nil
+	invalidControllerFalse := validOwner
+	invalidControllerFalse.Controller = pointer.BoolPtr(false)
+	invalidBlockDeletion := validOwner
+	invalidBlockDeletion.BlockOwnerDeletion = pointer.BoolPtr(true)
+
+	tests := []struct {
+		name      string
+		owners    []metav1.OwnerReference
+		expectErr string
+	}{
+		{
+			name:   "no owner",
+			owners: nil,
+		},
+		{
+			name:   "valid owner",
+			owners: []metav1.OwnerReference{validOwner},
+		},
+		{
+			name:      "duplicate owner",
+			owners:    []metav1.OwnerReference{validOwner, validOwner},
+			expectErr: "can only create pods with a single owner reference set to itself",
+		},
+		{
+			name:      "invalid name",
+			owners:    []metav1.OwnerReference{invalidName},
+			expectErr: "can only create pods with an owner reference set to itself",
+		},
+		{
+			name:      "invalid API version",
+			owners:    []metav1.OwnerReference{invalidAPI},
+			expectErr: "can only create pods with an owner reference set to itself",
+		},
+		{
+			name:      "invalid kind",
+			owners:    []metav1.OwnerReference{invalidKind},
+			expectErr: "can only create pods with an owner reference set to itself",
+		},
+		{
+			name:      "nil controller",
+			owners:    []metav1.OwnerReference{invalidControllerNil},
+			expectErr: "can only create pods with a controller owner reference set to itself",
+		},
+		{
+			name:      "false controller",
+			owners:    []metav1.OwnerReference{invalidControllerFalse},
+			expectErr: "can only create pods with a controller owner reference set to itself",
+		},
+		{
+			name:      "invalid blockOwnerDeletion",
+			owners:    []metav1.OwnerReference{invalidBlockDeletion},
+			expectErr: "must not set blockOwnerDeletion on an owner reference",
+		},
+	}
+
+	for _, test := range tests {
+		pod, _ := makeTestPod("ns", "test", "mynode", true)
+		pod.OwnerReferences = test.owners
+		a := &admitTestCase{
+			name:       test.name,
+			podsGetter: noExistingPods,
+			attributes: createPodAttributes(pod, mynode),
+			err:        test.expectErr,
+		}
+		a.run(t)
 	}
 }
 

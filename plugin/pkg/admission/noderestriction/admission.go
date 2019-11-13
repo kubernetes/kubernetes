@@ -215,10 +215,10 @@ func (p *Plugin) admitPodCreate(nodeName string, a admission.Attributes) error {
 	if pod.Spec.NodeName != nodeName {
 		return admission.NewForbidden(a, fmt.Errorf("node %q can only create pods with spec.nodeName set to itself", nodeName))
 	}
-	if len(pod.OwnerReferences) > 0 {
-		if len(pod.OwnerReferences) > 1 {
-			return admission.NewForbidden(a, fmt.Errorf("node %q can only create pods with a single owner reference set to itself", nodeName))
-		}
+	if len(pod.OwnerReferences) > 1 {
+		return admission.NewForbidden(a, fmt.Errorf("node %q can only create pods with a single owner reference set to itself", nodeName))
+	}
+	if len(pod.OwnerReferences) == 1 {
 		owner := pod.OwnerReferences[0]
 		if owner.APIVersion != v1.SchemeGroupVersion.String() ||
 			owner.Kind != "Node" ||
@@ -227,6 +227,9 @@ func (p *Plugin) admitPodCreate(nodeName string, a admission.Attributes) error {
 		}
 		if owner.Controller == nil || !*owner.Controller {
 			return admission.NewForbidden(a, fmt.Errorf("node %q can only create pods with a controller owner reference set to itself", nodeName))
+		}
+		if owner.BlockOwnerDeletion != nil && *owner.BlockOwnerDeletion {
+			return admission.NewForbidden(a, fmt.Errorf("node %q must not set blockOwnerDeletion on an owner reference", nodeName))
 		}
 	}
 
