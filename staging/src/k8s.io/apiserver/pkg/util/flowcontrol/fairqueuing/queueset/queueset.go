@@ -34,6 +34,8 @@ import (
 	"k8s.io/klog"
 )
 
+const nsTimeFmt = "2006-01-02 15:04:05.000000000"
+
 // queueSetFactory implements the QueueSetFactory interface
 // queueSetFactory makes QueueSet objects.
 type queueSetFactory struct {

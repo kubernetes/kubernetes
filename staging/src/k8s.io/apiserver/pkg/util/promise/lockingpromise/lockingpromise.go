@@ -38,6 +38,7 @@ type lockingPromise struct {
 
 var _ promise.LockingMutable = &lockingPromise{}
 
+// NewLockingPromise makes a new promise.LockingMutable
 func NewLockingPromise(lock sync.Locker, activeCounter counter.GoRoutineCounter) promise.LockingMutable {
 	return &lockingPromise{
 		lock:          lock,

@@ -42,8 +42,6 @@ type uniformClient struct {
 	thinkDuration time.Duration
 }
 
-const nsTimeFmt = "2006-01-02 15:04:05.000000000"
-
 // exerciseQueueSetUniformScenario runs a scenario based on the given set of uniform clients.
 // Each uniform client specifies a number of threads, each of which alternates between thinking
 // and making a synchronous request through the QueueSet.
