@@ -60,7 +60,7 @@ func TestCommandsGenerated(t *testing.T) {
 		"renew controller-manager.conf",
 	}
 
-	renewCmd := newCmdCertsRenewal()
+	renewCmd := newCmdCertsRenewal(os.Stdout)
 
 	fakeRoot := &cobra.Command{}
 	fakeRoot.AddCommand(renewCmd)
@@ -236,7 +236,7 @@ func TestRunRenewCommands(t *testing.T) {
 			}
 
 			// exec renew
-			renewCmds := getRenewSubCommands(tmpDir)
+			renewCmds := getRenewSubCommands(os.Stdout, tmpDir)
 			cmdtestutil.RunSubCommand(t, renewCmds, test.command, fmt.Sprintf("--cert-dir=%s", tmpDir))
 
 			// check the file is modified
@@ -279,7 +279,7 @@ func TestRenewUsingCSR(t *testing.T) {
 		t.Fatalf("couldn't write certificate %s: %v", cert.Name, err)
 	}
 
-	renewCmds := getRenewSubCommands(tmpDir)
+	renewCmds := getRenewSubCommands(os.Stdout, tmpDir)
 	cmdtestutil.RunSubCommand(t, renewCmds, cert.Name, "--csr-only", "--csr-dir="+tmpDir, fmt.Sprintf("--cert-dir=%s", tmpDir))
 
 	if _, _, err := pkiutil.TryLoadCSRAndKeyFromDisk(tmpDir, cert.Name); err != nil {
