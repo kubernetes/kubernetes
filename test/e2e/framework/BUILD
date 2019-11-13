@@ -22,7 +22,6 @@ go_library(
         "resource_usage_gatherer.go",
         "size.go",
         "skip.go",
-        "suites.go",
         "test_context.go",
         "util.go",
     ],

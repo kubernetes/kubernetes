@@ -70,9 +70,9 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 })
 
 var _ = ginkgo.SynchronizedAfterSuite(func() {
-	framework.CleanupSuite()
+	CleanupSuite()
 }, func() {
-	framework.AfterSuiteActions()
+	AfterSuiteActions()
 })
 
 // RunE2ETests checks configuration parameters (specified through flags) and then runs
