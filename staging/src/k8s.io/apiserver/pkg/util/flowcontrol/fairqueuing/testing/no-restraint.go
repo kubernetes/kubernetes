@@ -44,6 +44,6 @@ func (noRestraint) SetConfiguration(config fq.QueueSetConfig) error {
 func (noRestraint) Quiesce(fq.EmptyHandler) {
 }
 
-func (noRestraint) Wait(ctx context.Context, hashValue uint64) (quiescent, execute bool, afterExecution func()) {
+func (noRestraint) Wait(ctx context.Context, hashValue uint64, descr1, descr2 interface{}) (quiescent, execute bool, afterExecution func()) {
 	return false, true, func() {}
 }

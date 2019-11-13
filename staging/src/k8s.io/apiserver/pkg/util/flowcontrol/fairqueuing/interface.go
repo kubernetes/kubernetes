@@ -49,17 +49,19 @@ type QueueSet interface {
 	// triggering state and the required call).
 	Quiesce(EmptyHandler)
 
-	// Wait uses the given hashValue as the source of entropy
-	// as it shuffle-shards a request into a queue and waits for
-	// a decision on what to do with that request.  If tryAnother==true
-	// at return then the QueueSet has become undesirable and the client
-	// should try to find a different QueueSet to use; execute and
-	// afterExecution are irrelevant in this case.  Otherwise, if execute
-	// then the client should start executing the request and, once the
-	// request finishes execution or is canceled, call afterExecution().
-	// Otherwise the client should not execute the
-	// request and afterExecution is irrelevant.
-	Wait(ctx context.Context, hashValue uint64) (tryAnother, execute bool, afterExecution func())
+	// Wait uses the given hashValue as the source of entropy as it
+	// shuffle-shards a request into a queue and waits for a decision
+	// on what to do with that request.  The descr1 and descr2 values
+	// play no role in the logic but appear in log messages.  If
+	// tryAnother==true at return then the QueueSet has become
+	// undesirable and the client should try to find a different
+	// QueueSet to use; execute and afterExecution are irrelevant in
+	// this case.  Otherwise, if execute then the client should start
+	// executing the request and, once the request finishes execution
+	// or is canceled, call afterExecution().  Otherwise the client
+	// should not execute the request and afterExecution is
+	// irrelevant.
+	Wait(ctx context.Context, hashValue uint64, descr1, descr2 interface{}) (tryAnother, execute bool, afterExecution func())
 }
 
 // QueueSetConfig defines the configuration of a QueueSet.

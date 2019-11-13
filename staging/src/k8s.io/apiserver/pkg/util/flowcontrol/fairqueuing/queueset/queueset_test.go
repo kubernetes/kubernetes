@@ -27,6 +27,7 @@ import (
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	test "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/clock"
+	"k8s.io/klog"
 )
 
 type uniformScenario []uniformClient
@@ -41,21 +42,23 @@ type uniformClient struct {
 	thinkDuration time.Duration
 }
 
+const nsTimeFmt = "2006-01-02 15:04:05.000000000"
+
 // exerciseQueueSetUniformScenario runs a scenario based on the given set of uniform clients.
 // Each uniform client specifies a number of threads, each of which alternates between thinking
 // and making a synchronous request through the QueueSet.
 // This function measures how much concurrency each client got, on average, over
-// the intial totalDuration and tests to see whether they all got about the same amount.
+// the initial evalDuration and tests to see whether they all got about the same amount.
 // Each client needs to be demanding enough to use this amount, otherwise the fair result
 // is not equal amounts and the simple test in this function would not accurately test fairness.
 // expectPass indicates whether the QueueSet is expected to be fair.
 // expectedAllRequests indicates whether all requests are expected to get dispatched.
-func exerciseQueueSetUniformScenario(t *testing.T, qs fq.QueueSet, sc uniformScenario,
-	totalDuration time.Duration, expectPass bool, expectedAllRequests bool,
+func exerciseQueueSetUniformScenario(t *testing.T, name string, qs fq.QueueSet, sc uniformScenario,
+	evalDuration time.Duration, expectPass bool, expectedAllRequests bool,
 	clk *clock.FakeEventClock, counter counter.GoRoutineCounter) {
 
 	now := time.Now()
-	t.Logf("%s: Start", clk.Now().Format("2006-01-02 15:04:05.000000000"))
+	t.Logf("%s: Start %s, clk=%p, grc=%p", clk.Now().Format(nsTimeFmt), name, clk, counter)
 	integrators := make([]test.Integrator, len(sc))
 	var failedCount uint64
 	for i, uc := range sc {
@@ -66,8 +69,8 @@ func exerciseQueueSetUniformScenario(t *testing.T, qs fq.QueueSet, sc uniformSce
 				for k := 0; k < uc.nCalls; k++ {
 					ClockWait(clk, counter, uc.thinkDuration)
 					for {
-						tryAnother, execute, afterExecute := qs.Wait(context.Background(), uc.hash)
-						t.Logf("%s: %d, %d, %d got q=%v, e=%v", clk.Now().Format("2006-01-02 15:04:05.000000000"), i, j, k, tryAnother, execute)
+						tryAnother, execute, afterExecute := qs.Wait(context.Background(), uc.hash, name, []int{i, j, k})
+						t.Logf("%s: %d, %d, %d got a=%v, e=%v", clk.Now().Format(nsTimeFmt), i, j, k, tryAnother, execute)
 						if tryAnother {
 							continue
 						}
@@ -86,10 +89,10 @@ func exerciseQueueSetUniformScenario(t *testing.T, qs fq.QueueSet, sc uniformSce
 			}(i, j, uc, integrators[i])
 		}
 	}
-	lim := now.Add(totalDuration)
+	lim := now.Add(evalDuration)
 	clk.Run(&lim)
 	clk.SetTime(lim)
-	t.Logf("%s: End", clk.Now().Format("2006-01-02 15:04:05.000000000"))
+	t.Logf("%s: End", clk.Now().Format(nsTimeFmt))
 	results := make([]test.IntegratorResults, len(sc))
 	var sumOfAvg float64
 	for i := range sc {
@@ -132,6 +135,10 @@ func ClockWait(clk *clock.FakeEventClock, counter counter.GoRoutineCounter, dura
 	}
 }
 
+func init() {
+	klog.InitFlags(nil)
+}
+
 // TestNoRestraint should fail because the dummy QueueSet exercises no control
 func TestNoRestraint(t *testing.T) {
 	now := time.Now()
@@ -142,7 +149,7 @@ func TestNoRestraint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("QueueSet creation failed with %v", err)
 	}
-	exerciseQueueSetUniformScenario(t, nr, []uniformClient{
+	exerciseQueueSetUniformScenario(t, "NoRestraint", nr, []uniformClient{
 		{1001001001, 5, 10, time.Second, time.Second},
 		{2002002002, 2, 10, time.Second, time.Second / 2},
 	}, time.Second*10, false, true, clk, counter)
@@ -155,10 +162,10 @@ func TestUniformFlows(t *testing.T) {
 	qsf := NewQueueSetFactory(clk, counter)
 	config := fq.QueueSetConfig{
 		Name:             "TestUniformFlows",
-		ConcurrencyLimit: 100,
-		DesiredNumQueues: 128,
-		QueueLengthLimit: 128,
-		HandSize:         1,
+		ConcurrencyLimit: 4,
+		DesiredNumQueues: 8,
+		QueueLengthLimit: 6,
+		HandSize:         3,
 		RequestWaitLimit: 10 * time.Minute,
 	}
 	qs, err := qsf.NewQueueSet(config)
@@ -166,10 +173,10 @@ func TestUniformFlows(t *testing.T) {
 		t.Fatalf("QueueSet creation failed with %v", err)
 	}
 
-	exerciseQueueSetUniformScenario(t, qs, []uniformClient{
+	exerciseQueueSetUniformScenario(t, "UniformFlows", qs, []uniformClient{
 		{1001001001, 5, 10, time.Second, time.Second},
 		{2002002002, 5, 10, time.Second, time.Second},
-	}, time.Second*10, true, true, clk, counter)
+	}, time.Second*20, true, true, clk, counter)
 }
 
 func TestDifferentFlows(t *testing.T) {
@@ -179,10 +186,10 @@ func TestDifferentFlows(t *testing.T) {
 	qsf := NewQueueSetFactory(clk, counter)
 	config := fq.QueueSetConfig{
 		Name:             "TestDifferentFlows",
-		ConcurrencyLimit: 1,
-		DesiredNumQueues: 128,
-		QueueLengthLimit: 128,
-		HandSize:         1,
+		ConcurrencyLimit: 4,
+		DesiredNumQueues: 8,
+		QueueLengthLimit: 6,
+		HandSize:         3,
 		RequestWaitLimit: 10 * time.Minute,
 	}
 	qs, err := qsf.NewQueueSet(config)
@@ -190,10 +197,10 @@ func TestDifferentFlows(t *testing.T) {
 		t.Fatalf("QueueSet creation failed with %v", err)
 	}
 
-	exerciseQueueSetUniformScenario(t, qs, []uniformClient{
-		{1001001001, 5, 10, time.Second, time.Second},
-		{2002002002, 2, 5, time.Second, time.Second / 2},
-	}, time.Second*10, true, true, clk, counter)
+	exerciseQueueSetUniformScenario(t, "DifferentFlows", qs, []uniformClient{
+		{1001001001, 6, 10, time.Second, time.Second},
+		{2002002002, 4, 15, time.Second, time.Second / 2},
+	}, time.Second*20, true, true, clk, counter)
 }
 
 func TestTimeout(t *testing.T) {
@@ -214,7 +221,7 @@ func TestTimeout(t *testing.T) {
 		t.Fatalf("QueueSet creation failed with %v", err)
 	}
 
-	exerciseQueueSetUniformScenario(t, qs, []uniformClient{
+	exerciseQueueSetUniformScenario(t, "Timeout", qs, []uniformClient{
 		{1001001001, 5, 100, time.Second, time.Second},
 	}, time.Second*10, true, false, clk, counter)
 }

@@ -19,11 +19,14 @@ package clock
 import (
 	"container/heap"
 	"math/rand"
+	"runtime"
+	"strings"
 	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
+	"k8s.io/klog"
 )
 
 // EventFunc does some work that needs to be done at or after the
@@ -68,11 +71,37 @@ func (r RealEventClock) EventAfterTime(f EventFunc, t time.Time) {
 
 // waitGroupCounter is a wait group used for a GoRoutine Counter.  This private
 // type is used to disallow direct waitGroup access
-type waitGroupCounter struct{ sync.WaitGroup }
+type waitGroupCounter struct {
+	wg sync.WaitGroup
+}
 
 // compile time assertion that waitGroupCounter meets requirements
 //  of GoRoutineCounter
 var _ counter.GoRoutineCounter = (*waitGroupCounter)(nil)
+
+func (wgc *waitGroupCounter) Add(delta int) {
+	if klog.V(7) {
+		var pcs [5]uintptr
+		nCallers := runtime.Callers(2, pcs[:])
+		frames := runtime.CallersFrames(pcs[:nCallers])
+		frame1, more1 := frames.Next()
+		fileParts1 := strings.Split(frame1.File, "/")
+		tail2 := "(none)"
+		line2 := 0
+		if more1 {
+			frame2, _ := frames.Next()
+			fileParts2 := strings.Split(frame2.File, "/")
+			tail2 = fileParts2[len(fileParts2)-1]
+			line2 = frame2.Line
+		}
+		klog.Infof("GRC(%p).Add(%d) from %s:%d from %s:%d", wgc, delta, fileParts1[len(fileParts1)-1], frame1.Line, tail2, line2)
+	}
+	wgc.wg.Add(delta)
+}
+
+func (wgc *waitGroupCounter) Wait() {
+	wgc.wg.Wait()
+}
 
 // FakeEventClock is one whose time does not pass implicitly but
 // rather is explicitly set by invocations of its SetTime method
