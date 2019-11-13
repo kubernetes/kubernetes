@@ -303,6 +303,20 @@ func TestHeap_Close(t *testing.T) {
 	}
 }
 
+// TestHeap_Peek tests Heap.Peek function.
+func TestHeap_Peek(t *testing.T) {
+	h := NewHeap(testHeapObjectKeyFunc, compareInts)
+	h.Add(mkHeapObj("foo", 10))
+	h.Add(mkHeapObj("bar", 1))
+	h.Add(mkHeapObj("bal", 31))
+
+	// Get head of the heap
+	obj := h.Peek()
+	if e, a := 1, obj.(testHeapObject).val; a != e {
+		t.Fatalf("expected %d, got %d", e, a)
+	}
+}
+
 // TestHeap_List tests Heap.List function.
 func TestHeap_List(t *testing.T) {
 	h := NewHeap(testHeapObjectKeyFunc, compareInts)

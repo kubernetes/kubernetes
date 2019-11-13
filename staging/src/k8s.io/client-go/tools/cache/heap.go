@@ -114,6 +114,14 @@ func (h *heapData) Pop() interface{} {
 	return item.obj
 }
 
+// Peek is supposed to be called by heap.Peek only.
+func (h *heapData) Peek() interface{} {
+	if len(h.queue) > 0 {
+		return h.items[h.queue[0]].obj
+	}
+	return nil
+}
+
 // Heap is a thread-safe producer/consumer queue that implements a heap data structure.
 // It can be used to implement priority queues and similar data structures.
 type Heap struct {
@@ -256,6 +264,11 @@ func (h *Heap) Pop() (interface{}, error) {
 	}
 
 	return obj, nil
+}
+
+// Peek returns the head of the heap without removing it.
+func (h *Heap) Peek() interface{} {
+	return h.data.Peek()
 }
 
 // List returns a list of all the items.
