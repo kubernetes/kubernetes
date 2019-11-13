@@ -157,13 +157,17 @@ func (rc *reconciler) isMultiAttachForbidden(volumeSpec *volume.Spec) bool {
 			return false
 		}
 
+		seenMany := false
 		// check if this volume is allowed to be attached to multiple PODs/nodes, if yes, return false
 		for _, accessMode := range volumeSpec.PersistentVolume.Spec.AccessModes {
+			if accessMode == v1.ReadWriteOnce {
+				return true
+			}
 			if accessMode == v1.ReadWriteMany || accessMode == v1.ReadOnlyMany {
-				return false
+				seenMany = true
 			}
 		}
-		return true
+		return !seenMany
 	}
 
 	// we don't know if it's supported or not and let the attacher fail later in cases it's not supported
