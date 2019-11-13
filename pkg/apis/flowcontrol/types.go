@@ -28,7 +28,7 @@ const (
 	NonResourceAll = "*"
 	NameAll        = "*"
 
-	NamespaceEvery        = "*"             // matches every particular namespace
+	NamespaceEvery = "*" // matches every particular namespace
 )
 
 // System preset priority level names
