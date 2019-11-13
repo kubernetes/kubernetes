@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
