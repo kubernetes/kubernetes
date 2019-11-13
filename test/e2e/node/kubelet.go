@@ -32,6 +32,7 @@ import (
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -340,7 +341,7 @@ var _ = SIGDescribe("kubelet", func() {
 				ginkgo.By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
 				rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(uuid.NewUUID()))
 
-				err := framework.RunRC(testutils.RCConfig{
+				err := e2erc.RunRC(testutils.RCConfig{
 					Client:       f.ClientSet,
 					Name:         rcName,
 					Namespace:    f.Namespace.Name,
@@ -351,7 +352,7 @@ var _ = SIGDescribe("kubelet", func() {
 				framework.ExpectNoError(err)
 				// Perform a sanity check so that we know all desired pods are
 				// running on the nodes according to kubelet. The timeout is set to
-				// only 30 seconds here because framework.RunRC already waited for all pods to
+				// only 30 seconds here because e2erc.RunRC already waited for all pods to
 				// transition to the running status.
 				err = waitTillNPodsRunningOnNodes(f.ClientSet, nodeNames, rcName, ns, totalPods, time.Second*30)
 				framework.ExpectNoError(err)
@@ -360,7 +361,7 @@ var _ = SIGDescribe("kubelet", func() {
 				}
 
 				ginkgo.By("Deleting the RC")
-				framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rcName)
+				e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rcName)
 				// Check that the pods really are gone by querying /runningpods on the
 				// node. The /runningpods handler checks the container runtime (or its
 				// cache) and  returns a list of running pods. Some possible causes of

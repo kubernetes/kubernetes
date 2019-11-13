@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package rc
 
 import (
 	"fmt"
@@ -26,11 +26,13 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-// RcByNameContainer returns a ReplicationController with specified name and container
-func RcByNameContainer(name string, replicas int32, image string, labels map[string]string, c v1.Container,
+// ByNameContainer returns a ReplicationController with specified name and container
+func ByNameContainer(name string, replicas int32, image string, labels map[string]string, c v1.Container,
 	gracePeriod *int64) *v1.ReplicationController {
 
 	zeroGracePeriod := int64(0)
@@ -68,19 +70,19 @@ func RcByNameContainer(name string, replicas int32, image string, labels map[str
 
 // DeleteRCAndWaitForGC deletes only the Replication Controller and waits for GC to delete the pods.
 func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
-	return DeleteResourceAndWaitForGC(c, api.Kind("ReplicationController"), ns, name)
+	return framework.DeleteResourceAndWaitForGC(c, api.Kind("ReplicationController"), ns, name)
 }
 
 // ScaleRC scales Replication Controller to be desired size.
 func ScaleRC(clientset clientset.Interface, scalesGetter scaleclient.ScalesGetter, ns, name string, size uint, wait bool) error {
-	return ScaleResource(clientset, scalesGetter, ns, name, size, wait, api.Kind("ReplicationController"), api.SchemeGroupVersion.WithResource("replicationcontrollers"))
+	return framework.ScaleResource(clientset, scalesGetter, ns, name, size, wait, api.Kind("ReplicationController"), api.SchemeGroupVersion.WithResource("replicationcontrollers"))
 }
 
 // RunRC Launches (and verifies correctness) of a Replication Controller
 // and will wait for all pods it spawns to become "Running".
 func RunRC(config testutils.RCConfig) error {
 	ginkgo.By(fmt.Sprintf("creating replication controller %s in namespace %s", config.Name, config.Namespace))
-	config.NodeDumpFunc = DumpNodeDebugInfo
-	config.ContainerDumpFunc = LogFailedContainers
+	config.NodeDumpFunc = framework.DumpNodeDebugInfo
+	config.ContainerDumpFunc = e2ekubectl.LogFailedContainers
 	return testutils.RunRC(config)
 }
