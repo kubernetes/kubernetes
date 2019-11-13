@@ -132,6 +132,7 @@ func (sched *Scheduler) Cache() internalcache.Cache {
 
 type schedulerOptions struct {
 	schedulerName                  string
+	schedulerAlgorithmSource       schedulerapi.SchedulerAlgorithmSource
 	hardPodAffinitySymmetricWeight int32
 	disablePreemption              bool
 	percentageOfNodesToScore       int32
@@ -154,6 +155,13 @@ type Option func(*schedulerOptions)
 func WithName(schedulerName string) Option {
 	return func(o *schedulerOptions) {
 		o.schedulerName = schedulerName
+	}
+}
+
+// WithAlgorithmSource sets schedulerAlgorithmSource for Scheduler, the default is a source with DefaultProvider.
+func WithAlgorithmSource(source schedulerapi.SchedulerAlgorithmSource) Option {
+	return func(o *schedulerOptions) {
+		o.schedulerAlgorithmSource = source
 	}
 }
 
@@ -236,7 +244,10 @@ func WithPodMaxBackoffSeconds(podMaxBackoffSeconds int64) Option {
 }
 
 var defaultSchedulerOptions = schedulerOptions{
-	schedulerName:                   v1.DefaultSchedulerName,
+	schedulerName: v1.DefaultSchedulerName,
+	schedulerAlgorithmSource: schedulerapi.SchedulerAlgorithmSource{
+		Provider: defaultAlgorithmSourceProviderName(),
+	},
 	hardPodAffinitySymmetricWeight:  v1.DefaultHardPodAffinitySymmetricWeight,
 	disablePreemption:               false,
 	percentageOfNodesToScore:        schedulerapi.DefaultPercentageOfNodesToScore,
@@ -260,7 +271,6 @@ func New(client clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
 	podInformer coreinformers.PodInformer,
 	recorder events.EventRecorder,
-	schedulerAlgorithmSource schedulerapi.SchedulerAlgorithmSource,
 	stopCh <-chan struct{},
 	opts ...Option) (*Scheduler, error) {
 
@@ -326,7 +336,7 @@ func New(client clientset.Interface,
 		PluginConfig:                   options.frameworkPluginConfig,
 	})
 	var sched *Scheduler
-	source := schedulerAlgorithmSource
+	source := options.schedulerAlgorithmSource
 	switch {
 	case source.Provider != nil:
 		// Create the config from a named algorithm provider.
@@ -787,4 +797,9 @@ func (p *podPreemptorImpl) removeNominatedNodeName(pod *v1.Pod) error {
 		return nil
 	}
 	return p.setNominatedNodeName(pod, "")
+}
+
+func defaultAlgorithmSourceProviderName() *string {
+	provider := schedulerapi.SchedulerDefaultProviderName
+	return &provider
 }
