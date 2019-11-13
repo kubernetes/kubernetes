@@ -81,17 +81,19 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		}
 		// start controllers if possible
 		if controller, ok := s.ClientCA.(dynamiccertificates.ControllerRunner); ok {
-			// runonce to be sure that we have a value.
+			// runonce to try to prime data.  If this fails, it's ok because we fail closed.
+			// Files are required to be populated already, so this is for convenience.
 			if err := controller.RunOnce(); err != nil {
-				return nil, err
+				klog.Warningf("Initial population of client CA failed: %v", err)
 			}
 
 			go controller.Run(1, stopCh)
 		}
 		if controller, ok := s.Cert.(dynamiccertificates.ControllerRunner); ok {
-			// runonce to be sure that we have a value.
+			// runonce to try to prime data.  If this fails, it's ok because we fail closed.
+			// Files are required to be populated already, so this is for convenience.
 			if err := controller.RunOnce(); err != nil {
-				return nil, err
+				klog.Warningf("Initial population of default serving certificate failed: %v", err)
 			}
 
 			go controller.Run(1, stopCh)
@@ -102,18 +104,20 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 			}
 
 			if controller, ok := sniCert.(dynamiccertificates.ControllerRunner); ok {
-				// runonce to be sure that we have a value.
+				// runonce to try to prime data.  If this fails, it's ok because we fail closed.
+				// Files are required to be populated already, so this is for convenience.
 				if err := controller.RunOnce(); err != nil {
-					return nil, err
+					klog.Warningf("Initial population of SNI serving certificate failed: %v", err)
 				}
 
 				go controller.Run(1, stopCh)
 			}
 		}
 
-		// runonce to be sure that we have a value.
+		// runonce to try to prime data.  If this fails, it's ok because we fail closed.
+		// Files are required to be populated already, so this is for convenience.
 		if err := dynamicCertificateController.RunOnce(); err != nil {
-			return nil, err
+			klog.Warningf("Initial population of dynamic certificates failed: %v", err)
 		}
 		go dynamicCertificateController.Run(1, stopCh)
 

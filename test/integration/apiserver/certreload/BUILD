@@ -14,6 +14,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/dynamiccertificates:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//test/integration/framework:go_default_library",
     ],

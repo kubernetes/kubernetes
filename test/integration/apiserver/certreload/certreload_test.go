@@ -18,11 +18,8 @@ package podlogs
 
 import (
 	"bytes"
-	"crypto/tls"
-	"crypto/x509"
-	"encoding/base64"
+	"fmt"
 	"io/ioutil"
-	"net/url"
 	"path"
 	"strings"
 	"testing"
@@ -33,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/cert"
 	"k8s.io/component-base/cli/flag"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -88,13 +86,9 @@ MnVCuBwfwDXCAiEAw/1TA+CjPq9JC5ek1ifR0FybTURjeQqYkKpve1dveps=
 			dynamiccertificates.FileRefreshDuration = 1 * time.Second
 		},
 	})
-	apiserverURL, err := url.Parse(kubeconfig.Host)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	// wait for request header info
-	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "requestheader-client-ca-file", "-----BEGIN CERTIFICATE-----", 1))
+	err := wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "requestheader-client-ca-file", "-----BEGIN CERTIFICATE-----", 1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,24 +99,6 @@ MnVCuBwfwDXCAiEAw/1TA+CjPq9JC5ek1ifR0FybTURjeQqYkKpve1dveps=
 	}
 
 	// when we run this the second time, we know which one we are expecting
-	acceptableCAs := []string{}
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true,
-		GetClientCertificate: func(hello *tls.CertificateRequestInfo) (*tls.Certificate, error) {
-			acceptableCAs = []string{}
-			for _, curr := range hello.AcceptableCAs {
-				acceptableCAs = append(acceptableCAs, string(curr))
-			}
-			return &tls.Certificate{}, nil
-		},
-	}
-
-	conn, err := tls.Dial("tcp", apiserverURL.Host, tlsConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close()
-
 	if err := ioutil.WriteFile(clientCAFilename, differentClientCA, 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -132,11 +108,10 @@ MnVCuBwfwDXCAiEAw/1TA+CjPq9JC5ek1ifR0FybTURjeQqYkKpve1dveps=
 
 	time.Sleep(4 * time.Second)
 
-	conn2, err := tls.Dial("tcp", apiserverURL.Host, tlsConfig)
+	acceptableCAs, err := cert.GetClientCANamesForURL(kubeconfig.Host)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn2.Close()
 
 	expectedCAs := []string{"webhook-test.default.svc", "My Client"}
 	if len(expectedCAs) != len(acceptableCAs) {
@@ -334,29 +309,6 @@ func TestServingCert(t *testing.T) {
 			dynamiccertificates.FileRefreshDuration = 1 * time.Second
 		},
 	})
-	apiserverURL, err := url.Parse(kubeconfig.Host)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// when we run this the second time, we know which one we are expecting
-	acceptableCerts := [][]byte{}
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true,
-		VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-			acceptableCerts = make([][]byte, 0, len(rawCerts))
-			for _, r := range rawCerts {
-				acceptableCerts = append(acceptableCerts, r)
-			}
-			return nil
-		},
-	}
-
-	conn, err := tls.Dial("tcp", apiserverURL.Host, tlsConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close()
 
 	if err := ioutil.WriteFile(path.Join(servingCertPath, "apiserver.key"), serverKey, 0644); err != nil {
 		t.Fatal(err)
@@ -367,29 +319,13 @@ func TestServingCert(t *testing.T) {
 
 	time.Sleep(4 * time.Second)
 
-	conn2, err := tls.Dial("tcp", apiserverURL.Host, tlsConfig)
+	// get the certs we're actually serving with
+	_, actualCerts, err := cert.GetServingCertificatesForURL(kubeconfig.Host, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn2.Close()
-
-	cert, err := tls.X509KeyPair(serverCert, serverKey)
-	if err != nil {
+	if err := checkServingCerts(serverCert, actualCerts); err != nil {
 		t.Fatal(err)
-	}
-
-	expectedCerts := cert.Certificate
-	if len(expectedCerts) != len(acceptableCerts) {
-		var certs []string
-		for _, a := range acceptableCerts {
-			certs = append(certs, base64.StdEncoding.EncodeToString(a))
-		}
-		t.Fatalf("Unexpected number of certs: %v", strings.Join(certs, ":"))
-	}
-	for i := range expectedCerts {
-		if !bytes.Equal(acceptableCerts[i], expectedCerts[i]) {
-			t.Errorf("expected %q, got %q", base64.StdEncoding.EncodeToString(expectedCerts[i]), base64.StdEncoding.EncodeToString(acceptableCerts[i]))
-		}
 	}
 }
 
@@ -419,48 +355,14 @@ func TestSNICert(t *testing.T) {
 			}}
 		},
 	})
-	apiserverURL, err := url.Parse(kubeconfig.Host)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	// When we run this the second time, we know which one we are expecting.
-	acceptableCerts := [][]byte{}
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true,
-		VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-			acceptableCerts = make([][]byte, 0, len(rawCerts))
-			for _, r := range rawCerts {
-				acceptableCerts = append(acceptableCerts, r)
-			}
-			return nil
-		},
-		ServerName: "foo",
-	}
-
-	conn, err := tls.Dial("tcp", apiserverURL.Host, tlsConfig)
+	_, actualCerts, err := cert.GetServingCertificatesForURL(kubeconfig.Host, "foo")
 	if err != nil {
 		t.Fatal(err)
 	}
-	conn.Close()
-
-	cert, err := tls.LoadX509KeyPair(path.Join(servingCertPath, "foo.crt"), path.Join(servingCertPath, "foo.key"))
-	if err != nil {
+	if err := checkServingCerts(anotherServerCert, actualCerts); err != nil {
 		t.Fatal(err)
-	}
-
-	expectedCerts := cert.Certificate
-	if len(expectedCerts) != len(acceptableCerts) {
-		var certs []string
-		for _, a := range acceptableCerts {
-			certs = append(certs, base64.StdEncoding.EncodeToString(a))
-		}
-		t.Fatalf("Unexpected number of certs: %v", strings.Join(certs, ":"))
-	}
-	for i := range expectedCerts {
-		if !bytes.Equal(acceptableCerts[i], expectedCerts[i]) {
-			t.Errorf("expected %q, got %q", base64.StdEncoding.EncodeToString(expectedCerts[i]), base64.StdEncoding.EncodeToString(acceptableCerts[i]))
-		}
 	}
 
 	if err := ioutil.WriteFile(path.Join(servingCertPath, "foo.key"), serverKey, 0644); err != nil {
@@ -472,28 +374,40 @@ func TestSNICert(t *testing.T) {
 
 	time.Sleep(4 * time.Second)
 
-	conn2, err := tls.Dial("tcp", apiserverURL.Host, tlsConfig)
+	_, actualCerts, err = cert.GetServingCertificatesForURL(kubeconfig.Host, "foo")
 	if err != nil {
 		t.Fatal(err)
 	}
-	conn2.Close()
-
-	cert, err = tls.X509KeyPair(serverCert, serverKey)
-	if err != nil {
+	if err := checkServingCerts(serverCert, actualCerts); err != nil {
 		t.Fatal(err)
 	}
+}
 
-	expectedCerts = cert.Certificate
-	if len(expectedCerts) != len(acceptableCerts) {
+func checkServingCerts(expectedBytes []byte, actual [][]byte) error {
+	expectedCerts, err := cert.ParseCertsPEM(expectedBytes)
+	if err != nil {
+		return err
+	}
+	expected := [][]byte{}
+	for _, curr := range expectedCerts {
+		currBytes, err := cert.EncodeCertificates(curr)
+		if err != nil {
+			return err
+		}
+		expected = append(expected, []byte(strings.TrimSpace(string(currBytes))))
+	}
+
+	if len(expected) != len(actual) {
 		var certs []string
-		for _, a := range acceptableCerts {
-			certs = append(certs, base64.StdEncoding.EncodeToString(a))
+		for _, a := range actual {
+			certs = append(certs, string(a))
 		}
-		t.Fatalf("Unexpected number of certs: %v", strings.Join(certs, ":"))
+		return fmt.Errorf("unexpected number of certs %d vs %d: %v", len(expected), len(actual), strings.Join(certs, "\n"))
 	}
-	for i := range expectedCerts {
-		if !bytes.Equal(acceptableCerts[i], expectedCerts[i]) {
-			t.Errorf("expected %q, got %q", base64.StdEncoding.EncodeToString(expectedCerts[i]), base64.StdEncoding.EncodeToString(acceptableCerts[i]))
+	for i := range expected {
+		if !bytes.Equal(actual[i], expected[i]) {
+			return fmt.Errorf("expected %q, got %q", string(expected[i]), string(actual[i]))
 		}
 	}
+	return nil
 }
