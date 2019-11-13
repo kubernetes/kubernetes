@@ -88,6 +88,7 @@ const (
 )
 
 type LogsOptions struct {
+	AllNamespaces bool
 	Namespace     string
 	ResourceArg   string
 	AllContainers bool
@@ -169,6 +170,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on.")
 	cmd.Flags().IntVar(&o.MaxFollowConcurrency, "max-log-requests", o.MaxFollowConcurrency, "Specify maximum number of concurrent logs to follow when using by a selector. Defaults to 5.")
 	cmd.Flags().BoolVar(&o.Prefix, "prefix", o.Prefix, "Prefix each log line with the log source (pod name and container name)")
+	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	return cmd
 }
 
@@ -254,7 +256,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	if o.Object == nil {
 		builder := f.NewBuilder().
 			WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
-			NamespaceParam(o.Namespace).DefaultNamespace().
+			NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 			SingleResourceType()
 		if o.ResourceArg != "" {
 			builder.ResourceNames("pods", o.ResourceArg)
