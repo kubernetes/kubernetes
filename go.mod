@@ -77,6 +77,10 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.10.0
 	github.com/quobyte/api v0.1.8
+	github.com/pquerna/ffjson v0.0.0-20180717144149-af8b230fcd20 // indirect
+	github.com/prometheus/client_golang v1.0.0
+	github.com/prometheus/prometheus v2.5.0+incompatible
+	github.com/quobyte/api v0.1.2
 	github.com/robfig/cron v1.1.0
 	github.com/spf13/afero v1.2.2
 	github.com/spf13/cobra v1.1.1

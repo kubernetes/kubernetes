@@ -220,6 +220,15 @@ func (g *Grabber) GrabFromAPIServer() (APIServerMetrics, error) {
 	return parseAPIServerMetrics(output)
 }
 
+// GrabRawFromAPIServer returns metrics from API server in raw format
+func (g *Grabber) GrabRawFromAPIServer() (string, error) {
+	output, err := g.getMetricsFromAPIServer()
+	if err != nil {
+		return "", err
+	}
+	return output, nil
+}
+
 // Grab returns metrics from corresponding component
 func (g *Grabber) Grab() (Collection, error) {
 	result := Collection{}
