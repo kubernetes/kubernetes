@@ -137,7 +137,6 @@ pkg/proxy/winkernel
 pkg/proxy/winuserspace
 pkg/registry/admissionregistration/rest
 pkg/registry/apps/deployment/storage
-pkg/registry/apps/replicaset
 pkg/registry/apps/replicaset/storage
 pkg/registry/apps/rest
 pkg/registry/apps/statefulset/storage
