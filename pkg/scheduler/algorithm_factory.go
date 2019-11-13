@@ -25,10 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	appslisters "k8s.io/client-go/listers/apps/v1"
-	corelisters "k8s.io/client-go/listers/core/v1"
-	policylisters "k8s.io/client-go/listers/policy/v1beta1"
-	storagelisters "k8s.io/client-go/listers/storage/v1"
+	"k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -45,17 +42,8 @@ import (
 
 // PluginFactoryArgs are passed to all plugin factory functions.
 type PluginFactoryArgs struct {
-	NodeInfoLister                 schedulerlisters.NodeInfoLister
-	PodLister                      schedulerlisters.PodLister
-	ServiceLister                  corelisters.ServiceLister
-	ControllerLister               corelisters.ReplicationControllerLister
-	ReplicaSetLister               appslisters.ReplicaSetLister
-	StatefulSetLister              appslisters.StatefulSetLister
-	PDBLister                      policylisters.PodDisruptionBudgetLister
-	CSINodeLister                  storagelisters.CSINodeLister
-	PVLister                       corelisters.PersistentVolumeLister
-	PVCLister                      corelisters.PersistentVolumeClaimLister
-	StorageClassLister             storagelisters.StorageClassLister
+	SharedLister                   schedulerlisters.SharedLister
+	InformerFactory                informers.SharedInformerFactory
 	VolumeBinder                   *volumebinder.VolumeBinder
 	HardPodAffinitySymmetricWeight int32
 }
@@ -280,9 +268,9 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy, pluginArgs 
 
 			predicateFactory = func(args PluginFactoryArgs) predicates.FitPredicate {
 				predicate, precomputationFunction := predicates.NewServiceAffinityPredicate(
-					args.NodeInfoLister,
-					args.PodLister,
-					args.ServiceLister,
+					args.SharedLister.NodeInfos(),
+					args.SharedLister.Pods(),
+					args.InformerFactory.Core().V1().Services().Lister(),
 					pluginArgs.ServiceAffinityArgs.AffinityLabels,
 				)
 
@@ -404,8 +392,8 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, configPr
 			pcf = &PriorityConfigFactory{
 				MapReduceFunction: func(args PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
 					return priorities.NewServiceAntiAffinityPriority(
-						args.PodLister,
-						args.ServiceLister,
+						args.SharedLister.Pods(),
+						args.InformerFactory.Core().V1().Services().Lister(),
 						configProducerArgs.ServiceAffinityArgs.AntiAffinityLabelsPreference,
 					)
 				},
