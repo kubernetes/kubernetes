@@ -3745,11 +3745,36 @@ func describeNetworkPolicySpec(nps networkingv1.NetworkPolicySpec, w PrefixWrite
 	} else {
 		w.Write(LEVEL_2, "%s\n", metav1.FormatLabelSelector(&nps.PodSelector))
 	}
-	w.Write(LEVEL_1, "Allowing ingress traffic:\n")
-	printNetworkPolicySpecIngressFrom(nps.Ingress, "    ", w)
-	w.Write(LEVEL_1, "Allowing egress traffic:\n")
-	printNetworkPolicySpecEgressTo(nps.Egress, "    ", w)
+
+	ingressEnabled, egressEnabled := getPolicyType(nps)
+	if ingressEnabled {
+		w.Write(LEVEL_1, "Allowing ingress traffic:\n")
+		printNetworkPolicySpecIngressFrom(nps.Ingress, "    ", w)
+	} else {
+		w.Write(LEVEL_1, "Not affecting ingress traffic\n")
+	}
+	if egressEnabled {
+		w.Write(LEVEL_1, "Allowing egress traffic:\n")
+		printNetworkPolicySpecEgressTo(nps.Egress, "    ", w)
+	} else {
+		w.Write(LEVEL_1, "Not affecting egress traffic\n")
+
+	}
 	w.Write(LEVEL_1, "Policy Types: %v\n", policyTypesToString(nps.PolicyTypes))
+}
+
+func getPolicyType(nps networkingv1.NetworkPolicySpec) (bool, bool) {
+	var ingress, egress bool
+	for _, pt := range nps.PolicyTypes {
+		switch pt {
+		case networkingv1.PolicyTypeIngress:
+			ingress = true
+		case networkingv1.PolicyTypeEgress:
+			egress = true
+		}
+	}
+
+	return ingress, egress
 }
 
 func printNetworkPolicySpecIngressFrom(npirs []networkingv1.NetworkPolicyIngressRule, initialIndent string, w PrefixWriter) {
