@@ -1,6 +1,7 @@
 package validation
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -18,16 +19,12 @@ func TestValidateEncryptionConfigStructure(t *testing.T) {
 		{
 			desc: "nil config",
 			in:   nil,
-			want: field.ErrorList{
-				field.Required(field.NewPath("EncryptionProviderConfiguration"), "EncryptionProviderConfig can't be nil."),
-			},
+			want: field.ErrorList{encryptionProviderConfigShouldNotBeNil},
 		},
 		{
 			desc: "empty config",
 			in:   &config.EncryptionConfiguration{},
-			want: field.ErrorList{
-				field.Required(field.NewPath("EncryptionProviderConfiguration", "Resources"), "EncryptionProviderConfiguration.Resources must contain at least one resource."),
-			},
+			want: field.ErrorList{atLeastOneResourceIsRequired},
 		},
 		{
 			desc: "empty ResourceConfiguration",
@@ -37,25 +34,45 @@ func TestValidateEncryptionConfigStructure(t *testing.T) {
 				},
 			},
 			want: field.ErrorList{
-				field.Required(
-					field.NewPath(
-						"EncryptionProviderConfiguration",
-						"Resources",
-						"Resources"),
-					"EncryptionProviderConfiguration.Resources[0] must contain at least one resource."),
-				field.Required(
-					field.NewPath(
-						"EncryptionProviderConfiguration",
-						"Resources",
-						"Providers"),
-					"EncryptionProviderConfiguration.Resources[0] must contain at least one provider."),
+				field.Required(apiResources, fmt.Sprintf(atLeastOneK8SResourceRequiredFmt, 0)),
+				field.Required(providers, fmt.Sprintf(atLeastOneProviderRequiredFmt, 0)),
 			},
+		},
+		{
+			desc: "empty provider config",
+			in: &config.EncryptionConfiguration{
+				Resources: []config.ResourceConfiguration{
+					{
+						Resources: []string{"secrets"},
+						Providers: []config.ProviderConfiguration{},
+					},
+				},
+			},
+			want: field.ErrorList{field.Required(providers, fmt.Sprintf(atLeastOneProviderRequiredFmt, 0))},
+		},
+		{
+			desc: "empty api resource",
+			in: &config.EncryptionConfiguration{
+				Resources: []config.ResourceConfiguration{
+					{
+						Resources: []string{},
+						Providers: []config.ProviderConfiguration{
+							{
+								KMS: &config.KMSConfiguration{
+									Name: "kms-provider",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: field.ErrorList{field.Required(apiResources, fmt.Sprintf(atLeastOneK8SResourceRequiredFmt, 0))},
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
-			got := ValidateEncryptionConfig(tt.in)
+			got := ValidateEncryptionConfiguration(tt.in)
 			if d := cmp.Diff(tt.want, got); d != "" {
 				t.Fatalf("ErrorList mismatch (-want +got):\n%s", d)
 			}
