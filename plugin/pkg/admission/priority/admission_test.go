@@ -682,7 +682,6 @@ func TestPodAdmission(t *testing.T) {
 	for _, test := range tests {
 		klog.V(4).Infof("starting test %q", test.name)
 		ctrl := NewPlugin()
-		ctrl.resourceQuotaFeatureGateEnabled = true
 		ctrl.nonPreemptingPriority = true
 		// Add existing priority classes.
 		if err := addPriorityClasses(ctrl, test.existingClasses); err != nil {
