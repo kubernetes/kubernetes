@@ -6,6 +6,7 @@ go_library(
         "fix.go",
         "imports.go",
         "mod.go",
+        "mod_cache.go",
         "sortimports.go",
         "zstdlib.go",
     ],

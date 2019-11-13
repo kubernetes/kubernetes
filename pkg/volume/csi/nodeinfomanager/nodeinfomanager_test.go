@@ -27,7 +27,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1beta1"
+	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -611,62 +611,6 @@ func generateVolumeLimits(i int32) *storage.VolumeNodeResources {
 	}
 }
 
-// TestInstallCSIDriver_CSINodeInfoDisabled tests InstallCSIDriver with various existing Node annotations
-// and CSINodeInfo feature gate disabled.
-func TestInstallCSIDriverCSINodeInfoDisabled(t *testing.T) {
-	testcases := []testcase{
-		{
-			name:         "empty node",
-			driverName:   "com.example.csi.driver1",
-			existingNode: generateNode(nil /* nodeIDs */, nil /* labels */, nil /*capacity*/),
-			inputNodeID:  "com.example.csi/csi-node1",
-			expectedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "node1",
-					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"com.example.csi.driver1": "com.example.csi/csi-node1"})},
-				},
-			},
-		},
-		{
-			name:       "pre-existing node info from the same driver",
-			driverName: "com.example.csi.driver1",
-			existingNode: generateNode(
-				nodeIDMap{
-					"com.example.csi.driver1": "com.example.csi/csi-node1",
-				},
-				nil /* labels */, nil /*capacity*/),
-			inputNodeID: "com.example.csi/csi-node1",
-			expectedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "node1",
-					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"com.example.csi.driver1": "com.example.csi/csi-node1"})},
-				},
-			},
-		},
-		{
-			name:       "pre-existing node info from different driver",
-			driverName: "com.example.csi.driver1",
-			existingNode: generateNode(
-				nodeIDMap{
-					"net.example.storage.other-driver": "net.example.storage/test-node",
-				},
-				nil /* labels */, nil /*capacity*/),
-			inputNodeID: "com.example.csi/csi-node1",
-			expectedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node1",
-					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{
-						"com.example.csi.driver1":          "com.example.csi/csi-node1",
-						"net.example.storage.other-driver": "net.example.storage/test-node",
-					})},
-				},
-			},
-		},
-	}
-
-	test(t, true /* addNodeInfo */, false /* csiNodeInfoEnabled */, testcases)
-}
-
 // TestUninstallCSIDriver tests UninstallCSIDriver with various existing Node and/or CSINode objects.
 func TestUninstallCSIDriver(t *testing.T) {
 	testcases := []testcase{
@@ -827,54 +771,6 @@ func TestUninstallCSIDriver(t *testing.T) {
 	}
 
 	test(t, false /* addNodeInfo */, true /* csiNodeInfoEnabled */, testcases)
-}
-
-// TestUninstallCSIDriver tests UninstallCSIDriver with various existing Node objects and CSINode
-// feature disabled.
-func TestUninstallCSIDriverCSINodeInfoDisabled(t *testing.T) {
-	testcases := []testcase{
-		{
-			name:         "empty node",
-			driverName:   "com.example.csi/driver1",
-			existingNode: generateNode(nil /* nodeIDs */, nil /* labels */, nil /*capacity*/),
-			expectedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node1",
-				},
-			},
-		},
-		{
-			name:       "pre-existing node info from the same driver",
-			driverName: "com.example.csi/driver1",
-			existingNode: generateNode(
-				nodeIDMap{
-					"com.example.csi/driver1": "com.example.csi/csi-node1",
-				},
-				nil /* labels */, nil /*capacity*/),
-			expectedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node1",
-				},
-			},
-		},
-		{
-			name:       "pre-existing node info from different driver",
-			driverName: "com.example.csi/driver1",
-			existingNode: generateNode(
-				nodeIDMap{
-					"net.example.storage/other-driver": "net.example.storage/csi-node1",
-				},
-				nil /* labels */, nil /*capacity*/),
-			expectedNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "node1",
-					Annotations: map[string]string{annotationKeyNodeID: marshall(nodeIDMap{"net.example.storage/other-driver": "net.example.storage/csi-node1"})},
-				},
-			},
-		},
-	}
-
-	test(t, false /* addNodeInfo */, false /* csiNodeInfoEnabled */, testcases)
 }
 
 func TestSetMigrationAnnotation(t *testing.T) {
@@ -1089,7 +985,7 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 		}
 
 		// Assert
-		nodeInfo, err := client.StorageV1beta1().CSINodes().Get(nodeName, metav1.GetOptions{})
+		nodeInfo, err := client.StorageV1().CSINodes().Get(nodeName, metav1.GetOptions{})
 		if err != nil {
 			t.Errorf("error getting CSINode: %v", err)
 			continue
@@ -1115,7 +1011,6 @@ func getClientSet(existingNode *v1.Node, existingCSINode *storage.CSINode) *fake
 
 func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []testcase) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, csiNodeInfoEnabled)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()
 
 	for _, tc := range testcases {
 		t.Logf("test case: %q", tc.name)
@@ -1178,7 +1073,7 @@ func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []t
 
 		if csiNodeInfoEnabled {
 			// CSINode validation
-			nodeInfo, err := client.StorageV1beta1().CSINodes().Get(nodeName, metav1.GetOptions{})
+			nodeInfo, err := client.StorageV1().CSINodes().Get(nodeName, metav1.GetOptions{})
 			if err != nil {
 				if !errors.IsNotFound(err) {
 					t.Errorf("error getting CSINode: %v", err)

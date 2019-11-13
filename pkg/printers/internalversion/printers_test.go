@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -42,6 +43,25 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	utilpointer "k8s.io/utils/pointer"
 )
+
+func TestFormatResourceName(t *testing.T) {
+	tests := []struct {
+		kind schema.GroupKind
+		name string
+		want string
+	}{
+		{schema.GroupKind{}, "", ""},
+		{schema.GroupKind{}, "name", "name"},
+		{schema.GroupKind{Kind: "Kind"}, "", "kind/"}, // should not happen in practice
+		{schema.GroupKind{Kind: "Kind"}, "name", "kind/name"},
+		{schema.GroupKind{Group: "group", Kind: "Kind"}, "name", "kind.group/name"},
+	}
+	for _, tt := range tests {
+		if got := formatResourceName(tt.kind, tt.name, true); got != tt.want {
+			t.Errorf("formatResourceName(%q, %q) = %q, want %q", tt.kind, tt.name, got, tt.want)
+		}
+	}
+}
 
 type TestPrintHandler struct {
 	numCalls int
@@ -4366,6 +4386,10 @@ func TestPrintCronJobList(t *testing.T) {
 }
 
 func TestPrintStorageClass(t *testing.T) {
+	policyDelte := api.PersistentVolumeReclaimDelete
+	policyRetain := api.PersistentVolumeReclaimRetain
+	bindModeImmediate := storage.VolumeBindingImmediate
+	bindModeWait := storage.VolumeBindingWaitForFirstConsumer
 	tests := []struct {
 		sc       storage.StorageClass
 		expected []metav1beta1.TableRow
@@ -4378,7 +4402,8 @@ func TestPrintStorageClass(t *testing.T) {
 				},
 				Provisioner: "kubernetes.io/glusterfs",
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"sc1", "kubernetes.io/glusterfs", "0s"}}},
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"sc1", "kubernetes.io/glusterfs", "Delete",
+				"Immediate", false, "0s"}}},
 		},
 		{
 			sc: storage.StorageClass{
@@ -4388,7 +4413,60 @@ func TestPrintStorageClass(t *testing.T) {
 				},
 				Provisioner: "kubernetes.io/nfs",
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"sc2", "kubernetes.io/nfs", "5m"}}},
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"sc2", "kubernetes.io/nfs", "Delete",
+				"Immediate", false, "5m"}}},
+		},
+		{
+			sc: storage.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "sc3",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Provisioner:   "kubernetes.io/nfs",
+				ReclaimPolicy: &policyDelte,
+			},
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"sc3", "kubernetes.io/nfs", "Delete",
+				"Immediate", false, "5m"}}},
+		},
+		{
+			sc: storage.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "sc4",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Provisioner:       "kubernetes.io/nfs",
+				ReclaimPolicy:     &policyRetain,
+				VolumeBindingMode: &bindModeImmediate,
+			},
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"sc4", "kubernetes.io/nfs", "Retain",
+				"Immediate", false, "5m"}}},
+		},
+		{
+			sc: storage.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "sc5",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Provisioner:       "kubernetes.io/nfs",
+				ReclaimPolicy:     &policyRetain,
+				VolumeBindingMode: &bindModeWait,
+			},
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"sc5", "kubernetes.io/nfs", "Retain",
+				"WaitForFirstConsumer", false, "5m"}}},
+		},
+		{
+			sc: storage.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "sc6",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Provisioner:          "kubernetes.io/nfs",
+				ReclaimPolicy:        &policyRetain,
+				AllowVolumeExpansion: boolP(true),
+				VolumeBindingMode:    &bindModeWait,
+			},
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"sc6", "kubernetes.io/nfs", "Retain",
+				"WaitForFirstConsumer", true, "5m"}}},
 		},
 	}
 

@@ -241,6 +241,12 @@ func doCleanSubPaths(mounter mount.Interface, podDir string, volumeName string) 
 			if err = doCleanSubPath(mounter, fullContainerDirPath, filepath.Base(path)); err != nil {
 				return err
 			}
+
+			if info.IsDir() {
+				// skip subdirs of the volume: it only matters the first level to unmount, otherwise it would try to unmount subdir of the volume
+				return filepath.SkipDir
+			}
+
 			return nil
 		})
 		if err != nil {

@@ -51,6 +51,36 @@ func (s *intSliceValue) String() string {
 	return "[" + strings.Join(out, ",") + "]"
 }
 
+func (s *intSliceValue) Append(val string) error {
+	i, err := strconv.Atoi(val)
+	if err != nil {
+		return err
+	}
+	*s.value = append(*s.value, i)
+	return nil
+}
+
+func (s *intSliceValue) Replace(val []string) error {
+	out := make([]int, len(val))
+	for i, d := range val {
+		var err error
+		out[i], err = strconv.Atoi(d)
+		if err != nil {
+			return err
+		}
+	}
+	*s.value = out
+	return nil
+}
+
+func (s *intSliceValue) GetSlice() []string {
+	out := make([]string, len(*s.value))
+	for i, d := range *s.value {
+		out[i] = strconv.Itoa(d)
+	}
+	return out
+}
+
 func intSliceConv(val string) (interface{}, error) {
 	val = strings.Trim(val, "[]")
 	// Empty string would cause a slice with one (empty) entry

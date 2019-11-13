@@ -82,6 +82,9 @@ func (el *EndpointsLock) Update(ler LeaderElectionRecord) error {
 	if err != nil {
 		return err
 	}
+	if el.e.Annotations == nil {
+		el.e.Annotations = make(map[string]string)
+	}
 	el.e.Annotations[LeaderElectionRecordAnnotationKey] = string(recordBytes)
 	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Update(el.e)
 	return err

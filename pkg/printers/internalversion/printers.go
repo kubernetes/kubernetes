@@ -410,6 +410,9 @@ func AddHandlers(h printers.PrintHandler) {
 	storageClassColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Provisioner", Type: "string", Description: storagev1.StorageClass{}.SwaggerDoc()["provisioner"]},
+		{Name: "ReclaimPolicy", Type: "string", Description: storagev1.StorageClass{}.SwaggerDoc()["reclaimPolicy"]},
+		{Name: "VolumeBindingMode", Type: "string", Description: storagev1.StorageClass{}.SwaggerDoc()["volumeBindingMode"]},
+		{Name: "AllowVolumeExpansion", Type: "string", Description: storagev1.StorageClass{}.SwaggerDoc()["allowVolumeExpansion"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 
@@ -1857,7 +1860,23 @@ func printStorageClass(obj *storage.StorageClass, options printers.GenerateOptio
 		name += " (default)"
 	}
 	provtype := obj.Provisioner
-	row.Cells = append(row.Cells, name, provtype, translateTimestampSince(obj.CreationTimestamp))
+	reclaimPolicy := string(api.PersistentVolumeReclaimDelete)
+	if obj.ReclaimPolicy != nil {
+		reclaimPolicy = string(*obj.ReclaimPolicy)
+	}
+
+	volumeBindingMode := string(storage.VolumeBindingImmediate)
+	if obj.VolumeBindingMode != nil {
+		volumeBindingMode = string(*obj.VolumeBindingMode)
+	}
+
+	allowVolumeExpansion := false
+	if obj.AllowVolumeExpansion != nil {
+		allowVolumeExpansion = *obj.AllowVolumeExpansion
+	}
+
+	row.Cells = append(row.Cells, name, provtype, reclaimPolicy, volumeBindingMode, allowVolumeExpansion,
+		translateTimestampSince(obj.CreationTimestamp))
 
 	return []metav1beta1.TableRow{row}, nil
 }

@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 
 	authnv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,7 +48,7 @@ func TestLogEventsLegacy(t *testing.T) {
 	}{
 		{
 			&auditinternal.Event{
-				AuditID: types.UID(uuid.NewRandom().String()),
+				AuditID: types.UID(uuid.New().String()),
 			},
 			`[\d\:\-\.\+TZ]+ AUDIT: id="[\w-]+" stage="" ip="<unknown>" method="" user="<none>" groups="<none>" as="<self>" asgroups="<lookup>" namespace="<none>" uri="" response="<deferred>"`,
 		},
@@ -62,7 +62,7 @@ func TestLogEventsLegacy(t *testing.T) {
 					"127.0.0.1",
 				},
 				RequestReceivedTimestamp: metav1.NewMicroTime(time.Now()),
-				AuditID:                  types.UID(uuid.NewRandom().String()),
+				AuditID:                  types.UID(uuid.New().String()),
 				Stage:                    auditinternal.StageRequestReceived,
 				Verb:                     "get",
 				User: authnv1.UserInfo{
@@ -80,7 +80,7 @@ func TestLogEventsLegacy(t *testing.T) {
 		},
 		{
 			&auditinternal.Event{
-				AuditID: types.UID(uuid.NewRandom().String()),
+				AuditID: types.UID(uuid.New().String()),
 				Level:   auditinternal.LevelMetadata,
 				ObjectRef: &auditinternal.ObjectReference{
 					Resource:    "foo",
@@ -108,7 +108,7 @@ func TestLogEventsLegacy(t *testing.T) {
 func TestLogEventsJson(t *testing.T) {
 	for _, event := range []*auditinternal.Event{
 		{
-			AuditID: types.UID(uuid.NewRandom().String()),
+			AuditID: types.UID(uuid.New().String()),
 		},
 		{
 			ResponseStatus: &metav1.Status{
@@ -120,7 +120,7 @@ func TestLogEventsJson(t *testing.T) {
 			},
 			RequestReceivedTimestamp: metav1.NewMicroTime(time.Now().Truncate(time.Microsecond)),
 			StageTimestamp:           metav1.NewMicroTime(time.Now().Truncate(time.Microsecond)),
-			AuditID:                  types.UID(uuid.NewRandom().String()),
+			AuditID:                  types.UID(uuid.New().String()),
 			Stage:                    auditinternal.StageRequestReceived,
 			Verb:                     "get",
 			User: authnv1.UserInfo{
@@ -135,7 +135,7 @@ func TestLogEventsJson(t *testing.T) {
 			},
 		},
 		{
-			AuditID: types.UID(uuid.NewRandom().String()),
+			AuditID: types.UID(uuid.New().String()),
 			Level:   auditinternal.LevelMetadata,
 			ObjectRef: &auditinternal.ObjectReference{
 				Resource:    "foo",

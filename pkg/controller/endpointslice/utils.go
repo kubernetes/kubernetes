@@ -17,11 +17,8 @@ limitations under the License.
 package endpointslice
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"reflect"
-	"sort"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -33,14 +30,14 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/discovery/validation"
-	"k8s.io/kubernetes/pkg/util/hash"
+	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 )
 
 // podEndpointChanged returns true if the results of podToEndpoint are different
 // for the pods passed to this function.
 func podEndpointChanged(pod1, pod2 *corev1.Pod) bool {
-	endpoint1 := podToEndpoint(pod1, &corev1.Node{})
-	endpoint2 := podToEndpoint(pod2, &corev1.Node{})
+	endpoint1 := podToEndpoint(pod1, &corev1.Node{}, &corev1.Service{Spec: corev1.ServiceSpec{}})
+	endpoint2 := podToEndpoint(pod2, &corev1.Node{}, &corev1.Service{Spec: corev1.ServiceSpec{}})
 
 	endpoint1.TargetRef.ResourceVersion = ""
 	endpoint2.TargetRef.ResourceVersion = ""
@@ -49,7 +46,7 @@ func podEndpointChanged(pod1, pod2 *corev1.Pod) bool {
 }
 
 // podToEndpoint returns an Endpoint object generated from a Pod and Node.
-func podToEndpoint(pod *corev1.Pod, node *corev1.Node) discovery.Endpoint {
+func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service) discovery.Endpoint {
 	// Build out topology information. This is currently limited to hostname,
 	// zone, and region, but this will be expanded in the future.
 	topology := map[string]string{}
@@ -71,8 +68,8 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node) discovery.Endpoint {
 		}
 	}
 
-	ready := podutil.IsPodReady(pod)
-	return discovery.Endpoint{
+	ready := service.Spec.PublishNotReadyAddresses || podutil.IsPodReady(pod)
+	ep := discovery.Endpoint{
 		Addresses: getEndpointAddresses(pod.Status),
 		Conditions: discovery.EndpointConditions{
 			Ready: &ready,
@@ -86,6 +83,12 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node) discovery.Endpoint {
 			ResourceVersion: pod.ObjectMeta.ResourceVersion,
 		},
 	}
+
+	if endpointutil.ShouldSetHostname(pod, service) {
+		ep.Hostname = &pod.Spec.Hostname
+	}
+
+	return ep
 }
 
 // getEndpointPorts returns a list of EndpointPorts generated from a Service
@@ -159,7 +162,10 @@ func newEndpointSlice(service *corev1.Service, endpointMeta *endpointMeta) *disc
 	ownerRef := metav1.NewControllerRef(service, gvk)
 	return &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:          map[string]string{discovery.LabelServiceName: service.Name},
+			Labels: map[string]string{
+				discovery.LabelServiceName: service.Name,
+				discovery.LabelManagedBy:   controllerName,
+			},
 			GenerateName:    getEndpointSlicePrefix(service.Name),
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Namespace:       service.Namespace,
@@ -235,21 +241,6 @@ func addTriggerTimeAnnotation(endpointSlice *discovery.EndpointSlice, triggerTim
 	}
 }
 
-// deepHashObject creates a unique hash string from a go object.
-func deepHashObjectToString(objectToWrite interface{}) string {
-	hasher := md5.New()
-	hash.DeepHashObject(hasher, objectToWrite)
-	return hex.EncodeToString(hasher.Sum(nil)[0:])
-}
-
-// portMapKey is used to uniquely identify groups of endpoint ports.
-type portMapKey string
-
-func newPortMapKey(endpointPorts []discovery.EndpointPort) portMapKey {
-	sort.Sort(portsInOrder(endpointPorts))
-	return portMapKey(deepHashObjectToString(endpointPorts))
-}
-
 // endpointSliceEndpointLen helps sort endpoint slices by the number of
 // endpoints they contain.
 type endpointSliceEndpointLen []*discovery.EndpointSlice
@@ -258,15 +249,4 @@ func (sl endpointSliceEndpointLen) Len() int      { return len(sl) }
 func (sl endpointSliceEndpointLen) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
 func (sl endpointSliceEndpointLen) Less(i, j int) bool {
 	return len(sl[i].Endpoints) > len(sl[j].Endpoints)
-}
-
-// portsInOrder helps sort endpoint ports in a consistent way for hashing.
-type portsInOrder []discovery.EndpointPort
-
-func (sl portsInOrder) Len() int      { return len(sl) }
-func (sl portsInOrder) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
-func (sl portsInOrder) Less(i, j int) bool {
-	h1 := deepHashObjectToString(sl[i])
-	h2 := deepHashObjectToString(sl[j])
-	return h1 < h2
 }

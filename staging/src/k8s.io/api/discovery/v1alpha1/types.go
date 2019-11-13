@@ -121,11 +121,10 @@ type EndpointPort struct {
 	// The name of this port. All ports in an EndpointSlice must have a unique
 	// name. If the EndpointSlice is dervied from a Kubernetes service, this
 	// corresponds to the Service.ports[].name.
-	// Name must either be an empty string or pass IANA_SVC_NAME validation:
-	// * must be no more than 15 characters long
-	// * may contain only [-a-z0-9]
-	// * must contain at least one letter [a-z]
-	// * it must not start or end with a hyphen, nor contain adjacent hyphens
+	// Name must either be an empty string or pass DNS_LABEL validation:
+	// * must be no more than 63 characters long.
+	// * must consist of lower case alphanumeric characters or '-'.
+	// * must start and end with an alphanumeric character.
 	// Default is empty string.
 	Name *string `json:"name,omitempty" protobuf:"bytes,1,name=name"`
 	// The IP protocol for this port.
@@ -136,6 +135,13 @@ type EndpointPort struct {
 	// If this is not specified, ports are not restricted and must be
 	// interpreted in the context of the specific consumer.
 	Port *int32 `json:"port,omitempty" protobuf:"bytes,3,opt,name=port"`
+	// The application protocol for this port.
+	// This field follows standard Kubernetes label syntax.
+	// Un-prefixed names are reserved for IANA standard service names (as per
+	// RFC-6335 and http://www.iana.org/assignments/service-names).
+	// Non-standard protocols should use prefixed names.
+	// Default is empty string.
+	AppProtocol *string `json:"appProtocol,omitempty" protobuf:"bytes,4,name=appProtocol"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -23,14 +23,16 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
-	"k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-var hardSpread = v1.DoNotSchedule
+var (
+	hardSpread = v1.DoNotSchedule
+)
 
-func TestPodTopologySpreadFilter_SingleConstraint(t *testing.T) {
+func TestPodTopologySpread_Filter_SingleConstraint(t *testing.T) {
 	tests := []struct {
 		name         string
 		pod          *v1.Pod
@@ -75,7 +77,7 @@ func TestPodTopologySpreadFilter_SingleConstraint(t *testing.T) {
 			},
 		},
 		{
-			name: "existing pods with mis-matched namespace doens't count",
+			name: "existing pods with mis-matched namespace doesn't count",
 			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
 				1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(),
 			).Obj(),
@@ -267,9 +269,10 @@ func TestPodTopologySpreadFilter_SingleConstraint(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(tt.existingPods, tt.nodes)
-			meta := predicates.GetPredicateMetadata(tt.pod, snapshot)
-			state := v1alpha1.NewCycleState()
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, tt.nodes))
+			factory := &predicates.MetadataProducerFactory{}
+			meta := factory.GetPredicateMetadata(tt.pod, snapshot)
+			state := framework.NewCycleState()
 			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 			plugin, _ := New(nil, nil)
 			for _, node := range tt.nodes {
@@ -283,7 +286,7 @@ func TestPodTopologySpreadFilter_SingleConstraint(t *testing.T) {
 	}
 }
 
-func TestPodTopologySpreadFilter_MultipleConstraints(t *testing.T) {
+func TestPodTopologySpread_Filter_MultipleConstraints(t *testing.T) {
 	tests := []struct {
 		name         string
 		pod          *v1.Pod
@@ -464,9 +467,10 @@ func TestPodTopologySpreadFilter_MultipleConstraints(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(tt.existingPods, tt.nodes)
-			meta := predicates.GetPredicateMetadata(tt.pod, snapshot)
-			state := v1alpha1.NewCycleState()
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, tt.nodes))
+			factory := &predicates.MetadataProducerFactory{}
+			meta := factory.GetPredicateMetadata(tt.pod, snapshot)
+			state := framework.NewCycleState()
 			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 			plugin, _ := New(nil, nil)
 			for _, node := range tt.nodes {

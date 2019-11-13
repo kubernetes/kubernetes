@@ -26,9 +26,11 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -43,6 +45,7 @@ const (
 	preFilterWithExtensionsPluginName = "prefilter-with-extensions-plugin"
 	duplicatePluginName               = "duplicate-plugin"
 	testPlugin                        = "test-plugin"
+	permitPlugin                      = "permit-plugin"
 )
 
 // TestScoreWithNormalizePlugin implements ScoreWithNormalizePlugin interface.
@@ -130,6 +133,17 @@ type TestPlugin struct {
 	inj  injectedResult
 }
 
+type TestPluginPreFilterExtension struct {
+	inj injectedResult
+}
+
+func (e *TestPluginPreFilterExtension) AddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+	return NewStatus(Code(e.inj.PreFilterAddPodStatus), "injected status")
+}
+func (e *TestPluginPreFilterExtension) RemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+	return NewStatus(Code(e.inj.PreFilterRemovePodStatus), "injected status")
+}
+
 func (pl *TestPlugin) Name() string {
 	return pl.name
 }
@@ -147,7 +161,7 @@ func (pl *TestPlugin) PreFilter(ctx context.Context, state *CycleState, p *v1.Po
 }
 
 func (pl *TestPlugin) PreFilterExtensions() PreFilterExtensions {
-	return nil
+	return &TestPluginPreFilterExtension{inj: pl.inj}
 }
 
 func (pl *TestPlugin) Filter(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
@@ -247,6 +261,18 @@ var _ PreFilterPlugin = &TestDuplicatePlugin{}
 
 func newDuplicatePlugin(_ *runtime.Unknown, _ FrameworkHandle) (Plugin, error) {
 	return &TestDuplicatePlugin{}, nil
+}
+
+// TestPermitPlugin only implements PermitPlugin interface.
+type TestPermitPlugin struct {
+	PreFilterCalled int
+}
+
+func (pp *TestPermitPlugin) Name() string {
+	return permitPlugin
+}
+func (pp *TestPermitPlugin) Permit(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) (*Status, time.Duration) {
+	return NewStatus(Wait, ""), time.Duration(10 * time.Second)
 }
 
 var registry Registry = func() Registry {
@@ -571,6 +597,7 @@ func TestPreFilterPlugins(t *testing.T) {
 }
 
 func TestRecordingMetrics(t *testing.T) {
+	state := &CycleState{recordFrameworkMetrics: true}
 	tests := []struct {
 		name               string
 		action             func(f Framework)
@@ -580,117 +607,149 @@ func TestRecordingMetrics(t *testing.T) {
 	}{
 		{
 			name:               "PreFilter - Success",
-			action:             func(f Framework) { f.RunPreFilterPlugins(context.Background(), nil, pod) },
+			action:             func(f Framework) { f.RunPreFilterPlugins(context.Background(), state, pod) },
+			wantExtensionPoint: "PreFilter",
+			wantStatus:         Success,
+		},
+		{
+			name:               "PreFilterAddPod - Success",
+			action:             func(f Framework) { f.RunPreFilterExtensionAddPod(context.Background(), state, pod, nil, nil) },
+			wantExtensionPoint: "PreFilterExtensionAddPod",
+			wantStatus:         Success,
+		},
+		{
+			name:               "PreFilterRemovePod - Success",
+			action:             func(f Framework) { f.RunPreFilterExtensionRemovePod(context.Background(), state, pod, nil, nil) },
+			wantExtensionPoint: "PreFilterExtensionRemovePod",
+			wantStatus:         Success,
+		},
+		{
+			name:               "PreFilterRemovePod - Success",
+			action:             func(f Framework) { f.RunPreFilterPlugins(context.Background(), state, pod) },
 			wantExtensionPoint: "PreFilter",
 			wantStatus:         Success,
 		},
 		{
 			name:               "Filter - Success",
-			action:             func(f Framework) { f.RunFilterPlugins(context.Background(), nil, pod, nil) },
+			action:             func(f Framework) { f.RunFilterPlugins(context.Background(), state, pod, nil) },
 			wantExtensionPoint: "Filter",
 			wantStatus:         Success,
 		},
 		{
 			name:               "PostFilter - Success",
-			action:             func(f Framework) { f.RunPostFilterPlugins(context.Background(), nil, pod, nil, nil) },
+			action:             func(f Framework) { f.RunPostFilterPlugins(context.Background(), state, pod, nil, nil) },
 			wantExtensionPoint: "PostFilter",
 			wantStatus:         Success,
 		},
 		{
 			name:               "Score - Success",
-			action:             func(f Framework) { f.RunScorePlugins(context.Background(), nil, pod, nodes) },
+			action:             func(f Framework) { f.RunScorePlugins(context.Background(), state, pod, nodes) },
 			wantExtensionPoint: "Score",
 			wantStatus:         Success,
 		},
 		{
 			name:               "Reserve - Success",
-			action:             func(f Framework) { f.RunReservePlugins(context.Background(), nil, pod, "") },
+			action:             func(f Framework) { f.RunReservePlugins(context.Background(), state, pod, "") },
 			wantExtensionPoint: "Reserve",
 			wantStatus:         Success,
 		},
 		{
 			name:               "Unreserve - Success",
-			action:             func(f Framework) { f.RunUnreservePlugins(context.Background(), nil, pod, "") },
+			action:             func(f Framework) { f.RunUnreservePlugins(context.Background(), state, pod, "") },
 			wantExtensionPoint: "Unreserve",
 			wantStatus:         Success,
 		},
 		{
 			name:               "PreBind - Success",
-			action:             func(f Framework) { f.RunPreBindPlugins(context.Background(), nil, pod, "") },
+			action:             func(f Framework) { f.RunPreBindPlugins(context.Background(), state, pod, "") },
 			wantExtensionPoint: "PreBind",
 			wantStatus:         Success,
 		},
 		{
 			name:               "Bind - Success",
-			action:             func(f Framework) { f.RunBindPlugins(context.Background(), nil, pod, "") },
+			action:             func(f Framework) { f.RunBindPlugins(context.Background(), state, pod, "") },
 			wantExtensionPoint: "Bind",
 			wantStatus:         Success,
 		},
 		{
 			name:               "PostBind - Success",
-			action:             func(f Framework) { f.RunPostBindPlugins(context.Background(), nil, pod, "") },
+			action:             func(f Framework) { f.RunPostBindPlugins(context.Background(), state, pod, "") },
 			wantExtensionPoint: "PostBind",
 			wantStatus:         Success,
 		},
 		{
 			name:               "Permit - Success",
-			action:             func(f Framework) { f.RunPermitPlugins(context.Background(), nil, pod, "") },
+			action:             func(f Framework) { f.RunPermitPlugins(context.Background(), state, pod, "") },
 			wantExtensionPoint: "Permit",
 			wantStatus:         Success,
 		},
 
 		{
 			name:               "PreFilter - Error",
-			action:             func(f Framework) { f.RunPreFilterPlugins(context.Background(), nil, pod) },
+			action:             func(f Framework) { f.RunPreFilterPlugins(context.Background(), state, pod) },
 			inject:             injectedResult{PreFilterStatus: int(Error)},
 			wantExtensionPoint: "PreFilter",
 			wantStatus:         Error,
 		},
 		{
+			name:               "PreFilterAddPod - Error",
+			action:             func(f Framework) { f.RunPreFilterExtensionAddPod(context.Background(), state, pod, nil, nil) },
+			inject:             injectedResult{PreFilterAddPodStatus: int(Error)},
+			wantExtensionPoint: "PreFilterExtensionAddPod",
+			wantStatus:         Error,
+		},
+		{
+			name:               "PreFilterRemovePod - Error",
+			action:             func(f Framework) { f.RunPreFilterExtensionRemovePod(context.Background(), state, pod, nil, nil) },
+			inject:             injectedResult{PreFilterRemovePodStatus: int(Error)},
+			wantExtensionPoint: "PreFilterExtensionRemovePod",
+			wantStatus:         Error,
+		},
+		{
 			name:               "Filter - Error",
-			action:             func(f Framework) { f.RunFilterPlugins(context.Background(), nil, pod, nil) },
+			action:             func(f Framework) { f.RunFilterPlugins(context.Background(), state, pod, nil) },
 			inject:             injectedResult{FilterStatus: int(Error)},
 			wantExtensionPoint: "Filter",
 			wantStatus:         Error,
 		},
 		{
 			name:               "PostFilter - Error",
-			action:             func(f Framework) { f.RunPostFilterPlugins(context.Background(), nil, pod, nil, nil) },
+			action:             func(f Framework) { f.RunPostFilterPlugins(context.Background(), state, pod, nil, nil) },
 			inject:             injectedResult{PostFilterStatus: int(Error)},
 			wantExtensionPoint: "PostFilter",
 			wantStatus:         Error,
 		},
 		{
 			name:               "Score - Error",
-			action:             func(f Framework) { f.RunScorePlugins(context.Background(), nil, pod, nodes) },
+			action:             func(f Framework) { f.RunScorePlugins(context.Background(), state, pod, nodes) },
 			inject:             injectedResult{ScoreStatus: int(Error)},
 			wantExtensionPoint: "Score",
 			wantStatus:         Error,
 		},
 		{
 			name:               "Reserve - Error",
-			action:             func(f Framework) { f.RunReservePlugins(context.Background(), nil, pod, "") },
+			action:             func(f Framework) { f.RunReservePlugins(context.Background(), state, pod, "") },
 			inject:             injectedResult{ReserveStatus: int(Error)},
 			wantExtensionPoint: "Reserve",
 			wantStatus:         Error,
 		},
 		{
 			name:               "PreBind - Error",
-			action:             func(f Framework) { f.RunPreBindPlugins(context.Background(), nil, pod, "") },
+			action:             func(f Framework) { f.RunPreBindPlugins(context.Background(), state, pod, "") },
 			inject:             injectedResult{PreBindStatus: int(Error)},
 			wantExtensionPoint: "PreBind",
 			wantStatus:         Error,
 		},
 		{
 			name:               "Bind - Error",
-			action:             func(f Framework) { f.RunBindPlugins(context.Background(), nil, pod, "") },
+			action:             func(f Framework) { f.RunBindPlugins(context.Background(), state, pod, "") },
 			inject:             injectedResult{BindStatus: int(Error)},
 			wantExtensionPoint: "Bind",
 			wantStatus:         Error,
 		},
 		{
 			name:               "Permit - Error",
-			action:             func(f Framework) { f.RunPermitPlugins(context.Background(), nil, pod, "") },
+			action:             func(f Framework) { f.RunPermitPlugins(context.Background(), state, pod, "") },
 			inject:             injectedResult{PermitStatus: int(Error)},
 			wantExtensionPoint: "Permit",
 			wantStatus:         Error,
@@ -699,6 +758,10 @@ func TestRecordingMetrics(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			metrics.Register()
+			metrics.FrameworkExtensionPointDuration.Reset()
+			metrics.PluginExecutionDuration.Reset()
+
 			plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
 			r := make(Registry)
 			r.Register(testPlugin,
@@ -718,16 +781,22 @@ func TestRecordingMetrics(t *testing.T) {
 				PostBind:   pluginSet,
 				Unreserve:  pluginSet,
 			}
-			f, err := NewFramework(r, plugins, emptyArgs)
+			recorder := newMetricsRecorder(100, time.Nanosecond)
+			f, err := NewFramework(r, plugins, emptyArgs, withMetricsRecorder(recorder))
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
-			metrics.Register()
-			metrics.FrameworkExtensionPointDuration.Reset()
 
 			tt.action(f)
 
+			// Stop the goroutine which records metrics and ensure it's stopped.
+			close(recorder.stopCh)
+			<-recorder.isStoppedCh
+			// Try to clean up the metrics buffer again in case it's not empty.
+			recorder.flushMetrics()
+
 			collectAndCompareFrameworkMetrics(t, tt.wantExtensionPoint, tt.wantStatus)
+			collectAndComparePluginMetrics(t, tt.wantExtensionPoint, testPlugin, tt.wantStatus)
 		})
 	}
 }
@@ -750,6 +819,9 @@ func TestPermitWaitingMetric(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			metrics.Register()
+			metrics.PermitWaitDuration.Reset()
+
 			plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
 			r := make(Registry)
 			r.Register(testPlugin,
@@ -763,13 +835,49 @@ func TestPermitWaitingMetric(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
-			metrics.Register()
-			metrics.PermitWaitDuration.Reset()
 
 			f.RunPermitPlugins(context.TODO(), nil, pod, "")
 
 			collectAndComparePermitWaitDuration(t, tt.wantRes)
 		})
+	}
+}
+
+func TestRejectWaitingPod(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod",
+			UID:  types.UID("pod"),
+		},
+	}
+
+	testPermitPlugin := &TestPermitPlugin{}
+	r := make(Registry)
+	r.Register(permitPlugin,
+		func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
+			return testPermitPlugin, nil
+		})
+	plugins := &config.Plugins{
+		Permit: &config.PluginSet{Enabled: []config.Plugin{{Name: permitPlugin, Weight: 1}}},
+	}
+
+	f, err := NewFramework(r, plugins, emptyArgs)
+	if err != nil {
+		t.Fatalf("Failed to create framework for testing: %v", err)
+	}
+
+	go func() {
+		for {
+			waitingPod := f.GetWaitingPod(pod.UID)
+			if waitingPod != nil {
+				break
+			}
+		}
+		f.RejectWaitingPod(pod.UID)
+	}()
+	permitStatus := f.RunPermitPlugins(context.Background(), nil, pod, "")
+	if permitStatus.message != "pod \"pod\" rejected while waiting at permit: removed" {
+		t.Fatalf("RejectWaitingPod failed, permitStatus: %v", permitStatus)
 	}
 }
 
@@ -786,17 +894,19 @@ func buildScoreConfigWithWeights(weights map[string]int32, ps ...string) *config
 }
 
 type injectedResult struct {
-	ScoreRes         int64 `json:"scoreRes,omitempty"`
-	NormalizeRes     int64 `json:"normalizeRes,omitempty"`
-	ScoreStatus      int   `json:"scoreStatus,omitempty"`
-	NormalizeStatus  int   `json:"normalizeStatus,omitempty"`
-	PreFilterStatus  int   `json:"preFilterStatus,omitempty"`
-	FilterStatus     int   `json:"filterStatus,omitempty"`
-	PostFilterStatus int   `json:"postFilterStatus,omitempty"`
-	ReserveStatus    int   `json:"reserveStatus,omitempty"`
-	PreBindStatus    int   `json:"preBindStatus,omitempty"`
-	BindStatus       int   `json:"bindStatus,omitempty"`
-	PermitStatus     int   `json:"permitStatus,omitempty"`
+	ScoreRes                 int64 `json:"scoreRes,omitempty"`
+	NormalizeRes             int64 `json:"normalizeRes,omitempty"`
+	ScoreStatus              int   `json:"scoreStatus,omitempty"`
+	NormalizeStatus          int   `json:"normalizeStatus,omitempty"`
+	PreFilterStatus          int   `json:"preFilterStatus,omitempty"`
+	PreFilterAddPodStatus    int   `json:"preFilterAddPodStatus,omitempty"`
+	PreFilterRemovePodStatus int   `json:"preFilterRemovePodStatus,omitempty"`
+	FilterStatus             int   `json:"filterStatus,omitempty"`
+	PostFilterStatus         int   `json:"postFilterStatus,omitempty"`
+	ReserveStatus            int   `json:"reserveStatus,omitempty"`
+	PreBindStatus            int   `json:"preBindStatus,omitempty"`
+	BindStatus               int   `json:"bindStatus,omitempty"`
+	PermitStatus             int   `json:"permitStatus,omitempty"`
 }
 
 func setScoreRes(inj injectedResult) (int64, *Status) {
@@ -816,6 +926,33 @@ func injectNormalizeRes(inj injectedResult, scores NodeScoreList) *Status {
 	return nil
 }
 
+func collectAndComparePluginMetrics(t *testing.T, wantExtensionPoint, wantPlugin string, wantStatus Code) {
+	m := collectHistogramMetric(metrics.PluginExecutionDuration)
+	if len(m.Label) != 3 {
+		t.Fatalf("Unexpected number of label pairs, got: %v, want: 2", len(m.Label))
+	}
+
+	if *m.Label[0].Value != wantExtensionPoint {
+		t.Errorf("Unexpected extension point label, got: %q, want %q", *m.Label[0].Value, wantExtensionPoint)
+	}
+
+	if *m.Label[1].Value != wantPlugin {
+		t.Errorf("Unexpected plugin label, got: %q, want %q", *m.Label[1].Value, wantPlugin)
+	}
+
+	if *m.Label[2].Value != wantStatus.String() {
+		t.Errorf("Unexpected status code label, got: %q, want %q", *m.Label[2].Value, wantStatus)
+	}
+
+	if *m.Histogram.SampleCount == 0 {
+		t.Error("Expect at least 1 sample")
+	}
+
+	if *m.Histogram.SampleSum <= 0 {
+		t.Errorf("Expect latency to be greater than 0, got: %v", *m.Histogram.SampleSum)
+	}
+}
+
 func collectAndCompareFrameworkMetrics(t *testing.T, wantExtensionPoint string, wantStatus Code) {
 	m := collectHistogramMetric(metrics.FrameworkExtensionPointDuration)
 
@@ -832,11 +969,11 @@ func collectAndCompareFrameworkMetrics(t *testing.T, wantExtensionPoint string, 
 	}
 
 	if *m.Histogram.SampleCount != 1 {
-		t.Errorf("Expect 1 sample, got: %v", m.Histogram.SampleCount)
+		t.Errorf("Expect 1 sample, got: %v", *m.Histogram.SampleCount)
 	}
 
 	if *m.Histogram.SampleSum <= 0 {
-		t.Errorf("Expect latency to be greater than 0, got: %v", m.Histogram.SampleSum)
+		t.Errorf("Expect latency to be greater than 0, got: %v", *m.Histogram.SampleSum)
 	}
 }
 
@@ -858,17 +995,17 @@ func collectAndComparePermitWaitDuration(t *testing.T, wantRes string) {
 		}
 
 		if *m.Histogram.SampleCount != 1 {
-			t.Errorf("Expect 1 sample, got: %v", m.Histogram.SampleCount)
+			t.Errorf("Expect 1 sample, got: %v", *m.Histogram.SampleCount)
 		}
 
 		if *m.Histogram.SampleSum <= 0 {
-			t.Errorf("Expect latency to be greater than 0, got: %v", m.Histogram.SampleSum)
+			t.Errorf("Expect latency to be greater than 0, got: %v", *m.Histogram.SampleSum)
 		}
 	}
 }
 
 func collectHistogramMetric(metric prometheus.Collector) *dto.Metric {
-	ch := make(chan prometheus.Metric, 1)
+	ch := make(chan prometheus.Metric, 100)
 	metric.Collect(ch)
 	select {
 	case got := <-ch:

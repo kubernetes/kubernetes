@@ -18,8 +18,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm",
     deps = [
-        "//pkg/kubelet/apis/config:go_default_library",
-        "//pkg/proxy/apis/config:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -27,6 +25,8 @@ go_library(
         "//staging/src/k8s.io/cluster-bootstrap/token/api:go_default_library",
         "//staging/src/k8s.io/cluster-bootstrap/token/util:go_default_library",
         "//staging/src/k8s.io/cluster-bootstrap/util/secrets:go_default_library",
+        "//staging/src/k8s.io/kube-proxy/config/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
     ],
 )

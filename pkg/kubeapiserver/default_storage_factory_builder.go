@@ -26,7 +26,6 @@ import (
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -36,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // SpecialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
@@ -51,19 +49,15 @@ var SpecialDefaultResourcePrefixes = map[schema.GroupResource]string{
 	{Group: "policy", Resource: "podsecuritypolicies"}:     "podsecuritypolicy",
 }
 
+// NewStorageFactoryConfig returns a new StorageFactoryConfig set up with necessary resource overrides.
 func NewStorageFactoryConfig() *StorageFactoryConfig {
 
 	resources := []schema.GroupVersionResource{
 		batch.Resource("cronjobs").WithVersion("v1beta1"),
 		networking.Resource("ingresses").WithVersion("v1beta1"),
-	}
-	// add csinodes if CSINodeInfo feature gate is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		resources = append(resources, apisstorage.Resource("csinodes").WithVersion("v1beta1"))
-	}
-	// add csidrivers if CSIDriverRegistry feature gate is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		resources = append(resources, apisstorage.Resource("csidrivers").WithVersion("v1beta1"))
+		// TODO #83513 csinodes override can be removed in 1.18
+		apisstorage.Resource("csinodes").WithVersion("v1beta1"),
+		apisstorage.Resource("csidrivers").WithVersion("v1beta1"),
 	}
 
 	return &StorageFactoryConfig{
@@ -73,9 +67,10 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 	}
 }
 
+// StorageFactoryConfig is a configuration for creating storage factory.
 type StorageFactoryConfig struct {
 	StorageConfig                    storagebackend.Config
-	ApiResourceConfig                *serverstorage.ResourceConfig
+	APIResourceConfig                *serverstorage.ResourceConfig
 	DefaultResourceEncoding          *serverstorage.DefaultResourceEncodingConfig
 	DefaultStorageMediaType          string
 	Serializer                       runtime.StorageSerializer
@@ -84,6 +79,7 @@ type StorageFactoryConfig struct {
 	EncryptionProviderConfigFilepath string
 }
 
+// Complete completes the StorageFactoryConfig with provided etcdOptions returning completedStorageFactoryConfig.
 func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions) (*completedStorageFactoryConfig, error) {
 	c.StorageConfig = etcdOptions.StorageConfig
 	c.DefaultStorageMediaType = etcdOptions.DefaultStorageMediaType
@@ -92,10 +88,15 @@ func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions) 
 	return &completedStorageFactoryConfig{c}, nil
 }
 
+// completedStorageFactoryConfig is a wrapper around StorageFactoryConfig completed with etcd options.
+//
+// Note: this struct is intentionally unexported so that it can only be constructed via a StorageFactoryConfig.Complete
+// call. The implied consequence is that this does not comply with golint.
 type completedStorageFactoryConfig struct {
 	*StorageFactoryConfig
 }
 
+// New returns a new storage factory created from the completed storage factory configuration.
 func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFactory, error) {
 	resourceEncodingConfig := resourceconfig.MergeResourceEncodingConfigs(c.DefaultResourceEncoding, c.ResourceEncodingOverrides)
 	storageFactory := serverstorage.NewDefaultStorageFactory(
@@ -103,7 +104,7 @@ func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFact
 		c.DefaultStorageMediaType,
 		c.Serializer,
 		resourceEncodingConfig,
-		c.ApiResourceConfig,
+		c.APIResourceConfig,
 		SpecialDefaultResourcePrefixes)
 
 	storageFactory.AddCohabitatingResources(networking.Resource("networkpolicies"), extensions.Resource("networkpolicies"))

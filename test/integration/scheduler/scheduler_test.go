@@ -43,7 +43,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -55,20 +54,20 @@ type nodeStateManager struct {
 	makeUnSchedulable nodeMutationFunc
 }
 
-func PredicateOne(pod *v1.Pod, meta predicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
+func PredicateOne(pod *v1.Pod, meta predicates.Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
-func PredicateTwo(pod *v1.Pod, meta predicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
+func PredicateTwo(pod *v1.Pod, meta predicates.Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
-func PriorityOne(pod *v1.Pod, sharedLister schedulerlisters.SharedLister, nodes []*v1.Node) (schedulerframework.NodeScoreList, error) {
-	return []schedulerframework.NodeScore{}, nil
+func PriorityOne(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerframework.NodeScore, error) {
+	return schedulerframework.NodeScore{}, nil
 }
 
-func PriorityTwo(pod *v1.Pod, sharedLister schedulerlisters.SharedLister, nodes []*v1.Node) (schedulerframework.NodeScoreList, error) {
-	return []schedulerframework.NodeScore{}, nil
+func PriorityTwo(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerframework.NodeScore, error) {
+	return schedulerframework.NodeScore{}, nil
 }
 
 // TestSchedulerCreationFromConfigMap verifies that scheduler can be created
@@ -88,8 +87,8 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	// Pre-register some predicate and priority functions
 	scheduler.RegisterFitPredicate("PredicateOne", PredicateOne)
 	scheduler.RegisterFitPredicate("PredicateTwo", PredicateTwo)
-	scheduler.RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
-	scheduler.RegisterPriorityFunction("PriorityTwo", PriorityTwo, 1)
+	scheduler.RegisterPriorityMapReduceFunction("PriorityOne", PriorityOne, nil, 1)
+	scheduler.RegisterPriorityMapReduceFunction("PriorityTwo", PriorityTwo, nil, 1)
 
 	for i, test := range []struct {
 		policy               string
@@ -130,10 +129,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"kind" : "Policy",
 				"apiVersion" : "v1"
 			}`,
-			expectedPrioritizers: sets.NewString(
-				"InterPodAffinityPriority",
-				"SelectorSpreadPriority",
-			),
+			expectedPrioritizers: sets.NewString(),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -154,9 +150,11 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
 					{Name: "ImageLocality", Weight: 1},
+					{Name: "InterPodAffinity", Weight: 1},
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
 					{Name: "NodeAffinity", Weight: 1},
 					{Name: "NodePreferAvoidPods", Weight: 10000},
+					{Name: "DefaultPodTopologySpread", Weight: 1},
 					{Name: "TaintToleration", Weight: 1},
 				},
 			},
@@ -208,10 +206,7 @@ priorities:
 			policy: `apiVersion: v1
 kind: Policy
 `,
-			expectedPrioritizers: sets.NewString(
-				"InterPodAffinityPriority",
-				"SelectorSpreadPriority",
-			),
+			expectedPrioritizers: sets.NewString(),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -232,9 +227,11 @@ kind: Policy
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
 					{Name: "ImageLocality", Weight: 1},
+					{Name: "InterPodAffinity", Weight: 1},
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
 					{Name: "NodeAffinity", Weight: 1},
 					{Name: "NodePreferAvoidPods", Weight: 10000},
+					{Name: "DefaultPodTopologySpread", Weight: 1},
 					{Name: "TaintToleration", Weight: 1},
 				},
 			},

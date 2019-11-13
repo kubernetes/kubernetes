@@ -125,7 +125,7 @@ func TestPlugin(t *testing.T) {
 		},
 	}
 	fakeManager := &fakePDManager{}
-	fakeMounter := &mount.FakeMounter{}
+	fakeMounter := mount.NewFakeMounter(nil)
 	mounter, err := plug.(*awsElasticBlockStorePlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -314,7 +314,7 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 		},
 	}
 
-	mounter, err := plug.(*awsElasticBlockStorePlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
+	mounter, err := plug.(*awsElasticBlockStorePlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), &fakePDManager{}, mount.NewFakeMounter(nil))
 	if err != nil {
 		t.Errorf("Error creating new mounter:%v", err)
 	}
@@ -322,7 +322,7 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 		t.Errorf("Volume Mounter can be type-assert to Unmounter")
 	}
 
-	unmounter, err := plug.(*awsElasticBlockStorePlugin).newUnmounterInternal("vol1", types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
+	unmounter, err := plug.(*awsElasticBlockStorePlugin).newUnmounterInternal("vol1", types.UID("poduid"), &fakePDManager{}, mount.NewFakeMounter(nil))
 	if err != nil {
 		t.Errorf("Error creating new unmounter:%v", err)
 	}
@@ -361,7 +361,7 @@ func TestMountOptions(t *testing.T) {
 	}
 
 	fakeManager := &fakePDManager{}
-	fakeMounter := &mount.FakeMounter{}
+	fakeMounter := mount.NewFakeMounter(nil)
 
 	mounter, err := plug.(*awsElasticBlockStorePlugin).newMounterInternal(volume.NewSpecFromPersistentVolume(pv, false), types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {

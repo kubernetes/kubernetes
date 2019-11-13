@@ -29,11 +29,11 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
+	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/utils/pointer"
 )
 
@@ -206,11 +206,11 @@ func TestEnsureProxyAddon(t *testing.T) {
 				t.Errorf("test failed to convert external to internal version")
 				return
 			}
-			intControlPlane.ComponentConfigs.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{
+			intControlPlane.ComponentConfigs.KubeProxy = &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
 				BindAddress:        "",
 				HealthzBindAddress: "0.0.0.0:10256",
 				MetricsBindAddress: "127.0.0.1:10249",
-				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
 					MaxPerCore:            pointer.Int32Ptr(1),
 					Min:                   pointer.Int32Ptr(1),
 					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},

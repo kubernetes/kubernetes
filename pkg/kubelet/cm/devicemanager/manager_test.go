@@ -257,7 +257,6 @@ func setupDevicePlugin(t *testing.T, devs []*pluginapi.Device, pluginSocketName 
 func setupPluginManager(t *testing.T, pluginSocketName string, m Manager) pluginmanager.PluginManager {
 	pluginManager := pluginmanager.NewPluginManager(
 		filepath.Dir(pluginSocketName), /* sockDir */
-		"",                             /* deprecatedSockDir */
 		&record.FakeRecorder{},
 	)
 
@@ -745,7 +744,9 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 				testCase.description, testCase.expErr, err)
 		}
 		runContainerOpts, err := testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
-		as.Nil(err)
+		if testCase.expErr == nil {
+			as.Nil(err)
+		}
 		if testCase.expectedContainerOptsLen == nil {
 			as.Nil(runContainerOpts)
 		} else {

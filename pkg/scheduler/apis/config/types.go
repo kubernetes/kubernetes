@@ -17,6 +17,8 @@ limitations under the License.
 package config
 
 import (
+	"math"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfig "k8s.io/component-base/config"
@@ -50,7 +52,7 @@ type KubeSchedulerConfiguration struct {
 	AlgorithmSource SchedulerAlgorithmSource
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.
-	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
+	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range [0-100].
 	HardPodAffinitySymmetricWeight int32
 
 	// LeaderElection defines the configuration of leader election client.
@@ -86,17 +88,17 @@ type KubeSchedulerConfiguration struct {
 	// Duration to wait for a binding operation to complete before timing out
 	// Value must be non-negative integer. The value zero indicates no waiting.
 	// If this value is nil, the default value will be used.
-	BindTimeoutSeconds *int64
+	BindTimeoutSeconds int64
 
 	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
 	// If specified, it must be greater than 0. If this value is null, the default value (1s)
 	// will be used.
-	PodInitialBackoffSeconds *int64
+	PodInitialBackoffSeconds int64
 
 	// PodMaxBackoffSeconds is the max backoff for unschedulable pods.
-	// If specified, it must be greater than podInitialBackoffSeconds. If this value is null,
+	// If specified, it must be greater than or equal to podInitialBackoffSeconds. If this value is null,
 	// the default value (10s) will be used.
-	PodMaxBackoffSeconds *int64
+	PodMaxBackoffSeconds int64
 
 	// Plugins specify the set of plugins that should be enabled or disabled. Enabled plugins are the
 	// ones that should be enabled in addition to the default plugins. Disabled plugins are any of the
@@ -140,7 +142,7 @@ type SchedulerPolicyFileSource struct {
 type SchedulerPolicyConfigMapSource struct {
 	// Namespace is the namespace of the policy config map.
 	Namespace string
-	// Name is the name of hte policy config map.
+	// Name is the name of the policy config map.
 	Name string
 }
 
@@ -220,9 +222,24 @@ type PluginConfig struct {
 	Args runtime.Unknown
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// NOTE: The following methods are intentionally left out of the staging mirror.
-///////////////////////////////////////////////////////////////////////////////
+/*
+ * NOTE: The following variables and methods are intentionally left out of the staging mirror.
+ */
+const (
+	// DefaultPercentageOfNodesToScore defines the percentage of nodes of all nodes
+	// that once found feasible, the scheduler stops looking for more nodes.
+	// A value of 0 means adaptive, meaning the scheduler figures out a proper default.
+	DefaultPercentageOfNodesToScore = 0
+
+	// MaxCustomPriorityScore is the max score UtilizationShapePoint expects.
+	MaxCustomPriorityScore int64 = 10
+
+	// MaxTotalScore is the maximum total score.
+	MaxTotalScore int64 = math.MaxInt64
+
+	// MaxWeight defines the max weight value allowed for custom PriorityPolicy
+	MaxWeight = MaxTotalScore / MaxCustomPriorityScore
+)
 
 func appendPluginSet(dst *PluginSet, src *PluginSet) *PluginSet {
 	if dst == nil {

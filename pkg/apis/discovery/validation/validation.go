@@ -109,9 +109,7 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 		allErrs = append(allErrs, metavalidation.ValidateLabels(endpoint.Topology, topologyPath)...)
 
 		if endpoint.Hostname != nil {
-			for _, msg := range validation.IsDNS1123Label(*endpoint.Hostname) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), *endpoint.Hostname, msg))
-			}
+			allErrs = append(allErrs, apivalidation.ValidateDNS1123Label(*endpoint.Hostname, idxPath.Child("hostname"))...)
 		}
 	}
 
@@ -131,9 +129,7 @@ func validatePorts(endpointPorts []discovery.EndpointPort, fldPath *field.Path) 
 		idxPath := fldPath.Index(i)
 
 		if len(*endpointPort.Name) > 0 {
-			for _, msg := range validation.IsValidPortName(*endpointPort.Name) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), endpointPort.Name, msg))
-			}
+			allErrs = append(allErrs, apivalidation.ValidateDNS1123Label(*endpointPort.Name, idxPath.Child("name"))...)
 		}
 
 		if portNames.Has(*endpointPort.Name) {
@@ -146,6 +142,12 @@ func validatePorts(endpointPorts []discovery.EndpointPort, fldPath *field.Path) 
 			allErrs = append(allErrs, field.Required(idxPath.Child("protocol"), ""))
 		} else if !supportedPortProtocols.Has(string(*endpointPort.Protocol)) {
 			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), *endpointPort.Protocol, supportedPortProtocols.List()))
+		}
+
+		if endpointPort.AppProtocol != nil {
+			for _, msg := range validation.IsQualifiedName(*endpointPort.AppProtocol) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("appProtocol"), endpointPort.AppProtocol, msg))
+			}
 		}
 	}
 

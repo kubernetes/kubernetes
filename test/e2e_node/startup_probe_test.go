@@ -173,6 +173,10 @@ var _ = framework.KubeDescribe("StartupProbe [Serial] [Disruptive] [NodeAlphaFea
 			framework.ExpectNoError(err)
 
 			f.WaitForPodReady(p.Name)
+
+			p, err = podClient.Get(p.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
 			isReady, err := testutils.PodRunningReady(p)
 			framework.ExpectNoError(err)
 			gomega.Expect(isReady).To(gomega.BeTrue(), "pod should be ready")

@@ -22,11 +22,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"strconv"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/api/core/v1"
@@ -57,6 +57,12 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 	if g.isLegacyNetwork {
 		g.eventRecorder.Event(svc, v1.EventTypeWarning, "ILBOptionsIgnored", "Internal LoadBalancer options are not supported with Legacy Networks.")
 		options = ILBOptions{}
+	}
+	if !g.AlphaFeatureGate.Enabled(AlphaFeatureILBCustomSubnet) {
+		if options.SubnetName != "" {
+			g.eventRecorder.Event(svc, v1.EventTypeWarning, "ILBCustomSubnetOptionIgnored", "Internal LoadBalancer CustomSubnet options ignored as the feature gate is disabled.")
+			options.SubnetName = ""
+		}
 	}
 
 	loadBalancerName := g.GetLoadBalancerName(context.TODO(), clusterName, svc)
@@ -98,23 +104,32 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		return nil, err
 	}
 
+	subnetworkURL := g.SubnetworkURL()
+	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBCustomSubnet) {
+		// If this feature is enabled, changes to subnet annotation will be
+		// picked up and reflected in the forwarding rule.
+		// Removing the annotation will set the forwarding rule to use the default subnet.
+		if options.SubnetName != "" {
+			subnetworkURL = gceSubnetworkURL("", g.networkProjectID, g.region, options.SubnetName)
+		}
+	} else {
+		// TODO(84885) remove this once ILBCustomSubnet goes beta.
+		if existingFwdRule != nil && existingFwdRule.Subnetwork != "" {
+			// If the ILB already exists, continue using the subnet that it's already using.
+			// This is to support existing ILBs that were setup using the wrong subnet - https://github.com/kubernetes/kubernetes/pull/57861
+			subnetworkURL = existingFwdRule.Subnetwork
+		}
+	}
 	// Determine IP which will be used for this LB. If no forwarding rule has been established
 	// or specified in the Service spec, then requestedIP = "".
-	requestedIP := determineRequestedIP(svc, existingFwdRule)
-	ipToUse := requestedIP
+	ipToUse := ilbIPToUse(svc, existingFwdRule, subnetworkURL)
 
-	// If the ILB already exists, continue using the subnet that it's already using.
-	// This is to support existing ILBs that were setup using the wrong subnet.
-	subnetworkURL := g.SubnetworkURL()
-	if existingFwdRule != nil && existingFwdRule.Subnetwork != "" {
-		// external LBs have an empty Subnetwork field.
-		subnetworkURL = existingFwdRule.Subnetwork
-	}
+	klog.V(2).Infof("ensureInternalLoadBalancer(%v): Using subnet %s for LoadBalancer IP %s", loadBalancerName, options.SubnetName, ipToUse)
 
 	var addrMgr *addressManager
 	// If the network is not a legacy network, use the address manager
 	if !g.IsLegacyNetwork() {
-		addrMgr = newAddressManager(g, nm.String(), g.Region(), subnetworkURL, loadBalancerName, requestedIP, cloud.SchemeInternal)
+		addrMgr = newAddressManager(g, nm.String(), g.Region(), subnetworkURL, loadBalancerName, ipToUse, cloud.SchemeInternal)
 		ipToUse, err = addrMgr.HoldAddress()
 		if err != nil {
 			return nil, err
@@ -248,14 +263,26 @@ func (g *Cloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID string,
 		return err
 	}
 
-	klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting firewall for traffic", loadBalancerName)
-	if err := ignoreNotFound(g.DeleteFirewall(loadBalancerName)); err != nil {
-		if isForbidden(err) && g.OnXPN() {
-			klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): could not delete traffic firewall on XPN cluster. Raising event.", loadBalancerName)
-			g.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudDeleteCmd(loadBalancerName, g.NetworkProjectID()))
-		} else {
+	deleteFunc := func(fwName string) error {
+		if err := ignoreNotFound(g.DeleteFirewall(fwName)); err != nil {
+			if isForbidden(err) && g.OnXPN() {
+				klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): could not delete traffic firewall on XPN cluster. Raising event.", loadBalancerName)
+				g.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudDeleteCmd(fwName, g.NetworkProjectID()))
+				return nil
+			}
 			return err
 		}
+		return nil
+	}
+	fwName := MakeFirewallName(loadBalancerName)
+	klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting firewall %s for traffic",
+		loadBalancerName, fwName)
+	if err := deleteFunc(fwName); err != nil {
+		return err
+	}
+	klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting legacy name firewall for traffic", loadBalancerName)
+	if err := deleteFunc(loadBalancerName); err != nil {
+		return err
 	}
 
 	hcName := makeHealthCheckName(loadBalancerName, clusterID, sharedHealthCheck)
@@ -317,7 +344,7 @@ func (g *Cloud) teardownInternalHealthCheckAndFirewall(svc *v1.Service, hcName s
 	return nil
 }
 
-func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, sourceRanges []string, ports []string, protocol v1.Protocol, nodes []*v1.Node) error {
+func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, sourceRanges []string, ports []string, protocol v1.Protocol, nodes []*v1.Node, legacyFwName string) error {
 	klog.V(2).Infof("ensureInternalFirewall(%v): checking existing firewall", fwName)
 	targetTags, err := g.GetNodeTags(nodeNames(nodes))
 	if err != nil {
@@ -327,6 +354,29 @@ func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, s
 	existingFirewall, err := g.GetFirewall(fwName)
 	if err != nil && !isNotFound(err) {
 		return err
+	}
+	// TODO(84821) Remove legacyFwName logic after 3 releases, so there would have been atleast 2 master upgrades that would
+	// have triggered service sync and deletion of the legacy rules.
+	if legacyFwName != "" {
+		// Check for firewall named with the legacy naming scheme and delete if found.
+		legacyFirewall, err := g.GetFirewall(legacyFwName)
+		if err != nil && !isNotFound(err) {
+			return err
+		}
+		if legacyFirewall != nil && existingFirewall != nil {
+			// Delete the legacyFirewall rule if the new one was already created. If not, it will be deleted in the
+			// next sync or when the service is deleted.
+			defer func() {
+				err = g.DeleteFirewall(legacyFwName)
+				if err != nil {
+					klog.Errorf("Failed to delete legacy firewall %s for service %s/%s, err %v",
+						legacyFwName, svc.Namespace, svc.Name, err)
+				} else {
+					klog.V(2).Infof("Successfully deleted legacy firewall %s for service %s/%s",
+						legacyFwName, svc.Namespace, svc.Name)
+				}
+			}()
+		}
 	}
 
 	expectedFirewall := &compute.Firewall{
@@ -376,7 +426,7 @@ func (g *Cloud) ensureInternalFirewalls(loadBalancerName, ipAddress, clusterID s
 	if err != nil {
 		return err
 	}
-	err = g.ensureInternalFirewall(svc, loadBalancerName, fwDesc, sourceRanges.StringSlice(), ports, protocol, nodes)
+	err = g.ensureInternalFirewall(svc, MakeFirewallName(loadBalancerName), fwDesc, sourceRanges.StringSlice(), ports, protocol, nodes, loadBalancerName)
 	if err != nil {
 		return err
 	}
@@ -384,7 +434,7 @@ func (g *Cloud) ensureInternalFirewalls(loadBalancerName, ipAddress, clusterID s
 	// Second firewall is for health checking nodes / services
 	fwHCName := makeHealthCheckFirewallName(loadBalancerName, clusterID, sharedHealthCheck)
 	hcSrcRanges := L4LoadBalancerSrcRanges()
-	return g.ensureInternalFirewall(svc, fwHCName, "", hcSrcRanges, []string{healthCheckPort}, v1.ProtocolTCP, nodes)
+	return g.ensureInternalFirewall(svc, fwHCName, "", hcSrcRanges, []string{healthCheckPort}, v1.ProtocolTCP, nodes, "")
 }
 
 func (g *Cloud) ensureInternalHealthCheck(name string, svcName types.NamespacedName, shared bool, path string, port int32) (*compute.HealthCheck, error) {
@@ -723,20 +773,27 @@ func getNameFromLink(link string) string {
 	return fields[len(fields)-1]
 }
 
-func determineRequestedIP(svc *v1.Service, fwdRule *compute.ForwardingRule) string {
+// ilbIPToUse determines which IP address needs to be used in the ForwardingRule. If an IP has been
+// specified by the user, that is used. If there is an existing ForwardingRule, the ip address from
+// that is reused. In case a subnetwork change is requested, the existing ForwardingRule IP is ignored.
+func ilbIPToUse(svc *v1.Service, fwdRule *compute.ForwardingRule, requestedSubnet string) string {
 	if svc.Spec.LoadBalancerIP != "" {
 		return svc.Spec.LoadBalancerIP
 	}
-
-	if fwdRule != nil {
-		return fwdRule.IPAddress
+	if fwdRule == nil {
+		return ""
 	}
-
-	return ""
+	if requestedSubnet != fwdRule.Subnetwork {
+		// reset ip address since subnet is being changed.
+		return ""
+	}
+	return fwdRule.IPAddress
 }
 
 func getILBOptions(svc *v1.Service) ILBOptions {
-	return ILBOptions{AllowGlobalAccess: GetLoadBalancerAnnotationAllowGlobalAccess(svc)}
+	return ILBOptions{AllowGlobalAccess: GetLoadBalancerAnnotationAllowGlobalAccess(svc),
+		SubnetName: GetLoadBalancerAnnotationSubnet(svc),
+	}
 }
 
 // forwardingRuleComposite is a composite type encapsulating both the GA and Beta ForwardingRules.
@@ -765,7 +822,8 @@ func (f *forwardingRuleComposite) Equal(other *forwardingRuleComposite) bool {
 		f.lbScheme == other.lbScheme &&
 		equalStringSets(f.ports, other.ports) &&
 		f.backendService == other.backendService &&
-		f.allowGlobalAccess == other.allowGlobalAccess
+		f.allowGlobalAccess == other.allowGlobalAccess &&
+		f.subnetwork == other.subnetwork
 }
 
 // toForwardingRuleComposite converts a compute beta or GA ForwardingRule into the composite type

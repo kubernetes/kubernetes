@@ -29,6 +29,14 @@ type FakeExec struct {
 	CommandScript []FakeCommandAction
 	CommandCalls  int
 	LookPathFunc  func(string) (string, error)
+	// ExactOrder enforces that commands are called in the order they are scripted,
+	// and with the exact same arguments
+	ExactOrder bool
+	// DisableScripts removes the requirement that a slice of FakeCommandAction be
+	// propulated before calling Command(). This makes the fakeexec (and subsequent
+	// calls to Run() or CombinedOutput() always return success and there is no
+	// ability to set their output.
+	DisableScripts bool
 }
 
 var _ exec.Interface = &FakeExec{}
@@ -38,12 +46,32 @@ type FakeCommandAction func(cmd string, args ...string) exec.Cmd
 
 // Command is to track the commands that are executed
 func (fake *FakeExec) Command(cmd string, args ...string) exec.Cmd {
+	if fake.DisableScripts {
+		fakeCmd := &FakeCmd{DisableScripts: true}
+		return InitFakeCmd(fakeCmd, cmd, args...)
+	}
 	if fake.CommandCalls > len(fake.CommandScript)-1 {
 		panic(fmt.Sprintf("ran out of Command() actions. Could not handle command [%d]: %s args: %v", fake.CommandCalls, cmd, args))
 	}
 	i := fake.CommandCalls
 	fake.CommandCalls++
-	return fake.CommandScript[i](cmd, args...)
+	fakeCmd := fake.CommandScript[i](cmd, args...)
+	if fake.ExactOrder {
+		argv := append([]string{cmd}, args...)
+		fc := fakeCmd.(*FakeCmd)
+		if cmd != fc.Argv[0] {
+			panic(fmt.Sprintf("received command: %s, expected: %s", cmd, fc.Argv[0]))
+		}
+		if len(argv) != len(fc.Argv) {
+			panic(fmt.Sprintf("command (%s) received with extra/missing arguments. Expected %v, Received %v", cmd, fc.Argv, argv))
+		}
+		for i, a := range argv[1:] {
+			if a != fc.Argv[i+1] {
+				panic(fmt.Sprintf("command (%s) called with unexpected argument. Expected %s, Received %s", cmd, fc.Argv[i+1], a))
+			}
+		}
+	}
+	return fakeCmd
 }
 
 // CommandContext wraps arguments into exec.Cmd
@@ -74,6 +102,7 @@ type FakeCmd struct {
 	StderrPipeResponse   FakeStdIOPipeResponse
 	WaitResponse         error
 	StartResponse        error
+	DisableScripts       bool
 }
 
 var _ exec.Cmd = &FakeCmd{}
@@ -146,8 +175,11 @@ func (fake *FakeCmd) Wait() error {
 	return fake.WaitResponse
 }
 
-// Run sets runs the command
+// Run runs the command
 func (fake *FakeCmd) Run() error {
+	if fake.DisableScripts {
+		return nil
+	}
 	if fake.RunCalls > len(fake.RunScript)-1 {
 		panic("ran out of Run() actions")
 	}
@@ -169,6 +201,9 @@ func (fake *FakeCmd) Run() error {
 
 // CombinedOutput returns the output from the command
 func (fake *FakeCmd) CombinedOutput() ([]byte, error) {
+	if fake.DisableScripts {
+		return []byte{}, nil
+	}
 	if fake.CombinedOutputCalls > len(fake.CombinedOutputScript)-1 {
 		panic("ran out of CombinedOutput() actions")
 	}

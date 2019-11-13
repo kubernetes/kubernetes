@@ -166,6 +166,9 @@ type TestContextType struct {
 
 	// NonblockingTaints is the comma-delimeted string given by the user to specify taints which should not stop the test framework from running tests.
 	NonblockingTaints string
+
+	// ProgressReportURL is the URL which progress updates will be posted to as tests complete. If empty, no updates are sent.
+	ProgressReportURL string
 }
 
 // NodeKillerConfig describes configuration of NodeKiller -- a utility to
@@ -292,6 +295,8 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 
 	flags.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for runnning tests.")
 	flags.StringVar(&TestContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")
+
+	flags.StringVar(&TestContext.ProgressReportURL, "progress-report-url", "", "The URL to POST progress updates to as the suite runs to assist in aiding integrations. If empty, no messages sent.")
 }
 
 // RegisterClusterFlags registers flags specific to the cluster e2e test suite.

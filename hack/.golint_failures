@@ -1,3 +1,4 @@
+# Apart from this line, only trailing comments are supported
 cmd/cloud-controller-manager/app/apis/config/v1alpha1
 cmd/kube-apiserver/app
 cmd/kubeadm/app/apis/kubeadm/v1beta1
@@ -8,18 +9,14 @@ pkg/apis/admission
 pkg/apis/admissionregistration/v1
 pkg/apis/admissionregistration/v1beta1
 pkg/apis/admissionregistration/validation
-pkg/apis/apps
 pkg/apis/apps/v1
 pkg/apis/apps/v1beta1
 pkg/apis/apps/v1beta2
 pkg/apis/auditregistration/v1alpha1
 pkg/apis/authentication/v1
-pkg/apis/authorization/v1
-pkg/apis/authorization/validation
 pkg/apis/autoscaling/v1
 pkg/apis/autoscaling/v2beta1
 pkg/apis/autoscaling/v2beta2
-pkg/apis/autoscaling/validation
 pkg/apis/batch/v1
 pkg/apis/batch/v1beta1
 pkg/apis/batch/v2alpha1
@@ -37,11 +34,10 @@ pkg/apis/discovery/v1alpha1
 pkg/apis/events/v1beta1
 pkg/apis/extensions
 pkg/apis/extensions/v1beta1
+pkg/apis/flowcontrol/v1alpha1
 pkg/apis/networking/v1
 pkg/apis/node/v1alpha1
-pkg/apis/policy
 pkg/apis/policy/v1beta1
-pkg/apis/policy/validation
 pkg/apis/rbac
 pkg/apis/rbac/v1
 pkg/apis/rbac/v1alpha1
@@ -102,13 +98,11 @@ pkg/controller/volume/events
 pkg/controller/volume/expand
 pkg/controller/volume/persistentvolume
 pkg/controller/volume/persistentvolume/config/v1alpha1
-pkg/controller/volume/persistentvolume/options
 pkg/credentialprovider
 pkg/features
 pkg/kubeapiserver
 pkg/kubeapiserver/options
 pkg/kubectl/cmd/convert
-pkg/kubectl/cmd/get
 pkg/kubelet/apis/config
 pkg/kubelet/apis/config/v1beta1
 pkg/kubelet/checkpointmanager/testing/example_checkpoint_formats/v1
@@ -181,7 +175,6 @@ pkg/registry/core/replicationcontroller/storage
 pkg/registry/core/resourcequota/storage
 pkg/registry/core/rest
 pkg/registry/core/secret
-pkg/registry/core/secret/storage
 pkg/registry/core/service
 pkg/registry/core/service/allocator
 pkg/registry/core/service/allocator/storage
@@ -193,6 +186,7 @@ pkg/registry/core/serviceaccount/storage
 pkg/registry/events/rest
 pkg/registry/extensions/controller/storage
 pkg/registry/extensions/rest
+pkg/registry/flowcontrol/rest
 pkg/registry/networking/networkpolicy/storage
 pkg/registry/networking/rest
 pkg/registry/node/rest
@@ -215,7 +209,6 @@ pkg/registry/storage/rest
 pkg/registry/storage/storageclass
 pkg/registry/storage/storageclass/storage
 pkg/scheduler/apis/config/v1alpha1
-pkg/security/apparmor
 pkg/security/podsecuritypolicy
 pkg/security/podsecuritypolicy/group
 pkg/security/podsecuritypolicy/selinux
@@ -228,7 +221,7 @@ pkg/util/ebtables
 pkg/util/goroutinemap/exponentialbackoff
 pkg/util/iptables
 pkg/util/iptables/testing
-pkg/util/labels
+pkg/util/labels # See previous effort in PR #80685
 pkg/util/mount
 pkg/util/oom
 pkg/util/procfs
@@ -240,7 +233,6 @@ pkg/util/taints
 pkg/volume
 pkg/volume/azure_dd
 pkg/volume/azure_file
-pkg/volume/csi/csiv0
 pkg/volume/csi/fake
 pkg/volume/git_repo
 pkg/volume/iscsi
@@ -332,7 +324,6 @@ staging/src/k8s.io/apimachinery/pkg/runtime/testing
 staging/src/k8s.io/apimachinery/pkg/selection
 staging/src/k8s.io/apimachinery/pkg/test
 staging/src/k8s.io/apimachinery/pkg/types
-staging/src/k8s.io/apimachinery/pkg/util/cache
 staging/src/k8s.io/apimachinery/pkg/util/clock
 staging/src/k8s.io/apimachinery/pkg/util/errors
 staging/src/k8s.io/apimachinery/pkg/util/framer
@@ -420,7 +411,6 @@ staging/src/k8s.io/apiserver/plugin/pkg/authorizer/webhook
 staging/src/k8s.io/cli-runtime/pkg/genericclioptions
 staging/src/k8s.io/cli-runtime/pkg/printers
 staging/src/k8s.io/cli-runtime/pkg/resource
-staging/src/k8s.io/client-go/deprecated-dynamic
 staging/src/k8s.io/client-go/discovery
 staging/src/k8s.io/client-go/discovery/fake
 staging/src/k8s.io/client-go/dynamic
@@ -501,6 +491,7 @@ staging/src/k8s.io/kubectl/pkg/cmd/drain
 staging/src/k8s.io/kubectl/pkg/cmd/exec
 staging/src/k8s.io/kubectl/pkg/cmd/explain
 staging/src/k8s.io/kubectl/pkg/cmd/expose
+staging/src/k8s.io/kubectl/pkg/cmd/get
 staging/src/k8s.io/kubectl/pkg/cmd/label
 staging/src/k8s.io/kubectl/pkg/cmd/logs
 staging/src/k8s.io/kubectl/pkg/cmd/patch
@@ -546,7 +537,6 @@ staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 test/e2e/common
 test/e2e/lifecycle/bootstrap
 test/e2e/storage/vsphere
-test/e2e_kubeadm
 test/e2e_node
 test/e2e_node/remote
 test/e2e_node/runner/remote

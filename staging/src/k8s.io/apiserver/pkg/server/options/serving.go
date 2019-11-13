@@ -109,10 +109,10 @@ func NewSecureServingOptions() *SecureServingOptions {
 }
 
 func (s *SecureServingOptions) DefaultExternalAddress() (net.IP, error) {
-	if !s.ExternalAddress.IsUnspecified() {
+	if s.ExternalAddress != nil && !s.ExternalAddress.IsUnspecified() {
 		return s.ExternalAddress, nil
 	}
-	return utilnet.ChooseBindAddress(s.BindAddress)
+	return utilnet.ResolveBindAddress(s.BindAddress)
 }
 
 func (s *SecureServingOptions) Validate() []error {
@@ -251,7 +251,7 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 	// load SNI certs
 	namedTLSCerts := make([]dynamiccertificates.SNICertKeyContentProvider, 0, len(s.SNICertKeys))
 	for _, nck := range s.SNICertKeys {
-		tlsCert, err := dynamiccertificates.NewStaticSNICertKeyContentFromFiles(nck.CertFile, nck.KeyFile, nck.Names...)
+		tlsCert, err := dynamiccertificates.NewDynamicSNIContentFromFiles("sni-serving-cert", nck.CertFile, nck.KeyFile, nck.Names...)
 		namedTLSCerts = append(namedTLSCerts, tlsCert)
 		if err != nil {
 			return fmt.Errorf("failed to load SNI cert and key: %v", err)

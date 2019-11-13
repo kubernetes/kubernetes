@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -430,7 +430,7 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 		informers.Core().V1().Nodes(),
 		informers.Core().V1().PersistentVolumeClaims(),
 		informers.Core().V1().PersistentVolumes(),
-		informers.Storage().V1beta1().CSINodes(),
+		informers.Storage().V1().CSINodes(),
 		informers.Storage().V1beta1().CSIDrivers(),
 		cloud,
 		plugins,

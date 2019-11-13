@@ -39,6 +39,7 @@ import (
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
+	endpointslicemetrics "k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 )
 
@@ -53,6 +54,20 @@ const (
 	// 5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1.3s, 2.6s, 5.1s,
 	// 10.2s, 20.4s, 41s, 82s
 	maxRetries = 15
+	// controllerName is a unique value used with LabelManagedBy to indicated
+	// the component managing an EndpointSlice.
+	controllerName = "endpointslice-controller.k8s.io"
+	// managedBySetupAnnotation is set on a Service to indicate that
+	// EndpointSlices for the Service have already been configured with
+	// LabelManagedBy. If this annotation is not set, all related EndpointSlices
+	// will have LabelManagedBy set to reference this controller if the label
+	// is not already set. Once all EndpointSlices are labeled, the Controller
+	// will set this annotation on the Service.
+	managedBySetupAnnotation = "endpointslice.kubernetes.io/managed-by-setup"
+	// managedBySetupCompleteValue represents the value of the
+	// managedBySetupAnnotation that indicates that the setup process has been
+	// completed for a Service.
+	managedBySetupCompleteValue = "true"
 )
 
 // NewController creates and initializes a new Controller
@@ -72,6 +87,8 @@ func NewController(podInformer coreinformers.PodInformer,
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("endpoint_slice_controller", client.DiscoveryV1alpha1().RESTClient().GetRateLimiter())
 	}
 
+	endpointslicemetrics.RegisterMetrics()
+
 	c := &Controller{
 		client:           client,
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "endpoint_slice"),
@@ -79,11 +96,11 @@ func NewController(podInformer coreinformers.PodInformer,
 	}
 
 	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: c.enqueueService,
+		AddFunc: c.onServiceUpdate,
 		UpdateFunc: func(old, cur interface{}) {
-			c.enqueueService(cur)
+			c.onServiceUpdate(cur)
 		},
-		DeleteFunc: c.enqueueService,
+		DeleteFunc: c.onServiceDelete,
 	})
 	c.serviceLister = serviceInformer.Lister()
 	c.servicesSynced = serviceInformer.Informer().HasSynced
@@ -108,11 +125,14 @@ func NewController(podInformer coreinformers.PodInformer,
 		client:               c.client,
 		nodeLister:           c.nodeLister,
 		maxEndpointsPerSlice: c.maxEndpointsPerSlice,
+		metricsCache:         endpointslicemetrics.NewCache(maxEndpointsPerSlice),
 	}
 	c.triggerTimeTracker = endpointutil.NewTriggerTimeTracker()
 
 	c.eventBroadcaster = broadcaster
 	c.eventRecorder = recorder
+
+	c.serviceSelectorCache = endpointutil.NewServiceSelectorCache()
 
 	return c
 }
@@ -172,6 +192,10 @@ type Controller struct {
 	// workerLoopPeriod is the time between worker runs. The workers
 	// process the queue of service and pod changes
 	workerLoopPeriod time.Duration
+
+	// serviceSelectorCache is a cache of service selectors to avoid high CPU consumption caused by frequent calls
+	// to AsSelectorPreValidated (see #73527)
+	serviceSelectorCache *endpointutil.ServiceSelectorCache
 }
 
 // Run will not return until stopCh is closed.
@@ -251,6 +275,7 @@ func (c *Controller) syncService(key string) error {
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			c.triggerTimeTracker.DeleteService(namespace, name)
+			c.reconciler.deleteService(namespace, name)
 			// The service has been deleted, return nil so that it won't be retried.
 			return nil
 		}
@@ -275,7 +300,28 @@ func (c *Controller) syncService(key string) error {
 		return err
 	}
 
-	esLabelSelector := labels.Set(map[string]string{discovery.LabelServiceName: service.Name}).AsSelectorPreValidated()
+	// With the goal of different controllers being able to manage different
+	// subsets of EndpointSlices, LabelManagedBy has been added to indicate
+	// which controller or entity manages an EndpointSlice. As part of this
+	// v1.16->v1.17 change, EndpointSlices will initially be assumed to be
+	// managed by this controller unless a label is set to indicate otherwise.
+	// To ensure a seamless upgrade process, the managedBySetupAnnotation is
+	// used to indicate that LabelManagedBy has been set initially for related
+	// EndpointSlices. If it hasn't been set to the expected value here, we call
+	// ensureSetupManagedByAnnotation() to set up LabelManagedBy on each
+	// EndpointSlice.
+	// TODO(robscott): Remove this before v1.18.
+	err = c.ensureSetupManagedByAnnotation(service)
+	if err != nil {
+		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToSetEndpointSliceManagedByLabel",
+			"Error adding managed-by Label to Endpoint Slices for Service %s/%s: %v", service.Namespace, service.Name, err)
+		return err
+	}
+
+	esLabelSelector := labels.Set(map[string]string{
+		discovery.LabelServiceName: service.Name,
+		discovery.LabelManagedBy:   controllerName,
+	}).AsSelectorPreValidated()
 	endpointSlices, err := c.endpointSliceLister.EndpointSlices(service.Namespace).List(esLabelSelector)
 
 	if err != nil {
@@ -302,20 +348,76 @@ func (c *Controller) syncService(key string) error {
 	return nil
 }
 
-// obj could be a *v1.Service or a DeletionalFinalStateUnknown marker item
-func (c *Controller) enqueueService(obj interface{}) {
+// onServiceUpdate updates the Service Selector in the cache and queues the Service for processing.
+func (c *Controller) onServiceUpdate(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object"))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
 
+	_ = c.serviceSelectorCache.Update(key, obj.(*v1.Service).Spec.Selector)
 	c.queue.Add(key)
+}
+
+// onServiceDelete removes the Service Selector from the cache and queues the Service for processing.
+func (c *Controller) onServiceDelete(obj interface{}) {
+	key, err := controller.KeyFunc(obj)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		return
+	}
+
+	c.serviceSelectorCache.Delete(key)
+	c.queue.Add(key)
+}
+
+// ensureSetupManagedByAnnotation selects all EndpointSlices for a Service and
+// ensures they have LabelManagedBy set appropriately. This ensures that only
+// one controller or entity is trying to manage a given EndpointSlice. This
+// function provides backwards compatibility with the initial alpha release of
+// EndpointSlices that did not include these labels.
+// TODO(robscott): Remove this in time for v1.18.
+func (c *Controller) ensureSetupManagedByAnnotation(service *v1.Service) error {
+	if managedBySetup, ok := service.Annotations[managedBySetupAnnotation]; ok && managedBySetup == managedBySetupCompleteValue {
+		return nil
+	}
+
+	esLabelSelector := labels.Set(map[string]string{discovery.LabelServiceName: service.Name}).AsSelectorPreValidated()
+	endpointSlices, err := c.endpointSliceLister.EndpointSlices(service.Namespace).List(esLabelSelector)
+
+	if err != nil {
+		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToListEndpointSlices",
+			"Error listing Endpoint Slices for Service %s/%s: %v", service.Namespace, service.Name, err)
+		return err
+	}
+
+	for _, endpointSlice := range endpointSlices {
+		if _, ok := endpointSlice.Labels[discovery.LabelManagedBy]; !ok {
+			if endpointSlice.Labels == nil {
+				endpointSlice.Labels = make(map[string]string)
+			}
+
+			endpointSlice.Labels[discovery.LabelManagedBy] = controllerName
+			_, err = c.client.DiscoveryV1alpha1().EndpointSlices(endpointSlice.Namespace).Update(endpointSlice)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	if service.Annotations == nil {
+		service.Annotations = make(map[string]string)
+	}
+
+	service.Annotations[managedBySetupAnnotation] = managedBySetupCompleteValue
+	_, err = c.client.CoreV1().Services(service.Namespace).Update(service)
+	return err
 }
 
 func (c *Controller) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
-	services, err := endpointutil.GetPodServiceMemberships(c.serviceLister, pod)
+	services, err := c.serviceSelectorCache.GetPodServiceMemberships(c.serviceLister, pod)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", pod.Namespace, pod.Name, err))
 		return
@@ -326,7 +428,7 @@ func (c *Controller) addPod(obj interface{}) {
 }
 
 func (c *Controller) updatePod(old, cur interface{}) {
-	services := endpointutil.GetServicesToUpdateOnPodChange(c.serviceLister, old, cur, podEndpointChanged)
+	services := endpointutil.GetServicesToUpdateOnPodChange(c.serviceLister, c.serviceSelectorCache, old, cur, podEndpointChanged)
 	for key := range services {
 		c.queue.Add(key)
 	}

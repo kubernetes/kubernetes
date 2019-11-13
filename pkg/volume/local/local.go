@@ -191,6 +191,34 @@ func (plugin *localVolumePlugin) NewBlockVolumeUnmapper(volName string,
 // TODO: check if no path and no topology constraints are ok
 func (plugin *localVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	fs := v1.PersistentVolumeFilesystem
+	// The main purpose of reconstructed volume is to clean unused mount points
+	// and directories.
+	// For filesystem volume with directory source, no global mount path is
+	// needed to clean. Empty path is ok.
+	// For filesystem volume with block source, we should resolve to its device
+	// path if global mount path exists.
+	var path string
+	mounter := plugin.host.GetMounter(plugin.GetPluginName())
+	refs, err := mounter.GetMountRefs(mountPath)
+	if err != nil {
+		return nil, err
+	}
+	baseMountPath := plugin.generateBlockDeviceBaseGlobalPath()
+	for _, ref := range refs {
+		if mount.PathWithinBase(ref, baseMountPath) {
+			// If the global mount for block device exists, the source is block
+			// device.
+			// The resolved device path may not be the exact same as path in
+			// local PV object if symbolic link is used. However, it's the true
+			// source and can be used in reconstructed volume.
+			path, _, err = mount.GetDeviceNameFromMount(mounter, ref)
+			if err != nil {
+				return nil, err
+			}
+			klog.V(4).Infof("local: reconstructing volume %q (pod volume mount: %q) with device %q", volumeName, mountPath, path)
+			break
+		}
+	}
 	localVolume := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: volumeName,
@@ -198,7 +226,7 @@ func (plugin *localVolumePlugin) ConstructVolumeSpec(volumeName, mountPath strin
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				Local: &v1.LocalVolumeSource{
-					Path: "",
+					Path: path,
 				},
 			},
 			VolumeMode: &fs,

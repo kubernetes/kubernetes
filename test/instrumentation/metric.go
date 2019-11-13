@@ -17,7 +17,7 @@ limitations under the License.
 package main
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/component-base/metrics"
 )
 
 const (
@@ -39,7 +39,7 @@ type metric struct {
 }
 
 func (m metric) buildFQName() string {
-	return prometheus.BuildFQName(m.Namespace, m.Subsystem, m.Name)
+	return metrics.BuildFQName(m.Namespace, m.Subsystem, m.Name)
 }
 
 type byFQName []metric

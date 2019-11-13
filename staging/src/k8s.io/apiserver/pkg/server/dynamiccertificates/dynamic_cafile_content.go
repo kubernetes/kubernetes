@@ -215,8 +215,13 @@ func (c *DynamicFileCAContent) CurrentCABundleContent() (cabundle []byte) {
 }
 
 // VerifyOptions provides verifyoptions compatible with authenticators
-func (c *DynamicFileCAContent) VerifyOptions() x509.VerifyOptions {
-	return c.caBundle.Load().(*caBundleAndVerifier).verifyOptions
+func (c *DynamicFileCAContent) VerifyOptions() (x509.VerifyOptions, bool) {
+	uncastObj := c.caBundle.Load()
+	if uncastObj == nil {
+		return x509.VerifyOptions{}, false
+	}
+
+	return uncastObj.(*caBundleAndVerifier).verifyOptions, true
 }
 
 // newVerifyOptions creates a new verification func from a file.  It reads the content and then fails.

@@ -31,7 +31,6 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -56,14 +55,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
@@ -74,17 +71,14 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/master/ports"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
-	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
-	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
-	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -102,6 +96,9 @@ const (
 
 	// PodDeleteTimeout is how long to wait for a pod to be deleted.
 	PodDeleteTimeout = 5 * time.Minute
+
+	// PodGetTimeout is how long to wait for a pod to be got.
+	PodGetTimeout = 2 * time.Minute
 
 	// PodEventTimeout is how much we wait for a pod event to occur.
 	PodEventTimeout = 2 * time.Minute
@@ -184,9 +181,6 @@ var (
 	// AgnHostImage is the image URI of AgnHost
 	AgnHostImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
-	// For parsing Kubectl version for version-skewed testing.
-	gitVersionRegexp = regexp.MustCompile("GitVersion:\"(v.+?)\"")
-
 	// ProvidersWithSSH are those providers where each node is accessible with SSH
 	ProvidersWithSSH = []string{"gce", "gke", "aws", "local"}
 
@@ -228,57 +222,6 @@ func RunIfSystemSpecNameIs(names ...string) {
 	skipInternalf(1, "Skipped because system spec name %q is not in %v", TestContext.SystemSpecName, names)
 }
 
-// Run a test container to try and contact the Kubernetes api-server from a pod, wait for it
-// to flip to Ready, log its output and delete it.
-func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
-	path := "test/images/clusterapi-tester/pod.yaml"
-	Logf("Parsing pod from %v", path)
-	p, err := manifest.PodFromManifest(path)
-	if err != nil {
-		Logf("Failed to parse clusterapi-tester from manifest %v: %v", path, err)
-		return
-	}
-	p.Namespace = ns
-	if _, err := c.CoreV1().Pods(ns).Create(p); err != nil {
-		Logf("Failed to create %v: %v", p.Name, err)
-		return
-	}
-	defer func() {
-		if err := c.CoreV1().Pods(ns).Delete(p.Name, nil); err != nil {
-			Logf("Failed to delete pod %v: %v", p.Name, err)
-		}
-	}()
-	timeout := 5 * time.Minute
-	if err := e2epod.WaitForPodCondition(c, ns, p.Name, "clusterapi-tester", timeout, testutils.PodRunningReady); err != nil {
-		Logf("Pod %v took longer than %v to enter running/ready: %v", p.Name, timeout, err)
-		return
-	}
-	logs, err := e2epod.GetPodLogs(c, ns, p.Name, p.Spec.Containers[0].Name)
-	if err != nil {
-		Logf("Failed to retrieve logs from %v: %v", p.Name, err)
-	} else {
-		Logf("Output of clusterapi-tester:\n%v", logs)
-	}
-}
-
-// getDefaultClusterIPFamily obtains the default IP family of the cluster
-// using the Cluster IP address of the kubernetes service created in the default namespace
-// This unequivocally identifies the default IP family because services are single family
-// TODO: dual-stack may support multiple families per service
-// but we can detect if a cluster is dual stack because pods have two addresses (one per family)
-func getDefaultClusterIPFamily(c clientset.Interface) string {
-	// Get the ClusterIP of the kubernetes service created in the default namespace
-	svc, err := c.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
-	if err != nil {
-		Failf("Failed to get kubernetes service ClusterIP: %v", err)
-	}
-
-	if utilnet.IsIPv6String(svc.Spec.ClusterIP) {
-		return "ipv6"
-	}
-	return "ipv4"
-}
-
 // ProviderIs returns true if the provider is included is the providers. Otherwise false.
 func ProviderIs(providers ...string) bool {
 	for _, provider := range providers {
@@ -307,60 +250,6 @@ func NodeOSDistroIs(supportedNodeOsDistros ...string) bool {
 		}
 	}
 	return false
-}
-
-// ProxyMode returns a proxyMode of a kube-proxy.
-func ProxyMode(f *Framework) (string, error) {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-proxy-mode-detector",
-			Namespace: f.Namespace.Name,
-		},
-		Spec: v1.PodSpec{
-			HostNetwork: true,
-			Containers: []v1.Container{
-				{
-					Name:  "detector",
-					Image: AgnHostImage,
-					Args:  []string{"pause"},
-				},
-			},
-		},
-	}
-	f.PodClient().CreateSync(pod)
-	defer f.PodClient().DeleteSync(pod.Name, &metav1.DeleteOptions{}, DefaultPodDeletionTimeout)
-
-	cmd := "curl -q -s --connect-timeout 1 http://localhost:10249/proxyMode"
-	stdout, err := RunHostCmd(pod.Namespace, pod.Name, cmd)
-	if err != nil {
-		return "", err
-	}
-	Logf("ProxyMode: %s", stdout)
-	return stdout, nil
-}
-
-// SkipUnlessServerVersionGTE skips if the server version is less than v.
-func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface) {
-	gte, err := ServerVersionGTE(v, c)
-	if err != nil {
-		Failf("Failed to get server version: %v", err)
-	}
-	if !gte {
-		skipInternalf(1, "Not supported for server versions before %q", v)
-	}
-}
-
-// SkipIfMissingResource skips if the gvr resource is missing.
-func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, namespace string) {
-	resourceClient := dynamicClient.Resource(gvr).Namespace(namespace)
-	_, err := resourceClient.List(metav1.ListOptions{})
-	if err != nil {
-		// not all resources support list, so we ignore those
-		if apierrs.IsMethodNotSupported(err) || apierrs.IsNotFound(err) || apierrs.IsForbidden(err) {
-			skipInternalf(1, "Could not find %s resource, skipping test: %#v", gvr, err)
-		}
-		Failf("Unexpected error getting %v: %v", gvr, err)
-	}
 }
 
 // WaitForDaemonSets for all daemonsets in the given namespace to be ready
@@ -852,37 +741,8 @@ func countEndpointsNum(e *v1.Endpoints) int {
 	return num
 }
 
-// ServerVersionGTE returns true if v is greater than or equal to the server
-// version.
-//
-// TODO(18726): This should be incorporated into client.VersionInterface.
-func ServerVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface) (bool, error) {
-	serverVersion, err := c.ServerVersion()
-	if err != nil {
-		return false, fmt.Errorf("Unable to get server version: %v", err)
-	}
-	sv, err := utilversion.ParseSemantic(serverVersion.GitVersion)
-	if err != nil {
-		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
-	}
-	return sv.AtLeast(v), nil
-}
-
-// KubectlVersion gets the version of kubectl that's currently being used (see
-// --kubectl-path in e2e.go to use an alternate kubectl).
-func KubectlVersion() (*utilversion.Version, error) {
-	output := RunKubectlOrDie("version", "--client")
-	matches := gitVersionRegexp.FindStringSubmatch(output)
-	if len(matches) != 2 {
-		return nil, fmt.Errorf("Could not find kubectl version in output %v", output)
-	}
-	// Don't use the full match, as it contains "GitVersion:\"" and a
-	// trailing "\"".  Just use the submatch.
-	return utilversion.ParseSemantic(matches[1])
-}
-
-// RestclientConfig returns a config holds the information needed to build connection to kubernetes clusters.
-func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
+// restclientConfig returns a config holds the information needed to build connection to kubernetes clusters.
+func restclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 	Logf(">>> kubeConfig: %s", TestContext.KubeConfig)
 	if TestContext.KubeConfig == "" {
 		return nil, fmt.Errorf("KubeConfig must be specified to load client config")
@@ -901,13 +761,23 @@ func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 // ClientConfigGetter is a func that returns getter to return a config.
 type ClientConfigGetter func() (*restclient.Config, error)
 
-// LoadConfig returns a config for a rest client.
-func LoadConfig() (*restclient.Config, error) {
+// LoadConfig returns a config for a rest client with the UserAgent set to include the current test name.
+func LoadConfig() (config *restclient.Config, err error) {
+	defer func() {
+		if err == nil && config != nil {
+			testDesc := ginkgo.CurrentGinkgoTestDescription()
+			if len(testDesc.ComponentTexts) > 0 {
+				componentTexts := strings.Join(testDesc.ComponentTexts, " ")
+				config.UserAgent = fmt.Sprintf("%s -- %s", rest.DefaultKubernetesUserAgent(), componentTexts)
+			}
+		}
+	}()
+
 	if TestContext.NodeE2E {
 		// This is a node e2e test, apply the node e2e configuration
 		return &restclient.Config{Host: TestContext.Host}, nil
 	}
-	c, err := RestclientConfig(TestContext.KubeContext)
+	c, err := restclientConfig(TestContext.KubeContext)
 	if err != nil {
 		if TestContext.KubeConfig == "" {
 			return restclient.InClusterConfig()
@@ -1249,15 +1119,16 @@ func (f *Framework) MatchContainerOutput(
 
 	if podErr != nil {
 		// Pod failed. Dump all logs from all containers to see what's wrong
-		for _, container := range podStatus.Spec.Containers {
-			logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podStatus.Name, container.Name)
+		_ = podutil.VisitContainers(&podStatus.Spec, func(c *v1.Container) bool {
+			logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podStatus.Name, c.Name)
 			if err != nil {
 				Logf("Failed to get logs from node %q pod %q container %q: %v",
-					podStatus.Spec.NodeName, podStatus.Name, container.Name, err)
-				continue
+					podStatus.Spec.NodeName, podStatus.Name, c.Name, err)
+			} else {
+				Logf("Output of node %q pod %q container %q: %s", podStatus.Spec.NodeName, podStatus.Name, c.Name, logs)
 			}
-			Logf("Output of node %q pod %q container %q: %s", podStatus.Spec.NodeName, podStatus.Name, container.Name, logs)
-		}
+			return true
+		})
 		return fmt.Errorf("expected pod %q success: %v", createdPod.Name, podErr)
 	}
 
@@ -1370,7 +1241,7 @@ func DumpNodeDebugInfo(c clientset.Interface, nodeNames []string, logFunc func(f
 				e.Source, e.Type, e.Message, e.Reason, e.FirstTimestamp, e.LastTimestamp, e.InvolvedObject)
 		}
 		logFunc("\nLogging pods the kubelet thinks is on node %v", n)
-		podList, err := e2ekubelet.GetKubeletPods(c, n)
+		podList, err := getKubeletPods(c, n)
 		if err != nil {
 			logFunc("Unable to retrieve kubelet pods for node %v: %v", n, err)
 			continue
@@ -1388,6 +1259,33 @@ func DumpNodeDebugInfo(c clientset.Interface, nodeNames []string, logFunc func(f
 		}
 		e2emetrics.HighLatencyKubeletOperations(c, 10*time.Second, n, logFunc)
 		// TODO: Log node resource info
+	}
+}
+
+// getKubeletPods retrieves the list of pods on the kubelet.
+func getKubeletPods(c clientset.Interface, node string) (*v1.PodList, error) {
+	var client restclient.Result
+	finished := make(chan struct{}, 1)
+	go func() {
+		// call chain tends to hang in some cases when Node is not ready. Add an artificial timeout for this call. #22165
+		client = c.CoreV1().RESTClient().Get().
+			Resource("nodes").
+			SubResource("proxy").
+			Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
+			Suffix("pods").
+			Do()
+
+		finished <- struct{}{}
+	}()
+	select {
+	case <-finished:
+		result := &v1.PodList{}
+		if err := client.Into(result); err != nil {
+			return &v1.PodList{}, err
+		}
+		return result, nil
+	case <-time.After(PodGetTimeout):
+		return &v1.PodList{}, fmt.Errorf("Waiting up to %v for getting the list of pods", PodGetTimeout)
 	}
 }
 
@@ -1464,16 +1362,6 @@ func AddOrUpdateLabelOnNode(c clientset.Interface, nodeName string, labelKey, la
 	ExpectNoError(testutils.AddLabelsToNode(c, nodeName, map[string]string{labelKey: labelValue}))
 }
 
-// AddOrUpdateLabelOnNodeAndReturnOldValue adds the given label key and value to the given node or updates value and returns the old label value.
-func AddOrUpdateLabelOnNodeAndReturnOldValue(c clientset.Interface, nodeName string, labelKey, labelValue string) string {
-	var oldValue string
-	node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-	ExpectNoError(err)
-	oldValue = node.Labels[labelKey]
-	ExpectNoError(testutils.AddLabelsToNode(c, nodeName, map[string]string{labelKey: labelValue}))
-	return oldValue
-}
-
 // ExpectNodeHasLabel expects that the given node has the given label pair.
 func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string, labelValue string) {
 	ginkgo.By("verifying the node has the label " + labelKey + " " + labelValue)
@@ -1534,65 +1422,6 @@ func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool
 		return false, nil
 	}
 	return true, nil
-}
-
-// AddOrUpdateAvoidPodOnNode adds avoidPods annotations to node, will override if it exists
-func AddOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods v1.AvoidPods) {
-	err := wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
-		node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
-			return false, err
-		}
-
-		taintsData, err := json.Marshal(avoidPods)
-		ExpectNoError(err)
-
-		if node.Annotations == nil {
-			node.Annotations = make(map[string]string)
-		}
-		node.Annotations[v1.PreferAvoidPodsAnnotationKey] = string(taintsData)
-		_, err = c.CoreV1().Nodes().Update(node)
-		if err != nil {
-			if !apierrs.IsConflict(err) {
-				ExpectNoError(err)
-			} else {
-				Logf("Conflict when trying to add/update avoidPods %v to %v with error %v", avoidPods, nodeName, err)
-			}
-		}
-		return true, nil
-	})
-	ExpectNoError(err)
-}
-
-// RemoveAvoidPodsOffNode removes AvoidPods annotations from the node. It does not fail if no such annotation exists.
-func RemoveAvoidPodsOffNode(c clientset.Interface, nodeName string) {
-	err := wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
-		node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
-			return false, err
-		}
-
-		if node.Annotations == nil {
-			return true, nil
-		}
-		delete(node.Annotations, v1.PreferAvoidPodsAnnotationKey)
-		_, err = c.CoreV1().Nodes().Update(node)
-		if err != nil {
-			if !apierrs.IsConflict(err) {
-				ExpectNoError(err)
-			} else {
-				Logf("Conflict when trying to remove avoidPods to %v", nodeName)
-			}
-		}
-		return true, nil
-	})
-	ExpectNoError(err)
 }
 
 // ScaleResource scales resource to the given size.
@@ -1685,35 +1514,6 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 	return nil
 }
 
-type updateDSFunc func(*appsv1.DaemonSet)
-
-// UpdateDaemonSetWithRetries updates daemonsets with the given applyUpdate func
-// until it succeeds or a timeout expires.
-func UpdateDaemonSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDSFunc) (ds *appsv1.DaemonSet, err error) {
-	daemonsets := c.AppsV1().DaemonSets(namespace)
-	var updateErr error
-	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
-		if ds, err = daemonsets.Get(name, metav1.GetOptions{}); err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
-			return false, err
-		}
-		// Apply the update, then attempt to push it to the apiserver.
-		applyUpdate(ds)
-		if ds, err = daemonsets.Update(ds); err == nil {
-			Logf("Updating DaemonSet %s", name)
-			return true, nil
-		}
-		updateErr = err
-		return false, nil
-	})
-	if pollErr == wait.ErrWaitTimeout {
-		pollErr = fmt.Errorf("couldn't apply the provided updated to DaemonSet %q: %v", name, updateErr)
-	}
-	return ds, pollErr
-}
-
 // RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
 // inside of a shell.
 func RunHostCmd(ns, name, cmd string) (string, error) {
@@ -1792,61 +1592,6 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 	return nil
 }
 
-// ParseKVLines parses output that looks like lines containing "<key>: <val>"
-// and returns <val> if <key> is found. Otherwise, it returns the empty string.
-func ParseKVLines(output, key string) string {
-	delim := ":"
-	key = key + delim
-	for _, line := range strings.Split(output, "\n") {
-		pieces := strings.SplitAfterN(line, delim, 2)
-		if len(pieces) != 2 {
-			continue
-		}
-		k, v := pieces[0], pieces[1]
-		if k == key {
-			return strings.TrimSpace(v)
-		}
-	}
-	return ""
-}
-
-// RestartKubeProxy restarts kube-proxy on the given host.
-func RestartKubeProxy(host string) error {
-	// TODO: Make it work for all providers.
-	if !ProviderIs("gce", "gke", "aws") {
-		return fmt.Errorf("unsupported provider for RestartKubeProxy: %s", TestContext.Provider)
-	}
-	// kubelet will restart the kube-proxy since it's running in a static pod
-	Logf("Killing kube-proxy on node %v", host)
-	result, err := e2essh.SSH("sudo pkill kube-proxy", host, TestContext.Provider)
-	if err != nil || result.Code != 0 {
-		e2essh.LogResult(result)
-		return fmt.Errorf("couldn't restart kube-proxy: %v", err)
-	}
-	// wait for kube-proxy to come back up
-	sshCmd := "sudo /bin/sh -c 'pgrep kube-proxy | wc -l'"
-	err = wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
-		Logf("Waiting for kubeproxy to come back up with %v on %v", sshCmd, host)
-		result, err := e2essh.SSH(sshCmd, host, TestContext.Provider)
-		if err != nil {
-			return false, err
-		}
-		if result.Code != 0 {
-			e2essh.LogResult(result)
-			return false, fmt.Errorf("failed to run command, exited %d", result.Code)
-		}
-		if result.Stdout == "0\n" {
-			return false, nil
-		}
-		Logf("kube-proxy is back up.")
-		return true, nil
-	})
-	if err != nil {
-		return fmt.Errorf("kube-proxy didn't recover: %v", err)
-	}
-	return nil
-}
-
 // RestartKubelet restarts kubelet on the given host.
 func RestartKubelet(host string) error {
 	// TODO: Make it work for all providers and distros.
@@ -1894,21 +1639,6 @@ func RestartKubelet(host string) error {
 	return nil
 }
 
-// WaitForKubeletUp waits for the kubelet on the given host to be up.
-func WaitForKubeletUp(host string) error {
-	cmd := "curl http://localhost:" + strconv.Itoa(ports.KubeletReadOnlyPort) + "/healthz"
-	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(cmd, host, TestContext.Provider)
-		if err != nil || result.Code != 0 {
-			e2essh.LogResult(result)
-		}
-		if result.Stdout == "ok" {
-			return nil
-		}
-	}
-	return fmt.Errorf("waiting for kubelet timed out")
-}
-
 // RestartApiserver restarts the kube-apiserver.
 func RestartApiserver(cs clientset.Interface) error {
 	// TODO: Make it work for all providers.
@@ -1951,17 +1681,6 @@ func sshRestartMaster() error {
 		return fmt.Errorf("couldn't restart apiserver: %v", err)
 	}
 	return nil
-}
-
-// WaitForApiserverUp waits for the kube-apiserver to be up.
-func WaitForApiserverUp(c clientset.Interface) error {
-	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		body, err := c.CoreV1().RESTClient().Get().AbsPath("/healthz").Do().Raw()
-		if err == nil && string(body) == "ok" {
-			return nil
-		}
-	}
-	return fmt.Errorf("waiting for apiserver timed out")
 }
 
 // waitForApiserverRestarted waits until apiserver's restart count increased.
@@ -2032,128 +1751,6 @@ func WaitForControllerManagerUp() error {
 		}
 	}
 	return fmt.Errorf("waiting for controller-manager timed out")
-}
-
-// CheckForControllerManagerHealthy checks that the controller manager does not crash within "duration"
-func CheckForControllerManagerHealthy(duration time.Duration) error {
-	var PID string
-	cmd := "pidof kube-controller-manager"
-	for start := time.Now(); time.Since(start) < duration; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
-		if err != nil {
-			// We don't necessarily know that it crashed, pipe could just be broken
-			e2essh.LogResult(result)
-			return fmt.Errorf("master unreachable after %v", time.Since(start))
-		} else if result.Code != 0 {
-			e2essh.LogResult(result)
-			return fmt.Errorf("SSH result code not 0. actually: %v after %v", result.Code, time.Since(start))
-		} else if result.Stdout != PID {
-			if PID == "" {
-				PID = result.Stdout
-			} else {
-				//its dead
-				return fmt.Errorf("controller manager crashed, old PID: %s, new PID: %s", PID, result.Stdout)
-			}
-		} else {
-			Logf("kube-controller-manager still healthy after %v", time.Since(start))
-		}
-	}
-	return nil
-}
-
-// GenerateMasterRegexp returns a regex for matching master node name.
-func GenerateMasterRegexp(prefix string) string {
-	return prefix + "(-...)?"
-}
-
-// WaitForMasters waits until the cluster has the desired number of ready masters in it.
-func WaitForMasters(masterPrefix string, c clientset.Interface, size int, timeout time.Duration) error {
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
-		nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
-		if err != nil {
-			Logf("Failed to list nodes: %v", err)
-			continue
-		}
-
-		// Filter out nodes that are not master replicas
-		e2enode.Filter(nodes, func(node v1.Node) bool {
-			res, err := regexp.Match(GenerateMasterRegexp(masterPrefix), ([]byte)(node.Name))
-			if err != nil {
-				Logf("Failed to match regexp to node name: %v", err)
-				return false
-			}
-			return res
-		})
-
-		numNodes := len(nodes.Items)
-
-		// Filter out not-ready nodes.
-		e2enode.Filter(nodes, func(node v1.Node) bool {
-			return e2enode.IsConditionSetAsExpected(&node, v1.NodeReady, true)
-		})
-
-		numReady := len(nodes.Items)
-
-		if numNodes == size && numReady == size {
-			Logf("Cluster has reached the desired number of masters %d", size)
-			return nil
-		}
-		Logf("Waiting for the number of masters %d, current %d, not ready master nodes %d", size, numNodes, numNodes-numReady)
-	}
-	return fmt.Errorf("timeout waiting %v for the number of masters to be %d", timeout, size)
-}
-
-// GetHostExternalAddress gets the node for a pod and returns the first External
-// address. Returns an error if the node the pod is on doesn't have an External
-// address.
-func GetHostExternalAddress(client clientset.Interface, p *v1.Pod) (externalAddress string, err error) {
-	node, err := client.CoreV1().Nodes().Get(p.Spec.NodeName, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-	for _, address := range node.Status.Addresses {
-		if address.Type == v1.NodeExternalIP {
-			if address.Address != "" {
-				externalAddress = address.Address
-				break
-			}
-		}
-	}
-	if externalAddress == "" {
-		err = fmt.Errorf("No external address for pod %v on node %v",
-			p.Name, p.Spec.NodeName)
-	}
-	return
-}
-
-// GetHostAddress gets the node for a pod and returns the first
-// address. Returns an error if the node the pod is on doesn't have an
-// address.
-func GetHostAddress(client clientset.Interface, p *v1.Pod) (string, error) {
-	node, err := client.CoreV1().Nodes().Get(p.Spec.NodeName, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-	// Try externalAddress first
-	for _, address := range node.Status.Addresses {
-		if address.Type == v1.NodeExternalIP {
-			if address.Address != "" {
-				return address.Address, nil
-			}
-		}
-	}
-	// If no externalAddress found, try internalAddress
-	for _, address := range node.Status.Addresses {
-		if address.Type == v1.NodeInternalIP {
-			if address.Address != "" {
-				return address.Address, nil
-			}
-		}
-	}
-
-	// If not found, return error
-	return "", fmt.Errorf("No address for pod %v on node %v",
-		p.Name, p.Spec.NodeName)
 }
 
 type extractRT struct {
@@ -2274,56 +1871,6 @@ func UnblockNetwork(from string, to string) {
 	}
 }
 
-// CheckConnectivityToHost launches a pod to test connectivity to the specified
-// host. An error will be returned if the host is not reachable from the pod.
-//
-// An empty nodeName will use the schedule to choose where the pod is executed.
-func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, port, timeout int) error {
-	contName := fmt.Sprintf("%s-container", podName)
-
-	command := []string{
-		"nc",
-		"-vz",
-		"-w", strconv.Itoa(timeout),
-		host,
-		strconv.Itoa(port),
-	}
-
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: podName,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:    contName,
-					Image:   AgnHostImage,
-					Command: command,
-				},
-			},
-			NodeName:      nodeName,
-			RestartPolicy: v1.RestartPolicyNever,
-		},
-	}
-	podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-	_, err := podClient.Create(pod)
-	if err != nil {
-		return err
-	}
-	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, podName, f.Namespace.Name)
-
-	if err != nil {
-		logs, logErr := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, contName)
-		if logErr != nil {
-			Logf("Warning: Failed to get logs from pod %q: %v", pod.Name, logErr)
-		} else {
-			Logf("pod %s/%s logs:\n%s", f.Namespace.Name, pod.Name, logs)
-		}
-	}
-
-	return err
-}
-
 // CoreDump SSHs to the master and all nodes and dumps their logs into dir.
 // It shells out to cluster/log-dump/log-dump.sh to accomplish this.
 func CoreDump(dir string) {
@@ -2400,50 +1947,6 @@ func retryCmd(command string, args ...string) (string, string, error) {
 	return stdout, stderr, err
 }
 
-// WaitForStableCluster waits until all existing pods are scheduled and returns their amount.
-func WaitForStableCluster(c clientset.Interface, masterNodes sets.String) int {
-	timeout := 10 * time.Minute
-	startTime := time.Now()
-
-	allPods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
-	ExpectNoError(err)
-	// API server returns also Pods that succeeded. We need to filter them out.
-	currentPods := make([]v1.Pod, 0, len(allPods.Items))
-	for _, pod := range allPods.Items {
-		if pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
-			currentPods = append(currentPods, pod)
-		}
-
-	}
-	allPods.Items = currentPods
-	scheduledPods, currentlyNotScheduledPods := e2epod.GetPodsScheduled(masterNodes, allPods)
-	for len(currentlyNotScheduledPods) != 0 {
-		time.Sleep(2 * time.Second)
-
-		allPods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
-		ExpectNoError(err)
-		scheduledPods, currentlyNotScheduledPods = e2epod.GetPodsScheduled(masterNodes, allPods)
-
-		if startTime.Add(timeout).Before(time.Now()) {
-			Failf("Timed out after %v waiting for stable cluster.", timeout)
-			break
-		}
-	}
-	return len(scheduledPods)
-}
-
-// ListNamespaceEvents lists the events in the given namespace.
-func ListNamespaceEvents(c clientset.Interface, ns string) error {
-	ls, err := c.CoreV1().Events(ns).List(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-	for _, event := range ls.Items {
-		klog.Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
-	}
-	return nil
-}
-
 // E2ETestNodePreparer implements testutils.TestNodePreparer interface, which is used
 // to create/modify Nodes before running a test.
 type E2ETestNodePreparer struct {
@@ -2453,15 +1956,6 @@ type E2ETestNodePreparer struct {
 	// be at least <sum_of_keys> Nodes in the cluster.
 	countToStrategy       []testutils.CountToStrategy
 	nodeToAppliedStrategy map[string]testutils.PrepareNodeStrategy
-}
-
-// NewE2ETestNodePreparer returns a new instance of E2ETestNodePreparer.
-func NewE2ETestNodePreparer(client clientset.Interface, countToStrategy []testutils.CountToStrategy) testutils.TestNodePreparer {
-	return &E2ETestNodePreparer{
-		client:                client,
-		countToStrategy:       countToStrategy,
-		nodeToAppliedStrategy: make(map[string]testutils.PrepareNodeStrategy),
-	}
 }
 
 // PrepareNodes prepares nodes in the cluster.
@@ -2565,51 +2059,6 @@ func GetAllMasterAddresses(c clientset.Interface) []string {
 	return ips.List()
 }
 
-// SimpleGET executes a get on the given url, returns error if non-200 returned.
-func SimpleGET(c *http.Client, url, host string) (string, error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-	req.Host = host
-	res, err := c.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer res.Body.Close()
-	rawBody, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return "", err
-	}
-	body := string(rawBody)
-	if res.StatusCode != http.StatusOK {
-		err = fmt.Errorf(
-			"GET returned http error %v", res.StatusCode)
-	}
-	return body, err
-}
-
-// PollURL polls till the url responds with a healthy http code. If
-// expectUnreachable is true, it breaks on first non-healthy http code instead.
-func PollURL(route, host string, timeout time.Duration, interval time.Duration, httpClient *http.Client, expectUnreachable bool) error {
-	var lastBody string
-	pollErr := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		var err error
-		lastBody, err = SimpleGET(httpClient, route, host)
-		if err != nil {
-			Logf("host %v path %v: %v unreachable", host, route, err)
-			return expectUnreachable, nil
-		}
-		Logf("host %v path %v: reached", host, route)
-		return !expectUnreachable, nil
-	})
-	if pollErr != nil {
-		return fmt.Errorf("Failed to execute a successful GET within %v, Last response body for %v, host %v:\n%v\n\n%v",
-			timeout, route, host, lastBody, pollErr)
-	}
-	return nil
-}
-
 // DescribeIng describes information of ingress by running kubectl describe ing.
 func DescribeIng(ns string) {
 	Logf("\nOutput of kubectl describe ing:\n")
@@ -2665,43 +2114,6 @@ func CreateEmptyFileOnPod(namespace string, podName string, filePath string) err
 	return err
 }
 
-// PrintSummaries prints summaries of tests.
-func PrintSummaries(summaries []TestDataSummary, testBaseName string) {
-	now := time.Now()
-	for i := range summaries {
-		Logf("Printing summary: %v", summaries[i].SummaryKind())
-		switch TestContext.OutputPrintType {
-		case "hr":
-			if TestContext.ReportDir == "" {
-				Logf(summaries[i].PrintHumanReadable())
-			} else {
-				// TODO: learn to extract test name and append it to the kind instead of timestamp.
-				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".txt")
-				if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintHumanReadable()), 0644); err != nil {
-					Logf("Failed to write file %v with test performance data: %v", filePath, err)
-				}
-			}
-		case "json":
-			fallthrough
-		default:
-			if TestContext.OutputPrintType != "json" {
-				Logf("Unknown output type: %v. Printing JSON", TestContext.OutputPrintType)
-			}
-			if TestContext.ReportDir == "" {
-				Logf("%v JSON\n%v", summaries[i].SummaryKind(), summaries[i].PrintJSON())
-				Logf("Finished")
-			} else {
-				// TODO: learn to extract test name and append it to the kind instead of timestamp.
-				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".json")
-				Logf("Writing to %s", filePath)
-				if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintJSON()), 0644); err != nil {
-					Logf("Failed to write file %v with test performance data: %v", filePath, err)
-				}
-			}
-		}
-	}
-}
-
 // DumpDebugInfo dumps debug info of tests.
 func DumpDebugInfo(c clientset.Interface, ns string) {
 	sl, _ := c.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
@@ -2755,22 +2167,6 @@ func DsFromManifest(url string) (*appsv1.DaemonSet, error) {
 	return &ds, nil
 }
 
-// WaitForPersistentVolumeClaimDeleted waits for a PersistentVolumeClaim to be removed from the system until timeout occurs, whichever comes first.
-func WaitForPersistentVolumeClaimDeleted(c clientset.Interface, ns string, pvcName string, Poll, timeout time.Duration) error {
-	Logf("Waiting up to %v for PersistentVolumeClaim %s to be removed", timeout, pvcName)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		_, err := c.CoreV1().PersistentVolumeClaims(ns).Get(pvcName, metav1.GetOptions{})
-		if err != nil {
-			if apierrs.IsNotFound(err) {
-				Logf("Claim %q in namespace %q doesn't exist in the system", pvcName, ns)
-				return nil
-			}
-			Logf("Failed to get claim %q in namespace %q, retrying in %v. Error: %v", pvcName, ns, Poll, err)
-		}
-	}
-	return fmt.Errorf("PersistentVolumeClaim %s is not removed from the system within %v", pvcName, timeout)
-}
-
 // GetClusterZones returns the values of zone label collected from all nodes.
 func GetClusterZones(c clientset.Interface) (sets.String, error) {
 	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
@@ -2784,22 +2180,12 @@ func GetClusterZones(c clientset.Interface) (sets.String, error) {
 		if zone, found := node.Labels[v1.LabelZoneFailureDomain]; found {
 			zones.Insert(zone)
 		}
+
+		if zone, found := node.Labels[v1.LabelZoneFailureDomainStable]; found {
+			zones.Insert(zone)
+		}
 	}
 	return zones, nil
-}
-
-// WaitForNodeHasTaintOrNot waits for a taint to be added/removed from the node until timeout occurs, whichever comes first.
-func WaitForNodeHasTaintOrNot(c clientset.Interface, nodeName string, taint *v1.Taint, wantTrue bool, timeout time.Duration) error {
-	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
-		has, err := NodeHasTaint(c, nodeName, taint)
-		if err != nil {
-			return false, fmt.Errorf("Failed to check taint %s on node %s or not", taint.ToString(), nodeName)
-		}
-		return has == wantTrue, nil
-	}); err != nil {
-		return fmt.Errorf("expect node %v to have taint = %v within %v: %v", nodeName, wantTrue, timeout, err)
-	}
-	return nil
 }
 
 // GetFileModeRegex returns a file mode related regex which should be matched by the mounttest pods' output.

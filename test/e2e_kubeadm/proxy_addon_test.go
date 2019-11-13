@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
 	authv1 "k8s.io/api/authorization/v1"
@@ -47,7 +47,7 @@ var (
 
 // Define container for all the test specification aimed at verifying
 // that kubeadm configures the proxy addon as expected
-var _ = KubeadmDescribe("proxy addon", func() {
+var _ = Describe("proxy addon", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("proxy")

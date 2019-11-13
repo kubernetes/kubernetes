@@ -30,8 +30,9 @@ require (
 	github.com/russross/blackfriday v1.5.2
 	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/spf13/cobra v0.0.5
-	github.com/spf13/pflag v1.0.3
+	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.3.0
+	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
 	golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456
 	gopkg.in/yaml.v2 v2.2.4
 	gotest.tools v2.2.0+incompatible // indirect
@@ -41,22 +42,17 @@ require (
 	k8s.io/client-go v0.0.0
 	k8s.io/component-base v0.0.0
 	k8s.io/klog v1.0.0
-	k8s.io/kube-openapi v0.0.0-20190816220812-743ec37842bf
+	k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a
 	k8s.io/metrics v0.0.0
-	k8s.io/utils v0.0.0-20191010214722-8d271d903fe4
+	k8s.io/utils v0.0.0-20191030222137-2b95a09bc58d
 	sigs.k8s.io/kustomize v2.0.3+incompatible
 	sigs.k8s.io/yaml v1.1.0
+	vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc
 )
 
 replace (
-	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
-	golang.org/x/lint => golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1
-	golang.org/x/net => golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
-	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a
-	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
-	golang.org/x/text => golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db
-	golang.org/x/time => golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a
+	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cli-runtime => ../cli-runtime

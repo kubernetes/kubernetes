@@ -32,11 +32,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -104,7 +106,7 @@ func NewAttachDetachController(
 	nodeInformer coreinformers.NodeInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
-	csiNodeInformer storageinformers.CSINodeInformer,
+	csiNodeInformer storageinformersv1.CSINodeInformer,
 	csiDriverInformer storageinformers.CSIDriverInformer,
 	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
@@ -262,7 +264,7 @@ type attachDetachController struct {
 	nodeLister  corelisters.NodeLister
 	nodesSynced kcache.InformerSynced
 
-	csiNodeLister storagelisters.CSINodeLister
+	csiNodeLister storagelistersv1.CSINodeLister
 	csiNodeSynced kcache.InformerSynced
 
 	// csiDriverLister is the shared CSIDriver lister used to fetch and store
@@ -668,7 +670,7 @@ func (adc *attachDetachController) processVolumesInUse(
 var _ volume.VolumeHost = &attachDetachController{}
 var _ volume.AttachDetachVolumeHost = &attachDetachController{}
 
-func (adc *attachDetachController) CSINodeLister() storagelisters.CSINodeLister {
+func (adc *attachDetachController) CSINodeLister() storagelistersv1.CSINodeLister {
 	return adc.csiNodeLister
 }
 

@@ -177,6 +177,29 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 	return rtnPod
 }
 
+// getHostExternalAddress gets the node for a pod and returns the first External
+// address. Returns an error if the node the pod is on doesn't have an External
+// address.
+func getHostExternalAddress(client clientset.Interface, p *v1.Pod) (externalAddress string, err error) {
+	node, err := client.CoreV1().Nodes().Get(p.Spec.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	for _, address := range node.Status.Addresses {
+		if address.Type == v1.NodeExternalIP {
+			if address.Address != "" {
+				externalAddress = address.Address
+				break
+			}
+		}
+	}
+	if externalAddress == "" {
+		err = fmt.Errorf("No external address for pod %v on node %v",
+			p.Name, p.Spec.NodeName)
+	}
+	return
+}
+
 // Checks for a lingering nfs mount and/or uid directory on the pod's host. The host IP is used
 // so that this test runs in GCE, where it appears that SSH cannot resolve the hostname.
 // If expectClean is true then we expect the node to be cleaned up and thus commands like
@@ -189,7 +212,7 @@ func checkPodCleanup(c clientset.Interface, pod *v1.Pod, expectClean bool) {
 	podDir := filepath.Join("/var/lib/kubelet/pods", string(pod.UID))
 	mountDir := filepath.Join(podDir, "volumes", "kubernetes.io~nfs")
 	// use ip rather than hostname in GCE
-	nodeIP, err := framework.GetHostExternalAddress(c, pod)
+	nodeIP, err := getHostExternalAddress(c, pod)
 	framework.ExpectNoError(err)
 
 	condMsg := "deleted"

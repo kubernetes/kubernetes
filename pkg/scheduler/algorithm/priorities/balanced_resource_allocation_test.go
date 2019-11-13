@@ -401,7 +401,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 			if len(test.pod.Spec.Volumes) > 0 {
 				maxVolumes := 5
 				for _, info := range snapshot.NodeInfoMap {
@@ -409,9 +409,8 @@ func TestBalancedResourceAllocation(t *testing.T) {
 					info.TransientInfo.TransNodeInfo.RequestedVolumes = len(test.pod.Spec.Volumes)
 				}
 			}
-			function := priorityFunction(BalancedResourceAllocationMap, nil, nil)
 
-			list, err := function(test.pod, snapshot, test.nodes)
+			list, err := runMapReducePriority(BalancedResourceAllocationMap, nil, nil, test.pod, snapshot, test.nodes)
 
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)

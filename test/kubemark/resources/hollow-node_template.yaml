@@ -62,8 +62,8 @@ spec:
           mountPath: /var/log
         resources:
           requests:
-            cpu: 40m
-            memory: 100M
+            cpu: {{hollow_kubelet_millicpu}}m
+            memory: {{hollow_kubelet_mem_Ki}}Ki
         securityContext:
           privileged: true
       - name: hollow-proxy
@@ -90,10 +90,10 @@ spec:
           mountPath: /var/log
         resources:
           requests:
-            cpu: {{HOLLOW_PROXY_CPU}}m
-            memory: {{HOLLOW_PROXY_MEM}}Ki
+            cpu: {{hollow_proxy_millicpu}}m
+            memory: {{hollow_proxy_mem_Ki}}Ki
       - name: hollow-node-problem-detector
-        image: k8s.gcr.io/node-problem-detector:v0.4.1
+        image: k8s.gcr.io/node-problem-detector:v0.8.0
         env:
         - name: NODE_NAME
           valueFrom:
@@ -117,8 +117,8 @@ spec:
           mountPath: /var/log
         resources:
           requests:
-            cpu: 20m
-            memory: 20Mi
+            cpu: {{npd_millicpu}}m
+            memory: {{npd_mem_Ki}}Ki
         securityContext:
           privileged: true
       # Keep the pod running on unreachable node for 15 minutes.

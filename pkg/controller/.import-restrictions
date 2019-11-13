@@ -118,6 +118,7 @@
     {
       "SelectorRegexp": "k8s[.]io/client-go/",
       "AllowedPrefixes": [
+	"k8s.io/client-go/util/keyutil",
         "k8s.io/client-go/discovery",
         "k8s.io/client-go/dynamic",
         "k8s.io/client-go/informers",
@@ -146,9 +147,9 @@
         "k8s.io/client-go/listers/autoscaling/v1",
         "k8s.io/client-go/listers/batch/v1",
         "k8s.io/client-go/listers/certificates/v1beta1",
+        "k8s.io/client-go/listers/coordination/v1",
         "k8s.io/client-go/listers/core/v1",
         "k8s.io/client-go/listers/discovery/v1alpha1",
-        "k8s.io/client-go/listers/coordination/v1",
         "k8s.io/client-go/listers/extensions/v1beta1",
         "k8s.io/client-go/listers/policy/v1beta1",
         "k8s.io/client-go/listers/rbac/v1",
@@ -164,12 +165,12 @@
         "k8s.io/client-go/tools/record",
         "k8s.io/client-go/tools/reference",
         "k8s.io/client-go/tools/watch",
+        "k8s.io/client-go/transport",
         "k8s.io/client-go/util/cert",
         "k8s.io/client-go/util/flowcontrol",
         "k8s.io/client-go/util/retry",
-        "k8s.io/client-go/util/workqueue",
         "k8s.io/client-go/util/testing",
-        "k8s.io/client-go/transport"
+        "k8s.io/client-go/util/workqueue"
       ]
     },
     {

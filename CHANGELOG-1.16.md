@@ -381,6 +381,7 @@ The main themes of this release are:
   - Aggregated discovery requests can now timeout. Aggregated API servers must complete discovery calls within 5 seconds (other requests can take longer). Use the feature gate `EnableAggregatedDiscoveryTimeout=false` to temporarily revert behavior to the previous 30 second timeout if required (the temporary `EnableAggregatedDiscoveryTimeout` feature gate will be removed in v1.17). ([#82146](https://github.com/kubernetes/kubernetes/pull/82146), [@deads2k](https://github.com/deads2k))
   - the `scheduler.alpha.kubernetes.io/critical-pod` annotation is removed. Pod priority (`spec.priorityClassName`) should be used instead to mark pods as critical. ([#80342](https://github.com/kubernetes/kubernetes/pull/80342), [@draveness](https://github.com/draveness))
   - the NormalizeScore plugin set is removed from scheduler framework config API. Use ScorePlugin only. ([#80930](https://github.com/kubernetes/kubernetes/pull/80930), [@liu-cong](https://github.com/liu-cong))
+  - the node label `alpha.service-controller.kubernetes.io/exclude-balancer` which excludes a node from cloud load balancers (using Service Type=LoadBalancer) is deprecated in favor of `node.kubernetes.io/exclude-balancer`. Support for `alpha.service-controller.kubernetes.io/exclude-balancer` will be removed in v1.18.
 
 - Features:
 
@@ -1176,8 +1177,8 @@ filename | sha512 hash
 * Make kubectl get --ignore-not-found continue processing when encountering error.  ([#82120](https://github.com/kubernetes/kubernetes/pull/82120), [@soltysh](https://github.com/soltysh))
 * Dual stack services (Phase II of IPv6DualStack feature) are enabled via the IPVS proxier. iptables proxier does not support dualstack yet. Dualstack iptables proxier is WIP and should catchup soon. ([#82091](https://github.com/kubernetes/kubernetes/pull/82091), [@khenidak](https://github.com/khenidak))
     * to enable, kube-proxy must be have the following flags:
-    * --proxy-mode=ipvs 
-    * --cluster-cidrs=<cidr>,<cidr> 
+    * --proxy-mode=ipvs
+    * --cluster-cidrs=<cidr>,<cidr>
 * The apiserver now uses http/1.1 to communicate with admission webhooks, opening multiple connections to satisfy concurrent requests, and allowing spreading requests across multiple backing pods. ([#82090](https://github.com/kubernetes/kubernetes/pull/82090), [@liggitt](https://github.com/liggitt))
 * Added support to specify a global-access annotation for gce ILB. ([#81549](https://github.com/kubernetes/kubernetes/pull/81549), [@prameshj](https://github.com/prameshj))
 * Added new startupProbe, related to KEP https://github.com/kubernetes/enhancements/issues/950. ([#77807](https://github.com/kubernetes/kubernetes/pull/77807), [@matthyx](https://github.com/matthyx))
@@ -1210,7 +1211,7 @@ filename | sha512 hash
     * Master: convert service CIDR to list  `--service-cluster-ip-range=<CIDR>,<CIDR>` and make sure `IPv6DualStack` feature flag is turned on. The flag is validated and used as the following:
     * 1. `--service-cluster-ip-range[0]` is consider primary service range, and will be used for any service with `Service.Spec.IPFamily = nil` or any service in the at the time of turning on the feature flag.
     * 2. A cluster can be dualstack (i.e. Pods and nodes carry dualstack IPs) but does not need to support ingress on dualstack. In this case the cluster can perform egress using `PodIPs` (according to family and binding selection in user code) but will ingress will only be performed against the pod primary IP. This can be configured by supplying single entry to `--service-cluster-ip-range` flag.
-    * 3. Maximum of two entries is allowed in `--service-cluster-ip-range` and they are validated to be dual stacked `i.e. --service-cluster-ip-range=<v4>,<v6> or --service-cluster-ip-range=<v6>,<v4>`  
+    * 3. Maximum of two entries is allowed in `--service-cluster-ip-range` and they are validated to be dual stacked `i.e. --service-cluster-ip-range=<v4>,<v6> or --service-cluster-ip-range=<v6>,<v4>`
     * 4. Max 20 bit for range (min network bits `<v6>/108` or <v4>/12)
     * kube-controller-manager: convert service CIDR to list `--service-cluster-ip-range=<CIDR>,<CIDR>` and make sure `IPv6DualStack` feature flag is turned on. The flag is validated as above.
     * + to use:
@@ -1577,7 +1578,7 @@ filename | sha512 hash
 * NFS Drivers are now enabled to collect metrics, StatFS metrics provider is used to collect the metrics. ([#75805](https://github.com/kubernetes/kubernetes/pull/75805) , [@brahmaroutu](https://github.com/brahmaroutu)) ([#75805](https://github.com/kubernetes/kubernetes/pull/75805), [@brahmaroutu](https://github.com/brahmaroutu))
 * make node lease renew interval more heuristic based on node-status-update-frequency in kubelet ([#80173](https://github.com/kubernetes/kubernetes/pull/80173), [@gaorong](https://github.com/gaorong))
 * Introduction of the pod overhead feature to the scheduler.  This functionality is alpha-level as of  ([#78319](https://github.com/kubernetes/kubernetes/pull/78319), [@egernst](https://github.com/egernst))
-    * Kubernetes v1.16, and is only honored by servers that enable the PodOverhead feature.gate. 
+    * Kubernetes v1.16, and is only honored by servers that enable the PodOverhead feature.gate.
 * N/A ([#80260](https://github.com/kubernetes/kubernetes/pull/80260), [@khenidak](https://github.com/khenidak))
 * Add v1.Container.SecurityContext.WindowsOptions.RunAsUserName to the pod spec  ([#79489](https://github.com/kubernetes/kubernetes/pull/79489), [@bclau](https://github.com/bclau))
 * Pass-through volume MountOptions to global mount (NodeStageVolume) on the node for CSI ([#80191](https://github.com/kubernetes/kubernetes/pull/80191), [@davidz627](https://github.com/davidz627))
@@ -1650,7 +1651,7 @@ filename | sha512 hash
         * `daemonsets`, `deployments`, `replicasets` resources under `extensions/v1beta1` - use `apps/v1` instead
         * `networkpolicies` resources under `extensions/v1beta1` - use `networking.k8s.io/v1` instead
         * `podsecuritypolicies` resources under `extensions/v1beta1` - use `policy/v1beta1` instead
-    * Serving these resources can be temporarily re-enabled using the `--runtime-config` apiserver flag. 
+    * Serving these resources can be temporarily re-enabled using the `--runtime-config` apiserver flag.
         * `apps/v1beta1=true`
         * `apps/v1beta2=true`
         * `extensions/v1beta1/daemonsets=true,extensions/v1beta1/deployments=true,extensions/v1beta1/replicasets=true,extensions/v1beta1/networkpolicies=true,extensions/v1beta1/podsecuritypolicies=true`
@@ -1719,9 +1720,9 @@ filename | sha512 hash
 * To configure controller manager to use ipv6dual stack: ([#73977](https://github.com/kubernetes/kubernetes/pull/73977), [@khenidak](https://github.com/khenidak))
     * use --cluster-cidr="<cidr1>,<cidr2>".
     * Notes:
- 
-    * 1. Only the first two cidrs are used (soft limits for Alpha, might be lifted later on). 
-    * 2. Only the "RangeAllocator" (default) is allowed as a value for --cidr-allocator-type . Cloud allocators are not compatible with ipv6dualstack 
+
+    * 1. Only the first two cidrs are used (soft limits for Alpha, might be lifted later on).
+    * 2. Only the "RangeAllocator" (default) is allowed as a value for --cidr-allocator-type . Cloud allocators are not compatible with ipv6dualstack
 * When using the conformance test image, a new environment variable E2E_USE_GO_RUNNER will cause the tests to be run with the new Golang-based test runner rather than the current bash wrapper. ([#79284](https://github.com/kubernetes/kubernetes/pull/79284), [@johnSchnake](https://github.com/johnSchnake))
 * kubeadm: prevent PSP blocking of upgrade image prepull by using a non-root user ([#77792](https://github.com/kubernetes/kubernetes/pull/77792), [@neolit123](https://github.com/neolit123))
 * kubelet now accepts a --cni-cache-dir option, which defaults to /var/lib/cni/cache, where CNI stores cache files. ([#78908](https://github.com/kubernetes/kubernetes/pull/78908), [@dcbw](https://github.com/dcbw))

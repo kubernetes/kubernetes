@@ -5,7 +5,8 @@ go_library(
     srcs = [
         "doc.go",
         "exec.go",
-        "fake.go",
+        "fake_exec.go",
+        "fake_mounter.go",
         "mount.go",
         "mount_helper_common.go",
         "mount_helper_unix.go",
@@ -30,6 +31,9 @@ go_library(
             "//vendor/k8s.io/utils/io:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/k8s.io/utils/io:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:ios": [
             "//vendor/k8s.io/utils/io:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [

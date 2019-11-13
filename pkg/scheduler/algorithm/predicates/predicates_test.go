@@ -31,9 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
@@ -390,7 +390,8 @@ func TestPodFitsResources(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 			RegisterPredicateMetadataProducerWithExtendedResourceOptions(test.ignoredExtendedResources)
-			meta := GetPredicateMetadata(test.pod, nil)
+			factory := &MetadataProducerFactory{}
+			meta := factory.GetPredicateMetadata(test.pod, nil)
 			fits, reasons, err := PodFitsResources(test.pod, meta, test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -448,7 +449,8 @@ func TestPodFitsResources(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 1, 0, 0, 0)}}
 			test.nodeInfo.SetNode(&node)
-			fits, reasons, err := PodFitsResources(test.pod, GetPredicateMetadata(test.pod, nil), test.nodeInfo)
+			factory := &MetadataProducerFactory{}
+			fits, reasons, err := PodFitsResources(test.pod, factory.GetPredicateMetadata(test.pod, nil), test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -508,7 +510,8 @@ func TestPodFitsResources(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
-			fits, reasons, err := PodFitsResources(test.pod, GetPredicateMetadata(test.pod, nil), test.nodeInfo)
+			factory := &MetadataProducerFactory{}
+			fits, reasons, err := PodFitsResources(test.pod, factory.GetPredicateMetadata(test.pod, nil), test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -571,7 +574,8 @@ func TestPodFitsHost(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			nodeInfo := schedulernodeinfo.NewNodeInfo()
 			nodeInfo.SetNode(test.node)
-			fits, reasons, err := PodFitsHost(test.pod, GetPredicateMetadata(test.pod, nil), nodeInfo)
+			factory := &MetadataProducerFactory{}
+			fits, reasons, err := PodFitsHost(test.pod, factory.GetPredicateMetadata(test.pod, nil), nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -711,7 +715,8 @@ func TestPodFitsHostPorts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fits, reasons, err := PodFitsHostPorts(test.pod, GetPredicateMetadata(test.pod, nil), test.nodeInfo)
+			factory := &MetadataProducerFactory{}
+			fits, reasons, err := PodFitsHostPorts(test.pod, factory.GetPredicateMetadata(test.pod, nil), test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -763,7 +768,8 @@ func TestGCEDiskConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ok, reasons, err := NoDiskConflict(test.pod, GetPredicateMetadata(test.pod, nil), test.nodeInfo)
+			factory := &MetadataProducerFactory{}
+			ok, reasons, err := NoDiskConflict(test.pod, factory.GetPredicateMetadata(test.pod, nil), test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -818,7 +824,8 @@ func TestAWSDiskConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ok, reasons, err := NoDiskConflict(test.pod, GetPredicateMetadata(test.pod, nil), test.nodeInfo)
+			factory := &MetadataProducerFactory{}
+			ok, reasons, err := NoDiskConflict(test.pod, factory.GetPredicateMetadata(test.pod, nil), test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -879,7 +886,8 @@ func TestRBDDiskConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ok, reasons, err := NoDiskConflict(test.pod, GetPredicateMetadata(test.pod, nil), test.nodeInfo)
+			factory := &MetadataProducerFactory{}
+			ok, reasons, err := NoDiskConflict(test.pod, factory.GetPredicateMetadata(test.pod, nil), test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -940,7 +948,8 @@ func TestISCSIDiskConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ok, reasons, err := NoDiskConflict(test.pod, GetPredicateMetadata(test.pod, nil), test.nodeInfo)
+			factory := &MetadataProducerFactory{}
+			ok, reasons, err := NoDiskConflict(test.pod, factory.GetPredicateMetadata(test.pod, nil), test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1447,7 +1456,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1473,7 +1482,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1499,7 +1508,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1535,7 +1544,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1569,7 +1578,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1603,7 +1612,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1641,7 +1650,8 @@ func TestPodFitsSelector(t *testing.T) {
 			nodeInfo := schedulernodeinfo.NewNodeInfo()
 			nodeInfo.SetNode(&node)
 
-			fits, reasons, err := PodMatchNodeSelector(test.pod, GetPredicateMetadata(test.pod, nil), nodeInfo)
+			factory := &MetadataProducerFactory{}
+			fits, reasons, err := PodMatchNodeSelector(test.pod, factory.GetPredicateMetadata(test.pod, nil), nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1658,47 +1668,41 @@ func TestPodFitsSelector(t *testing.T) {
 func TestNodeLabelPresence(t *testing.T) {
 	label := map[string]string{"foo": "bar", "bar": "foo"}
 	tests := []struct {
-		pod      *v1.Pod
-		labels   []string
-		presence bool
-		fits     bool
-		name     string
+		pod           *v1.Pod
+		presentLabels []string
+		absentLabels  []string
+		fits          bool
+		name          string
 	}{
 		{
-			labels:   []string{"baz"},
-			presence: true,
-			fits:     false,
-			name:     "label does not match, presence true",
+			presentLabels: []string{"baz"},
+			fits:          false,
+			name:          "label does not match, presence true",
 		},
 		{
-			labels:   []string{"baz"},
-			presence: false,
-			fits:     true,
-			name:     "label does not match, presence false",
+			absentLabels: []string{"baz"},
+			fits:         true,
+			name:         "label does not match, presence false",
 		},
 		{
-			labels:   []string{"foo", "baz"},
-			presence: true,
-			fits:     false,
-			name:     "one label matches, presence true",
+			presentLabels: []string{"foo", "baz"},
+			fits:          false,
+			name:          "one label matches, presence true",
 		},
 		{
-			labels:   []string{"foo", "baz"},
-			presence: false,
-			fits:     false,
-			name:     "one label matches, presence false",
+			absentLabels: []string{"foo", "baz"},
+			fits:         false,
+			name:         "one label matches, presence false",
 		},
 		{
-			labels:   []string{"foo", "bar"},
-			presence: true,
-			fits:     true,
-			name:     "all labels match, presence true",
+			presentLabels: []string{"foo", "bar"},
+			fits:          true,
+			name:          "all labels match, presence true",
 		},
 		{
-			labels:   []string{"foo", "bar"},
-			presence: false,
-			fits:     false,
-			name:     "all labels match, presence false",
+			absentLabels: []string{"foo", "bar"},
+			fits:         false,
+			name:         "all labels match, presence false",
 		},
 	}
 	expectedFailureReasons := []PredicateFailureReason{ErrNodeLabelPresenceViolated}
@@ -1709,8 +1713,9 @@ func TestNodeLabelPresence(t *testing.T) {
 			nodeInfo := schedulernodeinfo.NewNodeInfo()
 			nodeInfo.SetNode(&node)
 
-			labelChecker := NodeLabelChecker{test.labels, test.presence}
-			fits, reasons, err := labelChecker.CheckNodeLabelPresence(test.pod, GetPredicateMetadata(test.pod, nil), nodeInfo)
+			labelChecker := NodeLabelChecker{test.presentLabels, test.absentLabels}
+			factory := &MetadataProducerFactory{}
+			fits, reasons, err := labelChecker.CheckNodeLabelPresence(test.pod, factory.GetPredicateMetadata(test.pod, nil), nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1855,7 +1860,7 @@ func TestServiceAffinity(t *testing.T) {
 		testIt := func(skipPrecompute bool) {
 			t.Run(fmt.Sprintf("%v/skipPrecompute/%v", test.name, skipPrecompute), func(t *testing.T) {
 				nodes := []*v1.Node{&node1, &node2, &node3, &node4, &node5}
-				s := nodeinfosnapshot.NewSnapshot(test.pods, nodes)
+				s := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
 
 				// Reimplementing the logic that the scheduler implements: Any time it makes a predicate, it registers any precomputations.
 				predicate, precompute := NewServiceAffinityPredicate(s.NodeInfos(), s.Pods(), fakelisters.ServiceLister(test.services), test.labels)
@@ -1865,7 +1870,8 @@ func TestServiceAffinity(t *testing.T) {
 						precompute(pm)
 					}
 				})
-				if pmeta, ok := (GetPredicateMetadata(test.pod, s)).(*predicateMetadata); ok {
+				factory := &MetadataProducerFactory{}
+				if pmeta, ok := (factory.GetPredicateMetadata(test.pod, s)).(*predicateMetadata); ok {
 					fits, reasons, err := predicate(test.pod, pmeta, s.NodeInfoMap[test.node.Name])
 					if err != nil {
 						t.Errorf("unexpected error: %v", err)
@@ -1973,7 +1979,8 @@ func TestRunGeneralPredicates(t *testing.T) {
 	for _, test := range resourceTests {
 		t.Run(test.name, func(t *testing.T) {
 			test.nodeInfo.SetNode(test.node)
-			fits, reasons, err := GeneralPredicates(test.pod, GetPredicateMetadata(test.pod, nil), test.nodeInfo)
+			factory := &MetadataProducerFactory{}
+			fits, reasons, err := GeneralPredicates(test.pod, factory.GetPredicateMetadata(test.pod, nil), test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -2922,13 +2929,14 @@ func TestInterPodAffinity(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			s := nodeinfosnapshot.NewSnapshot(test.pods, []*v1.Node{test.node})
+			s := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, []*v1.Node{test.node}))
 
 			fit := PodAffinityChecker{
 				nodeInfoLister: s.NodeInfos(),
 				podLister:      fakelisters.PodLister(test.pods),
 			}
-			fits, reasons, _ := fit.InterPodAffinityMatches(test.pod, GetPredicateMetadata(test.pod, s), s.NodeInfoMap[test.node.Name])
+			factory := &MetadataProducerFactory{}
+			fits, reasons, _ := fit.InterPodAffinityMatches(test.pod, factory.GetPredicateMetadata(test.pod, s), s.NodeInfoMap[test.node.Name])
 			if !fits && !reflect.DeepEqual(reasons, test.expectFailureReasons) {
 				t.Errorf("unexpected failure reasons: %v, want: %v", reasons, test.expectFailureReasons)
 			}
@@ -4011,22 +4019,23 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeA": false,
 				"nodeB": false,
 			},
-			name: "Test incoming pod's affinity: firstly check if all affinityTerms match, and then check if all topologyKeys match, and the match logic should be satified on the same pod",
+			name: "Test incoming pod's affinity: firstly check if all affinityTerms match, and then check if all topologyKeys match, and the match logic should be satisfied on the same pod",
 		},
 	}
 
 	for indexTest, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 			for indexNode, node := range test.nodes {
 				testFit := PodAffinityChecker{
 					nodeInfoLister: snapshot.NodeInfos(),
 					podLister:      snapshot.Pods(),
 				}
 
-				var meta PredicateMetadata
+				var meta Metadata
 				if !test.nometa {
-					meta = GetPredicateMetadata(test.pod, snapshot)
+					factory := &MetadataProducerFactory{}
+					meta = factory.GetPredicateMetadata(test.pod, snapshot)
 				}
 
 				fits, reasons, _ := testFit.InterPodAffinityMatches(test.pod, meta, snapshot.NodeInfoMap[node.Name])
@@ -4035,8 +4044,9 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				}
 				affinity := test.pod.Spec.Affinity
 				if affinity != nil && affinity.NodeAffinity != nil {
-					s := nodeinfosnapshot.NewSnapshot(nil, []*v1.Node{node})
-					fits2, reasons, err := PodMatchNodeSelector(test.pod, GetPredicateMetadata(test.pod, s), s.NodeInfoMap[node.Name])
+					s := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(nil, []*v1.Node{node}))
+					factory := &MetadataProducerFactory{}
+					fits2, reasons, err := PodMatchNodeSelector(test.pod, factory.GetPredicateMetadata(test.pod, s), s.NodeInfoMap[node.Name])
 					if err != nil {
 						t.Errorf("unexpected error: %v", err)
 					}
@@ -4244,7 +4254,8 @@ func TestPodToleratesTaints(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			nodeInfo := schedulernodeinfo.NewNodeInfo()
 			nodeInfo.SetNode(&test.node)
-			fits, reasons, err := PodToleratesNodeTaints(test.pod, GetPredicateMetadata(test.pod, nil), nodeInfo)
+			factory := &MetadataProducerFactory{}
+			fits, reasons, err := PodToleratesNodeTaints(test.pod, factory.GetPredicateMetadata(test.pod, nil), nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -4690,7 +4701,7 @@ func TestCheckNodeUnschedulablePredicate(t *testing.T) {
 				Spec: v1.PodSpec{
 					Tolerations: []v1.Toleration{
 						{
-							Key:    schedulerapi.TaintNodeUnschedulable,
+							Key:    v1.TaintNodeUnschedulable,
 							Effect: v1.TaintEffectNoSchedule,
 						},
 					},
@@ -4764,7 +4775,7 @@ func TestEvenPodsSpreadPredicate_SingleConstraint(t *testing.T) {
 			},
 		},
 		{
-			name: "existing pods with mis-matched namespace doens't count",
+			name: "existing pods with mis-matched namespace doesn't count",
 			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
 				1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(),
 			).Obj(),
@@ -4956,8 +4967,9 @@ func TestEvenPodsSpreadPredicate_SingleConstraint(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := nodeinfosnapshot.NewSnapshot(tt.existingPods, tt.nodes)
-			meta := GetPredicateMetadata(tt.pod, s)
+			s := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, tt.nodes))
+			factory := &MetadataProducerFactory{}
+			meta := factory.GetPredicateMetadata(tt.pod, s)
 			for _, node := range tt.nodes {
 				fits, _, _ := EvenPodsSpreadPredicate(tt.pod, meta, s.NodeInfoMap[node.Name])
 				if fits != tt.fits[node.Name] {
@@ -5149,8 +5161,9 @@ func TestEvenPodsSpreadPredicate_MultipleConstraints(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := nodeinfosnapshot.NewSnapshot(tt.existingPods, tt.nodes)
-			meta := GetPredicateMetadata(tt.pod, s)
+			s := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, tt.nodes))
+			factory := &MetadataProducerFactory{}
+			meta := factory.GetPredicateMetadata(tt.pod, s)
 			for _, node := range tt.nodes {
 				fits, _, _ := EvenPodsSpreadPredicate(tt.pod, meta, s.NodeInfoMap[node.Name])
 				if fits != tt.fits[node.Name] {

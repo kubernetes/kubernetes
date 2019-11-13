@@ -2076,6 +2076,45 @@ function start-fluentd-resource-update {
   wait-for-apiserver-and-update-fluentd &
 }
 
+# VolumeSnapshot CRDs and controller are installed by cluster addon manager,
+# which may not be available at this point. Run this as a background process.
+function wait-for-volumesnapshot-crd-and-controller {
+  # Wait until volumesnapshot CRDs and controller are in place.
+  echo "Wait until volume snapshot CRDs are installed"
+  until kubectl get volumesnapshotclasses.snapshot.storage.k8s.io
+  do
+    sleep 10
+  done
+
+  until kubectl get volumesnapshotcontents.snapshot.storage.k8s.io
+  do
+    sleep 10
+  done
+
+  until kubectl get volumesnapshots.snapshot.storage.k8s.io
+  do
+    sleep 10
+  done
+
+  echo "Wait until volume snapshot RBAC rules are installed"
+  until kubectl get clusterrolebinding volume-snapshot-controller-role
+  do
+    sleep 10
+  done
+
+  echo "Wait until volume snapshot controller is installed"
+  until kubectl get statefulset volume-snapshot-controller | grep volume-snapshot-controller | grep "1/1"
+  do
+    sleep 10
+  done
+}
+
+# Trigger background process that will wait for volumesnapshot CRDs
+# and snapshot-controller to be installed
+function start-volumesnapshot-crd-and-controller {
+  wait-for-volumesnapshot-crd-and-controller &
+}
+
 # Update {{ fluentd_container_runtime_service }} with actual container runtime name,
 # and {{ container_runtime_endpoint }} with actual container runtime
 # endpoint.
@@ -2443,6 +2482,11 @@ EOF
   fi
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
+  fi
+  if [[ "${ENABLE_VOLUME_SNAPSHOTS:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "volumesnapshots/crd"
+    setup-addon-manifests "addons" "volumesnapshots/volume-snapshot-controller"
+    start-volumesnapshot-crd-and-controller
   fi
   if [[ "${ENABLE_IP_MASQ_AGENT:-}" == "true" ]]; then
     setup-addon-manifests "addons" "ip-masq-agent"

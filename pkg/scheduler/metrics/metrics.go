@@ -254,6 +254,16 @@ var (
 		},
 		[]string{"extension_point", "status"})
 
+	PluginExecutionDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "plugin_execution_duration_seconds",
+			Help:           "Duration for running a plugin at a specific extension point.",
+			Buckets:        nil,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"plugin", "extension_point", "status"})
+
 	SchedulerQueueIncomingPods = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -271,6 +281,14 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"result"})
+
+	CacheSize = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "scheduler_cache_size",
+			Help:           "Number of nodes, pods, and assumed (bound) pods in the scheduler cache.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"type"})
 
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
@@ -294,9 +312,11 @@ var (
 		PodSchedulingDuration,
 		PodSchedulingAttempts,
 		FrameworkExtensionPointDuration,
+		PluginExecutionDuration,
 		SchedulerQueueIncomingPods,
 		SchedulerGoroutines,
 		PermitWaitDuration,
+		CacheSize,
 	}
 )
 

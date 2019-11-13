@@ -300,10 +300,9 @@ func (c *BlobDiskController) getStorageAccountKey(SAName string) (string, error)
 				klog.Warningf("azureDisk - account %s was not cached while getting keys", SAName)
 				return *v.Value, nil
 			}
+			c.accounts[SAName].key = *v.Value
+			return c.accounts[SAName].key, nil
 		}
-
-		c.accounts[SAName].key = *v.Value
-		return c.accounts[SAName].key, nil
 	}
 
 	return "", fmt.Errorf("couldn't find key named key1 in storage account:%s keys", SAName)

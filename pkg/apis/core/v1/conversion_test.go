@@ -338,13 +338,7 @@ func roundTripRS(t *testing.T, rs *apps.ReplicaSet) *apps.ReplicaSet {
 		t.Errorf("%v\nData: %s\nSource: %#v", err, string(data), rs)
 		return nil
 	}
-	obj3 := &apps.ReplicaSet{}
-	err = legacyscheme.Scheme.Convert(obj2, obj3, nil)
-	if err != nil {
-		t.Errorf("%v\nSource: %#v", err, obj2)
-		return nil
-	}
-	return obj3
+	return obj2.(*apps.ReplicaSet)
 }
 
 func Test_core_PodStatus_to_v1_PodStatus(t *testing.T) {

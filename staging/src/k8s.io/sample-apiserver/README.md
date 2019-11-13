@@ -187,19 +187,19 @@ only this superuser group is authorized.
 
    ``` shell
    curl -fv -k --cert client.p12:password \
-      https://localhost:8443/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
+      https://localhost:8443/apis/wardle.example.com/v1alpha1/namespaces/default/flunders
    ```
 
    Or use wget:
    ``` shell
    wget -O- --no-check-certificate \
       --certificate client.crt --private-key client.key \
-      https://localhost:8443/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
+      https://localhost:8443/apis/wardle.example.com/v1alpha1/namespaces/default/flunders
    ```
 
    Note: Recent OSX versions broke client certs with curl. On Mac try `brew install httpie` and then:
 
    ``` shell
    http --verify=no --cert client.crt --cert-key client.key \
-      https://localhost:8443/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
+      https://localhost:8443/apis/wardle.example.com/v1alpha1/namespaces/default/flunders
    ```

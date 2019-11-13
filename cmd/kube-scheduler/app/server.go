@@ -123,22 +123,24 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options, regist
 	}
 
 	if errs := opts.Validate(); len(errs) > 0 {
-		fmt.Fprintf(os.Stderr, "%v\n", utilerrors.NewAggregate(errs))
-		os.Exit(1)
+		return utilerrors.NewAggregate(errs)
 	}
 
 	if len(opts.WriteConfigTo) > 0 {
-		if err := options.WriteConfigFile(opts.WriteConfigTo, &opts.ComponentConfig); err != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", err)
-			os.Exit(1)
+		c := &schedulerserverconfig.Config{}
+		if err := opts.ApplyTo(c); err != nil {
+			return err
+		}
+		if err := options.WriteConfigFile(opts.WriteConfigTo, &c.ComponentConfig); err != nil {
+			return err
 		}
 		klog.Infof("Wrote configuration to: %s\n", opts.WriteConfigTo)
+		return nil
 	}
 
 	c, err := opts.Config()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+		return err
 	}
 
 	// Get the completed config
@@ -193,12 +195,12 @@ func Run(ctx context.Context, cc schedulerserverconfig.CompletedConfig, outOfTre
 		scheduler.WithHardPodAffinitySymmetricWeight(cc.ComponentConfig.HardPodAffinitySymmetricWeight),
 		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),
 		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
-		scheduler.WithBindTimeoutSeconds(*cc.ComponentConfig.BindTimeoutSeconds),
+		scheduler.WithBindTimeoutSeconds(cc.ComponentConfig.BindTimeoutSeconds),
 		scheduler.WithFrameworkOutOfTreeRegistry(outOfTreeRegistry),
 		scheduler.WithFrameworkPlugins(cc.ComponentConfig.Plugins),
 		scheduler.WithFrameworkPluginConfig(cc.ComponentConfig.PluginConfig),
-		scheduler.WithPodMaxBackoffSeconds(*cc.ComponentConfig.PodMaxBackoffSeconds),
-		scheduler.WithPodInitialBackoffSeconds(*cc.ComponentConfig.PodInitialBackoffSeconds),
+		scheduler.WithPodMaxBackoffSeconds(cc.ComponentConfig.PodMaxBackoffSeconds),
+		scheduler.WithPodInitialBackoffSeconds(cc.ComponentConfig.PodInitialBackoffSeconds),
 	)
 	if err != nil {
 		return err

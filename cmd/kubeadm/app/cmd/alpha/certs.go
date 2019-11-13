@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/copycerts"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -80,7 +79,7 @@ func newCmdCertsUtility(out io.Writer) *cobra.Command {
 	}
 
 	cmd.AddCommand(newCmdCertsRenewal())
-	cmd.AddCommand(newCmdCertsExpiration(out, kubeadmconstants.KubernetesDir))
+	cmd.AddCommand(newCmdCertsExpiration(out, constants.KubernetesDir))
 	cmd.AddCommand(NewCmdCertificateKey())
 	return cmd
 }
@@ -112,7 +111,7 @@ func newCmdCertsRenewal() *cobra.Command {
 		RunE:  cmdutil.SubCmdRunE("renew"),
 	}
 
-	cmd.AddCommand(getRenewSubCommands(kubeadmconstants.KubernetesDir)...)
+	cmd.AddCommand(getRenewSubCommands(constants.KubernetesDir)...)
 
 	return cmd
 }
@@ -207,6 +206,11 @@ func renewCert(flags *renewFlags, kdir string, handler *renewal.CertificateRenew
 		return err
 	}
 
+	if ok, _ := rm.CertificateExists(handler.Name); !ok {
+		fmt.Printf("MISSING! %s\n", handler.LongName)
+		return nil
+	}
+
 	// if the renewal operation is set to generate CSR request only
 	if flags.csrOnly {
 		// checks a path for storing CSR request is given
@@ -283,36 +287,54 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 			w := tabwriter.NewWriter(out, 10, 4, 3, ' ', 0)
 			fmt.Fprintln(w, "CERTIFICATE\tEXPIRES\tRESIDUAL TIME\tCERTIFICATE AUTHORITY\tEXTERNALLY MANAGED")
 			for _, handler := range rm.Certificates() {
-				e, err := rm.GetCertificateExpirationInfo(handler.Name)
-				if err != nil {
-					return err
+				if ok, _ := rm.CertificateExists(handler.Name); ok {
+					e, err := rm.GetCertificateExpirationInfo(handler.Name)
+					if err != nil {
+						return err
+					}
+
+					s := fmt.Sprintf("%s\t%s\t%s\t%s\t%-8v",
+						e.Name,
+						e.ExpirationDate.Format("Jan 02, 2006 15:04 MST"),
+						duration.ShortHumanDuration(e.ResidualTime()),
+						handler.CAName,
+						yesNo(e.ExternallyManaged),
+					)
+
+					fmt.Fprintln(w, s)
+					continue
 				}
 
-				s := fmt.Sprintf("%s\t%s\t%s\t%s\t%-8v",
-					e.Name,
-					e.ExpirationDate.Format("Jan 02, 2006 15:04 MST"),
-					duration.ShortHumanDuration(e.ResidualTime()),
-					handler.CAName,
-					yesNo(e.ExternallyManaged),
+				// the certificate does not exist (for any reason)
+				s := fmt.Sprintf("!MISSING! %s\t\t\t\t",
+					handler.Name,
 				)
-
 				fmt.Fprintln(w, s)
 			}
 			fmt.Fprintln(w)
 			fmt.Fprintln(w, "CERTIFICATE AUTHORITY\tEXPIRES\tRESIDUAL TIME\tEXTERNALLY MANAGED")
 			for _, handler := range rm.CAs() {
-				e, err := rm.GetCAExpirationInfo(handler.Name)
-				if err != nil {
-					return err
+				if ok, _ := rm.CAExists(handler.Name); ok {
+					e, err := rm.GetCAExpirationInfo(handler.Name)
+					if err != nil {
+						return err
+					}
+
+					s := fmt.Sprintf("%s\t%s\t%s\t%-8v",
+						e.Name,
+						e.ExpirationDate.Format("Jan 02, 2006 15:04 MST"),
+						duration.ShortHumanDuration(e.ResidualTime()),
+						yesNo(e.ExternallyManaged),
+					)
+
+					fmt.Fprintln(w, s)
+					continue
 				}
 
-				s := fmt.Sprintf("%s\t%s\t%s\t%-8v",
-					e.Name,
-					e.ExpirationDate.Format("Jan 02, 2006 15:04 MST"),
-					duration.ShortHumanDuration(e.ResidualTime()),
-					yesNo(e.ExternallyManaged),
+				// the CA does not exist (for any reason)
+				s := fmt.Sprintf("!MISSING! %s\t\t\t",
+					handler.Name,
 				)
-
 				fmt.Fprintln(w, s)
 			}
 			w.Flush()

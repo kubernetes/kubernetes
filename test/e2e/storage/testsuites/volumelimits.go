@@ -25,7 +25,7 @@ import (
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -109,7 +109,7 @@ func (t *volumeLimitsTestSuite) defineTests(driver TestDriver, pattern testpatte
 	// And one extra pod with a CSI volume should get Pending with a condition
 	// that says it's unschedulable because of volume limit.
 	// BEWARE: the test may create lot of volumes and it's really slow.
-	ginkgo.It("should support volume limits [Slow][Serial]", func() {
+	ginkgo.It("should support volume limits [Serial]", func() {
 		driverInfo := driver.GetDriverInfo()
 		if !driverInfo.Capabilities[CapVolumeLimits] {
 			ginkgo.Skip(fmt.Sprintf("driver %s does not support volume limits", driverInfo.Name))
@@ -124,15 +124,19 @@ func (t *volumeLimitsTestSuite) defineTests(driver TestDriver, pattern testpatte
 		l.config, l.testCleanup = driver.PrepareTest(f)
 		defer l.testCleanup()
 
-		ginkgo.By("Picking a random node")
-		var nodeName string
-		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
-		framework.ExpectNoError(err)
-		nodeName = node.Name
+		ginkgo.By("Picking a node")
+		// Some CSI drivers are deployed to a single node (e.g csi-hostpath),
+		// so we use that node instead of picking a random one.
+		nodeName := l.config.ClientNodeName
+		if nodeName == "" {
+			node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+			framework.ExpectNoError(err)
+			nodeName = node.Name
+		}
 		framework.Logf("Selected node %s", nodeName)
 
 		ginkgo.By("Checking node limits")
-		limit, err := getNodeLimits(l.cs, nodeName, driverInfo)
+		limit, err := getNodeLimits(l.cs, l.config, nodeName, driverInfo)
 		framework.ExpectNoError(err)
 
 		framework.Logf("Node %s can handle %d volumes of driver %s", nodeName, limit, driverInfo.Name)
@@ -143,8 +147,10 @@ func (t *volumeLimitsTestSuite) defineTests(driver TestDriver, pattern testpatte
 		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, dDriver)
 
 		l.resource = createGenericVolumeTestResource(driver, l.config, pattern, testVolumeSizeRange)
-		defer l.resource.cleanupResource()
-
+		defer func() {
+			err := l.resource.cleanupResource()
+			framework.ExpectNoError(err, "while cleaning up resource")
+		}()
 		defer func() {
 			cleanupTest(l.cs, l.ns.Name, l.runningPod.Name, l.unschedulablePod.Name, l.pvcs, l.pvNames)
 		}()
@@ -281,9 +287,9 @@ func waitForAllPVCsPhase(cs clientset.Interface, timeout time.Duration, pvcs []*
 	return pvNames, err
 }
 
-func getNodeLimits(cs clientset.Interface, nodeName string, driverInfo *DriverInfo) (int, error) {
+func getNodeLimits(cs clientset.Interface, config *PerTestConfig, nodeName string, driverInfo *DriverInfo) (int, error) {
 	if len(driverInfo.InTreePluginName) == 0 {
-		return getCSINodeLimits(cs, nodeName, driverInfo)
+		return getCSINodeLimits(cs, config, nodeName, driverInfo)
 	}
 	return getInTreeNodeLimits(cs, nodeName, driverInfo)
 }
@@ -315,18 +321,18 @@ func getInTreeNodeLimits(cs clientset.Interface, nodeName string, driverInfo *Dr
 	return int(limit.Value()), nil
 }
 
-func getCSINodeLimits(cs clientset.Interface, nodeName string, driverInfo *DriverInfo) (int, error) {
+func getCSINodeLimits(cs clientset.Interface, config *PerTestConfig, nodeName string, driverInfo *DriverInfo) (int, error) {
 	// Wait in a loop, the driver might just have been installed and kubelet takes a while to publish everything.
 	var limit int
 	err := wait.PollImmediate(2*time.Second, csiNodeInfoTimeout, func() (bool, error) {
-		csiNode, err := cs.StorageV1beta1().CSINodes().Get(nodeName, metav1.GetOptions{})
+		csiNode, err := cs.StorageV1().CSINodes().Get(nodeName, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("%s", err)
 			return false, nil
 		}
-		var csiDriver *storagev1beta1.CSINodeDriver
+		var csiDriver *storagev1.CSINodeDriver
 		for _, c := range csiNode.Spec.Drivers {
-			if c.Name == driverInfo.Name {
+			if c.Name == driverInfo.Name || c.Name == config.GetUniqueDriverName() {
 				csiDriver = &c
 				break
 			}

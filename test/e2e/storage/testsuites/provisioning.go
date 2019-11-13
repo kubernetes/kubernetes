@@ -162,10 +162,9 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 	}
 
 	cleanup := func() {
-		if l.driverCleanup != nil {
-			l.driverCleanup()
-			l.driverCleanup = nil
-		}
+		err := tryFunc(l.driverCleanup)
+		l.driverCleanup = nil
+		framework.ExpectNoError(err, "while cleaning up driver")
 
 		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
@@ -454,7 +453,10 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 	ginkgo.By("creating a storage class " + t.Class.Name)
 	class, err := t.Client.StorageV1().StorageClasses().Create(t.Class)
 	framework.ExpectNoError(err)
-	defer deleteStorageClass(t.Client, class.Name)
+	defer func() {
+		err = deleteStorageClass(t.Client, class.Name)
+		framework.ExpectNoError(err, "While deleting storage class")
+	}()
 
 	ginkgo.By("creating claims")
 	var claimNames []string

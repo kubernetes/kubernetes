@@ -222,7 +222,7 @@ func TestCreatePod(t *testing.T) {
 			}
 		}
 		if podDeleted != item.expectDelete {
-			t.Errorf("%v: Unexepected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
+			t.Errorf("%v: Unexpected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
 		}
 		close(stopCh)
 	}
@@ -319,7 +319,7 @@ func TestUpdatePod(t *testing.T) {
 			}
 		}
 		if podDeleted != item.expectDelete {
-			t.Errorf("%v: Unexepected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
+			t.Errorf("%v: Unexpected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
 		}
 		close(stopCh)
 	}
@@ -375,7 +375,7 @@ func TestCreateNode(t *testing.T) {
 			}
 		}
 		if podDeleted != item.expectDelete {
-			t.Errorf("%v: Unexepected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
+			t.Errorf("%v: Unexpected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
 		}
 		close(stopCh)
 	}
@@ -499,7 +499,7 @@ func TestUpdateNode(t *testing.T) {
 			}
 		}
 		if podDeleted != item.expectDelete {
-			t.Errorf("%v: Unexepected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
+			t.Errorf("%v: Unexpected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
 		}
 		close(stopCh)
 	}

@@ -40,7 +40,6 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	utilnet "k8s.io/utils/net"
 )
@@ -263,8 +262,8 @@ func isInternalLoadBalancer(lb *network.LoadBalancer) bool {
 // clusters moving from IPv4 to duakstack will require no changes
 // clusters moving from IPv6 (while not seen in the wild, we can not rule out their existence)
 // to dualstack will require deleting backend pools (the reconciler will take care of creating correct backendpools)
-func getBackendPoolName(clusterName string, service *v1.Service) string {
-	if !utilfeature.DefaultFeatureGate.Enabled(IPv6DualStack) {
+func getBackendPoolName(ipv6DualStackEnabled bool, clusterName string, service *v1.Service) string {
+	if !ipv6DualStackEnabled {
 		return clusterName
 	}
 	IPv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
@@ -721,7 +720,7 @@ func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.
 	}
 
 	var primaryIPConfig *network.InterfaceIPConfiguration
-	if !utilfeature.DefaultFeatureGate.Enabled(IPv6DualStack) {
+	if !as.Cloud.ipv6DualStackEnabled {
 		primaryIPConfig, err = getPrimaryIPConfig(nic)
 		if err != nil {
 			return err

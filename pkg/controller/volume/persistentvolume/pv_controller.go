@@ -206,7 +206,7 @@ type PersistentVolumeController struct {
 
 	// operationTimestamps caches start timestamp of operations
 	// (currently provision + binding/deletion) for metric recording.
-	// Detailed lifecyle/key for each operation
+	// Detailed lifecycle/key for each operation
 	// 1. provision + binding
 	//     key:        claimKey
 	//     start time: user has NOT provide any volume ref in the claim AND
@@ -1071,7 +1071,7 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(volume *v1.Persis
 	}
 
 	// Verify the claim is in cache: if so, then it is a different PVC with the same name
-	// since the volume is known to be released at this moment. Ths new (cached) PVC must use
+	// since the volume is known to be released at this moment. The new (cached) PVC must use
 	// a different PV -- we checked that the PV is unused in isVolumeReleased.
 	// So the old PV is safe to be recycled.
 	claimName := claimrefToClaimKey(volume.Spec.ClaimRef)

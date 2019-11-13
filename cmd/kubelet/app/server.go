@@ -77,6 +77,7 @@ import (
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/certificate/bootstrap"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
@@ -575,13 +576,12 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		// make a separate client for heartbeat with throttling disabled and a timeout attached
 		heartbeatClientConfig := *clientConfig
 		heartbeatClientConfig.Timeout = s.KubeletConfiguration.NodeStatusUpdateFrequency.Duration
-		// if the NodeLease feature is enabled, the timeout is the minimum of the lease duration and status update frequency
-		if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
-			leaseTimeout := time.Duration(s.KubeletConfiguration.NodeLeaseDurationSeconds) * time.Second
-			if heartbeatClientConfig.Timeout > leaseTimeout {
-				heartbeatClientConfig.Timeout = leaseTimeout
-			}
+		// The timeout is the minimum of the lease duration and status update frequency
+		leaseTimeout := time.Duration(s.KubeletConfiguration.NodeLeaseDurationSeconds) * time.Second
+		if heartbeatClientConfig.Timeout > leaseTimeout {
+			heartbeatClientConfig.Timeout = leaseTimeout
 		}
+
 		heartbeatClientConfig.QPS = float32(-1)
 		kubeDeps.HeartbeatClient, err = clientset.NewForConfig(&heartbeatClientConfig)
 		if err != nil {
@@ -636,6 +636,48 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 			klog.Info("--cgroups-per-qos enabled, but --cgroup-root was not specified.  defaulting to /")
 			s.CgroupRoot = "/"
 		}
+
+		var reservedSystemCPUs cpuset.CPUSet
+		var errParse error
+		if s.ReservedSystemCPUs != "" {
+			reservedSystemCPUs, errParse = cpuset.Parse(s.ReservedSystemCPUs)
+			if errParse != nil {
+				// invalid cpu list is provided, set reservedSystemCPUs to empty, so it won't overwrite kubeReserved/systemReserved
+				klog.Infof("Invalid ReservedSystemCPUs \"%s\"", s.ReservedSystemCPUs)
+				return errParse
+			}
+			// is it safe do use CAdvisor here ??
+			machineInfo, err := kubeDeps.CAdvisorInterface.MachineInfo()
+			if err != nil {
+				// if can't use CAdvisor here, fall back to non-explicit cpu list behavor
+				klog.Warning("Failed to get MachineInfo, set reservedSystemCPUs to empty")
+				reservedSystemCPUs = cpuset.NewCPUSet()
+			} else {
+				reservedList := reservedSystemCPUs.ToSlice()
+				first := reservedList[0]
+				last := reservedList[len(reservedList)-1]
+				if first < 0 || last >= machineInfo.NumCores {
+					// the specified cpuset is outside of the range of what the machine has
+					klog.Infof("Invalid cpuset specified by --reserved-cpus")
+					return fmt.Errorf("Invalid cpuset %q specified by --reserved-cpus", s.ReservedSystemCPUs)
+				}
+			}
+		} else {
+			reservedSystemCPUs = cpuset.NewCPUSet()
+		}
+
+		if reservedSystemCPUs.Size() > 0 {
+			// at cmd option valication phase it is tested either --system-reserved-cgroup or --kube-reserved-cgroup is specified, so overwrite should be ok
+			klog.Infof("Option --reserved-cpus is specified, it will overwrite the cpu setting in KubeReserved=\"%v\", SystemReserved=\"%v\".", s.KubeReserved, s.SystemReserved)
+			if s.KubeReserved != nil {
+				delete(s.KubeReserved, "cpu")
+			}
+			if s.SystemReserved == nil {
+				s.SystemReserved = make(map[string]string)
+			}
+			s.SystemReserved["cpu"] = strconv.Itoa(reservedSystemCPUs.Size())
+			klog.Infof("After cpu setting is overwritten, KubeReserved=\"%v\", SystemReserved=\"%v\"", s.KubeReserved, s.SystemReserved)
+		}
 		kubeReserved, err := parseResourceList(s.KubeReserved)
 		if err != nil {
 			return err
@@ -678,6 +720,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 					EnforceNodeAllocatable:   sets.NewString(s.EnforceNodeAllocatable...),
 					KubeReserved:             kubeReserved,
 					SystemReserved:           systemReserved,
+					ReservedSystemCPUs:       reservedSystemCPUs,
 					HardEvictionThresholds:   hardEvictionThresholds,
 				},
 				QOSReserved:                           *experimentalQOSReserved,

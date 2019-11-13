@@ -129,7 +129,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			totalPodCapacity += podCapacity.Value()
 		}
 
-		currentlyScheduledPods := framework.WaitForStableCluster(cs, masterNodes)
+		currentlyScheduledPods := WaitForStableCluster(cs, masterNodes)
 		podsNeededForSaturation := int(totalPodCapacity) - currentlyScheduledPods
 
 		ginkgo.By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster max pods and trying to start another one", podsNeededForSaturation))
@@ -171,7 +171,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 				nodeMaxAllocatable = allocatable.Value()
 			}
 		}
-		framework.WaitForStableCluster(cs, masterNodes)
+		WaitForStableCluster(cs, masterNodes)
 
 		pods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
@@ -246,7 +246,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		Description: Scheduling Pods MUST fail if the resource limits exceed Machine capacity.
 	*/
 	framework.ConformanceIt("validates resource limits of pods that are allowed to run ", func() {
-		framework.WaitForStableCluster(cs, masterNodes)
+		WaitForStableCluster(cs, masterNodes)
 		nodeMaxAllocatable := int64(0)
 		nodeToAllocatableMap := make(map[string]int64)
 		for _, node := range nodeList.Items {
@@ -356,7 +356,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		ginkgo.By("Trying to schedule Pod with nonempty NodeSelector.")
 		podName := "restricted-pod"
 
-		framework.WaitForStableCluster(cs, masterNodes)
+		WaitForStableCluster(cs, masterNodes)
 
 		conf := pausePodConfig{
 			Name:   podName,
@@ -411,7 +411,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		ginkgo.By("Trying to schedule Pod with nonempty NodeSelector.")
 		podName := "restricted-pod"
 
-		framework.WaitForStableCluster(cs, masterNodes)
+		WaitForStableCluster(cs, masterNodes)
 
 		conf := pausePodConfig{
 			Name: podName,

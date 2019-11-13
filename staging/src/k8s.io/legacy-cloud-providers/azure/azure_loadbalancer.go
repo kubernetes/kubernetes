@@ -35,8 +35,6 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -563,7 +561,7 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(IPv6DualStack) {
+	if az.ipv6DualStackEnabled {
 		// TODO: (khenidak) if we ever enable IPv6 single stack, then we should
 		// not wrap the following in a feature gate
 		ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
@@ -697,7 +695,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 	klog.V(2).Infof("reconcileLoadBalancer for service(%s): lb(%s) wantLb(%t) resolved load balancer name", serviceName, lbName, wantLb)
 	lbFrontendIPConfigName := az.getFrontendIPConfigName(service, subnet(service))
 	lbFrontendIPConfigID := az.getFrontendIPConfigID(lbName, lbFrontendIPConfigName)
-	lbBackendPoolName := getBackendPoolName(clusterName, service)
+	lbBackendPoolName := getBackendPoolName(az.ipv6DualStackEnabled, clusterName, service)
 	lbBackendPoolID := az.getBackendPoolID(lbName, lbBackendPoolName)
 
 	lbIdleTimeout, err := getIdleTimeout(service)
@@ -1096,8 +1094,9 @@ func (az *Cloud) reconcileLoadBalancerRule(
 				expectedRule.LoadBalancingRulePropertiesFormat.IdleTimeoutInMinutes = lbIdleTimeout
 			}
 
-			// we didn't construct the probe objects for UDP or SCTP because they're not used/needed/allowed
-			if protocol != v1.ProtocolUDP && protocol != v1.ProtocolSCTP {
+			// we didn't construct the probe objects for UDP or SCTP because they're not allowed on Azure.
+			// However, when externalTrafficPolicy is Local, Kubernetes HTTP health check would be used for probing.
+			if servicehelpers.NeedsHealthCheck(service) || (protocol != v1.ProtocolUDP && protocol != v1.ProtocolSCTP) {
 				expectedRule.Probe = &network.SubResource{
 					ID: to.StringPtr(az.getLoadBalancerProbeID(lbName, lbRuleName)),
 				}

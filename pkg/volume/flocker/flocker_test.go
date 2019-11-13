@@ -21,7 +21,7 @@ import (
 	"os"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -153,7 +153,7 @@ func TestPlugin(t *testing.T) {
 		},
 	}
 	fakeManager := &fakeFlockerUtil{}
-	fakeMounter := &mount.FakeMounter{}
+	fakeMounter := mount.NewFakeMounter(nil)
 	mounter, err := plug.(*flockerPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)

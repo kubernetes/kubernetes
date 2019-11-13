@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
 	cloudprovider "k8s.io/cloud-provider"
@@ -110,7 +110,7 @@ func TestPlugin(t *testing.T) {
 
 	// Test Mounter
 	fakeManager := &fakePDManager{}
-	fakeMounter := &mount.FakeMounter{}
+	fakeMounter := mount.NewFakeMounter(nil)
 	mounter, err := plug.(*vsphereVolumePlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)

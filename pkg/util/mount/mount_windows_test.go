@@ -224,7 +224,7 @@ func TestIsLikelyNotMountPoint(t *testing.T) {
 }
 
 func TestFormatAndMount(t *testing.T) {
-	fakeMounter := ErrorMounter{&FakeMounter{}, 0, nil}
+	fakeMounter := ErrorMounter{NewFakeMounter(nil), 0, nil}
 	execCallback := func(cmd string, args ...string) ([]byte, error) {
 		for j := range args {
 			if strings.Contains(args[j], "Get-Disk -Number") {

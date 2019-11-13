@@ -403,6 +403,7 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 		return nil, err
 	}
 	kubeconfig.DisableCompression = true
+	kubeconfig.ContentConfig.AcceptContentTypes = s.Generic.ClientConnection.AcceptContentTypes
 	kubeconfig.ContentConfig.ContentType = s.Generic.ClientConnection.ContentType
 	kubeconfig.QPS = s.Generic.ClientConnection.QPS
 	kubeconfig.Burst = int(s.Generic.ClientConnection.Burst)

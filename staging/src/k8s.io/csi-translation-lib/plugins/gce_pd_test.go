@@ -369,3 +369,35 @@ func TestBackwardCompatibleAccessModes(t *testing.T) {
 		}
 	}
 }
+
+func TestInlineReadOnly(t *testing.T) {
+	g := NewGCEPersistentDiskCSITranslator()
+	pv, err := g.TranslateInTreeInlineVolumeToCSI(&v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+				PDName:   "foo",
+				ReadOnly: true,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to translate in tree inline volume to CSI: %v", err)
+	}
+
+	if pv == nil || pv.Spec.PersistentVolumeSource.CSI == nil {
+		t.Fatal("PV or volume source unexpectedly nil")
+	}
+
+	if !pv.Spec.PersistentVolumeSource.CSI.ReadOnly {
+		t.Error("PV readonly value not true")
+	}
+
+	ams := pv.Spec.AccessModes
+	if len(ams) != 1 {
+		t.Errorf("got am %v, expected length of 1", ams)
+	}
+
+	if ams[0] != v1.ReadOnlyMany {
+		t.Errorf("got am %v, expected access mode of ReadOnlyMany", ams[0])
+	}
+}

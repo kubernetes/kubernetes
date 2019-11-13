@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
@@ -140,6 +141,7 @@ func TestPriorityMetadata(t *testing.T) {
 				podLimits:      nonPodLimits,
 				podTolerations: tolerations,
 				affinity:       podAffinity,
+				podSelector:    labels.NewSelector(),
 			},
 			name: "Produce a priorityMetadata with default requests",
 		},
@@ -149,8 +151,9 @@ func TestPriorityMetadata(t *testing.T) {
 				podLimits:      nonPodLimits,
 				podTolerations: tolerations,
 				affinity:       nil,
+				podSelector:    labels.NewSelector(),
 			},
-			name: "Produce a priorityMetadata with specified requests",
+			name: "Produce a priorityMetadata with tolerations and requests",
 		},
 		{
 			pod: podWithAffinityAndRequests,
@@ -158,18 +161,20 @@ func TestPriorityMetadata(t *testing.T) {
 				podLimits:      specifiedPodLimits,
 				podTolerations: nil,
 				affinity:       podAffinity,
+				podSelector:    labels.NewSelector(),
 			},
-			name: "Produce a priorityMetadata with specified requests",
+			name: "Produce a priorityMetadata with affinity and requests",
 		},
 	}
 	client := clientsetfake.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-	metaDataProducer := NewPriorityMetadataFactory(
+	metaDataProducer := NewMetadataFactory(
 		informerFactory.Core().V1().Services().Lister(),
 		informerFactory.Core().V1().ReplicationControllers().Lister(),
 		informerFactory.Apps().V1().ReplicaSets().Lister(),
 		informerFactory.Apps().V1().StatefulSets().Lister(),
+		1,
 	)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

@@ -189,6 +189,7 @@ type Proxier struct {
 	servicesSynced       bool
 	initialized          int32
 	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
+	syncPeriod           time.Duration
 
 	// These are effectively const and do not need the mutex to be held.
 	iptables       utiliptables.Interface
@@ -296,6 +297,7 @@ func NewProxier(ipt utiliptables.Interface,
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, &isIPv6, recorder),
 		endpointsMap:             make(proxy.EndpointsMap),
 		endpointsChanges:         proxy.NewEndpointChangeTracker(hostname, newEndpointInfo, &isIPv6, recorder, endpointSlicesEnabled),
+		syncPeriod:               syncPeriod,
 		iptables:                 ipt,
 		masqueradeAll:            masqueradeAll,
 		masqueradeMark:           masqueradeMark,
@@ -717,6 +719,14 @@ func (proxier *Proxier) syncProxyRules() {
 
 	klog.V(3).Info("Syncing iptables rules")
 
+	success := false
+	defer func() {
+		if !success {
+			klog.Infof("Sync failed; retrying in %s", proxier.syncPeriod)
+			proxier.syncRunner.RetryAfter(proxier.syncPeriod)
+		}
+	}()
+
 	// Create and link the kube chains.
 	for _, jump := range iptablesJumpChains {
 		if _, err := proxier.iptables.EnsureChain(jump.table, jump.dstChain); err != nil {
@@ -778,7 +788,7 @@ func (proxier *Proxier) syncProxyRules() {
 			writeLine(proxier.filterChains, utiliptables.MakeChainLine(chainName))
 		}
 	}
-	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain, KubeMarkMasqChain} {
+	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain, KubeMarkMasqChain, KubeMarkDropChain} {
 		if chain, ok := existingNATChains[chainName]; ok {
 			writeBytesLine(proxier.natChains, chain)
 		} else {
@@ -1432,6 +1442,8 @@ func (proxier *Proxier) syncProxyRules() {
 		utilproxy.RevertPorts(replacementPortsMap, proxier.portsMap)
 		return
 	}
+	success = true
+
 	for name, lastChangeTriggerTimes := range endpointUpdateResult.LastChangeTriggerTimes {
 		for _, lastChangeTriggerTime := range lastChangeTriggerTimes {
 			latency := metrics.SinceInSeconds(lastChangeTriggerTime)

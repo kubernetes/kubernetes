@@ -33,9 +33,9 @@ type FakeFischers struct {
 	Fake *FakeWardleV1alpha1
 }
 
-var fischersResource = schema.GroupVersionResource{Group: "wardle.k8s.io", Version: "v1alpha1", Resource: "fischers"}
+var fischersResource = schema.GroupVersionResource{Group: "wardle.example.com", Version: "v1alpha1", Resource: "fischers"}
 
-var fischersKind = schema.GroupVersionKind{Group: "wardle.k8s.io", Version: "v1alpha1", Kind: "Fischer"}
+var fischersKind = schema.GroupVersionKind{Group: "wardle.example.com", Version: "v1alpha1", Kind: "Fischer"}
 
 // Get takes name of the fischer, and returns the corresponding fischer object, and an error if there is any.
 func (c *FakeFischers) Get(name string, options v1.GetOptions) (result *v1alpha1.Fischer, err error) {

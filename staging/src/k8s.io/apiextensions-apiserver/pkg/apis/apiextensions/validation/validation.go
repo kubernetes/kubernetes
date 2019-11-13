@@ -1048,9 +1048,6 @@ func allowDefaults(requestGV schema.GroupVersion, oldCRDSpec *apiextensions.Cust
 		// don't tighten validation on existing persisted data
 		return true
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceDefaulting) {
-		return false
-	}
 	if requestGV == apiextensionsv1beta1.SchemeGroupVersion {
 		return false
 	}

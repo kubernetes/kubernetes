@@ -4659,6 +4659,12 @@ const (
 	NamespaceTerminating NamespacePhase = "Terminating"
 )
 
+const (
+	// NamespaceTerminatingCause is returned as a defaults.cause item when a change is
+	// forbidden due to the namespace being terminated.
+	NamespaceTerminatingCause metav1.CauseType = "NamespaceTerminating"
+)
+
 type NamespaceConditionType string
 
 // These are valid conditions of a namespace.
@@ -4768,6 +4774,7 @@ type Preconditions struct {
 	UID *types.UID `json:"uid,omitempty" protobuf:"bytes,1,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
 }
 
+// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodLogOptions is the query options for a Pod's logs REST call.
@@ -4819,6 +4826,7 @@ type PodLogOptions struct {
 	InsecureSkipTLSVerifyBackend bool `json:"insecureSkipTLSVerifyBackend,omitempty" protobuf:"varint,9,opt,name=insecureSkipTLSVerifyBackend"`
 }
 
+// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodAttachOptions is the query options to a Pod's remote attach call.
@@ -4856,6 +4864,7 @@ type PodAttachOptions struct {
 	Container string `json:"container,omitempty" protobuf:"bytes,5,opt,name=container"`
 }
 
+// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodExecOptions is the query options to a Pod's remote exec call.
@@ -4894,6 +4903,7 @@ type PodExecOptions struct {
 	Command []string `json:"command" protobuf:"bytes,6,rep,name=command"`
 }
 
+// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodPortForwardOptions is the query options to a Pod's port forward call
@@ -5779,7 +5789,7 @@ type WindowsSecurityContextOptions struct {
 	// Defaults to the user specified in image metadata if unspecified.
 	// May also be set in PodSecurityContext. If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
-	// This field is alpha-level and it is only honored by servers that enable the WindowsRunAsUserName feature flag.
+	// This field is beta-level and may be disabled with the WindowsRunAsUserName feature flag.
 	// +optional
 	RunAsUserName *string `json:"runAsUserName,omitempty" protobuf:"bytes,3,opt,name=runAsUserName"`
 }

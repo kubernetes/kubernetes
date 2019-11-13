@@ -143,6 +143,9 @@ func NodeRules() []rbacv1.PolicyRule {
 		// for it to be signed. This allows the kubelet to rotate it's own certificate.
 		rbacv1helpers.NewRule("create", "get", "list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
 
+		// Leases
+		rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("coordination.k8s.io").Resources("leases").RuleOrDie(),
+
 		// CSI
 		rbacv1helpers.NewRule("get").Groups(storageGroup).Resources("volumeattachments").RuleOrDie(),
 	}
@@ -169,11 +172,6 @@ func NodeRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
 		csiNodeInfoRule := rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, csiNodeInfoRule)
-	}
-
-	// Node leases
-	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
-		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups(coordinationGroup).Resources("leases").RuleOrDie())
 	}
 
 	// RuntimeClass
@@ -500,10 +498,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		// Needed to check API access. These creates are non-mutating
 		rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
 		rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
-		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csinodes").RuleOrDie())
+		// Needed for volume limits
+		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csinodes").RuleOrDie(),
 	}
 	roles = append(roles, rbacv1.ClusterRole{
 		// a role to use for the kube-scheduler

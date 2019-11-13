@@ -27,8 +27,6 @@ import (
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -58,13 +56,15 @@ const (
 
 // DefaultKubeProxyConfiguration assigns default values for the kube-proxy ComponentConfig
 func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
-	externalproxycfg := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{FeatureGates: make(map[string]bool)}
 	kind := "KubeProxyConfiguration"
 
-	// Do a roundtrip to the external version for defaulting
-	if internalcfg.ComponentConfigs.KubeProxy != nil {
-		Scheme.Convert(internalcfg.ComponentConfigs.KubeProxy, externalproxycfg, nil)
+	if internalcfg.ComponentConfigs.KubeProxy == nil {
+		internalcfg.ComponentConfigs.KubeProxy = &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+			FeatureGates: map[string]bool{},
+		}
 	}
+
+	externalproxycfg := internalcfg.ComponentConfigs.KubeProxy
 
 	if externalproxycfg.ClusterCIDR == "" && internalcfg.Networking.PodSubnet != "" {
 		externalproxycfg.ClusterCIDR = internalcfg.Networking.PodSubnet
@@ -83,28 +83,19 @@ func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.ClusterConfiguration)
 	if enabled, present := internalcfg.FeatureGates[features.IPv6DualStack]; present {
 		externalproxycfg.FeatureGates[features.IPv6DualStack] = enabled
 	}
-
-	// Run the rest of the kube-proxy defaulting code
-	Scheme.Default(externalproxycfg)
-
-	if internalcfg.ComponentConfigs.KubeProxy == nil {
-		internalcfg.ComponentConfigs.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{}
-	}
-
-	// TODO: Figure out how to handle errors in defaulting code
-	// Go back to the internal version
-	Scheme.Convert(externalproxycfg, internalcfg.ComponentConfigs.KubeProxy, nil)
 }
 
 // DefaultKubeletConfiguration assigns default values for the kubelet ComponentConfig
 func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
-	externalkubeletcfg := &kubeletconfigv1beta1.KubeletConfiguration{}
 	kind := "KubeletConfiguration"
 
-	// Do a roundtrip to the external version for defaulting
-	if internalcfg.ComponentConfigs.Kubelet != nil {
-		Scheme.Convert(internalcfg.ComponentConfigs.Kubelet, externalkubeletcfg, nil)
+	if internalcfg.ComponentConfigs.Kubelet == nil {
+		internalcfg.ComponentConfigs.Kubelet = &kubeletconfigv1beta1.KubeletConfiguration{
+			FeatureGates: map[string]bool{},
+		}
 	}
+
+	externalkubeletcfg := internalcfg.ComponentConfigs.Kubelet
 
 	if externalkubeletcfg.StaticPodPath == "" {
 		externalkubeletcfg.StaticPodPath = kubeadmapiv1beta2.DefaultManifestsDir
@@ -181,16 +172,6 @@ func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 	// We cannot show a warning for RotateCertificates==false and we must hardcode it to true.
 	// There is no way to determine if the user has set this or not, given the field is a non-pointer.
 	externalkubeletcfg.RotateCertificates = kubeletRotateCertificates
-
-	Scheme.Default(externalkubeletcfg)
-
-	if internalcfg.ComponentConfigs.Kubelet == nil {
-		internalcfg.ComponentConfigs.Kubelet = &kubeletconfig.KubeletConfiguration{}
-	}
-
-	// TODO: Figure out how to handle errors in defaulting code
-	// Go back to the internal version
-	Scheme.Convert(externalkubeletcfg, internalcfg.ComponentConfigs.Kubelet, nil)
 }
 
 // warnDefaultComponentConfigValue prints a warning if the user modified a field in a certain

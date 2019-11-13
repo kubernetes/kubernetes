@@ -183,12 +183,6 @@ const (
 	// Enable nodes to exclude themselves from network disruption checks
 	NodeDisruptionExclusion featuregate.Feature = "NodeDisruptionExclusion"
 
-	// owner: @jsafrane
-	// alpha: v1.9
-	//
-	// Enable running mount utilities in containers.
-	MountContainers featuregate.Feature = "MountContainers"
-
 	// owner: @saad-ali
 	// alpha: v1.12
 	// beta:  v1.14
@@ -198,6 +192,7 @@ const (
 	// owner: @verult
 	// alpha: v1.12
 	// beta:  v1.14
+	// ga:    v1.17
 	// Enable all logic related to the CSINode API object in storage.k8s.io
 	CSINodeInfo featuregate.Feature = "CSINodeInfo"
 
@@ -287,6 +282,8 @@ const (
 
 	// owner: @gnufied
 	// beta : v1.12
+	// GA   : v1.17
+
 	//
 	// Add support for volume plugins to report node specific
 	// volume limits
@@ -340,6 +337,7 @@ const (
 	// owner: @mtaufen
 	// alpha: v1.12
 	// beta:  v1.14
+	// GA: v1.17
 	//
 	// Kubelet uses the new Lease API to report node heartbeats,
 	// (Kube) Node Lifecycle Controller uses these heartbeats as a node health signal.
@@ -353,6 +351,7 @@ const (
 
 	// owner: @xing-yang
 	// alpha: v1.12
+	// beta: v1.17
 	//
 	// Enable volume snapshot data source support.
 	VolumeSnapshotDataSource featuregate.Feature = "VolumeSnapshotDataSource"
@@ -421,6 +420,7 @@ const (
 
 	// owner: @bclau
 	// alpha: v1.16
+	// beta: v1.17
 	//
 	// Enables support for running container entrypoints as different usernames than their default ones.
 	WindowsRunAsUserName featuregate.Feature = "WindowsRunAsUserName"
@@ -526,15 +526,14 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExpandPersistentVolumes:        {Default: true, PreRelease: featuregate.Beta},
 	ExpandInUsePersistentVolumes:   {Default: true, PreRelease: featuregate.Beta},
 	ExpandCSIVolumes:               {Default: true, PreRelease: featuregate.Beta},
-	AttachVolumeLimit:              {Default: true, PreRelease: featuregate.Beta},
+	AttachVolumeLimit:              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
 	CPUManager:                     {Default: true, PreRelease: featuregate.Beta},
 	CPUCFSQuotaPeriod:              {Default: false, PreRelease: featuregate.Alpha},
 	TopologyManager:                {Default: false, PreRelease: featuregate.Alpha},
 	ServiceNodeExclusion:           {Default: false, PreRelease: featuregate.Alpha},
 	NodeDisruptionExclusion:        {Default: false, PreRelease: featuregate.Alpha},
-	MountContainers:                {Default: false, PreRelease: featuregate.Alpha},
 	CSIDriverRegistry:              {Default: true, PreRelease: featuregate.Beta},
-	CSINodeInfo:                    {Default: true, PreRelease: featuregate.Beta},
+	CSINodeInfo:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
 	BlockVolume:                    {Default: true, PreRelease: featuregate.Beta},
 	StorageObjectInUseProtection:   {Default: true, PreRelease: featuregate.GA},
 	ResourceLimitsPriorityFunction: {Default: false, PreRelease: featuregate.Alpha},
@@ -561,14 +560,14 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIBlockVolume:                 {Default: true, PreRelease: featuregate.Beta},
 	CSIInlineVolume:                {Default: true, PreRelease: featuregate.Beta},
 	RuntimeClass:                   {Default: true, PreRelease: featuregate.Beta},
-	NodeLease:                      {Default: true, PreRelease: featuregate.Beta},
+	NodeLease:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	SCTPSupport:                    {Default: false, PreRelease: featuregate.Alpha},
-	VolumeSnapshotDataSource:       {Default: false, PreRelease: featuregate.Alpha},
+	VolumeSnapshotDataSource:       {Default: true, PreRelease: featuregate.Beta},
 	ProcMountType:                  {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:               {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:            {Default: true, PreRelease: featuregate.Beta},
 	WindowsGMSA:                    {Default: true, PreRelease: featuregate.Beta},
-	WindowsRunAsUserName:           {Default: false, PreRelease: featuregate.Alpha},
+	WindowsRunAsUserName:           {Default: true, PreRelease: featuregate.Beta},
 	ServiceLoadBalancerFinalizer:   {Default: true, PreRelease: featuregate.Beta},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: false, PreRelease: featuregate.Alpha},
@@ -599,7 +598,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	apiextensionsfeatures.CustomResourceSubresources:      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	apiextensionsfeatures.CustomResourceWebhookConversion: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	apiextensionsfeatures.CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	apiextensionsfeatures.CustomResourceDefaulting:        {Default: true, PreRelease: featuregate.Beta},
+	apiextensionsfeatures.CustomResourceDefaulting:        {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // TODO: remove in 1.18
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...

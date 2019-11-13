@@ -407,6 +407,9 @@ SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"
 # Optional: install a default StorageClass
 ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-true}"
 
+# Optional: install volume snapshot CRDs
+ENABLE_VOLUME_SNAPSHOTS="${ENABLE_VOLUME_SNAPSHOTS:-true}"
+
 # Optional: Enable legacy ABAC policy that makes all service accounts superusers.
 ENABLE_LEGACY_ABAC="${ENABLE_LEGACY_ABAC:-false}" # true, false
 

@@ -29,6 +29,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
@@ -238,10 +239,14 @@ func (cache *schedulerCache) UpdateNodeInfoSnapshot(nodeSnapshot *nodeinfosnapsh
 
 	// Take a snapshot of the nodes order in the tree
 	nodeSnapshot.NodeInfoList = make([]*schedulernodeinfo.NodeInfo, 0, cache.nodeTree.numNodes)
+	nodeSnapshot.HavePodsWithAffinityNodeInfoList = make([]*schedulernodeinfo.NodeInfo, 0, cache.nodeTree.numNodes)
 	for i := 0; i < cache.nodeTree.numNodes; i++ {
 		nodeName := cache.nodeTree.next()
 		if n := nodeSnapshot.NodeInfoMap[nodeName]; n != nil {
 			nodeSnapshot.NodeInfoList = append(nodeSnapshot.NodeInfoList, n)
+			if len(n.PodsWithAffinity()) > 0 {
+				nodeSnapshot.HavePodsWithAffinityNodeInfoList = append(nodeSnapshot.HavePodsWithAffinityNodeInfoList, n)
+			}
 		} else {
 			klog.Errorf("node %q exist in nodeTree but not in NodeInfoMap, this should not happen.", nodeName)
 		}
@@ -635,9 +640,11 @@ func (cache *schedulerCache) cleanupExpiredAssumedPods() {
 }
 
 // cleanupAssumedPods exists for making test deterministic by taking time as input argument.
+// It also reports metrics on the cache size for nodes, pods, and assumed pods.
 func (cache *schedulerCache) cleanupAssumedPods(now time.Time) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
+	defer cache.updateMetrics()
 
 	// The size of assumedPods should be small
 	for key := range cache.assumedPods {
@@ -679,4 +686,11 @@ func (cache *schedulerCache) GetNodeInfo(nodeName string) (*v1.Node, error) {
 	}
 
 	return n.info.Node(), nil
+}
+
+// updateMetrics updates cache size metric values for pods, assumed pods, and nodes
+func (cache *schedulerCache) updateMetrics() {
+	metrics.CacheSize.WithLabelValues("assumed_pods").Set(float64(len(cache.assumedPods)))
+	metrics.CacheSize.WithLabelValues("pods").Set(float64(len(cache.podStates)))
+	metrics.CacheSize.WithLabelValues("nodes").Set(float64(len(cache.nodes)))
 }

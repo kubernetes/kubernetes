@@ -28,7 +28,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	storagevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/storage"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -187,7 +186,7 @@ func validateVolumeAttachmentSource(source *storage.VolumeAttachmentSource, fldP
 			allErrs = append(allErrs, field.Required(fldPath.Child("persistentVolumeName"), "must specify non empty persistentVolumeName"))
 		}
 	case source.InlineVolumeSpec != nil:
-		allErrs = append(allErrs, storagevalidation.ValidatePersistentVolumeSpec(source.InlineVolumeSpec, "", true, fldPath.Child("inlineVolumeSpec"))...)
+		allErrs = append(allErrs, apivalidation.ValidatePersistentVolumeSpec(source.InlineVolumeSpec, "", true, fldPath.Child("inlineVolumeSpec"))...)
 	}
 	return allErrs
 }

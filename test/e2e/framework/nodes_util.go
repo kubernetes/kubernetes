@@ -281,43 +281,6 @@ func nodePoolsGKE() ([]string, error) {
 	return strings.Fields(stdout), nil
 }
 
-// MigTemplate (GCE-only) returns the name of the MIG template that the
-// nodes of the cluster use.
-func MigTemplate() (string, error) {
-	var errLast error
-	var templ string
-	key := "instanceTemplate"
-	if wait.Poll(Poll, SingleCallTimeout, func() (bool, error) {
-		// TODO(mikedanese): make this hit the compute API directly instead of
-		// shelling out to gcloud.
-		// An `instance-groups managed describe` call outputs what we want to stdout.
-		output, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
-			fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
-			"describe",
-			fmt.Sprintf("--zone=%s", TestContext.CloudConfig.Zone),
-			TestContext.CloudConfig.NodeInstanceGroup)
-		if err != nil {
-			errLast = fmt.Errorf("gcloud compute instance-groups managed describe call failed with err: %v", err)
-			return false, nil
-		}
-
-		// The 'describe' call probably succeeded; parse the output and try to
-		// find the line that looks like "instanceTemplate: url/to/<templ>" and
-		// return <templ>.
-		if val := ParseKVLines(output, key); len(val) > 0 {
-			url := strings.Split(val, "/")
-			templ = url[len(url)-1]
-			Logf("MIG group %s using template: %s", TestContext.CloudConfig.NodeInstanceGroup, templ)
-			return true, nil
-		}
-		errLast = fmt.Errorf("couldn't find %s in output to get MIG template. Output: %s", key, output)
-		return false, nil
-	}) != nil {
-		return "", fmt.Errorf("MigTemplate() failed with last error: %v", errLast)
-	}
-	return templ, nil
-}
-
 func gceUpgradeScript() string {
 	if len(TestContext.GCEUpgradeScript) == 0 {
 		return path.Join(TestContext.RepoRoot, "cluster/gce/upgrade.sh")
@@ -400,9 +363,4 @@ func (k *NodeKiller) kill(nodes []v1.Node) {
 		}()
 	}
 	wg.Wait()
-}
-
-// DeleteNodeOnCloudProvider deletes the specified node.
-func DeleteNodeOnCloudProvider(node *v1.Node) error {
-	return TestContext.CloudConfig.Provider.DeleteNode(node)
 }

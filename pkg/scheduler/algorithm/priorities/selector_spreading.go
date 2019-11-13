@@ -66,7 +66,7 @@ func NewSelectorSpreadPriority(
 // i.e. it pushes the scheduler towards a node where there's the smallest number of
 // pods which match the same service, RC,RSs or StatefulSets selectors as the pod being scheduled.
 func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
-	var selectors []labels.Selector
+	var selector labels.Selector
 	node := nodeInfo.Node()
 	if node == nil {
 		return framework.NodeScore{}, fmt.Errorf("node not found")
@@ -74,20 +74,12 @@ func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{
 
 	priorityMeta, ok := meta.(*priorityMetadata)
 	if ok {
-		selectors = priorityMeta.podSelectors
+		selector = priorityMeta.podSelector
 	} else {
-		selectors = getSelectors(pod, s.serviceLister, s.controllerLister, s.replicaSetLister, s.statefulSetLister)
+		selector = getSelector(pod, s.serviceLister, s.controllerLister, s.replicaSetLister, s.statefulSetLister)
 	}
 
-	if len(selectors) == 0 {
-		return framework.NodeScore{
-			Name:  node.Name,
-			Score: 0,
-		}, nil
-	}
-
-	count := countMatchingPods(pod.Namespace, selectors, nodeInfo)
-
+	count := countMatchingPods(pod.Namespace, selector, nodeInfo)
 	return framework.NodeScore{
 		Name:  node.Name,
 		Score: int64(count),
@@ -166,37 +158,22 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 type ServiceAntiAffinity struct {
 	podLister     schedulerlisters.PodLister
 	serviceLister corelisters.ServiceLister
-	label         string
+	labels        []string
 }
 
 // NewServiceAntiAffinityPriority creates a ServiceAntiAffinity.
-func NewServiceAntiAffinityPriority(podLister schedulerlisters.PodLister, serviceLister corelisters.ServiceLister, label string) (PriorityMapFunction, PriorityReduceFunction) {
+func NewServiceAntiAffinityPriority(podLister schedulerlisters.PodLister, serviceLister corelisters.ServiceLister, labels []string) (PriorityMapFunction, PriorityReduceFunction) {
 	antiAffinity := &ServiceAntiAffinity{
 		podLister:     podLister,
 		serviceLister: serviceLister,
-		label:         label,
+		labels:        labels,
 	}
 	return antiAffinity.CalculateAntiAffinityPriorityMap, antiAffinity.CalculateAntiAffinityPriorityReduce
 }
 
-// Classifies nodes into ones with labels and without labels.
-func (s *ServiceAntiAffinity) getNodeClassificationByLabels(nodes []*v1.Node) (map[string]string, []string) {
-	labeledNodes := map[string]string{}
-	nonLabeledNodes := []string{}
-	for _, node := range nodes {
-		if labels.Set(node.Labels).Has(s.label) {
-			label := labels.Set(node.Labels).Get(s.label)
-			labeledNodes[node.Name] = label
-		} else {
-			nonLabeledNodes = append(nonLabeledNodes, node.Name)
-		}
-	}
-	return labeledNodes, nonLabeledNodes
-}
-
-// countMatchingPods cout pods based on namespace and matching all selectors
-func countMatchingPods(namespace string, selectors []labels.Selector, nodeInfo *schedulernodeinfo.NodeInfo) int {
-	if nodeInfo.Pods() == nil || len(nodeInfo.Pods()) == 0 || len(selectors) == 0 {
+// countMatchingPods counts pods based on namespace and matching all selectors
+func countMatchingPods(namespace string, selector labels.Selector, nodeInfo *schedulernodeinfo.NodeInfo) int {
+	if nodeInfo.Pods() == nil || len(nodeInfo.Pods()) == 0 || selector.Empty() {
 		return 0
 	}
 	count := 0
@@ -204,14 +181,7 @@ func countMatchingPods(namespace string, selectors []labels.Selector, nodeInfo *
 		// Ignore pods being deleted for spreading purposes
 		// Similar to how it is done for SelectorSpreadPriority
 		if namespace == pod.Namespace && pod.DeletionTimestamp == nil {
-			matches := true
-			for _, selector := range selectors {
-				if !selector.Matches(labels.Set(pod.Labels)) {
-					matches = false
-					break
-				}
-			}
-			if matches {
+			if selector.Matches(labels.Set(pod.Labels)) {
 				count++
 			}
 		}
@@ -234,12 +204,14 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityMap(pod *v1.Pod, meta
 	} else {
 		firstServiceSelector = getFirstServiceSelector(pod, s.serviceLister)
 	}
-	//pods matched namespace,selector on current node
-	var selectors []labels.Selector
+	// Pods matched namespace,selector on current node.
+	var selector labels.Selector
 	if firstServiceSelector != nil {
-		selectors = append(selectors, firstServiceSelector)
+		selector = firstServiceSelector
+	} else {
+		selector = labels.NewSelector()
 	}
-	score := countMatchingPods(pod.Namespace, selectors, nodeInfo)
+	score := countMatchingPods(pod.Namespace, selector, nodeInfo)
 
 	return framework.NodeScore{
 		Name:  node.Name,
@@ -250,43 +222,68 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityMap(pod *v1.Pod, meta
 // CalculateAntiAffinityPriorityReduce computes each node score with the same value for a particular label.
 // The label to be considered is provided to the struct (ServiceAntiAffinity).
 func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityReduce(pod *v1.Pod, meta interface{}, sharedLister schedulerlisters.SharedLister, result framework.NodeScoreList) error {
+	reduceResult := make([]float64, len(result))
+	for _, label := range s.labels {
+		if err := s.updateNodeScoresForLabel(sharedLister, result, reduceResult, label); err != nil {
+			return err
+		}
+	}
+
+	// Update the result after all labels have been evaluated.
+	for i, nodeScore := range reduceResult {
+		result[i].Score = int64(nodeScore)
+	}
+	return nil
+}
+
+// updateNodeScoresForLabel updates the node scores for a single label. Note it does not update the
+// original result from the map phase directly, but instead updates the reduceResult, which is used
+// to update the original result finally. This makes sure that each call to updateNodeScoresForLabel
+// receives the same mapResult to work with.
+// Why are doing this? This is a workaround for the migration from priorities to score plugins.
+// Historically the priority is designed to handle only one label, and multiple priorities are configured
+// to work with multiple labels. Using multiple plugins is not allowed in the new framework. Therefore
+// we need to modify the old priority to be able to handle multiple labels so that it can be mapped
+// to a single plugin. This will be deprecated soon.
+func (s *ServiceAntiAffinity) updateNodeScoresForLabel(sharedLister schedulerlisters.SharedLister, mapResult framework.NodeScoreList, reduceResult []float64, label string) error {
 	var numServicePods int64
-	var label string
+	var labelValue string
 	podCounts := map[string]int64{}
 	labelNodesStatus := map[string]string{}
 	maxPriorityFloat64 := float64(framework.MaxNodeScore)
 
-	for _, hostPriority := range result {
+	for _, hostPriority := range mapResult {
 		numServicePods += hostPriority.Score
 		nodeInfo, err := sharedLister.NodeInfos().Get(hostPriority.Name)
 		if err != nil {
 			return err
 		}
-		if !labels.Set(nodeInfo.Node().Labels).Has(s.label) {
+		if !labels.Set(nodeInfo.Node().Labels).Has(label) {
 			continue
 		}
 
-		label = labels.Set(nodeInfo.Node().Labels).Get(s.label)
-		labelNodesStatus[hostPriority.Name] = label
-		podCounts[label] += hostPriority.Score
+		labelValue = labels.Set(nodeInfo.Node().Labels).Get(label)
+		labelNodesStatus[hostPriority.Name] = labelValue
+		podCounts[labelValue] += hostPriority.Score
 	}
 
 	//score int - scale of 0-maxPriority
 	// 0 being the lowest priority and maxPriority being the highest
-	for i, hostPriority := range result {
-		label, ok := labelNodesStatus[hostPriority.Name]
+	for i, hostPriority := range mapResult {
+		labelValue, ok := labelNodesStatus[hostPriority.Name]
 		if !ok {
-			result[i].Name = hostPriority.Name
-			result[i].Score = 0
 			continue
 		}
 		// initializing to the default/max node score of maxPriority
 		fScore := maxPriorityFloat64
 		if numServicePods > 0 {
-			fScore = maxPriorityFloat64 * (float64(numServicePods-podCounts[label]) / float64(numServicePods))
+			fScore = maxPriorityFloat64 * (float64(numServicePods-podCounts[labelValue]) / float64(numServicePods))
 		}
-		result[i].Name = hostPriority.Name
-		result[i].Score = int64(fScore)
+		// The score of current label only accounts for 1/len(s.labels) of the total score.
+		// The policy API definition only allows a single label to be configured, associated with a weight.
+		// This is compensated by the fact that the total weight is the sum of all weights configured
+		// in each policy config.
+		reduceResult[i] += fScore / float64(len(s.labels))
 	}
 
 	return nil

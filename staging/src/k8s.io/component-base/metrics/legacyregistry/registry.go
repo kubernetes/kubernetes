@@ -49,18 +49,12 @@ func Handler() http.Handler {
 // Register registers a collectable metric but uses the global registry
 func Register(c metrics.Registerable) error {
 	err := defaultRegistry.Register(c)
-	// sideload global prom registry as fallback
-	prometheus.Register(c)
 	return err
 }
 
 // MustRegister registers registerable metrics but uses the global registry.
 func MustRegister(cs ...metrics.Registerable) {
 	defaultRegistry.MustRegister(cs...)
-	// sideload global prom registry as fallback
-	for _, c := range cs {
-		prometheus.Register(c)
-	}
 }
 
 // RawMustRegister registers prometheus collectors but uses the global registry, this
@@ -69,10 +63,6 @@ func MustRegister(cs ...metrics.Registerable) {
 // Deprecated
 func RawMustRegister(cs ...prometheus.Collector) {
 	defaultRegistry.RawMustRegister(cs...)
-	// sideload global prom registry as fallback
-	for _, c := range cs {
-		prometheus.Register(c)
-	}
 }
 
 // RawRegister registers a prometheus collector but uses the global registry, this
@@ -81,7 +71,24 @@ func RawMustRegister(cs ...prometheus.Collector) {
 // Deprecated
 func RawRegister(c prometheus.Collector) error {
 	err := defaultRegistry.RawRegister(c)
-	// sideload global prom registry as fallback
-	prometheus.Register(c)
 	return err
+}
+
+// CustomRegister registers a custom collector but uses the global registry.
+func CustomRegister(c metrics.StableCollector) error {
+	err := defaultRegistry.CustomRegister(c)
+
+	//TODO(RainbowMango): Maybe we can wrap this error by error wrapping.(Golang 1.13)
+	_ = prometheus.Register(c)
+
+	return err
+}
+
+// CustomMustRegister registers custom collectors but uses the global registry.
+func CustomMustRegister(cs ...metrics.StableCollector) {
+	defaultRegistry.CustomMustRegister(cs...)
+
+	for _, c := range cs {
+		prometheus.MustRegister(c)
+	}
 }

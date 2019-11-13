@@ -25,8 +25,8 @@ import (
 
 // StaticVerifierFn is a VerifyOptionFunc that always returns the same value.  This allows verify options that cannot change.
 func StaticVerifierFn(opts x509.VerifyOptions) VerifyOptionFunc {
-	return func() x509.VerifyOptions {
-		return opts
+	return func() (x509.VerifyOptions, bool) {
+		return opts, true
 	}
 }
 

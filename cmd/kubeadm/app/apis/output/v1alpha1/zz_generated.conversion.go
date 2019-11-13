@@ -47,7 +47,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_BootstrapToken_To_output_BootstrapToken(in *BootstrapToken, out *output.BootstrapToken, s conversion.Scope) error {
-	out.ObjectMeta = in.ObjectMeta
 	out.BootstrapToken = in.BootstrapToken
 	return nil
 }
@@ -58,7 +57,6 @@ func Convert_v1alpha1_BootstrapToken_To_output_BootstrapToken(in *BootstrapToken
 }
 
 func autoConvert_output_BootstrapToken_To_v1alpha1_BootstrapToken(in *output.BootstrapToken, out *BootstrapToken, s conversion.Scope) error {
-	out.ObjectMeta = in.ObjectMeta
 	out.BootstrapToken = in.BootstrapToken
 	return nil
 }

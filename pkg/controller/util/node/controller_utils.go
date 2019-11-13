@@ -56,7 +56,7 @@ func DeletePods(kubeClient clientset.Interface, pods []*v1.Pod, recorder record.
 			continue
 		}
 
-		// Pod will be modified, so making copy is requiered.
+		// Pod will be modified, so making copy is required.
 		pod := pods[i].DeepCopy()
 		// Set reason and message in the pod object.
 		if _, err := SetPodTerminationReason(kubeClient, pod, nodeName); err != nil {
@@ -80,6 +80,11 @@ func DeletePods(kubeClient clientset.Interface, pods []*v1.Pod, recorder record.
 		klog.V(2).Infof("Starting deletion of pod %v/%v", pod.Namespace, pod.Name)
 		recorder.Eventf(pod, v1.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
 		if err := kubeClient.CoreV1().Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
+			if apierrors.IsNotFound(err) {
+				// NotFound error means that pod was already deleted.
+				// There is nothing left to do with this pod.
+				continue
+			}
 			return false, err
 		}
 		remaining = true
@@ -122,7 +127,7 @@ func MarkPodsNotReady(kubeClient clientset.Interface, pods []*v1.Pod, nodeName s
 			continue
 		}
 
-		// Pod will be modified, so making copy is requiered.
+		// Pod will be modified, so making copy is required.
 		pod := pods[i].DeepCopy()
 		for _, cond := range pod.Status.Conditions {
 			if cond.Type == v1.PodReady {
@@ -133,6 +138,11 @@ func MarkPodsNotReady(kubeClient clientset.Interface, pods []*v1.Pod, nodeName s
 				klog.V(2).Infof("Updating ready status of pod %v to false", pod.Name)
 				_, err := kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(pod)
 				if err != nil {
+					if apierrors.IsNotFound(err) {
+						// NotFound error means that pod was already deleted.
+						// There is nothing left to do with this pod.
+						continue
+					}
 					klog.Warningf("Failed to update status for pod %q: %v", format.Pod(pod), err)
 					errMsg = append(errMsg, fmt.Sprintf("%v", err))
 				}

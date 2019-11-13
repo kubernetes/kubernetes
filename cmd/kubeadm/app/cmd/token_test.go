@@ -172,7 +172,7 @@ func TestRunCreateToken(t *testing.T) {
 				},
 			}
 
-			err = RunCreateToken(&buf, fakeClient, "", cfg, tc.printJoin, "")
+			err = RunCreateToken(&buf, fakeClient, "", cfg, tc.printJoin, "", "")
 			if tc.expectedError && err == nil {
 				t.Error("unexpected success")
 			} else if !tc.expectedError && err != nil {
@@ -358,7 +358,6 @@ func TestTokenOutput(t *testing.T) {
 			expected: `{
     "kind": "BootstrapToken",
     "apiVersion": "output.kubeadm.k8s.io/v1alpha1",
-    "creationTimestamp": null,
     "token": "abcdef.1234567890123456",
     "description": "valid bootstrap tooken",
     "usages": [
@@ -380,7 +379,6 @@ func TestTokenOutput(t *testing.T) {
 			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
 			outputFormat: "yaml",
 			expected: `apiVersion: output.kubeadm.k8s.io/v1alpha1
-creationTimestamp: null
 description: valid bootstrap tooken
 groups:
 - system:bootstrappers:kubeadm:default-node-token
