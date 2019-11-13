@@ -98,6 +98,7 @@ go_test(
         "azure_storage_test.go",
         "azure_storageaccount_test.go",
         "azure_test.go",
+        "azure_utils_test.go",
         "azure_vmss_cache_test.go",
         "azure_vmss_test.go",
         "azure_wrap_test.go",
