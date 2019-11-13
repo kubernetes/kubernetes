@@ -45,7 +45,7 @@ type uniformClient struct {
 // Each uniform client specifies a number of threads, each of which alternates between thinking
 // and making a synchronous request through the QueueSet.
 // This function measures how much concurrency each client got, on average, over
-// the intial totalDuration and tests to see whether they all got about the same amount.
+// the initial totalDuration and tests to see whether they all got about the same amount.
 // Each client needs to be demanding enough to use this amount, otherwise the fair result
 // is not equal amounts and the simple test in this function would not accurately test fairness.
 // expectPass indicates whether the QueueSet is expected to be fair.
