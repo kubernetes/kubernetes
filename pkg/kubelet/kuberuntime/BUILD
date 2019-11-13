@@ -110,6 +110,7 @@ go_test(
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
+        "//pkg/kubelet/prober/results:go_default_library",
         "//pkg/kubelet/runtimeclass:go_default_library",
         "//pkg/kubelet/runtimeclass/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
