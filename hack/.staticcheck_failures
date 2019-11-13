@@ -19,7 +19,6 @@ pkg/controller/statefulset
 pkg/credentialprovider
 pkg/credentialprovider/aws
 pkg/kubeapiserver/admission
-pkg/kubelet/apis/podresources
 pkg/kubelet/cm/devicemanager
 pkg/kubelet/pluginmanager/operationexecutor
 pkg/kubelet/pluginmanager/pluginwatcher
