@@ -58,7 +58,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	testServer := kastesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	testServer := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true}, nil, framework.SharedEtcd())
 	defer testServer.TearDownFn()
 	kubeClientConfig := rest.CopyConfig(testServer.ClientConfig)
 	// force json because everything speaks it

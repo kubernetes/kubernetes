@@ -47,6 +47,9 @@ type TearDownFunc func()
 type TestServerInstanceOptions struct {
 	// DisableStorageCleanup Disable the automatic storage cleanup
 	DisableStorageCleanup bool
+
+	// Enable cert-auth for the kube-apiserver
+	EnableCertAuth bool
 }
 
 // TestServer return values supplied by kube-test-ApiServer
@@ -68,6 +71,7 @@ type Logger interface {
 func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 	return &TestServerInstanceOptions{
 		DisableStorageCleanup: false,
+		EnableCertAuth:        true,
 	}
 }
 
@@ -124,33 +128,36 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	}
 	s.SecureServing.ServerCert.CertDirectory = result.TmpDir
 
-	// create optional certificates for aggregation and client-cert auth
-	proxySigningKey, err := testutil.NewPrivateKey()
-	if err != nil {
-		return result, err
+	if instanceOptions.EnableCertAuth {
+		// create certificates for aggregation and client-cert auth
+		proxySigningKey, err := testutil.NewPrivateKey()
+		if err != nil {
+			return result, err
+		}
+		proxySigningCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "front-proxy-ca"}, proxySigningKey)
+		if err != nil {
+			return result, err
+		}
+		proxyCACertFile := path.Join(s.SecureServing.ServerCert.CertDirectory, "proxy-ca.crt")
+		if err := ioutil.WriteFile(proxyCACertFile, testutil.EncodeCertPEM(proxySigningCert), 0644); err != nil {
+			return result, err
+		}
+		s.Authentication.RequestHeader.ClientCAFile = proxyCACertFile
+		clientSigningKey, err := testutil.NewPrivateKey()
+		if err != nil {
+			return result, err
+		}
+		clientSigningCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "client-ca"}, clientSigningKey)
+		if err != nil {
+			return result, err
+		}
+		clientCACertFile := path.Join(s.SecureServing.ServerCert.CertDirectory, "client-ca.crt")
+		if err := ioutil.WriteFile(clientCACertFile, testutil.EncodeCertPEM(clientSigningCert), 0644); err != nil {
+			return result, err
+		}
+		s.Authentication.ClientCert.ClientCA = clientCACertFile
 	}
-	proxySigningCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "front-proxy-ca"}, proxySigningKey)
-	if err != nil {
-		return result, err
-	}
-	proxyCACertFile := path.Join(s.SecureServing.ServerCert.CertDirectory, "proxy-ca.crt")
-	if err := ioutil.WriteFile(proxyCACertFile, testutil.EncodeCertPEM(proxySigningCert), 0644); err != nil {
-		return result, err
-	}
-	s.Authentication.RequestHeader.ClientCAFile = proxyCACertFile
-	clientSigningKey, err := testutil.NewPrivateKey()
-	if err != nil {
-		return result, err
-	}
-	clientSigningCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "client-ca"}, clientSigningKey)
-	if err != nil {
-		return result, err
-	}
-	clientCACertFile := path.Join(s.SecureServing.ServerCert.CertDirectory, "client-ca.crt")
-	if err := ioutil.WriteFile(clientCACertFile, testutil.EncodeCertPEM(clientSigningCert), 0644); err != nil {
-		return result, err
-	}
-	s.Authentication.ClientCert.ClientCA = clientCACertFile
+
 	s.SecureServing.ExternalAddress = s.SecureServing.Listener.Addr().(*net.TCPAddr).IP // use listener addr although it is a loopback device
 
 	_, thisFile, _, ok := runtime.Caller(0)
