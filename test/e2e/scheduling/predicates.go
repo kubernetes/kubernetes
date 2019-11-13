@@ -129,6 +129,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			totalPodCapacity += podCapacity.Value()
 		}
 
+		WaitForPodsToBeDeleted(cs)
 		currentlyScheduledPods := WaitForStableCluster(cs, masterNodes)
 		podsNeededForSaturation := int(totalPodCapacity) - currentlyScheduledPods
 
