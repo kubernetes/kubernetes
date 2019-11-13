@@ -389,6 +389,11 @@ func (ed *emptyDir) TearDown() error {
 
 // TearDownAt simply discards everything in the directory.
 func (ed *emptyDir) TearDownAt(dir string) error {
+	defer func() {
+		// remove ready dir which created in TearUp func
+		volumeutil.CleanReady(ed.getMetaDir())
+	}()
+
 	if pathExists, pathErr := mount.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {

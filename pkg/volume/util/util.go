@@ -108,6 +108,13 @@ func SetReady(dir string) {
 	file.Close()
 }
 
+// CleanReady remove the 'ready' file
+func CleanReady(dir string) {
+	if err := os.RemoveAll(dir); err != nil && !os.IsNotExist(err) {
+		klog.Errorf("remove directory %s error %v", dir, err)
+	}
+}
+
 // GetSecretForPod locates secret by name in the pod's namespace and returns secret map
 func GetSecretForPod(pod *v1.Pod, secretName string, kubeClient clientset.Interface) (map[string]string, error) {
 	secret := make(map[string]string)
