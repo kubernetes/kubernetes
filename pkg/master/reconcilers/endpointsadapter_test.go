@@ -105,6 +105,11 @@ func TestEndpointsAdapterGet(t *testing.T) {
 func TestEndpointsAdapterCreate(t *testing.T) {
 	endpoints1, epSlice1 := generateEndpointsAndSlice("foo", "testing", []int{80}, []string{"10.1.2.3", "10.1.2.4"})
 
+	// even if an Endpoints resource includes an IPv6 address, it should not be
+	// included in the corresponding EndpointSlice.
+	endpoints2, _ := generateEndpointsAndSlice("foo", "testing", []int{80}, []string{"10.1.2.5", "10.1.2.6", "1234::5678:0000:0000:9abc:def0"})
+	_, epSlice2 := generateEndpointsAndSlice("foo", "testing", []int{80}, []string{"10.1.2.5", "10.1.2.6"})
+
 	testCases := map[string]struct {
 		endpointSlicesEnabled bool
 		expectedError         error
@@ -123,6 +128,15 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			endpoints:             []*corev1.Endpoints{},
 			namespaceParam:        endpoints1.Namespace,
 			endpointsParam:        endpoints1,
+		},
+		"single-endpoint-with-ipv6": {
+			endpointSlicesEnabled: true,
+			expectedError:         nil,
+			expectedEndpoints:     endpoints2,
+			expectedEndpointSlice: epSlice2,
+			endpoints:             []*corev1.Endpoints{},
+			namespaceParam:        endpoints2.Namespace,
+			endpointsParam:        endpoints2,
 		},
 		"single-endpoint-no-slices": {
 			endpointSlicesEnabled: false,
@@ -199,6 +213,13 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 	endpoints2, epSlice2 := generateEndpointsAndSlice("foo", "testing", []int{80, 443}, []string{"10.1.2.3", "10.1.2.4", "10.1.2.5"})
 	endpoints3, _ := generateEndpointsAndSlice("bar", "testing", []int{80, 443}, []string{"10.1.2.3", "10.1.2.4", "10.1.2.5"})
 
+	// ensure that EndpointSlice with deprecated IP address type is replaced
+	// with one that has an IPv4 address type.
+	endpoints4, _ := generateEndpointsAndSlice("foo", "testing", []int{80}, []string{"10.1.2.7", "10.1.2.8"})
+	_, epSlice4IP := generateEndpointsAndSlice("foo", "testing", []int{80}, []string{"10.1.2.7", "10.1.2.8"})
+	epSlice4IP.AddressType = discovery.AddressTypeIP
+	_, epSlice4IPv4 := generateEndpointsAndSlice("foo", "testing", []int{80}, []string{"10.1.2.7", "10.1.2.8"})
+
 	testCases := map[string]struct {
 		endpointSlicesEnabled bool
 		expectedError         error
@@ -217,6 +238,16 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			endpoints:             []*corev1.Endpoints{endpoints1},
 			namespaceParam:        "testing",
 			endpointsParam:        endpoints1,
+		},
+		"existing-endpointslice-replaced-with-updated-ipv4-address-type": {
+			endpointSlicesEnabled: true,
+			expectedError:         nil,
+			expectedEndpoints:     endpoints4,
+			expectedEndpointSlice: epSlice4IPv4,
+			endpoints:             []*corev1.Endpoints{endpoints4},
+			endpointSlices:        []*discovery.EndpointSlice{epSlice4IP},
+			namespaceParam:        "testing",
+			endpointsParam:        endpoints4,
 		},
 		"add-ports-and-ips": {
 			endpointSlicesEnabled: true,
@@ -291,9 +322,8 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 func generateEndpointsAndSlice(name, namespace string, ports []int, addresses []string) (*corev1.Endpoints, *discovery.EndpointSlice) {
 	objectMeta := metav1.ObjectMeta{Name: name, Namespace: namespace}
 	trueBool := true
-	addressTypeIP := discovery.AddressTypeIP
 
-	epSlice := &discovery.EndpointSlice{ObjectMeta: objectMeta, AddressType: &addressTypeIP}
+	epSlice := &discovery.EndpointSlice{ObjectMeta: objectMeta, AddressType: discovery.AddressTypeIPv4}
 	epSlice.Labels = map[string]string{discovery.LabelServiceName: name}
 	subset := corev1.EndpointSubset{}
 

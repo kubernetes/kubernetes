@@ -33,8 +33,6 @@ func TestSetDefaultEndpointPort(t *testing.T) {
 	fooStr := "foo"
 	protoTCP := v1.ProtocolTCP
 	protoUDP := v1.ProtocolUDP
-	ipAddressType := discovery.AddressTypeIP
-	otherAddressType := discovery.AddressType("other")
 
 	tests := map[string]struct {
 		original *discovery.EndpointSlice
@@ -45,7 +43,6 @@ func TestSetDefaultEndpointPort(t *testing.T) {
 				Port: utilpointer.Int32Ptr(80),
 			}}},
 			expected: &discovery.EndpointSlice{
-				AddressType: &ipAddressType,
 				Ports: []discovery.EndpointPort{{
 					Name:     &emptyStr,
 					Protocol: &protoTCP,
@@ -55,14 +52,12 @@ func TestSetDefaultEndpointPort(t *testing.T) {
 		},
 		"should not overwrite values with defaults when set": {
 			original: &discovery.EndpointSlice{
-				AddressType: &otherAddressType,
 				Ports: []discovery.EndpointPort{{
 					Name:     &fooStr,
 					Protocol: &protoUDP,
 				}},
 			},
 			expected: &discovery.EndpointSlice{
-				AddressType: &otherAddressType,
 				Ports: []discovery.EndpointPort{{
 					Name:     &fooStr,
 					Protocol: &protoUDP,

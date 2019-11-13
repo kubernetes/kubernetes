@@ -126,11 +126,6 @@ func (in *EndpointSlice) DeepCopyInto(out *EndpointSlice) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
-	if in.AddressType != nil {
-		in, out := &in.AddressType, &out.AddressType
-		*out = new(AddressType)
-		**out = **in
-	}
 	if in.Endpoints != nil {
 		in, out := &in.Endpoints, &out.Endpoints
 		*out = make([]Endpoint, len(*in))

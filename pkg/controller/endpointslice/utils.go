@@ -31,6 +31,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/discovery/validation"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
+	utilnet "k8s.io/utils/net"
 )
 
 // podEndpointChanged returns true if the results of podToEndpoint are different
@@ -70,7 +71,7 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service) 
 
 	ready := service.Spec.PublishNotReadyAddresses || podutil.IsPodReady(pod)
 	ep := discovery.Endpoint{
-		Addresses: getEndpointAddresses(pod.Status),
+		Addresses: getEndpointAddresses(pod.Status, service.Spec.IPFamily),
 		Conditions: discovery.EndpointConditions{
 			Ready: &ready,
 		},
@@ -124,16 +125,18 @@ func getEndpointPorts(service *corev1.Service, pod *corev1.Pod) []discovery.Endp
 }
 
 // getEndpointAddresses returns a list of addresses generated from a pod status.
-func getEndpointAddresses(podStatus corev1.PodStatus) []string {
-	if len(podStatus.PodIPs) > 1 {
-		addresss := []string{}
-		for _, podIP := range podStatus.PodIPs {
-			addresss = append(addresss, podIP.IP)
+func getEndpointAddresses(podStatus corev1.PodStatus, ipFamily *corev1.IPFamily) []string {
+	isIPv6Family := ipFamily != nil && *ipFamily == corev1.IPv6Protocol
+	addresses := []string{}
+
+	for _, podIP := range podStatus.PodIPs {
+		isIPv6PodIP := utilnet.IsIPv6String(podIP.IP)
+		if isIPv6Family == isIPv6PodIP {
+			addresses = append(addresses, podIP.IP)
 		}
-		return addresss
 	}
 
-	return []string{podStatus.PodIP}
+	return addresses
 }
 
 // endpointsEqualBeyondHash returns true if endpoints have equal attributes

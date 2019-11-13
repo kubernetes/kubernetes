@@ -2644,11 +2644,7 @@ func describeEndpointSlice(eps *discoveryv1alpha1.EndpointSlice, events *corev1.
 		printLabelsMultiline(w, "Labels", eps.Labels)
 		printAnnotationsMultiline(w, "Annotations", eps.Annotations)
 
-		addressType := "<unset>"
-		if eps.AddressType != nil {
-			addressType = string(*eps.AddressType)
-		}
-		w.Write(LEVEL_0, "AddressType:\t%s\n", addressType)
+		w.Write(LEVEL_0, "AddressType:\t%s\n", string(eps.AddressType))
 
 		if len(eps.Ports) == 0 {
 			w.Write(LEVEL_0, "Ports: <unset>\n")

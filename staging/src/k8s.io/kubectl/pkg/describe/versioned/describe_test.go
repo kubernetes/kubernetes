@@ -3516,7 +3516,6 @@ func TestDescribeStatefulSet(t *testing.T) {
 }
 
 func TestDescribeEndpointSlice(t *testing.T) {
-	addressTypeIP := discoveryv1alpha1.AddressTypeIP
 	protocolTCP := corev1.ProtocolTCP
 	port80 := int32(80)
 
@@ -3525,7 +3524,7 @@ func TestDescribeEndpointSlice(t *testing.T) {
 			Name:      "foo.123",
 			Namespace: "bar",
 		},
-		AddressType: &addressTypeIP,
+		AddressType: discoveryv1alpha1.AddressTypeIPv4,
 		Endpoints: []discoveryv1alpha1.Endpoint{
 			{
 				Addresses:  []string{"1.2.3.4", "1.2.3.5"},
@@ -3564,7 +3563,7 @@ func TestDescribeEndpointSlice(t *testing.T) {
 Namespace:    bar
 Labels:       <none>
 Annotations:  <none>
-AddressType:  IP
+AddressType:  IPv4
 Ports:
   Name     Port  Protocol
   ----     ----  --------

@@ -47,7 +47,7 @@ type reconciler struct {
 // that logic in reconciler
 type endpointMeta struct {
 	Ports       []discovery.EndpointPort `json:"ports" protobuf:"bytes,2,rep,name=ports"`
-	AddressType *discovery.AddressType   `json:"addressType" protobuf:"bytes,3,rep,name=addressType"`
+	AddressType discovery.AddressType    `json:"addressType" protobuf:"bytes,3,rep,name=addressType"`
 }
 
 // reconcile takes a set of pods currently matching a service selector and
@@ -55,13 +55,26 @@ type endpointMeta struct {
 // slices for the given service. It creates, updates, or deletes endpoint slices
 // to ensure the desired set of pods are represented by endpoint slices.
 func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, existingSlices []*discovery.EndpointSlice, triggerTime time.Time) error {
+	addressType := discovery.AddressTypeIPv4
+	if service.Spec.IPFamily != nil && *service.Spec.IPFamily == corev1.IPv6Protocol {
+		addressType = discovery.AddressTypeIPv6
+	}
+
+	slicesToCreate := []*discovery.EndpointSlice{}
+	slicesToUpdate := []*discovery.EndpointSlice{}
+	slicesToDelete := []*discovery.EndpointSlice{}
+
 	// Build data structures for existing state.
 	existingSlicesByPortMap := map[endpointutil.PortMapKey][]*discovery.EndpointSlice{}
 	numExistingEndpoints := 0
 	for _, existingSlice := range existingSlices {
-		epHash := endpointutil.NewPortMapKey(existingSlice.Ports)
-		existingSlicesByPortMap[epHash] = append(existingSlicesByPortMap[epHash], existingSlice)
-		numExistingEndpoints += len(existingSlice.Endpoints)
+		if existingSlice.AddressType == addressType {
+			epHash := endpointutil.NewPortMapKey(existingSlice.Ports)
+			existingSlicesByPortMap[epHash] = append(existingSlicesByPortMap[epHash], existingSlice)
+			numExistingEndpoints += len(existingSlice.Endpoints)
+		} else {
+			slicesToDelete = append(slicesToDelete, existingSlice)
+		}
 	}
 
 	// Build data structures for desired state.
@@ -78,10 +91,8 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 			}
 
 			if _, ok := desiredMetaByPortMap[epHash]; !ok {
-				// TODO: Support multiple backend types
-				ipAddressType := discovery.AddressTypeIP
 				desiredMetaByPortMap[epHash] = &endpointMeta{
-					AddressType: &ipAddressType,
+					AddressType: addressType,
 					Ports:       endpointPorts,
 				}
 			}
@@ -90,16 +101,14 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 			if err != nil {
 				return err
 			}
-
 			endpoint := podToEndpoint(pod, node, service)
-			desiredEndpointsByPortMap[epHash].Insert(&endpoint)
-			numDesiredEndpoints++
+			if len(endpoint.Addresses) > 0 {
+				desiredEndpointsByPortMap[epHash].Insert(&endpoint)
+				numDesiredEndpoints++
+			}
 		}
 	}
 
-	slicesToCreate := []*discovery.EndpointSlice{}
-	slicesToUpdate := []*discovery.EndpointSlice{}
-	sliceNamesToDelete := sets.String{}
 	spMetrics := metrics.NewServicePortCache()
 	totalAdded := 0
 	totalRemoved := 0
@@ -107,7 +116,7 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 	// Determine changes necessary for each group of slices by port map.
 	for portMap, desiredEndpoints := range desiredEndpointsByPortMap {
 		numEndpoints := len(desiredEndpoints)
-		pmSlicesToCreate, pmSlicesToUpdate, pmSliceNamesToDelete, added, removed := r.reconcileByPortMapping(
+		pmSlicesToCreate, pmSlicesToUpdate, pmSlicesToDelete, added, removed := r.reconcileByPortMapping(
 			service, existingSlicesByPortMap[portMap], desiredEndpoints, desiredMetaByPortMap[portMap])
 
 		totalAdded += added
@@ -115,7 +124,7 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 
 		spMetrics.Set(portMap, metrics.EfficiencyInfo{
 			Endpoints: numEndpoints,
-			Slices:    len(existingSlicesByPortMap[portMap]) + len(pmSlicesToCreate) - len(pmSliceNamesToDelete),
+			Slices:    len(existingSlicesByPortMap[portMap]) + len(pmSlicesToCreate) - len(pmSlicesToDelete),
 		})
 
 		if len(pmSlicesToCreate) > 0 {
@@ -124,8 +133,8 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 		if len(pmSlicesToUpdate) > 0 {
 			slicesToUpdate = append(slicesToUpdate, pmSlicesToUpdate...)
 		}
-		if pmSliceNamesToDelete.Len() > 0 {
-			sliceNamesToDelete = sliceNamesToDelete.Union(pmSliceNamesToDelete)
+		if len(pmSlicesToDelete) > 0 {
+			slicesToDelete = append(slicesToDelete, pmSlicesToDelete...)
 		}
 	}
 
@@ -134,14 +143,14 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 	for portMap, existingSlices := range existingSlicesByPortMap {
 		if _, ok := desiredEndpointsByPortMap[portMap]; !ok {
 			for _, existingSlice := range existingSlices {
-				sliceNamesToDelete.Insert(existingSlice.Name)
+				slicesToDelete = append(slicesToDelete, existingSlice)
 			}
 		}
 	}
 
 	// When no endpoint slices would usually exist, we need to add a placeholder.
-	if len(existingSlices) == sliceNamesToDelete.Len() && len(slicesToCreate) < 1 {
-		placeholderSlice := newEndpointSlice(service, &endpointMeta{Ports: []discovery.EndpointPort{}})
+	if len(existingSlices) == len(slicesToDelete) && len(slicesToCreate) < 1 {
+		placeholderSlice := newEndpointSlice(service, &endpointMeta{Ports: []discovery.EndpointPort{}, AddressType: addressType})
 		slicesToCreate = append(slicesToCreate, placeholderSlice)
 		spMetrics.Set(endpointutil.NewPortMapKey(placeholderSlice.Ports), metrics.EfficiencyInfo{
 			Endpoints: 0,
@@ -155,27 +164,41 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 	serviceNN := types.NamespacedName{Name: service.Name, Namespace: service.Namespace}
 	r.metricsCache.UpdateServicePortCache(serviceNN, spMetrics)
 
-	return r.finalize(service, slicesToCreate, slicesToUpdate, sliceNamesToDelete, triggerTime)
+	return r.finalize(service, slicesToCreate, slicesToUpdate, slicesToDelete, triggerTime)
 }
 
 // finalize creates, updates, and deletes slices as specified
 func (r *reconciler) finalize(
 	service *corev1.Service,
 	slicesToCreate,
-	slicesToUpdate []*discovery.EndpointSlice,
-	sliceNamesToDelete sets.String,
+	slicesToUpdate,
+	slicesToDelete []*discovery.EndpointSlice,
 	triggerTime time.Time,
 ) error {
 	errs := []error{}
 
 	// If there are slices to create and delete, change the creates to updates
 	// of the slices that would otherwise be deleted.
-	for len(slicesToCreate) > 0 && sliceNamesToDelete.Len() > 0 {
-		sliceName, _ := sliceNamesToDelete.PopAny()
+	for i := 0; i < len(slicesToDelete); {
+		if len(slicesToCreate) == 0 {
+			break
+		}
+		sliceToDelete := slicesToDelete[i]
 		slice := slicesToCreate[len(slicesToCreate)-1]
-		slicesToCreate = slicesToCreate[:len(slicesToCreate)-1]
-		slice.Name = sliceName
-		slicesToUpdate = append(slicesToUpdate, slice)
+		// Only update EndpointSlices that have the same AddressType as this
+		// field is considered immutable. Since Services also consider IPFamily
+		// immutable, the only case where this should matter will be the
+		// migration from IP to IPv4 and IPv6 AddressTypes, where there's a
+		// chance EndpointSlices with an IP AddressType would otherwise be
+		// updated to IPv4 or IPv6 without this check.
+		if sliceToDelete.AddressType == slice.AddressType {
+			slice.Name = sliceToDelete.Name
+			slicesToCreate = slicesToCreate[:len(slicesToCreate)-1]
+			slicesToUpdate = append(slicesToUpdate, slice)
+			slicesToDelete = append(slicesToDelete[:i], slicesToDelete[i+1:]...)
+		} else {
+			i++
+		}
 	}
 
 	for _, endpointSlice := range slicesToCreate {
@@ -202,11 +225,10 @@ func (r *reconciler) finalize(
 		}
 	}
 
-	for sliceNamesToDelete.Len() > 0 {
-		sliceName, _ := sliceNamesToDelete.PopAny()
-		err := r.client.DiscoveryV1alpha1().EndpointSlices(service.Namespace).Delete(sliceName, &metav1.DeleteOptions{})
+	for _, endpointSlice := range slicesToDelete {
+		err := r.client.DiscoveryV1alpha1().EndpointSlices(service.Namespace).Delete(endpointSlice.Name, &metav1.DeleteOptions{})
 		if err != nil {
-			errs = append(errs, fmt.Errorf("Error deleting %s EndpointSlice for Service %s/%s: %v", sliceName, service.Namespace, service.Name, err))
+			errs = append(errs, fmt.Errorf("Error deleting %s EndpointSlice for Service %s/%s: %v", endpointSlice.Name, service.Namespace, service.Name, err))
 		} else {
 			metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
 		}
@@ -229,7 +251,7 @@ func (r *reconciler) reconcileByPortMapping(
 	existingSlices []*discovery.EndpointSlice,
 	desiredSet endpointSet,
 	endpointMeta *endpointMeta,
-) ([]*discovery.EndpointSlice, []*discovery.EndpointSlice, sets.String, int, int) {
+) ([]*discovery.EndpointSlice, []*discovery.EndpointSlice, []*discovery.EndpointSlice, int, int) {
 	slicesByName := map[string]*discovery.EndpointSlice{}
 	sliceNamesUnchanged := sets.String{}
 	sliceNamesToUpdate := sets.String{}
@@ -345,7 +367,13 @@ func (r *reconciler) reconcileByPortMapping(
 		slicesToUpdate = append(slicesToUpdate, slicesByName[sliceName])
 	}
 
-	return slicesToCreate, slicesToUpdate, sliceNamesToDelete, numAdded, numRemoved
+	// Build slicesToDelete from slice names.
+	slicesToDelete := []*discovery.EndpointSlice{}
+	for _, sliceName := range sliceNamesToDelete.UnsortedList() {
+		slicesToDelete = append(slicesToDelete, slicesByName[sliceName])
+	}
+
+	return slicesToCreate, slicesToUpdate, slicesToDelete, numAdded, numRemoved
 }
 
 func (r *reconciler) deleteService(namespace, name string) {
