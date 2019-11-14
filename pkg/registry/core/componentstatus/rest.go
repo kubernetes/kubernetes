@@ -28,7 +28,6 @@ import (
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -40,19 +39,15 @@ import (
 
 type REST struct {
 	GetServersToValidate func() map[string]*Server
+	rest.TableConvertor
 }
 
 // NewStorage returns a new REST.
 func NewStorage(serverRetriever func() map[string]*Server) *REST {
 	return &REST{
 		GetServersToValidate: serverRetriever,
+		TableConvertor:       printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-}
-
-// ConvertToTable converts the result to the table.
-func (rs *REST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
-	tableConvertor := printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)}
-	return tableConvertor.ConvertToTable(ctx, object, tableOptions)
 }
 
 func (*REST) NamespaceScoped() bool {
