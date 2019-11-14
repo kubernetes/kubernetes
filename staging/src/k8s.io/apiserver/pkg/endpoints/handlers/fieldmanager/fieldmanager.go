@@ -115,7 +115,7 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (o
 	h.Write([]byte("/"))
 	h.Write([]byte(name))
 	sum := h.Sum32()
-	if sum%2 == 0 {
+	if sum%4 != 0 {
 		// By-pass
 		return newObj, nil
 	}
