@@ -274,6 +274,10 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.Persisten
 		},
 	}
 
+	if err := translateTopology(pv, GCEPDTopologyKey); err != nil {
+		return nil, fmt.Errorf("failed to translate topology: %v", err)
+	}
+
 	pv.Spec.PersistentVolumeSource.GCEPersistentDisk = nil
 	pv.Spec.PersistentVolumeSource.CSI = csiSource
 	pv.Spec.AccessModes = backwardCompatibleAccessModes(pv.Spec.AccessModes)

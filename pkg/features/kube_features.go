@@ -112,7 +112,9 @@ const (
 	EphemeralContainers featuregate.Feature = "EphemeralContainers"
 
 	// owner: @verb
+	// alpha: v1.10
 	// beta: v1.12
+	// GA: v1.17
 	//
 	// Allows all containers in a pod to share a process namespace.
 	PodShareProcessNamespace featuregate.Feature = "PodShareProcessNamespace"
@@ -308,7 +310,7 @@ const (
 
 	// owner: @vikaschoudhary16
 	// beta: v1.12
-	//
+	// ga: v1.17
 	//
 	// Enable resource quota scope selectors
 	ResourceQuotaScopeSelectors featuregate.Feature = "ResourceQuotaScopeSelectors"
@@ -432,7 +434,9 @@ const (
 	CSIMigrationOpenStack featuregate.Feature = "CSIMigrationOpenStack"
 
 	// owner: @MrHohn
-	// beta: v1.16
+	// alpha: v1.15
+	// beta:  v1.16
+	// GA: v1.17
 	//
 	// Enables Finalizer Protection for Service LoadBalancers.
 	ServiceLoadBalancerFinalizer featuregate.Feature = "ServiceLoadBalancerFinalizer"
@@ -519,7 +523,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	LocalStorageCapacityIsolation:  {Default: true, PreRelease: featuregate.Beta},
 	Sysctls:                        {Default: true, PreRelease: featuregate.Beta},
 	EphemeralContainers:            {Default: false, PreRelease: featuregate.Alpha},
-	PodShareProcessNamespace:       {Default: true, PreRelease: featuregate.Beta},
+	PodShareProcessNamespace:       {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
 	PodPriority:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.18
 	TaintNodesByCondition:          {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.18
 	QOSReserved:                    {Default: false, PreRelease: featuregate.Alpha},
@@ -556,7 +560,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	VolumeSubpath:                  {Default: true, PreRelease: featuregate.GA},
 	BalanceAttachedNodeVolumes:     {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSubpathEnvExpansion:      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19,
-	ResourceQuotaScopeSelectors:    {Default: true, PreRelease: featuregate.Beta},
+	ResourceQuotaScopeSelectors:    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.18
 	CSIBlockVolume:                 {Default: true, PreRelease: featuregate.Beta},
 	CSIInlineVolume:                {Default: true, PreRelease: featuregate.Beta},
 	RuntimeClass:                   {Default: true, PreRelease: featuregate.Beta},
@@ -568,13 +572,13 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletPodResources:            {Default: true, PreRelease: featuregate.Beta},
 	WindowsGMSA:                    {Default: true, PreRelease: featuregate.Beta},
 	WindowsRunAsUserName:           {Default: true, PreRelease: featuregate.Beta},
-	ServiceLoadBalancerFinalizer:   {Default: true, PreRelease: featuregate.Beta},
+	ServiceLoadBalancerFinalizer:   {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: false, PreRelease: featuregate.Alpha},
 	VolumePVCDataSource:                            {Default: true, PreRelease: featuregate.Beta},
 	PodOverhead:                                    {Default: false, PreRelease: featuregate.Alpha},
 	IPv6DualStack:                                  {Default: false, PreRelease: featuregate.Alpha},
-	EndpointSlice:                                  {Default: false, PreRelease: featuregate.Alpha},
+	EndpointSlice:                                  {Default: true, PreRelease: featuregate.Beta},
 	EvenPodsSpread:                                 {Default: false, PreRelease: featuregate.Alpha},
 	StartupProbe:                                   {Default: false, PreRelease: featuregate.Alpha},
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},

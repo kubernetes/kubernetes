@@ -161,6 +161,15 @@ func (v *GaugeVec) Delete(labels map[string]string) bool {
 	return v.GaugeVec.Delete(labels)
 }
 
+// Reset deletes all metrics in this vector.
+func (v *GaugeVec) Reset() {
+	if !v.IsCreated() {
+		return
+	}
+
+	v.GaugeVec.Reset()
+}
+
 func newGaugeFunc(opts GaugeOpts, function func() float64, v semver.Version) GaugeFunc {
 	g := NewGauge(&opts)
 

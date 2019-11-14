@@ -942,7 +942,8 @@ spec:
           volumePath: "101"
   templateGeneration: 8027668557984017414
   updateStrategy:
-    rollingUpdate: {}
+    rollingUpdate:
+      maxUnavailable: 2
     type: 荥ơ'禧ǵŊ)TiD¢ƿ媴h5
 status:
   collisionCount: 2063260600

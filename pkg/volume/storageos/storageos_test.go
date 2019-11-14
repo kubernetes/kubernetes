@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/utils/exec/testing"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -194,7 +195,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Couldn't get secret from %v/%v", pod.Namespace, secretName)
 	}
 
-	mounter, err := plug.(*storageosPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), pod, apiCfg, fakeManager, mount.NewFakeMounter(nil), mount.NewFakeExec(nil))
+	mounter, err := plug.(*storageosPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), pod, apiCfg, fakeManager, mount.NewFakeMounter(nil), &testingexec.FakeExec{})
 	if err != nil {
 		t.Fatalf("Failed to make a new Mounter: %v", err)
 	}
@@ -231,7 +232,7 @@ func TestPlugin(t *testing.T) {
 
 	// Test Unmounter
 	fakeManager = &fakePDManager{}
-	unmounter, err := plug.(*storageosPlugin).newUnmounterInternal("vol1-pvname", types.UID("poduid"), fakeManager, mount.NewFakeMounter(nil), mount.NewFakeExec(nil))
+	unmounter, err := plug.(*storageosPlugin).newUnmounterInternal("vol1-pvname", types.UID("poduid"), fakeManager, mount.NewFakeMounter(nil), &testingexec.FakeExec{})
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
@@ -372,7 +373,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	fakeManager := &fakePDManager{}
 	fakeConfig := &fakeConfig{}
 	apiCfg := fakeConfig.GetAPIConfig()
-	mounter, err := plug.(*storageosPlugin).newMounterInternal(spec, pod, apiCfg, fakeManager, mount.NewFakeMounter(nil), mount.NewFakeExec(nil))
+	mounter, err := plug.(*storageosPlugin).newMounterInternal(spec, pod, apiCfg, fakeManager, mount.NewFakeMounter(nil), &testingexec.FakeExec{})
 	if err != nil {
 		t.Fatalf("error creating a new internal mounter:%v", err)
 	}

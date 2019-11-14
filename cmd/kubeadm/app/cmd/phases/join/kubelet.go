@@ -147,7 +147,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	}
 
 	// Try to start the kubelet service in case it's inactive
-	klog.V(1).Infoln("[kubelet-start] Starting the kubelet")
+	fmt.Println("[kubelet-start] Starting the kubelet")
 	kubeletphase.TryStartKubelet()
 
 	// Now the kubelet will perform the TLS Bootstrap, transforming /etc/kubernetes/bootstrap-kubelet.conf to /etc/kubernetes/kubelet.conf

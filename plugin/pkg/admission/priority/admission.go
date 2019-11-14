@@ -24,7 +24,6 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializers "k8s.io/apiserver/pkg/admission/initializer"
@@ -35,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -54,10 +52,9 @@ func Register(plugins *admission.Plugins) {
 // Plugin is an implementation of admission.Interface.
 type Plugin struct {
 	*admission.Handler
-	client                          kubernetes.Interface
-	lister                          schedulingv1listers.PriorityClassLister
-	resourceQuotaFeatureGateEnabled bool
-	nonPreemptingPriority           bool
+	client                kubernetes.Interface
+	lister                schedulingv1listers.PriorityClassLister
+	nonPreemptingPriority bool
 }
 
 var _ admission.MutationInterface = &Plugin{}
@@ -87,7 +84,6 @@ func (p *Plugin) ValidateInitialization() error {
 // InspectFeatureGates allows setting bools without taking a dep on a global variable
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	p.nonPreemptingPriority = featureGates.Enabled(features.NonPreemptingPriority)
-	p.resourceQuotaFeatureGateEnabled = featureGates.Enabled(features.ResourceQuotaScopeSelectors)
 }
 
 // SetExternalKubeClientSet implements the WantsInternalKubeClientSet interface.
@@ -147,20 +143,6 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 	}
 }
 
-// priorityClassPermittedInNamespace returns true if we allow the given priority class name in the
-// given namespace. It currently checks that system priorities are created only in the system namespace.
-func priorityClassPermittedInNamespace(priorityClassName string, namespace string) bool {
-	// Only allow system priorities in the system namespace. This is to prevent abuse or incorrect
-	// usage of these priorities. Pods created at these priorities could preempt system critical
-	// components.
-	for _, spc := range schedulingapiv1.SystemPriorityClasses() {
-		if spc.Name == priorityClassName && namespace != metav1.NamespaceSystem {
-			return false
-		}
-	}
-	return true
-}
-
 // admitPod makes sure a new pod does not set spec.Priority field. It also makes sure that the PriorityClassName exists if it is provided and resolves the pod priority from the PriorityClassName.
 func (p *Plugin) admitPod(a admission.Attributes) error {
 	operation := a.GetOperation()
@@ -196,15 +178,6 @@ func (p *Plugin) admitPod(a admission.Attributes) error {
 			}
 			pod.Spec.PriorityClassName = pcName
 		} else {
-			pcName := pod.Spec.PriorityClassName
-			// If ResourceQuotaScopeSelectors is enabled, we should let pods with critical priorityClass to be created
-			// any namespace where administrator wants it to be created.
-			if !p.resourceQuotaFeatureGateEnabled {
-				if !priorityClassPermittedInNamespace(pcName, a.GetNamespace()) {
-					return admission.NewForbidden(a, fmt.Errorf("pods with %v priorityClass is not permitted in %v namespace", pcName, a.GetNamespace()))
-				}
-			}
-
 			// Try resolving the priority class name.
 			pc, err := p.lister.Get(pod.Spec.PriorityClassName)
 			if err != nil {

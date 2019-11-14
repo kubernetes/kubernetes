@@ -103,10 +103,9 @@ func (c *DynamicServingCertificateController) newTLSContent() (*dynamicCertifica
 
 	if c.clientCA != nil {
 		currClientCABundle := c.clientCA.CurrentCABundleContent()
-		// don't remove all content.  The value was configured at one time, so continue using that.
-		if len(currClientCABundle) == 0 {
-			return nil, fmt.Errorf("not loading an empty client ca bundle from %q", c.clientCA.Name())
-		}
+		// we allow removing all client ca bundles because the server is still secure when this happens. it just means
+		// that there isn't a hint to clients about which client-cert to used.  this happens when there is no client-ca
+		// yet known for authentication, which can happen in aggregated apiservers and some kube-apiserver deployment modes.
 		newContent.clientCA = caBundleContent{caBundle: currClientCABundle}
 	}
 
@@ -152,7 +151,7 @@ func (c *DynamicServingCertificateController) syncCerts() error {
 		newClientCAPool := x509.NewCertPool()
 		newClientCAs, err := cert.ParseCertsPEM(newContent.clientCA.caBundle)
 		if err != nil {
-			return fmt.Errorf("unable to load client CA file: %v", err)
+			return fmt.Errorf("unable to load client CA file %q: %v", string(newContent.clientCA.caBundle), err)
 		}
 		for i, cert := range newClientCAs {
 			klog.V(2).Infof("loaded client CA [%d/%q]: %s", i, c.clientCA.Name(), GetHumanCertDetail(cert))

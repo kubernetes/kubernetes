@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilpointer "k8s.io/utils/pointer"
@@ -336,7 +336,6 @@ func TestEsInfoChanged(t *testing.T) {
 }
 
 func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, offset, numEndpoints, unreadyMod int, hosts []string, portNums []*int32) *discovery.EndpointSlice {
-	ipAddressType := discovery.AddressTypeIP
 	tcpProtocol := v1.ProtocolTCP
 
 	endpointSlice := &discovery.EndpointSlice{
@@ -346,7 +345,7 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
 		},
 		Ports:       []discovery.EndpointPort{},
-		AddressType: &ipAddressType,
+		AddressType: discovery.AddressTypeIPv4,
 		Endpoints:   []discovery.Endpoint{},
 	}
 

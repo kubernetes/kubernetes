@@ -160,3 +160,12 @@ func (v *SummaryVec) Delete(labels map[string]string) bool {
 	}
 	return v.SummaryVec.Delete(labels)
 }
+
+// Reset deletes all metrics in this vector.
+func (v *SummaryVec) Reset() {
+	if !v.IsCreated() {
+		return
+	}
+
+	v.SummaryVec.Reset()
+}

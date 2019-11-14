@@ -32,12 +32,10 @@ option go_package = "v1alpha1";
 // Endpoint represents a single logical "backend" implementing a service.
 message Endpoint {
   // addresses of this endpoint. The contents of this field are interpreted
-  // according to the corresponding EndpointSlice addressType field. This
-  // allows for cases like dual-stack networking where both IPv4 and IPv6
-  // addresses would be included with the IP addressType. Consumers (e.g.
-  // kube-proxy) must handle different types of addresses in the context of
-  // their own capabilities. This must contain at least one address but no
-  // more than 100.
+  // according to the corresponding EndpointSlice addressType field. Consumers
+  // must handle different types of addresses in the context of their own
+  // capabilities. This must contain at least one address but no more than
+  // 100.
   // +listType=set
   repeated string addresses = 1;
 
@@ -123,13 +121,12 @@ message EndpointSlice {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // addressType specifies the type of address carried by this EndpointSlice.
-  // All addresses in this slice must be the same type. The following address
-  // types are currently supported:
-  // * IP:   Represents an IP Address. This can include both IPv4 and IPv6
-  //         addresses.
+  // All addresses in this slice must be the same type. This field is
+  // immutable after creation. The following address types are currently
+  // supported:
+  // * IPv4: Represents an IPv4 Address.
+  // * IPv6: Represents an IPv6 Address.
   // * FQDN: Represents a Fully Qualified Domain Name.
-  // Default is IP
-  // +optional
   optional string addressType = 4;
 
   // endpoints is a list of unique endpoints in this slice. Each slice may

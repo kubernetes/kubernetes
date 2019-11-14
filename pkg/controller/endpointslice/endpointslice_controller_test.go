@@ -24,7 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/informers"
@@ -62,7 +62,7 @@ func newController(nodeNames []string) (*fake.Clientset, *endpointSliceControlle
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Services(),
 		nodeInformer,
-		informerFactory.Discovery().V1alpha1().EndpointSlices(),
+		informerFactory.Discovery().V1beta1().EndpointSlices(),
 		int32(100),
 		client)
 
@@ -73,7 +73,7 @@ func newController(nodeNames []string) (*fake.Clientset, *endpointSliceControlle
 
 	return client, &endpointSliceController{
 		esController,
-		informerFactory.Discovery().V1alpha1().EndpointSlices().Informer().GetStore(),
+		informerFactory.Discovery().V1beta1().EndpointSlices().Informer().GetStore(),
 		informerFactory.Core().V1().Nodes().Informer().GetStore(),
 		informerFactory.Core().V1().Pods().Informer().GetStore(),
 		informerFactory.Core().V1().Services().Informer().GetStore(),
@@ -105,7 +105,7 @@ func TestSyncServiceWithSelector(t *testing.T) {
 	standardSyncService(t, esController, ns, serviceName, "true")
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
 
-	sliceList, err := client.DiscoveryV1alpha1().EndpointSlices(ns).List(metav1.ListOptions{})
+	sliceList, err := client.DiscoveryV1beta1().EndpointSlices(ns).List(metav1.ListOptions{})
 	assert.Nil(t, err, "Expected no error fetching endpoint slices")
 	assert.Len(t, sliceList.Items, 1, "Expected 1 endpoint slices")
 	slice := sliceList.Items[0]
@@ -172,7 +172,7 @@ func TestSyncServicePodSelection(t *testing.T) {
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
 
 	// an endpoint slice should be created, it should only reference pod1 (not pod2)
-	slices, err := client.DiscoveryV1alpha1().EndpointSlices(ns).List(metav1.ListOptions{})
+	slices, err := client.DiscoveryV1beta1().EndpointSlices(ns).List(metav1.ListOptions{})
 	assert.Nil(t, err, "Expected no error fetching endpoint slices")
 	assert.Len(t, slices.Items, 1, "Expected 1 endpoint slices")
 	slice := slices.Items[0]
@@ -198,6 +198,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 				discovery.LabelManagedBy:   controllerName,
 			},
 		},
+		AddressType: discovery.AddressTypeIPv4,
 	}, {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "matching-2",
@@ -207,6 +208,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 				discovery.LabelManagedBy:   controllerName,
 			},
 		},
+		AddressType: discovery.AddressTypeIPv4,
 	}, {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "partially-matching-1",
@@ -215,6 +217,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 				discovery.LabelServiceName: serviceName,
 			},
 		},
+		AddressType: discovery.AddressTypeIPv4,
 	}, {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "not-matching-1",
@@ -224,6 +227,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 				discovery.LabelManagedBy:   controllerName,
 			},
 		},
+		AddressType: discovery.AddressTypeIPv4,
 	}, {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "not-matching-2",
@@ -233,6 +237,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 				discovery.LabelManagedBy:   "something-else",
 			},
 		},
+		AddressType: discovery.AddressTypeIPv4,
 	}}
 
 	// need to add them to both store and fake clientset
@@ -241,7 +246,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected no error adding EndpointSlice: %v", err)
 		}
-		_, err = client.DiscoveryV1alpha1().EndpointSlices(ns).Create(endpointSlice)
+		_, err = client.DiscoveryV1beta1().EndpointSlices(ns).Create(endpointSlice)
 		if err != nil {
 			t.Fatalf("Expected no error creating EndpointSlice: %v", err)
 		}
@@ -272,16 +277,13 @@ func TestSyncServiceFull(t *testing.T) {
 	client, esController := newController([]string{"node-1"})
 	namespace := metav1.NamespaceDefault
 	serviceName := "all-the-protocols"
+	ipv6Family := v1.IPv6Protocol
 
-	// pod 1 only uses PodIP status attr
 	pod1 := newPod(1, namespace, true, 0)
-	pod1.Status.PodIP = "1.2.3.4"
-	pod1.Status.PodIPs = []v1.PodIP{}
+	pod1.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}}
 	esController.podStore.Add(pod1)
 
-	// pod 2 only uses PodIPs status attr
 	pod2 := newPod(2, namespace, true, 0)
-	pod2.Status.PodIP = ""
 	pod2.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.5"}, {IP: "1234::5678:0000:0000:9abc:def0"}}
 	esController.podStore.Add(pod2)
 
@@ -300,6 +302,7 @@ func TestSyncServiceFull(t *testing.T) {
 				{Name: "sctp-example", TargetPort: intstr.FromInt(3456), Protocol: v1.ProtocolSCTP},
 			},
 			Selector: map[string]string{"foo": "bar"},
+			IPFamily: &ipv6Family,
 		},
 	}
 	esController.serviceStore.Add(service)
@@ -312,36 +315,31 @@ func TestSyncServiceFull(t *testing.T) {
 
 	// last action should be to create endpoint slice
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
-	sliceList, err := client.DiscoveryV1alpha1().EndpointSlices(namespace).List(metav1.ListOptions{})
+	sliceList, err := client.DiscoveryV1beta1().EndpointSlices(namespace).List(metav1.ListOptions{})
 	assert.Nil(t, err, "Expected no error fetching endpoint slices")
 	assert.Len(t, sliceList.Items, 1, "Expected 1 endpoint slices")
 
 	// ensure all attributes of endpoint slice match expected state
 	slice := sliceList.Items[0]
-	assert.Len(t, slice.Endpoints, 2, "Expected 2 endpoints in first slice")
+	assert.Len(t, slice.Endpoints, 1, "Expected 1 endpoints in first slice")
 	assert.Equal(t, slice.Annotations["endpoints.kubernetes.io/last-change-trigger-time"], serviceCreateTime.Format(time.RFC3339Nano))
-	assert.ElementsMatch(t, []discovery.EndpointPort{{
-		Name:     strPtr("tcp-example"),
-		Protocol: protoPtr(v1.ProtocolTCP),
-		Port:     int32Ptr(int32(80)),
+	assert.EqualValues(t, []discovery.EndpointPort{{
+		Name:     strPtr("sctp-example"),
+		Protocol: protoPtr(v1.ProtocolSCTP),
+		Port:     int32Ptr(int32(3456)),
 	}, {
 		Name:     strPtr("udp-example"),
 		Protocol: protoPtr(v1.ProtocolUDP),
 		Port:     int32Ptr(int32(161)),
 	}, {
-		Name:     strPtr("sctp-example"),
-		Protocol: protoPtr(v1.ProtocolSCTP),
-		Port:     int32Ptr(int32(3456)),
+		Name:     strPtr("tcp-example"),
+		Protocol: protoPtr(v1.ProtocolTCP),
+		Port:     int32Ptr(int32(80)),
 	}}, slice.Ports)
 
 	assert.ElementsMatch(t, []discovery.Endpoint{{
 		Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-		Addresses:  []string{"1.2.3.4"},
-		TargetRef:  &v1.ObjectReference{Kind: "Pod", Namespace: namespace, Name: pod1.Name},
-		Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
-	}, {
-		Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-		Addresses:  []string{"1.2.3.5", "1234::5678:0000:0000:9abc:def0"},
+		Addresses:  []string{"1234::5678:0000:0000:9abc:def0"},
 		TargetRef:  &v1.ObjectReference{Kind: "Pod", Namespace: namespace, Name: pod2.Name},
 		Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
 	}}, slice.Endpoints)
@@ -419,7 +417,7 @@ func TestEnsureSetupManagedByAnnotation(t *testing.T) {
 				t.Fatalf("Expected no error adding EndpointSlice: %v", err)
 			}
 
-			_, err = client.DiscoveryV1alpha1().EndpointSlices(ns).Create(endpointSlice)
+			_, err = client.DiscoveryV1beta1().EndpointSlices(ns).Create(endpointSlice)
 			if err != nil {
 				t.Fatalf("Expected no error creating EndpointSlice: %v", err)
 			}
@@ -435,7 +433,7 @@ func TestEnsureSetupManagedByAnnotation(t *testing.T) {
 				t.Errorf("Expected managedBySetupAnnotation: %+v, got: %+v", managedBySetupCompleteValue, updatedService.Annotations[managedBySetupAnnotation])
 			}
 
-			updatedSlice, err := client.DiscoveryV1alpha1().EndpointSlices(ns).Get(endpointSlice.Name, metav1.GetOptions{})
+			updatedSlice, err := client.DiscoveryV1beta1().EndpointSlices(ns).Get(endpointSlice.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("Expected no error getting EndpointSlice: %v", err)
 			}

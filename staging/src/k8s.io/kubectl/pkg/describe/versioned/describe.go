@@ -41,7 +41,7 @@ import (
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
-	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
@@ -171,7 +171,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]describe.Desc
 		{Group: corev1.GroupName, Kind: "Endpoints"}:                              &EndpointsDescriber{c},
 		{Group: corev1.GroupName, Kind: "ConfigMap"}:                              &ConfigMapDescriber{c},
 		{Group: corev1.GroupName, Kind: "PriorityClass"}:                          &PriorityClassDescriber{c},
-		{Group: discoveryv1alpha1.GroupName, Kind: "EndpointSlice"}:               &EndpointSliceDescriber{c},
+		{Group: discoveryv1beta1.GroupName, Kind: "EndpointSlice"}:                &EndpointSliceDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "ReplicaSet"}:                  &ReplicaSetDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "NetworkPolicy"}:               &NetworkPolicyDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "PodSecurityPolicy"}:           &PodSecurityPolicyDescriber{c},
@@ -2621,7 +2621,7 @@ type EndpointSliceDescriber struct {
 }
 
 func (d *EndpointSliceDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
-	c := d.DiscoveryV1alpha1().EndpointSlices(namespace)
+	c := d.DiscoveryV1beta1().EndpointSlices(namespace)
 
 	eps, err := c.Get(name, metav1.GetOptions{})
 	if err != nil {
@@ -2636,7 +2636,7 @@ func (d *EndpointSliceDescriber) Describe(namespace, name string, describerSetti
 	return describeEndpointSlice(eps, events)
 }
 
-func describeEndpointSlice(eps *discoveryv1alpha1.EndpointSlice, events *corev1.EventList) (string, error) {
+func describeEndpointSlice(eps *discoveryv1beta1.EndpointSlice, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", eps.Name)
@@ -2644,11 +2644,7 @@ func describeEndpointSlice(eps *discoveryv1alpha1.EndpointSlice, events *corev1.
 		printLabelsMultiline(w, "Labels", eps.Labels)
 		printAnnotationsMultiline(w, "Annotations", eps.Annotations)
 
-		addressType := "<unset>"
-		if eps.AddressType != nil {
-			addressType = string(*eps.AddressType)
-		}
-		w.Write(LEVEL_0, "AddressType:\t%s\n", addressType)
+		w.Write(LEVEL_0, "AddressType:\t%s\n", string(eps.AddressType))
 
 		if len(eps.Ports) == 0 {
 			w.Write(LEVEL_0, "Ports: <unset>\n")
@@ -3745,11 +3741,36 @@ func describeNetworkPolicySpec(nps networkingv1.NetworkPolicySpec, w PrefixWrite
 	} else {
 		w.Write(LEVEL_2, "%s\n", metav1.FormatLabelSelector(&nps.PodSelector))
 	}
-	w.Write(LEVEL_1, "Allowing ingress traffic:\n")
-	printNetworkPolicySpecIngressFrom(nps.Ingress, "    ", w)
-	w.Write(LEVEL_1, "Allowing egress traffic:\n")
-	printNetworkPolicySpecEgressTo(nps.Egress, "    ", w)
+
+	ingressEnabled, egressEnabled := getPolicyType(nps)
+	if ingressEnabled {
+		w.Write(LEVEL_1, "Allowing ingress traffic:\n")
+		printNetworkPolicySpecIngressFrom(nps.Ingress, "    ", w)
+	} else {
+		w.Write(LEVEL_1, "Not affecting ingress traffic\n")
+	}
+	if egressEnabled {
+		w.Write(LEVEL_1, "Allowing egress traffic:\n")
+		printNetworkPolicySpecEgressTo(nps.Egress, "    ", w)
+	} else {
+		w.Write(LEVEL_1, "Not affecting egress traffic\n")
+
+	}
 	w.Write(LEVEL_1, "Policy Types: %v\n", policyTypesToString(nps.PolicyTypes))
+}
+
+func getPolicyType(nps networkingv1.NetworkPolicySpec) (bool, bool) {
+	var ingress, egress bool
+	for _, pt := range nps.PolicyTypes {
+		switch pt {
+		case networkingv1.PolicyTypeIngress:
+			ingress = true
+		case networkingv1.PolicyTypeEgress:
+			egress = true
+		}
+	}
+
+	return ingress, egress
 }
 
 func printNetworkPolicySpecIngressFrom(npirs []networkingv1.NetworkPolicyIngressRule, initialIndent string, w PrefixWriter) {

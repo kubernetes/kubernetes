@@ -235,6 +235,7 @@ func newTestKubeletWithImageList(
 
 	kubelet.probeManager = probetest.FakeManager{}
 	kubelet.livenessManager = proberesults.NewManager()
+	kubelet.startupManager = proberesults.NewManager()
 
 	kubelet.containerManager = cm.NewStubContainerManager()
 	fakeNodeRef := &v1.ObjectReference{

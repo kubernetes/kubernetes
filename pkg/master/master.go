@@ -44,7 +44,7 @@ import (
 	coordinationapiv1 "k8s.io/api/coordination/v1"
 	coordinationapiv1beta1 "k8s.io/api/coordination/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
-	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
@@ -77,7 +77,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1"
+	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
@@ -579,6 +579,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		certificatesapiv1beta1.SchemeGroupVersion,
 		coordinationapiv1.SchemeGroupVersion,
 		coordinationapiv1beta1.SchemeGroupVersion,
+		discoveryv1beta1.SchemeGroupVersion,
 		eventsv1beta1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,
 		networkingapiv1.SchemeGroupVersion,
@@ -614,7 +615,6 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret.DisableVersions(
 		auditregistrationv1alpha1.SchemeGroupVersion,
 		batchapiv2alpha1.SchemeGroupVersion,
-		discoveryv1alpha1.SchemeGroupVersion,
 		nodev1alpha1.SchemeGroupVersion,
 		rbacv1alpha1.SchemeGroupVersion,
 		schedulingv1alpha1.SchemeGroupVersion,

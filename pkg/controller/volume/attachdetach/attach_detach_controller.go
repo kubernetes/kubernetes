@@ -45,6 +45,8 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
+	utilexec "k8s.io/utils/exec"
+
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/populator"
@@ -768,8 +770,8 @@ func (adc *attachDetachController) DeleteServiceAccountTokenFunc() func(types.UI
 	}
 }
 
-func (adc *attachDetachController) GetExec(pluginName string) mount.Exec {
-	return mount.NewOSExec()
+func (adc *attachDetachController) GetExec(pluginName string) utilexec.Interface {
+	return utilexec.New()
 }
 
 func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.NodeName) {

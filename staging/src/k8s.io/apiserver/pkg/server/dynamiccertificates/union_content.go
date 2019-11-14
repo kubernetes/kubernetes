@@ -48,7 +48,9 @@ func (c unionCAContent) Name() string {
 func (c unionCAContent) CurrentCABundleContent() []byte {
 	caBundles := [][]byte{}
 	for _, curr := range c {
-		caBundles = append(caBundles, curr.CurrentCABundleContent())
+		if currCABytes := curr.CurrentCABundleContent(); len(currCABytes) > 0 {
+			caBundles = append(caBundles, []byte(strings.TrimSpace(string(currCABytes))))
+		}
 	}
 
 	return bytes.Join(caBundles, []byte("\n"))

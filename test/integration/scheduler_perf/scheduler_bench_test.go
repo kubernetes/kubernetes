@@ -48,7 +48,7 @@ var (
 
 // BenchmarkScheduling benchmarks the scheduling rate when the cluster has
 // various quantities of nodes and scheduled pods.
-func BenchmarkSchedulingV(b *testing.B) {
+func BenchmarkScheduling(b *testing.B) {
 	tests := []struct{ nodes, existingPods, minPods int }{
 		{nodes: 100, existingPods: 0, minPods: 100},
 		{nodes: 100, existingPods: 1000, minPods: 100},

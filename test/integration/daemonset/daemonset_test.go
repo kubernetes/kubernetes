@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
-	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -93,8 +92,6 @@ func setupScheduler(
 		Interface: cs.EventsV1beta1().Events(""),
 	})
 
-	defaultProviderName := schedulerconfig.SchedulerDefaultProviderName
-
 	sched, err := scheduler.New(
 		cs,
 		informerFactory,
@@ -103,9 +100,6 @@ func setupScheduler(
 			legacyscheme.Scheme,
 			v1.DefaultSchedulerName,
 		),
-		schedulerconfig.SchedulerAlgorithmSource{
-			Provider: &defaultProviderName,
-		},
 		ctx.Done(),
 	)
 	if err != nil {

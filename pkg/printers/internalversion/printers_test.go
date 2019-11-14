@@ -4736,7 +4736,6 @@ func TestPrintEndpoint(t *testing.T) {
 }
 
 func TestPrintEndpointSlice(t *testing.T) {
-	ipAddressType := discovery.AddressTypeIP
 	tcpProtocol := api.ProtocolTCP
 
 	tests := []struct {
@@ -4749,7 +4748,7 @@ func TestPrintEndpointSlice(t *testing.T) {
 					Name:              "abcslice.123",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
-				AddressType: &ipAddressType,
+				AddressType: discovery.AddressTypeIPv4,
 				Ports: []discovery.EndpointPort{{
 					Name:     utilpointer.StringPtr("http"),
 					Port:     utilpointer.Int32Ptr(80),
@@ -4760,14 +4759,14 @@ func TestPrintEndpointSlice(t *testing.T) {
 				}},
 			},
 			// Columns: Name, AddressType, Ports, Endpoints, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"abcslice.123", "IP", "80", "10.1.2.3,2001:db8::1234:5678", "0s"}}},
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"abcslice.123", "IPv4", "80", "10.1.2.3,2001:db8::1234:5678", "0s"}}},
 		}, {
 			endpointSlice: discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "longerslicename.123",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
 				},
-				AddressType: &ipAddressType,
+				AddressType: discovery.AddressTypeIPv6,
 				Ports: []discovery.EndpointPort{{
 					Name:     utilpointer.StringPtr("http"),
 					Port:     utilpointer.Int32Ptr(80),
@@ -4784,14 +4783,14 @@ func TestPrintEndpointSlice(t *testing.T) {
 				}},
 			},
 			// Columns: Name, AddressType, Ports, Endpoints, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"longerslicename.123", "IP", "80,443", "10.1.2.3,2001:db8::1234:5678,10.2.3.4 + 1 more...", "5m"}}},
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"longerslicename.123", "IPv6", "80,443", "10.1.2.3,2001:db8::1234:5678,10.2.3.4 + 1 more...", "5m"}}},
 		}, {
 			endpointSlice: discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "multiportslice.123",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
 				},
-				AddressType: &ipAddressType,
+				AddressType: discovery.AddressTypeIPv4,
 				Ports: []discovery.EndpointPort{{
 					Name:     utilpointer.StringPtr("http"),
 					Port:     utilpointer.Int32Ptr(80),
@@ -4816,7 +4815,7 @@ func TestPrintEndpointSlice(t *testing.T) {
 				}},
 			},
 			// Columns: Name, AddressType, Ports, Endpoints, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"multiportslice.123", "IP", "80,443,3000 + 1 more...", "10.1.2.3,2001:db8::1234:5678,10.2.3.4 + 1 more...", "5m"}}},
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"multiportslice.123", "IPv4", "80,443,3000 + 1 more...", "10.1.2.3,2001:db8::1234:5678,10.2.3.4 + 1 more...", "5m"}}},
 		},
 	}
 

@@ -18,6 +18,7 @@ package v1
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -81,7 +83,7 @@ func AddConversionFuncs(scheme *runtime.Scheme) error {
 
 		Convert_Slice_string_To_Slice_int32,
 
-		Convert_Slice_string_To_v1_DeletionPropagation,
+		Convert_Slice_string_To_Pointer_v1_DeletionPropagation,
 
 		Convert_Slice_string_To_v1_IncludeObjectPolicy,
 	)
@@ -352,13 +354,16 @@ func Convert_Slice_string_To_Slice_int32(in *[]string, out *[]int32, s conversio
 	return nil
 }
 
-// Convert_Slice_string_To_v1_DeletionPropagation allows converting a URL query parameter propagationPolicy
-func Convert_Slice_string_To_v1_DeletionPropagation(in *[]string, out *DeletionPropagation, s conversion.Scope) error {
+// Convert_Slice_string_To_Pointer_v1_DeletionPropagation allows converting a URL query parameter propagationPolicy
+func Convert_Slice_string_To_Pointer_v1_DeletionPropagation(in *[]string, out **DeletionPropagation, s conversion.Scope) error {
+	var str string
 	if len(*in) > 0 {
-		*out = DeletionPropagation((*in)[0])
+		str = (*in)[0]
 	} else {
-		*out = ""
+		str = ""
 	}
+	temp := DeletionPropagation(str)
+	*out = &temp
 	return nil
 }
 
@@ -366,6 +371,36 @@ func Convert_Slice_string_To_v1_DeletionPropagation(in *[]string, out *DeletionP
 func Convert_Slice_string_To_v1_IncludeObjectPolicy(in *[]string, out *IncludeObjectPolicy, s conversion.Scope) error {
 	if len(*in) > 0 {
 		*out = IncludeObjectPolicy((*in)[0])
+	}
+	return nil
+}
+
+// Convert_url_Values_To_v1_DeleteOptions allows converting a URL to DeleteOptions.
+func Convert_url_Values_To_v1_DeleteOptions(in *url.Values, out *DeleteOptions, s conversion.Scope) error {
+	if err := autoConvert_url_Values_To_v1_DeleteOptions(in, out, s); err != nil {
+		return err
+	}
+
+	uid := types.UID("")
+	if values, ok := (*in)["uid"]; ok && len(values) > 0 {
+		uid = types.UID(values[0])
+	}
+
+	resourceVersion := ""
+	if values, ok := (*in)["resourceVersion"]; ok && len(values) > 0 {
+		resourceVersion = values[0]
+	}
+
+	if len(uid) > 0 || len(resourceVersion) > 0 {
+		if out.Preconditions == nil {
+			out.Preconditions = &Preconditions{}
+		}
+		if len(uid) > 0 {
+			out.Preconditions.UID = &uid
+		}
+		if len(resourceVersion) > 0 {
+			out.Preconditions.ResourceVersion = &resourceVersion
+		}
 	}
 	return nil
 }

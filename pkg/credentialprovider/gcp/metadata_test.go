@@ -265,7 +265,7 @@ func TestContainerRegistryBasics(t *testing.T) {
 	}
 	val := creds[0]
 
-	if "_token" != val.Username {
+	if val.Username != "_token" {
 		t.Errorf("Unexpected username value, want: %s, got: %s", "_token", val.Username)
 	}
 	if token.AccessToken != val.Password {

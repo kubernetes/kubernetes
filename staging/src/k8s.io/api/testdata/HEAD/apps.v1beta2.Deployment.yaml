@@ -41,7 +41,9 @@ spec:
     matchLabels:
       74404d5---g8c2-k-91e.y5-g--58----0683-b-w7ld-6cs06xj-x5yv0wm-k18/M_-Nx.N_6-___._-.-W._AAn---v_-5-_8LXj: 6-4_WE-_JTrcd-2.-__E_Sv__26KX_R_.-.Nth._--S_4DA_-5_-4lQ42M--1
   strategy:
-    rollingUpdate: {}
+    rollingUpdate:
+      maxSurge: 3
+      maxUnavailable: 2
     type: 荥ơ'禧ǵŊ)TiD¢ƿ媴h5
   template:
     metadata:

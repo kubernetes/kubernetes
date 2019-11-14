@@ -27,21 +27,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
-	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
-	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
-	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
+	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
@@ -74,28 +69,7 @@ type Configurator struct {
 
 	informerFactory informers.SharedInformerFactory
 
-	// a means to list all PersistentVolumes
-	pVLister corelisters.PersistentVolumeLister
-	// a means to list all PersistentVolumeClaims
-	pVCLister corelisters.PersistentVolumeClaimLister
-	// a means to list all services
-	serviceLister corelisters.ServiceLister
-	// a means to list all controllers
-	controllerLister corelisters.ReplicationControllerLister
-	// a means to list all replicasets
-	replicaSetLister appslisters.ReplicaSetLister
-	// a means to list all statefulsets
-	statefulSetLister appslisters.StatefulSetLister
-	// a means to list all PodDisruptionBudgets
-	pdbLister policylisters.PodDisruptionBudgetLister
-	// a means to list all StorageClasses
-	storageClassLister storagelistersv1.StorageClassLister
-	// a means to list all CSINodes
-	csiNodeLister storagelistersv1.CSINodeLister
-	// a means to list all Nodes
-	nodeLister corelisters.NodeLister
-	// a means to list all Pods
-	podLister corelisters.PodLister
+	podInformer coreinformers.PodInformer
 
 	// Close this to stop all reflectors
 	StopEverything <-chan struct{}
@@ -136,110 +110,6 @@ type Configurator struct {
 
 	factoryArgs        PluginFactoryArgs
 	configProducerArgs *plugins.ConfigProducerArgs
-}
-
-// ConfigFactoryArgs is a set arguments passed to NewConfigFactory.
-type ConfigFactoryArgs struct {
-	Client                         clientset.Interface
-	InformerFactory                informers.SharedInformerFactory
-	NodeInformer                   coreinformers.NodeInformer
-	PodInformer                    coreinformers.PodInformer
-	PvInformer                     coreinformers.PersistentVolumeInformer
-	PvcInformer                    coreinformers.PersistentVolumeClaimInformer
-	ReplicationControllerInformer  coreinformers.ReplicationControllerInformer
-	ReplicaSetInformer             appsinformers.ReplicaSetInformer
-	StatefulSetInformer            appsinformers.StatefulSetInformer
-	ServiceInformer                coreinformers.ServiceInformer
-	PdbInformer                    policyinformers.PodDisruptionBudgetInformer
-	StorageClassInformer           storageinformersv1.StorageClassInformer
-	CSINodeInformer                storageinformersv1.CSINodeInformer
-	VolumeBinder                   *volumebinder.VolumeBinder
-	SchedulerCache                 internalcache.Cache
-	HardPodAffinitySymmetricWeight int32
-	DisablePreemption              bool
-	PercentageOfNodesToScore       int32
-	BindTimeoutSeconds             int64
-	PodInitialBackoffSeconds       int64
-	PodMaxBackoffSeconds           int64
-	StopCh                         <-chan struct{}
-	Registry                       framework.Registry
-	Plugins                        *schedulerapi.Plugins
-	PluginConfig                   []schedulerapi.PluginConfig
-	PluginConfigProducerRegistry   *plugins.ConfigProducerRegistry
-}
-
-// NewConfigFactory initializes the default implementation of a Configurator. To encourage eventual privatization of the struct type, we only
-// return the interface.
-func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
-	stopEverything := args.StopCh
-	if stopEverything == nil {
-		stopEverything = wait.NeverStop
-	}
-
-	// storageClassInformer is only enabled through VolumeScheduling feature gate
-	var storageClassLister storagelistersv1.StorageClassLister
-	if args.StorageClassInformer != nil {
-		storageClassLister = args.StorageClassInformer.Lister()
-	}
-
-	var csiNodeLister storagelistersv1.CSINodeLister
-	if args.CSINodeInformer != nil {
-		csiNodeLister = args.CSINodeInformer.Lister()
-	}
-
-	var pdbLister policylisters.PodDisruptionBudgetLister
-	if args.PdbInformer != nil {
-		pdbLister = args.PdbInformer.Lister()
-	}
-
-	c := &Configurator{
-		client:                         args.Client,
-		informerFactory:                args.InformerFactory,
-		pVLister:                       args.PvInformer.Lister(),
-		pVCLister:                      args.PvcInformer.Lister(),
-		serviceLister:                  args.ServiceInformer.Lister(),
-		controllerLister:               args.ReplicationControllerInformer.Lister(),
-		replicaSetLister:               args.ReplicaSetInformer.Lister(),
-		statefulSetLister:              args.StatefulSetInformer.Lister(),
-		pdbLister:                      pdbLister,
-		nodeLister:                     args.NodeInformer.Lister(),
-		podLister:                      args.PodInformer.Lister(),
-		storageClassLister:             storageClassLister,
-		csiNodeLister:                  csiNodeLister,
-		volumeBinder:                   args.VolumeBinder,
-		schedulerCache:                 args.SchedulerCache,
-		StopEverything:                 stopEverything,
-		hardPodAffinitySymmetricWeight: args.HardPodAffinitySymmetricWeight,
-		disablePreemption:              args.DisablePreemption,
-		percentageOfNodesToScore:       args.PercentageOfNodesToScore,
-		bindTimeoutSeconds:             args.BindTimeoutSeconds,
-		podInitialBackoffSeconds:       args.PodInitialBackoffSeconds,
-		podMaxBackoffSeconds:           args.PodMaxBackoffSeconds,
-		enableNonPreempting:            utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority),
-		registry:                       args.Registry,
-		plugins:                        args.Plugins,
-		pluginConfig:                   args.PluginConfig,
-		pluginConfigProducerRegistry:   args.PluginConfigProducerRegistry,
-		nodeInfoSnapshot:               nodeinfosnapshot.NewEmptySnapshot(),
-	}
-	c.factoryArgs = PluginFactoryArgs{
-		NodeInfoLister:                 c.nodeInfoSnapshot.NodeInfos(),
-		PodLister:                      c.nodeInfoSnapshot.Pods(),
-		ServiceLister:                  c.serviceLister,
-		ControllerLister:               c.controllerLister,
-		ReplicaSetLister:               c.replicaSetLister,
-		StatefulSetLister:              c.statefulSetLister,
-		PDBLister:                      c.pdbLister,
-		CSINodeLister:                  c.csiNodeLister,
-		PVLister:                       c.pVLister,
-		PVCLister:                      c.pVCLister,
-		StorageClassLister:             c.storageClassLister,
-		VolumeBinder:                   c.volumeBinder,
-		HardPodAffinitySymmetricWeight: c.hardPodAffinitySymmetricWeight,
-	}
-	c.configProducerArgs = &plugins.ConfigProducerArgs{}
-
-	return c
 }
 
 // GetHardPodAffinitySymmetricWeight is exposed for testing.
@@ -404,8 +274,8 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 
 	// Setup cache debugger.
 	debugger := cachedebugger.New(
-		c.nodeLister,
-		c.podLister,
+		c.informerFactory.Core().V1().Nodes().Lister(),
+		c.podInformer.Lister(),
 		c.schedulerCache,
 		podQueue,
 	)
@@ -427,8 +297,8 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		framework,
 		extenders,
 		c.volumeBinder,
-		c.pVCLister,
-		c.pdbLister,
+		c.informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
+		GetPodDisruptionBudgetLister(c.informerFactory),
 		c.alwaysCheckAllPredicates,
 		c.disablePreemption,
 		c.percentageOfNodesToScore,
@@ -648,4 +518,20 @@ type binder struct {
 func (b *binder) Bind(binding *v1.Binding) error {
 	klog.V(3).Infof("Attempting to bind %v to %v", binding.Name, binding.Target.Name)
 	return b.Client.CoreV1().Pods(binding.Namespace).Bind(binding)
+}
+
+// GetPodDisruptionBudgetLister returns pdb lister from the given informer factory. Returns nil if PodDisruptionBudget feature is disabled.
+func GetPodDisruptionBudgetLister(informerFactory informers.SharedInformerFactory) policylisters.PodDisruptionBudgetLister {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodDisruptionBudget) {
+		return informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister()
+	}
+	return nil
+}
+
+// GetCSINodeLister returns CSINode lister from the given informer factory. Returns nil if CSINodeInfo feature is disabled.
+func GetCSINodeLister(informerFactory informers.SharedInformerFactory) storagelisters.CSINodeLister {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CSINodeInfo) {
+		return informerFactory.Storage().V1().CSINodes().Lister()
+	}
+	return nil
 }

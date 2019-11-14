@@ -340,12 +340,6 @@ func dropDisabledFields(
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodShareProcessNamespace) && !shareProcessNamespaceInUse(oldPodSpec) {
-		if podSpec.SecurityContext != nil {
-			podSpec.SecurityContext.ShareProcessNamespace = nil
-		}
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) && !sysctlsInUse(oldPodSpec) {
 		if podSpec.SecurityContext != nil {
 			podSpec.SecurityContext.Sysctls = nil
@@ -629,16 +623,6 @@ func appArmorInUse(podAnnotations map[string]string) bool {
 		if strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
 			return true
 		}
-	}
-	return false
-}
-
-func shareProcessNamespaceInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.SecurityContext != nil && podSpec.SecurityContext.ShareProcessNamespace != nil {
-		return true
 	}
 	return false
 }

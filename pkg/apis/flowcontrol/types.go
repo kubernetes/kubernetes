@@ -320,44 +320,53 @@ type PriorityLevelConfigurationList struct {
 	Items []PriorityLevelConfiguration
 }
 
-// PriorityLevelConfigurationSpec is specification of a priority level
+// PriorityLevelConfigurationSpec specifies the configuration of a priority level.
+// +union
 type PriorityLevelConfigurationSpec struct {
-	// `type` indicates whether this priority level does
-	// queuing or is exempt.  Valid values are "Queuing" and "Exempt".
-	// "Exempt" means that requests of this priority level are not subject
-	// to concurrency limits (and thus are never queued) and do not detract
-	// from the concurrency available for non-exempt requests. The "Exempt"
-	// type is useful for apiserver self-requests and system administrator use.
+	// `type` indicates whether this priority level is subject to
+	// limitation on request execution.  A value of `"Exempt"` means
+	// that requests of this priority level are not subject to a limit
+	// (and thus are never queued) and do not detract from the
+	// capacity made available to other priority levels.  A value of
+	// `"Limited"` means that (a) requests of this priority level
+	// _are_ subject to limits and (b) some of the server's limited
+	// capacity is made available exclusively to this priority level.
 	// Required.
-	Type PriorityLevelQueueingType
+	// +unionDiscriminator
+	Type PriorityLevelEnablement
 
-	// `queuing` holds the configuration parameters that are
-	// only meaningful for a priority level that does queuing (i.e.,
-	// is not exempt).  This field must be non-empty if and only if
-	// `queuingType` is `"Queuing"`.
+	// `limited` specifies how requests are handled for a Limited priority level.
+	// This field must be non-empty if and only if `type` is `"Limited"`.
 	// +optional
-	Queuing *QueuingConfiguration
+	Limited *LimitedPriorityLevelConfiguration
 }
 
-// PriorityLevelQueueingType identifies the queuing nature of a priority level
-type PriorityLevelQueueingType string
+// PriorityLevelEnablement indicates whether limits on execution are enabled for the priority level
+type PriorityLevelEnablement string
 
-// Supported queuing types.
+// Supported priority level enablement values.
 const (
-	// PriorityLevelQueuingTypeQueueing is the PriorityLevelQueueingType for priority levels that queue
-	PriorityLevelQueuingTypeQueueing PriorityLevelQueueingType = "Queuing"
+	// PriorityLevelEnablementExempt means that requests are not subject to limits
+	PriorityLevelEnablementExempt PriorityLevelEnablement = "Exempt"
 
-	// PriorityLevelQueuingTypeExempt is the PriorityLevelQueueingType for priority levels that are exempt from concurrency controls
-	PriorityLevelQueuingTypeExempt PriorityLevelQueueingType = "Exempt"
+	// PriorityLevelEnablementLimited means that requests are subject to limits
+	PriorityLevelEnablementLimited PriorityLevelEnablement = "Limited"
 )
 
-// QueuingConfiguration holds the configuration parameters that are specific to a priority level that is subject to concurrency controls
-type QueuingConfiguration struct {
-	// `assuredConcurrencyShares` (ACS) must be a positive number. The
-	// server's concurrency limit (SCL) is divided among the
-	// concurrency-controlled priority levels in proportion to their
-	// assured concurrency shares. This produces the assured
-	// concurrency value (ACV) for each such priority level:
+// LimitedPriorityLevelConfiguration specifies how to handle requests that are subject to limits.
+// It addresses two issues:
+//  * How are requests for this priority level limited?
+//  * What should be done with requests that exceed the limit?
+type LimitedPriorityLevelConfiguration struct {
+	// `assuredConcurrencyShares` (ACS) configures the execution
+	// limit, which is a limit on the number of requests of this
+	// priority level that may be exeucting at a given time.  ACS must
+	// be a positive number. The server's concurrency limit (SCL) is
+	// divided among the concurrency-controlled priority levels in
+	// proportion to their assured concurrency shares. This produces
+	// the assured concurrency value (ACV) --- the number of requests
+	// that may be executing at a time --- for each such priority
+	// level:
 	//
 	//             ACV(l) = ceil( SCL * ACS(l) / ( sum[priority levels k] ACS(k) ) )
 	//
@@ -367,6 +376,43 @@ type QueuingConfiguration struct {
 	// +optional
 	AssuredConcurrencyShares int32
 
+	// `limitResponse` indicates what to do with requests that can not be executed right now
+	LimitResponse LimitResponse
+}
+
+// LimitResponse defines how to handle requests that can not be executed right now.
+// +union
+type LimitResponse struct {
+	// `type` is "Queue" or "Reject".
+	// "Queue" means that requests that can not be executed upon arrival
+	// are held in a queue until they can be executed or a queuing limit
+	// is reached.
+	// "Reject" means that requests that can not be executed upon arrival
+	// are rejected.
+	// Required.
+	// +unionDiscriminator
+	Type LimitResponseType
+
+	// `queuing` holds the configuration parameters for queuing.
+	// This field may be non-empty only if `type` is `"Queue"`.
+	// +optional
+	Queuing *QueuingConfiguration
+}
+
+// LimitResponseType identifies how a Limited priority level handles a request that can not be executed right now
+type LimitResponseType string
+
+// Supported limit responses.
+const (
+	// LimitResponseTypeQueue means that requests that can not be executed right now are queued until they can be executed or a queuing limit is hit
+	LimitResponseTypeQueue LimitResponseType = "Queue"
+
+	// LimitResponseTypeReject means that requests that can not be executed right now are rejected
+	LimitResponseTypeReject LimitResponseType = "Reject"
+)
+
+// QueuingConfiguration holds the configuration parameters for queuing
+type QueuingConfiguration struct {
 	// `queues` is the number of queues for this priority level. The
 	// queues exist independently at each apiserver. The value must be
 	// positive.  Setting it to 1 effectively precludes

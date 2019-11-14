@@ -31,12 +31,12 @@ require (
 	github.com/client9/misspell v0.3.4
 	github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 	github.com/codegangsta/negroni v1.0.0 // indirect
-	github.com/container-storage-interface/spec v1.1.0
+	github.com/container-storage-interface/spec v1.2.0
 	github.com/containerd/console v0.0.0-20170925154832-84eeaae905fa // indirect
 	github.com/containerd/containerd v1.0.2 // indirect
 	github.com/containerd/typeurl v0.0.0-20190228175220-2a93cfde8c20 // indirect
 	github.com/containernetworking/cni v0.7.1
-	github.com/coredns/corefile-migration v1.0.2
+	github.com/coredns/corefile-migration v1.0.4
 	github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
 	github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea
 	github.com/coreos/rkt v1.30.0 // indirect
@@ -220,12 +220,12 @@ replace (
 	github.com/clusterhq/flocker-go => github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 	github.com/cockroachdb/datadriven => github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa
 	github.com/codegangsta/negroni => github.com/codegangsta/negroni v1.0.0
-	github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.1.0
+	github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.2.0
 	github.com/containerd/console => github.com/containerd/console v0.0.0-20170925154832-84eeaae905fa
 	github.com/containerd/containerd => github.com/containerd/containerd v1.0.2
 	github.com/containerd/typeurl => github.com/containerd/typeurl v0.0.0-20190228175220-2a93cfde8c20
 	github.com/containernetworking/cni => github.com/containernetworking/cni v0.7.1
-	github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.2
+	github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.4
 	github.com/coreos/etcd => github.com/coreos/etcd v3.3.10+incompatible
 	github.com/coreos/go-etcd => github.com/coreos/go-etcd v2.0.0+incompatible
 	github.com/coreos/go-oidc => github.com/coreos/go-oidc v2.1.0+incompatible
@@ -559,7 +559,7 @@ replace (
 	mvdan.cc/lint => mvdan.cc/lint v0.0.0-20170908181259-adc824a0674b
 	mvdan.cc/unparam => mvdan.cc/unparam v0.0.0-20190209190245-fbb59629db34
 	sigs.k8s.io/kustomize => sigs.k8s.io/kustomize v2.0.3+incompatible
-	sigs.k8s.io/structured-merge-diff => sigs.k8s.io/structured-merge-diff v0.0.0-20190817042607-6149e4549fca
+	sigs.k8s.io/structured-merge-diff => sigs.k8s.io/structured-merge-diff v1.0.1-0.20191108220359-b1b620dd3f06
 	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.1.0
 	sourcegraph.com/sqs/pbtypes => sourcegraph.com/sqs/pbtypes v0.0.0-20180604144634-d3ebe8f20ae4
 	vbom.ml/util => vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc

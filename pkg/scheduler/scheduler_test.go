@@ -192,8 +192,8 @@ func TestSchedulerCreation(t *testing.T) {
 		informerFactory,
 		NewPodInformer(client, 0),
 		eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
-		schedulerapi.SchedulerAlgorithmSource{Provider: &testSource},
 		stopCh,
+		WithAlgorithmSource(schedulerapi.SchedulerAlgorithmSource{Provider: &testSource}),
 		WithPodInitialBackoffSeconds(1),
 		WithPodMaxBackoffSeconds(10),
 	)

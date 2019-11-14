@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -40,6 +41,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -52,6 +54,7 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 const (
@@ -539,32 +542,31 @@ func newConfigFactoryWithFrameworkRegistry(
 	client clientset.Interface, hardPodAffinitySymmetricWeight int32, stopCh <-chan struct{},
 	registry framework.Registry, pluginConfigProducerRegistry *frameworkplugins.ConfigProducerRegistry) *Configurator {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	return NewConfigFactory(&ConfigFactoryArgs{
-		Client:                         client,
-		InformerFactory:                informerFactory,
-		NodeInformer:                   informerFactory.Core().V1().Nodes(),
-		PodInformer:                    informerFactory.Core().V1().Pods(),
-		PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),
-		PvcInformer:                    informerFactory.Core().V1().PersistentVolumeClaims(),
-		ReplicationControllerInformer:  informerFactory.Core().V1().ReplicationControllers(),
-		ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
-		StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
-		ServiceInformer:                informerFactory.Core().V1().Services(),
-		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
-		CSINodeInformer:                informerFactory.Storage().V1().CSINodes(),
-		HardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
-		DisablePreemption:              disablePodPreemption,
-		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
-		BindTimeoutSeconds:             bindTimeoutSeconds,
-		PodInitialBackoffSeconds:       podInitialBackoffDurationSeconds,
-		PodMaxBackoffSeconds:           podMaxBackoffDurationSeconds,
-		StopCh:                         stopCh,
-		Registry:                       registry,
-		Plugins:                        nil,
-		PluginConfig:                   []schedulerapi.PluginConfig{},
-		PluginConfigProducerRegistry:   pluginConfigProducerRegistry,
-	})
+	snapshot := nodeinfosnapshot.NewEmptySnapshot()
+	return &Configurator{
+		client:                         client,
+		informerFactory:                informerFactory,
+		podInformer:                    informerFactory.Core().V1().Pods(),
+		hardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
+		disablePreemption:              disablePodPreemption,
+		percentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
+		bindTimeoutSeconds:             bindTimeoutSeconds,
+		podInitialBackoffSeconds:       podInitialBackoffDurationSeconds,
+		podMaxBackoffSeconds:           podMaxBackoffDurationSeconds,
+		StopEverything:                 stopCh,
+		enableNonPreempting:            utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NonPreemptingPriority),
+		registry:                       registry,
+		plugins:                        nil,
+		pluginConfig:                   []schedulerapi.PluginConfig{},
+		pluginConfigProducerRegistry:   pluginConfigProducerRegistry,
+		nodeInfoSnapshot:               snapshot,
+		factoryArgs: PluginFactoryArgs{
+			SharedLister:                   snapshot,
+			InformerFactory:                informerFactory,
+			HardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
+		},
+		configProducerArgs: &frameworkplugins.ConfigProducerArgs{},
+	}
 }
 
 func newConfigFactory(

@@ -31,8 +31,8 @@ pkg/apis/core/v1/helper/qos
 pkg/apis/core/v1/validation
 pkg/apis/core/validation
 pkg/apis/discovery/v1alpha1
+pkg/apis/discovery/v1beta1
 pkg/apis/events/v1beta1
-pkg/apis/extensions
 pkg/apis/extensions/v1beta1
 pkg/apis/flowcontrol/v1alpha1
 pkg/apis/networking/v1
@@ -243,6 +243,7 @@ pkg/volume/util/volumepathhandler
 pkg/volume/vsphere_volume
 plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1
 plugin/pkg/admission/limitranger
+plugin/pkg/admission/resourcequota/apis/resourcequota/v1
 plugin/pkg/admission/resourcequota/apis/resourcequota/v1alpha1
 plugin/pkg/admission/resourcequota/apis/resourcequota/v1beta1
 plugin/pkg/auth/authorizer/node
@@ -348,9 +349,11 @@ staging/src/k8s.io/apiserver/pkg/admission/configuration
 staging/src/k8s.io/apiserver/pkg/admission/initializer
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission
+staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts
 staging/src/k8s.io/apiserver/pkg/apis/apiserver
+staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1
 staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1
 staging/src/k8s.io/apiserver/pkg/apis/audit
 staging/src/k8s.io/apiserver/pkg/apis/audit/v1

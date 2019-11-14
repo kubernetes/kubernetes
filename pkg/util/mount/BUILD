@@ -4,7 +4,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "exec.go",
         "fake_exec.go",
         "fake_mounter.go",
         "mount.go",
@@ -75,6 +74,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/exec/testing:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows": [

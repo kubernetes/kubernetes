@@ -17,6 +17,8 @@ limitations under the License.
 package phases
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -76,7 +78,7 @@ func runKubeletStart(c workflow.RunData) error {
 
 	// Try to start the kubelet service in case it's inactive
 	if !data.DryRun() {
-		klog.V(1).Infoln("Starting the kubelet")
+		fmt.Println("[kubelet-start] Starting the kubelet")
 		kubeletphase.TryStartKubelet()
 	}
 

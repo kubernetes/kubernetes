@@ -50,16 +50,19 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/controller"
 	commonutils "k8s.io/kubernetes/test/e2e/common"
@@ -383,12 +386,12 @@ var _ = SIGDescribe("Kubectl client", func() {
 		forEachGBFile := func(run func(s string)) {
 			guestbookRoot := "test/e2e/testing-manifests/guestbook"
 			for _, gbAppFile := range []string{
-				"redis-slave-service.yaml",
-				"redis-master-service.yaml",
+				"agnhost-slave-service.yaml",
+				"agnhost-master-service.yaml",
 				"frontend-service.yaml",
 				"frontend-deployment.yaml.in",
-				"redis-master-deployment.yaml.in",
-				"redis-slave-deployment.yaml.in",
+				"agnhost-master-deployment.yaml.in",
+				"agnhost-slave-deployment.yaml.in",
 			} {
 				contents := commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile))))
 				run(contents)
@@ -398,7 +401,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		/*
 			Release : v1.9
 			Testname: Kubectl, guestbook application
-			Description: Create Guestbook application that contains redis server, 2 instances of redis slave, frontend application, frontend service and redis master service and redis slave service. Using frontend service, the test will write an entry into the guestbook application which will store the entry into the backend redis database. Application flow MUST work as expected and the data written MUST be available to read.
+			Description: Create Guestbook application that contains an agnhost master server, 2 agnhost slaves, frontend application, frontend service and agnhost master service and agnhost slave service. Using frontend service, the test will write an entry into the guestbook application which will store the entry into the backend agnhost store. Application flow MUST work as expected and the data written MUST be available to read.
 		*/
 		framework.ConformanceIt("should create and stop a working application ", func() {
 			defer forEachGBFile(func(contents string) {
@@ -1690,7 +1693,7 @@ metadata:
 			if checkContainersImage(containers, httpdImage) {
 				framework.Failf("Failed creating rc %s for 1 pod with expected image %s", rcName, httpdImage)
 			}
-			framework.WaitForRCToStabilize(c, ns, rcName, framework.PodStartTimeout)
+			waitForRCToStabilize(c, ns, rcName, framework.PodStartTimeout)
 
 			ginkgo.By("rolling-update to same image controller")
 
@@ -2300,17 +2303,17 @@ func validateGuestbookApp(c clientset.Interface, ns string) {
 	err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
 	framework.ExpectNoError(err)
 	framework.Logf("Waiting for frontend to serve content.")
-	if !waitForGuestbookResponse(c, "get", "", `{"data": ""}`, guestbookStartupTimeout, ns) {
+	if !waitForGuestbookResponse(c, "get", "", `{"data":""}`, guestbookStartupTimeout, ns) {
 		framework.Failf("Frontend service did not start serving content in %v seconds.", guestbookStartupTimeout.Seconds())
 	}
 
 	framework.Logf("Trying to add a new entry to the guestbook.")
-	if !waitForGuestbookResponse(c, "set", "TestEntry", `{"message": "Updated"}`, guestbookResponseTimeout, ns) {
+	if !waitForGuestbookResponse(c, "set", "TestEntry", `{"message":"Updated"}`, guestbookResponseTimeout, ns) {
 		framework.Failf("Cannot added new entry in %v seconds.", guestbookResponseTimeout.Seconds())
 	}
 
 	framework.Logf("Verifying that added entry can be retrieved.")
-	if !waitForGuestbookResponse(c, "get", "", `{"data": "TestEntry"}`, guestbookResponseTimeout, ns) {
+	if !waitForGuestbookResponse(c, "get", "", `{"data":"TestEntry"}`, guestbookResponseTimeout, ns) {
 		framework.Failf("Entry to guestbook wasn't correctly added in %v seconds.", guestbookResponseTimeout.Seconds())
 	}
 }
@@ -2339,7 +2342,7 @@ func makeRequestToGuestbook(c clientset.Interface, cmd, value string, ns string)
 	result, err := proxyRequest.Namespace(ns).
 		Context(ctx).
 		Name("frontend").
-		Suffix("/guestbook.php").
+		Suffix("/guestbook").
 		Param("cmd", cmd).
 		Param("key", "messages").
 		Param("value", value).
@@ -2605,4 +2608,36 @@ func createObjValidateOutputAndCleanup(client dynamic.ResourceInterface, obj *un
 	} else {
 		framework.ExpectNotEqual(fields, []string{"NAME", "AGE"}, fmt.Sprintf("expected non-default fields for resource: %s", resource.Name))
 	}
+}
+
+// waitForRCToStabilize waits till the RC has a matching generation/replica count between spec and status.
+func waitForRCToStabilize(c clientset.Interface, ns, name string, timeout time.Duration) error {
+	options := metav1.ListOptions{FieldSelector: fields.Set{
+		"metadata.name":      name,
+		"metadata.namespace": ns,
+	}.AsSelector().String()}
+	w, err := c.CoreV1().ReplicationControllers(ns).Watch(options)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+	defer cancel()
+	_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
+		switch event.Type {
+		case watch.Deleted:
+			return false, apierrs.NewNotFound(schema.GroupResource{Resource: "replicationcontrollers"}, "")
+		}
+		switch rc := event.Object.(type) {
+		case *v1.ReplicationController:
+			if rc.Name == name && rc.Namespace == ns &&
+				rc.Generation <= rc.Status.ObservedGeneration &&
+				*(rc.Spec.Replicas) == rc.Status.Replicas {
+				return true, nil
+			}
+			framework.Logf("Waiting for rc %s to stabilize, generation %v observed generation %v spec.replicas %d status.replicas %d",
+				name, rc.Generation, rc.Status.ObservedGeneration, *(rc.Spec.Replicas), rc.Status.Replicas)
+		}
+		return false, nil
+	})
+	return err
 }

@@ -19,7 +19,6 @@ package options
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"strings"
 	"time"
 
@@ -27,7 +26,6 @@ import (
 
 	"github.com/spf13/pflag"
 
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
@@ -251,38 +249,63 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 		cfg.TokenAccessReviewClient = client.AuthenticationV1().TokenReviews()
 	}
 
-	// look into configmaps/external-apiserver-authentication for missing authn info
-	if !s.SkipInClusterLookup {
-		err := s.lookupMissingConfigInCluster(client)
+	// get the clientCA information
+	clientCAFileSpecified := len(s.ClientCert.ClientCA) > 0
+	var clientCAProvider dynamiccertificates.CAContentProvider
+	if clientCAFileSpecified {
+		clientCAProvider, err = s.ClientCert.GetClientCAContentProvider()
 		if err != nil {
-			if s.TolerateInClusterLookupFailure {
-				klog.Warningf("Error looking up in-cluster authentication configuration: %v", err)
-				klog.Warningf("Continuing without authentication configuration. This may treat all requests as anonymous.")
-				klog.Warningf("To require authentication configuration lookup to succeed, set --authentication-tolerate-lookup-failure=false")
-			} else {
-				return err
+			return fmt.Errorf("unable to load client CA file %q: %v", s.ClientCert.ClientCA, err)
+		}
+		cfg.ClientCertificateCAContentProvider = clientCAProvider
+		if err = authenticationInfo.ApplyClientCert(cfg.ClientCertificateCAContentProvider, servingInfo); err != nil {
+			return fmt.Errorf("unable to assign  client CA file: %v", err)
+		}
+
+	} else if !s.SkipInClusterLookup {
+		if client == nil {
+			klog.Warningf("No authentication-kubeconfig provided in order to lookup client-ca-file in configmap/%s in %s, so client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+		} else {
+			clientCAProvider, err = dynamiccertificates.NewDynamicCAFromConfigMapController("client-ca", authenticationConfigMapNamespace, authenticationConfigMapName, "client-ca-file", client)
+			if err != nil {
+				return fmt.Errorf("unable to load configmap based client CA file: %v", err)
+			}
+			cfg.ClientCertificateCAContentProvider = clientCAProvider
+			if err = authenticationInfo.ApplyClientCert(cfg.ClientCertificateCAContentProvider, servingInfo); err != nil {
+				return fmt.Errorf("unable to assign configmap based client CA file: %v", err)
+			}
+
+		}
+	}
+
+	requestHeaderCAFileSpecified := len(s.RequestHeader.ClientCAFile) > 0
+	var requestHeaderConfig *authenticatorfactory.RequestHeaderConfig
+	if requestHeaderCAFileSpecified {
+		requestHeaderConfig, err = s.RequestHeader.ToAuthenticationRequestHeaderConfig()
+		if err != nil {
+			return fmt.Errorf("unable to create request header authentication config: %v", err)
+		}
+
+	} else if !s.SkipInClusterLookup {
+		if client == nil {
+			klog.Warningf("No authentication-kubeconfig provided in order to lookup requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+		} else {
+			requestHeaderConfig, err = s.createRequestHeaderConfig(client)
+			if err != nil {
+				if s.TolerateInClusterLookupFailure {
+					klog.Warningf("Error looking up in-cluster authentication configuration: %v", err)
+					klog.Warningf("Continuing without authentication configuration. This may treat all requests as anonymous.")
+					klog.Warningf("To require authentication configuration lookup to succeed, set --authentication-tolerate-lookup-failure=false")
+				} else {
+					return fmt.Errorf("unable to load configmap based request-header-client-ca-file: %v", err)
+				}
 			}
 		}
 	}
-
-	// configure AuthenticationInfo config
-	cfg.ClientCertificateCAContentProvider, err = s.ClientCert.GetClientCAContentProvider()
-	if err != nil {
-		return fmt.Errorf("unable to load client CA file: %v", err)
-	}
-	if cfg.ClientCertificateCAContentProvider != nil {
-		if err = authenticationInfo.ApplyClientCert(cfg.ClientCertificateCAContentProvider, servingInfo); err != nil {
-			return fmt.Errorf("unable to load client CA file: %v", err)
-		}
-	}
-
-	cfg.RequestHeaderConfig, err = s.RequestHeader.ToAuthenticationRequestHeaderConfig()
-	if err != nil {
-		return fmt.Errorf("unable to create request header authentication config: %v", err)
-	}
-	if cfg.RequestHeaderConfig != nil {
+	if requestHeaderConfig != nil {
+		cfg.RequestHeaderConfig = requestHeaderConfig
 		if err = authenticationInfo.ApplyClientCert(cfg.RequestHeaderConfig.CAContentProvider, servingInfo); err != nil {
-			return fmt.Errorf("unable to load client CA file: %v", err)
+			return fmt.Errorf("unable to load request-header-client-ca-file: %v", err)
 		}
 	}
 
@@ -310,97 +333,26 @@ const (
 	authenticationRoleName      = "extension-apiserver-authentication-reader"
 )
 
-func (s *DelegatingAuthenticationOptions) lookupMissingConfigInCluster(client kubernetes.Interface) error {
-	if len(s.ClientCert.ClientCA) > 0 && len(s.RequestHeader.ClientCAFile) > 0 {
-		return nil
-	}
-	if client == nil {
-		if len(s.ClientCert.ClientCA) == 0 {
-			klog.Warningf("No authentication-kubeconfig provided in order to lookup client-ca-file in configmap/%s in %s, so client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
-		}
-		if len(s.RequestHeader.ClientCAFile) == 0 {
-			klog.Warningf("No authentication-kubeconfig provided in order to lookup requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
-		}
-		return nil
+func (s *DelegatingAuthenticationOptions) createRequestHeaderConfig(client kubernetes.Interface) (*authenticatorfactory.RequestHeaderConfig, error) {
+	requestHeaderCAProvider, err := dynamiccertificates.NewDynamicCAFromConfigMapController("client-ca", authenticationConfigMapNamespace, authenticationConfigMapName, "requestheader-client-ca-file", client)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create request header authentication config: %v", err)
 	}
 
 	authConfigMap, err := client.CoreV1().ConfigMaps(authenticationConfigMapNamespace).Get(authenticationConfigMapName, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		// ignore, authConfigMap is nil now
+		return nil, nil
 	case errors.IsForbidden(err):
 		klog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
 			"'kubectl create rolebinding -n %s ROLEBINDING_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA'",
 			authenticationConfigMapName, authenticationConfigMapNamespace, authenticationConfigMapNamespace, authenticationRoleName)
-		return err
+		return nil, err
 	case err != nil:
-		return err
-	}
-
-	if len(s.ClientCert.ClientCA) == 0 {
-		if authConfigMap != nil {
-			opt, err := inClusterClientCA(authConfigMap)
-			if err != nil {
-				return err
-			}
-			if opt != nil {
-				s.ClientCert = *opt
-			}
-		}
-		if len(s.ClientCert.ClientCA) == 0 {
-			klog.Warningf("Cluster doesn't provide client-ca-file in configmap/%s in %s, so client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
-		}
-	}
-
-	if len(s.RequestHeader.ClientCAFile) == 0 {
-		if authConfigMap != nil {
-			opt, err := inClusterRequestHeader(authConfigMap)
-			if err != nil {
-				return err
-			}
-			if opt != nil {
-				s.RequestHeader = *opt
-			}
-		}
-		if len(s.RequestHeader.ClientCAFile) == 0 {
-			klog.Warningf("Cluster doesn't provide requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
-		}
-	}
-
-	return nil
-}
-
-func inClusterClientCA(authConfigMap *v1.ConfigMap) (*ClientCertAuthenticationOptions, error) {
-	clientCA, ok := authConfigMap.Data["client-ca-file"]
-	if !ok {
-		// not having a client-ca is fine, return nil
-		return nil, nil
-	}
-	clientCAProvider, err := dynamiccertificates.NewStaticCAContent("client-ca-file", []byte(clientCA))
-	if err != nil {
 		return nil, err
 	}
 
-	return &ClientCertAuthenticationOptions{
-		ClientCA:          "",
-		CAContentProvider: clientCAProvider,
-	}, nil
-}
-
-func inClusterRequestHeader(authConfigMap *v1.ConfigMap) (*RequestHeaderAuthenticationOptions, error) {
-	requestHeaderCA, ok := authConfigMap.Data["requestheader-client-ca-file"]
-	if !ok {
-		// not having a requestheader-client-ca is fine, return nil
-		return nil, nil
-	}
-
-	f, err := ioutil.TempFile("", "requestheader-client-ca-file")
-	if err != nil {
-		return nil, err
-	}
-	if err := ioutil.WriteFile(f.Name(), []byte(requestHeaderCA), 0600); err != nil {
-		return nil, err
-	}
 	usernameHeaders, err := deserializeStrings(authConfigMap.Data["requestheader-username-headers"])
 	if err != nil {
 		return nil, err
@@ -418,12 +370,12 @@ func inClusterRequestHeader(authConfigMap *v1.ConfigMap) (*RequestHeaderAuthenti
 		return nil, err
 	}
 
-	return &RequestHeaderAuthenticationOptions{
-		UsernameHeaders:     usernameHeaders,
-		GroupHeaders:        groupHeaders,
-		ExtraHeaderPrefixes: extraHeaderPrefixes,
-		ClientCAFile:        f.Name(),
-		AllowedNames:        allowedNames,
+	return &authenticatorfactory.RequestHeaderConfig{
+		CAContentProvider:   requestHeaderCAProvider,
+		UsernameHeaders:     headerrequest.StaticStringSlice(usernameHeaders),
+		GroupHeaders:        headerrequest.StaticStringSlice(groupHeaders),
+		ExtraHeaderPrefixes: headerrequest.StaticStringSlice(extraHeaderPrefixes),
+		AllowedClientNames:  headerrequest.StaticStringSlice(allowedNames),
 	}, nil
 }
 

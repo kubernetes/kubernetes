@@ -264,3 +264,56 @@ func TestShowHiddenMetric(t *testing.T) {
 	assert.Nil(t, err, "Gather failed %v", err)
 
 }
+
+func TestValidateShowHiddenMetricsVersion(t *testing.T) {
+	currentVersion := parseVersion(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "17",
+		GitVersion: "v1.17.1-alpha-1.12345",
+	})
+
+	var tests = []struct {
+		desc          string
+		targetVersion string
+		expectedError bool
+	}{
+		{
+			desc:          "invalid version is not allowed",
+			targetVersion: "1.invalid",
+			expectedError: true,
+		},
+		{
+			desc:          "patch version is not allowed",
+			targetVersion: "1.16.0",
+			expectedError: true,
+		},
+		{
+			desc:          "old version is not allowed",
+			targetVersion: "1.15",
+			expectedError: true,
+		},
+		{
+			desc:          "new version is not allowed",
+			targetVersion: "1.17",
+			expectedError: true,
+		},
+		{
+			desc:          "valid version is allowed",
+			targetVersion: "1.16",
+			expectedError: false,
+		},
+	}
+
+	for _, test := range tests {
+		tc := test
+		t.Run(tc.desc, func(t *testing.T) {
+			err := validateShowHiddenMetricsVersion(currentVersion, tc.targetVersion)
+
+			if tc.expectedError {
+				assert.Errorf(t, err, "Failed to test: %s", tc.desc)
+			} else {
+				assert.NoErrorf(t, err, "Failed to test: %s", tc.desc)
+			}
+		})
+	}
+}

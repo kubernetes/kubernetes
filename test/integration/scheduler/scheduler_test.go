@@ -272,16 +272,16 @@ priorities: []
 			informerFactory,
 			scheduler.NewPodInformer(clientSet, 0),
 			eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.DefaultSchedulerName),
-			kubeschedulerconfig.SchedulerAlgorithmSource{
+			nil,
+			scheduler.WithName(v1.DefaultSchedulerName),
+			scheduler.WithAlgorithmSource(kubeschedulerconfig.SchedulerAlgorithmSource{
 				Policy: &kubeschedulerconfig.SchedulerPolicySource{
 					ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
 						Namespace: policyConfigMap.Namespace,
 						Name:      policyConfigMap.Name,
 					},
 				},
-			},
-			nil,
-			scheduler.WithName(v1.DefaultSchedulerName),
+			}),
 			scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
 			scheduler.WithBindTimeoutSeconds(defaultBindTimeout),
 		)
@@ -335,16 +335,16 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 		informerFactory,
 		scheduler.NewPodInformer(clientSet, 0),
 		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.DefaultSchedulerName),
-		kubeschedulerconfig.SchedulerAlgorithmSource{
+		nil,
+		scheduler.WithName(v1.DefaultSchedulerName),
+		scheduler.WithAlgorithmSource(kubeschedulerconfig.SchedulerAlgorithmSource{
 			Policy: &kubeschedulerconfig.SchedulerPolicySource{
 				ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
 					Namespace: "non-existent-config",
 					Name:      "non-existent-config",
 				},
 			},
-		},
-		nil,
-		scheduler.WithName(v1.DefaultSchedulerName),
+		}),
 		scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
 		scheduler.WithBindTimeoutSeconds(defaultBindTimeout))
 

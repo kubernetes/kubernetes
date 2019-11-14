@@ -32,7 +32,6 @@ import (
 
 	// import DefaultProvider
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults"
-	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -99,16 +98,11 @@ func createScheduler(
 	recorder events.EventRecorder,
 	stopCh <-chan struct{},
 ) (*scheduler.Scheduler, error) {
-	defaultProviderName := schedulerconfig.SchedulerDefaultProviderName
-
 	return scheduler.New(
 		clientSet,
 		informerFactory,
 		podInformer,
 		recorder,
-		schedulerconfig.SchedulerAlgorithmSource{
-			Provider: &defaultProviderName,
-		},
 		stopCh,
 	)
 }

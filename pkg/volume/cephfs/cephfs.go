@@ -331,7 +331,7 @@ func (cephfsVolume *cephfsMounter) checkFuseMount() bool {
 	execute := cephfsVolume.plugin.host.GetExec(cephfsVolume.plugin.GetPluginName())
 	switch runtime.GOOS {
 	case "linux":
-		if _, err := execute.Run("/usr/bin/test", "-x", "/sbin/mount.fuse.ceph"); err == nil {
+		if _, err := execute.Command("/usr/bin/test", "-x", "/sbin/mount.fuse.ceph").CombinedOutput(); err == nil {
 			klog.V(4).Info("/sbin/mount.fuse.ceph exists, it should be fuse mount.")
 			return true
 		}

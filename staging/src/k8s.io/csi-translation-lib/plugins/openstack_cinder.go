@@ -27,6 +27,8 @@ import (
 const (
 	// CinderDriverName is the name of the CSI driver for Cinder
 	CinderDriverName = "cinder.csi.openstack.org"
+	// CinderTopologyKey is the zonal topology key for Cinder CSI Driver
+	CinderTopologyKey = "topology.cinder.csi.openstack.org/zone"
 	// CinderInTreePluginName is the name of the intree plugin for Cinder
 	CinderInTreePluginName = "kubernetes.io/cinder"
 )
@@ -90,6 +92,10 @@ func (t *osCinderCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) 
 		ReadOnly:         cinderSource.ReadOnly,
 		FSType:           cinderSource.FSType,
 		VolumeAttributes: map[string]string{},
+	}
+
+	if err := translateTopology(pv, CinderTopologyKey); err != nil {
+		return nil, fmt.Errorf("failed to translate topology: %v", err)
 	}
 
 	pv.Spec.Cinder = nil

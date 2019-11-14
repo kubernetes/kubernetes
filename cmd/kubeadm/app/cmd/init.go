@@ -63,21 +63,21 @@ var (
 		{{if .ControlPlaneEndpoint -}}
 		{{if .UploadCerts -}}
 		You can now join any number of the control-plane node running the following command on each as root:
-					  
+
 		  {{.joinControlPlaneCommand}}
-					
+
 		Please note that the certificate-key gives access to cluster sensitive data, keep it secret!
-		As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you can use 
+		As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you can use
 		"kubeadm init phase upload-certs --upload-certs" to reload certs afterward.
-		  
+
 		{{else -}}
-		You can now join any number of control-plane nodes by copying certificate authorities 
+		You can now join any number of control-plane nodes by copying certificate authorities
 		and service account keys on each node and then running the following as root:
-				  
-		  {{.joinControlPlaneCommand}}	  
-		  
+
+		  {{.joinControlPlaneCommand}}
+
 		{{end}}{{end}}Then you can join any number of worker nodes by running the following on each as root:
-						  
+
 		{{.joinWorkerCommand}}
 		`)))
 )
@@ -182,6 +182,7 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initRunner.AppendPhase(phases.NewUploadCertsPhase())
 	initRunner.AppendPhase(phases.NewMarkControlPlanePhase())
 	initRunner.AppendPhase(phases.NewBootstrapTokenPhase())
+	initRunner.AppendPhase(phases.NewKubeletFinalizePhase())
 	initRunner.AppendPhase(phases.NewAddonPhase())
 
 	// sets the data builder function, that will be used by the runner

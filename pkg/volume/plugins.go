@@ -38,6 +38,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
+	"k8s.io/utils/exec"
+
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -437,7 +439,7 @@ type VolumeHost interface {
 	DeleteServiceAccountTokenFunc() func(podUID types.UID)
 
 	// Returns an interface that should be used to execute any utilities in volume plugins
-	GetExec(pluginName string) mount.Exec
+	GetExec(pluginName string) exec.Interface
 
 	// Returns the labels on the node
 	GetNodeLabels() (map[string]string, error)

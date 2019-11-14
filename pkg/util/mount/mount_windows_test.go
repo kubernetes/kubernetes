@@ -24,10 +24,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/utils/exec/testing"
 )
 
 func makeLink(link, target string) error {
@@ -224,61 +224,61 @@ func TestIsLikelyNotMountPoint(t *testing.T) {
 }
 
 func TestFormatAndMount(t *testing.T) {
-	fakeMounter := ErrorMounter{NewFakeMounter(nil), 0, nil}
-	execCallback := func(cmd string, args ...string) ([]byte, error) {
-		for j := range args {
-			if strings.Contains(args[j], "Get-Disk -Number") {
-				return []byte("0"), nil
-			}
-
-			if strings.Contains(args[j], "Get-Partition -DiskNumber") {
-				return []byte("0"), nil
-			}
-
-			if strings.Contains(args[j], "mklink") {
-				return nil, nil
-			}
-		}
-		return nil, fmt.Errorf("Unexpected cmd %s, args %v", cmd, args)
-	}
-	fakeExec := NewFakeExec(execCallback)
-
-	mounter := SafeFormatAndMount{
-		Interface: &fakeMounter,
-		Exec:      fakeExec,
-	}
-
 	tests := []struct {
 		device       string
 		target       string
 		fstype       string
+		execScripts  []ExecArgs
 		mountOptions []string
 		expectError  bool
 	}{
 		{
-			"0",
-			"disk",
-			"NTFS",
-			[]string{},
-			false,
+			device: "0",
+			target: "disk",
+			fstype: "NTFS",
+			execScripts: []ExecArgs{
+				{"powershell", []string{"/c", "Get-Disk", "-Number"}, "0", nil},
+				{"powershell", []string{"/c", "Get-Partition", "-DiskNumber"}, "0", nil},
+				{"cmd", []string{"/c", "mklink", "/D"}, "", nil},
+			},
+			mountOptions: []string{},
+			expectError:  false,
 		},
 		{
-			"0",
-			"disk",
-			"",
-			[]string{},
-			false,
+			device: "0",
+			target: "disk",
+			fstype: "",
+			execScripts: []ExecArgs{
+				{"powershell", []string{"/c", "Get-Disk", "-Number"}, "0", nil},
+				{"powershell", []string{"/c", "Get-Partition", "-DiskNumber"}, "0", nil},
+				{"cmd", []string{"/c", "mklink", "/D"}, "", nil},
+			},
+			mountOptions: []string{},
+			expectError:  false,
 		},
 		{
-			"invalidDevice",
-			"disk",
-			"NTFS",
-			[]string{},
-			true,
+			device:       "invalidDevice",
+			target:       "disk",
+			fstype:       "NTFS",
+			mountOptions: []string{},
+			expectError:  true,
 		},
 	}
 
 	for _, test := range tests {
+		fakeMounter := ErrorMounter{NewFakeMounter(nil), 0, nil}
+		fakeExec := &testingexec.FakeExec{}
+		for _, script := range test.execScripts {
+			fakeCmd := &testingexec.FakeCmd{}
+			cmdAction := makeFakeCmd(fakeCmd, script.command, script.args...)
+			outputAction := makeFakeOutput(script.output, script.err)
+			fakeCmd.CombinedOutputScript = append(fakeCmd.CombinedOutputScript, outputAction)
+			fakeExec.CommandScript = append(fakeExec.CommandScript, cmdAction)
+		}
+		mounter := SafeFormatAndMount{
+			Interface: &fakeMounter,
+			Exec:      fakeExec,
+		}
 		base, err := ioutil.TempDir("", test.device)
 		if err != nil {
 			t.Fatalf(err.Error())
