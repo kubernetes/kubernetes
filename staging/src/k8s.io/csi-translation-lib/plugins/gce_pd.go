@@ -65,33 +65,6 @@ func NewGCEPersistentDiskCSITranslator() InTreePlugin {
 	return &gcePersistentDiskCSITranslator{}
 }
 
-func translateAllowedTopologies(terms []v1.TopologySelectorTerm) ([]v1.TopologySelectorTerm, error) {
-	if terms == nil {
-		return nil, nil
-	}
-
-	newTopologies := []v1.TopologySelectorTerm{}
-	for _, term := range terms {
-		newTerm := v1.TopologySelectorTerm{}
-		for _, exp := range term.MatchLabelExpressions {
-			var newExp v1.TopologySelectorLabelRequirement
-			if exp.Key == v1.LabelZoneFailureDomain {
-				newExp = v1.TopologySelectorLabelRequirement{
-					Key:    GCEPDTopologyKey,
-					Values: exp.Values,
-				}
-			} else if exp.Key == GCEPDTopologyKey {
-				newExp = exp
-			} else {
-				return nil, fmt.Errorf("unknown topology key: %v", exp.Key)
-			}
-			newTerm.MatchLabelExpressions = append(newTerm.MatchLabelExpressions, newExp)
-		}
-		newTopologies = append(newTopologies, newTerm)
-	}
-	return newTopologies, nil
-}
-
 func generateToplogySelectors(key string, values []string) []v1.TopologySelectorTerm {
 	return []v1.TopologySelectorTerm{
 		{
@@ -112,13 +85,13 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreeStorageClassToCSI(sc *st
 	np := map[string]string{}
 	for k, v := range sc.Parameters {
 		switch strings.ToLower(k) {
-		case "fstype":
+		case fsTypeKey:
 			// prefixed fstype parameter is stripped out by external provisioner
-			np["csi.storage.k8s.io/fstype"] = v
+			np[csiFsTypeKey] = v
 		// Strip out zone and zones parameters and translate them into topologies instead
-		case "zone":
+		case zoneKey:
 			generatedTopologies = generateToplogySelectors(GCEPDTopologyKey, []string{v})
-		case "zones":
+		case zonesKey:
 			generatedTopologies = generateToplogySelectors(GCEPDTopologyKey, strings.Split(v, ","))
 		default:
 			np[k] = v
@@ -130,7 +103,7 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreeStorageClassToCSI(sc *st
 	} else if len(generatedTopologies) > 0 {
 		sc.AllowedTopologies = generatedTopologies
 	} else if len(sc.AllowedTopologies) > 0 {
-		newTopologies, err := translateAllowedTopologies(sc.AllowedTopologies)
+		newTopologies, err := translateAllowedTopologies(sc.AllowedTopologies, GCEPDTopologyKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed translating allowed topologies: %v", err)
 		}
