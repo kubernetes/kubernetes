@@ -47,11 +47,18 @@ type Interface interface {
 	// is not a mountpoint.
 	// It should return ErrNotExist when the directory does not exist.
 	// IsLikelyNotMountPoint does NOT properly detect all mountpoint types
-	// most notably linux bind mounts and symbolic link.
+	// most notably linux bind mounts and symbolic link. For callers that do not
+	// care about such situations, this is a faster alternative to calling List()
+	// and scanning that output.
 	IsLikelyNotMountPoint(file string) (bool, error)
-	// GetMountRefs finds all mount references to the path, returns a
-	// list of paths. Path could be a mountpoint or a normal
-	// directory (for bind mount).
+	// GetMountRefs finds all mount references to pathname, returning a slice of
+	// paths. Pathname can be a mountpoint path or a normal	directory
+	// (for bind mount). On Linux, pathname is excluded from the slice.
+	// For example, if /dev/sdc was mounted at /path/a and /path/b,
+	// GetMountRefs("/path/a") would return ["/path/b"]
+	// GetMountRefs("/path/b") would return ["/path/a"]
+	// On Windows there is no way to query all mount points; as long as pathname is
+	// a valid mount, it will be returned.
 	GetMountRefs(pathname string) ([]string, error)
 }
 
