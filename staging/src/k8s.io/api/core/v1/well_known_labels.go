@@ -30,6 +30,10 @@ const (
 	LabelOSStable   = "kubernetes.io/os"
 	LabelArchStable = "kubernetes.io/arch"
 
+	// LabelWindowsBuild is used on Windows nodes to specify the Windows build number starting with v1.17.0.
+	// It's in the format MajorVersion.MinorVersion.BuildNumber (for ex: 10.0.17763)
+	LabelWindowsBuild = "node.kubernetes.io/windows-build"
+
 	// LabelNamespaceSuffixKubelet is an allowed label namespace suffix kubelets can self-set ([*.]kubelet.kubernetes.io/*)
 	LabelNamespaceSuffixKubelet = "kubelet.kubernetes.io"
 	// LabelNamespaceSuffixNode is an allowed label namespace suffix kubelets can self-set ([*.]node.kubernetes.io/*)
