@@ -21,6 +21,9 @@ import (
 	"os"
 	"runtime"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
 
@@ -881,4 +884,11 @@ func TestGetPodVolumeNames(t *testing.T) {
 			}
 		})
 	}
+}
+func TestCleanReady(t *testing.T) {
+	tsDir, err := ioutil.TempDir("", time.Now().UTC().Format("..2006_01_02_15_04_05."))
+	assert.NoErrorf(t, err, "unable to create new temp directory: %v", err)
+	CleanReady(tsDir)
+	_, err = os.Stat(tsDir)
+	assert.True(t, os.IsNotExist(err))
 }
