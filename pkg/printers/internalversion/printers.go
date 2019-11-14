@@ -32,7 +32,7 @@ import (
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	apiv1 "k8s.io/api/core/v1"
-	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
@@ -475,9 +475,9 @@ func AddHandlers(h printers.PrintHandler) {
 
 	endpointSliceColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "AddressType", Type: "string", Description: discoveryv1alpha1.EndpointSlice{}.SwaggerDoc()["addressType"]},
-		{Name: "Ports", Type: "string", Description: discoveryv1alpha1.EndpointSlice{}.SwaggerDoc()["ports"]},
-		{Name: "Endpoints", Type: "string", Description: discoveryv1alpha1.EndpointSlice{}.SwaggerDoc()["endpoints"]},
+		{Name: "AddressType", Type: "string", Description: discoveryv1beta1.EndpointSlice{}.SwaggerDoc()["addressType"]},
+		{Name: "Ports", Type: "string", Description: discoveryv1beta1.EndpointSlice{}.SwaggerDoc()["ports"]},
+		{Name: "Endpoints", Type: "string", Description: discoveryv1beta1.EndpointSlice{}.SwaggerDoc()["endpoints"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	h.TableHandler(endpointSliceColumnDefinitions, printEndpointSlice)

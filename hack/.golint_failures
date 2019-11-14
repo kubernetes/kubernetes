@@ -31,6 +31,7 @@ pkg/apis/core/v1/helper/qos
 pkg/apis/core/v1/validation
 pkg/apis/core/validation
 pkg/apis/discovery/v1alpha1
+pkg/apis/discovery/v1beta1
 pkg/apis/events/v1beta1
 pkg/apis/extensions/v1beta1
 pkg/apis/flowcontrol/v1alpha1

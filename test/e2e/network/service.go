@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
@@ -1405,9 +1404,8 @@ var _ = SIGDescribe("Services", func() {
 
 		service := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:        t.ServiceName,
-				Namespace:   t.Namespace,
-				Annotations: map[string]string{endpoint.TolerateUnreadyEndpointsAnnotation: "true"},
+				Name:      t.ServiceName,
+				Namespace: t.Namespace,
 			},
 			Spec: v1.ServiceSpec{
 				Selector: t.Labels,
@@ -1416,6 +1414,7 @@ var _ = SIGDescribe("Services", func() {
 					Port:       int32(port),
 					TargetPort: intstr.FromInt(port),
 				}},
+				PublishNotReadyAddresses: true,
 			},
 		}
 		rcSpec := framework.RcByNameContainer(t.Name, 1, t.Image, t.Labels, v1.Container{
@@ -1475,7 +1474,7 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("Update service to not tolerate unready services")
 		_, err = e2eservice.UpdateService(f.ClientSet, t.Namespace, t.ServiceName, func(s *v1.Service) {
-			s.ObjectMeta.Annotations[endpoint.TolerateUnreadyEndpointsAnnotation] = "false"
+			s.Spec.PublishNotReadyAddresses = false
 		})
 		framework.ExpectNoError(err)
 
@@ -1495,7 +1494,7 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("Update service to tolerate unready services again")
 		_, err = e2eservice.UpdateService(f.ClientSet, t.Namespace, t.ServiceName, func(s *v1.Service) {
-			s.ObjectMeta.Annotations[endpoint.TolerateUnreadyEndpointsAnnotation] = "true"
+			s.Spec.PublishNotReadyAddresses = true
 		})
 		framework.ExpectNoError(err)
 

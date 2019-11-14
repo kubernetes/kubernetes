@@ -21,18 +21,18 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	discoveryinformers "k8s.io/client-go/informers/discovery/v1alpha1"
+	discoveryinformers "k8s.io/client-go/informers/discovery/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	discoverylisters "k8s.io/client-go/listers/discovery/v1alpha1"
+	discoverylisters "k8s.io/client-go/listers/discovery/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -84,7 +84,7 @@ func NewController(podInformer coreinformers.PodInformer,
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-slice-controller"})
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
-		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("endpoint_slice_controller", client.DiscoveryV1alpha1().RESTClient().GetRateLimiter())
+		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("endpoint_slice_controller", client.DiscoveryV1beta1().RESTClient().GetRateLimiter())
 	}
 
 	endpointslicemetrics.RegisterMetrics()
@@ -399,7 +399,7 @@ func (c *Controller) ensureSetupManagedByAnnotation(service *v1.Service) error {
 			}
 
 			endpointSlice.Labels[discovery.LabelManagedBy] = controllerName
-			_, err = c.client.DiscoveryV1alpha1().EndpointSlices(endpointSlice.Namespace).Update(endpointSlice)
+			_, err = c.client.DiscoveryV1beta1().EndpointSlices(endpointSlice.Namespace).Update(endpointSlice)
 			if err != nil {
 				return err
 			}

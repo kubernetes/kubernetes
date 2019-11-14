@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -72,6 +72,8 @@ func TestReconcile1Pod(t *testing.T) {
 	svcv4, _ := newServiceAndEndpointMeta("foo", namespace)
 	svcv6, _ := newServiceAndEndpointMeta("foo", namespace)
 	svcv6.Spec.IPFamily = &ipv6Family
+	svcv6ClusterIP, _ := newServiceAndEndpointMeta("foo", namespace)
+	svcv6ClusterIP.Spec.ClusterIP = "1234::5678:0000:0000:9abc:def1"
 
 	pod1 := newPod(1, namespace, true, 1)
 	pod1.Status.PodIPs = []corev1.PodIP{{IP: "1.2.3.4"}, {IP: "1234::5678:0000:0000:9abc:def0"}}
@@ -111,6 +113,24 @@ func TestReconcile1Pod(t *testing.T) {
 		},
 		"ipv6": {
 			service:             svcv6,
+			expectedAddressType: discovery.AddressTypeIPv6,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses:  []string{"1234::5678:0000:0000:9abc:def0"},
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Topology: map[string]string{
+					"kubernetes.io/hostname":        "node-1",
+					"topology.kubernetes.io/zone":   "us-central1-a",
+					"topology.kubernetes.io/region": "us-central1",
+				},
+				TargetRef: &corev1.ObjectReference{
+					Kind:      "Pod",
+					Namespace: namespace,
+					Name:      "pod1",
+				},
+			},
+		},
+		"ipv6-clusterip": {
+			service:             svcv6ClusterIP,
 			expectedAddressType: discovery.AddressTypeIPv6,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1234::5678:0000:0000:9abc:def0"},
@@ -183,7 +203,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
 	endpointSlice1 := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
 
-	_, createErr := client.DiscoveryV1alpha1().EndpointSlices(namespace).Create(endpointSlice1)
+	_, createErr := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(endpointSlice1)
 	assert.Nil(t, createErr, "Expected no error creating endpoint slice")
 
 	numActionsBefore := len(client.Actions())
@@ -786,7 +806,7 @@ func portsAndAddressTypeEqual(slice1, slice2 discovery.EndpointSlice) bool {
 func createEndpointSlices(t *testing.T, client *fake.Clientset, namespace string, endpointSlices []*discovery.EndpointSlice) {
 	t.Helper()
 	for _, endpointSlice := range endpointSlices {
-		_, err := client.DiscoveryV1alpha1().EndpointSlices(namespace).Create(endpointSlice)
+		_, err := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(endpointSlice)
 		if err != nil {
 			t.Fatalf("Expected no error creating Endpoint Slice, got: %v", err)
 		}
@@ -795,7 +815,7 @@ func createEndpointSlices(t *testing.T, client *fake.Clientset, namespace string
 
 func fetchEndpointSlices(t *testing.T, client *fake.Clientset, namespace string) []discovery.EndpointSlice {
 	t.Helper()
-	fetchedSlices, err := client.DiscoveryV1alpha1().EndpointSlices(namespace).List(metav1.ListOptions{})
+	fetchedSlices, err := client.DiscoveryV1beta1().EndpointSlices(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error fetching Endpoint Slices, got: %v", err)
 		return []discovery.EndpointSlice{}
