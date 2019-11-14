@@ -30,7 +30,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
-	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 func prepareBlockMapperTest(plug *csiPlugin, specVolumeName string, t *testing.T) (*csiBlockMapper, *volume.Spec, *api.PersistentVolume, error) {
@@ -244,15 +243,6 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
-	fakeClient := fakeclient.NewSimpleClientset()
-	host := volumetest.NewFakeVolumeHostWithCSINodeName(
-		tmpDir,
-		fakeClient,
-		nil,
-		"fakeNode",
-		nil,
-	)
-	plug.host = host
 
 	csiMapper, _, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
 	if err != nil {
@@ -295,15 +285,6 @@ func TestBlockMapperMapPodDevice(t *testing.T) {
 
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
-	fakeClient := fakeclient.NewSimpleClientset()
-	host := volumetest.NewFakeVolumeHostWithCSINodeName(
-		tmpDir,
-		fakeClient,
-		nil,
-		"fakeNode",
-		nil,
-	)
-	plug.host = host
 
 	csiMapper, _, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
 	if err != nil {
@@ -371,14 +352,6 @@ func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, fakeClient)
 	defer os.RemoveAll(tmpDir)
 
-	host := volumetest.NewFakeVolumeHostWithCSINodeName(
-		tmpDir,
-		fakeClient,
-		nil,
-		"fakeNode",
-		plug.csiDriverLister,
-	)
-	plug.host = host
 	csiMapper, _, _, err := prepareBlockMapperTest(plug, "test-pv", t)
 	if err != nil {
 		t.Fatalf("Failed to make a new Mapper: %v", err)
@@ -401,15 +374,6 @@ func TestBlockMapperTearDownDevice(t *testing.T) {
 
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
-	fakeClient := fakeclient.NewSimpleClientset()
-	host := volumetest.NewFakeVolumeHostWithCSINodeName(
-		tmpDir,
-		fakeClient,
-		nil,
-		"fakeNode",
-		nil,
-	)
-	plug.host = host
 
 	_, spec, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
 	if err != nil {

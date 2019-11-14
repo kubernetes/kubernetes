@@ -55,11 +55,10 @@ func newPluginMgr(t *testing.T, apiObject runtime.Object) (*volume.VolumePluginM
 	host := volumetest.NewFakeVolumeHostWithNodeLabels(
 		tmpDir,
 		fakeClient,
-		nil,
+		ProbeVolumePlugins(),
 		map[string]string{sdcGUIDLabelName: "abc-123"},
 	)
-	plugMgr := &volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+	plugMgr := host.GetPluginMgr()
 
 	return plugMgr, tmpDir
 }

@@ -25,8 +25,10 @@ import (
 	"testing"
 
 	api "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -50,6 +52,13 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 		client = fakeclient.NewSimpleClientset()
 	}
 
+	client.Tracker().Add(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fakeNode",
+		},
+		Spec: v1.NodeSpec{},
+	})
+
 	// Start informer for CSIDrivers.
 	factory := informers.NewSharedInformerFactory(client, CsiResyncPeriod)
 	csiDriverInformer := factory.Storage().V1beta1().CSIDrivers()
@@ -59,14 +68,13 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,
 		client,
-		nil,
+		ProbeVolumePlugins(),
 		"fakeNode",
 		csiDriverLister,
 	)
-	plugMgr := &volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
-	plug, err := plugMgr.FindPluginByName(CSIPluginName)
+	pluginMgr := host.GetPluginMgr()
+	plug, err := pluginMgr.FindPluginByName(CSIPluginName)
 	if err != nil {
 		t.Fatalf("can't find plugin %v", CSIPluginName)
 	}
@@ -998,18 +1006,25 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 			}
 			defer os.RemoveAll(tmpDir)
 
-			client := fakeclient.NewSimpleClientset(getTestCSIDriver(test.driverName, nil, &test.canAttach, nil))
+			client := fakeclient.NewSimpleClientset(
+				getTestCSIDriver(test.driverName, nil, &test.canAttach, nil),
+				&v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "fakeNode",
+					},
+					Spec: v1.NodeSpec{},
+				},
+			)
 			factory := informers.NewSharedInformerFactory(client, CsiResyncPeriod)
 			host := volumetest.NewFakeVolumeHostWithCSINodeName(
 				tmpDir,
 				client,
-				nil,
+				ProbeVolumePlugins(),
 				"fakeNode",
 				factory.Storage().V1beta1().CSIDrivers().Lister(),
 			)
 
-			plugMgr := &volume.VolumePluginMgr{}
-			plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+			plugMgr := host.GetPluginMgr()
 
 			plugin, err := plugMgr.FindAttachablePluginBySpec(test.spec)
 			if err != nil && !test.shouldFail {
@@ -1118,10 +1133,16 @@ func TestPluginFindDeviceMountablePluginBySpec(t *testing.T) {
 			}
 			defer os.RemoveAll(tmpDir)
 
-			client := fakeclient.NewSimpleClientset()
-			host := volumetest.NewFakeVolumeHost(tmpDir, client, nil)
-			plugMgr := &volume.VolumePluginMgr{}
-			plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+			client := fakeclient.NewSimpleClientset(
+				&v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "fakeNode",
+					},
+					Spec: v1.NodeSpec{},
+				},
+			)
+			host := volumetest.NewFakeVolumeHostWithCSINodeName(tmpDir, client, ProbeVolumePlugins(), "fakeNode", nil)
+			plugMgr := host.GetPluginMgr()
 
 			plug, err := plugMgr.FindDeviceMountablePluginBySpec(test.spec)
 			if err != nil && !test.shouldFail {

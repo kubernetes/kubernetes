@@ -26,6 +26,7 @@ import (
 	"time"
 
 	api "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	storagebeta1 "k8s.io/api/storage/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -239,6 +240,12 @@ func TestCSI_VolumeAll(t *testing.T) {
 				}
 				objs = append(objs, driverInfo)
 			}
+			objs = append(objs, &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "fakeNode",
+				},
+				Spec: v1.NodeSpec{},
+			})
 
 			client := fakeclient.NewSimpleClientset(objs...)
 			fakeWatcher := watch.NewRaceFreeFake()
@@ -253,13 +260,11 @@ func TestCSI_VolumeAll(t *testing.T) {
 			host := volumetest.NewFakeVolumeHostWithCSINodeName(
 				tmpDir,
 				client,
-				nil,
-				"csi-node",
+				ProbeVolumePlugins(),
+				"fakeNode",
 				csiDriverInformer.Lister(),
 			)
-
-			plugMgr := &volume.VolumePluginMgr{}
-			plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+			plugMgr := host.GetPluginMgr()
 			csiClient := setupClient(t, true)
 
 			volSpec := test.specFunc(test.specName, test.driver, test.volName)
