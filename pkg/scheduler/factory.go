@@ -108,8 +108,8 @@ type Configurator struct {
 	pluginConfigProducerRegistry *plugins.ConfigProducerRegistry
 	nodeInfoSnapshot             *nodeinfosnapshot.Snapshot
 
-	factoryArgs        PluginFactoryArgs
-	configProducerArgs *plugins.ConfigProducerArgs
+	algorithmFactoryArgs AlgorithmFactoryArgs
+	configProducerArgs   *plugins.ConfigProducerArgs
 }
 
 // GetHardPodAffinitySymmetricWeight is exposed for testing.
@@ -232,12 +232,12 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		return nil, err
 	}
 
-	priorityMetaProducer, err := getPriorityMetadataProducer(c.factoryArgs)
+	priorityMetaProducer, err := getPriorityMetadataProducer(c.algorithmFactoryArgs)
 	if err != nil {
 		return nil, err
 	}
 
-	predicateMetaProducer, err := getPredicateMetadataProducer(c.factoryArgs)
+	predicateMetaProducer, err := getPredicateMetadataProducer(c.algorithmFactoryArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -337,7 +337,7 @@ func getBinderFunc(client clientset.Interface, extenders []algorithm.SchedulerEx
 // as framework plugins. Specifically, a priority will run as a framework plugin if a plugin config producer was
 // registered for that priority.
 func (c *Configurator) getPriorityConfigs(priorityKeys sets.String) ([]priorities.PriorityConfig, *schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
-	allPriorityConfigs, err := getPriorityFunctionConfigs(priorityKeys, c.factoryArgs)
+	allPriorityConfigs, err := getPriorityFunctionConfigs(priorityKeys, c.algorithmFactoryArgs)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -370,7 +370,7 @@ func (c *Configurator) getPriorityConfigs(priorityKeys sets.String) ([]prioritie
 // Note that the framework executes plugins according to their order in the Plugins list, and so predicates run as plugins
 // are added to the Plugins list according to the order specified in predicates.Ordering().
 func (c *Configurator) getPredicateConfigs(predicateKeys sets.String) (map[string]predicates.FitPredicate, *schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
-	allFitPredicates, err := getFitPredicateFunctions(predicateKeys, c.factoryArgs)
+	allFitPredicates, err := getFitPredicateFunctions(predicateKeys, c.algorithmFactoryArgs)
 	if err != nil {
 		return nil, nil, nil, err
 	}
