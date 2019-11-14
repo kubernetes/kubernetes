@@ -289,8 +289,8 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 		}
 
 		// Docker on Windows does some path fixups that were not carried into ContainerD.
-		// Make sure the ContainerPaths which are interpreted inside the container
-		//  have 'c:' and slashes facing the right way
+		// If using ContainerD, make sure paths inside the container have 'c:' and slashes facing the right way.
+		// This check would need to be changed later to support a Linux container on a Windows node
 		if (goruntime.GOOS == "windows" && m.Type() != types.DockerContainerRuntime) {
 			mount.ContainerPath = volumeutil.GetWindowsPath(v.ContainerPath)
 		}
