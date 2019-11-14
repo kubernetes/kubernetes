@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"net"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -76,7 +77,10 @@ func getCertificateNames(cert *x509.Certificate) []string {
 	var names []string
 
 	cn := cert.Subject.CommonName
-	if cn == "*" || len(validation.IsDNS1123Subdomain(strings.TrimPrefix(cn, "*."))) == 0 {
+	cnIsIP := net.ParseIP(cn) != nil
+	cnIsValidDomain := cn == "*" || len(validation.IsDNS1123Subdomain(strings.TrimPrefix(cn, "*."))) == 0
+	// don't use the CN if it is a valid IP because our IP serving detection may unexpectedly use it to terminate the connection.
+	if !cnIsIP && cnIsValidDomain {
 		names = append(names, cn)
 	}
 	for _, san := range cert.DNSNames {
