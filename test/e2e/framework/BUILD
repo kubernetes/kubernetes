@@ -15,7 +15,6 @@ go_library(
         "log_size_monitoring.go",
         "nodes_util.go",
         "pods.go",
-        "profile_gatherer.go",
         "provider.go",
         "psp.go",
         "resource_usage_gatherer.go",
