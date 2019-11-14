@@ -114,11 +114,16 @@ func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins [
 	host.hostUtil = hostutil.NewFakeHostUtil(pathToTypeMap)
 	host.exec = &testingexec.FakeExec{DisableScripts: true}
 	host.pluginMgr = &VolumePluginMgr{}
-	host.pluginMgr.InitPlugins(plugins, nil /* prober */, host)
+	if err := host.pluginMgr.InitPlugins(plugins, nil /* prober */, host); err != nil {
+		// TODO(dyzz): Pipe testing context through and throw a fatal error instead
+		panic(fmt.Sprintf("Failed to init plugins while creating fake volume host: %v", err))
+	}
 	host.subpather = &subpath.FakeSubpath{}
 	host.informerFactory = informers.NewSharedInformerFactory(kubeClient, time.Minute)
 	// Wait until the InitPlugins setup is finished before returning from this setup func
-	host.WaitForKubeletErrNil()
+	if err := host.WaitForKubeletErrNil(); err != nil {
+		panic(fmt.Sprintf("Failed to wait for kubelet err to be nil while creating fake volume host: %v", err))
+	}
 	return host
 }
 
