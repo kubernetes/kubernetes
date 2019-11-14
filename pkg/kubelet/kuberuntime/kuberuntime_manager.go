@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	goruntime "runtime"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -244,6 +245,17 @@ func NewKubeGenericRuntimeManager(
 // Type returns the type of the container runtime.
 func (m *kubeGenericRuntimeManager) Type() string {
 	return m.runtimeName
+}
+
+// SupportsSingleFileMapping returns whether the container runtime supports single file mappings or not.
+// It is supported on Windows only if the container runtime is containerd.
+func (m *kubeGenericRuntimeManager) SupportsSingleFileMapping() bool {
+	switch goruntime.GOOS {
+	case "windows":
+		return m.Type() != types.DockerContainerRuntime
+	default:
+		return true
+	}
 }
 
 func newRuntimeVersion(version string) (*utilversion.Version, error) {

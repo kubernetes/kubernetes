@@ -471,9 +471,10 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	}
 	opts.Mounts = append(opts.Mounts, mounts...)
 
-	// Disabling adding TerminationMessagePath on Windows as these files would be mounted as docker volume and
-	// Docker for Windows has a bug where only directories can be mounted
-	if len(container.TerminationMessagePath) != 0 && runtime.GOOS != "windows" {
+	// adding TerminationMessagePath on Windows is only allowed if ContainerD is used. Individual files cannot
+	// be mounted as volumes using Docker for Windows.
+	supportsSingleFileMapping := kl.containerRuntime.SupportsSingleFileMapping()
+	if len(container.TerminationMessagePath) != 0 && supportsSingleFileMapping {
 		p := kl.getPodContainerDir(pod.UID, container.Name)
 		if err := os.MkdirAll(p, 0750); err != nil {
 			klog.Errorf("Error on creating %q: %v", p, err)
