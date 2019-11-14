@@ -249,6 +249,45 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		return opExitStatus, errors.New(log("attacher.MountDevice failed to get CSIPersistentVolumeSource: %v", err))
 	}
 
+	// lets check if node/unstage is supported
+	if c.csiClient == nil {
+		c.csiClient, err = newCsiDriverClient(csiDriverName(csiSource.Driver))
+		if err != nil {
+			return opExitStatus, errors.New(log("attacher.MountDevice failed to create newCsiDriverClient: %v", err))
+		}
+	}
+	csi := c.csiClient
+
+	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	defer cancel()
+	// Check whether "STAGE_UNSTAGE_VOLUME" is set
+	stageUnstageSet, err := csi.NodeSupportsStageUnstage(ctx)
+	if err != nil {
+		return opExitStatus, err
+	}
+
+	// Get secrets and publish context required for mountDevice
+	nodeName := string(c.plugin.host.GetNodeName())
+	publishContext, err := c.plugin.getPublishContext(c.k8s, csiSource.VolumeHandle, csiSource.Driver, nodeName)
+
+	if err != nil {
+		opExitStatus = volumetypes.OperationStateNoChange
+		return opExitStatus, err
+	}
+
+	nodeStageSecrets := map[string]string{}
+	// we only require secrets if csiSource has them and volume has NodeStage capability
+	if csiSource.NodeStageSecretRef != nil && stageUnstageSet {
+		nodeStageSecrets, err = getCredentialsFromSecret(c.k8s, csiSource.NodeStageSecretRef)
+		if err != nil {
+			err = fmt.Errorf("fetching NodeStageSecretRef %s/%s failed: %v",
+				csiSource.NodeStageSecretRef.Namespace, csiSource.NodeStageSecretRef.Name, err)
+			// if we failed to fetch secret then that could be a transient error
+			opExitStatus = volumetypes.OperationStateNoChange
+			return opExitStatus, err
+		}
+	}
+
 	// Store volume metadata for UnmountDevice. Keep it around even if the
 	// driver does not support NodeStage, UnmountDevice still needs it.
 	if err = os.MkdirAll(deviceMountPath, 0750); err != nil {
@@ -279,46 +318,10 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		}
 	}()
 
-	if c.csiClient == nil {
-		c.csiClient, err = newCsiDriverClient(csiDriverName(csiSource.Driver))
-		if err != nil {
-			return opExitStatus, errors.New(log("attacher.MountDevice failed to create newCsiDriverClient: %v", err))
-		}
-	}
-	csi := c.csiClient
-
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
-	defer cancel()
-	// Check whether "STAGE_UNSTAGE_VOLUME" is set
-	stageUnstageSet, err := csi.NodeSupportsStageUnstage(ctx)
-	if err != nil {
-		return opExitStatus, err
-	}
 	if !stageUnstageSet {
 		klog.Infof(log("attacher.MountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping MountDevice..."))
 		// defer does *not* remove the metadata file and it's correct - UnmountDevice needs it there.
 		return opExitStatus, nil
-	}
-
-	// Start MountDevice
-	nodeName := string(c.plugin.host.GetNodeName())
-	publishContext, err := c.plugin.getPublishContext(c.k8s, csiSource.VolumeHandle, csiSource.Driver, nodeName)
-
-	if err != nil {
-		opExitStatus = volumetypes.OperationStateNoChange
-		return opExitStatus, err
-	}
-
-	nodeStageSecrets := map[string]string{}
-	if csiSource.NodeStageSecretRef != nil {
-		nodeStageSecrets, err = getCredentialsFromSecret(c.k8s, csiSource.NodeStageSecretRef)
-		if err != nil {
-			err = fmt.Errorf("fetching NodeStageSecretRef %s/%s failed: %v",
-				csiSource.NodeStageSecretRef.Namespace, csiSource.NodeStageSecretRef.Name, err)
-			// if we failed to fetch secret then that could be a transient error
-			opExitStatus = volumetypes.OperationStateNoChange
-			return opExitStatus, err
-		}
 	}
 
 	//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
