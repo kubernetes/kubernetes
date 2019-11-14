@@ -22,7 +22,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -56,7 +56,8 @@ type endpointMeta struct {
 // to ensure the desired set of pods are represented by endpoint slices.
 func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, existingSlices []*discovery.EndpointSlice, triggerTime time.Time) error {
 	addressType := discovery.AddressTypeIPv4
-	if service.Spec.IPFamily != nil && *service.Spec.IPFamily == corev1.IPv6Protocol {
+
+	if isIPv6Service(service) {
 		addressType = discovery.AddressTypeIPv6
 	}
 
@@ -203,7 +204,7 @@ func (r *reconciler) finalize(
 
 	for _, endpointSlice := range slicesToCreate {
 		addTriggerTimeAnnotation(endpointSlice, triggerTime)
-		_, err := r.client.DiscoveryV1alpha1().EndpointSlices(service.Namespace).Create(endpointSlice)
+		_, err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Create(endpointSlice)
 		if err != nil {
 			// If the namespace is terminating, creates will continue to fail. Simply drop the item.
 			if errors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
@@ -217,7 +218,7 @@ func (r *reconciler) finalize(
 
 	for _, endpointSlice := range slicesToUpdate {
 		addTriggerTimeAnnotation(endpointSlice, triggerTime)
-		_, err := r.client.DiscoveryV1alpha1().EndpointSlices(service.Namespace).Update(endpointSlice)
+		_, err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Update(endpointSlice)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("Error updating %s EndpointSlice for Service %s/%s: %v", endpointSlice.Name, service.Namespace, service.Name, err))
 		} else {
@@ -226,7 +227,7 @@ func (r *reconciler) finalize(
 	}
 
 	for _, endpointSlice := range slicesToDelete {
-		err := r.client.DiscoveryV1alpha1().EndpointSlices(service.Namespace).Delete(endpointSlice.Name, &metav1.DeleteOptions{})
+		err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Delete(endpointSlice.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			errs = append(errs, fmt.Errorf("Error deleting %s EndpointSlice for Service %s/%s: %v", endpointSlice.Name, service.Namespace, service.Name, err))
 		} else {

@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	utilnet "k8s.io/utils/net"
 
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 )
 
 type metaProxier struct {

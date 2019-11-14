@@ -22,7 +22,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -71,7 +71,7 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service) 
 
 	ready := service.Spec.PublishNotReadyAddresses || podutil.IsPodReady(pod)
 	ep := discovery.Endpoint{
-		Addresses: getEndpointAddresses(pod.Status, service.Spec.IPFamily),
+		Addresses: getEndpointAddresses(pod.Status, service),
 		Conditions: discovery.EndpointConditions{
 			Ready: &ready,
 		},
@@ -125,18 +125,23 @@ func getEndpointPorts(service *corev1.Service, pod *corev1.Pod) []discovery.Endp
 }
 
 // getEndpointAddresses returns a list of addresses generated from a pod status.
-func getEndpointAddresses(podStatus corev1.PodStatus, ipFamily *corev1.IPFamily) []string {
-	isIPv6Family := ipFamily != nil && *ipFamily == corev1.IPv6Protocol
+func getEndpointAddresses(podStatus corev1.PodStatus, service *corev1.Service) []string {
 	addresses := []string{}
 
 	for _, podIP := range podStatus.PodIPs {
 		isIPv6PodIP := utilnet.IsIPv6String(podIP.IP)
-		if isIPv6Family == isIPv6PodIP {
+		if isIPv6PodIP == isIPv6Service(service) {
 			addresses = append(addresses, podIP.IP)
 		}
 	}
 
 	return addresses
+}
+
+// isIPv6Service returns true if the Service uses IPv6 addresses.
+func isIPv6Service(service *corev1.Service) bool {
+	// IPFamily is not guaranteed to be set, even in an IPv6 only cluster.
+	return (service.Spec.IPFamily != nil && *service.Spec.IPFamily == corev1.IPv6Protocol) || utilnet.IsIPv6String(service.Spec.ClusterIP)
 }
 
 // endpointsEqualBeyondHash returns true if endpoints have equal attributes

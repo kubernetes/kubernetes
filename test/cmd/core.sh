@@ -1011,13 +1011,13 @@ __EOF__
   kubectl run testmetadata --image=nginx --replicas=2 --port=80 --expose --service-overrides='{ "metadata": { "annotations": { "zone-context": "home" } } } '
   # Check result
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'testmetadata:'
-  kube::test::get_object_assert 'service testmetadata' "{{.metadata.annotations}}" "map\[zone-context:home\]"
+  kube::test::get_object_assert 'service testmetadata' "{{.metadata.annotations}}" "map\[endpointslice.kubernetes.io/managed-by-setup:true zone-context:home\]"
 
   ### Expose deployment as a new service
   # Command
   kubectl expose deployment testmetadata  --port=1000 --target-port=80 --type=NodePort --name=exposemetadata --overrides='{ "metadata": { "annotations": { "zone-context": "work" } } } '
   # Check result
-  kube::test::get_object_assert 'service exposemetadata' "{{.metadata.annotations}}" "map\[zone-context:work\]"
+  kube::test::get_object_assert 'service exposemetadata' "{{.metadata.annotations}}" "map\[endpointslice.kubernetes.io/managed-by-setup:true zone-context:work\]"
 
   # Clean-Up
   # Command

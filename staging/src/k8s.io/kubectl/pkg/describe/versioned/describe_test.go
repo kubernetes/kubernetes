@@ -30,7 +30,7 @@ import (
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
-	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -2582,7 +2582,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"EndpointSliceDescriber": &EndpointSliceDescriber{
-			fake.NewSimpleClientset(&discoveryv1alpha1.EndpointSlice{
+			fake.NewSimpleClientset(&discoveryv1beta1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -3519,16 +3519,16 @@ func TestDescribeEndpointSlice(t *testing.T) {
 	protocolTCP := corev1.ProtocolTCP
 	port80 := int32(80)
 
-	fake := fake.NewSimpleClientset(&discoveryv1alpha1.EndpointSlice{
+	fake := fake.NewSimpleClientset(&discoveryv1beta1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo.123",
 			Namespace: "bar",
 		},
-		AddressType: discoveryv1alpha1.AddressTypeIPv4,
-		Endpoints: []discoveryv1alpha1.Endpoint{
+		AddressType: discoveryv1beta1.AddressTypeIPv4,
+		Endpoints: []discoveryv1beta1.Endpoint{
 			{
 				Addresses:  []string{"1.2.3.4", "1.2.3.5"},
-				Conditions: discoveryv1alpha1.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discoveryv1beta1.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
 				TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-123"},
 				Topology: map[string]string{
 					"topology.kubernetes.io/zone":   "us-central1-a",
@@ -3536,7 +3536,7 @@ func TestDescribeEndpointSlice(t *testing.T) {
 				},
 			}, {
 				Addresses:  []string{"1.2.3.6", "1.2.3.7"},
-				Conditions: discoveryv1alpha1.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discoveryv1beta1.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
 				TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-124"},
 				Topology: map[string]string{
 					"topology.kubernetes.io/zone":   "us-central1-b",
@@ -3544,7 +3544,7 @@ func TestDescribeEndpointSlice(t *testing.T) {
 				},
 			},
 		},
-		Ports: []discoveryv1alpha1.EndpointPort{
+		Ports: []discoveryv1beta1.EndpointPort{
 			{
 				Protocol: &protocolTCP,
 				Port:     &port80,

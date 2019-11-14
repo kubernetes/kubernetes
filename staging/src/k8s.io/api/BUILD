@@ -87,6 +87,7 @@ filegroup(
         "//staging/src/k8s.io/api/coordination/v1beta1:all-srcs",
         "//staging/src/k8s.io/api/core/v1:all-srcs",
         "//staging/src/k8s.io/api/discovery/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/api/discovery/v1beta1:all-srcs",
         "//staging/src/k8s.io/api/events/v1beta1:all-srcs",
         "//staging/src/k8s.io/api/extensions/v1beta1:all-srcs",
         "//staging/src/k8s.io/api/flowcontrol/v1alpha1:all-srcs",

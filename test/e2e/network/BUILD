@@ -34,7 +34,6 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/network",
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/controller/endpoint:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
