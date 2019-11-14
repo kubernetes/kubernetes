@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/volume"
-	ioutil "k8s.io/kubernetes/pkg/volume/util"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -267,7 +266,7 @@ func (m *csiBlockMapper) SetUpDevice() (string, error) {
 }
 
 func (m *csiBlockMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return ioutil.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
+	return nil
 }
 
 var _ volume.BlockVolumeUnmapper = &csiBlockMapper{}

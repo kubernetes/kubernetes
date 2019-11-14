@@ -419,7 +419,7 @@ func (b *fcDiskMapper) SetUpDevice() (string, error) {
 }
 
 func (b *fcDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return util.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
+	return nil
 }
 
 type fcDiskUnmapper struct {

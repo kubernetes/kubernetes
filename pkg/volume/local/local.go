@@ -621,7 +621,7 @@ func (m *localVolumeMapper) SetUpDevice() (string, error) {
 }
 
 func (m *localVolumeMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return util.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
+	return nil
 }
 
 // localVolumeUnmapper implements the BlockVolumeUnmapper interface for local volumes.

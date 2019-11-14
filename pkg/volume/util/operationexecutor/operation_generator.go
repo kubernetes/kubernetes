@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/util"
+	ioutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
@@ -1038,7 +1039,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			blockVolumeMapper.GetGlobalMapPath(volumeToMount.VolumeSpec)
 		if err != nil {
 			// On failure, return error. Caller will log and retry.
-			return volumeToMount.GenerateError("MapVolume.GetDeviceMountPath failed", err)
+			return volumeToMount.GenerateError("MapVolume.GetGlobalMapPath failed", err)
 		}
 		if volumeAttacher != nil {
 			// Wait for attachable volumes to finish attaching
@@ -1058,7 +1059,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		pluginDevicePath, mapErr := blockVolumeMapper.SetUpDevice()
 		if mapErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return volumeToMount.GenerateError("MapVolume.SetUp failed", mapErr)
+			return volumeToMount.GenerateError("MapVolume.SetUpDevice failed", mapErr)
 		}
 
 		// if pluginDevicePath is provided, assume attacher may not provide device
@@ -1084,7 +1085,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			return volumeToMount.GenerateError("MapVolume.EvalHostSymlinks failed", err)
 		}
 
-		// Map device to global and pod device map path
+		// Execute driver specific map
 		volumeMapPath, volName := blockVolumeMapper.GetPodDeviceMapPath()
 		mapErr = blockVolumeMapper.MapDevice(devicePath, globalMapPath, volumeMapPath, volName, volumeToMount.Pod.UID)
 		if mapErr != nil {
@@ -1092,13 +1093,11 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			return volumeToMount.GenerateError("MapVolume.MapDevice failed", mapErr)
 		}
 
-		// Take filedescriptor lock to keep a block device opened. Otherwise, there is a case
-		// that the block device is silently removed and attached another device with same name.
-		// Container runtime can't handler this problem. To avoid unexpected condition fd lock
-		// for the block device is required.
-		_, err = og.blkUtil.AttachFileDevice(devicePath)
-		if err != nil {
-			return volumeToMount.GenerateError("MapVolume.AttachFileDevice failed", err)
+		// Execute common map
+		mapErr = ioutil.MapBlockVolume(og.blkUtil, devicePath, globalMapPath, volumeMapPath, volName, volumeToMount.Pod.UID)
+		if mapErr != nil {
+			// On failure, return error. Caller will log and retry.
+			return volumeToMount.GenerateError("MapVolume.MapBlockVolume failed", mapErr)
 		}
 
 		// Update actual state of world to reflect volume is globally mounted
@@ -1207,21 +1206,16 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 	}
 
 	unmapVolumeFunc := func() (error, error) {
-		// Try to unmap volumeName symlink under pod device map path dir
 		// pods/{podUid}/volumeDevices/{escapeQualifiedPluginName}/{volumeName}
 		podDeviceUnmapPath, volName := blockVolumeUnmapper.GetPodDeviceMapPath()
-		unmapDeviceErr := og.blkUtil.UnmapDevice(podDeviceUnmapPath, volName)
-		if unmapDeviceErr != nil {
-			// On failure, return error. Caller will log and retry.
-			return volumeToUnmount.GenerateError("UnmapVolume.UnmapDevice on pod device map path failed", unmapDeviceErr)
-		}
-		// Try to unmap podUID symlink under global map path dir
 		// plugins/kubernetes.io/{PluginName}/volumeDevices/{volumePluginDependentPath}/{podUID}
 		globalUnmapPath := volumeToUnmount.DeviceMountPath
-		unmapDeviceErr = og.blkUtil.UnmapDevice(globalUnmapPath, string(volumeToUnmount.PodUID))
-		if unmapDeviceErr != nil {
+
+		// Execute common unmap
+		unmapErr := ioutil.UnmapBlockVolume(og.blkUtil, globalUnmapPath, podDeviceUnmapPath, volName, volumeToUnmount.PodUID)
+		if unmapErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return volumeToUnmount.GenerateError("UnmapVolume.UnmapDevice on global map path failed", unmapDeviceErr)
+			return volumeToUnmount.GenerateError("UnmapVolume.UnmapBlockVolume failed", unmapErr)
 		}
 
 		klog.Infof(
@@ -1306,34 +1300,13 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		// Search under globalMapPath dir if all symbolic links from pods have been removed already.
 		// If symbolic links are there, pods may still refer the volume.
 		globalMapPath := deviceToDetach.DeviceMountPath
-		refs, err := og.blkUtil.GetDeviceSymlinkRefs(deviceToDetach.DevicePath, globalMapPath)
+		refs, err := og.blkUtil.GetDeviceBindMountRefs(deviceToDetach.DevicePath, globalMapPath)
 		if err != nil {
-			return deviceToDetach.GenerateError("UnmapDevice.GetDeviceSymlinkRefs check failed", err)
+			return deviceToDetach.GenerateError("UnmapDevice.GetDeviceBindMountRefs check failed", err)
 		}
 		if len(refs) > 0 {
 			err = fmt.Errorf("The device %q is still referenced from other Pods %v", globalMapPath, refs)
 			return deviceToDetach.GenerateError("UnmapDevice failed", err)
-		}
-
-		// The block volume is not referenced from Pods. Release file descriptor lock.
-		// This should be done before calling TearDownDevice, because some plugins that do local detach
-		// in TearDownDevice will fail in detaching device due to the refcnt on the loopback device.
-		klog.V(4).Infof("UnmapDevice: deviceToDetach.DevicePath: %v", deviceToDetach.DevicePath)
-		loopPath, err := og.blkUtil.GetLoopDevice(deviceToDetach.DevicePath)
-		if err != nil {
-			if err.Error() == volumepathhandler.ErrDeviceNotFound {
-				klog.Warningf(deviceToDetach.GenerateMsgDetailed("UnmapDevice: Couldn't find loopback device which takes file descriptor lock", fmt.Sprintf("device path: %q", deviceToDetach.DevicePath)))
-			} else {
-				errInfo := "UnmapDevice.GetLoopDevice failed to get loopback device, " + fmt.Sprintf("device path: %q", deviceToDetach.DevicePath)
-				return deviceToDetach.GenerateError(errInfo, err)
-			}
-		} else {
-			if len(loopPath) != 0 {
-				err = og.blkUtil.RemoveLoopDevice(loopPath)
-				if err != nil {
-					return deviceToDetach.GenerateError("UnmapDevice.RemoveLoopDevice failed", err)
-				}
-			}
 		}
 
 		// Execute tear down device

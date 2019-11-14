@@ -29,7 +29,6 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 	"k8s.io/legacy-cloud-providers/aws"
 	utilstrings "k8s.io/utils/strings"
@@ -148,7 +147,7 @@ func (b *awsElasticBlockStoreMapper) SetUpDevice() (string, error) {
 }
 
 func (b *awsElasticBlockStoreMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return util.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
+	return nil
 }
 
 // GetGlobalMapPath returns global map path and error
