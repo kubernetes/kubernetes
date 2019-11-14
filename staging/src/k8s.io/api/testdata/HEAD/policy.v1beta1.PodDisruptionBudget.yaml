@@ -30,6 +30,8 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
+  maxUnavailable: 3
+  minAvailable: 2
   selector:
     matchExpressions:
     - key: p503---477-49p---o61---4fy--9---7--9-9s-0-u5lj2--10pq-0-7-9-2-0/fP81.-.9Vdx.TB_M-H_5_.t..bG0

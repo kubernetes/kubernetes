@@ -32,7 +32,8 @@ metadata:
 spec:
   egress:
   - ports:
-    - protocol: ɗ
+    - port: 3
+      protocol: ɗ
     to:
     - ipBlock:
         cidr: "51"
@@ -74,7 +75,8 @@ spec:
         matchLabels:
           yg--79-e-a74bc-v--0jjy45-17-053.zyyms7-tk1po6c-m61733-x-2v4r--5-xgc3-yz-7-x--c0-w5-6r/78A6.6O: 17_.8CnT
     ports:
-    - protocol: Ǐ2啗塧ȱ蓿彭聡A3fƻfʣ
+    - port: 2
+      protocol: Ǐ2啗塧ȱ蓿彭聡A3fƻfʣ
   podSelector:
     matchExpressions:
     - key: p503---477-49p---o61---4fy--9---7--9-9s-0-u5lj2--10pq-0-7-9-2-0/fP81.-.9Vdx.TB_M-H_5_.t..bG0
