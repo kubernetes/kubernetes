@@ -886,7 +886,7 @@ func observeSuccessfulOperation(verb, typeName string, startTime time.Time, requ
 	metrics.RecordEtcdRequestLatency(verb, typeName, startTime)
 	metrics.RecordEtcdRequestSize(verb, typeName, requestSize)
 	metrics.RecordEtcdResponseSize(verb, typeName,responseSize)
-	klog.Infof("etcd request: operation:%s type:%q request-size: %d, response-size: %d", verb, typeName, responseSize, responseSize)
+	klog.Infof("etcd request: operation:%s type:%q request-size: %d, response-size: %d, latency: %v", verb, typeName, responseSize, responseSize, time.Now().Sub(startTime))
 }
 
 func size(kvs []*mvccpb.KeyValue) uint64 {
