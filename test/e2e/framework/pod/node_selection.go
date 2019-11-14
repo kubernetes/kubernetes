@@ -48,6 +48,28 @@ func setNodeAffinityRequirement(nodeSelection *NodeSelection, operator v1.NodeSe
 		})
 }
 
+// SetNodeAffinityTopologyRequirement sets node affinity to a specified topology
+func SetNodeAffinityTopologyRequirement(nodeSelection *NodeSelection, topology map[string]string) {
+	if nodeSelection.Affinity == nil {
+		nodeSelection.Affinity = &v1.Affinity{}
+	}
+	if nodeSelection.Affinity.NodeAffinity == nil {
+		nodeSelection.Affinity.NodeAffinity = &v1.NodeAffinity{}
+	}
+	if nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{}
+	}
+	for k, v := range topology {
+		nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(nodeSelection.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+			v1.NodeSelectorTerm{
+				MatchExpressions: []v1.NodeSelectorRequirement{
+					{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}},
+				},
+			})
+
+	}
+}
+
 // SetAffinity sets affinity to nodeName to nodeSelection
 func SetAffinity(nodeSelection *NodeSelection, nodeName string) {
 	setNodeAffinityRequirement(nodeSelection, v1.NodeSelectorOpIn, nodeName)
