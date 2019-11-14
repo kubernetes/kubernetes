@@ -25,6 +25,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -88,7 +89,7 @@ func makeTestPod(namespace, name, node string, mirror bool) (*api.Pod, *corev1.P
 			APIVersion: "v1",
 			Kind:       "Node",
 			Name:       node,
-			UID:        "node-uid-12345",
+			UID:        types.UID(node + "-uid"),
 			Controller: &controller,
 		}
 		corePod.OwnerReferences = []metav1.OwnerReference{owner}
@@ -229,11 +230,12 @@ func setForbiddenUpdateLabels(node *api.Node, value string) *api.Node {
 }
 
 type admitTestCase struct {
-	name       string
-	podsGetter corev1lister.PodLister
-	attributes admission.Attributes
-	features   featuregate.FeatureGate
-	err        string
+	name        string
+	podsGetter  corev1lister.PodLister
+	nodesGetter corev1lister.NodeLister
+	attributes  admission.Attributes
+	features    featuregate.FeatureGate
+	err         string
 }
 
 func (a *admitTestCase) run(t *testing.T) {
@@ -243,6 +245,7 @@ func (a *admitTestCase) run(t *testing.T) {
 			c.InspectFeatureGates(a.features)
 		}
 		c.podsGetter = a.podsGetter
+		c.nodesGetter = a.nodesGetter
 		err := c.Admit(context.TODO(), a.attributes, nil)
 		if (err == nil) != (len(a.err) == 0) {
 			t.Errorf("nodePlugin.Admit() error = %v, expected %v", err, a.err)
@@ -259,7 +262,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		mynode = &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
 		bob    = &user.DefaultInfo{Name: "bob"}
 
-		mynodeObjMeta    = metav1.ObjectMeta{Name: "mynode"}
+		mynodeObjMeta    = metav1.ObjectMeta{Name: "mynode", UID: "mynode-uid"}
 		mynodeObj        = &api.Node{ObjectMeta: mynodeObjMeta}
 		mynodeObjConfigA = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{
 			ConfigMap: &api.ConfigMapNodeConfigSource{
@@ -376,6 +379,9 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			},
 		}
 
+		existingNodesIndex = cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+		existingNodes      = corev1lister.NewNodeLister(existingNodesIndex)
+
 		noExistingPodsIndex = cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
 		noExistingPods      = corev1lister.NewPodLister(noExistingPodsIndex)
 
@@ -399,6 +405,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	existingPodsIndex.Add(v1mypod)
 	existingPodsIndex.Add(v1otherpod)
 	existingPodsIndex.Add(v1unboundpod)
+
+	existingNodesIndex.Add(&v1.Node{ObjectMeta: mynodeObjMeta})
 
 	sapod, _ := makeTestPod("ns", "mysapod", "mynode", true)
 	sapod.Spec.ServiceAccountName = "foo"
@@ -1262,11 +1270,23 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt.nodesGetter = existingNodes
 		tt.run(t)
 	}
 }
 
 func Test_nodePlugin_Admit_OwnerReference(t *testing.T) {
+	expectedNodeIndex := cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+	expectedNodeIndex.Add(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "mynode", UID: "mynode-uid"}})
+	expectedNode := corev1lister.NewNodeLister(expectedNodeIndex)
+
+	unexpectedNodeIndex := cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+	unexpectedNodeIndex.Add(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "mynode", UID: "mynode-unexpected-uid"}})
+	unexpectedNode := corev1lister.NewNodeLister(unexpectedNodeIndex)
+
+	noNodesIndex := cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+	noNodes := corev1lister.NewNodeLister(noNodesIndex)
+
 	noExistingPodsIndex := cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
 	noExistingPods := corev1lister.NewPodLister(noExistingPodsIndex)
 
@@ -1275,7 +1295,7 @@ func Test_nodePlugin_Admit_OwnerReference(t *testing.T) {
 		APIVersion: "v1",
 		Kind:       "Node",
 		Name:       "mynode",
-		UID:        "node-uid-12345",
+		UID:        "mynode-uid",
 		Controller: pointer.BoolPtr(true),
 	}
 	invalidName := validOwner
@@ -1292,9 +1312,10 @@ func Test_nodePlugin_Admit_OwnerReference(t *testing.T) {
 	invalidBlockDeletion.BlockOwnerDeletion = pointer.BoolPtr(true)
 
 	tests := []struct {
-		name      string
-		owners    []metav1.OwnerReference
-		expectErr string
+		name        string
+		owners      []metav1.OwnerReference
+		nodesGetter corev1lister.NodeLister
+		expectErr   string
 	}{
 		{
 			name:   "no owner",
@@ -1313,6 +1334,18 @@ func Test_nodePlugin_Admit_OwnerReference(t *testing.T) {
 			name:      "invalid name",
 			owners:    []metav1.OwnerReference{invalidName},
 			expectErr: "can only create pods with an owner reference set to itself",
+		},
+		{
+			name:        "invalid UID",
+			owners:      []metav1.OwnerReference{validOwner},
+			nodesGetter: unexpectedNode,
+			expectErr:   "UID mismatch",
+		},
+		{
+			name:        "node not found",
+			owners:      []metav1.OwnerReference{validOwner},
+			nodesGetter: noNodes,
+			expectErr:   "not found",
 		},
 		{
 			name:      "invalid API version",
@@ -1342,13 +1375,18 @@ func Test_nodePlugin_Admit_OwnerReference(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		if test.nodesGetter == nil {
+			test.nodesGetter = expectedNode
+		}
+
 		pod, _ := makeTestPod("ns", "test", "mynode", true)
 		pod.OwnerReferences = test.owners
 		a := &admitTestCase{
-			name:       test.name,
-			podsGetter: noExistingPods,
-			attributes: createPodAttributes(pod, mynode),
-			err:        test.expectErr,
+			name:        test.name,
+			podsGetter:  noExistingPods,
+			nodesGetter: test.nodesGetter,
+			attributes:  createPodAttributes(pod, mynode),
+			err:         test.expectErr,
 		}
 		a.run(t)
 	}

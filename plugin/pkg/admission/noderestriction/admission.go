@@ -70,6 +70,7 @@ type Plugin struct {
 	*admission.Handler
 	nodeIdentifier nodeidentifier.NodeIdentifier
 	podsGetter     corev1lister.PodLister
+	nodesGetter    corev1lister.NodeLister
 
 	tokenRequestEnabled            bool
 	csiNodeInfoEnabled             bool
@@ -92,6 +93,7 @@ func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 // SetExternalKubeInformerFactory registers an informer factory into Plugin
 func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	p.podsGetter = f.Core().V1().Pods().Lister()
+	p.nodesGetter = f.Core().V1().Nodes().Lister()
 }
 
 // ValidateInitialization validates the Plugin was initialized properly
@@ -101,6 +103,9 @@ func (p *Plugin) ValidateInitialization() error {
 	}
 	if p.podsGetter == nil {
 		return fmt.Errorf("%s requires a pod getter", PluginName)
+	}
+	if p.nodesGetter == nil {
+		return fmt.Errorf("%s requires a node getter", PluginName)
 	}
 	return nil
 }
@@ -127,6 +132,8 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		// disallow requests we cannot match to a particular node
 		return admission.NewForbidden(a, fmt.Errorf("could not determine node from user %q", a.GetUserInfo().GetName()))
 	}
+
+	// TODO: if node doesn't exist and this isn't a create node request, then reject.
 
 	switch a.GetResource().GroupResource() {
 	case podResource:
@@ -230,6 +237,18 @@ func (p *Plugin) admitPodCreate(nodeName string, a admission.Attributes) error {
 		}
 		if owner.BlockOwnerDeletion != nil && *owner.BlockOwnerDeletion {
 			return admission.NewForbidden(a, fmt.Errorf("node %q must not set blockOwnerDeletion on an owner reference", nodeName))
+		}
+
+		// Verify the node UID.
+		node, err := p.nodesGetter.Get(nodeName)
+		if errors.IsNotFound(err) {
+			return err
+		}
+		if err != nil {
+			return admission.NewForbidden(a, fmt.Errorf("error looking up node %s to verify uid: %v", nodeName, err))
+		}
+		if owner.UID != node.UID {
+			return admission.NewForbidden(a, fmt.Errorf("node %s UID mismatch: expected %s got %s", nodeName, owner.UID, node.UID))
 		}
 	}
 
