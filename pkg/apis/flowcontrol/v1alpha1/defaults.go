@@ -40,6 +40,12 @@ func SetDefaults_FlowSchemaSpec(spec *v1alpha1.FlowSchemaSpec) {
 	}
 }
 
+func SetDefaults_LimitedPriorityLevelConfiguration(lplc *v1alpha1.LimitedPriorityLevelConfiguration) {
+	if lplc.AssuredConcurrencyShares == 0 {
+		lplc.AssuredConcurrencyShares = PriorityLevelConfigurationDefaultAssuredConcurrencyShares
+	}
+}
+
 // SetDefaults_FlowSchema sets default values for flow schema
 func SetDefaults_QueuingConfiguration(cfg *v1alpha1.QueuingConfiguration) {
 	if cfg.HandSize == 0 {
@@ -51,8 +57,4 @@ func SetDefaults_QueuingConfiguration(cfg *v1alpha1.QueuingConfiguration) {
 	if cfg.QueueLengthLimit == 0 {
 		cfg.QueueLengthLimit = PriorityLevelConfigurationDefaultQueueLengthLimit
 	}
-	if cfg.AssuredConcurrencyShares == 0 {
-		cfg.AssuredConcurrencyShares = PriorityLevelConfigurationDefaultAssuredConcurrencyShares
-	}
-
 }
