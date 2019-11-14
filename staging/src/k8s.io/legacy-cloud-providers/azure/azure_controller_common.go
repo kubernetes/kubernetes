@@ -33,7 +33,6 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	volerr "k8s.io/cloud-provider/volume/errors"
 	"k8s.io/klog"
-	"k8s.io/utils/keymutex"
 )
 
 const (
@@ -58,9 +57,6 @@ var defaultBackOff = kwait.Backoff{
 	Jitter:   0.0,
 }
 
-// acquire lock to attach/detach disk in one node
-var diskOpMutex = keymutex.NewHashed(0)
-
 type controllerCommon struct {
 	subscriptionID        string
 	location              string
@@ -68,7 +64,9 @@ type controllerCommon struct {
 	resourceGroup         string
 	// store disk URI when disk is in attaching or detaching process
 	diskAttachDetachMap sync.Map
-	cloud               *Cloud
+	// vm disk map used to lock per vm update calls
+	vmLockMap *lockMap
+	cloud     *Cloud
 }
 
 // getNodeVMSet gets the VMSet interface based on config.VMType and the real virtual machine type.
@@ -144,8 +142,8 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 		return -1, fmt.Errorf("failed to get azure instance id for node %q (%v)", nodeName, err)
 	}
 
-	diskOpMutex.LockKey(instanceid)
-	defer diskOpMutex.UnlockKey(instanceid)
+	c.vmLockMap.LockEntry(strings.ToLower(string(nodeName)))
+	defer c.vmLockMap.UnlockEntry(strings.ToLower(string(nodeName)))
 
 	lun, err := c.GetNextDiskLun(nodeName)
 	if err != nil {
@@ -161,7 +159,7 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 
 // DetachDisk detaches a disk from host. The vhd can be identified by diskName or diskURI.
 func (c *controllerCommon) DetachDisk(diskName, diskURI string, nodeName types.NodeName) error {
-	instanceid, err := c.cloud.InstanceID(context.TODO(), nodeName)
+	_, err := c.cloud.InstanceID(context.TODO(), nodeName)
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			// if host doesn't exist, no need to detach
@@ -181,20 +179,20 @@ func (c *controllerCommon) DetachDisk(diskName, diskURI string, nodeName types.N
 	klog.V(2).Infof("detach %v from node %q", diskURI, nodeName)
 
 	// make the lock here as small as possible
-	diskOpMutex.LockKey(instanceid)
+	c.vmLockMap.LockEntry(strings.ToLower(string(nodeName)))
 	c.diskAttachDetachMap.Store(strings.ToLower(diskURI), "detaching")
 	resp, err := vmset.DetachDisk(diskName, diskURI, nodeName)
 	c.diskAttachDetachMap.Delete(strings.ToLower(diskURI))
-	diskOpMutex.UnlockKey(instanceid)
+	c.vmLockMap.UnlockEntry(strings.ToLower(string(nodeName)))
 
 	if c.cloud.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
 		klog.V(2).Infof("azureDisk - update backing off: detach disk(%s, %s), err: %v", diskName, diskURI, err)
 		retryErr := kwait.ExponentialBackoff(c.cloud.RequestBackoff(), func() (bool, error) {
-			diskOpMutex.LockKey(instanceid)
+			c.vmLockMap.LockEntry(strings.ToLower(string(nodeName)))
 			c.diskAttachDetachMap.Store(strings.ToLower(diskURI), "detaching")
 			resp, err := vmset.DetachDisk(diskName, diskURI, nodeName)
 			c.diskAttachDetachMap.Delete(strings.ToLower(diskURI))
-			diskOpMutex.UnlockKey(instanceid)
+			c.vmLockMap.UnlockEntry(strings.ToLower(string(nodeName)))
 			return c.cloud.processHTTPRetryResponse(nil, "", resp, err)
 		})
 		if retryErr != nil {
