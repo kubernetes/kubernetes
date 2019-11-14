@@ -70,6 +70,9 @@ func IsCorruptedMnt(err error) bool {
 	return false
 }
 
+// NormalizeWindowsPath makes sure the given path is a valid path on Windows
+// systems by making sure all instances of `/` are replaced with `\\`, and the
+// path beings with `c:`
 func NormalizeWindowsPath(path string) string {
 	normalizedPath := strings.Replace(path, "/", "\\", -1)
 	if strings.HasPrefix(normalizedPath, "\\") {
