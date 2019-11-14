@@ -14,7 +14,6 @@ pkg/controller/podgc
 pkg/controller/replicaset
 pkg/controller/resourcequota
 pkg/controller/statefulset
-pkg/kubeapiserver/admission
 pkg/kubelet/apis/podresources
 pkg/kubelet/cm/devicemanager
 pkg/kubelet/pluginmanager/operationexecutor
