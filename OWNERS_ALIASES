@@ -217,6 +217,7 @@ aliases:
     - krmayankk
     - mattjmcnaughton
   sig-network-approvers:
+    - andrewsykim
     - bowei
     - caseydavenport
     - danwinship
