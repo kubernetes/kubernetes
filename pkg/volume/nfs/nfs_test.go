@@ -123,7 +123,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if volumePath != expectedPath {
 		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, volumePath)
 	}
-	if _, err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(volumePath); err != nil {

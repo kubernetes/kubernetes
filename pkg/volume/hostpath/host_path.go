@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
-	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/validation"
 )
 
@@ -227,20 +226,16 @@ func (b *hostPathMounter) CanMount() error {
 }
 
 // SetUp does nothing.
-func (b *hostPathMounter) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	internalSetup := func() error {
-		err := validation.ValidatePathNoBacksteps(b.GetPath())
-		if err != nil {
-			return fmt.Errorf("invalid HostPath `%s`: %v", b.GetPath(), err)
-		}
-
-		if *b.pathType == v1.HostPathUnset {
-			return nil
-		}
-		return checkType(b.GetPath(), b.pathType, b.hu)
+func (b *hostPathMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	err := validation.ValidatePathNoBacksteps(b.GetPath())
+	if err != nil {
+		return fmt.Errorf("invalid HostPath `%s`: %v", b.GetPath(), err)
 	}
-	return volumetypes.OperationFinished, internalSetup()
 
+	if *b.pathType == v1.HostPathUnset {
+		return nil
+	}
+	return checkType(b.GetPath(), b.pathType, b.hu)
 }
 
 // SetUpAt does not make sense for host paths - probably programmer error.

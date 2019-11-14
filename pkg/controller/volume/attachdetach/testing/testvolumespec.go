@@ -32,7 +32,6 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 const TestPluginName = "kubernetes.io/testPlugin"
@@ -435,15 +434,15 @@ func (attacher *testPluginAttacher) GetDeviceMountPath(spec *volume.Spec) (strin
 	return "", nil
 }
 
-func (attacher *testPluginAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+func (attacher *testPluginAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
 	attacher.pluginLock.Lock()
 	defer attacher.pluginLock.Unlock()
 	if spec == nil {
 		*attacher.ErrorEncountered = true
 		klog.Errorf("MountDevice called with nil volume spec")
-		return volumetypes.OperationFinished, fmt.Errorf("MountDevice called with nil volume spec")
+		return fmt.Errorf("MountDevice called with nil volume spec")
 	}
-	return volumetypes.OperationFinished, nil
+	return nil
 }
 
 // Detacher

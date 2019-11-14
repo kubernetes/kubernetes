@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
-	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 // NewAttacher implements AttachableVolumePlugin.NewAttacher.
@@ -144,7 +143,10 @@ func (attacher *rbdAttacher) GetDeviceMountPath(spec *volume.Spec) (string, erro
 	return makePDNameInternal(attacher.plugin.host, pool, img), nil
 }
 
-func (attacher *rbdAttacher) mountDeviceInternal(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+// MountDevice implements Attacher.MountDevice. It is called by the kubelet to
+// mount device at the given mount path.
+// This method is idempotent, callers are responsible for retrying on failure.
+func (attacher *rbdAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
 	klog.V(4).Infof("rbd: mouting device %s to %s", devicePath, deviceMountPath)
 	notMnt, err := attacher.mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -180,14 +182,6 @@ func (attacher *rbdAttacher) mountDeviceInternal(spec *volume.Spec, devicePath s
 	}
 	klog.V(3).Infof("rbd: successfully mount device %s at %s (fstype: %s)", devicePath, deviceMountPath, fstype)
 	return nil
-}
-
-// MountDevice implements Attacher.MountDevice. It is called by the kubelet to
-// mount device at the given mount path.
-// This method is idempotent, callers are responsible for retrying on failure.
-func (attacher *rbdAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
-	err := attacher.mountDeviceInternal(spec, devicePath, deviceMountPath)
-	return volumetypes.OperationFinished, err
 }
 
 // rbdDetacher implements volume.Detacher interface.

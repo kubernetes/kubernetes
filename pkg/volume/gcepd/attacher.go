@@ -38,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/legacy-cloud-providers/gce"
 )
 
@@ -287,7 +286,7 @@ func (attacher *gcePersistentDiskAttacher) GetDeviceMountPath(
 	return makeGlobalPDName(attacher.host, volumeSource.PDName), nil
 }
 
-func (attacher *gcePersistentDiskAttacher) mountDeviceInternal(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *gcePersistentDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
 	// Only mount the PD globally once.
 	mounter := attacher.host.GetMounter(gcePersistentDiskPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
@@ -327,11 +326,6 @@ func (attacher *gcePersistentDiskAttacher) mountDeviceInternal(spec *volume.Spec
 		klog.V(4).Infof("formatting spec %v devicePath %v deviceMountPath %v fs %v with options %+v", spec.Name(), devicePath, deviceMountPath, volumeSource.FSType, options)
 	}
 	return nil
-}
-
-func (attacher *gcePersistentDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
-	err := attacher.mountDeviceInternal(spec, devicePath, deviceMountPath)
-	return volumetypes.OperationFinished, err
 }
 
 type gcePersistentDiskDetacher struct {

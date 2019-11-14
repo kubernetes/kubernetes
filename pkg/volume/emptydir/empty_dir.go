@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/fsquota"
-	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 // TODO: in the near future, this will be changed to be more restrictive
@@ -193,9 +192,8 @@ func (ed *emptyDir) CanMount() error {
 }
 
 // SetUp creates new directory.
-func (ed *emptyDir) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := ed.SetUpAt(ed.GetPath(), mounterArgs)
-	return volumetypes.OperationFinished, err
+func (ed *emptyDir) SetUp(mounterArgs volume.MounterArgs) error {
+	return ed.SetUpAt(ed.GetPath(), mounterArgs)
 }
 
 // SetUpAt creates new directory.

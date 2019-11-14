@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -220,9 +219,8 @@ func (cephfsVolume *cephfsMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (cephfsVolume *cephfsMounter) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := cephfsVolume.SetUpAt(cephfsVolume.GetPath(), mounterArgs)
-	return volumetypes.OperationFinished, err
+func (cephfsVolume *cephfsMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return cephfsVolume.SetUpAt(cephfsVolume.GetPath(), mounterArgs)
 }
 
 // SetUpAt attaches the disk and bind mounts to the volume path.

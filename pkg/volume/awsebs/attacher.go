@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/legacy-cloud-providers/aws"
 )
 
@@ -207,7 +206,7 @@ func (attacher *awsElasticBlockStoreAttacher) GetDeviceMountPath(
 }
 
 // FIXME: this method can be further pruned.
-func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
 	mounter := attacher.host.GetMounter(awsElasticBlockStorePluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -222,17 +221,17 @@ func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, dev
 				dir = filepath.Dir(deviceMountPath)
 			}
 			if err := os.MkdirAll(dir, 0750); err != nil {
-				return volumetypes.OperationFinished, fmt.Errorf("making dir %s failed with %s", dir, err)
+				return fmt.Errorf("making dir %s failed with %s", dir, err)
 			}
 			notMnt = true
 		} else {
-			return volumetypes.OperationFinished, err
+			return err
 		}
 	}
 
 	volumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
-		return volumetypes.OperationFinished, err
+		return err
 	}
 
 	options := []string{}
@@ -245,10 +244,10 @@ func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, dev
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
 		if err != nil {
 			os.Remove(deviceMountPath)
-			return volumetypes.OperationFinished, err
+			return err
 		}
 	}
-	return volumetypes.OperationFinished, nil
+	return nil
 }
 
 type awsElasticBlockStoreDetacher struct {

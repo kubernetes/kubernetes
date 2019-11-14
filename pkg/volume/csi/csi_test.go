@@ -360,7 +360,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				if err != nil {
 					t.Fatalf("csiTest.VolumeAll deviceMounter.GetdeviceMountPath failed %s", err)
 				}
-				if _, err := csiDevMounter.MountDevice(volSpec, devicePath, devMountPath); err != nil {
+				if err := csiDevMounter.MountDevice(volSpec, devicePath, devMountPath); err != nil {
 					t.Fatalf("csiTest.VolumeAll deviceMounter.MountDevice failed: %v", err)
 				}
 				t.Log("csiTest.VolumeAll device mounted at path:", devMountPath)
@@ -417,7 +417,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			csiMounter.csiClient = csiClient
 			var mounterArgs volume.MounterArgs
 			mounterArgs.FsGroup = fsGroup
-			if _, err := csiMounter.SetUp(mounterArgs); err != nil {
+			if err := csiMounter.SetUp(mounterArgs); err != nil {
 				t.Fatalf("csiTest.VolumeAll mounter.Setup(fsGroup) failed: %s", err)
 			}
 			t.Log("csiTest.VolumeAll mounter.Setup(fsGroup) done OK")

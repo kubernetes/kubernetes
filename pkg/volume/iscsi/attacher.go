@@ -31,8 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/utils/keymutex"
 )
 
 type iscsiAttacher struct {
@@ -102,7 +100,7 @@ func (attacher *iscsiAttacher) GetDeviceMountPath(
 	return attacher.manager.MakeGlobalPDName(*mounter.iscsiDisk), nil
 }
 
-func (attacher *iscsiAttacher) mountDeviceInternal(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *iscsiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
 	mounter := attacher.host.GetMounter(iscsiPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -134,11 +132,6 @@ func (attacher *iscsiAttacher) mountDeviceInternal(spec *volume.Spec, devicePath
 		}
 	}
 	return nil
-}
-
-func (attacher *iscsiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
-	err := attacher.mountDeviceInternal(spec, devicePath, deviceMountPath)
-	return volumetypes.OperationFinished, err
 }
 
 type iscsiDetacher struct {

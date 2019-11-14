@@ -34,7 +34,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 type cinderDiskAttacher struct {
@@ -269,7 +268,7 @@ func (attacher *cinderDiskAttacher) GetDeviceMountPath(
 }
 
 // FIXME: this method can be further pruned.
-func (attacher *cinderDiskAttacher) mountDeviceInternal(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
 	mounter := attacher.host.GetMounter(cinderVolumePluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -302,11 +301,6 @@ func (attacher *cinderDiskAttacher) mountDeviceInternal(spec *volume.Spec, devic
 		}
 	}
 	return nil
-}
-
-func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
-	err := attacher.mountDeviceInternal(spec, devicePath, deviceMountPath)
-	return volumetypes.OperationFinished, err
 }
 
 type cinderDiskDetacher struct {

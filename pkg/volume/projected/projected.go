@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/downwardapi"
 	"k8s.io/kubernetes/pkg/volume/secret"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -185,9 +184,8 @@ func (s *projectedVolumeMounter) CanMount() error {
 	return nil
 }
 
-func (s *projectedVolumeMounter) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := s.SetUpAt(s.GetPath(), mounterArgs)
-	return volumetypes.OperationFinished, err
+func (s *projectedVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return s.SetUpAt(s.GetPath(), mounterArgs)
 }
 
 func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {

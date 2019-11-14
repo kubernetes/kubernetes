@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -235,10 +234,9 @@ func (mounter *quobyteMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (mounter *quobyteMounter) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+func (mounter *quobyteMounter) SetUp(mounterArgs volume.MounterArgs) error {
 	pluginDir := mounter.plugin.host.GetPluginDir(utilstrings.EscapeQualifiedName(quobytePluginName))
-	err := mounter.SetUpAt(pluginDir, mounterArgs)
-	return volumetypes.OperationFinished, err
+	return mounter.SetUpAt(pluginDir, mounterArgs)
 }
 
 func (mounter *quobyteMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {

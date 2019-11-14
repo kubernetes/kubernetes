@@ -201,7 +201,7 @@ func TestInvalidLocalPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = mounter.SetUp(volume.MounterArgs{})
+	err = mounter.SetUp(volume.MounterArgs{})
 	expectedMsg := "invalid path: /no/backsteps/allowed/.. must not contain '..'"
 	if err.Error() != expectedMsg {
 		t.Fatalf("expected error `%s` but got `%s`", expectedMsg, err)
@@ -231,7 +231,7 @@ func TestBlockDeviceGlobalPathAndMountDevice(t *testing.T) {
 
 	fmt.Println("expected global path is:", expectedGlobalPath)
 
-	_, err = dm.MountDevice(pvSpec, tmpBlockDir, expectedGlobalPath)
+	err = dm.MountDevice(pvSpec, tmpBlockDir, expectedGlobalPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +276,7 @@ func TestFSGlobalPathAndMountDevice(t *testing.T) {
 	}
 
 	// Actually, we will do nothing if the local path is FS type
-	_, err = dm.MountDevice(pvSpec, tmpFSDir, expectedGlobalPath)
+	err = dm.MountDevice(pvSpec, tmpFSDir, expectedGlobalPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -308,7 +308,7 @@ func TestMountUnmount(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if _, err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 
@@ -429,7 +429,7 @@ func testFSGroupMount(plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGr
 
 	var mounterArgs volume.MounterArgs
 	mounterArgs.FsGroup = &fsGroup
-	if _, err := mounter.SetUp(mounterArgs); err != nil {
+	if err := mounter.SetUp(mounterArgs); err != nil {
 		return err
 	}
 	return nil
@@ -587,7 +587,7 @@ func TestMountOptions(t *testing.T) {
 	fakeMounter := mount.NewFakeMounter(nil)
 	mounter.(*localVolumeMounter).mounter = fakeMounter
 
-	if _, err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	mountOptions := fakeMounter.MountPoints[0].Opts

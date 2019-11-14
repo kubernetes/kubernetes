@@ -1056,6 +1056,9 @@ func TestAttacherGetDeviceMountPath(t *testing.T) {
 
 func TestAttacherMountDevice(t *testing.T) {
 	pvName := "test-pv"
+	nonFinalError := volumetypes.NewUncertainProgressError("")
+	transientError := volumetypes.NewTransientOperationFailure("")
+
 	testCases := []struct {
 		testName         string
 		volName          string
@@ -1064,7 +1067,7 @@ func TestAttacherMountDevice(t *testing.T) {
 		stageUnstageSet  bool
 		shouldFail       bool
 		createAttachment bool
-		exitStatus       volumetypes.OperationStatus
+		exitError        error
 		spec             *volume.Spec
 	}{
 		{
@@ -1075,7 +1078,6 @@ func TestAttacherMountDevice(t *testing.T) {
 			stageUnstageSet:  true,
 			createAttachment: true,
 			spec:             volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
-			exitStatus:       volumetypes.OperationFinished,
 		},
 		{
 			testName:         "normal PV with mount options",
@@ -1084,7 +1086,6 @@ func TestAttacherMountDevice(t *testing.T) {
 			deviceMountPath:  "path2",
 			stageUnstageSet:  true,
 			createAttachment: true,
-			exitStatus:       volumetypes.OperationFinished,
 			spec:             volume.NewSpecFromPersistentVolume(makeTestPVWithMountOptions(pvName, 10, testDriver, "test-vol1", []string{"test-op"}), false),
 		},
 		{
@@ -1095,7 +1096,7 @@ func TestAttacherMountDevice(t *testing.T) {
 			stageUnstageSet:  true,
 			createAttachment: false,
 			shouldFail:       true,
-			exitStatus:       volumetypes.OperationStateNoChange,
+			exitError:        transientError,
 			spec:             volume.NewSpecFromPersistentVolume(makeTestPVWithMountOptions(pvName, 10, testDriver, "test-vol1", []string{"test-op"}), false),
 		},
 		{
@@ -1106,7 +1107,6 @@ func TestAttacherMountDevice(t *testing.T) {
 			stageUnstageSet:  true,
 			shouldFail:       true,
 			createAttachment: true,
-			exitStatus:       volumetypes.OperationFinished,
 			spec:             volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, ""), false),
 		},
 		{
@@ -1117,7 +1117,6 @@ func TestAttacherMountDevice(t *testing.T) {
 			stageUnstageSet:  true,
 			shouldFail:       false,
 			createAttachment: true,
-			exitStatus:       volumetypes.OperationFinished,
 			spec:             volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
 		},
 		{
@@ -1128,7 +1127,6 @@ func TestAttacherMountDevice(t *testing.T) {
 			stageUnstageSet:  true,
 			shouldFail:       true,
 			createAttachment: true,
-			exitStatus:       volumetypes.OperationFinished,
 			spec:             volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
 		},
 		{
@@ -1138,7 +1136,6 @@ func TestAttacherMountDevice(t *testing.T) {
 			deviceMountPath:  "path2",
 			stageUnstageSet:  false,
 			createAttachment: true,
-			exitStatus:       volumetypes.OperationFinished,
 			spec:             volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
 		},
 		{
@@ -1148,7 +1145,6 @@ func TestAttacherMountDevice(t *testing.T) {
 			deviceMountPath:  "path2",
 			shouldFail:       true,
 			createAttachment: true,
-			exitStatus:       volumetypes.OperationFinished,
 			spec:             volume.NewSpecFromVolume(makeTestVol(pvName, testDriver)),
 		},
 		{
@@ -1159,7 +1155,7 @@ func TestAttacherMountDevice(t *testing.T) {
 			stageUnstageSet:  true,
 			createAttachment: true,
 			spec:             volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, fakecsi.NodeStageTimeOut_VolumeID), false),
-			exitStatus:       volumetypes.OperationInProgress,
+			exitError:        nonFinalError,
 			shouldFail:       true,
 		},
 	}
@@ -1199,7 +1195,7 @@ func TestAttacherMountDevice(t *testing.T) {
 			}
 
 			// Run
-			exitStatus, err := csiAttacher.MountDevice(tc.spec, tc.devicePath, tc.deviceMountPath)
+			err := csiAttacher.MountDevice(tc.spec, tc.devicePath, tc.deviceMountPath)
 
 			// Verify
 			if err != nil {
@@ -1212,8 +1208,8 @@ func TestAttacherMountDevice(t *testing.T) {
 				t.Errorf("test should fail, but no error occurred")
 			}
 
-			if exitStatus != tc.exitStatus {
-				t.Fatalf("expected exitStatus: %v got: %v", tc.exitStatus, exitStatus)
+			if tc.exitError != nil && reflect.TypeOf(tc.exitError) != reflect.TypeOf(err) {
+				t.Fatalf("expected exitError: %v got: %v", tc.exitError, err)
 			}
 
 			// Verify call goes through all the way
@@ -1348,7 +1344,7 @@ func TestAttacherMountDeviceWithInline(t *testing.T) {
 			}()
 
 			// Run
-			_, err = csiAttacher.MountDevice(tc.spec, tc.devicePath, tc.deviceMountPath)
+			err = csiAttacher.MountDevice(tc.spec, tc.devicePath, tc.deviceMountPath)
 
 			// Verify
 			if err != nil {

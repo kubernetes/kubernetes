@@ -224,7 +224,6 @@ go_test(
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/hostutil:go_default_library",
         "//pkg/volume/util/subpath:go_default_library",
-        "//pkg/volume/util/types:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

@@ -221,7 +221,7 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 			var mounterArgs volume.MounterArgs
 			fsGroup := int64(2000)
 			mounterArgs.FsGroup = &fsGroup
-			if _, err := csiMounter.SetUp(mounterArgs); err != nil {
+			if err := csiMounter.SetUp(mounterArgs); err != nil {
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
 
@@ -361,7 +361,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 			}
 
 			// Mounter.SetUp()
-			if _, err := csiMounter.SetUp(volume.MounterArgs{}); err != nil {
+			if err := csiMounter.SetUp(volume.MounterArgs{}); err != nil {
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
 
@@ -402,13 +402,15 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 	fakeClient := fakeclient.NewSimpleClientset()
 	plug, tmpDir := newTestPlugin(t, fakeClient)
 	defer os.RemoveAll(tmpDir)
+	nonFinalError := volumetypes.NewUncertainProgressError("non-final-error")
+	transientError := volumetypes.NewTransientOperationFailure("transient-error")
 
 	testCases := []struct {
 		name             string
 		podUID           types.UID
 		spec             func(string, []string) *volume.Spec
 		shouldFail       bool
-		exitStatus       volumetypes.OperationStatus
+		exitError        error
 		createAttachment bool
 	}{
 		{
@@ -420,7 +422,6 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 				pvSrc.Spec.MountOptions = options
 				return volume.NewSpecFromPersistentVolume(pvSrc, false)
 			},
-			exitStatus:       volumetypes.OperationFinished,
 			createAttachment: true,
 		},
 		{
@@ -429,7 +430,7 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 			spec: func(fsType string, options []string) *volume.Spec {
 				return volume.NewSpecFromPersistentVolume(makeTestPV("pv3", 20, testDriver, "vol4"), false)
 			},
-			exitStatus:       volumetypes.OperationStateNoChange,
+			exitError:        transientError,
 			createAttachment: false,
 			shouldFail:       true,
 		},
@@ -440,7 +441,7 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 				return volume.NewSpecFromPersistentVolume(makeTestPV("pv4", 20, testDriver, fakecsi.NodePublishTimeOut_VolumeID), false)
 			},
 			createAttachment: true,
-			exitStatus:       volumetypes.OperationInProgress,
+			exitError:        nonFinalError,
 			shouldFail:       true,
 		},
 		{
@@ -454,7 +455,7 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 				}
 				return volume.NewSpecFromPersistentVolume(pv, false)
 			},
-			exitStatus:       volumetypes.OperationStateNoChange,
+			exitError:        transientError,
 			createAttachment: true,
 			shouldFail:       true,
 		},
@@ -487,11 +488,10 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 					t.Fatalf("failed to setup VolumeAttachment: %v", err)
 				}
 			}
+			err = csiMounter.SetUp(volume.MounterArgs{})
 
-			opExistStatus, err := csiMounter.SetUp(volume.MounterArgs{})
-
-			if opExistStatus != tc.exitStatus {
-				t.Fatalf("expected exitStatus: %v but got %v", tc.exitStatus, opExistStatus)
+			if tc.exitError != nil && reflect.TypeOf(tc.exitError) != reflect.TypeOf(err) {
+				t.Fatalf("expected exitError: %+v got: %+v", tc.exitError, err)
 			}
 
 			if tc.shouldFail && err == nil {
@@ -604,7 +604,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 			}
 
 			// Mounter.SetUp()
-			if _, err := csiMounter.SetUp(volume.MounterArgs{}); err != nil {
+			if err := csiMounter.SetUp(volume.MounterArgs{}); err != nil {
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
 
@@ -757,7 +757,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 			fsGroupPtr = &fsGroup
 		}
 		mounterArgs.FsGroup = fsGroupPtr
-		if _, err := csiMounter.SetUp(mounterArgs); err != nil {
+		if err := csiMounter.SetUp(mounterArgs); err != nil {
 			t.Fatalf("mounter.Setup failed: %v", err)
 		}
 

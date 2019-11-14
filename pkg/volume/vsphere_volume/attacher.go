@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/legacy-cloud-providers/vsphere"
 )
 
@@ -208,7 +207,8 @@ func (plugin *vsphereVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([
 	return mounter.GetMountRefs(deviceMountPath)
 }
 
-func (attacher *vsphereVMDKAttacher) mountDeviceInternal(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+// MountDevice mounts device to global mount point.
+func (attacher *vsphereVMDKAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
 	klog.Info("vsphere MountDevice", devicePath, deviceMountPath)
 	mounter := attacher.host.GetMounter(vsphereVolumePluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
@@ -246,12 +246,6 @@ func (attacher *vsphereVMDKAttacher) mountDeviceInternal(spec *volume.Spec, devi
 		klog.V(4).Infof("formatting spec %v devicePath %v deviceMountPath %v fs %v with options %+v", spec.Name(), devicePath, deviceMountPath, volumeSource.FSType, options)
 	}
 	return nil
-}
-
-// MountDevice mounts device to global mount point.
-func (attacher *vsphereVMDKAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
-	err := attacher.mountDeviceInternal(spec, devicePath, deviceMountPath)
-	return volumetypes.OperationFinished, err
 }
 
 type vsphereVMDKDetacher struct {

@@ -19,11 +19,10 @@ package volume
 import (
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 // Volume represents a directory used by pods or hosts on a node. All method
@@ -129,7 +128,11 @@ type Mounter interface {
 	// content should be owned by 'fsGroup' so that it can be
 	// accessed by the pod. This may be called more than once, so
 	// implementations must be idempotent.
-	SetUp(mounterArgs MounterArgs) (volumetypes.OperationStatus, error)
+	// It could return following types of errors:
+	//   - TransientOperationFailure
+	//   - UncertainProgressError
+	//   - Error of any other type should be considered a final error
+	SetUp(mounterArgs MounterArgs) error
 
 	// SetUpAt prepares and mounts/unpacks the volume to the
 	// specified directory path, which may or may not exist yet.
@@ -249,7 +252,11 @@ type DeviceMounter interface {
 	// MountDevice mounts the disk to a global path which
 	// individual pods can then bind mount
 	// Note that devicePath can be empty if the volume plugin does not implement any of Attach and WaitForAttach methods.
-	MountDevice(spec *Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error)
+	// It could return following types of errors:
+	//   - TransientOperationFailure
+	//   - UncertainProgressError
+	//   - Error of any other type should be considered a final error
+	MountDevice(spec *Spec, devicePath string, deviceMountPath string) error
 }
 
 type BulkVolumeVerifier interface {

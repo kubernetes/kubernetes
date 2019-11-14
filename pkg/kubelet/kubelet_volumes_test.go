@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
-	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 func TestListVolumesForPod(t *testing.T) {
@@ -531,8 +530,8 @@ func (f *stubVolume) CanMount() error {
 	return nil
 }
 
-func (f *stubVolume) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	return volumetypes.OperationFinished, nil
+func (f *stubVolume) SetUp(mounterArgs volume.MounterArgs) error {
+	return nil
 }
 
 func (f *stubVolume) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {

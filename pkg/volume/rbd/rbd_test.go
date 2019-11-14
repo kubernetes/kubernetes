@@ -281,7 +281,7 @@ func doTestPlugin(t *testing.T, c *testcase) {
 	if deviceMountPath != c.expectedDeviceMountPath {
 		t.Errorf("Unexpected mount path, expected %q, not: %q", c.expectedDeviceMountPath, deviceMountPath)
 	}
-	_, err = attacher.MountDevice(c.spec, devicePath, deviceMountPath)
+	err = attacher.MountDevice(c.spec, devicePath, deviceMountPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +307,7 @@ func doTestPlugin(t *testing.T, c *testcase) {
 		t.Errorf("Unexpected path, expected %q, got: %q", c.expectedPodMountPath, path)
 	}
 
-	if _, err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {

@@ -21,7 +21,6 @@ go_library(
         "//pkg/util/node:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
-        "//pkg/volume/util/types:go_default_library",
         "//pkg/volume/util/volumepathhandler:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",

@@ -21,7 +21,6 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/volume"
-	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/utils/exec"
 )
 
@@ -40,9 +39,8 @@ var _ volume.Mounter = &flexVolumeMounter{}
 // Mounter interface
 
 // SetUp creates new directory.
-func (f *flexVolumeMounter) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := f.SetUpAt(f.GetPath(), mounterArgs)
-	return volumetypes.OperationFinished, err
+func (f *flexVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return f.SetUpAt(f.GetPath(), mounterArgs)
 }
 
 // SetUpAt creates new directory.

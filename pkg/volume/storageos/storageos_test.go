@@ -210,7 +210,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Expected path: '%s' got: '%s'", expectedPath, volPath)
 	}
 
-	if _, err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(volPath); err != nil {
