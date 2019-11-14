@@ -87,6 +87,7 @@ type KubeControllerManagerOptions struct {
 	InsecureServing *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback
 	Authentication  *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization   *apiserveroptions.DelegatingAuthorizationOptions
+	Metrics         *metrics.Options
 
 	Master                      string
 	Kubeconfig                  string
@@ -177,6 +178,7 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		}).WithLoopback(),
 		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
+		Metrics:        metrics.NewOptions(),
 	}
 
 	s.Authentication.RemoteKubeConfigFileOptional = true
@@ -246,19 +248,12 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.ResourceQuotaController.AddFlags(fss.FlagSet("resourcequota controller"))
 	s.SAController.AddFlags(fss.FlagSet("serviceaccount controller"))
 	s.TTLAfterFinishedController.AddFlags(fss.FlagSet("ttl-after-finished controller"))
+	s.Metrics.AddFlags(fss.FlagSet("metrics"))
 
 	fs := fss.FlagSet("misc")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fss.FlagSet("generic"))
-
-	mfs := fss.FlagSet("metrics")
-	mfs.StringVar(&s.ShowHiddenMetricsForVersion, "show-hidden-metrics-for-version", s.ShowHiddenMetricsForVersion,
-		"The previous version for which you want to show hidden metrics. "+
-			"Only the previous minor version is meaningful, other values will not be allowed. "+
-			"The format is <major>.<minor>, e.g.: '1.16'. "+
-			"The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics, "+
-			"rather than being surprised when they are permanently removed in the release after that.")
 
 	return fss
 }
@@ -392,7 +387,7 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.InsecureServing.Validate()...)
 	errs = append(errs, s.Authentication.Validate()...)
 	errs = append(errs, s.Authorization.Validate()...)
-	errs = append(errs, metrics.ValidateShowHiddenMetricsVersion(s.ShowHiddenMetricsForVersion)...)
+	errs = append(errs, s.Metrics.Validate()...)
 
 	// TODO: validate component config, master and kubeconfig
 
@@ -440,10 +435,7 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 	if err := s.ApplyTo(c); err != nil {
 		return nil, err
 	}
-
-	if len(s.ShowHiddenMetricsForVersion) > 0 {
-		metrics.SetShowHidden()
-	}
+	s.Metrics.Apply()
 
 	return c, nil
 }

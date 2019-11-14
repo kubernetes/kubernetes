@@ -51,19 +51,6 @@ func shouldHide(currentVersion *semver.Version, deprecatedVersion *semver.Versio
 	return false
 }
 
-func validateShowHiddenMetricsVersion(currentVersion semver.Version, targetVersionStr string) error {
-	if targetVersionStr == "" {
-		return nil
-	}
-
-	validVersionStr := fmt.Sprintf("%d.%d", currentVersion.Major, currentVersion.Minor-1)
-	if targetVersionStr != validVersionStr {
-		return fmt.Errorf("--show-hidden-metrics-for-version must be omitted or have the value '%v'. Only the previous minor version is allowed", validVersionStr)
-	}
-
-	return nil
-}
-
 // ValidateShowHiddenMetricsVersion checks invalid version for which show hidden metrics.
 func ValidateShowHiddenMetricsVersion(v string) []error {
 	err := validateShowHiddenMetricsVersion(parseVersion(version.Get()), v)
