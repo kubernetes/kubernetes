@@ -31,6 +31,8 @@ import (
 const (
 	// AWSEBSDriverName is the name of the CSI driver for EBS
 	AWSEBSDriverName = "ebs.csi.aws.com"
+	// AWSEBSTopologyKey is the zonal topology key for AWS EBS CSI Driver
+	AWSEBSTopologyKey = "topology.ebs.csi.aws.com/zone"
 	// AWSEBSInTreePluginName is the name of the intree plugin for EBS
 	AWSEBSInTreePluginName = "kubernetes.io/aws-ebs"
 )
@@ -119,6 +121,10 @@ func (t *awsElasticBlockStoreCSITranslator) TranslateInTreePVToCSI(pv *v1.Persis
 		VolumeAttributes: map[string]string{
 			"partition": strconv.FormatInt(int64(ebsSource.Partition), 10),
 		},
+	}
+
+	if err := translateTopology(pv, AWSEBSTopologyKey); err != nil {
+		return nil, fmt.Errorf("failed to translate topology: %v", err)
 	}
 
 	pv.Spec.AWSElasticBlockStore = nil
