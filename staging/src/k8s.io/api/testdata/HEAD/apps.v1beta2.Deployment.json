@@ -1370,36 +1370,37 @@
               ]
             }
           }
-        ]
+        ],
+        "ttlSecondsAfterFinished": 920774957
       }
     },
     "strategy": {
-      "type": "荥ơ'禧ǵŊ)TiD¢ƿ媴h5",
+      "type": "4Y鳲Jɡ",
       "rollingUpdate": {
         
       }
     },
-    "minReadySeconds": 212061711,
-    "revisionHistoryLimit": -1092090658,
-    "progressDeadlineSeconds": -1707056814
+    "minReadySeconds": -419004432,
+    "revisionHistoryLimit": -2085203475,
+    "progressDeadlineSeconds": 1509382724
   },
   "status": {
-    "observedGeneration": 2992108727478230062,
-    "replicas": 407742062,
-    "updatedReplicas": 2115789304,
-    "readyReplicas": 902022378,
-    "availableReplicas": 1660081568,
-    "unavailableReplicas": 904244563,
+    "observedGeneration": -1204525443392556846,
+    "replicas": 713723472,
+    "updatedReplicas": -420410572,
+    "readyReplicas": 2090641304,
+    "availableReplicas": 212061711,
+    "unavailableReplicas": 1698016262,
     "conditions": [
       {
-        "type": "洅啶",
-        "status": "Ƅ抄3昞财Î嘝zʄ",
-        "lastUpdateTime": "2524-02-08T04:27:05Z",
-        "lastTransitionTime": "2146-08-16T07:05:27Z",
+        "type": "D宊獟¡鯩W",
+        "status": "潑鶋洅啶",
+        "lastUpdateTime": "2298-08-12T23:51:42Z",
+        "lastTransitionTime": "2145-08-16T17:56:09Z",
         "reason": "426",
         "message": "427"
       }
     ],
-    "collisionCount": -1977467928
+    "collisionCount": 867742020
   }
 }

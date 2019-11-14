@@ -30,12 +30,12 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  minReadySeconds: 212061711
-  progressDeadlineSeconds: 1109758199
+  minReadySeconds: -419004432
+  progressDeadlineSeconds: 1690909182
   replicas: 896585016
-  revisionHistoryLimit: -1092090658
+  revisionHistoryLimit: -2085203475
   rollbackTo:
-    revision: -318895959020904110
+    revision: 406887705435658820
   selector:
     matchExpressions:
     - key: 50-u--25cu87--r7p-w1e67-8pj5t-kl-v0q6b68--nu5oii38fn-8.629b-jd-8c45-0-8--6n--w0--w---196g8d--iv1-5--5ht-a-29--0qso796/3___47._49pIB_o61ISU4--A_.XK_._M99
@@ -44,7 +44,7 @@ spec:
       74404d5---g8c2-k-91e.y5-g--58----0683-b-w7ld-6cs06xj-x5yv0wm-k18/M_-Nx.N_6-___._-.-W._AAn---v_-5-_8LXj: 6-4_WE-_JTrcd-2.-__E_Sv__26KX_R_.-.Nth._--S_4DA_-5_-4lQ42M--1
   strategy:
     rollingUpdate: {}
-    type: 荥ơ'禧ǵŊ)TiD¢ƿ媴h5
+    type: 4Y鳲Jɡ
   template:
     metadata:
       annotations:
@@ -744,6 +744,7 @@ spec:
         maxSkew: -137402083
         topologyKey: "419"
         whenUnsatisfiable: Ȩç捌聮ŃŻ@ǮJ=礏ƴ磳藷曥
+      ttlSecondsAfterFinished: 920774957
       volumes:
       - awsElasticBlockStore:
           fsType: "47"
@@ -944,17 +945,17 @@ spec:
           storagePolicyName: "103"
           volumePath: "101"
 status:
-  availableReplicas: 740158871
-  collisionCount: 571778293
+  availableReplicas: -1092090658
+  collisionCount: -2111453451
   conditions:
-  - lastTransitionTime: "1970-05-16T01:44:00Z"
-    lastUpdateTime: "2469-07-10T03:20:34Z"
+  - lastTransitionTime: "2683-06-27T07:30:49Z"
+    lastUpdateTime: "2956-12-23T01:34:27Z"
     message: "427"
     reason: "426"
-    status: '''ƈoIǢ龞瞯å'
-    type: ""
-  observedGeneration: 1751238822830387407
-  readyReplicas: -1450995995
-  replicas: -106050665
-  unavailableReplicas: -449319810
-  updatedReplicas: -929473748
+    status: ¡鯩WɓDɏ挭跡Ƅ抄3昞财Î嘝zʄ!ć
+    type: "N"
+  observedGeneration: 3065418972607127731
+  readyReplicas: 1869087237
+  replicas: -1004855892
+  unavailableReplicas: -1979737528
+  updatedReplicas: -229216582
