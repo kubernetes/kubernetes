@@ -96,7 +96,6 @@ package_group(
         "//pkg/kubelet/server",
         "//pkg/kubelet/server/stats",
         "//pkg/kubelet/volumemanager/metrics",
-        "//pkg/master",
         "//pkg/scheduler/framework/v1alpha1",
         "//pkg/volume/util/operationexecutor",
         "//staging/src/k8s.io/apiserver/pkg/admission/metrics",
