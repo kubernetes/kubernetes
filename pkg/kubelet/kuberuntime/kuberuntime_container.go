@@ -288,6 +288,12 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 			Propagation:    v.Propagation,
 		}
 
+		// Docker on Windows does some path fixups that were not carried into ContainerD.
+		// Make sure the ContainerPaths which are interpreted inside the container
+		//  have 'c:' and slashes facing the right way
+		if (goruntime.GOOS == "windows" && m.Type() != types.DockerContainerRuntime) {
+			mount.ContainerPath = volumeutil.GetWindowsPath(v.ContainerPath)
+		}
 		volumeMounts = append(volumeMounts, mount)
 	}
 
