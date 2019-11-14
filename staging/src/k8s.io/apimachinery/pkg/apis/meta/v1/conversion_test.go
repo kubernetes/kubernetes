@@ -75,13 +75,13 @@ func TestConvertSliceStringToDeletionPropagation(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		var dp v1.DeletionPropagation
-		if err := v1.Convert_Slice_string_To_v1_DeletionPropagation(&tc.Input, &dp, nil); err != nil {
-			t.Errorf("Convert_Slice_string_To_v1_DeletionPropagation(%#v): %v", tc.Input, err)
+		var dpPtr *v1.DeletionPropagation
+		if err := v1.Convert_Slice_string_To_Pointer_v1_DeletionPropagation(&tc.Input, &dpPtr, nil); err != nil {
+			t.Errorf("Convert_Slice_string_To_Pointer_v1_DeletionPropagation(%#v): %v", tc.Input, err)
 			continue
 		}
-		if !apiequality.Semantic.DeepEqual(dp, tc.Output) {
-			t.Errorf("slice string to DeletionPropagation conversion failed: got %v; want %v", dp, tc.Output)
+		if !apiequality.Semantic.DeepEqual(dpPtr, &tc.Output) {
+			t.Errorf("slice string to DeletionPropagation conversion failed: got %v; want %v", *dpPtr, tc.Output)
 		}
 	}
 }

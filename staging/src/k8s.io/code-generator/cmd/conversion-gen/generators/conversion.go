@@ -1068,6 +1068,11 @@ func (g *genConversion) generateFromUrlValues(inType, outType *types.Type, sw *g
 	}
 	sw.Do("func auto"+nameTmpl+"(in *$.inType|raw$, out *$.outType|raw$, s $.Scope|raw$) error {\n", args)
 	for _, outMember := range outType.Members {
+		if tagvals := extractTag(outMember.CommentLines); tagvals != nil && tagvals[0] == "false" {
+			// This field is excluded from conversion.
+			sw.Do("// INFO: in."+outMember.Name+" opted out of conversion generation\n", nil)
+			continue
+		}
 		jsonTag := reflect.StructTag(outMember.Tags).Get("json")
 		index := strings.Index(jsonTag, ",")
 		if index == -1 {

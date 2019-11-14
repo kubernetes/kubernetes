@@ -163,6 +163,7 @@ message DeleteOptions {
 
   // Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be
   // returned.
+  // +k8s:conversion-gen=false
   // +optional
   optional Preconditions preconditions = 2;
 
