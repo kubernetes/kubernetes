@@ -572,27 +572,26 @@ func TestReflectorFullListIfExpired(t *testing.T) {
 			for i := 0; i < 8; i++ {
 				pods[i] = v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod-%d", i), ResourceVersion: fmt.Sprintf("%d", i)}}
 			}
-			switch options.ResourceVersion {
-			case "0":
+			rvContinueLimit := func(rv, c string, l int64) metav1.ListOptions {
+				return metav1.ListOptions{ResourceVersion: rv, Continue: c, Limit: l}
+			}
+			switch rvContinueLimit(options.ResourceVersion, options.Continue, options.Limit) {
+			// initial limited list
+			case rvContinueLimit("0", "", 4):
 				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}, Items: pods[0:4]}, nil
-			case "10":
-				switch options.Limit {
-				case 4:
-					switch options.Continue {
-					case "":
-						return &v1.PodList{ListMeta: metav1.ListMeta{Continue: "C1", ResourceVersion: "11"}, Items: pods[0:4]}, nil
-					case "C1":
-						return nil, apierrs.NewResourceExpired("The resourceVersion for the provided watch is too old.")
-					default:
-						t.Fatalf("Unrecognized Continue: %s", options.Continue)
-					}
-				case 0:
-					return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "11"}, Items: pods[0:8]}, nil
-				default:
-					t.Fatalf("Unrecognized Limit: %d", options.Limit)
-				}
+			// first page of the rv=10 list
+			case rvContinueLimit("10", "", 4):
+				return &v1.PodList{ListMeta: metav1.ListMeta{Continue: "C1", ResourceVersion: "11"}, Items: pods[0:4]}, nil
+			// second page of the above list
+			case rvContinueLimit("", "C1", 4):
+				return nil, apierrs.NewResourceExpired("The resourceVersion for the provided watch is too old.")
+			// rv=10 unlimited list
+			case rvContinueLimit("10", "", 0):
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "11"}, Items: pods[0:8]}, nil
 			default:
-				t.Fatalf("Unrecognized ResourceVersion: %s", options.ResourceVersion)
+				err := fmt.Errorf("unexpected list options: %#v", options)
+				t.Error(err)
+				return nil, err
 			}
 			return nil, nil
 		},
@@ -601,25 +600,29 @@ func TestReflectorFullListIfExpired(t *testing.T) {
 	r.WatchListPageSize = 4
 
 	// Initial list should use RV=0
-	r.ListAndWatch(stopCh)
+	if err := r.ListAndWatch(stopCh); err != nil {
+		t.Fatal(err)
+	}
 
 	results := s.List()
 	if len(results) != 4 {
 		t.Errorf("Expected 4 results, got %d", len(results))
 	}
 
-	// relist should use lastSyncResourceVersions (RV=10) and since second page of RV=10 is expired, it should full list with RV=10
+	// relist should use lastSyncResourceVersions (RV=10) and since second page of that expired, it should full list with RV=10
 	stopCh = make(chan struct{})
-	r.ListAndWatch(stopCh)
+	if err := r.ListAndWatch(stopCh); err != nil {
+		t.Fatal(err)
+	}
 
 	results = s.List()
 	if len(results) != 8 {
 		t.Errorf("Expected 8 results, got %d", len(results))
 	}
 
-	expectedRVs := []string{"0", "10", "10", "10"}
+	expectedRVs := []string{"0", "10", "", "10"}
 	if !reflect.DeepEqual(listCallRVs, expectedRVs) {
-		t.Errorf("Expected series of list calls with resource versiosn of %v but got: %v", expectedRVs, listCallRVs)
+		t.Errorf("Expected series of list calls with resource versiosn of %#v but got: %#v", expectedRVs, listCallRVs)
 	}
 }
 
