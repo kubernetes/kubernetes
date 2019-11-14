@@ -57,10 +57,12 @@ go_test(
         "cert_key_test.go",
         "client_ca_test.go",
         "named_certificates_test.go",
+        "server_test.go",
         "tlsconfig_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
+        "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
