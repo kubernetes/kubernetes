@@ -21,6 +21,7 @@ DNS_DOMAIN=${4:-"cluster.local"}
 KUBECONFIG_DIR=${KUBECONFIG_DIR:-/opt/kubernetes/cfg}
 
 # Generate a kubeconfig file
+mkdir -p ${KUBECONFIG_DIR}
 cat <<EOF > "${KUBECONFIG_DIR}/kubelet.kubeconfig"
 apiVersion: v1
 kind: Config
@@ -58,7 +59,7 @@ KUBELET_KUBECONFIG="--kubeconfig=${KUBECONFIG_DIR}/kubelet.kubeconfig"
 KUBE_ALLOW_PRIV="--allow-privileged=false"
 
 # DNS info
-KUBELET__DNS_IP="--cluster-dns=${DNS_SERVER_IP}"
+KUBELET_DNS_IP="--cluster-dns=${DNS_SERVER_IP}"
 KUBELET_DNS_DOMAIN="--cluster-domain=${DNS_DOMAIN}"
 
 # Add your own!
@@ -72,7 +73,7 @@ KUBELET_OPTS="      \${KUBE_LOGTOSTDERR}     \\
                     \${NODE_HOSTNAME}        \\
                     \${KUBELET_KUBECONFIG}   \\
                     \${KUBE_ALLOW_PRIV}      \\
-                    \${KUBELET__DNS_IP}      \\
+                    \${KUBELET_DNS_IP}      \\
                     \${KUBELET_DNS_DOMAIN}   \\
                     \$KUBELET_ARGS"
 
