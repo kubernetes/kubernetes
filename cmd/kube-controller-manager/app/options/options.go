@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/metrics"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
@@ -87,8 +88,9 @@ type KubeControllerManagerOptions struct {
 	Authentication  *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization   *apiserveroptions.DelegatingAuthorizationOptions
 
-	Master     string
-	Kubeconfig string
+	Master                      string
+	Kubeconfig                  string
+	ShowHiddenMetricsForVersion string
 }
 
 // NewKubeControllerManagerOptions creates a new KubeControllerManagerOptions with a default config.
@@ -250,6 +252,14 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fss.FlagSet("generic"))
 
+	mfs := fss.FlagSet("metrics")
+	mfs.StringVar(&s.ShowHiddenMetricsForVersion, "show-hidden-metrics-for-version", s.ShowHiddenMetricsForVersion,
+		"The previous version for which you want to show hidden metrics. "+
+			"Only the previous minor version is meaningful, other values will not be allowed. "+
+			"The format is <major>.<minor>, e.g.: '1.16'. "+
+			"The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics, "+
+			"rather than being surprised when they are permanently removed in the release after that.")
+
 	return fss
 }
 
@@ -382,6 +392,7 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.InsecureServing.Validate()...)
 	errs = append(errs, s.Authentication.Validate()...)
 	errs = append(errs, s.Authorization.Validate()...)
+	errs = append(errs, metrics.ValidateShowHiddenMetricsVersion(s.ShowHiddenMetricsForVersion)...)
 
 	// TODO: validate component config, master and kubeconfig
 
@@ -428,6 +439,10 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 	}
 	if err := s.ApplyTo(c); err != nil {
 		return nil, err
+	}
+
+	if len(s.ShowHiddenMetricsForVersion) > 0 {
+		metrics.SetShowHidden()
 	}
 
 	return c, nil
