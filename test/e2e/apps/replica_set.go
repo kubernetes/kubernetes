@@ -96,8 +96,7 @@ var _ = SIGDescribe("ReplicaSet", func() {
 	ginkgo.It("should serve a basic image on each replica with a private image", func() {
 		// requires private images
 		framework.SkipUnlessProviderIs("gce", "gke")
-		privateimage := imageutils.GetConfig(imageutils.Agnhost)
-		privateimage.SetRegistry(imageutils.PrivateRegistry)
+		privateimage := imageutils.GetConfig(imageutils.AgnhostPrivate)
 		testReplicaSetServeImageOrFail(f, "private", privateimage.GetE2EImage())
 	})
 

@@ -66,18 +66,17 @@ var CommonImageWhiteList = sets.NewString(
 )
 
 type testImagesStruct struct {
-	AgnhostImage    string
-	BusyBoxImage    string
-	GBFrontendImage string
-	KittenImage     string
-	MounttestImage  string
-	NautilusImage   string
-	NginxImage      string
-	NginxNewImage   string
-	HttpdImage      string
-	HttpdNewImage   string
-	PauseImage      string
-	RedisImage      string
+	AgnhostImage   string
+	BusyBoxImage   string
+	KittenImage    string
+	MounttestImage string
+	NautilusImage  string
+	NginxImage     string
+	NginxNewImage  string
+	HttpdImage     string
+	HttpdNewImage  string
+	PauseImage     string
+	RedisImage     string
 }
 
 var testImages testImagesStruct
@@ -86,7 +85,6 @@ func init() {
 	testImages = testImagesStruct{
 		imageutils.GetE2EImage(imageutils.Agnhost),
 		imageutils.GetE2EImage(imageutils.BusyBox),
-		imageutils.GetE2EImage(imageutils.GBFrontend),
 		imageutils.GetE2EImage(imageutils.Kitten),
 		imageutils.GetE2EImage(imageutils.Mounttest),
 		imageutils.GetE2EImage(imageutils.Nautilus),
