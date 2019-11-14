@@ -59,10 +59,10 @@ func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, select
 		// TODO: Add validation for PodSpec, currently this will check volumes, which we know will
 		// fail. We should really check that the union of the given volumes and volumeClaims match
 		// volume mounts in the containers.
-		// allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(template, fldPath)...)
-		allErrs = append(allErrs, unversionedvalidation.ValidateLabels(template.Labels, fldPath.Child("labels"))...)
-		allErrs = append(allErrs, apivalidation.ValidateAnnotations(template.Annotations, fldPath.Child("annotations"))...)
-		allErrs = append(allErrs, apivalidation.ValidatePodSpecificAnnotations(template.Annotations, &template.Spec, fldPath.Child("annotations"))...)
+		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(template, fldPath)...)
+		// allErrs = append(allErrs, unversionedvalidation.ValidateLabels(template.Labels, fldPath.Child("labels"))...)
+		// allErrs = append(allErrs, apivalidation.ValidateAnnotations(template.Annotations, fldPath.Child("annotations"))...)
+		// allErrs = append(allErrs, apivalidation.ValidatePodSpecificAnnotations(template.Annotations, &template.Spec, fldPath.Child("annotations"))...)
 	}
 	return allErrs
 }
