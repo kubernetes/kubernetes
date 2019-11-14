@@ -344,6 +344,8 @@ function kube::release::create_docker_images_for_server() {
     local DOCKER_BUILD_OPTS=()
     if [[ "${KUBE_BUILD_PULL_LATEST_IMAGES}" =~ [yY] ]]; then
         DOCKER_BUILD_OPTS+=("--pull")
+    else
+        DOCKER_BUILD_OPTS+=("")
     fi
     local -r docker_build_opts="${DOCKER_BUILD_OPTS[@]}"
 
