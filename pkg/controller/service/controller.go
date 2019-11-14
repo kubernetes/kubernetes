@@ -79,11 +79,6 @@ const (
 	// originated from: https://github.com/kubernetes/kubernetes/blob/28e800245e/pkg/features/kube_features.go#L178
 	serviceNodeExclusionFeature = "ServiceNodeExclusion"
 
-	// serviceLoadBalancerFinalizerFeature is the feature gate name that
-	// enables Finalizer Protection for Service LoadBalancers.
-	// originated from: https://github.com/kubernetes/kubernetes/blob/28e800245e/pkg/features/kube_features.go#L433
-	serviceLoadBalancerFinalizerFeature = "ServiceLoadBalancerFinalizer"
-
 	// legacyNodeRoleBehaviro is the feature gate name that enables legacy
 	// behavior to vary cluster functionality on the node-role.kubernetes.io
 	// labels.
@@ -103,12 +98,13 @@ type serviceCache struct {
 // Controller keeps cloud provider service resources
 // (like load balancers) in sync with the registry.
 type Controller struct {
-	cloud               cloudprovider.Interface
-	knownHosts          []*v1.Node
-	servicesToUpdate    []*v1.Service
-	kubeClient          clientset.Interface
-	clusterName         string
-	balancer            cloudprovider.LoadBalancer
+	cloud            cloudprovider.Interface
+	knownHosts       []*v1.Node
+	servicesToUpdate []*v1.Service
+	kubeClient       clientset.Interface
+	clusterName      string
+	balancer         cloudprovider.LoadBalancer
+	// TODO(#85155): Stop relying on this and remove the cache completely.
 	cache               *serviceCache
 	serviceLister       corelisters.ServiceLister
 	serviceListerSynced cache.InformerSynced
@@ -170,15 +166,8 @@ func New(
 					s.enqueueService(cur)
 				}
 			},
-			DeleteFunc: func(old interface{}) {
-				if utilfeature.DefaultFeatureGate.Enabled(serviceLoadBalancerFinalizerFeature) {
-					// No need to handle deletion event if finalizer feature gate is
-					// enabled. Because the deletion would be handled by the update
-					// path when the deletion timestamp is added.
-					return
-				}
-				s.enqueueService(old)
-			},
+			// No need to handle deletion event because the deletion would be handled by
+			// the update path when the deletion timestamp is added.
 		},
 		serviceSyncPeriod,
 	)
@@ -335,10 +324,8 @@ func (s *Controller) syncLoadBalancerIfNeeded(service *v1.Service, key string) (
 				return op, fmt.Errorf("failed to delete load balancer: %v", err)
 			}
 		}
-		// Always try to remove finalizer when load balancer is deleted.
-		// It will be a no-op if finalizer does not exist.
-		// Note this also clears up finalizer if the cluster is downgraded
-		// from a version that attaches finalizer to a version that doesn't.
+		// Always remove finalizer when load balancer is deleted, this ensures Services
+		// can be deleted after all corresponding load balancer resources are deleted.
 		if err := s.removeFinalizer(service); err != nil {
 			return op, fmt.Errorf("failed to remove load balancer cleanup finalizer: %v", err)
 		}
@@ -348,15 +335,10 @@ func (s *Controller) syncLoadBalancerIfNeeded(service *v1.Service, key string) (
 		op = ensureLoadBalancer
 		klog.V(2).Infof("Ensuring load balancer for service %s", key)
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuringLoadBalancer", "Ensuring load balancer")
-		if utilfeature.DefaultFeatureGate.Enabled(serviceLoadBalancerFinalizerFeature) {
-			// Always try to add finalizer prior to load balancer creation.
-			// It will be a no-op if finalizer already exists.
-			// Note this also retrospectively puts on finalizer if the cluster
-			// is upgraded from a version that doesn't attach finalizer to a
-			// version that does.
-			if err := s.addFinalizer(service); err != nil {
-				return op, fmt.Errorf("failed to add load balancer cleanup finalizer: %v", err)
-			}
+		// Always add a finalizer prior to creating load balancers, this ensures Services
+		// can't be deleted until all corresponding load balancer resources are also deleted.
+		if err := s.addFinalizer(service); err != nil {
+			return op, fmt.Errorf("failed to add load balancer cleanup finalizer: %v", err)
 		}
 		newStatus, err = s.ensureLoadBalancer(service)
 		if err != nil {
