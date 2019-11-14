@@ -19,6 +19,7 @@ package cert
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"net/url"
 	"strings"
 )
@@ -43,7 +44,9 @@ func GetClientCANames(apiHost string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	if err := conn.Close(); err != nil {
+		return nil, err
+	}
 
 	return acceptableCAs, nil
 }
@@ -72,7 +75,9 @@ func GetServingCertificates(apiHost, serverName string) ([]*x509.Certificate, []
 	if err != nil {
 		return nil, nil, err
 	}
-	conn.Close()
+	if err = conn.Close(); err != nil {
+		return nil, nil, fmt.Errorf("failed to close connection : %v", err)
+	}
 
 	peerCerts := conn.ConnectionState().PeerCertificates
 	peerCertBytes := [][]byte{}
