@@ -3,7 +3,6 @@ kind: CustomResourceDefinition
 metadata:
   name: blockaffinities.crd.projectcalico.org
   labels:
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   scope: Cluster
