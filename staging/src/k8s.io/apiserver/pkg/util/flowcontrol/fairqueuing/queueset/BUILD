@@ -18,8 +18,6 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise/lockingpromise:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/metrics:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/shufflesharding:go_default_library",
-        "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
@@ -33,6 +31,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/clock:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/shufflesharding:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

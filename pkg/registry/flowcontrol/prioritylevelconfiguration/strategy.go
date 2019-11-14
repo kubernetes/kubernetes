@@ -81,7 +81,7 @@ func (priorityLevelConfigurationStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (priorityLevelConfigurationStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidatePriorityLevelConfiguration(obj.(*flowcontrol.PriorityLevelConfiguration))
+	return validation.ValidatePriorityLevelConfigurationUpdate(old.(*flowcontrol.PriorityLevelConfiguration), obj.(*flowcontrol.PriorityLevelConfiguration))
 }
 
 type priorityLevelConfigurationStatusStrategy struct {

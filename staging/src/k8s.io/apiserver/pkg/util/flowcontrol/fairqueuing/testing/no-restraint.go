@@ -31,14 +31,14 @@ func NewNoRestraintFactory() fq.QueueSetFactory {
 
 type noRestraintFactory struct{}
 
-func (noRestraintFactory) NewQueueSet(config fq.QueueSetConfig) (fq.QueueSet, error) {
-	return noRestraint{}, nil
+func (noRestraintFactory) NewQueueSet(config fq.QueueSetConfig) fq.QueueSet {
+	return noRestraint{}
 }
 
 type noRestraint struct{}
 
-func (noRestraint) SetConfiguration(config fq.QueueSetConfig) error {
-	return nil
+func (noRestraint) SetConfiguration(config fq.QueueSetConfig) {
+	return
 }
 
 func (noRestraint) Quiesce(fq.EmptyHandler) {
