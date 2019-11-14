@@ -35,6 +35,12 @@ import (
 	utilnet "k8s.io/utils/net"
 )
 
+var supportedEndpointSliceAddressTypes = sets.NewString(
+	string(discovery.AddressTypeIP), // IP is a deprecated address type
+	string(discovery.AddressTypeIPv4),
+	string(discovery.AddressTypeIPv6),
+)
+
 // BaseEndpointInfo contains base information that defines an endpoint.
 // This could be used directly by proxier while processing endpoints,
 // or can be used for constructing a more specific EndpointInfo struct
@@ -173,6 +179,11 @@ func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 // It returns true if items changed, otherwise return false. Will add/update/delete items of EndpointsChangeMap.
 // If removeSlice is true, slice will be removed, otherwise it will be added or updated.
 func (ect *EndpointChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.EndpointSlice, removeSlice bool) bool {
+	if !supportedEndpointSliceAddressTypes.Has(string(endpointSlice.AddressType)) {
+		klog.V(4).Infof("EndpointSlice address type not supported by kube-proxy: %s", endpointSlice.AddressType)
+		return false
+	}
+
 	// This should never happen
 	if endpointSlice == nil {
 		klog.Error("Nil endpointSlice passed to EndpointSliceUpdate")
