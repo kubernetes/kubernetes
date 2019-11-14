@@ -12,9 +12,6 @@ metadata:
   name: csi-gce-pd-provisioner-role
 rules:
   - apiGroups: [""]
-    resources: ["secrets"]
-    verbs: ["get", "list"]
-  - apiGroups: [""]
     resources: ["persistentvolumes"]
     verbs: ["get", "list", "watch", "create", "delete"]
   - apiGroups: [""]
@@ -48,7 +45,6 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: csi-gce-pd-controller-sa
-    namespace: default
 roleRef:
   kind: ClusterRole
   name: csi-gce-pd-provisioner-role
@@ -83,7 +79,6 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: csi-gce-pd-controller-sa
-    namespace: default
 roleRef:
   kind: ClusterRole
   name: csi-gce-pd-attacher-role
@@ -118,7 +113,6 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: csi-gce-pd-controller-sa
-    namespace: default
 roleRef:
   kind: ClusterRole
   name: csi-gce-pd-resizer-role
@@ -134,18 +128,15 @@ rules:
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["list", "watch", "create", "update", "patch"]
-  - apiGroups: [""]
-    resources: ["secrets"]
-    verbs: ["get", "list"]
   - apiGroups: ["snapshot.storage.k8s.io"]
     resources: ["volumesnapshotclasses"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["snapshot.storage.k8s.io"]
     resources: ["volumesnapshotcontents"]
-    verbs: ["create", "get", "list", "watch", "update", "delete"]
+    verbs: ["get", "list", "watch", "update", "delete", "patch"]
   - apiGroups: ["snapshot.storage.k8s.io"]
     resources: ["volumesnapshotcontents/status"]
-    verbs: ["update"]
+    verbs: ["update", "patch"]
 
 ---
 kind: ClusterRoleBinding
@@ -155,7 +146,6 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: csi-gce-pd-controller-sa
-    namespace: default
 roleRef:
   kind: ClusterRole
   name: csi-gce-pd-snapshotter-role
@@ -170,7 +160,6 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: csi-gce-pd-controller-sa
-    namespace: default
 roleRef:
   kind: ClusterRole
   name: e2e-test-privileged-psp
