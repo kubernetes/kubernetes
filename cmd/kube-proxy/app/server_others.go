@@ -32,6 +32,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-base/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -39,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
-	"k8s.io/kubernetes/pkg/proxy/metrics"
+	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
@@ -105,6 +106,10 @@ func newProxyServer(
 		}, nil
 	}
 
+	if len(config.ShowHiddenMetricsForVersion) > 0 {
+		metrics.SetShowHidden()
+	}
+
 	client, eventClient, err := createClients(config.ClientConnection, master)
 	if err != nil {
 		return nil, err
@@ -167,7 +172,7 @@ func newProxyServer(
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
-		metrics.RegisterMetrics()
+		proxymetrics.RegisterMetrics()
 	} else if proxyMode == proxyModeIPVS {
 		klog.V(0).Info("Using ipvs Proxier.")
 		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
@@ -228,7 +233,7 @@ func newProxyServer(
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
-		metrics.RegisterMetrics()
+		proxymetrics.RegisterMetrics()
 	} else {
 		klog.V(0).Info("Using userspace Proxier.")
 
