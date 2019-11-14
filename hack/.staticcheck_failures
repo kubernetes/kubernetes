@@ -40,7 +40,6 @@ pkg/util/ebtables
 pkg/util/ipconfig
 pkg/util/iptables
 pkg/util/ipvs/testing
-pkg/util/mount
 pkg/util/netsh
 pkg/volume
 pkg/volume/awsebs

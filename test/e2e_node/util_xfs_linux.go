@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/mount"
 )
 
 func detectMountpoint(m mount.Interface, path string) string {

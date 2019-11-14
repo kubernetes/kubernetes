@@ -28,7 +28,6 @@ go_library(
         "//pkg/proxy/config:go_default_library",
         "//pkg/proxy/iptables:go_default_library",
         "//pkg/util/iptables:go_default_library",
-        "//pkg/util/mount:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/oom:go_default_library",
         "//pkg/util/sysctl:go_default_library",
@@ -70,6 +69,7 @@ go_library(
         "//test/utils:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/k8s.io/utils/mount:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )

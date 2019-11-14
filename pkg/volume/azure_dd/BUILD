@@ -25,7 +25,6 @@ go_library(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/volumepathhandler:go_default_library",
@@ -42,6 +41,7 @@ go_library(
         "//vendor/github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-04-01/storage:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/mount:go_default_library",
         "//vendor/k8s.io/utils/strings:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
