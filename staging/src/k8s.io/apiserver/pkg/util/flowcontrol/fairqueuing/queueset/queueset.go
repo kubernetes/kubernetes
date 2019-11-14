@@ -568,7 +568,7 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 
 		// decrement here to maintain the invariant that (qs.robinIndex+1) % numQueues
 		// is the index of the next queue after the one last dispatched from
-		if qs.robinIndex >= -r.Queue.Index {
+		if qs.robinIndex >= r.Queue.Index {
 			qs.robinIndex--
 		}
 
