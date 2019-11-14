@@ -6049,6 +6049,7 @@ func autoConvert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s
 	out.PreemptionPolicy = (*core.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
 	out.Overhead = *(*core.ResourceList)(unsafe.Pointer(&in.Overhead))
 	out.TopologySpreadConstraints = *(*[]core.TopologySpreadConstraint)(unsafe.Pointer(&in.TopologySpreadConstraints))
+	// WARNING: in.TTLSecondsAfterFinished requires manual conversion: does not exist in peer-type
 	return nil
 }
 
