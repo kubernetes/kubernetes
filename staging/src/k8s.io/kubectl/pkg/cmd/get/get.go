@@ -126,11 +126,11 @@ var (
 		# List resource information in custom columns.
 		kubectl get pod test-pod -o custom-columns=CONTAINER:.spec.containers[0].name,IMAGE:.spec.containers[0].image
 
-		# List all replication controllers and services together in ps output format.
-		kubectl get rc,services
+		# List all replica set and services together in ps output format.
+		kubectl get rs,services
 
 		# List one or more resources by their type and names.
-		kubectl get rc/web service/frontend pods/web-pod-13je7`))
+		kubectl get deploy/web service/frontend pods/web-pod-13je7`))
 )
 
 const (
