@@ -180,6 +180,14 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		if l.config.ClientNodeName != "" {
 			e2eskipper.Skipf("Driver %q requires to deploy on a specific node - skipping", l.driver.GetDriverInfo().Name)
 		}
+		// For multi-node tests there must be enough nodes with the same toopology to schedule the pods
+		nodeSelection := e2epod.NodeSelection{Name: l.config.ClientNodeName}
+		topologyKeys := dInfo.TopologyKeys
+		if len(topologyKeys) != 0 {
+			if err = ensureTopologyRequirements(&nodeSelection, nodes, l.cs, topologyKeys, 2); err != nil {
+				framework.Failf("Error setting topology requirements: %v", err)
+			}
+		}
 
 		var pvcs []*v1.PersistentVolumeClaim
 		numVols := 2
@@ -192,7 +200,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		}
 
 		TestAccessMultipleVolumesAcrossPodRecreation(l.config.Framework, l.cs, l.ns.Name,
-			e2epod.NodeSelection{Name: l.config.ClientNodeName}, pvcs, false /* sameNode */)
+			nodeSelection, pvcs, false /* sameNode */)
 	})
 
 	// This tests below configuration (only <block, filesystem> pattern is tested):
@@ -266,6 +274,14 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		if l.config.ClientNodeName != "" {
 			e2eskipper.Skipf("Driver %q requires to deploy on a specific node - skipping", l.driver.GetDriverInfo().Name)
 		}
+		// For multi-node tests there must be enough nodes with the same toopology to schedule the pods
+		nodeSelection := e2epod.NodeSelection{Name: l.config.ClientNodeName}
+		topologyKeys := dInfo.TopologyKeys
+		if len(topologyKeys) != 0 {
+			if err = ensureTopologyRequirements(&nodeSelection, nodes, l.cs, topologyKeys, 2); err != nil {
+				framework.Failf("Error setting topology requirements: %v", err)
+			}
+		}
 
 		var pvcs []*v1.PersistentVolumeClaim
 		numVols := 2
@@ -283,7 +299,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		}
 
 		TestAccessMultipleVolumesAcrossPodRecreation(l.config.Framework, l.cs, l.ns.Name,
-			e2epod.NodeSelection{Name: l.config.ClientNodeName}, pvcs, false /* sameNode */)
+			nodeSelection, pvcs, false /* sameNode */)
 	})
 
 	// This tests below configuration:
@@ -335,6 +351,14 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		if l.config.ClientNodeName != "" {
 			e2eskipper.Skipf("Driver %q requires to deploy on a specific node - skipping", l.driver.GetDriverInfo().Name)
 		}
+		// For multi-node tests there must be enough nodes with the same toopology to schedule the pods
+		nodeSelection := e2epod.NodeSelection{Name: l.config.ClientNodeName}
+		topologyKeys := dInfo.TopologyKeys
+		if len(topologyKeys) != 0 {
+			if err = ensureTopologyRequirements(&nodeSelection, nodes, l.cs, topologyKeys, 2); err != nil {
+				framework.Failf("Error setting topology requirements: %v", err)
+			}
+		}
 
 		// Create volume
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
@@ -343,7 +367,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 
 		// Test access to the volume from pods on different node
 		TestConcurrentAccessToSingleVolume(l.config.Framework, l.cs, l.ns.Name,
-			e2epod.NodeSelection{Name: l.config.ClientNodeName}, resource.Pvc, numPods, false /* sameNode */)
+			nodeSelection, resource.Pvc, numPods, false /* sameNode */)
 	})
 }
 
@@ -503,4 +527,57 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		ginkgo.By(fmt.Sprintf("Rechecking if read from the volume in pod%d works properly", index))
 		utils.CheckReadFromPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
 	}
+}
+
+// getCurrentTopologies() goes through all Nodes and returns unique driver topologies and count of Nodes per topology
+func getCurrentTopologiesNumber(cs clientset.Interface, nodes *v1.NodeList, keys []string) ([]topology, []int, error) {
+	topos := []topology{}
+	topoCount := []int{}
+
+	// TODO: scale?
+	for _, n := range nodes.Items {
+		topo := map[string]string{}
+		for _, k := range keys {
+			v, ok := n.Labels[k]
+			if ok {
+				topo[k] = v
+			}
+		}
+
+		found := false
+		for i, existingTopo := range topos {
+			if topologyEqual(existingTopo, topo) {
+				found = true
+				topoCount[i]++
+				break
+			}
+		}
+		if !found {
+			framework.Logf("found topology %v", topo)
+			topos = append(topos, topo)
+			topoCount = append(topoCount, 1)
+		}
+	}
+	return topos, topoCount, nil
+}
+
+// ensureTopologyRequirements sets nodeSelection affinity according to given topology keys for drivers that provide them
+func ensureTopologyRequirements(nodeSelection *e2epod.NodeSelection, nodes *v1.NodeList, cs clientset.Interface, topologyKeys []string, minCount int) error {
+	topologyList, topologyCount, err := getCurrentTopologiesNumber(cs, nodes, topologyKeys)
+	if err != nil {
+		return err
+	}
+	suitableTopologies := []topology{}
+	for i, topo := range topologyList {
+		if topologyCount[i] >= minCount {
+			suitableTopologies = append(suitableTopologies, topo)
+		}
+	}
+	if len(suitableTopologies) == 0 {
+		framework.Skipf("No topology with at least %d nodes found - skipping", minCount)
+	}
+	// Take the first suitable topology
+	e2epod.SetNodeAffinityTopologyRequirement(nodeSelection, suitableTopologies[0])
+
+	return nil
 }
