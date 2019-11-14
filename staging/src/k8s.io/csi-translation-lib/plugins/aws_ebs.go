@@ -45,8 +45,21 @@ func NewAWSElasticBlockStoreCSITranslator() InTreePlugin {
 	return &awsElasticBlockStoreCSITranslator{}
 }
 
-// TranslateInTreeStorageClassParametersToCSI translates InTree EBS storage class parameters to CSI storage class
+// TranslateInTreeStorageClassToCSI translates InTree EBS storage class parameters to CSI storage class
 func (t *awsElasticBlockStoreCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
+	params := map[string]string{}
+
+	for k, v := range sc.Parameters {
+		switch strings.ToLower(k) {
+		case "fstype":
+			params["csi.storage.k8s.io/fstype"] = v
+		default:
+			params[k] = v
+		}
+	}
+
+	sc.Parameters = params
+
 	return sc, nil
 }
 
