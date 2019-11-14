@@ -17,8 +17,8 @@ limitations under the License.
 package fieldmanager
 
 import (
+	"encoding/json"
 	"fmt"
-	"hash/fnv"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -108,17 +108,16 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (o
 	}
 
 	acc, _ := meta.Accessor(newObj)
-	name := acc.GetName()
-	namespace := acc.GetNamespace()
-	h := fnv.New32a()
-	h.Write([]byte(namespace))
-	h.Write([]byte("/"))
-	h.Write([]byte(name))
-	sum := h.Sum32()
-	if sum%4 != 0 {
-		// By-pass
-		return newObj, nil
+	annotations := acc.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
 	}
+	delete(annotations, "my-veryown-annotations")
+	acc.SetAnnotations(annotations)
+	js, err := json.Marshal(newObj)
+	annotations["my-veryown-annotations"] = string(js)
+	acc.SetAnnotations(annotations)
+	return newObj, nil
 
 	// First try to decode the managed fields provided in the update,
 	// This is necessary to allow directly updating managed fields.
