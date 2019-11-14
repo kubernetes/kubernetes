@@ -25,7 +25,7 @@ import (
 func init() {
 	// Register functions that extract metadata used by priorities computations.
 	scheduler.RegisterPriorityMetadataProducerFactory(
-		func(args scheduler.PluginFactoryArgs) priorities.MetadataProducer {
+		func(args scheduler.AlgorithmFactoryArgs) priorities.MetadataProducer {
 			serviceLister := args.InformerFactory.Core().V1().Services().Lister()
 			controllerLister := args.InformerFactory.Core().V1().ReplicationControllers().Lister()
 			replicaSetLister := args.InformerFactory.Apps().V1().ReplicaSets().Lister()
@@ -40,7 +40,7 @@ func init() {
 	scheduler.RegisterPriorityConfigFactory(
 		priorities.ServiceSpreadingPriority,
 		scheduler.PriorityConfigFactory{
-			MapReduceFunction: func(args scheduler.PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
+			MapReduceFunction: func(args scheduler.AlgorithmFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
 				serviceLister := args.InformerFactory.Core().V1().Services().Lister()
 				return priorities.NewSelectorSpreadPriority(serviceLister, algorithm.EmptyControllerLister{}, algorithm.EmptyReplicaSetLister{}, algorithm.EmptyStatefulSetLister{})
 			},
@@ -58,7 +58,7 @@ func init() {
 	scheduler.RegisterPriorityConfigFactory(
 		priorities.SelectorSpreadPriority,
 		scheduler.PriorityConfigFactory{
-			MapReduceFunction: func(args scheduler.PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
+			MapReduceFunction: func(args scheduler.AlgorithmFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
 				serviceLister := args.InformerFactory.Core().V1().Services().Lister()
 				controllerLister := args.InformerFactory.Core().V1().ReplicationControllers().Lister()
 				replicaSetLister := args.InformerFactory.Apps().V1().ReplicaSets().Lister()

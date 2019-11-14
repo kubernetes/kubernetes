@@ -326,7 +326,7 @@ func New(client clientset.Interface,
 		pluginConfig:                   options.frameworkPluginConfig,
 		pluginConfigProducerRegistry:   options.frameworkConfigProducerRegistry,
 		nodeInfoSnapshot:               snapshot,
-		factoryArgs: PluginFactoryArgs{
+		algorithmFactoryArgs: AlgorithmFactoryArgs{
 			SharedLister:                   snapshot,
 			InformerFactory:                informerFactory,
 			VolumeBinder:                   volumeBinder,
