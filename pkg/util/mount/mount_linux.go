@@ -362,24 +362,37 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 		return "", err
 	}
 
+	fstype := getDiskType(disk, output, "\n")
+	if len(fstype) == 0 {
+		fstype = getDiskType(disk, output, " ")
+		if len(fstype) == 0 {
+			return "", fmt.Errorf("blkid returns invalid output: %s", output)
+		}
+	}
+
+	return fstype, nil
+}
+
+func getDiskType(disk string, output string, sep string) string {
 	var fstype, pttype string
 
-	lines := strings.Split(output, "\n")
+	lines := strings.Split(output, sep)
 	for _, l := range lines {
 		if len(l) <= 0 {
 			// Ignore empty line.
 			continue
 		}
+		l = strings.Trim(l, "\n")
 		cs := strings.Split(l, "=")
 		if len(cs) != 2 {
-			return "", fmt.Errorf("blkid returns invalid output: %s", output)
+			continue
 		}
 		// TYPE is filesystem type, and PTTYPE is partition table type, according
 		// to https://www.kernel.org/pub/linux/utils/util-linux/v2.21/libblkid-docs/.
 		if cs[0] == "TYPE" {
-			fstype = cs[1]
+			fstype = trimQuotes(cs[1])
 		} else if cs[0] == "PTTYPE" {
-			pttype = cs[1]
+			pttype = trimQuotes(cs[1])
 		}
 	}
 
@@ -387,10 +400,21 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 		klog.V(4).Infof("Disk %s detected partition table type: %s", disk, pttype)
 		// Returns a special non-empty string as filesystem type, then kubelet
 		// will not format it.
-		return "unknown data, probably partitions", nil
+		return "unknown data, probably partitions"
 	}
 
-	return fstype, nil
+	klog.V(4).Infof("the type of disk %s is %s", disk, fstype)
+	return fstype
+}
+
+func trimQuotes(s string) string {
+	klog.V(4).Infof("trimQuotes for string %s", s)
+	if len(s) >= 2 {
+		if s[0] == '"' && s[len(s)-1] == '"' {
+			return s[1 : len(s)-1]
+		}
+	}
+	return s
 }
 
 // ListProcMounts is shared with NsEnterMounter
