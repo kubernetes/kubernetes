@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	utilexec "k8s.io/utils/exec"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -502,7 +503,7 @@ func (plugin *rbdPlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod, _ 
 	return plugin.newBlockVolumeMapperInternal(spec, uid, &RBDUtil{}, secret, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
 }
 
-func (plugin *rbdPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUID types.UID, manager diskManager, secret string, mounter mount.Interface, exec mount.Exec) (volume.BlockVolumeMapper, error) {
+func (plugin *rbdPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUID types.UID, manager diskManager, secret string, mounter mount.Interface, exec utilexec.Interface) (volume.BlockVolumeMapper, error) {
 	mon, err := getVolumeSourceMonitors(spec)
 	if err != nil {
 		return nil, err
@@ -770,7 +771,7 @@ type rbd struct {
 	ReadOnly bool
 	plugin   *rbdPlugin
 	mounter  *mount.SafeFormatAndMount
-	exec     mount.Exec
+	exec     utilexec.Interface
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager                diskManager
 	volume.MetricsProvider `json:"-"`

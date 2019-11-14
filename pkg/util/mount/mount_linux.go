@@ -273,7 +273,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 		// Run fsck on the disk to fix repairable issues, only do this for volumes requested as rw.
 		klog.V(4).Infof("Checking for issues with fsck on disk: %s", source)
 		args := []string{"-a", source}
-		out, err := mounter.Exec.Run("fsck", args...)
+		out, err := mounter.Exec.Command("fsck", args...).CombinedOutput()
 		if err != nil {
 			ee, isExitError := err.(utilexec.ExitError)
 			switch {
@@ -320,7 +320,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 				}
 			}
 			klog.Infof("Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", source, fstype, args)
-			_, err := mounter.Exec.Run("mkfs."+fstype, args...)
+			_, err := mounter.Exec.Command("mkfs."+fstype, args...).CombinedOutput()
 			if err == nil {
 				// the disk has been formatted successfully try to mount it again.
 				klog.Infof("Disk successfully formatted (mkfs): %s - %s %s", fstype, source, target)
@@ -344,7 +344,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 	args := []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", disk}
 	klog.V(4).Infof("Attempting to determine if disk %q is formatted using blkid with args: (%v)", disk, args)
-	dataOut, err := mounter.Exec.Run("blkid", args...)
+	dataOut, err := mounter.Exec.Command("blkid", args...).CombinedOutput()
 	output := string(dataOut)
 	klog.V(4).Infof("Output: %q, err: %v", output, err)
 

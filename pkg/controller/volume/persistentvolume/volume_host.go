@@ -27,6 +27,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
+	utilexec "k8s.io/utils/exec"
+
 	"k8s.io/kubernetes/pkg/util/mount"
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -116,8 +118,8 @@ func (ctrl *PersistentVolumeController) DeleteServiceAccountTokenFunc() func(typ
 	}
 }
 
-func (adc *PersistentVolumeController) GetExec(pluginName string) mount.Exec {
-	return mount.NewOSExec()
+func (adc *PersistentVolumeController) GetExec(pluginName string) utilexec.Interface {
+	return utilexec.New()
 }
 
 func (ctrl *PersistentVolumeController) GetNodeLabels() (map[string]string, error) {

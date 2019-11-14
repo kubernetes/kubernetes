@@ -29,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/utils/exec/testing"
+
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -164,7 +166,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	fakeManager := newFakeDiskManager()
 	defer fakeManager.Cleanup()
 	fakeMounter := mount.NewFakeMounter(nil)
-	fakeExec := mount.NewFakeExec(nil)
+	fakeExec := &testingexec.FakeExec{}
 	mounter, err := plug.(*fcPlugin).newMounterInternal(spec, types.UID("poduid"), fakeManager, fakeMounter, fakeExec)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -227,7 +229,7 @@ func doTestPluginNilMounter(t *testing.T, spec *volume.Spec) {
 	fakeManager := newFakeDiskManager()
 	defer fakeManager.Cleanup()
 	fakeMounter := mount.NewFakeMounter(nil)
-	fakeExec := mount.NewFakeExec(nil)
+	fakeExec := &testingexec.FakeExec{}
 	mounter, err := plug.(*fcPlugin).newMounterInternal(spec, types.UID("poduid"), fakeManager, fakeMounter, fakeExec)
 	if err == nil {
 		t.Errorf("Error failed to make a new Mounter is expected: %v", err)

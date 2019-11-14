@@ -56,6 +56,7 @@ go_library(
         "//staging/src/k8s.io/cloud-provider/volume/errors:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 

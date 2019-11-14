@@ -33,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
+	utilexec "k8s.io/utils/exec"
+
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -179,10 +181,10 @@ func (attacher *gcePersistentDiskAttacher) BulkVerifyVolumes(volumesByNode map[t
 }
 
 // search Windows disk number by LUN
-func getDiskID(pdName string, exec mount.Exec) (string, error) {
+func getDiskID(pdName string, exec utilexec.Interface) (string, error) {
 	// TODO: replace Get-GcePdName with native windows support of Get-Disk, see issue #74674
 	cmd := `Get-GcePdName | select Name, DeviceId | ConvertTo-Json`
-	output, err := exec.Run("powershell", "/c", cmd)
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
 		klog.Errorf("Get-GcePdName failed, error: %v, output: %q", err, string(output))
 		err = errors.New(err.Error() + " " + string(output))

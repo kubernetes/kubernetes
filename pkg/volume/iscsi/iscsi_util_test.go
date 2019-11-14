@@ -17,16 +17,20 @@ limitations under the License.
 package iscsi
 
 import (
-	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/exec/testing"
+
 	"k8s.io/kubernetes/pkg/volume"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+)
+
+const (
+	TestIface = "192.168.1.10:pv0001"
 )
 
 func TestExtractDeviceAndPrefix(t *testing.T) {
@@ -216,28 +220,28 @@ func TestParseIscsiadmShow(t *testing.T) {
 }
 
 func TestClonedIface(t *testing.T) {
-	cmdCount := 0
-	fakeExec := mount.NewFakeExec(func(cmd string, args ...string) ([]byte, error) {
-		cmdCount++
-		if cmd != "iscsiadm" {
-			t.Errorf("iscsiadm command expected, got %q", cmd)
-		}
-		switch cmdCount {
-		case 1:
-			// iscsiadm -m iface -I <iface> -o show
-			return []byte("iface.ipaddress = <empty>\niface.transport_name = tcp\niface.initiatorname = <empty>\n"), nil
-
-		case 2:
-			// iscsiadm -m iface -I <newIface> -o new
-			return []byte("New interface 192.168.1.10:pv0001 added"), nil
-		case 3:
-			// iscsiadm -m iface -I <newIface> -o update -n <key> -v <val>
-			return []byte(""), nil
-		case 4:
-			return []byte(""), nil
-		}
-		return nil, fmt.Errorf("Unexpected exec call nr %d: %s", cmdCount, cmd)
-	})
+	fakeExec := &testingexec.FakeExec{}
+	scripts := []volumetest.CommandScript{
+		{
+			Cmd:    "iscsiadm",
+			Args:   []string{"-m", "iface", "-I", "", "-o", "show"},
+			Output: "iface.ipaddress = <empty>\niface.transport_name = tcp\niface.initiatorname = <empty>\n",
+		},
+		{
+			Cmd:  "iscsiadm",
+			Args: []string{"-m", "iface", "-I", TestIface, "-o", "new"},
+		},
+		{
+			Cmd:  "iscsiadm",
+			Args: []string{"-m", "iface", "-I", TestIface, "-o", "update", "-n", "iface.initiatorname", "-v", ""},
+		},
+		{
+			Cmd:  "iscsiadm",
+			Args: []string{"-m", "iface", "-I", TestIface, "-o", "update", "-n", "iface.transport_name", "-v", "tcp"},
+		},
+	}
+	volumetest.ScriptCommands(fakeExec, scripts)
+	fakeExec.ExactOrder = true
 	plugins := []volume.VolumePlugin{
 		&iscsiPlugin{
 			host: nil,
@@ -246,27 +250,32 @@ func TestClonedIface(t *testing.T) {
 	plugin := plugins[0]
 	fakeMounter := iscsiDiskMounter{
 		iscsiDisk: &iscsiDisk{
-			Iface:  "192.168.1.10:pv0001",
+			Iface:  TestIface,
 			plugin: plugin.(*iscsiPlugin)},
 		exec: fakeExec,
 	}
-	cloneIface(fakeMounter)
-	if cmdCount != 4 {
-		t.Errorf("expected 4 CombinedOutput() calls, got %d", cmdCount)
+	err := cloneIface(fakeMounter)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
-
+	if fakeExec.CommandCalls != len(scripts) {
+		t.Errorf("expected 4 CombinedOutput() calls, got %d", fakeExec.CommandCalls)
+	}
 }
 
 func TestClonedIfaceShowError(t *testing.T) {
-	cmdCount := 0
-	fakeExec := mount.NewFakeExec(func(cmd string, args ...string) ([]byte, error) {
-		cmdCount++
-		if cmd != "iscsiadm" {
-			t.Errorf("iscsiadm command expected, got %q", cmd)
-		}
-		// iscsiadm -m iface -I <iface> -o show, return test error
-		return []byte(""), errors.New("test error")
-	})
+	fakeExec := &testingexec.FakeExec{}
+	scripts := []volumetest.CommandScript{
+		{
+			Cmd:        "iscsiadm",
+			Args:       []string{"-m", "iface", "-I", "", "-o", "show"},
+			Output:     "test error",
+			ReturnCode: 1,
+		},
+	}
+	volumetest.ScriptCommands(fakeExec, scripts)
+	fakeExec.ExactOrder = true
+
 	plugins := []volume.VolumePlugin{
 		&iscsiPlugin{
 			host: nil,
@@ -275,43 +284,49 @@ func TestClonedIfaceShowError(t *testing.T) {
 	plugin := plugins[0]
 	fakeMounter := iscsiDiskMounter{
 		iscsiDisk: &iscsiDisk{
-			Iface:  "192.168.1.10:pv0001",
+			Iface:  TestIface,
 			plugin: plugin.(*iscsiPlugin)},
 		exec: fakeExec,
 	}
-	cloneIface(fakeMounter)
-	if cmdCount != 1 {
-		t.Errorf("expected 1 CombinedOutput() calls, got %d", cmdCount)
+	err := cloneIface(fakeMounter)
+	if err == nil {
+		t.Errorf("expect to receive error, nil received")
+	}
+	if fakeExec.CommandCalls != len(scripts) {
+		t.Errorf("expected 1 CombinedOutput() calls, got %d", fakeExec.CommandCalls)
 	}
 
 }
 
 func TestClonedIfaceUpdateError(t *testing.T) {
-	cmdCount := 0
-	fakeExec := mount.NewFakeExec(func(cmd string, args ...string) ([]byte, error) {
-		cmdCount++
-		if cmd != "iscsiadm" {
-			t.Errorf("iscsiadm command expected, got %q", cmd)
-		}
-		switch cmdCount {
-		case 1:
-			// iscsiadm -m iface -I <iface> -o show
-			return []byte("iface.ipaddress = <empty>\niface.transport_name = tcp\niface.initiatorname = <empty>\n"), nil
+	fakeExec := &testingexec.FakeExec{}
+	scripts := []volumetest.CommandScript{
+		{
+			Cmd:    "iscsiadm",
+			Args:   []string{"-m", "iface", "-I", "", "-o", "show"},
+			Output: "iface.ipaddress = <empty>\niface.transport_name = tcp\niface.initiatorname = <empty>\n",
+		},
+		{
+			Cmd:  "iscsiadm",
+			Args: []string{"-m", "iface", "-I", TestIface, "-o", "new"},
+		},
+		{
+			Cmd:  "iscsiadm",
+			Args: []string{"-m", "iface", "-I", TestIface, "-o", "update", "-n", "iface.initiatorname", "-v", ""},
+		},
+		{
+			Cmd:        "iscsiadm",
+			Args:       []string{"-m", "iface", "-I", TestIface, "-o", "update", "-n", "iface.transport_name", "-v", "tcp"},
+			ReturnCode: 1,
+		},
+		{
+			Cmd:  "iscsiadm",
+			Args: []string{"-m", "iface", "-I", TestIface, "-o", "delete"},
+		},
+	}
+	volumetest.ScriptCommands(fakeExec, scripts)
+	fakeExec.ExactOrder = true
 
-		case 2:
-			// iscsiadm -m iface -I <newIface> -o new
-			return []byte("New interface 192.168.1.10:pv0001 added"), nil
-		case 3:
-			// iscsiadm -m iface -I <newIface> -o update -n <key> -v <val>
-			return []byte(""), nil
-		case 4:
-			return []byte(""), errors.New("test error")
-		case 5:
-			// iscsiadm -m iface -I <newIface> -o delete
-			return []byte(""), nil
-		}
-		return nil, fmt.Errorf("Unexpected exec call nr %d: %s", cmdCount, cmd)
-	})
 	plugins := []volume.VolumePlugin{
 		&iscsiPlugin{
 			host: nil,
@@ -320,13 +335,16 @@ func TestClonedIfaceUpdateError(t *testing.T) {
 	plugin := plugins[0]
 	fakeMounter := iscsiDiskMounter{
 		iscsiDisk: &iscsiDisk{
-			Iface:  "192.168.1.10:pv0001",
+			Iface:  TestIface,
 			plugin: plugin.(*iscsiPlugin)},
 		exec: fakeExec,
 	}
-	cloneIface(fakeMounter)
-	if cmdCount != 5 {
-		t.Errorf("expected 5 CombinedOutput() calls, got %d", cmdCount)
+	err := cloneIface(fakeMounter)
+	if err == nil {
+		t.Errorf("expect to receive error, nil received")
+	}
+	if fakeExec.CommandCalls != len(scripts) {
+		t.Errorf("expected 5 CombinedOutput() calls, got %d", fakeExec.CommandCalls)
 	}
 
 }
