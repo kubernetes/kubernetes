@@ -30,8 +30,8 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  minReadySeconds: 997447044
-  revisionHistoryLimit: 989524452
+  minReadySeconds: 1791868025
+  revisionHistoryLimit: 1774123594
   selector:
     matchExpressions:
     - key: p503---477-49p---o61---4fy--9---7--9-9s-0-u5lj2--10pq-0-7-9-2-0/fP81.-.9Vdx.TB_M-H_5_.t..bG0
@@ -745,6 +745,7 @@ spec:
         maxSkew: 1956797678
         topologyKey: "426"
         whenUnsatisfiable: ƀ+瑏eCmAȥ睙
+      ttlSecondsAfterFinished: -1155633598
       volumes:
       - awsElasticBlockStore:
           fsType: "47"
@@ -947,19 +948,20 @@ spec:
   updateStrategy:
     rollingUpdate:
       maxUnavailable: 2
+    type: ɹr
 status:
-  collisionCount: 129237050
+  collisionCount: -2022058870
   conditions:
-  - lastTransitionTime: "2733-02-09T15:36:31Z"
+  - lastTransitionTime: "2608-01-15T11:03:45Z"
     message: "434"
     reason: "433"
-    status: 2ț
-    type: '{ɦ!f親ʚ«Ǥ栌Ə侷ŧĞö'
-  currentNumberScheduled: 1606858231
-  desiredNumberScheduled: -793692762
-  numberAvailable: -1734448297
-  numberMisscheduled: 1791868025
-  numberReady: -1152625369
-  numberUnavailable: -1757575936
-  observedGeneration: 3839991706170762113
-  updatedNumberScheduled: -1292943463
+    status: 肤 遞Ȼ棉砍蛗癨爅M骧渡胛2
+    type: (XEfê澙凋B/ü橚2ț
+  currentNumberScheduled: 894067740
+  desiredNumberScheduled: 1689648303
+  numberAvailable: 2022921268
+  numberMisscheduled: 67329694
+  numberReady: -1121580186
+  numberUnavailable: 796653404
+  observedGeneration: -7548731162582934359
+  updatedNumberScheduled: 129237050

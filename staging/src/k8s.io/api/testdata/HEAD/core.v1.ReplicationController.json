@@ -1362,21 +1362,22 @@
               ]
             }
           }
-        ]
+        ],
+        "ttlSecondsAfterFinished": -314040472
       }
     }
   },
   "status": {
-    "replicas": -580887468,
-    "fullyLabeledReplicas": 189301373,
-    "readyReplicas": -1235733921,
-    "availableReplicas": -1438616392,
-    "observedGeneration": 7696803627798560212,
+    "replicas": 450920824,
+    "fullyLabeledReplicas": 288987348,
+    "readyReplicas": 1792051742,
+    "availableReplicas": -190325707,
+    "observedGeneration": -1068886766021926092,
     "conditions": [
       {
-        "type": "獰Ĉ癯頯aɴí(Ȟ9\"",
-        "status": "oǰ'źĄ栧焷蜪sÛ°",
-        "lastTransitionTime": "2129-09-06T04:28:43Z",
+        "type": "峣/vɟ擅Ɇǥȼ廱Ioǰ'",
+        "status": " ",
+        "lastTransitionTime": "2458-09-11T18:04:30Z",
         "reason": "429",
         "message": "430"
       }

@@ -1378,10 +1378,12 @@
               ]
             }
           }
-        ]
+        ],
+        "ttlSecondsAfterFinished": 920774957
       }
     },
     "updateStrategy": {
+      "type": "4Y鳲Jɡ",
       "rollingUpdate": {
         "maxUnavailable": 2
       }
@@ -1403,7 +1405,7 @@
       {
         "type": "{ɦ!f親ʚ«Ǥ栌Ə侷ŧĞö",
         "status": "2ț",
-        "lastTransitionTime": "2733-02-09T15:36:31Z",
+        "lastTransitionTime": "2733-02-09T15:36:31Z", 
         "reason": "433",
         "message": "434"
       }

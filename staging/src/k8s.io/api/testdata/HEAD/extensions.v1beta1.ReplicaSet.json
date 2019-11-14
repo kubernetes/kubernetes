@@ -1378,21 +1378,22 @@
               ]
             }
           }
-        ]
+        ],
+        "ttlSecondsAfterFinished": -1754419098
       }
     }
   },
   "status": {
-    "replicas": -1165029050,
-    "fullyLabeledReplicas": 1893057016,
-    "readyReplicas": -2099726885,
-    "availableReplicas": -928976522,
-    "observedGeneration": 702392770146794584,
+    "replicas": 1530007970,
+    "fullyLabeledReplicas": -1915115520,
+    "readyReplicas": 163538560,
+    "availableReplicas": 1092856739,
+    "observedGeneration": 6535678482024543905,
     "conditions": [
       {
-        "type": "暁×軓鼐嵱宯ÙQ阉(闒ƈƳ",
-        "status": "ű孖站畦f黹ʩ鹸ɷ",
-        "lastTransitionTime": "2233-10-15T01:58:37Z",
+        "type": "鮻ȧH僠 \u0026G凒",
+        "status": "闒ƈƳ萎Ŋ\u003ceÙ蝌铀",
+        "lastTransitionTime": "2465-10-05T05:36:46Z",
         "reason": "434",
         "message": "435"
       }
