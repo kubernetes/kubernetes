@@ -159,7 +159,7 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	SchedulingAlgorithmPremptionEvaluationDuration = metrics.NewHistogram(
+	SchedulingAlgorithmPreemptionEvaluationDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "scheduling_algorithm_preemption_evaluation_seconds",
@@ -168,7 +168,7 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	DeprecatedSchedulingAlgorithmPremptionEvaluationDuration = metrics.NewHistogram(
+	DeprecatedSchedulingAlgorithmPreemptionEvaluationDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "scheduling_algorithm_preemption_evaluation",
@@ -228,9 +228,10 @@ var (
 
 	PodSchedulingDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "pod_scheduling_duration_seconds",
-			Help:           "E2e latency for a pod being scheduled which may include multiple scheduling attempts.",
+			Subsystem: SchedulerSubsystem,
+			Name:      "pod_scheduling_duration_seconds",
+			Help:      "E2e latency for a pod being scheduled which may include multiple scheduling attempts.",
+			// Start with 1ms with the last bucket being [~16s, Inf)
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		})
@@ -246,20 +247,23 @@ var (
 
 	FrameworkExtensionPointDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "framework_extension_point_duration_seconds",
-			Help:           "Latency for running all plugins of a specific extension point.",
-			Buckets:        nil,
+			Subsystem: SchedulerSubsystem,
+			Name:      "framework_extension_point_duration_seconds",
+			Help:      "Latency for running all plugins of a specific extension point.",
+			// Start with 0.1ms with the last bucket being [~200ms, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.0001, 2, 12),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"extension_point", "status"})
 
 	PluginExecutionDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "plugin_execution_duration_seconds",
-			Help:           "Duration for running a plugin at a specific extension point.",
-			Buckets:        nil,
+			Subsystem: SchedulerSubsystem,
+			Name:      "plugin_execution_duration_seconds",
+			Help:      "Duration for running a plugin at a specific extension point.",
+			// Start with 0.01ms with the last bucket being [~22ms, Inf). We use a small factor (1.5)
+			// so that we have better granularity since plugin latency is very sensitive.
+			Buckets:        metrics.ExponentialBuckets(0.00001, 1.5, 20),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"plugin", "extension_point", "status"})
@@ -304,8 +308,8 @@ var (
 		DeprecatedSchedulingAlgorithmPredicateEvaluationDuration,
 		SchedulingAlgorithmPriorityEvaluationDuration,
 		DeprecatedSchedulingAlgorithmPriorityEvaluationDuration,
-		SchedulingAlgorithmPremptionEvaluationDuration,
-		DeprecatedSchedulingAlgorithmPremptionEvaluationDuration,
+		SchedulingAlgorithmPreemptionEvaluationDuration,
+		DeprecatedSchedulingAlgorithmPreemptionEvaluationDuration,
 		PreemptionVictims,
 		PreemptionAttempts,
 		pendingPods,
