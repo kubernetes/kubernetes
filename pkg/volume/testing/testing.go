@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
@@ -71,7 +72,7 @@ const (
 type fakeVolumeHost struct {
 	rootDir         string
 	kubeClient      clientset.Interface
-	pluginMgr       VolumePluginMgr
+	pluginMgr       *VolumePluginMgr
 	cloud           cloudprovider.Interface
 	mounter         mount.Interface
 	hostUtil        hostutil.HostUtils
@@ -81,47 +82,48 @@ type fakeVolumeHost struct {
 	subpather       subpath.Interface
 	csiDriverLister storagelisters.CSIDriverLister
 	informerFactory informers.SharedInformerFactory
+	kubeletErr      error
+	mux             sync.Mutex
 }
 
 var _ VolumeHost = &fakeVolumeHost{}
 var _ AttachDetachVolumeHost = &fakeVolumeHost{}
 
 func NewFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeVolumeHost {
-	return newFakeVolumeHost(rootDir, kubeClient, plugins, nil, nil)
+	return newFakeVolumeHost(rootDir, kubeClient, plugins, nil, nil, "", nil)
 }
 
 func NewFakeVolumeHostWithCloudProvider(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface) *fakeVolumeHost {
-	return newFakeVolumeHost(rootDir, kubeClient, plugins, cloud, nil)
+	return newFakeVolumeHost(rootDir, kubeClient, plugins, cloud, nil, "", nil)
 }
 
 func NewFakeVolumeHostWithNodeLabels(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, labels map[string]string) *fakeVolumeHost {
-	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil, nil)
+	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil, nil, "", nil)
 	volHost.nodeLabels = labels
 	return volHost
 }
 
 func NewFakeVolumeHostWithCSINodeName(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelisters.CSIDriverLister) *fakeVolumeHost {
-	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil, nil)
-	volHost.nodeName = nodeName
-	if driverLister != nil {
-		volHost.csiDriverLister = driverLister
-	}
+	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil, nil, nodeName, driverLister)
 	return volHost
 }
 
-func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface, pathToTypeMap map[string]hostutil.FileType) *fakeVolumeHost {
-	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: cloud}
+func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelisters.CSIDriverLister) *fakeVolumeHost {
+	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: cloud, nodeName: nodeName, csiDriverLister: driverLister}
 	host.mounter = mount.NewFakeMounter(nil)
 	host.hostUtil = hostutil.NewFakeHostUtil(pathToTypeMap)
 	host.exec = &testingexec.FakeExec{DisableScripts: true}
+	host.pluginMgr = &VolumePluginMgr{}
 	host.pluginMgr.InitPlugins(plugins, nil /* prober */, host)
 	host.subpather = &subpath.FakeSubpath{}
 	host.informerFactory = informers.NewSharedInformerFactory(kubeClient, time.Minute)
+	// Wait until the InitPlugins setup is finished before returning from this setup func
+	host.WaitForKubeletErrNil()
 	return host
 }
 
 func NewFakeVolumeHostWithMounterFSType(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType) *fakeVolumeHost {
-	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil, pathToTypeMap)
+	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil, pathToTypeMap, "", nil)
 	return volHost
 }
 
@@ -167,6 +169,10 @@ func (f *fakeVolumeHost) GetHostUtil() hostutil.HostUtils {
 
 func (f *fakeVolumeHost) GetSubpather() subpath.Interface {
 	return f.subpather
+}
+
+func (f *fakeVolumeHost) GetPluginMgr() *VolumePluginMgr {
+	return f.pluginMgr
 }
 
 func (f *fakeVolumeHost) NewWrapperMounter(volName string, spec Spec, pod *v1.Pod, opts VolumeOptions) (Mounter, error) {
@@ -1519,17 +1525,13 @@ func VerifyGetMapPodDeviceCallCount(
 // manager and fake volume plugin using a fake volume host.
 func GetTestVolumePluginMgr(
 	t *testing.T) (*VolumePluginMgr, *FakeVolumePlugin) {
-	v := NewFakeVolumeHost(
-		"",  /* rootDir */
-		nil, /* kubeClient */
-		nil, /* plugins */
-	)
 	plugins := ProbeVolumePlugins(VolumeConfig{})
-	if err := v.pluginMgr.InitPlugins(plugins, nil /* prober */, v); err != nil {
-		t.Fatal(err)
-	}
-
-	return &v.pluginMgr, plugins[0].(*FakeVolumePlugin)
+	v := NewFakeVolumeHost(
+		"",      /* rootDir */
+		nil,     /* kubeClient */
+		plugins, /* plugins */
+	)
+	return v.pluginMgr, plugins[0].(*FakeVolumePlugin)
 }
 
 // CreateTestPVC returns a provisionable PVC for tests
@@ -1593,9 +1595,20 @@ func (f *fakeVolumeHost) IsAttachDetachController() bool {
 }
 
 func (f *fakeVolumeHost) SetKubeletError(err error) {
+	f.mux.Lock()
+	defer f.mux.Unlock()
+	f.kubeletErr = err
 	return
 }
 
 func (f *fakeVolumeHost) WaitForCacheSync() error {
 	return nil
+}
+
+func (f *fakeVolumeHost) WaitForKubeletErrNil() error {
+	return wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+		f.mux.Lock()
+		defer f.mux.Unlock()
+		return f.kubeletErr == nil, nil
+	})
 }
