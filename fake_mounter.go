@@ -36,6 +36,7 @@ type FakeMounter struct {
 	UnmountFunc UnmountFunc
 }
 
+// UnmountFunc is a function callback to be executed during the Unmount() call.
 type UnmountFunc func(path string) error
 
 var _ Interface = &FakeMounter{}
@@ -55,6 +56,8 @@ type FakeAction struct {
 	FSType string // applies only to "mount" actions
 }
 
+// NewFakeMounter returns a FakeMounter struct that implements Interface and is
+// suitable for testing purposes.
 func NewFakeMounter(mps []MountPoint) *FakeMounter {
 	return &FakeMounter{
 		MountPoints: mps,
