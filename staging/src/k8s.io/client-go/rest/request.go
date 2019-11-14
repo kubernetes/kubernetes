@@ -810,15 +810,16 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 			// Thus in case of "GET" operations, we simply retry it.
 			// We are not automatically retrying "write" operations, as
 			// they are not idempotent.
-			if !net.IsConnectionReset(err) || r.verb != "GET" {
+			if net.IsConnectionReset(err) && r.verb == "GET" {
+				// For the purpose of retry, we set the artificial "retry-after" response.
+				// TODO: Should we clean the original response if it exists?
+				resp = &http.Response{
+					StatusCode: http.StatusInternalServerError,
+					Header:     http.Header{"Retry-After": []string{"1"}},
+					Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
+				}
+			} else {
 				return err
-			}
-			// For the purpose of retry, we set the artificial "retry-after" response.
-			// TODO: Should we clean the original response if it exists?
-			resp = &http.Response{
-				StatusCode: http.StatusInternalServerError,
-				Header:     http.Header{"Retry-After": []string{"1"}},
-				Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
 			}
 		}
 
