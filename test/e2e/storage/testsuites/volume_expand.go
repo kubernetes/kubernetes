@@ -40,6 +40,8 @@ const (
 	resizePollInterval = 2 * time.Second
 	// total time to wait for cloudprovider or file system resize to finish
 	totalResizeWaitPeriod = 10 * time.Minute
+	// time to wait for PVC conditions to sync
+	pvcConditionSyncPeriod = 2 * time.Minute
 )
 
 type volumeExpandTestSuite struct {
@@ -194,15 +196,9 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 			framework.ExpectNoError(err, "While waiting for pvc resize to finish")
 
 			ginkgo.By("Checking for conditions on pvc")
-			l.resource.pvc, err = f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Get(l.resource.pvc.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err, "While fetching pvc after controller resize")
-
-			inProgressConditions := l.resource.pvc.Status.Conditions
-			// if there are conditions on the PVC, it must be of FileSystemResizePending type
-			if len(inProgressConditions) > 0 {
-				framework.ExpectEqual(len(inProgressConditions), 1, "pvc must have file system resize pending condition")
-				framework.ExpectEqual(inProgressConditions[0].Type, v1.PersistentVolumeClaimFileSystemResizePending, "pvc must have fs resizing condition")
-			}
+			npvc, err := WaitForPendingFSResizeCondition(l.resource.pvc, f.ClientSet)
+			framework.ExpectNoError(err, "While waiting for pvc to have fs resizing condition")
+			l.resource.pvc = npvc
 
 			ginkgo.By("Creating a new pod with same volume")
 			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
@@ -327,6 +323,31 @@ func WaitForControllerVolumeResize(pvc *v1.PersistentVolumeClaim, c clientset.In
 		}
 		return false, nil
 	})
+}
+
+// WaitForPendingFSResizeCondition waits for pvc to have resize condition
+func WaitForPendingFSResizeCondition(pvc *v1.PersistentVolumeClaim, c clientset.Interface) (*v1.PersistentVolumeClaim, error) {
+	var updatedPVC *v1.PersistentVolumeClaim
+	waitErr := wait.PollImmediate(resizePollInterval, pvcConditionSyncPeriod, func() (bool, error) {
+		var err error
+		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+
+		if err != nil {
+			return false, fmt.Errorf("error fetching pvc %q for checking for resize status : %v", pvc.Name, err)
+		}
+
+		inProgressConditions := updatedPVC.Status.Conditions
+		// if there are no PVC conditions that means no node expansion is necessary
+		if len(inProgressConditions) == 0 {
+			return true, nil
+		}
+		conditionType := inProgressConditions[0].Type
+		if conditionType == v1.PersistentVolumeClaimFileSystemResizePending {
+			return true, nil
+		}
+		return false, nil
+	})
+	return updatedPVC, waitErr
 }
 
 // WaitForFSResize waits for the filesystem in the pv to be resized
