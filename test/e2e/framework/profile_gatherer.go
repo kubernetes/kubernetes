@@ -42,23 +42,23 @@ func createProfilesDirectoryIfNeeded() error {
 	profileDirPath := getProfilesDirectoryPath()
 	if _, err := os.Stat(profileDirPath); os.IsNotExist(err) {
 		if mkdirErr := os.Mkdir(profileDirPath, 0777); mkdirErr != nil {
-			return fmt.Errorf("Failed to create profiles dir: %v", mkdirErr)
+			return fmt.Errorf("failed to create profiles dir: %v", mkdirErr)
 		}
 	} else if err != nil {
-		return fmt.Errorf("Failed to check existence of profiles dir: %v", err)
+		return fmt.Errorf("failed to check existence of profiles dir: %v", err)
 	}
 	return nil
 }
 
 func checkProfileGatheringPrerequisites() error {
 	if !TestContext.AllowGatheringProfiles {
-		return fmt.Errorf("Can't gather profiles as --allow-gathering-profiles is false")
+		return fmt.Errorf("can't gather profiles as --allow-gathering-profiles is false")
 	}
 	if TestContext.ReportDir == "" {
-		return fmt.Errorf("Can't gather profiles as --report-dir is empty")
+		return fmt.Errorf("can't gather profiles as --report-dir is empty")
 	}
 	if err := createProfilesDirectoryIfNeeded(); err != nil {
-		return fmt.Errorf("Failed to ensure profiles dir: %v", err)
+		return fmt.Errorf("failed to ensure profiles dir: %v", err)
 	}
 	return nil
 }
@@ -72,7 +72,7 @@ func getPortForComponent(componentName string) (int, error) {
 	case "kube-controller-manager":
 		return 10252, nil
 	}
-	return -1, fmt.Errorf("Port for component %v unknown", componentName)
+	return -1, fmt.Errorf("port for component %v unknown", componentName)
 }
 
 // Gathers profiles from a master component through SSH. E.g usages:
@@ -83,11 +83,11 @@ func getPortForComponent(componentName string) (int, error) {
 // We don't export this method but wrappers around it (see below).
 func gatherProfile(componentName, profileBaseName, profileKind string) error {
 	if err := checkProfileGatheringPrerequisites(); err != nil {
-		return fmt.Errorf("Profile gathering pre-requisite failed: %v", err)
+		return fmt.Errorf("profile gathering pre-requisite failed: %v", err)
 	}
 	profilePort, err := getPortForComponent(componentName)
 	if err != nil {
-		return fmt.Errorf("Profile gathering failed finding component port: %v", err)
+		return fmt.Errorf("profile gathering failed finding component port: %v", err)
 	}
 	if profileBaseName == "" {
 		profileBaseName = time.Now().Format(time.RFC3339)
@@ -97,7 +97,7 @@ func gatherProfile(componentName, profileBaseName, profileKind string) error {
 	getCommand := fmt.Sprintf("curl -s localhost:%v/debug/pprof/%s", profilePort, profileKind)
 	sshResult, err := e2essh.SSH(getCommand, GetMasterHost()+":22", TestContext.Provider)
 	if err != nil {
-		return fmt.Errorf("Failed to execute curl command on master through SSH: %v", err)
+		return fmt.Errorf("failed to execute curl command on master through SSH: %v", err)
 	}
 
 	profilePrefix := componentName
@@ -107,22 +107,22 @@ func gatherProfile(componentName, profileBaseName, profileKind string) error {
 	case strings.HasPrefix(profileKind, "profile"):
 		profilePrefix += "_CPUProfile_"
 	default:
-		return fmt.Errorf("Unknown profile kind provided: %s", profileKind)
+		return fmt.Errorf("unknown profile kind provided: %s", profileKind)
 	}
 
 	// Write the profile data to a file.
 	rawprofilePath := path.Join(getProfilesDirectoryPath(), profilePrefix+profileBaseName+".pprof")
 	rawprofile, err := os.Create(rawprofilePath)
 	if err != nil {
-		return fmt.Errorf("Failed to create file for the profile graph: %v", err)
+		return fmt.Errorf("failed to create file for the profile graph: %v", err)
 	}
 	defer rawprofile.Close()
 
 	if _, err := rawprofile.Write([]byte(sshResult.Stdout)); err != nil {
-		return fmt.Errorf("Failed to write file with profile data: %v", err)
+		return fmt.Errorf("failed to write file with profile data: %v", err)
 	}
 	if err := rawprofile.Close(); err != nil {
-		return fmt.Errorf("Failed to close file: %v", err)
+		return fmt.Errorf("failed to close file: %v", err)
 	}
 	// Create a graph from the data and write it to a pdf file.
 	var cmd *exec.Cmd
@@ -133,19 +133,19 @@ func gatherProfile(componentName, profileBaseName, profileKind string) error {
 	case strings.HasPrefix(profileKind, "profile"):
 		cmd = exec.Command("go", "tool", "pprof", "-pdf", "-symbolize=none", rawprofile.Name())
 	default:
-		return fmt.Errorf("Unknown profile kind provided: %s", profileKind)
+		return fmt.Errorf("unknown profile kind provided: %s", profileKind)
 	}
 	outfilePath := path.Join(getProfilesDirectoryPath(), profilePrefix+profileBaseName+".pdf")
 	outfile, err := os.Create(outfilePath)
 	if err != nil {
-		return fmt.Errorf("Failed to create file for the profile graph: %v", err)
+		return fmt.Errorf("failed to create file for the profile graph: %v", err)
 	}
 	defer outfile.Close()
 	cmd.Stdout = outfile
 	stderr := bytes.NewBuffer(nil)
 	cmd.Stderr = stderr
 	if err := cmd.Run(); nil != err {
-		return fmt.Errorf("Failed to run 'go tool pprof': %v, stderr: %#v", err, stderr.String())
+		return fmt.Errorf("failed to run 'go tool pprof': %v, stderr: %#v", err, stderr.String())
 	}
 	return nil
 }

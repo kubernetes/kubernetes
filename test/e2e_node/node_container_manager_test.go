@@ -79,7 +79,7 @@ func expectFileValToEqual(filePath string, expectedValue, delta int64) error {
 
 	// Ensure that values are within a delta range to work around rounding errors.
 	if (actual < (expectedValue - delta)) || (actual > (expectedValue + delta)) {
-		return fmt.Errorf("Expected value at %q to be between %d and %d. Got %d", filePath, (expectedValue - delta), (expectedValue + delta), actual)
+		return fmt.Errorf("expected value at %q to be between %d and %d. Got %d", filePath, (expectedValue - delta), (expectedValue + delta), actual)
 	}
 	return nil
 }
@@ -186,7 +186,7 @@ func runTest(f *framework.Framework) error {
 	expectedNAPodCgroup := cm.ParseCgroupfsToCgroupName(currentConfig.CgroupRoot)
 	expectedNAPodCgroup = cm.NewCgroupName(expectedNAPodCgroup, "kubepods")
 	if !cgroupManager.Exists(expectedNAPodCgroup) {
-		return fmt.Errorf("Expected Node Allocatable Cgroup Does not exist")
+		return fmt.Errorf("expected Node Allocatable Cgroup Does not exist")
 	}
 	// TODO: Update cgroupManager to expose a Status interface to get current Cgroup Settings.
 	// The node may not have updated capacity and allocatable yet, so check that it happens eventually.
@@ -196,7 +196,7 @@ func runTest(f *framework.Framework) error {
 			return err
 		}
 		if len(nodeList.Items) != 1 {
-			return fmt.Errorf("Unexpected number of node objects for node e2e. Expects only one node: %+v", nodeList)
+			return fmt.Errorf("unexpected number of node objects for node e2e. Expects only one node: %+v", nodeList)
 		}
 		node := nodeList.Items[0]
 		capacity := node.Status.Capacity
@@ -222,21 +222,21 @@ func runTest(f *framework.Framework) error {
 		allocatableCPU, allocatableMemory, _ = getAllocatableLimits("200m", "300Mi", "1738", capacity)
 		// Expect allocatable to include all resources in capacity.
 		if len(schedulerAllocatable) != len(capacity) {
-			return fmt.Errorf("Expected all resources in capacity to be found in allocatable")
+			return fmt.Errorf("expected all resources in capacity to be found in allocatable")
 		}
 		// CPU based evictions are not supported.
 		if allocatableCPU.Cmp(schedulerAllocatable[v1.ResourceCPU]) != 0 {
-			return fmt.Errorf("Unexpected cpu allocatable value exposed by the node. Expected: %v, got: %v, capacity: %v", allocatableCPU, schedulerAllocatable[v1.ResourceCPU], capacity[v1.ResourceCPU])
+			return fmt.Errorf("unexpected cpu allocatable value exposed by the node. Expected: %v, got: %v, capacity: %v", allocatableCPU, schedulerAllocatable[v1.ResourceCPU], capacity[v1.ResourceCPU])
 		}
 		if allocatableMemory.Cmp(schedulerAllocatable[v1.ResourceMemory]) != 0 {
-			return fmt.Errorf("Unexpected memory allocatable value exposed by the node. Expected: %v, got: %v, capacity: %v", allocatableMemory, schedulerAllocatable[v1.ResourceMemory], capacity[v1.ResourceMemory])
+			return fmt.Errorf("unexpected memory allocatable value exposed by the node. Expected: %v, got: %v, capacity: %v", allocatableMemory, schedulerAllocatable[v1.ResourceMemory], capacity[v1.ResourceMemory])
 		}
 		return nil
 	}, time.Minute, 5*time.Second).Should(gomega.BeNil())
 
 	kubeReservedCgroupName := cm.NewCgroupName(cm.RootCgroupName, kubeReservedCgroup)
 	if !cgroupManager.Exists(kubeReservedCgroupName) {
-		return fmt.Errorf("Expected kube reserved cgroup Does not exist")
+		return fmt.Errorf("expected kube reserved cgroup Does not exist")
 	}
 	// Expect CPU shares on kube reserved cgroup to equal it's reservation which is `100m`.
 	kubeReservedCPU := resource.MustParse(currentConfig.KubeReserved[string(v1.ResourceCPU)])
@@ -255,7 +255,7 @@ func runTest(f *framework.Framework) error {
 	}
 	systemReservedCgroupName := cm.NewCgroupName(cm.RootCgroupName, systemReservedCgroup)
 	if !cgroupManager.Exists(systemReservedCgroupName) {
-		return fmt.Errorf("Expected system reserved cgroup Does not exist")
+		return fmt.Errorf("expected system reserved cgroup Does not exist")
 	}
 	// Expect CPU shares on system reserved cgroup to equal it's reservation which is `100m`.
 	systemReservedCPU := resource.MustParse(currentConfig.SystemReserved[string(v1.ResourceCPU)])

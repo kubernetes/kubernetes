@@ -64,7 +64,7 @@ func waitForNominatedNodeNameWithTimeout(cs clientset.Interface, pod *v1.Pod, ti
 		}
 		return false, err
 	}); err != nil {
-		return fmt.Errorf("Pod %v/%v annotation did not get set: %v", pod.Namespace, pod.Name, err)
+		return fmt.Errorf("pod %v/%v annotation did not get set: %v", pod.Namespace, pod.Name, err)
 	}
 	return nil
 }
