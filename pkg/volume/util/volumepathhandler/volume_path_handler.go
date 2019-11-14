@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
+	utilexec "k8s.io/utils/exec"
 
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -139,7 +140,7 @@ func mapBindMountDevice(v VolumePathHandler, devicePath string, mapPath string, 
 	}
 
 	// Bind mount file
-	mounter := &mount.SafeFormatAndMount{Interface: mount.New(""), Exec: mount.NewOSExec()}
+	mounter := &mount.SafeFormatAndMount{Interface: mount.New(""), Exec: utilexec.New()}
 	if err := mounter.Mount(devicePath, linkPath, "" /* fsType */, []string{"bind"}); err != nil {
 		return fmt.Errorf("failed to bind mount devicePath: %s to linkPath %s: %v", devicePath, linkPath, err)
 	}
@@ -196,7 +197,7 @@ func unmapBindMountDevice(v VolumePathHandler, mapPath string, linkName string) 
 	}
 
 	// Unmount file
-	mounter := &mount.SafeFormatAndMount{Interface: mount.New(""), Exec: mount.NewOSExec()}
+	mounter := &mount.SafeFormatAndMount{Interface: mount.New(""), Exec: utilexec.New()}
 	if err := mounter.Unmount(linkPath); err != nil {
 		return fmt.Errorf("failed to unmount linkPath %s: %v", linkPath, err)
 	}
