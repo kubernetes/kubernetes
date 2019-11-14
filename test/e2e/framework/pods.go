@@ -33,10 +33,12 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+
+	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 // DefaultPodDeletionTimeout is the default timeout for deleting pod

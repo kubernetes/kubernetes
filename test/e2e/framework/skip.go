@@ -28,6 +28,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
+
+	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
