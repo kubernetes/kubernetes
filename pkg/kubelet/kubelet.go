@@ -1418,6 +1418,24 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 		// start syncing lease
 		go kl.nodeLeaseController.Run(wait.NeverStop)
+
+		// Wait for node cache be ready:
+		// if new labels are labeled in a node, and pods use nodeSelector,
+		// kubelet may reject the pods at kubelet restarting because node
+		// cache is not populated and kubelet still uses stale node info
+		// which has no new labels.
+		_ = wait.PollInfinite(10*time.Millisecond, func() (bool, error) {
+			klog.V(2).Infof("wait for node cache be ready")
+			// wait for the node to be registered
+			if kl.registerNode && !kl.registrationCompleted {
+				return false, nil
+			}
+			// wait for node cache to be populated
+			if _, err := kl.nodeLister.Get(string(kl.nodeName)); err != nil {
+				return false, nil
+			}
+			return true, nil
+		})
 	}
 	go wait.Until(kl.updateRuntimeUp, 5*time.Second, wait.NeverStop)
 
