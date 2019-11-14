@@ -31,10 +31,10 @@ import (
 const (
 	// AWSEBSDriverName is the name of the CSI driver for EBS
 	AWSEBSDriverName = "ebs.csi.aws.com"
-	// AWSEBSTopologyKey is the zonal topology key for AWS EBS CSI Driver
-	AWSEBSTopologyKey = "topology.ebs.csi.aws.com/zone"
 	// AWSEBSInTreePluginName is the name of the intree plugin for EBS
 	AWSEBSInTreePluginName = "kubernetes.io/aws-ebs"
+	// AWSEBSTopologyKey is the zonal topology key for AWS EBS CSI driver
+	AWSEBSTopologyKey = "topology." + AWSEBSDriverName + "/zone"
 )
 
 var _ InTreePlugin = &awsElasticBlockStoreCSITranslator{}
@@ -49,15 +49,33 @@ func NewAWSElasticBlockStoreCSITranslator() InTreePlugin {
 
 // TranslateInTreeStorageClassToCSI translates InTree EBS storage class parameters to CSI storage class
 func (t *awsElasticBlockStoreCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
-	params := map[string]string{}
-
+	var (
+		generatedTopologies []v1.TopologySelectorTerm
+		params              = map[string]string{}
+	)
 	for k, v := range sc.Parameters {
 		switch strings.ToLower(k) {
-		case "fstype":
-			params["csi.storage.k8s.io/fstype"] = v
+		case fsTypeKey:
+			params[csiFsTypeKey] = v
+		case zoneKey:
+			generatedTopologies = generateToplogySelectors(AWSEBSTopologyKey, []string{v})
+		case zonesKey:
+			generatedTopologies = generateToplogySelectors(AWSEBSTopologyKey, strings.Split(v, ","))
 		default:
 			params[k] = v
 		}
+	}
+
+	if len(generatedTopologies) > 0 && len(sc.AllowedTopologies) > 0 {
+		return nil, fmt.Errorf("cannot simultaneously set allowed topologies and zone/zones parameters")
+	} else if len(generatedTopologies) > 0 {
+		sc.AllowedTopologies = generatedTopologies
+	} else if len(sc.AllowedTopologies) > 0 {
+		newTopologies, err := translateAllowedTopologies(sc.AllowedTopologies, AWSEBSTopologyKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed translating allowed topologies: %v", err)
+		}
+		sc.AllowedTopologies = newTopologies
 	}
 
 	sc.Parameters = params
