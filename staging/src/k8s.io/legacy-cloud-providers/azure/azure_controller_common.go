@@ -300,3 +300,17 @@ func (c *controllerCommon) DisksAreAttached(diskNames []string, nodeName types.N
 
 	return attached, nil
 }
+
+func filterDetachingDisks(unfilteredDisks []compute.DataDisk) []compute.DataDisk {
+	filteredDisks := []compute.DataDisk{}
+	for _, disk := range unfilteredDisks {
+		if disk.ToBeDetached != nil && *disk.ToBeDetached {
+			if disk.Name != nil {
+				klog.V(2).Infof("Filtering disk: %s with ToBeDetached flag set.", *disk.Name)
+			}
+		} else {
+			filteredDisks = append(filteredDisks, disk)
+		}
+	}
+	return filteredDisks
+}

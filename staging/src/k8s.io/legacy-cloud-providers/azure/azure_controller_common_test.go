@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 )
 
 func TestCommonAttachDisk(t *testing.T) {
@@ -247,4 +248,39 @@ func TestDisksAreAttached(t *testing.T) {
 		assert.Equal(t, test.expectedAttached, attached, "TestCase[%d]: %s", i, test.desc)
 		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
 	}
+}
+
+func TestFilteredDetatchingDisks(t *testing.T) {
+
+	disks := []compute.DataDisk{
+		{
+			Name:         pointer.StringPtr("DiskName1"),
+			ToBeDetached: pointer.BoolPtr(false),
+			ManagedDisk: &compute.ManagedDiskParameters{
+				ID: pointer.StringPtr("ManagedID"),
+			},
+		},
+		{
+			Name:         pointer.StringPtr("DiskName2"),
+			ToBeDetached: pointer.BoolPtr(true),
+		},
+		{
+			Name:         pointer.StringPtr("DiskName3"),
+			ToBeDetached: nil,
+		},
+		{
+			Name:         pointer.StringPtr("DiskName4"),
+			ToBeDetached: nil,
+		},
+	}
+
+	filteredDisks := filterDetachingDisks(disks)
+	assert.Equal(t, 3, len(filteredDisks))
+	assert.Equal(t, "DiskName1", *filteredDisks[0].Name)
+	assert.Equal(t, "ManagedID", *filteredDisks[0].ManagedDisk.ID)
+	assert.Equal(t, "DiskName3", *filteredDisks[1].Name)
+
+	disks = []compute.DataDisk{}
+	filteredDisks = filterDetachingDisks(disks)
+	assert.Equal(t, 0, len(filteredDisks))
 }
