@@ -59,7 +59,8 @@
       {
         "ports": [
           {
-            "protocol": "Ǐ2啗塧ȱ蓿彭聡A3fƻfʣ"
+            "protocol": "Ǐ2啗塧ȱ蓿彭聡A3fƻfʣ",
+            "port": 2
           }
         ],
         "from": [
@@ -100,7 +101,8 @@
       {
         "ports": [
           {
-            "protocol": "ɗ"
+            "protocol": "ɗ",
+            "port": 3
           }
         ],
         "to": [
