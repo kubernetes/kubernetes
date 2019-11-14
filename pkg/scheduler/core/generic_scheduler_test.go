@@ -2286,3 +2286,32 @@ func assignDefaultStartTime(pods []*v1.Pod) {
 		}
 	}
 }
+
+func TestFairEvaluationForNodes(t *testing.T) {
+	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
+	predicates := map[string]algorithmpredicates.FitPredicate{"true": truePredicate}
+	numAllNodes := 500
+	nodeNames := make([]string, 0, numAllNodes)
+	for i := 0; i < numAllNodes; i++ {
+		nodeNames = append(nodeNames, strconv.Itoa(i))
+	}
+	nodes := makeNodeList(nodeNames)
+	g := makeScheduler(predicates, nodes)
+	// To make numAllNodes % nodesToFind != 0
+	g.percentageOfNodesToScore = 30
+	nodesToFind := int(g.numFeasibleNodesToFind(int32(numAllNodes)))
+
+	// Iterating over all nodes more than twice
+	for i := 0; i < 2*(numAllNodes/nodesToFind+1); i++ {
+		nodesThatFit, _, _, err := g.findNodesThatFit(context.Background(), framework.NewCycleState(), &v1.Pod{})
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if len(nodesThatFit) != nodesToFind {
+			t.Errorf("got %d nodes filtered, want %d", len(nodesThatFit), nodesToFind)
+		}
+		if g.nextStartNodeIndex != (i+1)*nodesToFind%numAllNodes {
+			t.Errorf("got %d lastProcessedNodeIndex, want %d", g.nextStartNodeIndex, (i+1)*nodesToFind%numAllNodes)
+		}
+	}
+}
