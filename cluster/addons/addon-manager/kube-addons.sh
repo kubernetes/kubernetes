@@ -120,7 +120,7 @@ function generate_prune_whitelist_flags() {
 # besides the default ones.
 extra_prune_whitelist=
 if [ -n "${KUBECTL_EXTRA_PRUNE_WHITELIST:-}" ]; then
-  extra_prune_whitelist=( "${KUBECTL_EXTRA_PRUNE_WHITELIST:-}" )
+  read -ra extra_prune_whitelist <<< "${KUBECTL_EXTRA_PRUNE_WHITELIST}"
 fi
 prune_whitelist=( "${KUBECTL_PRUNE_WHITELIST[@]}"  "${extra_prune_whitelist[@]}" )
 prune_whitelist_flags=$(generate_prune_whitelist_flags "${prune_whitelist[@]}")
