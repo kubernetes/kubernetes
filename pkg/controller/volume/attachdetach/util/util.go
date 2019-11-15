@@ -282,6 +282,10 @@ func translateInTreeSpecToCSIIfNeeded(spec *volume.Spec, nodeName types.NodeName
 	if err != nil {
 		return nil, err
 	}
+	if !migratable {
+		// Jump out of translation fast so we don't check the node if the spec itself is not migratable
+		return spec, nil
+	}
 	migrationSupportedOnNode, err := isCSIMigrationSupportedOnNode(nodeName, spec, vpm, csiMigratedPluginManager)
 	if err != nil {
 		return nil, err
