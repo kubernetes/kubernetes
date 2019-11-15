@@ -19,7 +19,7 @@ require (
 	github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/stretchr/testify v1.3.0
-	github.com/vmware/govmomi v0.20.1
+	github.com/vmware/govmomi v0.20.3
 	golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456
