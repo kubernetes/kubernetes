@@ -57,17 +57,6 @@ const (
 	// controllerName is a unique value used with LabelManagedBy to indicated
 	// the component managing an EndpointSlice.
 	controllerName = "endpointslice-controller.k8s.io"
-	// managedBySetupAnnotation is set on a Service to indicate that
-	// EndpointSlices for the Service have already been configured with
-	// LabelManagedBy. If this annotation is not set, all related EndpointSlices
-	// will have LabelManagedBy set to reference this controller if the label
-	// is not already set. Once all EndpointSlices are labeled, the Controller
-	// will set this annotation on the Service.
-	managedBySetupAnnotation = "endpointslice.kubernetes.io/managed-by-setup"
-	// managedBySetupCompleteValue represents the value of the
-	// managedBySetupAnnotation that indicates that the setup process has been
-	// completed for a Service.
-	managedBySetupCompleteValue = "true"
 )
 
 // NewController creates and initializes a new Controller
@@ -300,24 +289,6 @@ func (c *Controller) syncService(key string) error {
 		return err
 	}
 
-	// With the goal of different controllers being able to manage different
-	// subsets of EndpointSlices, LabelManagedBy has been added to indicate
-	// which controller or entity manages an EndpointSlice. As part of this
-	// v1.16->v1.17 change, EndpointSlices will initially be assumed to be
-	// managed by this controller unless a label is set to indicate otherwise.
-	// To ensure a seamless upgrade process, the managedBySetupAnnotation is
-	// used to indicate that LabelManagedBy has been set initially for related
-	// EndpointSlices. If it hasn't been set to the expected value here, we call
-	// ensureSetupManagedByAnnotation() to set up LabelManagedBy on each
-	// EndpointSlice.
-	// TODO(robscott): Remove this before v1.18.
-	err = c.ensureSetupManagedByAnnotation(service)
-	if err != nil {
-		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToSetEndpointSliceManagedByLabel",
-			"Error adding managed-by Label to Endpoint Slices for Service %s/%s: %v", service.Namespace, service.Name, err)
-		return err
-	}
-
 	esLabelSelector := labels.Set(map[string]string{
 		discovery.LabelServiceName: service.Name,
 		discovery.LabelManagedBy:   controllerName,
@@ -370,49 +341,6 @@ func (c *Controller) onServiceDelete(obj interface{}) {
 
 	c.serviceSelectorCache.Delete(key)
 	c.queue.Add(key)
-}
-
-// ensureSetupManagedByAnnotation selects all EndpointSlices for a Service and
-// ensures they have LabelManagedBy set appropriately. This ensures that only
-// one controller or entity is trying to manage a given EndpointSlice. This
-// function provides backwards compatibility with the initial alpha release of
-// EndpointSlices that did not include these labels.
-// TODO(robscott): Remove this in time for v1.18.
-func (c *Controller) ensureSetupManagedByAnnotation(service *v1.Service) error {
-	if managedBySetup, ok := service.Annotations[managedBySetupAnnotation]; ok && managedBySetup == managedBySetupCompleteValue {
-		return nil
-	}
-
-	esLabelSelector := labels.Set(map[string]string{discovery.LabelServiceName: service.Name}).AsSelectorPreValidated()
-	endpointSlices, err := c.endpointSliceLister.EndpointSlices(service.Namespace).List(esLabelSelector)
-
-	if err != nil {
-		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToListEndpointSlices",
-			"Error listing Endpoint Slices for Service %s/%s: %v", service.Namespace, service.Name, err)
-		return err
-	}
-
-	for _, endpointSlice := range endpointSlices {
-		if _, ok := endpointSlice.Labels[discovery.LabelManagedBy]; !ok {
-			if endpointSlice.Labels == nil {
-				endpointSlice.Labels = make(map[string]string)
-			}
-
-			endpointSlice.Labels[discovery.LabelManagedBy] = controllerName
-			_, err = c.client.DiscoveryV1beta1().EndpointSlices(endpointSlice.Namespace).Update(endpointSlice)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	if service.Annotations == nil {
-		service.Annotations = make(map[string]string)
-	}
-
-	service.Annotations[managedBySetupAnnotation] = managedBySetupCompleteValue
-	_, err = c.client.CoreV1().Services(service.Namespace).Update(service)
-	return err
 }
 
 func (c *Controller) addPod(obj interface{}) {
