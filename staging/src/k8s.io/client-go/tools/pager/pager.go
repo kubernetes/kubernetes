@@ -77,6 +77,7 @@ func (p *ListPager) List(ctx context.Context, options metav1.ListOptions) (runti
 	if options.Limit == 0 {
 		options.Limit = p.PageSize
 	}
+	requestedResourceVersion := options.ResourceVersion
 	var list *metainternalversion.List
 	for {
 		select {
@@ -94,9 +95,11 @@ func (p *ListPager) List(ctx context.Context, options metav1.ListOptions) (runti
 			if !errors.IsResourceExpired(err) || !p.FullListIfExpired || options.Continue == "" {
 				return nil, err
 			}
-			// the list expired while we were processing, fall back to a full list
+			// the list expired while we were processing, fall back to a full list at
+			// the requested ResourceVersion.
 			options.Limit = 0
 			options.Continue = ""
+			options.ResourceVersion = requestedResourceVersion
 			return p.PageFn(ctx, options)
 		}
 		m, err := meta.ListAccessor(obj)
@@ -129,6 +132,10 @@ func (p *ListPager) List(ctx context.Context, options metav1.ListOptions) (runti
 
 		// set the next loop up
 		options.Continue = m.GetContinue()
+		// Clear the ResourceVersion on the subsequent List calls to avoid the
+		// `specifying resource version is not allowed when using continue` error.
+		// See https://github.com/kubernetes/kubernetes/issues/85221#issuecomment-553748143.
+		options.ResourceVersion = ""
 	}
 }
 
