@@ -626,7 +626,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	VolumePVCDataSource:                            {Default: true, PreRelease: featuregate.Beta},
 	PodOverhead:                                    {Default: false, PreRelease: featuregate.Alpha},
 	IPv6DualStack:                                  {Default: false, PreRelease: featuregate.Alpha},
-	EndpointSlice:                                  {Default: true, PreRelease: featuregate.Beta},
+	EndpointSlice:                                  {Default: false, PreRelease: featuregate.Beta},
 	EvenPodsSpread:                                 {Default: false, PreRelease: featuregate.Alpha},
 	StartupProbe:                                   {Default: false, PreRelease: featuregate.Alpha},
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},
