@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -74,6 +76,11 @@ type Key struct {
 	Secret string `json:"secret"`
 }
 
+// String implements Stringer interface in a log safe way.
+func (k Key) String() string {
+	return fmt.Sprintf("Name: %s, Secret: [REDACTED]", k.Name)
+}
+
 // IdentityConfiguration is an empty struct to allow identity transformer in provider configuration.
 type IdentityConfiguration struct{}
 
@@ -83,7 +90,7 @@ type KMSConfiguration struct {
 	Name string `json:"name"`
 	// cacheSize is the maximum number of secrets which are cached in memory. The default value is 1000.
 	// +optional
-	CacheSize int32 `json:"cachesize,omitempty"`
+	CacheSize *int32 `json:"cachesize,omitempty"`
 	// endpoint is the gRPC server listening address, for example "unix:///var/run/kms-provider.sock".
 	Endpoint string `json:"endpoint"`
 	// Timeout for gRPC calls to kms-plugin (ex. 5s). The default is 3 seconds.
