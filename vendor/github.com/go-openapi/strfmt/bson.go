@@ -16,12 +16,12 @@ package strfmt
 
 import (
 	"database/sql/driver"
-	"errors"
 	"fmt"
 
-	"github.com/globalsign/mgo/bson"
-	"github.com/mailru/easyjson/jlexer"
-	"github.com/mailru/easyjson/jwriter"
+	"go.mongodb.org/mongo-driver/bson"
+
+	"go.mongodb.org/mongo-driver/bson/bsontype"
+	bsonprim "go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func init() {
@@ -32,27 +32,45 @@ func init() {
 
 // IsBSONObjectID returns true when the string is a valid BSON.ObjectId
 func IsBSONObjectID(str string) bool {
-	return bson.IsObjectIdHex(str)
+	_, err := bsonprim.ObjectIDFromHex(str)
+	return err == nil
 }
 
-// ObjectId represents a BSON object ID (alias to github.com/globalsign/mgo/bson.ObjectId)
+// ObjectId represents a BSON object ID (alias to go.mongodb.org/mongo-driver/bson/primitive.ObjectID)
 //
 // swagger:strfmt bsonobjectid
-type ObjectId bson.ObjectId
+type ObjectId bsonprim.ObjectID
 
 // NewObjectId creates a ObjectId from a Hex String
 func NewObjectId(hex string) ObjectId {
-	return ObjectId(bson.ObjectIdHex(hex))
+	oid, err := bsonprim.ObjectIDFromHex(hex)
+	if err != nil {
+		panic(err)
+	}
+	return ObjectId(oid)
 }
 
 // MarshalText turns this instance into text
-func (id *ObjectId) MarshalText() ([]byte, error) {
-	return []byte(bson.ObjectId(*id).Hex()), nil
+func (id ObjectId) MarshalText() ([]byte, error) {
+	oid := bsonprim.ObjectID(id)
+	if oid == bsonprim.NilObjectID {
+		return nil, nil
+	}
+	return []byte(oid.Hex()), nil
 }
 
 // UnmarshalText hydrates this instance from text
 func (id *ObjectId) UnmarshalText(data []byte) error { // validation is performed later on
-	*id = ObjectId(bson.ObjectIdHex(string(data)))
+	if len(data) == 0 {
+		*id = ObjectId(bsonprim.NilObjectID)
+		return nil
+	}
+	oidstr := string(data)
+	oid, err := bsonprim.ObjectIDFromHex(oidstr)
+	if err != nil {
+		return err
+	}
+	*id = ObjectId(oid)
 	return nil
 }
 
@@ -72,58 +90,63 @@ func (id *ObjectId) Scan(raw interface{}) error {
 }
 
 // Value converts a value to a database driver value
-func (id *ObjectId) Value() (driver.Value, error) {
-	return driver.Value(string(*id)), nil
+func (id ObjectId) Value() (driver.Value, error) {
+	return driver.Value(bsonprim.ObjectID(id).Hex()), nil
 }
 
-func (id *ObjectId) String() string {
-	return string(*id)
+func (id ObjectId) String() string {
+	return bsonprim.ObjectID(id).String()
 }
 
 // MarshalJSON returns the ObjectId as JSON
-func (id *ObjectId) MarshalJSON() ([]byte, error) {
-	var w jwriter.Writer
-	id.MarshalEasyJSON(&w)
-	return w.BuildBytes()
-}
-
-// MarshalEasyJSON writes the ObjectId to a easyjson.Writer
-func (id *ObjectId) MarshalEasyJSON(w *jwriter.Writer) {
-	w.String(bson.ObjectId(*id).Hex())
+func (id ObjectId) MarshalJSON() ([]byte, error) {
+	return bsonprim.ObjectID(id).MarshalJSON()
 }
 
 // UnmarshalJSON sets the ObjectId from JSON
 func (id *ObjectId) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	id.UnmarshalEasyJSON(&l)
-	return l.Error()
-}
-
-// UnmarshalEasyJSON sets the ObjectId from a easyjson.Lexer
-func (id *ObjectId) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	if data := in.String(); in.Ok() {
-		*id = NewObjectId(data)
-	}
-}
-
-// GetBSON returns the hex representation of the ObjectId as a bson.M{} map.
-func (id *ObjectId) GetBSON() (interface{}, error) {
-	return bson.M{"data": bson.ObjectId(*id).Hex()}, nil
-}
-
-// SetBSON sets the ObjectId from raw bson data
-func (id *ObjectId) SetBSON(raw bson.Raw) error {
-	var m bson.M
-	if err := raw.Unmarshal(&m); err != nil {
+	var obj bsonprim.ObjectID
+	if err := obj.UnmarshalJSON(data); err != nil {
 		return err
 	}
+	*id = ObjectId(obj)
+	return nil
+}
 
-	if data, ok := m["data"].(string); ok {
-		*id = NewObjectId(data)
-		return nil
+// MarshalBSON renders the object id as a BSON document
+func (id ObjectId) MarshalBSON() ([]byte, error) {
+	return bson.Marshal(bson.M{"data": bsonprim.ObjectID(id)})
+}
+
+// UnmarshalBSON reads the objectId from a BSON document
+func (id *ObjectId) UnmarshalBSON(data []byte) error {
+	var obj struct {
+		Data bsonprim.ObjectID
 	}
+	if err := bson.Unmarshal(data, &obj); err != nil {
+		return err
+	}
+	*id = ObjectId(obj.Data)
+	return nil
+}
 
-	return errors.New("couldn't unmarshal bson raw value as ObjectId")
+// MarshalBSONValue is an interface implemented by types that can marshal themselves
+// into a BSON document represented as bytes. The bytes returned must be a valid
+// BSON document if the error is nil.
+func (id ObjectId) MarshalBSONValue() (bsontype.Type, []byte, error) {
+	oid := bsonprim.ObjectID(id)
+	return bsontype.ObjectID, oid[:], nil
+}
+
+// UnmarshalBSONValue is an interface implemented by types that can unmarshal a
+// BSON value representation of themselves. The BSON bytes and type can be
+// assumed to be valid. UnmarshalBSONValue must copy the BSON value bytes if it
+// wishes to retain the data after returning.
+func (id *ObjectId) UnmarshalBSONValue(tpe bsontype.Type, data []byte) error {
+	var oid bsonprim.ObjectID
+	copy(oid[:], data)
+	*id = ObjectId(oid)
+	return nil
 }
 
 // DeepCopyInto copies the receiver and writes its value into out.

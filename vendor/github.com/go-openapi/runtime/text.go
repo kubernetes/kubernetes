@@ -39,6 +39,12 @@ func TextConsumer() Consumer {
 		}
 		b := buf.Bytes()
 
+		// If the buffer is empty, no need to unmarshal it, which causes a panic.
+		if len(b) == 0 {
+			data = ""
+			return nil
+		}
+
 		if tu, ok := data.(encoding.TextUnmarshaler); ok {
 			err := tu.UnmarshalText(b)
 			if err != nil {

@@ -215,6 +215,28 @@ func (a *Assertions) Errorf(err error, msg string, args ...interface{}) bool {
 	return Errorf(a.t, err, msg, args...)
 }
 
+// Eventually asserts that given condition will be met in waitFor time,
+// periodically checking target function each tick.
+//
+//    a.Eventually(func() bool { return true; }, time.Second, 10*time.Millisecond)
+func (a *Assertions) Eventually(condition func() bool, waitFor time.Duration, tick time.Duration, msgAndArgs ...interface{}) bool {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	return Eventually(a.t, condition, waitFor, tick, msgAndArgs...)
+}
+
+// Eventuallyf asserts that given condition will be met in waitFor time,
+// periodically checking target function each tick.
+//
+//    a.Eventuallyf(func() bool { return true; }, time.Second, 10*time.Millisecond, "error message %s", "formatted")
+func (a *Assertions) Eventuallyf(condition func() bool, waitFor time.Duration, tick time.Duration, msg string, args ...interface{}) bool {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	return Eventuallyf(a.t, condition, waitFor, tick, msg, args...)
+}
+
 // Exactly asserts that two objects are equal in value and type.
 //
 //    a.Exactly(int32(123), int64(123))
@@ -301,6 +323,56 @@ func (a *Assertions) FileExistsf(path string, msg string, args ...interface{}) b
 		h.Helper()
 	}
 	return FileExistsf(a.t, path, msg, args...)
+}
+
+// Greater asserts that the first element is greater than the second
+//
+//    a.Greater(2, 1)
+//    a.Greater(float64(2), float64(1))
+//    a.Greater("b", "a")
+func (a *Assertions) Greater(e1 interface{}, e2 interface{}, msgAndArgs ...interface{}) bool {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	return Greater(a.t, e1, e2, msgAndArgs...)
+}
+
+// GreaterOrEqual asserts that the first element is greater than or equal to the second
+//
+//    a.GreaterOrEqual(2, 1)
+//    a.GreaterOrEqual(2, 2)
+//    a.GreaterOrEqual("b", "a")
+//    a.GreaterOrEqual("b", "b")
+func (a *Assertions) GreaterOrEqual(e1 interface{}, e2 interface{}, msgAndArgs ...interface{}) bool {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	return GreaterOrEqual(a.t, e1, e2, msgAndArgs...)
+}
+
+// GreaterOrEqualf asserts that the first element is greater than or equal to the second
+//
+//    a.GreaterOrEqualf(2, 1, "error message %s", "formatted")
+//    a.GreaterOrEqualf(2, 2, "error message %s", "formatted")
+//    a.GreaterOrEqualf("b", "a", "error message %s", "formatted")
+//    a.GreaterOrEqualf("b", "b", "error message %s", "formatted")
+func (a *Assertions) GreaterOrEqualf(e1 interface{}, e2 interface{}, msg string, args ...interface{}) bool {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	return GreaterOrEqualf(a.t, e1, e2, msg, args...)
+}
+
+// Greaterf asserts that the first element is greater than the second
+//
+//    a.Greaterf(2, 1, "error message %s", "formatted")
+//    a.Greaterf(float64(2, "error message %s", "formatted"), float64(1))
+//    a.Greaterf("b", "a", "error message %s", "formatted")
+func (a *Assertions) Greaterf(e1 interface{}, e2 interface{}, msg string, args ...interface{}) bool {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	return Greaterf(a.t, e1, e2, msg, args...)
 }
 
 // HTTPBodyContains asserts that a specified handler returns a
@@ -567,6 +639,22 @@ func (a *Assertions) JSONEqf(expected string, actual string, msg string, args ..
 	return JSONEqf(a.t, expected, actual, msg, args...)
 }
 
+// YAMLEq asserts that two YAML strings are equivalent.
+func (a *Assertions) YAMLEq(expected string, actual string, msgAndArgs ...interface{}) bool {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	return YAMLEq(a.t, expected, actual, msgAndArgs...)
+}
+
+// YAMLEqf asserts that two YAML strings are equivalent.
+func (a *Assertions) YAMLEqf(expected string, actual string, msg string, args ...interface{}) bool {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	return YAMLEqf(a.t, expected, actual, msg, args...)
+}
+
 // Len asserts that the specified object has specific length.
 // Len also fails if the object has a type that len() not accept.
 //
@@ -587,6 +675,56 @@ func (a *Assertions) Lenf(object interface{}, length int, msg string, args ...in
 		h.Helper()
 	}
 	return Lenf(a.t, object, length, msg, args...)
+}
+
+// Less asserts that the first element is less than the second
+//
+//    a.Less(1, 2)
+//    a.Less(float64(1), float64(2))
+//    a.Less("a", "b")
+func (a *Assertions) Less(e1 interface{}, e2 interface{}, msgAndArgs ...interface{}) bool {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	return Less(a.t, e1, e2, msgAndArgs...)
+}
+
+// LessOrEqual asserts that the first element is less than or equal to the second
+//
+//    a.LessOrEqual(1, 2)
+//    a.LessOrEqual(2, 2)
+//    a.LessOrEqual("a", "b")
+//    a.LessOrEqual("b", "b")
+func (a *Assertions) LessOrEqual(e1 interface{}, e2 interface{}, msgAndArgs ...interface{}) bool {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	return LessOrEqual(a.t, e1, e2, msgAndArgs...)
+}
+
+// LessOrEqualf asserts that the first element is less than or equal to the second
+//
+//    a.LessOrEqualf(1, 2, "error message %s", "formatted")
+//    a.LessOrEqualf(2, 2, "error message %s", "formatted")
+//    a.LessOrEqualf("a", "b", "error message %s", "formatted")
+//    a.LessOrEqualf("b", "b", "error message %s", "formatted")
+func (a *Assertions) LessOrEqualf(e1 interface{}, e2 interface{}, msg string, args ...interface{}) bool {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	return LessOrEqualf(a.t, e1, e2, msg, args...)
+}
+
+// Lessf asserts that the first element is less than the second
+//
+//    a.Lessf(1, 2, "error message %s", "formatted")
+//    a.Lessf(float64(1, "error message %s", "formatted"), float64(2))
+//    a.Lessf("a", "b", "error message %s", "formatted")
+func (a *Assertions) Lessf(e1 interface{}, e2 interface{}, msg string, args ...interface{}) bool {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	return Lessf(a.t, e1, e2, msg, args...)
 }
 
 // Nil asserts that the specified object is nil.
@@ -875,6 +1013,32 @@ func (a *Assertions) Regexpf(rx interface{}, str interface{}, msg string, args .
 		h.Helper()
 	}
 	return Regexpf(a.t, rx, str, msg, args...)
+}
+
+// Same asserts that two pointers reference the same object.
+//
+//    a.Same(ptr1, ptr2)
+//
+// Both arguments must be pointer variables. Pointer variable sameness is
+// determined based on the equality of both type and value.
+func (a *Assertions) Same(expected interface{}, actual interface{}, msgAndArgs ...interface{}) bool {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	return Same(a.t, expected, actual, msgAndArgs...)
+}
+
+// Samef asserts that two pointers reference the same object.
+//
+//    a.Samef(ptr1, ptr2, "error message %s", "formatted")
+//
+// Both arguments must be pointer variables. Pointer variable sameness is
+// determined based on the equality of both type and value.
+func (a *Assertions) Samef(expected interface{}, actual interface{}, msg string, args ...interface{}) bool {
+	if h, ok := a.t.(tHelper); ok {
+		h.Helper()
+	}
+	return Samef(a.t, expected, actual, msg, args...)
 }
 
 // Subset asserts that the specified list(array, slice...) contains all
