@@ -117,7 +117,7 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (o
 	delete(annotations, "my-veryown-annotations")
 	acc.SetAnnotations(annotations)
 	js, _ := json.Marshal(newObj)
-	annotations["my-veryown-annotations"] = strings.Repeat("a", int(0.6*math.Pow10(int(math.Log10(float64(len(js)))))))
+	annotations["my-veryown-annotations"] = strings.Repeat("a", int(0.3*math.Pow10(int(math.Log10(float64(len(js)))))))
 
 	acc.SetAnnotations(annotations)
 	return newObj, nil
