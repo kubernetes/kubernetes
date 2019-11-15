@@ -110,16 +110,15 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (o
 	}
 
 	acc, _ := meta.Accessor(newObj)
-	annotations := acc.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-	delete(annotations, "my-veryown-annotations")
-	acc.SetAnnotations(annotations)
 	js, _ := json.Marshal(newObj)
-	annotations["my-veryown-annotations"] = strings.Repeat("a", int(0.3*math.Pow10(int(math.Log10(float64(len(js)))))))
-
-	acc.SetAnnotations(annotations)
+	entry := metav1.ManagedFieldsEntry{
+		Manager:    "Fede",
+		APIVersion: "v1",
+		FieldsV1:   &metav1.FieldsV1{Raw: []byte(fmt.Sprintf("%q", strings.Repeat("a", int(0.3*math.Pow10(int(math.Log10(float64(len(js)))))))))},
+		FieldsType: "FieldsV1",
+		Operation:  metav1.ManagedFieldsOperationUpdate,
+	}
+	acc.SetManagedFields([]metav1.ManagedFieldsEntry{entry})
 	return newObj, nil
 
 	// First try to decode the managed fields provided in the update,
