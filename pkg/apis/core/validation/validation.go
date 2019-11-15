@@ -4175,10 +4175,7 @@ func validateServiceExternalTrafficFieldsValue(service *core.Service) field.Erro
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("externalTrafficPolicy"), service.Spec.ExternalTrafficPolicy,
 			fmt.Sprintf("ExternalTrafficPolicy must be empty, %v or %v", core.ServiceExternalTrafficPolicyTypeCluster, core.ServiceExternalTrafficPolicyTypeLocal)))
 	}
-	// 'externalTrafficPolicy=Local' is mutually exclusive with topologyKeys
-	if service.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal && len(service.Spec.TopologyKeys) > 0 {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec").Child("externalTrafficPolicy"), "externalTrafficPolicy must not be set to 'Local' when topologyKeys is specified"))
-	}
+
 	if service.Spec.HealthCheckNodePort < 0 {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("healthCheckNodePort"), service.Spec.HealthCheckNodePort,
 			"HealthCheckNodePort must be not less than 0"))

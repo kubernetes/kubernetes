@@ -10127,7 +10127,7 @@ func TestValidateService(t *testing.T) {
 					"kubernetes.io/hostname",
 				}
 			},
-			numErrs: 2,
+			numErrs: 1,
 		},
 	}
 
