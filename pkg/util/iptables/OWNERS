@@ -9,5 +9,6 @@ approvers:
   - dcbw
   - thockin
   - eparis
+  - danwinship
 labels:
 - sig/network
