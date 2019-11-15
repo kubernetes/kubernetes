@@ -133,7 +133,7 @@ const (
 	//
 	//
 	// Enables managing request concurrency with prioritization and fairness at each server
-	RequestManagement featuregate.Feature = "RequestManagement"
+	APIPriorityAndFairness featuregate.Feature = "APIPriorityAndFairness"
 
 	// owner: @wojtek-t
 	// alpha: v1.16
@@ -163,6 +163,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WinOverlay:              {Default: false, PreRelease: featuregate.Alpha},
 	WinDSR:                  {Default: false, PreRelease: featuregate.Alpha},
 	WatchBookmark:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	RequestManagement:       {Default: false, PreRelease: featuregate.Alpha},
+	APIPriorityAndFairness:  {Default: false, PreRelease: featuregate.Alpha},
 	RemoveSelfLink:          {Default: false, PreRelease: featuregate.Alpha},
 }
