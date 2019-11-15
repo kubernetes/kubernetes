@@ -352,6 +352,7 @@ type gcePDCSIDriver struct {
 
 var _ testsuites.TestDriver = &gcePDCSIDriver{}
 var _ testsuites.DynamicPVTestDriver = &gcePDCSIDriver{}
+var _ testsuites.SnapshottableTestDriver = &gcePDCSIDriver{}
 
 // InitGcePDCSIDriver returns gcePDCSIDriver that implements TestDriver interface
 func InitGcePDCSIDriver() testsuites.TestDriver {
@@ -383,6 +384,7 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 				testsuites.CapTopology:            true,
 				testsuites.CapControllerExpansion: true,
 				testsuites.CapNodeExpansion:       true,
+				testsuites.CapSnapshotDataSource:  true,
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			TopologyKeys:        []string{GCEPDCSIZoneTopologyKey},
@@ -416,6 +418,15 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.PerT
 	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 
 	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
+}
+
+func (g *gcePDCSIDriver) GetSnapshotClass(config *testsuites.PerTestConfig) *unstructured.Unstructured {
+	parameters := map[string]string{}
+	snapshotter := g.driverInfo.Name
+	ns := config.Framework.Namespace.Name
+	suffix := fmt.Sprintf("%s-vsc", snapshotter)
+
+	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
 }
 
 func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
