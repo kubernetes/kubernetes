@@ -373,7 +373,13 @@ func newServiceAndEndpointMeta(name, namespace string) (v1.Service, endpointMeta
 	}
 
 	svc := v1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				managedBySetupAnnotation: managedBySetupCompleteValue,
+			},
+		},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{{
 				TargetPort: portNameIntStr,
@@ -399,6 +405,9 @@ func newEmptyEndpointSlice(n int, namespace string, endpointMeta endpointMeta, s
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s.%d", svc.Name, n),
 			Namespace: namespace,
+			Labels: map[string]string{
+				discovery.LabelManagedBy: controllerName,
+			},
 		},
 		Ports:       endpointMeta.Ports,
 		AddressType: endpointMeta.AddressType,

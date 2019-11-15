@@ -17,6 +17,7 @@ limitations under the License.
 package endpointslice
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	discovery "k8s.io/api/discovery/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -300,36 +302,34 @@ func (c *Controller) syncService(key string) error {
 		return err
 	}
 
-	// With the goal of different controllers being able to manage different
-	// subsets of EndpointSlices, LabelManagedBy has been added to indicate
-	// which controller or entity manages an EndpointSlice. As part of this
-	// v1.16->v1.17 change, EndpointSlices will initially be assumed to be
-	// managed by this controller unless a label is set to indicate otherwise.
-	// To ensure a seamless upgrade process, the managedBySetupAnnotation is
-	// used to indicate that LabelManagedBy has been set initially for related
-	// EndpointSlices. If it hasn't been set to the expected value here, we call
-	// ensureSetupManagedByAnnotation() to set up LabelManagedBy on each
-	// EndpointSlice.
-	// TODO(robscott): Remove this before v1.18.
-	err = c.ensureSetupManagedByAnnotation(service)
-	if err != nil {
-		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToSetEndpointSliceManagedByLabel",
-			"Error adding managed-by Label to Endpoint Slices for Service %s/%s: %v", service.Namespace, service.Name, err)
-		return err
+	managedBySetup, ok := service.Annotations[managedBySetupAnnotation]
+	managedByLabelsSetup := ok && managedBySetup == managedBySetupCompleteValue
+	esLabelSelectorMap := map[string]string{discovery.LabelServiceName: service.Name}
+	if managedByLabelsSetup {
+		esLabelSelectorMap[discovery.LabelManagedBy] = controllerName
 	}
 
-	esLabelSelector := labels.Set(map[string]string{
-		discovery.LabelServiceName: service.Name,
-		discovery.LabelManagedBy:   controllerName,
-	}).AsSelectorPreValidated()
+	esLabelSelector := labels.Set(esLabelSelectorMap).AsSelectorPreValidated()
 	endpointSlices, err := c.endpointSliceLister.EndpointSlices(service.Namespace).List(esLabelSelector)
-
 	if err != nil {
 		// Since we're getting stuff from a local cache, it is basically
 		// impossible to get this error.
 		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToListEndpointSlices",
 			"Error listing Endpoint Slices for Service %s/%s: %v", service.Namespace, service.Name, err)
 		return err
+	}
+
+	// If managedByLabels haven't been setup yet, we need to do some extra
+	// filtering here to ensure an EndpointSlice isn't already managed by
+	// another entity.
+	if !managedByLabelsSetup {
+		filteredSlices := []*discovery.EndpointSlice{}
+		for _, endpointSlice := range endpointSlices {
+			if !managedByAnotherEntity(endpointSlice) {
+				filteredSlices = append(filteredSlices, endpointSlice)
+			}
+		}
+		endpointSlices = filteredSlices
 	}
 
 	// We call ComputeEndpointLastChangeTriggerTime here to make sure that the
@@ -343,6 +343,26 @@ func (c *Controller) syncService(key string) error {
 		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToUpdateEndpointSlices",
 			"Error updating Endpoint Slices for Service %s/%s: %v", service.Namespace, service.Name, err)
 		return err
+	}
+
+	// With the goal of different controllers being able to manage different
+	// subsets of EndpointSlices, LabelManagedBy has been added to indicate
+	// which controller or entity manages an EndpointSlice. As part of this
+	// v1.16->v1.17 change, EndpointSlices will initially be assumed to be
+	// managed by this controller unless a label is set to indicate otherwise.
+	// To ensure a seamless upgrade process, the managedBySetupAnnotation is
+	// used to indicate that LabelManagedBy has been set initially for related
+	// EndpointSlices. If it hasn't been set up yet, the reconciler.reconcile
+	// call will have set the labels on all relevant EndpointSlices and now
+	// we can set the annotation on the Service.
+	// TODO(robscott): Remove this before v1.18.
+	if !managedByLabelsSetup {
+		err = c.setManagedBySetupAnnotation(service)
+		if err != nil {
+			c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToSetServiceManagedByAnnotation",
+				"Error adding setup-managed-by Annotations to Service %s/%s: %v", service.Namespace, service.Name, err)
+			return err
+		}
 	}
 
 	return nil
@@ -378,40 +398,20 @@ func (c *Controller) onServiceDelete(obj interface{}) {
 // function provides backwards compatibility with the initial alpha release of
 // EndpointSlices that did not include these labels.
 // TODO(robscott): Remove this in time for v1.18.
-func (c *Controller) ensureSetupManagedByAnnotation(service *v1.Service) error {
-	if managedBySetup, ok := service.Annotations[managedBySetupAnnotation]; ok && managedBySetup == managedBySetupCompleteValue {
-		return nil
-	}
-
-	esLabelSelector := labels.Set(map[string]string{discovery.LabelServiceName: service.Name}).AsSelectorPreValidated()
-	endpointSlices, err := c.endpointSliceLister.EndpointSlices(service.Namespace).List(esLabelSelector)
+func (c *Controller) setManagedBySetupAnnotation(service *v1.Service) error {
+	servicePatch, err := json.Marshal(map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"annotations": map[string]interface{}{
+				managedBySetupAnnotation: managedBySetupCompleteValue,
+			},
+		},
+	})
 
 	if err != nil {
-		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToListEndpointSlices",
-			"Error listing Endpoint Slices for Service %s/%s: %v", service.Namespace, service.Name, err)
 		return err
 	}
 
-	for _, endpointSlice := range endpointSlices {
-		if _, ok := endpointSlice.Labels[discovery.LabelManagedBy]; !ok {
-			if endpointSlice.Labels == nil {
-				endpointSlice.Labels = make(map[string]string)
-			}
-
-			endpointSlice.Labels[discovery.LabelManagedBy] = controllerName
-			_, err = c.client.DiscoveryV1beta1().EndpointSlices(endpointSlice.Namespace).Update(endpointSlice)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	if service.Annotations == nil {
-		service.Annotations = make(map[string]string)
-	}
-
-	service.Annotations[managedBySetupAnnotation] = managedBySetupCompleteValue
-	_, err = c.client.CoreV1().Services(service.Namespace).Update(service)
+	_, err = c.client.CoreV1().Services(service.Namespace).Patch(service.Name, types.MergePatchType, servicePatch)
 	return err
 }
 

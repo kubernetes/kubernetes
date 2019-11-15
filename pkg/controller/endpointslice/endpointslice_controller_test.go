@@ -18,7 +18,6 @@ package endpointslice
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -256,20 +255,28 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 	numActionsBefore := len(client.Actions()) + 1
 	standardSyncService(t, esController, ns, serviceName, "false")
 
-	if len(client.Actions()) != numActionsBefore+5 {
-		t.Errorf("Expected 5 more actions, got %d", len(client.Actions())-numActionsBefore)
+	if len(client.Actions()) != numActionsBefore+4 {
+		t.Errorf("Expected 4 more actions, got %d", len(client.Actions())-numActionsBefore)
 	}
 
-	// endpointslice should have LabelsManagedBy set as part of update.
-	expectAction(t, client.Actions(), numActionsBefore, "update", "endpointslices")
-
-	// service should have managedBySetupAnnotation set as part of update.
-	expectAction(t, client.Actions(), numActionsBefore+1, "update", "services")
-
 	// only 3 slices should match, 2 of those should be deleted, 1 should be updated as a placeholder
-	expectAction(t, client.Actions(), numActionsBefore+2, "update", "endpointslices")
-	expectAction(t, client.Actions(), numActionsBefore+3, "delete", "endpointslices")
-	expectAction(t, client.Actions(), numActionsBefore+4, "delete", "endpointslices")
+	expectAction(t, client.Actions(), numActionsBefore, "update", "endpointslices")
+	expectAction(t, client.Actions(), numActionsBefore+1, "delete", "endpointslices")
+	expectAction(t, client.Actions(), numActionsBefore+2, "delete", "endpointslices")
+
+	// service should have managedBySetupAnnotation set as part of patch.
+	expectAction(t, client.Actions(), numActionsBefore+3, "patch", "services")
+
+	endpointSliceList, err := client.DiscoveryV1beta1().EndpointSlices(ns).List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Expected no error fetching EndpointSlices, got: %v", err)
+	}
+
+	for _, endpointSlice := range endpointSliceList.Items {
+		if endpointSlice.Name != "not-matching-2" && endpointSlice.Labels[discovery.LabelManagedBy] != controllerName {
+			t.Errorf("Expected %s EndpointSlice to have managed-by label value of %s, got %s", endpointSlice.Name, controllerName, endpointSlice.Labels[discovery.LabelManagedBy])
+		}
+	}
 }
 
 // Ensure SyncService handles a variety of protocols and IPs appropriately.
@@ -294,6 +301,9 @@ func TestSyncServiceFull(t *testing.T) {
 			Name:              serviceName,
 			Namespace:         namespace,
 			CreationTimestamp: metav1.NewTime(serviceCreateTime),
+			Annotations: map[string]string{
+				managedBySetupAnnotation: managedBySetupCompleteValue,
+			},
 		},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
@@ -343,106 +353,6 @@ func TestSyncServiceFull(t *testing.T) {
 		TargetRef:  &v1.ObjectReference{Kind: "Pod", Namespace: namespace, Name: pod2.Name},
 		Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
 	}}, slice.Endpoints)
-}
-
-func TestEnsureSetupManagedByAnnotation(t *testing.T) {
-	serviceName := "testing-1"
-
-	testCases := map[string]struct {
-		serviceAnnotation   string
-		startingSliceLabels map[string]string
-		expectedSliceLabels map[string]string
-	}{
-		"already-labeled": {
-			serviceAnnotation: "foo",
-			startingSliceLabels: map[string]string{
-				discovery.LabelServiceName: serviceName,
-				discovery.LabelManagedBy:   controllerName,
-			},
-			expectedSliceLabels: map[string]string{
-				discovery.LabelServiceName: serviceName,
-				discovery.LabelManagedBy:   controllerName,
-			},
-		},
-		"already-annotated": {
-			serviceAnnotation: managedBySetupCompleteValue,
-			startingSliceLabels: map[string]string{
-				discovery.LabelServiceName: serviceName,
-				discovery.LabelManagedBy:   "other-controller",
-			},
-			expectedSliceLabels: map[string]string{
-				discovery.LabelServiceName: serviceName,
-				discovery.LabelManagedBy:   "other-controller",
-			},
-		},
-		"missing-and-extra-label": {
-			serviceAnnotation: "foo",
-			startingSliceLabels: map[string]string{
-				discovery.LabelServiceName: serviceName,
-				"foo":                      "bar",
-			},
-			expectedSliceLabels: map[string]string{
-				discovery.LabelServiceName: serviceName,
-				discovery.LabelManagedBy:   controllerName,
-				"foo":                      "bar",
-			},
-		},
-		"different-service": {
-			serviceAnnotation: "foo",
-			startingSliceLabels: map[string]string{
-				discovery.LabelServiceName: "something-else",
-			},
-			expectedSliceLabels: map[string]string{
-				discovery.LabelServiceName: "something-else",
-			},
-		},
-	}
-
-	for name, testCase := range testCases {
-		t.Run(name, func(t *testing.T) {
-			client, esController := newController([]string{"node-1"})
-			ns := metav1.NamespaceDefault
-			service := createService(t, esController, ns, serviceName, testCase.serviceAnnotation)
-
-			endpointSlice := &discovery.EndpointSlice{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "testing",
-					Namespace: ns,
-					Labels:    testCase.startingSliceLabels,
-				},
-			}
-
-			err := esController.endpointSliceStore.Add(endpointSlice)
-			if err != nil {
-				t.Fatalf("Expected no error adding EndpointSlice: %v", err)
-			}
-
-			_, err = client.DiscoveryV1beta1().EndpointSlices(ns).Create(endpointSlice)
-			if err != nil {
-				t.Fatalf("Expected no error creating EndpointSlice: %v", err)
-			}
-
-			esController.ensureSetupManagedByAnnotation(service)
-
-			updatedService, err := client.CoreV1().Services(ns).Get(service.Name, metav1.GetOptions{})
-			if err != nil {
-				t.Fatalf("Expected no error getting Service: %v", err)
-			}
-
-			if updatedService.Annotations[managedBySetupAnnotation] != managedBySetupCompleteValue {
-				t.Errorf("Expected managedBySetupAnnotation: %+v, got: %+v", managedBySetupCompleteValue, updatedService.Annotations[managedBySetupAnnotation])
-			}
-
-			updatedSlice, err := client.DiscoveryV1beta1().EndpointSlices(ns).Get(endpointSlice.Name, metav1.GetOptions{})
-			if err != nil {
-				t.Fatalf("Expected no error getting EndpointSlice: %v", err)
-			}
-
-			if !reflect.DeepEqual(updatedSlice.Labels, testCase.expectedSliceLabels) {
-				t.Errorf("Expected labels: %+v, got: %+v", updatedSlice.Labels, testCase.expectedSliceLabels)
-			}
-		})
-	}
 }
 
 // Test helpers

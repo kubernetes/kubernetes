@@ -281,8 +281,9 @@ func (r *reconciler) reconcileByPortMapping(
 			}
 		}
 
-		// If an endpoint was updated or removed, mark for update or delete
-		if endpointUpdated || len(existingSlice.Endpoints) != len(newEndpoints) {
+		// If an endpoint was updated or removed, or the EndpointSlice needs
+		// a managed-by label, mark for update or delete
+		if endpointUpdated || len(existingSlice.Endpoints) != len(newEndpoints) || needsManagedByLabel(existingSlice) {
 			if len(existingSlice.Endpoints) > len(newEndpoints) {
 				numRemoved += len(existingSlice.Endpoints) - len(newEndpoints)
 			}
@@ -291,6 +292,9 @@ func (r *reconciler) reconcileByPortMapping(
 				sliceNamesToDelete.Insert(existingSlice.Name)
 			} else {
 				// otherwise, mark for update
+				if needsManagedByLabel(existingSlice) {
+					slicesByName[existingSlice.Name] = addManagedByLabel(existingSlice)
+				}
 				existingSlice.Endpoints = newEndpoints
 				sliceNamesToUpdate.Insert(existingSlice.Name)
 			}

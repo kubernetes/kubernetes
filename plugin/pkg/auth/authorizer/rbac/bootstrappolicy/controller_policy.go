@@ -153,7 +153,8 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "endpointslice-controller"},
 			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("services", "pods", "nodes").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("pods", "nodes").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch", "patch").Groups(legacyGroup).Resources("services").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "list", "create", "update", "delete").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
 				eventsRule(),
 			},

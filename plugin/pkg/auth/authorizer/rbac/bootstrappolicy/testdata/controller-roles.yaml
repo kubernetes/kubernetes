@@ -462,10 +462,18 @@ items:
     resources:
     - nodes
     - pods
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
     - services
     verbs:
     - get
     - list
+    - patch
     - watch
   - apiGroups:
     - discovery.k8s.io

@@ -144,6 +144,44 @@ func isIPv6Service(service *corev1.Service) bool {
 	return (service.Spec.IPFamily != nil && *service.Spec.IPFamily == corev1.IPv6Protocol) || utilnet.IsIPv6String(service.Spec.ClusterIP)
 }
 
+// needsManagedByLabel returns true if an EndpointSlice does not have
+// LabelManagedBy set to this controller name.
+func needsManagedByLabel(endpointSlice *discovery.EndpointSlice) bool {
+	if endpointSlice.Labels == nil {
+		return true
+	}
+	managedByValue, ok := endpointSlice.Labels[discovery.LabelManagedBy]
+	if !ok || managedByValue != controllerName {
+		return true
+	}
+	return false
+}
+
+// addManagedByLabel sets LabelManagedBy to this controller name for the
+// provided EndpointSlice.
+func addManagedByLabel(endpointSlice *discovery.EndpointSlice) *discovery.EndpointSlice {
+	epSlice := endpointSlice.DeepCopy()
+	if epSlice.Labels == nil {
+		epSlice.Labels = make(map[string]string)
+	}
+	epSlice.Labels[discovery.LabelManagedBy] = controllerName
+	return epSlice
+}
+
+// managedByAnotherEntity returns true if an EndpointSlice has a managed-by
+// label set that doesn't match this controller name.
+func managedByAnotherEntity(endpointSlice *discovery.EndpointSlice) bool {
+	if endpointSlice.Labels == nil {
+		return false
+	}
+	managedByValue, ok := endpointSlice.Labels[discovery.LabelManagedBy]
+	if !ok || managedByValue == controllerName {
+		return false
+	}
+
+	return true
+}
+
 // endpointsEqualBeyondHash returns true if endpoints have equal attributes
 // but excludes equality checks that would have already been covered with
 // endpoint hashing (see hashEndpoint func for more info).
