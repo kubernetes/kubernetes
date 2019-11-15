@@ -52,23 +52,26 @@ func (RealClock) Since(ts time.Time) time.Duration {
 	return time.Since(ts)
 }
 
-// Same as time.After(d).
+// After is the same as time.After(d).
 func (RealClock) After(d time.Duration) <-chan time.Time {
 	return time.After(d)
 }
 
+// NewTimer returns a new Timer.
 func (RealClock) NewTimer(d time.Duration) Timer {
 	return &realTimer{
 		timer: time.NewTimer(d),
 	}
 }
 
+// NewTicker returns a new Ticker.
 func (RealClock) NewTicker(d time.Duration) Ticker {
 	return &realTicker{
 		ticker: time.NewTicker(d),
 	}
 }
 
+// Sleep pauses the clock for duration d.
 func (RealClock) Sleep(d time.Duration) {
 	time.Sleep(d)
 }
@@ -94,6 +97,7 @@ type fakeClockWaiter struct {
 	destChan      chan time.Time
 }
 
+// NewFakePassiveClock returns a new fake clock.
 func NewFakePassiveClock(t time.Time) *FakePassiveClock {
 	return &FakePassiveClock{
 		time: t,
