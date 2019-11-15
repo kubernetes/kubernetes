@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -146,6 +147,12 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
 			}
 		}()
+
+		ginkgo.By("starting a pod to use the claim")
+		command := "echo 'hello world' > /mnt/test/data"
+		pod := StartInPodWithVolume(cs, pvc.Namespace, pvc.Name, "pvc-snapshottable-tester", command, e2epod.NodeSelection{Name: config.ClientNodeName})
+		defer StopPod(cs, pod)
+
 		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 

@@ -631,6 +631,12 @@ func prepareSnapshotDataSourceForProvisioning(
 	ginkgo.By("[Initialize dataSource]creating a initClaim")
 	updatedClaim, err := client.CoreV1().PersistentVolumeClaims(initClaim.Namespace).Create(initClaim)
 	framework.ExpectNoError(err)
+
+	// write namespace to the /mnt/test (= the volume).
+	ginkgo.By("[Initialize dataSource]write data to volume")
+	command := fmt.Sprintf("echo '%s' > /mnt/test/initialData", updatedClaim.GetNamespace())
+	RunInPodWithVolume(client, updatedClaim.Namespace, updatedClaim.Name, "pvc-snapshot-writer", command, node)
+
 	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, updatedClaim.Namespace, updatedClaim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 	framework.ExpectNoError(err)
 
@@ -638,11 +644,6 @@ func prepareSnapshotDataSourceForProvisioning(
 	// Get new copy of the initClaim
 	_, err = client.CoreV1().PersistentVolumeClaims(updatedClaim.Namespace).Get(updatedClaim.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-
-	// write namespace to the /mnt/test (= the volume).
-	ginkgo.By("[Initialize dataSource]write data to volume")
-	command := fmt.Sprintf("echo '%s' > /mnt/test/initialData", updatedClaim.GetNamespace())
-	RunInPodWithVolume(client, updatedClaim.Namespace, updatedClaim.Name, "pvc-snapshot-writer", command, node)
 
 	ginkgo.By("[Initialize dataSource]creating a SnapshotClass")
 	snapshotClass, err = dynamicClient.Resource(snapshotClassGVR).Create(snapshotClass, metav1.CreateOptions{})
