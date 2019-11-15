@@ -112,7 +112,7 @@ func (v *Value) ToJSONFast() ([]byte, error) {
 	return buf.Bytes(), err
 }
 
-func (v *Value) WriteJSONStream(stream *jsoniter.Stream) {
+func (v *Value) WriteJSONStream(stream Stream) {
 	switch {
 	case v.Null:
 		stream.WriteNil()
@@ -128,7 +128,7 @@ func (v *Value) WriteJSONStream(stream *jsoniter.Stream) {
 		stream.WriteArrayStart()
 		for i := range v.ListValue.Items {
 			if i > 0 {
-				stream.WriteMore()
+				stream.WriteRaw(",")
 			}
 			v.ListValue.Items[i].WriteJSONStream(stream)
 		}
@@ -137,7 +137,7 @@ func (v *Value) WriteJSONStream(stream *jsoniter.Stream) {
 		stream.WriteObjectStart()
 		for i := range v.MapValue.Items {
 			if i > 0 {
-				stream.WriteMore()
+				stream.WriteRaw(",")
 			}
 			stream.WriteObjectField(v.MapValue.Items[i].Name)
 			v.MapValue.Items[i].Value.WriteJSONStream(stream)
@@ -146,4 +146,23 @@ func (v *Value) WriteJSONStream(stream *jsoniter.Stream) {
 	default:
 		stream.Write([]byte("invalid_value"))
 	}
+}
+
+type Stream interface {
+	Write([]byte) (int, error)
+	WriteRaw(string)
+	WriteString(string)
+	WriteBool(bool)
+	WriteInt(int)
+	WriteInt64(int64)
+	WriteFloat64(float64)
+	WriteNil()
+	WriteArrayStart()
+	WriteArrayEnd()
+	WriteObjectStart()
+	WriteObjectEnd()
+	WriteObjectField(string)
+	Buffer() []byte
+	Flush() error
+	SetBuffer(buf []byte)
 }
