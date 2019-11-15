@@ -1067,81 +1067,91 @@ func allowDefaults(requestGV schema.GroupVersion, oldCRDSpec *apiextensions.Cust
 }
 
 func specHasDefaults(spec *apiextensions.CustomResourceDefinitionSpec) bool {
-	if spec.Validation != nil && schemaHasDefaults(spec.Validation.OpenAPIV3Schema) {
+	return hasSchemaWith(spec, schemaHasDefaults)
+}
+
+func schemaHasDefaults(s *apiextensions.JSONSchemaProps) bool {
+	return schemaHas(s, func(s *apiextensions.JSONSchemaProps) bool {
+		return s.Default != nil
+	})
+}
+
+func hasSchemaWith(spec *apiextensions.CustomResourceDefinitionSpec, pred func(s *apiextensions.JSONSchemaProps) bool) bool {
+	if spec.Validation != nil && spec.Validation.OpenAPIV3Schema != nil && pred(spec.Validation.OpenAPIV3Schema) {
 		return true
 	}
 	for _, v := range spec.Versions {
-		if v.Schema != nil && schemaHasDefaults(v.Schema.OpenAPIV3Schema) {
+		if v.Schema != nil && v.Schema.OpenAPIV3Schema != nil && pred(v.Schema.OpenAPIV3Schema) {
 			return true
 		}
 	}
 	return false
 }
 
-func schemaHasDefaults(s *apiextensions.JSONSchemaProps) bool {
+func schemaHas(s *apiextensions.JSONSchemaProps, pred func(s *apiextensions.JSONSchemaProps) bool) bool {
 	if s == nil {
 		return false
 	}
 
-	if s.Default != nil {
+	if pred(s) {
 		return true
 	}
 
 	if s.Items != nil {
-		if s.Items != nil && schemaHasDefaults(s.Items.Schema) {
+		if s.Items != nil && schemaHas(s.Items.Schema, pred) {
 			return true
 		}
 		for _, s := range s.Items.JSONSchemas {
-			if schemaHasDefaults(&s) {
+			if schemaHas(&s, pred) {
 				return true
 			}
 		}
 	}
 	for _, s := range s.AllOf {
-		if schemaHasDefaults(&s) {
+		if schemaHas(&s, pred) {
 			return true
 		}
 	}
 	for _, s := range s.AnyOf {
-		if schemaHasDefaults(&s) {
+		if schemaHas(&s, pred) {
 			return true
 		}
 	}
 	for _, s := range s.OneOf {
-		if schemaHasDefaults(&s) {
+		if schemaHas(&s, pred) {
 			return true
 		}
 	}
-	if schemaHasDefaults(s.Not) {
+	if schemaHas(s.Not, pred) {
 		return true
 	}
 	for _, s := range s.Properties {
-		if schemaHasDefaults(&s) {
+		if schemaHas(&s, pred) {
 			return true
 		}
 	}
 	if s.AdditionalProperties != nil {
-		if schemaHasDefaults(s.AdditionalProperties.Schema) {
+		if schemaHas(s.AdditionalProperties.Schema, pred) {
 			return true
 		}
 	}
 	for _, s := range s.PatternProperties {
-		if schemaHasDefaults(&s) {
+		if schemaHas(&s, pred) {
 			return true
 		}
 	}
 	if s.AdditionalItems != nil {
-		if schemaHasDefaults(s.AdditionalItems.Schema) {
+		if schemaHas(s.AdditionalItems.Schema, pred) {
 			return true
 		}
 	}
 	for _, s := range s.Definitions {
-		if schemaHasDefaults(&s) {
+		if schemaHas(&s, pred) {
 			return true
 		}
 	}
 	for _, d := range s.Dependencies {
-		if schemaHasDefaults(d.Schema) {
+		if schemaHas(d.Schema, pred) {
 			return true
 		}
 	}
@@ -1162,74 +1172,9 @@ func specHasKubernetesExtensions(spec *apiextensions.CustomResourceDefinitionSpe
 }
 
 func schemaHasKubernetesExtensions(s *apiextensions.JSONSchemaProps) bool {
-	if s == nil {
-		return false
-	}
-
-	if s.XEmbeddedResource || s.XPreserveUnknownFields != nil || s.XIntOrString || len(s.XListMapKeys) > 0 || s.XListType != nil {
-		return true
-	}
-
-	if s.Items != nil {
-		if s.Items != nil && schemaHasKubernetesExtensions(s.Items.Schema) {
-			return true
-		}
-		for _, s := range s.Items.JSONSchemas {
-			if schemaHasKubernetesExtensions(&s) {
-				return true
-			}
-		}
-	}
-	for _, s := range s.AllOf {
-		if schemaHasKubernetesExtensions(&s) {
-			return true
-		}
-	}
-	for _, s := range s.AnyOf {
-		if schemaHasKubernetesExtensions(&s) {
-			return true
-		}
-	}
-	for _, s := range s.OneOf {
-		if schemaHasKubernetesExtensions(&s) {
-			return true
-		}
-	}
-	if schemaHasKubernetesExtensions(s.Not) {
-		return true
-	}
-	for _, s := range s.Properties {
-		if schemaHasKubernetesExtensions(&s) {
-			return true
-		}
-	}
-	if s.AdditionalProperties != nil {
-		if schemaHasKubernetesExtensions(s.AdditionalProperties.Schema) {
-			return true
-		}
-	}
-	for _, s := range s.PatternProperties {
-		if schemaHasKubernetesExtensions(&s) {
-			return true
-		}
-	}
-	if s.AdditionalItems != nil {
-		if schemaHasKubernetesExtensions(s.AdditionalItems.Schema) {
-			return true
-		}
-	}
-	for _, s := range s.Definitions {
-		if schemaHasKubernetesExtensions(&s) {
-			return true
-		}
-	}
-	for _, d := range s.Dependencies {
-		if schemaHasKubernetesExtensions(d.Schema) {
-			return true
-		}
-	}
-
-	return false
+	return schemaHas(s, func(s *apiextensions.JSONSchemaProps) bool {
+		return s.XEmbeddedResource || s.XPreserveUnknownFields != nil || s.XIntOrString || len(s.XListMapKeys) > 0 || s.XListType != nil
+	})
 }
 
 // requireStructuralSchema returns true if schemas specified must be structural
@@ -1389,72 +1334,7 @@ func specHasInvalidTypes(spec *apiextensions.CustomResourceDefinitionSpec) bool 
 
 // SchemaHasInvalidTypes returns true if it contains invalid offending openapi-v3 specification.
 func SchemaHasInvalidTypes(s *apiextensions.JSONSchemaProps) bool {
-	if s == nil {
-		return false
-	}
-
-	if len(s.Type) > 0 && !openapiV3Types.Has(s.Type) {
-		return true
-	}
-
-	if s.Items != nil {
-		if s.Items != nil && SchemaHasInvalidTypes(s.Items.Schema) {
-			return true
-		}
-		for _, s := range s.Items.JSONSchemas {
-			if SchemaHasInvalidTypes(&s) {
-				return true
-			}
-		}
-	}
-	for _, s := range s.AllOf {
-		if SchemaHasInvalidTypes(&s) {
-			return true
-		}
-	}
-	for _, s := range s.AnyOf {
-		if SchemaHasInvalidTypes(&s) {
-			return true
-		}
-	}
-	for _, s := range s.OneOf {
-		if SchemaHasInvalidTypes(&s) {
-			return true
-		}
-	}
-	if SchemaHasInvalidTypes(s.Not) {
-		return true
-	}
-	for _, s := range s.Properties {
-		if SchemaHasInvalidTypes(&s) {
-			return true
-		}
-	}
-	if s.AdditionalProperties != nil {
-		if SchemaHasInvalidTypes(s.AdditionalProperties.Schema) {
-			return true
-		}
-	}
-	for _, s := range s.PatternProperties {
-		if SchemaHasInvalidTypes(&s) {
-			return true
-		}
-	}
-	if s.AdditionalItems != nil {
-		if SchemaHasInvalidTypes(s.AdditionalItems.Schema) {
-			return true
-		}
-	}
-	for _, s := range s.Definitions {
-		if SchemaHasInvalidTypes(&s) {
-			return true
-		}
-	}
-	for _, d := range s.Dependencies {
-		if SchemaHasInvalidTypes(d.Schema) {
-			return true
-		}
-	}
-
-	return false
+	return schemaHas(s, func(s *apiextensions.JSONSchemaProps) bool {
+		return len(s.Type) > 0 && !openapiV3Types.Has(s.Type)
+	})
 }
