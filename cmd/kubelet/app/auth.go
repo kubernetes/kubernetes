@@ -17,6 +17,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -36,7 +37,7 @@ import (
 )
 
 // BuildAuth creates an authenticator, an authorizer, and a matching authorizer attributes getter compatible with the kubelet's needs
-func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubeletconfig.KubeletConfiguration) (server.AuthInterface, error) {
+func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubeletconfig.KubeletConfiguration, stopCh <-chan struct{}) (server.AuthInterface, error) {
 	// Get clients, if provided
 	var (
 		tokenClient authenticationclient.TokenReviewInterface
@@ -47,7 +48,7 @@ func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubel
 		sarClient = client.AuthorizationV1().SubjectAccessReviews()
 	}
 
-	authenticator, err := BuildAuthn(tokenClient, config.Authentication)
+	authenticator, err := BuildAuthn(tokenClient, config.Authentication, stopCh)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +64,7 @@ func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubel
 }
 
 // BuildAuthn creates an authenticator compatible with the kubelet's needs
-func BuildAuthn(client authenticationclient.TokenReviewInterface, authn kubeletconfig.KubeletAuthentication) (authenticator.Request, error) {
+func BuildAuthn(client authenticationclient.TokenReviewInterface, authn kubeletconfig.KubeletAuthentication, stopCh <-chan struct{}) (authenticator.Request, error) {
 	var clientCertificateCAContentProvider authenticatorfactory.CAContentProvider
 	var err error
 	if len(authn.X509.ClientCAFile) > 0 {
@@ -86,8 +87,19 @@ func BuildAuthn(client authenticationclient.TokenReviewInterface, authn kubeletc
 		authenticatorConfig.TokenAccessReviewClient = client
 	}
 
-	authenticator, _, err := authenticatorConfig.New()
-	return authenticator, err
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		<-stopCh
+		cancel()
+	}()
+
+	authenticator, _, err := authenticatorConfig.New(ctx)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+
+	return authenticator, nil
 }
 
 // BuildAuthz creates an authorizer compatible with the kubelet's needs

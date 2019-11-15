@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -310,7 +311,7 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 	}
 
 	// create authenticator
-	authenticator, securityDefinitions, err := cfg.New()
+	authenticator, securityDefinitions, err := cfg.New(context.TODO())
 	if err != nil {
 		return err
 	}
