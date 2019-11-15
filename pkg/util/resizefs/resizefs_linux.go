@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/mount"
 )
 
 // ResizeFs Provides support for resizing file systems

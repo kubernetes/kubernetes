@@ -26,6 +26,11 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/utils/exec"
+	"k8s.io/utils/exec/testing"
+	"k8s.io/utils/mount"
+	utilstrings "k8s.io/utils/strings"
+
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -40,17 +45,12 @@ import (
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/utils/exec"
-	"k8s.io/utils/exec/testing"
-
-	"k8s.io/kubernetes/pkg/util/mount"
 	. "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
-	utilstrings "k8s.io/utils/strings"
 )
 
 const (
