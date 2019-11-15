@@ -79,7 +79,6 @@ test/e2e/storage/utils
 test/e2e/storage/vsphere
 test/e2e/upgrades
 test/e2e/upgrades/storage
-test/e2e/windows
 test/images/agnhost/dns
 test/images/agnhost/inclusterclient
 test/images/agnhost/net/nat

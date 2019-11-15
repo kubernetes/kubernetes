@@ -28,9 +28,6 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-const dnsTestPodHostName = "dns-querier-1"
-const dnsTestServiceName = "dns-test-service"
-
 var _ = SIGDescribe("DNS", func() {
 
 	ginkgo.BeforeEach(func() {
@@ -76,6 +73,7 @@ var _ = SIGDescribe("DNS", func() {
 
 		framework.Logf("ipconfig /all:\n%s", stdout)
 		dnsRegex, err := regexp.Compile(`DNS Servers[\s*.]*:(\s*[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})+`)
+		framework.ExpectNoError(err)
 
 		if dnsRegex.MatchString(stdout) {
 			match := dnsRegex.FindString(stdout)
