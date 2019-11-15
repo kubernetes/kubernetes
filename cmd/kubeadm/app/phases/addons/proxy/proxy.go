@@ -57,7 +57,12 @@ func EnsureProxyAddon(cfg *kubeadmapi.ClusterConfiguration, localEndpoint *kubea
 		return err
 	}
 
-	proxyBytes, err := componentconfigs.Known[componentconfigs.KubeProxyConfigurationKind].Marshal(cfg.ComponentConfigs.KubeProxy)
+	kubeProxyCfg, ok := cfg.ComponentConfigs[componentconfigs.KubeProxyGroup]
+	if !ok {
+		return errors.New("no kube-proxy component config found in the active component config set")
+	}
+
+	proxyBytes, err := kubeProxyCfg.Marshal()
 	if err != nil {
 		return errors.Wrap(err, "error when marshaling")
 	}

@@ -64,7 +64,7 @@ func ValidateClusterConfiguration(c *kubeadm.ClusterConfiguration) field.ErrorLi
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("featureGates"))...)
 	allErrs = append(allErrs, ValidateHostPort(c.ControlPlaneEndpoint, field.NewPath("controlPlaneEndpoint"))...)
 	allErrs = append(allErrs, ValidateEtcd(&c.Etcd, field.NewPath("etcd"))...)
-	allErrs = append(allErrs, componentconfigs.Known.Validate(c)...)
+	allErrs = append(allErrs, componentconfigs.Validate(c)...)
 	return allErrs
 }
 

@@ -25,8 +25,6 @@ go_library(
         "//staging/src/k8s.io/cluster-bootstrap/token/api:go_default_library",
         "//staging/src/k8s.io/cluster-bootstrap/token/util:go_default_library",
         "//staging/src/k8s.io/cluster-bootstrap/util/secrets:go_default_library",
-        "//staging/src/k8s.io/kube-proxy/config/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
     ],
 )

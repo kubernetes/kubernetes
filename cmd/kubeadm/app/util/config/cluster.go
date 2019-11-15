@@ -28,7 +28,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
@@ -79,7 +78,7 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	}
 
 	// gets the component configs from the corresponding config maps
-	if err := getComponentConfigs(client, &initcfg.ClusterConfiguration); err != nil {
+	if err := componentconfigs.FetchFromCluster(&initcfg.ClusterConfiguration, client); err != nil {
 		return nil, errors.Wrap(err, "failed to get component configs")
 	}
 
@@ -190,28 +189,6 @@ func getAPIEndpoint(data map[string]string, nodeName string, apiEndpoint *kubead
 
 	apiEndpoint.AdvertiseAddress = e.AdvertiseAddress
 	apiEndpoint.BindPort = e.BindPort
-	return nil
-}
-
-// getComponentConfigs gets the component configs from the corresponding config maps
-func getComponentConfigs(client clientset.Interface, clusterConfiguration *kubeadmapi.ClusterConfiguration) error {
-	// some config maps is versioned, so we need the KubernetesVersion for getting the right config map
-	k8sVersion := version.MustParseGeneric(clusterConfiguration.KubernetesVersion)
-	for kind, registration := range componentconfigs.Known {
-		obj, err := registration.GetFromConfigMap(client, k8sVersion)
-		if err != nil {
-			return err
-		}
-
-		// Some components may not be installed or managed by kubeadm, hence GetFromConfigMap won't return an error or an object
-		if obj == nil {
-			continue
-		}
-
-		if ok := registration.SetToInternalConfig(obj, clusterConfiguration); !ok {
-			return errors.Errorf("couldn't save componentconfig value for kind %q", string(kind))
-		}
-	}
 	return nil
 }
 
