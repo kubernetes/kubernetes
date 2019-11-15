@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -30,7 +31,9 @@ import (
 )
 
 func TestSimpleCache(t *testing.T) {
-	testCache(newSimpleCache(4096, clock.RealClock{}), t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	testCache(newSimpleCache(ctx, clock.RealClock{}), t)
 }
 
 // Note: the performance profile of this benchmark may not match that in the production.
@@ -39,16 +42,22 @@ func TestSimpleCache(t *testing.T) {
 func BenchmarkCacheContentions(b *testing.B) {
 	for _, numKeys := range []int{1 << 8, 1 << 12, 1 << 16} {
 		b.Run(fmt.Sprintf("Simple/keys=%d", numKeys), func(b *testing.B) {
-			benchmarkCache(newSimpleCache(4096, clock.RealClock{}), b, numKeys)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			benchmarkCache(newSimpleCache(ctx, clock.RealClock{}), b, numKeys)
 		})
 		b.Run(fmt.Sprintf("Striped/keys=%d", numKeys), func(b *testing.B) {
-			benchmarkCache(newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(128, clock.RealClock{}) }), b, numKeys)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			benchmarkCache(newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(ctx, clock.RealClock{}) }), b, numKeys)
 		})
 	}
 }
 
 func TestStripedCache(t *testing.T) {
-	testCache(newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(128, clock.RealClock{}) }), t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	testCache(newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(ctx, clock.RealClock{}) }), t)
 }
 
 func benchmarkCache(cache cache, b *testing.B, numKeys int) {
