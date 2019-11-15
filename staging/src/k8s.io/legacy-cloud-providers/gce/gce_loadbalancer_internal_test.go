@@ -21,6 +21,7 @@ package gce
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -1394,4 +1395,72 @@ func TestEnsureInternalLoadBalancerCustomSubnet(t *testing.T) {
 		t.Errorf("Unexpected error %v", err)
 	}
 	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
+}
+
+func TestGetPortRanges(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		Desc   string
+		Input  []int
+		Result []string
+	}{
+		{Desc: "All Unique", Input: []int{8, 66, 23, 13, 89}, Result: []string{"8", "13", "23", "66", "89"}},
+		{Desc: "All Unique Sorted", Input: []int{1, 7, 9, 16, 26}, Result: []string{"1", "7", "9", "16", "26"}},
+		{Desc: "Ranges", Input: []int{56, 78, 67, 79, 21, 80, 12}, Result: []string{"12", "21", "56", "67", "78-80"}},
+		{Desc: "Ranges Sorted", Input: []int{5, 7, 90, 1002, 1003, 1004, 1005, 2501}, Result: []string{"5", "7", "90", "1002-1005", "2501"}},
+		{Desc: "Ranges Duplicates", Input: []int{15, 37, 900, 2002, 2003, 2003, 2004, 2004}, Result: []string{"15", "37", "900", "2002-2004"}},
+		{Desc: "Duplicates", Input: []int{10, 10, 10, 10, 10}, Result: []string{"10"}},
+		{Desc: "Only ranges", Input: []int{18, 19, 20, 21, 22, 55, 56, 77, 78, 79, 3504, 3505, 3506}, Result: []string{"18-22", "55-56", "77-79", "3504-3506"}},
+		{Desc: "Single Range", Input: []int{6000, 6001, 6002, 6003, 6004, 6005}, Result: []string{"6000-6005"}},
+		{Desc: "One value", Input: []int{12}, Result: []string{"12"}},
+		{Desc: "Empty", Input: []int{}, Result: nil},
+	} {
+		result := getPortRanges(tc.Input)
+		if !reflect.DeepEqual(result, tc.Result) {
+			t.Errorf("Expected %v, got %v for test case %s", tc.Result, result, tc.Desc)
+		}
+	}
+}
+
+func TestEnsureInternalFirewallPortRanges(t *testing.T) {
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	require.NoError(t, err)
+	vals := DefaultTestClusterValues()
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
+	fwName := MakeFirewallName(lbName)
+	tc := struct {
+		Input  []int
+		Result []string
+	}{
+		Input: []int{15, 37, 900, 2002, 2003, 2003, 2004, 2004}, Result: []string{"15", "37", "900", "2002-2004"},
+	}
+	c := gce.c.(*cloud.MockGCE)
+	c.MockFirewalls.InsertHook = nil
+	c.MockFirewalls.UpdateHook = nil
+
+	nodes, err := createAndInsertNodes(gce, []string{"test-node-1"}, vals.ZoneName)
+	require.NoError(t, err)
+	sourceRange := []string{"10.0.0.0/20"}
+	// Manually create a firewall rule with the legacy name - lbName
+	gce.ensureInternalFirewall(
+		svc,
+		fwName,
+		"firewall with legacy name",
+		sourceRange,
+		getPortRanges(tc.Input),
+		v1.ProtocolTCP,
+		nodes,
+		"")
+	if err != nil {
+		t.Errorf("Unexpected error %v when ensuring legacy firewall %s for svc %+v", err, lbName, svc)
+	}
+	existingFirewall, err := gce.GetFirewall(fwName)
+	if err != nil || existingFirewall == nil || len(existingFirewall.Allowed) == 0 {
+		t.Errorf("Unexpected error %v when looking up firewall %s, Got firewall %+v", err, fwName, existingFirewall)
+	}
+	existingPorts := existingFirewall.Allowed[0].Ports
+	if !reflect.DeepEqual(existingPorts, tc.Result) {
+		t.Errorf("Expected firewall rule with ports %v,got %v", tc.Result, existingPorts)
+	}
 }
