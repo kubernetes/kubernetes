@@ -22,6 +22,10 @@ type NodeIPAMControllerConfiguration struct {
 	ServiceCIDR string
 	// secondaryServiceCIDR is CIDR Range for Services in cluster. This is used in dual stack clusters. SecondaryServiceCIDR must be of different IP family than ServiceCIDR
 	SecondaryServiceCIDR string
-	// NodeCIDRMaskSize is the mask size for node cidr in cluster.
+	// NodeCIDRMaskSize is the mask size for node cidr in single-stack cluster.
 	NodeCIDRMaskSize int32
+	// NodeCIDRMaskSizeIPv4 is the mask size for node cidr in dual-stack cluster.
+	NodeCIDRMaskSizeIPv4 int32
+	// NodeCIDRMaskSizeIPv6 is the mask size for node cidr in dual-stack cluster.
+	NodeCIDRMaskSizeIPv6 int32
 }

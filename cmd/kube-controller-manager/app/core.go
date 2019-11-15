@@ -21,6 +21,7 @@ limitations under the License.
 package app
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -29,7 +30,7 @@ import (
 
 	"k8s.io/klog"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
@@ -46,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
 	nodeipamcontroller "k8s.io/kubernetes/pkg/controller/nodeipam"
+	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	lifecyclecontroller "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/controller/podgc"
@@ -69,6 +71,13 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
+const (
+	// defaultNodeMaskCIDRIPv4 is default mask size for IPv4 node cidr
+	defaultNodeMaskCIDRIPv4 = 24
+	// defaultNodeMaskCIDRIPv6 is default mask size for IPv6 node cidr
+	defaultNodeMaskCIDRIPv6 = 64
+)
+
 func startServiceController(ctx ControllerContext) (http.Handler, bool, error) {
 	serviceController, err := servicecontroller.New(
 		ctx.Cloud,
@@ -85,6 +94,7 @@ func startServiceController(ctx ControllerContext) (http.Handler, bool, error) {
 	go serviceController.Run(ctx.Stop, int(ctx.ComponentConfig.ServiceController.ConcurrentServiceSyncs))
 	return nil, true, nil
 }
+
 func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) {
 	var serviceCIDR *net.IPNet
 	var secondaryServiceCIDR *net.IPNet
@@ -147,6 +157,20 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 		}
 	}
 
+	var nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6 int
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack) {
+		nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6, err = setNodeCIDRMaskSizesDualStack(ctx.ComponentConfig.NodeIPAMController)
+	} else {
+		nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6, err = setNodeCIDRMaskSizes(ctx.ComponentConfig.NodeIPAMController)
+	}
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	// get list of node cidr mask sizes
+	nodeCIDRMaskSizes := getNodeCIDRMaskSizes(clusterCIDRs, nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6)
+
 	nodeIpamController, err := nodeipamcontroller.NewNodeIpamController(
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.Cloud,
@@ -154,7 +178,7 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 		clusterCIDRs,
 		serviceCIDR,
 		secondaryServiceCIDR,
-		int(ctx.ComponentConfig.NodeIPAMController.NodeCIDRMaskSize),
+		nodeCIDRMaskSizes,
 		ipam.CIDRAllocatorType(ctx.ComponentConfig.KubeCloudShared.CIDRAllocatorType),
 	)
 	if err != nil {
@@ -561,4 +585,51 @@ func processCIDRs(cidrsList string) ([]*net.IPNet, bool, error) {
 	dualstack, _ := netutils.IsDualStackCIDRs(cidrs)
 
 	return cidrs, dualstack, nil
+}
+
+// setNodeCIDRMaskSizes returns the IPv4 and IPv6 node cidr mask sizes.
+// If --node-cidr-mask-size not set, then it will return default IPv4 and IPv6 cidr mask sizes.
+func setNodeCIDRMaskSizes(cfg nodeipamconfig.NodeIPAMControllerConfiguration) (int, int, error) {
+	ipv4Mask, ipv6Mask := defaultNodeMaskCIDRIPv4, defaultNodeMaskCIDRIPv6
+	// NodeCIDRMaskSizeIPv4 and NodeCIDRMaskSizeIPv6 can be used only for dual-stack clusters
+	if cfg.NodeCIDRMaskSizeIPv4 != 0 || cfg.NodeCIDRMaskSizeIPv6 != 0 {
+		return ipv4Mask, ipv6Mask, errors.New("usage of --node-cidr-mask-size-ipv4 and --node-cidr-mask-size-ipv6 are not allowed with non dual-stack clusters")
+	}
+	if cfg.NodeCIDRMaskSize != 0 {
+		ipv4Mask = int(cfg.NodeCIDRMaskSize)
+		ipv6Mask = int(cfg.NodeCIDRMaskSize)
+	}
+	return ipv4Mask, ipv6Mask, nil
+}
+
+// setNodeCIDRMaskSizesDualStack returns the IPv4 and IPv6 node cidr mask sizes to the value provided
+// for --node-cidr-mask-size-ipv4 and --node-cidr-mask-size-ipv6 respectively. If value not provided,
+// then it will return default IPv4 and IPv6 cidr mask sizes.
+func setNodeCIDRMaskSizesDualStack(cfg nodeipamconfig.NodeIPAMControllerConfiguration) (int, int, error) {
+	ipv4Mask, ipv6Mask := defaultNodeMaskCIDRIPv4, defaultNodeMaskCIDRIPv6
+	// NodeCIDRMaskSize can be used only for single stack clusters
+	if cfg.NodeCIDRMaskSize != 0 {
+		return ipv4Mask, ipv6Mask, errors.New("usage of --node-cidr-mask-size is not allowed with dual-stack clusters")
+	}
+	if cfg.NodeCIDRMaskSizeIPv4 != 0 {
+		ipv4Mask = int(cfg.NodeCIDRMaskSizeIPv4)
+	}
+	if cfg.NodeCIDRMaskSizeIPv6 != 0 {
+		ipv6Mask = int(cfg.NodeCIDRMaskSizeIPv6)
+	}
+	return ipv4Mask, ipv6Mask, nil
+}
+
+// getNodeCIDRMaskSizes is a helper function that helps the generate the node cidr mask
+// sizes slice based on the cluster cidr slice
+func getNodeCIDRMaskSizes(clusterCIDRs []*net.IPNet, maskSizeIPv4, maskSizeIPv6 int) []int {
+	nodeMaskCIDRs := []int{}
+	for _, clusterCIDR := range clusterCIDRs {
+		if netutils.IsIPv6CIDR(clusterCIDR) {
+			nodeMaskCIDRs = append(nodeMaskCIDRs, maskSizeIPv6)
+		} else {
+			nodeMaskCIDRs = append(nodeMaskCIDRs, maskSizeIPv4)
+		}
+	}
+	return nodeMaskCIDRs
 }

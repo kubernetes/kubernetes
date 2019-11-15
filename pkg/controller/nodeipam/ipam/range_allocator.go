@@ -21,9 +21,9 @@ import (
 	"net"
 	"sync"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/klog"
 
-	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -71,7 +71,7 @@ type rangeAllocator struct {
 // Caller must always pass in a list of existing nodes so the new allocator.
 // Caller must ensure that ClusterCIDRs are semantically correct e.g (1 for non DualStack, 2 for DualStack etc..)
 // can initialize its CIDR map. NodeList is only nil in testing.
-func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.NodeInformer, clusterCIDRs []*net.IPNet, serviceCIDR *net.IPNet, secondaryServiceCIDR *net.IPNet, subNetMaskSize int, nodeList *v1.NodeList) (CIDRAllocator, error) {
+func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.NodeInformer, allocatorParams CIDRAllocatorParams, nodeList *v1.NodeList) (CIDRAllocator, error) {
 	if client == nil {
 		klog.Fatalf("kubeClient is nil when starting NodeController")
 	}
@@ -84,9 +84,9 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 
 	// create a cidrSet for each cidr we operate on
 	// cidrSet are mapped to clusterCIDR by index
-	cidrSets := make([]*cidrset.CidrSet, len(clusterCIDRs))
-	for idx, cidr := range clusterCIDRs {
-		cidrSet, err := cidrset.NewCIDRSet(cidr, subNetMaskSize)
+	cidrSets := make([]*cidrset.CidrSet, len(allocatorParams.ClusterCIDRs))
+	for idx, cidr := range allocatorParams.ClusterCIDRs {
+		cidrSet, err := cidrset.NewCIDRSet(cidr, allocatorParams.NodeCIDRMaskSizes[idx])
 		if err != nil {
 			return nil, err
 		}
@@ -95,7 +95,7 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 
 	ra := &rangeAllocator{
 		client:                client,
-		clusterCIDRs:          clusterCIDRs,
+		clusterCIDRs:          allocatorParams.ClusterCIDRs,
 		cidrSets:              cidrSets,
 		nodeLister:            nodeInformer.Lister(),
 		nodesSynced:           nodeInformer.Informer().HasSynced,
@@ -104,14 +104,14 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 		nodesInProcessing:     sets.NewString(),
 	}
 
-	if serviceCIDR != nil {
-		ra.filterOutServiceRange(serviceCIDR)
+	if allocatorParams.ServiceCIDR != nil {
+		ra.filterOutServiceRange(allocatorParams.ServiceCIDR)
 	} else {
 		klog.V(0).Info("No Service CIDR provided. Skipping filtering out service addresses.")
 	}
 
-	if secondaryServiceCIDR != nil {
-		ra.filterOutServiceRange(secondaryServiceCIDR)
+	if allocatorParams.SecondaryServiceCIDR != nil {
+		ra.filterOutServiceRange(allocatorParams.SecondaryServiceCIDR)
 	} else {
 		klog.V(0).Info("No Secondary Service CIDR provided. Skipping filtering out secondary service addresses.")
 	}
