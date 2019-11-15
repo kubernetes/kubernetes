@@ -38,7 +38,6 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const nobodyUser = int64(65534)
@@ -115,7 +114,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 			p, err = c.CoreV1().Pods(ns).Get(p.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			validated, found := p.Annotations[psputil.ValidatedPSPAnnotation]
-			gomega.Expect(found).To(gomega.BeTrue(), "PSP annotation not found")
+			framework.ExpectEqual(found, true, "PSP annotation not found")
 			framework.ExpectEqual(validated, expectedPSP.Name, "Unexpected validated PSP")
 		})
 	})
@@ -123,7 +122,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 
 func expectForbidden(err error) {
 	framework.ExpectError(err, "should be forbidden")
-	gomega.Expect(apierrs.IsForbidden(err)).To(gomega.BeTrue(), "should be forbidden error")
+	framework.ExpectEqual(apierrs.IsForbidden(err), true, "should be forbidden error")
 }
 
 func testPrivilegedPods(tester func(pod *v1.Pod)) {
