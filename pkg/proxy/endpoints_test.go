@@ -400,7 +400,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			} else {
 				for i := range newEndpoints[x] {
 					ep := newEndpoints[x][i].(*BaseEndpointInfo)
-					if *ep != *(tc.expected[x][i]) {
+					if !(reflect.DeepEqual(*ep, *(tc.expected[x][i]))) {
 						t.Errorf("[%s] expected new[%v][%d] to be %v, got %v", tc.desc, x, i, tc.expected[x][i], *ep)
 					}
 				}
@@ -1699,21 +1699,21 @@ func TestCheckoutChanges(t *testing.T) {
 			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, false),
 			expectedChanges: []*endpointsChange{{
 				previous: EndpointsMap{
-					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80"), newTestEp("10.0.1.2:80")},
-					svcPortName1: []Endpoint{newTestEp("10.0.1.1:443"), newTestEp("10.0.1.2:443")},
+					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", ""), newTestEp("10.0.1.2:80", "")},
+					svcPortName1: []Endpoint{newTestEp("10.0.1.1:443", ""), newTestEp("10.0.1.2:443", "")},
 				},
 				current: EndpointsMap{
-					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80"), newTestEp("10.0.1.2:80")},
+					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", ""), newTestEp("10.0.1.2:80", "")},
 				},
 			}},
 			items: map[types.NamespacedName]*endpointsChange{
 				{Namespace: "ns1", Name: "svc1"}: {
 					previous: EndpointsMap{
-						svcPortName0: []Endpoint{newTestEp("10.0.1.1:80"), newTestEp("10.0.1.2:80")},
-						svcPortName1: []Endpoint{newTestEp("10.0.1.1:443"), newTestEp("10.0.1.2:443")},
+						svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", ""), newTestEp("10.0.1.2:80", "")},
+						svcPortName1: []Endpoint{newTestEp("10.0.1.1:443", ""), newTestEp("10.0.1.2:443", "")},
 					},
 					current: EndpointsMap{
-						svcPortName0: []Endpoint{newTestEp("10.0.1.1:80"), newTestEp("10.0.1.2:80")},
+						svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", ""), newTestEp("10.0.1.2:80", "")},
 					},
 				},
 			},
@@ -1724,7 +1724,7 @@ func TestCheckoutChanges(t *testing.T) {
 			expectedChanges: []*endpointsChange{{
 				previous: EndpointsMap{},
 				current: EndpointsMap{
-					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80"), newTestEp("10.0.1.2:80")},
+					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "host1"), newTestEp("10.0.1.2:80", "host1")},
 				},
 			}},
 			useEndpointSlices: true,
@@ -1737,11 +1737,11 @@ func TestCheckoutChanges(t *testing.T) {
 			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, true),
 			expectedChanges: []*endpointsChange{{
 				previous: EndpointsMap{
-					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80"), newTestEp("10.0.1.2:80")},
-					svcPortName1: []Endpoint{newTestEp("10.0.1.1:443"), newTestEp("10.0.1.2:443")},
+					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "host1"), newTestEp("10.0.1.2:80", "host1")},
+					svcPortName1: []Endpoint{newTestEp("10.0.1.1:443", "host1"), newTestEp("10.0.1.2:443", "host1")},
 				},
 				current: EndpointsMap{
-					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80"), newTestEp("10.0.1.2:80")},
+					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "host1"), newTestEp("10.0.1.2:80", "host1")},
 				},
 			}},
 			useEndpointSlices: true,
@@ -1796,6 +1796,9 @@ func compareEndpointsMapsStr(t *testing.T, newMap EndpointsMap, expected map[Ser
 	if len(newMap) != len(expected) {
 		t.Errorf("expected %d results, got %d: %v", len(expected), len(newMap), newMap)
 	}
+	endpointEqual := func(a, b *BaseEndpointInfo) bool {
+		return a.Endpoint == b.Endpoint && a.IsLocal == b.IsLocal
+	}
 	for x := range expected {
 		if len(newMap[x]) != len(expected[x]) {
 			t.Errorf("expected %d endpoints for %v, got %d", len(expected[x]), x, len(newMap[x]))
@@ -1807,7 +1810,7 @@ func compareEndpointsMapsStr(t *testing.T, newMap EndpointsMap, expected map[Ser
 					t.Errorf("Failed to cast endpointsInfo")
 					continue
 				}
-				if *newEp != *(expected[x][i]) {
+				if !endpointEqual(newEp, expected[x][i]) {
 					t.Errorf("expected new[%v][%d] to be %v, got %v (IsLocal expected %v, got %v)", x, i, expected[x][i], newEp, expected[x][i].IsLocal, newEp.IsLocal)
 				}
 			}
@@ -1815,8 +1818,14 @@ func compareEndpointsMapsStr(t *testing.T, newMap EndpointsMap, expected map[Ser
 	}
 }
 
-func newTestEp(ep string) *BaseEndpointInfo {
-	return &BaseEndpointInfo{Endpoint: ep}
+func newTestEp(ep, host string) *BaseEndpointInfo {
+	endpointInfo := &BaseEndpointInfo{Endpoint: ep}
+	if host != "" {
+		endpointInfo.Topology = map[string]string{
+			"kubernetes.io/hostname": host,
+		}
+	}
+	return endpointInfo
 }
 
 func initializeCache(endpointSliceCache *EndpointSliceCache, endpointSlices []*discovery.EndpointSlice) {

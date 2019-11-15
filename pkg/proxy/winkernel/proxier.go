@@ -444,6 +444,8 @@ func (em proxyEndpointsMap) unmerge(other proxyEndpointsMap, curServices proxySe
 type Proxier struct {
 	// EndpointSlice support has not been added for this proxier yet.
 	proxyconfig.NoopEndpointSliceHandler
+	// TODO(imroc): implement node handler for winkernel proxier.
+	proxyconfig.NoopNodeHandler
 
 	// endpointsChanges and serviceChanges contains all changes to endpoints and
 	// services that happened since policies were synced. For a single object,

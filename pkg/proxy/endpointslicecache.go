@@ -254,7 +254,7 @@ func (cache *EndpointSliceCache) addEndpointsByIP(serviceNN types.NamespacedName
 		}
 
 		isLocal := cache.isLocal(endpoint.Topology[v1.LabelHostname])
-		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal)
+		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal, endpoint.Topology)
 
 		// This logic ensures we're deduping potential overlapping endpoints
 		// isLocal should not vary between matching IPs, but if it does, we
