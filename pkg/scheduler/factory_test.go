@@ -560,7 +560,7 @@ func newConfigFactoryWithFrameworkRegistry(
 		pluginConfig:                   []schedulerapi.PluginConfig{},
 		pluginConfigProducerRegistry:   pluginConfigProducerRegistry,
 		nodeInfoSnapshot:               snapshot,
-		factoryArgs: PluginFactoryArgs{
+		algorithmFactoryArgs: AlgorithmFactoryArgs{
 			SharedLister:                   snapshot,
 			InformerFactory:                informerFactory,
 			HardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,

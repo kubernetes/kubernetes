@@ -214,6 +214,7 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceAccountList,Item
 API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceList,Items
 API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceSpec,ExternalIPs
 API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceSpec,LoadBalancerSourceRanges
+API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceSpec,TopologyKeys
 API rule violation: list_type_missing,k8s.io/api/core/v1,TopologySelectorLabelRequirement,Values
 API rule violation: list_type_missing,k8s.io/api/core/v1,TopologySelectorTerm,MatchLabelExpressions
 API rule violation: list_type_missing,k8s.io/api/events/v1beta1,EventList,Items
@@ -662,6 +663,8 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,K
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NamespaceControllerConfiguration,ConcurrentNamespaceSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NamespaceControllerConfiguration,NamespaceSyncPeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeIPAMControllerConfiguration,NodeCIDRMaskSize
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeIPAMControllerConfiguration,NodeCIDRMaskSizeIPv4
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeIPAMControllerConfiguration,NodeCIDRMaskSizeIPv6
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeIPAMControllerConfiguration,SecondaryServiceCIDR
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeIPAMControllerConfiguration,ServiceCIDR
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeLifecycleControllerConfiguration,EnableTaintManager

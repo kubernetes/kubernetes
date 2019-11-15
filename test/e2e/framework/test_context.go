@@ -354,24 +354,6 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.DurationVar(&nodeKiller.SimulatedDowntime, "node-killer-simulated-downtime", 10*time.Minute, "A delay between node death and recreation")
 }
 
-// RegisterNodeFlags registers flags specific to the node e2e test suite.
-func RegisterNodeFlags(flags *flag.FlagSet) {
-	// Mark the test as node e2e when node flags are api.Registry.
-	TestContext.NodeE2E = true
-	flags.StringVar(&TestContext.NodeName, "node-name", "", "Name of the node to run tests on.")
-	// TODO(random-liu): Move kubelet start logic out of the test.
-	// TODO(random-liu): Move log fetch logic out of the test.
-	// There are different ways to start kubelet (systemd, initd, docker, manually started etc.)
-	// and manage logs (journald, upstart etc.).
-	// For different situation we need to mount different things into the container, run different commands.
-	// It is hard and unnecessary to deal with the complexity inside the test suite.
-	flags.BoolVar(&TestContext.NodeConformance, "conformance", false, "If true, the test suite will not start kubelet, and fetch system log (kernel, docker, kubelet log etc.) to the report directory.")
-	flags.BoolVar(&TestContext.PrepullImages, "prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
-	flags.StringVar(&TestContext.ImageDescription, "image-description", "", "The description of the image which the test will be running on.")
-	flags.StringVar(&TestContext.SystemSpecName, "system-spec-name", "", "The name of the system spec (e.g., gke) that's used in the node e2e test. The system specs are in test/e2e_node/system/specs/. This is used by the test framework to determine which tests to run for validating the system requirements.")
-	flags.Var(cliflag.NewMapStringString(&TestContext.ExtraEnvs), "extra-envs", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
-}
-
 func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
 	clusterNick := "cluster"
 	userNick := "user"

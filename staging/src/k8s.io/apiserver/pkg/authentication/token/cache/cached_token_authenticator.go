@@ -64,11 +64,11 @@ type cache interface {
 }
 
 // New returns a token authenticator that caches the results of the specified authenticator. A ttl of 0 bypasses the cache.
-func New(authenticator authenticator.Token, cacheErrs bool, successTTL, failureTTL time.Duration) authenticator.Token {
-	return newWithClock(authenticator, cacheErrs, successTTL, failureTTL, utilclock.RealClock{})
+func New(ctx context.Context, authenticator authenticator.Token, cacheErrs bool, successTTL, failureTTL time.Duration) authenticator.Token {
+	return newWithClock(ctx, authenticator, cacheErrs, successTTL, failureTTL, utilclock.RealClock{})
 }
 
-func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL, failureTTL time.Duration, clock utilclock.Clock) authenticator.Token {
+func newWithClock(ctx context.Context, authenticator authenticator.Token, cacheErrs bool, successTTL, failureTTL time.Duration, clock utilclock.Clock) authenticator.Token {
 	randomCacheKey := make([]byte, 32)
 	if _, err := rand.Read(randomCacheKey); err != nil {
 		panic(err) // rand should never fail
@@ -86,7 +86,7 @@ func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL,
 		// used. Currently we advertise support 5k nodes and 10k
 		// namespaces; a 32k entry cache is therefore a 2x safety
 		// margin.
-		cache: newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(1024, clock) }),
+		cache: newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(ctx, clock) }),
 
 		hashPool: &sync.Pool{
 			New: func() interface{} {

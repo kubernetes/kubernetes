@@ -41,12 +41,12 @@ type Volume interface {
 // and pod device map path.
 type BlockVolume interface {
 	// GetGlobalMapPath returns a global map path which contains
-	// symbolic links associated to a block device.
+	// bind mount associated to a block device.
 	// ex. plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid}
 	GetGlobalMapPath(spec *Spec) (string, error)
 	// GetPodDeviceMapPath returns a pod device map path
 	// and name of a symbolic link associated to a block device.
-	// ex. pods/{podUid}}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName}
+	// ex. pods/{podUid}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/, {volumeName}
 	GetPodDeviceMapPath() (string, string)
 }
 
@@ -152,35 +152,43 @@ type Unmounter interface {
 	TearDownAt(dir string) error
 }
 
-// BlockVolumeMapper interface provides methods to set up/map the volume.
+// BlockVolumeMapper interface is a mapper interface for block volume.
 type BlockVolumeMapper interface {
 	BlockVolume
-	// SetUpDevice prepares the volume to a self-determined directory path,
-	// which may or may not exist yet and returns combination of physical
-	// device path of a block volume and error.
-	// If the plugin is non-attachable, it should prepare the device
-	// in /dev/ (or where appropriate) and return unique device path.
-	// Unique device path across kubelet node reboot is required to avoid
-	// unexpected block volume destruction.
-	// If the plugin is attachable, it should not do anything here,
-	// just return empty string for device path.
-	// Instead, attachable plugin have to return unique device path
-	// at attacher.Attach() and attacher.WaitForAttach().
-	// This may be called more than once, so implementations must be idempotent.
-	SetUpDevice() (string, error)
-
-	// Map maps the block device path for the specified spec and pod.
-	MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error
 }
 
-// BlockVolumeUnmapper interface provides methods to cleanup/unmap the volumes.
+// CustomBlockVolumeMapper interface provides custom methods to set up/map the volume.
+type CustomBlockVolumeMapper interface {
+	BlockVolumeMapper
+	// SetUpDevice prepares the volume to the node by the plugin specific way.
+	// For most in-tree plugins, attacher.Attach() and attacher.WaitForAttach()
+	// will do necessary works.
+	// This may be called more than once, so implementations must be idempotent.
+	SetUpDevice() error
+
+	// MapPodDevice maps the block device to a path and return the path.
+	// Unique device path across kubelet node reboot is required to avoid
+	// unexpected block volume destruction.
+	// If empty string is returned, the path retuned by attacher.Attach() and
+	// attacher.WaitForAttach() will be used.
+	MapPodDevice() (string, error)
+}
+
+// BlockVolumeUnmapper interface is an unmapper interface for block volume.
 type BlockVolumeUnmapper interface {
 	BlockVolume
-	// TearDownDevice removes traces of the SetUpDevice procedure under
-	// a self-determined directory.
+}
+
+// CustomBlockVolumeUnmapper interface provides custom methods to cleanup/unmap the volumes.
+type CustomBlockVolumeUnmapper interface {
+	BlockVolumeUnmapper
+	// TearDownDevice removes traces of the SetUpDevice procedure.
 	// If the plugin is non-attachable, this method detaches the volume
 	// from a node.
 	TearDownDevice(mapPath string, devicePath string) error
+
+	// UnmapPodDevice removes traces of the MapPodDevice procedure.
+	UnmapPodDevice() error
 }
 
 // Provisioner is an interface that creates templates for PersistentVolumes

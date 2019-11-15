@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -124,7 +125,8 @@ func TestSyncHandler(t *testing.T) {
 		if tc.storageClass != nil {
 			informerFactory.Storage().V1().StorageClasses().Informer().GetIndexer().Add(tc.storageClass)
 		}
-		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, storageClassInformer, nil, allPlugins, csitrans.New())
+		translator := csitrans.New()
+		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, storageClassInformer, nil, allPlugins, translator, csimigration.NewPluginManager(translator))
 		if err != nil {
 			t.Fatalf("error creating expand controller : %v", err)
 		}

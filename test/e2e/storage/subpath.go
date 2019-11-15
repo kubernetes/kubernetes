@@ -57,6 +57,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		  This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
 		*/
 		framework.ConformanceIt("should support subpaths with secret pod [LinuxOnly]", func() {
+			// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default container runtime on Windows.
 			pod := testsuites.SubpathTestPod(f, "secret-key", "secret", &v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "my-secret"}}, privilegedSecurityContext)
 			testsuites.TestBasicSubpath(f, "secret-value", pod)
 		})
@@ -68,6 +69,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		  This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
 		*/
 		framework.ConformanceIt("should support subpaths with configmap pod [LinuxOnly]", func() {
+			// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default container runtime on Windows.
 			pod := testsuites.SubpathTestPod(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, privilegedSecurityContext)
 			testsuites.TestBasicSubpath(f, "configmap-value", pod)
 		})
@@ -79,6 +81,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		  This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
 		*/
 		framework.ConformanceIt("should support subpaths with configmap pod with mountPath of existing file [LinuxOnly]", func() {
+			// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default container runtime on Windows.
 			pod := testsuites.SubpathTestPod(f, "configmap-key", "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-configmap"}}}, privilegedSecurityContext)
 			file := "/etc/resolv.conf"
 			pod.Spec.Containers[0].VolumeMounts[0].MountPath = file
@@ -92,6 +95,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		  This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
 		*/
 		framework.ConformanceIt("should support subpaths with downward pod [LinuxOnly]", func() {
+			// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default container runtime on Windows.
 			pod := testsuites.SubpathTestPod(f, "downward/podname", "downwardAPI", &v1.VolumeSource{
 				DownwardAPI: &v1.DownwardAPIVolumeSource{
 					Items: []v1.DownwardAPIVolumeFile{{Path: "downward/podname", FieldRef: &v1.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"}}},
@@ -107,6 +111,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		  This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
 		*/
 		framework.ConformanceIt("should support subpaths with projected pod [LinuxOnly]", func() {
+			// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default container runtime on Windows.
 			pod := testsuites.SubpathTestPod(f, "projected/configmap-key", "projected", &v1.VolumeSource{
 				Projected: &v1.ProjectedVolumeSource{
 					Sources: []v1.VolumeProjection{

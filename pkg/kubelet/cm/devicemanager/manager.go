@@ -31,6 +31,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
@@ -189,6 +190,7 @@ func (m *ManagerImpl) removeContents(dir string) error {
 	if err != nil {
 		return err
 	}
+	var errs []error
 	for _, name := range names {
 		filePath := filepath.Join(dir, name)
 		if filePath == m.checkpointFile() {
@@ -204,10 +206,12 @@ func (m *ManagerImpl) removeContents(dir string) error {
 		}
 		err = os.RemoveAll(filePath)
 		if err != nil {
-			return err
+			errs = append(errs, err)
+			klog.Errorf("Failed to remove file %s: %v", filePath, err)
+			continue
 		}
 	}
-	return nil
+	return errorsutil.NewAggregate(errs)
 }
 
 // checkpointFile returns device plugin checkpoint file path.

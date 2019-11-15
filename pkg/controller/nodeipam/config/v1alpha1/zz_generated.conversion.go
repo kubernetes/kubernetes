@@ -84,6 +84,8 @@ func autoConvert_v1alpha1_NodeIPAMControllerConfiguration_To_config_NodeIPAMCont
 	out.ServiceCIDR = in.ServiceCIDR
 	out.SecondaryServiceCIDR = in.SecondaryServiceCIDR
 	out.NodeCIDRMaskSize = in.NodeCIDRMaskSize
+	out.NodeCIDRMaskSizeIPv4 = in.NodeCIDRMaskSizeIPv4
+	out.NodeCIDRMaskSizeIPv6 = in.NodeCIDRMaskSizeIPv6
 	return nil
 }
 
@@ -91,5 +93,7 @@ func autoConvert_config_NodeIPAMControllerConfiguration_To_v1alpha1_NodeIPAMCont
 	out.ServiceCIDR = in.ServiceCIDR
 	out.SecondaryServiceCIDR = in.SecondaryServiceCIDR
 	out.NodeCIDRMaskSize = in.NodeCIDRMaskSize
+	out.NodeCIDRMaskSizeIPv4 = in.NodeCIDRMaskSizeIPv4
+	out.NodeCIDRMaskSizeIPv6 = in.NodeCIDRMaskSizeIPv6
 	return nil
 }

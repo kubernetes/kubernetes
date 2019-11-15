@@ -31,17 +31,22 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/probe"
 )
 
 type REST struct {
 	GetServersToValidate func() map[string]*Server
+	rest.TableConvertor
 }
 
 // NewStorage returns a new REST.
 func NewStorage(serverRetriever func() map[string]*Server) *REST {
 	return &REST{
 		GetServersToValidate: serverRetriever,
+		TableConvertor:       printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 }
 

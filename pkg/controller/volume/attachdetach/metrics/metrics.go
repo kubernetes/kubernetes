@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -60,14 +62,18 @@ func Register(pvcLister corelisters.PersistentVolumeClaimLister,
 	podLister corelisters.PodLister,
 	asw cache.ActualStateOfWorld,
 	dsw cache.DesiredStateOfWorld,
-	pluginMgr *volume.VolumePluginMgr) {
+	pluginMgr *volume.VolumePluginMgr,
+	csiMigratedPluginManager csimigration.PluginManager,
+	intreeToCSITranslator csimigration.InTreeToCSITranslator) {
 	registerMetrics.Do(func() {
 		legacyregistry.CustomMustRegister(newAttachDetachStateCollector(pvcLister,
 			podLister,
 			pvLister,
 			asw,
 			dsw,
-			pluginMgr))
+			pluginMgr,
+			csiMigratedPluginManager,
+			intreeToCSITranslator))
 		legacyregistry.MustRegister(forcedDetachMetricCounter)
 	})
 }
@@ -75,12 +81,14 @@ func Register(pvcLister corelisters.PersistentVolumeClaimLister,
 type attachDetachStateCollector struct {
 	metrics.BaseStableCollector
 
-	pvcLister       corelisters.PersistentVolumeClaimLister
-	podLister       corelisters.PodLister
-	pvLister        corelisters.PersistentVolumeLister
-	asw             cache.ActualStateOfWorld
-	dsw             cache.DesiredStateOfWorld
-	volumePluginMgr *volume.VolumePluginMgr
+	pvcLister                corelisters.PersistentVolumeClaimLister
+	podLister                corelisters.PodLister
+	pvLister                 corelisters.PersistentVolumeLister
+	asw                      cache.ActualStateOfWorld
+	dsw                      cache.DesiredStateOfWorld
+	volumePluginMgr          *volume.VolumePluginMgr
+	csiMigratedPluginManager csimigration.PluginManager
+	intreeToCSITranslator    csimigration.InTreeToCSITranslator
 }
 
 // volumeCount is a map of maps used as a counter, e.g.:
@@ -105,8 +113,10 @@ func newAttachDetachStateCollector(
 	pvLister corelisters.PersistentVolumeLister,
 	asw cache.ActualStateOfWorld,
 	dsw cache.DesiredStateOfWorld,
-	pluginMgr *volume.VolumePluginMgr) *attachDetachStateCollector {
-	return &attachDetachStateCollector{pvcLister: pvcLister, podLister: podLister, pvLister: pvLister, asw: asw, dsw: dsw, volumePluginMgr: pluginMgr}
+	pluginMgr *volume.VolumePluginMgr,
+	csiMigratedPluginManager csimigration.PluginManager,
+	intreeToCSITranslator csimigration.InTreeToCSITranslator) *attachDetachStateCollector {
+	return &attachDetachStateCollector{pvcLister: pvcLister, podLister: podLister, pvLister: pvLister, asw: asw, dsw: dsw, volumePluginMgr: pluginMgr, csiMigratedPluginManager: csiMigratedPluginManager, intreeToCSITranslator: intreeToCSITranslator}
 }
 
 // Check if our collector implements necessary collector interface
@@ -158,7 +168,7 @@ func (collector *attachDetachStateCollector) getVolumeInUseCount() volumeCount {
 			continue
 		}
 		for _, podVolume := range pod.Spec.Volumes {
-			volumeSpec, err := util.CreateVolumeSpec(podVolume, pod.Namespace, collector.pvcLister, collector.pvLister)
+			volumeSpec, err := util.CreateVolumeSpec(podVolume, pod.Namespace, types.NodeName(pod.Spec.NodeName), collector.volumePluginMgr, collector.pvcLister, collector.pvLister, collector.csiMigratedPluginManager, collector.intreeToCSITranslator)
 			if err != nil {
 				continue
 			}

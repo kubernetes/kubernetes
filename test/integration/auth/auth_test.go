@@ -70,7 +70,7 @@ func getTestTokenAuth() authenticator.Request {
 	return group.NewGroupAdder(bearertoken.New(tokenAuthenticator), []string{user.AllAuthenticated})
 }
 
-func getTestWebhookTokenAuth(serverURL string) (authenticator.Request, error) {
+func getTestWebhookTokenAuth(ctx context.Context, serverURL string) (authenticator.Request, error) {
 	kubecfgFile, err := ioutil.TempFile("", "webhook-kubecfg")
 	if err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func getTestWebhookTokenAuth(serverURL string) (authenticator.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	return bearertoken.New(cache.New(webhookTokenAuth, false, 2*time.Minute, 2*time.Minute)), nil
+	return bearertoken.New(cache.New(ctx, webhookTokenAuth, false, 2*time.Minute, 2*time.Minute)), nil
 }
 
 func path(resource, namespace, name string) string {
@@ -1176,7 +1176,11 @@ func TestReadOnlyAuthorization(t *testing.T) {
 func TestWebhookTokenAuthenticator(t *testing.T) {
 	authServer := newTestWebhookTokenAuthServer()
 	defer authServer.Close()
-	authenticator, err := getTestWebhookTokenAuth(authServer.URL)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	authenticator, err := getTestWebhookTokenAuth(ctx, authServer.URL)
 	if err != nil {
 		t.Fatalf("error starting webhook token authenticator server: %v", err)
 	}

@@ -372,9 +372,17 @@ func TestMapUnmap(t *testing.T) {
 	if volName != testPVName {
 		t.Errorf("Got unexpected volNamne: %s, expected %s", volName, testPVName)
 	}
-	devPath, err := mapper.SetUpDevice()
-	if err != nil {
-		t.Errorf("Failed to SetUpDevice, err: %v", err)
+	var devPath string
+
+	if customMapper, ok := mapper.(volume.CustomBlockVolumeMapper); ok {
+		err = customMapper.SetUpDevice()
+		if err != nil {
+			t.Errorf("Failed to SetUpDevice, err: %v", err)
+		}
+		devPath, err = customMapper.MapPodDevice()
+		if err != nil {
+			t.Errorf("Failed to MapPodDevice, err: %v", err)
+		}
 	}
 
 	if _, err := os.Stat(devPath); err != nil {
@@ -393,8 +401,14 @@ func TestMapUnmap(t *testing.T) {
 		t.Fatalf("Got a nil Unmapper")
 	}
 
-	if err := unmapper.TearDownDevice(globalPath, devPath); err != nil {
-		t.Errorf("TearDownDevice failed, err: %v", err)
+	if customUnmapper, ok := unmapper.(volume.CustomBlockVolumeUnmapper); ok {
+		if err := customUnmapper.UnmapPodDevice(); err != nil {
+			t.Errorf("UnmapPodDevice failed, err: %v", err)
+		}
+
+		if err := customUnmapper.TearDownDevice(globalPath, devPath); err != nil {
+			t.Errorf("TearDownDevice failed, err: %v", err)
+		}
 	}
 }
 

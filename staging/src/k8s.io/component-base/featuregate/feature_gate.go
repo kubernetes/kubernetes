@@ -40,17 +40,25 @@ const (
 	//   AllAlpha=false,NewFeature=true  will result in newFeature=true
 	//   AllAlpha=true,NewFeature=false  will result in newFeature=false
 	allAlphaGate Feature = "AllAlpha"
+
+	// allBetaGate is a global toggle for beta features. Per-feature key
+	// values override the default set by allBetaGate. Examples:
+	//   AllBeta=false,NewFeature=true  will result in NewFeature=true
+	//   AllBeta=true,NewFeature=false  will result in NewFeature=false
+	allBetaGate Feature = "AllBeta"
 )
 
 var (
 	// The generic features.
 	defaultFeatures = map[Feature]FeatureSpec{
 		allAlphaGate: {Default: false, PreRelease: Alpha},
+		allBetaGate:  {Default: false, PreRelease: Beta},
 	}
 
 	// Special handling for a few gates.
 	specialFeatures = map[Feature]func(known map[Feature]FeatureSpec, enabled map[Feature]bool, val bool){
 		allAlphaGate: setUnsetAlphaGates,
+		allBetaGate:  setUnsetBetaGates,
 	}
 )
 
@@ -122,6 +130,16 @@ type featureGate struct {
 func setUnsetAlphaGates(known map[Feature]FeatureSpec, enabled map[Feature]bool, val bool) {
 	for k, v := range known {
 		if v.PreRelease == Alpha {
+			if _, found := enabled[k]; !found {
+				enabled[k] = val
+			}
+		}
+	}
+}
+
+func setUnsetBetaGates(known map[Feature]FeatureSpec, enabled map[Feature]bool, val bool) {
+	for k, v := range known {
+		if v.PreRelease == Beta {
 			if _, found := enabled[k]; !found {
 				enabled[k] = val
 			}

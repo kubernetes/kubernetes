@@ -109,3 +109,32 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 func yamlUnmarshal(data []byte, v interface{}) error {
 	return yaml.Unmarshal(data, v)
 }
+
+func TestPrintersSuccess(t *testing.T) {
+	om := func(name string) metav1.ObjectMeta { return metav1.ObjectMeta{Name: name} }
+
+	genericPrinters := map[string]ResourcePrinter{
+		"json": NewTypeSetter(scheme.Scheme).ToPrinter(&JSONPrinter{}),
+		"yaml": NewTypeSetter(scheme.Scheme).ToPrinter(&YAMLPrinter{}),
+	}
+	objects := map[string]runtime.Object{
+		"pod":             &v1.Pod{ObjectMeta: om("pod")},
+		"emptyPodList":    &v1.PodList{},
+		"nonEmptyPodList": &v1.PodList{Items: []v1.Pod{{}}},
+		"endpoints": &v1.Endpoints{
+			Subsets: []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{IP: "127.0.0.1"}, {IP: "localhost"}},
+				Ports:     []v1.EndpointPort{{Port: 8080}},
+			}}},
+	}
+
+	// Test PrintObj() success.
+	for pName, p := range genericPrinters {
+		for oName, obj := range objects {
+			b := &bytes.Buffer{}
+			if err := p.PrintObj(obj, b); err != nil {
+				t.Errorf("printer '%v', object '%v'; error: '%v'", pName, oName, err)
+			}
+		}
+	}
+}

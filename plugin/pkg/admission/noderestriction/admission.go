@@ -70,6 +70,7 @@ type Plugin struct {
 	*admission.Handler
 	nodeIdentifier nodeidentifier.NodeIdentifier
 	podsGetter     corev1lister.PodLister
+	nodesGetter    corev1lister.NodeLister
 
 	tokenRequestEnabled            bool
 	csiNodeInfoEnabled             bool
@@ -92,6 +93,7 @@ func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 // SetExternalKubeInformerFactory registers an informer factory into Plugin
 func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	p.podsGetter = f.Core().V1().Pods().Lister()
+	p.nodesGetter = f.Core().V1().Nodes().Lister()
 }
 
 // ValidateInitialization validates the Plugin was initialized properly
@@ -101,6 +103,9 @@ func (p *Plugin) ValidateInitialization() error {
 	}
 	if p.podsGetter == nil {
 		return fmt.Errorf("%s requires a pod getter", PluginName)
+	}
+	if p.nodesGetter == nil {
+		return fmt.Errorf("%s requires a node getter", PluginName)
 	}
 	return nil
 }
@@ -127,6 +132,8 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		// disallow requests we cannot match to a particular node
 		return admission.NewForbidden(a, fmt.Errorf("could not determine node from user %q", a.GetUserInfo().GetName()))
 	}
+
+	// TODO: if node doesn't exist and this isn't a create node request, then reject.
 
 	switch a.GetResource().GroupResource() {
 	case podResource:
@@ -177,43 +184,7 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 func (p *Plugin) admitPod(nodeName string, a admission.Attributes) error {
 	switch a.GetOperation() {
 	case admission.Create:
-		// require a pod object
-		pod, ok := a.GetObject().(*api.Pod)
-		if !ok {
-			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
-		}
-
-		// only allow nodes to create mirror pods
-		if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; !isMirrorPod {
-			return admission.NewForbidden(a, fmt.Errorf("pod does not have %q annotation, node %q can only create mirror pods", api.MirrorPodAnnotationKey, nodeName))
-		}
-
-		// only allow nodes to create a pod bound to itself
-		if pod.Spec.NodeName != nodeName {
-			return admission.NewForbidden(a, fmt.Errorf("node %q can only create pods with spec.nodeName set to itself", nodeName))
-		}
-
-		// don't allow a node to create a pod that references any other API objects
-		if pod.Spec.ServiceAccountName != "" {
-			return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference a service account", nodeName))
-		}
-		hasSecrets := false
-		podutil.VisitPodSecretNames(pod, func(name string) (shouldContinue bool) { hasSecrets = true; return false })
-		if hasSecrets {
-			return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference secrets", nodeName))
-		}
-		hasConfigMaps := false
-		podutil.VisitPodConfigmapNames(pod, func(name string) (shouldContinue bool) { hasConfigMaps = true; return false })
-		if hasConfigMaps {
-			return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference configmaps", nodeName))
-		}
-		for _, v := range pod.Spec.Volumes {
-			if v.PersistentVolumeClaim != nil {
-				return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference persistentvolumeclaims", nodeName))
-			}
-		}
-
-		return nil
+		return p.admitPodCreate(nodeName, a)
 
 	case admission.Delete:
 		// get the existing pod
@@ -233,6 +204,75 @@ func (p *Plugin) admitPod(nodeName string, a admission.Attributes) error {
 	default:
 		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %q, node %q can only create and delete mirror pods", a.GetOperation(), nodeName))
 	}
+}
+
+func (p *Plugin) admitPodCreate(nodeName string, a admission.Attributes) error {
+	// require a pod object
+	pod, ok := a.GetObject().(*api.Pod)
+	if !ok {
+		return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+	}
+
+	// only allow nodes to create mirror pods
+	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; !isMirrorPod {
+		return admission.NewForbidden(a, fmt.Errorf("pod does not have %q annotation, node %q can only create mirror pods", api.MirrorPodAnnotationKey, nodeName))
+	}
+
+	// only allow nodes to create a pod bound to itself
+	if pod.Spec.NodeName != nodeName {
+		return admission.NewForbidden(a, fmt.Errorf("node %q can only create pods with spec.nodeName set to itself", nodeName))
+	}
+	if len(pod.OwnerReferences) > 1 {
+		return admission.NewForbidden(a, fmt.Errorf("node %q can only create pods with a single owner reference set to itself", nodeName))
+	}
+	if len(pod.OwnerReferences) == 1 {
+		owner := pod.OwnerReferences[0]
+		if owner.APIVersion != v1.SchemeGroupVersion.String() ||
+			owner.Kind != "Node" ||
+			owner.Name != nodeName {
+			return admission.NewForbidden(a, fmt.Errorf("node %q can only create pods with an owner reference set to itself", nodeName))
+		}
+		if owner.Controller == nil || !*owner.Controller {
+			return admission.NewForbidden(a, fmt.Errorf("node %q can only create pods with a controller owner reference set to itself", nodeName))
+		}
+		if owner.BlockOwnerDeletion != nil && *owner.BlockOwnerDeletion {
+			return admission.NewForbidden(a, fmt.Errorf("node %q must not set blockOwnerDeletion on an owner reference", nodeName))
+		}
+
+		// Verify the node UID.
+		node, err := p.nodesGetter.Get(nodeName)
+		if errors.IsNotFound(err) {
+			return err
+		}
+		if err != nil {
+			return admission.NewForbidden(a, fmt.Errorf("error looking up node %s to verify uid: %v", nodeName, err))
+		}
+		if owner.UID != node.UID {
+			return admission.NewForbidden(a, fmt.Errorf("node %s UID mismatch: expected %s got %s", nodeName, owner.UID, node.UID))
+		}
+	}
+
+	// don't allow a node to create a pod that references any other API objects
+	if pod.Spec.ServiceAccountName != "" {
+		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference a service account", nodeName))
+	}
+	hasSecrets := false
+	podutil.VisitPodSecretNames(pod, func(name string) (shouldContinue bool) { hasSecrets = true; return false })
+	if hasSecrets {
+		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference secrets", nodeName))
+	}
+	hasConfigMaps := false
+	podutil.VisitPodConfigmapNames(pod, func(name string) (shouldContinue bool) { hasConfigMaps = true; return false })
+	if hasConfigMaps {
+		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference configmaps", nodeName))
+	}
+	for _, v := range pod.Spec.Volumes {
+		if v.PersistentVolumeClaim != nil {
+			return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference persistentvolumeclaims", nodeName))
+		}
+	}
+
+	return nil
 }
 
 // admitPodStatus allows to update the status of a pod if it is

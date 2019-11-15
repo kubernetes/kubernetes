@@ -118,10 +118,6 @@ func (plugin *glusterfsPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.Glusterfs != nil)
 }
 
-func (plugin *glusterfsPlugin) IsMigratedToCSI() bool {
-	return false
-}
-
 func (plugin *glusterfsPlugin) RequiresRemount() bool {
 	return false
 }

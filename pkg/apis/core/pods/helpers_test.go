@@ -168,6 +168,20 @@ func TestConvertDownwardAPIFieldLabel(t *testing.T) {
 			expectedLabel: "spec.nodeName",
 			expectedValue: "127.0.0.1",
 		},
+		{
+			version:       "v1",
+			label:         "status.podIPs",
+			value:         "10.244.0.6,fd00::6",
+			expectedLabel: "status.podIPs",
+			expectedValue: "10.244.0.6,fd00::6",
+		},
+		{
+			version:       "v1",
+			label:         "status.podIPs",
+			value:         "10.244.0.6",
+			expectedLabel: "status.podIPs",
+			expectedValue: "10.244.0.6",
+		},
 	}
 	for _, tc := range testCases {
 		label, value, err := ConvertDownwardAPIFieldLabel(tc.version, tc.label, tc.value)

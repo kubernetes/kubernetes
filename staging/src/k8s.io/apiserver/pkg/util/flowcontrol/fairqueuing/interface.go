@@ -70,7 +70,9 @@ type QueueSetConfig struct {
 	Name string
 	// ConcurrencyLimit is the maximum number of requests of this QueueSet that may be executing at a time
 	ConcurrencyLimit int
-	// DesiredNumQueues is the number of queues that the API says should exist now
+	// DesiredNumQueues is the number of queues that the API says
+	// should exist now.  This may be zero, in which case
+	// QueueLengthLimit, HandSize, and RequestWaitLimit are ignored.
 	DesiredNumQueues int
 	// QueueLengthLimit is the maximum number of requests that may be waiting in a given queue at a time
 	QueueLengthLimit int

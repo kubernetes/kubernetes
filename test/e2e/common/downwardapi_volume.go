@@ -91,13 +91,12 @@ var _ = ginkgo.Describe("[sig-storage] Downward API volume", func() {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		framework.SkipIfNodeOSDistroIs("windows")
 		podName := "metadata-volume-" + string(uuid.NewUUID())
-		uid := int64(1001)
 		gid := int64(1234)
 		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podinfo/podname")
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
-			RunAsUser: &uid,
-			FSGroup:   &gid,
+			FSGroup: &gid,
 		}
+		setPodNonRootUser(pod)
 		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
 			fmt.Sprintf("%s\n", podName),
 		})
@@ -107,14 +106,13 @@ var _ = ginkgo.Describe("[sig-storage] Downward API volume", func() {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
 		framework.SkipIfNodeOSDistroIs("windows")
 		podName := "metadata-volume-" + string(uuid.NewUUID())
-		uid := int64(1001)
 		gid := int64(1234)
 		mode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		pod := downwardAPIVolumePodForModeTest(podName, "/etc/podinfo/podname", &mode, nil)
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
-			RunAsUser: &uid,
-			FSGroup:   &gid,
+			FSGroup: &gid,
 		}
+		setPodNonRootUser(pod)
 		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
 			"mode of file \"/etc/podinfo/podname\": -r--r-----",
 		})

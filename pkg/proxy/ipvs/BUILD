@@ -56,6 +56,7 @@ go_library(
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/proxy:go_default_library",
+        "//pkg/proxy/config:go_default_library",
         "//pkg/proxy/healthcheck:go_default_library",
         "//pkg/proxy/metrics:go_default_library",
         "//pkg/proxy/util:go_default_library",

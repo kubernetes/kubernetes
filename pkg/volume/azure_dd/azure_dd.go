@@ -31,8 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/legacy-cloud-providers/azure"
@@ -120,11 +118,6 @@ func (plugin *azureDataDiskPlugin) GetVolumeName(spec *volume.Spec) (string, err
 func (plugin *azureDataDiskPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.AzureDisk != nil) ||
 		(spec.Volume != nil && spec.Volume.AzureDisk != nil)
-}
-
-func (plugin *azureDataDiskPlugin) IsMigratedToCSI() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
 }
 
 func (plugin *azureDataDiskPlugin) RequiresRemount() bool {

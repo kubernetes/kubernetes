@@ -39,6 +39,7 @@ func TestFeatureGateFlag(t *testing.T) {
 			arg: "",
 			expect: map[Feature]bool{
 				allAlphaGate:  false,
+				allBetaGate:   false,
 				testAlphaGate: false,
 				testBetaGate:  false,
 			},
@@ -47,6 +48,7 @@ func TestFeatureGateFlag(t *testing.T) {
 			arg: "fooBarBaz=true",
 			expect: map[Feature]bool{
 				allAlphaGate:  false,
+				allBetaGate:   false,
 				testAlphaGate: false,
 				testBetaGate:  false,
 			},
@@ -56,6 +58,7 @@ func TestFeatureGateFlag(t *testing.T) {
 			arg: "AllAlpha=false",
 			expect: map[Feature]bool{
 				allAlphaGate:  false,
+				allBetaGate:   false,
 				testAlphaGate: false,
 				testBetaGate:  false,
 			},
@@ -64,6 +67,7 @@ func TestFeatureGateFlag(t *testing.T) {
 			arg: "AllAlpha=true",
 			expect: map[Feature]bool{
 				allAlphaGate:  true,
+				allBetaGate:   false,
 				testAlphaGate: true,
 				testBetaGate:  false,
 			},
@@ -72,6 +76,7 @@ func TestFeatureGateFlag(t *testing.T) {
 			arg: "AllAlpha=banana",
 			expect: map[Feature]bool{
 				allAlphaGate:  false,
+				allBetaGate:   false,
 				testAlphaGate: false,
 				testBetaGate:  false,
 			},
@@ -81,6 +86,7 @@ func TestFeatureGateFlag(t *testing.T) {
 			arg: "AllAlpha=false,TestAlpha=true",
 			expect: map[Feature]bool{
 				allAlphaGate:  false,
+				allBetaGate:   false,
 				testAlphaGate: true,
 				testBetaGate:  false,
 			},
@@ -89,6 +95,7 @@ func TestFeatureGateFlag(t *testing.T) {
 			arg: "TestAlpha=true,AllAlpha=false",
 			expect: map[Feature]bool{
 				allAlphaGate:  false,
+				allBetaGate:   false,
 				testAlphaGate: true,
 				testBetaGate:  false,
 			},
@@ -97,6 +104,7 @@ func TestFeatureGateFlag(t *testing.T) {
 			arg: "AllAlpha=true,TestAlpha=false",
 			expect: map[Feature]bool{
 				allAlphaGate:  true,
+				allBetaGate:   false,
 				testAlphaGate: false,
 				testBetaGate:  false,
 			},
@@ -105,6 +113,7 @@ func TestFeatureGateFlag(t *testing.T) {
 			arg: "TestAlpha=false,AllAlpha=true",
 			expect: map[Feature]bool{
 				allAlphaGate:  true,
+				allBetaGate:   false,
 				testAlphaGate: false,
 				testBetaGate:  false,
 			},
@@ -113,33 +122,110 @@ func TestFeatureGateFlag(t *testing.T) {
 			arg: "TestBeta=true,AllAlpha=false",
 			expect: map[Feature]bool{
 				allAlphaGate:  false,
+				allBetaGate:   false,
 				testAlphaGate: false,
 				testBetaGate:  true,
 			},
 		},
+
+		{
+			arg: "AllBeta=false",
+			expect: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   false,
+				testAlphaGate: false,
+				testBetaGate:  false,
+			},
+		},
+		{
+			arg: "AllBeta=true",
+			expect: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   true,
+				testAlphaGate: false,
+				testBetaGate:  true,
+			},
+		},
+		{
+			arg: "AllBeta=banana",
+			expect: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   false,
+				testAlphaGate: false,
+				testBetaGate:  false,
+			},
+			parseError: "invalid value of AllBeta",
+		},
+		{
+			arg: "AllBeta=false,TestBeta=true",
+			expect: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   false,
+				testAlphaGate: false,
+				testBetaGate:  true,
+			},
+		},
+		{
+			arg: "TestBeta=true,AllBeta=false",
+			expect: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   false,
+				testAlphaGate: false,
+				testBetaGate:  true,
+			},
+		},
+		{
+			arg: "AllBeta=true,TestBeta=false",
+			expect: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   true,
+				testAlphaGate: false,
+				testBetaGate:  false,
+			},
+		},
+		{
+			arg: "TestBeta=false,AllBeta=true",
+			expect: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   true,
+				testAlphaGate: false,
+				testBetaGate:  false,
+			},
+		},
+		{
+			arg: "TestAlpha=true,AllBeta=false",
+			expect: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   false,
+				testAlphaGate: true,
+				testBetaGate:  false,
+			},
+		},
 	}
 	for i, test := range tests {
-		fs := pflag.NewFlagSet("testfeaturegateflag", pflag.ContinueOnError)
-		f := NewFeatureGate()
-		f.Add(map[Feature]FeatureSpec{
-			testAlphaGate: {Default: false, PreRelease: Alpha},
-			testBetaGate:  {Default: false, PreRelease: Beta},
-		})
-		f.AddFlag(fs)
+		t.Run(test.arg, func(t *testing.T) {
+			fs := pflag.NewFlagSet("testfeaturegateflag", pflag.ContinueOnError)
+			f := NewFeatureGate()
+			f.Add(map[Feature]FeatureSpec{
+				testAlphaGate: {Default: false, PreRelease: Alpha},
+				testBetaGate:  {Default: false, PreRelease: Beta},
+			})
+			f.AddFlag(fs)
 
-		err := fs.Parse([]string{fmt.Sprintf("--%s=%s", flagName, test.arg)})
-		if test.parseError != "" {
-			if !strings.Contains(err.Error(), test.parseError) {
-				t.Errorf("%d: Parse() Expected %v, Got %v", i, test.parseError, err)
+			err := fs.Parse([]string{fmt.Sprintf("--%s=%s", flagName, test.arg)})
+			if test.parseError != "" {
+				if !strings.Contains(err.Error(), test.parseError) {
+					t.Errorf("%d: Parse() Expected %v, Got %v", i, test.parseError, err)
+				}
+			} else if err != nil {
+				t.Errorf("%d: Parse() Expected nil, Got %v", i, err)
 			}
-		} else if err != nil {
-			t.Errorf("%d: Parse() Expected nil, Got %v", i, err)
-		}
-		for k, v := range test.expect {
-			if actual := f.enabled.Load().(map[Feature]bool)[k]; actual != v {
-				t.Errorf("%d: expected %s=%v, Got %v", i, k, v, actual)
+			for k, v := range test.expect {
+				if actual := f.enabled.Load().(map[Feature]bool)[k]; actual != v {
+					t.Errorf("%d: expected %s=%v, Got %v", i, k, v, actual)
+				}
 			}
-		}
+		})
 	}
 }
 

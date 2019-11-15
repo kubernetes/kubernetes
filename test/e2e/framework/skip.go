@@ -28,6 +28,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
+
+	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
@@ -173,4 +175,12 @@ func serverVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface
 		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
 	}
 	return sv.AtLeast(v), nil
+}
+
+// AppArmorDistros are distros with AppArmor support
+var AppArmorDistros = []string{"gci", "ubuntu"}
+
+// SkipIfAppArmorNotSupported skips if the AppArmor is not supported by the node OS distro.
+func SkipIfAppArmorNotSupported() {
+	SkipUnlessNodeOSDistroIs(AppArmorDistros...)
 }

@@ -48,13 +48,12 @@ func parseSelectorOrDie(s string) fields.Selector {
 // buildQueryValues is a convenience function for knowing if a namespace should be in a query param or not
 func buildQueryValues(query url.Values) url.Values {
 	v := url.Values{}
-	if query != nil {
-		for key, values := range query {
-			for _, value := range values {
-				v.Add(key, value)
-			}
+	for key, values := range query {
+		for _, value := range values {
+			v.Add(key, value)
 		}
 	}
+
 	return v
 }
 

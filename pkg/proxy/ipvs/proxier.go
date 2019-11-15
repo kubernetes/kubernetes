@@ -23,12 +23,17 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"k8s.io/klog"
+	utilexec "k8s.io/utils/exec"
+	utilnet "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
@@ -38,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
@@ -50,8 +54,6 @@ import (
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
-	utilexec "k8s.io/utils/exec"
-	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -200,6 +202,7 @@ type Proxier struct {
 	serviceMap   proxy.ServiceMap
 	endpointsMap proxy.EndpointsMap
 	portsMap     map[utilproxy.LocalPort]utilproxy.Closeable
+	nodeLabels   map[string]string
 	// endpointsSynced, endpointSlicesSynced, and servicesSynced are set to true when
 	// corresponding objects are synced after startup. This is used to avoid updating
 	// ipvs rules with some partial data after kube-proxy restart.
@@ -894,6 +897,58 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 
 	// Sync unconditionally - this is called once per lifetime.
 	proxier.syncProxyRules()
+}
+
+// OnNodeAdd is called whenever creation of new node object
+// is observed.
+func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
+	if node.Name != proxier.hostname {
+		klog.Errorf("Received a watch event for a node %s that doesn't match the current node %v", node.Name, proxier.hostname)
+		return
+	}
+	oldLabels := proxier.nodeLabels
+	newLabels := node.Labels
+	proxier.mu.Lock()
+	proxier.nodeLabels = newLabels
+	proxier.mu.Unlock()
+	if !reflect.DeepEqual(oldLabels, newLabels) {
+		proxier.syncProxyRules()
+	}
+}
+
+// OnNodeUpdate is called whenever modification of an existing
+// node object is observed.
+func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
+	if node.Name != proxier.hostname {
+		klog.Errorf("Received a watch event for a node %s that doesn't match the current node %v", node.Name, proxier.hostname)
+		return
+	}
+	oldLabels := proxier.nodeLabels
+	newLabels := node.Labels
+	proxier.mu.Lock()
+	proxier.nodeLabels = newLabels
+	proxier.mu.Unlock()
+	if !reflect.DeepEqual(oldLabels, newLabels) {
+		proxier.syncProxyRules()
+	}
+}
+
+// OnNodeDelete is called whever deletion of an existing node
+// object is observed.
+func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
+	if node.Name != proxier.hostname {
+		klog.Errorf("Received a watch event for a node %s that doesn't match the current node %v", node.Name, proxier.hostname)
+		return
+	}
+	proxier.mu.Lock()
+	proxier.nodeLabels = nil
+	proxier.mu.Unlock()
+	proxier.syncProxyRules()
+}
+
+// OnNodeSynced is called once all the initial event handlers were
+// called and the state is fully propagated to local cache.
+func (proxier *Proxier) OnNodeSynced() {
 }
 
 // EntryInvalidErr indicates if an ipset entry is invalid or not
@@ -1866,7 +1921,18 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 		curEndpoints.Insert(des.String())
 	}
 
-	for _, epInfo := range proxier.endpointsMap[svcPortName] {
+	endpoints := proxier.endpointsMap[svcPortName]
+
+	// Service Topology will not be enabled in the following cases:
+	// 1. externalTrafficPolicy=Local (mutually exclusive with service topology).
+	// 2. ServiceTopology is not enabled.
+	// 3. EndpointSlice is not enabled (service topology depends on endpoint slice
+	// to get topology information).
+	if !onlyNodeLocalEndpoints && utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
+		endpoints = proxy.FilterTopologyEndpoint(proxier.nodeLabels, proxier.serviceMap[svcPortName].TopologyKeys(), endpoints)
+	}
+
+	for _, epInfo := range endpoints {
 		if onlyNodeLocalEndpoints && !epInfo.GetIsLocal() {
 			continue
 		}

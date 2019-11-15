@@ -18,6 +18,7 @@ package label
 
 import (
 	"bytes"
+	"io/ioutil"
 	"net/http"
 	"reflect"
 	"strings"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
@@ -494,5 +496,72 @@ func TestLabelMultipleObjects(t *testing.T) {
 	}
 	if strings.Count(buf.String(), "labeled") != len(pods.Items) {
 		t.Errorf("not all labels are set: %s", buf.String())
+	}
+}
+
+func TestLabelResourceVersion(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch req.Method {
+			case "GET":
+				switch req.URL.Path {
+				case "/namespaces/test/pods/foo":
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Header:     cmdtesting.DefaultHeader(),
+						Body: ioutil.NopCloser(bytes.NewBufferString(
+							`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","resourceVersion":"10"}}`,
+						))}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			case "PATCH":
+				switch req.URL.Path {
+				case "/namespaces/test/pods/foo":
+					body, err := ioutil.ReadAll(req.Body)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if !bytes.Equal(body, []byte(`{"metadata":{"labels":{"a":"b"},"resourceVersion":"10"}}`)) {
+						t.Fatalf("expected patch with resourceVersion set, got %s", string(body))
+					}
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Header:     cmdtesting.DefaultHeader(),
+						Body: ioutil.NopCloser(bytes.NewBufferString(
+							`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","resourceVersion":"11"}}`,
+						))}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			default:
+				t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdLabel(tf, iostreams)
+	cmd.SetOutput(bufOut)
+	options := NewLabelOptions(iostreams)
+	options.resourceVersion = "10"
+	args := []string{"pods/foo", "a=b"}
+	if err := options.Complete(tf, cmd, args); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := options.Validate(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := options.RunLabel(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

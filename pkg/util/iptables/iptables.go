@@ -397,7 +397,7 @@ func (runner *runner) runContext(ctx context.Context, op operation, args []strin
 	iptablesCmd := iptablesCommand(runner.protocol)
 	fullArgs := append(runner.waitFlag, string(op))
 	fullArgs = append(fullArgs, args...)
-	klog.V(5).Infof("running iptables %s %v", string(op), args)
+	klog.V(5).Infof("running iptables: %s %v", iptablesCmd, fullArgs)
 	if ctx == nil {
 		return runner.exec.Command(iptablesCmd, fullArgs...).CombinedOutput()
 	}

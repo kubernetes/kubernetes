@@ -197,8 +197,32 @@ func TestDifferentFlows(t *testing.T) {
 
 	exerciseQueueSetUniformScenario(t, "DifferentFlows", qs, []uniformClient{
 		{1001001001, 6, 10, time.Second, time.Second},
-		{2002002002, 4, 15, time.Second, time.Second / 2},
+		{2002002002, 5, 15, time.Second, time.Second / 2},
 	}, time.Second*20, true, true, clk, counter)
+}
+
+func TestDifferentFlowsWithoutQueuing(t *testing.T) {
+	now := time.Now()
+
+	clk, counter := clock.NewFakeEventClock(now, 0, nil)
+	qsf := NewQueueSetFactory(clk, counter)
+	config := fq.QueueSetConfig{
+		Name:             "TestDifferentFlowsWithoutQueuing",
+		ConcurrencyLimit: 4,
+		DesiredNumQueues: 0,
+		QueueLengthLimit: 6,
+		HandSize:         3,
+		RequestWaitLimit: 10 * time.Minute,
+	}
+	qs, err := qsf.NewQueueSet(config)
+	if err != nil {
+		t.Fatalf("QueueSet creation failed with %v", err)
+	}
+
+	exerciseQueueSetUniformScenario(t, "DifferentFlowsWithoutQueuing", qs, []uniformClient{
+		{1001001001, 6, 10, time.Second, 57 * time.Millisecond},
+		{2002002002, 4, 15, time.Second, 750 * time.Millisecond},
+	}, time.Second*13, false, false, clk, counter)
 }
 
 func TestTimeout(t *testing.T) {

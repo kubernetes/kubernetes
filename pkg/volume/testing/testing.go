@@ -411,10 +411,6 @@ func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *FakeVolumePlugin) IsMigratedToCSI() bool {
-	return false
-}
-
 func (plugin *FakeVolumePlugin) RequiresRemount() bool {
 	return false
 }
@@ -653,10 +649,6 @@ func (f *FakeBasicVolumePlugin) CanSupport(spec *Spec) bool {
 	return strings.HasPrefix(spec.Name(), f.GetPluginName())
 }
 
-func (plugin *FakeBasicVolumePlugin) IsMigratedToCSI() bool {
-	return false
-}
-
 func (f *FakeBasicVolumePlugin) ConstructVolumeSpec(ame, mountPath string) (*Spec, error) {
 	return f.Plugin.ConstructVolumeSpec(ame, mountPath)
 }
@@ -750,10 +742,6 @@ func (plugin *FakeFileVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *FakeFileVolumePlugin) IsMigratedToCSI() bool {
-	return false
-}
-
 func (plugin *FakeFileVolumePlugin) RequiresRemount() bool {
 	return false
 }
@@ -804,7 +792,8 @@ type FakeVolume struct {
 	GetDeviceMountPathCallCount int
 	SetUpDeviceCallCount        int
 	TearDownDeviceCallCount     int
-	MapDeviceCallCount          int
+	MapPodDeviceCallCount       int
+	UnmapPodDeviceCallCount     int
 	GlobalMapPathCallCount      int
 	PodDeviceMapPathCallCount   int
 }
@@ -880,11 +869,11 @@ func (fv *FakeVolume) TearDownAt(dir string) error {
 }
 
 // Block volume support
-func (fv *FakeVolume) SetUpDevice() (string, error) {
+func (fv *FakeVolume) SetUpDevice() error {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.SetUpDeviceCallCount++
-	return "", nil
+	return nil
 }
 
 // Block volume support
@@ -950,18 +939,33 @@ func (fv *FakeVolume) GetTearDownDeviceCallCount() int {
 }
 
 // Block volume support
-func (fv *FakeVolume) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, pod types.UID) error {
+func (fv *FakeVolume) UnmapPodDevice() error {
 	fv.Lock()
 	defer fv.Unlock()
-	fv.MapDeviceCallCount++
+	fv.UnmapPodDeviceCallCount++
 	return nil
 }
 
 // Block volume support
-func (fv *FakeVolume) GetMapDeviceCallCount() int {
+func (fv *FakeVolume) GetUnmapPodDeviceCallCount() int {
 	fv.RLock()
 	defer fv.RUnlock()
-	return fv.MapDeviceCallCount
+	return fv.UnmapPodDeviceCallCount
+}
+
+// Block volume support
+func (fv *FakeVolume) MapPodDevice() (string, error) {
+	fv.Lock()
+	defer fv.Unlock()
+	fv.MapPodDeviceCallCount++
+	return "", nil
+}
+
+// Block volume support
+func (fv *FakeVolume) GetMapPodDeviceCallCount() int {
+	fv.RLock()
+	defer fv.RUnlock()
+	return fv.MapPodDeviceCallCount
 }
 
 func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error) {
@@ -1138,12 +1142,12 @@ type FakeVolumePathHandler struct {
 	sync.RWMutex
 }
 
-func (fv *FakeVolumePathHandler) MapDevice(devicePath string, mapDir string, linkName string) error {
+func (fv *FakeVolumePathHandler) MapDevice(devicePath string, mapDir string, linkName string, bindMount bool) error {
 	// nil is success, else error
 	return nil
 }
 
-func (fv *FakeVolumePathHandler) UnmapDevice(mapDir string, linkName string) error {
+func (fv *FakeVolumePathHandler) UnmapDevice(mapDir string, linkName string, bindMount bool) error {
 	// nil is success, else error
 	return nil
 }
@@ -1158,7 +1162,12 @@ func (fv *FakeVolumePathHandler) IsSymlinkExist(mapPath string) (bool, error) {
 	return true, nil
 }
 
-func (fv *FakeVolumePathHandler) GetDeviceSymlinkRefs(devPath string, mapPath string) ([]string, error) {
+func (fv *FakeVolumePathHandler) IsDeviceBindMountExist(mapPath string) (bool, error) {
+	// nil is success, else error
+	return true, nil
+}
+
+func (fv *FakeVolumePathHandler) GetDeviceBindMountRefs(devPath string, mapPath string) ([]string, error) {
 	// nil is success, else error
 	return []string{}, nil
 }
@@ -1173,14 +1182,14 @@ func (fv *FakeVolumePathHandler) AttachFileDevice(path string) (string, error) {
 	return "", nil
 }
 
+func (fv *FakeVolumePathHandler) DetachFileDevice(path string) error {
+	// nil is success, else error
+	return nil
+}
+
 func (fv *FakeVolumePathHandler) GetLoopDevice(path string) (string, error) {
 	// nil is success, else error
 	return "/dev/loop1", nil
-}
-
-func (fv *FakeVolumePathHandler) RemoveLoopDevice(device string) error {
-	// nil is success, else error
-	return nil
 }
 
 // FindEmptyDirectoryUsageOnTmpfs finds the expected usage of an empty directory existing on
@@ -1488,22 +1497,22 @@ func VerifyGetPodDeviceMapPathCallCount(
 		expectedPodDeviceMapPathCallCount)
 }
 
-// VerifyGetMapDeviceCallCount ensures that at least one of the Mappers for this
-// plugin has the expectedMapDeviceCallCount number of calls. Otherwise it
+// VerifyGetMapPodDeviceCallCount ensures that at least one of the Mappers for this
+// plugin has the expectedMapPodDeviceCallCount number of calls. Otherwise it
 // returns an error.
-func VerifyGetMapDeviceCallCount(
-	expectedMapDeviceCallCount int,
+func VerifyGetMapPodDeviceCallCount(
+	expectedMapPodDeviceCallCount int,
 	fakeVolumePlugin *FakeVolumePlugin) error {
 	for _, mapper := range fakeVolumePlugin.GetBlockVolumeMapper() {
-		actualCallCount := mapper.GetMapDeviceCallCount()
-		if actualCallCount >= expectedMapDeviceCallCount {
+		actualCallCount := mapper.GetMapPodDeviceCallCount()
+		if actualCallCount >= expectedMapPodDeviceCallCount {
 			return nil
 		}
 	}
 
 	return fmt.Errorf(
-		"No Mapper have expected MapdDeviceCallCount. Expected: <%v>.",
-		expectedMapDeviceCallCount)
+		"No Mapper have expected MapPodDeviceCallCount. Expected: <%v>.",
+		expectedMapPodDeviceCallCount)
 }
 
 // GetTestVolumePluginMgr creates, initializes, and returns a test volume plugin

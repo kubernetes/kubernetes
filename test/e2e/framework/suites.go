@@ -22,6 +22,7 @@ import (
 	"path"
 	"time"
 
+	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 )
 

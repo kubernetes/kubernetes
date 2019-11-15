@@ -29,7 +29,6 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 	utilstrings "k8s.io/utils/strings"
 )
@@ -136,10 +135,6 @@ func (plugin *gcePersistentDiskPlugin) newUnmapperInternal(volName string, podUI
 		}}, nil
 }
 
-func (c *gcePersistentDiskUnmapper) TearDownDevice(mapPath, devicePath string) error {
-	return nil
-}
-
 type gcePersistentDiskUnmapper struct {
 	*gcePersistentDisk
 }
@@ -152,14 +147,6 @@ type gcePersistentDiskMapper struct {
 }
 
 var _ volume.BlockVolumeMapper = &gcePersistentDiskMapper{}
-
-func (b *gcePersistentDiskMapper) SetUpDevice() (string, error) {
-	return "", nil
-}
-
-func (b *gcePersistentDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return util.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
-}
 
 // GetGlobalMapPath returns global map path and error
 // path: plugins/kubernetes.io/{PluginName}/volumeDevices/pdName

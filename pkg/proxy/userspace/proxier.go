@@ -112,6 +112,8 @@ type asyncRunnerInterface interface {
 type Proxier struct {
 	// EndpointSlice support has not been added for this proxier yet.
 	config.NoopEndpointSliceHandler
+	// TODO(imroc): implement node handler for userspace proxier.
+	config.NoopNodeHandler
 
 	loadBalancer    LoadBalancer
 	mu              sync.Mutex // protects serviceMap

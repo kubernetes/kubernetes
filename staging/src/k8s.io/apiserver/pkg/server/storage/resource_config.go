@@ -52,6 +52,24 @@ func (o *ResourceConfig) EnableAll() {
 	}
 }
 
+// DisableMatchingVersions disables all group/versions for which the matcher function returns true. It does not modify individual resource enablement/disablement.
+func (o *ResourceConfig) DisableMatchingVersions(matcher func(gv schema.GroupVersion) bool) {
+	for k := range o.GroupVersionConfigs {
+		if matcher(k) {
+			o.GroupVersionConfigs[k] = false
+		}
+	}
+}
+
+// EnableMatchingVersions enables all group/versions for which the matcher function returns true. It does not modify individual resource enablement/disablement.
+func (o *ResourceConfig) EnableMatchingVersions(matcher func(gv schema.GroupVersion) bool) {
+	for k := range o.GroupVersionConfigs {
+		if matcher(k) {
+			o.GroupVersionConfigs[k] = true
+		}
+	}
+}
+
 // DisableVersions disables the versions entirely.
 func (o *ResourceConfig) DisableVersions(versions ...schema.GroupVersion) {
 	for _, version := range versions {

@@ -78,10 +78,6 @@ func (plugin *iscsiPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.ISCSI != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.ISCSI != nil)
 }
 
-func (plugin *iscsiPlugin) IsMigratedToCSI() bool {
-	return false
-}
-
 func (plugin *iscsiPlugin) RequiresRemount() bool {
 	return false
 }
@@ -384,14 +380,6 @@ type iscsiDiskMapper struct {
 
 var _ volume.BlockVolumeMapper = &iscsiDiskMapper{}
 
-func (b *iscsiDiskMapper) SetUpDevice() (string, error) {
-	return "", nil
-}
-
-func (b *iscsiDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return ioutil.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
-}
-
 type iscsiDiskUnmapper struct {
 	*iscsiDisk
 	exec       utilexec.Interface
@@ -399,6 +387,7 @@ type iscsiDiskUnmapper struct {
 }
 
 var _ volume.BlockVolumeUnmapper = &iscsiDiskUnmapper{}
+var _ volume.CustomBlockVolumeUnmapper = &iscsiDiskUnmapper{}
 
 // Even though iSCSI plugin has attacher/detacher implementation, iSCSI plugin
 // needs volume detach operation during TearDownDevice(). This method is only
@@ -414,6 +403,10 @@ func (c *iscsiDiskUnmapper) TearDownDevice(mapPath, _ string) error {
 		return fmt.Errorf("iscsi: failed to delete the directory: %s\nError: %v", mapPath, err)
 	}
 	klog.V(4).Infof("iscsi: successfully detached disk: %s", mapPath)
+	return nil
+}
+
+func (c *iscsiDiskUnmapper) UnmapPodDevice() error {
 	return nil
 }
 

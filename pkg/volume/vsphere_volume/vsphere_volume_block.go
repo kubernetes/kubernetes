@@ -29,7 +29,6 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 	utilstrings "k8s.io/utils/strings"
 )
@@ -133,22 +132,10 @@ type vsphereBlockVolumeMapper struct {
 	*vsphereVolume
 }
 
-func (v vsphereBlockVolumeMapper) SetUpDevice() (string, error) {
-	return "", nil
-}
-
-func (v vsphereBlockVolumeMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return util.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
-}
-
 var _ volume.BlockVolumeUnmapper = &vsphereBlockVolumeUnmapper{}
 
 type vsphereBlockVolumeUnmapper struct {
 	*vsphereVolume
-}
-
-func (v *vsphereBlockVolumeUnmapper) TearDownDevice(mapPath, devicePath string) error {
-	return nil
 }
 
 // GetGlobalMapPath returns global map path and error

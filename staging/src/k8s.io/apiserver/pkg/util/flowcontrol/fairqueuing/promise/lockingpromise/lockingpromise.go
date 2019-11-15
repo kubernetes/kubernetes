@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
-	"k8s.io/apiserver/pkg/util/promise"
+	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/promise"
 )
 
 // lockingPromise implements LockingMutable based on a condition

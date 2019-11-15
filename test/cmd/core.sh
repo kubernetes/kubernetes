@@ -896,6 +896,12 @@ run_service_tests() {
   kubectl set selector services redis-master role=padawan --dry-run -o yaml "${kube_flags[@]}"
   ! kubectl set selector services redis-master role=padawan --local -o yaml "${kube_flags[@]}" || exit 1
   kube::test::get_object_assert 'services redis-master' "{{range$service_selector_field}}{{.}}:{{end}}" "redis:master:backend:"
+  # --resource-version=<current-resource-version> succeeds
+  rv=$(kubectl get services redis-master -o jsonpath='{.metadata.resourceVersion}' "${kube_flags[@]}")
+  kubectl set selector services redis-master rvtest1=true "--resource-version=${rv}" "${kube_flags[@]}"
+  # --resource-version=<non-current-resource-version> fails
+  output_message=$(! kubectl set selector services redis-master rvtest1=true --resource-version=1 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'Conflict'
 
   ### Dump current redis-master service
   output_service=$(kubectl get service redis-master -o json "${kube_flags[@]}")
