@@ -36,6 +36,7 @@ func NewHeuristicWatchCacheSizes(expectedRAMCapacityMB int) map[schema.GroupReso
 	watchCacheSizes := make(map[schema.GroupResource]int)
 	watchCacheSizes[schema.GroupResource{Resource: "replicationcontrollers"}] = maxInt(5*clusterSize, 100)
 	watchCacheSizes[schema.GroupResource{Resource: "endpoints"}] = maxInt(10*clusterSize, 1000)
+	watchCacheSizes[schema.GroupResource{Resource: "endpointslices", Group: "discovery.k8s.io"}] = maxInt(10*clusterSize, 1000)
 	watchCacheSizes[schema.GroupResource{Resource: "nodes"}] = maxInt(5*clusterSize, 1000)
 	watchCacheSizes[schema.GroupResource{Resource: "pods"}] = maxInt(50*clusterSize, 1000)
 	watchCacheSizes[schema.GroupResource{Resource: "services"}] = maxInt(5*clusterSize, 1000)
