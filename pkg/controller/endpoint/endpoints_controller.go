@@ -50,6 +50,7 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
+	utillabels "k8s.io/kubernetes/pkg/util/labels"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -505,9 +506,9 @@ func (e *EndpointController) syncService(key string) error {
 	}
 
 	if !helper.IsServiceIPSet(service) {
-		newEndpoints.Labels[v1.IsHeadlessService] = ""
+		newEndpoints.Labels = utillabels.CloneAndAddLabel(newEndpoints.Labels, v1.IsHeadlessService, "")
 	} else {
-		delete(newEndpoints.Labels, v1.IsHeadlessService)
+		newEndpoints.Labels = utillabels.CloneAndRemoveLabel(newEndpoints.Labels, v1.IsHeadlessService)
 	}
 
 	klog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
