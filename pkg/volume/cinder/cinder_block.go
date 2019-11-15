@@ -128,10 +128,6 @@ func (plugin *cinderPlugin) newUnmapperInternal(volName string, podUID types.UID
 		}}, nil
 }
 
-func (c *cinderPluginUnmapper) TearDownDevice(mapPath, devicePath string) error {
-	return nil
-}
-
 type cinderPluginUnmapper struct {
 	*cinderVolume
 }
@@ -144,14 +140,6 @@ type cinderVolumeMapper struct {
 }
 
 var _ volume.BlockVolumeMapper = &cinderVolumeMapper{}
-
-func (b *cinderVolumeMapper) SetUpDevice() (string, error) {
-	return "", nil
-}
-
-func (b *cinderVolumeMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return nil
-}
 
 // GetGlobalMapPath returns global map path and error
 // path: plugins/kubernetes.io/{PluginName}/volumeDevices/volumeID

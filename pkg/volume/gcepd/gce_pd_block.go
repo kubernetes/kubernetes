@@ -135,10 +135,6 @@ func (plugin *gcePersistentDiskPlugin) newUnmapperInternal(volName string, podUI
 		}}, nil
 }
 
-func (c *gcePersistentDiskUnmapper) TearDownDevice(mapPath, devicePath string) error {
-	return nil
-}
-
 type gcePersistentDiskUnmapper struct {
 	*gcePersistentDisk
 }
@@ -151,14 +147,6 @@ type gcePersistentDiskMapper struct {
 }
 
 var _ volume.BlockVolumeMapper = &gcePersistentDiskMapper{}
-
-func (b *gcePersistentDiskMapper) SetUpDevice() (string, error) {
-	return "", nil
-}
-
-func (b *gcePersistentDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return nil
-}
 
 // GetGlobalMapPath returns global map path and error
 // path: plugins/kubernetes.io/{PluginName}/volumeDevices/pdName

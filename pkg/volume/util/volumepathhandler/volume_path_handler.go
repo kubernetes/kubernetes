@@ -252,7 +252,7 @@ func (v VolumePathHandler) IsSymlinkExist(mapPath string) (bool, error) {
 	if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
 		return true, nil
 	}
-	// If file exits but it's not symbolic link, return fale and no error
+	// If file exits but it's not symbolic link, return false and no error
 	return false, nil
 }
 
@@ -274,7 +274,7 @@ func (v VolumePathHandler) IsDeviceBindMountExist(mapPath string) (bool, error) 
 	if fi.Mode()&os.ModeDevice == os.ModeDevice {
 		return true, nil
 	}
-	// If file exits but it's not device, return fale and no error
+	// If file exits but it's not device, return false and no error
 	return false, nil
 }
 

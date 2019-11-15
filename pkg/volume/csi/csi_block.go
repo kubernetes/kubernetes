@@ -48,6 +48,7 @@ type csiBlockMapper struct {
 }
 
 var _ volume.BlockVolumeMapper = &csiBlockMapper{}
+var _ volume.CustomBlockVolumeMapper = &csiBlockMapper{}
 
 // GetGlobalMapPath returns a global map path (on the node) to a device file which will be symlinked to
 // Example: plugins/kubernetes.io/csi/volumeDevices/{pvname}/dev
@@ -203,26 +204,26 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 }
 
 // SetUpDevice ensures the device is attached returns path where the device is located.
-func (m *csiBlockMapper) SetUpDevice() (string, error) {
+func (m *csiBlockMapper) SetUpDevice() error {
 	if !m.plugin.blockEnabled {
-		return "", errors.New("CSIBlockVolume feature not enabled")
+		return errors.New("CSIBlockVolume feature not enabled")
 	}
 	klog.V(4).Infof(log("blockMapper.SetUpDevice called"))
 
 	// Get csiSource from spec
 	if m.spec == nil {
-		return "", errors.New(log("blockMapper.SetUpDevice spec is nil"))
+		return errors.New(log("blockMapper.SetUpDevice spec is nil"))
 	}
 
 	csiSource, err := getCSISourceFromSpec(m.spec)
 	if err != nil {
-		return "", errors.New(log("blockMapper.SetUpDevice failed to get CSI persistent source: %v", err))
+		return errors.New(log("blockMapper.SetUpDevice failed to get CSI persistent source: %v", err))
 	}
 
 	driverName := csiSource.Driver
 	skip, err := m.plugin.skipAttach(driverName)
 	if err != nil {
-		return "", errors.New(log("blockMapper.SetupDevice failed to check CSIDriver for %s: %v", driverName, err))
+		return errors.New(log("blockMapper.SetupDevice failed to check CSIDriver for %s: %v", driverName, err))
 	}
 
 	var attachment *storage.VolumeAttachment
@@ -232,7 +233,7 @@ func (m *csiBlockMapper) SetUpDevice() (string, error) {
 		attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, nodeName)
 		attachment, err = m.k8s.StorageV1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 		if err != nil {
-			return "", errors.New(log("blockMapper.SetupDevice failed to get volume attachment [id=%v]: %v", attachID, err))
+			return errors.New(log("blockMapper.SetupDevice failed to get volume attachment [id=%v]: %v", attachID, err))
 		}
 	}
 
@@ -247,29 +248,30 @@ func (m *csiBlockMapper) SetUpDevice() (string, error) {
 
 	csiClient, err := m.csiClientGetter.Get()
 	if err != nil {
-		return "", errors.New(log("blockMapper.SetUpDevice failed to get CSI client: %v", err))
+		return errors.New(log("blockMapper.SetUpDevice failed to get CSI client: %v", err))
 	}
 
 	// Call NodeStageVolume
 	stagingPath, err := m.stageVolumeForBlock(ctx, csiClient, accessMode, csiSource, attachment)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	// Call NodePublishVolume
-	publishPath, err := m.publishVolumeForBlock(ctx, csiClient, accessMode, csiSource, attachment, stagingPath)
+	_, err = m.publishVolumeForBlock(ctx, csiClient, accessMode, csiSource, attachment, stagingPath)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	return publishPath, nil
-}
-
-func (m *csiBlockMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
 	return nil
 }
 
+func (m *csiBlockMapper) MapPodDevice() (string, error) {
+	return m.getPublishPath(), nil
+}
+
 var _ volume.BlockVolumeUnmapper = &csiBlockMapper{}
+var _ volume.CustomBlockVolumeUnmapper = &csiBlockMapper{}
 
 // unpublishVolumeForBlock unpublishes a block volume from publishPath
 func (m *csiBlockMapper) unpublishVolumeForBlock(ctx context.Context, csi csiClient, publishPath string) error {
@@ -360,5 +362,10 @@ func (m *csiBlockMapper) TearDownDevice(globalMapPath, devicePath string) error 
 		}
 	}
 
+	return nil
+}
+
+// UnmapPodDevice unmaps the block device path.
+func (m *csiBlockMapper) UnmapPodDevice() error {
 	return nil
 }

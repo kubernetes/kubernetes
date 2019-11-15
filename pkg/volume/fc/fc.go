@@ -414,20 +414,13 @@ type fcDiskMapper struct {
 
 var _ volume.BlockVolumeMapper = &fcDiskMapper{}
 
-func (b *fcDiskMapper) SetUpDevice() (string, error) {
-	return "", nil
-}
-
-func (b *fcDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return nil
-}
-
 type fcDiskUnmapper struct {
 	*fcDisk
 	deviceUtil util.DeviceUtil
 }
 
 var _ volume.BlockVolumeUnmapper = &fcDiskUnmapper{}
+var _ volume.CustomBlockVolumeUnmapper = &fcDiskUnmapper{}
 
 func (c *fcDiskUnmapper) TearDownDevice(mapPath, devicePath string) error {
 	err := c.manager.DetachBlockFCDisk(*c, mapPath, devicePath)
@@ -439,6 +432,10 @@ func (c *fcDiskUnmapper) TearDownDevice(mapPath, devicePath string) error {
 		return fmt.Errorf("fc: failed to delete the directory: %s\nError: %v", mapPath, err)
 	}
 	klog.V(4).Infof("fc: successfully detached disk: %s", mapPath)
+	return nil
+}
+
+func (c *fcDiskUnmapper) UnmapPodDevice() error {
 	return nil
 }
 
