@@ -110,10 +110,6 @@ func (plugin *quobytePlugin) CanSupport(spec *volume.Spec) bool {
 	return false
 }
 
-func (plugin *quobytePlugin) IsMigratedToCSI() bool {
-	return false
-}
-
 func (plugin *quobytePlugin) RequiresRemount() bool {
 	return false
 }

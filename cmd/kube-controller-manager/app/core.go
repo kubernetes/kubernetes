@@ -65,6 +65,7 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/generic"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 	netutils "k8s.io/utils/net"
 )
 
@@ -254,10 +255,14 @@ func startRouteController(ctx ControllerContext) (http.Handler, bool, error) {
 }
 
 func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler, bool, error) {
+	plugins, err := ProbeControllerVolumePlugins(ctx.Cloud, ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to probe volume plugins when starting persistentvolume controller: %v", err)
+	}
 	params := persistentvolumecontroller.ControllerParameters{
 		KubeClient:                ctx.ClientBuilder.ClientOrDie("persistent-volume-binder"),
 		SyncPeriod:                ctx.ComponentConfig.PersistentVolumeBinderController.PVClaimBinderSyncPeriod.Duration,
-		VolumePlugins:             ProbeControllerVolumePlugins(ctx.Cloud, ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
+		VolumePlugins:             plugins,
 		Cloud:                     ctx.Cloud,
 		ClusterName:               ctx.ComponentConfig.KubeCloudShared.ClusterName,
 		VolumeInformer:            ctx.InformerFactory.Core().V1().PersistentVolumes(),
@@ -291,6 +296,11 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 		csiDriverInformer = ctx.InformerFactory.Storage().V1beta1().CSIDrivers()
 	}
 
+	plugins, err := ProbeAttachableVolumePlugins()
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to probe volume plugins when starting attach/detach controller: %v", err)
+	}
+
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
 			ctx.ClientBuilder.ClientOrDie("attachdetach-controller"),
@@ -301,7 +311,7 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 			csiNodeInformer,
 			csiDriverInformer,
 			ctx.Cloud,
-			ProbeAttachableVolumePlugins(),
+			plugins,
 			GetDynamicPluginProber(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
 			ctx.ComponentConfig.AttachDetachController.DisableAttachDetachReconcilerSync,
 			ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
@@ -316,17 +326,23 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 
 func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, error) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+		plugins, err := ProbeExpandableVolumePlugins(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
+		if err != nil {
+			return nil, true, fmt.Errorf("failed to probe volume plugins when starting volume expand controller: %v", err)
+		}
+		csiTranslator := csitrans.New()
 		expandController, expandControllerErr := expand.NewExpandController(
 			ctx.ClientBuilder.ClientOrDie("expand-controller"),
 			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 			ctx.InformerFactory.Core().V1().PersistentVolumes(),
 			ctx.InformerFactory.Storage().V1().StorageClasses(),
 			ctx.Cloud,
-			ProbeExpandableVolumePlugins(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
-			csitrans.New())
+			plugins,
+			csiTranslator,
+			csimigration.NewPluginManager(csiTranslator))
 
 		if expandControllerErr != nil {
-			return nil, true, fmt.Errorf("failed to start volume expand controller : %v", expandControllerErr)
+			return nil, true, fmt.Errorf("failed to start volume expand controller: %v", expandControllerErr)
 		}
 		go expandController.Run(ctx.Stop)
 		return nil, true, nil

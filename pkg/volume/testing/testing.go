@@ -411,10 +411,6 @@ func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *FakeVolumePlugin) IsMigratedToCSI() bool {
-	return false
-}
-
 func (plugin *FakeVolumePlugin) RequiresRemount() bool {
 	return false
 }
@@ -653,10 +649,6 @@ func (f *FakeBasicVolumePlugin) CanSupport(spec *Spec) bool {
 	return strings.HasPrefix(spec.Name(), f.GetPluginName())
 }
 
-func (plugin *FakeBasicVolumePlugin) IsMigratedToCSI() bool {
-	return false
-}
-
 func (f *FakeBasicVolumePlugin) ConstructVolumeSpec(ame, mountPath string) (*Spec, error) {
 	return f.Plugin.ConstructVolumeSpec(ame, mountPath)
 }
@@ -748,10 +740,6 @@ func (plugin *FakeFileVolumePlugin) GetVolumeName(spec *Spec) (string, error) {
 
 func (plugin *FakeFileVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
-}
-
-func (plugin *FakeFileVolumePlugin) IsMigratedToCSI() bool {
-	return false
 }
 
 func (plugin *FakeFileVolumePlugin) RequiresRemount() bool {

@@ -52,7 +52,8 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 		nil, /* prober */
 		false,
 		5*time.Second,
-		DefaultTimerConfig)
+		DefaultTimerConfig,
+	)
 
 	// Assert
 	if err != nil {

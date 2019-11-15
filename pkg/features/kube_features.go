@@ -389,11 +389,25 @@ const (
 	// Enables the GCE PD in-tree driver to GCE CSI Driver migration feature.
 	CSIMigrationGCE featuregate.Feature = "CSIMigrationGCE"
 
+	// owner: @davidz627
+	// alpha: v1.17
+	//
+	// Disables the GCE PD in-tree driver.
+	// Expects GCE PD CSI Driver to be installed and configured on all nodes.
+	CSIMigrationGCEComplete featuregate.Feature = "CSIMigrationGCEComplete"
+
 	// owner: @leakingtapan
 	// alpha: v1.14
 	//
 	// Enables the AWS EBS in-tree driver to AWS EBS CSI Driver migration feature.
 	CSIMigrationAWS featuregate.Feature = "CSIMigrationAWS"
+
+	// owner: @leakingtapan
+	// alpha: v1.17
+	//
+	// Disables the AWS EBS in-tree driver.
+	// Expects AWS EBS CSI Driver to be installed and configured on all nodes.
+	CSIMigrationAWSComplete featuregate.Feature = "CSIMigrationAWSComplete"
 
 	// owner: @andyzhangx
 	// alpha: v1.15
@@ -402,10 +416,24 @@ const (
 	CSIMigrationAzureDisk featuregate.Feature = "CSIMigrationAzureDisk"
 
 	// owner: @andyzhangx
+	// alpha: v1.17
+	//
+	// Disables the Azure Disk in-tree driver.
+	// Expects Azure Disk CSI Driver to be installed and configured on all nodes.
+	CSIMigrationAzureDiskComplete featuregate.Feature = "CSIMigrationAzureDiskComplete"
+
+	// owner: @andyzhangx
 	// alpha: v1.15
 	//
 	// Enables the Azure File in-tree driver to Azure File Driver migration feature.
 	CSIMigrationAzureFile featuregate.Feature = "CSIMigrationAzureFile"
+
+	// owner: @andyzhangx
+	// alpha: v1.17
+	//
+	// Disables the Azure File in-tree driver.
+	// Expects Azure File CSI Driver to be installed and configured on all nodes.
+	CSIMigrationAzureFileComplete featuregate.Feature = "CSIMigrationAzureFileComplete"
 
 	// owner: @RobertKrawitz
 	// beta: v1.15
@@ -432,6 +460,13 @@ const (
 	//
 	// Enables the OpenStack Cinder in-tree driver to OpenStack Cinder CSI Driver migration feature.
 	CSIMigrationOpenStack featuregate.Feature = "CSIMigrationOpenStack"
+
+	// owner: @adisky
+	// alpha: v1.17
+	//
+	// Disables the OpenStack Cinder in-tree driver.
+	// Expects the OpenStack Cinder CSI Driver to be installed and configured on all nodes.
+	CSIMigrationOpenStackComplete featuregate.Feature = "CSIMigrationOpenStackComplete"
 
 	// owner: @MrHohn
 	// alpha: v1.15
@@ -552,11 +587,16 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CRIContainerLogRotation:        {Default: true, PreRelease: featuregate.Beta},
 	CSIMigration:                   {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationGCE:                {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationGCEComplete:        {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAWS:                {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationAWSComplete:        {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAzureDisk:          {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationAzureDiskComplete:  {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAzureFile:          {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationAzureFileComplete:  {Default: false, PreRelease: featuregate.Alpha},
 	RunAsGroup:                     {Default: true, PreRelease: featuregate.Beta},
 	CSIMigrationOpenStack:          {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationOpenStackComplete:  {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSubpath:                  {Default: true, PreRelease: featuregate.GA},
 	BalanceAttachedNodeVolumes:     {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSubpathEnvExpansion:      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19,
