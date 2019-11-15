@@ -290,9 +290,11 @@ func (r *reconciler) reconcileByPortMapping(
 				// if no endpoints desired in this slice, mark for deletion
 				sliceNamesToDelete.Insert(existingSlice.Name)
 			} else {
-				// otherwise, mark for update
-				existingSlice.Endpoints = newEndpoints
-				sliceNamesToUpdate.Insert(existingSlice.Name)
+				// otherwise, copy and mark for update
+				epSlice := existingSlice.DeepCopy()
+				epSlice.Endpoints = newEndpoints
+				slicesByName[existingSlice.Name] = epSlice
+				sliceNamesToUpdate.Insert(epSlice.Name)
 			}
 		} else {
 			// slices with no changes will be useful if there are leftover endpoints
@@ -344,6 +346,10 @@ func (r *reconciler) reconcileByPortMapping(
 		// If we didn't find a sliceToFill, generate a new empty one.
 		if sliceToFill == nil {
 			sliceToFill = newEndpointSlice(service, endpointMeta)
+		} else {
+			// deep copy required to modify this slice.
+			sliceToFill = sliceToFill.DeepCopy()
+			slicesByName[sliceToFill.Name] = sliceToFill
 		}
 
 		// Fill the slice up with remaining endpoints.

@@ -18,6 +18,7 @@ package endpointslice
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -239,6 +241,8 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 		AddressType: discovery.AddressTypeIPv4,
 	}}
 
+	cmc := newCacheMutationCheck(endpointSlices)
+
 	// need to add them to both store and fake clientset
 	for _, endpointSlice := range endpointSlices {
 		err := esController.endpointSliceStore.Add(endpointSlice)
@@ -262,6 +266,9 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 	// only 2 slices should match, 2 should be deleted, 1 should be updated as a placeholder
 	expectAction(t, client.Actions(), numActionsBefore, "update", "endpointslices")
 	expectAction(t, client.Actions(), numActionsBefore+1, "delete", "endpointslices")
+
+	// ensure cache mutation has not occurred
+	cmc.Check(t)
 }
 
 // Ensure SyncService handles a variety of protocols and IPs appropriately.
@@ -316,17 +323,17 @@ func TestSyncServiceFull(t *testing.T) {
 	assert.Len(t, slice.Endpoints, 1, "Expected 1 endpoints in first slice")
 	assert.Equal(t, slice.Annotations["endpoints.kubernetes.io/last-change-trigger-time"], serviceCreateTime.Format(time.RFC3339Nano))
 	assert.EqualValues(t, []discovery.EndpointPort{{
-		Name:     strPtr("sctp-example"),
+		Name:     utilpointer.StringPtr("sctp-example"),
 		Protocol: protoPtr(v1.ProtocolSCTP),
-		Port:     int32Ptr(int32(3456)),
+		Port:     utilpointer.Int32Ptr(int32(3456)),
 	}, {
-		Name:     strPtr("udp-example"),
+		Name:     utilpointer.StringPtr("udp-example"),
 		Protocol: protoPtr(v1.ProtocolUDP),
-		Port:     int32Ptr(int32(161)),
+		Port:     utilpointer.Int32Ptr(int32(161)),
 	}, {
-		Name:     strPtr("tcp-example"),
+		Name:     utilpointer.StringPtr("tcp-example"),
 		Protocol: protoPtr(v1.ProtocolTCP),
-		Port:     int32Ptr(int32(80)),
+		Port:     utilpointer.Int32Ptr(int32(80)),
 	}}, slice.Ports)
 
 	assert.ElementsMatch(t, []discovery.Endpoint{{
@@ -382,14 +389,49 @@ func expectAction(t *testing.T, actions []k8stesting.Action, index int, verb, re
 	}
 }
 
-func strPtr(str string) *string {
-	return &str
-}
-
+// protoPtr takes a Protocol and returns a pointer to it.
 func protoPtr(proto v1.Protocol) *v1.Protocol {
 	return &proto
 }
 
-func int32Ptr(num int32) *int32 {
-	return &num
+// cacheMutationCheck helps ensure that cached objects have not been changed
+// in any way throughout a test run.
+type cacheMutationCheck struct {
+	objects []cacheObject
+}
+
+// cacheObject stores a reference to an original object as well as a deep copy
+// of that object to track any mutations in the original object.
+type cacheObject struct {
+	original runtime.Object
+	deepCopy runtime.Object
+}
+
+// newCacheMutationCheck initializes a cacheMutationCheck with EndpointSlices.
+func newCacheMutationCheck(endpointSlices []*discovery.EndpointSlice) cacheMutationCheck {
+	cmc := cacheMutationCheck{}
+	for _, endpointSlice := range endpointSlices {
+		cmc.Add(endpointSlice)
+	}
+	return cmc
+}
+
+// Add appends a runtime.Object and a deep copy of that object into the
+// cacheMutationCheck.
+func (cmc *cacheMutationCheck) Add(o runtime.Object) {
+	cmc.objects = append(cmc.objects, cacheObject{
+		original: o,
+		deepCopy: o.DeepCopyObject(),
+	})
+}
+
+// Check verifies that no objects in the cacheMutationCheck have been mutated.
+func (cmc *cacheMutationCheck) Check(t *testing.T) {
+	for _, o := range cmc.objects {
+		if !reflect.DeepEqual(o.original, o.deepCopy) {
+			// Cached objects can't be safely mutated and instead should be deep
+			// copied before changed in any way.
+			t.Errorf("Cached object was unexpectedly mutated. Original: %+v, Mutated: %+v", o.deepCopy, o.original)
+		}
+	}
 }
