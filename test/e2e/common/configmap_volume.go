@@ -39,7 +39,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST default to 0x644.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func() {
-		doConfigMapE2EWithoutMappings(f, 0, 0, nil)
+		doConfigMapE2EWithoutMappings(f, false, 0, nil)
 	})
 
 	/*
@@ -50,14 +50,14 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func() {
 		defaultMode := int32(0400)
-		doConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
+		doConfigMapE2EWithoutMappings(f, false, 0, &defaultMode)
 	})
 
 	ginkgo.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeFeature:FSGroup]", func() {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
 		framework.SkipIfNodeOSDistroIs("windows")
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
-		doConfigMapE2EWithoutMappings(f, 1000, 1001, &defaultMode)
+		doConfigMapE2EWithoutMappings(f, true, 1001, &defaultMode)
 	})
 
 	/*
@@ -67,13 +67,14 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		This test is marked LinuxOnly since Windows does not support running as UID / GID.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume as non-root [LinuxOnly] [NodeConformance]", func() {
-		doConfigMapE2EWithoutMappings(f, 1000, 0, nil)
+		// TODO(claudiub): Remove [LinuxOnly] tag when the WindowsRunAsUserName feature gate is enabled by default.
+		doConfigMapE2EWithoutMappings(f, true, 0, nil)
 	})
 
 	ginkgo.It("should be consumable from pods in volume as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]", func() {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		framework.SkipIfNodeOSDistroIs("windows")
-		doConfigMapE2EWithoutMappings(f, 1000, 1001, nil)
+		doConfigMapE2EWithoutMappings(f, true, 1001, nil)
 	})
 
 	/*
@@ -82,7 +83,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST default to 0x644.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func() {
-		doConfigMapE2EWithMappings(f, 0, 0, nil)
+		doConfigMapE2EWithMappings(f, false, 0, nil)
 	})
 
 	/*
@@ -93,7 +94,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [LinuxOnly] [NodeConformance]", func() {
 		mode := int32(0400)
-		doConfigMapE2EWithMappings(f, 0, 0, &mode)
+		doConfigMapE2EWithMappings(f, false, 0, &mode)
 	})
 
 	/*
@@ -103,13 +104,14 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		This test is marked LinuxOnly since Windows does not support running as UID / GID.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [LinuxOnly] [NodeConformance]", func() {
-		doConfigMapE2EWithMappings(f, 1000, 0, nil)
+		// TODO(claudiub): Remove [LinuxOnly] tag when the WindowsRunAsUserName feature gate is enabled by default.
+		doConfigMapE2EWithMappings(f, true, 0, nil)
 	})
 
 	ginkgo.It("should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]", func() {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		framework.SkipIfNodeOSDistroIs("windows")
-		doConfigMapE2EWithMappings(f, 1000, 1001, nil)
+		doConfigMapE2EWithMappings(f, true, 1001, nil)
 	})
 
 	/*
@@ -586,8 +588,7 @@ func newConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
 	}
 }
 
-func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, defaultMode *int32) {
-	userID := int64(uid)
+func doConfigMapE2EWithoutMappings(f *framework.Framework, asUser bool, fsGroup int64, defaultMode *int32) {
 	groupID := int64(fsGroup)
 
 	var (
@@ -642,8 +643,8 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, d
 		},
 	}
 
-	if userID != 0 {
-		pod.Spec.SecurityContext.RunAsUser = &userID
+	if asUser {
+		setPodNonRootUser(pod)
 	}
 
 	if groupID != 0 {
@@ -662,8 +663,7 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, d
 	f.TestContainerOutputRegexp("consume configMaps", pod, 0, output)
 }
 
-func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, itemMode *int32) {
-	userID := int64(uid)
+func doConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fsGroup int64, itemMode *int32) {
 	groupID := int64(fsGroup)
 
 	var (
@@ -725,8 +725,8 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, item
 		},
 	}
 
-	if userID != 0 {
-		pod.Spec.SecurityContext.RunAsUser = &userID
+	if asUser {
+		setPodNonRootUser(pod)
 	}
 
 	if groupID != 0 {
