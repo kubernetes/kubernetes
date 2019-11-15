@@ -245,8 +245,24 @@ func ValidateFlowSchemaResourcePolicyRule(rule *flowcontrol.ResourcePolicyRule, 
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("resources"), rule.Resources, "if '*' is present, must not specify other resources"))
 	}
 
+	if len(rule.Namespaces) == 0 && !rule.ClusterScope {
+		allErrs = append(allErrs, field.Required(fldPath.Child("namespaces"), "resource rules that are not cluster scoped must supply at least one namespace"))
+	} else if hasWildcard(rule.Namespaces) {
+		if len(rule.Namespaces) > 1 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespaces"), rule.Namespaces, "if '*' is present, must not specify other namespaces"))
+		}
+	} else {
+		for idx, tgtNS := range rule.Namespaces {
+			for _, msg := range apimachineryvalidation.ValidateNamespaceName(tgtNS, false) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("namespaces").Index(idx), tgtNS, nsErrIntro+msg))
+			}
+		}
+	}
+
 	return allErrs
 }
+
+const nsErrIntro = "each member of this list must be '*' or a DNS-1123 label; "
 
 // ValidateFlowSchemaStatus validates status for the flow-schema.
 func ValidateFlowSchemaStatus(status *flowcontrol.FlowSchemaStatus, fldPath *field.Path) field.ErrorList {
@@ -424,8 +440,12 @@ func ValidateNonResourceURLPath(path string, fldPath *field.Path) *field.Error {
 }
 
 func hasWildcard(operations []string) bool {
-	for _, o := range operations {
-		if o == "*" {
+	return memberInList("*", operations...)
+}
+
+func memberInList(seek string, a ...string) bool {
+	for _, ai := range a {
+		if ai == seek {
 			return true
 		}
 	}
