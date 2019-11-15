@@ -600,14 +600,16 @@ func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
 		klog.Errorf("Received a watch event for a node %s that doesn't match the current node %v", node.Name, proxier.hostname)
 		return
 	}
-	oldLabels := proxier.nodeLabels
-	newLabels := node.Labels
-	proxier.mu.Lock()
-	proxier.nodeLabels = newLabels
-	proxier.mu.Unlock()
-	if !reflect.DeepEqual(oldLabels, newLabels) {
-		proxier.syncProxyRules()
+
+	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
+		return
 	}
+
+	proxier.mu.Lock()
+	proxier.nodeLabels = node.Labels
+	proxier.mu.Unlock()
+
+	proxier.syncProxyRules()
 }
 
 // OnNodeUpdate is called whenever modification of an existing
@@ -617,14 +619,16 @@ func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
 		klog.Errorf("Received a watch event for a node %s that doesn't match the current node %v", node.Name, proxier.hostname)
 		return
 	}
-	oldLabels := proxier.nodeLabels
-	newLabels := node.Labels
-	proxier.mu.Lock()
-	proxier.nodeLabels = newLabels
-	proxier.mu.Unlock()
-	if !reflect.DeepEqual(oldLabels, newLabels) {
-		proxier.syncProxyRules()
+
+	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
+		return
 	}
+
+	proxier.mu.Lock()
+	proxier.nodeLabels = node.Labels
+	proxier.mu.Unlock()
+
+	proxier.syncProxyRules()
 }
 
 // OnNodeDelete is called whever deletion of an existing node
@@ -637,6 +641,7 @@ func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 	proxier.mu.Lock()
 	proxier.nodeLabels = nil
 	proxier.mu.Unlock()
+
 	proxier.syncProxyRules()
 }
 
