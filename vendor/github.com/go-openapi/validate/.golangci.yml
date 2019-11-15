@@ -4,17 +4,25 @@ linters-settings:
   golint:
     min-confidence: 0
   gocyclo:
-    min-complexity: 25
+    min-complexity: 50
   maligned:
     suggest-new: true
   dupl:
     threshold: 100
   goconst:
     min-len: 2
-    min-occurrences: 2
+    min-occurrences: 3
 
 linters:
   enable-all: true
   disable:
     - maligned
     - lll
+    - godox
+    - gocognit
+    - whitespace
+    - wsl
+    - funlen
+    - gochecknoglobals
+    - gochecknoinits
+    - scopelint
