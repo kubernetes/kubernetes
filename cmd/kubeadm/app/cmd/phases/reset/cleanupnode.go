@@ -128,7 +128,7 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 	fmt.Printf("[reset] Deleting contents of config directories: %v\n", dirsToClean)
 	for _, dir := range dirsToClean {
 		if err := CleanDir(dir); err != nil {
-			klog.Warningf("[reset] Failed to remove directory: %q [%v]\n", dir, err)
+			klog.Warningf("[reset] Failed to delete contents of %q directory: %v", dir, err)
 		}
 	}
 
