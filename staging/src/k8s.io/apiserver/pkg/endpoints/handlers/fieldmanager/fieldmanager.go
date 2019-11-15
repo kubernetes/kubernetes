@@ -17,10 +17,7 @@ limitations under the License.
 package fieldmanager
 
 import (
-	"encoding/json"
 	"fmt"
-	"math"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -109,19 +106,6 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (o
 		return newObj, nil
 	}
 
-	acc, _ := meta.Accessor(newObj)
-	annotations := acc.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-	delete(annotations, "my-veryown-annotations")
-	acc.SetAnnotations(annotations)
-	js, _ := json.Marshal(newObj)
-	annotations["my-veryown-annotations"] = strings.Repeat("a", int(0.3*math.Pow10(int(math.Log10(float64(len(js)))))))
-
-	acc.SetAnnotations(annotations)
-	return newObj, nil
-
 	// First try to decode the managed fields provided in the update,
 	// This is necessary to allow directly updating managed fields.
 	var managed Managed
@@ -146,7 +130,7 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (o
 		return nil, fmt.Errorf("failed to encode managed fields: %v", err)
 	}
 
-	return object, nil
+	return newObj, nil
 }
 
 // Apply is used when server-side apply is called, as it merges the
