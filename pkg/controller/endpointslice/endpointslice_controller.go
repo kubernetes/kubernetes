@@ -311,11 +311,16 @@ func (c *Controller) syncService(key string) error {
 	// ensureSetupManagedByAnnotation() to set up LabelManagedBy on each
 	// EndpointSlice.
 	// TODO(robscott): Remove this before v1.18.
-	err = c.ensureSetupManagedByAnnotation(service)
+	changed, err := c.ensureSetupManagedByAnnotation(service)
 	if err != nil {
 		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToSetEndpointSliceManagedByLabel",
 			"Error adding managed-by Label to Endpoint Slices for Service %s/%s: %v", service.Namespace, service.Name, err)
 		return err
+	}
+	if changed {
+		// we made changes to the service, and potentially to endpointslices
+		// return early and wait until the watch event on the service triggers our sync loop again
+		return nil
 	}
 
 	esLabelSelector := labels.Set(map[string]string{
@@ -378,9 +383,9 @@ func (c *Controller) onServiceDelete(obj interface{}) {
 // function provides backwards compatibility with the initial alpha release of
 // EndpointSlices that did not include these labels.
 // TODO(robscott): Remove this in time for v1.18.
-func (c *Controller) ensureSetupManagedByAnnotation(service *v1.Service) error {
+func (c *Controller) ensureSetupManagedByAnnotation(service *v1.Service) (bool, error) {
 	if managedBySetup, ok := service.Annotations[managedBySetupAnnotation]; ok && managedBySetup == managedBySetupCompleteValue {
-		return nil
+		return false, nil
 	}
 
 	esLabelSelector := labels.Set(map[string]string{discovery.LabelServiceName: service.Name}).AsSelectorPreValidated()
@@ -389,11 +394,13 @@ func (c *Controller) ensureSetupManagedByAnnotation(service *v1.Service) error {
 	if err != nil {
 		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToListEndpointSlices",
 			"Error listing Endpoint Slices for Service %s/%s: %v", service.Namespace, service.Name, err)
-		return err
+		return false, err
 	}
 
 	for _, endpointSlice := range endpointSlices {
 		if _, ok := endpointSlice.Labels[discovery.LabelManagedBy]; !ok {
+			// shared object, copy before changing
+			endpointSlice = endpointSlice.DeepCopy()
 			if endpointSlice.Labels == nil {
 				endpointSlice.Labels = make(map[string]string)
 			}
@@ -401,18 +408,20 @@ func (c *Controller) ensureSetupManagedByAnnotation(service *v1.Service) error {
 			endpointSlice.Labels[discovery.LabelManagedBy] = controllerName
 			_, err = c.client.DiscoveryV1beta1().EndpointSlices(endpointSlice.Namespace).Update(endpointSlice)
 			if err != nil {
-				return err
+				return false, err
 			}
 		}
 	}
 
+	// shared object, copy before changing
+	service = service.DeepCopy()
 	if service.Annotations == nil {
 		service.Annotations = make(map[string]string)
 	}
 
 	service.Annotations[managedBySetupAnnotation] = managedBySetupCompleteValue
 	_, err = c.client.CoreV1().Services(service.Namespace).Update(service)
-	return err
+	return true, err
 }
 
 func (c *Controller) addPod(obj interface{}) {

@@ -183,7 +183,7 @@ func TestSyncServicePodSelection(t *testing.T) {
 }
 
 // Ensure SyncService correctly selects and labels EndpointSlices.
-func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
+func TestSyncServiceEndpointSliceLabelSelectionSetup(t *testing.T) {
 	client, esController := newController([]string{"node-1"})
 	ns := metav1.NamespaceDefault
 	serviceName := "testing-1"
@@ -256,8 +256,8 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 	numActionsBefore := len(client.Actions()) + 1
 	standardSyncService(t, esController, ns, serviceName, "false")
 
-	if len(client.Actions()) != numActionsBefore+5 {
-		t.Errorf("Expected 5 more actions, got %d", len(client.Actions())-numActionsBefore)
+	if len(client.Actions()) != numActionsBefore+2 {
+		t.Errorf("Expected 2 more actions, got %d", len(client.Actions())-numActionsBefore)
 	}
 
 	// endpointslice should have LabelsManagedBy set as part of update.
@@ -265,11 +265,91 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 
 	// service should have managedBySetupAnnotation set as part of update.
 	expectAction(t, client.Actions(), numActionsBefore+1, "update", "services")
+}
+
+// Ensure SyncService correctly selects and labels EndpointSlices.
+func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
+	client, esController := newController([]string{"node-1"})
+	ns := metav1.NamespaceDefault
+	serviceName := "testing-1"
+
+	// 5 slices, 3 with matching labels for our service
+	endpointSlices := []*discovery.EndpointSlice{{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "matching-1",
+			Namespace: ns,
+			Labels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				discovery.LabelManagedBy:   controllerName,
+			},
+		},
+		AddressType: discovery.AddressTypeIPv4,
+	}, {
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "matching-2",
+			Namespace: ns,
+			Labels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				discovery.LabelManagedBy:   controllerName,
+			},
+		},
+		AddressType: discovery.AddressTypeIPv4,
+	}, {
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "partially-matching-1",
+			Namespace: ns,
+			Labels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				discovery.LabelManagedBy:   controllerName,
+			},
+		},
+		AddressType: discovery.AddressTypeIPv4,
+	}, {
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "not-matching-1",
+			Namespace: ns,
+			Labels: map[string]string{
+				discovery.LabelServiceName: "something-else",
+				discovery.LabelManagedBy:   controllerName,
+			},
+		},
+		AddressType: discovery.AddressTypeIPv4,
+	}, {
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "not-matching-2",
+			Namespace: ns,
+			Labels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				discovery.LabelManagedBy:   "something-else",
+			},
+		},
+		AddressType: discovery.AddressTypeIPv4,
+	}}
+
+	// need to add them to both store and fake clientset
+	for _, endpointSlice := range endpointSlices {
+		err := esController.endpointSliceStore.Add(endpointSlice)
+		if err != nil {
+			t.Fatalf("Expected no error adding EndpointSlice: %v", err)
+		}
+		_, err = client.DiscoveryV1beta1().EndpointSlices(ns).Create(endpointSlice)
+		if err != nil {
+			t.Fatalf("Expected no error creating EndpointSlice: %v", err)
+		}
+	}
+
+	// +1 for extra action involved in Service creation before syncService call.
+	numActionsBefore := len(client.Actions()) + 1
+	standardSyncService(t, esController, ns, serviceName, "true")
+
+	if len(client.Actions()) != numActionsBefore+3 {
+		t.Errorf("Expected 3 more actions, got %d", len(client.Actions())-numActionsBefore)
+	}
 
 	// only 3 slices should match, 2 of those should be deleted, 1 should be updated as a placeholder
-	expectAction(t, client.Actions(), numActionsBefore+2, "update", "endpointslices")
-	expectAction(t, client.Actions(), numActionsBefore+3, "delete", "endpointslices")
-	expectAction(t, client.Actions(), numActionsBefore+4, "delete", "endpointslices")
+	expectAction(t, client.Actions(), numActionsBefore+0, "update", "endpointslices")
+	expectAction(t, client.Actions(), numActionsBefore+1, "delete", "endpointslices")
+	expectAction(t, client.Actions(), numActionsBefore+2, "delete", "endpointslices")
 }
 
 // Ensure SyncService handles a variety of protocols and IPs appropriately.
@@ -294,6 +374,7 @@ func TestSyncServiceFull(t *testing.T) {
 			Name:              serviceName,
 			Namespace:         namespace,
 			CreationTimestamp: metav1.NewTime(serviceCreateTime),
+			Annotations:       map[string]string{managedBySetupAnnotation: "true"},
 		},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{
