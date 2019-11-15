@@ -21,6 +21,7 @@ go_test(
         "//pkg/apis/coordination:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/discovery:go_default_library",
+        "//pkg/apis/flowcontrol:go_default_library",
         "//pkg/apis/networking:go_default_library",
         "//pkg/apis/node:go_default_library",
         "//pkg/apis/policy:go_default_library",
@@ -65,6 +66,8 @@ go_library(
         "//pkg/apis/discovery/install:go_default_library",
         "//pkg/apis/events/install:go_default_library",
         "//pkg/apis/extensions/install:go_default_library",
+        "//pkg/apis/flowcontrol:go_default_library",
+        "//pkg/apis/flowcontrol/util:go_default_library",
         "//pkg/apis/networking:go_default_library",
         "//pkg/apis/node:go_default_library",
         "//pkg/apis/policy:go_default_library",
@@ -88,6 +91,7 @@ go_library(
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/discovery/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/flowcontrol/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/scheduling/v1:go_default_library",
@@ -99,6 +103,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/duration:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
     ],
 )
 

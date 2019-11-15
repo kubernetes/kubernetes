@@ -129,8 +129,6 @@ var missingHanlders = sets.NewString(
 	"PriorityClass",
 	"PodPreset",
 	"AuditSink",
-	"FlowSchema",                 // TODO(yue9944882): remove this comment by merging print-handler for flow-control API
-	"PriorityLevelConfiguration", // TODO(yue9944882): remove this comment by merging print-handler for flow-control API
 )
 
 // known types that are no longer served we should tolerate restmapper errors for
