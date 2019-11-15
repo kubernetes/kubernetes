@@ -252,20 +252,22 @@
             "port": "79",
             "host": "80"
           }
-        }
+        },
+        "type": "9Ȏ瀮"
       },
       "terminationMessagePath": "81",
-      "terminationMessagePolicy": "Ņ£",
+      "terminationMessagePolicy": "/",
+      "imagePullPolicy": "Ō¾\\ĒP鄸靇杧ž譋娲瘹ɭ",
       "securityContext": {
         "capabilities": {
           "add": [
-            "2Ō¾\\ĒP鄸靇杧ž"
+            "Ɏ(dɅ囥"
           ],
           "drop": [
-            "娲瘹ɭȊɚɎ(dɅ囥糷磩窮秳ķ蟒苾h^"
+            "磩窮秳ķ蟒苾h^樅燴壩卄"
           ]
         },
-        "privileged": false,
+        "privileged": true,
         "seLinuxOptions": {
           "user": "82",
           "role": "83",
@@ -277,12 +279,12 @@
           "gmsaCredentialSpec": "87",
           "runAsUserName": "88"
         },
-        "runAsUser": 4491726672505793472,
-        "runAsGroup": -5441351197948631872,
+        "runAsUser": -4560530827556737110,
+        "runAsGroup": 5837448331722877852,
         "runAsNonRoot": true,
         "readOnlyRootFilesystem": true,
-        "allowPrivilegeEscalation": true,
-        "procMount": "ĭÐl恕ɍȇ廄裭4懙"
+        "allowPrivilegeEscalation": false,
+        "procMount": "ɍȇ廄裭4懙鏮嵒ƫS捕ɷ"
       },
       "stdin": true,
       "tty": true,

@@ -32,6 +32,7 @@ ephemeralContainers:
       name: "28"
       optional: false
   image: "20"
+  imagePullPolicy: Ō¾\ĒP鄸靇杧ž譋娲瘹ɭ
   lifecycle:
     postStart:
       exec:
@@ -63,6 +64,7 @@ ephemeralContainers:
       tcpSocket:
         host: "80"
         port: "79"
+    type: 9Ȏ瀮
   livenessProbe:
     exec:
       command:
@@ -115,18 +117,18 @@ ephemeralContainers:
     requests:
       Ƣ6/ʕVŚ(ĿȊ甞: "776"
   securityContext:
-    allowPrivilegeEscalation: true
+    allowPrivilegeEscalation: false
     capabilities:
       add:
-      - 2Ō¾\ĒP鄸靇杧ž
+      - Ɏ(dɅ囥
       drop:
-      - 娲瘹ɭȊɚɎ(dɅ囥糷磩窮秳ķ蟒苾h^
-    privileged: false
-    procMount: ĭÐl恕ɍȇ廄裭4懙
+      - 磩窮秳ķ蟒苾h^樅燴壩卄
+    privileged: true
+    procMount: ɍȇ廄裭4懙鏮嵒ƫS捕ɷ
     readOnlyRootFilesystem: true
-    runAsGroup: -5441351197948631872
+    runAsGroup: 5837448331722877852
     runAsNonRoot: true
-    runAsUser: 4491726672505793472
+    runAsUser: -4560530827556737110
     seLinuxOptions:
       level: "85"
       role: "83"
@@ -159,7 +161,7 @@ ephemeralContainers:
   stdin: true
   targetContainerName: "89"
   terminationMessagePath: "81"
-  terminationMessagePolicy: Ņ£
+  terminationMessagePolicy: /
   tty: true
   volumeDevices:
   - devicePath: "44"
