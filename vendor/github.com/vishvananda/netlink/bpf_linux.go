@@ -1,49 +1,12 @@
 package netlink
 
-/*
-#include <asm/types.h>
-#include <asm/unistd.h>
-#include <errno.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <unistd.h>
+import (
+	"unsafe"
 
-static int load_simple_bpf(int prog_type, int ret) {
-#ifdef __NR_bpf
-	// { return ret; }
-	__u64 __attribute__((aligned(8))) insns[] = {
-		0x00000000000000b7ull | ((__u64)ret<<32),
-		0x0000000000000095ull,
-	};
-	__u8 __attribute__((aligned(8))) license[] = "ASL2";
-	// Copied from a header file since libc is notoriously slow to update.
-	// The call will succeed or fail and that will be our indication on
-	// whether or not it is supported.
-	struct {
-		__u32 prog_type;
-		__u32 insn_cnt;
-		__u64 insns;
-		__u64 license;
-		__u32 log_level;
-		__u32 log_size;
-		__u64 log_buf;
-		__u32 kern_version;
-	} __attribute__((aligned(8))) attr = {
-		.prog_type = prog_type,
-		.insn_cnt = 2,
-		.insns = (uintptr_t)&insns,
-		.license = (uintptr_t)&license,
-	};
-	return syscall(__NR_bpf, 5, &attr, sizeof(attr));
-#else
-	errno = EINVAL;
-	return -1;
-#endif
-}
-*/
-import "C"
+	"golang.org/x/sys/unix"
+)
 
-type BpfProgType C.int
+type BpfProgType uint32
 
 const (
 	BPF_PROG_TYPE_UNSPEC BpfProgType = iota
@@ -55,8 +18,36 @@ const (
 	BPF_PROG_TYPE_XDP
 )
 
-// loadSimpleBpf loads a trivial bpf program for testing purposes
-func loadSimpleBpf(progType BpfProgType, ret int) (int, error) {
-	fd, err := C.load_simple_bpf(C.int(progType), C.int(ret))
-	return int(fd), err
+type BPFAttr struct {
+	ProgType    uint32
+	InsnCnt     uint32
+	Insns       uintptr
+	License     uintptr
+	LogLevel    uint32
+	LogSize     uint32
+	LogBuf      uintptr
+	KernVersion uint32
+}
+
+// loadSimpleBpf loads a trivial bpf program for testing purposes.
+func loadSimpleBpf(progType BpfProgType, ret uint32) (int, error) {
+	insns := []uint64{
+		0x00000000000000b7 | (uint64(ret) << 32),
+		0x0000000000000095,
+	}
+	license := []byte{'A', 'S', 'L', '2', '\x00'}
+	attr := BPFAttr{
+		ProgType: uint32(progType),
+		InsnCnt:  uint32(len(insns)),
+		Insns:    uintptr(unsafe.Pointer(&insns[0])),
+		License:  uintptr(unsafe.Pointer(&license[0])),
+	}
+	fd, _, errno := unix.Syscall(unix.SYS_BPF,
+		5, /* bpf cmd */
+		uintptr(unsafe.Pointer(&attr)),
+		unsafe.Sizeof(attr))
+	if errno != 0 {
+		return 0, errno
+	}
+	return int(fd), nil
 }
