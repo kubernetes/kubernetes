@@ -1883,7 +1883,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlersWithNodeInfoNotReady(t *testin
 	podToReject := pods[0]
 	podToAdmit := pods[1]
 	node, err := kl.getNodeAnyWay()
-	assert.EqualError(t, err, ErrNodeInfoCacheNotReady.Error())
+	assert.EqualError(t, err, lifecycle.ErrNodeInfoCacheNotReady.Error())
 	node.Status = v1.NodeStatus{
 		Allocatable: v1.ResourceList{
 			v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),

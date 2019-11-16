@@ -244,7 +244,7 @@ func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
 		if node, err = kl.nodeLister.Get(string(kl.nodeName)); err == nil {
 			return node, nil
 		}
-		err = lifecycyle.ErrNodeInfoCacheNotReady
+		err = lifecycle.ErrNodeInfoCacheNotReady
 	}
 
 	node, e := kl.initialNode(context.TODO())
@@ -277,7 +277,7 @@ func (kl *Kubelet) GetHostIP() (net.IP, error) {
 // the initialNode.
 func (kl *Kubelet) getHostIPAnyWay() (net.IP, error) {
 	node, err := kl.getNodeAnyWay()
-	if err != nil {
+	if err != nil && err != lifecycle.ErrNodeInfoCacheNotReady {
 		return nil, err
 	}
 	return utilnode.GetNodeHostIP(node)
