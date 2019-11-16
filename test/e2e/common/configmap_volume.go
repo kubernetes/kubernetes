@@ -64,10 +64,8 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Release : v1.9
 		Testname: ConfigMap Volume, without mapping, non-root user
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Pod is run as a non-root user with uid=1000. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The file on the volume MUST have file mode set to default value of 0x644.
-		This test is marked LinuxOnly since Windows does not support running as UID / GID.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume as non-root [LinuxOnly] [NodeConformance]", func() {
-		// TODO(claudiub): Remove [LinuxOnly] tag when the WindowsRunAsUserName feature gate is enabled by default.
+	framework.ConformanceIt("should be consumable from pods in volume as non-root [NodeConformance]", func() {
 		doConfigMapE2EWithoutMappings(f, true, 0, nil)
 	})
 
@@ -101,10 +99,8 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		Release : v1.9
 		Testname: ConfigMap Volume, with mapping, non-root user
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. Pod is run as a non-root user with uid=1000. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The file on the volume MUST have file mode set to default value of 0x644.
-		This test is marked LinuxOnly since Windows does not support running as UID / GID.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [LinuxOnly] [NodeConformance]", func() {
-		// TODO(claudiub): Remove [LinuxOnly] tag when the WindowsRunAsUserName feature gate is enabled by default.
+	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [NodeConformance]", func() {
 		doConfigMapE2EWithMappings(f, true, 0, nil)
 	})
 
