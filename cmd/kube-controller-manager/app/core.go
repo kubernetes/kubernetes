@@ -159,8 +159,12 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 
 	var nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6 int
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack) {
+		// only --node-cidr-mask-size-ipv4 and --node-cidr-mask-size-ipv6 supported with dual stack clusters.
+		// --node-cidr-mask-size flag is incompatible with dual stack clusters.
 		nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6, err = setNodeCIDRMaskSizesDualStack(ctx.ComponentConfig.NodeIPAMController)
 	} else {
+		// only --node-cidr-mask-size supported with single stack clusters.
+		// --node-cidr-mask-size-ipv4 and --node-cidr-mask-size-ipv6 flags are incompatible with dual stack clusters.
 		nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6, err = setNodeCIDRMaskSizes(ctx.ComponentConfig.NodeIPAMController)
 	}
 
@@ -623,12 +627,13 @@ func setNodeCIDRMaskSizesDualStack(cfg nodeipamconfig.NodeIPAMControllerConfigur
 // getNodeCIDRMaskSizes is a helper function that helps the generate the node cidr mask
 // sizes slice based on the cluster cidr slice
 func getNodeCIDRMaskSizes(clusterCIDRs []*net.IPNet, maskSizeIPv4, maskSizeIPv6 int) []int {
-	nodeMaskCIDRs := []int{}
-	for _, clusterCIDR := range clusterCIDRs {
+	nodeMaskCIDRs := make([]int, len(clusterCIDRs))
+
+	for idx, clusterCIDR := range clusterCIDRs {
 		if netutils.IsIPv6CIDR(clusterCIDR) {
-			nodeMaskCIDRs = append(nodeMaskCIDRs, maskSizeIPv6)
+			nodeMaskCIDRs[idx] = maskSizeIPv6
 		} else {
-			nodeMaskCIDRs = append(nodeMaskCIDRs, maskSizeIPv4)
+			nodeMaskCIDRs[idx] = maskSizeIPv4
 		}
 	}
 	return nodeMaskCIDRs
