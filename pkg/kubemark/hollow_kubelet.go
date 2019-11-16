@@ -111,7 +111,7 @@ func NewHollowKubelet(
 		VolumePlugins:      volumePlugins(),
 		TLSOptions:         nil,
 		OOMAdjuster:        oom.NewFakeOOMAdjuster(),
-		Mounter:            mount.New("" /* default mount path */),
+		Mounter:            &mount.FakeMounter{},
 		Subpather:          &subpath.FakeSubpath{},
 		HostUtil:           hostutil.NewFakeHostUtil(nil),
 	}
