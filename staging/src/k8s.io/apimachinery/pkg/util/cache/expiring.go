@@ -18,15 +18,13 @@ package cache
 
 import (
 	"container/heap"
-	"context"
 	"sync"
 	"time"
 
 	utilclock "k8s.io/apimachinery/pkg/util/clock"
 )
 
-// NewExpiring returns an initialized expiring cache. Users must call
-// (*Expiring).Run() to begin the GC goroutine.
+// NewExpiring returns an initialized expiring cache.
 func NewExpiring() *Expiring {
 	return NewExpiringWithClock(utilclock.RealClock{})
 }
@@ -72,7 +70,7 @@ func (c *Expiring) Get(key interface{}) (val interface{}, ok bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	e, ok := c.cache[key]
-	if !ok || c.clock.Now().After(e.expiry) {
+	if !ok || !c.clock.Now().Before(e.expiry) {
 		return nil, false
 	}
 	return e.val, true
@@ -80,9 +78,13 @@ func (c *Expiring) Get(key interface{}) (val interface{}, ok bool) {
 
 // Set sets a key/value/expiry entry in the map, overwriting any previous entry
 // with the same key. The entry expires at the given expiry time, but its TTL
-// may be lengthened or shortened by additional calls to Set().
+// may be lengthened or shortened by additional calls to Set(). Garbage
+// collection of expired entries occurs during calls to Set(), however calls to
+// Get() will not return expired entries that have not yet been garbage
+// collected.
 func (c *Expiring) Set(key interface{}, val interface{}, ttl time.Duration) {
-	expiry := c.clock.Now().Add(ttl)
+	now := c.clock.Now()
+	expiry := now.Add(ttl)
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -94,6 +96,9 @@ func (c *Expiring) Set(key interface{}, val interface{}, ttl time.Duration) {
 		expiry:     expiry,
 		generation: c.generation,
 	}
+
+	// Run GC inline before pushing the new entry.
+	c.gc(now)
 
 	heap.Push(&c.heap, &expiringHeapEntry{
 		key:        key,
@@ -134,28 +139,7 @@ func (c *Expiring) Len() int {
 	return len(c.cache)
 }
 
-const gcInterval = 50 * time.Millisecond
-
-// Run runs the GC goroutine. The goroutine exits when the passed in context is
-// cancelled.
-func (c *Expiring) Run(ctx context.Context) {
-	t := c.clock.NewTicker(gcInterval)
-	defer t.Stop()
-	for {
-		select {
-		case <-t.C():
-			c.gc()
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func (c *Expiring) gc() {
-	now := c.clock.Now()
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
+func (c *Expiring) gc(now time.Time) {
 	for {
 		// Return from gc if the heap is empty or the next element is not yet
 		// expired.
@@ -164,7 +148,7 @@ func (c *Expiring) gc() {
 		// from looking at the (*expiringHeap).Pop() implmentation below.
 		// heap.Pop() swaps the first entry with the last entry of the heap, then
 		// calls (*expiringHeap).Pop() which returns the last element.
-		if len(c.heap) == 0 || now.After(c.heap[0].expiry) {
+		if len(c.heap) == 0 || now.Before(c.heap[0].expiry) {
 			return
 		}
 		cleanup := heap.Pop(&c.heap).(*expiringHeapEntry)

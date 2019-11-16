@@ -67,6 +67,14 @@ items:
     - get
     - list
     - watch
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - csinodes
+    verbs:
+    - get
+    - list
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -438,45 +446,6 @@ items:
     - endpoints/restricted
     verbs:
     - create
-  - apiGroups:
-    - ""
-    - events.k8s.io
-    resources:
-    - events
-    verbs:
-    - create
-    - patch
-    - update
-- apiVersion: rbac.authorization.k8s.io/v1
-  kind: ClusterRole
-  metadata:
-    annotations:
-      rbac.authorization.kubernetes.io/autoupdate: "true"
-    creationTimestamp: null
-    labels:
-      kubernetes.io/bootstrapping: rbac-defaults
-    name: system:controller:endpointslice-controller
-  rules:
-  - apiGroups:
-    - ""
-    resources:
-    - nodes
-    - pods
-    - services
-    verbs:
-    - get
-    - list
-    - watch
-  - apiGroups:
-    - discovery.k8s.io
-    resources:
-    - endpointslices
-    verbs:
-    - create
-    - delete
-    - get
-    - list
-    - update
   - apiGroups:
     - ""
     - events.k8s.io

@@ -18,6 +18,7 @@ package plugins
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -64,6 +65,17 @@ type InTreePlugin interface {
 	// RepairVolumeHandle generates a correct volume handle based on node ID information.
 	RepairVolumeHandle(volumeHandle, nodeID string) (string, error)
 }
+
+const (
+	// fsTypeKey is the deprecated storage class parameter key for fstype
+	fsTypeKey = "fstype"
+	// csiFsTypeKey is the storage class parameter key for CSI fstype
+	csiFsTypeKey = "csi.storage.k8s.io/fstype"
+	// zoneKey is the deprecated storage class parameter key for zone
+	zoneKey = "zone"
+	// zonesKey is the deprecated storage class parameter key for zones
+	zonesKey = "zones"
+)
 
 // replaceTopology overwrites an existing topology key by a new one.
 func replaceTopology(pv *v1.PersistentVolume, oldKey, newKey string) error {
@@ -152,4 +164,33 @@ func translateTopology(pv *v1.PersistentVolume, topologyKey string) error {
 	}
 
 	return nil
+}
+
+// translateAllowedTopologies translates allowed topologies within storage class
+// from legacy failure domain to given CSI topology key
+func translateAllowedTopologies(terms []v1.TopologySelectorTerm, key string) ([]v1.TopologySelectorTerm, error) {
+	if terms == nil {
+		return nil, nil
+	}
+
+	newTopologies := []v1.TopologySelectorTerm{}
+	for _, term := range terms {
+		newTerm := v1.TopologySelectorTerm{}
+		for _, exp := range term.MatchLabelExpressions {
+			var newExp v1.TopologySelectorLabelRequirement
+			if exp.Key == v1.LabelZoneFailureDomain {
+				newExp = v1.TopologySelectorLabelRequirement{
+					Key:    key,
+					Values: exp.Values,
+				}
+			} else if exp.Key == key {
+				newExp = exp
+			} else {
+				return nil, fmt.Errorf("unknown topology key: %v", exp.Key)
+			}
+			newTerm.MatchLabelExpressions = append(newTerm.MatchLabelExpressions, newExp)
+		}
+		newTopologies = append(newTopologies, newTerm)
+	}
+	return newTopologies, nil
 }

@@ -60,7 +60,6 @@ go_library(
         "//vendor/k8s.io/klog:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
-            "//pkg/util/mount:go_default_library",
             "//pkg/util/procfs:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
@@ -78,9 +77,9 @@ go_library(
             "//vendor/github.com/google/cadvisor/client/v2:go_default_library",
             "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+            "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
-            "//pkg/util/mount:go_default_library",
             "//pkg/util/procfs:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
@@ -98,6 +97,7 @@ go_library(
             "//vendor/github.com/google/cadvisor/client/v2:go_default_library",
             "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+            "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "//conditions:default": [],
     }),
@@ -166,7 +166,6 @@ go_test(
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/security/apparmor:go_default_library",
-        "//pkg/util/mount:go_default_library",
         "//pkg/volume/util/fsquota:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/scheduling/v1:go_default_library",
@@ -207,6 +206,7 @@ go_test(
         "//vendor/github.com/onsi/gomega/types:go_default_library",
         "//vendor/github.com/prometheus/common/model:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/mount:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/kubelet/stats/pidlimit:go_default_library",

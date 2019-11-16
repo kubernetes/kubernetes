@@ -27,8 +27,7 @@ import (
 
 	"k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
-
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/mount"
 )
 
 func scsiHostRescan(io ioHandler, exec utilexec.Interface) {

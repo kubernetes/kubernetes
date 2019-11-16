@@ -21,7 +21,7 @@ package vsphere_volume
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/mount"
 )
 
 func verifyDevicePath(path string) (string, error) {
