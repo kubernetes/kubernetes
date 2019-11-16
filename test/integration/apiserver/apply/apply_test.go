@@ -527,6 +527,7 @@ func TestApplyManagedFields(t *testing.T) {
 					"operation": "Apply",
 					"apiVersion": "v1",
 					"time": "` + accessor.GetManagedFields()[0].Time.UTC().Format(time.RFC3339) + `",
+<<<<<<< HEAD
 					"fieldsType": "FieldsV1",
 					"fieldsV1": {
 						"f:metadata": {
@@ -535,12 +536,17 @@ func TestApplyManagedFields(t *testing.T) {
 							}
 						}
 					}
+=======
+					"fieldsType": "FieldsV2",
+					"fieldsV2": "H4sIAAAAAAAA/4o20jHRUXSJ0ok20VF0ytaJNtBRKkktLtHNSUxKzVGKjY0FAAAA//8="
+>>>>>>> GZIP
 				},
 				{
 					"manager": "updater",
 					"operation": "Update",
 					"apiVersion": "v1",
 					"time": "` + accessor.GetManagedFields()[1].Time.UTC().Format(time.RFC3339) + `",
+<<<<<<< HEAD
 					"fieldsType": "FieldsV1",
 					"fieldsV1": {
 						"f:data": {
@@ -548,6 +554,10 @@ func TestApplyManagedFields(t *testing.T) {
 							"f:new-key": {}
 						}
 					}
+=======
+					"fieldsType": "FieldsV2",
+					"fieldsV2": "H4sIAAAAAAAA/4o20jHRUYzUiTbQUfTUMdBRykst181OrVSKjQUAAAD//w=="
+>>>>>>> GZIP
 				}
 			]
 		},
@@ -991,10 +1001,15 @@ func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
 		Operation:  metav1.ManagedFieldsOperationApply,
 		APIVersion: "apps/v1",
 		Time:       actual.Time,
+<<<<<<< HEAD
 		FieldsType: "FieldsV1",
 		FieldsV1: &metav1.FieldsV1{
 			Raw: []byte(`{"f:metadata":{"f:labels":{"f:sidecar_version":{}}},"f:spec":{"f:template":{"f:spec":{"f:containers":{"k:{\"name\":\"sidecar\"}":{"f:image":{},"f:name":{},".":{}}}}}}}`),
 		},
+=======
+		FieldsType: "FieldsV2",
+		FieldsV2:   []byte{31,139,8,0,0,0,0,0,0,255,138,54,210,49,209,81,116,137,210,137,54,209,81,116,202,214,137,54,208,81,42,206,76,73,77,78,44,138,47,75,45,42,206,204,207,83,138,141,5,169,41,2,43,113,49,6,83,16,142,155,147,78,180,161,161,78,181,98,166,21,76,147,82,45,200,8,69,83,29,3,29,197,204,88,48,0,0,0,0,255,255},
+>>>>>>> GZIP
 	}
 
 	if !reflect.DeepEqual(actual, expected) {

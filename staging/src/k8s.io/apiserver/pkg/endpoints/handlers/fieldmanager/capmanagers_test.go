@@ -17,7 +17,6 @@ limitations under the License.
 package fieldmanager
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -29,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 )
 
@@ -117,7 +117,7 @@ func TestCapUpdateManagers(t *testing.T) {
 		for _, f := range fields {
 			s.Insert(fieldpath.MakePathOrDie(f))
 		}
-		b, err := s.ToJSON()
+		b, err := internal.SetToFieldsV2(*s)
 		if err != nil {
 			panic(fmt.Sprintf("error building ManagedFieldsEntry for test: %v", err))
 		}
@@ -262,8 +262,7 @@ func expectIdempotence(t *testing.T, f TestFieldManager) {
 func expectManagesField(t *testing.T, f TestFieldManager, m string, p fieldpath.Path) {
 	for _, e := range f.ManagedFields() {
 		if e.Manager == m {
-			var s fieldpath.Set
-			err := s.FromJSON(bytes.NewReader(e.FieldsV1.Raw))
+			s, err := internal.FieldsToSetV2(e.FieldsV2)
 			if err != nil {
 				t.Fatalf("error parsing managedFields for %v: %v: %#v", m, err, f.ManagedFields())
 			}
