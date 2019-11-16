@@ -20,6 +20,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/klog"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -124,13 +126,21 @@ func NewFilteredMetadataInformer(client metadata.Interface, gvr schema.GroupVers
 					if tweakListOptions != nil {
 						tweakListOptions(&options)
 					}
-					return client.Resource(gvr).Namespace(namespace).List(options)
+					obj, err := client.Resource(gvr).Namespace(namespace).List(options)
+					if err != nil {
+						klog.Errorf("error listing %#v: %v", gvr, err)
+					}
+					return obj, err
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 					if tweakListOptions != nil {
 						tweakListOptions(&options)
 					}
-					return client.Resource(gvr).Namespace(namespace).Watch(options)
+					w, err := client.Resource(gvr).Namespace(namespace).Watch(options)
+					if err != nil {
+						klog.Errorf("error watching %#v: %v", gvr, err)
+					}
+					return w, err
 				},
 			},
 			&metav1.PartialObjectMetadata{},

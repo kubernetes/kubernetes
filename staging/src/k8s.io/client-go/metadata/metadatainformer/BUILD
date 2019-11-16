@@ -18,6 +18,7 @@ go_library(
         "//staging/src/k8s.io/client-go/metadata:go_default_library",
         "//staging/src/k8s.io/client-go/metadata/metadatalister:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
