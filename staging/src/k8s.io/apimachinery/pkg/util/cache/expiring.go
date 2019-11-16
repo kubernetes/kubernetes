@@ -102,8 +102,8 @@ func (c *Expiring) Set(key interface{}, val interface{}, ttl time.Duration) {
 
 	heap.Push(&c.heap, &expiringHeapEntry{
 		key:        key,
-		generation: c.generation,
 		expiry:     expiry,
+		generation: c.generation,
 	})
 }
 
@@ -158,13 +158,13 @@ func (c *Expiring) gc(now time.Time) {
 
 type expiringHeapEntry struct {
 	key        interface{}
-	generation uint64
 	expiry     time.Time
+	generation uint64
 }
 
-// expiringHeap is a min-heap ordered by expiration time of it's entries. The
-// expiring cache uses this as a priority queue efficiently organize entries to
-// be garbage collected once they expire.
+// expiringHeap is a min-heap ordered by expiration time of its entries. The
+// expiring cache uses this as a priority queue to efficiently organize entries
+// which will be garbage collected once they expire.
 type expiringHeap []*expiringHeapEntry
 
 var _ heap.Interface = &expiringHeap{}
