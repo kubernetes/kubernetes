@@ -103,6 +103,107 @@ func TestExpiration(t *testing.T) {
 	}
 }
 
+func TestGarbageCollection(t *testing.T) {
+	fc := &utilclock.FakeClock{}
+
+	type entry struct {
+		key, val string
+		ttl      time.Duration
+	}
+
+	tests := []struct {
+		name string
+		now  time.Time
+		set  []entry
+		want map[string]string
+	}{
+		{
+			name: "two entries just set",
+			now:  fc.Now().Add(0 * time.Second),
+			set: []entry{
+				{"a", "aa", 1 * time.Second},
+				{"b", "bb", 2 * time.Second},
+			},
+			want: map[string]string{
+				"a": "aa",
+				"b": "bb",
+			},
+		},
+		{
+			name: "first entry expired now",
+			now:  fc.Now().Add(1 * time.Second),
+			set: []entry{
+				{"a", "aa", 1 * time.Second},
+				{"b", "bb", 2 * time.Second},
+			},
+			want: map[string]string{
+				"b": "bb",
+			},
+		},
+		{
+			name: "first entry expired half a second ago",
+			now:  fc.Now().Add(1500 * time.Millisecond),
+			set: []entry{
+				{"a", "aa", 1 * time.Second},
+				{"b", "bb", 2 * time.Second},
+			},
+			want: map[string]string{
+				"b": "bb",
+			},
+		},
+		{
+			name: "three entries weird order",
+			now:  fc.Now().Add(1 * time.Second),
+			set: []entry{
+				{"c", "cc", 3 * time.Second},
+				{"a", "aa", 1 * time.Second},
+				{"b", "bb", 2 * time.Second},
+			},
+			want: map[string]string{
+				"b": "bb",
+				"c": "cc",
+			},
+		},
+		{
+			name: "expire multiple entries in one cycle",
+			now:  fc.Now().Add(2500 * time.Millisecond),
+			set: []entry{
+				{"a", "aa", 1 * time.Second},
+				{"b", "bb", 2 * time.Second},
+				{"c", "cc", 3 * time.Second},
+			},
+			want: map[string]string{
+				"c": "cc",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			c := NewExpiringWithClock(fc)
+			for _, e := range test.set {
+				c.Set(e.key, e.val, e.ttl)
+			}
+
+			c.gc(test.now)
+
+			for k, want := range test.want {
+				got, ok := c.Get(k)
+				if !ok {
+					t.Errorf("expected cache to have entry for key=%q but found none", k)
+					continue
+				}
+				if got != want {
+					t.Errorf("unexpected value for key=%q: got=%q, want=%q", k, got, want)
+				}
+			}
+			if got, want := c.Len(), len(test.want); got != want {
+				t.Errorf("unexpected cache size: got=%d, want=%d", got, want)
+			}
+		})
+	}
+}
+
 func BenchmarkExpiringCacheContention(b *testing.B) {
 	b.Run("evict_probablility=100%", func(b *testing.B) {
 		benchmarkExpiringCacheContention(b, 1)

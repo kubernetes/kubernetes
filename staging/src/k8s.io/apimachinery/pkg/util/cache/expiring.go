@@ -70,7 +70,7 @@ func (c *Expiring) Get(key interface{}) (val interface{}, ok bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	e, ok := c.cache[key]
-	if !ok || c.clock.Now().After(e.expiry) {
+	if !ok || !c.clock.Now().Before(e.expiry) {
 		return nil, false
 	}
 	return e.val, true
@@ -148,7 +148,7 @@ func (c *Expiring) gc(now time.Time) {
 		// from looking at the (*expiringHeap).Pop() implmentation below.
 		// heap.Pop() swaps the first entry with the last entry of the heap, then
 		// calls (*expiringHeap).Pop() which returns the last element.
-		if len(c.heap) == 0 || now.After(c.heap[0].expiry) {
+		if len(c.heap) == 0 || now.Before(c.heap[0].expiry) {
 			return
 		}
 		cleanup := heap.Pop(&c.heap).(*expiringHeapEntry)
