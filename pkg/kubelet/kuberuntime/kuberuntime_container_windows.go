@@ -52,18 +52,19 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 	cpuRequest := container.Resources.Requests.Cpu()
 	cpuLimit := container.Resources.Limits.Cpu()
 	isolatedByHyperv := kubeletapis.ShouldIsolatedByHyperV(pod.Annotations)
+	cpuLimitMillValue := cpuLimit.MilliValue()
 	if !cpuLimit.IsZero() {
 		// Note that sysinfo.NumCPU() is limited to 64 CPUs on Windows due to Processor Groups,
 		// as only 64 processors are available for execution by a given process. This causes
 		// some oddities on systems with more than 64 processors.
 		// Refer https://msdn.microsoft.com/en-us/library/windows/desktop/dd405503(v=vs.85).aspx.
-		cpuMaximum := 10000 * cpuLimit.MilliValue() / int64(sysinfo.NumCPU()) / 1000
+		cpuMaximum := 10000 * cpuLimitMillValue / int64(sysinfo.NumCPU()) / 1000
+		cpuCount := int64(cpuLimitMillValue+999) / 1000
+		wc.Resources.CpuCount = cpuCount
+		wc.Resources.NanoCpus = cpuLimitMillValue * 1000 * 1000
 		if isolatedByHyperv {
-			cpuCount := int64(cpuLimit.MilliValue()+999) / 1000
-			wc.Resources.CpuCount = cpuCount
-
 			if cpuCount != 0 {
-				cpuMaximum = cpuLimit.MilliValue() / cpuCount * 10000 / 1000
+				cpuMaximum = cpuLimitMillValue / cpuCount * 10000 / 1000
 			}
 		}
 		// ensure cpuMaximum is in range [1, 10000].
@@ -76,7 +77,7 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 		wc.Resources.CpuMaximum = cpuMaximum
 	}
 
-	cpuShares := milliCPUToShares(cpuLimit.MilliValue(), isolatedByHyperv)
+	cpuShares := milliCPUToShares(cpuLimitMillValue, isolatedByHyperv)
 	if cpuShares == 0 {
 		cpuShares = milliCPUToShares(cpuRequest.MilliValue(), isolatedByHyperv)
 	}

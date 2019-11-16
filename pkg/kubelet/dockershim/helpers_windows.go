@@ -70,6 +70,7 @@ func (ds *dockerService) updateCreateConfig(
 		rOpts := wc.GetResources()
 		if rOpts != nil {
 			createConfig.HostConfig.Resources = dockercontainer.Resources{
+				NanoCPUs:   rOpts.NanoCpus,
 				Memory:     rOpts.MemoryLimitInBytes,
 				CPUShares:  rOpts.CpuShares,
 				CPUCount:   rOpts.CpuCount,
