@@ -264,6 +264,7 @@ func TestStressExpiringCache(t *testing.T) {
 	for i := 0; i < 256; i++ {
 		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			rand := rand.New(rand.NewSource(rand.Int63()))
 			for {
 				select {
@@ -273,11 +274,18 @@ func TestStressExpiringCache(t *testing.T) {
 				}
 				key := keys[rand.Intn(numKeys)]
 				if _, ok := cache.Get(key); !ok {
-					cache.Set(key, struct{}{}, time.Second)
+					cache.Set(key, struct{}{}, 50*time.Millisecond)
 				}
 			}
 		}()
 	}
 
-	wg.Done()
+	wg.Wait()
+
+	// trigger a GC with a set and check the cache size.
+	time.Sleep(60 * time.Millisecond)
+	cache.Set("trigger", "gc", time.Second)
+	if cache.Len() != 1 {
+		t.Errorf("unexpected cache size: got=%d, want=1", cache.Len())
+	}
 }
