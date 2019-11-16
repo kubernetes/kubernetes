@@ -15,6 +15,7 @@ metadata:
   managedFields:
   - apiVersion: "17"
     fieldsType: "18"
+    fieldsV2: Wg==
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -26,19 +27,19 @@ metadata:
     kind: "12"
     name: "13"
     uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "11042405498087606203"
+  resourceVersion: "16964250748386560239"
   selfLink: "5"
-  uid: "7"
+  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
 spec:
   limits:
   - default:
-      甞谐颋ǅS: "632"
+      ;Ơ歿:狞夌碕ʂ: "737"
     defaultRequest:
-      狱³-Ǐ忄*齧獚: "502"
+      Ƽ@hDrȮO励鹗塢: "874"
     max:
-      o,c鮽ort昍řČ扷5Ɨ: "647"
+      Ž燹憍峕?狱³-Ǐ忄*齧獚敆Ȏț: "2"
     maxLimitRequestRatio:
-      亞螩B峅x4%a鯿rŎǀ朲^苣fƼ@h: "494"
+      UɦOŖ: "746"
     min:
-      Ă凗蓏Ŋ蛊ĉy: "361"
-    type: '@Hr鯹)晿'
+      峅x: "826"
+    type: 脽ěĂ凗蓏Ŋ蛊ĉy緅縕

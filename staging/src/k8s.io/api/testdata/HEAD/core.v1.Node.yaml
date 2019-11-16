@@ -15,6 +15,7 @@ metadata:
   managedFields:
   - apiVersion: "17"
     fieldsType: "18"
+    fieldsV2: Wg==
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -26,9 +27,9 @@ metadata:
     kind: "12"
     name: "13"
     uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "11042405498087606203"
+  resourceVersion: "16964250748386560239"
   selfLink: "5"
-  uid: "7"
+  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
 spec:
   configSource:
     configMap:
@@ -36,31 +37,31 @@ spec:
       name: "25"
       namespace: "24"
       resourceVersion: "26"
-      uid: Ă凗蓏Ŋ蛊ĉy
+      uid: 颋ǅ
   externalID: "28"
   podCIDR: "19"
   podCIDRs:
   - "20"
   providerID: "21"
   taints:
-  - effect: Hr鯹)晿<o,c鮽ort昍řČ扷5Ɨ
+  - effect: ěĂ凗蓏Ŋ蛊ĉy緅縕
     key: "22"
     value: "23"
 status:
   addresses:
   - address: "31"
-    type: OŖ樅尷
+    type: ĴC浔Ű壝ž
   allocatable:
-    峅x: "826"
+    獚敆ȎțêɘĲ斬³;Ơ歿:狞夌碕ʂɭ: "166"
   capacity:
-    縕>Ž燹憍峕?狱³-Ǐ忄*齧獚敆Ȏț: "2"
+    ǡƏS$+½H: "758"
   conditions:
-  - lastHeartbeatTime: "2339-08-25T14:46:58Z"
-    lastTransitionTime: "2681-06-13T05:43:15Z"
+  - lastHeartbeatTime: "2363-01-13T11:22:34Z"
+    lastTransitionTime: "2809-10-24T21:55:41Z"
     message: "30"
     reason: "29"
-    status: P$Iņɖ橙9ȫŚʒ
-    type: ""
+    status: ""
+    type: ŚʒUɦOŖ樅尷
   config:
     active:
       configMap:
@@ -68,14 +69,14 @@ status:
         name: "49"
         namespace: "48"
         resourceVersion: "50"
-        uid: 譋娲瘹ɭȊɚɎ(
+        uid: -议}ȧ外ĺ稥氹Ç|¶
     assigned:
       configMap:
         kubeletConfigKey: "47"
         name: "45"
         namespace: "44"
         resourceVersion: "46"
-        uid: £趕ã/鈱$-议}ȧ外ĺ
+        uid: 檮Ǣ冖ž琔n宂¬轚9Ȏ瀮昃2
     error: "56"
     lastKnownGood:
       configMap:
@@ -83,14 +84,14 @@ status:
         name: "53"
         namespace: "52"
         resourceVersion: "54"
-        uid: ėf倐ȓ圬剴扲ȿQZ{ʁgɸ
+        uid: ɚɎ(dɅ囥糷磩窮秳ķ蟒
   daemonEndpoints:
     kubeletEndpoint:
-      Port: -1579157235
+      Port: 548013580
   images:
   - names:
     - "42"
-    sizeBytes: 9177598355370950419
+    sizeBytes: 776543445579928012
   nodeInfo:
     architecture: "41"
     bootID: "34"
@@ -102,9 +103,9 @@ status:
     operatingSystem: "40"
     osImage: "36"
     systemUUID: "33"
-  phase: '%a鯿rŎǀ朲^苣f'
+  phase: cP$Iņɖ橙9
   volumesAttached:
   - devicePath: "43"
-    name: ȭ%ƎÜ掸8½£.vǴʌ鴜Ł%ŨȈ
+    name: 託仭
   volumesInUse:
-  - üA謥ǣ偐圠=l畣潁谯耨V6&]鴍Ɋ
+  - 錕?øēƺ魋Ď儇击3ƆìQ喞艋

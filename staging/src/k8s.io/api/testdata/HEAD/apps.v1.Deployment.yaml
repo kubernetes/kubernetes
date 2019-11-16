@@ -15,6 +15,7 @@ metadata:
   managedFields:
   - apiVersion: "17"
     fieldsType: "18"
+    fieldsV2: Wg==
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -26,20 +27,22 @@ metadata:
     kind: "12"
     name: "13"
     uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "11042405498087606203"
+  resourceVersion: "16964250748386560239"
   selfLink: "5"
-  uid: "7"
+  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
 spec:
   minReadySeconds: 212061711
   progressDeadlineSeconds: -1707056814
-  replicas: 896585016
+  replicas: -1978186127
   revisionHistoryLimit: -1092090658
   selector:
     matchExpressions:
-    - key: 50-u--25cu87--r7p-w1e67-8pj5t-kl-v0q6b68--nu5oii38fn-8.629b-jd-8c45-0-8--6n--w0--w---196g8d--iv1-5--5ht-a-29--0qso796/3___47._49pIB_o61ISU4--A_.XK_._M99
-      operator: Exists
+    - key: 5816m59-dx8----i--5-8t36b--09--23-u19m-35--d.vo61---4fy--9---7--9-9s-0-u5lj2--10pq-0-7-9-2-ekg-071b/YJTrcd-2.-__E_Sv__26KX_F
+      operator: NotIn
+      values:
+      - y_y_o0_5qN2_---_M.N_._a6.9bHjdH.-.5_.I8__.-AIw.__-___16
     matchLabels:
-      74404d5---g8c2-k-91e.y5-g--58----0683-b-w7ld-6cs06xj-x5yv0wm-k18/M_-Nx.N_6-___._-.-W._AAn---v_-5-_8LXj: 6-4_WE-_JTrcd-2.-__E_Sv__26KX_R_.-.Nth._--S_4DA_-5_-4lQ42M--1
+      w9v--m0-1y5-g3/JFHn7y-74.-0MUORQQ.N2.1.L.l-Y._.-44..d.__g: F-_3-n-_-__3u-.__P__.7U-Uo_F
   strategy:
     rollingUpdate:
       maxSurge: 3
@@ -51,30 +54,31 @@ spec:
         "32": "33"
       clusterName: "38"
       creationTimestamp: null
-      deletionGracePeriodSeconds: -2575298329142810753
+      deletionGracePeriodSeconds: -2848337479447330428
       finalizers:
       - "37"
       generateName: "26"
-      generation: -8542870036622468681
+      generation: 3557306139556084909
       labels:
         "30": "31"
       managedFields:
       - apiVersion: "40"
         fieldsType: "41"
+        fieldsV2: KA==
         manager: "39"
-        operation: 躢
+        operation: 妻ƅTGS5Ǎ
       name: "25"
       namespace: "27"
       ownerReferences:
       - apiVersion: "34"
-        blockOwnerDeletion: true
-        controller: true
+        blockOwnerDeletion: false
+        controller: false
         kind: "35"
         name: "36"
-        uid: ƶȤ^}
-      resourceVersion: "1736621709629422270"
+        uid: '@Z^嫫猤痈C*ĕʄő芖{|ǘ"^饣'
+      resourceVersion: "1755593733408306642"
       selfLink: "28"
-      uid: ?Qȫş
+      uid: g滠鼍ƭt?QȫşŇɜa頢ƛƟ)Ù
     spec:
       activeDeadlineSeconds: -8619192438821356882
       affinity:
@@ -747,18 +751,16 @@ spec:
       volumes:
       - awsElasticBlockStore:
           fsType: "47"
-          partition: 912004803
-          readOnly: true
+          partition: -1843754483
           volumeID: "46"
         azureDisk:
-          cachingMode: '|@?鷅bȻN'
+          cachingMode: d飼$俊跾|@?鷅bȻN
           diskName: "110"
           diskURI: "111"
           fsType: "112"
           kind: 榱*Gưoɘ檲
           readOnly: true
         azureFile:
-          readOnly: true
           secretName: "96"
           shareName: "97"
         cephfs:
@@ -771,17 +773,18 @@ spec:
           user: "83"
         cinder:
           fsType: "79"
+          readOnly: true
           secretRef:
             name: "80"
           volumeID: "78"
         configMap:
-          defaultMode: 1593906314
+          defaultMode: -252664583
           items:
           - key: "99"
-            mode: 195263908
+            mode: 870237686
             path: "100"
           name: "98"
-          optional: false
+          optional: true
         csi:
           driver: "142"
           fsType: "143"
@@ -791,24 +794,23 @@ spec:
           volumeAttributes:
             "144": "145"
         downwardAPI:
-          defaultMode: 824682619
+          defaultMode: -1347926683
           items:
           - fieldRef:
               apiVersion: "89"
               fieldPath: "90"
-            mode: 1569992019
+            mode: -1319491110
             path: "88"
             resourceFieldRef:
               containerName: "91"
-              divisor: "660"
+              divisor: "825"
               resource: "92"
         emptyDir:
-          medium: Xŋ朘瑥A徙ɶɊł/擇ɦĽ胚O醔ɍ厶耈
-          sizeLimit: "473"
+          medium: A徙ɶɊł/擇ɦĽ胚
+          sizeLimit: "426"
         fc:
           fsType: "94"
-          lun: -1740986684
-          readOnly: true
+          lun: -1252931244
           targetWWNs:
           - "93"
           wwids:
@@ -818,7 +820,6 @@ spec:
           fsType: "74"
           options:
             "76": "77"
-          readOnly: true
           secretRef:
             name: "75"
         flocker:
@@ -826,7 +827,7 @@ spec:
           datasetUUID: "87"
         gcePersistentDisk:
           fsType: "45"
-          partition: -1188153605
+          partition: 636617833
           pdName: "44"
         gitRepo:
           directory: "50"
@@ -838,14 +839,14 @@ spec:
           readOnly: true
         hostPath:
           path: "43"
-          type: ƛƟ)ÙæNǚ錯ƶRquA?瞲Ť倱<
+          type: ƶRquA?瞲Ť倱<įXŋ朘
         iscsi:
           chapAuthDiscovery: true
           fsType: "59"
           initiatorName: "62"
           iqn: "57"
           iscsiInterface: "58"
-          lun: 994527057
+          lun: -547518679
           portals:
           - "60"
           secretRef:
@@ -858,7 +859,6 @@ spec:
           server: "54"
         persistentVolumeClaim:
           claimName: "65"
-          readOnly: true
         photonPersistentDisk:
           fsType: "114"
           pdID: "113"
@@ -900,6 +900,7 @@ spec:
               path: "127"
         quobyte:
           group: "108"
+          readOnly: true
           registry: "105"
           tenant: "109"
           user: "107"
@@ -911,6 +912,7 @@ spec:
           monitors:
           - "66"
           pool: "69"
+          readOnly: true
           secretRef:
             name: "72"
           user: "70"
@@ -925,10 +927,10 @@ spec:
           system: "131"
           volumeName: "136"
         secret:
-          defaultMode: 332383000
+          defaultMode: 912004803
           items:
           - key: "52"
-            mode: -547518679
+            mode: 2064656704
             path: "53"
           optional: true
           secretName: "51"

@@ -6,8 +6,8 @@
     "generateName": "3",
     "namespace": "4",
     "selfLink": "5",
-    "uid": "7",
-    "resourceVersion": "11042405498087606203",
+    "uid": "ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e",
+    "resourceVersion": "16964250748386560239",
     "generation": 8071137005907523419,
     "creationTimestamp": null,
     "deletionGracePeriodSeconds": -4955867275792137171,
@@ -36,34 +36,36 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "fieldsV2": "Wg=="
       }
     ]
   },
   "spec": {
     "privileged": true,
     "defaultAddCapabilities": [
-      "qJ枊a8衍`Ĩ"
+      "ǸƢ6/"
     ],
     "requiredDropCapabilities": [
-      ".蘯6ċV夸"
+      "VŚ(ĿȊ甞谐颋"
     ],
     "allowedCapabilities": [
-      "ɑ"
+      "SǡƏ"
     ],
     "volumes": [
-      "ʤ脽ěĂ凗蓏Ŋ蛊ĉy緅縕\u003eŽ"
+      "$+½H牗洝尿彀亞螩B峅"
     ],
     "hostNetwork": true,
     "hostPorts": [
       {
-        "min": -321835912,
-        "max": 1575426699
+        "min": -827642756,
+        "max": -1487653240
       }
     ],
+    "hostPID": true,
     "hostIPC": true,
     "seLinux": {
-      "rule": "S",
+      "rule": "",
       "seLinuxOptions": {
         "user": "19",
         "role": "20",
@@ -72,38 +74,38 @@
       }
     },
     "runAsUser": {
-      "rule": "+½H牗洝尿彀亞螩",
+      "rule": ":狞夌碕ʂɭîcP$Iņɖ",
       "ranges": [
         {
-          "min": 8901768137137123048,
-          "max": -90233536926144532
+          "min": 6715860513467504728,
+          "max": -7606590868934742876
         }
       ]
     },
     "runAsGroup": {
-      "rule": "³;Ơ歿:狞夌碕ʂɭîcP",
+      "rule": "ē ƕP喂ƈ斎AO6ĴC浔Ű壝ž(-",
       "ranges": [
         {
-          "min": -8679730194918865907,
-          "max": 2607109693095207331
+          "min": 4788190398976706073,
+          "max": 7506785378065797295
         }
       ]
     },
     "supplementalGroups": {
-      "rule": "ɖ橙9",
+      "rule": "?øēƺ魋Ď儇击3ƆìQ",
       "ranges": [
         {
-          "min": -5498021643263379468,
-          "max": -236027028483226507
+          "min": -9190478501544852634,
+          "max": -8763960668058519584
         }
       ]
     },
     "fsGroup": {
-      "rule": "UɦOŖ",
+      "rule": "託仭",
       "ranges": [
         {
-          "min": 8572633303645749270,
-          "max": 3058121789713366904
+          "min": -7003704988542234731,
+          "max": -2225037131652530471
         }
       ]
     },
@@ -111,8 +113,7 @@
     "allowPrivilegeEscalation": false,
     "allowedHostPaths": [
       {
-        "pathPrefix": "23",
-        "readOnly": true
+        "pathPrefix": "23"
       }
     ],
     "allowedFlexVolumes": [
@@ -132,7 +133,7 @@
       "27"
     ],
     "allowedProcMountTypes": [
-      "ǣ偐圠=l畣潁"
+      "¬轚9Ȏ瀮昃"
     ],
     "runtimeClass": {
       "allowedRuntimeClassNames": [

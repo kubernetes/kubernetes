@@ -1133,7 +1133,7 @@ func schema_pkg_apis_meta_v1_ManagedFieldsEntry(ref common.ReferenceCallback) co
 					},
 					"fieldsType": {
 						SchemaProps: spec.SchemaProps{
-							Description: "FieldsType is the discriminator for the different fields format and version. There is currently only one possible value: \"FieldsV1\"",
+							Description: "FieldsType is the discriminator for the different fields format and version. There are currently only two possible values: \"FieldsV1\", \"FieldsV2\"",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1142,6 +1142,18 @@ func schema_pkg_apis_meta_v1_ManagedFieldsEntry(ref common.ReferenceCallback) co
 						SchemaProps: spec.SchemaProps{
 							Description: "FieldsV1 holds the first JSON version format as described in the \"FieldsV1\" type.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.FieldsV1"),
+						},
+					},
+					"fieldsV2": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "FieldsV2 holds the second version format as described in TODO.",
+							Type:        []string{"string"},
+							Format:      "byte",
 						},
 					},
 				},

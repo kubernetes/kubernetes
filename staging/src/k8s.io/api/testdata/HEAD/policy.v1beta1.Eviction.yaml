@@ -2,12 +2,12 @@ apiVersion: policy/v1beta1
 deleteOptions:
   dryRun:
   - "20"
-  gracePeriodSeconds: 3850803321873644574
-  orphanDependents: true
+  gracePeriodSeconds: -8496244716696586452
+  orphanDependents: false
   preconditions:
     resourceVersion: "19"
-    uid: 枊a8衍`Ĩɘ.蘯6ċV夸eɑeʤ脽ě
-  propagationPolicy: 蓏Ŋ
+    uid: 6/ʕVŚ(ĿȊ甞谐颋ǅSǡƏS$+
+  propagationPolicy: 牗洝尿彀亞螩B峅x4%a鯿rŎ
 kind: Eviction
 metadata:
   annotations:
@@ -24,6 +24,7 @@ metadata:
   managedFields:
   - apiVersion: "17"
     fieldsType: "18"
+    fieldsV2: Wg==
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -35,6 +36,6 @@ metadata:
     kind: "12"
     name: "13"
     uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "11042405498087606203"
+  resourceVersion: "16964250748386560239"
   selfLink: "5"
-  uid: "7"
+  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e

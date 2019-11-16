@@ -31,108 +31,33 @@ import (
 // (api format) to the format used by sigs.k8s.io/structured-merge-diff and back
 func TestRoundTripManagedFields(t *testing.T) {
 	tests := []string{
-		`null
-`,
 		`- apiVersion: v1
-  fieldsType: FieldsV1
-  fieldsV1:
-    v:3:
-      f:alsoPi: {}
-    v:3.1415:
-      f:pi: {}
-    v:false:
-      f:notTrue: {}
-  manager: foo
-  operation: Update
-  time: "2001-02-03T04:05:06Z"
-- apiVersion: v1beta1
-  fieldsType: FieldsV1
-  fieldsV1:
-    i:5:
-      f:i: {}
-  manager: foo
-  operation: Update
-  time: "2011-12-13T14:15:16Z"
-`,
-		`- apiVersion: v1
-  fieldsType: FieldsV1
-  fieldsV1:
-    f:spec:
-      f:containers:
-        k:{"name":"c"}:
-          f:image: {}
-          f:name: {}
-  manager: foo
-  operation: Apply
-`,
-		`- apiVersion: v1
-  fieldsType: FieldsV1
-  fieldsV1:
-    f:apiVersion: {}
-    f:kind: {}
-    f:metadata:
-      f:labels:
-        f:app: {}
-      f:name: {}
-    f:spec:
-      f:replicas: {}
-      f:selector:
-        f:matchLabels:
-          f:app: {}
-      f:template:
-        f:medatada:
-          f:labels:
-            f:app: {}
-        f:spec:
-          f:containers:
-            k:{"name":"nginx"}:
-              .: {}
-              f:image: {}
-              f:name: {}
-              f:ports:
-                i:0:
-                  f:containerPort: {}
+  fieldsType: FieldsV2
+  fieldsV2: WzIsNSwzLFswLCJhbHNvUGkiXSw1LDMuMTQxNSxbMCwicGkiXSw1LGZhbHNlLFswLCJub3RUcnVlIl1d
   manager: foo
   operation: Update
 `,
 		`- apiVersion: v1
-  fieldsType: FieldsV1
-  fieldsV1:
-    f:allowVolumeExpansion: {}
-    f:apiVersion: {}
-    f:kind: {}
-    f:metadata:
-      f:name: {}
-      f:parameters:
-        f:resturl: {}
-        f:restuser: {}
-        f:secretName: {}
-        f:secretNamespace: {}
-    f:provisioner: {}
+  fieldsType: FieldsV2
+  fieldsV2: WzIsNCwhcixbNCwhRkIsWzcseyFpOiJjIn0sWzAsITUsMCwhaV1dXV0=
   manager: foo
-  operation: Apply
+  operation: Update
 `,
 		`- apiVersion: v1
-  fieldsType: FieldsV1
-  fieldsV1:
-    f:apiVersion: {}
-    f:kind: {}
-    f:metadata:
-      f:name: {}
-    f:spec:
-      f:group: {}
-      f:names:
-        f:kind: {}
-        f:plural: {}
-        f:shortNames:
-          i:0: {}
-        f:singular: {}
-      f:scope: {}
-      f:versions:
-        k:{"name":"v1"}:
-          f:name: {}
-          f:served: {}
-          f:storage: {}
+  fieldsType: FieldsV2
+  fieldsV2: WzIsMCwhRTgsMCwhZyw0LCFEWixbNCwhQmssWzAsImFwcCJdLDAsIWldLDQsIXIsWzAsIURyLDQsIUR5LFs0LCFHTSxbMCwiYXBwIl1dLDQsIUQzLFs0LCJtZWRhdGFkYSIsWzQsIUJrLFswLCJhcHAiXV0sNCwhcixbNCwhRkIsWzExLHshaToibmdpbngifSxbMCwhNSwwLCFpLDQsIUJGLFs2LDAsWzAsIUhYXV1dXV1dXV0=
+  manager: foo
+  operation: Update
+`,
+		`- apiVersion: v1
+  fieldsType: FieldsV2
+  fieldsV2: WzIsMCwhTFYsMCwhRTgsMCwhZyw0LCFEWixbMCwhaSw0LCFGVCxbMCwicmVzdHVybCIsMCwicmVzdHVzZXIiLDAsIUZkLDAsIUpEXV0sMCwhR1dd
+  manager: foo
+  operation: Update
+`,
+		`- apiVersion: v1
+  fieldsType: FieldsV2
+  fieldsV2: WzIsMCwhRTgsMCwhZyw0LCFEWixbMCwhaV0sNCwhcixbMCwhMyw0LCFCQSxbMCwhZywwLCFCcyw0LCFGZSxbMiwwXSwwLCFEMF0sMCwhQkosNCwhRDUsWzcseyFpOiJ2MSJ9LFswLCFpLDAsIUIyLDAsIUMwXV1dXQ==
   manager: foo
   operation: Update
 `,

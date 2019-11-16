@@ -113,25 +113,25 @@ func TestCapUpdateManagers(t *testing.T) {
 	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
 	f.fieldManager = fieldmanager.NewCapManagersManager(&fakeManager{}, 3)
 
-	set := func(fields ...string) *metav1.FieldsV1 {
+	set := func(fields ...string) []byte {
 		s := fieldpath.NewSet()
 		for _, f := range fields {
 			s.Insert(fieldpath.MakePathOrDie(f))
 		}
-		b, err := s.ToJSON()
+		b, err := s.ToJSON_V2Experimental()
 		if err != nil {
 			panic(fmt.Sprintf("error building ManagedFieldsEntry for test: %v", err))
 		}
-		return &metav1.FieldsV1{Raw: b}
+		return b
 	}
 
-	entry := func(name string, version string, order int, fields *metav1.FieldsV1) metav1.ManagedFieldsEntry {
+	entry := func(name string, version string, order int, fields []byte) metav1.ManagedFieldsEntry {
 		return metav1.ManagedFieldsEntry{
 			Manager:    name,
 			APIVersion: version,
 			Operation:  "Update",
-			FieldsType: "FieldsV1",
-			FieldsV1:   fields,
+			FieldsType: "FieldsV2",
+			FieldsV2:   fields,
 			Time:       &metav1.Time{Time: time.Time{}.Add(time.Hour * time.Duration(order))},
 		}
 	}
@@ -264,7 +264,7 @@ func expectManagesField(t *testing.T, f TestFieldManager, m string, p fieldpath.
 	for _, e := range f.ManagedFields() {
 		if e.Manager == m {
 			var s fieldpath.Set
-			err := s.FromJSON(bytes.NewReader(e.FieldsV1.Raw))
+			err := s.FromJSON(bytes.NewReader(e.FieldsV2))
 			if err != nil {
 				t.Fatalf("error parsing managedFields for %v: %v: %#v", m, err, f.ManagedFields())
 			}

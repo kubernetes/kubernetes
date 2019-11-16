@@ -77,8 +77,7 @@ func (s *Set) ToJSONStream_V2Experimental(w io.Writer) error {
 
 	stream.WriteArrayStart()
 	stream.WriteInt(strings.DefaultVersion)
-	stream.WriteRaw(",")
-	err = s.emitContents_v2(false, stream, &r)
+	err = s.emitContents_v2(false, stream, &r, false)
 	if err != nil {
 		return err
 	}
@@ -209,12 +208,11 @@ func (s *Set) emitContents_v1(includeSelf bool, stream *jsoniter.Stream, r *reus
 	return manageMemory(stream)
 }
 
-func (s *Set) emitContents_v2(includeSelf bool, stream value.Stream, r *reusableBuilder) error {
+func (s *Set) emitContents_v2(includeSelf bool, stream value.Stream, r *reusableBuilder, skipFirstComma bool) error {
 	mi, ci := 0, 0
-	first := true
 	preWrite := func() {
-		if first {
-			first = false
+		if skipFirstComma {
+			skipFirstComma = false
 			return
 		}
 		stream.WriteRaw(",")
@@ -242,7 +240,7 @@ func (s *Set) emitContents_v2(includeSelf bool, stream value.Stream, r *reusable
 			}
 			stream.WriteRaw(",")
 			stream.WriteArrayStart()
-			if err := s.Children.members[ci].set.emitContents_v2(false, stream, r); err != nil {
+			if err := s.Children.members[ci].set.emitContents_v2(false, stream, r, true); err != nil {
 				return err
 			}
 			stream.WriteArrayEnd()
@@ -254,7 +252,7 @@ func (s *Set) emitContents_v2(includeSelf bool, stream value.Stream, r *reusable
 			}
 			stream.WriteRaw(",")
 			stream.WriteArrayStart()
-			if err := s.Children.members[ci].set.emitContents_v2(true, stream, r); err != nil {
+			if err := s.Children.members[ci].set.emitContents_v2(true, stream, r, true); err != nil {
 				return err
 			}
 			stream.WriteArrayEnd()
@@ -288,7 +286,7 @@ func (s *Set) emitContents_v2(includeSelf bool, stream value.Stream, r *reusable
 		}
 		stream.WriteRaw(",")
 		stream.WriteArrayStart()
-		if err := s.Children.members[ci].set.emitContents_v2(false, stream, r); err != nil {
+		if err := s.Children.members[ci].set.emitContents_v2(false, stream, r, true); err != nil {
 			return err
 		}
 		stream.WriteArrayEnd()

@@ -39,7 +39,7 @@ type readerWithStringTable struct {
 }
 
 func NewReaderWithStringTable(r io.Reader) (io.Reader, error) {
-	version, err := parseStringTableVersion(r)
+	r, version, err := parseStringTableVersion(r)
 	if err != nil {
 		return nil, err
 	}
@@ -55,18 +55,20 @@ func NewReaderWithStringTable(r io.Reader) (io.Reader, error) {
 	}, nil
 }
 
-func parseStringTableVersion(r io.Reader) (int, error) {
+func parseStringTableVersion(r io.Reader) (io.Reader, int, error) {
 	version := 0
+	b := make([]byte, 1)
 	for {
-		b := make([]byte, 1)
 		if n, err := r.Read(b); n != 1 || err != nil {
-			return 0, err
-		} else if b[0] == byte(',') || b[0] == byte(':') || b[0] == byte('}') || b[0] == byte(']') {
-			return version, nil
+			return nil, 0, err
+		} else if b[0] == byte(',') {
+			return r, version, nil
+		} else if b[0] == byte(']') {
+			return bytes.NewReader(b), version, nil
 		} else if b[0] >= byte('0') && b[0] <= byte('9') {
 			version = 10*version + int(b[0]) - int('0')
 		} else {
-			return 0, fmt.Errorf("expecting a digit between 0 and 9 but got: %v", b[0])
+			return nil, 0, fmt.Errorf("expecting a digit between 0 and 9 but got: %v", b[0])
 		}
 	}
 }

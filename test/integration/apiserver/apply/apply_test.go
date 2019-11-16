@@ -527,27 +527,16 @@ func TestApplyManagedFields(t *testing.T) {
 					"operation": "Apply",
 					"apiVersion": "v1",
 					"time": "` + accessor.GetManagedFields()[0].Time.UTC().Format(time.RFC3339) + `",
-					"fieldsType": "FieldsV1",
-					"fieldsV1": {
-						"f:metadata": {
-							"f:labels": {
-								"f:test-label": {}
-							}
-						}
-					}
+					"fieldsType": "FieldsV2",
+					"fieldsV2": "WzIsNCwhRFosWzQsIUJrLFswLCJ0ZXN0LWxhYmVsIl1dXQ=="
 				},
 				{
 					"manager": "updater",
 					"operation": "Update",
 					"apiVersion": "v1",
 					"time": "` + accessor.GetManagedFields()[1].Time.UTC().Format(time.RFC3339) + `",
-					"fieldsType": "FieldsV1",
-					"fieldsV1": {
-						"f:data": {
-							"f:key": {},
-							"f:new-key": {}
-						}
-					}
+					"fieldsType": "FieldsV2",
+					"fieldsV2": "WzIsNCwhWSxbMCwhSSwwLCJuZXcta2V5Il1d"
 				}
 			]
 		},
@@ -991,10 +980,8 @@ func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
 		Operation:  metav1.ManagedFieldsOperationApply,
 		APIVersion: "apps/v1",
 		Time:       actual.Time,
-		FieldsType: "FieldsV1",
-		FieldsV1: &metav1.FieldsV1{
-			Raw: []byte(`{"f:metadata":{"f:labels":{"f:sidecar_version":{}}},"f:spec":{"f:template":{"f:spec":{"f:containers":{"k:{\"name\":\"sidecar\"}":{"f:image":{},"f:name":{},".":{}}}}}}}`),
-		},
+		FieldsType: "FieldsV2",
+		FieldsV2:   []byte(`[2,4,!DZ,[4,!Bk,[0,"sidecar_version"]],4,!r,[4,!D3,[4,!r,[4,!FB,[11,{!i:"sidecar"},[0,!5,0,!i]]]]]]`),
 	}
 
 	if !reflect.DeepEqual(actual, expected) {
