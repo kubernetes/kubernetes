@@ -29,11 +29,7 @@ import (
 )
 
 func TestExpiringCache(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	cache := NewExpiring()
-	go cache.Run(ctx)
 
 	if result, ok := cache.Get("foo"); ok || result != nil {
 		t.Errorf("Expected null, false, got %#v, %v", result, ok)
@@ -62,12 +58,8 @@ func TestExpiringCache(t *testing.T) {
 }
 
 func TestExpiration(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	fc := &utilclock.FakeClock{}
 	c := NewExpiringWithClock(fc)
-	go c.Run(ctx)
 
 	c.Set("a", "a", time.Second)
 
@@ -100,12 +92,10 @@ func TestExpiration(t *testing.T) {
 	// remove the key.
 	c.Set("a", "a", time.Second)
 
-	c.mu.Lock()
 	e := c.cache["a"]
 	e.generation++
 	e.expiry = e.expiry.Add(1 * time.Second)
 	c.cache["a"] = e
-	c.mu.Unlock()
 
 	fc.Step(1 * time.Second)
 	if _, ok := c.Get("a"); !ok {
@@ -126,12 +116,8 @@ func BenchmarkExpiringCacheContention(b *testing.B) {
 }
 
 func benchmarkExpiringCacheContention(b *testing.B, prob float64) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	const numKeys = 1 << 16
 	cache := NewExpiring()
-	go cache.Run(ctx)
 
 	keys := []string{}
 	for i := 0; i < numKeys; i++ {
@@ -166,7 +152,6 @@ func TestStressExpiringCache(t *testing.T) {
 
 	const numKeys = 1 << 16
 	cache := NewExpiring()
-	go cache.Run(ctx)
 
 	keys := []string{}
 	for i := 0; i < numKeys; i++ {
