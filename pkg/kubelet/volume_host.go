@@ -38,6 +38,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	"k8s.io/kubernetes/pkg/volume"
@@ -234,7 +235,7 @@ func (kvh *kubeletVolumeHost) GetHostIP() (net.IP, error) {
 
 func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 	node, err := kvh.kubelet.getNodeAnyWay()
-	if err != nil {
+	if err != nil && err != lifecycle.ErrNodeInfoCacheNotReady {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}
 	return node.Status.Allocatable, nil

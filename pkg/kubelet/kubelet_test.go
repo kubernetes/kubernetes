@@ -1852,6 +1852,51 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	checkPodStatus(t, kl, podToAdmit, v1.PodPending)
 }
 
+// Test verifies that the kubelet invokes an admission handler during HandlePodAdditions when nodeinfo not ready.
+func TestHandlePodAdditionsInvokesPodAdmitHandlersWithNodeInfoNotReady(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{}}
+
+	pods := []*v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       "123456789",
+				Name:      "podA",
+				Namespace: "foo",
+			},
+			Spec: v1.PodSpec{
+				NodeSelector: map[string]string{
+					"a": "a",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       "987654321",
+				Name:      "podB",
+				Namespace: "foo",
+			},
+		},
+	}
+	podToReject := pods[0]
+	podToAdmit := pods[1]
+	node, err := kl.getNodeAnyWay()
+	assert.EqualError(t, err, ErrNodeInfoCacheNotReady.Error())
+	node.Status = v1.NodeStatus{
+		Allocatable: v1.ResourceList{
+			v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+		},
+	}
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{node}}
+	kl.HandlePodAdditions(pods)
+
+	// Check pod status stored in the status map.
+	checkPodStatus(t, kl, podToReject, v1.PodFailed)
+	checkPodStatus(t, kl, podToAdmit, v1.PodPending)
+}
+
 // testPodSyncLoopHandler is a lifecycle.PodSyncLoopHandler that is used for testing.
 type testPodSyncLoopHandler struct {
 	// list of pods to sync

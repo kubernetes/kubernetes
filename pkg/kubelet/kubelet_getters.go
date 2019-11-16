@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -237,12 +238,20 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 // in which case return a manufactured nodeInfo representing a node with no pods,
 // zero capacity, and the default labels.
 func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
+	var node *v1.Node
+	var err error
 	if kl.kubeClient != nil {
-		if n, err := kl.nodeLister.Get(string(kl.nodeName)); err == nil {
-			return n, nil
+		if node, err = kl.nodeLister.Get(string(kl.nodeName)); err == nil {
+			return node, nil
 		}
+		err = lifecycyle.ErrNodeInfoCacheNotReady
 	}
-	return kl.initialNode(context.TODO())
+
+	node, e := kl.initialNode(context.TODO())
+	if e == nil {
+		e = err
+	}
+	return node, e
 }
 
 // GetNodeConfig returns the container manager node config.

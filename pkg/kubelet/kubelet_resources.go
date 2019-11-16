@@ -19,10 +19,11 @@ package kubelet
 import (
 	"fmt"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 // defaultPodLimitsForDownwardAPI copies the input pod, and optional container,
@@ -38,7 +39,7 @@ func (kl *Kubelet) defaultPodLimitsForDownwardAPI(pod *v1.Pod, container *v1.Con
 	}
 
 	node, err := kl.getNodeAnyWay()
-	if err != nil {
+	if err != nil && err == lifecycle.ErrNodeInfoCacheNotReady {
 		return nil, nil, fmt.Errorf("failed to find node object, expected a node")
 	}
 	allocatable := node.Status.Allocatable

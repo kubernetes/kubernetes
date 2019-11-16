@@ -1370,7 +1370,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	kl.StatsProvider.GetCgroupStats("/", true)
 	// Start container manager.
 	node, err := kl.getNodeAnyWay()
-	if err != nil {
+	if err != nil && err != lifecycle.ErrNodeInfoCacheNotReady {
 		// Fail kubelet and rely on the babysitter to retry starting kubelet.
 		klog.Fatalf("Kubelet failed to get node info: %v", err)
 	}

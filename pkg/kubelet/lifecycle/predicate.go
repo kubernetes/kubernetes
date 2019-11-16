@@ -17,16 +17,18 @@ limitations under the License.
 package lifecycle
 
 import (
+	"errors"
 	"fmt"
-
-	"k8s.io/klog"
-
 	"k8s.io/api/core/v1"
+	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
+
+// ErrNodeInfoCacheNotReady indicates nodeInfo is not ready
+var ErrNodeInfoCacheNotReady = errors.New("nodeInfo is not ready")
 
 type getNodeAnyWayFuncType func() (*v1.Node, error)
 
@@ -55,13 +57,18 @@ func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admission
 }
 
 func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	tolerant := false
 	node, err := w.getNodeAnyWayFunc()
 	if err != nil {
-		klog.Errorf("Cannot get Node info: %v", err)
-		return PodAdmitResult{
-			Admit:   false,
-			Reason:  "InvalidNodeInfo",
-			Message: "Kubelet cannot get node info.",
+		if err == ErrNodeInfoCacheNotReady {
+			tolerant = true
+		} else {
+			klog.Errorf("Cannot get Node info: %v", err)
+			return PodAdmitResult{
+				Admit:   false,
+				Reason:  "InvalidNodeInfo",
+				Message: "Kubelet cannot get node info.",
+			}
 		}
 	}
 	admitPod := attrs.Pod
@@ -90,7 +97,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
 
 	fit, reasons, err := predicates.GeneralPredicates(podWithoutMissingExtendedResources, nil, nodeInfo)
-	if err != nil {
+	if err != nil && !tolerant {
 		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
 		klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
 		return PodAdmitResult{
@@ -127,9 +134,16 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		r := reasons[0]
 		switch re := r.(type) {
 		case *predicates.PredicateFailureError:
-			reason = re.PredicateName
-			message = re.Error()
-			klog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(admitPod), message)
+			if tolerant {
+				fit = true
+				reason = re.PredicateName
+				message = ErrNodeInfoCacheNotReady.Error()
+				klog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v, but tolerant: %v", format.Pod(admitPod), message, tolerant)
+			} else {
+				reason = re.PredicateName
+				message = re.Error()
+				klog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(admitPod), message)
+			}
 		case *predicates.InsufficientResourceError:
 			reason = fmt.Sprintf("OutOf%s", re.ResourceName)
 			message = re.Error()
