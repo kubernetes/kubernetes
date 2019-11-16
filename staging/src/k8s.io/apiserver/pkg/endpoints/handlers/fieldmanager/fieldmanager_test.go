@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager_test
+package fieldmanager
 
 import (
 	"errors"
@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
 	"sigs.k8s.io/yaml"
@@ -65,7 +64,7 @@ type fakeObjectDefaulter struct{}
 func (d *fakeObjectDefaulter) Default(in runtime.Object) {}
 
 type TestFieldManager struct {
-	fieldManager fieldmanager.Manager
+	fieldManager Manager
 	emptyObj     runtime.Object
 	liveObj      runtime.Object
 }
@@ -80,7 +79,7 @@ func NewTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
 		panic(err)
 	}
 
-	f, err := fieldmanager.NewStructuredMergeManager(
+	f, err := NewStructuredMergeManager(
 		m,
 		&fakeObjectConvertor{},
 		&fakeObjectDefaulter{},
@@ -93,8 +92,8 @@ func NewTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
 	live := &unstructured.Unstructured{}
 	live.SetKind(gvk.Kind)
 	live.SetAPIVersion(gvk.GroupVersion().String())
-	f = fieldmanager.NewStripMetaManager(f)
-	f = fieldmanager.NewBuildManagerInfoManager(f, gvk.GroupVersion())
+	f = NewStripMetaManager(f)
+	f = NewBuildManagerInfoManager(f, gvk.GroupVersion())
 	return TestFieldManager{
 		fieldManager: f,
 		emptyObj:     live,
@@ -107,7 +106,7 @@ func (f *TestFieldManager) Reset() {
 }
 
 func (f *TestFieldManager) Apply(obj []byte, manager string, force bool) error {
-	out, err := fieldmanager.NewFieldManager(f.fieldManager).Apply(f.liveObj, obj, manager, force)
+	out, err := NewFieldManager(f.fieldManager).Apply(f.liveObj, obj, manager, force)
 	if err == nil {
 		f.liveObj = out
 	}
@@ -115,7 +114,7 @@ func (f *TestFieldManager) Apply(obj []byte, manager string, force bool) error {
 }
 
 func (f *TestFieldManager) Update(obj runtime.Object, manager string) error {
-	out, err := fieldmanager.NewFieldManager(f.fieldManager).Update(f.liveObj, obj, manager)
+	out, err := NewFieldManager(f.fieldManager).Update(f.liveObj, obj, manager)
 	if err == nil {
 		f.liveObj = out
 	}

@@ -33,31 +33,31 @@ func TestRoundTripManagedFields(t *testing.T) {
 	tests := []string{
 		`- apiVersion: v1
   fieldsType: FieldsV2
-  fieldsV2: WzIsNSwzLFswLCJhbHNvUGkiXSw1LDMuMTQxNSxbMCwicGkiXSw1LGZhbHNlLFswLCJub3RUcnVlIl1d
+  fieldsV2: H4sIAAAAAAAA/4o20jHVMdaJNtBRSswpzg/IVIoFCegZmhiagkULICJpiTnFqWCBvPySkKLSVKXYWAAAAAD//w==
   manager: foo
   operation: Update
 `,
 		`- apiVersion: v1
   fieldsType: FieldsV2
-  fieldsV2: WzIsNCwhcixbNCwhRkIsWzcseyFpOiJjIn0sWzAsITUsMCwhaV1dXV0=
+  fieldsV2: H4sIAAAAAAAA/4o20jHRUSzSiTbRUXRz0ok216lWzLRSSlaq1Yk20FE01THQUcyMjY2NBQAAAP//
   manager: foo
   operation: Update
 `,
 		`- apiVersion: v1
   fieldsType: FieldsV2
-  fieldsV2: WzIsMCwhRTgsMCwhZyw0LCFEWixbNCwhQmssWzAsImFwcCJdLDAsIWldLDQsIXIsWzAsIURyLDQsIUR5LFs0LCFHTSxbMCwiYXBwIl1dLDQsIUQzLFs0LCJtZWRhdGFkYSIsWzQsIUJrLFswLCJhcHAiXV0sNCwhcixbNCwhRkIsWzExLHshaToibmdpbngifSxbMCwhNSwwLCFpLDQsIUJGLFs2LDAsWzAsIUhYXV1dXV1dXV0=
+  fieldsV2: H4sIAAAAAAAA/4o20jHQUXS1AJHpOiY6ii5ROtEmOopO2TrRBjpKiQUFSrEgucxYkGQRSFDRpQissBKs0N0XoRCsxsUYJK6Um5qSWJKYkqiEYRzMJBMdRTcnnWhDQ51qxUwrpbz0zLwKpVqwDaZgK0HqnNx0os10DMCiHhGxUAAAAAD//w==
   manager: foo
   operation: Update
 `,
 		`- apiVersion: v1
   fieldsType: FieldsV2
-  fieldsV2: WzIsMCwhTFYsMCwhRTgsMCwhZyw0LCFEWixbMCwhaSw0LCFGVCxbMCwicmVzdHVybCIsMCwicmVzdHVzZXIiLDAsIUZkLDAsIUpEXV0sMCwhR1dd
+  fieldsV2: H4sIAAAAAAAA/4o20jHQUfQJA5GuFiAyXcdER9ElSifaQEcxE8R2CwGxlYpSi0tKi3KUdGDs4tQiEEfRLQVEernExoJo9/BYAAAAAP//
   manager: foo
   operation: Update
 `,
 		`- apiVersion: v1
   fieldsType: FieldsV2
-  fieldsV2: WzIsMCwhRTgsMCwhZyw0LCFEWixbMCwhaV0sNCwhcixbMCwhMyw0LCFCQSxbMCwhZywwLCFCcyw0LCFGZSxbMiwwXSwwLCFEMF0sMCwhQkosNCwhRDUsWzcseyFpOiJ2MSJ9LFswLCFpLDAsIUIyLDAsIUMwXV1dXQ==
+  fieldsV2: H4sIAAAAAAAA/4o20jHQUXS1AJHpOiY6ii5ROtEGOoqZsSBOEZhtDGI6OYLZ6SCFTsUgEbdUHZDuWJCIC4Ry8gIbYaoTba5TrZhppVRmqFQLMQ8sDbbM2SA2NjYWAAAA//8=
   manager: foo
   operation: Update
 `,

@@ -14,10 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager_test
+package fieldmanager
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -29,26 +28,26 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 )
 
 type fakeManager struct{}
 
-var _ fieldmanager.Manager = &fakeManager{}
+var _ Manager = &fakeManager{}
 
-func (*fakeManager) Update(_, newObj runtime.Object, managed fieldmanager.Managed, _ string) (runtime.Object, fieldmanager.Managed, error) {
+func (*fakeManager) Update(_, newObj runtime.Object, managed Managed, _ string) (runtime.Object, Managed, error) {
 	return newObj, managed, nil
 }
 
-func (*fakeManager) Apply(_ runtime.Object, _ []byte, _ fieldmanager.Managed, _ string, force bool) (runtime.Object, fieldmanager.Managed, error) {
+func (*fakeManager) Apply(_ runtime.Object, _ []byte, _ Managed, _ string, force bool) (runtime.Object, Managed, error) {
 	panic("not implemented")
 	return nil, nil, nil
 }
 
 func TestCapManagersManagerMergesEntries(t *testing.T) {
 	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
-	f.fieldManager = fieldmanager.NewCapManagersManager(f.fieldManager, 3)
+	f.fieldManager = NewCapManagersManager(f.fieldManager, 3)
 
 	podWithLabels := func(labels ...string) runtime.Object {
 		labelMap := map[string]interface{}{}
@@ -111,14 +110,14 @@ func TestCapManagersManagerMergesEntries(t *testing.T) {
 
 func TestCapUpdateManagers(t *testing.T) {
 	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
-	f.fieldManager = fieldmanager.NewCapManagersManager(&fakeManager{}, 3)
+	f.fieldManager = NewCapManagersManager(&fakeManager{}, 3)
 
 	set := func(fields ...string) []byte {
 		s := fieldpath.NewSet()
 		for _, f := range fields {
 			s.Insert(fieldpath.MakePathOrDie(f))
 		}
-		b, err := s.ToJSON_V2Experimental()
+		b, err := internal.SetToFieldsV2(*s)
 		if err != nil {
 			panic(fmt.Sprintf("error building ManagedFieldsEntry for test: %v", err))
 		}
@@ -263,8 +262,7 @@ func expectIdempotence(t *testing.T, f TestFieldManager) {
 func expectManagesField(t *testing.T, f TestFieldManager, m string, p fieldpath.Path) {
 	for _, e := range f.ManagedFields() {
 		if e.Manager == m {
-			var s fieldpath.Set
-			err := s.FromJSON(bytes.NewReader(e.FieldsV2))
+			s, err := internal.FieldsToSetV2(e.FieldsV2)
 			if err != nil {
 				t.Fatalf("error parsing managedFields for %v: %v: %#v", m, err, f.ManagedFields())
 			}
