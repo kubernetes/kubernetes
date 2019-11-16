@@ -17,203 +17,55 @@ limitations under the License.
 package value
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
-// A Value is an object; it corresponds to an 'atom' in the schema.
-type Value struct {
-	// Exactly one of the below must be set.
-	FloatValue   *Float
-	IntValue     *Int
-	StringValue  *String
-	BooleanValue *Boolean
-	ListValue    *List
-	MapValue     *Map
-	Null         bool // represents an explicit `"foo" = null`
+var (
+	readPool  = jsoniter.NewIterator(jsoniter.ConfigCompatibleWithStandardLibrary).Pool()
+	writePool = jsoniter.NewStream(jsoniter.ConfigCompatibleWithStandardLibrary, nil, 1024).Pool()
+)
+
+func FromJSON(input []byte) (Value, error) {
+	return FromJSONFast(input)
 }
 
-// Equals returns true iff the two values are equal.
-func (v Value) Equals(rhs Value) bool {
-	if v.FloatValue != nil || rhs.FloatValue != nil {
-		var lf float64
-		if v.FloatValue != nil {
-			lf = float64(*v.FloatValue)
-		} else if v.IntValue != nil {
-			lf = float64(*v.IntValue)
-		} else {
-			return false
-		}
-		var rf float64
-		if rhs.FloatValue != nil {
-			rf = float64(*rhs.FloatValue)
-		} else if rhs.IntValue != nil {
-			rf = float64(*rhs.IntValue)
-		} else {
-			return false
-		}
-		return lf == rf
-	}
-	if v.IntValue != nil {
-		if rhs.IntValue != nil {
-			return *v.IntValue == *rhs.IntValue
-		}
-		return false
-	}
-	if v.StringValue != nil {
-		if rhs.StringValue != nil {
-			return *v.StringValue == *rhs.StringValue
-		}
-		return false
-	}
-	if v.BooleanValue != nil {
-		if rhs.BooleanValue != nil {
-			return *v.BooleanValue == *rhs.BooleanValue
-		}
-		return false
-	}
-	if v.ListValue != nil {
-		if rhs.ListValue != nil {
-			return v.ListValue.Equals(rhs.ListValue)
-		}
-		return false
-	}
-	if v.MapValue != nil {
-		if rhs.MapValue != nil {
-			return v.MapValue.Equals(rhs.MapValue)
-		}
-		return false
-	}
-	if v.Null {
-		if rhs.Null {
-			return true
-		}
-		return false
-	}
-	// No field is set, on either objects.
-	return true
+func FromJSONFast(input []byte) (Value, error) {
+	iter := readPool.BorrowIterator(input)
+	defer readPool.ReturnIterator(iter)
+	return ReadJSONIter(iter)
 }
 
-// Less provides a total ordering for Value (so that they can be sorted, even
-// if they are of different types).
-func (v Value) Less(rhs Value) bool {
-	return v.Compare(rhs) == -1
+func ToJSON(v Value) ([]byte, error) {
+	buf := bytes.Buffer{}
+	stream := writePool.BorrowStream(&buf)
+	defer writePool.ReturnStream(stream)
+	WriteJSONStream(v, stream)
+	b := stream.Buffer()
+	err := stream.Flush()
+	// Help jsoniter manage its buffers--without this, the next
+	// use of the stream is likely to require an allocation. Look
+	// at the jsoniter stream code to understand why. They were probably
+	// optimizing for folks using the buffer directly.
+	stream.SetBuffer(b[:0])
+	return buf.Bytes(), err
 }
 
-// Compare provides a total ordering for Value (so that they can be
-// sorted, even if they are of different types). The result will be 0 if
-// v==rhs, -1 if v < rhs, and +1 if v > rhs.
-func (v Value) Compare(rhs Value) int {
-	if v.FloatValue != nil {
-		if rhs.FloatValue == nil {
-			// Extra: compare floats and ints numerically.
-			if rhs.IntValue != nil {
-				return v.FloatValue.Compare(Float(*rhs.IntValue))
-			}
-			return -1
-		}
-		return v.FloatValue.Compare(*rhs.FloatValue)
-	} else if rhs.FloatValue != nil {
-		// Extra: compare floats and ints numerically.
-		if v.IntValue != nil {
-			return Float(*v.IntValue).Compare(*rhs.FloatValue)
-		}
-		return 1
+func ReadJSONIter(iter *jsoniter.Iterator) (Value, error) {
+	v := iter.Read()
+	if iter.Error != nil && iter.Error != io.EOF {
+		return nil, iter.Error
 	}
-
-	if v.IntValue != nil {
-		if rhs.IntValue == nil {
-			return -1
-		}
-		return v.IntValue.Compare(*rhs.IntValue)
-	} else if rhs.IntValue != nil {
-		return 1
-	}
-
-	if v.StringValue != nil {
-		if rhs.StringValue == nil {
-			return -1
-		}
-		return strings.Compare(string(*v.StringValue), string(*rhs.StringValue))
-	} else if rhs.StringValue != nil {
-		return 1
-	}
-
-	if v.BooleanValue != nil {
-		if rhs.BooleanValue == nil {
-			return -1
-		}
-		return v.BooleanValue.Compare(*rhs.BooleanValue)
-	} else if rhs.BooleanValue != nil {
-		return 1
-	}
-
-	if v.ListValue != nil {
-		if rhs.ListValue == nil {
-			return -1
-		}
-		return v.ListValue.Compare(rhs.ListValue)
-	} else if rhs.ListValue != nil {
-		return 1
-	}
-	if v.MapValue != nil {
-		if rhs.MapValue == nil {
-			return -1
-		}
-		return v.MapValue.Compare(rhs.MapValue)
-	} else if rhs.MapValue != nil {
-		return 1
-	}
-	if v.Null {
-		if !rhs.Null {
-			return -1
-		}
-		return 0
-	} else if rhs.Null {
-		return 1
-	}
-
-	// Invalid Value-- nothing is set.
-	return 0
+	return ValueInterface{Value: v}, nil
 }
 
-type Int int64
-type Float float64
-type String string
-type Boolean bool
-
-// Compare compares integers. The result will be 0 if i==rhs, -1 if i <
-// rhs, and +1 if i > rhs.
-func (i Int) Compare(rhs Int) int {
-	if i > rhs {
-		return 1
-	} else if i < rhs {
-		return -1
-	}
-	return 0
-}
-
-// Compare compares floats. The result will be 0 if f==rhs, -1 if f <
-// rhs, and +1 if f > rhs.
-func (f Float) Compare(rhs Float) int {
-	if f > rhs {
-		return 1
-	} else if f < rhs {
-		return -1
-	}
-	return 0
-}
-
-// Compare compares booleans. The result will be 0 if b==rhs, -1 if b <
-// rhs, and +1 if b > rhs.
-func (b Boolean) Compare(rhs Boolean) int {
-	if b == rhs {
-		return 0
-	} else if b == false {
-		return -1
-	}
-	return 1
+func WriteJSONStream(v Value, stream *jsoniter.Stream) {
+	stream.WriteVal(v.Interface())
 }
 
 // Field is an individual key-value pair.
@@ -244,295 +96,474 @@ func (f FieldList) Sort() {
 
 // Less compares two lists lexically.
 func (f FieldList) Less(rhs FieldList) bool {
-	return f.Compare(rhs) == -1
-}
-
-// Less compares two lists lexically. The result will be 0 if f==rhs, -1
-// if f < rhs, and +1 if f > rhs.
-func (f FieldList) Compare(rhs FieldList) int {
 	i := 0
 	for {
 		if i >= len(f) && i >= len(rhs) {
 			// Maps are the same length and all items are equal.
-			return 0
+			return false
 		}
 		if i >= len(f) {
 			// F is shorter.
-			return -1
+			return true
 		}
 		if i >= len(rhs) {
 			// RHS is shorter.
-			return 1
-		}
-		if c := strings.Compare(f[i].Name, rhs[i].Name); c != 0 {
-			return c
-		}
-		if c := f[i].Value.Compare(rhs[i].Value); c != 0 {
-			return c
-		}
-		// The items are equal; continue.
-		i++
-	}
-}
-
-// List is a list of items.
-type List struct {
-	Items []Value
-}
-
-// Equals compares two lists lexically.
-func (l *List) Equals(rhs *List) bool {
-	if len(l.Items) != len(rhs.Items) {
-		return false
-	}
-
-	for i, lv := range l.Items {
-		if !lv.Equals(rhs.Items[i]) {
 			return false
 		}
-	}
-	return true
-}
-
-// Less compares two lists lexically.
-func (l *List) Less(rhs *List) bool {
-	return l.Compare(rhs) == -1
-}
-
-// Compare compares two lists lexically. The result will be 0 if l==rhs, -1
-// if l < rhs, and +1 if l > rhs.
-func (l *List) Compare(rhs *List) int {
-	i := 0
-	for {
-		if i >= len(l.Items) && i >= len(rhs.Items) {
-			// Lists are the same length and all items are equal.
-			return 0
+		if f[i].Name != rhs[i].Name {
+			// the map having the field name that sorts lexically less is "less"
+			return f[i].Name < rhs[i].Name
 		}
-		if i >= len(l.Items) {
-			// LHS is shorter.
-			return -1
+		if Less(f[i].Value, rhs[i].Value) {
+			// F is less; return
+			return true
 		}
-		if i >= len(rhs.Items) {
-			// RHS is shorter.
-			return 1
-		}
-		if c := l.Items[i].Compare(rhs.Items[i]); c != 0 {
-			return c
+		if Less(rhs[i].Value, f[i].Value) {
+			// RHS is less; return
+			return false
 		}
 		// The items are equal; continue.
 		i++
 	}
 }
 
-// Map is a map of key-value pairs. It represents both structs and maps. We use
-// a list and a go-language map to preserve order.
-//
-// Set and Get helpers are provided.
-type Map struct {
-	Items []Field
+type Value interface {
+	IsMap() bool
+	IsList() bool
+	IsBool() bool
+	IsInt() bool
+	IsFloat() bool
+	IsString() bool
+	IsNull() bool
 
-	// may be nil; lazily constructed.
-	// TODO: Direct modifications to Items above will cause serious problems.
-	index map[string]int
-	// may be empty; lazily constructed.
-	// TODO: Direct modifications to Items above will cause serious problems.
-	order []int
+	Map() Map
+	List() List
+	Bool() bool
+	Int() int64
+	Float() float64
+	String() string
+
+	Interface() interface{}
 }
 
-func (m *Map) computeOrder() []int {
-	if len(m.order) != len(m.Items) {
-		m.order = make([]int, len(m.Items))
-		for i := range m.order {
-			m.order[i] = i
-		}
-		sort.SliceStable(m.order, func(i, j int) bool {
-			return m.Items[m.order[i]].Name < m.Items[m.order[j]].Name
+type List interface {
+	Interface() []interface{}
+	Length() int
+	Iterate(func(int, Value))
+	At(int) Value
+}
+
+type ValueInterface struct {
+	Value interface{}
+}
+
+func (v ValueInterface) IsMap() bool {
+	if _, ok := v.Value.(map[string]interface{}); ok {
+		return true
+	}
+	if _, ok := v.Value.(map[interface{}]interface{}); ok {
+		return true
+	}
+	return false
+}
+
+func (v ValueInterface) Map() Map {
+	if v.Value == nil {
+		return MapString(nil)
+	}
+	switch t := v.Value.(type) {
+	case map[string]interface{}:
+		return MapString(t)
+	case map[interface{}]interface{}:
+		return MapInterface(t)
+	}
+	panic(fmt.Errorf("not a map: %#v", v))
+}
+
+func (v ValueInterface) IsList() bool {
+	if v.Value == nil {
+		return false
+	}
+	_, ok := v.Value.([]interface{})
+	return ok
+}
+
+func (v ValueInterface) List() List {
+	return ListInterface(v.Value.([]interface{}))
+}
+
+func (v ValueInterface) IsFloat() bool {
+	if v.Value == nil {
+		return false
+	} else if _, ok := v.Value.(float64); ok {
+		return true
+	} else if _, ok := v.Value.(float32); ok {
+		return true
+	}
+	return false
+}
+
+func (v ValueInterface) Float() float64 {
+	if f, ok := v.Value.(float32); ok {
+		return float64(f)
+	}
+	return v.Value.(float64)
+}
+
+func (v ValueInterface) IsInt() bool {
+	if v.Value == nil {
+		return false
+	} else if _, ok := v.Value.(int); ok {
+		return true
+	} else if _, ok := v.Value.(int8); ok {
+		return true
+	} else if _, ok := v.Value.(int16); ok {
+		return true
+	} else if _, ok := v.Value.(int32); ok {
+		return true
+	} else if _, ok := v.Value.(int64); ok {
+		return true
+	}
+	return false
+}
+
+func (v ValueInterface) Int() int64 {
+	if i, ok := v.Value.(int); ok {
+		return int64(i)
+	} else if i, ok := v.Value.(int8); ok {
+		return int64(i)
+	} else if i, ok := v.Value.(int16); ok {
+		return int64(i)
+	} else if i, ok := v.Value.(int32); ok {
+		return int64(i)
+	}
+	return v.Value.(int64)
+}
+
+func (v ValueInterface) IsString() bool {
+	if v.Value == nil {
+		return false
+	}
+	_, ok := v.Value.(string)
+	return ok
+}
+
+func (v ValueInterface) String() string {
+	return v.Value.(string)
+}
+
+func (v ValueInterface) IsBool() bool {
+	if v.Value == nil {
+		return false
+	}
+	_, ok := v.Value.(bool)
+	return ok
+}
+
+func (v ValueInterface) Bool() bool {
+	return v.Value.(bool)
+}
+
+func (v ValueInterface) IsNull() bool {
+	return v.Value == nil
+}
+
+func (v ValueInterface) Interface() interface{} {
+	return v.Value
+}
+
+type ListInterface []interface{}
+
+func (l ListInterface) Interface() []interface{} {
+	return l
+}
+
+func (l ListInterface) Length() int {
+	return len(l)
+}
+
+func (l ListInterface) At(i int) Value {
+	return ValueInterface{Value: l[i]}
+}
+
+func (l ListInterface) Iterate(iter func(int, Value)) {
+	for i, val := range l {
+		iter(i, ValueInterface{Value: val})
+	}
+}
+
+func Copy(v Value) Value {
+	if v.IsList() {
+		l := make([]interface{}, 0, v.List().Length())
+		v.List().Iterate(func(_ int, item Value) {
+			l = append(l, Copy(ValueInterface{Value: item}))
 		})
+		return ValueInterface{Value: l}
 	}
-	return m.order
+	if v.IsMap() {
+		m := make(map[string]interface{}, v.Map().Length())
+		v.Map().Iterate(func(key string, item Value) bool {
+			m[key] = Copy(item)
+			return true
+		})
+		return ValueInterface{Value: m}
+	}
+	// Scalars don't have to be copied
+	return v
 }
 
-// Equals compares two maps lexically.
-func (m *Map) Equals(rhs *Map) bool {
-	if len(m.Items) != len(rhs.Items) {
+func ToString(v Value) string {
+	if v.IsNull() {
+		return "null"
+	}
+	switch {
+	case v.IsFloat():
+		return fmt.Sprintf("%v", v.Float())
+	case v.IsInt():
+		return fmt.Sprintf("%v", v.Int())
+	case v.IsString():
+		return fmt.Sprintf("%q", v.String())
+	case v.IsBool():
+		return fmt.Sprintf("%v", v.Bool())
+	case v.IsList():
+		strs := []string{}
+		v.List().Iterate(func(_ int, item Value) {
+			strs = append(strs, ToString(item))
+		})
+		return "[" + strings.Join(strs, ",") + "]"
+	case v.IsMap():
+		strs := []string{}
+		v.Map().Iterate(func(k string, v Value) bool {
+			strs = append(strs, fmt.Sprintf("%v=%v", k, ToString(v)))
+			return true
+		})
+		return "{" + strings.Join(strs, ";") + "}"
+	}
+	return fmt.Sprintf("{{undefined(%#v)}}", v)
+}
+
+// Equals returns true iff the two values are equal.
+func Equals(lhs, rhs Value) bool {
+	return !Less(lhs, rhs) && !Less(rhs, lhs)
+}
+
+// Less provides a total ordering for Value (so that they can be sorted, even
+// if they are of different types).
+func Less(lhs, rhs Value) bool {
+	if lhs.IsFloat() {
+		if !rhs.IsFloat() {
+			// Extra: compare floats and ints numerically.
+			if rhs.IsInt() {
+				return lhs.Float() < float64(rhs.Int())
+			}
+			return true
+		}
+		return lhs.Float() < rhs.Float()
+	} else if rhs.IsFloat() {
+		// Extra: compare floats and ints numerically.
+		if lhs.IsInt() {
+			return float64(lhs.Int()) < rhs.Float()
+		}
 		return false
 	}
-	for _, lfield := range m.Items {
-		rfield, ok := rhs.Get(lfield.Name)
-		if !ok {
+
+	if lhs.IsInt() {
+		if !rhs.IsInt() {
+			return true
+		}
+		return lhs.Int() < rhs.Int()
+	} else if rhs.IsInt() {
+		return false
+	}
+
+	if lhs.IsString() {
+		if !rhs.IsString() {
+			return true
+		}
+		return lhs.String() < rhs.String()
+	} else if rhs.IsString() {
+		return false
+	}
+
+	if lhs.IsBool() {
+		if !rhs.IsBool() {
+			return true
+		}
+		if lhs.Bool() == rhs.Bool() {
 			return false
 		}
-		if !lfield.Value.Equals(rfield.Value) {
+		return lhs.Bool() == false
+	} else if rhs.IsBool() {
+		return false
+	}
+
+	if lhs.IsList() {
+		if !rhs.IsList() {
+			return true
+		}
+		return ListLess(lhs.List(), rhs.List())
+	} else if rhs.IsList() {
+		return false
+	}
+	if lhs.IsMap() {
+		if !rhs.IsMap() {
+			return true
+		}
+		return MapLess(lhs.Map(), rhs.Map())
+	} else if rhs.IsMap() {
+		return false
+	}
+	if lhs.IsNull() {
+		if !rhs.IsNull() {
+			return true
+		}
+		return false
+	} else if rhs.IsNull() {
+		return false
+	}
+
+	// Invalid Value-- nothing is set.
+	return false
+}
+
+func ListLess(lhs, rhs List) bool {
+	i := 0
+	for {
+		if i >= lhs.Length() && i >= rhs.Length() {
+			// Lists are the same length and all items are equal.
 			return false
 		}
+		if i >= lhs.Length() {
+			// LHS is shorter.
+			return true
+		}
+		if i >= rhs.Length() {
+			// RHS is shorter.
+			return false
+		}
+		if Less(lhs.At(i), rhs.At(i)) {
+			// LHS is less; return
+			return true
+		}
+		if Less(rhs.At(i), lhs.At(i)) {
+			// RHS is less; return
+			return false
+		}
+		// The items are equal; continue.
+		i++
 	}
-	return true
 }
 
-// Less compares two maps lexically.
-func (m *Map) Less(rhs *Map) bool {
-	return m.Compare(rhs) == -1
-}
-
-// Compare compares two maps lexically.
-func (m *Map) Compare(rhs *Map) int {
-	var noAllocL, noAllocR [2]int
-	var morder, rorder []int
-
-	// For very short maps (<2 elements) this permits us to avoid
-	// allocating the order array. We could make this accomodate larger
-	// maps, but 2 items should be enough to cover most path element
-	// comparisons, and at some point there will be diminishing returns.
-	// This has a large effect on the path element deserialization test,
-	// because everything is sorted / compared, but only once.
-	switch len(m.Items) {
-	case 0:
-		morder = noAllocL[0:0]
-	case 1:
-		morder = noAllocL[0:1]
-	case 2:
-		morder = noAllocL[0:2]
-		if m.Items[0].Name > m.Items[1].Name {
-			morder[0] = 1
-		} else {
-			morder[1] = 1
-		}
-	default:
-		morder = m.computeOrder()
-	}
-
-	switch len(rhs.Items) {
-	case 0:
-		rorder = noAllocR[0:0]
-	case 1:
-		rorder = noAllocR[0:1]
-	case 2:
-		rorder = noAllocR[0:2]
-		if rhs.Items[0].Name > rhs.Items[1].Name {
-			rorder[0] = 1
-		} else {
-			rorder[1] = 1
-		}
-	default:
-		rorder = rhs.computeOrder()
-	}
+func MapLess(lhs, rhs Map) bool {
+	lorder := []string{}
+	lhs.Iterate(func(key string, _ Value) bool {
+		lorder = append(lorder, key)
+		return true
+	})
+	sort.Strings(lorder)
+	rorder := []string{}
+	rhs.Iterate(func(key string, _ Value) bool {
+		rorder = append(rorder, key)
+		return true
+	})
+	sort.Strings(rorder)
 
 	i := 0
 	for {
-		if i >= len(morder) && i >= len(rorder) {
+		if i >= len(lorder) && i >= len(rorder) {
 			// Maps are the same length and all items are equal.
-			return 0
+			return false
 		}
-		if i >= len(morder) {
+		if i >= len(lorder) {
 			// LHS is shorter.
-			return -1
+			return true
 		}
 		if i >= len(rorder) {
 			// RHS is shorter.
-			return 1
+			return false
 		}
-		fa, fb := &m.Items[morder[i]], &rhs.Items[rorder[i]]
-		if c := strings.Compare(fa.Name, fb.Name); c != 0 {
-			return c
+		aname, bname := lorder[i], rorder[i]
+		if aname != bname {
+			// the map having the field name that sorts lexically less is "less"
+			return aname < bname
 		}
-		if c := fa.Value.Compare(fb.Value); c != 0 {
-			return c
+		aval, _ := lhs.Get(aname)
+		bval, _ := rhs.Get(bname)
+		if Less(aval, bval) {
+			// LHS is less; return
+			return true
+		}
+		if Less(bval, aval) {
+			// RHS is less; return
+			return false
 		}
 		// The items are equal; continue.
 		i++
 	}
 }
 
-// Get returns the (Field, true) or (nil, false) if it is not present
-func (m *Map) Get(key string) (*Field, bool) {
-	if m.index == nil {
-		m.index = map[string]int{}
-		for i := range m.Items {
-			m.index[m.Items[i].Name] = i
+type Map interface {
+	Length() int
+	Get(string) (Value, bool)
+	Set(string, Value)
+	Delete(string)
+	Iterate(func(string, Value) bool)
+}
+
+type MapString map[string]interface{}
+
+func (m MapString) Length() int {
+	return len(m)
+}
+
+func (m MapString) Get(key string) (Value, bool) {
+	val, ok := m[key]
+	return ValueInterface{Value: val}, ok
+}
+
+func (m MapString) Set(key string, val Value) {
+	m[key] = val.Interface()
+}
+
+func (m MapString) Delete(key string) {
+	delete(m, key)
+}
+
+func (m MapString) Iterate(iter func(string, Value) bool) {
+	for key, value := range m {
+		if !iter(key, ValueInterface{Value: value}) {
+			return
 		}
 	}
-	f, ok := m.index[key]
-	if !ok {
-		return nil, false
-	}
-	return &m.Items[f], true
 }
 
-// Set inserts or updates the given item.
-func (m *Map) Set(key string, value Value) {
-	if f, ok := m.Get(key); ok {
-		f.Value = value
-		return
-	}
-	m.Items = append(m.Items, Field{Name: key, Value: value})
-	i := len(m.Items) - 1
-	m.index[key] = i
-	m.order = nil
+type MapInterface map[interface{}]interface{}
+
+func (m MapInterface) Length() int {
+	return len(m)
 }
 
-// Delete removes the key from the set.
-func (m *Map) Delete(key string) {
-	items := []Field{}
-	for i := range m.Items {
-		if m.Items[i].Name != key {
-			items = append(items, m.Items[i])
+func (m MapInterface) Get(key string) (Value, bool) {
+	val, ok := m[key]
+	return ValueInterface{Value: val}, ok
+}
+
+func (m MapInterface) Set(key string, val Value) {
+	m[key] = val.Interface()
+}
+
+func (m MapInterface) Delete(key string) {
+	delete(m, key)
+}
+
+func (m MapInterface) Iterate(iter func(string, Value) bool) {
+	for key, value := range m {
+		vk, ok := key.(string)
+		if !ok {
+			continue
 		}
-	}
-	m.Items = items
-	m.index = nil // Since the list has changed
-	m.order = nil
-}
-
-// StringValue returns s as a scalar string Value.
-func StringValue(s string) Value {
-	s2 := String(s)
-	return Value{StringValue: &s2}
-}
-
-// IntValue returns i as a scalar numeric (integer) Value.
-func IntValue(i int) Value {
-	i2 := Int(i)
-	return Value{IntValue: &i2}
-}
-
-// FloatValue returns f as a scalar numeric (float) Value.
-func FloatValue(f float64) Value {
-	f2 := Float(f)
-	return Value{FloatValue: &f2}
-}
-
-// BooleanValue returns b as a scalar boolean Value.
-func BooleanValue(b bool) Value {
-	b2 := Boolean(b)
-	return Value{BooleanValue: &b2}
-}
-
-// String returns a human-readable representation of the value.
-func (v Value) String() string {
-	switch {
-	case v.FloatValue != nil:
-		return fmt.Sprintf("%v", *v.FloatValue)
-	case v.IntValue != nil:
-		return fmt.Sprintf("%v", *v.IntValue)
-	case v.StringValue != nil:
-		return fmt.Sprintf("%q", *v.StringValue)
-	case v.BooleanValue != nil:
-		return fmt.Sprintf("%v", *v.BooleanValue)
-	case v.ListValue != nil:
-		strs := []string{}
-		for _, item := range v.ListValue.Items {
-			strs = append(strs, item.String())
+		if !iter(vk, ValueInterface{Value: value}) {
+			return
 		}
-		return "[" + strings.Join(strs, ",") + "]"
-	case v.MapValue != nil:
-		strs := []string{}
-		for _, i := range v.MapValue.Items {
-			strs = append(strs, fmt.Sprintf("%v=%v", i.Name, i.Value))
-		}
-		return "{" + strings.Join(strs, ";") + "}"
-	default:
-		fallthrough
-	case v.Null == true:
-		return "null"
 	}
 }

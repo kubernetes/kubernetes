@@ -110,7 +110,7 @@ func PathElementString(pe fieldpath.PathElement) (string, error) {
 	case pe.Key != nil:
 		kv := map[string]json.RawMessage{}
 		for _, k := range *pe.Key {
-			b, err := k.Value.ToJSON()
+			b, err := value.ToJSON(k.Value)
 			if err != nil {
 				return "", err
 			}
@@ -127,7 +127,7 @@ func PathElementString(pe fieldpath.PathElement) (string, error) {
 		}
 		return Key + ":" + string(b), nil
 	case pe.Value != nil:
-		b, err := pe.Value.ToJSON()
+		b, err := value.ToJSON(*pe.Value)
 		if err != nil {
 			return "", err
 		}
