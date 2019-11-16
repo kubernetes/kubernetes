@@ -430,6 +430,9 @@ var _ = SIGDescribe("Kubectl client", func() {
 				"LimitRange":  true,
 				"PodPreset":   true,
 
+				// ignored for being disruptive in an e2e, and getting automatically deleted by a controller
+				"Node": true,
+
 				// ignored temporarily while waiting for bug fix.
 				"ComponentStatus":    true,
 				"ClusterRoleBinding": true,
