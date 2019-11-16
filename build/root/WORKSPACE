@@ -73,11 +73,11 @@ container_repositories()
 load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 
 container_pull(
-    name = "debian_jessie",
-    digest = "sha256:e25703ee6ab5b2fac31510323d959cdae31eebdf48e88891c549e55b25ad7e94",
-    registry = "index.docker.io",
-    repository = "library/debian",
-    tag = "jessie",  # ignored when digest provided, but kept here for documentation.
+    name = "distroless_base",
+    digest = "sha256:7fa7445dfbebae4f4b7ab0e6ef99276e96075ae42584af6286ba080750d6dfe5",
+    registry = "gcr.io",
+    repository = "distroless/base",
+    tag = "latest",  # ignored when digest provided, but kept here for documentation.
 )
 
 load("//build:workspace.bzl", "release_dependencies")
