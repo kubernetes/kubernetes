@@ -17,10 +17,9 @@ limitations under the License.
 package prober
 
 import (
-	"math/rand"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog"
@@ -126,12 +125,10 @@ func newWorker(
 
 // run periodically probes the container.
 func (w *worker) run() {
+	initialDelayPeriod := time.Duration(w.spec.InitialDelaySeconds) * time.Second
+	time.Sleep(initialDelayPeriod)
+
 	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
-
-	// If kubelet restarted the probes could be started in rapid succession.
-	// Let the worker wait for a random portion of tickerPeriod before probing.
-	time.Sleep(time.Duration(rand.Float64() * float64(probeTickerPeriod)))
-
 	probeTicker := time.NewTicker(probeTickerPeriod)
 
 	defer func() {
