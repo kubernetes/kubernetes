@@ -94,7 +94,7 @@ var Known Registrations = map[RegistrationKind]Registration{
 		// AddToSchemeFuncs must use v1alpha1scheme defined in k8s.io/kubernetes, because the schema defined in k8s.io/kube-proxy doesn't have defaulting functions
 		AddToSchemeFuncs: []AddToSchemeFunc{kubeproxyconfigv1alpha1.AddToScheme},
 		DefaulterFunc:    DefaultKubeProxyConfiguration,
-		ValidateFunc:     NoValidator("kubelet"),
+		ValidateFunc:     NoValidator("kube-proxy"),
 		EmptyValue:       &kubeproxyconfigv1alpha1.KubeProxyConfiguration{},
 		GetFromInternalConfig: func(cfg *kubeadmapi.ClusterConfiguration) (runtime.Object, bool) {
 			return cfg.ComponentConfigs.KubeProxy, cfg.ComponentConfigs.KubeProxy != nil
@@ -113,7 +113,7 @@ var Known Registrations = map[RegistrationKind]Registration{
 		// PAddToSchemeFuncs must use v1alpha1scheme defined in k8s.io/kubernetes, because the schema defined in k8s.io/kubelet doesn't have defaulting functions
 		AddToSchemeFuncs: []AddToSchemeFunc{kubeletconfigv1beta1.AddToScheme},
 		DefaulterFunc:    DefaultKubeletConfiguration,
-		ValidateFunc:     NoValidator("kube-proxy"),
+		ValidateFunc:     NoValidator("kubelet"),
 		EmptyValue:       &kubeletconfigv1beta1.KubeletConfiguration{},
 		GetFromInternalConfig: func(cfg *kubeadmapi.ClusterConfiguration) (runtime.Object, bool) {
 			return cfg.ComponentConfigs.Kubelet, cfg.ComponentConfigs.Kubelet != nil
