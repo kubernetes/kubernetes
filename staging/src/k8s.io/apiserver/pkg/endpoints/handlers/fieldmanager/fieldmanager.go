@@ -92,7 +92,7 @@ func newDefaultFieldManager(f Manager, objectCreater runtime.ObjectCreater, kind
 	f = NewStripMetaManager(f)
 	f = NewBuildManagerInfoManager(f, kind.GroupVersion())
 	f = NewCapManagersManager(f, DefaultMaxUpdateManagers)
-	f = NewSkipNonAppliedManager(f, objectCreater, kind)
+	//f = NewSkipNonAppliedManager(f, objectCreater, kind)
 	return NewFieldManager(f)
 }
 
