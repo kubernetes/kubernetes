@@ -84,6 +84,7 @@ func DeserializePathElement(s string) (PathElement, error) {
 		iter := readPool.BorrowIterator(b)
 		defer readPool.ReturnIterator(iter)
 		fields := value.FieldList{}
+
 		iter.ReadObjectCB(func(iter *jsoniter.Iterator, key string) bool {
 			v, err := value.ReadJSONIter(iter)
 			if err != nil {
@@ -134,19 +135,20 @@ func serializePathElementToWriter(w io.Writer, pe PathElement) error {
 			return err
 		}
 		stream.WriteObjectStart()
+
 		for i, field := range *pe.Key {
 			if i > 0 {
 				stream.WriteMore()
 			}
 			stream.WriteObjectField(field.Name)
-			field.Value.WriteJSONStream(stream)
+			value.WriteJSONStream(field.Value, stream)
 		}
 		stream.WriteObjectEnd()
 	case pe.Value != nil:
 		if _, err := stream.Write(peValueSepBytes); err != nil {
 			return err
 		}
-		pe.Value.WriteJSONStream(stream)
+		value.WriteJSONStream(*pe.Value, stream)
 	case pe.Index != nil:
 		if _, err := stream.Write(peIndexSepBytes); err != nil {
 			return err

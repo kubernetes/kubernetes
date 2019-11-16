@@ -76,10 +76,10 @@ func (s *PathElementValueMap) Get(pe PathElement) (value.Value, bool) {
 		return !s.members[i].PathElement.Less(pe)
 	})
 	if loc == len(s.members) {
-		return value.Value{}, false
+		return nil, false
 	}
 	if s.members[loc].PathElement.Equals(pe) {
 		return s.members[loc].Value, true
 	}
-	return value.Value{}, false
+	return nil, false
 }

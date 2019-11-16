@@ -49,17 +49,14 @@ var _ TypeConverter = DeducedTypeConverter{}
 
 // ObjectToTyped converts an object into a TypedValue with a "deduced type".
 func (DeducedTypeConverter) ObjectToTyped(obj runtime.Object) (*typed.TypedValue, error) {
-	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
-		return nil, err
-	}
-	return typed.DeducedParseableType.FromUnstructured(u)
+	return typed.DeducedParseableType.FromInterface(obj)
 }
 
 // TypedToObject transforms the typed value into a runtime.Object. That
 // is not specific to deduced type.
 func (DeducedTypeConverter) TypedToObject(value *typed.TypedValue) (runtime.Object, error) {
-	return valueToObject(value.AsValue())
+	v := value.AsValue()
+	return valueToObject(&v)
 }
 
 type typeConverter struct {
@@ -80,29 +77,30 @@ func NewTypeConverter(models proto.Models, preserveUnknownFields bool) (TypeConv
 }
 
 func (c *typeConverter) ObjectToTyped(obj runtime.Object) (*typed.TypedValue, error) {
-	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
-		return nil, err
-	}
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	t := c.parser.Type(gvk)
 	if t == nil {
 		return nil, newNoCorrespondingTypeError(gvk)
 	}
-	return t.FromUnstructured(u)
+	return t.FromInterface(obj)
 }
 
 func (c *typeConverter) TypedToObject(value *typed.TypedValue) (runtime.Object, error) {
-	return valueToObject(value.AsValue())
+	v := value.AsValue()
+	return valueToObject(&v)
 }
 
-func valueToObject(value *value.Value) (runtime.Object, error) {
-	vu := value.ToUnstructured(false)
-	u, ok := vu.(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("failed to convert typed to unstructured: want map, got %T", vu)
+func valueToObject(val *value.Value) (runtime.Object, error) {
+	v := *val
+	vu :=  v.Interface()
+	switch o := vu.(type) {
+	case map[string]interface{}:
+		return &unstructured.Unstructured{Object: o}, nil
+	case runtime.Object:
+		return o, nil
+	default:
+		return nil, fmt.Errorf("failed to convert typed to runtime.Object or unstructured for type %T", vu)
 	}
-	return &unstructured.Unstructured{Object: u}, nil
 }
 
 type noCorrespondingTypeErr struct {
