@@ -14,8 +14,6 @@
 
 .PHONY: all push container clean orphan all-push push-manifest
 
-include ../../hack/make-rules/Makefile.manifest
-
 REGISTRY ?= staging-k8s.gcr.io
 IMAGE = $(REGISTRY)/pause
 IMAGE_WITH_ARCH = $(IMAGE)-$(ARCH)
@@ -31,6 +29,12 @@ ALL_ARCH = amd64 arm arm64 ppc64le s390x
 CFLAGS = -Os -Wall -Werror -static -DVERSION=v$(TAG)-$(REV)
 KUBE_CROSS_IMAGE ?= k8s.gcr.io/kube-cross
 KUBE_CROSS_VERSION ?= $(shell cat ../build-image/cross/VERSION)
+DOCKER_VERSION ?= $(shell docker version --format '{{.Client.Version}}' | cut -d"-" -f1 | gawk -F. '{ printf("%02d%02d%02d\n", $$1,$$2,$$3); }')
+
+ifeq ($(shell test $(DOCKER_VERSION) -gt 180600; echo $$?),0)
+	DOCKER_CLI_EXPERIMENTAL ?= enabled
+	export DOCKER_CLI_EXPERIMENTAL
+endif
 
 BIN = pause
 SRCS = pause.c
@@ -59,9 +63,6 @@ endif
 all: all-container
 
 all-push: all-push-images push-manifest
-
-push-manifest: manifest-tool
-	manifest-tool push from-args --platforms $(call join_platforms,$(ALL_ARCH)) --template $(IMAGE)-ARCH:$(TAG) --target $(IMAGE):$(TAG)
 
 sub-container-%:
 	$(MAKE) ARCH=$* container
@@ -93,6 +94,11 @@ push: .push-$(ARCH)
 .push-$(ARCH): .container-$(ARCH)
 	docker push $(IMAGE_WITH_ARCH):$(TAG)
 	touch $@
+
+push-manifest:
+	docker manifest create --amend $(IMAGE):$(TAG) $(foreach ALL_ARCH,$(ALL_ARCH),$(IMAGE)-$(ALL_ARCH):$(TAG))
+	docker manifest annotate --arch $(ARCH) $(IMAGE):$(TAG) $(IMAGE_WITH_ARCH):$(TAG)
+	docker manifest push --purge $(IMAGE):$(TAG)
 
 # Useful for testing, not automatically included in container image
 orphan: bin/orphan-$(ARCH)
