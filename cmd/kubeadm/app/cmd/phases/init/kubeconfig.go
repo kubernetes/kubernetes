@@ -20,11 +20,13 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 var (
@@ -117,7 +119,7 @@ func runKubeConfig(c workflow.RunData) error {
 		return errors.New("kubeconfig phase invoked with an invalid data struct")
 	}
 
-	fmt.Printf("[kubeconfig] Using kubeconfig folder %q\n", data.KubeConfigDir())
+	kubeadmlog.Infof("[kubeconfig] Using kubeconfig folder %q\n", data.KubeConfigDir())
 	return nil
 }
 
@@ -131,7 +133,7 @@ func runKubeConfigFile(kubeConfigFileName string) func(workflow.RunData) error {
 
 		// if external CA mode, skip certificate authority generation
 		if data.ExternalCA() {
-			fmt.Printf("[kubeconfig] External CA mode: Using user provided %s\n", kubeConfigFileName)
+			kubeadmlog.Infof("[kubeconfig] External CA mode: Using user provided %s\n", kubeConfigFileName)
 			return nil
 		}
 

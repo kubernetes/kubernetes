@@ -17,18 +17,17 @@ limitations under the License.
 package uploadconfig
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
+
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 const (
@@ -41,7 +40,7 @@ const (
 // ResetClusterStatusForNode removes the APIEndpoint of a given control-plane node
 // from the ClusterStatus and updates the kubeadm ConfigMap
 func ResetClusterStatusForNode(nodeName string, client clientset.Interface) error {
-	fmt.Printf("[reset] Removing info for node %q from the ConfigMap %q in the %q Namespace\n",
+	kubeadmlog.Infof("[reset] Removing info for node %q from the ConfigMap %q in the %q Namespace\n",
 		nodeName, kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 
 	return apiclient.MutateConfigMap(client, metav1.ObjectMeta{
@@ -55,7 +54,7 @@ func ResetClusterStatusForNode(nodeName string, client clientset.Interface) erro
 				return errors.Errorf("APIEndpoints from ConfigMap %q in the %q Namespace is nil",
 					kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 			}
-			klog.V(2).Infof("Removing APIEndpoint for Node %q", nodeName)
+			kubeadmlog.V(2).Infof("Removing APIEndpoint for Node %q", nodeName)
 			delete(cs.APIEndpoints, nodeName)
 			return nil
 		})
@@ -64,7 +63,7 @@ func ResetClusterStatusForNode(nodeName string, client clientset.Interface) erro
 
 // UploadConfiguration saves the InitConfiguration used for later reference (when upgrading for instance)
 func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
-	fmt.Printf("[upload-config] Storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+	kubeadmlog.Infof("[upload-config] Storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 
 	// Prepare the ClusterConfiguration for upload
 	// The components store their config in their own ConfigMaps, then reset the .ComponentConfig struct;

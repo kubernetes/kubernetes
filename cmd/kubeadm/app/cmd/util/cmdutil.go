@@ -22,9 +22,9 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // SubCmdRunE returns a function that handles a case where a subcommand must be specified
@@ -76,7 +76,7 @@ func GetKubeConfigPath(file string) string {
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
 	rules.Precedence = append(rules.Precedence, kubeadmconstants.GetAdminKubeConfigPath())
 	file = rules.GetDefaultFilename()
-	klog.V(1).Infof("Using kubeconfig file: %s", file)
+	kubeadmlog.V(1).Infof("Using kubeconfig file: %s", file)
 	return file
 }
 

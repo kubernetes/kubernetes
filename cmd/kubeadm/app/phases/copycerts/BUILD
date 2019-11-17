@@ -11,6 +11,7 @@ go_library(
         "//cmd/kubeadm/app/phases/bootstraptoken/node:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//cmd/kubeadm/app/util/crypto:go_default_library",
+        "//cmd/kubeadm/app/util/log:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -21,7 +22,6 @@ go_library(
         "//staging/src/k8s.io/client-go/util/keyutil:go_default_library",
         "//staging/src/k8s.io/cluster-bootstrap/token/util:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

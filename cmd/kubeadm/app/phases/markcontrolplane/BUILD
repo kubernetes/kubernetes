@@ -27,6 +27,7 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
+        "//cmd/kubeadm/app/util/log:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
     ],

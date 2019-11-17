@@ -19,14 +19,13 @@ package componentconfigs
 import (
 	"path/filepath"
 
-	"k8s.io/klog"
-
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -177,6 +176,6 @@ func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 // warnDefaultComponentConfigValue prints a warning if the user modified a field in a certain
 // CompomentConfig from the default recommended value in kubeadm.
 func warnDefaultComponentConfigValue(componentConfigKind, paramName string, defaultValue, userValue interface{}) {
-	klog.Warningf("The recommended value for %q in %q is: %v; the provided value is: %v",
+	kubeadmlog.Warningf("The recommended value for %q in %q is: %v; the provided value is: %v",
 		paramName, componentConfigKind, defaultValue, userValue)
 }

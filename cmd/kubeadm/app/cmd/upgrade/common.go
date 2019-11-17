@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -43,6 +42,7 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 func getK8sVersionFromUserInput(flags *applyPlanFlags, args []string, versionIsMandatory bool) (string, error) {
@@ -87,11 +87,11 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	}
 
 	// Fetch the configuration from a file or ConfigMap and validate it
-	fmt.Println("[upgrade/config] Making sure the configuration is correct:")
+	kubeadmlog.Infoln("[upgrade/config] Making sure the configuration is correct:")
 
 	var cfg *kubeadmapi.InitConfiguration
 	if flags.cfgPath != "" {
-		klog.Warning("WARNING: Usage of the --config flag for reconfiguring the cluster during upgrade is not recommended!")
+		kubeadmlog.Warning("WARNING: Usage of the --config flag for reconfiguring the cluster during upgrade is not recommended!")
 		cfg, err = configutil.LoadInitConfigurationFromFile(flags.cfgPath)
 	} else {
 		cfg, err = configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade/config", false)
@@ -99,14 +99,14 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			fmt.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
-			fmt.Println("[upgrade/config] Without this information, 'kubeadm upgrade' won't know how to configure your upgraded cluster.")
-			fmt.Println("")
-			fmt.Println("[upgrade/config] Next steps:")
-			fmt.Printf("\t- OPTION 1: Run 'kubeadm config upload from-flags' and specify the same CLI arguments you passed to 'kubeadm init' when you created your control-plane.\n")
-			fmt.Printf("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your control-plane.\n")
-			fmt.Printf("\t- OPTION 3: Pass a config file to 'kubeadm upgrade' using the --config flag.\n")
-			fmt.Println("")
+			kubeadmlog.Infof("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+			kubeadmlog.Infoln("[upgrade/config] Without this information, 'kubeadm upgrade' won't know how to configure your upgraded cluster.")
+			kubeadmlog.Infoln("")
+			kubeadmlog.Infoln("[upgrade/config] Next steps:")
+			kubeadmlog.Infof("\t- OPTION 1: Run 'kubeadm config upload from-flags' and specify the same CLI arguments you passed to 'kubeadm init' when you created your control-plane.\n")
+			kubeadmlog.Infof("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your control-plane.\n")
+			kubeadmlog.Infof("\t- OPTION 3: Pass a config file to 'kubeadm upgrade' using the --config flag.\n")
+			kubeadmlog.Infoln("")
 			err = errors.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
 		return nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
@@ -120,7 +120,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
 
 	// Ensure the user is root
-	klog.V(1).Info("running preflight checks")
+	kubeadmlog.V(1).Info("running preflight checks")
 	if err := runPreflightChecks(client, ignorePreflightErrorsSet, &cfg.ClusterConfiguration); err != nil {
 		return nil, nil, nil, err
 	}
@@ -146,7 +146,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	// Check if feature gate flags used in the cluster are consistent with the set of features currently supported by kubeadm
 	if msg := features.CheckDeprecatedFlags(&features.InitFeatureGates, cfg.FeatureGates); len(msg) > 0 {
 		for _, m := range msg {
-			fmt.Printf("[upgrade/config] %s\n", m)
+			kubeadmlog.Infof("[upgrade/config] %s\n", m)
 		}
 		return nil, nil, nil, errors.New("[upgrade/config] FATAL. Unable to upgrade a cluster using deprecated feature-gate flags. Please see the release notes")
 	}
@@ -180,7 +180,7 @@ func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer
 
 // runPreflightChecks runs the root preflight check
 func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.String, cfg *kubeadmapi.ClusterConfiguration) error {
-	fmt.Println("[preflight] Running pre-flight checks.")
+	kubeadmlog.Infoln("[preflight] Running pre-flight checks.")
 	err := preflight.RunRootCheckOnly(ignorePreflightErrors)
 	if err != nil {
 		return err
@@ -238,7 +238,7 @@ func getWaiter(dryRun bool, client clientset.Interface) apiclient.Waiter {
 // InteractivelyConfirmUpgrade asks the user whether they _really_ want to upgrade.
 func InteractivelyConfirmUpgrade(question string) error {
 
-	fmt.Printf("[upgrade/confirm] %s [y/N]: ", question)
+	kubeadmlog.Infof("[upgrade/confirm] %s [y/N]: ", question)
 
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Scan()

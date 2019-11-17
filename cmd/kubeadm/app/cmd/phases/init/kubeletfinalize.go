@@ -22,13 +22,14 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
+
 	clientcmd "k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 var (
@@ -85,10 +86,10 @@ func runKubeletFinalizeCertRotation(c workflow.RunData) error {
 	rotate := false
 	pemPath := filepath.Join(pkiPath, "kubelet-client-current.pem")
 	if _, err := os.Stat(pemPath); err == nil {
-		klog.V(1).Infof("[kubelet-finalize] Assuming that kubelet client certificate rotation is enabled: found %q", pemPath)
+		kubeadmlog.V(1).Infof("[kubelet-finalize] Assuming that kubelet client certificate rotation is enabled: found %q", pemPath)
 		rotate = true
 	} else {
-		klog.V(1).Infof("[kubelet-finalize] Assuming that kubelet client certificate rotation is disabled: %v", err)
+		kubeadmlog.V(1).Infof("[kubelet-finalize] Assuming that kubelet client certificate rotation is disabled: %v", err)
 	}
 
 	// Exit early if rotation is disabled.
@@ -97,7 +98,7 @@ func runKubeletFinalizeCertRotation(c workflow.RunData) error {
 	}
 
 	kubeconfigPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
-	fmt.Printf("[kubelet-finalize] Updating %q to point to a rotatable kubelet client certificate and key\n", kubeconfigPath)
+	kubeadmlog.Infof("[kubelet-finalize] Updating %q to point to a rotatable kubelet client certificate and key\n", kubeconfigPath)
 
 	// Exit early if dry-running is enabled.
 	if data.DryRun() {
@@ -129,7 +130,7 @@ func runKubeletFinalizeCertRotation(c workflow.RunData) error {
 	}
 
 	// Restart the kubelet.
-	klog.V(1).Info("[kubelet-finalize] Restarting the kubelet to enable client certificate rotation")
+	kubeadmlog.V(1).Info("[kubelet-finalize] Restarting the kubelet to enable client certificate rotation")
 	kubeletphase.TryRestartKubelet()
 
 	return nil

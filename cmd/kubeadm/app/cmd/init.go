@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -27,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 var (
@@ -142,7 +143,7 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 			}
 
 			data := c.(*initData)
-			fmt.Printf("[init] Using Kubernetes version: %s\n", data.cfg.KubernetesVersion)
+			kubeadmlog.Infof("[init] Using Kubernetes version: %s\n", data.cfg.KubernetesVersion)
 
 			if err := initRunner.Run(args); err != nil {
 				return err

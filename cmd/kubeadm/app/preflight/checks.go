@@ -36,15 +36,16 @@ import (
 
 	"github.com/PuerkitoBio/purell"
 	"github.com/pkg/errors"
+
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	kubeadmversion "k8s.io/component-base/version"
-	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	system "k8s.io/system-validators/validators"
 	utilsexec "k8s.io/utils/exec"
@@ -99,7 +100,7 @@ func (ContainerRuntimeCheck) Name() string {
 
 // Check validates the container runtime
 func (crc ContainerRuntimeCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infoln("validating the container runtime")
+	kubeadmlog.V(1).Infoln("validating the container runtime")
 	if err := crc.runtime.IsRunning(); err != nil {
 		errorList = append(errorList, err)
 	}
@@ -125,7 +126,7 @@ func (sc ServiceCheck) Name() string {
 
 // Check validates if the service is enabled and active.
 func (sc ServiceCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infoln("validating if the service is enabled and active")
+	kubeadmlog.V(1).Infoln("validating if the service is enabled and active")
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
 		return []error{err}, nil
@@ -163,7 +164,7 @@ func (FirewalldCheck) Name() string {
 
 // Check validates if the firewall is enabled and active.
 func (fc FirewalldCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infoln("validating if the firewall is enabled and active")
+	kubeadmlog.V(1).Infoln("validating if the firewall is enabled and active")
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
 		return []error{err}, nil
@@ -198,7 +199,7 @@ func (poc PortOpenCheck) Name() string {
 
 // Check validates if the particular port is available.
 func (poc PortOpenCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infof("validating availability of port %d", poc.port)
+	kubeadmlog.V(1).Infof("validating availability of port %d", poc.port)
 
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", poc.port))
 	if err != nil {
@@ -246,7 +247,7 @@ func (dac DirAvailableCheck) Name() string {
 
 // Check validates if a directory does not exist or empty.
 func (dac DirAvailableCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infof("validating the existence and emptiness of directory %s", dac.Path)
+	kubeadmlog.V(1).Infof("validating the existence and emptiness of directory %s", dac.Path)
 
 	// If it doesn't exist we are good:
 	if _, err := os.Stat(dac.Path); os.IsNotExist(err) {
@@ -283,7 +284,7 @@ func (fac FileAvailableCheck) Name() string {
 
 // Check validates if the given file does not already exist.
 func (fac FileAvailableCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infof("validating the existence of file %s", fac.Path)
+	kubeadmlog.V(1).Infof("validating the existence of file %s", fac.Path)
 
 	if _, err := os.Stat(fac.Path); err == nil {
 		return nil, []error{errors.Errorf("%s already exists", fac.Path)}
@@ -307,7 +308,7 @@ func (fac FileExistingCheck) Name() string {
 
 // Check validates if the given file already exists.
 func (fac FileExistingCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infof("validating the existence of file %s", fac.Path)
+	kubeadmlog.V(1).Infof("validating the existence of file %s", fac.Path)
 
 	if _, err := os.Stat(fac.Path); err != nil {
 		return nil, []error{errors.Errorf("%s doesn't exist", fac.Path)}
@@ -332,7 +333,7 @@ func (fcc FileContentCheck) Name() string {
 
 // Check validates if the given file contains the given content.
 func (fcc FileContentCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infof("validating the contents of file %s", fcc.Path)
+	kubeadmlog.V(1).Infof("validating the contents of file %s", fcc.Path)
 	f, err := os.Open(fcc.Path)
 	if err != nil {
 		return nil, []error{errors.Errorf("%s does not exist", fcc.Path)}
@@ -373,7 +374,7 @@ func (ipc InPathCheck) Name() string {
 
 // Check validates if the given executable is present in the path.
 func (ipc InPathCheck) Check() (warnings, errs []error) {
-	klog.V(1).Infof("validating the presence of executable %s", ipc.executable)
+	kubeadmlog.V(1).Infof("validating the presence of executable %s", ipc.executable)
 	_, err := ipc.exec.LookPath(ipc.executable)
 	if err != nil {
 		if ipc.mandatory {
@@ -403,7 +404,7 @@ func (HostnameCheck) Name() string {
 
 // Check validates if hostname match dns sub domain regex.
 func (hc HostnameCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infoln("checking whether the given node name is reachable using net.LookupHost")
+	kubeadmlog.V(1).Infoln("checking whether the given node name is reachable using net.LookupHost")
 
 	addr, err := net.LookupHost(hc.nodeName)
 	if addr == nil {
@@ -429,7 +430,7 @@ func (hst HTTPProxyCheck) Name() string {
 
 // Check validates http connectivity type, direct or via proxy.
 func (hst HTTPProxyCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infoln("validating if the connectivity type is via proxy or direct")
+	kubeadmlog.V(1).Infoln("validating if the connectivity type is via proxy or direct")
 	u := &url.URL{Scheme: hst.Proto, Host: hst.Host}
 	if utilsnet.IsIPv6String(hst.Host) {
 		u.Host = net.JoinHostPort(hst.Host, "1234")
@@ -468,7 +469,7 @@ func (HTTPProxyCIDRCheck) Name() string {
 // Check validates http connectivity to first IP address in the CIDR.
 // If it is not directly connected and goes via proxy it will produce warning.
 func (subnet HTTPProxyCIDRCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infoln("validating http connectivity to first IP address in the CIDR")
+	kubeadmlog.V(1).Infoln("validating http connectivity to first IP address in the CIDR")
 	if len(subnet.CIDR) == 0 {
 		return nil, nil
 	}
@@ -517,7 +518,7 @@ func (SystemVerificationCheck) Name() string {
 
 // Check runs all individual checks
 func (sysver SystemVerificationCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infoln("running all checks")
+	kubeadmlog.V(1).Infoln("running all checks")
 	// Create a buffered writer and choose a quite large value (1M) and suppose the output from the system verification test won't exceed the limit
 	// Run the system verification check, but write to out buffered writer instead of stdout
 	bufw := bufio.NewWriterSize(os.Stdout, 1*1024*1024)
@@ -554,7 +555,7 @@ func (sysver SystemVerificationCheck) Check() (warnings, errorList []error) {
 
 	if len(errs) != 0 {
 		// Only print the output from the system verification check if the check failed
-		fmt.Println("[preflight] The system verification failed. Printing the output from the verification:")
+		kubeadmlog.Infoln("[preflight] The system verification failed. Printing the output from the verification:")
 		bufw.Flush()
 		return warns, errs
 	}
@@ -574,7 +575,7 @@ func (KubernetesVersionCheck) Name() string {
 
 // Check validates Kubernetes and kubeadm versions
 func (kubever KubernetesVersionCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infoln("validating Kubernetes and kubeadm version")
+	kubeadmlog.V(1).Infoln("validating Kubernetes and kubeadm version")
 	// Skip this check for "super-custom builds", where apimachinery/the overall codebase version is not set.
 	if strings.HasPrefix(kubever.KubeadmVersion, "v0.0.0") {
 		return nil, nil
@@ -615,7 +616,7 @@ func (KubeletVersionCheck) Name() string {
 
 // Check validates kubelet version. It should be not less than minimal supported version
 func (kubever KubeletVersionCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infoln("validating kubelet version")
+	kubeadmlog.V(1).Infoln("validating kubelet version")
 	kubeletVersion, err := GetKubeletVersion(kubever.exec)
 	if err != nil {
 		return nil, []error{errors.Wrap(err, "couldn't get kubelet version")}
@@ -646,7 +647,7 @@ func (SwapCheck) Name() string {
 
 // Check validates whether swap is enabled or not
 func (swc SwapCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infoln("validating whether swap is enabled or not")
+	kubeadmlog.V(1).Infoln("validating whether swap is enabled or not")
 	f, err := os.Open("/proc/swaps")
 	if err != nil {
 		// /proc/swaps not available, thus no reasons to warn
@@ -687,7 +688,7 @@ func (ExternalEtcdVersionCheck) Name() string {
 // Check validates external etcd version
 // TODO: Use the official etcd Golang client for this instead?
 func (evc ExternalEtcdVersionCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infoln("validating the external etcd version")
+	kubeadmlog.V(1).Infoln("validating the external etcd version")
 
 	// Return quickly if the user isn't using external etcd
 	if evc.Etcd.External.Endpoints == nil {
@@ -835,13 +836,13 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 	for _, image := range ipc.imageList {
 		ret, err := ipc.runtime.ImageExists(image)
 		if ret && err == nil {
-			klog.V(1).Infof("image exists: %s", image)
+			kubeadmlog.V(1).Infof("image exists: %s", image)
 			continue
 		}
 		if err != nil {
 			errorList = append(errorList, errors.Wrapf(err, "failed to check if image %s exists", image))
 		}
-		klog.V(1).Infof("pulling %s", image)
+		kubeadmlog.V(1).Infof("pulling %s", image)
 		if err := ipc.runtime.PullImage(image); err != nil {
 			errorList = append(errorList, errors.Wrapf(err, "failed to pull image %s", image))
 		}
@@ -995,7 +996,7 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 	containerRuntime, err := utilruntime.NewContainerRuntime(execer, nodeReg.CRISocket)
 	isDocker := false
 	if err != nil {
-		fmt.Printf("[preflight] WARNING: Couldn't create the interface used for talking to the container runtime: %v\n", err)
+		kubeadmlog.Infof("[preflight] WARNING: Couldn't create the interface used for talking to the container runtime: %v\n", err)
 	} else {
 		checks = append(checks, ContainerRuntimeCheck{runtime: containerRuntime})
 		if containerRuntime.IsDocker() {

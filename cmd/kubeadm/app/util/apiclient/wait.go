@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // Waiter is an interface for waiting for criteria in Kubernetes to happen
@@ -82,7 +83,7 @@ func (w *KubeWaiter) WaitForAPI() error {
 			return false, nil
 		}
 
-		fmt.Printf("[apiclient] All control plane components are healthy after %f seconds\n", time.Since(start).Seconds())
+		kubeadmlog.Infof("[apiclient] All control plane components are healthy after %f seconds\n", time.Since(start).Seconds())
 		return true, nil
 	})
 }
@@ -124,7 +125,7 @@ func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
 	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
 		_, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).Get(podName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
-			fmt.Printf("[apiclient] The old Pod %q is now removed (which is desired)\n", podName)
+			kubeadmlog.Infof("[apiclient] The old Pod %q is now removed (which is desired)\n", podName)
 			return true, nil
 		}
 		return false, nil
@@ -134,19 +135,19 @@ func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
 // WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
 func (w *KubeWaiter) WaitForHealthyKubelet(initalTimeout time.Duration, healthzEndpoint string) error {
 	time.Sleep(initalTimeout)
-	fmt.Printf("[kubelet-check] Initial timeout of %v passed.\n", initalTimeout)
+	kubeadmlog.Infof("[kubelet-check] Initial timeout of %v passed.\n", initalTimeout)
 	return TryRunCommand(func() error {
 		client := &http.Client{Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
 		resp, err := client.Get(healthzEndpoint)
 		if err != nil {
-			fmt.Println("[kubelet-check] It seems like the kubelet isn't running or healthy.")
-			fmt.Printf("[kubelet-check] The HTTP call equal to 'curl -sSL %s' failed with error: %v.\n", healthzEndpoint, err)
+			kubeadmlog.Infoln("[kubelet-check] It seems like the kubelet isn't running or healthy.")
+			kubeadmlog.Infof("[kubelet-check] The HTTP call equal to 'curl -sSL %s' failed with error: %v.\n", healthzEndpoint, err)
 			return err
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			fmt.Println("[kubelet-check] It seems like the kubelet isn't running or healthy.")
-			fmt.Printf("[kubelet-check] The HTTP call equal to 'curl -sSL %s' returned HTTP code %d\n", healthzEndpoint, resp.StatusCode)
+			kubeadmlog.Infoln("[kubelet-check] It seems like the kubelet isn't running or healthy.")
+			kubeadmlog.Infof("[kubelet-check] The HTTP call equal to 'curl -sSL %s' returned HTTP code %d\n", healthzEndpoint, resp.StatusCode)
 			return errors.New("the kubelet healthz endpoint is unhealthy")
 		}
 		return nil
@@ -246,7 +247,7 @@ func getStaticPodSingleHash(client clientset.Interface, nodeName string, compone
 	}
 
 	staticPodHash := staticPod.Annotations["kubernetes.io/config.hash"]
-	fmt.Printf("Static pod: %s hash: %s\n", staticPodName, staticPodHash)
+	kubeadmlog.Infof("Static pod: %s hash: %s\n", staticPodName, staticPodHash)
 	return staticPodHash, nil
 }
 

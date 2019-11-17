@@ -18,13 +18,11 @@ package config
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"strconv"
 
 	"github.com/pkg/errors"
-	"k8s.io/klog"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,6 +37,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	kubeadmruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
@@ -100,7 +99,7 @@ func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions,
 		if err != nil {
 			return err
 		}
-		klog.V(1).Infof("detected and using CRI socket: %s", cfg.CRISocket)
+		kubeadmlog.V(1).Infof("detected and using CRI socket: %s", cfg.CRISocket)
 	}
 
 	return nil
@@ -122,7 +121,7 @@ func SetAPIEndpointDynamicDefaults(cfg *kubeadmapi.APIEndpoint) error {
 			return err
 		}
 		if loopbackIP != nil {
-			klog.V(4).Infof("Found active IP %v on loopback interface", loopbackIP.String())
+			kubeadmlog.V(4).Infof("Found active IP %v on loopback interface", loopbackIP.String())
 			cfg.AdvertiseAddress = loopbackIP.String()
 			return nil
 		}
@@ -204,7 +203,7 @@ func DefaultedInitConfiguration(versionedInitCfg *kubeadmapiv1beta2.InitConfigur
 
 // LoadInitConfigurationFromFile loads a supported versioned InitConfiguration from a file, converts it into internal config, defaults it and verifies it.
 func LoadInitConfigurationFromFile(cfgPath string) (*kubeadmapi.InitConfiguration, error) {
-	klog.V(1).Infof("loading configuration from %q", cfgPath)
+	kubeadmlog.V(1).Infof("loading configuration from %q", cfgPath)
 
 	b, err := ioutil.ReadFile(cfgPath)
 	if err != nil {
@@ -290,7 +289,7 @@ func documentMapToInitConfiguration(gvkmap map[schema.GroupVersionKind][]byte, a
 			continue
 		}
 
-		fmt.Printf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
+		kubeadmlog.Infof("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
 	}
 
 	// Enforce that InitConfiguration and/or ClusterConfiguration has to exist among the YAML documents
@@ -321,7 +320,7 @@ func documentMapToInitConfiguration(gvkmap map[schema.GroupVersionKind][]byte, a
 			}
 		} else {
 			// This should never happen in practice
-			fmt.Printf("[config] WARNING: Decoded a kind that couldn't be saved to the internal configuration: %q\n", string(kind))
+			kubeadmlog.Infof("[config] WARNING: Decoded a kind that couldn't be saved to the internal configuration: %q\n", string(kind))
 		}
 	}
 

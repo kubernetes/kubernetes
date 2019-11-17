@@ -18,7 +18,6 @@ package componentconfigs
 
 import (
 	"github.com/pkg/errors"
-	"k8s.io/klog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +28,7 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // GetFromKubeletConfigMap returns the pointer to the ComponentConfig API object read from the kubelet-config-version
@@ -69,7 +69,7 @@ func GetFromKubeProxyConfigMap(client clientset.Interface, version *version.Vers
 		// or to use other proxy solution. It may also be forbidden - if the kube-proxy phase was skipped we have neither
 		// the config map, nor the RBAC rules allowing join access to it.
 		if apierrors.IsNotFound(err) || apierrors.IsForbidden(err) {
-			klog.Warningf("Warning: No kube-proxy config is loaded. Continuing without it: %v", err)
+			kubeadmlog.Warningf("Warning: No kube-proxy config is loaded. Continuing without it: %v", err)
 			return nil, nil
 		}
 		return nil, err

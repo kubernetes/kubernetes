@@ -8,9 +8,9 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
         "//cmd/kubeadm/app/componentconfigs:go_default_library",
+        "//cmd/kubeadm/app/util/log:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )

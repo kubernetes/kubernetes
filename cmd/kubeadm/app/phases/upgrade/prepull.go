@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -79,7 +81,7 @@ func (d *DaemonSetPrepuller) CreateFunc(component string) error {
 
 // WaitFunc waits for all Pods in the specified DaemonSet to be in the Running state
 func (d *DaemonSetPrepuller) WaitFunc(component string) {
-	fmt.Printf("[upgrade/prepull] Prepulling image for component %s.\n", component)
+	kubeadmlog.Infof("[upgrade/prepull] Prepulling image for component %s.\n", component)
 	d.waiter.WaitForPodsWithLabel("k8s-app=upgrade-prepull-" + component)
 }
 
@@ -91,13 +93,13 @@ func (d *DaemonSetPrepuller) DeleteFunc(component string) error {
 	if err := apiclient.DeleteDaemonSetForeground(d.client, metav1.NamespaceSystem, dsName); err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrapf(err, "unable to cleanup the DaemonSet used for prepulling %s", component)
 	}
-	fmt.Printf("[upgrade/prepull] Prepulled image for component %s.\n", component)
+	kubeadmlog.Infof("[upgrade/prepull] Prepulled image for component %s.\n", component)
 	return nil
 }
 
 // PrepullImagesInParallel creates DaemonSets synchronously but waits in parallel for the images to pull
 func PrepullImagesInParallel(kubePrepuller Prepuller, timeout time.Duration, componentsToPrepull []string) error {
-	fmt.Printf("[upgrade/prepull] Will prepull images for components %v\n", componentsToPrepull)
+	kubeadmlog.Infof("[upgrade/prepull] Will prepull images for components %v\n", componentsToPrepull)
 
 	timeoutChan := time.After(timeout)
 
@@ -125,7 +127,7 @@ func PrepullImagesInParallel(kubePrepuller Prepuller, timeout time.Duration, com
 		return err
 	}
 
-	fmt.Println("[upgrade/prepull] Successfully prepulled the images for all the control plane components")
+	kubeadmlog.Infoln("[upgrade/prepull] Successfully prepulled the images for all the control plane components")
 	return nil
 }
 

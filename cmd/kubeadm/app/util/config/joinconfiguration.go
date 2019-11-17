@@ -20,9 +20,9 @@ import (
 	"io/ioutil"
 
 	"github.com/pkg/errors"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // SetJoinDynamicDefaults checks and sets configuration values for the JoinConfiguration object
@@ -72,7 +73,7 @@ func LoadOrDefaultJoinConfiguration(cfgPath string, defaultversionedcfg *kubeadm
 
 // LoadJoinConfigurationFromFile loads versioned JoinConfiguration from file, converts it to internal, defaults and validates it
 func LoadJoinConfigurationFromFile(cfgPath string) (*kubeadmapi.JoinConfiguration, error) {
-	klog.V(1).Infof("loading configuration from %q", cfgPath)
+	kubeadmlog.V(1).Infof("loading configuration from %q", cfgPath)
 
 	b, err := ioutil.ReadFile(cfgPath)
 	if err != nil {

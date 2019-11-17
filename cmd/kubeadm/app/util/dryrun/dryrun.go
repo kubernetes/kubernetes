@@ -27,6 +27,7 @@ import (
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // FileToPrint represents a temporary file on disk that might want to be aliased when printing
@@ -89,25 +90,25 @@ func NewWaiter() apiclient.Waiter {
 
 // WaitForAPI just returns a dummy nil, to indicate that the program should just proceed
 func (w *Waiter) WaitForAPI() error {
-	fmt.Println("[dryrun] Would wait for the API Server's /healthz endpoint to return 'ok'")
+	kubeadmlog.Infoln("[dryrun] Would wait for the API Server's /healthz endpoint to return 'ok'")
 	return nil
 }
 
 // WaitForPodsWithLabel just returns a dummy nil, to indicate that the program should just proceed
 func (w *Waiter) WaitForPodsWithLabel(kvLabel string) error {
-	fmt.Printf("[dryrun] Would wait for the Pods with the label %q in the %s namespace to become Running\n", kvLabel, metav1.NamespaceSystem)
+	kubeadmlog.Infof("[dryrun] Would wait for the Pods with the label %q in the %s namespace to become Running\n", kvLabel, metav1.NamespaceSystem)
 	return nil
 }
 
 // WaitForPodToDisappear just returns a dummy nil, to indicate that the program should just proceed
 func (w *Waiter) WaitForPodToDisappear(podName string) error {
-	fmt.Printf("[dryrun] Would wait for the %q Pod in the %s namespace to be deleted\n", podName, metav1.NamespaceSystem)
+	kubeadmlog.Infof("[dryrun] Would wait for the %q Pod in the %s namespace to be deleted\n", podName, metav1.NamespaceSystem)
 	return nil
 }
 
 // WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
 func (w *Waiter) WaitForHealthyKubelet(_ time.Duration, healthzEndpoint string) error {
-	fmt.Printf("[dryrun] Would make sure the kubelet %q endpoint is healthy\n", healthzEndpoint)
+	kubeadmlog.Infof("[dryrun] Would make sure the kubelet %q endpoint is healthy\n", healthzEndpoint)
 	return nil
 }
 

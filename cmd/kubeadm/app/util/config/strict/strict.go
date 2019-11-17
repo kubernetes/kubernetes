@@ -20,9 +20,9 @@ import (
 	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	"sigs.k8s.io/yaml"
 )
 
@@ -44,14 +44,14 @@ func VerifyUnmarshalStrict(bytes []byte, gvk schema.GroupVersionKind) error {
 		if err != nil {
 			err := errors.Errorf("unknown configuration %#v for scheme definitions in %q and %q",
 				gvk, scheme.Scheme.Name(), componentconfigs.Scheme.Name())
-			klog.Warning(err.Error())
+			kubeadmlog.Warning(err.Error())
 			return err
 		}
 	}
 
 	if err := yaml.UnmarshalStrict(bytes, iface); err != nil {
 		err := errors.Wrapf(err, "error unmarshaling configuration %#v", gvk)
-		klog.Warning(err.Error())
+		kubeadmlog.Warning(err.Error())
 		return err
 	}
 	return nil

@@ -27,7 +27,6 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -50,6 +49,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
@@ -117,7 +117,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			if len(args) > 0 {
 				bto.TokenStr = args[0]
 			}
-			klog.V(1).Infoln("[token] validating mixed arguments")
+			kubeadmlog.V(1).Infoln("[token] validating mixed arguments")
 			if err := validation.ValidateMixedArguments(tokenCmd.Flags()); err != nil {
 				return err
 			}
@@ -126,7 +126,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 				return err
 			}
 
-			klog.V(1).Infoln("[token] getting Clientsets from kubeconfig file")
+			kubeadmlog.V(1).Infoln("[token] getting Clientsets from kubeconfig file")
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			if err != nil {
@@ -239,7 +239,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 	kubeadmscheme.Scheme.Default(clusterCfg)
 
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
-	klog.V(1).Infoln("[token] loading configurations")
+	kubeadmlog.V(1).Infoln("[token] loading configurations")
 
 	// In fact, we don't do any CRI ops at all.
 	// This is just to force skipping the CRI detection.
@@ -251,7 +251,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 		return err
 	}
 
-	klog.V(1).Infoln("[token] creating token")
+	kubeadmlog.V(1).Infoln("[token] creating token")
 	if err := tokenphase.CreateNewTokens(client, internalcfg.BootstrapTokens); err != nil {
 		return err
 	}
@@ -290,7 +290,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 
 // RunGenerateToken just generates a random token for the user
 func RunGenerateToken(out io.Writer) error {
-	klog.V(1).Infoln("[token] generating random token")
+	kubeadmlog.V(1).Infoln("[token] generating random token")
 	token, err := bootstraputil.GenerateBootstrapToken()
 	if err != nil {
 		return err
@@ -366,7 +366,7 @@ func (tpf *tokenTextPrintFlags) ToPrinter(outputFormat string) (output.Printer, 
 // RunListTokens lists details on all existing bootstrap tokens on the server.
 func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, printer output.Printer) error {
 	// First, build our selector for bootstrap tokens only
-	klog.V(1).Infoln("[token] preparing selector for bootstrap token")
+	kubeadmlog.V(1).Infoln("[token] preparing selector for bootstrap token")
 	tokenSelector := fields.SelectorFromSet(
 		map[string]string{
 			// TODO: We hard-code "type" here until `field_constants.go` that is
@@ -379,7 +379,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, pr
 		FieldSelector: tokenSelector.String(),
 	}
 
-	klog.V(1).Info("[token] retrieving list of bootstrap tokens")
+	kubeadmlog.V(1).Info("[token] retrieving list of bootstrap tokens")
 	secrets, err := client.CoreV1().Secrets(metav1.NamespaceSystem).List(listOptions)
 	if err != nil {
 		return errors.Wrap(err, "failed to list bootstrap tokens")
@@ -417,7 +417,7 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 	for _, tokenIDOrToken := range tokenIDsOrTokens {
 		// Assume this is a token id and try to parse it
 		tokenID := tokenIDOrToken
-		klog.V(1).Infof("[token] parsing token %q", tokenIDOrToken)
+		kubeadmlog.V(1).Infof("[token] parsing token %q", tokenIDOrToken)
 		if !bootstraputil.IsValidBootstrapTokenID(tokenIDOrToken) {
 			// Okay, the full token with both id and secret was probably passed. Parse it and extract the ID only
 			bts, err := kubeadmapiv1beta2.NewBootstrapTokenString(tokenIDOrToken)
@@ -429,7 +429,7 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 		}
 
 		tokenSecretName := bootstraputil.BootstrapTokenSecretName(tokenID)
-		klog.V(1).Infof("[token] deleting token %q", tokenID)
+		kubeadmlog.V(1).Infof("[token] deleting token %q", tokenID)
 		if err := client.CoreV1().Secrets(metav1.NamespaceSystem).Delete(tokenSecretName, nil); err != nil {
 			return errors.Wrapf(err, "failed to delete bootstrap token %q", tokenID)
 		}

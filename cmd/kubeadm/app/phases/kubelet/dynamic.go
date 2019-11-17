@@ -17,8 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
@@ -27,6 +25,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // EnableDynamicConfigForNode updates the Node's ConfigSource to enable Dynamic Kubelet Configuration, depending on what version the kubelet is
@@ -34,9 +33,9 @@ import (
 func EnableDynamicConfigForNode(client clientset.Interface, nodeName string, kubeletVersion *version.Version) error {
 
 	configMapName := kubeadmconstants.GetKubeletConfigMapName(kubeletVersion)
-	fmt.Printf("[kubelet] Enabling Dynamic Kubelet Config for Node %q; config sourced from ConfigMap %q in namespace %s\n",
+	kubeadmlog.Infof("[kubelet] Enabling Dynamic Kubelet Config for Node %q; config sourced from ConfigMap %q in namespace %s\n",
 		nodeName, configMapName, metav1.NamespaceSystem)
-	fmt.Println("[kubelet] WARNING: The Dynamic Kubelet Config feature is beta, but off by default. It hasn't been well-tested yet at this stage, use with caution.")
+	kubeadmlog.Infoln("[kubelet] WARNING: The Dynamic Kubelet Config feature is beta, but off by default. It hasn't been well-tested yet at this stage, use with caution.")
 
 	_, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, configMapName)
 	if err != nil {

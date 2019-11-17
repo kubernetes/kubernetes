@@ -15,6 +15,7 @@ go_library(
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/phases/certs:go_default_library",
+        "//cmd/kubeadm/app/util/log:go_default_library",
         "//cmd/kubeadm/app/util/pkiutil:go_default_library",
         "//staging/src/k8s.io/api/certificates/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

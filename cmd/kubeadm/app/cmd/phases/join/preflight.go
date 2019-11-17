@@ -18,18 +18,18 @@ package phases
 
 import (
 	"bytes"
-	"fmt"
 	"text/template"
 
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -84,10 +84,10 @@ func runPreflight(c workflow.RunData) error {
 	if !ok {
 		return errors.New("preflight phase invoked with an invalid data struct")
 	}
-	fmt.Println("[preflight] Running pre-flight checks")
+	kubeadmlog.Infoln("[preflight] Running pre-flight checks")
 
 	// Start with general checks
-	klog.V(1).Infoln("[preflight] Running general checks")
+	kubeadmlog.V(1).Infoln("[preflight] Running general checks")
 	if err := preflight.RunJoinNodeChecks(utilsexec.New(), j.Cfg(), j.IgnorePreflightErrors()); err != nil {
 		return err
 	}
@@ -98,7 +98,7 @@ func runPreflight(c workflow.RunData) error {
 	}
 
 	// Continue with more specific checks based on the init configuration
-	klog.V(1).Infoln("[preflight] Running configuration dependant checks")
+	kubeadmlog.V(1).Infoln("[preflight] Running configuration dependant checks")
 	if j.Cfg().ControlPlane != nil {
 		// Checks if the cluster configuration supports
 		// joining a new control plane instance and if all the necessary certificates are provided
@@ -115,15 +115,15 @@ func runPreflight(c workflow.RunData) error {
 		}
 
 		// run kubeadm init preflight checks for checking all the prerequisites
-		fmt.Println("[preflight] Running pre-flight checks before initializing the new control plane instance")
+		kubeadmlog.Infoln("[preflight] Running pre-flight checks before initializing the new control plane instance")
 
 		if err := preflight.RunInitNodeChecks(utilsexec.New(), initCfg, j.IgnorePreflightErrors(), true, hasCertificateKey); err != nil {
 			return err
 		}
 
-		fmt.Println("[preflight] Pulling images required for setting up a Kubernetes cluster")
-		fmt.Println("[preflight] This might take a minute or two, depending on the speed of your internet connection")
-		fmt.Println("[preflight] You can also perform this action in beforehand using 'kubeadm config images pull'")
+		kubeadmlog.Infoln("[preflight] Pulling images required for setting up a Kubernetes cluster")
+		kubeadmlog.Infoln("[preflight] This might take a minute or two, depending on the speed of your internet connection")
+		kubeadmlog.Infoln("[preflight] You can also perform this action in beforehand using 'kubeadm config images pull'")
 		if err := preflight.RunPullImagesCheck(utilsexec.New(), initCfg, j.IgnorePreflightErrors()); err != nil {
 			return err
 		}

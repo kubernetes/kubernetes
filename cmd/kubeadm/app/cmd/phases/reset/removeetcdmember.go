@@ -18,15 +18,14 @@ package phases
 
 import (
 	"errors"
-	"fmt"
 	"path/filepath"
 
-	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	utilstaticpod "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
@@ -51,19 +50,19 @@ func runRemoveETCDMemberPhase(c workflow.RunData) error {
 	cfg := r.Cfg()
 
 	// Only clear etcd data when using local etcd.
-	klog.V(1).Infoln("[reset] Checking for etcd config")
+	kubeadmlog.V(1).Infoln("[reset] Checking for etcd config")
 	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
 	etcdDataDir, err := getEtcdDataDir(etcdManifestPath, cfg)
 	if err == nil {
 		r.AddDirsToClean(etcdDataDir)
 		if cfg != nil {
 			if err := etcdphase.RemoveStackedEtcdMemberFromCluster(r.Client(), cfg); err != nil {
-				klog.Warningf("[reset] failed to remove etcd member: %v\n.Please manually remove this etcd member using etcdctl", err)
+				kubeadmlog.Warningf("[reset] failed to remove etcd member: %v\n.Please manually remove this etcd member using etcdctl", err)
 			}
 		}
 	} else {
-		fmt.Println("[reset] No etcd config found. Assuming external etcd")
-		fmt.Println("[reset] Please, manually reset etcd to prevent further issues")
+		kubeadmlog.Infoln("[reset] No etcd config found. Assuming external etcd")
+		kubeadmlog.Infoln("[reset] Please, manually reset etcd to prevent further issues")
 	}
 
 	return nil
@@ -76,7 +75,7 @@ func getEtcdDataDir(manifestPath string, cfg *kubeadmapi.InitConfiguration) (str
 	if cfg != nil && cfg.Etcd.Local != nil {
 		return cfg.Etcd.Local.DataDir, nil
 	}
-	klog.Warningln("[reset] No kubeadm config, using etcd pod spec to get data directory")
+	kubeadmlog.Warningln("[reset] No kubeadm config, using etcd pod spec to get data directory")
 
 	etcdPod, err := utilstaticpod.ReadStaticPodFromDisk(manifestPath)
 	if err != nil {

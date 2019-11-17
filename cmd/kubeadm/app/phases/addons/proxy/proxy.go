@@ -18,9 +18,9 @@ package proxy
 
 import (
 	"bytes"
-	"fmt"
 
 	"github.com/pkg/errors"
+
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 const (
@@ -94,7 +95,7 @@ func EnsureProxyAddon(cfg *kubeadmapi.ClusterConfiguration, localEndpoint *kubea
 		return errors.Wrap(err, "error when creating kube-proxy RBAC rules")
 	}
 
-	fmt.Println("[addons] Applied essential addon: kube-proxy")
+	kubeadmlog.Infoln("[addons] Applied essential addon: kube-proxy")
 	return nil
 }
 

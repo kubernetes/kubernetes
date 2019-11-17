@@ -17,8 +17,6 @@ limitations under the License.
 package phases
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -26,6 +24,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 var (
@@ -75,13 +74,13 @@ func runBootstrapToken(c workflow.RunData) error {
 	if !data.SkipTokenPrint() {
 		tokens := data.Tokens()
 		if len(tokens) == 1 {
-			fmt.Printf("[bootstrap-token] Using token: %s\n", tokens[0])
+			kubeadmlog.Infof("[bootstrap-token] Using token: %s\n", tokens[0])
 		} else if len(tokens) > 1 {
-			fmt.Printf("[bootstrap-token] Using tokens: %v\n", tokens)
+			kubeadmlog.Infof("[bootstrap-token] Using tokens: %v\n", tokens)
 		}
 	}
 
-	fmt.Println("[bootstrap-token] Configuring bootstrap tokens, cluster-info ConfigMap, RBAC Roles")
+	kubeadmlog.Infoln("[bootstrap-token] Configuring bootstrap tokens, cluster-info ConfigMap, RBAC Roles")
 	// Create the default node bootstrap token
 	if err := nodebootstraptokenphase.UpdateOrCreateTokens(client, false, data.Cfg().BootstrapTokens); err != nil {
 		return errors.Wrap(err, "error updating or creating token")

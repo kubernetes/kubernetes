@@ -17,13 +17,13 @@ limitations under the License.
 package phases
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -56,20 +56,20 @@ func runPreflight(c workflow.RunData) error {
 		return errors.New("preflight phase invoked with an invalid data struct")
 	}
 
-	fmt.Println("[preflight] Running pre-flight checks")
+	kubeadmlog.Infoln("[preflight] Running pre-flight checks")
 	if err := preflight.RunInitNodeChecks(utilsexec.New(), data.Cfg(), data.IgnorePreflightErrors(), false, false); err != nil {
 		return err
 	}
 
 	if !data.DryRun() {
-		fmt.Println("[preflight] Pulling images required for setting up a Kubernetes cluster")
-		fmt.Println("[preflight] This might take a minute or two, depending on the speed of your internet connection")
-		fmt.Println("[preflight] You can also perform this action in beforehand using 'kubeadm config images pull'")
+		kubeadmlog.Infoln("[preflight] Pulling images required for setting up a Kubernetes cluster")
+		kubeadmlog.Infoln("[preflight] This might take a minute or two, depending on the speed of your internet connection")
+		kubeadmlog.Infoln("[preflight] You can also perform this action in beforehand using 'kubeadm config images pull'")
 		if err := preflight.RunPullImagesCheck(utilsexec.New(), data.Cfg(), data.IgnorePreflightErrors()); err != nil {
 			return err
 		}
 	} else {
-		fmt.Println("[preflight] Would pull the required images (like 'kubeadm config images pull')")
+		kubeadmlog.Infoln("[preflight] Would pull the required images (like 'kubeadm config images pull')")
 	}
 
 	return nil

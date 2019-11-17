@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/copycerts"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 var (
@@ -97,7 +98,7 @@ func NewCmdCertificateKey() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Println(key)
+			kubeadmlog.Infoln(key)
 			return nil
 		},
 	}
@@ -219,7 +220,7 @@ func renewCert(flags *renewFlags, kdir string, internalcfg *kubeadmapi.InitConfi
 	}
 
 	if ok, _ := rm.CertificateExists(handler.Name); !ok {
-		fmt.Printf("MISSING! %s\n", handler.LongName)
+		kubeadmlog.Infof("MISSING! %s\n", handler.LongName)
 		return nil
 	}
 
@@ -254,11 +255,11 @@ func renewCert(flags *renewFlags, kdir string, internalcfg *kubeadmapi.InitConfi
 			return err
 		}
 		if !renewed {
-			fmt.Printf("Detected external %s, %s can't be renewed\n", handler.CABaseName, handler.LongName)
+			kubeadmlog.Infof("Detected external %s, %s can't be renewed\n", handler.CABaseName, handler.LongName)
 			return nil
 		}
 	}
-	fmt.Printf("%s renewed\n", handler.LongName)
+	kubeadmlog.Infof("%s renewed\n", handler.LongName)
 	return nil
 }
 
@@ -270,10 +271,10 @@ func getInternalCfg(cfgPath string, kubeconfigPath string, cfg kubeadmapiv1beta2
 		if err == nil {
 			internalcfg, err := configutil.FetchInitConfigurationFromCluster(client, out, logPrefix, false)
 			if err == nil {
-				fmt.Println() // add empty line to separate the FetchInitConfigurationFromCluster output from the command output
+				kubeadmlog.Infoln() // add empty line to separate the FetchInitConfigurationFromCluster output from the command output
 				return internalcfg, nil
 			}
-			fmt.Printf("[%s] Error reading configuration from the Cluster. Falling back to default configuration\n\n", logPrefix)
+			kubeadmlog.Infof("[%s] Error reading configuration from the Cluster. Falling back to default configuration\n\n", logPrefix)
 		}
 	}
 

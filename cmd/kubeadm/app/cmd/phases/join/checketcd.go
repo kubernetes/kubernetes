@@ -17,11 +17,11 @@ limitations under the License.
 package phases
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // NewCheckEtcdPhase is a hidden phase that runs after the control-plane-prepare and
@@ -51,11 +51,11 @@ func runCheckEtcdPhase(c workflow.RunData) error {
 	}
 
 	if cfg.Etcd.External != nil {
-		fmt.Println("[check-etcd] Skipping etcd check in external mode")
+		kubeadmlog.Infoln("[check-etcd] Skipping etcd check in external mode")
 		return nil
 	}
 
-	fmt.Println("[check-etcd] Checking that the etcd cluster is healthy")
+	kubeadmlog.Infoln("[check-etcd] Checking that the etcd cluster is healthy")
 
 	// Checks that the etcd cluster is healthy
 	// NB. this check cannot be implemented before because it requires the admin.conf and all the certificates

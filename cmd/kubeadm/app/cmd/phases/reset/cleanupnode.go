@@ -18,16 +18,15 @@ package phases
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 
-	"k8s.io/klog"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	utilsexec "k8s.io/utils/exec"
 )
@@ -54,21 +53,21 @@ func runCleanupNode(c workflow.RunData) error {
 	certsDir := r.CertificatesDir()
 
 	// Try to stop the kubelet service
-	klog.V(1).Infoln("[reset] Getting init system")
+	kubeadmlog.V(1).Infoln("[reset] Getting init system")
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
-		klog.Warningln("[reset] The kubelet service could not be stopped by kubeadm. Unable to detect a supported init system!")
-		klog.Warningln("[reset] Please ensure kubelet is stopped manually")
+		kubeadmlog.Warningln("[reset] The kubelet service could not be stopped by kubeadm. Unable to detect a supported init system!")
+		kubeadmlog.Warningln("[reset] Please ensure kubelet is stopped manually")
 	} else {
-		fmt.Println("[reset] Stopping the kubelet service")
+		kubeadmlog.Infoln("[reset] Stopping the kubelet service")
 		if err := initSystem.ServiceStop("kubelet"); err != nil {
-			klog.Warningf("[reset] The kubelet service could not be stopped by kubeadm: [%v]\n", err)
-			klog.Warningln("[reset] Please ensure kubelet is stopped manually")
+			kubeadmlog.Warningf("[reset] The kubelet service could not be stopped by kubeadm: [%v]\n", err)
+			kubeadmlog.Warningln("[reset] Please ensure kubelet is stopped manually")
 		}
 	}
 
 	// Try to unmount mounted directories under kubeadmconstants.KubeletRunDirectory in order to be able to remove the kubeadmconstants.KubeletRunDirectory directory later
-	fmt.Printf("[reset] Unmounting mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
+	kubeadmlog.Infof("[reset] Unmounting mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
 	// In case KubeletRunDirectory holds a symbolic link, evaluate it
 	kubeletRunDir, err := absoluteKubeletRunDirectory()
 	if err == nil {
@@ -76,17 +75,17 @@ func runCleanupNode(c workflow.RunData) error {
 		r.AddDirsToClean(kubeletRunDir)
 	}
 
-	klog.V(1).Info("[reset] Removing Kubernetes-managed containers")
+	kubeadmlog.V(1).Info("[reset] Removing Kubernetes-managed containers")
 	if err := removeContainers(utilsexec.New(), r.CRISocketPath()); err != nil {
-		klog.Warningf("[reset] Failed to remove containers: %v\n", err)
+		kubeadmlog.Warningf("[reset] Failed to remove containers: %v\n", err)
 	}
 
 	r.AddDirsToClean("/var/lib/dockershim", "/var/run/kubernetes", "/var/lib/cni")
 
 	// Remove contents from the config and pki directories
-	klog.V(1).Infoln("[reset] Removing contents from the config and pki directories")
+	kubeadmlog.V(1).Infoln("[reset] Removing contents from the config and pki directories")
 	if certsDir != kubeadmapiv1beta2.DefaultCertificatesDir {
-		klog.Warningf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", certsDir)
+		kubeadmlog.Warningf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", certsDir)
 	}
 	resetConfigDir(kubeadmconstants.KubernetesDir, certsDir)
 
@@ -96,12 +95,12 @@ func runCleanupNode(c workflow.RunData) error {
 func absoluteKubeletRunDirectory() (string, error) {
 	absoluteKubeletRunDirectory, err := filepath.EvalSymlinks(kubeadmconstants.KubeletRunDirectory)
 	if err != nil {
-		klog.Warningf("[reset] Failed to evaluate the %q directory. Skipping its unmount and cleanup: %v\n", kubeadmconstants.KubeletRunDirectory, err)
+		kubeadmlog.Warningf("[reset] Failed to evaluate the %q directory. Skipping its unmount and cleanup: %v\n", kubeadmconstants.KubeletRunDirectory, err)
 		return "", err
 	}
 	err = unmountKubeletDirectory(absoluteKubeletRunDirectory)
 	if err != nil {
-		klog.Warningf("[reset] Failed to unmount mounted directories in %s \n", kubeadmconstants.KubeletRunDirectory)
+		kubeadmlog.Warningf("[reset] Failed to unmount mounted directories in %s \n", kubeadmconstants.KubeletRunDirectory)
 		return "", err
 	}
 	return absoluteKubeletRunDirectory, nil
@@ -125,10 +124,10 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 		filepath.Join(configPathDir, kubeadmconstants.ManifestsSubDirName),
 		pkiPathDir,
 	}
-	fmt.Printf("[reset] Deleting contents of config directories: %v\n", dirsToClean)
+	kubeadmlog.Infof("[reset] Deleting contents of config directories: %v\n", dirsToClean)
 	for _, dir := range dirsToClean {
 		if err := CleanDir(dir); err != nil {
-			klog.Warningf("[reset] Failed to remove directory: %q [%v]\n", dir, err)
+			kubeadmlog.Warningf("[reset] Failed to remove directory: %q [%v]\n", dir, err)
 		}
 	}
 
@@ -139,10 +138,10 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 		filepath.Join(configPathDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
 		filepath.Join(configPathDir, kubeadmconstants.SchedulerKubeConfigFileName),
 	}
-	fmt.Printf("[reset] Deleting files: %v\n", filesToClean)
+	kubeadmlog.Infof("[reset] Deleting files: %v\n", filesToClean)
 	for _, path := range filesToClean {
 		if err := os.RemoveAll(path); err != nil {
-			klog.Warningf("[reset] Failed to remove file: %q [%v]\n", path, err)
+			kubeadmlog.Warningf("[reset] Failed to remove file: %q [%v]\n", path, err)
 		}
 	}
 }

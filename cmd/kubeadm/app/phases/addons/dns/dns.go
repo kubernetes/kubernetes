@@ -35,13 +35,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	utilsnet "k8s.io/utils/net"
 )
 
@@ -132,7 +132,7 @@ func kubeDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 	if err := createKubeDNSAddon(dnsDeploymentBytes, dnsServiceBytes, client); err != nil {
 		return err
 	}
-	fmt.Println("[addons] Applied essential addon: kube-dns")
+	kubeadmlog.Infoln("[addons] Applied essential addon: kube-dns")
 	return nil
 }
 
@@ -221,7 +221,7 @@ func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 	if err := createCoreDNSAddon(coreDNSDeploymentBytes, coreDNSServiceBytes, coreDNSConfigMapBytes, client); err != nil {
 		return err
 	}
-	fmt.Println("[addons] Applied essential addon: CoreDNS")
+	kubeadmlog.Infoln("[addons] Applied essential addon: CoreDNS")
 	return nil
 }
 
@@ -243,7 +243,7 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 			// Errors in Corefile Migration is verified during preflight checks. This part will be executed when a user has chosen
 			// to ignore preflight check errors.
 			hasCoreDNSMigrationFailed = true
-			klog.Warningf("the CoreDNS Configuration was not migrated: %v. The existing CoreDNS Corefile configuration has been retained.", err)
+			kubeadmlog.Warningf("the CoreDNS Configuration was not migrated: %v. The existing CoreDNS Corefile configuration has been retained.", err)
 			if err := apiclient.CreateOrRetainConfigMap(client, coreDNSConfigMap, kubeadmconstants.CoreDNSConfigMap); err != nil {
 				return err
 			}
@@ -372,17 +372,17 @@ func migrateCoreDNSCorefile(client clientset.Interface, cm *v1.ConfigMap, corefi
 	}); err != nil {
 		return errors.Wrap(err, "unable to update the CoreDNS ConfigMap")
 	}
-	fmt.Println("[addons]: Migrating CoreDNS Corefile")
+	kubeadmlog.Infoln("[addons]: Migrating CoreDNS Corefile")
 	changes, err := migration.Deprecated(currentInstalledCoreDNSVersion, kubeadmconstants.CoreDNSVersion, corefile)
 	if err != nil {
 		return errors.Wrap(err, "unable to get list of changes to the configuration.")
 	}
 	// show the migration changes
-	klog.V(2).Infof("the CoreDNS configuration has been migrated and applied: %v.", updatedCorefile)
-	klog.V(2).Infoln("the old migration has been saved in the CoreDNS ConfigMap under the name [Corefile-backup]")
-	klog.V(2).Infoln("The changes in the new CoreDNS Configuration are as follows:")
+	kubeadmlog.V(2).Infof("the CoreDNS configuration has been migrated and applied: %v.", updatedCorefile)
+	kubeadmlog.V(2).Infoln("the old migration has been saved in the CoreDNS ConfigMap under the name [Corefile-backup]")
+	kubeadmlog.V(2).Infoln("The changes in the new CoreDNS Configuration are as follows:")
 	for _, change := range changes {
-		klog.V(2).Infof("%v", change.ToString())
+		kubeadmlog.V(2).Infof("%v", change.ToString())
 	}
 	return nil
 }
@@ -565,7 +565,7 @@ func omitHostnameInTranslation(forwardIPs []string) ([]string, error) {
 		}
 		parseIP := net.ParseIP(proxyHost)
 		if parseIP == nil {
-			klog.Warningf("your kube-dns configuration contains a hostname %v. It will be omitted in the translation to CoreDNS as hostnames are unsupported", proxyHost)
+			kubeadmlog.Warningf("your kube-dns configuration contains a hostname %v. It will be omitted in the translation to CoreDNS as hostnames are unsupported", proxyHost)
 		} else {
 			forwardIPs[index] = value
 			index++

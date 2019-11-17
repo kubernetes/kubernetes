@@ -26,6 +26,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 var (
@@ -132,7 +133,7 @@ func runControlPlanePhase(c workflow.RunData) error {
 		return errors.New("control-plane phase invoked with an invalid data struct")
 	}
 
-	fmt.Printf("[control-plane] Using manifest folder %q\n", data.ManifestDir())
+	kubeadmlog.Infof("[control-plane] Using manifest folder %q\n", data.ManifestDir())
 	return nil
 }
 
@@ -144,7 +145,7 @@ func runControlPlaneSubphase(component string) func(c workflow.RunData) error {
 		}
 		cfg := data.Cfg()
 
-		fmt.Printf("[control-plane] Creating static Pod manifest for %q\n", component)
+		kubeadmlog.Infof("[control-plane] Creating static Pod manifest for %q\n", component)
 		return controlplane.CreateStaticPodFiles(data.ManifestDir(), data.KustomizeDir(), &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, component)
 	}
 }

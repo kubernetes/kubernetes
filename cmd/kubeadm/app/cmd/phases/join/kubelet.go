@@ -17,16 +17,15 @@ limitations under the License.
 package phases
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
+
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -35,6 +34,7 @@ import (
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 var (
@@ -104,7 +104,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	defer os.Remove(bootstrapKubeConfigFile)
 
 	// Write the bootstrap kubelet config file or the TLS-Bootstrapped kubelet config file down to disk
-	klog.V(1).Infof("[kubelet-start] writing bootstrap kubelet config file at %s", bootstrapKubeConfigFile)
+	kubeadmlog.V(1).Infof("[kubelet-start] writing bootstrap kubelet config file at %s", bootstrapKubeConfigFile)
 	if err := kubeconfigutil.WriteToDisk(bootstrapKubeConfigFile, tlsBootstrapCfg); err != nil {
 		return errors.Wrap(err, "couldn't save bootstrap-kubelet.conf to disk")
 	}
@@ -112,7 +112,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	// Write the ca certificate to disk so kubelet can use it for authentication
 	cluster := tlsBootstrapCfg.Contexts[tlsBootstrapCfg.CurrentContext].Cluster
 	if _, err := os.Stat(cfg.CACertPath); os.IsNotExist(err) {
-		klog.V(1).Infof("[kubelet-start] writing CA certificate at %s", cfg.CACertPath)
+		kubeadmlog.V(1).Infof("[kubelet-start] writing CA certificate at %s", cfg.CACertPath)
 		if err := certutil.WriteCert(cfg.CACertPath, tlsBootstrapCfg.Clusters[cluster].CertificateAuthorityData); err != nil {
 			return errors.Wrap(err, "couldn't save the CA certificate to disk")
 		}
@@ -130,7 +130,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 
 	// Configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
 	// Try to stop the kubelet service so no race conditions occur when configuring it
-	klog.V(1).Infoln("[kubelet-start] Stopping the kubelet")
+	kubeadmlog.V(1).Infoln("[kubelet-start] Stopping the kubelet")
 	kubeletphase.TryStopKubelet()
 
 	// Write the configuration for the kubelet (using the bootstrap token credentials) to disk so the kubelet can start
@@ -147,7 +147,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	}
 
 	// Try to start the kubelet service in case it's inactive
-	fmt.Println("[kubelet-start] Starting the kubelet")
+	kubeadmlog.Infoln("[kubelet-start] Starting the kubelet")
 	kubeletphase.TryStartKubelet()
 
 	// Now the kubelet will perform the TLS Bootstrap, transforming /etc/kubernetes/bootstrap-kubelet.conf to /etc/kubernetes/kubelet.conf
@@ -155,7 +155,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	// times out, display a somewhat user-friendly message.
 	waiter := apiclient.NewKubeWaiter(nil, kubeadmconstants.TLSBootstrapTimeout, os.Stdout)
 	if err := waiter.WaitForKubeletAndFunc(waitForTLSBootstrappedClient); err != nil {
-		fmt.Printf(kubeadmJoinFailMsg, err)
+		kubeadmlog.Infof(kubeadmJoinFailMsg, err)
 		return err
 	}
 
@@ -165,7 +165,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 		return err
 	}
 
-	klog.V(1).Infoln("[kubelet-start] preserving the crisocket information for the node")
+	kubeadmlog.V(1).Infoln("[kubelet-start] preserving the crisocket information for the node")
 	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
 		return errors.Wrap(err, "error uploading crisocket")
 	}
@@ -175,7 +175,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 
 // waitForTLSBootstrappedClient waits for the /etc/kubernetes/kubelet.conf file to be available
 func waitForTLSBootstrappedClient() error {
-	fmt.Println("[kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap...")
+	kubeadmlog.Infoln("[kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap...")
 
 	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
 	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, kubeadmconstants.TLSBootstrapTimeout, func() (bool, error) {

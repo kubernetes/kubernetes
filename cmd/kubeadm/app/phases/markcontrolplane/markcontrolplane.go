@@ -17,25 +17,24 @@ limitations under the License.
 package markcontrolplane
 
 import (
-	"fmt"
-
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // MarkControlPlane taints the control-plane and sets the control-plane label
 func MarkControlPlane(client clientset.Interface, controlPlaneName string, taints []v1.Taint) error {
 
-	fmt.Printf("[mark-control-plane] Marking the node %s as control-plane by adding the label \"%s=''\"\n", controlPlaneName, constants.LabelNodeRoleMaster)
+	kubeadmlog.Infof("[mark-control-plane] Marking the node %s as control-plane by adding the label \"%s=''\"\n", controlPlaneName, constants.LabelNodeRoleMaster)
 
 	if len(taints) > 0 {
 		taintStrs := []string{}
 		for _, taint := range taints {
 			taintStrs = append(taintStrs, taint.ToString())
 		}
-		fmt.Printf("[mark-control-plane] Marking the node %s as control-plane by adding the taints %v\n", controlPlaneName, taintStrs)
+		kubeadmlog.Infof("[mark-control-plane] Marking the node %s as control-plane by adding the taints %v\n", controlPlaneName, taintStrs)
 	}
 
 	return apiclient.PatchNode(client, controlPlaneName, func(n *v1.Node) {

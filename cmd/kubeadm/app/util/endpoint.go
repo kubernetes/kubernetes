@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
 	"net"
 	"net/url"
 	"strconv"
@@ -26,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/validation"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // GetControlPlaneEndpoint returns a properly formatted endpoint for the control plane built according following rules:
@@ -63,7 +63,7 @@ func GetControlPlaneEndpoint(controlPlaneEndpoint string, localEndpoint *kubeadm
 		// if a port is provided within the controlPlaneAddress warn the users we are using it, else use the bindport
 		if port != "" {
 			if port != bindPortString {
-				fmt.Println("[endpoint] WARNING: port specified in controlPlaneEndpoint overrides bindPort in the controlplane address")
+				kubeadmlog.Infoln("[endpoint] WARNING: port specified in controlPlaneEndpoint overrides bindPort in the controlplane address")
 			}
 		} else {
 			port = bindPortString

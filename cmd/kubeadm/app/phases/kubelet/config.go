@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // WriteConfigToDisk writes the kubelet config object down to a file
@@ -57,7 +58,7 @@ func CreateConfigMap(cfg *kubeletconfigv1beta1.KubeletConfiguration, k8sVersionS
 	}
 
 	configMapName := kubeadmconstants.GetKubeletConfigMapName(k8sVersion)
-	fmt.Printf("[kubelet] Creating a ConfigMap %q in namespace %s with the configuration for the kubelets in the cluster\n", configMapName, metav1.NamespaceSystem)
+	kubeadmlog.Infof("[kubelet] Creating a ConfigMap %q in namespace %s with the configuration for the kubelets in the cluster\n", configMapName, metav1.NamespaceSystem)
 
 	kubeletBytes, err := getConfigBytes(cfg)
 	if err != nil {
@@ -131,7 +132,7 @@ func DownloadConfig(client clientset.Interface, kubeletVersion *version.Version,
 	// Download the ConfigMap from the cluster based on what version the kubelet is
 	configMapName := kubeadmconstants.GetKubeletConfigMapName(kubeletVersion)
 
-	fmt.Printf("[kubelet-start] Downloading configuration for the kubelet from the %q ConfigMap in the %s namespace\n",
+	kubeadmlog.Infof("[kubelet-start] Downloading configuration for the kubelet from the %q ConfigMap in the %s namespace\n",
 		configMapName, metav1.NamespaceSystem)
 
 	kubeletCfg, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, configMapName)
@@ -160,7 +161,7 @@ func getConfigBytes(kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration) ([
 // writeConfigBytesToDisk writes a byte slice down to disk at the specific location of the kubelet config file
 func writeConfigBytesToDisk(b []byte, kubeletDir string) error {
 	configFile := filepath.Join(kubeletDir, kubeadmconstants.KubeletConfigurationFileName)
-	fmt.Printf("[kubelet-start] Writing kubelet configuration to file %q\n", configFile)
+	kubeadmlog.Infof("[kubelet-start] Writing kubelet configuration to file %q\n", configFile)
 
 	// creates target folder if not already exists
 	if err := os.MkdirAll(kubeletDir, 0700); err != nil {

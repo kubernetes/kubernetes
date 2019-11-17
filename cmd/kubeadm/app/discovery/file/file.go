@@ -28,9 +28,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // RetrieveValidatedConfigInfo connects to the API Server and makes sure it can talk
@@ -66,7 +66,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string, discove
 
 	// If the discovery file config contains authentication credentials
 	if kubeconfigutil.HasAuthenticationCredentials(config) {
-		klog.V(1).Info("[discovery] Using authentication credentials from the discovery file for validating TLS connection")
+		kubeadmlog.V(1).Info("[discovery] Using authentication credentials from the discovery file for validating TLS connection")
 
 		// We should ensure that all the authentication info is embedded in config file, so everything will work also when
 		// the kubeconfig file will be stored in /etc/kubernetes/boostrap-kubelet.conf
@@ -75,7 +75,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string, discove
 		}
 	} else {
 		// If the discovery file config does not contains authentication credentials
-		klog.V(1).Info("[discovery] Discovery file does not contains authentication credentials, using unauthenticated request for validating TLS connection")
+		kubeadmlog.V(1).Info("[discovery] Discovery file does not contains authentication credentials, using unauthenticated request for validating TLS connection")
 
 		// Create a new kubeconfig object from the discovery file config, with only the server and the CA cert.
 		// NB. We do this in order to not pick up other possible misconfigurations in the clusterinfo file
@@ -94,7 +94,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string, discove
 		return nil, err
 	}
 
-	klog.V(1).Infof("[discovery] Created cluster-info discovery client, requesting info from %q\n", currentCluster.Server)
+	kubeadmlog.V(1).Infof("[discovery] Created cluster-info discovery client, requesting info from %q\n", currentCluster.Server)
 
 	var clusterinfoCM *v1.ConfigMap
 
@@ -105,10 +105,10 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string, discove
 			if apierrors.IsForbidden(err) {
 				// If the request is unauthorized, the cluster admin has not granted access to the cluster info configmap for unauthenticated users
 				// In that case, trust the cluster admin and do not refresh the cluster-info data
-				klog.Warningf("[discovery] Could not access the %s ConfigMap for refreshing the cluster-info information, but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo)
+				kubeadmlog.Warningf("[discovery] Could not access the %s ConfigMap for refreshing the cluster-info information, but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo)
 				return true, nil
 			}
-			klog.V(1).Infof("[discovery] Error reading the %s ConfigMap, will try again: %v\n", bootstrapapi.ConfigMapClusterInfo, err)
+			kubeadmlog.V(1).Infof("[discovery] Error reading the %s ConfigMap, will try again: %v\n", bootstrapapi.ConfigMapClusterInfo, err)
 			return false, nil
 		}
 		return true, nil
@@ -125,7 +125,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string, discove
 	// We somehow got hold of the ConfigMap, try to read some data from it. If we can't, fallback on the user-provided file
 	refreshedBaseKubeConfig, err := tryParseClusterInfoFromConfigMap(clusterinfoCM)
 	if err != nil {
-		klog.V(1).Infof("[discovery] The %s ConfigMap isn't set up properly (%v), but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo, err)
+		kubeadmlog.V(1).Infof("[discovery] The %s ConfigMap isn't set up properly (%v), but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo, err)
 		return config, nil
 	}
 
@@ -133,7 +133,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string, discove
 	currentCluster.Server = refreshedCluster.Server
 	currentCluster.CertificateAuthorityData = refreshedCluster.CertificateAuthorityData
 
-	klog.V(1).Infof("[discovery] Synced Server and CertificateAuthorityData from the %s ConfigMap", bootstrapapi.ConfigMapClusterInfo)
+	kubeadmlog.V(1).Infof("[discovery] Synced Server and CertificateAuthorityData from the %s ConfigMap", bootstrapapi.ConfigMapClusterInfo)
 	return config, nil
 }
 

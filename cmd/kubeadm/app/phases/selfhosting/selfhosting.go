@@ -22,9 +22,8 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/klog"
-
 	"github.com/pkg/errors"
+
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +33,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 const (
@@ -57,12 +57,12 @@ const (
 //      Otherwise, there is a race condition when we proceed without kubelet having restarted the API server correctly and the next .Create call flakes
 // 9. Do that for the kube-apiserver, kube-controller-manager and kube-scheduler in a loop
 func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubeadmapi.InitConfiguration, client clientset.Interface, waiter apiclient.Waiter, dryRun bool, certsInSecrets bool) error {
-	klog.V(1).Infoln("creating self hosted control plane")
+	kubeadmlog.V(1).Infoln("creating self hosted control plane")
 	// Adjust the timeout slightly to something self-hosting specific
 	waiter.SetTimeout(selfHostingWaitTimeout)
 
 	// Here the map of different mutators to use for the control plane's PodSpec is stored
-	klog.V(1).Infoln("getting mutators")
+	kubeadmlog.V(1).Infoln("getting mutators")
 	mutators := GetMutatorsFromFeatureGates(certsInSecrets)
 
 	if certsInSecrets {
@@ -81,7 +81,7 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 
 		// Since we want this function to be idempotent; just continue and try the next component if this file doesn't exist
 		if _, err := os.Stat(manifestPath); err != nil {
-			fmt.Printf("[self-hosted] The Static Pod for the component %q doesn't seem to be on the disk; trying the next one\n", componentName)
+			kubeadmlog.Infof("[self-hosted] The Static Pod for the component %q doesn't seem to be on the disk; trying the next one\n", componentName)
 			continue
 		}
 
@@ -126,7 +126,7 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 			return err
 		}
 
-		fmt.Printf("[self-hosted] self-hosted %s ready after %f seconds\n", componentName, time.Since(start).Seconds())
+		kubeadmlog.Infof("[self-hosted] self-hosted %s ready after %f seconds\n", componentName, time.Since(start).Seconds())
 	}
 	return nil
 }

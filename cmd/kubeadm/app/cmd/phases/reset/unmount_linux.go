@@ -23,7 +23,7 @@ import (
 	"strings"
 	"syscall"
 
-	"k8s.io/klog"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // unmountKubeletDirectory unmounts all paths that contain KubeletRunDirectory
@@ -39,7 +39,7 @@ func unmountKubeletDirectory(absoluteKubeletRunDirectory string) error {
 			continue
 		}
 		if err := syscall.Unmount(m[1], 0); err != nil {
-			klog.Warningf("[reset] Failed to unmount mounted directory in %s: %s", absoluteKubeletRunDirectory, m[1])
+			kubeadmlog.Warningf("[reset] Failed to unmount mounted directory in %s: %s", absoluteKubeletRunDirectory, m[1])
 		}
 	}
 	return nil

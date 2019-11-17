@@ -30,12 +30,13 @@ import (
 	"go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/pkg/transport"
 	"google.golang.org/grpc"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 const etcdTimeout = 2 * time.Second
@@ -104,7 +105,7 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 	for _, e := range clusterStatus.APIEndpoints {
 		endpoints = append(endpoints, GetClientURLByIP(e.AdvertiseAddress))
 	}
-	klog.V(1).Infof("etcd endpoints read from pods: %s", strings.Join(endpoints, ","))
+	kubeadmlog.V(1).Infof("etcd endpoints read from pods: %s", strings.Join(endpoints, ","))
 
 	// Creates an etcd client
 	etcdClient, err := New(
@@ -122,7 +123,7 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 	if err != nil {
 		return nil, errors.Wrap(err, "error syncing endpoints with etc")
 	}
-	klog.V(1).Infof("update etcd endpoints: %s", strings.Join(etcdClient.Endpoints, ","))
+	kubeadmlog.V(1).Infof("update etcd endpoints: %s", strings.Join(etcdClient.Endpoints, ","))
 
 	return etcdClient, nil
 }
@@ -156,14 +157,14 @@ func (c *Client) Sync() error {
 		if err == nil {
 			return true, nil
 		}
-		klog.V(5).Infof("Failed to sync etcd endpoints: %v", err)
+		kubeadmlog.V(5).Infof("Failed to sync etcd endpoints: %v", err)
 		lastError = err
 		return false, nil
 	})
 	if err != nil {
 		return lastError
 	}
-	klog.V(1).Infof("etcd endpoints read from etcd: %s", strings.Join(cli.Endpoints(), ","))
+	kubeadmlog.V(1).Infof("etcd endpoints read from etcd: %s", strings.Join(cli.Endpoints(), ","))
 
 	c.Endpoints = cli.Endpoints()
 	return nil
@@ -201,7 +202,7 @@ func (c *Client) GetMemberID(peerURL string) (uint64, error) {
 		if err == nil {
 			return true, nil
 		}
-		klog.V(5).Infof("Failed to get etcd member list: %v", err)
+		kubeadmlog.V(5).Infof("Failed to get etcd member list: %v", err)
 		lastError = err
 		return false, nil
 	})
@@ -242,7 +243,7 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 		if err == nil {
 			return true, nil
 		}
-		klog.V(5).Infof("Failed to remove etcd member: %v", err)
+		kubeadmlog.V(5).Infof("Failed to remove etcd member: %v", err)
 		lastError = err
 		return false, nil
 	})
@@ -292,7 +293,7 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 		if err == nil {
 			return true, nil
 		}
-		klog.V(5).Infof("Failed to add etcd member: %v", err)
+		kubeadmlog.V(5).Infof("Failed to add etcd member: %v", err)
 		lastError = err
 		return false, nil
 	})
@@ -385,7 +386,7 @@ func (c *Client) getClusterStatus() (map[string]*clientv3.StatusResponse, error)
 			if err == nil {
 				return true, nil
 			}
-			klog.V(5).Infof("Failed to get etcd status for %s: %v", ep, err)
+			kubeadmlog.V(5).Infof("Failed to get etcd status for %s: %v", ep, err)
 			lastError = err
 			return false, nil
 		})
@@ -402,17 +403,17 @@ func (c *Client) getClusterStatus() (map[string]*clientv3.StatusResponse, error)
 func (c *Client) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
 	for i := 0; i < retries; i++ {
 		if i > 0 {
-			klog.V(1).Infof("[etcd] Waiting %v until next retry\n", retryInterval)
+			kubeadmlog.V(1).Infof("[etcd] Waiting %v until next retry\n", retryInterval)
 			time.Sleep(retryInterval)
 		}
-		klog.V(2).Infof("[etcd] attempting to see if all cluster endpoints (%s) are available %d/%d", c.Endpoints, i+1, retries)
+		kubeadmlog.V(2).Infof("[etcd] attempting to see if all cluster endpoints (%s) are available %d/%d", c.Endpoints, i+1, retries)
 		_, err := c.getClusterStatus()
 		if err != nil {
 			switch err {
 			case context.DeadlineExceeded:
-				klog.V(1).Infof("[etcd] Attempt timed out")
+				kubeadmlog.V(1).Infof("[etcd] Attempt timed out")
 			default:
-				klog.V(1).Infof("[etcd] Attempt failed with error: %v\n", err)
+				kubeadmlog.V(1).Infof("[etcd] Attempt failed with error: %v\n", err)
 			}
 			continue
 		}

@@ -26,9 +26,11 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/kustomize"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	"sigs.k8s.io/kustomize/pkg/constants"
 	"sigs.k8s.io/kustomize/pkg/fs"
 	"sigs.k8s.io/kustomize/pkg/ifc"
@@ -189,7 +191,7 @@ func (km *Manager) Kustomize(data []byte) ([]byte, error) {
 		return data, nil
 	}
 
-	fmt.Printf("[kustomize] Applying %d patches to %s Resource=%s/%s\n", patchesCnt, resource.GroupVersionKind(), resource.GetNamespace(), resource.GetName())
+	kubeadmlog.Infof("[kustomize] Applying %d patches to %s Resource=%s/%s\n", patchesCnt, resource.GroupVersionKind(), resource.GetNamespace(), resource.GetName())
 
 	// create an in memory fs to use for the kustomization
 	memFS := fs.MakeFakeFS()

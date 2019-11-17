@@ -19,12 +19,12 @@ package phases
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"strings"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // NewPreflightPhase creates a kubeadm workflow phase implements preflight checks for reset
@@ -50,8 +50,8 @@ func runPreflight(c workflow.RunData) error {
 	}
 
 	if !r.ForceReset() {
-		fmt.Println("[reset] WARNING: Changes made to this host by 'kubeadm init' or 'kubeadm join' will be reverted.")
-		fmt.Print("[reset] Are you sure you want to proceed? [y/N]: ")
+		kubeadmlog.Infoln("[reset] WARNING: Changes made to this host by 'kubeadm init' or 'kubeadm join' will be reverted.")
+		kubeadmlog.Info("[reset] Are you sure you want to proceed? [y/N]: ")
 		s := bufio.NewScanner(r.InputReader())
 		s.Scan()
 		if err := s.Err(); err != nil {
@@ -62,6 +62,6 @@ func runPreflight(c workflow.RunData) error {
 		}
 	}
 
-	fmt.Println("[preflight] Running pre-flight checks")
+	kubeadmlog.Infoln("[preflight] Running pre-flight checks")
 	return preflight.RunRootCheckOnly(r.IgnorePreflightErrors())
 }

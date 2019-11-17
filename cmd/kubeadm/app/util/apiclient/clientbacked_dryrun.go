@@ -18,7 +18,6 @@ package apiclient
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/pkg/errors"
 
@@ -31,6 +30,7 @@ import (
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/clientcmd"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // ClientBackedDryRunGetter implements the DryRunGetter interface for use in NewDryRunClient() and proxies all GET and LIST requests to the backing API server reachable via rest.Config
@@ -82,7 +82,7 @@ func (clg *ClientBackedDryRunGetter) HandleGetAction(action core.GetAction) (boo
 	}
 	newObj, err := decodeUnstructuredIntoAPIObject(action, unstructuredObj)
 	if err != nil {
-		fmt.Printf("error after decode: %v %v\n", unstructuredObj, err)
+		kubeadmlog.Infof("error after decode: %v %v\n", unstructuredObj, err)
 		return true, nil, err
 	}
 	return true, newObj, err
@@ -101,7 +101,7 @@ func (clg *ClientBackedDryRunGetter) HandleListAction(action core.ListAction) (b
 	}
 	newObj, err := decodeUnstructuredIntoAPIObject(action, unstructuredList)
 	if err != nil {
-		fmt.Printf("error after decode: %v %v\n", unstructuredList, err)
+		kubeadmlog.Infof("error after decode: %v %v\n", unstructuredList, err)
 		return true, nil, err
 	}
 	return true, newObj, err
@@ -128,6 +128,6 @@ func decodeUnstructuredIntoAPIObject(action core.Action, unstructuredObj runtime
 
 func printIfNotExists(err error) {
 	if apierrors.IsNotFound(err) {
-		fmt.Println("[dryrun] The GET request didn't yield any result, the API Server returned a NotFound error.")
+		kubeadmlog.Infoln("[dryrun] The GET request didn't yield any result, the API Server returned a NotFound error.")
 	}
 }

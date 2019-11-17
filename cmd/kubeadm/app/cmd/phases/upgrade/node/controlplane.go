@@ -17,7 +17,6 @@ limitations under the License.
 package node
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/pkg/errors"
@@ -26,6 +25,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // NewControlPlane creates a kubeadm workflow phase that implements handling of control-plane upgrade.
@@ -54,7 +54,7 @@ func runControlPlane() func(c workflow.RunData) error {
 
 		// if this is not a control-plane node, this phase should not be executed
 		if !data.IsControlPlaneNode() {
-			fmt.Println("[upgrade] Skipping phase. Not a control plane node.")
+			kubeadmlog.Infoln("[upgrade] Skipping phase. Not a control plane node.")
 			return nil
 		}
 
@@ -67,7 +67,7 @@ func runControlPlane() func(c workflow.RunData) error {
 		kustomizeDir := data.KustomizeDir()
 
 		// Upgrade the control plane and etcd if installed on this node
-		fmt.Printf("[upgrade] Upgrading your Static Pod-hosted control plane instance to version %q...\n", cfg.KubernetesVersion)
+		kubeadmlog.Infof("[upgrade] Upgrading your Static Pod-hosted control plane instance to version %q...\n", cfg.KubernetesVersion)
 		if dryRun {
 			return upgrade.DryRunStaticPodUpgrade(kustomizeDir, cfg)
 		}
@@ -78,7 +78,7 @@ func runControlPlane() func(c workflow.RunData) error {
 			return errors.Wrap(err, "couldn't complete the static pod upgrade")
 		}
 
-		fmt.Println("[upgrade] The control plane instance for this node was successfully updated!")
+		kubeadmlog.Infoln("[upgrade] The control plane instance for this node was successfully updated!")
 
 		return nil
 	}

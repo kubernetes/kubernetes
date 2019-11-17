@@ -17,15 +17,14 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
@@ -35,6 +34,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
@@ -93,13 +93,13 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 
 	client, err := getClientset(options.kubeconfigPath, false)
 	if err == nil {
-		klog.V(1).Infof("[reset] Loaded client set from kubeconfig file: %s", options.kubeconfigPath)
+		kubeadmlog.V(1).Infof("[reset] Loaded client set from kubeconfig file: %s", options.kubeconfigPath)
 		cfg, err = configutil.FetchInitConfigurationFromCluster(client, out, "reset", false)
 		if err != nil {
-			klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
+			kubeadmlog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
 		}
 	} else {
-		klog.V(1).Infof("[reset] Could not obtain a client set from the kubeconfig file: %s", options.kubeconfigPath)
+		kubeadmlog.V(1).Infof("[reset] Could not obtain a client set from the kubeconfig file: %s", options.kubeconfigPath)
 	}
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors, ignorePreflightErrors(cfg))
@@ -117,10 +117,10 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 		if err != nil {
 			return nil, err
 		}
-		klog.V(1).Infof("[reset] Detected and using CRI socket: %s", criSocketPath)
+		kubeadmlog.V(1).Infof("[reset] Detected and using CRI socket: %s", criSocketPath)
 	} else {
 		criSocketPath = options.criSocketPath
-		klog.V(1).Infof("[reset] Using specified CRI socket: %s", criSocketPath)
+		kubeadmlog.V(1).Infof("[reset] Using specified CRI socket: %s", criSocketPath)
 	}
 
 	return &resetData{
@@ -184,9 +184,9 @@ func NewCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 			cleanDirs(data)
 
 			// output help text instructing user how to remove cni folders
-			fmt.Print(cniCleanupInstructions)
+			kubeadmlog.Info(cniCleanupInstructions)
 			// Output help text instructing user how to remove iptables rules
-			fmt.Print(iptablesCleanupInstructions)
+			kubeadmlog.Info(iptablesCleanupInstructions)
 			return nil
 		},
 	}
@@ -213,9 +213,9 @@ func NewCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 }
 
 func cleanDirs(data *resetData) {
-	fmt.Printf("[reset] Deleting contents of stateful directories: %v\n", data.dirsToClean)
+	kubeadmlog.Infof("[reset] Deleting contents of stateful directories: %v\n", data.dirsToClean)
 	for _, dir := range data.dirsToClean {
-		klog.V(1).Infof("[reset] Deleting content of %s", dir)
+		kubeadmlog.V(1).Infof("[reset] Deleting content of %s", dir)
 		phases.CleanDir(dir)
 	}
 }

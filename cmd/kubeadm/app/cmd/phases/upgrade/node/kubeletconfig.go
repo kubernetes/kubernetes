@@ -17,7 +17,6 @@ limitations under the License.
 package node
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -31,6 +30,7 @@ import (
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 var (
@@ -83,7 +83,7 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 		kubeletVersionStr := cfg.ClusterConfiguration.KubernetesVersion
 		if data.KubeletVersion() != "" && data.KubeletVersion() != kubeletVersionStr {
 			kubeletVersionStr = data.KubeletVersion()
-			fmt.Printf("[upgrade] Using kubelet config version %s, while kubernetes-version is %s\n", kubeletVersionStr, cfg.ClusterConfiguration.KubernetesVersion)
+			kubeadmlog.Infof("[upgrade] Using kubelet config version %s, while kubernetes-version is %s\n", kubeletVersionStr, cfg.ClusterConfiguration.KubernetesVersion)
 		}
 
 		// Parse the desired kubelet version
@@ -105,8 +105,8 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 			return nil
 		}
 
-		fmt.Println("[upgrade] The configuration for this node was successfully updated!")
-		fmt.Println("[upgrade] Now you should go ahead and upgrade the kubelet package using your package manager.")
+		kubeadmlog.Infoln("[upgrade] The configuration for this node was successfully updated!")
+		kubeadmlog.Infoln("[upgrade] Now you should go ahead and upgrade the kubelet package using your package manager.")
 		return nil
 	}
 }

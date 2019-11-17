@@ -20,9 +20,9 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -31,6 +31,7 @@ import (
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 var (
@@ -105,7 +106,7 @@ func runUploadKubeadmConfig(c workflow.RunData) error {
 		return err
 	}
 
-	klog.V(1).Infoln("[upload-config] Uploading the kubeadm ClusterConfiguration to a ConfigMap")
+	kubeadmlog.V(1).Infoln("[upload-config] Uploading the kubeadm ClusterConfiguration to a ConfigMap")
 	if err := uploadconfig.UploadConfiguration(cfg, client); err != nil {
 		return errors.Wrap(err, "error uploading the kubeadm ClusterConfiguration")
 	}
@@ -119,12 +120,12 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 		return err
 	}
 
-	klog.V(1).Infoln("[upload-config] Uploading the kubelet component config to a ConfigMap")
+	kubeadmlog.V(1).Infoln("[upload-config] Uploading the kubelet component config to a ConfigMap")
 	if err = kubeletphase.CreateConfigMap(cfg.ClusterConfiguration.ComponentConfigs.Kubelet, cfg.KubernetesVersion, client); err != nil {
 		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
 	}
 
-	klog.V(1).Infoln("[upload-config] Preserving the CRISocket information for the control-plane node")
+	kubeadmlog.V(1).Infoln("[upload-config] Preserving the CRISocket information for the control-plane node")
 	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
 		return errors.Wrap(err, "Error writing Crisocket information for the control-plane node")
 	}

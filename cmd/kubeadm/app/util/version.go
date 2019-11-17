@@ -29,8 +29,8 @@ import (
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	pkgversion "k8s.io/component-base/version"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 const (
@@ -98,19 +98,19 @@ func kubernetesReleaseVersion(version string, fetcher func(string, time.Duration
 		if err != nil {
 			if clientVersionErr == nil {
 				// Handle air-gapped environments by falling back to the client version.
-				klog.Warningf("could not fetch a Kubernetes version from the internet: %v", err)
-				klog.Warningf("falling back to the local client version: %s", clientVersion)
+				kubeadmlog.Warningf("could not fetch a Kubernetes version from the internet: %v", err)
+				kubeadmlog.Warningf("falling back to the local client version: %s", clientVersion)
 				return kubernetesReleaseVersion(clientVersion, fetcher)
 			}
 		}
 
 		if clientVersionErr != nil {
 			if err != nil {
-				klog.Warningf("could not obtain neither client nor remote version; fall back to: %s", constants.CurrentKubernetesVersion)
+				kubeadmlog.Warningf("could not obtain neither client nor remote version; fall back to: %s", constants.CurrentKubernetesVersion)
 				return kubernetesReleaseVersion(constants.CurrentKubernetesVersion.String(), fetcher)
 			}
 
-			klog.Warningf("could not obtain client version; using remote version: %s", body)
+			kubeadmlog.Warningf("could not obtain client version; using remote version: %s", body)
 			return kubernetesReleaseVersion(body, fetcher)
 		}
 
@@ -179,7 +179,7 @@ func splitVersion(version string) (string, string, error) {
 
 // Internal helper: return content of URL
 func fetchFromURL(url string, timeout time.Duration) (string, error) {
-	klog.V(2).Infof("fetching Kubernetes version from URL: %s", url)
+	kubeadmlog.V(2).Infof("fetching Kubernetes version from URL: %s", url)
 	client := &http.Client{Timeout: timeout, Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
 	resp, err := client.Get(url)
 	if err != nil {
@@ -248,7 +248,7 @@ func validateStableVersion(remoteVersion, clientVersion string) (string, error) 
 	if verClient.Major() < verRemote.Major() ||
 		(verClient.Major() == verRemote.Major()) && verClient.Minor() < verRemote.Minor() {
 		estimatedRelease := fmt.Sprintf("stable-%d.%d", verClient.Major(), verClient.Minor())
-		klog.Infof("remote version is much newer: %s; falling back to: %s", remoteVersion, estimatedRelease)
+		kubeadmlog.Infof("remote version is much newer: %s; falling back to: %s", remoteVersion, estimatedRelease)
 		return estimatedRelease, nil
 	}
 	return remoteVersion, nil

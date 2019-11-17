@@ -32,6 +32,7 @@ import (
 	certstype "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	certutil "k8s.io/client-go/util/cert"
 	csrutil "k8s.io/client-go/util/certificate/csr"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -96,7 +97,7 @@ func (r *APIRenewer) Renew(cfg *certutil.Config) (*x509.Certificate, crypto.Sign
 		return nil, nil, errors.Wrap(err, "couldn't create certificate signing request")
 	}
 
-	fmt.Printf("[certs] Certificate request %q created\n", req.Name)
+	kubeadmlog.Infof("[certs] Certificate request %q created\n", req.Name)
 
 	ctx, cancel := context.WithTimeout(context.Background(), watchTimeout)
 	defer cancel()

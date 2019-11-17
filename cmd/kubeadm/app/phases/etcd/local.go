@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"k8s.io/klog"
 
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
@@ -66,16 +66,16 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir, kustomizeDir string, node
 		return err
 	}
 
-	klog.V(1).Infof("[etcd] wrote Static Pod manifest for a local etcd member to %q\n", kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestDir))
+	kubeadmlog.V(1).Infof("[etcd] wrote Static Pod manifest for a local etcd member to %q\n", kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestDir))
 	return nil
 }
 
 // CheckLocalEtcdClusterStatus verifies health state of local/stacked etcd cluster before installing a new etcd member
 func CheckLocalEtcdClusterStatus(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration) error {
-	klog.V(1).Info("[etcd] Checking etcd cluster health")
+	kubeadmlog.V(1).Info("[etcd] Checking etcd cluster health")
 
 	// creates an etcd client that connects to all the local/stacked etcd members
-	klog.V(1).Info("creating etcd client that connects to etcd pods")
+	kubeadmlog.V(1).Info("creating etcd client that connects to etcd pods")
 	etcdClient, err := etcdutil.NewFromCluster(client, cfg.CertificatesDir)
 	if err != nil {
 		return err
@@ -94,7 +94,7 @@ func CheckLocalEtcdClusterStatus(client clientset.Interface, cfg *kubeadmapi.Clu
 // when reset the control plane node.
 func RemoveStackedEtcdMemberFromCluster(client clientset.Interface, cfg *kubeadmapi.InitConfiguration) error {
 	// creates an etcd client that connects to all the local/stacked etcd members
-	klog.V(1).Info("[etcd] creating etcd client that connects to etcd pods")
+	kubeadmlog.V(1).Info("[etcd] creating etcd client that connects to etcd pods")
 	etcdClient, err := etcdutil.NewFromCluster(client, cfg.CertificatesDir)
 	if err != nil {
 		return err
@@ -103,18 +103,18 @@ func RemoveStackedEtcdMemberFromCluster(client clientset.Interface, cfg *kubeadm
 	// notifies the other members of the etcd cluster about the removing member
 	etcdPeerAddress := etcdutil.GetPeerURL(&cfg.LocalAPIEndpoint)
 
-	klog.V(2).Infof("[etcd] get the member id from peer: %s", etcdPeerAddress)
+	kubeadmlog.V(2).Infof("[etcd] get the member id from peer: %s", etcdPeerAddress)
 	id, err := etcdClient.GetMemberID(etcdPeerAddress)
 	if err != nil {
 		return err
 	}
 
-	klog.V(1).Infof("[etcd] removing etcd member: %s, id: %d", etcdPeerAddress, id)
+	kubeadmlog.V(1).Infof("[etcd] removing etcd member: %s, id: %d", etcdPeerAddress, id)
 	members, err := etcdClient.RemoveMember(id)
 	if err != nil {
 		return err
 	}
-	klog.V(1).Infof("[etcd] Updated etcd member list: %v", members)
+	kubeadmlog.V(1).Infof("[etcd] Updated etcd member list: %v", members)
 
 	return nil
 }
@@ -124,7 +124,7 @@ func RemoveStackedEtcdMemberFromCluster(client clientset.Interface, cfg *kubeadm
 // Other members of the etcd cluster will be notified of the joining node in beforehand as well.
 func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifestDir, kustomizeDir string, nodeName string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint) error {
 	// creates an etcd client that connects to all the local/stacked etcd members
-	klog.V(1).Info("creating etcd client that connects to etcd pods")
+	kubeadmlog.V(1).Info("creating etcd client that connects to etcd pods")
 	etcdClient, err := etcdutil.NewFromCluster(client, cfg.CertificatesDir)
 	if err != nil {
 		return err
@@ -133,15 +133,15 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 	// notifies the other members of the etcd cluster about the joining member
 	etcdPeerAddress := etcdutil.GetPeerURL(endpoint)
 
-	klog.V(1).Infof("Adding etcd member: %s", etcdPeerAddress)
+	kubeadmlog.V(1).Infof("Adding etcd member: %s", etcdPeerAddress)
 	initialCluster, err := etcdClient.AddMember(nodeName, etcdPeerAddress)
 	if err != nil {
 		return err
 	}
-	fmt.Println("[etcd] Announced new etcd member joining to the existing etcd cluster")
-	klog.V(1).Infof("Updated etcd member list: %v", initialCluster)
+	kubeadmlog.Infoln("[etcd] Announced new etcd member joining to the existing etcd cluster")
+	kubeadmlog.V(1).Infof("Updated etcd member list: %v", initialCluster)
 
-	fmt.Printf("[etcd] Creating static Pod manifest for %q\n", kubeadmconstants.Etcd)
+	kubeadmlog.Infof("[etcd] Creating static Pod manifest for %q\n", kubeadmconstants.Etcd)
 
 	// gets etcd StaticPodSpec, actualized for the current InitConfiguration and the new list of etcd members
 	spec := GetEtcdPodSpec(cfg, endpoint, nodeName, initialCluster)
@@ -160,7 +160,7 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 		return err
 	}
 
-	fmt.Printf("[etcd] Waiting for the new etcd member to join the cluster. This can take up to %v\n", etcdHealthyCheckInterval*etcdHealthyCheckRetries)
+	kubeadmlog.Infof("[etcd] Waiting for the new etcd member to join the cluster. This can take up to %v\n", etcdHealthyCheckInterval*etcdHealthyCheckRetries)
 	if _, err := etcdClient.WaitForClusterAvailable(etcdHealthyCheckRetries, etcdHealthyCheckInterval); err != nil {
 		return err
 	}

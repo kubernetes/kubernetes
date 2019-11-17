@@ -26,6 +26,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/copycerts"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // NewUploadCertsPhase returns the uploadCerts phase
@@ -51,7 +52,7 @@ func runUploadCerts(c workflow.RunData) error {
 	}
 
 	if !data.UploadCerts() {
-		fmt.Printf("[upload-certs] Skipping phase. Please see --%s\n", options.UploadCerts)
+		kubeadmlog.Infof("[upload-certs] Skipping phase. Please see --%s\n", options.UploadCerts)
 		return nil
 	}
 	client, err := data.Client()
@@ -71,7 +72,7 @@ func runUploadCerts(c workflow.RunData) error {
 		return errors.Wrap(err, "error uploading certs")
 	}
 	if !data.SkipCertificateKeyPrint() {
-		fmt.Printf("[upload-certs] Using certificate key:\n%s\n", data.CertificateKey())
+		kubeadmlog.Infof("[upload-certs] Using certificate key:\n%s\n", data.CertificateKey())
 	}
 	return nil
 }

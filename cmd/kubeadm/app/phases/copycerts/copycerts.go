@@ -18,7 +18,6 @@ package copycerts
 
 import (
 	"encoding/hex"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -35,12 +34,12 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	keyutil "k8s.io/client-go/util/keyutil"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
-	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	cryptoutil "k8s.io/kubernetes/cmd/kubeadm/app/util/crypto"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 const (
@@ -85,7 +84,7 @@ func CreateCertificateKey() (string, error) {
 
 //UploadCerts save certs needs to join a new control-plane on kubeadm-certs sercret.
 func UploadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, key string) error {
-	fmt.Printf("[upload-certs] Storing the certificates in Secret %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
+	kubeadmlog.Infof("[upload-certs] Storing the certificates in Secret %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
 	decodedKey, err := hex.DecodeString(key)
 	if err != nil {
 		return errors.Wrap(err, "error decoding certificate key")
@@ -215,7 +214,7 @@ func getDataFromDisk(cfg *kubeadmapi.InitConfiguration, key []byte) (map[string]
 
 // DownloadCerts downloads the certificates needed to join a new control plane.
 func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, key string) error {
-	fmt.Printf("[download-certs] Downloading the certificates in Secret %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
+	kubeadmlog.Infof("[download-certs] Downloading the certificates in Secret %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
 
 	decodedKey, err := hex.DecodeString(key)
 	if err != nil {
@@ -238,7 +237,7 @@ func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration
 			return errors.Errorf("the Secret does not include the required certificate or key - name: %s, path: %s", certOrKeyName, certOrKeyPath)
 		}
 		if len(certOrKeyData) == 0 {
-			klog.V(1).Infof("[download-certs] Not saving %q to disk, since it is empty in the %q Secret\n", certOrKeyName, kubeadmconstants.KubeadmCertsSecret)
+			kubeadmlog.V(1).Infof("[download-certs] Not saving %q to disk, since it is empty in the %q Secret\n", certOrKeyName, kubeadmconstants.KubeadmCertsSecret)
 			continue
 		}
 		if err := writeCertOrKey(certOrKeyPath, certOrKeyData); err != nil {

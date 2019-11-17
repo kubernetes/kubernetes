@@ -22,13 +22,13 @@ import (
 	"github.com/pkg/errors"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/file"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/https"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery/token"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // TokenUser defines token user
@@ -48,7 +48,7 @@ func For(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 	// This is usually the case of Token discovery, but it can also be used with a discovery file
 	// without embedded authentication credentials.
 	if len(cfg.Discovery.TLSBootstrapToken) != 0 {
-		klog.V(1).Info("[discovery] Using provided TLSBootstrapToken as authentication credentials for the join process")
+		kubeadmlog.V(1).Info("[discovery] Using provided TLSBootstrapToken as authentication credentials for the join process")
 
 		clusterinfo := kubeconfigutil.GetClusterFromKubeConfig(config)
 		return kubeconfigutil.CreateWithToken(

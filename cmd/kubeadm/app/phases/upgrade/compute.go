@@ -26,6 +26,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // Upgrade defines an upgrade possibility to upgrade from a current version to a new one
@@ -75,7 +76,7 @@ type ClusterState struct {
 // GetAvailableUpgrades fetches all versions from the specified VersionGetter and computes which
 // kinds of upgrades can be performed
 func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool, etcdClient etcdutil.ClusterInterrogator, dnsType kubeadmapi.DNSAddOnType, client clientset.Interface) ([]Upgrade, error) {
-	fmt.Println("[upgrade] Fetching available versions to upgrade to")
+	kubeadmlog.Infoln("[upgrade] Fetching available versions to upgrade to")
 
 	// Collect the upgrades kubeadm can do in this list
 	upgrades := []Upgrade{}
@@ -95,8 +96,8 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 	// Get and output the current latest stable version
 	stableVersionStr, stableVersion, err := versionGetterImpl.VersionFromCILabel("stable", "stable version")
 	if err != nil {
-		fmt.Printf("[upgrade/versions] WARNING: %v\n", err)
-		fmt.Println("[upgrade/versions] WARNING: Falling back to current kubeadm version as latest stable version")
+		kubeadmlog.Infof("[upgrade/versions] WARNING: %v\n", err)
+		kubeadmlog.Infoln("[upgrade/versions] WARNING: Falling back to current kubeadm version as latest stable version")
 		stableVersionStr, stableVersion = kubeadmVersionStr, kubeadmVersion
 	}
 
@@ -142,7 +143,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		// Get and output the latest patch version for the cluster branch
 		patchVersionStr, patchVersion, err := versionGetterImpl.VersionFromCILabel(versionLabel, description)
 		if err != nil {
-			fmt.Printf("[upgrade/versions] WARNING: %v\n", err)
+			kubeadmlog.Infof("[upgrade/versions] WARNING: %v\n", err)
 		} else {
 			// Check if a minor version upgrade is possible when a patch release exists
 			// It's only possible if the latest patch version is higher than the current patch version
@@ -265,7 +266,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 	}
 
 	// Add a newline in the end of this output to leave some space to the next output section
-	fmt.Println("")
+	kubeadmlog.Infoln("")
 
 	return upgrades, nil
 }
@@ -294,7 +295,7 @@ func minorUpgradePossibleWithPatchRelease(stableVersion, patchVersion *versionut
 func getSuggestedEtcdVersion(kubernetesVersion string) string {
 	etcdVersion, err := kubeadmconstants.EtcdSupportedVersion(kubernetesVersion)
 	if err != nil {
-		fmt.Printf("[upgrade/versions] WARNING: No recommended etcd for requested Kubernetes version (%s)\n", kubernetesVersion)
+		kubeadmlog.Infof("[upgrade/versions] WARNING: No recommended etcd for requested Kubernetes version (%s)\n", kubernetesVersion)
 		return "N/A"
 	}
 	return etcdVersion.String()

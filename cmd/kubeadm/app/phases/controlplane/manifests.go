@@ -24,21 +24,22 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 	utilsnet "k8s.io/utils/net"
 )
 
 // CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
 func CreateInitStaticPodManifestFiles(manifestDir, kustomizeDir string, cfg *kubeadmapi.InitConfiguration) error {
-	klog.V(1).Infoln("[control-plane] creating static Pod files")
+	kubeadmlog.V(1).Infoln("[control-plane] creating static Pod files")
 	return CreateStaticPodFiles(manifestDir, kustomizeDir, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
 }
 
@@ -87,7 +88,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 // CreateStaticPodFiles creates all the requested static pod files.
 func CreateStaticPodFiles(manifestDir, kustomizeDir string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, componentNames ...string) error {
 	// gets the StaticPodSpecs, actualized for the current ClusterConfiguration
-	klog.V(1).Infoln("[control-plane] getting StaticPodSpecs")
+	kubeadmlog.V(1).Infoln("[control-plane] getting StaticPodSpecs")
 	specs := GetStaticPodSpecs(cfg, endpoint)
 
 	// creates required static pod specs
@@ -112,7 +113,7 @@ func CreateStaticPodFiles(manifestDir, kustomizeDir string, cfg *kubeadmapi.Clus
 			return errors.Wrapf(err, "failed to create static pod manifest file for %q", componentName)
 		}
 
-		klog.V(1).Infof("[control-plane] wrote static Pod manifest for component %q to %q\n", componentName, kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir))
+		kubeadmlog.V(1).Infof("[control-plane] wrote static Pod manifest for component %q to %q\n", componentName, kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir))
 	}
 
 	return nil
@@ -205,13 +206,13 @@ func getAuthzModes(authzModeExtraArgs string) string {
 			if isValidAuthzMode(requested) {
 				mode = append(mode, requested)
 			} else {
-				klog.Warningf("ignoring unknown kube-apiserver authorization-mode %q", requested)
+				kubeadmlog.Warningf("ignoring unknown kube-apiserver authorization-mode %q", requested)
 			}
 		}
 
 		// only return the user provided mode if at least one was valid
 		if len(mode) > 0 {
-			klog.Warningf("the default kube-apiserver authorization-mode is %q; using %q",
+			kubeadmlog.Warningf("the default kube-apiserver authorization-mode is %q; using %q",
 				strings.Join(defaultMode, ","),
 				strings.Join(mode, ","),
 			)

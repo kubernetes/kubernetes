@@ -29,6 +29,7 @@ import (
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
 	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 var controlPlaneJoinExample = cmdutil.Examples(`
@@ -127,7 +128,7 @@ func runEtcdPhase(c workflow.RunData) error {
 	}
 	// in case of local etcd
 	if cfg.Etcd.External != nil {
-		fmt.Println("[control-plane-join] using external etcd - no local stacked instance added")
+		kubeadmlog.Infoln("[control-plane-join] using external etcd - no local stacked instance added")
 		return nil
 	}
 

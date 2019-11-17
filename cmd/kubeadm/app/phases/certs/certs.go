@@ -19,24 +19,23 @@ package certs
 import (
 	"crypto"
 	"crypto/x509"
-	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/pkg/errors"
+
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
-	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
+	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 // CreatePKIAssets will create and write to disk all PKI assets necessary to establish the control plane.
 // If the PKI assets already exists in the target folder, they are used only if evaluated equal; otherwise an error is returned.
 func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
-	klog.V(1).Infoln("creating PKI assets")
+	kubeadmlog.V(1).Infoln("creating PKI assets")
 
 	// This structure cannot handle multilevel CA hierarchies.
 	// This isn't a problem right now, but may become one in the future.
@@ -58,7 +57,7 @@ func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 		return errors.Wrap(err, "error creating PKI assets")
 	}
 
-	fmt.Printf("[certs] Valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
+	kubeadmlog.Infof("[certs] Valid certificates and keys now exist in %q\n", cfg.CertificatesDir)
 
 	// Service accounts are not x509 certs, so handled separately
 	return CreateServiceAccountKeyAndPublicKeyFiles(cfg.CertificatesDir)
@@ -67,13 +66,13 @@ func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 // CreateServiceAccountKeyAndPublicKeyFiles create a new public/private key files for signing service account users.
 // If the sa public/private key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
 func CreateServiceAccountKeyAndPublicKeyFiles(certsDir string) error {
-	klog.V(1).Infoln("creating a new public/private key files for signing service account users")
+	kubeadmlog.V(1).Infoln("creating a new public/private key files for signing service account users")
 	_, err := keyutil.PrivateKeyFromFile(filepath.Join(certsDir, kubeadmconstants.ServiceAccountPrivateKeyName))
 	if err == nil {
 		// kubeadm doesn't validate the existing certificate key more than this;
 		// Basically, if we find a key file with the same path kubeadm thinks those files
 		// are equal and doesn't bother writing a new file
-		fmt.Printf("[certs] Using the existing %q key\n", kubeadmconstants.ServiceAccountKeyBaseName)
+		kubeadmlog.Infof("[certs] Using the existing %q key\n", kubeadmconstants.ServiceAccountKeyBaseName)
 		return nil
 	} else if !os.IsNotExist(err) {
 		return errors.Wrapf(err, "file %s existed but it could not be loaded properly", kubeadmconstants.ServiceAccountPrivateKeyName)
@@ -86,7 +85,7 @@ func CreateServiceAccountKeyAndPublicKeyFiles(certsDir string) error {
 	}
 
 	// Write .key and .pub files to disk
-	fmt.Printf("[certs] Generating %q key and public key\n", kubeadmconstants.ServiceAccountKeyBaseName)
+	kubeadmlog.Infof("[certs] Generating %q key and public key\n", kubeadmconstants.ServiceAccountKeyBaseName)
 
 	if err := pkiutil.WriteKey(certsDir, kubeadmconstants.ServiceAccountKeyBaseName, key); err != nil {
 		return err
@@ -101,7 +100,7 @@ func CreateCACertAndKeyFiles(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfigur
 	if certSpec.CAName != "" {
 		return errors.Errorf("this function should only be used for CAs, but cert %s has CA %s", certSpec.Name, certSpec.CAName)
 	}
-	klog.V(1).Infof("creating a new certificate authority for %s", certSpec.Name)
+	kubeadmlog.V(1).Infof("creating a new certificate authority for %s", certSpec.Name)
 
 	certConfig, err := certSpec.GetConfig(cfg)
 	if err != nil {
@@ -199,10 +198,10 @@ func writeCertificateAuthorityFilesIfNotExist(pkiDir string, baseName string, ca
 		// kubeadm doesn't validate the existing certificate Authority more than this;
 		// Basically, if we find a certificate file with the same path; and it is a CA
 		// kubeadm thinks those files are equal and doesn't bother writing a new file
-		fmt.Printf("[certs] Using the existing %q certificate and key\n", baseName)
+		kubeadmlog.Infof("[certs] Using the existing %q certificate and key\n", baseName)
 	} else {
 		// Write .crt and .key files to disk
-		fmt.Printf("[certs] Generating %q certificate and key\n", baseName)
+		kubeadmlog.Infof("[certs] Generating %q certificate and key\n", baseName)
 
 		if err := pkiutil.WriteCertAndKey(pkiDir, baseName, caCert, caKey); err != nil {
 			return errors.Wrapf(err, "failure while saving %s certificate and key", baseName)
@@ -235,16 +234,16 @@ func writeCertificateFilesIfNotExist(pkiDir string, baseName string, signingCert
 			return err
 		}
 
-		fmt.Printf("[certs] Using the existing %q certificate and key\n", baseName)
+		kubeadmlog.Infof("[certs] Using the existing %q certificate and key\n", baseName)
 	} else {
 		// Write .crt and .key files to disk
-		fmt.Printf("[certs] Generating %q certificate and key\n", baseName)
+		kubeadmlog.Infof("[certs] Generating %q certificate and key\n", baseName)
 
 		if err := pkiutil.WriteCertAndKey(pkiDir, baseName, cert, key); err != nil {
 			return errors.Wrapf(err, "failure while saving %s certificate and key", baseName)
 		}
 		if pkiutil.HasServerAuth(cert) {
-			fmt.Printf("[certs] %s serving cert is signed for DNS names %v and IPs %v\n", baseName, cert.DNSNames, cert.IPAddresses)
+			kubeadmlog.Infof("[certs] %s serving cert is signed for DNS names %v and IPs %v\n", baseName, cert.DNSNames, cert.IPAddresses)
 		}
 	}
 
@@ -261,10 +260,10 @@ func writeCSRFilesIfNotExist(csrDir string, baseName string, csr *x509.Certifica
 			return errors.Wrapf(err, "%s CSR existed but it could not be loaded properly", baseName)
 		}
 
-		fmt.Printf("[certs] Using the existing %q CSR\n", baseName)
+		kubeadmlog.Infof("[certs] Using the existing %q CSR\n", baseName)
 	} else {
 		// Write .key and .csr files to disk
-		fmt.Printf("[certs] Generating %q key and CSR\n", baseName)
+		kubeadmlog.Infof("[certs] Generating %q key and CSR\n", baseName)
 
 		if err := pkiutil.WriteKey(csrDir, baseName, key); err != nil {
 			return errors.Wrapf(err, "failure while saving %s key", baseName)

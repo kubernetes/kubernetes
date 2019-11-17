@@ -77,7 +77,7 @@ func checkErr(err error, handleErr func(string, int)) {
 			// thus no error from ParseInt is handled here.
 			if v, e := strconv.ParseInt(f.Value.String(), 10, 32); e == nil {
 				// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/logging.md
-				// klog.V(5) - Trace level verbosity
+				// kubeadmlog.V(5) - Trace level verbosity
 				if v > 4 {
 					msg = fmt.Sprintf("%+v", err)
 				}

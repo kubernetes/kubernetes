@@ -18,7 +18,6 @@ package alpha
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -39,6 +38,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 var (
@@ -91,8 +91,8 @@ func getSelfhostingSubCommand(in io.Reader) *cobra.Command {
 			var err error
 
 			if !forcePivot {
-				fmt.Println("WARNING: self-hosted clusters are not supported by kubeadm upgrade and by other kubeadm commands!")
-				fmt.Print("[pivot] are you sure you want to proceed? [y/n]: ")
+				kubeadmlog.Infoln("WARNING: self-hosted clusters are not supported by kubeadm upgrade and by other kubeadm commands!")
+				kubeadmlog.Info("[pivot] are you sure you want to proceed? [y/n]: ")
 				s := bufio.NewScanner(in)
 				s.Scan()
 
@@ -105,7 +105,7 @@ func getSelfhostingSubCommand(in io.Reader) *cobra.Command {
 				}
 			}
 
-			fmt.Println("[pivot] pivoting cluster to self-hosted")
+			kubeadmlog.Infoln("[pivot] pivoting cluster to self-hosted")
 
 			if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
 				return err

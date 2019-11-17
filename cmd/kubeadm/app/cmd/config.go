@@ -27,7 +27,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
-	"k8s.io/klog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -44,6 +43,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	utilsexec "k8s.io/utils/exec"
 )
@@ -302,7 +302,7 @@ func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 			The configuration is located in the %q namespace in the %q ConfigMap.
 		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			klog.V(1).Infoln("[config] retrieving ClientSet from file")
+			kubeadmlog.V(1).Infoln("[config] retrieving ClientSet from file")
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			if err != nil {
 				return err
@@ -334,7 +334,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 				return errors.New("the --config flag is mandatory")
 			}
 
-			klog.V(1).Infoln("[config] retrieving ClientSet from file")
+			kubeadmlog.V(1).Infoln("[config] retrieving ClientSet from file")
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			if err != nil {
 				return err
@@ -347,7 +347,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 			}
 
 			// Upload the configuration using the file
-			klog.V(1).Infof("[config] uploading configuration")
+			kubeadmlog.V(1).Infof("[config] uploading configuration")
 			return uploadconfig.UploadConfiguration(internalcfg, client)
 		},
 	}
@@ -379,11 +379,11 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var err error
-			klog.V(1).Infoln("[config] creating new FeatureGates")
+			kubeadmlog.V(1).Infoln("[config] creating new FeatureGates")
 			if clusterCfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
 				return nil
 			}
-			klog.V(1).Infoln("[config] retrieving ClientSet from file")
+			kubeadmlog.V(1).Infoln("[config] retrieving ClientSet from file")
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 			if err != nil {
 				return err
@@ -394,14 +394,14 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 			phaseutil.SetKubernetesVersion(clusterCfg)
 
 			// Default both statically and dynamically, convert to internal API type, and validate everything
-			klog.V(1).Infoln("[config] converting to internal API type")
+			kubeadmlog.V(1).Infoln("[config] converting to internal API type")
 			internalcfg, err := configutil.DefaultedInitConfiguration(initCfg, clusterCfg)
 			if err != nil {
 				return err
 			}
 
 			// Finally, upload the configuration
-			klog.V(1).Infof("[config] uploading configuration")
+			kubeadmlog.V(1).Infof("[config] uploading configuration")
 			return uploadconfig.UploadConfiguration(internalcfg, client)
 		},
 	}
@@ -413,7 +413,7 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 // RunConfigView gets the configuration persisted in the cluster
 func RunConfigView(out io.Writer, client clientset.Interface) error {
 
-	klog.V(1).Infoln("[config] getting the cluster configuration")
+	kubeadmlog.V(1).Infoln("[config] getting the cluster configuration")
 	cfgConfigMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.KubeadmConfigConfigMap, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -490,7 +490,7 @@ func PullControlPlaneImages(runtime utilruntime.ContainerRuntime, cfg *kubeadmap
 		if err := runtime.PullImage(image); err != nil {
 			return errors.Wrapf(err, "failed to pull image %q", image)
 		}
-		fmt.Printf("[config/images] Pulled %s\n", image)
+		kubeadmlog.Infof("[config/images] Pulled %s\n", image)
 	}
 	return nil
 }

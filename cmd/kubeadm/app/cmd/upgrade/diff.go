@@ -23,10 +23,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	client "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -35,6 +35,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 type diffFlags struct {
@@ -132,7 +133,7 @@ func runDiff(flags *diffFlags, args []string) error {
 		case constants.KubeScheduler:
 			path = flags.schedulerManifestPath
 		default:
-			klog.Errorf("[diff] unknown spec %v", spec)
+			kubeadmlog.Errorf("[diff] unknown spec %v", spec)
 			continue
 		}
 

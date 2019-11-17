@@ -18,7 +18,6 @@ package apiclient
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -34,6 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetretry "k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // ConfigMapMutator is a function that mutates the given ConfigMap and optionally returns an error
@@ -290,7 +290,7 @@ func PatchNodeOnce(client clientset.Interface, nodeName string, patchFn func(*v1
 		if _, err := client.CoreV1().Nodes().Patch(n.Name, types.StrategicMergePatchType, patchBytes); err != nil {
 			// TODO also check for timeouts
 			if apierrors.IsConflict(err) {
-				fmt.Println("Temporarily unable to update node metadata due to conflict (will retry)")
+				kubeadmlog.Infoln("Temporarily unable to update node metadata due to conflict (will retry)")
 				return false, nil
 			}
 			return false, errors.Wrapf(err, "error patching node %q through apiserver", n.Name)

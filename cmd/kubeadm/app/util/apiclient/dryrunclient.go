@@ -24,12 +24,14 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // DryRunGetter is an interface that must be supplied to the NewDryRunClient function in order to construct a fully functional fake dryrun clientset
@@ -123,7 +125,7 @@ func NewDryRunClientWithOpts(opts DryRunClientOptions) clientset.Interface {
 					// Print the marshalled object format with one tab indentation
 					objBytes, err := opts.MarshalFunc(obj, action.GetResource().GroupVersion())
 					if err == nil {
-						fmt.Println("[dryrun] Returning faked GET response:")
+						kubeadmlog.Infoln("[dryrun] Returning faked GET response:")
 						PrintBytesWithLinePrefix(opts.Writer, objBytes, "\t")
 					}
 				}
@@ -148,7 +150,7 @@ func NewDryRunClientWithOpts(opts DryRunClientOptions) clientset.Interface {
 					// Print the marshalled object format with one tab indentation
 					objBytes, err := opts.MarshalFunc(objs, action.GetResource().GroupVersion())
 					if err == nil {
-						fmt.Println("[dryrun] Returning faked LIST response:")
+						kubeadmlog.Infoln("[dryrun] Returning faked LIST response:")
 						PrintBytesWithLinePrefix(opts.Writer, objBytes, "\t")
 					}
 				}
@@ -222,7 +224,7 @@ func logDryRunAction(action core.Action, w io.Writer, marshalFunc MarshalFunc) {
 		// Print the marshalled object with a tab indentation
 		objBytes, err := marshalFunc(objAction.GetObject(), action.GetResource().GroupVersion())
 		if err == nil {
-			fmt.Println("[dryrun] Attached object:")
+			kubeadmlog.Infoln("[dryrun] Attached object:")
 			PrintBytesWithLinePrefix(w, objBytes, "\t")
 		}
 	}

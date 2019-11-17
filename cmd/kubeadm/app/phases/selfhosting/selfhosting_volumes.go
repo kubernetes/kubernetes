@@ -17,7 +17,6 @@ limitations under the License.
 package selfhosting
 
 import (
-	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
@@ -27,6 +26,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 type tlsKeyPair struct {
@@ -242,7 +242,7 @@ func uploadTLSSecrets(client clientset.Interface, certDir string) error {
 		if err := apiclient.CreateOrUpdateSecret(client, secret); err != nil {
 			return err
 		}
-		fmt.Printf("[self-hosted] Created TLS secret %q from %s and %s\n", tlsKeyPair.name, tlsKeyPair.cert, tlsKeyPair.key)
+		kubeadmlog.Infof("[self-hosted] Created TLS secret %q from %s and %s\n", tlsKeyPair.name, tlsKeyPair.cert, tlsKeyPair.key)
 	}
 
 	return nil
@@ -263,7 +263,7 @@ func uploadKubeConfigSecrets(client clientset.Interface, kubeConfigDir string) e
 		if err := apiclient.CreateOrUpdateSecret(client, secret); err != nil {
 			return err
 		}
-		fmt.Printf("[self-hosted] Created secret for kubeconfig file %q\n", file)
+		kubeadmlog.Infof("[self-hosted] Created secret for kubeconfig file %q\n", file)
 	}
 
 	return nil

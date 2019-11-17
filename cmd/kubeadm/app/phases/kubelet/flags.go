@@ -24,13 +24,14 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"k8s.io/klog"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -84,7 +85,7 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 		kubeletFlags["network-plugin"] = "cni"
 		driver, err := kubeadmutil.GetCgroupDriverDocker(opts.execer)
 		if err != nil {
-			klog.Warningf("cannot automatically assign a '--cgroup-driver' value when starting the Kubelet: %v\n", err)
+			kubeadmlog.Warningf("cannot automatically assign a '--cgroup-driver' value when starting the Kubelet: %v\n", err)
 		} else {
 			kubeletFlags["cgroup-driver"] = driver
 		}
@@ -107,7 +108,7 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 
 	ok, err := opts.isServiceActiveFunc("systemd-resolved")
 	if err != nil {
-		klog.Warningf("cannot determine if systemd-resolved is active: %v\n", err)
+		kubeadmlog.Warningf("cannot determine if systemd-resolved is active: %v\n", err)
 	}
 	if ok {
 		kubeletFlags["resolv-conf"] = "/run/systemd/resolve/resolv.conf"
@@ -115,7 +116,7 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 
 	// Make sure the node name we're passed will work with Kubelet
 	if opts.nodeRegOpts.Name != "" && opts.nodeRegOpts.Name != opts.defaultHostname {
-		klog.V(1).Infof("setting kubelet hostname-override to %q", opts.nodeRegOpts.Name)
+		kubeadmlog.V(1).Infof("setting kubelet hostname-override to %q", opts.nodeRegOpts.Name)
 		kubeletFlags["hostname-override"] = opts.nodeRegOpts.Name
 	}
 
@@ -133,7 +134,7 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 // writeKubeletFlagBytesToDisk writes a byte slice down to disk at the specific location of the kubelet flag overrides file
 func writeKubeletFlagBytesToDisk(b []byte, kubeletDir string) error {
 	kubeletEnvFilePath := filepath.Join(kubeletDir, constants.KubeletEnvFileName)
-	fmt.Printf("[kubelet-start] Writing kubelet environment file with flags to file %q\n", kubeletEnvFilePath)
+	kubeadmlog.Infof("[kubelet-start] Writing kubelet environment file with flags to file %q\n", kubeletEnvFilePath)
 
 	// creates target folder if not already exists
 	if err := os.MkdirAll(kubeletDir, 0700); err != nil {

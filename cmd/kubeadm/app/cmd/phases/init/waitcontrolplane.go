@@ -25,12 +25,13 @@ import (
 
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
+
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 var (
@@ -77,7 +78,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	}
 
 	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
-	klog.V(1).Infoln("[wait-control-plane] Waiting for the API server to be healthy")
+	kubeadmlog.V(1).Infoln("[wait-control-plane] Waiting for the API server to be healthy")
 
 	client, err := data.Client()
 	if err != nil {
@@ -90,7 +91,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		return errors.Wrap(err, "error creating waiter")
 	}
 
-	fmt.Printf("[wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods from directory %q. This can take up to %v\n", data.ManifestDir(), timeout)
+	kubeadmlog.Infof("[wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods from directory %q. This can take up to %v\n", data.ManifestDir(), timeout)
 
 	if err := waiter.WaitForKubeletAndFunc(waiter.WaitForAPI); err != nil {
 		ctx := map[string]string{
@@ -110,9 +111,9 @@ func printFilesIfDryRunning(data InitData) error {
 	}
 	manifestDir := data.ManifestDir()
 
-	fmt.Printf("[dryrun] Wrote certificates, kubeconfig files and control plane manifests to the %q directory\n", manifestDir)
-	fmt.Println("[dryrun] The certificates or kubeconfig files would not be printed due to their sensitive nature")
-	fmt.Printf("[dryrun] Please examine the %q directory for details about what would be written\n", manifestDir)
+	kubeadmlog.Infof("[dryrun] Wrote certificates, kubeconfig files and control plane manifests to the %q directory\n", manifestDir)
+	kubeadmlog.Infoln("[dryrun] The certificates or kubeconfig files would not be printed due to their sensitive nature")
+	kubeadmlog.Infof("[dryrun] Please examine the %q directory for details about what would be written\n", manifestDir)
 
 	// Print the contents of the upgraded manifests and pretend like they were in /etc/kubernetes/manifests
 	files := []dryrunutil.FileToPrint{}

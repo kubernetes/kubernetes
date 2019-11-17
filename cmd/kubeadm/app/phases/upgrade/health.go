@@ -17,7 +17,6 @@ limitations under the License.
 package upgrade
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 
@@ -31,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 // healthCheck is a helper struct for easily performing healthchecks against the cluster and printing the output
@@ -60,7 +60,7 @@ func (c *healthCheck) Name() string {
 // - (if self-hosted) that there are DaemonSets with at least one Pod for all control plane components
 // - (if static pod-hosted) that all required Static Pod manifests exist on disk
 func CheckClusterHealth(client clientset.Interface, ignoreChecksErrors sets.String) error {
-	fmt.Println("[upgrade] Making sure the cluster is healthy:")
+	kubeadmlog.Infoln("[upgrade] Making sure the cluster is healthy:")
 
 	healthChecks := []preflight.Checker{
 		&healthCheck{

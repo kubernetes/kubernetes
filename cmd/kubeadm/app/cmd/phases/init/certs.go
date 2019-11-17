@@ -22,6 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
@@ -30,6 +31,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -195,7 +197,7 @@ func runCertsSa(c workflow.RunData) error {
 
 	// if external CA mode, skip service account key generation
 	if data.ExternalCA() {
-		fmt.Printf("[certs] Using existing sa keys\n")
+		kubeadmlog.Infof("[certs] Using existing sa keys\n")
 		return nil
 	}
 
@@ -209,7 +211,7 @@ func runCerts(c workflow.RunData) error {
 		return errors.New("certs phase invoked with an invalid data struct")
 	}
 
-	fmt.Printf("[certs] Using certificateDir folder %q\n", data.CertificateWriteDir())
+	kubeadmlog.Infof("[certs] Using certificateDir folder %q\n", data.CertificateWriteDir())
 	return nil
 }
 
@@ -222,16 +224,16 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 
 		// if using external etcd, skips etcd certificate authority generation
 		if data.Cfg().Etcd.External != nil && ca.Name == "etcd-ca" {
-			fmt.Printf("[certs] External etcd mode: Skipping %s certificate authority generation\n", ca.BaseName)
+			kubeadmlog.Infof("[certs] External etcd mode: Skipping %s certificate authority generation\n", ca.BaseName)
 			return nil
 		}
 
 		if _, err := pkiutil.TryLoadCertFromDisk(data.CertificateDir(), ca.BaseName); err == nil {
 			if _, err := pkiutil.TryLoadKeyFromDisk(data.CertificateDir(), ca.BaseName); err == nil {
-				fmt.Printf("[certs] Using existing %s certificate authority\n", ca.BaseName)
+				kubeadmlog.Infof("[certs] Using existing %s certificate authority\n", ca.BaseName)
 				return nil
 			}
-			fmt.Printf("[certs] Using existing %s keyless certificate authority\n", ca.BaseName)
+			kubeadmlog.Infof("[certs] Using existing %s keyless certificate authority\n", ca.BaseName)
 			return nil
 		}
 
@@ -254,7 +256,7 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 
 		// if using external etcd, skips etcd certificates generation
 		if data.Cfg().Etcd.External != nil && cert.CAName == "etcd-ca" {
-			fmt.Printf("[certs] External etcd mode: Skipping %s certificate generation\n", cert.BaseName)
+			kubeadmlog.Infof("[certs] External etcd mode: Skipping %s certificate generation\n", cert.BaseName)
 			return nil
 		}
 
@@ -268,12 +270,12 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 				return errors.Wrapf(err, "[certs] certificate %s not signed by CA certificate %s", cert.BaseName, caCert.BaseName)
 			}
 
-			fmt.Printf("[certs] Using existing %s certificate and key on disk\n", cert.BaseName)
+			kubeadmlog.Infof("[certs] Using existing %s certificate and key on disk\n", cert.BaseName)
 			return nil
 		}
 
 		if csrOnly {
-			fmt.Printf("[certs] Generating CSR for %s instead of certificate\n", cert.BaseName)
+			kubeadmlog.Infof("[certs] Generating CSR for %s instead of certificate\n", cert.BaseName)
 			if csrDir == "" {
 				csrDir = data.CertificateWriteDir()
 			}

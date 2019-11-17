@@ -17,15 +17,14 @@ limitations under the License.
 package phases
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/pkg/errors"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
+	kubeadmlog "k8s.io/kubernetes/cmd/kubeadm/app/util/log"
 )
 
 var (
@@ -90,14 +89,14 @@ func runEtcdPhaseLocal() func(c workflow.RunData) error {
 					return errors.Wrapf(err, "failed to create etcd directory %q", cfg.Etcd.Local.DataDir)
 				}
 			} else {
-				fmt.Printf("[dryrun] Would ensure that %q directory is present\n", cfg.Etcd.Local.DataDir)
+				kubeadmlog.Infof("[dryrun] Would ensure that %q directory is present\n", cfg.Etcd.Local.DataDir)
 			}
-			fmt.Printf("[etcd] Creating static Pod manifest for local etcd in %q\n", data.ManifestDir())
+			kubeadmlog.Infof("[etcd] Creating static Pod manifest for local etcd in %q\n", data.ManifestDir())
 			if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(data.ManifestDir(), data.KustomizeDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
 				return errors.Wrap(err, "error creating local etcd static pod manifest file")
 			}
 		} else {
-			klog.V(1).Infoln("[etcd] External etcd mode. Skipping the creation of a manifest for local etcd")
+			kubeadmlog.V(1).Infoln("[etcd] External etcd mode. Skipping the creation of a manifest for local etcd")
 		}
 		return nil
 	}
