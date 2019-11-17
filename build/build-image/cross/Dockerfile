@@ -50,9 +50,13 @@ RUN echo "deb http://archive.ubuntu.com/ubuntu xenial main universe" > /etc/apt/
   && for platform in ${KUBE_DYNAMIC_CROSSPLATFORMS}; do apt-get install -y crossbuild-essential-${platform}; done \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN if [ "${platform}" = "amd64" ]; then ARCH=x86_64; else ARCH=${platform}; fi
-
-RUN PROTOBUF_VERSION=3.0.2; ZIPNAME="protoc-${PROTOBUF_VERSION}-linux-${ARCH}.zip"; \
+RUN PROTOBUF_VERSION=3.10.0; \
+  if [ "$(uname -m)" = "amd64" ]; then PROTOC_ARCH="x86_64"; \
+  elif [ "$(uname -m)" = "ppc64le" ]; then PROTOC_ARCH="ppcle_64"; \
+  elif [ "$(uname -m)" = "s390x" ]; then PROTOC_ARCH="s390x_64"; \
+  elif [ "$(uname -m)" = "aarch64" ]; then PROTOC_ARCH="aarch_64"; \
+  else PROTOC_ARCH=$(uname -m); fi ; \ 
+  ZIPNAME="protoc-${PROTOBUF_VERSION}-linux-${PROTOC_ARCH}.zip"; \
   mkdir /tmp/protoc && cd /tmp/protoc \
   && wget "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/${ZIPNAME}" \
   && unzip "${ZIPNAME}" \
@@ -77,5 +81,5 @@ RUN go get golang.org/x/tools/cmd/cover \
 RUN export ETCD_VERSION=v3.2.24; \
   mkdir -p /usr/local/src/etcd \
   && cd /usr/local/src/etcd \
-  && curl -fsSL https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-${platform}.tar.gz | tar -xz \
-  && ln -s ../src/etcd/etcd-${ETCD_VERSION}-linux-${platform}/etcd /usr/local/bin/
+  && curl -fsSL https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-$(uname -m|sed 's/x86_64/amd64/g').tar.gz | tar -xz \
+  && ln -s ../src/etcd/etcd-${ETCD_VERSION}-linux-$(uname -m|sed 's/x86_64/amd64/g')/etcd /usr/local/bin/
