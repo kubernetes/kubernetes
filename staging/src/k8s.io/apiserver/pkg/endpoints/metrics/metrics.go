@@ -76,9 +76,10 @@ var (
 	)
 	deprecatedRequestCounter = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_request_count",
-			Help:           "(Deprecated) Counter of apiserver requests broken out for each verb, group, version, resource, scope, component, client, and HTTP response contentType and code.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Name:              "apiserver_request_count",
+			Help:              "Counter of apiserver requests broken out for each verb, group, version, resource, scope, component, client, and HTTP response contentType and code.",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component", "client", "contentType", "code"},
 	)
@@ -106,21 +107,23 @@ var (
 	deprecatedRequestLatencies = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Name: "apiserver_request_latencies",
-			Help: "(Deprecated) Response latency distribution in microseconds for each verb, group, version, resource, subresource, scope and component.",
+			Help: "Response latency distribution in microseconds for each verb, group, version, resource, subresource, scope and component.",
 			// Use buckets ranging from 125 ms to 8 seconds.
-			Buckets:        compbasemetrics.ExponentialBuckets(125000, 2.0, 7),
-			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:           compbasemetrics.ExponentialBuckets(125000, 2.0, 7),
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
 	deprecatedRequestLatenciesSummary = compbasemetrics.NewSummaryVec(
 		&compbasemetrics.SummaryOpts{
 			Name: "apiserver_request_latencies_summary",
-			Help: "(Deprecated) Response latency summary in microseconds for each verb, group, version, resource, subresource, scope and component.",
+			Help: "Response latency summary in microseconds for each verb, group, version, resource, subresource, scope and component.",
 			// Make the sliding window of 5h.
 			// TODO: The value for this should be based on our SLI definition (medium term).
-			MaxAge:         5 * time.Hour,
-			StabilityLevel: compbasemetrics.ALPHA,
+			MaxAge:            5 * time.Hour,
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
@@ -145,9 +148,10 @@ var (
 	)
 	DeprecatedDroppedRequests = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_dropped_requests",
-			Help:           "(Deprecated) Number of requests dropped with 'Try again later' response",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Name:              "apiserver_dropped_requests",
+			Help:              "Number of requests dropped with 'Try again later' response",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 		[]string{"requestKind"},
 	)

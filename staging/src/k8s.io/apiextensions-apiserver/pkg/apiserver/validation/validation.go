@@ -35,7 +35,7 @@ func NewSchemaValidator(customResourceValidation *apiextensions.CustomResourceVa
 	openapiSchema := &spec.Schema{}
 	if customResourceValidation != nil {
 		// TODO: replace with NewStructural(...).ToGoOpenAPI
-		if err := ConvertJSONSchemaProps(customResourceValidation.OpenAPIV3Schema, openapiSchema); err != nil {
+		if err := ConvertJSONSchemaPropsWithPostProcess(customResourceValidation.OpenAPIV3Schema, openapiSchema, StripUnsupportedFormatsPostProcess); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -103,7 +103,7 @@ func ConvertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema)
 type PostProcessFunc func(*spec.Schema) error
 
 // ConvertJSONSchemaPropsWithPostProcess converts the schema from apiextensions.JSONSchemaPropos to go-openapi/spec.Schema
-// and run a post process step on each JSONSchemaProps node.
+// and run a post process step on each JSONSchemaProps node. postProcess is never called for nil schemas.
 func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, out *spec.Schema, postProcess PostProcessFunc) error {
 	if in == nil {
 		return nil
