@@ -238,6 +238,11 @@ func (g *GenericPLEG) relist() {
 	for pid, events := range eventsByPodID {
 		pod := g.podRecords.getCurrent(pid)
 		if g.cacheEnabled() {
+			// this pod was in the list to reinspect and we did so because it had events, so remove it
+			// from the list (we don't want the reinspection code below to inspect it a second time in
+			// this relist execution)
+			delete(g.podsToReinspect, pid)
+
 			// updateCache() will inspect the pod and update the cache. If an
 			// error occurs during the inspection, we want PLEG to retry again
 			// in the next relist. To achieve this, we do not update the
@@ -255,11 +260,6 @@ func (g *GenericPLEG) relist() {
 				needsReinspection[pid] = pod
 
 				continue
-			} else {
-				// this pod was in the list to reinspect and we did so because it had events, so remove it
-				// from the list (we don't want the reinspection code below to inspect it a second time in
-				// this relist execution)
-				delete(g.podsToReinspect, pid)
 			}
 		}
 		// Update the internal storage and send out the events.
