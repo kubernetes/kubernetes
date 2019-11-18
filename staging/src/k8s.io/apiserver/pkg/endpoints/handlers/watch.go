@@ -64,6 +64,8 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 // serveWatch will serve a watch response.
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
 func serveWatch(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration) {
+	defer watcher.Stop()
+
 	options, err := optionsForTransform(mediaTypeOptions, req)
 	if err != nil {
 		scope.err(err, w, req)
@@ -201,7 +203,6 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// ensure the connection times out
 	timeoutCh, cleanup := s.TimeoutFactory.TimeoutCh()
 	defer cleanup()
-	defer s.Watching.Stop()
 
 	// begin the stream
 	w.Header().Set("Content-Type", s.MediaType)
@@ -285,8 +286,6 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 	buf := &bytes.Buffer{}
 	streamBuf := &bytes.Buffer{}
 	ch := s.Watching.ResultChan()
-
-	defer s.Watching.Stop()
 
 	for {
 		select {
