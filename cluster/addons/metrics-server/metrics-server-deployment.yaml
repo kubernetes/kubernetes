@@ -65,7 +65,7 @@ spec:
           name: https
           protocol: TCP
       - name: metrics-server-nanny
-        image: k8s.gcr.io/addon-resizer:1.8.11
+        image: gke.gcr.io/addon-resizer:1.8.11-gke.0
         resources:
           limits:
             cpu: 100m
