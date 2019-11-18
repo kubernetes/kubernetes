@@ -30,11 +30,14 @@ import (
 	"k8s.io/klog"
 )
 
+const (
+	// ADFSIdentitySystem is the override value for tenantID on Azure Stack clouds.
+	ADFSIdentitySystem = "adfs"
+)
+
 var (
 	// ErrorNoAuth indicates that no credentials are provided.
 	ErrorNoAuth = fmt.Errorf("no credentials provided for Azure cloud provider")
-	// ADFSIdentitySystem indicates value of tenantId for ADFS on Azure Stack.
-	ADFSIdentitySystem = "ADFS"
 )
 
 // AzureAuthConfig holds auth related part of cloud config
@@ -59,15 +62,19 @@ type AzureAuthConfig struct {
 	UserAssignedIdentityID string `json:"userAssignedIdentityID,omitempty" yaml:"userAssignedIdentityID,omitempty"`
 	// The ID of the Azure Subscription that the cluster is deployed in
 	SubscriptionID string `json:"subscriptionId,omitempty" yaml:"subscriptionId,omitempty"`
-	// Identity system value for the deployment. This gets populate for Azure Stack case.
-	IdentitySystem string `json:"identitySystem,omitempty" yaml:"identitySystem,omitempty"`
+	// IdentitySystem indicates the identity provider. Relevant only to hybrid clouds (Azure Stack).
+	// Allowed values are 'azure_ad' (default), 'adfs'.
+	IdentitySystem string `json:"identitySystem" yaml:"identitySystem"`
+	// CloudFQDN represents the hybrid cloud's fully qualified domain name: {location}.{domain}
+	// If set, cloud provider will generate its autorest.Environment instead of using one of the pre-defined ones.
+	CloudFQDN string `json:"cloudFQDN" yaml:"cloudFQDN"`
 }
 
 // GetServicePrincipalToken creates a new service principal token based on the configuration
 func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (*adal.ServicePrincipalToken, error) {
 	var tenantID string
 	if strings.EqualFold(config.IdentitySystem, ADFSIdentitySystem) {
-		tenantID = "adfs"
+		tenantID = ADFSIdentitySystem
 	} else {
 		tenantID = config.TenantID
 	}
@@ -126,10 +133,18 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 }
 
 // ParseAzureEnvironment returns azure environment by name
-func ParseAzureEnvironment(cloudName string) (*azure.Environment, error) {
+func ParseAzureEnvironment(cloudName, cloudFQDN, identitySystem string) (*azure.Environment, error) {
 	var env azure.Environment
 	var err error
-	if cloudName == "" {
+	if cloudFQDN != "" {
+		resourceManagerEndpoint := fmt.Sprintf("https://management.%s/", cloudFQDN)
+		nameOverride := azure.OverrideProperty{Key: azure.EnvironmentName, Value: cloudName}
+		klog.V(4).Infof("Loading environment from resource manager endpoint: %s", resourceManagerEndpoint)
+		env, err = azure.EnvironmentFromURL(resourceManagerEndpoint, nameOverride)
+		if err == nil && strings.EqualFold(cloudName, "AzureStackCloud") {
+			azureStackOverrides(env, cloudFQDN, identitySystem)
+		}
+	} else if cloudName == "" {
 		env = azure.PublicCloud
 	} else {
 		env, err = azure.EnvironmentFromName(cloudName)
@@ -150,4 +165,23 @@ func decodePkcs12(pkcs []byte, password string) (*x509.Certificate, *rsa.Private
 	}
 
 	return certificate, rsaPrivateKey, nil
+}
+
+func azureStackOverrides(env azure.Environment, cloudFQDN, identitySystem string) azure.Environment {
+	// if AzureStack, make sure the generated environment matches what AKSe currently generates
+	env.ManagementPortalURL = fmt.Sprintf("https://portal.%s/", cloudFQDN)
+	// TODO: figure out why AKSe does this
+	// why is autorest not setting ServiceManagementEndpoint?
+	env.ServiceManagementEndpoint = env.TokenAudience
+	// TODO: figure out why AKSe does this
+	// ResourceManagerVMDNSSuffix is not referenced in k/k
+	split := strings.Split(cloudFQDN, ".")
+	domain := strings.Join(split[1:], ".")
+	env.ResourceManagerVMDNSSuffix = fmt.Sprintf("cloudapp.%s", domain)
+	// NOTE: autorest sets KeyVaultEndpoint while AKSe does not
+	if strings.EqualFold(identitySystem, ADFSIdentitySystem) {
+		env.ActiveDirectoryEndpoint = strings.TrimSuffix(env.ActiveDirectoryEndpoint, "/")
+		env.ActiveDirectoryEndpoint = strings.TrimSuffix(env.ActiveDirectoryEndpoint, "adfs")
+	}
+	return env
 }
