@@ -41,7 +41,7 @@ func TestCanSupport(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/storageos")
 	if err != nil {
@@ -65,7 +65,7 @@ func TestGetAccessModes(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/storageos")
 	if err != nil {
@@ -150,7 +150,7 @@ func TestPlugin(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/storageos")
 	if err != nil {
@@ -185,7 +185,7 @@ func TestPlugin(t *testing.T) {
 			"apiAddr":     []byte("tcp://localhost:5705"),
 		}})
 
-	plug.(*storageosPlugin).host = volumetest.NewFakeVolumeHost(tmpDir, client, nil)
+	plug.(*storageosPlugin).host = volumetest.NewFakeVolumeHost(t, tmpDir, client, nil)
 
 	// Test Mounter
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid"), Namespace: "default"}}
@@ -365,7 +365,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 
 	client := fake.NewSimpleClientset(pv, claim)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, client, nil))
 	plug, _ := plugMgr.FindPluginByName(storageosPluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
