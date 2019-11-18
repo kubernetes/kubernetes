@@ -120,6 +120,7 @@ func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFac
 		WebhookConfigFile:           s.WebhookConfigFile,
 		WebhookCacheAuthorizedTTL:   s.WebhookCacheAuthorizedTTL,
 		WebhookCacheUnauthorizedTTL: s.WebhookCacheUnauthorizedTTL,
+                WebhookVersion:              s.WebhookVersion,
 		VersionedInformerFactory:    versionedInformerFactory,
 	}
 }
