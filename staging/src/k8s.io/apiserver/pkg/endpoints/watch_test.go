@@ -212,6 +212,48 @@ func TestWatchWebsocketClientClose(t *testing.T) {
 	}
 }
 
+func TestWatchClientClose(t *testing.T) {
+	simpleStorage := &SimpleRESTStorage{}
+	_ = rest.Watcher(simpleStorage) // Give compile error if this doesn't work.
+	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	dest, _ := url.Parse(server.URL)
+	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simples"
+	dest.RawQuery = "watch=1"
+
+	request, err := http.NewRequest("GET", dest.String(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	request.Header.Add("Accept", "application/json")
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if response.StatusCode != http.StatusOK {
+		b, _ := ioutil.ReadAll(response.Body)
+		t.Fatalf("Unexpected response: %#v\n%s", response, string(b))
+	}
+
+	// Close response to cause a cancel on the server
+	if err := response.Body.Close(); err != nil {
+		t.Fatalf("Unexpected close client err: %v", err)
+	}
+
+	select {
+	case data, ok := <-simpleStorage.fakeWatch.ResultChan():
+		if ok {
+			t.Errorf("expected a closed result channel, but got watch result %#v", data)
+		}
+	case <-time.After(5 * time.Second):
+		t.Errorf("watcher did not close when client closed")
+	}
+}
+
 func TestWatchRead(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	_ = rest.Watcher(simpleStorage) // Give compile error if this doesn't work.
