@@ -839,7 +839,7 @@ func TestRescheduleProvisioning(t *testing.T) {
 		context.closeFn()
 	}()
 
-	ctrl, informerFactory, err := initPVController(context, 0)
+	ctrl, informerFactory, err := initPVController(t, context, 0)
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
@@ -887,7 +887,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 	clientset := context.clientSet
 	ns := context.ns.Name
 
-	ctrl, informerFactory, err := initPVController(context, provisionDelaySeconds)
+	ctrl, informerFactory, err := initPVController(t, context, provisionDelaySeconds)
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
@@ -924,13 +924,13 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 	}
 }
 
-func initPVController(context *testContext, provisionDelaySeconds int) (*persistentvolume.PersistentVolumeController, informers.SharedInformerFactory, error) {
+func initPVController(t *testing.T, context *testContext, provisionDelaySeconds int) (*persistentvolume.PersistentVolumeController, informers.SharedInformerFactory, error) {
 	clientset := context.clientSet
 	// Informers factory for controllers, we disable resync period for testing.
 	informerFactory := informers.NewSharedInformerFactory(clientset, 0)
 
 	// Start PV controller for volume binding.
-	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil)
+	host := volumetest.NewFakeVolumeHost(t, "/tmp/fake", nil, nil)
 	plugin := &volumetest.FakeVolumePlugin{
 		PluginName:             provisionerPluginName,
 		Host:                   host,

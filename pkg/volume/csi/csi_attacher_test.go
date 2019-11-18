@@ -1514,7 +1514,7 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset) (*csiPlu
 	csiDriverLister := csiDriverInformer.Lister()
 	factory.Start(wait.NeverStop)
 
-	host := volumetest.NewFakeVolumeHostWithCSINodeName(
+	host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
 		tmpDir,
 		fakeClient,
 		ProbeVolumePlugins(),

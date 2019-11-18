@@ -47,7 +47,7 @@ func TestCanSupport(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/azure-file")
 	if err != nil {
@@ -71,7 +71,7 @@ func TestGetAccessModes(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/azure-file")
 	if err != nil {
@@ -106,20 +106,20 @@ func getTestTempDir(t *testing.T) string {
 func TestPluginAzureCloudProvider(t *testing.T) {
 	tmpDir := getTestTempDir(t)
 	defer os.RemoveAll(tmpDir)
-	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHostWithCloudProvider(tmpDir, nil, nil, getAzureTestCloud(t)))
+	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHostWithCloudProvider(t, tmpDir, nil, nil, getAzureTestCloud(t)))
 }
 
 func TestPluginWithoutCloudProvider(t *testing.T) {
 	tmpDir := getTestTempDir(t)
 	defer os.RemoveAll(tmpDir)
-	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 }
 
 func TestPluginWithOtherCloudProvider(t *testing.T) {
 	tmpDir := getTestTempDir(t)
 	defer os.RemoveAll(tmpDir)
 	cloud := &fakecloud.Cloud{}
-	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHostWithCloudProvider(tmpDir, nil, nil, cloud))
+	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHostWithCloudProvider(t, tmpDir, nil, nil, cloud))
 }
 
 func testPlugin(t *testing.T, tmpDir string, volumeHost volume.VolumeHost) {
@@ -214,7 +214,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	client := fake.NewSimpleClientset(pv, claim)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost("/tmp/fake", client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, "/tmp/fake", client, nil))
 	plug, _ := plugMgr.FindPluginByName(azureFilePluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
@@ -246,7 +246,7 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/azure-file")
 	if err != nil {

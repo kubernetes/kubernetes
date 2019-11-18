@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"k8s.io/utils/exec"
-	"k8s.io/utils/exec/testing"
+	testingexec "k8s.io/utils/exec/testing"
 	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
 
@@ -89,47 +89,44 @@ type fakeVolumeHost struct {
 var _ VolumeHost = &fakeVolumeHost{}
 var _ AttachDetachVolumeHost = &fakeVolumeHost{}
 
-func NewFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeVolumeHost {
-	return newFakeVolumeHost(rootDir, kubeClient, plugins, nil, nil, "", nil)
+func NewFakeVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeVolumeHost {
+	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, nil, "", nil)
 }
 
-func NewFakeVolumeHostWithCloudProvider(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface) *fakeVolumeHost {
-	return newFakeVolumeHost(rootDir, kubeClient, plugins, cloud, nil, "", nil)
+func NewFakeVolumeHostWithCloudProvider(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface) *fakeVolumeHost {
+	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, cloud, nil, "", nil)
 }
 
-func NewFakeVolumeHostWithNodeLabels(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, labels map[string]string) *fakeVolumeHost {
-	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil, nil, "", nil)
+func NewFakeVolumeHostWithNodeLabels(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, labels map[string]string) *fakeVolumeHost {
+	volHost := newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, nil, "", nil)
 	volHost.nodeLabels = labels
 	return volHost
 }
 
-func NewFakeVolumeHostWithCSINodeName(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelisters.CSIDriverLister) *fakeVolumeHost {
-	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil, nil, nodeName, driverLister)
-	return volHost
+func NewFakeVolumeHostWithCSINodeName(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelisters.CSIDriverLister) *fakeVolumeHost {
+	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, nil, nodeName, driverLister)
 }
 
-func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelisters.CSIDriverLister) *fakeVolumeHost {
+func NewFakeVolumeHostWithMounterFSType(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType) *fakeVolumeHost {
+	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, pathToTypeMap, "", nil)
+}
+
+func newFakeVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelisters.CSIDriverLister) *fakeVolumeHost {
 	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: cloud, nodeName: nodeName, csiDriverLister: driverLister}
 	host.mounter = mount.NewFakeMounter(nil)
 	host.hostUtil = hostutil.NewFakeHostUtil(pathToTypeMap)
 	host.exec = &testingexec.FakeExec{DisableScripts: true}
 	host.pluginMgr = &VolumePluginMgr{}
 	if err := host.pluginMgr.InitPlugins(plugins, nil /* prober */, host); err != nil {
-		// TODO(dyzz): Pipe testing context through and throw a fatal error instead
-		panic(fmt.Sprintf("Failed to init plugins while creating fake volume host: %v", err))
+		t.Fatalf("Failed to init plugins while creating fake volume host: %v", err)
 	}
 	host.subpather = &subpath.FakeSubpath{}
 	host.informerFactory = informers.NewSharedInformerFactory(kubeClient, time.Minute)
 	// Wait until the InitPlugins setup is finished before returning from this setup func
 	if err := host.WaitForKubeletErrNil(); err != nil {
-		panic(fmt.Sprintf("Failed to wait for kubelet err to be nil while creating fake volume host: %v", err))
+		t.Fatalf("Failed to wait for kubelet err to be nil while creating fake volume host: %v", err)
 	}
 	return host
-}
-
-func NewFakeVolumeHostWithMounterFSType(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType) *fakeVolumeHost {
-	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil, pathToTypeMap, "", nil)
-	return volHost
 }
 
 func (f *fakeVolumeHost) GetPluginDir(podUID string) string {
@@ -1532,6 +1529,7 @@ func GetTestVolumePluginMgr(
 	t *testing.T) (*VolumePluginMgr, *FakeVolumePlugin) {
 	plugins := ProbeVolumePlugins(VolumeConfig{})
 	v := NewFakeVolumeHost(
+		t,
 		"",      /* rootDir */
 		nil,     /* kubeClient */
 		plugins, /* plugins */

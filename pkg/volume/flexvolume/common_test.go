@@ -19,12 +19,12 @@ package flexvolume
 import (
 	"encoding/json"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/test/utils/harness"
 	"k8s.io/utils/exec"
-	"k8s.io/utils/exec/testing"
+	exectesting "k8s.io/utils/exec/testing"
 )
 
 func testPlugin(h *harness.Harness) (*flexVolumeAttachablePlugin, string) {
@@ -33,13 +33,13 @@ func testPlugin(h *harness.Harness) (*flexVolumeAttachablePlugin, string) {
 		flexVolumePlugin: &flexVolumePlugin{
 			driverName:          "test",
 			execPath:            "/plugin",
-			host:                volumetesting.NewFakeVolumeHost(rootDir, nil, nil),
+			host:                volumetesting.NewFakeVolumeHost(h.T, rootDir, nil, nil),
 			unsupportedCommands: []string{},
 		},
 	}, rootDir
 }
 
-func assertDriverCall(t *harness.Harness, output testingexec.FakeCombinedOutputAction, expectedCommand string, expectedArgs ...string) testingexec.FakeCommandAction {
+func assertDriverCall(t *harness.Harness, output exectesting.FakeCombinedOutputAction, expectedCommand string, expectedArgs ...string) exectesting.FakeCommandAction {
 	return func(cmd string, args ...string) exec.Cmd {
 		if cmd != "/plugin/test" {
 			t.Errorf("Wrong executable called: got %v, expected %v", cmd, "/plugin/test")
@@ -51,20 +51,20 @@ func assertDriverCall(t *harness.Harness, output testingexec.FakeCombinedOutputA
 		if !sameArgs(cmdArgs, expectedArgs) {
 			t.Errorf("Wrong args for %s: got %v, expected %v", args[0], cmdArgs, expectedArgs)
 		}
-		return &testingexec.FakeCmd{
+		return &exectesting.FakeCmd{
 			Argv:                 args,
-			CombinedOutputScript: []testingexec.FakeCombinedOutputAction{output},
+			CombinedOutputScript: []exectesting.FakeCombinedOutputAction{output},
 		}
 	}
 }
 
-func fakeRunner(fakeCommands ...testingexec.FakeCommandAction) exec.Interface {
-	return &testingexec.FakeExec{
+func fakeRunner(fakeCommands ...exectesting.FakeCommandAction) exec.Interface {
+	return &exectesting.FakeExec{
 		CommandScript: fakeCommands,
 	}
 }
 
-func fakeResultOutput(result interface{}) testingexec.FakeCombinedOutputAction {
+func fakeResultOutput(result interface{}) exectesting.FakeCombinedOutputAction {
 	return func() ([]byte, error) {
 		bytes, err := json.Marshal(result)
 		if err != nil {
@@ -74,11 +74,11 @@ func fakeResultOutput(result interface{}) testingexec.FakeCombinedOutputAction {
 	}
 }
 
-func successOutput() testingexec.FakeCombinedOutputAction {
+func successOutput() exectesting.FakeCombinedOutputAction {
 	return fakeResultOutput(&DriverStatus{StatusSuccess, "", "", "", true, nil, 0})
 }
 
-func notSupportedOutput() testingexec.FakeCombinedOutputAction {
+func notSupportedOutput() exectesting.FakeCombinedOutputAction {
 	return fakeResultOutput(&DriverStatus{StatusNotSupported, "", "", "", false, nil, 0})
 }
 

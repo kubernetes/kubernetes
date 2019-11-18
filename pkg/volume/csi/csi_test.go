@@ -257,7 +257,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			}
 			factory.Start(wait.NeverStop)
 
-			host := volumetest.NewFakeVolumeHostWithCSINodeName(
+			host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
 				tmpDir,
 				client,
 				ProbeVolumePlugins(),

@@ -56,7 +56,7 @@ func NewTestPlugin(t *testing.T, client *fakeclient.Clientset) (*volume.VolumePl
 	csiDriverLister := csiDriverInformer.Lister()
 	go factory.Start(wait.NeverStop)
 
-	host := volumetest.NewFakeVolumeHostWithCSINodeName(
+	host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
 		tmpDir,
 		client,
 		csi.ProbeVolumePlugins(),
