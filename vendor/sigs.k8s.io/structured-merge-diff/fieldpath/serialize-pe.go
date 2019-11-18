@@ -141,11 +141,7 @@ func serializePathElementToWriter(w io.Writer, pe PathElement) error {
 		stream.WriteObjectStart()
 		for i, field := range *pe.Key {
 			if i > 0 {
-<<<<<<< HEAD
-				stream.WriteMore()
-=======
 				stream.WriteRaw(",")
->>>>>>> hack/update-vendor.sh
 			}
 			stream.WriteObjectField(field.Name)
 			field.Value.WriteJSONStream(stream)
