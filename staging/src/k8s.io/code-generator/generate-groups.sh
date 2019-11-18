@@ -52,8 +52,9 @@ shift 4
   cd "$(dirname "${0}")"
   go install ./cmd/{defaulter-gen,client-gen,lister-gen,informer-gen,deepcopy-gen}
 )
-# We expect the above commands to get installed here:
-gobin="$(go env GOBIN)" 
+# Go installs the above commands to get installed in $GOBIN if defined, and $GOPATH/bin otherwise:
+GOBIN="$(go env GOBIN)"
+gobin="${GOBIN:-$(go env GOPATH)/bin}"
 
 function codegen::join() { local IFS="$1"; shift; echo "$*"; }
 
