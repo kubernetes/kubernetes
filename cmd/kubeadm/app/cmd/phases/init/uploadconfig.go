@@ -29,7 +29,6 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
-	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 )
 
@@ -124,10 +123,6 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
 	}
 
-	klog.V(1).Infoln("[upload-config] Preserving the CRISocket information for the control-plane node")
-	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
-		return errors.Wrap(err, "Error writing Crisocket information for the control-plane node")
-	}
 	return nil
 }
 

@@ -29,6 +29,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
+	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 )
 
 var (
@@ -54,6 +55,12 @@ func NewKubeletFinalizePhase() workflow.Phase {
 				RunAllSiblings: true,
 			},
 			{
+				Name:         "annotate-cri-socket",
+				Short:        "Annotate node with the CRI socket",
+				InheritFlags: []string{options.NodeName, options.NodeCRISocket, options.CfgPath, options.KubeconfigPath},
+				Run:          runAnnotateCRISocket,
+			},
+			{
 				Name:         "experimental-cert-rotation",
 				Short:        "Enable kubelet client certificate rotation",
 				InheritFlags: []string{options.CfgPath, options.CertificatesDir},
@@ -61,6 +68,23 @@ func NewKubeletFinalizePhase() workflow.Phase {
 			},
 		},
 	}
+}
+
+// runAnnotateCRISocket annotates the current node with the CRI socket location.
+func runAnnotateCRISocket(c workflow.RunData) error {
+	data, ok := c.(InitData)
+	if !ok {
+		return errors.New("annotate-cri-socket phase invoked with an invalid data struct")
+	}
+	klog.V(1).Infoln("[kubelet-finalize] preserving the crisocket information for the node")
+	client, err := data.Client()
+	if err != nil {
+		return errors.New("failed to create a clientset")
+	}
+	if err := patchnodephase.AnnotateCRISocket(client, data.Cfg().NodeRegistration.Name, data.Cfg().NodeRegistration.CRISocket); err != nil {
+		return errors.Wrap(err, "error uploading crisocket")
+	}
+	return nil
 }
 
 // runKubeletFinalizeCertRotation detects if the kubelet certificate rotation is enabled
