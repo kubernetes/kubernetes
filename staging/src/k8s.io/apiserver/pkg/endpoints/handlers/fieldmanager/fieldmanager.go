@@ -96,7 +96,8 @@ func newDefaultFieldManager(f Manager, objectCreater runtime.ObjectCreater, kind
 	f = NewStripMetaManager(f)
 	f = NewBuildManagerInfoManager(f, kind.GroupVersion())
 	f = NewCapManagersManager(f, DefaultMaxUpdateManagers)
-	//f = NewSkipNonAppliedManager(f, objectCreater, kind)
+	// DO NOT MERGE -- this is to test the performance impact of maintaining field managers on every modifying request.
+	// f = NewSkipNonAppliedManager(f, objectCreater, kind)
 	return NewFieldManager(f)
 }
 
