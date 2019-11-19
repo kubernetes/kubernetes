@@ -258,7 +258,7 @@ __kubectl_custom_func() {
             return
             ;;
         kubectl_logs)
-	    	__kubectl_parse_get "deployments" "{{ range .items  }}deploy/{{ .metadata.name }} {{ end }}"
+            __kubectl_parse_get "deployments" "{{ range .items  }}deploy/{{ .metadata.name }} {{ end }}"
             __kubectl_parse_get "statefulsets" "{{ range .items  }}sts/{{ .metadata.name }} {{ end }}"
             __kubectl_parse_get "replicasets" "{{ range .items  }}rs/{{ .metadata.name }} {{ end }}"
             __kubectl_parse_get "jobs" "{{ range .items  }}job/{{ .metadata.name }} {{ end }}"
