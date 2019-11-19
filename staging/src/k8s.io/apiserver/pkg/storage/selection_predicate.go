@@ -74,6 +74,7 @@ type SelectionPredicate struct {
 	Label               labels.Selector
 	Field               fields.Selector
 	GetAttrs            AttrFunc
+	IndexLabels         []string
 	IndexFields         []string
 	Limit               int64
 	Continue            string
@@ -127,4 +128,22 @@ func (s *SelectionPredicate) MatchesSingle() (string, bool) {
 // Empty returns true if the predicate performs no filtering.
 func (s *SelectionPredicate) Empty() bool {
 	return s.Label.Empty() && s.Field.Empty()
+}
+
+// For any index defined by IndexFields, if a matcher can match only (a subset)
+// of objects that return <value> for a given index, a pair (<index name>, <value>)
+// wil be returned.
+func (s *SelectionPredicate) MatcherIndex() []MatchValue {
+	var result []MatchValue
+	for _, field := range s.IndexFields {
+		if value, ok := s.Field.RequiresExactMatch(field); ok {
+			result = append(result, MatchValue{IndexName: field, Value: value})
+		}
+	}
+	for _, label := range s.IndexLabels {
+		if value, ok := s.Label.RequiresExactMatch(label); ok {
+			result = append(result, MatchValue{IndexName: label, Value: value})
+		}
+	}
+	return result
 }

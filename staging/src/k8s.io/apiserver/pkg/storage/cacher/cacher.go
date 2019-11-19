@@ -100,6 +100,10 @@ type Config struct {
 	// needs to process an incoming event.
 	IndexerFuncs storage.IndexerFuncs
 
+	// Indexers is used to accelerate the list operation, falls back to regular list
+	// operation if no indexer found.
+	Indexers *cache.Indexers
+
 	// NewFunc is a function that creates new empty object storing a object of type Type.
 	NewFunc func() runtime.Object
 
@@ -367,7 +371,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 
 	watchCache := newWatchCache(
-		config.CacheCapacity, config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner)
+		config.CacheCapacity, config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers)
 	listerWatcher := NewCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
@@ -701,7 +705,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	}
 	filter := filterWithAttrsFunction(key, pred)
 
-	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndList(listRV, trace)
+	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndList(listRV, pred.MatcherIndex(), trace)
 	if err != nil {
 		return err
 	}
