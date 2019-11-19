@@ -311,7 +311,7 @@ var _ = SIGDescribe("Networking", func() {
 		})
 	})
 
-	ginkgo.It("should recreate its iptables rules if they are deleted [Disruptive]", func() {
+	ginkgo.It("should recreate its iptables rules if they are deleted", func() {
 		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		framework.SkipUnlessSSHKeyPresent()
 
@@ -382,8 +382,8 @@ var _ = SIGDescribe("Networking", func() {
 		ginkgo.By("verifying that kubelet rules are eventually recreated")
 		err = utilwait.PollImmediate(framework.Poll, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
 			result, err = e2essh.SSH("sudo iptables-save -t nat", host, framework.TestContext.Provider)
+			e2essh.LogResult(result)
 			if err != nil || result.Code != 0 {
-				e2essh.LogResult(result)
 				return false, err
 			}
 

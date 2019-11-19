@@ -397,12 +397,18 @@ func (runner *runner) runContext(ctx context.Context, op operation, args []strin
 	iptablesCmd := iptablesCommand(runner.protocol)
 	fullArgs := append(runner.waitFlag, string(op))
 	fullArgs = append(fullArgs, args...)
-	klog.V(5).Infof("running iptables: %s %v", iptablesCmd, fullArgs)
+	klog.V(1).Infof("running iptables: %s %v", iptablesCmd, fullArgs)
+	var out []byte
+	var err error
 	if ctx == nil {
-		return runner.exec.Command(iptablesCmd, fullArgs...).CombinedOutput()
+		out, err = runner.exec.Command(iptablesCmd, fullArgs...).CombinedOutput()
+	} else {
+		out, err = runner.exec.CommandContext(ctx, iptablesCmd, fullArgs...).CombinedOutput()
 	}
-	return runner.exec.CommandContext(ctx, iptablesCmd, fullArgs...).CombinedOutput()
-	// Don't log err here - callers might not think it is an error.
+	if err != nil {
+		klog.V(1).Infof("iptables returned %v:\n%s", err, string(out))
+	}
+	return out, err
 }
 
 // Returns (bool, nil) if it was able to check the existence of the rule, or

@@ -86,10 +86,7 @@ func RunE2ETests(t *testing.T) {
 	defer logs.FlushLogs()
 
 	gomega.RegisterFailHandler(e2elog.Fail)
-	// Disable skipped tests unless they are explicitly requested.
-	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
-		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Feature:.+\]`
-	}
+	config.GinkgoConfig.FocusString = "should recreate its iptables rules if they are deleted"
 
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
 	var r []ginkgo.Reporter
