@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -117,6 +118,30 @@ func TestSplitYAMLDocument(t *testing.T) {
 		if testCase.expect != string(token) {
 			t.Errorf("%d: token did not match: %q %q", i, testCase.expect, string(token))
 		}
+	}
+}
+
+func TestYamlDecoderBuffer(t *testing.T) {
+	d := `---
+stuff: 1
+	test-foo: 1`
+	r := NewDocumentDecoder(ioutil.NopCloser(bytes.NewReader([]byte(d))))
+
+	// Set the buffer size to something unacceptably small, expect an error
+	buf := make([]byte, 3)
+	r.Buffer(buf, len(buf))
+
+	_, err := ioutil.ReadAll(r)
+	if !errors.Is(err, bufio.ErrTooLong) {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Use a larger max size for the buffer, no longer see an error
+	r = NewDocumentDecoder(ioutil.NopCloser(bytes.NewReader([]byte(d))))
+	r.Buffer(buf, 4096)
+	_, err = ioutil.ReadAll(r)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 

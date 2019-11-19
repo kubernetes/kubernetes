@@ -90,13 +90,20 @@ type YAMLDecoder struct {
 // the YAML spec) into its own chunk. io.ErrShortBuffer will be
 // returned if the entire buffer could not be read to assist
 // the caller in framing the chunk.
-func NewDocumentDecoder(r io.ReadCloser) io.ReadCloser {
+func NewDocumentDecoder(r io.ReadCloser) *YAMLDecoder {
 	scanner := bufio.NewScanner(r)
 	scanner.Split(splitYAMLDocument)
 	return &YAMLDecoder{
 		r:       r,
 		scanner: scanner,
 	}
+}
+
+// Buffer sets the internal buffer to use when scanning YAML documents, similar
+// to bufio.Scanner's Buffer function. Similarly, do not call this function
+// after calling Read (otherwise a panic occurs).
+func (d *YAMLDecoder) Buffer(buf []byte, max int) {
+	d.scanner.Buffer(buf, max)
 }
 
 // Read reads the previous slice into the buffer, or attempts to read
