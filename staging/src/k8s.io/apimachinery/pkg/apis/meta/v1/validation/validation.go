@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"strings"
 	"unicode"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,6 +55,11 @@ func ValidateLabelSelectorRequirement(sr metav1.LabelSelectorRequirement, fldPat
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), sr.Operator, "not a valid selector operator"))
 	}
 	allErrs = append(allErrs, ValidateLabelName(sr.Key, fldPath.Child("key"))...)
+	for i := range sr.Values {
+		if errs := validation.IsValidLabelValue(sr.Values[i]); len(errs) != 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("values"), sr.Operator, fmt.Sprintf("invalid label value: %q: at key: %q: %s", sr.Key, sr.Values[i], strings.Join(errs, "; "))))
+		}
+	}
 	return allErrs
 }
 
