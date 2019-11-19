@@ -17,10 +17,13 @@ limitations under the License.
 package metrics
 
 import (
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
@@ -204,12 +207,6 @@ func TestMustRegister(t *testing.T) {
 			registryVersion: &v115,
 			expectedPanics:  []bool{false},
 		},
-		{
-			desc:            "test must registering same hidden metric",
-			metrics:         []*Counter{alphaHiddenCounter, alphaHiddenCounter},
-			registryVersion: &v115,
-			expectedPanics:  []bool{false, false}, // hidden metrics no-opt
-		},
 	}
 
 	for _, test := range tests {
@@ -313,6 +310,83 @@ func TestValidateShowHiddenMetricsVersion(t *testing.T) {
 				assert.Errorf(t, err, "Failed to test: %s", tc.desc)
 			} else {
 				assert.NoErrorf(t, err, "Failed to test: %s", tc.desc)
+			}
+		})
+	}
+}
+
+func TestEnableHiddenMetrics(t *testing.T) {
+	currentVersion := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "17",
+		GitVersion: "v1.17.1-alpha-1.12345",
+	}
+
+	var tests = []struct {
+		name           string
+		fqName         string
+		counter        *Counter
+		mustRegister   bool
+		expectedMetric string
+	}{
+		{
+			name:   "hide by register",
+			fqName: "hidden_metric_register",
+			counter: NewCounter(&CounterOpts{
+				Name:              "hidden_metric_register",
+				Help:              "counter help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.16.0",
+			}),
+			mustRegister: false,
+			expectedMetric: `
+				# HELP hidden_metric_register [STABLE] (Deprecated since 1.16.0) counter help
+				# TYPE hidden_metric_register counter
+				hidden_metric_register 1
+				`,
+		},
+		{
+			name:   "hide by must register",
+			fqName: "hidden_metric_must_register",
+			counter: NewCounter(&CounterOpts{
+				Name:              "hidden_metric_must_register",
+				Help:              "counter help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.16.0",
+			}),
+			mustRegister: true,
+			expectedMetric: `
+				# HELP hidden_metric_must_register [STABLE] (Deprecated since 1.16.0) counter help
+				# TYPE hidden_metric_must_register counter
+				hidden_metric_must_register 1
+				`,
+		},
+	}
+
+	for _, test := range tests {
+		tc := test
+		t.Run(tc.name, func(t *testing.T) {
+			registry := newKubeRegistry(currentVersion)
+			if tc.mustRegister {
+				registry.MustRegister(tc.counter)
+			} else {
+				_ = registry.Register(tc.counter)
+			}
+
+			tc.counter.Inc() // no-ops, because counter hasn't been initialized
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(""), tc.fqName); err != nil {
+				t.Fatal(err)
+			}
+
+			SetShowHidden()
+			defer func() {
+				showHiddenOnce = *new(sync.Once)
+				showHidden.Store(false)
+			}()
+
+			tc.counter.Inc()
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(tc.expectedMetric), tc.fqName); err != nil {
+				t.Fatal(err)
 			}
 		})
 	}

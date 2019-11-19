@@ -143,6 +143,19 @@ func (r *lazyMetric) Create(version *semver.Version) bool {
 	return r.IsCreated()
 }
 
+// ClearState will clear all the states marked by Create.
+// It intends to be used for re-register a hidden metric.
+func (r *lazyMetric) ClearState() {
+	r.createLock.Lock()
+	defer r.createLock.Unlock()
+
+	r.isDeprecated = false
+	r.isHidden = false
+	r.isCreated = false
+	r.markDeprecationOnce = *(new(sync.Once))
+	r.createOnce = *(new(sync.Once))
+}
+
 /*
 This code is directly lifted from the prometheus codebase. It's a convenience struct which
 allows you satisfy the Collector interface automatically if you already satisfy the Metric interface.
