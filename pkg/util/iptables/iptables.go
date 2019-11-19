@@ -40,7 +40,7 @@ const (
 	// Prepend is the insert flag for iptable
 	Prepend RulePosition = "-I"
 	// Append is the append flag for iptable
-	Append  RulePosition = "-A"
+	Append RulePosition = "-A"
 )
 
 // Interface is an injectable interface for running iptables commands.  Implementations must be goroutine-safe.
@@ -101,7 +101,7 @@ type Table string
 
 const (
 	// TableNAT represents the built-in nat table
-	TableNAT    Table = "nat"
+	TableNAT Table = "nat"
 	// TableFilter represents the built-in filter table
 	TableFilter Table = "filter"
 	// TableMangle represents the built-in mangle table
@@ -115,13 +115,13 @@ const (
 	// ChainPostrouting used for source NAT in nat table
 	ChainPostrouting Chain = "POSTROUTING"
 	// ChainPrerouting used for DNAT (destination NAT) in nat table
-	ChainPrerouting  Chain = "PREROUTING"
+	ChainPrerouting Chain = "PREROUTING"
 	// ChainOutput used for the packets going out from local
-	ChainOutput      Chain = "OUTPUT"
+	ChainOutput Chain = "OUTPUT"
 	// ChainInput used for incoming packets
-	ChainInput       Chain = "INPUT"
+	ChainInput Chain = "INPUT"
 	// ChainForward used for the packets for another NIC
-	ChainForward     Chain = "FORWARD"
+	ChainForward Chain = "FORWARD"
 )
 
 const (
@@ -138,6 +138,7 @@ type RestoreCountersFlag bool
 
 // RestoreCounters a boolean true constant for the option flag RestoreCountersFlag
 const RestoreCounters RestoreCountersFlag = true
+
 // NoRestoreCounters a boolean false constant for the option flag RestoreCountersFlag
 const NoRestoreCounters RestoreCountersFlag = false
 
@@ -146,6 +147,7 @@ type FlushFlag bool
 
 // FlushTables a boolean true constant for option flag FlushFlag
 const FlushTables FlushFlag = true
+
 // NoFlushTables a boolean false constant for option flag FlushFlag
 const NoFlushTables FlushFlag = false
 
@@ -160,13 +162,16 @@ var RandomFullyMinVersion = utilversion.MustParseGeneric("1.6.2")
 
 // WaitMinVersion a minimum iptables versions supporting the -w and -w<seconds> flags
 var WaitMinVersion = utilversion.MustParseGeneric("1.4.20")
+
 // WaitSecondsMinVersion a minimum iptables versions supporting the wait seconds
 var WaitSecondsMinVersion = utilversion.MustParseGeneric("1.4.22")
+
 // WaitRestoreMinVersion a minimum iptables versions supporting the wait restore seconds
 var WaitRestoreMinVersion = utilversion.MustParseGeneric("1.6.2")
 
 // WaitString a constant for specifying the wait flag
 const WaitString = "-w"
+
 // WaitSecondsValue a constant for specifying the default wait seconds
 const WaitSecondsValue = "5"
 
