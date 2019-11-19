@@ -114,8 +114,6 @@ type Registerable interface {
 // prometheus.Gatherer interfaces
 type KubeRegistry interface {
 	// Deprecated
-	RawRegister(prometheus.Collector) error
-	// Deprecated
 	RawMustRegister(...prometheus.Collector)
 	CustomRegister(c StableCollector) error
 	CustomMustRegister(cs ...StableCollector)
@@ -191,15 +189,6 @@ func (kr *kubeRegistry) CustomMustRegister(cs ...StableCollector) {
 	}
 
 	kr.PromRegistry.MustRegister(collectors...)
-}
-
-// RawRegister takes a native prometheus.Collector and registers the collector
-// to the registry. This bypasses metrics safety checks, so should only be used
-// to register custom prometheus collectors.
-//
-// Deprecated
-func (kr *kubeRegistry) RawRegister(c prometheus.Collector) error {
-	return kr.PromRegistry.Register(c)
 }
 
 // RawMustRegister takes a native prometheus.Collector and registers the collector

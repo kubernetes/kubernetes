@@ -65,15 +65,6 @@ func RawMustRegister(cs ...prometheus.Collector) {
 	defaultRegistry.RawMustRegister(cs...)
 }
 
-// RawRegister registers a prometheus collector but uses the global registry, this
-// bypasses the metric stability framework
-//
-// Deprecated
-func RawRegister(c prometheus.Collector) error {
-	err := defaultRegistry.RawRegister(c)
-	return err
-}
-
 // CustomRegister registers a custom collector but uses the global registry.
 func CustomRegister(c metrics.StableCollector) error {
 	err := defaultRegistry.CustomRegister(c)
