@@ -197,6 +197,10 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj))
 		return
 	}
+
+	// If "pod" is a nominated pod, we should remove it from SchedulingQueue.
+	sched.SchedulingQueue.DeleteNominatedPodIfExists(pod)
+
 	if err := sched.SchedulingQueue.Delete(pod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to dequeue %T: %v", obj, err))
 	}
