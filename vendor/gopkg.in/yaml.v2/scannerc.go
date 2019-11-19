@@ -634,13 +634,14 @@ func yaml_parser_fetch_more_tokens(parser *yaml_parser_t) bool {
 			need_more_tokens = true
 		} else {
 			// Check if any potential simple key may occupy the head position.
-			if !yaml_parser_stale_simple_keys(parser) {
-				return false
-			}
-
-			for i := range parser.simple_keys {
+			for i := len(parser.simple_keys) - 1; i >= 0; i-- {
 				simple_key := &parser.simple_keys[i]
-				if simple_key.possible && simple_key.token_number == parser.tokens_parsed {
+				if simple_key.token_number < parser.tokens_parsed {
+					break
+				}
+				if valid, ok := yaml_simple_key_is_valid(parser, simple_key); !ok {
+					return false
+				} else if valid && simple_key.token_number == parser.tokens_parsed {
 					need_more_tokens = true
 					break
 				}
@@ -675,11 +676,6 @@ func yaml_parser_fetch_next_token(parser *yaml_parser_t) bool {
 
 	// Eat whitespaces and comments until we reach the next token.
 	if !yaml_parser_scan_to_next_token(parser) {
-		return false
-	}
-
-	// Remove obsolete potential simple keys.
-	if !yaml_parser_stale_simple_keys(parser) {
 		return false
 	}
 
@@ -837,29 +833,30 @@ func yaml_parser_fetch_next_token(parser *yaml_parser_t) bool {
 		"found character that cannot start any token")
 }
 
-// Check the list of potential simple keys and remove the positions that
-// cannot contain simple keys anymore.
-func yaml_parser_stale_simple_keys(parser *yaml_parser_t) bool {
-	// Check for a potential simple key for each flow level.
-	for i := range parser.simple_keys {
-		simple_key := &parser.simple_keys[i]
-
-		// The specification requires that a simple key
-		//
-		//  - is limited to a single line,
-		//  - is shorter than 1024 characters.
-		if simple_key.possible && (simple_key.mark.line < parser.mark.line || simple_key.mark.index+1024 < parser.mark.index) {
-
-			// Check if the potential simple key to be removed is required.
-			if simple_key.required {
-				return yaml_parser_set_scanner_error(parser,
-					"while scanning a simple key", simple_key.mark,
-					"could not find expected ':'")
-			}
-			simple_key.possible = false
-		}
+func yaml_simple_key_is_valid(parser *yaml_parser_t, simple_key *yaml_simple_key_t) (valid, ok bool) {
+	if !simple_key.possible {
+		return false, true
 	}
-	return true
+
+	// The 1.2 specification says:
+	//
+	//     "If the ? indicator is omitted, parsing needs to see past the
+	//     implicit key to recognize it as such. To limit the amount of
+	//     lookahead required, the “:” indicator must appear at most 1024
+	//     Unicode characters beyond the start of the key. In addition, the key
+	//     is restricted to a single line."
+	//
+	if simple_key.mark.line < parser.mark.line || simple_key.mark.index+1024 < parser.mark.index {
+		// Check if the potential simple key to be removed is required.
+		if simple_key.required {
+			return false, yaml_parser_set_scanner_error(parser,
+				"while scanning a simple key", simple_key.mark,
+				"could not find expected ':'")
+		}
+		simple_key.possible = false
+		return false, true
+	}
+	return true, true
 }
 
 // Check if a simple key may start at the current position and add it if
@@ -879,8 +876,8 @@ func yaml_parser_save_simple_key(parser *yaml_parser_t) bool {
 			possible:     true,
 			required:     required,
 			token_number: parser.tokens_parsed + (len(parser.tokens) - parser.tokens_head),
+			mark:         parser.mark,
 		}
-		simple_key.mark = parser.mark
 
 		if !yaml_parser_remove_simple_key(parser) {
 			return false
@@ -912,7 +909,12 @@ const max_flow_level = 10000
 // Increase the flow level and resize the simple key list if needed.
 func yaml_parser_increase_flow_level(parser *yaml_parser_t) bool {
 	// Reset the simple key on the next level.
-	parser.simple_keys = append(parser.simple_keys, yaml_simple_key_t{})
+	parser.simple_keys = append(parser.simple_keys, yaml_simple_key_t{
+		possible:     false,
+		required:     false,
+		token_number: parser.tokens_parsed + (len(parser.tokens) - parser.tokens_head),
+		mark:         parser.mark,
+	})
 
 	// Increase the flow level.
 	parser.flow_level++
@@ -1286,7 +1288,11 @@ func yaml_parser_fetch_value(parser *yaml_parser_t) bool {
 	simple_key := &parser.simple_keys[len(parser.simple_keys)-1]
 
 	// Have we found a simple key?
-	if simple_key.possible {
+	if valid, ok := yaml_simple_key_is_valid(parser, simple_key); !ok {
+		return false
+
+	} else if valid {
+
 		// Create the KEY token and insert it into the queue.
 		token := yaml_token_t{
 			typ:        yaml_KEY_TOKEN,
