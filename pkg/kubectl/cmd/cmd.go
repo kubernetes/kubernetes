@@ -258,15 +258,15 @@ __kubectl_custom_func() {
             return
             ;;
         kubectl_logs)
-	    __kubectl_parse_get "deploy" "{{ range .items  }}deploy/{{ .metadata.name }} {{ end }}"
-            __kubectl_parse_get "sts" "{{ range .items  }}sts/{{ .metadata.name }} {{ end }}"
-            __kubectl_parse_get "rs" "{{ range .items  }}rs/{{ .metadata.name }} {{ end }}"
-            __kubectl_parse_get "job" "{{ range .items  }}job/{{ .metadata.name }} {{ end }}"
+	    	__kubectl_parse_get "deployments" "{{ range .items  }}deploy/{{ .metadata.name }} {{ end }}"
+            __kubectl_parse_get "statefulsets" "{{ range .items  }}sts/{{ .metadata.name }} {{ end }}"
+            __kubectl_parse_get "replicasets" "{{ range .items  }}rs/{{ .metadata.name }} {{ end }}"
+            __kubectl_parse_get "jobs" "{{ range .items  }}job/{{ .metadata.name }} {{ end }}"
             __kubectl_require_pod_and_container
             return
             ;;
-	kubectl_port-forward)
-	    __kubectl_parse_get "service" "{{ range .items  }}svc/{{ .metadata.name }} {{ end }}"
+		kubectl_port-forward)
+	    	__kubectl_parse_get "service" "{{ range .items  }}svc/{{ .metadata.name }} {{ end }}"
             __kubectl_get_resource_pod
             return
             ;;
