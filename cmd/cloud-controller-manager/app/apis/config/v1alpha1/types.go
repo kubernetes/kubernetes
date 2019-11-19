@@ -23,6 +23,7 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// CloudControllerManagerConfiguration holds configuration for CloudControllerManager
 type CloudControllerManagerConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
