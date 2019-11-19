@@ -133,9 +133,10 @@ type Proxier struct {
 	// endpointsSynced and servicesSynced are set to 1 when the corresponding
 	// objects are synced after startup. This is used to avoid updating iptables
 	// with some partial data after kube-proxy restart.
-	endpointsSynced int32
-	servicesSynced  int32
-	initialized     int32
+	endpointsSynced       int32
+	servicesSynced        int32
+	initialized           int32
+	onServiceActionAtomic int32
 	// protects serviceChanges
 	serviceChangesLock sync.Mutex
 	serviceChanges     map[types.NamespacedName]*serviceChange // map of service changes
@@ -231,20 +232,21 @@ func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 		return nil, fmt.Errorf("failed to flush iptables: %v", err)
 	}
 	proxier := &Proxier{
-		loadBalancer:    loadBalancer,
-		serviceMap:      make(map[proxy.ServicePortName]*ServiceInfo),
-		serviceChanges:  make(map[types.NamespacedName]*serviceChange),
-		portMap:         make(map[portMapKey]*portMapValue),
-		syncPeriod:      syncPeriod,
-		minSyncPeriod:   minSyncPeriod,
-		udpIdleTimeout:  udpIdleTimeout,
-		listenIP:        listenIP,
-		iptables:        iptables,
-		hostIP:          hostIP,
-		proxyPorts:      proxyPorts,
-		makeProxySocket: makeProxySocket,
-		exec:            exec,
-		stopChan:        make(chan struct{}),
+		loadBalancer:          loadBalancer,
+		serviceMap:            make(map[proxy.ServicePortName]*ServiceInfo),
+		serviceChanges:        make(map[types.NamespacedName]*serviceChange),
+		portMap:               make(map[portMapKey]*portMapValue),
+		syncPeriod:            syncPeriod,
+		minSyncPeriod:         minSyncPeriod,
+		udpIdleTimeout:        udpIdleTimeout,
+		listenIP:              listenIP,
+		iptables:              iptables,
+		hostIP:                hostIP,
+		proxyPorts:            proxyPorts,
+		makeProxySocket:       makeProxySocket,
+		exec:                  exec,
+		stopChan:              make(chan struct{}),
+		onServiceActionAtomic: 0,
 	}
 	klog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, numBurstSyncs)
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("userspace-proxy-sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, numBurstSyncs)
@@ -361,7 +363,9 @@ func (proxier *Proxier) syncProxyRules() {
 	changes := proxier.serviceChanges
 	proxier.serviceChanges = make(map[types.NamespacedName]*serviceChange)
 	proxier.serviceChangesLock.Unlock()
-
+        
+	klog.V(2).Infof("userspace syncProxyRules service events: %d", len(changes))
+	
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 
@@ -370,6 +374,9 @@ func (proxier *Proxier) syncProxyRules() {
 		existingPorts := proxier.mergeService(change.current)
 		proxier.unmergeService(change.previous, existingPorts)
 	}
+
+	klog.V(2).Infof("release lock onServiceActionAtomic after service events processed.")
+	atomic.StoreInt32(&proxier.onServiceActionAtomic, 0)
 
 	proxier.ensurePortals()
 	proxier.cleanupStaleStickySessions()
@@ -384,6 +391,11 @@ func (proxier *Proxier) SyncLoop() {
 func (proxier *Proxier) ensurePortals() {
 	// NB: This does not remove rules that should not be present.
 	for name, info := range proxier.serviceMap {
+		// The priority of handling service events is higher than ensurePortals.
+		if atomic.LoadInt32(&proxier.onServiceActionAtomic) > 0 {
+			klog.V(2).Infof("iptables sync is interrupted due to service events received")
+			return
+		}
 		err := proxier.openPortal(name, info)
 		if err != nil {
 			klog.Errorf("Failed to ensure portal for %q: %v", name, err)
@@ -604,6 +616,8 @@ func (proxier *Proxier) serviceChange(previous, current *v1.Service, detail stri
 		delete(proxier.serviceChanges, svcName)
 	} else if proxier.isInitialized() {
 		// change will have an effect, ask the proxy to sync
+		klog.V(2).Infof("service %s is changed, will interrupt ensurePortals.", svcName)
+		atomic.StoreInt32(&proxier.onServiceActionAtomic, 1)
 		proxier.syncRunner.Run()
 	}
 }
