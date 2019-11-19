@@ -202,7 +202,9 @@ func (o *ScaleOptions) RunScale() error {
 		}
 		return nil
 	})
-
+	if err != nil {
+		return err
+	}
 	if len(o.ResourceVersion) != 0 && len(infos) > 1 {
 		return fmt.Errorf("cannot use --resource-version with multiple resources")
 	}
