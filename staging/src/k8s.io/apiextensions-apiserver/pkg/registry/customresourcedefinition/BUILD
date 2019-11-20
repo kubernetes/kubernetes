@@ -31,6 +31,9 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/storage/names:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/dryrun:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//pkg/printers:go_default_library",
+        "//pkg/printers/internalversion:go_default_library",
+        "//pkg/printers/storage:go_default_library",
     ],
 )
 
@@ -60,5 +63,8 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
+        "//pkg/printers:go_default_library",
+        "//pkg/printers/internalversion:go_default_library",
+        "//pkg/printers/storage:go_default_library",
     ],
 )
