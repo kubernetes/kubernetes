@@ -111,7 +111,7 @@ func (client BlobContainersClient) ClearLegalHoldPreparer(ctx context.Context, r
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -223,7 +223,7 @@ func (client BlobContainersClient) CreatePreparer(ctx context.Context, resourceG
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -335,7 +335,7 @@ func (client BlobContainersClient) CreateOrUpdateImmutabilityPolicyPreparer(ctx 
 		"subscriptionId":         autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -443,7 +443,7 @@ func (client BlobContainersClient) DeletePreparer(ctx context.Context, resourceG
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -548,7 +548,7 @@ func (client BlobContainersClient) DeleteImmutabilityPolicyPreparer(ctx context.
 		"subscriptionId":         autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -658,7 +658,7 @@ func (client BlobContainersClient) ExtendImmutabilityPolicyPreparer(ctx context.
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -763,7 +763,7 @@ func (client BlobContainersClient) GetPreparer(ctx context.Context, resourceGrou
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -867,7 +867,7 @@ func (client BlobContainersClient) GetImmutabilityPolicyPreparer(ctx context.Con
 		"subscriptionId":         autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -972,7 +972,7 @@ func (client BlobContainersClient) LeasePreparer(ctx context.Context, resourceGr
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -1017,10 +1017,9 @@ func (client BlobContainersClient) LeaseResponder(resp *http.Response) (result L
 // insensitive.
 // accountName - the name of the storage account within the specified resource group. Storage account names
 // must be between 3 and 24 characters in length and use numbers and lower-case letters only.
-// skipToken - optional. Continuation token for the list operation.
 // maxpagesize - optional. Specified maximum number of containers that can be included in the list.
 // filter - optional. When specified, only container names starting with the filter will be listed.
-func (client BlobContainersClient) List(ctx context.Context, resourceGroupName string, accountName string, skipToken string, maxpagesize string, filter string) (result ListContainerItemsPage, err error) {
+func (client BlobContainersClient) List(ctx context.Context, resourceGroupName string, accountName string, maxpagesize string, filter string) (result ListContainerItemsPage, err error) {
 	if tracing.IsEnabled() {
 		ctx = tracing.StartSpan(ctx, fqdn+"/BlobContainersClient.List")
 		defer func() {
@@ -1045,7 +1044,7 @@ func (client BlobContainersClient) List(ctx context.Context, resourceGroupName s
 	}
 
 	result.fn = client.listNextResults
-	req, err := client.ListPreparer(ctx, resourceGroupName, accountName, skipToken, maxpagesize, filter)
+	req, err := client.ListPreparer(ctx, resourceGroupName, accountName, maxpagesize, filter)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "storage.BlobContainersClient", "List", nil, "Failure preparing request")
 		return
@@ -1067,19 +1066,16 @@ func (client BlobContainersClient) List(ctx context.Context, resourceGroupName s
 }
 
 // ListPreparer prepares the List request.
-func (client BlobContainersClient) ListPreparer(ctx context.Context, resourceGroupName string, accountName string, skipToken string, maxpagesize string, filter string) (*http.Request, error) {
+func (client BlobContainersClient) ListPreparer(ctx context.Context, resourceGroupName string, accountName string, maxpagesize string, filter string) (*http.Request, error) {
 	pathParameters := map[string]interface{}{
 		"accountName":       autorest.Encode("path", accountName),
 		"resourceGroupName": autorest.Encode("path", resourceGroupName),
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
-	}
-	if len(skipToken) > 0 {
-		queryParameters["$skipToken"] = autorest.Encode("query", skipToken)
 	}
 	if len(maxpagesize) > 0 {
 		queryParameters["$maxpagesize"] = autorest.Encode("query", maxpagesize)
@@ -1138,7 +1134,7 @@ func (client BlobContainersClient) listNextResults(ctx context.Context, lastResu
 }
 
 // ListComplete enumerates all values, automatically crossing page boundaries as required.
-func (client BlobContainersClient) ListComplete(ctx context.Context, resourceGroupName string, accountName string, skipToken string, maxpagesize string, filter string) (result ListContainerItemsIterator, err error) {
+func (client BlobContainersClient) ListComplete(ctx context.Context, resourceGroupName string, accountName string, maxpagesize string, filter string) (result ListContainerItemsIterator, err error) {
 	if tracing.IsEnabled() {
 		ctx = tracing.StartSpan(ctx, fqdn+"/BlobContainersClient.List")
 		defer func() {
@@ -1149,7 +1145,7 @@ func (client BlobContainersClient) ListComplete(ctx context.Context, resourceGro
 			tracing.EndSpan(ctx, sc, err)
 		}()
 	}
-	result.page, err = client.List(ctx, resourceGroupName, accountName, skipToken, maxpagesize, filter)
+	result.page, err = client.List(ctx, resourceGroupName, accountName, maxpagesize, filter)
 	return
 }
 
@@ -1223,7 +1219,7 @@ func (client BlobContainersClient) LockImmutabilityPolicyPreparer(ctx context.Co
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -1327,7 +1323,7 @@ func (client BlobContainersClient) SetLegalHoldPreparer(ctx context.Context, res
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -1431,7 +1427,7 @@ func (client BlobContainersClient) UpdatePreparer(ctx context.Context, resourceG
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}

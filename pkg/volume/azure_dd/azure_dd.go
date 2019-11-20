@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-04-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	"k8s.io/klog"
 
 	v1 "k8s.io/api/core/v1"
