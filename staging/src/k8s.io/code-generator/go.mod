@@ -6,12 +6,14 @@ go 1.12
 
 require (
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
-	github.com/go-openapi/jsonpointer v0.19.3 // indirect
-	github.com/go-openapi/spec v0.19.2 // indirect
+	github.com/go-openapi/jsonreference v0.19.3 // indirect
+	github.com/go-openapi/spec v0.19.3 // indirect
 	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
 	github.com/json-iterator/go v1.1.8 // indirect
+	github.com/mailru/easyjson v0.7.0 // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/spf13/pflag v1.0.5
+	github.com/stretchr/testify v1.4.0 // indirect
 	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9 // indirect
 	golang.org/x/tools v0.0.0-20190920225731-5eefd052ad72 // indirect
 	gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485

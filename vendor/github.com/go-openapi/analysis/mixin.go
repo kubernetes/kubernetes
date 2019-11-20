@@ -27,7 +27,7 @@ import (
 // collisions are avoided by appending "Mixin<N>" but only if
 // needed.
 //
-// The following parts of primary are never modified by merging:
+// The following parts of primary are subject to merge, filling empty details
 //   - Info
 //   - BasePath
 //   - Host
@@ -57,6 +57,8 @@ func Mixin(primary *spec.Swagger, mixins ...*spec.Swagger) []string {
 	initPrimary(primary)
 
 	for i, m := range mixins {
+		skipped = append(skipped, mergeSwaggerProps(primary, m)...)
+
 		skipped = append(skipped, mergeConsumes(primary, m)...)
 
 		skipped = append(skipped, mergeProduces(primary, m)...)
@@ -220,10 +222,10 @@ func mergeResponses(primary *spec.Swagger, m *spec.Swagger) (skipped []string) {
 		}
 		primary.Responses[k] = v
 	}
-	return
+	return skipped
 }
 
-func mergeConsumes(primary *spec.Swagger, m *spec.Swagger) (skipped []string) {
+func mergeConsumes(primary *spec.Swagger, m *spec.Swagger) []string {
 	for _, v := range m.Consumes {
 		found := false
 		for _, vv := range primary.Consumes {
@@ -238,10 +240,10 @@ func mergeConsumes(primary *spec.Swagger, m *spec.Swagger) (skipped []string) {
 		}
 		primary.Consumes = append(primary.Consumes, v)
 	}
-	return
+	return []string{}
 }
 
-func mergeProduces(primary *spec.Swagger, m *spec.Swagger) (skipped []string) {
+func mergeProduces(primary *spec.Swagger, m *spec.Swagger) []string {
 	for _, v := range m.Produces {
 		found := false
 		for _, vv := range primary.Produces {
@@ -256,7 +258,7 @@ func mergeProduces(primary *spec.Swagger, m *spec.Swagger) (skipped []string) {
 		}
 		primary.Produces = append(primary.Produces, v)
 	}
-	return
+	return []string{}
 }
 
 func mergeTags(primary *spec.Swagger, m *spec.Swagger) (skipped []string) {
@@ -279,7 +281,7 @@ func mergeTags(primary *spec.Swagger, m *spec.Swagger) (skipped []string) {
 	return
 }
 
-func mergeSchemes(primary *spec.Swagger, m *spec.Swagger) (skipped []string) {
+func mergeSchemes(primary *spec.Swagger, m *spec.Swagger) []string {
 	for _, v := range m.Schemes {
 		found := false
 		for _, vv := range primary.Schemes {
@@ -293,6 +295,95 @@ func mergeSchemes(primary *spec.Swagger, m *spec.Swagger) (skipped []string) {
 			continue
 		}
 		primary.Schemes = append(primary.Schemes, v)
+	}
+	return []string{}
+}
+
+func mergeSwaggerProps(primary *spec.Swagger, m *spec.Swagger) []string {
+	var skipped []string
+	primary.Extensions, skipped = mergeExtensions(primary.Extensions, m.Extensions)
+
+	// merging details in swagger top properties
+	if primary.Host == "" {
+		primary.Host = m.Host
+	}
+	if primary.BasePath == "" {
+		primary.BasePath = m.BasePath
+	}
+	if primary.Info == nil {
+		primary.Info = m.Info
+	} else if m.Info != nil {
+		var sk []string
+		primary.Info.Extensions, sk = mergeExtensions(primary.Info.Extensions, m.Info.Extensions)
+		skipped = append(skipped, sk...)
+		if primary.Info.Description == "" {
+			primary.Info.Description = m.Info.Description
+		}
+		if primary.Info.Title == "" {
+			primary.Info.Description = m.Info.Description
+		}
+		if primary.Info.TermsOfService == "" {
+			primary.Info.TermsOfService = m.Info.TermsOfService
+		}
+		if primary.Info.Version == "" {
+			primary.Info.Version = m.Info.Version
+		}
+
+		if primary.Info.Contact == nil {
+			primary.Info.Contact = m.Info.Contact
+		} else if m.Info.Contact != nil {
+			if primary.Info.Contact.Name == "" {
+				primary.Info.Contact.Name = m.Info.Contact.Name
+			}
+			if primary.Info.Contact.URL == "" {
+				primary.Info.Contact.URL = m.Info.Contact.URL
+			}
+			if primary.Info.Contact.Email == "" {
+				primary.Info.Contact.Email = m.Info.Contact.Email
+			}
+		}
+
+		if primary.Info.License == nil {
+			primary.Info.License = m.Info.License
+		} else if m.Info.License != nil {
+			if primary.Info.License.Name == "" {
+				primary.Info.License.Name = m.Info.License.Name
+			}
+			if primary.Info.License.URL == "" {
+				primary.Info.License.URL = m.Info.License.URL
+			}
+		}
+
+	}
+	if primary.ExternalDocs == nil {
+		primary.ExternalDocs = m.ExternalDocs
+	} else if m.ExternalDocs != nil {
+		if primary.ExternalDocs.Description == "" {
+			primary.ExternalDocs.Description = m.ExternalDocs.Description
+		}
+		if primary.ExternalDocs.URL == "" {
+			primary.ExternalDocs.URL = m.ExternalDocs.URL
+		}
+	}
+	return skipped
+}
+
+func mergeExtensions(primary spec.Extensions, m spec.Extensions) (result spec.Extensions, skipped []string) {
+	if primary == nil {
+		result = m
+		return
+	}
+	if m == nil {
+		result = primary
+		return
+	}
+	result = primary
+	for k, v := range m {
+		if _, found := primary[k]; found {
+			skipped = append(skipped, k)
+			continue
+		}
+		primary[k] = v
 	}
 	return
 }

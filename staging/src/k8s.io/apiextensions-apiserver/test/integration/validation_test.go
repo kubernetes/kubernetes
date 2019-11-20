@@ -25,9 +25,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	clientschema "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -250,6 +252,180 @@ func TestCustomResourceValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestCustomResourceItemsValidation(t *testing.T) {
+	tearDown, apiExtensionClient, client, err := fixtures.StartDefaultServerWithClients(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	// decode CRD manifest
+	obj, _, err := clientschema.Codecs.UniversalDeserializer().Decode([]byte(fixtureItemsAndType), nil, nil)
+	if err != nil {
+		t.Fatalf("failed decoding of: %v\n\n%s", err, fixtureItemsAndType)
+	}
+	crd := obj.(*apiextensionsv1.CustomResourceDefinition)
+
+	// create CRDs
+	t.Logf("Creating CRD %s", crd.Name)
+	if _, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, client); err != nil {
+		t.Fatalf("unexpected create error: %v", err)
+	}
+
+	// create CR
+	gvr := schema.GroupVersionResource{
+		Group:    crd.Spec.Group,
+		Version:  crd.Spec.Versions[0].Name,
+		Resource: crd.Spec.Names.Plural,
+	}
+	u := unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": gvr.GroupVersion().String(),
+		"kind":       crd.Spec.Names.Kind,
+		"metadata": map[string]interface{}{
+			"name": "foo",
+		},
+		"items-no-type": map[string]interface{}{
+			"items": []interface{}{
+				map[string]interface{}{},
+			},
+		},
+		"items-items-no-type": map[string]interface{}{
+			"items": []interface{}{
+				[]interface{}{map[string]interface{}{}},
+			},
+		},
+		"items-properties-items-no-type": map[string]interface{}{
+			"items": []interface{}{
+				map[string]interface{}{
+					"items": []interface{}{
+						map[string]interface{}{},
+					},
+				},
+			},
+		},
+		"type-array-no-items": map[string]interface{}{
+			"type": "array",
+		},
+		"items-and-type": map[string]interface{}{
+			"items": []interface{}{map[string]interface{}{}},
+			"type":  "array",
+		},
+		"issue-84880": map[string]interface{}{
+			"volumes": []interface{}{
+				map[string]interface{}{
+					"downwardAPI": map[string]interface{}{
+						"items": []interface{}{
+							map[string]interface{}{
+								"path": "annotations",
+							},
+						},
+					},
+				},
+			},
+		},
+	}}
+	_, err = client.Resource(gvr).Create(&u, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+const fixtureItemsAndType = `
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: foos.tests.example.com
+spec:
+  group: tests.example.com
+  version: v1beta1
+  names:
+    plural: foos
+    singular: foo
+    kind: Foo
+    listKind: Foolist
+  scope: Cluster
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          items-no-type:
+            type: object
+            properties:
+              items:
+                type: array
+                items:
+                  type: object
+          items-items-no-type:
+            type: object
+            properties:
+              items:
+                type: array
+                items:
+                  type: array
+                  items:
+                    type: object
+          items-properties-items-no-type:
+            type: object
+            properties:
+              items:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    items:
+                      type: array
+                      items:
+                        type: object
+          type-array-no-items:
+            type: object
+            properties:
+              type:
+                type: string
+          items-and-type:
+            type: object
+            properties:
+              type:
+                type: string
+              items:
+                type: array
+                items:
+                  type: object
+          default-with-items-and-no-type:
+            type: object
+            properties:
+              type:
+                type: string
+              items:
+                type: array
+                items:
+                  type: object
+            default: {"items": []}
+          issue-84880:
+            type: object
+            properties:
+              volumes:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    downwardAPI:
+                      type: object
+                      properties:
+                        items:
+                          items:
+                            properties:
+                              path:
+                                type: string
+                            required:
+                            - path
+                            type: object
+                          type: array
+`
 
 func TestCustomResourceUpdateValidation(t *testing.T) {
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
