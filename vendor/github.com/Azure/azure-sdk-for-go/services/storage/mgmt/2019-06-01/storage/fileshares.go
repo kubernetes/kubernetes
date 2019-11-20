@@ -116,7 +116,7 @@ func (client FileSharesClient) CreatePreparer(ctx context.Context, resourceGroup
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -217,7 +217,7 @@ func (client FileSharesClient) DeletePreparer(ctx context.Context, resourceGroup
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -315,7 +315,7 @@ func (client FileSharesClient) GetPreparer(ctx context.Context, resourceGroupNam
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -354,10 +354,9 @@ func (client FileSharesClient) GetResponder(resp *http.Response) (result FileSha
 // insensitive.
 // accountName - the name of the storage account within the specified resource group. Storage account names
 // must be between 3 and 24 characters in length and use numbers and lower-case letters only.
-// skipToken - optional. Continuation token for the list operation.
 // maxpagesize - optional. Specified maximum number of shares that can be included in the list.
 // filter - optional. When specified, only share names starting with the filter will be listed.
-func (client FileSharesClient) List(ctx context.Context, resourceGroupName string, accountName string, skipToken string, maxpagesize string, filter string) (result FileShareItemsPage, err error) {
+func (client FileSharesClient) List(ctx context.Context, resourceGroupName string, accountName string, maxpagesize string, filter string) (result FileShareItemsPage, err error) {
 	if tracing.IsEnabled() {
 		ctx = tracing.StartSpan(ctx, fqdn+"/FileSharesClient.List")
 		defer func() {
@@ -382,7 +381,7 @@ func (client FileSharesClient) List(ctx context.Context, resourceGroupName strin
 	}
 
 	result.fn = client.listNextResults
-	req, err := client.ListPreparer(ctx, resourceGroupName, accountName, skipToken, maxpagesize, filter)
+	req, err := client.ListPreparer(ctx, resourceGroupName, accountName, maxpagesize, filter)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "storage.FileSharesClient", "List", nil, "Failure preparing request")
 		return
@@ -404,19 +403,16 @@ func (client FileSharesClient) List(ctx context.Context, resourceGroupName strin
 }
 
 // ListPreparer prepares the List request.
-func (client FileSharesClient) ListPreparer(ctx context.Context, resourceGroupName string, accountName string, skipToken string, maxpagesize string, filter string) (*http.Request, error) {
+func (client FileSharesClient) ListPreparer(ctx context.Context, resourceGroupName string, accountName string, maxpagesize string, filter string) (*http.Request, error) {
 	pathParameters := map[string]interface{}{
 		"accountName":       autorest.Encode("path", accountName),
 		"resourceGroupName": autorest.Encode("path", resourceGroupName),
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
-	}
-	if len(skipToken) > 0 {
-		queryParameters["$skipToken"] = autorest.Encode("query", skipToken)
 	}
 	if len(maxpagesize) > 0 {
 		queryParameters["$maxpagesize"] = autorest.Encode("query", maxpagesize)
@@ -475,7 +471,7 @@ func (client FileSharesClient) listNextResults(ctx context.Context, lastResults 
 }
 
 // ListComplete enumerates all values, automatically crossing page boundaries as required.
-func (client FileSharesClient) ListComplete(ctx context.Context, resourceGroupName string, accountName string, skipToken string, maxpagesize string, filter string) (result FileShareItemsIterator, err error) {
+func (client FileSharesClient) ListComplete(ctx context.Context, resourceGroupName string, accountName string, maxpagesize string, filter string) (result FileShareItemsIterator, err error) {
 	if tracing.IsEnabled() {
 		ctx = tracing.StartSpan(ctx, fqdn+"/FileSharesClient.List")
 		defer func() {
@@ -486,7 +482,7 @@ func (client FileSharesClient) ListComplete(ctx context.Context, resourceGroupNa
 			tracing.EndSpan(ctx, sc, err)
 		}()
 	}
-	result.page, err = client.List(ctx, resourceGroupName, accountName, skipToken, maxpagesize, filter)
+	result.page, err = client.List(ctx, resourceGroupName, accountName, maxpagesize, filter)
 	return
 }
 
@@ -558,7 +554,7 @@ func (client FileSharesClient) UpdatePreparer(ctx context.Context, resourceGroup
 		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}

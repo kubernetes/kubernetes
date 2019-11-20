@@ -29,7 +29,7 @@ import (
 )
 
 // The package's fully qualified name.
-const fqdn = "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-04-01/storage"
+const fqdn = "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 
 // AccessTier enumerates the values for access tier.
 type AccessTier string
@@ -380,21 +380,58 @@ func PossiblePermissionsValues() []Permissions {
 	return []Permissions{A, C, D, L, P, R, U, W}
 }
 
+// PrivateEndpointConnectionProvisioningState enumerates the values for private endpoint connection
+// provisioning state.
+type PrivateEndpointConnectionProvisioningState string
+
+const (
+	// Creating ...
+	Creating PrivateEndpointConnectionProvisioningState = "Creating"
+	// Deleting ...
+	Deleting PrivateEndpointConnectionProvisioningState = "Deleting"
+	// Failed ...
+	Failed PrivateEndpointConnectionProvisioningState = "Failed"
+	// Succeeded ...
+	Succeeded PrivateEndpointConnectionProvisioningState = "Succeeded"
+)
+
+// PossiblePrivateEndpointConnectionProvisioningStateValues returns an array of possible values for the PrivateEndpointConnectionProvisioningState const type.
+func PossiblePrivateEndpointConnectionProvisioningStateValues() []PrivateEndpointConnectionProvisioningState {
+	return []PrivateEndpointConnectionProvisioningState{Creating, Deleting, Failed, Succeeded}
+}
+
+// PrivateEndpointServiceConnectionStatus enumerates the values for private endpoint service connection status.
+type PrivateEndpointServiceConnectionStatus string
+
+const (
+	// Approved ...
+	Approved PrivateEndpointServiceConnectionStatus = "Approved"
+	// Pending ...
+	Pending PrivateEndpointServiceConnectionStatus = "Pending"
+	// Rejected ...
+	Rejected PrivateEndpointServiceConnectionStatus = "Rejected"
+)
+
+// PossiblePrivateEndpointServiceConnectionStatusValues returns an array of possible values for the PrivateEndpointServiceConnectionStatus const type.
+func PossiblePrivateEndpointServiceConnectionStatusValues() []PrivateEndpointServiceConnectionStatus {
+	return []PrivateEndpointServiceConnectionStatus{Approved, Pending, Rejected}
+}
+
 // ProvisioningState enumerates the values for provisioning state.
 type ProvisioningState string
 
 const (
-	// Creating ...
-	Creating ProvisioningState = "Creating"
-	// ResolvingDNS ...
-	ResolvingDNS ProvisioningState = "ResolvingDNS"
-	// Succeeded ...
-	Succeeded ProvisioningState = "Succeeded"
+	// ProvisioningStateCreating ...
+	ProvisioningStateCreating ProvisioningState = "Creating"
+	// ProvisioningStateResolvingDNS ...
+	ProvisioningStateResolvingDNS ProvisioningState = "ResolvingDNS"
+	// ProvisioningStateSucceeded ...
+	ProvisioningStateSucceeded ProvisioningState = "Succeeded"
 )
 
 // PossibleProvisioningStateValues returns an array of possible values for the ProvisioningState const type.
 func PossibleProvisioningStateValues() []ProvisioningState {
-	return []ProvisioningState{Creating, ResolvingDNS, Succeeded}
+	return []ProvisioningState{ProvisioningStateCreating, ProvisioningStateResolvingDNS, ProvisioningStateSucceeded}
 }
 
 // PublicAccess enumerates the values for public access.
@@ -1005,7 +1042,7 @@ func NewAccountListResultPage(getNextPage func(context.Context, AccountListResul
 
 // AccountProperties properties of the storage account.
 type AccountProperties struct {
-	// ProvisioningState - READ-ONLY; Gets the status of the storage account at the time the operation was called. Possible values include: 'Creating', 'ResolvingDNS', 'Succeeded'
+	// ProvisioningState - READ-ONLY; Gets the status of the storage account at the time the operation was called. Possible values include: 'ProvisioningStateCreating', 'ProvisioningStateResolvingDNS', 'ProvisioningStateSucceeded'
 	ProvisioningState ProvisioningState `json:"provisioningState,omitempty"`
 	// PrimaryEndpoints - READ-ONLY; Gets the URLs that are used to perform a retrieval of a public blob, queue, or table object. Note that Standard_ZRS and Premium_LRS accounts only return the blob endpoint.
 	PrimaryEndpoints *Endpoints `json:"primaryEndpoints,omitempty"`
@@ -1043,6 +1080,8 @@ type AccountProperties struct {
 	FailoverInProgress *bool `json:"failoverInProgress,omitempty"`
 	// LargeFileSharesState - Allow large file shares if sets to Enabled. It cannot be disabled once it is enabled. Possible values include: 'Disabled', 'Enabled'
 	LargeFileSharesState LargeFileSharesState `json:"largeFileSharesState,omitempty"`
+	// PrivateEndpointConnections - READ-ONLY; List of private endpoint connection associated with the specified storage account
+	PrivateEndpointConnections *[]PrivateEndpointConnection `json:"privateEndpointConnections,omitempty"`
 }
 
 // AccountPropertiesCreateParameters the parameters used to create the storage account.
@@ -1642,6 +1681,14 @@ type Endpoints struct {
 	Web *string `json:"web,omitempty"`
 	// Dfs - READ-ONLY; Gets the dfs endpoint.
 	Dfs *string `json:"dfs,omitempty"`
+}
+
+// ErrorResponse an error response from the storage resource provider.
+type ErrorResponse struct {
+	// Code - An identifier for the error. Codes are invariant and are intended to be consumed programmatically.
+	Code *string `json:"code,omitempty"`
+	// Message - A message describing the error, intended to be suitable for display in a user interface.
+	Message *string `json:"message,omitempty"`
 }
 
 // FileServiceItems ...
@@ -2824,6 +2871,195 @@ type OperationListResult struct {
 type OperationProperties struct {
 	// ServiceSpecification - One property of operation, include metric specifications.
 	ServiceSpecification *ServiceSpecification `json:"serviceSpecification,omitempty"`
+}
+
+// PrivateEndpoint the Private Endpoint resource.
+type PrivateEndpoint struct {
+	// ID - READ-ONLY; The ARM identifier for Private Endpoint
+	ID *string `json:"id,omitempty"`
+}
+
+// PrivateEndpointConnection the Private Endpoint Connection resource.
+type PrivateEndpointConnection struct {
+	autorest.Response `json:"-"`
+	// PrivateEndpointConnectionProperties - Resource properties.
+	*PrivateEndpointConnectionProperties `json:"properties,omitempty"`
+	// ID - READ-ONLY; Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
+	ID *string `json:"id,omitempty"`
+	// Name - READ-ONLY; The name of the resource
+	Name *string `json:"name,omitempty"`
+	// Type - READ-ONLY; The type of the resource. Ex- Microsoft.Compute/virtualMachines or Microsoft.Storage/storageAccounts.
+	Type *string `json:"type,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for PrivateEndpointConnection.
+func (pec PrivateEndpointConnection) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if pec.PrivateEndpointConnectionProperties != nil {
+		objectMap["properties"] = pec.PrivateEndpointConnectionProperties
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for PrivateEndpointConnection struct.
+func (pec *PrivateEndpointConnection) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var privateEndpointConnectionProperties PrivateEndpointConnectionProperties
+				err = json.Unmarshal(*v, &privateEndpointConnectionProperties)
+				if err != nil {
+					return err
+				}
+				pec.PrivateEndpointConnectionProperties = &privateEndpointConnectionProperties
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				pec.ID = &ID
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				pec.Name = &name
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				pec.Type = &typeVar
+			}
+		}
+	}
+
+	return nil
+}
+
+// PrivateEndpointConnectionProperties properties of the PrivateEndpointConnectProperties.
+type PrivateEndpointConnectionProperties struct {
+	// PrivateEndpoint - The resource of private end point.
+	PrivateEndpoint *PrivateEndpoint `json:"privateEndpoint,omitempty"`
+	// PrivateLinkServiceConnectionState - A collection of information about the state of the connection between service consumer and provider.
+	PrivateLinkServiceConnectionState *PrivateLinkServiceConnectionState `json:"privateLinkServiceConnectionState,omitempty"`
+	// ProvisioningState - The provisioning state of the private endpoint connection resource. Possible values include: 'Succeeded', 'Creating', 'Deleting', 'Failed'
+	ProvisioningState PrivateEndpointConnectionProvisioningState `json:"provisioningState,omitempty"`
+}
+
+// PrivateLinkResource a private link resource
+type PrivateLinkResource struct {
+	// PrivateLinkResourceProperties - Resource properties.
+	*PrivateLinkResourceProperties `json:"properties,omitempty"`
+	// ID - READ-ONLY; Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
+	ID *string `json:"id,omitempty"`
+	// Name - READ-ONLY; The name of the resource
+	Name *string `json:"name,omitempty"`
+	// Type - READ-ONLY; The type of the resource. Ex- Microsoft.Compute/virtualMachines or Microsoft.Storage/storageAccounts.
+	Type *string `json:"type,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for PrivateLinkResource.
+func (plr PrivateLinkResource) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if plr.PrivateLinkResourceProperties != nil {
+		objectMap["properties"] = plr.PrivateLinkResourceProperties
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for PrivateLinkResource struct.
+func (plr *PrivateLinkResource) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var privateLinkResourceProperties PrivateLinkResourceProperties
+				err = json.Unmarshal(*v, &privateLinkResourceProperties)
+				if err != nil {
+					return err
+				}
+				plr.PrivateLinkResourceProperties = &privateLinkResourceProperties
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				plr.ID = &ID
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				plr.Name = &name
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				plr.Type = &typeVar
+			}
+		}
+	}
+
+	return nil
+}
+
+// PrivateLinkResourceListResult a list of private link resources
+type PrivateLinkResourceListResult struct {
+	autorest.Response `json:"-"`
+	// Value - Array of private link resources
+	Value *[]PrivateLinkResource `json:"value,omitempty"`
+}
+
+// PrivateLinkResourceProperties properties of a private link resource.
+type PrivateLinkResourceProperties struct {
+	// GroupID - READ-ONLY; The private link resource group id.
+	GroupID *string `json:"groupId,omitempty"`
+	// RequiredMembers - READ-ONLY; The private link resource required member names.
+	RequiredMembers *[]string `json:"requiredMembers,omitempty"`
+	// RequiredZoneNames - The private link resource Private link DNS zone name.
+	RequiredZoneNames *[]string `json:"requiredZoneNames,omitempty"`
+}
+
+// PrivateLinkServiceConnectionState a collection of information about the state of the connection between
+// service consumer and provider.
+type PrivateLinkServiceConnectionState struct {
+	// Status - Indicates whether the connection has been Approved/Rejected/Removed by the owner of the service. Possible values include: 'Pending', 'Approved', 'Rejected'
+	Status PrivateEndpointServiceConnectionStatus `json:"status,omitempty"`
+	// Description - The reason for approval/rejection of the connection.
+	Description *string `json:"description,omitempty"`
+	// ActionRequired - A message indicating if changes on the service provider require any updates on the consumer.
+	ActionRequired *string `json:"actionRequired,omitempty"`
 }
 
 // ProxyResource the resource model definition for a ARM proxy resource. It will have everything other than

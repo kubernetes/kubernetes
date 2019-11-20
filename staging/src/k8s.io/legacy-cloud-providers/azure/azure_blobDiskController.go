@@ -30,7 +30,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-04-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	azstorage "github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/rubiojr/go-vhd/vhd"
@@ -344,7 +344,7 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 	}
 
 	// account exists but not ready yet
-	if provisionState != storage.Succeeded {
+	if provisionState != storage.ProvisioningStateSucceeded {
 		// we don't want many attempts to validate the account readiness
 		// here hence we are locking
 		counter := 1
@@ -375,7 +375,7 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 				return false, nil // error performing the query - retryable
 			}
 
-			if provisionState == storage.Succeeded {
+			if provisionState == storage.ProvisioningStateSucceeded {
 				return true, nil
 			}
 

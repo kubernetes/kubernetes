@@ -1,4 +1,4 @@
-// Package storage implements the Azure ARM Storage service API version 2019-04-01.
+// Package storage implements the Azure ARM Storage service API version 2019-06-01.
 //
 // The Azure Storage Management API.
 package storage

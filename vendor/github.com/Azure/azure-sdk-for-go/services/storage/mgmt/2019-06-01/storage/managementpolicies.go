@@ -107,7 +107,7 @@ func (client ManagementPoliciesClient) CreateOrUpdatePreparer(ctx context.Contex
 		"subscriptionId":       autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -202,7 +202,7 @@ func (client ManagementPoliciesClient) DeletePreparer(ctx context.Context, resou
 		"subscriptionId":       autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -294,7 +294,7 @@ func (client ManagementPoliciesClient) GetPreparer(ctx context.Context, resource
 		"subscriptionId":       autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2019-04-01"
+	const APIVersion = "2019-06-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
