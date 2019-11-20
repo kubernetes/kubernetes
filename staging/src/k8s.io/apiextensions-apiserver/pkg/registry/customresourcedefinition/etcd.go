@@ -19,8 +19,9 @@ package customresourcedefinition
 import (
 	"context"
 	"fmt"
-
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 )
 
+
 // rest implements a RESTStorage for API services against etcd
 type REST struct {
 	*genericregistry.Store
@@ -40,16 +42,18 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against API services.
 func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *REST {
 	strategy := NewStrategy(scheme)
+	converter := CustomResourceDefinitionHandler()
+
 
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &apiextensions.CustomResourceDefinition{} },
 		NewListFunc:              func() runtime.Object { return &apiextensions.CustomResourceDefinitionList{} },
 		PredicateFunc:            MatchCustomResourceDefinition,
 		DefaultQualifiedResource: apiextensions.Resource("customresourcedefinitions"),
-
 		CreateStrategy: strategy,
 		UpdateStrategy: strategy,
 		DeleteStrategy: strategy,
+		TableConvertor: converter,
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
@@ -190,3 +194,44 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
+
+func CustomResourceDefinitionHandler() rest.TableConvertor {
+	customResourceDefinitionColumnDefinitions := []apiextensionsv1.CustomResourceColumnDefinition {
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Kind", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["kind"]},
+		{Name: "Scope", Type: "string", Description: "Scope of the custom resource definition"},
+		{Name: "Version", Type: "string", Priority: 1, Description: "API version of the custom resource definition"},
+		{Name: "Group", Type: "string", Priority: 1, Description: "Groups in the CRD"},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	converter, err := tableconvertor.New(customResourceDefinitionColumnDefinitions)
+	if err != nil {
+		panic(err)
+	}
+	return converter
+}
+
+//func printCustomResourceDefinition(crd *apiextensions.CustomResourceDefinition, options tableconvertor.GenerateOptions) ([]metav1.TableRow, error) {
+//	row := metav1.TableRow{
+//		Object: runtime.RawExtension{Object: crd},
+//	}
+//
+//	group := crd.Spec.Group
+//	scope := crd.Spec.Scope
+//	version := crd.Spec.Version
+//
+//	row.Cells = append(row.Cells, crd.Name, crd.Spec.Names.Kind, scope, version, group, translateTimestampSince(crd.CreationTimestamp))
+//	return []metav1.TableRow{row}, nil
+//}
+//
+//func printCustomResourceDefinitionList(list *apiextensions.CustomResourceDefinitionList, options tableconvertor.GenerateOptions) ([]metav1.TableRow, error) {
+//	rows := make([]metav1.TableRow, 0, len(list.Items))
+//	for i := range list.Items {
+//		r, err := printCustomResourceDefinition(&list.Items[i], options)
+//		if err != nil {
+//			return nil, err
+//		}
+//		rows = append(rows, r...)
+//	}
+//	return rows, nil
+//}
