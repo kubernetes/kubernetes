@@ -487,6 +487,11 @@ func NewImagesPull(runtime utilruntime.ContainerRuntime, images []string) *Image
 func PullControlPlaneImages(runtime utilruntime.ContainerRuntime, cfg *kubeadmapi.ClusterConfiguration) error {
 	images := images.GetControlPlaneImages(cfg)
 	for _, image := range images {
+		ret, err := runtime.ImageExists(image)
+		if ret && err == nil {
+			klog.V(1).Infof("[config/images] image exists: %s", image)
+			continue
+		}
 		if err := runtime.PullImage(image); err != nil {
 			return errors.Wrapf(err, "failed to pull image %q", image)
 		}
