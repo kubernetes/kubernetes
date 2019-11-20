@@ -8,7 +8,7 @@ metadata:
     tier: backend
 spec:
   ports:
-  - port: 6379
+  - port: 8080
   selector:
     app: agnhost
     role: slave

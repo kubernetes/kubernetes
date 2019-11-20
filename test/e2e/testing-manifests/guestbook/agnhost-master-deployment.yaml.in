@@ -19,10 +19,11 @@ spec:
       containers:
       - name: master
         image: {{.AgnhostImage}}
-        args: [ "guestbook", "--http-port", "6379" ]
+        args: [ "guestbook", "--http-port", "8080" ]
         resources:
           requests:
             cpu: 100m
             memory: 100Mi
         ports:
+        - containerPort: 8080
         - containerPort: 6379

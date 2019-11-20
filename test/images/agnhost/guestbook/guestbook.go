@@ -38,7 +38,6 @@ var CmdGuestbook = &cobra.Command{
 	Short: "Creates a HTTP server with various endpoints representing a guestbook app",
 	Long: `Starts a HTTP server on the given --http-port (default: 80), serving various endpoints representing a guestbook app. The endpoints and their purpose are:
 
-- /register: A guestbook slave will subscribe to a master, to its given --slaveof endpoint. The master will then push any updates it receives to its registered slaves through the --backend-port.
 - /get: Returns '{"data": value}', where the value is the stored value for the given key if non-empty, or the entire store.
 - /set: Will set the given key-value pair in its own store and propagate it to its slaves, if any. Will return '{"data": "Updated"}' to the caller on success.
 - /guestbook: Will proxy the request to agnhost-master if the given cmd is 'set', or agnhost-slave if the given cmd is 'get'.`,
@@ -50,7 +49,7 @@ var (
 	httpPort    string
 	backendPort string
 	slaveOf     string
-	slaves      []string
+	slaves      []net.Conn
 	store       map[string]interface{}
 )
 
@@ -61,84 +60,128 @@ const (
 
 func init() {
 	CmdGuestbook.Flags().StringVar(&httpPort, "http-port", "80", "HTTP Listen Port")
-	CmdGuestbook.Flags().StringVar(&backendPort, "backend-port", "6379", "Backend's HTTP Listen Port")
+	CmdGuestbook.Flags().StringVar(&backendPort, "backend-port", "6379", "Backend's Listen Port")
 	CmdGuestbook.Flags().StringVar(&slaveOf, "slaveof", "", "The host's name to register to")
 	store = make(map[string]interface{})
 }
 
 func main(cmd *cobra.Command, args []string) {
-	go registerNode(slaveOf, backendPort)
+	go handleBackend(slaveOf, backendPort)
 	startHTTPServer(httpPort)
 }
 
-func registerNode(registerTo, port string) {
+func handleBackend(registerTo, port string) {
 	if registerTo == "" {
+		// we're not registering to anyone, we're the master.
+		listenAndHandleRegistration(port)
 		return
 	}
 
 	hostPort := net.JoinHostPort(registerTo, backendPort)
-	_, err := net.ResolveTCPAddr("tcp", hostPort)
+	addr, err := net.ResolveTCPAddr("tcp", hostPort)
 	if err != nil {
 		log.Fatalf("--slaveof param and/or --backend-port param are invalid. %v", err)
 		return
 	}
 
 	start := time.Now()
+	var conn net.Conn
 	for time.Since(start) < timeout {
-		response, err := dialHTTP("register", hostPort)
+		conn, err = net.DialTCP("tcp", nil, addr)
 		if err != nil {
-			log.Printf("encountered error while registering to master: %v. Retrying in 1 second.", err)
+			log.Printf("encountered error while dialing master: %v. Retrying in 1 second.", err)
 			time.Sleep(sleep)
-			continue
+		} else {
+			break
+		}
+	}
+
+	if conn == nil {
+		log.Fatalf("Timed out while waiting to connect to master: %s", registerTo)
+	}
+
+	defer conn.Close()
+	buf := make([]byte, 2048)
+	for {
+		n, err := conn.Read(buf)
+		if err != nil {
+			log.Fatalf("Error while reading data from master: %v", err)
 		}
 
 		responseJSON := make(map[string]interface{})
-		err = json.Unmarshal([]byte(response), &responseJSON)
+		err = json.Unmarshal(buf[0:n], &responseJSON)
 		if err != nil {
 			log.Fatalf("Error while unmarshaling master's response: %v", err)
 		}
 
-		var ok bool
-		store, ok = responseJSON["data"].(map[string]interface{})
+		storeUpdates, ok := responseJSON["data"].(map[string]interface{})
 		if !ok {
 			log.Fatalf("Could not cast responseJSON: %s", responseJSON["data"])
 		}
-		log.Printf("Registered to node: %s", registerTo)
-		return
+		log.Printf("Received updates: %s", storeUpdates)
+
+		for k, v := range storeUpdates {
+			store[k] = v
+		}
 	}
-
-	log.Fatal("Timed out while registering to master.")
 }
 
-func startHTTPServer(port string) {
-	http.HandleFunc("/register", registerHandler)
-	http.HandleFunc("/get", getHandler)
-	http.HandleFunc("/set", setHandler)
-	http.HandleFunc("/guestbook", guestbookHandler)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
-}
-
-// registerHandler will register the caller in this server's list of slaves.
+// listenAndHandleRegistration will start a TCP listener on the given port, and will register
+// its clients in this server's list of slaves.
 // /set requests will be propagated to slaves, if any.
-func registerHandler(w http.ResponseWriter, r *http.Request) {
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+func listenAndHandleRegistration(port string) {
+	serverConn, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
-		fmt.Fprintf(w, "userip: %q is not IP:port", r.RemoteAddr)
-		return
+		log.Fatalf("Could not start listening on port: %s. Error: %v", port, err)
 	}
-	log.Printf("GET /register, IP: %s", ip)
+	defer serverConn.Close()
 
-	// send all the store to the slave as well.
+	log.Printf("Listening TCP connections on: %s", port)
+	for {
+		conn, err := serverConn.Accept()
+		if err != nil {
+			log.Printf("Client could not register: %v", err)
+			continue
+		}
+
+		clientAddr := conn.RemoteAddr().String()
+		log.Printf("Client connected: %s", clientAddr)
+
+		// send all the store to the slave as well.
+		err = sendStoreUpdates(conn, store)
+		if err != nil {
+			conn.Close()
+			continue
+		}
+
+		slaves = append(slaves, conn)
+		log.Printf("Node '%s' registered.", clientAddr)
+	}
+}
+
+func sendStoreUpdates(conn net.Conn, storeUpdates map[string]interface{}) error {
 	output := make(map[string]interface{})
 	output["data"] = store
 	bytes, err := json.Marshal(output)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("response could not be serialized. %v", err), http.StatusExpectationFailed)
-		return
+		log.Printf("Could not serialize data: %v", err)
+		conn.Write([]byte(fmt.Sprintf("Could not serialize data. %v", err)))
+		return err
 	}
-	fmt.Fprint(w, string(bytes))
-	slaves = append(slaves, ip)
-	log.Printf("Node '%s' registered.", ip)
+
+	_, err = conn.Write(bytes)
+	if err != nil {
+		log.Printf("Could not write data: %v", err)
+		return err
+	}
+	return nil
+}
+
+func startHTTPServer(port string) {
+	http.HandleFunc("/get", getHandler)
+	http.HandleFunc("/set", setHandler)
+	http.HandleFunc("/guestbook", guestbookHandler)
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
 }
 
 // getHandler will return '{"data": value}', where value is the stored value for
@@ -193,10 +236,10 @@ func setHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	store[key] = value
-	request := fmt.Sprintf("set?key=%s&value=%s", key, value)
+	storeUpdate := make(map[string]interface{})
+	storeUpdate["key"] = value
 	for _, slave := range slaves {
-		hostPort := net.JoinHostPort(slave, backendPort)
-		_, err = dialHTTP(request, hostPort)
+		err = sendStoreUpdates(slave, storeUpdate)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("encountered error while propagating to slave '%s': %v", slave, err), http.StatusExpectationFailed)
 			return

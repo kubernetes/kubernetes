@@ -8,8 +8,12 @@ metadata:
     tier: backend
 spec:
   ports:
+  - port: 8080
+    targetPort: 8080
+    name: http-port
   - port: 6379
     targetPort: 6379
+    name: backend-port
   selector:
     app: agnhost
     role: master

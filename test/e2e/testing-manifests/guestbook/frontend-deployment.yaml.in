@@ -17,7 +17,7 @@ spec:
       containers:
       - name: guestbook-frontend
         image: {{.AgnhostImage}}
-        args: [ "guestbook", "--backend-port", "6379" ]
+        args: [ "guestbook", "--backend-port", "8080" ]
         resources:
           requests:
             cpu: 100m
