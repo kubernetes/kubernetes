@@ -355,6 +355,37 @@ func TestNodeAddress(t *testing.T) {
 	}
 }
 
+func TestMachineExtendedResources(t *testing.T) {
+	existingNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Annotations: make(map[string]string)},
+		Spec:       v1.NodeSpec{},
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				"pre-existing": resource.MustParse("0"),
+			},
+		},
+	}
+
+	// construct setter
+	setter := MachineExtendedResources(map[string]string{
+		"com.example/dongle": "4",
+	})
+
+	// call setter on existing node
+	err := setter(existingNode)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := v1.ResourceList{
+		"pre-existing":       resource.MustParse("0"),
+		"com.example/dongle": resource.MustParse("4"),
+	}
+
+	assert.True(t, apiequality.Semantic.DeepEqual(expected, existingNode.Status.Capacity),
+		"Diff: %s", diff.ObjectDiff(expected, existingNode.Status.Capacity))
+}
+
 func TestMachineInfo(t *testing.T) {
 	const nodeName = "test-node"
 

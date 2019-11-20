@@ -146,7 +146,7 @@ func asArgs(fn, defaultFn func(*pflag.FlagSet)) []string {
 	return args
 }
 
-func TestValidateKubeletFlags(t *testing.T) {
+func TestValidateKubeletLabelFlags(t *testing.T) {
 	tests := []struct {
 		name   string
 		error  bool
@@ -185,6 +185,58 @@ func TestValidateKubeletFlags(t *testing.T) {
 
 			if !tt.error && err != nil {
 				t.Errorf("ValidateKubeletFlags should not have failed with labels: %+v", tt.labels)
+			}
+		})
+	}
+
+}
+
+func TestValidateKubeletResourceFlags(t *testing.T) {
+	tests := []struct {
+		name      string
+		error     bool
+		resources map[string]string
+	}{
+		{
+			name:  "Invalid resource (not integer)",
+			error: true,
+			resources: map[string]string{
+				"example.com/dongle": "4.5",
+			},
+		},
+		{
+			name:  "Invalid resource (negative)",
+			error: true,
+			resources: map[string]string{
+				"example.com/dongle": "-4",
+			},
+		},
+		{
+			name:  "Valid resource",
+			error: false,
+			resources: map[string]string{
+				"example.com/dongle": "4",
+			},
+		},
+		{
+			name:      "Empty resource list",
+			error:     false,
+			resources: map[string]string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateKubeletFlags(&KubeletFlags{
+				NodeExtendedResources: tt.resources,
+			})
+
+			if tt.error && err == nil {
+				t.Errorf("ValidateKubeletFlags should have failed with resources: %+v", tt.resources)
+			}
+
+			if !tt.error && err != nil {
+				t.Errorf("ValidateKubeletFlags should not have failed with resources: %+v", tt.resources)
 			}
 		})
 	}

@@ -227,6 +227,22 @@ func hasAddressValue(addresses []v1.NodeAddress, addressValue string) bool {
 	return false
 }
 
+func MachineExtendedResources(nodeExtendedResources map[string]string) Setter {
+	return func(node *v1.Node) error {
+		if node.Status.Capacity == nil {
+			node.Status.Capacity = v1.ResourceList{}
+		}
+		for k, v := range nodeExtendedResources {
+			q, err := resource.ParseQuantity(v)
+			if err != nil {
+				return err
+			}
+			node.Status.Capacity[v1.ResourceName(k)] = q
+		}
+		return nil
+	}
+}
+
 // MachineInfo returns a Setter that updates machine-related information on the node.
 func MachineInfo(nodeName string,
 	maxPods int,

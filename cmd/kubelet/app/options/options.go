@@ -22,6 +22,7 @@ import (
 	_ "net/http/pprof" // Enable pprof HTTP handlers.
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -164,6 +165,8 @@ type KubeletFlags struct {
 	// NodeStatusMaxImages caps the number of images reported in Node.Status.Images.
 	// This is an experimental, short-term flag to help with node scalability.
 	NodeStatusMaxImages int32
+	// NodeExtendedResources are a static map of extended resources to register with this node
+	NodeExtendedResources map[string]string
 
 	// DEPRECATED FLAGS
 	// minimumGCAge is the minimum age for a finished container before it is
@@ -214,6 +217,7 @@ func NewKubeletFlags() *KubeletFlags {
 		ExperimentalKernelMemcgNotification: false,
 		RemoteRuntimeEndpoint:               remoteRuntimeEndpoint,
 		NodeLabels:                          make(map[string]string),
+		NodeExtendedResources:               make(map[string]string),
 		VolumePluginDir:                     "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
 		RegisterNode:                        true,
 		SeccompProfileRoot:                  filepath.Join(defaultRootDir, "seccomp"),
@@ -241,6 +245,13 @@ func ValidateKubeletFlags(f *KubeletFlags) error {
 	}
 	if len(unknownLabels) > 0 {
 		return fmt.Errorf("unknown 'kubernetes.io' or 'k8s.io' labels specified with --node-labels: %v\n--node-labels in the 'kubernetes.io' namespace must begin with an allowed prefix (%s) or be in the specifically allowed set (%s)", unknownLabels.List(), strings.Join(kubeletapis.KubeletLabelNamespaces(), ", "), strings.Join(kubeletapis.KubeletLabels(), ", "))
+	}
+
+	for k, v := range f.NodeExtendedResources {
+		// This is possibly a little more restrictive then necessary, but all pure integers are valid Quantities
+		if i, err := strconv.ParseInt(v, 10, 64); err != nil || i < 0 {
+			return fmt.Errorf("node extended resources must be whole 64-bit signed (but non-negative) integers. Instead we saw %s=%s", k, v)
+		}
 	}
 
 	return nil
@@ -397,6 +408,8 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.StringVar(&f.SeccompProfileRoot, "seccomp-profile-root", f.SeccompProfileRoot, "<Warning: Alpha feature> Directory path for seccomp profiles.")
 	fs.StringVar(&f.BootstrapCheckpointPath, "bootstrap-checkpoint-path", f.BootstrapCheckpointPath, "<Warning: Alpha feature> Path to the directory where the checkpoints are stored")
 	fs.Int32Var(&f.NodeStatusMaxImages, "node-status-max-images", f.NodeStatusMaxImages, "<Warning: Alpha feature> The maximum number of images to report in Node.Status.Images. If -1 is specified, no cap will be applied.")
+	bindableNodeExtendedResources := cliflag.ConfigurationMap(f.NodeExtendedResources)
+	fs.Var(&bindableNodeExtendedResources, "node-extended-resources", "<Warning: Alpha feature> A static pool of resources to advertise when registering the node in the cluster.")
 
 	// DEPRECATED FLAGS
 	fs.StringVar(&f.BootstrapKubeconfig, "experimental-bootstrap-kubeconfig", f.BootstrapKubeconfig, "")

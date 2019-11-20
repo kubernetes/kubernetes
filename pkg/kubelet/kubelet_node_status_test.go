@@ -184,6 +184,11 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
 			kubelet.nodeStatusMaxImages = tc.nodeStatusMaxImages
+			kubelet.nodeExtendedResources = map[string]string{
+				"example.com/dongle": "4",
+				// Assert that we clobber whatever "extended" resources with the built-in ones
+				string(v1.ResourceCPU): "7777",
+			}
 			kubelet.kubeClient = nil // ensure only the heartbeat client is used
 			kubelet.containerManager = &localCM{
 				ContainerManager: cm.NewStubContainerManager(),
@@ -265,16 +270,18 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 						KubeProxyVersion:        version.Get().String(),
 					},
 					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
-						v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						v1.ResourceCPU:                        *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:                     *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourcePods:                       *resource.NewQuantity(0, resource.DecimalSI),
+						v1.ResourceEphemeralStorage:           *resource.NewQuantity(5000, resource.BinarySI),
+						v1.ResourceName("example.com/dongle"): *resource.NewQuantity(4, resource.DecimalSI),
 					},
 					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(1800, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(9900e6, resource.BinarySI),
-						v1.ResourcePods:             *resource.NewQuantity(0, resource.DecimalSI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(3000, resource.BinarySI),
+						v1.ResourceCPU:                        *resource.NewMilliQuantity(1800, resource.DecimalSI),
+						v1.ResourceMemory:                     *resource.NewQuantity(9900e6, resource.BinarySI),
+						v1.ResourcePods:                       *resource.NewQuantity(0, resource.DecimalSI),
+						v1.ResourceEphemeralStorage:           *resource.NewQuantity(3000, resource.BinarySI),
+						v1.ResourceName("example.com/dongle"): *resource.NewQuantity(4, resource.DecimalSI),
 					},
 					Addresses: []v1.NodeAddress{
 						{Type: v1.NodeInternalIP, Address: "127.0.0.1"},
