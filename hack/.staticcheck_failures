@@ -65,7 +65,6 @@ pkg/volume/util/fsquota/common
 pkg/volume/util/operationexecutor
 pkg/volume/util/subpath
 pkg/volume/vsphere_volume
-test/e2e/apimachinery
 test/e2e/apps
 test/e2e/auth
 test/e2e/autoscaling

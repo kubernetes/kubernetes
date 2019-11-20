@@ -326,7 +326,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
 			pods, err := podClient.List(metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("Failed to list pods: %v", err)
+				return false, fmt.Errorf("failed to list pods: %v", err)
 			}
 			// We intentionally don't wait the number of pods to reach
 			// rc.Spec.Replicas. We want to see if the garbage collector and the
@@ -384,7 +384,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
 			rc, err := rcClient.Get(rc.Name, metav1.GetOptions{})
 			if err != nil {
-				return false, fmt.Errorf("Failed to get rc: %v", err)
+				return false, fmt.Errorf("failed to get rc: %v", err)
 			}
 			if rc.Status.Replicas == *rc.Spec.Replicas {
 				return true, nil
@@ -411,7 +411,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.Poll(5*time.Second, 120*time.Second, func() (bool, error) {
 			rcs, err := rcClient.List(metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("Failed to list rcs: %v", err)
+				return false, fmt.Errorf("failed to list rcs: %v", err)
 			}
 			if len(rcs.Items) != 0 {
 				return false, nil
@@ -450,7 +450,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
 			rc, err := rcClient.Get(rc.Name, metav1.GetOptions{})
 			if err != nil {
-				return false, fmt.Errorf("Failed to get rc: %v", err)
+				return false, fmt.Errorf("failed to get rc: %v", err)
 			}
 			if rc.Status.Replicas == *rc.Spec.Replicas {
 				return true, nil
@@ -499,7 +499,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
 			rsList, err := rsClient.List(metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("Failed to list rs: %v", err)
+				return false, fmt.Errorf("failed to list rs: %v", err)
 			}
 			return len(rsList.Items) > 0, nil
 
@@ -558,7 +558,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		err = wait.PollImmediate(500*time.Millisecond, 1*time.Minute, func() (bool, error) {
 			rsList, err := rsClient.List(metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("Failed to list rs: %v", err)
+				return false, fmt.Errorf("failed to list rs: %v", err)
 			}
 			return len(rsList.Items) > 0, nil
 
@@ -631,7 +631,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
 			rc, err := rcClient.Get(rc.Name, metav1.GetOptions{})
 			if err != nil {
-				return false, fmt.Errorf("Failed to get rc: %v", err)
+				return false, fmt.Errorf("failed to get rc: %v", err)
 			}
 			if rc.Status.Replicas == *rc.Spec.Replicas {
 				return true, nil
@@ -726,7 +726,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
 			rc1, err := rcClient.Get(rc1.Name, metav1.GetOptions{})
 			if err != nil {
-				return false, fmt.Errorf("Failed to get rc: %v", err)
+				return false, fmt.Errorf("failed to get rc: %v", err)
 			}
 			if rc1.Status.Replicas == *rc1.Spec.Replicas {
 				return true, nil
@@ -854,7 +854,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err := wait.Poll(5*time.Second, 90*time.Second, func() (bool, error) {
 			pods, err2 = podClient.List(metav1.ListOptions{})
 			if err2 != nil {
-				return false, fmt.Errorf("Failed to list pods: %v", err)
+				return false, fmt.Errorf("failed to list pods: %v", err)
 			}
 			if len(pods.Items) == 0 {
 				return true, nil
@@ -1057,7 +1057,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 				return false, nil
 			}
 			if err != nil && !errors.IsNotFound(err) {
-				return false, fmt.Errorf("Failed to get owner: %v", err)
+				return false, fmt.Errorf("failed to get owner: %v", err)
 			}
 			return true, nil
 		}); err != nil {
@@ -1086,7 +1086,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		err = wait.PollImmediate(500*time.Millisecond, 2*time.Minute, func() (bool, error) {
 			jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 			if err != nil {
-				return false, fmt.Errorf("Failed to list jobs: %v", err)
+				return false, fmt.Errorf("failed to list jobs: %v", err)
 			}
 			return len(jobs.Items) > 0, nil
 		})

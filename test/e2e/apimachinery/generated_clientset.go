@@ -67,7 +67,7 @@ func testingPod(name, value string) v1.Pod {
 
 func observeCreation(w watch.Interface) {
 	select {
-	case event, _ := <-w.ResultChan():
+	case event := <-w.ResultChan():
 		if event.Type != watch.Added {
 			framework.Failf("Failed to observe the creation: %v", event)
 		}
@@ -82,7 +82,7 @@ func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool)
 	timeout := false
 	for !updated && !timeout {
 		select {
-		case event, _ := <-w.ResultChan():
+		case event := <-w.ResultChan():
 			if event.Type == watch.Modified {
 				if expectedUpdate(event.Object) {
 					updated = true
@@ -95,7 +95,6 @@ func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool)
 	if !updated {
 		framework.Failf("Failed to observe pod update")
 	}
-	return
 }
 
 var _ = SIGDescribe("Generated clientset", func() {

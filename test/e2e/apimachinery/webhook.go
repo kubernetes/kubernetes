@@ -59,20 +59,19 @@ const (
 	serviceName     = "e2e-test-webhook"
 	roleBindingName = "webhook-auth-reader"
 
-	skipNamespaceLabelKey     = "skip-webhook-admission"
-	skipNamespaceLabelValue   = "yes"
-	skippedNamespaceName      = "exempted-namesapce"
-	disallowedPodName         = "disallowed-pod"
-	toBeAttachedPodName       = "to-be-attached-pod"
-	hangingPodName            = "hanging-pod"
-	disallowedConfigMapName   = "disallowed-configmap"
-	nonDeletableConfigmapName = "nondeletable-configmap"
-	allowedConfigMapName      = "allowed-configmap"
-	failNamespaceLabelKey     = "fail-closed-webhook"
-	failNamespaceLabelValue   = "yes"
-	failNamespaceName         = "fail-closed-namesapce"
-	addedLabelKey             = "added-label"
-	addedLabelValue           = "yes"
+	skipNamespaceLabelKey   = "skip-webhook-admission"
+	skipNamespaceLabelValue = "yes"
+	skippedNamespaceName    = "exempted-namesapce"
+	disallowedPodName       = "disallowed-pod"
+	toBeAttachedPodName     = "to-be-attached-pod"
+	hangingPodName          = "hanging-pod"
+	disallowedConfigMapName = "disallowed-configmap"
+	allowedConfigMapName    = "allowed-configmap"
+	failNamespaceLabelKey   = "fail-closed-webhook"
+	failNamespaceLabelValue = "yes"
+	failNamespaceName       = "fail-closed-namesapce"
+	addedLabelKey           = "added-label"
+	addedLabelValue         = "yes"
 )
 
 var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
@@ -1187,36 +1186,6 @@ func testWebhook(f *framework.Framework) {
 	framework.ExpectNoError(err, "failed to create configmap %s in namespace: %s", configmap.Name, skippedNamespaceName)
 }
 
-func testBlockingConfigmapDeletion(f *framework.Framework) {
-	ginkgo.By("create a configmap that should be denied by the webhook when deleting")
-	client := f.ClientSet
-	configmap := nonDeletableConfigmap(f)
-	_, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(configmap)
-	framework.ExpectNoError(err, "failed to create configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
-
-	ginkgo.By("deleting the configmap should be denied by the webhook")
-	err = client.CoreV1().ConfigMaps(f.Namespace.Name).Delete(configmap.Name, &metav1.DeleteOptions{})
-	framework.ExpectError(err, "deleting configmap %s in namespace: %s should be denied", configmap.Name, f.Namespace.Name)
-	expectedErrMsg1 := "the configmap cannot be deleted because it contains unwanted key and value"
-	if !strings.Contains(err.Error(), expectedErrMsg1) {
-		framework.Failf("expect error contains %q, got %q", expectedErrMsg1, err.Error())
-	}
-
-	ginkgo.By("remove the offending key and value from the configmap data")
-	toCompliantFn := func(cm *v1.ConfigMap) {
-		if cm.Data == nil {
-			cm.Data = map[string]string{}
-		}
-		cm.Data["webhook-e2e-test"] = "webhook-allow"
-	}
-	_, err = updateConfigMap(client, f.Namespace.Name, configmap.Name, toCompliantFn)
-	framework.ExpectNoError(err, "failed to update configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
-
-	ginkgo.By("deleting the updated configmap should be successful")
-	err = client.CoreV1().ConfigMaps(f.Namespace.Name).Delete(configmap.Name, &metav1.DeleteOptions{})
-	framework.ExpectNoError(err, "failed to delete configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
-}
-
 func testAttachingPodWebhook(f *framework.Framework) {
 	ginkgo.By("create a pod")
 	client := f.ClientSet
@@ -1655,17 +1624,6 @@ func namedNonCompliantConfigMap(name string, f *framework.Framework) *v1.ConfigM
 		},
 		Data: map[string]string{
 			"webhook-e2e-test": "webhook-disallow",
-		},
-	}
-}
-
-func nonDeletableConfigmap(f *framework.Framework) *v1.ConfigMap {
-	return &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: nonDeletableConfigmapName,
-		},
-		Data: map[string]string{
-			"webhook-e2e-test": "webhook-nondeletable",
 		},
 	}
 }

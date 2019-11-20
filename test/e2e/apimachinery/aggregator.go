@@ -32,7 +32,6 @@ import (
 	unstructuredv1 "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
@@ -48,8 +47,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 )
-
-var serverAggregatorVersion = utilversion.MustParseSemantic("v1.10.0")
 
 const (
 	aggregatorServicePort = 7443
@@ -405,7 +402,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	}
 
 	pods, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
-	framework.ExpectNoError(result.Error(), "getting pods for flunders service")
+	framework.ExpectNoError(err, "getting pods for flunders service")
 
 	// kubectl get flunders -v 9
 	// curl -k -v -XGET https://localhost/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
@@ -461,7 +458,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	unstruct := &unstructuredv1.Unstructured{}
 	err = unstruct.UnmarshalJSON(jsonFlunder)
 	framework.ExpectNoError(err, "unmarshalling test-flunder as unstructured for create using dynamic client")
-	unstruct, err = dynamicClient.Create(unstruct, metav1.CreateOptions{})
+	_, err = dynamicClient.Create(unstruct, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 
 	// kubectl get flunders
