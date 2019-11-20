@@ -103,6 +103,7 @@ test/e2e/common/container_probe.go: "with readiness probe that fails should neve
 test/e2e/common/container_probe.go: "should be restarted with a exec \\\"cat /tmp/health\\\" liveness probe"
 test/e2e/common/container_probe.go: "should *not* be restarted with a exec \\\"cat /tmp/health\\\" liveness probe"
 test/e2e/common/container_probe.go: "should be restarted with a /healthz http liveness probe"
+test/e2e/common/container_probe.go: "should *not* be restarted with a tcp:8080 liveness probe"
 test/e2e/common/container_probe.go: "should have monotonically increasing restart count"
 test/e2e/common/container_probe.go: "should *not* be restarted with a /healthz http liveness probe"
 test/e2e/common/docker_containers.go: "should use the image defaults if command and args are blank"
