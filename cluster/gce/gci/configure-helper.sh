@@ -2697,18 +2697,23 @@ EOF
     local -r metadata_proxy_yaml="${dst_dir}/metadata-proxy/gce/metadata-proxy.yaml"
     update-daemon-set-prometheus-to-sd-parameters ${metadata_proxy_yaml}
   fi
+
   if [[ "${ENABLE_ISTIO:-}" == "true" ]]; then
-    if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" || "${MONITORING_FLAG_SET}" == "true" ]]; then
-      if [[ "${ISTIO_AUTH_TYPE:-}" == "MUTUAL_TLS" ]]; then
-        setup-addon-manifests "addons" "istio/auth-sd"
-      else
-        setup-addon-manifests "addons" "istio/noauth-sd"
-      fi
+    if [[ "${ISTIO_OPERATOR:-}" == "true" ]]; then
+      setup-addon-manifests "addons" "istio/operator"
     else
-      if [[ "${ISTIO_AUTH_TYPE:-}" == "MUTUAL_TLS" ]]; then
-        setup-addon-manifests "addons" "istio/auth"
+      if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" || "${MONITORING_FLAG_SET}" == "true" ]]; then
+        if [[ "${ISTIO_AUTH_TYPE:-}" == "MUTUAL_TLS" ]]; then
+          setup-addon-manifests "addons" "istio/auth-sd"
+        else
+          setup-addon-manifests "addons" "istio/noauth-sd"
+        fi
       else
-        setup-addon-manifests "addons" "istio/noauth"
+        if [[ "${ISTIO_AUTH_TYPE:-}" == "MUTUAL_TLS" ]]; then
+          setup-addon-manifests "addons" "istio/auth"
+        else
+          setup-addon-manifests "addons" "istio/noauth"
+        fi
       fi
     fi
   fi
