@@ -133,14 +133,12 @@ aliases:
     - childsb
 
   sig-scheduling-maintainers:
-    - bsalamat
     - k82cn
     - wojtek-t
     - ravisantoshgudimetla
     - Huang-Wei
     - ahg-g
   sig-scheduling:
-    - bsalamat
     - k82cn
     - resouer
     - ravisantoshgudimetla
