@@ -98,7 +98,7 @@ as well as `namePrefix`'s and `nameSuffix`'s.
 | Name          | Type      | Desc                                |
 | :------------ | :-------- | :---------------------------------- |
 | **behavior**  | string    | Merge behavior when the ConfigMap generator is defined in a base.  May be one of `create`, `replace`, `merge`. |
-| **env**       | string    | Single file to generate ConfigMap data entries from.  Should be a path to a local *env* file, e.g. `path/to/file.env`, where each line of the file is a `key=value` pair.  *Each line* will appear as an entry in the ConfigMap data field. |
+| **envs**      | []string  | List of files to generate ConfigMap data entries from. Each item should be a path to a local *env* file, e.g. `path/to/file.env`, where each line of the file is a `key=value` pair. *Each line* will appear as an entry in the ConfigMap data field. |
 | **files**     | []string  | List of files to generate ConfigMap data entries from. Each item should be a path to a local file, e.g. `path/to/file.config`, and the filename will appear as an entry in the ConfigMap data field with its contents as a value.  |
 | **literals**  | []string  | List of literal ConfigMap data entries. Each item should be a key and literal value, e.g. `somekey=somevalue`, and the key/value will appear as an entry in the ConfigMap data field.|
 | **name**      | string    | Name for the ConfigMap.  Modified by the `namePrefix` and `nameSuffix` fields. |
@@ -126,7 +126,8 @@ configMapGenerator:
 # generate a ConfigMap named my-system-env-<some-hash> where each key/value pair in the
 # env.txt appears as a data entry (separated by \n).
 - name: my-system-env
-  env: env.txt
+  envs:
+  - env.txt
 ```
 
 {% endmethod %}
@@ -186,7 +187,7 @@ as well as `namePrefix`'s and `nameSuffix`'s.
 | Name          | Type    | Desc                                |
 | :------------ | :------ | :---------------------------------- |
 | **behavior**  | string  | Merge behavior when the Secret generator is defined in a base.  May be one of `create`, `replace`, `merge`. |
-| **env**       | string  | Single file to generate Secret data entries from.  Should be a path to a local *env* file, e.g. `path/to/file.env`, where each line of the file is a `key=value` pair.  *Each line* will appear as an entry in the Secret data field. |
+| **envs**      | []string  | List of files to generate Secret data entries from. Each item should be a path to a local *env* file, e.g. `path/to/file.env`, where each line of the file is a `key=value` pair. *Each line* will appear as an entry in the Secret data field. |
 | **files**     | []string  | List of files to generate Secret data entries from. Each item should be a path to a local file, e.g. `path/to/file.config`, and the filename will appear as an entry in the ConfigMap data field with its contents as a value.  |
 | **literals**  | []string  | List of literal Secret data entries. Each item should be a key and literal value, e.g. `somekey=somevalue`, and the key/value will appear as an entry in the Secret data field.|
 | **name**      | string  | Name for the Secret.  Modified by the `namePrefix` and `nameSuffix` fields. |
@@ -206,9 +207,9 @@ secretGenerator:
     - secret/tls.key
   type: "kubernetes.io/tls"
 - name: env_file_secret
-  # env is a path to a file to read lines of key=val
-  # you can only specify one env file per secret.
-  env: env.txt
+  # envs is a list of paths to files containing lines of key=val
+  envs:
+  - env.txt
   type: Opaque
 ```
 
