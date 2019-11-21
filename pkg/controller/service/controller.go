@@ -351,6 +351,10 @@ func (s *Controller) syncLoadBalancerIfNeeded(service *v1.Service, key string) (
 			}
 			return op, fmt.Errorf("failed to ensure load balancer: %v", err)
 		}
+		if newStatus == nil {
+			return op, fmt.Errorf("service status returned by EnsureLoadBalancer is nil")
+		}
+
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuredLoadBalancer", "Ensured load balancer")
 	}
 
