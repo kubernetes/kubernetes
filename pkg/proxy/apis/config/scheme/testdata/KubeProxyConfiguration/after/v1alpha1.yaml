@@ -27,6 +27,9 @@ ipvs:
   scheduler: ""
   strictARP: false
   syncPeriod: 30s
+  tcpFinTimeout: 0s
+  tcpTimeout: 0s
+  udpTimeout: 0s
 kind: KubeProxyConfiguration
 metricsBindAddress: 127.0.0.1:10249
 mode: ""
