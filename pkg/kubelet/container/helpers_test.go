@@ -415,6 +415,11 @@ func TestShouldContainerBeRestarted(t *testing.T) {
 		Namespace: pod.Namespace,
 		ContainerStatuses: []*ContainerStatus{
 			{
+				Name:     "alive",
+				State:    ContainerStateExited,
+				ExitCode: 2,
+			},
+			{
 				Name:  "alive",
 				State: ContainerStateRunning,
 			},
@@ -427,11 +432,6 @@ func TestShouldContainerBeRestarted(t *testing.T) {
 				Name:     "failed",
 				State:    ContainerStateExited,
 				ExitCode: 1,
-			},
-			{
-				Name:     "alive",
-				State:    ContainerStateExited,
-				ExitCode: 2,
 			},
 			{
 				Name:  "unknown",

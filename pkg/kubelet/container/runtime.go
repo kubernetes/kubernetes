@@ -317,12 +317,15 @@ type ContainerStatus struct {
 // FindContainerStatusByName returns container status in the pod status with the given name.
 // When there are multiple containers' statuses with the same name, the first match will be returned.
 func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *ContainerStatus {
+	var containerStatRet *ContainerStatus
 	for _, containerStatus := range podStatus.ContainerStatuses {
 		if containerStatus.Name == containerName {
-			return containerStatus
+			if containerStatRet == nil || containerStatus.State != ContainerStateExited {
+				containerStatRet = containerStatus
+			}
 		}
 	}
-	return nil
+	return containerStatRet
 }
 
 // Get container status of all the running containers in a pod
