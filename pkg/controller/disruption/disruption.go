@@ -240,6 +240,7 @@ func (dc *DisruptionController) getPodDeployment(controllerRef *metav1.OwnerRefe
 	}
 	controllerRef = metav1.GetControllerOf(rs)
 	if controllerRef == nil {
+		// This case will be covered by the getPodReplicaSet finder.
 		return nil, nil
 	}
 
@@ -565,15 +566,15 @@ func (dc *DisruptionController) trySync(pdb *policy.PodDisruptionBudget) error {
 		dc.recorder.Eventf(pdb, v1.EventTypeNormal, "NoPods", "No matching pods found")
 	}
 
-	expectedCount, desiredHealthy, err := dc.getExpectedPodCount(pdb, pods)
+	expectedCount, desiredHealthy, coveredPods, err := dc.getExpectedPodCount(pdb, pods)
 	if err != nil {
 		dc.recorder.Eventf(pdb, v1.EventTypeWarning, "CalculateExpectedPodCountFailed", "Failed to calculate the number of expected pods: %v", err)
 		return err
 	}
 
 	currentTime := time.Now()
-	disruptedPods, recheckTime := dc.buildDisruptedPodMap(pods, pdb, currentTime)
-	currentHealthy := countHealthyPods(pods, disruptedPods, currentTime)
+	disruptedPods, recheckTime := dc.buildDisruptedPodMap(coveredPods, pdb, currentTime)
+	currentHealthy := countHealthyPods(coveredPods, disruptedPods, currentTime)
 	err = dc.updatePdbStatus(pdb, currentHealthy, desiredHealthy, expectedCount, disruptedPods)
 
 	if err == nil && recheckTime != nil {
@@ -585,7 +586,12 @@ func (dc *DisruptionController) trySync(pdb *policy.PodDisruptionBudget) error {
 	return err
 }
 
-func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBudget, pods []*v1.Pod) (expectedCount, desiredHealthy int32, err error) {
+// getExpectedPodCount computes the expected number of pods (i.e. the total number of pods
+// if all controllers covered by the pdb have the desired number of replicas), the desired number
+// of healthy pods (the minimum number of of healthy pods as prescribed by the pdb), a list of
+// the pods covered by the pdb (all pods that were part of the computation of the desired number of pods, so
+// any pods without controllers or with unsupported controllers are left out).
+func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBudget, pods []*v1.Pod) (expectedCount, desiredHealthy int32, coveredPods []*v1.Pod, err error) {
 	err = nil
 	// TODO(davidopp): consider making the way expectedCount and rules about
 	// permitted controller configurations (specifically, considering it an error
@@ -593,7 +599,7 @@ func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBud
 	// handled the same way for integer and percentage minAvailable
 
 	if pdb.Spec.MaxUnavailable != nil {
-		expectedCount, err = dc.getExpectedScale(pdb, pods)
+		expectedCount, coveredPods, err = dc.getExpectedScale(pdb, pods)
 		if err != nil {
 			return
 		}
@@ -610,8 +616,9 @@ func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBud
 		if pdb.Spec.MinAvailable.Type == intstr.Int {
 			desiredHealthy = pdb.Spec.MinAvailable.IntVal
 			expectedCount = int32(len(pods))
+			coveredPods = pods
 		} else if pdb.Spec.MinAvailable.Type == intstr.String {
-			expectedCount, err = dc.getExpectedScale(pdb, pods)
+			expectedCount, coveredPods, err = dc.getExpectedScale(pdb, pods)
 			if err != nil {
 				return
 			}
@@ -627,7 +634,7 @@ func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBud
 	return
 }
 
-func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget, pods []*v1.Pod) (expectedCount int32, err error) {
+func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget, pods []*v1.Pod) (expectedCount int32, coveredPods []*v1.Pod, err error) {
 	// When the user specifies a fraction of pods that must be available, we
 	// use as the fraction's denominator
 	// SUM_{all c in C} scale(c)
@@ -647,13 +654,14 @@ func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget
 	for _, pod := range pods {
 		controllerRef := metav1.GetControllerOf(pod)
 		if controllerRef == nil {
-			err = fmt.Errorf("found no controller ref for pod %q", pod.Name)
-			dc.recorder.Event(pdb, v1.EventTypeWarning, "NoControllerRef", err.Error())
-			return
+			dc.recorder.Event(pdb, v1.EventTypeWarning, "NoControllerRef",
+				fmt.Sprintf("found no controller ref for pod %q", pod.Name))
+			continue
 		}
 
 		// If we already know the scale of the controller there is no need to do anything.
 		if _, found := controllerScale[controllerRef.UID]; found {
+			coveredPods = append(coveredPods, pod)
 			continue
 		}
 
@@ -667,15 +675,28 @@ func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget
 			}
 			if controllerNScale != nil {
 				controllerScale[controllerNScale.UID] = controllerNScale.scale
+				coveredPods = append(coveredPods, pod)
 				foundController = true
 				break
 			}
 		}
+		// If the pod has a controllerRef but no matching controller, it means that
+		// either the controller resource doesn't exist (i.e. we have  an orphaned pod)
+		// or the controller does not support the scale subresource. If this happens,
+		// an event is created and the pod is ignored for the purposes of computing
+		// the values for the PDB.
 		if !foundController {
-			err = fmt.Errorf("found no controllers for pod %q", pod.Name)
-			dc.recorder.Event(pdb, v1.EventTypeWarning, "NoControllers", err.Error())
-			return
+			dc.recorder.Event(pdb, v1.EventTypeWarning, "NoScaleController",
+				fmt.Sprintf("controller for pod %q does not exist or does not support scale", pod.Name))
 		}
+	}
+
+	// If the map does not have any entries, it means none of the pods has a controller that
+	// could give us the desired scale.
+	// TODO: Consider if this should return an error in addition to creating the event.
+	if len(controllerScale) == 0 {
+		dc.recorder.Event(pdb, v1.EventTypeWarning, "NoScaleControllers",
+			"No controllers found that support scale")
 	}
 
 	// 2. Add up all the controllers.

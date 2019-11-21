@@ -28,6 +28,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	autoscalingapi "k8s.io/api/autoscaling/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -55,6 +56,8 @@ import (
 type pdbStates map[string]policy.PodDisruptionBudget
 
 var alwaysReady = func() bool { return true }
+
+var controllerKindJob = batchv1.SchemeGroupVersion.WithKind("Job")
 
 func (ps *pdbStates) Set(pdb *policy.PodDisruptionBudget) error {
 	key, err := controller.KeyFunc(pdb)
@@ -123,6 +126,7 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypeWithName(customGVK, &v1.Service{})
+	_ = batchv1.AddToScheme(scheme)
 	fakeScaleClient := &scalefake.FakeScaleClient{}
 
 	dc := NewDisruptionController(
@@ -238,6 +242,13 @@ func updatePodOwnerToSs(t *testing.T, pod *v1.Pod, ss *apps.StatefulSet) {
 	var controllerReference metav1.OwnerReference
 	var trueVar = true
 	controllerReference = metav1.OwnerReference{UID: ss.UID, APIVersion: controllerKindSS.GroupVersion().String(), Kind: controllerKindSS.Kind, Name: ss.Name, Controller: &trueVar}
+	pod.OwnerReferences = append(pod.OwnerReferences, controllerReference)
+}
+
+func updatePodOwnerToJob(t *testing.T, pod *v1.Pod, job *batchv1.Job) {
+	var controllerReference metav1.OwnerReference
+	var trueVar = true
+	controllerReference = metav1.OwnerReference{UID: job.UID, APIVersion: controllerKindJob.GroupVersion().String(), Kind: controllerKindJob.Kind, Name: job.Name, Controller: &trueVar}
 	pod.OwnerReferences = append(pod.OwnerReferences, controllerReference)
 }
 
@@ -362,6 +373,26 @@ func newStatefulSet(t *testing.T, size int32) (*apps.StatefulSet, string) {
 	}
 
 	return ss, ssName
+}
+
+func newJob(t *testing.T) (*batchv1.Job, string) {
+	job := &batchv1.Job{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
+		ObjectMeta: metav1.ObjectMeta{
+			UID:             uuid.NewUUID(),
+			Name:            "foobar",
+			Namespace:       metav1.NamespaceDefault,
+			ResourceVersion: "18",
+			Labels:          fooBar(),
+		},
+		Spec: batchv1.JobSpec{},
+	}
+
+	jobName, err := controller.KeyFunc(job)
+	if err != nil {
+		t.Fatalf("Unexpected error naming Job: %q: %v", job.Name, err)
+	}
+	return job, jobName
 }
 
 func update(t *testing.T, store cache.Store, obj interface{}) {
@@ -615,11 +646,12 @@ func TestMultipleControllers(t *testing.T) {
 	//ps.VerifyDisruptionAllowed(t, pdbName, 0)
 }
 
-func TestReplicationController(t *testing.T) {
+func TestRoguePodWithMatchingLabels(t *testing.T) {
 	// The budget in this test matches foo=bar, but the RC and its pods match
 	// {foo=bar, baz=quux}.  Later, when we add a rogue pod with only a foo=bar
-	// label, it will match the budget but have no controllers, which should
-	// trigger the controller to set PodDisruptionAllowed to false.
+	// label, it will match the budget but have no controllers. This should
+	// lead to this pod being ignored and the pdb will set status based on
+	// only the pods that have a known controller.
 	labels := map[string]string{
 		"foo": "bar",
 		"baz": "quux",
@@ -658,7 +690,47 @@ func TestReplicationController(t *testing.T) {
 	rogue, _ := newPod(t, "rogue")
 	add(t, dc.podStore, rogue)
 	dc.sync(pdbName)
-	ps.VerifyDisruptionAllowed(t, pdbName, 0)
+	ps.VerifyDisruptionAllowed(t, pdbName, 1)
+}
+
+func TestPodsWithUnknownController(t *testing.T) {
+	labels := map[string]string{
+		"foo": "bar",
+	}
+
+	dc, ps := newFakeDisruptionController()
+
+	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromString("25%"))
+	add(t, dc.pdbStore, pdb)
+	rc, _ := newReplicationController(t, 4)
+	rc.Spec.Selector = labels
+	add(t, dc.rcStore, rc)
+	dc.sync(pdbName)
+
+	ps.VerifyPdbStatus(t, pdbName, 0, 0, 0, 0, map[string]metav1.Time{})
+
+	var pods []*v1.Pod
+
+	for i := int32(0); i < 4; i++ {
+		pod, _ := newPod(t, fmt.Sprintf("foobar %d", i))
+		updatePodOwnerToRc(t, pod, rc)
+		pods = append(pods, pod)
+		pod.Labels = labels
+		add(t, dc.podStore, pod)
+		dc.sync(pdbName)
+		if i < 3 {
+			ps.VerifyPdbStatus(t, pdbName, 0, i+1, 3, 4, map[string]metav1.Time{})
+		} else {
+			ps.VerifyPdbStatus(t, pdbName, 1, 4, 3, 4, map[string]metav1.Time{})
+		}
+	}
+
+	job, _ := newJob(t)
+	jobPod, _ := newPod(t, "foobarjob")
+	updatePodOwnerToJob(t, jobPod, job)
+	add(t, dc.podStore, jobPod)
+	dc.sync(pdbName)
+	ps.VerifyPdbStatus(t, pdbName, 1, 4, 3, 4, map[string]metav1.Time{})
 }
 
 func TestStatefulSetController(t *testing.T) {
