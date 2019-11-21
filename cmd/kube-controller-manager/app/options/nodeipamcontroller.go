@@ -57,6 +57,8 @@ func (o *NodeIPAMControllerOptions) ApplyTo(cfg *nodeipamconfig.NodeIPAMControll
 	}
 
 	cfg.NodeCIDRMaskSize = o.NodeCIDRMaskSize
+	cfg.NodeCIDRMaskSizeIPv4 = o.NodeCIDRMaskSizeIPv4
+	cfg.NodeCIDRMaskSizeIPv6 = o.NodeCIDRMaskSizeIPv6
 
 	return nil
 }
