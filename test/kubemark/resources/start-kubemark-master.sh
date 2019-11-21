@@ -776,4 +776,4 @@ until [ "$(curl 127.0.0.1:8080/healthz 2> /dev/null)" == "ok" ]; do
 	fi
 done
 
-echo "Done for the configuration for kubermark master"
+echo "Done for the configuration for kubemark master"
