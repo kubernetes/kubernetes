@@ -29,7 +29,7 @@ import (
 )
 
 // tfWideDeepWorkload defines a workload to run
-// https://github.com/tensorflow/models/tree/master/official/wide_deep.
+// https://github.com/tensorflow/models/tree/master/official/r1/wide_deep.
 type tfWideDeepWorkload struct{}
 
 // Ensure tfWideDeepWorkload implements NodePerfWorkload interface.

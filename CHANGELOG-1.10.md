@@ -3022,7 +3022,7 @@ filename | sha256 hash
 * Improve scheduler performance of MatchInterPodAffinity predicate. ([#57476](https://github.com/kubernetes/kubernetes/pull/57476), [@misterikkit](https://github.com/misterikkit))
 * Improve scheduler performance of MatchInterPodAffinity predicate. ([#57477](https://github.com/kubernetes/kubernetes/pull/57477), [@misterikkit](https://github.com/misterikkit))
 * Improve scheduler performance of MatchInterPodAffinity predicate. ([#57478](https://github.com/kubernetes/kubernetes/pull/57478), [@misterikkit](https://github.com/misterikkit))
-* Allow use resource ID to specify public IP address in azure_loadbalancer ([#53557](https://github.com/kubernetes/kubernetes/pull/53557), [@yolo3301](https://github.com/yolo3301))
+* Allow use resource ID to specify public IP address in azure_loadbalancer ([#53557](https://github.com/kubernetes/kubernetes/pull/53557), [@yolocs](https://github.com/yolocs))
 * Fixes a bug where if an error was returned that was not an `autorest.DetailedError` we would return `"not found", nil` which caused nodes to go to `NotReady` state. ([#57484](https://github.com/kubernetes/kubernetes/pull/57484), [@brendandburns](https://github.com/brendandburns))
 * Add the path '/version/' to the `system:discovery` cluster role. ([#57368](https://github.com/kubernetes/kubernetes/pull/57368), [@brendandburns](https://github.com/brendandburns))
 * Fixes issue creating docker secrets with kubectl 1.9 for accessing docker private registries. ([#57463](https://github.com/kubernetes/kubernetes/pull/57463), [@dims](https://github.com/dims))

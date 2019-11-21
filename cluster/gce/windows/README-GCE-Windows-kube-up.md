@@ -139,7 +139,7 @@ use the steps below to run K8s e2e tests. These steps are based on
 
 *   The canonical arguments for running all Windows e2e tests against a cluster
     on GCE can be seen by searching for `--test-cmd-args` in the [test
-    configuration](https://github.com/kubernetes/test-infra/blob/master/config/jobs/kubernetes/sig-gcp/sig-gcp-windows.yaml#L78)
+    configuration](https://github.com/kubernetes/test-infra/blob/master/config/jobs/kubernetes/sig-windows/windows-gce.yaml#L78)
     for the `ci-kubernetes-e2e-windows-gce` continuous test job. These arguments
     should be passed to the `run-e2e` script; escape the ginkgo arguments by
     adding quotes around them. For example:
