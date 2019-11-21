@@ -132,7 +132,9 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 	return nil, ErrorNoAuth
 }
 
-// ParseAzureEnvironment returns azure environment by name
+// ParseAzureEnvironment returns the azure environment.
+// If 'cloudFQDN' is set, environment is computed by quering the cloud's resource manager endpoint.
+// Otherwise, a pre-defined Environment is looked up by name.
 func ParseAzureEnvironment(cloudName, cloudFQDN, identitySystem string) (*azure.Environment, error) {
 	var env azure.Environment
 	var err error
@@ -169,14 +171,14 @@ func decodePkcs12(pkcs []byte, password string) (*x509.Certificate, *rsa.Private
 	return certificate, rsaPrivateKey, nil
 }
 
+// azureStackOverrides ensures that the Environment matches what AKSe currently generates for Azure Stack
 func azureStackOverrides(env *azure.Environment, cloudFQDN, identitySystem string) {
-	// if AzureStack, make sure the generated environment matches what AKSe currently generates
 	env.ManagementPortalURL = fmt.Sprintf("https://portal.%s/", cloudFQDN)
 	// TODO: figure out why AKSe does this
 	// why is autorest not setting ServiceManagementEndpoint?
 	env.ServiceManagementEndpoint = env.TokenAudience
 	// TODO: figure out why AKSe does this
-	// ResourceManagerVMDNSSuffix is not referenced in k/k
+	// May not be required, ResourceManagerVMDNSSuffix is not used by k/k
 	split := strings.Split(cloudFQDN, ".")
 	domain := strings.Join(split[1:], ".")
 	env.ResourceManagerVMDNSSuffix = fmt.Sprintf("cloudapp.%s", domain)
