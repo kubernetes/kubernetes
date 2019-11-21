@@ -315,11 +315,8 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string 
 	// Let the controller-manager allocate Node CIDRs for the Pod network.
 	// Each node will get a subspace of the address CIDR provided with --pod-network-cidr.
 	if cfg.Networking.PodSubnet != "" {
-		// TODO(Arvinderpal): Needs to be fixed once PR #73977 lands. Should be a list of maskSizes.
-		maskSize := calcNodeCidrSize(cfg.Networking.PodSubnet)
 		defaultArguments["allocate-node-cidrs"] = "true"
 		defaultArguments["cluster-cidr"] = cfg.Networking.PodSubnet
-		defaultArguments["node-cidr-mask-size"] = maskSize
 		if cfg.Networking.ServiceSubnet != "" {
 			defaultArguments["service-cluster-ip-range"] = cfg.Networking.ServiceSubnet
 		}
@@ -329,6 +326,10 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string 
 	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
 	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {
 		defaultArguments["feature-gates"] = fmt.Sprintf("%s=%t", features.IPv6DualStack, enabled)
+	} else if cfg.Networking.PodSubnet != "" {
+		// TODO(Arvinderpal): Needs to be fixed once PR #73977 lands. Should be a list of maskSizes.
+		maskSize := calcNodeCidrSize(cfg.Networking.PodSubnet)
+		defaultArguments["node-cidr-mask-size"] = maskSize
 	}
 
 	command := []string{"kube-controller-manager"}
