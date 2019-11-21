@@ -64,10 +64,10 @@ type AzureAuthConfig struct {
 	SubscriptionID string `json:"subscriptionId,omitempty" yaml:"subscriptionId,omitempty"`
 	// IdentitySystem indicates the identity provider. Relevant only to hybrid clouds (Azure Stack).
 	// Allowed values are 'azure_ad' (default), 'adfs'.
-	IdentitySystem string `json:"identitySystem" yaml:"identitySystem"`
+	IdentitySystem string `json:"identitySystem,omitempty" yaml:"identitySystem,omitempty"`
 	// CloudFQDN represents the hybrid cloud's fully qualified domain name: {location}.{domain}
 	// If set, cloud provider will generate its autorest.Environment instead of using one of the pre-defined ones.
-	CloudFQDN string `json:"cloudFQDN" yaml:"cloudFQDN"`
+	CloudFQDN string `json:"cloudFQDN,omitempty" yaml:"cloudFQDN,omitempty"`
 }
 
 // GetServicePrincipalToken creates a new service principal token based on the configuration
@@ -142,11 +142,13 @@ func ParseAzureEnvironment(cloudName, cloudFQDN, identitySystem string) (*azure.
 		klog.V(4).Infof("Loading environment from resource manager endpoint: %s", resourceManagerEndpoint)
 		env, err = azure.EnvironmentFromURL(resourceManagerEndpoint, nameOverride)
 		if err == nil && strings.EqualFold(cloudName, "AzureStackCloud") {
-			azureStackOverrides(env, cloudFQDN, identitySystem)
+			azureStackOverrides(&env, cloudFQDN, identitySystem)
 		}
 	} else if cloudName == "" {
+		klog.V(4).Info("Using public cloud environment")
 		env = azure.PublicCloud
 	} else {
+		klog.V(4).Infof("Using %s environment", cloudName)
 		env, err = azure.EnvironmentFromName(cloudName)
 	}
 	return &env, err
@@ -167,7 +169,7 @@ func decodePkcs12(pkcs []byte, password string) (*x509.Certificate, *rsa.Private
 	return certificate, rsaPrivateKey, nil
 }
 
-func azureStackOverrides(env azure.Environment, cloudFQDN, identitySystem string) azure.Environment {
+func azureStackOverrides(env *azure.Environment, cloudFQDN, identitySystem string) {
 	// if AzureStack, make sure the generated environment matches what AKSe currently generates
 	env.ManagementPortalURL = fmt.Sprintf("https://portal.%s/", cloudFQDN)
 	// TODO: figure out why AKSe does this
@@ -183,5 +185,4 @@ func azureStackOverrides(env azure.Environment, cloudFQDN, identitySystem string
 		env.ActiveDirectoryEndpoint = strings.TrimSuffix(env.ActiveDirectoryEndpoint, "/")
 		env.ActiveDirectoryEndpoint = strings.TrimSuffix(env.ActiveDirectoryEndpoint, "adfs")
 	}
-	return env
 }
