@@ -15,3 +15,42 @@ limitations under the License.
 */
 
 package cache
+
+import (
+	"github.com/prometheus/client_golang/prometheus"
+)
+
+const (
+	reflectorSubsystem = "reflector"
+)
+
+var (
+	// reflectorListCount is the number of list requests issued by a reflector in order to start
+	// a watch broken down by the group-version-kind and the resource-version used.
+	reflectorListCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: reflectorSubsystem,
+			Name:      "watch_list_count",
+			Help:      "Number of list requests issued by reflector to start a watch",
+		},
+		[]string{
+			"resource_type",    // Type of the resource the reflector is watching.
+			"resource_version", // Resource version [empty, zero, explicit] used in the list request.
+		},
+	)
+)
+
+func resourceVersionToLabelValue(rv string) string {
+	switch rv {
+	case "":
+		return "empty"
+	case "0":
+		return "zero"
+	default:
+		return "explicit"
+	}
+}
+
+func init() {
+	prometheus.MustRegister(reflectorListCount)
+}

@@ -212,6 +212,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 				pager.PageSize = r.WatchListPageSize
 			}
 
+			reflectorListCount.WithLabelValues(r.expectedTypeName, resourceVersionToLabelValue(options.ResourceVersion)).Inc()
 			list, err = pager.List(context.Background(), options)
 			if isExpiredError(err) {
 				r.setIsLastSyncResourceVersionExpired(true)
@@ -220,7 +221,9 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 				// continuation pages, but the pager might not be enabled, or the full list might fail because the
 				// resource version it is listing at is expired, so we need to fallback to resourceVersion="" in all
 				// to recover and ensure the reflector makes forward progress.
-				list, err = pager.List(context.Background(), metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
+				rv := r.relistResourceVersion()
+				reflectorListCount.WithLabelValues(r.expectedTypeName, resourceVersionToLabelValue(rv)).Inc()
+				list, err = pager.List(context.Background(), metav1.ListOptions{ResourceVersion: rv})
 			}
 			close(listCh)
 		}()
