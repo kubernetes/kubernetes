@@ -65,9 +65,9 @@ type AzureAuthConfig struct {
 	// IdentitySystem indicates the identity provider. Relevant only to hybrid clouds (Azure Stack).
 	// Allowed values are 'azure_ad' (default), 'adfs'.
 	IdentitySystem string `json:"identitySystem,omitempty" yaml:"identitySystem,omitempty"`
-	// CloudFQDN represents the hybrid cloud's fully qualified domain name: {location}.{domain}
-	// If set, cloud provider will generate its autorest.Environment instead of using one of the pre-defined ones.
-	CloudFQDN string `json:"cloudFQDN,omitempty" yaml:"cloudFQDN,omitempty"`
+	// ResourceManagerEndpoint is the cloud's resource manager endpoint. If set, cloud provider queries this endpoint
+	// in order to generate an autorest.Environment instance instead of using one of the pre-defined Environments.
+	ResourceManagerEndpoint string `json:"resourceManagerEndpoint,omitempty" yaml:"resourceManagerEndpoint,omitempty"`
 }
 
 // GetServicePrincipalToken creates a new service principal token based on the configuration
@@ -133,18 +133,17 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 }
 
 // ParseAzureEnvironment returns the azure environment.
-// If 'cloudFQDN' is set, environment is computed by quering the cloud's resource manager endpoint.
+// If 'resourceManagerEndpoint' is set, the environment is computed by quering the cloud's resource manager endpoint.
 // Otherwise, a pre-defined Environment is looked up by name.
-func ParseAzureEnvironment(cloudName, cloudFQDN, identitySystem string) (*azure.Environment, error) {
+func ParseAzureEnvironment(cloudName, resourceManagerEndpoint, identitySystem string) (*azure.Environment, error) {
 	var env azure.Environment
 	var err error
-	if cloudFQDN != "" {
-		resourceManagerEndpoint := fmt.Sprintf("https://management.%s/", cloudFQDN)
-		nameOverride := azure.OverrideProperty{Key: azure.EnvironmentName, Value: cloudName}
+	if resourceManagerEndpoint != "" {
 		klog.V(4).Infof("Loading environment from resource manager endpoint: %s", resourceManagerEndpoint)
+		nameOverride := azure.OverrideProperty{Key: azure.EnvironmentName, Value: cloudName}
 		env, err = azure.EnvironmentFromURL(resourceManagerEndpoint, nameOverride)
-		if err == nil && strings.EqualFold(cloudName, "AzureStackCloud") {
-			azureStackOverrides(&env, cloudFQDN, identitySystem)
+		if err == nil {
+			azureStackOverrides(&env, resourceManagerEndpoint, identitySystem)
 		}
 	} else if cloudName == "" {
 		klog.V(4).Info("Using public cloud environment")
@@ -172,19 +171,16 @@ func decodePkcs12(pkcs []byte, password string) (*x509.Certificate, *rsa.Private
 }
 
 // azureStackOverrides ensures that the Environment matches what AKSe currently generates for Azure Stack
-func azureStackOverrides(env *azure.Environment, cloudFQDN, identitySystem string) {
-	env.ManagementPortalURL = fmt.Sprintf("https://portal.%s/", cloudFQDN)
-	// TODO: figure out why AKSe does this
-	// why is autorest not setting ServiceManagementEndpoint?
+func azureStackOverrides(env *azure.Environment, resourceManagerEndpoint, identitySystem string) {
+	env.ManagementPortalURL = strings.Replace(resourceManagerEndpoint, "https://management.", "https://portal.", -1)
+	// TODO: figure out why AKSe does this, why is autorest not setting ServiceManagementEndpoint?
 	env.ServiceManagementEndpoint = env.TokenAudience
-	// TODO: figure out why AKSe does this
-	// May not be required, ResourceManagerVMDNSSuffix is not used by k/k
-	split := strings.Split(cloudFQDN, ".")
-	domain := strings.Join(split[1:], ".")
-	env.ResourceManagerVMDNSSuffix = fmt.Sprintf("cloudapp.%s", domain)
-	// NOTE: autorest sets KeyVaultEndpoint while AKSe does not
+	// TODO: figure out why AKSe does this, may not be required, ResourceManagerVMDNSSuffix is not referenced anywhere
+	env.ResourceManagerVMDNSSuffix = strings.Replace(resourceManagerEndpoint, "https://management.", "cloudapp.", -1)
+	env.ResourceManagerVMDNSSuffix = strings.TrimSuffix(env.ResourceManagerVMDNSSuffix, "/")
 	if strings.EqualFold(identitySystem, ADFSIdentitySystem) {
 		env.ActiveDirectoryEndpoint = strings.TrimSuffix(env.ActiveDirectoryEndpoint, "/")
 		env.ActiveDirectoryEndpoint = strings.TrimSuffix(env.ActiveDirectoryEndpoint, "adfs")
 	}
+	// NOTE: autorest sets KeyVaultEndpoint while AKSe does not
 }
