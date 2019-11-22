@@ -158,39 +158,45 @@ func newPodWorkers(syncPodFn syncPodFnType, recorder record.EventRecorder, workQ
 func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 	var lastSyncTime time.Time
 	for update := range podUpdates {
-		err := func() error {
-			podUID := update.Pod.UID
-			// This is a blocking call that would return only if the cache
-			// has an entry for the pod that is newer than minRuntimeCache
-			// Time. This ensures the worker doesn't start syncing until
-			// after the cache is at least newer than the finished time of
-			// the previous sync.
-			status, err := p.podCache.GetNewerThan(podUID, lastSyncTime)
-			if err != nil {
-				// This is the legacy event thrown by manage pod loop
-				// all other events are now dispatched from syncPodFn
-				p.recorder.Eventf(update.Pod, v1.EventTypeWarning, events.FailedSync, "error determining status: %v", err)
+		func() {
+			var err error
+			defer func() {
+				// ensure wrapUp is executed even when crash happens
+				p.wrapUp(update.Pod.UID, err)
+			}()
+			err = func() error {
+				podUID := update.Pod.UID
+				// This is a blocking call that would return only if the cache
+				// has an entry for the pod that is newer than minRuntimeCache
+				// Time. This ensures the worker doesn't start syncing until
+				// after the cache is at least newer than the finished time of
+				// the previous sync.
+				status, err := p.podCache.GetNewerThan(podUID, lastSyncTime)
+				if err != nil {
+					// This is the legacy event thrown by manage pod loop
+					// all other events are now dispatched from syncPodFn
+					p.recorder.Eventf(update.Pod, v1.EventTypeWarning, events.FailedSync, "error determining status: %v", err)
+					return err
+				}
+				err = p.syncPodFn(syncPodOptions{
+					mirrorPod:      update.MirrorPod,
+					pod:            update.Pod,
+					podStatus:      status,
+					killPodOptions: update.KillPodOptions,
+					updateType:     update.UpdateType,
+				})
+				lastSyncTime = time.Now()
 				return err
+			}()
+			// notify the call-back function if the operation succeeded or not
+			if update.OnCompleteFunc != nil {
+				update.OnCompleteFunc(err)
 			}
-			err = p.syncPodFn(syncPodOptions{
-				mirrorPod:      update.MirrorPod,
-				pod:            update.Pod,
-				podStatus:      status,
-				killPodOptions: update.KillPodOptions,
-				updateType:     update.UpdateType,
-			})
-			lastSyncTime = time.Now()
-			return err
+			if err != nil {
+				// IMPORTANT: we do not log errors here, the syncPodFn is responsible for logging errors
+				klog.Errorf("Error syncing pod %s (%q), skipping: %v", update.Pod.UID, format.Pod(update.Pod), err)
+			}
 		}()
-		// notify the call-back function if the operation succeeded or not
-		if update.OnCompleteFunc != nil {
-			update.OnCompleteFunc(err)
-		}
-		if err != nil {
-			// IMPORTANT: we do not log errors here, the syncPodFn is responsible for logging errors
-			klog.Errorf("Error syncing pod %s (%q), skipping: %v", update.Pod.UID, format.Pod(update.Pod), err)
-		}
-		p.wrapUp(update.Pod.UID, err)
 	}
 }
 
@@ -218,8 +224,22 @@ func (p *podWorkers) UpdatePod(options *UpdatePodOptions) {
 		// the status of the pod for the first pod worker sync. See corresponding
 		// comment in syncPod.
 		go func() {
-			defer runtime.HandleCrash()
-			p.managePodLoop(podUpdates)
+			for {
+				// isCrash indicates whether the worker loop is broken by a crash or not
+				isCrash := false
+				func() {
+					defer runtime.HandleCrash(func(r interface{}) {
+						if r != nil {
+							isCrash = true
+						}
+					})
+					p.managePodLoop(podUpdates)
+				}()
+				if !isCrash {
+					break
+				}
+				klog.Warningf("worker for pod uid=%v crashes, restart", uid)
+			}
 		}()
 	}
 	if !p.isWorking[pod.UID] {

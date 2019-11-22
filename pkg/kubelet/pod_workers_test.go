@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -339,5 +340,80 @@ func TestKillPodNowFunc(t *testing.T) {
 	}
 	if syncPodRecords[0].updateType != kubetypes.SyncPodKill {
 		t.Errorf("Pod update type was %v, but expected %v", syncPodRecords[0].updateType, kubetypes.SyncPodKill)
+	}
+}
+
+func createCrashOncePodWorkers() (*podWorkers, map[types.UID][]syncPodRecord) {
+	lock := sync.Mutex{}
+	processed := make(map[types.UID][]syncPodRecord)
+	fakeRecorder := &record.FakeRecorder{}
+	fakeRuntime := &containertest.FakeRuntime{}
+	fakeCache := containertest.NewFakeCache(fakeRuntime)
+	podWorkers := newPodWorkers(
+		func(options syncPodOptions) error {
+			func() {
+				lock.Lock()
+				defer lock.Unlock()
+				pod := options.pod
+				processed[pod.UID] = append(processed[pod.UID], syncPodRecord{
+					name:       pod.Name,
+					updateType: options.updateType,
+				})
+				if len(processed[pod.UID]) == 1 {
+					panic("worker crashes in first sync")
+				}
+			}()
+			return nil
+		},
+		fakeRecorder,
+		queue.NewBasicWorkQueue(&clock.RealClock{}),
+		time.Second,
+		time.Second,
+		fakeCache,
+	)
+	return podWorkers, processed
+}
+
+func TestCrashPodWorkersCanRecover(t *testing.T) {
+	oldReallyCrash := runtime.ReallyCrash
+	defer func() {
+		runtime.ReallyCrash = oldReallyCrash
+	}()
+	runtime.ReallyCrash = false
+
+	podWorkers, processed := createCrashOncePodWorkers()
+
+	numPods := 3
+	for i := 0; i < numPods; i++ {
+		pod := newPod(string(i), string(i))
+		podWorkers.UpdatePod(&UpdatePodOptions{
+			Pod:        pod,
+			UpdateType: kubetypes.SyncPodCreate,
+		})
+		podWorkers.UpdatePod(&UpdatePodOptions{
+			Pod:        pod,
+			UpdateType: kubetypes.SyncPodUpdate,
+		})
+	}
+	drainWorkers(podWorkers, numPods)
+
+	if len(processed) != numPods {
+		t.Errorf("Not all pods processed: %v", len(processed))
+		return
+	}
+	for i := 0; i < numPods; i++ {
+		uid := types.UID(string(i))
+		// each pod should be processed two times (create and update)
+		syncPodRecords := processed[uid]
+		if len(syncPodRecords) != 2 {
+			t.Errorf("Pod %v processed %v times, but expected 2", i, len(syncPodRecords))
+			continue
+		}
+		if syncPodRecords[0].updateType != kubetypes.SyncPodCreate {
+			t.Errorf("Pod %v event was %v, but expected %v", i, syncPodRecords[0].updateType, kubetypes.SyncPodCreate)
+		}
+		if syncPodRecords[1].updateType != kubetypes.SyncPodUpdate {
+			t.Errorf("Pod %v event was %v, but expected %v", i, syncPodRecords[1].updateType, kubetypes.SyncPodUpdate)
+		}
 	}
 }
