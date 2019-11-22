@@ -533,6 +533,21 @@ func createBatchPodSequential(f *framework.Framework, pods []*v1.Pod) (time.Dura
 	return batchLag, e2eLags
 }
 
+// verifyLatencyWithinThreshold verifies whether 50, 90 and 99th percentiles of a latency metric are
+// within the expected threshold.
+func verifyLatencyWithinThreshold(threshold, actual e2emetrics.LatencyMetric, metricName string) error {
+	if actual.Perc50 > threshold.Perc50 {
+		return fmt.Errorf("too high %v latency 50th percentile: %v", metricName, actual.Perc50)
+	}
+	if actual.Perc90 > threshold.Perc90 {
+		return fmt.Errorf("too high %v latency 90th percentile: %v", metricName, actual.Perc90)
+	}
+	if actual.Perc99 > threshold.Perc99 {
+		return fmt.Errorf("too high %v latency 99th percentile: %v", metricName, actual.Perc99)
+	}
+	return nil
+}
+
 // logAndVerifyLatency verifies that whether pod creation latency satisfies the limit.
 func logAndVerifyLatency(batchLag time.Duration, e2eLags []e2emetrics.PodLatencyData, podStartupLimits e2emetrics.LatencyMetric,
 	podBatchStartupLimit time.Duration, testInfo map[string]string, isVerify bool) {
@@ -549,7 +564,7 @@ func logAndVerifyLatency(batchLag time.Duration, e2eLags []e2emetrics.PodLatency
 
 	if isVerify {
 		// check whether e2e pod startup time is acceptable.
-		framework.ExpectNoError(e2emetrics.VerifyLatencyWithinThreshold(podStartupLimits, podStartupLatency, "pod startup"))
+		framework.ExpectNoError(verifyLatencyWithinThreshold(podStartupLimits, podStartupLatency, "pod startup"))
 
 		// check bactch pod creation latency
 		if podBatchStartupLimit > 0 {
