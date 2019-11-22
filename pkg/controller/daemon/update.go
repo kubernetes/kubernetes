@@ -389,11 +389,11 @@ func (dsc *DaemonSetsController) getUnavailableNumbers(ds *apps.DaemonSet, nodeL
 	var numUnavailable, desiredNumberScheduled int
 	for i := range nodeList {
 		node := nodeList[i]
-		wantToRun, _, _, err := dsc.nodeShouldRunDaemonPod(node, ds)
+		shouldSchedule, _, err := dsc.nodeShouldRunDaemonPod(node, ds)
 		if err != nil {
 			return -1, -1, err
 		}
-		if !wantToRun {
+		if !shouldSchedule {
 			continue
 		}
 		desiredNumberScheduled++
