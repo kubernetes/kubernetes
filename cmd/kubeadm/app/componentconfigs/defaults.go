@@ -63,6 +63,12 @@ func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.ClusterConfiguration)
 			FeatureGates: map[string]bool{},
 		}
 	}
+	// The below code is necessary because while KubeProxy may be defined, the user may not
+	// have defined any feature-gates, thus FeatureGates will be nil and the later insertion
+	// of any feature-gates (e.g. IPv6DualStack) will cause a panic.
+	if internalcfg.ComponentConfigs.KubeProxy.FeatureGates == nil {
+		internalcfg.ComponentConfigs.KubeProxy.FeatureGates = map[string]bool{}
+	}
 
 	externalproxycfg := internalcfg.ComponentConfigs.KubeProxy
 
