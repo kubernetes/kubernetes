@@ -332,6 +332,11 @@ func (f *Framework) AfterEach() {
 				if err := f.ClientSet.CoreV1().Namespaces().Delete(ns.Name, nil); err != nil {
 					if !apierrors.IsNotFound(err) {
 						nsDeletionErrors[ns.Name] = err
+
+						// Dump namespace if we are unable to delete the namespace and the dump was not already performed.
+						if !ginkgo.CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
+							DumpAllNamespaceInfo(f.ClientSet, ns.Name)
+						}
 					} else {
 						Logf("Namespace %v was already deleted", ns.Name)
 					}
