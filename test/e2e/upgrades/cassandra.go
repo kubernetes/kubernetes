@@ -60,7 +60,7 @@ func (CassandraUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 
 func cassandraKubectlCreate(ns, file string) {
 	input := string(testfiles.ReadOrDie(filepath.Join(cassandraManifestPath, file)))
-	framework.RunKubectlOrDieInput(input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
+	framework.RunKubectlOrDieInput(ns, input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
 }
 
 // Setup creates a Cassandra StatefulSet and a PDB. It also brings up a tester

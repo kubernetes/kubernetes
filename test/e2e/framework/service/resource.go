@@ -105,7 +105,7 @@ func EnableAndDisableInternalLB() (enable func(svc *v1.Service), disable func(sv
 func DescribeSvc(ns string) {
 	framework.Logf("\nOutput of kubectl describe svc:\n")
 	desc, _ := framework.RunKubectl(
-		"describe", "svc", fmt.Sprintf("--namespace=%v", ns))
+		ns, "describe", "svc", fmt.Sprintf("--namespace=%v", ns))
 	framework.Logf(desc)
 }
 

@@ -87,11 +87,11 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		}
 
 		for _, ns := range namespaces {
-			framework.RunKubectlOrDie("create", "-f", backendRcYaml, getNsCmdFlag(ns))
+			framework.RunKubectlOrDie(ns.Name, "create", "-f", backendRcYaml, getNsCmdFlag(ns))
 		}
 
 		for _, ns := range namespaces {
-			framework.RunKubectlOrDie("create", "-f", backendSvcYaml, getNsCmdFlag(ns))
+			framework.RunKubectlOrDie(ns.Name, "create", "-f", backendSvcYaml, getNsCmdFlag(ns))
 		}
 
 		// wait for objects
@@ -139,7 +139,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 
 		// create a pod in each namespace
 		for _, ns := range namespaces {
-			framework.NewKubectlCommand("create", "-f", "-", getNsCmdFlag(ns)).WithStdinData(updatedPodYaml).ExecOrDie()
+			framework.NewKubectlCommand(ns.Name, "create", "-f", "-", getNsCmdFlag(ns)).WithStdinData(updatedPodYaml).ExecOrDie(ns.Name)
 		}
 
 		// wait until the pods have been scheduler, i.e. are not Pending anymore. Remember

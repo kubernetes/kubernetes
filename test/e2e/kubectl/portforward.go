@@ -169,7 +169,7 @@ func (c *portForwardCommand) Stop() {
 
 // runPortForward runs port-forward, warning, this may need root functionality on some systems.
 func runPortForward(ns, podName string, port int) *portForwardCommand {
-	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath)
+	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 	cmd := tk.KubectlCmd("port-forward", fmt.Sprintf("--namespace=%v", ns), podName, fmt.Sprintf(":%d", port))
 	// This is somewhat ugly but is the only way to retrieve the port that was picked
 	// by the port-forward command. We don't want to hard code the port as we have no

@@ -69,8 +69,8 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			httpYaml := readFile(test, "http-liveness.yaml.in")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
-			framework.RunKubectlOrDieInput(execYaml, "create", "-f", "-", nsFlag)
-			framework.RunKubectlOrDieInput(httpYaml, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, execYaml, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, httpYaml, "create", "-f", "-", nsFlag)
 
 			// Since both containers start rapidly, we can easily run this test in parallel.
 			var wg sync.WaitGroup
@@ -120,8 +120,8 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			podName := "secret-test-pod"
 
 			ginkgo.By("creating secret and pod")
-			framework.RunKubectlOrDieInput(secretYaml, "create", "-f", "-", nsFlag)
-			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, secretYaml, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-", nsFlag)
 			err := e2epod.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
 			framework.ExpectNoError(err)
 
@@ -139,7 +139,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			podName := "dapi-test-pod"
 
 			ginkgo.By("creating the pod")
-			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-", nsFlag)
 			err := e2epod.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
 			framework.ExpectNoError(err)
 

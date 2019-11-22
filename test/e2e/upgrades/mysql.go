@@ -61,7 +61,7 @@ func (MySQLUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 
 func mysqlKubectlCreate(ns, file string) {
 	input := string(testfiles.ReadOrDie(filepath.Join(mysqlManifestPath, file)))
-	framework.RunKubectlOrDieInput(input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
+	framework.RunKubectlOrDieInput(ns, input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
 }
 
 func (t *MySQLUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName string) string {

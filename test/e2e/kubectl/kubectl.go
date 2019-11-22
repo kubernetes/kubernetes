@@ -183,7 +183,7 @@ func cleanupKubectlInputs(fileContents string, ns string, selectors ...string) {
 	}
 	// support backward compatibility : file paths or raw json - since we are removing file path
 	// dependencies from this test.
-	framework.RunKubectlOrDieInput(fileContents, "delete", "--grace-period=0", "--force", "-f", "-", nsArg)
+	framework.RunKubectlOrDieInput(ns, fileContents, "delete", "--grace-period=0", "--force", "-f", "-", nsArg)
 	framework.AssertCleanup(ns, selectors...)
 }
 
@@ -191,11 +191,11 @@ func readTestFileOrDie(file string) []byte {
 	return testfiles.ReadOrDie(path.Join(kubeCtlManifestPath, file))
 }
 
-func runKubectlRetryOrDie(args ...string) string {
+func runKubectlRetryOrDie(ns string, args ...string) string {
 	var err error
 	var output string
 	for i := 0; i < 5; i++ {
-		output, err = framework.RunKubectl(args...)
+		output, err = framework.RunKubectl(ns, args...)
 		if err == nil || (!strings.Contains(err.Error(), genericregistry.OptimisticLockErrorMsg) && !strings.Contains(err.Error(), "Operation cannot be fulfilled")) {
 			break
 		}
@@ -230,14 +230,14 @@ var _ = SIGDescribe("Kubectl alpha client", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			framework.RunKubectlOrDie("delete", "cronjobs", cjName, nsFlag)
+			framework.RunKubectlOrDie(ns, "delete", "cronjobs", cjName, nsFlag)
 		})
 
 		ginkgo.It("should create a CronJob", func() {
 			framework.SkipIfMissingResource(f.DynamicClient, cronJobGroupVersionResourceAlpha, f.Namespace.Name)
 
 			schedule := "*/5 * * * ?"
-			framework.RunKubectlOrDie("run", cjName, "--restart=OnFailure", "--generator=cronjob/v2alpha1",
+			framework.RunKubectlOrDie(ns, "run", cjName, "--restart=OnFailure", "--generator=cronjob/v2alpha1",
 				"--schedule="+schedule, "--image="+busyboxImage, nsFlag)
 			ginkgo.By("verifying the CronJob " + cjName + " was created")
 			sj, err := c.BatchV1beta1().CronJobs(ns).Get(cjName, metav1.GetOptions{})
@@ -342,7 +342,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			defer cleanupKubectlInputs(nautilus, ns, updateDemoSelector)
 
 			ginkgo.By("creating a replication controller")
-			framework.RunKubectlOrDieInput(nautilus, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
+			framework.RunKubectlOrDieInput(ns, nautilus, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
 
@@ -355,15 +355,15 @@ var _ = SIGDescribe("Kubectl client", func() {
 			defer cleanupKubectlInputs(nautilus, ns, updateDemoSelector)
 
 			ginkgo.By("creating a replication controller")
-			framework.RunKubectlOrDieInput(nautilus, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
+			framework.RunKubectlOrDieInput(ns, nautilus, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			ginkgo.By("scaling down the replication controller")
 			debugDiscovery()
-			framework.RunKubectlOrDie("scale", "rc", "update-demo-nautilus", "--replicas=1", "--timeout=5m", fmt.Sprintf("--namespace=%v", ns))
+			framework.RunKubectlOrDie(ns, "scale", "rc", "update-demo-nautilus", "--replicas=1", "--timeout=5m", fmt.Sprintf("--namespace=%v", ns))
 			validateController(c, nautilusImage, 1, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			ginkgo.By("scaling up the replication controller")
 			debugDiscovery()
-			framework.RunKubectlOrDie("scale", "rc", "update-demo-nautilus", "--replicas=2", "--timeout=5m", fmt.Sprintf("--namespace=%v", ns))
+			framework.RunKubectlOrDie(ns, "scale", "rc", "update-demo-nautilus", "--replicas=2", "--timeout=5m", fmt.Sprintf("--namespace=%v", ns))
 			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
 
@@ -374,11 +374,11 @@ var _ = SIGDescribe("Kubectl client", func() {
 		*/
 		framework.ConformanceIt("should do a rolling update of a replication controller ", func() {
 			ginkgo.By("creating the initial replication controller")
-			framework.RunKubectlOrDieInput(string(nautilus[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
+			framework.RunKubectlOrDieInput(ns, string(nautilus[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			ginkgo.By("rolling-update to new replication controller")
 			debugDiscovery()
-			framework.RunKubectlOrDieInput(string(kitten[:]), "rolling-update", "update-demo-nautilus", "--update-period=1s", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
+			framework.RunKubectlOrDieInput(ns, string(kitten[:]), "rolling-update", "update-demo-nautilus", "--update-period=1s", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			validateController(c, kittenImage, 2, "update-demo", updateDemoSelector, getUDData("kitten.jpg", ns), ns)
 			// Everything will hopefully be cleaned up when the namespace is deleted.
 		})
@@ -412,7 +412,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.By("creating all guestbook components")
 			forEachGBFile(func(contents string) {
 				framework.Logf(contents)
-				framework.RunKubectlOrDieInput(contents, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
+				framework.RunKubectlOrDieInput(ns, contents, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			})
 
 			ginkgo.By("validating guestbook app")
@@ -515,7 +515,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 						obj.SetName(obj.GetName() + randString)
 					}
 
-					createObjValidateOutputAndCleanup(client, obj, resource)
+					createObjValidateOutputAndCleanup(f.Namespace.Name, client, obj, resource)
 				}
 			}
 		})
@@ -526,7 +526,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		ginkgo.BeforeEach(func() {
 			ginkgo.By(fmt.Sprintf("creating the pod from %v", podYaml))
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pod-with-readiness-probe.yaml.in")))
-			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
+			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			gomega.Expect(e2epod.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout)).To(gomega.BeTrue())
 		})
 		ginkgo.AfterEach(func() {
@@ -535,7 +535,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 		ginkgo.It("should support exec", func() {
 			ginkgo.By("executing a command in the container")
-			execOutput := framework.RunKubectlOrDie("exec", fmt.Sprintf("--namespace=%v", ns), simplePodName, "echo", "running", "in", "container")
+			execOutput := framework.RunKubectlOrDie(ns, "exec", fmt.Sprintf("--namespace=%v", ns), simplePodName, "echo", "running", "in", "container")
 			if e, a := "running in container", strings.TrimSpace(execOutput); e != a {
 				framework.Failf("Unexpected kubectl exec output. Wanted %q, got %q", e, a)
 			}
@@ -545,13 +545,13 @@ var _ = SIGDescribe("Kubectl client", func() {
 			for i := 0; i < len(veryLongData); i++ {
 				veryLongData[i] = 'a'
 			}
-			execOutput = framework.RunKubectlOrDie("exec", fmt.Sprintf("--namespace=%v", ns), simplePodName, "echo", string(veryLongData))
+			execOutput = framework.RunKubectlOrDie(ns, "exec", fmt.Sprintf("--namespace=%v", ns), simplePodName, "echo", string(veryLongData))
 			framework.ExpectEqual(string(veryLongData), strings.TrimSpace(execOutput), "Unexpected kubectl exec output")
 
 			ginkgo.By("executing a command in the container with noninteractive stdin")
-			execOutput = framework.NewKubectlCommand("exec", fmt.Sprintf("--namespace=%v", ns), "-i", simplePodName, "cat").
+			execOutput = framework.NewKubectlCommand(ns, "exec", fmt.Sprintf("--namespace=%v", ns), "-i", simplePodName, "cat").
 				WithStdinData("abcd1234").
-				ExecOrDie()
+				ExecOrDie(ns)
 			if e, a := "abcd1234", execOutput; e != a {
 				framework.Failf("Unexpected kubectl exec output. Wanted %q, got %q", e, a)
 			}
@@ -565,9 +565,9 @@ var _ = SIGDescribe("Kubectl client", func() {
 			defer closer.Close()
 
 			ginkgo.By("executing a command in the container with pseudo-interactive stdin")
-			execOutput = framework.NewKubectlCommand("exec", fmt.Sprintf("--namespace=%v", ns), "-i", simplePodName, "sh").
+			execOutput = framework.NewKubectlCommand(ns, "exec", fmt.Sprintf("--namespace=%v", ns), "-i", simplePodName, "sh").
 				WithStdinReader(r).
-				ExecOrDie()
+				ExecOrDie(ns)
 			if e, a := "hi", strings.TrimSpace(execOutput); e != a {
 				framework.Failf("Unexpected kubectl exec output. Wanted %q, got %q", e, a)
 			}
@@ -575,7 +575,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 		ginkgo.It("should support exec using resource/name", func() {
 			ginkgo.By("executing a command in the container")
-			execOutput := framework.RunKubectlOrDie("exec", fmt.Sprintf("--namespace=%v", ns), simplePodResourceName, "echo", "running", "in", "container")
+			execOutput := framework.RunKubectlOrDie(ns, "exec", fmt.Sprintf("--namespace=%v", ns), simplePodResourceName, "echo", "running", "in", "container")
 			if e, a := "running in container", strings.TrimSpace(execOutput); e != a {
 				framework.Failf("Unexpected kubectl exec output. Wanted %q, got %q", e, a)
 			}
@@ -595,9 +595,9 @@ var _ = SIGDescribe("Kubectl client", func() {
 			for _, proxyVar := range []string{"https_proxy", "HTTPS_PROXY"} {
 				proxyLogs.Reset()
 				ginkgo.By("Running kubectl via an HTTP proxy using " + proxyVar)
-				output := framework.NewKubectlCommand(fmt.Sprintf("--namespace=%s", ns), "exec", "httpd", "echo", "running", "in", "container").
+				output := framework.NewKubectlCommand(ns, fmt.Sprintf("--namespace=%s", ns), "exec", "httpd", "echo", "running", "in", "container").
 					WithEnv(append(os.Environ(), fmt.Sprintf("%s=%s", proxyVar, proxyAddr))).
-					ExecOrDie()
+					ExecOrDie(ns)
 
 				// Verify we got the normal output captured by the exec server
 				expectedExecOutput := "running in container\n"
@@ -622,7 +622,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			}
 
 			ginkgo.By("Starting kubectl proxy")
-			port, proxyCmd, err := startProxyServer()
+			port, proxyCmd, err := startProxyServer(ns)
 			framework.ExpectNoError(err)
 			defer framework.TryKill(proxyCmd)
 
@@ -630,9 +630,9 @@ var _ = SIGDescribe("Kubectl client", func() {
 			host := fmt.Sprintf("--server=http://127.0.0.1:%d", port)
 			ginkgo.By("Running kubectl via kubectl proxy using " + host)
 			output := framework.NewKubectlCommand(
-				host, fmt.Sprintf("--namespace=%s", ns),
+				ns, host, fmt.Sprintf("--namespace=%s", ns),
 				"exec", "httpd", "echo", "running", "in", "container",
-			).ExecOrDie()
+			).ExecOrDie(ns)
 
 			// Verify we got the normal output captured by the exec server
 			expectedExecOutput := "running in container\n"
@@ -645,40 +645,40 @@ var _ = SIGDescribe("Kubectl client", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			ginkgo.By("execing into a container with a successful command")
-			_, err := framework.NewKubectlCommand(nsFlag, "exec", "httpd", "--", "/bin/sh", "-c", "exit 0").Exec()
+			_, err := framework.NewKubectlCommand(ns, nsFlag, "exec", "httpd", "--", "/bin/sh", "-c", "exit 0").Exec()
 			framework.ExpectNoError(err)
 
 			ginkgo.By("execing into a container with a failing command")
-			_, err = framework.NewKubectlCommand(nsFlag, "exec", "httpd", "--", "/bin/sh", "-c", "exit 42").Exec()
+			_, err = framework.NewKubectlCommand(ns, nsFlag, "exec", "httpd", "--", "/bin/sh", "-c", "exit 42").Exec()
 			ee, ok := err.(uexec.ExitError)
 			framework.ExpectEqual(ok, true)
 			framework.ExpectEqual(ee.ExitStatus(), 42)
 
 			ginkgo.By("running a successful command")
-			_, err = framework.NewKubectlCommand(nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=Never", "success", "--", "/bin/sh", "-c", "exit 0").Exec()
+			_, err = framework.NewKubectlCommand(ns, nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=Never", "success", "--", "/bin/sh", "-c", "exit 0").Exec()
 			framework.ExpectNoError(err)
 
 			ginkgo.By("running a failing command")
-			_, err = framework.NewKubectlCommand(nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=Never", "failure-1", "--", "/bin/sh", "-c", "exit 42").Exec()
+			_, err = framework.NewKubectlCommand(ns, nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=Never", "failure-1", "--", "/bin/sh", "-c", "exit 42").Exec()
 			ee, ok = err.(uexec.ExitError)
 			framework.ExpectEqual(ok, true)
 			framework.ExpectEqual(ee.ExitStatus(), 42)
 
 			ginkgo.By("running a failing command without --restart=Never")
-			_, err = framework.NewKubectlCommand(nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", "failure-2", "--", "/bin/sh", "-c", "cat && exit 42").
+			_, err = framework.NewKubectlCommand(ns, nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", "failure-2", "--", "/bin/sh", "-c", "cat && exit 42").
 				WithStdinData("abcd1234").
 				Exec()
 			framework.ExpectNoError(err)
 
 			ginkgo.By("running a failing command without --restart=Never, but with --rm")
-			_, err = framework.NewKubectlCommand(nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", "--rm", "failure-3", "--", "/bin/sh", "-c", "cat && exit 42").
+			_, err = framework.NewKubectlCommand(ns, nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", "--rm", "failure-3", "--", "/bin/sh", "-c", "cat && exit 42").
 				WithStdinData("abcd1234").
 				Exec()
 			framework.ExpectNoError(err)
 			e2epod.WaitForPodToDisappear(f.ClientSet, ns, "failure-3", labels.Everything(), 2*time.Second, wait.ForeverTestTimeout)
 
 			ginkgo.By("running a failing command with --leave-stdin-open")
-			_, err = framework.NewKubectlCommand(nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=Never", "failure-4", "--leave-stdin-open", "--", "/bin/sh", "-c", "exit 42").
+			_, err = framework.NewKubectlCommand(ns, nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=Never", "failure-4", "--leave-stdin-open", "--", "/bin/sh", "-c", "exit 42").
 				WithStdinData("abcd1234").
 				Exec()
 			framework.ExpectNoError(err)
@@ -689,9 +689,9 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			ginkgo.By("executing a command with run and attach with stdin")
 			// We wait for a non-empty line so we know kubectl has attached
-			runOutput := framework.NewKubectlCommand(nsFlag, "run", "run-test", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--stdin", "--", "sh", "-c", "while [ -z \"$s\" ]; do read s; sleep 1; done; echo read:$s && cat && echo 'stdin closed'").
+			runOutput := framework.NewKubectlCommand(ns, nsFlag, "run", "run-test", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--stdin", "--", "sh", "-c", "while [ -z \"$s\" ]; do read s; sleep 1; done; echo read:$s && cat && echo 'stdin closed'").
 				WithStdinData("value\nabcd1234").
-				ExecOrDie()
+				ExecOrDie(ns)
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("read:value"))
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("abcd1234"))
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
@@ -699,17 +699,17 @@ var _ = SIGDescribe("Kubectl client", func() {
 			gomega.Expect(c.BatchV1().Jobs(ns).Delete("run-test", nil)).To(gomega.BeNil())
 
 			ginkgo.By("executing a command with run and attach without stdin")
-			runOutput = framework.NewKubectlCommand(fmt.Sprintf("--namespace=%v", ns), "run", "run-test-2", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
+			runOutput = framework.NewKubectlCommand(ns, fmt.Sprintf("--namespace=%v", ns), "run", "run-test-2", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				WithStdinData("abcd1234").
-				ExecOrDie()
+				ExecOrDie(ns)
 			gomega.Expect(runOutput).ToNot(gomega.ContainSubstring("abcd1234"))
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
 			gomega.Expect(c.BatchV1().Jobs(ns).Delete("run-test-2", nil)).To(gomega.BeNil())
 
 			ginkgo.By("executing a command with run and attach with stdin with open stdin should remain running")
-			runOutput = framework.NewKubectlCommand(nsFlag, "run", "run-test-3", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
+			runOutput = framework.NewKubectlCommand(ns, nsFlag, "run", "run-test-3", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				WithStdinData("abcd1234\n").
-				ExecOrDie()
+				ExecOrDie(ns)
 			gomega.Expect(runOutput).ToNot(gomega.ContainSubstring("stdin closed"))
 			g := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
 			runTestPod, _, err := polymorphichelpers.GetFirstPod(f.ClientSet.CoreV1(), ns, "run=run-test-3", 1*time.Minute, g)
@@ -724,7 +724,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				if !e2epod.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, 1*time.Second) {
 					framework.Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test-3")
 				}
-				logOutput := framework.RunKubectlOrDie(nsFlag, "logs", runTestPod.Name)
+				logOutput := framework.RunKubectlOrDie(ns, nsFlag, "logs", runTestPod.Name)
 				gomega.Expect(logOutput).ToNot(gomega.ContainSubstring("stdin closed"))
 				return strings.Contains(logOutput, "abcd1234"), nil
 			})
@@ -738,13 +738,13 @@ var _ = SIGDescribe("Kubectl client", func() {
 			podName := "run-log-test"
 
 			ginkgo.By("executing a command with run")
-			framework.RunKubectlOrDie("run", podName, "--generator=run-pod/v1", "--image="+busyboxImage, "--restart=OnFailure", nsFlag, "--", "sh", "-c", "sleep 10; seq 100 | while read i; do echo $i; sleep 0.01; done; echo EOF")
+			framework.RunKubectlOrDie(ns, "run", podName, "--generator=run-pod/v1", "--image="+busyboxImage, "--restart=OnFailure", nsFlag, "--", "sh", "-c", "sleep 10; seq 100 | while read i; do echo $i; sleep 0.01; done; echo EOF")
 
 			if !e2epod.CheckPodsRunningReadyOrSucceeded(c, ns, []string{podName}, framework.PodStartTimeout) {
 				framework.Failf("Pod for run-log-test was not ready")
 			}
 
-			logOutput := framework.RunKubectlOrDie(nsFlag, "logs", "-f", "run-log-test")
+			logOutput := framework.RunKubectlOrDie(ns, nsFlag, "logs", "-f", "run-log-test")
 			gomega.Expect(logOutput).To(gomega.ContainSubstring("EOF"))
 		})
 
@@ -792,7 +792,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			inClusterPort := strings.TrimSpace(framework.RunHostCmdOrDie(ns, simplePodName, "printenv KUBERNETES_SERVICE_PORT"))
 			inClusterURL := net.JoinHostPort(inClusterHost, inClusterPort)
 			framework.Logf("copying %s to the %s pod", kubectlPath, simplePodName)
-			framework.RunKubectlOrDie("cp", kubectlPath, ns+"/"+simplePodName+":/tmp/")
+			framework.RunKubectlOrDie(ns, "cp", kubectlPath, ns+"/"+simplePodName+":/tmp/")
 
 			// Build a kubeconfig file that will make use of the injected ca and token,
 			// but point at the DNS host and the default namespace
@@ -822,7 +822,7 @@ users:
     tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
 `), os.FileMode(0755)))
 			framework.Logf("copying override kubeconfig to the %s pod", simplePodName)
-			framework.RunKubectlOrDie("cp", filepath.Join(tmpDir, overrideKubeconfigName), ns+"/"+simplePodName+":/tmp/")
+			framework.RunKubectlOrDie(ns, "cp", filepath.Join(tmpDir, overrideKubeconfigName), ns+"/"+simplePodName+":/tmp/")
 
 			framework.ExpectNoError(ioutil.WriteFile(filepath.Join(tmpDir, "invalid-configmap-with-namespace.yaml"), []byte(`
 kind: ConfigMap
@@ -838,8 +838,8 @@ metadata:
   name: "configmap without namespace and invalid name"
 `), os.FileMode(0755)))
 			framework.Logf("copying configmap manifests to the %s pod", simplePodName)
-			framework.RunKubectlOrDie("cp", filepath.Join(tmpDir, "invalid-configmap-with-namespace.yaml"), ns+"/"+simplePodName+":/tmp/")
-			framework.RunKubectlOrDie("cp", filepath.Join(tmpDir, "invalid-configmap-without-namespace.yaml"), ns+"/"+simplePodName+":/tmp/")
+			framework.RunKubectlOrDie(ns, "cp", filepath.Join(tmpDir, "invalid-configmap-with-namespace.yaml"), ns+"/"+simplePodName+":/tmp/")
+			framework.RunKubectlOrDie(ns, "cp", filepath.Join(tmpDir, "invalid-configmap-without-namespace.yaml"), ns+"/"+simplePodName+":/tmp/")
 
 			ginkgo.By("getting pods with in-cluster configs")
 			execOutput := framework.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --v=6 2>&1")
@@ -898,7 +898,7 @@ metadata:
 		*/
 		framework.ConformanceIt("should check if v1 is in available api versions ", func() {
 			ginkgo.By("validating api versions")
-			output := framework.RunKubectlOrDie("api-versions")
+			output := framework.RunKubectlOrDie(ns, "api-versions")
 			if !strings.Contains(output, "v1") {
 				framework.Failf("No v1 in kubectl api-versions")
 			}
@@ -908,12 +908,12 @@ metadata:
 	ginkgo.Describe("Kubectl get componentstatuses", func() {
 		ginkgo.It("should get componentstatuses", func() {
 			ginkgo.By("getting list of componentstatuses")
-			output := framework.RunKubectlOrDie("get", "componentstatuses", "-o", "jsonpath={.items[*].metadata.name}")
+			output := framework.RunKubectlOrDie(ns, "get", "componentstatuses", "-o", "jsonpath={.items[*].metadata.name}")
 			components := strings.Split(output, " ")
 			ginkgo.By("getting details of componentstatuses")
 			for _, component := range components {
 				ginkgo.By("getting status of " + component)
-				framework.RunKubectlOrDie("get", "componentstatuses", component)
+				framework.RunKubectlOrDie(ns, "get", "componentstatuses", component)
 			}
 		})
 	})
@@ -924,12 +924,12 @@ metadata:
 
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			ginkgo.By("creating Agnhost RC")
-			framework.RunKubectlOrDieInput(controllerJSON, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, controllerJSON, "create", "-f", "-", nsFlag)
 			ginkgo.By("applying a modified configuration")
 			stdin := modifyReplicationControllerConfiguration(controllerJSON)
-			framework.NewKubectlCommand("apply", "-f", "-", nsFlag).
+			framework.NewKubectlCommand(ns, "apply", "-f", "-", nsFlag).
 				WithStdinReader(stdin).
-				ExecOrDie()
+				ExecOrDie(ns)
 			ginkgo.By("checking the result")
 			forEachReplicationController(c, ns, "app", "agnhost", validateReplicationControllerConfiguration)
 		})
@@ -938,16 +938,16 @@ metadata:
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			ginkgo.By("creating Agnhost SVC")
-			framework.RunKubectlOrDieInput(string(serviceJSON[:]), "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, string(serviceJSON[:]), "create", "-f", "-", nsFlag)
 
 			ginkgo.By("getting the original port")
-			originalNodePort := framework.RunKubectlOrDie("get", "service", "agnhost-master", nsFlag, "-o", "jsonpath={.spec.ports[0].port}")
+			originalNodePort := framework.RunKubectlOrDie(ns, "get", "service", "agnhost-master", nsFlag, "-o", "jsonpath={.spec.ports[0].port}")
 
 			ginkgo.By("applying the same configuration")
-			framework.RunKubectlOrDieInput(string(serviceJSON[:]), "apply", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, string(serviceJSON[:]), "apply", "-f", "-", nsFlag)
 
 			ginkgo.By("getting the port after applying configuration")
-			currentNodePort := framework.RunKubectlOrDie("get", "service", "agnhost-master", nsFlag, "-o", "jsonpath={.spec.ports[0].port}")
+			currentNodePort := framework.RunKubectlOrDie(ns, "get", "service", "agnhost-master", nsFlag, "-o", "jsonpath={.spec.ports[0].port}")
 
 			ginkgo.By("checking the result")
 			if originalNodePort != currentNodePort {
@@ -962,20 +962,20 @@ metadata:
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			ginkgo.By("deployment replicas number is 2")
-			framework.RunKubectlOrDieInput(deployment1Yaml, "apply", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, deployment1Yaml, "apply", "-f", "-", nsFlag)
 
 			ginkgo.By("check the last-applied matches expectations annotations")
-			output := framework.RunKubectlOrDieInput(deployment1Yaml, "apply", "view-last-applied", "-f", "-", nsFlag, "-o", "json")
+			output := framework.RunKubectlOrDieInput(ns, deployment1Yaml, "apply", "view-last-applied", "-f", "-", nsFlag, "-o", "json")
 			requiredString := "\"replicas\": 2"
 			if !strings.Contains(output, requiredString) {
 				framework.Failf("Missing %s in kubectl view-last-applied", requiredString)
 			}
 
 			ginkgo.By("apply file doesn't have replicas")
-			framework.RunKubectlOrDieInput(deployment2Yaml, "apply", "set-last-applied", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, deployment2Yaml, "apply", "set-last-applied", "-f", "-", nsFlag)
 
 			ginkgo.By("check last-applied has been updated, annotations doesn't have replicas")
-			output = framework.RunKubectlOrDieInput(deployment1Yaml, "apply", "view-last-applied", "-f", "-", nsFlag, "-o", "json")
+			output = framework.RunKubectlOrDieInput(ns, deployment1Yaml, "apply", "view-last-applied", "-f", "-", nsFlag, "-o", "json")
 			requiredString = "\"replicas\": 2"
 			if strings.Contains(output, requiredString) {
 				framework.Failf("Presenting %s in kubectl view-last-applied", requiredString)
@@ -984,13 +984,13 @@ metadata:
 			ginkgo.By("scale set replicas to 3")
 			httpdDeploy := "httpd-deployment"
 			debugDiscovery()
-			framework.RunKubectlOrDie("scale", "deployment", httpdDeploy, "--replicas=3", nsFlag)
+			framework.RunKubectlOrDie(ns, "scale", "deployment", httpdDeploy, "--replicas=3", nsFlag)
 
 			ginkgo.By("apply file doesn't have replicas but image changed")
-			framework.RunKubectlOrDieInput(deployment3Yaml, "apply", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, deployment3Yaml, "apply", "-f", "-", nsFlag)
 
 			ginkgo.By("verify replicas still is 3 and image has been updated")
-			output = framework.RunKubectlOrDieInput(deployment3Yaml, "get", "-f", "-", nsFlag, "-o", "json")
+			output = framework.RunKubectlOrDieInput(ns, deployment3Yaml, "get", "-f", "-", nsFlag, "-o", "json")
 			requiredItems := []string{"\"replicas\": 3", imageutils.GetE2EImage(imageutils.Httpd)}
 			for _, item := range requiredItems {
 				if !strings.Contains(output, item) {
@@ -1134,7 +1134,7 @@ metadata:
 		*/
 		framework.ConformanceIt("should check if Kubernetes master services is included in cluster-info ", func() {
 			ginkgo.By("validating cluster-info")
-			output := framework.RunKubectlOrDie("cluster-info")
+			output := framework.RunKubectlOrDie(ns, "cluster-info")
 			// Can't check exact strings due to terminal control commands (colors)
 			requiredItems := []string{"Kubernetes master", "is running at"}
 			for _, item := range requiredItems {
@@ -1148,7 +1148,7 @@ metadata:
 	ginkgo.Describe("Kubectl cluster-info dump", func() {
 		ginkgo.It("should check if cluster-info dump succeeds", func() {
 			ginkgo.By("running cluster-info dump")
-			framework.RunKubectlOrDie("cluster-info", "dump")
+			framework.RunKubectlOrDie(ns, "cluster-info", "dump")
 		})
 	})
 
@@ -1163,15 +1163,15 @@ metadata:
 			serviceJSON := readTestFileOrDie(agnhostServiceFilename)
 
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
-			framework.RunKubectlOrDieInput(controllerJSON, "create", "-f", "-", nsFlag)
-			framework.RunKubectlOrDieInput(string(serviceJSON[:]), "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, controllerJSON, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, string(serviceJSON[:]), "create", "-f", "-", nsFlag)
 
 			ginkgo.By("Waiting for Agnhost master to start.")
 			waitForOrFailWithDebug(1)
 
 			// Pod
 			forEachPod(func(pod v1.Pod) {
-				output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
+				output := framework.RunKubectlOrDie(ns, "describe", "pod", pod.Name, nsFlag)
 				requiredStrings := [][]string{
 					{"Name:", "agnhost-master-"},
 					{"Namespace:", ns},
@@ -1202,10 +1202,10 @@ metadata:
 				{"Pod Template:"},
 				{"Image:", agnhostImage},
 				{"Events:"}}
-			checkKubectlOutputWithRetry(requiredStrings, "describe", "rc", "agnhost-master", nsFlag)
+			checkKubectlOutputWithRetry(ns, requiredStrings, "describe", "rc", "agnhost-master", nsFlag)
 
 			// Service
-			output := framework.RunKubectlOrDie("describe", "service", "agnhost-master", nsFlag)
+			output := framework.RunKubectlOrDie(ns, "describe", "service", "agnhost-master", nsFlag)
 			requiredStrings = [][]string{
 				{"Name:", "agnhost-master"},
 				{"Namespace:", ns},
@@ -1225,7 +1225,7 @@ metadata:
 			nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			node := nodes.Items[0]
-			output = framework.RunKubectlOrDie("describe", "node", node.Name)
+			output = framework.RunKubectlOrDie(ns, "describe", "node", node.Name)
 			requiredStrings = [][]string{
 				{"Name:", node.Name},
 				{"Labels:"},
@@ -1245,7 +1245,7 @@ metadata:
 			checkOutput(output, requiredStrings)
 
 			// Namespace
-			output = framework.RunKubectlOrDie("describe", "namespace", ns)
+			output = framework.RunKubectlOrDie(ns, "describe", "namespace", ns)
 			requiredStrings = [][]string{
 				{"Name:", ns},
 				{"Labels:"},
@@ -1260,7 +1260,7 @@ metadata:
 			ginkgo.By("creating a cronjob")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			cronjobYaml := commonutils.SubstituteImageName(string(readTestFileOrDie("busybox-cronjob.yaml")))
-			framework.RunKubectlOrDieInput(cronjobYaml, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, cronjobYaml, "create", "-f", "-", nsFlag)
 
 			ginkgo.By("waiting for cronjob to start.")
 			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
@@ -1273,7 +1273,7 @@ metadata:
 			framework.ExpectNoError(err)
 
 			ginkgo.By("verifying kubectl describe prints")
-			output := framework.RunKubectlOrDie("describe", "cronjob", "cronjob-test", nsFlag)
+			output := framework.RunKubectlOrDie(ns, "describe", "cronjob", "cronjob-test", nsFlag)
 			requiredStrings := [][]string{
 				{"Name:", "cronjob-test"},
 				{"Namespace:", ns},
@@ -1308,7 +1308,7 @@ metadata:
 			ginkgo.By("creating Agnhost RC")
 
 			framework.Logf("namespace %v", ns)
-			framework.RunKubectlOrDieInput(controllerJSON, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, controllerJSON, "create", "-f", "-", nsFlag)
 
 			// It may take a while for the pods to get registered in some cases, wait to be sure.
 			ginkgo.By("Waiting for Agnhost master to start.")
@@ -1366,12 +1366,12 @@ metadata:
 			}
 
 			ginkgo.By("exposing RC")
-			framework.RunKubectlOrDie("expose", "rc", "agnhost-master", "--name=rm2", "--port=1234", fmt.Sprintf("--target-port=%d", agnhostPort), nsFlag)
+			framework.RunKubectlOrDie(ns, "expose", "rc", "agnhost-master", "--name=rm2", "--port=1234", fmt.Sprintf("--target-port=%d", agnhostPort), nsFlag)
 			framework.WaitForService(c, ns, "rm2", true, framework.Poll, framework.ServiceStartTimeout)
 			validateService("rm2", 1234, framework.ServiceStartTimeout)
 
 			ginkgo.By("exposing service")
-			framework.RunKubectlOrDie("expose", "service", "rm2", "--name=rm3", "--port=2345", fmt.Sprintf("--target-port=%d", agnhostPort), nsFlag)
+			framework.RunKubectlOrDie(ns, "expose", "service", "rm2", "--name=rm3", "--port=2345", fmt.Sprintf("--target-port=%d", agnhostPort), nsFlag)
 			framework.WaitForService(c, ns, "rm3", true, framework.Poll, framework.ServiceStartTimeout)
 			validateService("rm3", 2345, framework.ServiceStartTimeout)
 		})
@@ -1384,7 +1384,7 @@ metadata:
 			ginkgo.By("creating the pod")
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pause-pod.yaml.in")))
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-", nsFlag)
 			gomega.Expect(e2epod.CheckPodsRunningReady(c, ns, []string{pausePodName}, framework.PodStartTimeout)).To(gomega.BeTrue())
 		})
 		ginkgo.AfterEach(func() {
@@ -1401,17 +1401,17 @@ metadata:
 			labelValue := "testing-label-value"
 
 			ginkgo.By("adding the label " + labelName + " with value " + labelValue + " to a pod")
-			framework.RunKubectlOrDie("label", "pods", pausePodName, labelName+"="+labelValue, nsFlag)
+			framework.RunKubectlOrDie(ns, "label", "pods", pausePodName, labelName+"="+labelValue, nsFlag)
 			ginkgo.By("verifying the pod has the label " + labelName + " with the value " + labelValue)
-			output := framework.RunKubectlOrDie("get", "pod", pausePodName, "-L", labelName, nsFlag)
+			output := framework.RunKubectlOrDie(ns, "get", "pod", pausePodName, "-L", labelName, nsFlag)
 			if !strings.Contains(output, labelValue) {
 				framework.Failf("Failed updating label " + labelName + " to the pod " + pausePodName)
 			}
 
 			ginkgo.By("removing the label " + labelName + " of a pod")
-			framework.RunKubectlOrDie("label", "pods", pausePodName, labelName+"-", nsFlag)
+			framework.RunKubectlOrDie(ns, "label", "pods", pausePodName, labelName+"-", nsFlag)
 			ginkgo.By("verifying the pod doesn't have the label " + labelName)
-			output = framework.RunKubectlOrDie("get", "pod", pausePodName, "-L", labelName, nsFlag)
+			output = framework.RunKubectlOrDie(ns, "get", "pod", pausePodName, "-L", labelName, nsFlag)
 			if strings.Contains(output, labelValue) {
 				framework.Failf("Failed removing label " + labelName + " of the pod " + pausePodName)
 			}
@@ -1425,7 +1425,7 @@ metadata:
 			ginkgo.By("creating the pod")
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("busybox-pod.yaml")))
-			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-", nsFlag)
 			gomega.Expect(e2epod.CheckPodsRunningReady(c, ns, []string{busyboxPodName}, framework.PodStartTimeout)).To(gomega.BeTrue())
 		})
 		ginkgo.AfterEach(func() {
@@ -1446,7 +1446,7 @@ metadata:
 			}
 
 			ginkgo.By("specifying a remote filepath " + podSource + " on the pod")
-			framework.RunKubectlOrDie("cp", podSource, tempDestination.Name(), nsFlag)
+			framework.RunKubectlOrDie(ns, "cp", podSource, tempDestination.Name(), nsFlag)
 			ginkgo.By("verifying that the contents of the remote file " + podSource + " have been copied to a local file " + tempDestination.Name())
 			localData, err := ioutil.ReadAll(tempDestination)
 			if err != nil {
@@ -1466,10 +1466,10 @@ metadata:
 			ginkgo.By("creating an pod")
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			// Agnhost image generates logs for a total of 100 lines over 20s.
-			framework.RunKubectlOrDie("run", podName, "--generator=run-pod/v1", "--image="+agnhostImage, nsFlag, "--", "logs-generator", "--log-lines-total", "100", "--run-duration", "20s")
+			framework.RunKubectlOrDie(ns, "run", podName, "--generator=run-pod/v1", "--image="+agnhostImage, nsFlag, "--", "logs-generator", "--log-lines-total", "100", "--run-duration", "20s")
 		})
 		ginkgo.AfterEach(func() {
-			framework.RunKubectlOrDie("delete", "pod", podName, nsFlag)
+			framework.RunKubectlOrDie(ns, "delete", "pod", podName, nsFlag)
 		})
 
 		/*
@@ -1500,19 +1500,19 @@ metadata:
 			framework.ExpectNoError(err)
 
 			ginkgo.By("limiting log lines")
-			out := framework.RunKubectlOrDie("logs", podName, containerName, nsFlag, "--tail=1")
+			out := framework.RunKubectlOrDie(ns, "logs", podName, containerName, nsFlag, "--tail=1")
 			framework.Logf("got output %q", out)
 			gomega.Expect(len(out)).NotTo(gomega.BeZero())
 			framework.ExpectEqual(len(lines(out)), 1)
 
 			ginkgo.By("limiting log bytes")
-			out = framework.RunKubectlOrDie("logs", podName, containerName, nsFlag, "--limit-bytes=1")
+			out = framework.RunKubectlOrDie(ns, "logs", podName, containerName, nsFlag, "--limit-bytes=1")
 			framework.Logf("got output %q", out)
 			framework.ExpectEqual(len(lines(out)), 1)
 			framework.ExpectEqual(len(out), 1)
 
 			ginkgo.By("exposing timestamps")
-			out = framework.RunKubectlOrDie("logs", podName, containerName, nsFlag, "--tail=1", "--timestamps")
+			out = framework.RunKubectlOrDie(ns, "logs", podName, containerName, nsFlag, "--tail=1", "--timestamps")
 			framework.Logf("got output %q", out)
 			l := lines(out)
 			framework.ExpectEqual(len(l), 1)
@@ -1529,9 +1529,9 @@ metadata:
 			// because the granularity is only 1 second and
 			// it could end up rounding the wrong way.
 			time.Sleep(2500 * time.Millisecond) // ensure that startup logs on the node are seen as older than 1s
-			recentOut := framework.RunKubectlOrDie("logs", podName, containerName, nsFlag, "--since=1s")
+			recentOut := framework.RunKubectlOrDie(ns, "logs", podName, containerName, nsFlag, "--since=1s")
 			recent := len(strings.Split(recentOut, "\n"))
-			olderOut := framework.RunKubectlOrDie("logs", podName, containerName, nsFlag, "--since=24h")
+			olderOut := framework.RunKubectlOrDie(ns, "logs", podName, containerName, nsFlag, "--since=24h")
 			older := len(strings.Split(olderOut, "\n"))
 			gomega.Expect(recent).To(gomega.BeNumerically("<", older), "expected recent(%v) to be less than older(%v)\nrecent lines:\n%v\nolder lines:\n%v\n", recent, older, recentOut, olderOut)
 		})
@@ -1547,12 +1547,12 @@ metadata:
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			ginkgo.By("creating Agnhost RC")
-			framework.RunKubectlOrDieInput(controllerJSON, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, controllerJSON, "create", "-f", "-", nsFlag)
 			ginkgo.By("Waiting for Agnhost master to start.")
 			waitForOrFailWithDebug(1)
 			ginkgo.By("patching all pods")
 			forEachPod(func(pod v1.Pod) {
-				framework.RunKubectlOrDie("patch", "pod", pod.Name, nsFlag, "-p", "{\"metadata\":{\"annotations\":{\"x\":\"y\"}}}")
+				framework.RunKubectlOrDie(ns, "patch", "pod", pod.Name, nsFlag, "-p", "{\"metadata\":{\"annotations\":{\"x\":\"y\"}}}")
 			})
 
 			ginkgo.By("checking annotations")
@@ -1578,7 +1578,7 @@ metadata:
 			Description: The command ‘kubectl version’ MUST return the major, minor versions,  GitCommit, etc of the Client and the Server that the kubectl is configured to connect to.
 		*/
 		framework.ConformanceIt("should check is all data is printed ", func() {
-			version := framework.RunKubectlOrDie("version")
+			version := framework.RunKubectlOrDie(ns, "version")
 			requiredItems := []string{"Client Version:", "Server Version:", "Major:", "Minor:", "GitCommit:"}
 			for _, item := range requiredItems {
 				if !strings.Contains(version, item) {
@@ -1597,7 +1597,7 @@ metadata:
 		ginkgo.BeforeEach(func() {
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			name = "e2e-test-httpd-deployment"
-			cleanUp = func() { framework.RunKubectlOrDie("delete", "deployment", name, nsFlag) }
+			cleanUp = func() { framework.RunKubectlOrDie(ns, "delete", "deployment", name, nsFlag) }
 		})
 
 		ginkgo.AfterEach(func() {
@@ -1611,7 +1611,7 @@ metadata:
 		*/
 		framework.ConformanceIt("should create an rc or deployment from an image ", func() {
 			ginkgo.By("running the image " + httpdImage)
-			framework.RunKubectlOrDie("run", name, "--image="+httpdImage, nsFlag)
+			framework.RunKubectlOrDie(ns, "run", name, "--image="+httpdImage, nsFlag)
 			ginkgo.By("verifying the pod controlled by " + name + " gets created")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": name}))
 			podlist, err := e2epod.WaitForPodsWithLabel(c, ns, label)
@@ -1620,7 +1620,7 @@ metadata:
 			}
 			pods := podlist.Items
 			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != httpdImage {
-				framework.RunKubectlOrDie("get", "pods", "-L", "run", nsFlag)
+				framework.RunKubectlOrDie(ns, "get", "pods", "-L", "run", nsFlag)
 				framework.Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", httpdImage, len(pods))
 			}
 		})
@@ -1636,7 +1636,7 @@ metadata:
 		})
 
 		ginkgo.AfterEach(func() {
-			framework.RunKubectlOrDie("delete", "rc", rcName, nsFlag)
+			framework.RunKubectlOrDie(ns, "delete", "rc", rcName, nsFlag)
 		})
 
 		/*
@@ -1646,7 +1646,7 @@ metadata:
 		*/
 		framework.ConformanceIt("should create an rc from an image ", func() {
 			ginkgo.By("running the image " + httpdImage)
-			framework.RunKubectlOrDie("run", rcName, "--image="+httpdImage, "--generator=run/v1", nsFlag)
+			framework.RunKubectlOrDie(ns, "run", rcName, "--image="+httpdImage, "--generator=run/v1", nsFlag)
 			ginkgo.By("verifying the rc " + rcName + " was created")
 			rc, err := c.CoreV1().ReplicationControllers(ns).Get(rcName, metav1.GetOptions{})
 			if err != nil {
@@ -1665,7 +1665,7 @@ metadata:
 			}
 			pods := podlist.Items
 			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != httpdImage {
-				framework.RunKubectlOrDie("get", "pods", "-L", "run", nsFlag)
+				framework.RunKubectlOrDie(ns, "get", "pods", "-L", "run", nsFlag)
 				framework.Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", httpdImage, len(pods))
 			}
 
@@ -1677,7 +1677,7 @@ metadata:
 			if !e2epod.CheckPodsRunningReady(c, ns, podNames, framework.PodStartTimeout) {
 				framework.Failf("Pods for rc %s were not ready", rcName)
 			}
-			_, err = framework.RunKubectl("logs", "rc/"+rcName, nsFlag)
+			_, err = framework.RunKubectl(ns, "logs", "rc/"+rcName, nsFlag)
 			// a non-nil error is fine as long as we actually found a pod.
 			if err != nil && !strings.Contains(err.Error(), " in pod ") {
 				framework.Failf("Failed getting logs by rc %s: %v", rcName, err)
@@ -1697,7 +1697,7 @@ metadata:
 		})
 
 		ginkgo.AfterEach(func() {
-			framework.RunKubectlOrDie("delete", "rc", rcName, nsFlag)
+			framework.RunKubectlOrDie(ns, "delete", "rc", rcName, nsFlag)
 		})
 
 		/*
@@ -1707,7 +1707,7 @@ metadata:
 		*/
 		framework.ConformanceIt("should support rolling-update to same image ", func() {
 			ginkgo.By("running the image " + httpdImage)
-			framework.RunKubectlOrDie("run", rcName, "--image="+httpdImage, "--generator=run/v1", nsFlag)
+			framework.RunKubectlOrDie(ns, "run", rcName, "--image="+httpdImage, "--generator=run/v1", nsFlag)
 			ginkgo.By("verifying the rc " + rcName + " was created")
 			rc, err := c.CoreV1().ReplicationControllers(ns).Get(rcName, metav1.GetOptions{})
 			if err != nil {
@@ -1722,7 +1722,7 @@ metadata:
 			ginkgo.By("rolling-update to same image controller")
 
 			debugDiscovery()
-			runKubectlRetryOrDie("rolling-update", rcName, "--update-period=1s", "--image="+httpdImage, "--image-pull-policy="+string(v1.PullIfNotPresent), nsFlag)
+			runKubectlRetryOrDie(ns, "rolling-update", rcName, "--update-period=1s", "--image="+httpdImage, "--image-pull-policy="+string(v1.PullIfNotPresent), nsFlag)
 			validateController(c, httpdImage, 1, rcName, "run="+rcName, noOpValidatorFn, ns)
 		})
 	})
@@ -1738,7 +1738,7 @@ metadata:
 
 		ginkgo.AfterEach(func() {
 			err := wait.Poll(framework.Poll, 2*time.Minute, func() (bool, error) {
-				out, err := framework.RunKubectl("delete", "deployment", dName, nsFlag)
+				out, err := framework.RunKubectl(ns, "delete", "deployment", dName, nsFlag)
 				if err != nil {
 					if strings.Contains(err.Error(), "could not find default credentials") {
 						err = nil
@@ -1757,7 +1757,7 @@ metadata:
 		*/
 		framework.ConformanceIt("should create a deployment from an image ", func() {
 			ginkgo.By("running the image " + httpdImage)
-			framework.RunKubectlOrDie("run", dName, "--image="+httpdImage, "--generator=deployment/apps.v1", nsFlag)
+			framework.RunKubectlOrDie(ns, "run", dName, "--image="+httpdImage, "--generator=deployment/apps.v1", nsFlag)
 			ginkgo.By("verifying the deployment " + dName + " was created")
 			d, err := c.AppsV1().Deployments(ns).Get(dName, metav1.GetOptions{})
 			if err != nil {
@@ -1776,7 +1776,7 @@ metadata:
 			}
 			pods := podlist.Items
 			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != httpdImage {
-				framework.RunKubectlOrDie("get", "pods", "-L", "run", nsFlag)
+				framework.RunKubectlOrDie(ns, "get", "pods", "-L", "run", nsFlag)
 				framework.Failf("Failed creating 1 pod with expected image %s. Number of pods = %v", httpdImage, len(pods))
 			}
 		})
@@ -1792,7 +1792,7 @@ metadata:
 		})
 
 		ginkgo.AfterEach(func() {
-			framework.RunKubectlOrDie("delete", "jobs", jobName, nsFlag)
+			framework.RunKubectlOrDie(ns, "delete", "jobs", jobName, nsFlag)
 		})
 
 		/*
@@ -1802,7 +1802,7 @@ metadata:
 		*/
 		framework.ConformanceIt("should create a job from an image when restart is OnFailure ", func() {
 			ginkgo.By("running the image " + httpdImage)
-			framework.RunKubectlOrDie("run", jobName, "--restart=OnFailure", "--generator=job/v1", "--image="+httpdImage, nsFlag)
+			framework.RunKubectlOrDie(ns, "run", jobName, "--restart=OnFailure", "--generator=job/v1", "--image="+httpdImage, nsFlag)
 			ginkgo.By("verifying the job " + jobName + " was created")
 			job, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
 			if err != nil {
@@ -1828,14 +1828,14 @@ metadata:
 		})
 
 		ginkgo.AfterEach(func() {
-			framework.RunKubectlOrDie("delete", "cronjobs", cjName, nsFlag)
+			framework.RunKubectlOrDie(ns, "delete", "cronjobs", cjName, nsFlag)
 		})
 
 		ginkgo.It("should create a CronJob", func() {
 			framework.SkipIfMissingResource(f.DynamicClient, cronJobGroupVersionResourceBeta, f.Namespace.Name)
 
 			schedule := "*/5 * * * ?"
-			framework.RunKubectlOrDie("run", cjName, "--restart=OnFailure", "--generator=cronjob/v1beta1",
+			framework.RunKubectlOrDie(ns, "run", cjName, "--restart=OnFailure", "--generator=cronjob/v1beta1",
 				"--schedule="+schedule, "--image="+busyboxImage, nsFlag)
 			ginkgo.By("verifying the CronJob " + cjName + " was created")
 			cj, err := c.BatchV1beta1().CronJobs(ns).Get(cjName, metav1.GetOptions{})
@@ -1865,7 +1865,7 @@ metadata:
 		})
 
 		ginkgo.AfterEach(func() {
-			framework.RunKubectlOrDie("delete", "pods", podName, nsFlag)
+			framework.RunKubectlOrDie(ns, "delete", "pods", podName, nsFlag)
 		})
 
 		/*
@@ -1875,7 +1875,7 @@ metadata:
 		*/
 		framework.ConformanceIt("should create a pod from an image when restart is Never ", func() {
 			ginkgo.By("running the image " + httpdImage)
-			framework.RunKubectlOrDie("run", podName, "--restart=Never", "--generator=run-pod/v1", "--image="+httpdImage, nsFlag)
+			framework.RunKubectlOrDie(ns, "run", podName, "--restart=Never", "--generator=run-pod/v1", "--image="+httpdImage, nsFlag)
 			ginkgo.By("verifying the pod " + podName + " was created")
 			pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
 			if err != nil {
@@ -1901,7 +1901,7 @@ metadata:
 		})
 
 		ginkgo.AfterEach(func() {
-			framework.RunKubectlOrDie("delete", "pods", podName, nsFlag)
+			framework.RunKubectlOrDie(ns, "delete", "pods", podName, nsFlag)
 		})
 
 		/*
@@ -1911,7 +1911,7 @@ metadata:
 		*/
 		framework.ConformanceIt("should update a single-container pod's image ", func() {
 			ginkgo.By("running the image " + httpdImage)
-			framework.RunKubectlOrDie("run", podName, "--generator=run-pod/v1", "--image="+httpdImage, "--labels=run="+podName, nsFlag)
+			framework.RunKubectlOrDie(ns, "run", podName, "--generator=run-pod/v1", "--image="+httpdImage, "--labels=run="+podName, nsFlag)
 
 			ginkgo.By("verifying the pod " + podName + " is running")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": podName}))
@@ -1921,14 +1921,14 @@ metadata:
 			}
 
 			ginkgo.By("verifying the pod " + podName + " was created")
-			podJSON := framework.RunKubectlOrDie("get", "pod", podName, nsFlag, "-o", "json")
+			podJSON := framework.RunKubectlOrDie(ns, "get", "pod", podName, nsFlag, "-o", "json")
 			if !strings.Contains(podJSON, podName) {
 				framework.Failf("Failed to find pod %s in [%s]", podName, podJSON)
 			}
 
 			ginkgo.By("replace the image in the pod")
 			podJSON = strings.Replace(podJSON, httpdImage, busyboxImage, 1)
-			framework.RunKubectlOrDieInput(podJSON, "replace", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, podJSON, "replace", "-f", "-", nsFlag)
 
 			ginkgo.By("verifying the pod " + podName + " has the right image " + busyboxImage)
 			pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
@@ -1956,10 +1956,10 @@ metadata:
 			ginkgo.By("executing a command with run --rm and attach with stdin")
 			t := time.NewTimer(runJobTimeout)
 			defer t.Stop()
-			runOutput := framework.NewKubectlCommand(nsFlag, "run", jobName, "--image="+busyboxImage, "--rm=true", "--generator=job/v1", "--restart=OnFailure", "--attach=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
+			runOutput := framework.NewKubectlCommand(ns, nsFlag, "run", jobName, "--image="+busyboxImage, "--rm=true", "--generator=job/v1", "--restart=OnFailure", "--attach=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				WithStdinData("abcd1234").
 				WithTimeout(t.C).
-				ExecOrDie()
+				ExecOrDie(ns)
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("abcd1234"))
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
 
@@ -1982,7 +1982,7 @@ metadata:
 		*/
 		framework.ConformanceIt("should support proxy with --port 0 ", func() {
 			ginkgo.By("starting the proxy server")
-			port, cmd, err := startProxyServer()
+			port, cmd, err := startProxyServer(ns)
 			if cmd != nil {
 				defer framework.TryKill(cmd)
 			}
@@ -2014,7 +2014,7 @@ metadata:
 			path := filepath.Join(tmpdir, "test")
 			defer os.Remove(path)
 			defer os.Remove(tmpdir)
-			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath)
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 			cmd := tk.KubectlCmd("proxy", fmt.Sprintf("--unix-socket=%s", path))
 			stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
 			if err != nil {
@@ -2048,11 +2048,11 @@ metadata:
 			nodeName := scheduling.GetNodeThatCanRunPod(f)
 
 			ginkgo.By("adding the taint " + testTaint.ToString() + " to a node")
-			runKubectlRetryOrDie("taint", "nodes", nodeName, testTaint.ToString())
+			runKubectlRetryOrDie(ns, "taint", "nodes", nodeName, testTaint.ToString())
 			defer framework.RemoveTaintOffNode(f.ClientSet, nodeName, testTaint)
 
 			ginkgo.By("verifying the node has the taint " + testTaint.ToString())
-			output := runKubectlRetryOrDie("describe", "node", nodeName)
+			output := runKubectlRetryOrDie(ns, "describe", "node", nodeName)
 			requiredStrings := [][]string{
 				{"Name:", nodeName},
 				{"Taints:"},
@@ -2061,9 +2061,9 @@ metadata:
 			checkOutput(output, requiredStrings)
 
 			ginkgo.By("removing the taint " + testTaint.ToString() + " of a node")
-			runKubectlRetryOrDie("taint", "nodes", nodeName, testTaint.Key+":"+string(testTaint.Effect)+"-")
+			runKubectlRetryOrDie(ns, "taint", "nodes", nodeName, testTaint.Key+":"+string(testTaint.Effect)+"-")
 			ginkgo.By("verifying the node doesn't have the taint " + testTaint.Key)
-			output = runKubectlRetryOrDie("describe", "node", nodeName)
+			output = runKubectlRetryOrDie(ns, "describe", "node", nodeName)
 			if strings.Contains(output, testTaint.Key) {
 				framework.Failf("Failed removing taint " + testTaint.Key + " of the node " + nodeName)
 			}
@@ -2079,11 +2079,11 @@ metadata:
 			nodeName := scheduling.GetNodeThatCanRunPod(f)
 
 			ginkgo.By("adding the taint " + testTaint.ToString() + " to a node")
-			runKubectlRetryOrDie("taint", "nodes", nodeName, testTaint.ToString())
+			runKubectlRetryOrDie(ns, "taint", "nodes", nodeName, testTaint.ToString())
 			defer framework.RemoveTaintOffNode(f.ClientSet, nodeName, testTaint)
 
 			ginkgo.By("verifying the node has the taint " + testTaint.ToString())
-			output := runKubectlRetryOrDie("describe", "node", nodeName)
+			output := runKubectlRetryOrDie(ns, "describe", "node", nodeName)
 			requiredStrings := [][]string{
 				{"Name:", nodeName},
 				{"Taints:"},
@@ -2097,11 +2097,11 @@ metadata:
 				Effect: v1.TaintEffectPreferNoSchedule,
 			}
 			ginkgo.By("adding another taint " + newTestTaint.ToString() + " to the node")
-			runKubectlRetryOrDie("taint", "nodes", nodeName, newTestTaint.ToString())
+			runKubectlRetryOrDie(ns, "taint", "nodes", nodeName, newTestTaint.ToString())
 			defer framework.RemoveTaintOffNode(f.ClientSet, nodeName, newTestTaint)
 
 			ginkgo.By("verifying the node has the taint " + newTestTaint.ToString())
-			output = runKubectlRetryOrDie("describe", "node", nodeName)
+			output = runKubectlRetryOrDie(ns, "describe", "node", nodeName)
 			requiredStrings = [][]string{
 				{"Name:", nodeName},
 				{"Taints:"},
@@ -2115,11 +2115,11 @@ metadata:
 				Effect: v1.TaintEffectNoExecute,
 			}
 			ginkgo.By("adding NoExecute taint " + noExecuteTaint.ToString() + " to the node")
-			runKubectlRetryOrDie("taint", "nodes", nodeName, noExecuteTaint.ToString())
+			runKubectlRetryOrDie(ns, "taint", "nodes", nodeName, noExecuteTaint.ToString())
 			defer framework.RemoveTaintOffNode(f.ClientSet, nodeName, noExecuteTaint)
 
 			ginkgo.By("verifying the node has the taint " + noExecuteTaint.ToString())
-			output = runKubectlRetryOrDie("describe", "node", nodeName)
+			output = runKubectlRetryOrDie(ns, "describe", "node", nodeName)
 			requiredStrings = [][]string{
 				{"Name:", nodeName},
 				{"Taints:"},
@@ -2128,9 +2128,9 @@ metadata:
 			checkOutput(output, requiredStrings)
 
 			ginkgo.By("removing all taints that have the same key " + testTaint.Key + " of the node")
-			runKubectlRetryOrDie("taint", "nodes", nodeName, testTaint.Key+"-")
+			runKubectlRetryOrDie(ns, "taint", "nodes", nodeName, testTaint.Key+"-")
 			ginkgo.By("verifying the node doesn't have the taints that have the same key " + testTaint.Key)
-			output = runKubectlRetryOrDie("describe", "node", nodeName)
+			output = runKubectlRetryOrDie(ns, "describe", "node", nodeName)
 			if strings.Contains(output, testTaint.Key) {
 				framework.Failf("Failed removing taints " + testTaint.Key + " of the node " + nodeName)
 			}
@@ -2143,7 +2143,7 @@ metadata:
 			quotaName := "million"
 
 			ginkgo.By("calling kubectl quota")
-			framework.RunKubectlOrDie("create", "quota", quotaName, "--hard=pods=1000000,services=1000000", nsFlag)
+			framework.RunKubectlOrDie(ns, "create", "quota", quotaName, "--hard=pods=1000000,services=1000000", nsFlag)
 
 			ginkgo.By("verifying that the quota was created")
 			quota, err := c.CoreV1().ResourceQuotas(ns).Get(quotaName, metav1.GetOptions{})
@@ -2172,7 +2172,7 @@ metadata:
 			quotaName := "scopes"
 
 			ginkgo.By("calling kubectl quota")
-			framework.RunKubectlOrDie("create", "quota", quotaName, "--hard=pods=1000000", "--scopes=BestEffort,NotTerminating", nsFlag)
+			framework.RunKubectlOrDie(ns, "create", "quota", quotaName, "--hard=pods=1000000", "--scopes=BestEffort,NotTerminating", nsFlag)
 
 			ginkgo.By("verifying that the quota was created")
 			quota, err := c.CoreV1().ResourceQuotas(ns).Get(quotaName, metav1.GetOptions{})
@@ -2200,7 +2200,7 @@ metadata:
 			quotaName := "scopes"
 
 			ginkgo.By("calling kubectl quota")
-			out, err := framework.RunKubectl("create", "quota", quotaName, "--hard=hard=pods=1000000", "--scopes=Foo", nsFlag)
+			out, err := framework.RunKubectl(ns, "create", "quota", quotaName, "--hard=hard=pods=1000000", "--scopes=Foo", nsFlag)
 			if err == nil {
 				framework.Failf("Expected kubectl to fail, but it succeeded: %s", out)
 			}
@@ -2235,10 +2235,10 @@ func checkOutput(output string, required [][]string) {
 	}
 }
 
-func checkKubectlOutputWithRetry(required [][]string, args ...string) {
+func checkKubectlOutputWithRetry(namespace string, required [][]string, args ...string) {
 	var pollErr error
 	wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-		output := framework.RunKubectlOrDie(args...)
+		output := framework.RunKubectlOrDie(namespace, args...)
 		err := checkOutputReturnError(output, required)
 		if err != nil {
 			pollErr = err
@@ -2269,9 +2269,9 @@ func getAPIVersions(apiEndpoint string) (*metav1.APIVersions, error) {
 	return &apiVersions, nil
 }
 
-func startProxyServer() (int, *exec.Cmd, error) {
+func startProxyServer(ns string) (int, *exec.Cmd, error) {
 	// Specifying port 0 indicates we want the os to pick a random port.
-	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath)
+	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 	cmd := tk.KubectlCmd("proxy", "-p", "0", "--disable-filter")
 	stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
 	if err != nil {
@@ -2511,17 +2511,17 @@ func startLocalProxy() (srv *httptest.Server, logs *bytes.Buffer) {
 func createApplyCustomResource(resource, namespace, name string, crd *crd.TestCrd) error {
 	ns := fmt.Sprintf("--namespace=%v", namespace)
 	ginkgo.By("successfully create CR")
-	if _, err := framework.RunKubectlInput(resource, ns, "create", "--validate=true", "-f", "-"); err != nil {
+	if _, err := framework.RunKubectlInput(namespace, resource, ns, "create", "--validate=true", "-f", "-"); err != nil {
 		return fmt.Errorf("failed to create CR %s in namespace %s: %v", resource, ns, err)
 	}
-	if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, name); err != nil {
+	if _, err := framework.RunKubectl(namespace, ns, "delete", crd.Crd.Spec.Names.Plural, name); err != nil {
 		return fmt.Errorf("failed to delete CR %s: %v", name, err)
 	}
 	ginkgo.By("successfully apply CR")
-	if _, err := framework.RunKubectlInput(resource, ns, "apply", "--validate=true", "-f", "-"); err != nil {
+	if _, err := framework.RunKubectlInput(namespace, resource, ns, "apply", "--validate=true", "-f", "-"); err != nil {
 		return fmt.Errorf("failed to apply CR %s in namespace %s: %v", resource, ns, err)
 	}
-	if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, name); err != nil {
+	if _, err := framework.RunKubectl(namespace, ns, "delete", crd.Crd.Spec.Names.Plural, name); err != nil {
 		return fmt.Errorf("failed to delete CR %s: %v", name, err)
 	}
 	return nil
@@ -2556,7 +2556,7 @@ func validateController(c clientset.Interface, containerImage string, replicas i
 	ginkgo.By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
 waitLoop:
 	for start := time.Now(); time.Since(start) < framework.PodStartTimeout; time.Sleep(5 * time.Second) {
-		getPodsOutput := framework.RunKubectlOrDie("get", "pods", "-o", "template", getPodsTemplate, "-l", testname, fmt.Sprintf("--namespace=%v", ns))
+		getPodsOutput := framework.RunKubectlOrDie(ns, "get", "pods", "-o", "template", getPodsTemplate, "-l", testname, fmt.Sprintf("--namespace=%v", ns))
 		pods := strings.Fields(getPodsOutput)
 		if numPods := len(pods); numPods != replicas {
 			ginkgo.By(fmt.Sprintf("Replicas for %s: expected=%d actual=%d", testname, replicas, numPods))
@@ -2564,13 +2564,13 @@ waitLoop:
 		}
 		var runningPods []string
 		for _, podID := range pods {
-			running := framework.RunKubectlOrDie("get", "pods", podID, "-o", "template", getContainerStateTemplate, fmt.Sprintf("--namespace=%v", ns))
+			running := framework.RunKubectlOrDie(ns, "get", "pods", podID, "-o", "template", getContainerStateTemplate, fmt.Sprintf("--namespace=%v", ns))
 			if running != "true" {
 				framework.Logf("%s is created but not running", podID)
 				continue waitLoop
 			}
 
-			currentImage := framework.RunKubectlOrDie("get", "pods", podID, "-o", "template", getImageTemplate, fmt.Sprintf("--namespace=%v", ns))
+			currentImage := framework.RunKubectlOrDie(ns, "get", "pods", podID, "-o", "template", getImageTemplate, fmt.Sprintf("--namespace=%v", ns))
 			currentImage = trimDockerRegistry(currentImage)
 			if currentImage != containerImage {
 				framework.Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, containerImage, currentImage)
@@ -2616,13 +2616,13 @@ func deleteObj(client dynamic.ResourceInterface, name string) {
 // createObjValidateOutputAndCleanup creates an object using the provided client
 // and then verifies that the kubectl get output provides custom columns. Once
 // the test has completed, it deletes the object.
-func createObjValidateOutputAndCleanup(client dynamic.ResourceInterface, obj *unstructured.Unstructured, resource metav1.APIResource) {
+func createObjValidateOutputAndCleanup(namespace string, client dynamic.ResourceInterface, obj *unstructured.Unstructured, resource metav1.APIResource) {
 	_, err := client.Create(obj, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	defer deleteObj(client, obj.GetName())
 
 	// get test resource
-	output := framework.RunKubectlOrDie("get", resource.Name, "--all-namespaces")
+	output := framework.RunKubectlOrDie(namespace, "get", resource.Name, "--all-namespaces")
 	if output == "" {
 		framework.Failf("No stdout from kubectl get for %s (likely need to define test resources)", resource.Name)
 	}

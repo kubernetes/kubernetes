@@ -195,7 +195,7 @@ func getNodeMemory(f *framework.Framework) nodeMemory {
 
 	nodeName := nodeList.Items[0].ObjectMeta.Name
 
-	kubeletConfig, err := getCurrentKubeletConfig(nodeName)
+	kubeletConfig, err := getCurrentKubeletConfig(nodeName, f.Namespace.Name)
 	framework.ExpectNoError(err)
 
 	systemReserve, err := resource.ParseQuantity(kubeletConfig.SystemReserved["memory"])
@@ -250,9 +250,9 @@ func getTotalAllocatableMemory(f *framework.Framework) *resource.Quantity {
 }
 
 // getCurrentKubeletConfig modified from test/e2e_node/util.go
-func getCurrentKubeletConfig(nodeName string) (*kubeletconfig.KubeletConfiguration, error) {
+func getCurrentKubeletConfig(nodeName, namespace string) (*kubeletconfig.KubeletConfiguration, error) {
 
-	resp := pollConfigz(5*time.Minute, 5*time.Second, nodeName)
+	resp := pollConfigz(5*time.Minute, 5*time.Second, nodeName, namespace)
 	kubeCfg, err := decodeConfigz(resp)
 	if err != nil {
 		return nil, err
@@ -261,10 +261,10 @@ func getCurrentKubeletConfig(nodeName string) (*kubeletconfig.KubeletConfigurati
 }
 
 // Causes the test to fail, or returns a status 200 response from the /configz endpoint
-func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName string) *http.Response {
+func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, namespace string) *http.Response {
 	// start local proxy, so we can send graceful deletion over query string, rather than body parameter
 	ginkgo.By("Opening proxy to cluster")
-	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath)
+	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
 	cmd := tk.KubectlCmd("proxy", "-p", "0")
 	stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
 	framework.ExpectNoError(err)
