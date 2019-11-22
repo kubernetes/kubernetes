@@ -13,6 +13,9 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
         "//test/utils:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
+        "//test/e2e/framework/log:go_default_library",
+        "//vendor/github.com/onsi/ginkgo:go_default_library",
     ],
 )
 

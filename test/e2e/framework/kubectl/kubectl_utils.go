@@ -17,10 +17,12 @@ limitations under the License.
 package kubectl
 
 import (
+	"bytes"
 	"fmt"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,25 +31,34 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+
+	"github.com/onsi/ginkgo"
 )
 
-// TestKubeconfig is a struct containing the minimum attributes needed to run KubectlCmd.
+const (
+	maxKubectlExecRetries = 5
+)
+
+// TestKubeconfig is a struct containing the needed attributes from TestContext and Framework(Namespace).
 type TestKubeconfig struct {
 	CertDir     string
 	Host        string
 	KubeConfig  string
 	KubeContext string
 	KubectlPath string
+	Namespace   string // Every test has at least one namespace unless creation is skipped
 }
 
 // NewTestKubeconfig returns a new Kubeconfig struct instance.
-func NewTestKubeconfig(certdir string, host string, kubeconfig string, kubecontext string, kubectlpath string) *TestKubeconfig {
+func NewTestKubeconfig(certdir, host, kubeconfig, kubecontext, kubectlpath, namespace string) *TestKubeconfig {
 	return &TestKubeconfig{
 		CertDir:     certdir,
 		Host:        host,
 		KubeConfig:  kubeconfig,
 		KubeContext: kubecontext,
 		KubectlPath: kubectlpath,
+		Namespace:   namespace,
 	}
 }
 
@@ -115,4 +126,78 @@ func kubectlLogPod(c clientset.Interface, pod v1.Pod, containerNameSubstr string
 			logFunc("%s : STARTLOG\n%s\nENDLOG for container %v:%v:%v", containerNameSubstr, logs, pod.Namespace, pod.Name, container.Name)
 		}
 	}
+}
+
+// WriteFileViaContainer writes a file using kubectl exec echo <contents> > <path> via specified container
+// because of the primitive technique we're using here, we only allow ASCII alphanumeric characters
+func (tk *TestKubeconfig) WriteFileViaContainer(podName, containerName string, path string, contents string) error {
+	ginkgo.By("writing a file in the container")
+	allowedCharacters := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	for _, c := range contents {
+		if !strings.ContainsRune(allowedCharacters, c) {
+			return fmt.Errorf("Unsupported character in string to write: %v", c)
+		}
+	}
+	command := fmt.Sprintf("echo '%s' > '%s'; sync", contents, path)
+	stdout, stderr, err := tk.kubectlExecWithRetry(tk.Namespace, podName, containerName, "--", "/bin/sh", "-c", command)
+	if err != nil {
+		e2elog.Logf("error running kubectl exec to write file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
+	}
+	return err
+}
+
+// ReadFileViaContainer reads a file using kubectl exec cat <path>.
+func (tk *TestKubeconfig) ReadFileViaContainer(podName, containerName string, path string) (string, error) {
+	ginkgo.By("reading a file in the container")
+
+	stdout, stderr, err := tk.kubectlExecWithRetry(tk.Namespace, podName, containerName, "--", "cat", path)
+	if err != nil {
+		e2elog.Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
+	}
+	return string(stdout), err
+}
+
+func (tk *TestKubeconfig) kubectlExecWithRetry(namespace string, podName, containerName string, args ...string) ([]byte, []byte, error) {
+	for numRetries := 0; numRetries < maxKubectlExecRetries; numRetries++ {
+		if numRetries > 0 {
+			e2elog.Logf("Retrying kubectl exec (retry count=%v/%v)", numRetries+1, maxKubectlExecRetries)
+		}
+
+		stdOutBytes, stdErrBytes, err := tk.kubectlExec(namespace, podName, containerName, args...)
+		if err != nil {
+			if strings.Contains(strings.ToLower(string(stdErrBytes)), "i/o timeout") {
+				// Retry on "i/o timeout" errors
+				e2elog.Logf("Warning: kubectl exec encountered i/o timeout.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
+				continue
+			}
+			if strings.Contains(strings.ToLower(string(stdErrBytes)), "container not found") {
+				// Retry on "container not found" errors
+				e2elog.Logf("Warning: kubectl exec encountered container not found.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
+				time.Sleep(2 * time.Second)
+				continue
+			}
+		}
+
+		return stdOutBytes, stdErrBytes, err
+	}
+	err := fmt.Errorf("Failed: kubectl exec failed %d times with \"i/o timeout\". Giving up", maxKubectlExecRetries)
+	return nil, nil, err
+}
+
+func (tk *TestKubeconfig) kubectlExec(namespace string, podName, containerName string, args ...string) ([]byte, []byte, error) {
+	var stdout, stderr bytes.Buffer
+	cmdArgs := []string{
+		"exec",
+		fmt.Sprintf("--namespace=%v", namespace),
+		podName,
+		fmt.Sprintf("-c=%v", containerName),
+	}
+	cmdArgs = append(cmdArgs, args...)
+
+	cmd := tk.KubectlCmd(cmdArgs...)
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+
+	e2elog.Logf("Running '%s %s'", cmd.Path, strings.Join(cmdArgs, " "))
+	err := cmd.Run()
+	return stdout.Bytes(), stderr.Bytes(), err
 }
