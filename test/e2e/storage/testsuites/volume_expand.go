@@ -54,33 +54,33 @@ var _ TestSuite = &volumeExpandTestSuite{}
 func InitVolumeExpandTestSuite() TestSuite {
 	return &volumeExpandTestSuite{
 		tsInfo: TestSuiteInfo{
-			name: "volume-expand",
-			testPatterns: []testpatterns.TestPattern{
+			Name: "volume-expand",
+			TestPatterns: []testpatterns.TestPattern{
 				testpatterns.DefaultFsDynamicPV,
 				testpatterns.BlockVolModeDynamicPV,
 				testpatterns.DefaultFsDynamicPVAllowExpansion,
 				testpatterns.BlockVolModeDynamicPVAllowExpansion,
 			},
-			supportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: volume.SizeRange{
 				Min: "1Mi",
 			},
 		},
 	}
 }
 
-func (v *volumeExpandTestSuite) getTestSuiteInfo() TestSuiteInfo {
+func (v *volumeExpandTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return v.tsInfo
 }
 
-func (v *volumeExpandTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (v *volumeExpandTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
-func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config        *PerTestConfig
 		driverCleanup func()
 
-		resource *genericVolumeTestResource
+		resource *VolumeResource
 		pod      *v1.Pod
 		pod2     *v1.Pod
 
@@ -111,8 +111,8 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, driver.GetDriverInfo().InTreePluginName)
-		testVolumeSizeRange := v.getTestSuiteInfo().supportedSizeRange
-		l.resource = createGenericVolumeTestResource(driver, l.config, pattern, testVolumeSizeRange)
+		testVolumeSizeRange := v.GetTestSuiteInfo().SupportedSizeRange
+		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 	}
 
 	cleanup := func() {
@@ -132,7 +132,7 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 		}
 
 		if l.resource != nil {
-			errs = append(errs, l.resource.cleanupResource())
+			errs = append(errs, l.resource.CleanupResource())
 			l.resource = nil
 		}
 
@@ -148,13 +148,13 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 			defer cleanup()
 
 			var err error
-			gomega.Expect(l.resource.sc.AllowVolumeExpansion).To(gomega.BeNil())
+			gomega.Expect(l.resource.Sc.AllowVolumeExpansion).To(gomega.BeNil())
 			ginkgo.By("Expanding non-expandable pvc")
-			currentPvcSize := l.resource.pvc.Spec.Resources.Requests[v1.ResourceStorage]
+			currentPvcSize := l.resource.Pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			newSize := currentPvcSize.DeepCopy()
 			newSize.Add(resource.MustParse("1Gi"))
 			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
-			_, err = ExpandPVCSize(l.resource.pvc, newSize, f.ClientSet)
+			_, err = ExpandPVCSize(l.resource.Pvc, newSize, f.ClientSet)
 			framework.ExpectError(err, "While updating non-expandable PVC")
 		})
 	} else {
@@ -164,7 +164,7 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 			var err error
 			ginkgo.By("Creating a pod with dynamically provisioned volume")
-			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
+			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
 			defer func() {
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod)
 				framework.ExpectNoError(err, "while cleaning up pod already deleted in resize test")
@@ -177,31 +177,31 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 			// We expand the PVC while no pod is using it to ensure offline expansion
 			ginkgo.By("Expanding current pvc")
-			currentPvcSize := l.resource.pvc.Spec.Resources.Requests[v1.ResourceStorage]
+			currentPvcSize := l.resource.Pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			newSize := currentPvcSize.DeepCopy()
 			newSize.Add(resource.MustParse("1Gi"))
 			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
-			newPVC, err := ExpandPVCSize(l.resource.pvc, newSize, f.ClientSet)
+			newPVC, err := ExpandPVCSize(l.resource.Pvc, newSize, f.ClientSet)
 			framework.ExpectNoError(err, "While updating pvc for more size")
-			l.resource.pvc = newPVC
-			gomega.Expect(l.resource.pvc).NotTo(gomega.BeNil())
+			l.resource.Pvc = newPVC
+			gomega.Expect(l.resource.Pvc).NotTo(gomega.BeNil())
 
-			pvcSize := l.resource.pvc.Spec.Resources.Requests[v1.ResourceStorage]
+			pvcSize := l.resource.Pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			if pvcSize.Cmp(newSize) != 0 {
-				framework.Failf("error updating pvc size %q", l.resource.pvc.Name)
+				framework.Failf("error updating pvc size %q", l.resource.Pvc.Name)
 			}
 
 			ginkgo.By("Waiting for cloudprovider resize to finish")
-			err = WaitForControllerVolumeResize(l.resource.pvc, f.ClientSet, totalResizeWaitPeriod)
+			err = WaitForControllerVolumeResize(l.resource.Pvc, f.ClientSet, totalResizeWaitPeriod)
 			framework.ExpectNoError(err, "While waiting for pvc resize to finish")
 
 			ginkgo.By("Checking for conditions on pvc")
-			npvc, err := WaitForPendingFSResizeCondition(l.resource.pvc, f.ClientSet)
+			npvc, err := WaitForPendingFSResizeCondition(l.resource.Pvc, f.ClientSet)
 			framework.ExpectNoError(err, "While waiting for pvc to have fs resizing condition")
-			l.resource.pvc = npvc
+			l.resource.Pvc = npvc
 
 			ginkgo.By("Creating a new pod with same volume")
-			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
+			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
 			defer func() {
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod2)
 				framework.ExpectNoError(err, "while cleaning up pod before exiting resizing test")
@@ -209,10 +209,10 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 			framework.ExpectNoError(err, "while recreating pod for resizing")
 
 			ginkgo.By("Waiting for file system resize to finish")
-			l.resource.pvc, err = WaitForFSResize(l.resource.pvc, f.ClientSet)
+			l.resource.Pvc, err = WaitForFSResize(l.resource.Pvc, f.ClientSet)
 			framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
-			pvcConditions := l.resource.pvc.Status.Conditions
+			pvcConditions := l.resource.Pvc.Status.Conditions
 			framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
 		})
 
@@ -222,7 +222,7 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 			var err error
 			ginkgo.By("Creating a pod with dynamically provisioned volume")
-			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
+			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
 			defer func() {
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod)
 				framework.ExpectNoError(err, "while cleaning up pod already deleted in resize test")
@@ -231,29 +231,29 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 			// We expand the PVC while no pod is using it to ensure offline expansion
 			ginkgo.By("Expanding current pvc")
-			currentPvcSize := l.resource.pvc.Spec.Resources.Requests[v1.ResourceStorage]
+			currentPvcSize := l.resource.Pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			newSize := currentPvcSize.DeepCopy()
 			newSize.Add(resource.MustParse("1Gi"))
 			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
-			newPVC, err := ExpandPVCSize(l.resource.pvc, newSize, f.ClientSet)
+			newPVC, err := ExpandPVCSize(l.resource.Pvc, newSize, f.ClientSet)
 			framework.ExpectNoError(err, "While updating pvc for more size")
-			l.resource.pvc = newPVC
-			gomega.Expect(l.resource.pvc).NotTo(gomega.BeNil())
+			l.resource.Pvc = newPVC
+			gomega.Expect(l.resource.Pvc).NotTo(gomega.BeNil())
 
-			pvcSize := l.resource.pvc.Spec.Resources.Requests[v1.ResourceStorage]
+			pvcSize := l.resource.Pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			if pvcSize.Cmp(newSize) != 0 {
-				framework.Failf("error updating pvc size %q", l.resource.pvc.Name)
+				framework.Failf("error updating pvc size %q", l.resource.Pvc.Name)
 			}
 
 			ginkgo.By("Waiting for cloudprovider resize to finish")
-			err = WaitForControllerVolumeResize(l.resource.pvc, f.ClientSet, totalResizeWaitPeriod)
+			err = WaitForControllerVolumeResize(l.resource.Pvc, f.ClientSet, totalResizeWaitPeriod)
 			framework.ExpectNoError(err, "While waiting for pvc resize to finish")
 
 			ginkgo.By("Waiting for file system resize to finish")
-			l.resource.pvc, err = WaitForFSResize(l.resource.pvc, f.ClientSet)
+			l.resource.Pvc, err = WaitForFSResize(l.resource.Pvc, f.ClientSet)
 			framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
-			pvcConditions := l.resource.pvc.Status.Conditions
+			pvcConditions := l.resource.Pvc.Status.Conditions
 			framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
 		})
 

@@ -56,25 +56,25 @@ var _ TestSuite = &snapshottableTestSuite{}
 func InitSnapshottableTestSuite() TestSuite {
 	return &snapshottableTestSuite{
 		tsInfo: TestSuiteInfo{
-			name: "snapshottable",
-			testPatterns: []testpatterns.TestPattern{
+			Name: "snapshottable",
+			TestPatterns: []testpatterns.TestPattern{
 				testpatterns.DynamicSnapshot,
 			},
-			supportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: volume.SizeRange{
 				Min: "1Mi",
 			},
 		},
 	}
 }
 
-func (s *snapshottableTestSuite) getTestSuiteInfo() TestSuiteInfo {
+func (s *snapshottableTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *snapshottableTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *snapshottableTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
-func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	var (
 		sDriver SnapshottableTestDriver
 		dDriver DynamicPVTestDriver
@@ -117,7 +117,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		if class == nil {
 			framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
 		}
-		testVolumeSizeRange := s.getTestSuiteInfo().supportedSizeRange
+		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
 		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
 		claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
 		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)

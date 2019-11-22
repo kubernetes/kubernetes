@@ -63,35 +63,35 @@ var _ TestSuite = &volumeIOTestSuite{}
 func InitVolumeIOTestSuite() TestSuite {
 	return &volumeIOTestSuite{
 		tsInfo: TestSuiteInfo{
-			name: "volumeIO",
-			testPatterns: []testpatterns.TestPattern{
+			Name: "volumeIO",
+			TestPatterns: []testpatterns.TestPattern{
 				testpatterns.DefaultFsInlineVolume,
 				testpatterns.DefaultFsPreprovisionedPV,
 				testpatterns.DefaultFsDynamicPV,
 			},
-			supportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: volume.SizeRange{
 				Min: "1Mi",
 			},
 		},
 	}
 }
 
-func (t *volumeIOTestSuite) getTestSuiteInfo() TestSuiteInfo {
+func (t *volumeIOTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeIOTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeIOTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
 	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(
 		testpatterns.PreprovisionedPV,
 		testpatterns.InlineVolume))
 }
 
-func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeIOTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config        *PerTestConfig
 		driverCleanup func()
 
-		resource *genericVolumeTestResource
+		resource *VolumeResource
 
 		intreeOps   opCounts
 		migratedOps opCounts
@@ -116,9 +116,9 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
 
-		testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
-		l.resource = createGenericVolumeTestResource(driver, l.config, pattern, testVolumeSizeRange)
-		if l.resource.volSource == nil {
+		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
+		if l.resource.VolSource == nil {
 			framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 		}
 
@@ -127,7 +127,7 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 	cleanup := func() {
 		var errs []error
 		if l.resource != nil {
-			errs = append(errs, l.resource.cleanupResource())
+			errs = append(errs, l.resource.CleanupResource())
 			l.resource = nil
 		}
 
@@ -155,7 +155,7 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 		podSec := v1.PodSecurityContext{
 			FSGroup: fsGroup,
 		}
-		err := testVolumeIO(f, cs, convertTestConfig(l.config), *l.resource.volSource, &podSec, testFile, fileSizes)
+		err := testVolumeIO(f, cs, convertTestConfig(l.config), *l.resource.VolSource, &podSec, testFile, fileSizes)
 		framework.ExpectNoError(err)
 	})
 }
