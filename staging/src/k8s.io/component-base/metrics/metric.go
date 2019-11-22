@@ -102,8 +102,7 @@ func (r *lazyMetric) determineDeprecationStatus(version semver.Version) {
 			return
 		}
 		if shouldHide(&version, selfVersion) {
-			// TODO(RainbowMango): Remove this log temporarily. https://github.com/kubernetes/kubernetes/issues/85369
-			// klog.Warningf("This metric has been deprecated for more than one release, hiding.")
+			klog.Warningf("This metric has been deprecated for more than one release, hiding.")
 			r.isHidden = true
 		}
 	})

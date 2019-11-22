@@ -73,6 +73,7 @@ func TestAddFlags(t *testing.T) {
 		"--cluster-signing-cert-file=/cluster-signing-cert",
 		"--cluster-signing-key-file=/cluster-signing-key",
 		"--concurrent-deployment-syncs=10",
+		"--concurrent-job-syncs=10",
 		"--concurrent-statefulset-syncs=15",
 		"--concurrent-endpoint-syncs=10",
 		"--concurrent-service-endpoint-syncs=10",
@@ -270,7 +271,7 @@ func TestAddFlags(t *testing.T) {
 		},
 		JobController: &JobControllerOptions{
 			&jobconfig.JobControllerConfiguration{
-				ConcurrentJobSyncs: 5,
+				ConcurrentJobSyncs: 10,
 			},
 		},
 		NamespaceController: &NamespaceControllerOptions{
