@@ -45,8 +45,8 @@ var _ TestSuite = &ephemeralTestSuite{}
 func InitEphemeralTestSuite() TestSuite {
 	return &ephemeralTestSuite{
 		tsInfo: TestSuiteInfo{
-			name: "ephemeral",
-			testPatterns: []testpatterns.TestPattern{
+			Name: "ephemeral",
+			TestPatterns: []testpatterns.TestPattern{
 				{
 					Name:    "inline ephemeral CSI volume",
 					VolType: testpatterns.CSIInlineVolume,
@@ -56,14 +56,14 @@ func InitEphemeralTestSuite() TestSuite {
 	}
 }
 
-func (p *ephemeralTestSuite) getTestSuiteInfo() TestSuiteInfo {
+func (p *ephemeralTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return p.tsInfo
 }
 
-func (p *ephemeralTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (p *ephemeralTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
-func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config        *PerTestConfig
 		driverCleanup func()
