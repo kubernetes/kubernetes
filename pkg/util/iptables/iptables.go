@@ -33,14 +33,17 @@ import (
 	utiltrace "k8s.io/utils/trace"
 )
 
+// RulePosition holds the -I/-A flags for iptable
 type RulePosition string
 
 const (
+	// Prepend is the insert flag for iptable
 	Prepend RulePosition = "-I"
-	Append  RulePosition = "-A"
+	// Append is the append flag for iptable
+	Append RulePosition = "-A"
 )
 
-// An injectable interface for running iptables commands.  Implementations must be goroutine-safe.
+// Interface is an injectable interface for running iptables commands.  Implementations must be goroutine-safe.
 type Interface interface {
 	// EnsureChain checks if the specified chain exists and, if not, creates it.  If the chain existed, return true.
 	EnsureChain(table Table, chain Chain) (bool, error)
@@ -83,29 +86,42 @@ type Interface interface {
 	HasRandomFully() bool
 }
 
+// Protocol defines the ip protocol either ipv4 or ipv6
 type Protocol byte
 
 const (
+	// ProtocolIpv4 represents ipv4 protocol in iptables
 	ProtocolIpv4 Protocol = iota + 1
+	// ProtocolIpv6 represents ipv6 protocol in iptables
 	ProtocolIpv6
 )
 
+// Table represents different iptable like filter,nat, mangle and raw
 type Table string
 
 const (
-	TableNAT    Table = "nat"
+	// TableNAT represents the built-in nat table
+	TableNAT Table = "nat"
+	// TableFilter represents the built-in filter table
 	TableFilter Table = "filter"
+	// TableMangle represents the built-in mangle table
 	TableMangle Table = "mangle"
 )
 
+// Chain represents the different rules
 type Chain string
 
 const (
+	// ChainPostrouting used for source NAT in nat table
 	ChainPostrouting Chain = "POSTROUTING"
-	ChainPrerouting  Chain = "PREROUTING"
-	ChainOutput      Chain = "OUTPUT"
-	ChainInput       Chain = "INPUT"
-	ChainForward     Chain = "FORWARD"
+	// ChainPrerouting used for DNAT (destination NAT) in nat table
+	ChainPrerouting Chain = "PREROUTING"
+	// ChainOutput used for the packets going out from local
+	ChainOutput Chain = "OUTPUT"
+	// ChainInput used for incoming packets
+	ChainInput Chain = "INPUT"
+	// ChainForward used for the packets for another NIC
+	ChainForward Chain = "FORWARD"
 )
 
 const (
@@ -117,32 +133,49 @@ const (
 	cmdIP6Tables        string = "ip6tables"
 )
 
-// Option flag for Restore
+// RestoreCountersFlag is an option flag for Restore
 type RestoreCountersFlag bool
 
+// RestoreCounters a boolean true constant for the option flag RestoreCountersFlag
 const RestoreCounters RestoreCountersFlag = true
+
+// NoRestoreCounters a boolean false constant for the option flag RestoreCountersFlag
 const NoRestoreCounters RestoreCountersFlag = false
 
-// Option flag for Flush
+// FlushFlag an option flag for Flush
 type FlushFlag bool
 
+// FlushTables a boolean true constant for option flag FlushFlag
 const FlushTables FlushFlag = true
+
+// NoFlushTables a boolean false constant for option flag FlushFlag
 const NoFlushTables FlushFlag = false
 
+// MinCheckVersion minimum version to be checked
 // Versions of iptables less than this do not support the -C / --check flag
 // (test whether a rule exists).
 var MinCheckVersion = utilversion.MustParseGeneric("1.4.11")
 
+// RandomFullyMinVersion is the minimum version from which the --random-fully flag is supported,
+// used for port mapping to be fully randomized
 var RandomFullyMinVersion = utilversion.MustParseGeneric("1.6.2")
 
-// Minimum iptables versions supporting the -w and -w<seconds> flags
+// WaitMinVersion a minimum iptables versions supporting the -w and -w<seconds> flags
 var WaitMinVersion = utilversion.MustParseGeneric("1.4.20")
+
+// WaitSecondsMinVersion a minimum iptables versions supporting the wait seconds
 var WaitSecondsMinVersion = utilversion.MustParseGeneric("1.4.22")
+
+// WaitRestoreMinVersion a minimum iptables versions supporting the wait restore seconds
 var WaitRestoreMinVersion = utilversion.MustParseGeneric("1.6.2")
 
+// WaitString a constant for specifying the wait flag
 const WaitString = "-w"
+
+// WaitSecondsValue a constant for specifying the default wait seconds
 const WaitSecondsValue = "5"
 
+// LockfilePath16x is the iptables lock file acquired by any process that's making any change in the iptable rule
 const LockfilePath16x = "/run/xtables.lock"
 
 // runner implements Interface in terms of exec("iptables").
@@ -706,7 +739,6 @@ const iptablesStatusResourceProblem = 4
 func isResourceError(err error) bool {
 	if ee, isExitError := err.(utilexec.ExitError); isExitError {
 		return ee.ExitStatus() == iptablesStatusResourceProblem
-	} else {
-		return false
 	}
+	return false
 }
