@@ -568,6 +568,9 @@ func TestConverter_MapElemAddr(t *testing.T) {
 	}
 	third := Foo{}
 	err = c.Convert(&second, &third, AllowDifferentFieldTypeNames, nil)
+	if err != nil {
+		t.Fatalf("error on Convert: %v", err)
+	}
 	if e, a := first, third; !reflect.DeepEqual(e, a) {
 		t.Errorf("Unexpected diff: %v", diff.ObjectDiff(e, a))
 	}
