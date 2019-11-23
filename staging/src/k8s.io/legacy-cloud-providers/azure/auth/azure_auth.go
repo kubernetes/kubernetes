@@ -173,14 +173,11 @@ func decodePkcs12(pkcs []byte, password string) (*x509.Certificate, *rsa.Private
 // azureStackOverrides ensures that the Environment matches what AKSe currently generates for Azure Stack
 func azureStackOverrides(env *azure.Environment, resourceManagerEndpoint, identitySystem string) {
 	env.ManagementPortalURL = strings.Replace(resourceManagerEndpoint, "https://management.", "https://portal.", -1)
-	// TODO: figure out why AKSe does this, why is autorest not setting ServiceManagementEndpoint?
 	env.ServiceManagementEndpoint = env.TokenAudience
-	// TODO: figure out why AKSe does this, may not be required, ResourceManagerVMDNSSuffix is not referenced anywhere
 	env.ResourceManagerVMDNSSuffix = strings.Replace(resourceManagerEndpoint, "https://management.", "cloudapp.", -1)
 	env.ResourceManagerVMDNSSuffix = strings.TrimSuffix(env.ResourceManagerVMDNSSuffix, "/")
 	if strings.EqualFold(identitySystem, ADFSIdentitySystem) {
 		env.ActiveDirectoryEndpoint = strings.TrimSuffix(env.ActiveDirectoryEndpoint, "/")
 		env.ActiveDirectoryEndpoint = strings.TrimSuffix(env.ActiveDirectoryEndpoint, "adfs")
 	}
-	// NOTE: autorest sets KeyVaultEndpoint while AKSe does not
 }
