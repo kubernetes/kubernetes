@@ -46,6 +46,7 @@ func TestDeletePods(t *testing.T) {
 		description       string
 		interval          time.Duration
 		timeout           time.Duration
+		ctxTimeoutEarly   bool
 		expectPendingPods bool
 		expectError       bool
 		expectedError     *error
@@ -92,6 +93,22 @@ func TestDeletePods(t *testing.T) {
 			},
 		},
 		{
+			description:       "Context Canceled",
+			interval:          1000 * time.Millisecond,
+			timeout:           5 * time.Second,
+			ctxTimeoutEarly:   true,
+			expectPendingPods: true,
+			expectError:       true,
+			expectedError:     &wait.ErrWaitTimeout,
+			getPodFn: func(namespace, name string) (*corev1.Pod, error) {
+				oldPodMap, _ := createPods(false)
+				if oldPod, found := oldPodMap[name]; found {
+					return &oldPod, nil
+				}
+				return nil, fmt.Errorf("%q: not found", name)
+			},
+		},
+		{
 			description:       "Client error could be passed out",
 			interval:          200 * time.Millisecond,
 			timeout:           5 * time.Second,
@@ -107,14 +124,22 @@ func TestDeletePods(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			_, pods := createPods(false)
-			ctx := context.TODO()
+			ctx := context.Background()
+			if test.ctxTimeoutEarly {
+				ctx, _ = context.WithTimeout(ctx, 100*time.Millisecond)
+			}
+			start := time.Now()
 			pendingPods, err := waitForDelete(ctx, pods, test.interval, test.timeout, false, test.getPodFn, nil, time.Duration(math.MaxInt64))
-
+			elapsed := time.Since(start)
 			if test.expectError {
 				if err == nil {
 					t.Fatalf("%s: unexpected non-error", test.description)
 				} else if test.expectedError != nil {
-					if *test.expectedError != err {
+					if test.ctxTimeoutEarly {
+						if elapsed >= test.timeout {
+							t.Fatalf("%s: the supplied context did not effectively cancel the waitForDelete", test.description)
+						}
+					} else if *test.expectedError != err {
 						t.Fatalf("%s: the error does not match expected error", test.description)
 					}
 				}
