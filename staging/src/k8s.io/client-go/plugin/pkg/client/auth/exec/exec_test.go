@@ -97,6 +97,10 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		panic(err)
+	}
 	validCert = &cert
 }
 
@@ -760,7 +764,7 @@ func TestConcurrentUpdateTransportConfig(t *testing.T) {
 }
 
 // genClientCert generates an x509 certificate for testing. Certificate and key
-// are returned in PEM encoding.
+// are returned in PEM encoding. The generated cert expires in 24 hours.
 func genClientCert(t *testing.T) ([]byte, []byte) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
