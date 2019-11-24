@@ -39,6 +39,7 @@ const (
 	EvictionKind = "Eviction"
 	// EvictionSubresource represents the kind of evictions object as pod's subresource
 	EvictionSubresource = "pods/eviction"
+	podSkipMsgTemplate  = "pod %q has DeletionTimestamp older than %v seconds, skipping\n"
 )
 
 // Helper contains the parameters to control the behaviour of drainer
@@ -56,6 +57,12 @@ type Helper struct {
 	// DisableEviction forces drain to use delete rather than evict
 	DisableEviction bool
 
+	// SkipWaitForDeleteTimeoutSeconds ignores pods that have a
+	// DeletionTimeStamp > N seconds. It's up to the user to decide when this
+	// option is appropriate; examples include the Node is unready and the pods
+	// won't drain otherwise
+	SkipWaitForDeleteTimeoutSeconds int
+
 	Out    io.Writer
 	ErrOut io.Writer
 
@@ -64,6 +71,19 @@ type Helper struct {
 
 	// OnPodDeletedOrEvicted is called when a pod is evicted/deleted; for printing progress output
 	OnPodDeletedOrEvicted func(pod *corev1.Pod, usingEviction bool)
+}
+
+type waitForDeleteParams struct {
+	ctx                             context.Context
+	pods                            []corev1.Pod
+	interval                        time.Duration
+	timeout                         time.Duration
+	usingEviction                   bool
+	getPodFn                        func(string, string) (*corev1.Pod, error)
+	onDoneFn                        func(pod *corev1.Pod, usingEviction bool)
+	globalTimeout                   time.Duration
+	skipWaitForDeleteTimeoutSeconds int
+	out                             io.Writer
 }
 
 // CheckEvictionSupport uses Discovery API to find out if the server support
@@ -238,7 +258,19 @@ func (d *Helper) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodF
 					return
 				}
 			}
-			_, err := waitForDelete(ctx, []corev1.Pod{pod}, 1*time.Second, time.Duration(math.MaxInt64), true, getPodFn, d.OnPodDeletedOrEvicted, globalTimeout)
+			params := waitForDeleteParams{
+				ctx:                             ctx,
+				pods:                            []corev1.Pod{pod},
+				interval:                        1 * time.Second,
+				timeout:                         time.Duration(math.MaxInt64),
+				usingEviction:                   true,
+				getPodFn:                        getPodFn,
+				onDoneFn:                        d.OnPodDeletedOrEvicted,
+				globalTimeout:                   globalTimeout,
+				skipWaitForDeleteTimeoutSeconds: d.SkipWaitForDeleteTimeoutSeconds,
+				out:                             d.Out,
+			}
+			_, err := waitForDelete(params)
 			if err == nil {
 				returnCh <- nil
 			} else {
@@ -280,31 +312,48 @@ func (d *Helper) deletePods(pods []corev1.Pod, getPodFn func(namespace, name str
 		}
 	}
 	ctx := d.getContext()
-	_, err := waitForDelete(ctx, pods, 1*time.Second, globalTimeout, false, getPodFn, d.OnPodDeletedOrEvicted, globalTimeout)
+	params := waitForDeleteParams{
+		ctx:                             ctx,
+		pods:                            pods,
+		interval:                        1 * time.Second,
+		timeout:                         globalTimeout,
+		usingEviction:                   false,
+		getPodFn:                        getPodFn,
+		onDoneFn:                        d.OnPodDeletedOrEvicted,
+		globalTimeout:                   globalTimeout,
+		skipWaitForDeleteTimeoutSeconds: d.SkipWaitForDeleteTimeoutSeconds,
+		out:                             d.Out,
+	}
+	_, err := waitForDelete(params)
 	return err
 }
 
-func waitForDelete(ctx context.Context, pods []corev1.Pod, interval, timeout time.Duration, usingEviction bool, getPodFn func(string, string) (*corev1.Pod, error), onDoneFn func(pod *corev1.Pod, usingEviction bool), globalTimeout time.Duration) ([]corev1.Pod, error) {
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+func waitForDelete(params waitForDeleteParams) ([]corev1.Pod, error) {
+	pods := params.pods
+	err := wait.PollImmediate(params.interval, params.timeout, func() (bool, error) {
 		pendingPods := []corev1.Pod{}
 		for i, pod := range pods {
-			p, err := getPodFn(pod.Namespace, pod.Name)
+			p, err := params.getPodFn(pod.Namespace, pod.Name)
 			if apierrors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
-				if onDoneFn != nil {
-					onDoneFn(&pod, usingEviction)
+				if params.onDoneFn != nil {
+					params.onDoneFn(&pod, params.usingEviction)
 				}
 				continue
 			} else if err != nil {
 				return false, err
 			} else {
+				if shouldSkipPod(*p, params.skipWaitForDeleteTimeoutSeconds) {
+					fmt.Fprintf(params.out, podSkipMsgTemplate, pod.Name, params.skipWaitForDeleteTimeoutSeconds)
+					continue
+				}
 				pendingPods = append(pendingPods, pods[i])
 			}
 		}
 		pods = pendingPods
 		if len(pendingPods) > 0 {
 			select {
-			case <-ctx.Done():
-				return false, fmt.Errorf("global timeout reached: %v", globalTimeout)
+			case <-params.ctx.Done():
+				return false, fmt.Errorf("global timeout reached: %v", params.globalTimeout)
 			default:
 				return false, nil
 			}
