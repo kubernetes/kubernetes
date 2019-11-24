@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog"
+	utilnet "k8s.io/utils/net"
 )
 
 func buildConfigFromEnvs(masterURL, kubeconfigPath string) (*restclient.Config, error) {
@@ -52,7 +53,11 @@ func flattenSubsets(subsets []corev1.EndpointSubset) []string {
 	ips := []string{}
 	for _, ss := range subsets {
 		for _, addr := range ss.Addresses {
-			ips = append(ips, fmt.Sprintf(`"%s"`, addr.IP))
+			if utilnet.IsIPv6String(addr.IP) {
+				ips = append(ips, fmt.Sprintf(`"[%s]"`, addr.IP))
+			} else {
+				ips = append(ips, fmt.Sprintf(`"%s"`, addr.IP))
+			}
 		}
 	}
 	return ips
