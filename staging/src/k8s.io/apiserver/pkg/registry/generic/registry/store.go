@@ -432,11 +432,8 @@ func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, o
 		// requests to remove all finalizers from the object, so we
 		// ignore the NotFound error.
 		if storage.IsNotFound(err) {
-			_, err := e.finalizeDelete(ctx, obj, true)
-			// clients are expecting an updated object if a PUT succeeded,
-			// but finalizeDelete returns a metav1.Status, so return
-			// the object in the request instead.
-			return obj, false, err
+			// return the object in the request instead.
+			return obj, false, nil
 		}
 		return nil, false, storeerr.InterpretDeleteError(err, e.qualifiedResourceFromContext(ctx), name)
 	}
