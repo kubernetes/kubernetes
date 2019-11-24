@@ -109,6 +109,23 @@ func TestDeletePods(t *testing.T) {
 			},
 		},
 		{
+			description:       "Skip Deleted Pod",
+			interval:          200 * time.Millisecond,
+			timeout:           3 * time.Second,
+			expectPendingPods: false,
+			expectError:       false,
+			expectedError:     nil,
+			getPodFn: func(namespace, name string) (*corev1.Pod, error) {
+				oldPodMap, _ := createPods(false)
+				if oldPod, found := oldPodMap[name]; found {
+					dTime := &metav1.Time{Time: time.Now().Add(time.Duration(100) * time.Second * -1)}
+					oldPod.ObjectMeta.SetDeletionTimestamp(dTime)
+					return &oldPod, nil
+				}
+				return nil, fmt.Errorf("%q: not found", name)
+			},
+		},
+		{
 			description:       "Client error could be passed out",
 			interval:          200 * time.Millisecond,
 			timeout:           5 * time.Second,
@@ -124,13 +141,29 @@ func TestDeletePods(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			_, pods := createPods(false)
-			ctx := context.Background()
+			var ctx context.Context
+			var cancel context.CancelFunc
+			ctx = context.Background()
 			if test.ctxTimeoutEarly {
-				ctx, _ = context.WithTimeout(ctx, 100*time.Millisecond)
+				ctx, cancel = context.WithTimeout(ctx, 100*time.Millisecond)
+				defer cancel()
+			}
+			params := waitForDeleteParams{
+				ctx:                             ctx,
+				pods:                            pods,
+				interval:                        test.interval,
+				timeout:                         test.timeout,
+				usingEviction:                   false,
+				getPodFn:                        test.getPodFn,
+				onDoneFn:                        nil,
+				globalTimeout:                   time.Duration(math.MaxInt64),
+				out:                             os.Stdout,
+				skipWaitForDeleteTimeoutSeconds: 10,
 			}
 			start := time.Now()
-			pendingPods, err := waitForDelete(ctx, pods, test.interval, test.timeout, false, test.getPodFn, nil, time.Duration(math.MaxInt64))
+			pendingPods, err := waitForDelete(params)
 			elapsed := time.Since(start)
+
 			if test.expectError {
 				if err == nil {
 					t.Fatalf("%s: unexpected non-error", test.description)
