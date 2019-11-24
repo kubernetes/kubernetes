@@ -842,7 +842,7 @@ func (proxier *Proxier) syncProxyRules() {
 			writeLine(proxier.filterChains, utiliptables.MakeChainLine(chainName))
 		}
 	}
-	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain, KubeMarkMasqChain, KubeMarkDropChain} {
+	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain, KubeMarkMasqChain} {
 		if chain, ok := existingNATChains[chainName]; ok {
 			writeBytesLine(proxier.natChains, chain)
 		} else {
