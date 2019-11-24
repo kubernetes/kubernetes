@@ -30,19 +30,19 @@ const (
 	Destination = "-d "
 	// Source represents the source address flag
 	Source = "-s "
-	// DPort represents the destination port
+	// DPort represents the destination port flag
 	DPort = "--dport "
-	// Protocol represents the protocol flag which takes input by number of name
+	// Protocol represents the protocol flag
 	Protocol = "-p "
 	// Jump represents jump flag specifies the jump target
 	Jump = "-j "
 	// Reject specifies the reject target
 	Reject = "REJECT"
-	// ToDest represents the --to-destination flag used to specify the destination address in DNAT
+	// ToDest represents the flag used to specify the destination address in DNAT
 	ToDest = "--to-destination "
 	// Recent represents the sub-command recent that allows to dynamically create list of IP address to match against
 	Recent = "recent "
-	// MatchSet represents the --match-set flag which match packets against the specified set
+	// MatchSet represents the flag which match packets against the specified set
 	MatchSet = "--match-set "
 	// SrcType represents the --src-type flag which matches if the source address is of given type
 	SrcType = "--src-type "
@@ -53,79 +53,78 @@ const (
 // Rule holds a map of rules.
 type Rule map[string]string
 
-// FakeIPTables no-op implementation of iptables Interface.
+// FakeIPTables is no-op implementation of iptables Interface.
 type FakeIPTables struct {
 	hasRandomFully bool
 	Lines          []byte
 }
 
-// NewFake returns a pointer for no-op implementation of iptables Interface.
+// NewFake returns a no-op iptables.Interface
 func NewFake() *FakeIPTables {
 	return &FakeIPTables{}
 }
 
-// SetHasRandomFully will enable the port maping fully randomized in the no-op implementation of iptables Interface.
+// SetHasRandomFully is part of iptables.Interface
 func (f *FakeIPTables) SetHasRandomFully(can bool) *FakeIPTables {
 	f.hasRandomFully = can
 	return f
 }
 
-// EnsureChain will returns true and states the specified chain exists for testing.
+// EnsureChain is part of iptables.Interface
 func (*FakeIPTables) EnsureChain(table iptables.Table, chain iptables.Chain) (bool, error) {
 	return true, nil
 }
 
-// FlushChain returns nil and states that the specified chain is cleared.
+// FlushChain is part of iptables.Interface
 func (*FakeIPTables) FlushChain(table iptables.Table, chain iptables.Chain) error {
 	return nil
 }
 
-// DeleteChain returns nil and states that the specified chain exists and it is deleted.
+// DeleteChain is part of iptables.Interface
 func (*FakeIPTables) DeleteChain(table iptables.Table, chain iptables.Chain) error {
 	return nil
 }
 
-// EnsureRule return true and states that the specified rule is present.
+// EnsureRule is part of iptables.Interface
 func (*FakeIPTables) EnsureRule(position iptables.RulePosition, table iptables.Table, chain iptables.Chain, args ...string) (bool, error) {
 	return true, nil
 }
 
-// DeleteRule returns nil and states that the specified rule is present and is deleted.
+// DeleteRule is part of iptables.Interface
 func (*FakeIPTables) DeleteRule(table iptables.Table, chain iptables.Chain, args ...string) error {
 	return nil
 }
 
-// IsIpv6 returns false and states that it is managing only ipv4 tables.
+// IsIpv6 is part of iptables.Interface
 func (*FakeIPTables) IsIpv6() bool {
 	return false
 }
 
-// Save returns a copy of the iptables lines byte array.
+// Save is part of iptables.Interface
 func (f *FakeIPTables) Save(table iptables.Table) ([]byte, error) {
 	lines := make([]byte, len(f.Lines))
 	copy(lines, f.Lines)
 	return lines, nil
 }
 
-// SaveInto calls `iptables-save` command for table and stores result in a given buffer.
+// SaveInto is part of iptables.Interface
 func (f *FakeIPTables) SaveInto(table iptables.Table, buffer *bytes.Buffer) error {
 	buffer.Write(f.Lines)
 	return nil
 }
 
-// Restore returns null and states that it ran `iptables-restore` successfully.
+// Restore is part of iptables.Interface
 func (*FakeIPTables) Restore(table iptables.Table, data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
 	return nil
 }
 
-// RestoreAll is the same as Restore except that no table is specified.
+// RestoreAll is part of iptables.Interface
 func (f *FakeIPTables) RestoreAll(data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
 	f.Lines = data
 	return nil
 }
 
-// Monitor detects when the given iptables tables have been flushed by an external
-// tool (e.g. a firewall reload) by creating canary chains and polling to see if they have been deleted.
+// Monitor is part of iptables.Interface
 func (f *FakeIPTables) Monitor(canary iptables.Chain, tables []iptables.Table, reloadFunc func(), interval time.Duration, stopCh <-chan struct{}) {
 }
 
@@ -137,9 +136,7 @@ func getToken(line, separator string) string {
 	return ""
 }
 
-// GetRules returns a list of rules for the given chain.
-// The chain name must match exactly.
-// The matching is pretty dumb, don't rely on it for anything but testing.
+// GetRules is part of iptables.Interface
 func (f *FakeIPTables) GetRules(chainName string) (rules []Rule) {
 	for _, l := range strings.Split(string(f.Lines), "\n") {
 		if strings.Contains(l, fmt.Sprintf("-A %v", chainName)) {
@@ -156,7 +153,7 @@ func (f *FakeIPTables) GetRules(chainName string) (rules []Rule) {
 	return
 }
 
-// HasRandomFully returns the value of the flag --random-fully
+// HasRandomFully is part of iptables.Interface
 func (f *FakeIPTables) HasRandomFully() bool {
 	return f.hasRandomFully
 }
