@@ -824,6 +824,51 @@ func TestRemovePod(t *testing.T) {
 	}
 }
 
+// TestRemoveAssumedPod tests after added pod is removed.
+func TestRemoveAssumedPod(t *testing.T) {
+	// Enable volumesOnNodeForBalancing to do balanced resource allocation
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BalanceAttachedNodeVolumes, true)()
+	nodeName := "node"
+	basePod := makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}})
+	tests := []struct {
+		pod       *v1.Pod
+		wNodeInfo *schedulernodeinfo.NodeInfo
+	}{{
+		pod: basePod,
+		wNodeInfo: newNodeInfo(
+			&schedulernodeinfo.Resource{
+				MilliCPU: 100,
+				Memory:   500,
+			},
+			&schedulernodeinfo.Resource{
+				MilliCPU: 100,
+				Memory:   500,
+			},
+			[]*v1.Pod{basePod},
+			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
+			make(map[string]*schedulernodeinfo.ImageStateSummary),
+		),
+	}}
+
+	for i, tt := range tests {
+		cache := newSchedulerCache(time.Second, time.Second, nil)
+		if err := cache.AssumePod(tt.pod); err != nil {
+			t.Fatalf("AssumePod failed: %v", err)
+		}
+
+		n := cache.nodes[nodeName]
+		deepEqualWithoutGeneration(t, i, n, tt.wNodeInfo)
+		if err := cache.RemoveAssumedPod(tt.pod); err != nil {
+			t.Fatalf("RemovePod failed: %v", err)
+		}
+
+		n = cache.nodes[nodeName]
+		if n != nil {
+			t.Errorf("#%d: expecting pod deleted and nil node info, get=%s", i, n.info)
+		}
+	}
+}
+
 func TestForgetPod(t *testing.T) {
 	nodeName := "node"
 	basePod := makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}})

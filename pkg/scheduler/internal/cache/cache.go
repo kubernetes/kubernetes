@@ -348,8 +348,10 @@ func (cache *schedulerCache) ForgetPod(pod *v1.Pod) error {
 		}
 		delete(cache.assumedPods, key)
 		delete(cache.podStates, key)
+	case !ok && !cache.assumedPods[key]:
+		return nil
 	default:
-		return fmt.Errorf("pod %v wasn't assumed so cannot be forgotten", key)
+		return fmt.Errorf("pod %v could not found in podStates or assumedPods", key)
 	}
 	return nil
 }
@@ -479,6 +481,32 @@ func (cache *schedulerCache) RemovePod(pod *v1.Pod) error {
 		delete(cache.podStates, key)
 	default:
 		return fmt.Errorf("pod %v is not found in scheduler cache, so cannot be removed from it", key)
+	}
+	return nil
+}
+
+func (cache *schedulerCache) RemoveAssumedPod(pod *v1.Pod) error {
+	key, err := schedulernodeinfo.GetPodKey(pod)
+	if err != nil {
+		return err
+	}
+
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	currState, ok := cache.podStates[key]
+	switch {
+	case ok && cache.assumedPods[key]:
+		err := cache.removePod(currState.pod)
+		if err != nil {
+			return err
+		}
+		delete(cache.podStates, key)
+		delete(cache.assumedPods, key)
+	case !ok && !cache.assumedPods[key]:
+		return nil
+	default:
+		return fmt.Errorf("pod %v could not found in podStates or assumedPods", key)
 	}
 	return nil
 }

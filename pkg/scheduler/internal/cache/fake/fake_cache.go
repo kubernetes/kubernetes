@@ -56,6 +56,9 @@ func (c *Cache) UpdatePod(oldPod, newPod *v1.Pod) error { return nil }
 // RemovePod is a fake method for testing.
 func (c *Cache) RemovePod(pod *v1.Pod) error { return nil }
 
+// RemoveAssumedPod is a fake method for testing.
+func (c *Cache) RemoveAssumedPod(pod *v1.Pod) error { return nil }
+
 // IsAssumedPod is a fake method for testing.
 func (c *Cache) IsAssumedPod(pod *v1.Pod) (bool, error) {
 	return c.IsAssumedPodFunc(pod), nil

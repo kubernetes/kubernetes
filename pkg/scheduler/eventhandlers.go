@@ -197,6 +197,9 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj))
 		return
 	}
+	if err := sched.SchedulerCache.RemoveAssumedPod(pod); err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to remove assumed pod from cache %T: %v", obj, err))
+	}
 	if err := sched.SchedulingQueue.Delete(pod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to dequeue %T: %v", obj, err))
 	}
