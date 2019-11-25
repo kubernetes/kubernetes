@@ -23,8 +23,9 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/utils/exec/testing"
+	testingexec "k8s.io/utils/exec/testing"
 
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -350,55 +351,78 @@ func TestClonedIfaceUpdateError(t *testing.T) {
 }
 
 func TestGetVolCount(t *testing.T) {
-	testCases := []struct {
-		name   string
-		portal string
-		iqn    string
-		count  int
-	}{
-		{
-			name:   "wrong portal, no volumes",
-			portal: "192.168.0.2:3260", // incorrect IP address
-			iqn:    "iqn.2003-01.io.k8s:e2e.volume-1",
-			count:  0,
-		},
-		{
-			name:   "wrong iqn, no volumes",
-			portal: "127.0.0.1:3260",
-			iqn:    "iqn.2003-01.io.k8s:e2e.volume-3", // incorrect volume
-			count:  0,
-		},
-		{
-			name:   "single volume",
-			portal: "192.168.0.1:3260",
-			iqn:    "iqn.2003-01.io.k8s:e2e.volume-1",
-			count:  1,
-		},
-		{
-			name:   "two volumes",
-			portal: "127.0.0.1:3260",
-			iqn:    "iqn.2003-01.io.k8s:e2e.volume-1",
-			count:  2,
-		},
-	}
-
 	// This will create a dir structure like this:
 	// /tmp/refcounter555814673
 	// ├── iface-127.0.0.1:3260:pv1
 	// │   └── 127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-3
 	// └── iface-127.0.0.1:3260:pv2
-	//     ├── 127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-2
-	//     └── 192.168.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-1
+	// │   ├── 127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-2
+	// │   └── 192.168.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-1
+	// └── volumeDevices
+	//     └── 192.168.0.2:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-4
+	//     └── 192.168.0.3:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-5
 
-	baseDir, err := createFakePluginDir()
+	baseDir, err := createFakePluginDirs()
 	if err != nil {
 		t.Errorf("error creating fake plugin dir: %v", err)
 	}
+
 	defer os.RemoveAll(baseDir)
+
+	testCases := []struct {
+		name    string
+		baseDir string
+		portal  string
+		iqn     string
+		count   int
+	}{
+		{
+			name:    "wrong portal, no volumes",
+			baseDir: baseDir,
+			portal:  "192.168.0.2:3260", // incorrect IP address
+			iqn:     "iqn.2003-01.io.k8s:e2e.volume-1",
+			count:   0,
+		},
+		{
+			name:    "wrong iqn, no volumes",
+			baseDir: baseDir,
+			portal:  "127.0.0.1:3260",
+			iqn:     "iqn.2003-01.io.k8s:e2e.volume-3", // incorrect volume
+			count:   0,
+		},
+		{
+			name:    "single volume",
+			baseDir: baseDir,
+			portal:  "192.168.0.1:3260",
+			iqn:     "iqn.2003-01.io.k8s:e2e.volume-1",
+			count:   1,
+		},
+		{
+			name:    "two volumes",
+			baseDir: baseDir,
+			portal:  "127.0.0.1:3260",
+			iqn:     "iqn.2003-01.io.k8s:e2e.volume-1",
+			count:   2,
+		},
+		{
+			name:    "volumeDevices (block) volume",
+			baseDir: filepath.Join(baseDir, config.DefaultKubeletVolumeDevicesDirName),
+			portal:  "192.168.0.2:3260",
+			iqn:     "iqn.2003-01.io.k8s:e2e.volume-1-lun-4",
+			count:   1,
+		},
+		{
+			name:    "nonexistent path",
+			baseDir: filepath.Join(baseDir, "this_path_should_not_exist"),
+			portal:  "127.0.0.1:3260",
+			iqn:     "iqn.2003-01.io.k8s:e2e.unknown",
+			count:   0,
+		},
+	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			count, err := getVolCount(baseDir, tc.portal, tc.iqn)
+			count, err := getVolCount(tc.baseDir, tc.portal, tc.iqn)
 			if err != nil {
 				t.Errorf("expected no error, got %v", err)
 			}
@@ -409,7 +433,7 @@ func TestGetVolCount(t *testing.T) {
 	}
 }
 
-func createFakePluginDir() (string, error) {
+func createFakePluginDirs() (string, error) {
 	dir, err := ioutil.TempDir("", "refcounter")
 	if err != nil {
 		return "", err
@@ -419,6 +443,8 @@ func createFakePluginDir() (string, error) {
 		"iface-127.0.0.1:3260:pv1/127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-3",
 		"iface-127.0.0.1:3260:pv2/127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-2",
 		"iface-127.0.0.1:3260:pv2/192.168.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-1",
+		filepath.Join(config.DefaultKubeletVolumeDevicesDirName, "iface-127.0.0.1:3260/192.168.0.2:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-4"),
+		filepath.Join(config.DefaultKubeletVolumeDevicesDirName, "iface-127.0.0.1:3260/192.168.0.3:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-5"),
 	}
 
 	for _, d := range subdirs {
