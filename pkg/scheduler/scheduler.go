@@ -303,7 +303,9 @@ func New(client clientset.Interface,
 			VolumeBinder: volumeBinder,
 		})
 	}
-	registry.Merge(options.frameworkOutOfTreeRegistry)
+	if err := registry.Merge(options.frameworkOutOfTreeRegistry); err != nil {
+		return nil, err
+	}
 
 	snapshot := nodeinfosnapshot.NewEmptySnapshot()
 
