@@ -1391,26 +1391,26 @@ func (v *vSphereVolume) DeleteVolume() {
 }
 
 // Azure
-type azureDriver struct {
+type azureDiskDriver struct {
 	driverInfo testsuites.DriverInfo
 }
 
-type azureVolume struct {
+type azureDiskVolume struct {
 	volumeName string
 }
 
-var _ testsuites.TestDriver = &azureDriver{}
-var _ testsuites.PreprovisionedVolumeTestDriver = &azureDriver{}
-var _ testsuites.InlineVolumeTestDriver = &azureDriver{}
-var _ testsuites.PreprovisionedPVTestDriver = &azureDriver{}
-var _ testsuites.DynamicPVTestDriver = &azureDriver{}
+var _ testsuites.TestDriver = &azureDiskDriver{}
+var _ testsuites.PreprovisionedVolumeTestDriver = &azureDiskDriver{}
+var _ testsuites.InlineVolumeTestDriver = &azureDiskDriver{}
+var _ testsuites.PreprovisionedPVTestDriver = &azureDiskDriver{}
+var _ testsuites.DynamicPVTestDriver = &azureDiskDriver{}
 
-// InitAzureDriver returns azureDriver that implements TestDriver interface
-func InitAzureDriver() testsuites.TestDriver {
-	return &azureDriver{
+// InitAzureDiskDriver returns azureDiskDriver that implements TestDriver interface
+func InitAzureDiskDriver() testsuites.TestDriver {
+	return &azureDiskDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:             "azure",
-			InTreePluginName: "kubernetes.io/azure-file",
+			Name:             "azure-disk",
+			InTreePluginName: "kubernetes.io/azure-disk",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: volume.SizeRange{
 				Min: "5Gi",
@@ -1433,16 +1433,16 @@ func InitAzureDriver() testsuites.TestDriver {
 	}
 }
 
-func (a *azureDriver) GetDriverInfo() *testsuites.DriverInfo {
+func (a *azureDiskDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &a.driverInfo
 }
 
-func (a *azureDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
+func (a *azureDiskDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	framework.SkipUnlessProviderIs("azure")
 }
 
-func (a *azureDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
-	av, ok := volume.(*azureVolume)
+func (a *azureDiskDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
+	av, ok := volume.(*azureDiskVolume)
 	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Azure test volume")
 
 	diskName := av.volumeName[(strings.LastIndex(av.volumeName, "/") + 1):]
@@ -1462,8 +1462,8 @@ func (a *azureDriver) GetVolumeSource(readOnly bool, fsType string, volume tests
 	return &volSource
 }
 
-func (a *azureDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	av, ok := volume.(*azureVolume)
+func (a *azureDiskDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
+	av, ok := volume.(*azureDiskVolume)
 	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Azure test volume")
 
 	diskName := av.volumeName[(strings.LastIndex(av.volumeName, "/") + 1):]
@@ -1483,7 +1483,7 @@ func (a *azureDriver) GetPersistentVolumeSource(readOnly bool, fsType string, vo
 	return &pvSource, nil
 }
 
-func (a *azureDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestConfig, fsType string) *storagev1.StorageClass {
+func (a *azureDiskDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := "kubernetes.io/azure-disk"
 	parameters := map[string]string{}
 	if fsType != "" {
@@ -1495,7 +1495,7 @@ func (a *azureDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTest
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (a *azureDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
+func (a *azureDiskDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
 	return &testsuites.PerTestConfig{
 		Driver:    a,
 		Prefix:    "azure",
@@ -1503,7 +1503,7 @@ func (a *azureDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestCo
 	}, func() {}
 }
 
-func (a *azureDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
+func (a *azureDiskDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
 	ginkgo.By("creating a test azure disk volume")
 	if volType == testpatterns.InlineVolume {
 		// Volume will be created in framework.TestContext.CloudConfig.Zone zone,
@@ -1514,12 +1514,12 @@ func (a *azureDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 	}
 	volumeName, err := e2epv.CreatePDWithRetry()
 	framework.ExpectNoError(err)
-	return &azureVolume{
+	return &azureDiskVolume{
 		volumeName: volumeName,
 	}
 }
 
-func (v *azureVolume) DeleteVolume() {
+func (v *azureDiskVolume) DeleteVolume() {
 	e2epv.DeletePDWithRetry(v.volumeName)
 }
 
