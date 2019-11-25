@@ -156,6 +156,17 @@ func TestDeltaFIFO_requeueOnPop(t *testing.T) {
 	}
 }
 
+func BenchmarkAddUpdate(t *testing.B) {
+	t.ReportAllocs()
+	t.ResetTimer()
+	f := NewDeltaFIFO(testFifoObjectKeyFunc, nil)
+	for n := 0; n < t.N; n++ {
+		f.Add(mkFifoObj("foo", 10))
+		f.Update(mkFifoObj("foo", 12))
+		f.Delete(mkFifoObj("foo", 15))
+	}
+}
+
 func TestDeltaFIFO_addUpdate(t *testing.T) {
 	f := NewDeltaFIFO(testFifoObjectKeyFunc, nil)
 	f.Add(mkFifoObj("foo", 10))
