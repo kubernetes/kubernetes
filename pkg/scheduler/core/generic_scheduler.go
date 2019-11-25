@@ -1125,10 +1125,22 @@ func (g *genericScheduler) selectVictimsOnNode(
 		}
 		return nil
 	}
-	// As the first step, remove all the lower priority pods from the node and
+	// As the first step, remove all the lower priority pods(except the pods of daemonSet) from the node and
 	// check if the given pod can be scheduled.
 	podPriority := podutil.GetPodPriority(pod)
 	for _, p := range nodeInfo.Pods() {
+		// ignore the pods of daemonSet.
+		ignore := false
+		for _, ownerReference := range p.OwnerReferences {
+			if "DaemonSet" == ownerReference.Kind {
+				ignore = true
+				break
+			}
+		}
+		if ignore {
+			continue
+		}
+
 		if podutil.GetPodPriority(p) < podPriority {
 			potentialVictims = append(potentialVictims, p)
 			if err := removePod(p); err != nil {
