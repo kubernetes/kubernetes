@@ -49,6 +49,7 @@ var (
 // Options is a struct to support version command
 type Options struct {
 	ClientOnly bool
+	ServerOnly bool
 	Short      bool
 	Output     string
 
@@ -80,6 +81,7 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 		},
 	}
 	cmd.Flags().BoolVar(&o.ClientOnly, "client", o.ClientOnly, "Client version only (no server required).")
+	cmd.Flags().BoolVar(&o.ServerOnly, "server", o.ServerOnly, "Server version only.")
 	cmd.Flags().BoolVar(&o.Short, "short", o.Short, "Print just the version number.")
 	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "One of 'yaml' or 'json'.")
 	return cmd
@@ -118,7 +120,9 @@ func (o *Options) Run() error {
 	)
 
 	clientVersion := version.Get()
-	versionInfo.ClientVersion = &clientVersion
+	if !o.ServerOnly {
+		versionInfo.ClientVersion = &clientVersion
+	}
 
 	if !o.ClientOnly && o.discoveryClient != nil {
 		// Always request fresh data from the server
@@ -130,12 +134,16 @@ func (o *Options) Run() error {
 	switch o.Output {
 	case "":
 		if o.Short {
-			fmt.Fprintf(o.Out, "Client Version: %s\n", clientVersion.GitVersion)
+			if !o.ServerOnly {
+				fmt.Fprintf(o.Out, "Client Version: %s\n", clientVersion.GitVersion)
+			}
 			if serverVersion != nil {
 				fmt.Fprintf(o.Out, "Server Version: %s\n", serverVersion.GitVersion)
 			}
 		} else {
-			fmt.Fprintf(o.Out, "Client Version: %s\n", fmt.Sprintf("%#v", clientVersion))
+			if !o.ServerOnly {
+				fmt.Fprintf(o.Out, "Client Version: %s\n", fmt.Sprintf("%#v", clientVersion))
+			}
 			if serverVersion != nil {
 				fmt.Fprintf(o.Out, "Server Version: %s\n", fmt.Sprintf("%#v", *serverVersion))
 			}
