@@ -123,7 +123,7 @@ func TestSyncHandler(t *testing.T) {
 		if tc.storageClass != nil {
 			informerFactory.Storage().V1().StorageClasses().Informer().GetIndexer().Add(tc.storageClass)
 		}
-		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, storageClassInformer, nil, allPlugins)
+		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, storageClassInformer, nil, allPlugins, nil)
 		if err != nil {
 			t.Fatalf("error creating expand controller : %v", err)
 		}
