@@ -62,7 +62,6 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 )
 
 const (
@@ -483,17 +482,6 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(endpointSliceColumnDefinitions, printEndpointSlice)
 	h.TableHandler(endpointSliceColumnDefinitions, printEndpointSliceList)
-
-	customResourceDefinitionColumnDefinitions := []metav1beta1.TableColumnDefinition{
-		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Kind", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["kind"]},
-		{Name: "Scope", Type: "string", Description: "Scope of the custom resource definition"},
-		{Name: "Version", Type: "string", Priority: 1, Description: "API version of the custom resource definition"},
-		{Name: "Group", Type: "string", Priority: 1, Description: "Groups in the CRD"},
-		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
-	}
-	h.TableHandler(customResourceDefinitionColumnDefinitions, printCustomResourceDefinition)
-	h.TableHandler(customResourceDefinitionColumnDefinitions, printCustomResourceDefinitionList)
 }
 
 // Pass ports=nil for all ports.
@@ -865,31 +853,6 @@ func printReplicaSetList(list *apps.ReplicaSetList, options printers.GenerateOpt
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printReplicaSet(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
-	}
-	return rows, nil
-}
-
-func printCustomResourceDefinition(crd *apiextensions.CustomResourceDefinition, options printers.GenerateOptions) ([]metav1beta1.TableRow, error) {
-	row := metav1beta1.TableRow{
-		Object: runtime.RawExtension{Object: crd},
-	}
-
-	group := crd.Spec.Group
-	scope := crd.Spec.Scope
-	version := crd.Spec.Version
-
-	row.Cells = append(row.Cells, crd.Name, crd.Spec.Names.Kind, scope, version, group, translateTimestampSince(crd.CreationTimestamp))
-	return []metav1beta1.TableRow{row}, nil
-}
-
-func printCustomResourceDefinitionList(list *apiextensions.CustomResourceDefinitionList, options printers.GenerateOptions) ([]metav1beta1.TableRow, error) {
-	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
-	for i := range list.Items {
-		r, err := printCustomResourceDefinition(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}
