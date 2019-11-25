@@ -46,7 +46,7 @@ kube::etcd::validate() {
   fi
 
   # validate installed version is at least equal to minimum
-  version=$(etcd --version | tail -n +1 | head -n 1 | cut -d " " -f 3)
+  version=$(etcd --version | grep Version | tail -n +1 | head -n 1 | cut -d " " -f 3)
   if [[ $(kube::etcd::version "${ETCD_VERSION}") -gt $(kube::etcd::version "${version}") ]]; then
    export PATH=${KUBE_ROOT}/third_party/etcd:${PATH}
    hash etcd
