@@ -104,11 +104,16 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
 		}
 
+		ginkgo.By("Getting plugin name")
+		defaultClass, err := c.StorageV1().StorageClasses().Get(defaultScName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Error getting default storageclass: %v", err)
+		pluginName := defaultClass.Provisioner
+
 		controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
 
 		framework.ExpectNoError(err, "Error getting c-m metrics : %v", err)
 
-		storageOpMetrics := getControllerStorageMetrics(controllerMetrics)
+		storageOpMetrics := getControllerStorageMetrics(controllerMetrics, pluginName)
 
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 		framework.ExpectNoError(err)
@@ -126,7 +131,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
 		framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
 
-		updatedStorageMetrics := waitForDetachAndGrabMetrics(storageOpMetrics, metricsGrabber)
+		updatedStorageMetrics := waitForDetachAndGrabMetrics(storageOpMetrics, metricsGrabber, pluginName)
 
 		framework.ExpectNotEqual(len(updatedStorageMetrics.latencyMetrics), 0, "Error fetching c-m updated storage metrics")
 		framework.ExpectNotEqual(len(updatedStorageMetrics.statusMetrics), 0, "Error fetching c-m updated storage metrics")
@@ -145,15 +150,16 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
 		}
 
+		ginkgo.By("Geting default storageclass")
+		defaultClass, err := c.StorageV1().StorageClasses().Get(defaultScName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Error getting default storageclass: %v", err)
+		pluginName := defaultClass.Provisioner
+
 		controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
 
 		framework.ExpectNoError(err, "Error getting c-m metrics : %v", err)
 
-		storageOpMetrics := getControllerStorageMetrics(controllerMetrics)
-
-		ginkgo.By("Creating an invalid storageclass")
-		defaultClass, err := c.StorageV1().StorageClasses().Get(defaultScName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "Error getting default storageclass: %v", err)
+		storageOpMetrics := getControllerStorageMetrics(controllerMetrics, pluginName)
 
 		invalidSc = &storagev1.StorageClass{
 			ObjectMeta: metav1.ObjectMeta{
@@ -188,7 +194,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		ginkgo.By("Checking failure metrics")
 		updatedControllerMetrics, err := metricsGrabber.GrabFromControllerManager()
 		framework.ExpectNoError(err, "failed to get controller manager metrics")
-		updatedStorageMetrics := getControllerStorageMetrics(updatedControllerMetrics)
+		updatedStorageMetrics := getControllerStorageMetrics(updatedControllerMetrics, pluginName)
 
 		framework.ExpectNotEqual(len(updatedStorageMetrics.statusMetrics), 0, "Error fetching c-m updated storage metrics")
 		verifyMetricCount(storageOpMetrics, updatedStorageMetrics, "volume_provision", true)
@@ -521,7 +527,7 @@ func newStorageControllerMetrics() *storageControllerMetrics {
 	}
 }
 
-func waitForDetachAndGrabMetrics(oldMetrics *storageControllerMetrics, metricsGrabber *metrics.Grabber) *storageControllerMetrics {
+func waitForDetachAndGrabMetrics(oldMetrics *storageControllerMetrics, metricsGrabber *metrics.Grabber, pluginName string) *storageControllerMetrics {
 	backoff := wait.Backoff{
 		Duration: 10 * time.Second,
 		Factor:   1.2,
@@ -542,7 +548,7 @@ func waitForDetachAndGrabMetrics(oldMetrics *storageControllerMetrics, metricsGr
 			return false, err
 		}
 
-		updatedStorageMetrics = getControllerStorageMetrics(updatedMetrics)
+		updatedStorageMetrics = getControllerStorageMetrics(updatedMetrics, pluginName)
 		newDetachCount, ok := updatedStorageMetrics.latencyMetrics["volume_detach"]
 
 		// if detach metrics are not yet there, we need to retry
@@ -555,6 +561,7 @@ func waitForDetachAndGrabMetrics(oldMetrics *storageControllerMetrics, metricsGr
 		if oldDetachCount >= newDetachCount {
 			return false, nil
 		}
+
 		return true, nil
 	}
 
@@ -602,7 +609,7 @@ func verifyMetricCount(oldMetrics, newMetrics *storageControllerMetrics, metricN
 	gomega.Expect(newStatusCount).To(gomega.BeNumerically(">", oldStatusCount), "New status count %d should be more than old count %d for action %s", newStatusCount, oldStatusCount, metricName)
 }
 
-func getControllerStorageMetrics(ms metrics.ControllerManagerMetrics) *storageControllerMetrics {
+func getControllerStorageMetrics(ms metrics.ControllerManagerMetrics, pluginName string) *storageControllerMetrics {
 	result := newStorageControllerMetrics()
 
 	for method, samples := range ms {
@@ -612,6 +619,10 @@ func getControllerStorageMetrics(ms metrics.ControllerManagerMetrics) *storageCo
 			for _, sample := range samples {
 				count := int64(sample.Value)
 				operation := string(sample.Metric["operation_name"])
+				metricPluginName := string(sample.Metric["volume_plugin"])
+				if len(pluginName) > 0 && pluginName != metricPluginName {
+					continue
+				}
 				result.latencyMetrics[operation] = count
 			}
 		case "storage_operation_status_count":
@@ -620,6 +631,10 @@ func getControllerStorageMetrics(ms metrics.ControllerManagerMetrics) *storageCo
 				operation := string(sample.Metric["operation_name"])
 				status := string(sample.Metric["status"])
 				statusCounts := result.statusMetrics[operation]
+				metricPluginName := string(sample.Metric["volume_plugin"])
+				if len(pluginName) > 0 && pluginName != metricPluginName {
+					continue
+				}
 				switch status {
 				case "success":
 					statusCounts.successCount = count
