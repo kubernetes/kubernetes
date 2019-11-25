@@ -615,9 +615,11 @@ func shouldTurnOnDynamicClient(client clientset.Interface) bool {
 
 	for _, resource := range apiResourceList.APIResources {
 		if resource.Name == "serviceaccounts/token" &&
-			resource.Group == "authentication.k8s.io" &&
-			sets.NewString(resource.Verbs...).Has("create") {
-			return true
+			resource.Group == "authentication.k8s.io" {
+			if sets.NewString(resource.Verbs...).Has("create") {
+				return true
+			}
+			return false
 		}
 	}
 
