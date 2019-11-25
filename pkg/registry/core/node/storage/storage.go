@@ -19,12 +19,16 @@ package storage
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -35,15 +39,16 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/registry/core/node"
-	noderest "k8s.io/kubernetes/pkg/registry/core/node/rest"
+	restproxy "k8s.io/kubernetes/pkg/registry/core/rest/proxy"
 )
 
 // NodeStorage includes storage for nodes and all sub resources
 type NodeStorage struct {
 	Node   *REST
 	Status *StatusREST
-	Proxy  *noderest.ProxyREST
+	Proxy  *restproxy.REST
 
 	KubeletConnectionInfo client.ConnectionInfoGetter
 }
@@ -105,7 +110,6 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 	// Set up REST handlers
 	nodeREST := &REST{Store: store, proxyTransport: proxyTransport}
 	statusREST := &StatusREST{store: &statusStore}
-	proxyREST := &noderest.ProxyREST{Store: store, ProxyTransport: proxyTransport}
 
 	// Build a NodeGetter that looks up nodes using the REST handler
 	nodeGetter := client.NodeGetterFunc(func(ctx context.Context, nodeName string, options metav1.GetOptions) (*v1.Node, error) {
@@ -130,7 +134,8 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 		return nil, err
 	}
 	nodeREST.connection = connectionInfoGetter
-	proxyREST.Connection = connectionInfoGetter
+
+	proxyREST := &restproxy.REST{Redirector: nodeREST, ProxyTransport: proxyTransport}
 
 	return &NodeStorage{
 		Node:                  nodeREST,
@@ -145,7 +150,34 @@ var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a URL to which one can send traffic for the specified node.
 func (r *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
-	return node.ResourceLocation(r, r.connection, r.proxyTransport, ctx, id)
+	schemeReq, name, portReq, valid := utilnet.SplitSchemeNamePort(id)
+	if !valid {
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid node request %q", id))
+	}
+
+	info, err := r.connection.GetConnectionInfo(ctx, types.NodeName(name))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// We check if we want to get a default Kubelet's transport. It happens if either:
+	// - no port is specified in request (Kubelet's port is default)
+	// - the requested port matches the kubelet port for this node
+	if portReq == "" || portReq == info.Port {
+		return &url.URL{
+				Scheme: info.Scheme,
+				Host:   net.JoinHostPort(info.Hostname, info.Port),
+			},
+			info.Transport,
+			nil
+	}
+
+	if err := proxyutil.IsProxyableHostname(ctx, &net.Resolver{}, info.Hostname); err != nil {
+		return nil, nil, errors.NewBadRequest(err.Error())
+	}
+
+	// Otherwise, return the requested scheme and port, and the proxy transport
+	return &url.URL{Scheme: schemeReq, Host: net.JoinHostPort(info.Hostname, portReq)}, r.proxyTransport, nil
 }
 
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.

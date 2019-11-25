@@ -61,6 +61,7 @@ go_library(
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
         "//pkg/printers/storage:go_default_library",
+        "//pkg/registry/core/rest/proxy:go_default_library",
         "//pkg/registry/core/service:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/registry/core/service/portallocator:go_default_library",

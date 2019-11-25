@@ -94,13 +94,13 @@ func TestObjectSelector(t *testing.T) {
 		{
 			name:           "does not match object that does not implement Object interface",
 			objectSelector: runLevel1Excluder,
-			attrs:          admission.NewAttributesRecord(&corev1.NodeProxyOptions{}, nil, schema.GroupVersionKind{}, "", "name", schema.GroupVersionResource{}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:          admission.NewAttributesRecord(&corev1.ProxyOptions{}, nil, schema.GroupVersionKind{}, "", "name", schema.GroupVersionResource{}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall:     false,
 		},
 		{
 			name:           "empty selector matches everything, including object that does not implement Object interface",
 			objectSelector: &metav1.LabelSelector{},
-			attrs:          admission.NewAttributesRecord(&corev1.NodeProxyOptions{}, nil, schema.GroupVersionKind{}, "", "name", schema.GroupVersionResource{}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			attrs:          admission.NewAttributesRecord(&corev1.ProxyOptions{}, nil, schema.GroupVersionKind{}, "", "name", schema.GroupVersionResource{}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall:     true,
 		},
 	}

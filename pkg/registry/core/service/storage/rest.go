@@ -43,6 +43,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	restproxy "k8s.io/kubernetes/pkg/registry/core/rest/proxy"
 	registry "k8s.io/kubernetes/pkg/registry/core/service"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
@@ -103,7 +104,7 @@ func NewREST(
 	secondaryServiceIPs ipallocator.Interface,
 	serviceNodePorts portallocator.Interface,
 	proxyTransport http.RoundTripper,
-) (*REST, *registry.ProxyREST) {
+) (*REST, *restproxy.REST) {
 	// detect this cluster default Service IPFamily (ipfamily of --service-cluster-ip-range)
 	// we do it once here, to avoid having to do it over and over during ipfamily assignment
 	serviceIPFamily := api.IPv4Protocol
@@ -124,7 +125,7 @@ func NewREST(
 		proxyTransport:         proxyTransport,
 		pods:                   pods,
 	}
-	return rest, &registry.ProxyREST{Redirector: rest, ProxyTransport: proxyTransport}
+	return rest, &restproxy.REST{Redirector: rest, ProxyTransport: proxyTransport}
 }
 
 var (

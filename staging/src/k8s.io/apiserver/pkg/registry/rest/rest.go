@@ -292,8 +292,8 @@ type Responder interface {
 	Error(err error)
 }
 
-// Connecter is a storage object that responds to a connection request.
-type Connecter interface {
+// Connector is a storage object that responds to a connection request.
+type Connector interface {
 	// Connect returns an http.Handler that will handle the request/response for a given API invocation.
 	// The provided responder may be used for common API responses. The responder will write both status
 	// code and body, so the ServeHTTP method should exit after invoking the responder. The Handler will

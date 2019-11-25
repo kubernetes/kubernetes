@@ -19,17 +19,10 @@ package node
 import (
 	"context"
 	"fmt"
-	"net"
-	"net/http"
-	"net/url"
-
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
@@ -39,8 +32,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/client"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // nodeStrategy implements behavior for nodes
@@ -228,36 +219,4 @@ func MatchNode(label labels.Selector, field fields.Selector) pkgstorage.Selectio
 // NameTriggerFunc returns value metadata.namespace of given object.
 func NameTriggerFunc(obj runtime.Object) string {
 	return obj.(*api.Node).ObjectMeta.Name
-}
-
-// ResourceLocation returns a URL and transport which one can use to send traffic for the specified node.
-func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGetter, proxyTransport http.RoundTripper, ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
-	schemeReq, name, portReq, valid := utilnet.SplitSchemeNamePort(id)
-	if !valid {
-		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid node request %q", id))
-	}
-
-	info, err := connection.GetConnectionInfo(ctx, types.NodeName(name))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// We check if we want to get a default Kubelet's transport. It happens if either:
-	// - no port is specified in request (Kubelet's port is default)
-	// - the requested port matches the kubelet port for this node
-	if portReq == "" || portReq == info.Port {
-		return &url.URL{
-				Scheme: info.Scheme,
-				Host:   net.JoinHostPort(info.Hostname, info.Port),
-			},
-			info.Transport,
-			nil
-	}
-
-	if err := proxyutil.IsProxyableHostname(ctx, &net.Resolver{}, info.Hostname); err != nil {
-		return nil, nil, errors.NewBadRequest(err.Error())
-	}
-
-	// Otherwise, return the requested scheme and port, and the proxy transport
-	return &url.URL{Scheme: schemeReq, Host: net.JoinHostPort(info.Hostname, portReq)}, proxyTransport, nil
 }

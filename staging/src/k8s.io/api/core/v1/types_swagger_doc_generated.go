@@ -1122,15 +1122,6 @@ func (NodeList) SwaggerDoc() map[string]string {
 	return map_NodeList
 }
 
-var map_NodeProxyOptions = map[string]string{
-	"":     "NodeProxyOptions is the query options to a Node's proxy call.",
-	"path": "Path is the URL path to use for the current proxy request to node.",
-}
-
-func (NodeProxyOptions) SwaggerDoc() map[string]string {
-	return map_NodeProxyOptions
-}
-
 var map_NodeResources = map[string]string{
 	"":         "NodeResources is an object for conveying resource information about a node. see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.",
 	"Capacity": "Capacity represents the available resources of a node",
@@ -1553,15 +1544,6 @@ func (PodPortForwardOptions) SwaggerDoc() map[string]string {
 	return map_PodPortForwardOptions
 }
 
-var map_PodProxyOptions = map[string]string{
-	"":     "PodProxyOptions is the query options to a Pod's proxy call.",
-	"path": "Path is the URL path to use for the current proxy request to pod.",
-}
-
-func (PodProxyOptions) SwaggerDoc() map[string]string {
-	return map_PodProxyOptions
-}
-
 var map_PodReadinessGate = map[string]string{
 	"":              "PodReadinessGate contains the reference to a pod condition",
 	"conditionType": "ConditionType refers to a condition in the pod's condition list with matching type.",
@@ -1762,6 +1744,15 @@ var map_ProjectedVolumeSource = map[string]string{
 
 func (ProjectedVolumeSource) SwaggerDoc() map[string]string {
 	return map_ProjectedVolumeSource
+}
+
+var map_ProxyOptions = map[string]string{
+	"":     "ProxyOptions is the query options to a resource's proxy call.",
+	"path": "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
+}
+
+func (ProxyOptions) SwaggerDoc() map[string]string {
+	return map_ProxyOptions
 }
 
 var map_QuobyteVolumeSource = map[string]string{
@@ -2177,15 +2168,6 @@ var map_ServicePort = map[string]string{
 
 func (ServicePort) SwaggerDoc() map[string]string {
 	return map_ServicePort
-}
-
-var map_ServiceProxyOptions = map[string]string{
-	"":     "ServiceProxyOptions is the query options to a Service's proxy call.",
-	"path": "Path is the part of URLs that include service endpoints, suffixes, and parameters to use for the current proxy request to service. For example, the whole request URL is http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy. Path is _search?q=user:kimchy.",
-}
-
-func (ServiceProxyOptions) SwaggerDoc() map[string]string {
-	return map_ServiceProxyOptions
 }
 
 var map_ServiceSpec = map[string]string{

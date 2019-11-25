@@ -23,7 +23,6 @@ import (
 	"net/url"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -35,47 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/pod"
 )
 
-// ProxyREST implements the proxy subresource for a Pod
-type ProxyREST struct {
-	Store          *genericregistry.Store
-	ProxyTransport http.RoundTripper
-}
-
-// Implement Connecter
-var _ = rest.Connecter(&ProxyREST{})
-
-var proxyMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
-
-// New returns an empty podProxyOptions object.
-func (r *ProxyREST) New() runtime.Object {
-	return &api.PodProxyOptions{}
-}
-
-// ConnectMethods returns the list of HTTP methods that can be proxied
-func (r *ProxyREST) ConnectMethods() []string {
-	return proxyMethods
-}
-
-// NewConnectOptions returns versioned resource that represents proxy parameters
-func (r *ProxyREST) NewConnectOptions() (runtime.Object, bool, string) {
-	return &api.PodProxyOptions{}, true, "path"
-}
-
-// Connect returns a handler for the pod proxy
-func (r *ProxyREST) Connect(ctx context.Context, id string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
-	proxyOpts, ok := opts.(*api.PodProxyOptions)
-	if !ok {
-		return nil, fmt.Errorf("Invalid options object: %#v", opts)
-	}
-	location, transport, err := pod.ResourceLocation(r.Store, r.ProxyTransport, ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	location.Path = net.JoinPreservingTrailingSlash(location.Path, proxyOpts.Path)
-	// Return a proxy handler that uses the desired transport, wrapped with additional proxy handling (to get URL rewriting, X-Forwarded-* headers, etc)
-	return newThrottledUpgradeAwareProxyHandler(location, transport, true, false, false, responder), nil
-}
-
 // Support both GET and POST methods. We must support GET for browsers that want to use WebSockets.
 var upgradeableMethods = []string{"GET", "POST"}
 
@@ -85,8 +43,8 @@ type AttachREST struct {
 	KubeletConn client.ConnectionInfoGetter
 }
 
-// Implement Connecter
-var _ = rest.Connecter(&AttachREST{})
+// Implement Connector
+var _ = rest.Connector(&AttachREST{})
 
 // New creates a new podAttachOptions object.
 func (r *AttachREST) New() runtime.Object {
@@ -122,8 +80,8 @@ type ExecREST struct {
 	KubeletConn client.ConnectionInfoGetter
 }
 
-// Implement Connecter
-var _ = rest.Connecter(&ExecREST{})
+// Implement Connector
+var _ = rest.Connector(&ExecREST{})
 
 // New creates a new podExecOptions object.
 func (r *ExecREST) New() runtime.Object {
@@ -159,8 +117,8 @@ type PortForwardREST struct {
 	KubeletConn client.ConnectionInfoGetter
 }
 
-// Implement Connecter
-var _ = rest.Connecter(&PortForwardREST{})
+// Implement Connector
+var _ = rest.Connector(&PortForwardREST{})
 
 // New returns an empty podPortForwardOptions object
 func (r *PortForwardREST) New() runtime.Object {

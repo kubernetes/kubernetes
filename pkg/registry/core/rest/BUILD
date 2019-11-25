@@ -73,6 +73,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/registry/core/rest/proxy:all-srcs",
+    ],
     tags = ["automanaged"],
 )

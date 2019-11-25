@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
@@ -45,7 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // podStrategy implements behavior for Pods
@@ -238,7 +236,8 @@ type ResourceGetter interface {
 	Get(context.Context, string, *metav1.GetOptions) (runtime.Object, error)
 }
 
-func getPod(getter ResourceGetter, ctx context.Context, name string) (*api.Pod, error) {
+// GetPod returns a pod.
+func GetPod(getter ResourceGetter, ctx context.Context, name string) (*api.Pod, error) {
 	obj, err := getter.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -250,8 +249,8 @@ func getPod(getter ResourceGetter, ctx context.Context, name string) (*api.Pod, 
 	return pod, nil
 }
 
-// returns primary IP for a Pod
-func getPodIP(pod *api.Pod) string {
+// GetPodIP returns primary IP for a Pod
+func GetPodIP(pod *api.Pod) string {
 	if pod == nil {
 		return ""
 	}
@@ -260,45 +259,6 @@ func getPodIP(pod *api.Pod) string {
 	}
 
 	return ""
-}
-
-// ResourceLocation returns a URL to which one can send traffic for the specified pod.
-func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
-	// Allow ID as "podname" or "podname:port" or "scheme:podname:port".
-	// If port is not specified, try to use the first defined port on the pod.
-	scheme, name, port, valid := utilnet.SplitSchemeNamePort(id)
-	if !valid {
-		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid pod request %q", id))
-	}
-
-	pod, err := getPod(getter, ctx, name)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Try to figure out a port.
-	if port == "" {
-		for i := range pod.Spec.Containers {
-			if len(pod.Spec.Containers[i].Ports) > 0 {
-				port = fmt.Sprintf("%d", pod.Spec.Containers[i].Ports[0].ContainerPort)
-				break
-			}
-		}
-	}
-	podIP := getPodIP(pod)
-	if err := proxyutil.IsProxyableIP(podIP); err != nil {
-		return nil, nil, errors.NewBadRequest(err.Error())
-	}
-
-	loc := &url.URL{
-		Scheme: scheme,
-	}
-	if port == "" {
-		loc.Host = podIP
-	} else {
-		loc.Host = net.JoinHostPort(podIP, port)
-	}
-	return loc, rt, nil
 }
 
 // getContainerNames returns a formatted string containing the container names
@@ -319,7 +279,7 @@ func LogLocation(
 	name string,
 	opts *api.PodLogOptions,
 ) (*url.URL, http.RoundTripper, error) {
-	pod, err := getPod(getter, ctx, name)
+	pod, err := GetPod(getter, ctx, name)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -481,7 +441,7 @@ func streamLocation(
 	container,
 	path string,
 ) (*url.URL, http.RoundTripper, error) {
-	pod, err := getPod(getter, ctx, name)
+	pod, err := GetPod(getter, ctx, name)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -538,7 +498,7 @@ func PortForwardLocation(
 	name string,
 	opts *api.PodPortForwardOptions,
 ) (*url.URL, http.RoundTripper, error) {
-	pod, err := getPod(getter, ctx, name)
+	pod, err := GetPod(getter, ctx, name)
 	if err != nil {
 		return nil, nil, err
 	}

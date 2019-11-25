@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package node
+package proxy
 
 import (
 	"context"
@@ -25,48 +25,44 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
-	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
-	"k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/registry/core/node"
 )
 
-// ProxyREST implements the proxy subresource for a Node
-type ProxyREST struct {
-	Store          *genericregistry.Store
-	Connection     client.ConnectionInfoGetter
+// REST implements the proxy subresource for a resource.
+type REST struct {
+	Redirector     rest.Redirector
 	ProxyTransport http.RoundTripper
 }
 
-// Implement Connecter
-var _ = rest.Connecter(&ProxyREST{})
+// Implement Connector
+var _ = rest.Connector(&REST{})
 
 var proxyMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 
-// New returns an empty nodeProxyOptions object.
-func (r *ProxyREST) New() runtime.Object {
-	return &api.NodeProxyOptions{}
+// New returns an empty ProxyOptions.
+func (r *REST) New() runtime.Object {
+	return &api.ProxyOptions{}
 }
 
 // ConnectMethods returns the list of HTTP methods that can be proxied
-func (r *ProxyREST) ConnectMethods() []string {
+func (r *REST) ConnectMethods() []string {
 	return proxyMethods
 }
 
 // NewConnectOptions returns versioned resource that represents proxy parameters
-func (r *ProxyREST) NewConnectOptions() (runtime.Object, bool, string) {
-	return &api.NodeProxyOptions{}, true, "path"
+func (r *REST) NewConnectOptions() (runtime.Object, bool, string) {
+	return &api.ProxyOptions{}, true, "path"
 }
 
-// Connect returns a handler for the node proxy
-func (r *ProxyREST) Connect(ctx context.Context, id string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
-	proxyOpts, ok := opts.(*api.NodeProxyOptions)
+// Connect returns a handler for the  proxy
+func (r *REST) Connect(ctx context.Context, id string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
+	proxyOpts, ok := opts.(*api.ProxyOptions)
 	if !ok {
 		return nil, fmt.Errorf("Invalid options object: %#v", opts)
 	}
-	location, transport, err := node.ResourceLocation(r.Store, r.Connection, r.ProxyTransport, ctx, id)
+	location, transport, err := r.Redirector.ResourceLocation(ctx, id)
 	if err != nil {
 		return nil, err
 	}

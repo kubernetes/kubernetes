@@ -238,7 +238,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	updater, isUpdater := storage.(rest.Updater)
 	patcher, isPatcher := storage.(rest.Patcher)
 	watcher, isWatcher := storage.(rest.Watcher)
-	connecter, isConnecter := storage.(rest.Connecter)
+	connecter, isConnecter := storage.(rest.Connector)
 	storageMeta, isMetadata := storage.(rest.StorageMetadata)
 	storageVersionProvider, isStorageVersionProvider := storage.(rest.StorageVersionProvider)
 	if !isMetadata {
@@ -1132,7 +1132,7 @@ func restfulGetResourceWithOptions(r rest.GetterWithOptions, scope handlers.Requ
 	}
 }
 
-func restfulConnectResource(connecter rest.Connecter, scope handlers.RequestScope, admit admission.Interface, restPath string, isSubresource bool) restful.RouteFunction {
+func restfulConnectResource(connecter rest.Connector, scope handlers.RequestScope, admit admission.Interface, restPath string, isSubresource bool) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		handlers.ConnectResource(connecter, &scope, admit, restPath, isSubresource)(res.ResponseWriter, req.Request)
 	}

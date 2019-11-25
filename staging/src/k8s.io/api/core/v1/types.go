@@ -4943,32 +4943,8 @@ type PodPortForwardOptions struct {
 // +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// PodProxyOptions is the query options to a Pod's proxy call.
-type PodProxyOptions struct {
-	metav1.TypeMeta `json:",inline"`
-
-	// Path is the URL path to use for the current proxy request to pod.
-	// +optional
-	Path string `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
-}
-
-// +k8s:conversion-gen:explicit-from=net/url.Values
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// NodeProxyOptions is the query options to a Node's proxy call.
-type NodeProxyOptions struct {
-	metav1.TypeMeta `json:",inline"`
-
-	// Path is the URL path to use for the current proxy request to node.
-	// +optional
-	Path string `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
-}
-
-// +k8s:conversion-gen:explicit-from=net/url.Values
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ServiceProxyOptions is the query options to a Service's proxy call.
-type ServiceProxyOptions struct {
+// ProxyOptions is the query options to a resource's proxy call.
+type ProxyOptions struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// Path is the part of URLs that include service endpoints, suffixes,

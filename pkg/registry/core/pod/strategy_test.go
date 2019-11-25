@@ -601,7 +601,7 @@ func TestGetPodIP(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			podIP := getPodIP(tc.pod)
+			podIP := GetPodIP(tc.pod)
 			if podIP != tc.expectedIP {
 				t.Errorf("expected pod ip:%v does not match actual %v", tc.expectedIP, podIP)
 			}

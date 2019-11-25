@@ -2254,13 +2254,6 @@ message NodeList {
   repeated Node items = 2;
 }
 
-// NodeProxyOptions is the query options to a Node's proxy call.
-message NodeProxyOptions {
-  // Path is the URL path to use for the current proxy request to node.
-  // +optional
-  optional string path = 1;
-}
-
 // NodeResources is an object for conveying resource information about a node.
 // see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.
 message NodeResources {
@@ -3169,13 +3162,6 @@ message PodPortForwardOptions {
   repeated int32 ports = 1;
 }
 
-// PodProxyOptions is the query options to a Pod's proxy call.
-message PodProxyOptions {
-  // Path is the URL path to use for the current proxy request to pod.
-  // +optional
-  optional string path = 1;
-}
-
 // PodReadinessGate contains the reference to a pod condition
 message PodReadinessGate {
   // ConditionType refers to a condition in the pod's condition list with matching type.
@@ -3756,6 +3742,17 @@ message ProjectedVolumeSource {
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
   optional int32 defaultMode = 2;
+}
+
+// ProxyOptions is the query options to a resource's proxy call.
+message ProxyOptions {
+  // Path is the part of URLs that include service endpoints, suffixes,
+  // and parameters to use for the current proxy request to service.
+  // For example, the whole request URL is
+  // http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy.
+  // Path is _search?q=user:kimchy.
+  // +optional
+  optional string path = 1;
 }
 
 // Represents a Quobyte mount that lasts the lifetime of a pod.
@@ -4602,17 +4599,6 @@ message ServicePort {
   // More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
   // +optional
   optional int32 nodePort = 5;
-}
-
-// ServiceProxyOptions is the query options to a Service's proxy call.
-message ServiceProxyOptions {
-  // Path is the part of URLs that include service endpoints, suffixes,
-  // and parameters to use for the current proxy request to service.
-  // For example, the whole request URL is
-  // http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy.
-  // Path is _search?q=user:kimchy.
-  // +optional
-  optional string path = 1;
 }
 
 // ServiceSpec describes the attributes that a user creates on a service.

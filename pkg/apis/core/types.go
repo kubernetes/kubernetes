@@ -4296,31 +4296,11 @@ type PodPortForwardOptions struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// PodProxyOptions is the query options to a Pod's proxy call
-type PodProxyOptions struct {
+// ProxyOptions is the query options to a resource's proxy call.
+type ProxyOptions struct {
 	metav1.TypeMeta
 
-	// Path is the URL path to use for the current proxy request
-	Path string
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// NodeProxyOptions is the query options to a Node's proxy call
-type NodeProxyOptions struct {
-	metav1.TypeMeta
-
-	// Path is the URL path to use for the current proxy request
-	Path string
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ServiceProxyOptions is the query options to a Service's proxy call.
-type ServiceProxyOptions struct {
-	metav1.TypeMeta
-
-	// Path is the part of URLs that include service endpoints, suffixes,
+	// Path is the part of URLs that include endpoints, suffixes,
 	// and parameters to use for the current proxy request to service.
 	// For example, the whole request URL is
 	// http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy.

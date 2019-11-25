@@ -991,16 +991,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.NodeProxyOptions)(nil), (*core.NodeProxyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NodeProxyOptions_To_core_NodeProxyOptions(a.(*v1.NodeProxyOptions), b.(*core.NodeProxyOptions), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*core.NodeProxyOptions)(nil), (*v1.NodeProxyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_NodeProxyOptions_To_v1_NodeProxyOptions(a.(*core.NodeProxyOptions), b.(*v1.NodeProxyOptions), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1.NodeResources)(nil), (*core.NodeResources)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_NodeResources_To_core_NodeResources(a.(*v1.NodeResources), b.(*core.NodeResources), scope)
 	}); err != nil {
@@ -1311,16 +1301,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.PodProxyOptions)(nil), (*core.PodProxyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_PodProxyOptions_To_core_PodProxyOptions(a.(*v1.PodProxyOptions), b.(*core.PodProxyOptions), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*core.PodProxyOptions)(nil), (*v1.PodProxyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_PodProxyOptions_To_v1_PodProxyOptions(a.(*core.PodProxyOptions), b.(*v1.PodProxyOptions), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1.PodReadinessGate)(nil), (*core.PodReadinessGate)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_PodReadinessGate_To_core_PodReadinessGate(a.(*v1.PodReadinessGate), b.(*core.PodReadinessGate), scope)
 	}); err != nil {
@@ -1438,6 +1418,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*core.ProjectedVolumeSource)(nil), (*v1.ProjectedVolumeSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_ProjectedVolumeSource_To_v1_ProjectedVolumeSource(a.(*core.ProjectedVolumeSource), b.(*v1.ProjectedVolumeSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.ProxyOptions)(nil), (*core.ProxyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ProxyOptions_To_core_ProxyOptions(a.(*v1.ProxyOptions), b.(*core.ProxyOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.ProxyOptions)(nil), (*v1.ProxyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_ProxyOptions_To_v1_ProxyOptions(a.(*core.ProxyOptions), b.(*v1.ProxyOptions), scope)
 	}); err != nil {
 		return err
 	}
@@ -1776,16 +1766,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ServiceProxyOptions)(nil), (*core.ServiceProxyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ServiceProxyOptions_To_core_ServiceProxyOptions(a.(*v1.ServiceProxyOptions), b.(*core.ServiceProxyOptions), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*core.ServiceProxyOptions)(nil), (*v1.ServiceProxyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_ServiceProxyOptions_To_v1_ServiceProxyOptions(a.(*core.ServiceProxyOptions), b.(*v1.ServiceProxyOptions), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1.ServiceSpec)(nil), (*core.ServiceSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_ServiceSpec_To_core_ServiceSpec(a.(*v1.ServiceSpec), b.(*core.ServiceSpec), scope)
 	}); err != nil {
@@ -2006,11 +1986,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*url.Values)(nil), (*v1.NodeProxyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_url_Values_To_v1_NodeProxyOptions(a.(*url.Values), b.(*v1.NodeProxyOptions), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*url.Values)(nil), (*v1.PodAttachOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_url_Values_To_v1_PodAttachOptions(a.(*url.Values), b.(*v1.PodAttachOptions), scope)
 	}); err != nil {
@@ -2031,13 +2006,8 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*url.Values)(nil), (*v1.PodProxyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_url_Values_To_v1_PodProxyOptions(a.(*url.Values), b.(*v1.PodProxyOptions), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*url.Values)(nil), (*v1.ServiceProxyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_url_Values_To_v1_ServiceProxyOptions(a.(*url.Values), b.(*v1.ServiceProxyOptions), scope)
+	if err := s.AddGeneratedConversionFunc((*url.Values)(nil), (*v1.ProxyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_url_Values_To_v1_ProxyOptions(a.(*url.Values), b.(*v1.ProxyOptions), scope)
 	}); err != nil {
 		return err
 	}
@@ -4684,44 +4654,6 @@ func Convert_core_NodeList_To_v1_NodeList(in *core.NodeList, out *v1.NodeList, s
 	return autoConvert_core_NodeList_To_v1_NodeList(in, out, s)
 }
 
-func autoConvert_v1_NodeProxyOptions_To_core_NodeProxyOptions(in *v1.NodeProxyOptions, out *core.NodeProxyOptions, s conversion.Scope) error {
-	out.Path = in.Path
-	return nil
-}
-
-// Convert_v1_NodeProxyOptions_To_core_NodeProxyOptions is an autogenerated conversion function.
-func Convert_v1_NodeProxyOptions_To_core_NodeProxyOptions(in *v1.NodeProxyOptions, out *core.NodeProxyOptions, s conversion.Scope) error {
-	return autoConvert_v1_NodeProxyOptions_To_core_NodeProxyOptions(in, out, s)
-}
-
-func autoConvert_core_NodeProxyOptions_To_v1_NodeProxyOptions(in *core.NodeProxyOptions, out *v1.NodeProxyOptions, s conversion.Scope) error {
-	out.Path = in.Path
-	return nil
-}
-
-// Convert_core_NodeProxyOptions_To_v1_NodeProxyOptions is an autogenerated conversion function.
-func Convert_core_NodeProxyOptions_To_v1_NodeProxyOptions(in *core.NodeProxyOptions, out *v1.NodeProxyOptions, s conversion.Scope) error {
-	return autoConvert_core_NodeProxyOptions_To_v1_NodeProxyOptions(in, out, s)
-}
-
-func autoConvert_url_Values_To_v1_NodeProxyOptions(in *url.Values, out *v1.NodeProxyOptions, s conversion.Scope) error {
-	// WARNING: Field TypeMeta does not have json tag, skipping.
-
-	if values, ok := map[string][]string(*in)["path"]; ok && len(values) > 0 {
-		if err := runtime.Convert_Slice_string_To_string(&values, &out.Path, s); err != nil {
-			return err
-		}
-	} else {
-		out.Path = ""
-	}
-	return nil
-}
-
-// Convert_url_Values_To_v1_NodeProxyOptions is an autogenerated conversion function.
-func Convert_url_Values_To_v1_NodeProxyOptions(in *url.Values, out *v1.NodeProxyOptions, s conversion.Scope) error {
-	return autoConvert_url_Values_To_v1_NodeProxyOptions(in, out, s)
-}
-
 func autoConvert_v1_NodeResources_To_core_NodeResources(in *v1.NodeResources, out *core.NodeResources, s conversion.Scope) error {
 	out.Capacity = *(*core.ResourceList)(unsafe.Pointer(&in.Capacity))
 	return nil
@@ -5880,44 +5812,6 @@ func Convert_url_Values_To_v1_PodPortForwardOptions(in *url.Values, out *v1.PodP
 	return autoConvert_url_Values_To_v1_PodPortForwardOptions(in, out, s)
 }
 
-func autoConvert_v1_PodProxyOptions_To_core_PodProxyOptions(in *v1.PodProxyOptions, out *core.PodProxyOptions, s conversion.Scope) error {
-	out.Path = in.Path
-	return nil
-}
-
-// Convert_v1_PodProxyOptions_To_core_PodProxyOptions is an autogenerated conversion function.
-func Convert_v1_PodProxyOptions_To_core_PodProxyOptions(in *v1.PodProxyOptions, out *core.PodProxyOptions, s conversion.Scope) error {
-	return autoConvert_v1_PodProxyOptions_To_core_PodProxyOptions(in, out, s)
-}
-
-func autoConvert_core_PodProxyOptions_To_v1_PodProxyOptions(in *core.PodProxyOptions, out *v1.PodProxyOptions, s conversion.Scope) error {
-	out.Path = in.Path
-	return nil
-}
-
-// Convert_core_PodProxyOptions_To_v1_PodProxyOptions is an autogenerated conversion function.
-func Convert_core_PodProxyOptions_To_v1_PodProxyOptions(in *core.PodProxyOptions, out *v1.PodProxyOptions, s conversion.Scope) error {
-	return autoConvert_core_PodProxyOptions_To_v1_PodProxyOptions(in, out, s)
-}
-
-func autoConvert_url_Values_To_v1_PodProxyOptions(in *url.Values, out *v1.PodProxyOptions, s conversion.Scope) error {
-	// WARNING: Field TypeMeta does not have json tag, skipping.
-
-	if values, ok := map[string][]string(*in)["path"]; ok && len(values) > 0 {
-		if err := runtime.Convert_Slice_string_To_string(&values, &out.Path, s); err != nil {
-			return err
-		}
-	} else {
-		out.Path = ""
-	}
-	return nil
-}
-
-// Convert_url_Values_To_v1_PodProxyOptions is an autogenerated conversion function.
-func Convert_url_Values_To_v1_PodProxyOptions(in *url.Values, out *v1.PodProxyOptions, s conversion.Scope) error {
-	return autoConvert_url_Values_To_v1_PodProxyOptions(in, out, s)
-}
-
 func autoConvert_v1_PodReadinessGate_To_core_PodReadinessGate(in *v1.PodReadinessGate, out *core.PodReadinessGate, s conversion.Scope) error {
 	out.ConditionType = core.PodConditionType(in.ConditionType)
 	return nil
@@ -6420,6 +6314,44 @@ func autoConvert_core_ProjectedVolumeSource_To_v1_ProjectedVolumeSource(in *core
 // Convert_core_ProjectedVolumeSource_To_v1_ProjectedVolumeSource is an autogenerated conversion function.
 func Convert_core_ProjectedVolumeSource_To_v1_ProjectedVolumeSource(in *core.ProjectedVolumeSource, out *v1.ProjectedVolumeSource, s conversion.Scope) error {
 	return autoConvert_core_ProjectedVolumeSource_To_v1_ProjectedVolumeSource(in, out, s)
+}
+
+func autoConvert_v1_ProxyOptions_To_core_ProxyOptions(in *v1.ProxyOptions, out *core.ProxyOptions, s conversion.Scope) error {
+	out.Path = in.Path
+	return nil
+}
+
+// Convert_v1_ProxyOptions_To_core_ProxyOptions is an autogenerated conversion function.
+func Convert_v1_ProxyOptions_To_core_ProxyOptions(in *v1.ProxyOptions, out *core.ProxyOptions, s conversion.Scope) error {
+	return autoConvert_v1_ProxyOptions_To_core_ProxyOptions(in, out, s)
+}
+
+func autoConvert_core_ProxyOptions_To_v1_ProxyOptions(in *core.ProxyOptions, out *v1.ProxyOptions, s conversion.Scope) error {
+	out.Path = in.Path
+	return nil
+}
+
+// Convert_core_ProxyOptions_To_v1_ProxyOptions is an autogenerated conversion function.
+func Convert_core_ProxyOptions_To_v1_ProxyOptions(in *core.ProxyOptions, out *v1.ProxyOptions, s conversion.Scope) error {
+	return autoConvert_core_ProxyOptions_To_v1_ProxyOptions(in, out, s)
+}
+
+func autoConvert_url_Values_To_v1_ProxyOptions(in *url.Values, out *v1.ProxyOptions, s conversion.Scope) error {
+	// WARNING: Field TypeMeta does not have json tag, skipping.
+
+	if values, ok := map[string][]string(*in)["path"]; ok && len(values) > 0 {
+		if err := runtime.Convert_Slice_string_To_string(&values, &out.Path, s); err != nil {
+			return err
+		}
+	} else {
+		out.Path = ""
+	}
+	return nil
+}
+
+// Convert_url_Values_To_v1_ProxyOptions is an autogenerated conversion function.
+func Convert_url_Values_To_v1_ProxyOptions(in *url.Values, out *v1.ProxyOptions, s conversion.Scope) error {
+	return autoConvert_url_Values_To_v1_ProxyOptions(in, out, s)
 }
 
 func autoConvert_v1_QuobyteVolumeSource_To_core_QuobyteVolumeSource(in *v1.QuobyteVolumeSource, out *core.QuobyteVolumeSource, s conversion.Scope) error {
@@ -7434,44 +7366,6 @@ func autoConvert_core_ServicePort_To_v1_ServicePort(in *core.ServicePort, out *v
 // Convert_core_ServicePort_To_v1_ServicePort is an autogenerated conversion function.
 func Convert_core_ServicePort_To_v1_ServicePort(in *core.ServicePort, out *v1.ServicePort, s conversion.Scope) error {
 	return autoConvert_core_ServicePort_To_v1_ServicePort(in, out, s)
-}
-
-func autoConvert_v1_ServiceProxyOptions_To_core_ServiceProxyOptions(in *v1.ServiceProxyOptions, out *core.ServiceProxyOptions, s conversion.Scope) error {
-	out.Path = in.Path
-	return nil
-}
-
-// Convert_v1_ServiceProxyOptions_To_core_ServiceProxyOptions is an autogenerated conversion function.
-func Convert_v1_ServiceProxyOptions_To_core_ServiceProxyOptions(in *v1.ServiceProxyOptions, out *core.ServiceProxyOptions, s conversion.Scope) error {
-	return autoConvert_v1_ServiceProxyOptions_To_core_ServiceProxyOptions(in, out, s)
-}
-
-func autoConvert_core_ServiceProxyOptions_To_v1_ServiceProxyOptions(in *core.ServiceProxyOptions, out *v1.ServiceProxyOptions, s conversion.Scope) error {
-	out.Path = in.Path
-	return nil
-}
-
-// Convert_core_ServiceProxyOptions_To_v1_ServiceProxyOptions is an autogenerated conversion function.
-func Convert_core_ServiceProxyOptions_To_v1_ServiceProxyOptions(in *core.ServiceProxyOptions, out *v1.ServiceProxyOptions, s conversion.Scope) error {
-	return autoConvert_core_ServiceProxyOptions_To_v1_ServiceProxyOptions(in, out, s)
-}
-
-func autoConvert_url_Values_To_v1_ServiceProxyOptions(in *url.Values, out *v1.ServiceProxyOptions, s conversion.Scope) error {
-	// WARNING: Field TypeMeta does not have json tag, skipping.
-
-	if values, ok := map[string][]string(*in)["path"]; ok && len(values) > 0 {
-		if err := runtime.Convert_Slice_string_To_string(&values, &out.Path, s); err != nil {
-			return err
-		}
-	} else {
-		out.Path = ""
-	}
-	return nil
-}
-
-// Convert_url_Values_To_v1_ServiceProxyOptions is an autogenerated conversion function.
-func Convert_url_Values_To_v1_ServiceProxyOptions(in *url.Values, out *v1.ServiceProxyOptions, s conversion.Scope) error {
-	return autoConvert_url_Values_To_v1_ServiceProxyOptions(in, out, s)
 }
 
 func autoConvert_v1_ServiceSpec_To_core_ServiceSpec(in *v1.ServiceSpec, out *core.ServiceSpec, s conversion.Scope) error {

@@ -136,7 +136,7 @@ func (r *RequestScope) GetEquivalentResourceMapper() runtime.EquivalentResourceM
 }
 
 // ConnectResource returns a function that handles a connect request on a rest.Storage object.
-func ConnectResource(connecter rest.Connecter, scope *RequestScope, admit admission.Interface, restPath string, isSubresource bool) http.HandlerFunc {
+func ConnectResource(connecter rest.Connector, scope *RequestScope, admit admission.Interface, restPath string, isSubresource bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		if isDryRun(req.URL) {
 			scope.err(errors.NewBadRequest("dryRun is not supported"), w, req)

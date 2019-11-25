@@ -539,7 +539,7 @@ func (storage *SimpleRESTStorage) Watcher() *watch.FakeWatcher {
 	return storage.fakeWatch
 }
 
-// Implement Connecter
+// Implement Connector
 type ConnecterRESTStorage struct {
 	connectHandler http.Handler
 	handlerFunc    func() http.Handler
@@ -551,8 +551,8 @@ type ConnecterRESTStorage struct {
 	takesPath              string
 }
 
-// Implement Connecter
-var _ = rest.Connecter(&ConnecterRESTStorage{})
+// Implement Connector
+var _ = rest.Connector(&ConnecterRESTStorage{})
 
 func (s *ConnecterRESTStorage) New() runtime.Object {
 	return &genericapitesting.Simple{}

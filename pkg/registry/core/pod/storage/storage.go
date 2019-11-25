@@ -19,6 +19,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -42,8 +44,10 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
 	podrest "k8s.io/kubernetes/pkg/registry/core/pod/rest"
+	restproxy "k8s.io/kubernetes/pkg/registry/core/rest/proxy"
 )
 
 // PodStorage includes storage for pods and all sub resources
@@ -55,7 +59,7 @@ type PodStorage struct {
 	Status              *StatusREST
 	EphemeralContainers *EphemeralContainersREST
 	Log                 *podrest.LogREST
-	Proxy               *podrest.ProxyREST
+	Proxy               *restproxy.REST
 	Exec                *podrest.ExecREST
 	Attach              *podrest.AttachREST
 	PortForward         *podrest.PortForwardREST
@@ -98,15 +102,16 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 	ephemeralContainersStore.UpdateStrategy = pod.EphemeralContainersStrategy
 
 	bindingREST := &BindingREST{store: store}
+	podREST := &REST{store, proxyTransport}
 	return PodStorage{
-		Pod:                 &REST{store, proxyTransport},
+		Pod:                 podREST,
 		Binding:             &BindingREST{store: store},
 		LegacyBinding:       &LegacyBindingREST{bindingREST},
 		Eviction:            newEvictionStorage(store, podDisruptionBudgetClient),
 		Status:              &StatusREST{store: &statusStore},
 		EphemeralContainers: &EphemeralContainersREST{store: &ephemeralContainersStore},
 		Log:                 &podrest.LogREST{Store: store, KubeletConn: k},
-		Proxy:               &podrest.ProxyREST{Store: store, ProxyTransport: proxyTransport},
+		Proxy:               &restproxy.REST{Redirector: podREST, ProxyTransport: proxyTransport},
 		Exec:                &podrest.ExecREST{Store: store, KubeletConn: k},
 		Attach:              &podrest.AttachREST{Store: store, KubeletConn: k},
 		PortForward:         &podrest.PortForwardREST{Store: store, KubeletConn: k},
@@ -117,8 +122,42 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a pods location from its HostIP
-func (r *REST) ResourceLocation(ctx context.Context, name string) (*url.URL, http.RoundTripper, error) {
-	return pod.ResourceLocation(r, r.proxyTransport, ctx, name)
+func (r *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
+	// Allow ID as "podname" or "podname:port" or "scheme:podname:port".
+	// If port is not specified, try to use the first defined port on the pod.
+	scheme, name, port, valid := utilnet.SplitSchemeNamePort(id)
+	if !valid {
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid pod request %q", id))
+	}
+
+	p, err := pod.GetPod(r, ctx, name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Try to figure out a port.
+	if port == "" {
+		for i := range p.Spec.Containers {
+			if len(p.Spec.Containers[i].Ports) > 0 {
+				port = fmt.Sprintf("%d", p.Spec.Containers[i].Ports[0].ContainerPort)
+				break
+			}
+		}
+	}
+	podIP := pod.GetPodIP(p)
+	if err := proxyutil.IsProxyableIP(podIP); err != nil {
+		return nil, nil, errors.NewBadRequest(err.Error())
+	}
+
+	loc := &url.URL{
+		Scheme: scheme,
+	}
+	if port == "" {
+		loc.Host = podIP
+	} else {
+		loc.Host = net.JoinHostPort(podIP, port)
+	}
+	return loc, r.proxyTransport, nil
 }
 
 // Implement ShortNamesProvider
