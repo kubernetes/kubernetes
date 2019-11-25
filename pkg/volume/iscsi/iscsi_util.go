@@ -926,9 +926,13 @@ func isSessionBusy(host volume.VolumeHost, portal, iqn string) bool {
 // getVolCount returns the number of volumes in use by the kubelet.
 // It does so by counting the number of directories prefixed by the given portal and IQN.
 func getVolCount(dir, portal, iqn string) (int, error) {
-	// The topmost dirs are named after the ifaces, e.g., iface-default or iface-127.0.0.1:3260:pv0
+	// For FileSystem volumes, the topmost dirs are named after the ifaces, e.g., iface-default or iface-127.0.0.1:3260:pv0.
+	// For Block volumes, the default topmost dir is volumeDevices.
 	contents, err := ioutil.ReadDir(dir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
 		return 0, err
 	}
 
