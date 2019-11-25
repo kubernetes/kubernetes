@@ -19,7 +19,7 @@
 
 ### Running Locally
 
-- Install [GitBook Toolchain](https://docs.gitbook.com/)
+- Install [GitBook Toolchain](https://gitbookio.gitbooks.io/docs-toolchain/setup.html)
 - From `docs/book` run `npm install`  to install node_modules locally (don't run install, it updates the shrinkwrap.json)
 - From `docs/book` run `gitbook serve`
 - Go to `http://localhost:4000` in a browser
