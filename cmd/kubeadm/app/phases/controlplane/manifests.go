@@ -260,11 +260,13 @@ func isValidAuthzMode(authzMode string) bool {
 // the available bits to maximize the number used for nodes, but still have the node
 // CIDR be a multiple of eight.
 //
-func calcNodeCidrSize(podSubnet string) string {
+func calcNodeCidrSize(podSubnet string) (string, bool) {
 	maskSize := "24"
+	isIPv6 := false
 	if ip, podCidr, err := net.ParseCIDR(podSubnet); err == nil {
 		if utilsnet.IsIPv6(ip) {
 			var nodeCidrSize int
+			isIPv6 = true
 			podNetSize, totalBits := podCidr.Mask.Size()
 			switch {
 			case podNetSize == 112:
@@ -280,7 +282,7 @@ func calcNodeCidrSize(podSubnet string) string {
 			maskSize = strconv.Itoa(nodeCidrSize)
 		}
 	}
-	return maskSize
+	return maskSize, isIPv6
 }
 
 // getControllerManagerCommand builds the right controller manager command from the given config object and version
@@ -324,12 +326,25 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string 
 
 	// TODO: The following code should be remvoved after dual-stack is GA.
 	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
-	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {
+	enabled, present := cfg.FeatureGates[features.IPv6DualStack]
+	if present {
 		defaultArguments["feature-gates"] = fmt.Sprintf("%s=%t", features.IPv6DualStack, enabled)
-	} else if cfg.Networking.PodSubnet != "" {
-		// TODO(Arvinderpal): Needs to be fixed once PR #73977 lands. Should be a list of maskSizes.
-		maskSize := calcNodeCidrSize(cfg.Networking.PodSubnet)
-		defaultArguments["node-cidr-mask-size"] = maskSize
+	}
+	if cfg.Networking.PodSubnet != "" {
+		if enabled {
+			// any errors will be caught during validation
+			subnets := strings.Split(cfg.Networking.PodSubnet, ",")
+			for _, podSubnet := range subnets {
+				if maskSize, isIPv6 := calcNodeCidrSize(podSubnet); isIPv6 {
+					defaultArguments["node-cidr-mask-size-ipv6"] = maskSize
+				} else {
+					defaultArguments["node-cidr-mask-size-ipv4"] = maskSize
+				}
+			}
+		} else {
+			maskSize, _ := calcNodeCidrSize(cfg.Networking.PodSubnet)
+			defaultArguments["node-cidr-mask-size"] = maskSize
+		}
 	}
 
 	command := []string{"kube-controller-manager"}
