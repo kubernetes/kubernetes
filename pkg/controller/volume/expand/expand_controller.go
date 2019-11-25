@@ -101,7 +101,8 @@ func NewExpandController(
 	pvInformer coreinformers.PersistentVolumeInformer,
 	scInformer storageclassinformer.StorageClassInformer,
 	cloud cloudprovider.Interface,
-	plugins []volume.VolumePlugin) (ExpandController, error) {
+	plugins []volume.VolumePlugin,
+	prober volume.DynamicPluginProber) (ExpandController, error) {
 
 	expc := &expandController{
 		kubeClient:        kubeClient,
@@ -115,7 +116,7 @@ func NewExpandController(
 		queue:             workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "volume_expand"),
 	}
 
-	if err := expc.volumePluginMgr.InitPlugins(plugins, nil, expc); err != nil {
+	if err := expc.volumePluginMgr.InitPlugins(plugins, prober, expc); err != nil {
 		return nil, fmt.Errorf("could not initialize volume plugins for Expand Controller : %+v", err)
 	}
 
