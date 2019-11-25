@@ -63,14 +63,18 @@ var _ discovery.CachedDiscoveryInterface = &CachedDiscoveryClient{}
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
 func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	filename := filepath.Join(d.cacheDirectory, groupVersion, "serverresources.json")
-	cachedBytes, err := d.getCachedFile(filename)
+	cachedBytes, cacheErr := d.getCachedFile(filename)
 	// don't fail on errors, we either don't have a file or won't be able to run the cached check. Either way we can fallback.
-	if err == nil {
+	if cacheErr == nil {
 		cachedResources := &metav1.APIResourceList{}
-		if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), cachedBytes, cachedResources); err == nil {
+		err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), cachedBytes, cachedResources)
+		if err == nil {
 			klog.V(10).Infof("returning cached discovery info from %v", filename)
 			return cachedResources, nil
 		}
+		klog.V(6).Infof("failed to decode cached discovery info from %v due to %v, fallback to live discover", filename, err)
+	} else {
+		klog.V(6).Infof("failed to read cache from %v due to %v, fallback to live discover", filename, cacheErr)
 	}
 
 	liveResources, err := d.delegate.ServerResourcesForGroupVersion(groupVersion)
@@ -106,14 +110,18 @@ func (d *CachedDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, 
 // preferred version.
 func (d *CachedDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
 	filename := filepath.Join(d.cacheDirectory, "servergroups.json")
-	cachedBytes, err := d.getCachedFile(filename)
+	cachedBytes, cacheErr := d.getCachedFile(filename)
 	// don't fail on errors, we either don't have a file or won't be able to run the cached check. Either way we can fallback.
-	if err == nil {
+	if cacheErr == nil {
 		cachedGroups := &metav1.APIGroupList{}
-		if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), cachedBytes, cachedGroups); err == nil {
+		err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), cachedBytes, cachedGroups)
+		if err == nil {
 			klog.V(10).Infof("returning cached discovery info from %v", filename)
 			return cachedGroups, nil
 		}
+		klog.V(6).Infof("failed to decode cached discovery info from %v due to %v, fallback to live discover", filename, err)
+	} else {
+		klog.V(6).Infof("failed to read cache from %v due to %v, fallback to live discover", filename, cacheErr)
 	}
 
 	liveGroups, err := d.delegate.ServerGroups()
