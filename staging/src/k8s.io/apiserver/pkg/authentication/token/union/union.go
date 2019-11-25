@@ -18,6 +18,7 @@ package union
 
 import (
 	"context"
+	"fmt"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -58,7 +59,7 @@ func (authHandler *unionAuthTokenHandler) AuthenticateToken(ctx context.Context,
 			if authHandler.FailOnError {
 				return info, ok, err
 			}
-			errlist = append(errlist, err)
+			errlist = append(errlist, fmt.Errorf("%T: %v", currAuthRequestHandler, err))
 			continue
 		}
 

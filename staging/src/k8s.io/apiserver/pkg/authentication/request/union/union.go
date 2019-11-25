@@ -17,6 +17,7 @@ limitations under the License.
 package union
 
 import (
+	"fmt"
 	"net/http"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -58,7 +59,7 @@ func (authHandler *unionAuthRequestHandler) AuthenticateRequest(req *http.Reques
 			if authHandler.FailOnError {
 				return resp, ok, err
 			}
-			errlist = append(errlist, err)
+			errlist = append(errlist, fmt.Errorf("%T: %v", currAuthRequestHandler, err))
 			continue
 		}
 
