@@ -1176,7 +1176,7 @@ func TestGetListComponentStatus(t *testing.T) {
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, statuses)},
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: componentStatusTableObjBody(codec, (*statuses).Items...)},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -1184,10 +1184,10 @@ func TestGetListComponentStatus(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"componentstatuses"})
 
-	expected := `NAME            AGE
-servergood      <unknown>
-serverbad       <unknown>
-serverunknown   <unknown>
+	expected := `NAME            STATUS      MESSAGE   ERROR
+servergood      Healthy     ok        
+serverbad       Unhealthy             bad status: 500
+serverunknown   Unhealthy             fizzbuzz error
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
@@ -2783,6 +2783,33 @@ func nodeTableObjBody(codec runtime.Codec, nodes ...corev1.Node) io.ReadCloser {
 		table.Rows = append(table.Rows, metav1.TableRow{
 			Object: runtime.RawExtension{Raw: b.Bytes()},
 			Cells:  []interface{}{nodes[i].Name, "Unknown", "<none>", "<unknown>", ""},
+		})
+	}
+	return cmdtesting.ObjBody(codec, table)
+}
+
+// build a meta table response from a componentStatus list
+func componentStatusTableObjBody(codec runtime.Codec, componentStatuses ...corev1.ComponentStatus) io.ReadCloser {
+	table := &metav1.Table{
+		ColumnDefinitions: []metav1.TableColumnDefinition{
+			{Name: "Name", Type: "string", Format: "name"},
+			{Name: "Status", Type: "string", Format: ""},
+			{Name: "Message", Type: "string", Format: ""},
+			{Name: "Error", Type: "string", Format: ""},
+		},
+	}
+	for _, v := range componentStatuses {
+		b := bytes.NewBuffer(nil)
+		codec.Encode(&v, b)
+		var status string
+		if v.Conditions[0].Status == corev1.ConditionTrue {
+			status = "Healthy"
+		} else {
+			status = "Unhealthy"
+		}
+		table.Rows = append(table.Rows, metav1.TableRow{
+			Object: runtime.RawExtension{Raw: b.Bytes()},
+			Cells:  []interface{}{v.Name, status, v.Conditions[0].Message, v.Conditions[0].Error},
 		})
 	}
 	return cmdtesting.ObjBody(codec, table)
