@@ -372,6 +372,11 @@ func (o *ApplyOptions) Run() error {
 		}
 	}
 
+	// Enforce CLI specified namespace on server request.
+	if o.EnforceNamespace {
+		o.VisitedNamespaces.Insert(o.Namespace)
+	}
+
 	// Generates the objects using the resource builder if they have not
 	// already been stored by calling "SetObjects()" in the pre-processor.
 	infos, err := o.GetObjects()
@@ -424,7 +429,6 @@ func (o *ApplyOptions) Run() error {
 				}
 				if errors.IsConflict(err) {
 					err = fmt.Errorf(`%v
-
 Please review the fields above--they currently have other managers. Here
 are the ways you can resolve this warning:
 * If you intend to manage all of these fields, please re-run the apply
@@ -435,7 +439,6 @@ are the ways you can resolve this warning:
 * You may co-own fields by updating your manifest to match the existing
   value; in this case, you'll become the manager if the other manager(s)
   stop managing the field (remove it from their configuration).
-
 See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 				}
 				return err
