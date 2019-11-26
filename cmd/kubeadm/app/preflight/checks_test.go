@@ -753,18 +753,20 @@ func TestSetHasItemOrAll(t *testing.T) {
 func TestImagePullCheck(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		RunScript: []fakeexec.FakeRunAction{
-			// Test case 1: img1 and img2 exist, img3 doesn't exist
+			// Test case 1: pull 3 images successfully
 			func() ([]byte, []byte, error) { return nil, nil, nil },
 			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
 
-			// Test case 2: images don't exist
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
+			// Test case 2: image pull errors
+			func() ([]byte, []byte, error) { return nil, nil, nil },
 			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			// Test case1: pull only img3
+			// Test case1: pull 3 images
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return nil, nil },
 			func() ([]byte, error) { return nil, nil },
 			// Test case 2: fail to pull image2 and image3
 			func() ([]byte, error) { return nil, nil },
@@ -775,10 +777,6 @@ func TestImagePullCheck(t *testing.T) {
 
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -803,7 +801,7 @@ func TestImagePullCheck(t *testing.T) {
 		t.Fatalf("did not expect any warnings but got %q", warnings)
 	}
 	if len(errors) != 0 {
-		t.Fatalf("expected 1 errors but got %d: %q", len(errors), errors)
+		t.Fatalf("expected 0 errors but got %d: %q", len(errors), errors)
 	}
 
 	warnings, errors = check.Check()
