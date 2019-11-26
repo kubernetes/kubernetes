@@ -74,7 +74,7 @@ func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}
 		return asPartialObjectMetadataList(obj, target.GroupVersion())
 
 	case target.Kind == "Table":
-		options, ok := opts.(*metav1beta1.TableOptions)
+		options, ok := opts.(*metav1.TableOptions)
 		if !ok {
 			return nil, fmt.Errorf("unexpected TableOptions, got %T", opts)
 		}
@@ -93,8 +93,8 @@ func optionsForTransform(mediaType negotiation.MediaTypeOptions, req *http.Reque
 	switch target := mediaType.Convert; {
 	case target == nil:
 	case target.Kind == "Table" && (target.GroupVersion() == metav1beta1.SchemeGroupVersion || target.GroupVersion() == metav1.SchemeGroupVersion):
-		opts := &metav1beta1.TableOptions{}
-		if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), metav1beta1.SchemeGroupVersion, opts); err != nil {
+		opts := &metav1.TableOptions{}
+		if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), metav1.SchemeGroupVersion, opts); err != nil {
 			return nil, err
 		}
 		switch errs := validation.ValidateTableOptions(opts); len(errs) {
@@ -159,7 +159,7 @@ func (e errNotAcceptable) Status() metav1.Status {
 	}
 }
 
-func asTable(ctx context.Context, result runtime.Object, opts *metav1beta1.TableOptions, scope *RequestScope, groupVersion schema.GroupVersion) (runtime.Object, error) {
+func asTable(ctx context.Context, result runtime.Object, opts *metav1.TableOptions, scope *RequestScope, groupVersion schema.GroupVersion) (runtime.Object, error) {
 	switch groupVersion {
 	case metav1beta1.SchemeGroupVersion, metav1.SchemeGroupVersion:
 	default:
