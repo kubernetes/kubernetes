@@ -427,6 +427,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				// This assumption is based on a lack of TableColumnDefinition
 				// in pkg/printers/internalversion/printers.go
 				"ClusterRole": true,
+				"Role":        true,
 				"LimitRange":  true,
 				"PodPreset":   true,
 
@@ -434,14 +435,13 @@ var _ = SIGDescribe("Kubectl client", func() {
 				"Node": true,
 
 				// ignored temporarily while waiting for bug fix.
-				"ComponentStatus":    true,
-				"ClusterRoleBinding": true,
-				"ResourceQuota":      true,
+				"CustomResourceDefinition": true,
 
 				// ignored because no test data exists.
 				// Do not add anything to this list, instead add fixtures in
 				// the test/integration/etcd package.
 				"BackendConfig":         true,
+				"ComponentStatus":       true,
 				"NodeMetrics":           true,
 				"PodMetrics":            true,
 				"VolumeSnapshotClass":   true,
@@ -2606,10 +2606,19 @@ func createObjValidateOutputAndCleanup(client dynamic.ResourceInterface, obj *un
 
 	splitOutput := strings.SplitN(output, "\n", 2)
 	fields := strings.Fields(splitOutput[0])
-	if resource.Namespaced {
-		framework.ExpectNotEqual(fields, []string{"NAMESPACE", "NAME", "CREATED", "AT"}, fmt.Sprintf("expected non-default fields for namespaced resource: %s", resource.Name))
-	} else {
-		framework.ExpectNotEqual(fields, []string{"NAME", "AGE"}, fmt.Sprintf("expected non-default fields for resource: %s", resource.Name))
+
+	defaultColumns := [][]string{
+		// namespaced, server-side
+		{"NAMESPACE", "NAME", "CREATED", "AT"},
+		// namespaced, client-side
+		{"NAMESPACE", "NAME", "AGE"},
+		// cluster-scoped, server-side
+		{"NAME", "CREATED", "AT"},
+		// cluster-scoped, client-side
+		{"NAME", "AGE"},
+	}
+	for _, defaults := range defaultColumns {
+		framework.ExpectNotEqual(fields, defaults, fmt.Sprintf("expected non-default fields for resource: %s", resource.Name))
 	}
 }
 
