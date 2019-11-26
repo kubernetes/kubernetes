@@ -231,7 +231,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 				},
 			},
 			checkError: func(err error) bool {
-				return strings.Contains(err.Error(), "Only bound persistent volume claims can be expanded")
+				return strings.Contains(err.Error(), "only bound persistent volume claims can be expanded")
 			},
 		},
 	}

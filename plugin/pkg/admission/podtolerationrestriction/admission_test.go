@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -228,7 +227,7 @@ func TestPodAdmission(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.testName, func(t *testing.T) {
-			namespace := &corev1.Namespace{
+			namespace := &v1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "testNamespace",
 					Namespace:   "",
@@ -328,7 +327,7 @@ func TestIgnoreUpdatingInitializedPod(t *testing.T) {
 	if err != nil {
 		t.Errorf("error in marshalling namespace tolerations %v", namespaceTolerations)
 	}
-	namespace := &corev1.Namespace{
+	namespace := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testNamespace",
 			Namespace: "",

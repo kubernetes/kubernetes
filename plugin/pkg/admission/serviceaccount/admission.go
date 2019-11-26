@@ -259,11 +259,7 @@ func shouldIgnore(a admission.Attributes) bool {
 		return true
 	}
 	_, ok := obj.(*api.Pod)
-	if !ok {
-		return true
-	}
-
-	return false
+	return !ok
 }
 
 func shouldAutomount(sa *corev1.ServiceAccount, pod *api.Pod) bool {
@@ -427,7 +423,7 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 	// Find the name of a referenced ServiceAccountToken secret we can mount
 	serviceAccountToken, err := s.getReferencedServiceAccountToken(serviceAccount)
 	if err != nil {
-		return fmt.Errorf("Error looking up service account token for %s/%s: %v", serviceAccount.Namespace, serviceAccount.Name, err)
+		return fmt.Errorf("error looking up service account token for %s/%s: %v", serviceAccount.Namespace, serviceAccount.Name, err)
 	}
 	if len(serviceAccountToken) == 0 {
 		// We don't have an API token to mount, so return

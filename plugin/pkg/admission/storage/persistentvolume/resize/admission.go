@@ -99,7 +99,7 @@ func (pvcr *persistentVolumeClaimResize) Validate(ctx context.Context, a admissi
 	}
 
 	if oldPvc.Status.Phase != api.ClaimBound {
-		return admission.NewForbidden(a, fmt.Errorf("Only bound persistent volume claims can be expanded"))
+		return admission.NewForbidden(a, fmt.Errorf("only bound persistent volume claims can be expanded"))
 	}
 
 	// Growing Persistent volumes is only allowed for PVCs for which their StorageClass

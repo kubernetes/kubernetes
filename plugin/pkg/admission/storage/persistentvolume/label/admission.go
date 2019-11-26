@@ -335,7 +335,7 @@ func (l *persistentVolumeLabel) getAzurePVLabeler() (cloudprovider.PVLabeler, er
 
 		azurePVLabeler, ok := cloudProvider.(cloudprovider.PVLabeler)
 		if !ok {
-			return nil, errors.New("Azure cloud provider does not implement PV labeling")
+			return nil, errors.New("the Azure cloud provider does not implement PV labeling")
 		}
 		l.azurePVLabeler = azurePVLabeler
 	}

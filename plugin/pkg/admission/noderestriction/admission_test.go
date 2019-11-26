@@ -24,7 +24,6 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -68,13 +67,13 @@ func init() {
 	utilruntime.Must(csiNodeInfoEnabledFeature.SetFromMap(map[string]bool{string(features.CSINodeInfo): true}))
 }
 
-func makeTestPod(namespace, name, node string, mirror bool) (*api.Pod, *corev1.Pod) {
+func makeTestPod(namespace, name, node string, mirror bool) (*api.Pod, *v1.Pod) {
 	corePod := &api.Pod{}
 	corePod.Namespace = namespace
 	corePod.UID = types.UID("pod-uid")
 	corePod.Name = name
 	corePod.Spec.NodeName = node
-	v1Pod := &corev1.Pod{}
+	v1Pod := &v1.Pod{}
 	v1Pod.Namespace = namespace
 	v1Pod.UID = types.UID("pod-uid")
 	v1Pod.Name = name

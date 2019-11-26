@@ -87,14 +87,12 @@ func addClusterRoleLabel(roles []rbacv1.ClusterRole) {
 	for i := range roles {
 		addDefaultMetadata(&roles[i])
 	}
-	return
 }
 
 func addClusterRoleBindingLabel(rolebindings []rbacv1.ClusterRoleBinding) {
 	for i := range rolebindings {
 		addDefaultMetadata(&rolebindings[i])
 	}
-	return
 }
 
 func NodeRules() []rbacv1.PolicyRule {

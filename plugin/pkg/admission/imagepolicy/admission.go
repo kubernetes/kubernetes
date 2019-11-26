@@ -182,7 +182,7 @@ func (a *Plugin) admitPod(ctx context.Context, pod *api.Pod, attributes admissio
 		}
 		var statusCode int
 		if result.StatusCode(&statusCode); statusCode < 200 || statusCode >= 300 {
-			return a.webhookError(pod, attributes, fmt.Errorf("Error contacting webhook: %d", statusCode))
+			return a.webhookError(pod, attributes, fmt.Errorf("error contacting webhook: %d", statusCode))
 		}
 
 		if err := result.Into(review); err != nil {
