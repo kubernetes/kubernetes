@@ -5424,6 +5424,14 @@ type Secret struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
+	// Immutable, if set to true, ensures that data stored in the Secret cannot
+	// be updated (only object metadata can be modified).
+	// If not set to true, the field can be modified at any time.
+	// Defaulted to nil.
+	// This is an alpha field enabled by ImmutableEphemeralVolumes feature gate.
+	// +optional
+	Immutable *bool `json:"immutable,omitempty"`
+
 	// Data contains the secret data. Each key must consist of alphanumeric
 	// characters, '-', '_' or '.'. The serialized form of the secret data is a
 	// base64 encoded string, representing the arbitrary (possibly non-string)
@@ -5556,6 +5564,14 @@ type ConfigMap struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Immutable, if set to true, ensures that data stored in the ConfigMap cannot
+	// be updated (only object metadata can be modified).
+	// If not set to true, the field can be modified at any time.
+	// Defaulted to nil.
+	// This is an alpha field enabled by ImmutableEphemeralVolumes feature gate.
+	// +optional
+	Immutable *bool `json:"immutable,omitempty"`
 
 	// Data contains the configuration data.
 	// Each key must consist of alphanumeric characters, '-', '_' or '.'.
