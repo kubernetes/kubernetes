@@ -97,6 +97,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//cmd/controller-manager/app/options:go_default_library",
+        "//cmd/kube-controller-manager/app/config:go_default_library",
         "//pkg/controller/apis/config:go_default_library",
         "//pkg/controller/certificates/signer/config:go_default_library",
         "//pkg/controller/daemon/config:go_default_library",
