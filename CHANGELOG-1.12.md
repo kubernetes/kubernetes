@@ -1596,7 +1596,7 @@ filename | sha256 hash
 * Update to golang 1.10.4 ([#68802](https://github.com/kubernetes/kubernetes/pull/68802), [@ixdy](https://github.com/ixdy))
 * kubeadm now uses fat manifests for the kube-dns images ([#68830](https://github.com/kubernetes/kubernetes/pull/68830), [@rosti](https://github.com/rosti))
 * Update Cluster Autoscaler version to 1.12.0. ([#68739](https://github.com/kubernetes/kubernetes/pull/68739), [@losipiuk](https://github.com/losipiuk))
-    * See https://github.com/kubernetes/autoscaler/releases/tag/1.12.0 for CA release notes.
+    * See https://github.com/kubernetes/autoscaler/releases/tag/cluster-autoscaler-1.12.0 for CA release notes.
 * kube-proxy restores the *filter table when running in ipvs mode. ([#68786](https://github.com/kubernetes/kubernetes/pull/68786), [@alexjx](https://github.com/alexjx))
 * New kubeDNS image fixes an issue where SRV records were incorrectly being compressed. Added manifest file for multiple arch images. ([#68430](https://github.com/kubernetes/kubernetes/pull/68430), [@prameshj](https://github.com/prameshj))
 * Drain should delete terminal pods. ([#68767](https://github.com/kubernetes/kubernetes/pull/68767), [@ravisantoshgudimetla](https://github.com/ravisantoshgudimetla))
