@@ -28,10 +28,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
 )
@@ -106,7 +105,7 @@ func LogFailedContainers(c clientset.Interface, ns string, logFunc func(ftm stri
 	logFunc("Running kubectl logs on non-ready containers in %v", ns)
 	for _, pod := range podList.Items {
 		if res, err := testutils.PodRunningReady(&pod); !res || err != nil {
-			kubectlLogPod(c, pod, "", framework.Logf)
+			kubectlLogPod(c, pod, "", e2elog.Logf)
 		}
 	}
 }

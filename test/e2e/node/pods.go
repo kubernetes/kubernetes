@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
