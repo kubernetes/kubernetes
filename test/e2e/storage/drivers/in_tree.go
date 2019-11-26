@@ -1417,7 +1417,9 @@ func InitAzureDiskDriver() testsuites.TestDriver {
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
+				"ext3",
 				"ext4",
+				"xfs",
 			),
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
@@ -1505,13 +1507,6 @@ func (a *azureDiskDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTe
 
 func (a *azureDiskDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
 	ginkgo.By("creating a test azure disk volume")
-	if volType == testpatterns.InlineVolume {
-		// Volume will be created in framework.TestContext.CloudConfig.Zone zone,
-		// so pods should be also scheduled there.
-		config.ClientNodeSelector = map[string]string{
-			v1.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
-		}
-	}
 	volumeName, err := e2epv.CreatePDWithRetry()
 	framework.ExpectNoError(err)
 	return &azureDiskVolume{
