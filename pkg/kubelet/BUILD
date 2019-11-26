@@ -68,6 +68,7 @@ go_library(
         "//pkg/kubelet/network/dns:go_default_library",
         "//pkg/kubelet/nodelease:go_default_library",
         "//pkg/kubelet/nodestatus:go_default_library",
+        "//pkg/kubelet/nodestatus/nodeaddress:go_default_library",
         "//pkg/kubelet/oom:go_default_library",
         "//pkg/kubelet/pleg:go_default_library",
         "//pkg/kubelet/pluginmanager:go_default_library",
