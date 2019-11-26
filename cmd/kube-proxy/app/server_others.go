@@ -26,7 +26,7 @@ import (
 	"net"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -142,7 +142,8 @@ func newProxyServer(
 	if nodeIP.IsUnspecified() {
 		nodeIP = utilnode.GetNodeIP(client, hostname)
 		if nodeIP == nil {
-			return nil, fmt.Errorf("unable to get node IP for hostname %s", hostname)
+			klog.V(0).Infof("can't determine this node's IP, assuming 127.0.0.1; if this is incorrect, please set the --bind-address flag")
+			nodeIP = net.ParseIP("127.0.0.1")
 		}
 	}
 	if proxyMode == proxyModeIPTables {
