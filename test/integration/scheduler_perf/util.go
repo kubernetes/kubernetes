@@ -17,17 +17,12 @@ limitations under the License.
 package benchmark
 
 import (
-	"fmt"
-	"sort"
-	"strings"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/kubernetes/test/integration/util"
 )
 
@@ -70,131 +65,4 @@ func getScheduledPods(podInformer coreinformers.PodInformer) ([]*v1.Pod, error) 
 		}
 	}
 	return scheduled, nil
-}
-
-type bucket struct {
-	cumulativeCount uint64
-	upperBound      float64
-}
-
-type histogram struct {
-	sampleCount uint64
-	sampleSum   float64
-	buckets     []bucket
-}
-
-func (h *histogram) string() string {
-	var lines []string
-	var last uint64
-	for _, b := range h.buckets {
-		lines = append(lines, fmt.Sprintf("%v %v", b.upperBound, b.cumulativeCount-last))
-		last = b.cumulativeCount
-	}
-	return strings.Join(lines, "\n")
-}
-
-func (h *histogram) subtract(y *histogram) {
-	h.sampleCount -= y.sampleCount
-	h.sampleSum -= y.sampleSum
-	for i := range h.buckets {
-		h.buckets[i].cumulativeCount -= y.buckets[i].cumulativeCount
-	}
-}
-
-func (h *histogram) deepCopy() *histogram {
-	var buckets []bucket
-	for _, b := range h.buckets {
-		buckets = append(buckets, b)
-	}
-	return &histogram{
-		sampleCount: h.sampleCount,
-		sampleSum:   h.sampleSum,
-		buckets:     buckets,
-	}
-}
-
-type histogramSet map[string]map[string]*histogram
-
-func (hs histogramSet) string(metricName string) string {
-	sets := make(map[string][]uint64)
-	names := []string{}
-	labels := []string{}
-	hLen := 0
-	for name, h := range hs {
-		sets[name] = []uint64{}
-		names = append(names, name)
-		var last uint64
-		for _, b := range h[metricName].buckets {
-			sets[name] = append(sets[name], b.cumulativeCount-last)
-			last = b.cumulativeCount
-			if hLen == 0 {
-				labels = append(labels, fmt.Sprintf("%v", b.upperBound))
-			}
-		}
-
-		hLen = len(h[metricName].buckets)
-	}
-
-	sort.Strings(names)
-
-	lines := []string{"# " + strings.Join(names, " ")}
-	for i := 0; i < hLen; i++ {
-		counts := []string{}
-		for _, name := range names {
-			counts = append(counts, fmt.Sprintf("%v", sets[name][i]))
-		}
-		lines = append(lines, fmt.Sprintf("%v %v", labels[i], strings.Join(counts, " ")))
-	}
-
-	return strings.Join(lines, "\n")
-}
-
-var prevHistogram = make(map[string]*histogram)
-
-func collectRelativeMetrics(metrics []string) map[string]*histogram {
-	rh := make(map[string]*histogram)
-	m, _ := legacyregistry.DefaultGatherer.Gather()
-	for _, mFamily := range m {
-		if mFamily.Name == nil {
-			continue
-		}
-		if !strings.HasPrefix(*mFamily.Name, "scheduler") {
-			continue
-		}
-
-		metricFound := false
-		for _, metricsName := range metrics {
-			if *mFamily.Name == metricsName {
-				metricFound = true
-				break
-			}
-		}
-
-		if !metricFound {
-			continue
-		}
-
-		hist := mFamily.GetMetric()[0].GetHistogram()
-		h := &histogram{
-			sampleCount: *hist.SampleCount,
-			sampleSum:   *hist.SampleSum,
-		}
-
-		for _, bckt := range hist.Bucket {
-			b := bucket{
-				cumulativeCount: *bckt.CumulativeCount,
-				upperBound:      *bckt.UpperBound,
-			}
-			h.buckets = append(h.buckets, b)
-		}
-
-		rh[*mFamily.Name] = h.deepCopy()
-		if prevHistogram[*mFamily.Name] != nil {
-			rh[*mFamily.Name].subtract(prevHistogram[*mFamily.Name])
-		}
-		prevHistogram[*mFamily.Name] = h
-
-	}
-
-	return rh
 }
