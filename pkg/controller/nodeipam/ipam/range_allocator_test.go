@@ -26,9 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/util/testing"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/testutil"
+	testutilrecorder "k8s.io/kubernetes/pkg/controller/testutil"
 )
 
 const (
@@ -240,7 +241,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			return
 		}
 		rangeAllocator.nodesSynced = alwaysReady
-		rangeAllocator.recorder = testutil.NewFakeRecorder()
+		rangeAllocator.recorder = testutilrecorder.NewFakeRecorder()
 		go allocator.Run(wait.NeverStop)
 
 		// this is a bit of white box testing
@@ -326,7 +327,7 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 			return
 		}
 		rangeAllocator.nodesSynced = alwaysReady
-		rangeAllocator.recorder = testutil.NewFakeRecorder()
+		rangeAllocator.recorder = testutilrecorder.NewFakeRecorder()
 		go allocator.Run(wait.NeverStop)
 
 		// this is a bit of white box testing
@@ -460,7 +461,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 			return
 		}
 		rangeAllocator.nodesSynced = alwaysReady
-		rangeAllocator.recorder = testutil.NewFakeRecorder()
+		rangeAllocator.recorder = testutilrecorder.NewFakeRecorder()
 		go allocator.Run(wait.NeverStop)
 
 		// this is a bit of white box testing

@@ -16,10 +16,25 @@ go_library(
     name = "go_default_library",
     srcs = [
         "fake_handler.go",
+        "fake_node_handler.go",
         "tmpdir.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/testing",
     importpath = "k8s.io/client-go/util/testing",
+    deps = [
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
+        "//vendor/github.com/evanphx/json-patch:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
+    ],
 )
 
 filegroup(

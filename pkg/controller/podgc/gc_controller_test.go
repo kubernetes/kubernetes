@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/testutil"
+	"k8s.io/client-go/util/testing"
 )
 
 type FakeController struct{}

@@ -45,6 +45,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller/testutil"
+	testutilnode "k8s.io/client-go/util/testing"
+
 	"k8s.io/kubernetes/pkg/securitycontext"
 
 	"github.com/stretchr/testify/assert"
@@ -577,7 +579,7 @@ func TestComputeHash(t *testing.T) {
 func TestRemoveTaintOffNode(t *testing.T) {
 	tests := []struct {
 		name           string
-		nodeHandler    *testutil.FakeNodeHandler
+		nodeHandler    *testutilnode.FakeNodeHandler
 		nodeName       string
 		taintsToRemove []*v1.Taint
 		expectedTaints []v1.Taint
@@ -585,7 +587,7 @@ func TestRemoveTaintOffNode(t *testing.T) {
 	}{
 		{
 			name: "remove one taint from node",
-			nodeHandler: &testutil.FakeNodeHandler{
+			nodeHandler: &testutilnode.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -612,7 +614,7 @@ func TestRemoveTaintOffNode(t *testing.T) {
 		},
 		{
 			name: "remove multiple taints from node",
-			nodeHandler: &testutil.FakeNodeHandler{
+			nodeHandler: &testutilnode.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -643,7 +645,7 @@ func TestRemoveTaintOffNode(t *testing.T) {
 		},
 		{
 			name: "remove no-exist taints from node",
-			nodeHandler: &testutil.FakeNodeHandler{
+			nodeHandler: &testutilnode.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -671,7 +673,7 @@ func TestRemoveTaintOffNode(t *testing.T) {
 		},
 		{
 			name: "remove taint from node without taints",
-			nodeHandler: &testutil.FakeNodeHandler{
+			nodeHandler: &testutilnode.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -690,7 +692,7 @@ func TestRemoveTaintOffNode(t *testing.T) {
 		},
 		{
 			name: "remove empty taint list from node without taints",
-			nodeHandler: &testutil.FakeNodeHandler{
+			nodeHandler: &testutilnode.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -707,7 +709,7 @@ func TestRemoveTaintOffNode(t *testing.T) {
 		},
 		{
 			name: "remove empty taint list from node",
-			nodeHandler: &testutil.FakeNodeHandler{
+			nodeHandler: &testutilnode.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -751,7 +753,7 @@ func TestRemoveTaintOffNode(t *testing.T) {
 func TestAddOrUpdateTaintOnNode(t *testing.T) {
 	tests := []struct {
 		name           string
-		nodeHandler    *testutil.FakeNodeHandler
+		nodeHandler    *testutilnode.FakeNodeHandler
 		nodeName       string
 		taintsToAdd    []*v1.Taint
 		expectedTaints []v1.Taint
@@ -759,7 +761,7 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 	}{
 		{
 			name: "add one taint on node",
-			nodeHandler: &testutil.FakeNodeHandler{
+			nodeHandler: &testutilnode.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -786,7 +788,7 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 		},
 		{
 			name: "add multiple taints to node",
-			nodeHandler: &testutil.FakeNodeHandler{
+			nodeHandler: &testutilnode.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -817,7 +819,7 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 		},
 		{
 			name: "add exist taints to node",
-			nodeHandler: &testutil.FakeNodeHandler{
+			nodeHandler: &testutilnode.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -845,7 +847,7 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 		},
 		{
 			name: "add taint to node without taints",
-			nodeHandler: &testutil.FakeNodeHandler{
+			nodeHandler: &testutilnode.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -866,7 +868,7 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 		},
 		{
 			name: "add empty taint list to node without taints",
-			nodeHandler: &testutil.FakeNodeHandler{
+			nodeHandler: &testutilnode.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -883,7 +885,7 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 		},
 		{
 			name: "add empty taint list to node",
-			nodeHandler: &testutil.FakeNodeHandler{
+			nodeHandler: &testutilnode.FakeNodeHandler{
 				Existing: []*v1.Node{
 					{
 						ObjectMeta: metav1.ObjectMeta{

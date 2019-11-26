@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/controller/testutil"
+	testutil "k8s.io/client-go/util/testing"
 
 	"github.com/stretchr/testify/assert"
 )
