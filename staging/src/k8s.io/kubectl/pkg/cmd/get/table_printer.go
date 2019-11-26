@@ -51,6 +51,10 @@ var recognizedTableVersions = map[schema.GroupVersionKind]bool{
 	metav1.SchemeGroupVersion.WithKind("Table"):      true,
 }
 
+// assert the types are identical, since we're decoding both types into a metav1.Table
+var _ metav1.Table = metav1beta1.Table{}
+var _ metav1beta1.Table = metav1.Table{}
+
 func decodeIntoTable(obj runtime.Object) (runtime.Object, error) {
 	event, isEvent := obj.(*metav1.WatchEvent)
 	if isEvent {
