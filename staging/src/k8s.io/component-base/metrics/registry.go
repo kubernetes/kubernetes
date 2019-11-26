@@ -104,6 +104,9 @@ type Registerable interface {
 
 	// ClearState will clear all the states marked by Create.
 	ClearState()
+
+	// FQName returns the fully-qualified metric name of the collector.
+	FQName() string
 }
 
 // KubeRegistry is an interface which implements a subset of prometheus.Registerer and
@@ -127,7 +130,7 @@ type KubeRegistry interface {
 type kubeRegistry struct {
 	PromRegistry
 	version              semver.Version
-	hiddenCollectors     []Registerable // stores all collectors that has been hidden
+	hiddenCollectors     map[string]Registerable // stores all collectors that has been hidden
 	hiddenCollectorsLock sync.RWMutex
 }
 
@@ -228,7 +231,7 @@ func (kr *kubeRegistry) trackHiddenCollector(c Registerable) {
 	kr.hiddenCollectorsLock.Lock()
 	defer kr.hiddenCollectorsLock.Unlock()
 
-	kr.hiddenCollectors = append(kr.hiddenCollectors, c)
+	kr.hiddenCollectors[c.FQName()] = c
 }
 
 // enableHiddenCollectors will re-register all of the hidden collectors.
@@ -245,8 +248,9 @@ func (kr *kubeRegistry) enableHiddenCollectors() {
 
 func newKubeRegistry(v apimachineryversion.Info) *kubeRegistry {
 	r := &kubeRegistry{
-		PromRegistry: prometheus.NewRegistry(),
-		version:      parseVersion(v),
+		PromRegistry:     prometheus.NewRegistry(),
+		version:          parseVersion(v),
+		hiddenCollectors: make(map[string]Registerable),
 	}
 
 	registriesLock.Lock()

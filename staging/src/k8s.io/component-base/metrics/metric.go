@@ -158,6 +158,11 @@ func (r *lazyMetric) ClearState() {
 	r.createOnce = *(new(sync.Once))
 }
 
+// FQName returns the fully-qualified metric name of the collector.
+func (r *lazyMetric) FQName() string {
+	return r.fqName
+}
+
 /*
 This code is directly lifted from the prometheus codebase. It's a convenience struct which
 allows you satisfy the Collector interface automatically if you already satisfy the Metric interface.
