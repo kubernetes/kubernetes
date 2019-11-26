@@ -38,6 +38,7 @@ import (
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -481,6 +482,24 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(endpointSliceColumnDefinitions, printEndpointSlice)
 	h.TableHandler(endpointSliceColumnDefinitions, printEndpointSliceList)
+
+	csiNodeColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Drivers", Type: "integer", Description: "Drivers indicates the number of CSI drivers registered on the node"},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(csiNodeColumnDefinitions, printCSINode)
+	h.TableHandler(csiNodeColumnDefinitions, printCSINodeList)
+
+	csiDriverColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "AttachRequired", Type: "boolean", Description: storagev1beta1.CSIDriverSpec{}.SwaggerDoc()["attachRequired"]},
+		{Name: "PodInfoOnMount", Type: "boolean", Description: storagev1beta1.CSIDriverSpec{}.SwaggerDoc()["podInfoOnMount"]},
+		{Name: "Modes", Type: "string", Description: storagev1beta1.CSIDriverSpec{}.SwaggerDoc()["volumeLifecycleModes"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(csiDriverColumnDefinitions, printCSIDriver)
+	h.TableHandler(csiDriverColumnDefinitions, printCSIDriverList)
 }
 
 // Pass ports=nil for all ports.
@@ -1188,6 +1207,62 @@ func printEndpointSliceList(list *discovery.EndpointSliceList, options printers.
 	return rows, nil
 }
 
+func printCSINode(obj *storage.CSINode, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	row.Cells = append(row.Cells, obj.Name, len(obj.Spec.Drivers), translateTimestampSince(obj.CreationTimestamp))
+	return []metav1.TableRow{row}, nil
+}
+
+func printCSINodeList(list *storage.CSINodeList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printCSINode(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printCSIDriver(obj *storage.CSIDriver, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	attachRequired := true
+	if obj.Spec.AttachRequired != nil {
+		attachRequired = *obj.Spec.AttachRequired
+	}
+	podInfoOnMount := false
+	if obj.Spec.PodInfoOnMount != nil {
+		podInfoOnMount = *obj.Spec.PodInfoOnMount
+	}
+	allModes := []string{}
+	for _, mode := range obj.Spec.VolumeLifecycleModes {
+		allModes = append(allModes, string(mode))
+	}
+	modes := strings.Join(allModes, ",")
+	if len(modes) == 0 {
+		modes = "<none>"
+	}
+
+	row.Cells = append(row.Cells, obj.Name, attachRequired, podInfoOnMount, modes, translateTimestampSince(obj.CreationTimestamp))
+	return []metav1.TableRow{row}, nil
+}
+
+func printCSIDriverList(list *storage.CSIDriverList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printCSIDriver(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
 func printNamespace(obj *api.Namespace, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
