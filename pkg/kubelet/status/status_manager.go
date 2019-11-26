@@ -67,8 +67,9 @@ type manager struct {
 	podStatusChannel chan podStatusSyncRequest
 	// Map from (mirror) pod UID to latest status version successfully sent to the API server.
 	// apiStatusVersions must only be accessed from the sync thread.
-	apiStatusVersions map[kubetypes.MirrorPodUID]uint64
-	podDeletionSafety PodDeletionSafetyProvider
+	apiStatusVersions     map[kubetypes.MirrorPodUID]uint64
+	apiStatusVersionsLock sync.Mutex
+	podDeletionSafety     PodDeletionSafetyProvider
 }
 
 // PodStatusProvider knows how to provide status for a pod. It's intended to be used by other components
@@ -473,6 +474,8 @@ func (m *manager) syncBatch() {
 	func() { // Critical section
 		m.podStatusesLock.RLock()
 		defer m.podStatusesLock.RUnlock()
+		m.apiStatusVersionsLock.Lock()
+		defer m.apiStatusVersionsLock.Unlock()
 
 		// Clean up orphaned versions.
 		for uid := range m.apiStatusVersions {
@@ -513,6 +516,8 @@ func (m *manager) syncBatch() {
 
 // syncPod syncs the given status with the API server. The caller must not hold the lock.
 func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
+	m.apiStatusVersionsLock.Lock()
+	defer m.apiStatusVersionsLock.Unlock()
 	if !m.needsUpdate(uid, status) {
 		klog.V(1).Infof("Status for pod %q is up-to-date; skipping", uid)
 		return
