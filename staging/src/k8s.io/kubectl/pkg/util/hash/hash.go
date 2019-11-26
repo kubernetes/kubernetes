@@ -56,7 +56,14 @@ func SecretHash(sec *v1.Secret) (string, error) {
 // Data, Kind, and Name are taken into account.
 func encodeConfigMap(cm *v1.ConfigMap) (string, error) {
 	// json.Marshal sorts the keys in a stable order in the encoding
-	m := map[string]interface{}{"kind": "ConfigMap", "name": cm.Name, "data": cm.Data}
+	m := map[string]interface{}{
+		"kind": "ConfigMap",
+		"name": cm.Name,
+		"data": cm.Data,
+	}
+	if cm.Immutable != nil {
+		m["immutable"] = *cm.Immutable
+	}
 	if len(cm.BinaryData) > 0 {
 		m["binaryData"] = cm.BinaryData
 	}
@@ -70,8 +77,17 @@ func encodeConfigMap(cm *v1.ConfigMap) (string, error) {
 // encodeSecret encodes a Secret.
 // Data, Kind, Name, and Type are taken into account.
 func encodeSecret(sec *v1.Secret) (string, error) {
+	m := map[string]interface{}{
+		"kind": "Secret",
+		"type": sec.Type,
+		"name": sec.Name,
+		"data": sec.Data,
+	}
+	if sec.Immutable != nil {
+		m["immutable"] = *sec.Immutable
+	}
 	// json.Marshal sorts the keys in a stable order in the encoding
-	data, err := json.Marshal(map[string]interface{}{"kind": "Secret", "type": sec.Type, "name": sec.Name, "data": sec.Data})
+	data, err := json.Marshal(m)
 	if err != nil {
 		return "", err
 	}
