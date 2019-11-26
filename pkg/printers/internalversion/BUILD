@@ -45,6 +45,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/printers/internalversion",
     deps = [
+        "//pkg/apis/admissionregistration:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
         "//pkg/apis/authentication/install:go_default_library",
