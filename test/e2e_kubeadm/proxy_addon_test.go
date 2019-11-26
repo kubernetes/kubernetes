@@ -29,6 +29,7 @@ const (
 	kubeProxyServiceAccountName     = "kube-proxy"
 	kubeProxyConfigMap              = "kube-proxy"
 	kubeProxyConfigMapKey           = "config.conf"
+	kubeProxyConfigMapKeyKubeconfig = "kubeconfig.conf"
 	kubeProxyClusterRoleName        = "system:node-proxier"
 	kubeProxyClusterRoleBindingName = "kubeadm:node-proxier"
 	kubeProxyRoleName               = "kube-proxy"
@@ -75,6 +76,7 @@ var _ = Describe("proxy addon", func() {
 			cm := GetConfigMap(f.ClientSet, kubeSystemNamespace, kubeProxyConfigMap)
 
 			gomega.Expect(cm.Data).To(gomega.HaveKey(kubeProxyConfigMapKey))
+			gomega.Expect(cm.Data).To(gomega.HaveKey(kubeProxyConfigMapKeyKubeconfig))
 		})
 
 		ginkgo.It("should have related Role and RoleBinding", func() {
