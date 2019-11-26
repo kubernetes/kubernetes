@@ -3253,7 +3253,7 @@ func TestPrintRoleBinding(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"binding1", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"binding1", "Role/extension-apiserver-authentication-reader", "0s"}}},
 		},
 		// Generate options=Wide; print subject and roles.
 		{
@@ -3284,7 +3284,7 @@ func TestPrintRoleBinding(t *testing.T) {
 			},
 			options: printers.GenerateOptions{Wide: true},
 			// Columns: Name, Age, Role, Users, Groups, ServiceAccounts
-			expected: []metav1.TableRow{{Cells: []interface{}{"binding2", "0s", "Role/role-name", "user-name", "group-name", "service-account-namespace/service-account-name"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"binding2", "Role/role-name", "0s", "user-name", "group-name", "service-account-namespace/service-account-name"}}},
 		},
 	}
 
@@ -3328,7 +3328,7 @@ func TestPrintClusterRoleBinding(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"binding1", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"binding1", "Role/extension-apiserver-authentication-reader", "0s"}}},
 		},
 		// Generate options=Wide; print subject and roles.
 		{
@@ -3359,7 +3359,7 @@ func TestPrintClusterRoleBinding(t *testing.T) {
 			},
 			options: printers.GenerateOptions{Wide: true},
 			// Columns: Name, Age, Role, Users, Groups, ServiceAccounts
-			expected: []metav1.TableRow{{Cells: []interface{}{"binding2", "0s", "Role/role-name", "user-name", "group-name", "service-account-namespace/service-account-name"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"binding2", "Role/role-name", "0s", "user-name", "group-name", "service-account-namespace/service-account-name"}}},
 		},
 	}
 

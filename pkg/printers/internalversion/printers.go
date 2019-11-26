@@ -371,8 +371,8 @@ func AddHandlers(h printers.PrintHandler) {
 
 	roleBindingsColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Role", Type: "string", Description: rbacv1beta1.RoleBinding{}.SwaggerDoc()["roleRef"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
-		{Name: "Role", Type: "string", Priority: 1, Description: rbacv1beta1.RoleBinding{}.SwaggerDoc()["roleRef"]},
 		{Name: "Users", Type: "string", Priority: 1, Description: "Users in the roleBinding"},
 		{Name: "Groups", Type: "string", Priority: 1, Description: "Groups in the roleBinding"},
 		{Name: "ServiceAccounts", Type: "string", Priority: 1, Description: "ServiceAccounts in the roleBinding"},
@@ -382,8 +382,8 @@ func AddHandlers(h printers.PrintHandler) {
 
 	clusterRoleBindingsColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Role", Type: "string", Description: rbacv1beta1.ClusterRoleBinding{}.SwaggerDoc()["roleRef"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
-		{Name: "Role", Type: "string", Priority: 1, Description: rbacv1beta1.ClusterRoleBinding{}.SwaggerDoc()["roleRef"]},
 		{Name: "Users", Type: "string", Priority: 1, Description: "Users in the clusterRoleBinding"},
 		{Name: "Groups", Type: "string", Priority: 1, Description: "Groups in the clusterRoleBinding"},
 		{Name: "ServiceAccounts", Type: "string", Priority: 1, Description: "ServiceAccounts in the clusterRoleBinding"},
@@ -1630,11 +1630,11 @@ func printRoleBinding(obj *rbac.RoleBinding, options printers.GenerateOptions) (
 		Object: runtime.RawExtension{Object: obj},
 	}
 
-	row.Cells = append(row.Cells, obj.Name, translateTimestampSince(obj.CreationTimestamp))
+	roleRef := fmt.Sprintf("%s/%s", obj.RoleRef.Kind, obj.RoleRef.Name)
+	row.Cells = append(row.Cells, obj.Name, roleRef, translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
-		roleRef := fmt.Sprintf("%s/%s", obj.RoleRef.Kind, obj.RoleRef.Name)
 		users, groups, sas, _ := rbac.SubjectsStrings(obj.Subjects)
-		row.Cells = append(row.Cells, roleRef, strings.Join(users, ", "), strings.Join(groups, ", "), strings.Join(sas, ", "))
+		row.Cells = append(row.Cells, strings.Join(users, ", "), strings.Join(groups, ", "), strings.Join(sas, ", "))
 	}
 	return []metav1.TableRow{row}, nil
 }
@@ -1657,11 +1657,11 @@ func printClusterRoleBinding(obj *rbac.ClusterRoleBinding, options printers.Gene
 		Object: runtime.RawExtension{Object: obj},
 	}
 
-	row.Cells = append(row.Cells, obj.Name, translateTimestampSince(obj.CreationTimestamp))
+	roleRef := fmt.Sprintf("%s/%s", obj.RoleRef.Kind, obj.RoleRef.Name)
+	row.Cells = append(row.Cells, obj.Name, roleRef, translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
-		roleRef := fmt.Sprintf("%s/%s", obj.RoleRef.Kind, obj.RoleRef.Name)
 		users, groups, sas, _ := rbac.SubjectsStrings(obj.Subjects)
-		row.Cells = append(row.Cells, roleRef, strings.Join(users, ", "), strings.Join(groups, ", "), strings.Join(sas, ", "))
+		row.Cells = append(row.Cells, strings.Join(users, ", "), strings.Join(groups, ", "), strings.Join(sas, ", "))
 	}
 	return []metav1.TableRow{row}, nil
 }
