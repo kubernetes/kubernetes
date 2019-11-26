@@ -120,6 +120,9 @@ func createAggregatorConfig(
 		},
 	}
 
+	// we need to clear the poststarthooks so we don't add them multiple times to all the servers (that fails)
+	aggregatorConfig.GenericConfig.PostStartHooks = map[string]genericapiserver.PostStartHookConfigEntry{}
+
 	return aggregatorConfig, nil
 }
 
