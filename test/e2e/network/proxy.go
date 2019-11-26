@@ -33,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -159,9 +161,9 @@ var _ = SIGDescribe("Proxy", func() {
 				Labels:      labels,
 				CreatedPods: &pods,
 			}
-			err = framework.RunRC(cfg)
+			err = e2erc.RunRC(cfg)
 			framework.ExpectNoError(err)
-			defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, cfg.Name)
+			defer e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, cfg.Name)
 
 			err = waitForEndpoint(f.ClientSet, f.Namespace.Name, service.Name)
 			framework.ExpectNoError(err)
@@ -287,23 +289,16 @@ func truncate(b []byte, maxLen int) []byte {
 	return b2
 }
 
-func pickNode(cs clientset.Interface) (string, error) {
-	// TODO: investigate why it doesn't work on master Node.
-	nodes := framework.GetReadySchedulableNodesOrDie(cs)
-	if len(nodes.Items) == 0 {
-		return "", fmt.Errorf("no nodes exist, can't test node proxy")
-	}
-	return nodes.Items[0].Name, nil
-}
-
 func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
-	node, err := pickNode(f.ClientSet)
+	// TODO: investigate why it doesn't work on master Node.
+	node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
 	framework.ExpectNoError(err)
+
 	// TODO: Change it to test whether all requests succeeded when requests
 	// not reaching Kubelet issue is debugged.
 	serviceUnavailableErrors := 0
 	for i := 0; i < proxyAttempts; i++ {
-		_, status, d, err := doProxy(f, prefix+node+nodeDest, i)
+		_, status, d, err := doProxy(f, prefix+node.Name+nodeDest, i)
 		if status == http.StatusServiceUnavailable {
 			framework.Logf("ginkgo.Failed proxying node logs due to service unavailable: %v", err)
 			time.Sleep(time.Second)

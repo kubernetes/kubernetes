@@ -9,6 +9,9 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/volume/util/fsquota/common",
     visibility = ["//visibility:public"],
     deps = select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/k8s.io/klog:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/k8s.io/klog:go_default_library",
         ],

@@ -221,43 +221,6 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	})
 })
 
-var _ = SIGDescribe("PodPriorityResolution [Serial]", func() {
-	var cs clientset.Interface
-	var ns string
-	f := framework.NewDefaultFramework("sched-pod-priority")
-
-	ginkgo.BeforeEach(func() {
-		cs = f.ClientSet
-		ns = f.Namespace.Name
-
-		err := framework.CheckTestingNSDeletedExcept(cs, ns)
-		framework.ExpectNoError(err)
-	})
-
-	// This test verifies that system critical priorities are created automatically and resolved properly.
-	ginkgo.It("validates critical system priorities are created and resolved", func() {
-		// Create pods that use system critical priorities and
-		ginkgo.By("Create pods that use critical system priorities.")
-		systemPriorityClasses := []string{
-			scheduling.SystemNodeCritical, scheduling.SystemClusterCritical,
-		}
-		for i, spc := range systemPriorityClasses {
-			pod := createPausePod(f, pausePodConfig{
-				Name:              fmt.Sprintf("pod%d-%v", i, spc),
-				Namespace:         metav1.NamespaceSystem,
-				PriorityClassName: spc,
-			})
-			defer func() {
-				// Clean-up the pod.
-				err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
-				framework.ExpectNoError(err)
-			}()
-			gomega.Expect(pod.Spec.Priority).NotTo(gomega.BeNil())
-			framework.Logf("Created pod: %v", pod.Name)
-		}
-	})
-})
-
 // construct a fakecpu so as to set it to status of Node object
 // otherwise if we update CPU/Memory/etc, those values will be corrected back by kubelet
 var fakecpu v1.ResourceName = "example.com/fakecpu"

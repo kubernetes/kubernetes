@@ -3,11 +3,9 @@ language: go
 go_import_path: go.uber.org/atomic
 
 go:
-  - 1.7.x
-  - 1.8.x
-  - 1.9.x
-  - 1.10.x
-  - 1.x # latest release
+  - 1.7
+  - 1.8
+  - 1.9
 
 cache:
   directories:

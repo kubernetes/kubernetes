@@ -738,7 +738,7 @@ binary | sha256 hash
 - **Simplified User Experience**
   - Easier to get a cluster up and running (eg: `kubeadm`, intra-cluster bootstrapping)
   - Easier to understand a cluster (eg: API audit logs, server-based API defaults)
-- **Stateful Appplication Support**
+- **Stateful Application Support**
   - Enhanced persistence capabilities (eg: `StorageClasses`, new volume plugins)
   - New resources and scheduler features (eg: `ScheduledJob` resource, pod/node affinity/anti-affinity)
 - **Cluster Federation**

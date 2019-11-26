@@ -232,13 +232,12 @@ func (p *Plugin) defaultGetNamespace(name string) (*corev1.Namespace, error) {
 
 func (p *Plugin) getNodeSelectorMap(namespace *corev1.Namespace) (labels.Set, error) {
 	selector := labels.Set{}
-	labelsMap := labels.Set{}
 	var err error
 	found := false
 	if len(namespace.ObjectMeta.Annotations) > 0 {
 		for _, annotation := range NamespaceNodeSelectors {
 			if ns, ok := namespace.ObjectMeta.Annotations[annotation]; ok {
-				labelsMap, err = labels.ConvertSelectorToLabelsMap(ns)
+				labelsMap, err := labels.ConvertSelectorToLabelsMap(ns)
 				if err != nil {
 					return labels.Set{}, err
 				}

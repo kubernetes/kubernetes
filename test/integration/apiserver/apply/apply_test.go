@@ -180,7 +180,7 @@ func TestNoOpUpdateSameResourceVersion(t *testing.T) {
 		}
 	}`)
 
-	o, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
 		Namespace("default").
 		Param("fieldManager", "apply_test").
 		Resource(podResource).
@@ -190,23 +190,6 @@ func TestNoOpUpdateSameResourceVersion(t *testing.T) {
 		Get()
 	if err != nil {
 		t.Fatalf("Failed to create object: %v", err)
-	}
-
-	// Need to update once for some reason
-	// TODO (#82042): Remove this update once possible
-	b, err := json.MarshalIndent(o, "\t", "\t")
-	if err != nil {
-		t.Fatalf("Failed to marshal created object: %v", err)
-	}
-	_, err = client.CoreV1().RESTClient().Put().
-		Namespace("default").
-		Resource(podResource).
-		Name(podName).
-		Body(b).
-		Do().
-		Get()
-	if err != nil {
-		t.Fatalf("Failed to apply first no-op update: %v", err)
 	}
 
 	// Sleep for one second to make sure that the times of each update operation is different.
@@ -383,6 +366,75 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 		Body([]byte(obj)).Do().Get()
 	if err != nil {
 		t.Fatalf("Failed to apply object with force: %v", err)
+	}
+}
+
+// TestApplyGroupsManySeparateUpdates tests that when many different managers update the same object,
+// the number of managedFields entries will only grow to a certain size.
+func TestApplyGroupsManySeparateUpdates(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	obj := []byte(`{
+		"apiVersion": "admissionregistration.k8s.io/v1",
+		"kind": "ValidatingWebhookConfiguration",
+		"metadata": {
+			"name": "webhook",
+			"labels": {"applier":"true"},
+		},
+	}`)
+
+	object, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/admissionregistration.k8s.io/v1").
+		Resource("validatingwebhookconfigurations").
+		Name("webhook").
+		Param("fieldManager", "apply_test").
+		Body(obj).Do().Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	for i := 0; i < 20; i++ {
+		unique := fmt.Sprintf("updater%v", i)
+		version := "v1"
+		if i%2 == 0 {
+			version = "v1beta1"
+		}
+		object, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
+			AbsPath("/apis/admissionregistration.k8s.io/"+version).
+			Resource("validatingwebhookconfigurations").
+			Name("webhook").
+			Param("fieldManager", unique).
+			Body([]byte(`{"metadata":{"labels":{"` + unique + `":"new"}}}`)).Do().Get()
+		if err != nil {
+			t.Fatalf("Failed to patch object: %v", err)
+		}
+	}
+
+	accessor, err := meta.Accessor(object)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor: %v", err)
+	}
+
+	// Expect 11 entries, because the cap for update entries is 10, and 1 apply entry
+	if actual, expected := len(accessor.GetManagedFields()), 11; actual != expected {
+		if b, err := json.MarshalIndent(object, "\t", "\t"); err == nil {
+			t.Fatalf("Object expected to contain %v entries in managedFields, but got %v:\n%v", expected, actual, string(b))
+		} else {
+			t.Fatalf("Object expected to contain %v entries in managedFields, but got %v: error marshalling object: %v", expected, actual, err)
+		}
+	}
+
+	// Expect the first entry to have the manager name "apply_test"
+	if actual, expected := accessor.GetManagedFields()[0].Manager, "apply_test"; actual != expected {
+		t.Fatalf("Expected first manager to be named %v but got %v", expected, actual)
+	}
+
+	// Expect the second entry to have the manager name "ancient-changes"
+	if actual, expected := accessor.GetManagedFields()[1].Manager, "ancient-changes"; actual != expected {
+		t.Fatalf("Expected first manager to be named %v but got %v", expected, actual)
 	}
 }
 
@@ -941,7 +993,7 @@ func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
 		Time:       actual.Time,
 		FieldsType: "FieldsV1",
 		FieldsV1: &metav1.FieldsV1{
-			Raw: []byte(`{"f:metadata":{"f:labels":{"f:sidecar_version":{}}},"f:spec":{"f:template":{"f:spec":{"f:containers":{"k:{\"name\":\"sidecar\"}":{".":{},"f:image":{},"f:name":{}}}}}}}`),
+			Raw: []byte(`{"f:metadata":{"f:labels":{"f:sidecar_version":{}}},"f:spec":{"f:template":{"f:spec":{"f:containers":{"k:{\"name\":\"sidecar\"}":{"f:image":{},"f:name":{},".":{}}}}}}}`),
 		},
 	}
 

@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-func addPriorityClasses(ctrl *priorityPlugin, priorityClasses []*scheduling.PriorityClass) error {
+func addPriorityClasses(ctrl *Plugin, priorityClasses []*scheduling.PriorityClass) error {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	ctrl.SetExternalKubeInformerFactory(informerFactory)
 	// First add the existing classes to the cache.
@@ -173,7 +173,7 @@ func TestPriorityClassAdmission(t *testing.T) {
 	for _, test := range tests {
 		klog.V(4).Infof("starting test %q", test.name)
 
-		ctrl := newPlugin()
+		ctrl := NewPlugin()
 		// Add existing priority classes.
 		if err := addPriorityClasses(ctrl, test.existingClasses); err != nil {
 			t.Errorf("Test %q: unable to add object to informer: %v", test.name, err)
@@ -274,7 +274,7 @@ func TestDefaultPriority(t *testing.T) {
 
 	for _, test := range tests {
 		klog.V(4).Infof("starting test %q", test.name)
-		ctrl := newPlugin()
+		ctrl := NewPlugin()
 		if err := addPriorityClasses(ctrl, test.classesBefore); err != nil {
 			t.Errorf("Test %q: unable to add object to informer: %v", test.name, err)
 		}
@@ -626,7 +626,7 @@ func TestPodAdmission(t *testing.T) {
 			[]*scheduling.PriorityClass{systemClusterCritical},
 			*pods[7],
 			scheduling.SystemCriticalPriority,
-			true,
+			false,
 			nil,
 		},
 		{
@@ -681,8 +681,8 @@ func TestPodAdmission(t *testing.T) {
 
 	for _, test := range tests {
 		klog.V(4).Infof("starting test %q", test.name)
-
-		ctrl := newPlugin()
+		ctrl := NewPlugin()
+		ctrl.nonPreemptingPriority = true
 		// Add existing priority classes.
 		if err := addPriorityClasses(ctrl, test.existingClasses); err != nil {
 			t.Errorf("Test %q: unable to add object to informer: %v", test.name, err)
@@ -704,6 +704,7 @@ func TestPodAdmission(t *testing.T) {
 		)
 		err := admissiontesting.WithReinvocationTesting(t, ctrl).Admit(context.TODO(), attrs, nil)
 		klog.Infof("Got %v", err)
+
 		if !test.expectError {
 			if err != nil {
 				t.Errorf("Test %q: unexpected error received: %v", test.name, err)

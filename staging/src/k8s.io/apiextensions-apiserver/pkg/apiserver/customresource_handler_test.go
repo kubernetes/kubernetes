@@ -96,6 +96,9 @@ func TestConvertFieldLabel(t *testing.T) {
 				t.Fatal(err)
 			}
 			_, c, err := f.NewConverter(&crd)
+			if err != nil {
+				t.Fatalf("Failed to create CR converter. error: %v", err)
+			}
 
 			label, value, err := c.ConvertFieldLabel(schema.GroupVersionKind{}, test.label, "value")
 			if e, a := test.expectError, err != nil; e != a {

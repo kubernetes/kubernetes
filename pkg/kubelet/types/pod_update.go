@@ -137,9 +137,24 @@ func (sp SyncPodType) String() string {
 	}
 }
 
+// IsMirrorPod returns true if the passed Pod is a Mirror Pod.
+func IsMirrorPod(pod *v1.Pod) bool {
+	_, ok := pod.Annotations[ConfigMirrorAnnotationKey]
+	return ok
+}
+
+// IsStaticPod returns true if the pod is a static pod.
+func IsStaticPod(pod *v1.Pod) bool {
+	source, err := GetPodSource(pod)
+	return err == nil && source != ApiserverSource
+}
+
 // IsCriticalPod returns true if pod's priority is greater than or equal to SystemCriticalPriority.
 func IsCriticalPod(pod *v1.Pod) bool {
 	if IsStaticPod(pod) {
+		return true
+	}
+	if IsMirrorPod(pod) {
 		return true
 	}
 	if pod.Spec.Priority != nil && IsCriticalPodBasedOnPriority(*pod.Spec.Priority) {
@@ -165,10 +180,4 @@ func Preemptable(preemptor, preemptee *v1.Pod) bool {
 // IsCriticalPodBasedOnPriority checks if the given pod is a critical pod based on priority resolved from pod Spec.
 func IsCriticalPodBasedOnPriority(priority int32) bool {
 	return priority >= scheduling.SystemCriticalPriority
-}
-
-// IsStaticPod returns true if the pod is a static pod.
-func IsStaticPod(pod *v1.Pod) bool {
-	source, err := GetPodSource(pod)
-	return err == nil && source != ApiserverSource
 }

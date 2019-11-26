@@ -68,7 +68,8 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		tokenId, err := GenerateTokenId()
 		framework.ExpectNoError(err)
 		secret := newTokenSecret(tokenId, "tokenSecret")
-		secret, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)
+		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)
+		framework.ExpectNoError(err)
 		secretNeedClean = bootstrapapi.BootstrapTokenSecretPrefix + tokenId
 
 		ginkgo.By("wait for the bootstrap token secret be signed")

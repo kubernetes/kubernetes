@@ -27,7 +27,6 @@ go_library(
         "//vendor/sigs.k8s.io/structured-merge-diff/merge:go_default_library",
         "//vendor/sigs.k8s.io/structured-merge-diff/typed:go_default_library",
         "//vendor/sigs.k8s.io/structured-merge-diff/value:go_default_library",
-        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 

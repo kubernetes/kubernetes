@@ -41,8 +41,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/utils/integer"
 
 	"k8s.io/klog"
@@ -95,7 +95,7 @@ func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchin
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("job_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
+		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("job_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	jm := &JobController{
@@ -771,15 +771,22 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 				go func() {
 					defer wait.Done()
 					err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &job.Spec.Template, job, metav1.NewControllerRef(job, controllerKind))
-					if err != nil && errors.IsTimeout(err) {
-						// Pod is created but its initialization has timed out.
-						// If the initialization is successful eventually, the
-						// controller will observe the creation via the informer.
-						// If the initialization fails, or if the pod keeps
-						// uninitialized for a long time, the informer will not
-						// receive any update, and the controller will create a new
-						// pod when the expectation expires.
-						return
+					if err != nil {
+						if errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
+							// If the namespace is being torn down, we can safely ignore
+							// this error since all subsequent creations will fail.
+							return
+						}
+						if errors.IsTimeout(err) {
+							// Pod is created but its initialization has timed out.
+							// If the initialization is successful eventually, the
+							// controller will observe the creation via the informer.
+							// If the initialization fails, or if the pod keeps
+							// uninitialized for a long time, the informer will not
+							// receive any update, and the controller will create a new
+							// pod when the expectation expires.
+							return
+						}
 					}
 					if err != nil {
 						defer utilruntime.HandleError(err)

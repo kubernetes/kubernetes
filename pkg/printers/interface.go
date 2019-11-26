@@ -20,7 +20,6 @@ import (
 	"io"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // ResourcePrinter is an interface that knows how to print runtime objects.
@@ -35,20 +34,4 @@ type ResourcePrinterFunc func(runtime.Object, io.Writer) error
 // PrintObj implements ResourcePrinter
 func (fn ResourcePrinterFunc) PrintObj(obj runtime.Object, w io.Writer) error {
 	return fn(obj, w)
-}
-
-// PrintOptions struct defines a struct for various print options
-type PrintOptions struct {
-	NoHeaders     bool
-	WithNamespace bool
-	WithKind      bool
-	Wide          bool
-	ShowLabels    bool
-	Kind          schema.GroupKind
-	ColumnLabels  []string
-
-	SortBy string
-
-	// indicates if it is OK to ignore missing keys for rendering an output template.
-	AllowMissingKeys bool
 }

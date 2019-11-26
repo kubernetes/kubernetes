@@ -21,7 +21,7 @@ import (
 	"math"
 
 	"k8s.io/klog"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // FunctionShape represents shape of scoring function.
@@ -38,14 +38,23 @@ type FunctionShapePoint struct {
 
 var (
 	// give priority to least utilized nodes by default
-	defaultFunctionShape, _ = NewFunctionShape([]FunctionShapePoint{{0, 10}, {100, 0}})
+	defaultFunctionShape, _ = NewFunctionShape([]FunctionShapePoint{
+		{
+			Utilization: 0,
+			Score:       framework.MaxNodeScore,
+		},
+		{
+			Utilization: 100,
+			Score:       framework.MinNodeScore,
+		},
+	})
 )
 
 const (
 	minUtilization = 0
 	maxUtilization = 100
 	minScore       = 0
-	maxScore       = schedulerapi.MaxPriority
+	maxScore       = framework.MaxNodeScore
 )
 
 // NewFunctionShape creates instance of FunctionShape in a safe way performing all

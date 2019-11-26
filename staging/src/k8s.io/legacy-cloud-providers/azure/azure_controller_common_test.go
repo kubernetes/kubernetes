@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 )
 
 func TestCommonAttachDisk(t *testing.T) {
@@ -68,6 +69,7 @@ func TestCommonAttachDisk(t *testing.T) {
 			resourceGroup:         testCloud.ResourceGroup,
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
+			vmLockMap:             newLockMap(),
 		}
 		diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/disk-name",
 			testCloud.SubscriptionID, testCloud.ResourceGroup)
@@ -116,6 +118,7 @@ func TestCommonDetachDisk(t *testing.T) {
 			resourceGroup:         testCloud.ResourceGroup,
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
+			vmLockMap:             newLockMap(),
 		}
 		diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/disk-name",
 			testCloud.SubscriptionID, testCloud.ResourceGroup)
@@ -156,6 +159,7 @@ func TestGetDiskLun(t *testing.T) {
 			resourceGroup:         testCloud.ResourceGroup,
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
+			vmLockMap:             newLockMap(),
 		}
 		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 
@@ -179,7 +183,7 @@ func TestGetNextDiskLun(t *testing.T) {
 			expectedErr:     false,
 		},
 		{
-			desc:            "LUN -1 and and error shall be returned if there's no available LUN",
+			desc:            "LUN -1 and  error shall be returned if there's no available LUN",
 			isDataDisksFull: true,
 			expectedLun:     -1,
 			expectedErr:     true,
@@ -194,6 +198,7 @@ func TestGetNextDiskLun(t *testing.T) {
 			resourceGroup:         testCloud.ResourceGroup,
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
+			vmLockMap:             newLockMap(),
 		}
 		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, test.isDataDisksFull)
 
@@ -235,6 +240,7 @@ func TestDisksAreAttached(t *testing.T) {
 			resourceGroup:         testCloud.ResourceGroup,
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
+			vmLockMap:             newLockMap(),
 		}
 		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 
@@ -242,4 +248,39 @@ func TestDisksAreAttached(t *testing.T) {
 		assert.Equal(t, test.expectedAttached, attached, "TestCase[%d]: %s", i, test.desc)
 		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
 	}
+}
+
+func TestFilteredDetatchingDisks(t *testing.T) {
+
+	disks := []compute.DataDisk{
+		{
+			Name:         pointer.StringPtr("DiskName1"),
+			ToBeDetached: pointer.BoolPtr(false),
+			ManagedDisk: &compute.ManagedDiskParameters{
+				ID: pointer.StringPtr("ManagedID"),
+			},
+		},
+		{
+			Name:         pointer.StringPtr("DiskName2"),
+			ToBeDetached: pointer.BoolPtr(true),
+		},
+		{
+			Name:         pointer.StringPtr("DiskName3"),
+			ToBeDetached: nil,
+		},
+		{
+			Name:         pointer.StringPtr("DiskName4"),
+			ToBeDetached: nil,
+		},
+	}
+
+	filteredDisks := filterDetachingDisks(disks)
+	assert.Equal(t, 3, len(filteredDisks))
+	assert.Equal(t, "DiskName1", *filteredDisks[0].Name)
+	assert.Equal(t, "ManagedID", *filteredDisks[0].ManagedDisk.ID)
+	assert.Equal(t, "DiskName3", *filteredDisks[1].Name)
+
+	disks = []compute.DataDisk{}
+	filteredDisks = filterDetachingDisks(disks)
+	assert.Equal(t, 0, len(filteredDisks))
 }

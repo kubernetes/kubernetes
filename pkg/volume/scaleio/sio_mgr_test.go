@@ -21,9 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util/mount"
-
 	siotypes "github.com/thecodeteam/goscaleio/types/v1"
+	"k8s.io/utils/exec/testing"
 )
 
 var (
@@ -44,7 +43,7 @@ var (
 )
 
 func newTestMgr(t *testing.T) *sioMgr {
-	mgr, err := newSioMgr(fakeConfig, mount.NewFakeExec(nil))
+	mgr, err := newSioMgr(fakeConfig, &testingexec.FakeExec{})
 	if err != nil {
 		t.Error(err)
 	}
@@ -53,7 +52,7 @@ func newTestMgr(t *testing.T) *sioMgr {
 }
 
 func TestMgrNew(t *testing.T) {
-	mgr, err := newSioMgr(fakeConfig, mount.NewFakeExec(nil))
+	mgr, err := newSioMgr(fakeConfig, &testingexec.FakeExec{})
 	if err != nil {
 		t.Fatal(err)
 	}

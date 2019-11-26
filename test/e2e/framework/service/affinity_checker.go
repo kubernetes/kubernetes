@@ -34,7 +34,7 @@ import (
 func CheckAffinity(execPod *v1.Pod, serviceIP string, servicePort int, shouldHold bool) bool {
 	serviceIPPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
 	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 2 http://%s/`, serviceIPPort)
-	timeout := TestTimeout
+	timeout := AffinityTimeout
 	if execPod == nil {
 		timeout = LoadBalancerPollTimeout
 	}

@@ -40,7 +40,7 @@ For example, let's consider the following `pod.yaml` file:
       containers:
       - args:
         - dns-suffix
-        image: gcr.io/kubernetes-e2e-test-images/agnhost:2.2
+        image: gcr.io/kubernetes-e2e-test-images/agnhost:2.8
         name: agnhost
       dnsConfig:
         nameservers:
@@ -189,6 +189,38 @@ Usage:
 ```
 
 
+### guestbook
+
+Starts a HTTP server on the given `--http-port` (default: 80), serving various endpoints representing a
+guestbook app. The endpoints and their purpose are:
+
+- `/register`: A guestbook slave will subscribe to a master, to its given `--slaveof` endpoint. The master
+  will then push any updates it receives to its registered slaves through the `--backend-port` (default: 6379).
+- `/get`: Returns `{"data": value}`, where the `value` is the stored value for the given `key` if non-empty,
+  or the entire store.
+- `/set`: Will set the given key-value pair in its own store and propagate it to its slaves, if any.
+  Will return `{"data": "Updated"}` to the caller on success.
+- `/guestbook`: Will proxy the request to `agnhost-master` if the given `cmd` is `set`, or `agnhost-slave`
+  if the given `cmd` is `get`.
+
+Usage:
+
+```console
+guestbook="test/e2e/testing-manifests/guestbook"
+sed_expr="s|{{.AgnhostImage}}|gcr.io/kubernetes-e2e-test-images/agnhost:2.8|"
+
+# create the services.
+kubectl create -f ${guestbook}/frontend-service.yaml
+kubectl create -f ${guestbook}/agnhost-master-service.yaml
+kubectl create -f ${guestbook}/agnhost-slave-service.yaml
+
+# create the deployments.
+cat ${guestbook}/frontend-deployment.yaml.in | sed ${sed_expr} | kubectl create -f -
+cat ${guestbook}/agnhost-master-deployment.yaml.in | sed ${sed_expr} | kubectl create -f -
+cat ${guestbook}/agnhost-slave-deployment.yaml.in | sed ${sed_expr} | kubectl create -f -
+```
+
+
 ### help
 
 Prints the binary's help menu. Additionally, it can be followed by another subcommand
@@ -258,14 +290,14 @@ Examples:
 
 ```console
 docker run -i \
-  gcr.io/kubernetes-e2e-test-images/agnhost:2.2 \
+  gcr.io/kubernetes-e2e-test-images/agnhost:2.8 \
   logs-generator --log-lines-total 10 --run-duration 1s
 ```
 
 ```console
 kubectl run logs-generator \
   --generator=run-pod/v1 \
-  --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.2 \
+  --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.8 \
   --restart=Never \
   -- logs-generator -t 10 -d 1s
 ```
@@ -392,7 +424,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.2 \
+      --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.8 \
       --restart=Never \
       --env "POD_IP=<POD_IP>" \
       --env "NODE_IP=<NODE_IP>" \
@@ -447,7 +479,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.1 \
+      --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.8 \
       --restart=Never \
       --env "BIND_ADDRESS=localhost" \
       --env "BIND_PORT=8080" \
@@ -461,7 +493,7 @@ Usage:
 
 ### porter
 
-Serves requested data on ports specified in ENV variables. For example, if the the environment
+Serves requested data on ports specified in ENV variables. For example, if the environment
 variable `SERVE_PORT_9001` is set, then the subcommand will start serving on the port 9001.
 Additionally, if the environment variable `SERVE_TLS_PORT_9002` is set, then the subcommand
 will start a TLS server on that port.
@@ -534,6 +566,6 @@ The image contains `iperf`.
 
 ## Image
 
-The image can be found at `gcr.io/kubernetes-e2e-test-images/agnhost:2.2` for Linux
-containers, and `e2eteam/agnhost:2.2` for Windows containers. In the future, the same
+The image can be found at `gcr.io/kubernetes-e2e-test-images/agnhost:2.8` for Linux
+containers, and `e2eteam/agnhost:2.8` for Windows containers. In the future, the same
 repository can be used for both OSes.

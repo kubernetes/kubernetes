@@ -21,7 +21,7 @@ import (
 	"regexp"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -70,27 +70,30 @@ func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 	azureSource := volume.AzureDisk
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			// A.K.A InnerVolumeSpecName required to match for Unmount
-			Name: volume.Name,
+			// Must be unique per disk as it is used as the unique part of the
+			// staging path
+			Name: fmt.Sprintf("%s-%s", AzureDiskDriverName, azureSource.DiskName),
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				CSI: &v1.CSIPersistentVolumeSource{
 					Driver:           AzureDiskDriverName,
 					VolumeHandle:     azureSource.DataDiskURI,
-					ReadOnly:         *azureSource.ReadOnly,
-					FSType:           *azureSource.FSType,
 					VolumeAttributes: map[string]string{azureDiskKind: "Managed"},
 				},
 			},
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 		},
 	}
+	if azureSource.ReadOnly != nil {
+		pv.Spec.PersistentVolumeSource.CSI.ReadOnly = *azureSource.ReadOnly
+	}
 
-	if *azureSource.CachingMode != "" {
+	if azureSource.CachingMode != nil && *azureSource.CachingMode != "" {
 		pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes[azureDiskCachingMode] = string(*azureSource.CachingMode)
 	}
-	if *azureSource.FSType != "" {
+	if azureSource.FSType != nil {
+		pv.Spec.PersistentVolumeSource.CSI.FSType = *azureSource.FSType
 		pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes[azureDiskFSType] = *azureSource.FSType
 	}
 	if azureSource.Kind != nil {
@@ -205,6 +208,10 @@ func (t *azureDiskCSITranslator) GetInTreePluginName() string {
 // GetCSIPluginName returns the name of the CSI plugin
 func (t *azureDiskCSITranslator) GetCSIPluginName() string {
 	return AzureDiskDriverName
+}
+
+func (t *azureDiskCSITranslator) RepairVolumeHandle(volumeHandle, nodeID string) (string, error) {
+	return volumeHandle, nil
 }
 
 func isManagedDisk(diskURI string) bool {

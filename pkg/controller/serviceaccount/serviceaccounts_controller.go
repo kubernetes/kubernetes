@@ -31,8 +31,8 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
 // ServiceAccountsControllerOptions contains options for running a ServiceAccountsController
@@ -68,7 +68,7 @@ func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInforme
 		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount"),
 	}
 	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
 			return nil, err
 		}
 	}
@@ -213,7 +213,10 @@ func (c *ServiceAccountsController) syncNamespace(key string) error {
 		sa.Namespace = ns.Name
 
 		if _, err := c.client.CoreV1().ServiceAccounts(ns.Name).Create(&sa); err != nil && !apierrs.IsAlreadyExists(err) {
-			createFailures = append(createFailures, err)
+			// we can safely ignore terminating namespace errors
+			if !apierrs.HasStatusCause(err, v1.NamespaceTerminatingCause) {
+				createFailures = append(createFailures, err)
+			}
 		}
 	}
 

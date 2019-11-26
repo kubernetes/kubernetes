@@ -17,11 +17,15 @@ limitations under the License.
 package metrics
 
 import (
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
+
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
@@ -58,6 +62,39 @@ var (
 		},
 	)
 )
+
+func TestShouldHide(t *testing.T) {
+	currentVersion := parseVersion(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "17",
+		GitVersion: "v1.17.1-alpha-1.12345",
+	})
+
+	var tests = []struct {
+		desc              string
+		deprecatedVersion string
+		shouldHide        bool
+	}{
+		{
+			desc:              "current minor release should not be hidden",
+			deprecatedVersion: "1.17.0",
+			shouldHide:        false,
+		},
+		{
+			desc:              "older minor release should be hidden",
+			deprecatedVersion: "1.16.0",
+			shouldHide:        true,
+		},
+	}
+
+	for _, test := range tests {
+		tc := test
+		t.Run(tc.desc, func(t *testing.T) {
+			result := shouldHide(&currentVersion, parseSemver(tc.deprecatedVersion))
+			assert.Equalf(t, tc.shouldHide, result, "expected should hide %v, but got %v", tc.shouldHide, result)
+		})
+	}
+}
 
 func TestRegister(t *testing.T) {
 	var tests = []struct {
@@ -170,12 +207,6 @@ func TestMustRegister(t *testing.T) {
 			registryVersion: &v115,
 			expectedPanics:  []bool{false},
 		},
-		{
-			desc:            "test must registering same hidden metric",
-			metrics:         []*Counter{alphaHiddenCounter, alphaHiddenCounter},
-			registryVersion: &v115,
-			expectedPanics:  []bool{false, false}, // hidden metrics no-opt
-		},
 	}
 
 	for _, test := range tests {
@@ -209,9 +240,8 @@ func TestShowHiddenMetric(t *testing.T) {
 	registry.MustRegister(alphaHiddenCounter)
 
 	ms, err := registry.Gather()
-	if len(ms) != expectedMetricCount {
-		t.Errorf("Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
-	}
+	assert.Equalf(t, expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
+
 	showHidden.Store(true)
 	defer showHidden.Store(false)
 	registry.MustRegister(NewCounter(
@@ -227,11 +257,137 @@ func TestShowHiddenMetric(t *testing.T) {
 	expectedMetricCount = 1
 
 	ms, err = registry.Gather()
-	if len(ms) != expectedMetricCount {
-		t.Errorf("Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
-	}
-	if err != nil {
-		t.Fatalf("Gather failed %v", err)
+	assert.Equalf(t, expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
+	assert.Nil(t, err, "Gather failed %v", err)
+
+}
+
+func TestValidateShowHiddenMetricsVersion(t *testing.T) {
+	currentVersion := parseVersion(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "17",
+		GitVersion: "v1.17.1-alpha-1.12345",
+	})
+
+	var tests = []struct {
+		desc          string
+		targetVersion string
+		expectedError bool
+	}{
+		{
+			desc:          "invalid version is not allowed",
+			targetVersion: "1.invalid",
+			expectedError: true,
+		},
+		{
+			desc:          "patch version is not allowed",
+			targetVersion: "1.16.0",
+			expectedError: true,
+		},
+		{
+			desc:          "old version is not allowed",
+			targetVersion: "1.15",
+			expectedError: true,
+		},
+		{
+			desc:          "new version is not allowed",
+			targetVersion: "1.17",
+			expectedError: true,
+		},
+		{
+			desc:          "valid version is allowed",
+			targetVersion: "1.16",
+			expectedError: false,
+		},
 	}
 
+	for _, test := range tests {
+		tc := test
+		t.Run(tc.desc, func(t *testing.T) {
+			err := validateShowHiddenMetricsVersion(currentVersion, tc.targetVersion)
+
+			if tc.expectedError {
+				assert.Errorf(t, err, "Failed to test: %s", tc.desc)
+			} else {
+				assert.NoErrorf(t, err, "Failed to test: %s", tc.desc)
+			}
+		})
+	}
+}
+
+func TestEnableHiddenMetrics(t *testing.T) {
+	currentVersion := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "17",
+		GitVersion: "v1.17.1-alpha-1.12345",
+	}
+
+	var tests = []struct {
+		name           string
+		fqName         string
+		counter        *Counter
+		mustRegister   bool
+		expectedMetric string
+	}{
+		{
+			name:   "hide by register",
+			fqName: "hidden_metric_register",
+			counter: NewCounter(&CounterOpts{
+				Name:              "hidden_metric_register",
+				Help:              "counter help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.16.0",
+			}),
+			mustRegister: false,
+			expectedMetric: `
+				# HELP hidden_metric_register [STABLE] (Deprecated since 1.16.0) counter help
+				# TYPE hidden_metric_register counter
+				hidden_metric_register 1
+				`,
+		},
+		{
+			name:   "hide by must register",
+			fqName: "hidden_metric_must_register",
+			counter: NewCounter(&CounterOpts{
+				Name:              "hidden_metric_must_register",
+				Help:              "counter help",
+				StabilityLevel:    STABLE,
+				DeprecatedVersion: "1.16.0",
+			}),
+			mustRegister: true,
+			expectedMetric: `
+				# HELP hidden_metric_must_register [STABLE] (Deprecated since 1.16.0) counter help
+				# TYPE hidden_metric_must_register counter
+				hidden_metric_must_register 1
+				`,
+		},
+	}
+
+	for _, test := range tests {
+		tc := test
+		t.Run(tc.name, func(t *testing.T) {
+			registry := newKubeRegistry(currentVersion)
+			if tc.mustRegister {
+				registry.MustRegister(tc.counter)
+			} else {
+				_ = registry.Register(tc.counter)
+			}
+
+			tc.counter.Inc() // no-ops, because counter hasn't been initialized
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(""), tc.fqName); err != nil {
+				t.Fatal(err)
+			}
+
+			SetShowHidden()
+			defer func() {
+				showHiddenOnce = *new(sync.Once)
+				showHidden.Store(false)
+			}()
+
+			tc.counter.Inc()
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(tc.expectedMetric), tc.fqName); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
 }

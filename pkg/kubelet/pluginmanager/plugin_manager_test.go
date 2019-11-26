@@ -28,15 +28,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
+	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher"
 )
 
 var (
-	socketDir           string
-	deprecatedSocketDir string
-	supportedVersions   = []string{"v1beta1", "v1beta2"}
+	socketDir         string
+	supportedVersions = []string{"v1beta1", "v1beta2"}
 )
 
 type fakePluginHandler struct {
@@ -55,7 +54,7 @@ func newFakePluginHandler() *fakePluginHandler {
 }
 
 // ValidatePlugin is a fake method
-func (f *fakePluginHandler) ValidatePlugin(pluginName string, endpoint string, versions []string, foundInDeprecatedDir bool) error {
+func (f *fakePluginHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
 	f.Lock()
 	defer f.Unlock()
 	f.validatePluginCalled = true
@@ -83,20 +82,12 @@ func init() {
 		panic(fmt.Sprintf("Could not create a temp directory: %s", d))
 	}
 
-	d2, err := ioutil.TempDir("", "deprecateddir_plugin_manager_test")
-	if err != nil {
-		panic(fmt.Sprintf("Could not create a temp directory: %s", d))
-	}
-
 	socketDir = d
-	deprecatedSocketDir = d2
 }
 
 func cleanup(t *testing.T) {
 	require.NoError(t, os.RemoveAll(socketDir))
-	require.NoError(t, os.RemoveAll(deprecatedSocketDir))
 	os.MkdirAll(socketDir, 0755)
-	os.MkdirAll(deprecatedSocketDir, 0755)
 }
 
 func waitForRegistration(t *testing.T, fakePluginHandler *fakePluginHandler) {
@@ -129,7 +120,7 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 func TestPluginRegistration(t *testing.T) {
 	defer cleanup(t)
 
-	pluginManager := newTestPluginManager(socketDir, deprecatedSocketDir)
+	pluginManager := newTestPluginManager(socketDir)
 
 	// Start the plugin manager
 	stopChan := make(chan struct{})
@@ -154,12 +145,10 @@ func TestPluginRegistration(t *testing.T) {
 }
 
 func newTestPluginManager(
-	sockDir string,
-	deprecatedSockDir string) PluginManager {
+	sockDir string) PluginManager {
 
 	pm := NewPluginManager(
 		sockDir,
-		deprecatedSockDir,
 		&record.FakeRecorder{},
 	)
 	return pm

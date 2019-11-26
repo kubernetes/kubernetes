@@ -20,7 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc/status"
 
 	"k8s.io/component-base/metrics"
@@ -49,7 +48,7 @@ var (
 			Help:      "Latencies in seconds of value transformation operations.",
 			// In-process transformations (ex. AES CBC) complete on the order of 20 microseconds. However, when
 			// external KMS is involved latencies may climb into milliseconds.
-			Buckets:        prometheus.ExponentialBuckets(5e-6, 2, 14),
+			Buckets:        metrics.ExponentialBuckets(5e-6, 2, 14),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"transformation_type"},
@@ -59,11 +58,12 @@ var (
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "transformation_latencies_microseconds",
-			Help:      "(Deprecated) Latencies in microseconds of value transformation operations.",
+			Help:      "Latencies in microseconds of value transformation operations.",
 			// In-process transformations (ex. AES CBC) complete on the order of 20 microseconds. However, when
 			// external KMS is involved latencies may climb into milliseconds.
-			Buckets:        prometheus.ExponentialBuckets(5, 2, 14),
-			StabilityLevel: metrics.ALPHA,
+			Buckets:           metrics.ExponentialBuckets(5, 2, 14),
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 		[]string{"transformation_type"},
 	)
@@ -81,11 +81,12 @@ var (
 
 	deprecatedTransformerFailuresTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "transformation_failures_total",
-			Help:           "(Deprecated) Total number of failed transformation operations.",
-			StabilityLevel: metrics.ALPHA,
+			Namespace:         namespace,
+			Subsystem:         subsystem,
+			Name:              "transformation_failures_total",
+			Help:              "Total number of failed transformation operations.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.15.0",
 		},
 		[]string{"transformation_type"},
 	)
@@ -106,18 +107,19 @@ var (
 			Subsystem:      subsystem,
 			Name:           "data_key_generation_duration_seconds",
 			Help:           "Latencies in seconds of data encryption key(DEK) generation operations.",
-			Buckets:        prometheus.ExponentialBuckets(5e-6, 2, 14),
+			Buckets:        metrics.ExponentialBuckets(5e-6, 2, 14),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
 	deprecatedDataKeyGenerationLatencies = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "data_key_generation_latencies_microseconds",
-			Help:           "(Deprecated) Latencies in microseconds of data encryption key(DEK) generation operations.",
-			Buckets:        prometheus.ExponentialBuckets(5, 2, 14),
-			StabilityLevel: metrics.ALPHA,
+			Namespace:         namespace,
+			Subsystem:         subsystem,
+			Name:              "data_key_generation_latencies_microseconds",
+			Help:              "Latencies in microseconds of data encryption key(DEK) generation operations.",
+			Buckets:           metrics.ExponentialBuckets(5, 2, 14),
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 	)
 	dataKeyGenerationFailuresTotal = metrics.NewCounter(

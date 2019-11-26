@@ -2,7 +2,7 @@ package hcn
 
 import (
 	"encoding/json"
-
+	"errors"
 	"github.com/Microsoft/hcsshim/internal/guid"
 	"github.com/Microsoft/hcsshim/internal/interop"
 	"github.com/sirupsen/logrus"
@@ -298,6 +298,10 @@ func GetEndpointByName(endpointName string) (*HostComputeEndpoint, error) {
 // Create Endpoint.
 func (endpoint *HostComputeEndpoint) Create() (*HostComputeEndpoint, error) {
 	logrus.Debugf("hcn::HostComputeEndpoint::Create id=%s", endpoint.Id)
+
+	if endpoint.HostComputeNamespace != "" {
+		return nil, errors.New("endpoint create error, endpoint json HostComputeNamespace is read only and should not be set")
+	}
 
 	jsonString, err := json.Marshal(endpoint)
 	if err != nil {

@@ -520,19 +520,36 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 		})
 
 		ginkgo.AfterEach(func() {
-			defer func() {
+			prePullImagesIfNeccecary := func() {
 				if expectedNodeCondition == v1.NodeDiskPressure && framework.TestContext.PrepullImages {
 					// The disk eviction test may cause the prepulled images to be evicted,
 					// prepull those images again to ensure this test not affect following tests.
 					PrePullAllImages()
 				}
-			}()
+			}
+			// Run prePull using a defer to make sure it is executed even when the assertions below fails
+			defer prePullImagesIfNeccecary()
+
 			ginkgo.By("deleting pods")
 			for _, spec := range testSpecs {
 				ginkgo.By(fmt.Sprintf("deleting pod: %s", spec.pod.Name))
 				f.PodClient().DeleteSync(spec.pod.Name, &metav1.DeleteOptions{}, 10*time.Minute)
 			}
+
+			// In case a test fails before verifying that NodeCondition no longer exist on the node,
+			// we should wait for the NodeCondition to disappear
+			ginkgo.By(fmt.Sprintf("making sure NodeCondition %s no longer exist on the node", expectedNodeCondition))
+			gomega.Eventually(func() error {
+				if expectedNodeCondition != noPressure && hasNodeCondition(f, expectedNodeCondition) {
+					return fmt.Errorf("Conditions havent returned to normal, node still has %s", expectedNodeCondition)
+				}
+				return nil
+			}, pressureDissapearTimeout, evictionPollInterval).Should(gomega.BeNil())
+
 			reduceAllocatableMemoryUsage()
+			ginkgo.By("making sure we have all the required images for testing")
+			prePullImagesIfNeccecary()
+
 			ginkgo.By("making sure we can start a new pod after the test")
 			podName := "test-admit-pod"
 			f.PodClient().CreateSync(&v1.Pod{

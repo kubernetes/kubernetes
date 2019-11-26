@@ -22,11 +22,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/api/core/v1"
@@ -48,7 +49,7 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 	}
 
 	nm := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}
-	ports, protocol := getPortsAndProtocol(svc.Spec.Ports)
+	ports, _, protocol := getPortsAndProtocol(svc.Spec.Ports)
 	if protocol != v1.ProtocolTCP && protocol != v1.ProtocolUDP {
 		return nil, fmt.Errorf("Invalid protocol %s, only TCP and UDP are supported", string(protocol))
 	}
@@ -57,6 +58,12 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 	if g.isLegacyNetwork {
 		g.eventRecorder.Event(svc, v1.EventTypeWarning, "ILBOptionsIgnored", "Internal LoadBalancer options are not supported with Legacy Networks.")
 		options = ILBOptions{}
+	}
+	if !g.AlphaFeatureGate.Enabled(AlphaFeatureILBCustomSubnet) {
+		if options.SubnetName != "" {
+			g.eventRecorder.Event(svc, v1.EventTypeWarning, "ILBCustomSubnetOptionIgnored", "Internal LoadBalancer CustomSubnet options ignored as the feature gate is disabled.")
+			options.SubnetName = ""
+		}
 	}
 
 	loadBalancerName := g.GetLoadBalancerName(context.TODO(), clusterName, svc)
@@ -98,23 +105,32 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		return nil, err
 	}
 
+	subnetworkURL := g.SubnetworkURL()
+	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBCustomSubnet) {
+		// If this feature is enabled, changes to subnet annotation will be
+		// picked up and reflected in the forwarding rule.
+		// Removing the annotation will set the forwarding rule to use the default subnet.
+		if options.SubnetName != "" {
+			subnetworkURL = gceSubnetworkURL("", g.networkProjectID, g.region, options.SubnetName)
+		}
+	} else {
+		// TODO(84885) remove this once ILBCustomSubnet goes beta.
+		if existingFwdRule != nil && existingFwdRule.Subnetwork != "" {
+			// If the ILB already exists, continue using the subnet that it's already using.
+			// This is to support existing ILBs that were setup using the wrong subnet - https://github.com/kubernetes/kubernetes/pull/57861
+			subnetworkURL = existingFwdRule.Subnetwork
+		}
+	}
 	// Determine IP which will be used for this LB. If no forwarding rule has been established
 	// or specified in the Service spec, then requestedIP = "".
-	requestedIP := determineRequestedIP(svc, existingFwdRule)
-	ipToUse := requestedIP
+	ipToUse := ilbIPToUse(svc, existingFwdRule, subnetworkURL)
 
-	// If the ILB already exists, continue using the subnet that it's already using.
-	// This is to support existing ILBs that were setup using the wrong subnet.
-	subnetworkURL := g.SubnetworkURL()
-	if existingFwdRule != nil && existingFwdRule.Subnetwork != "" {
-		// external LBs have an empty Subnetwork field.
-		subnetworkURL = existingFwdRule.Subnetwork
-	}
+	klog.V(2).Infof("ensureInternalLoadBalancer(%v): Using subnet %s for LoadBalancer IP %s", loadBalancerName, options.SubnetName, ipToUse)
 
 	var addrMgr *addressManager
 	// If the network is not a legacy network, use the address manager
 	if !g.IsLegacyNetwork() {
-		addrMgr = newAddressManager(g, nm.String(), g.Region(), subnetworkURL, loadBalancerName, requestedIP, cloud.SchemeInternal)
+		addrMgr = newAddressManager(g, nm.String(), g.Region(), subnetworkURL, loadBalancerName, ipToUse, cloud.SchemeInternal)
 		ipToUse, err = addrMgr.HoldAddress()
 		if err != nil {
 			return nil, err
@@ -216,7 +232,7 @@ func (g *Cloud) updateInternalLoadBalancer(clusterName, clusterID string, svc *v
 	}
 
 	// Generate the backend service name
-	_, protocol := getPortsAndProtocol(svc.Spec.Ports)
+	_, _, protocol := getPortsAndProtocol(svc.Spec.Ports)
 	scheme := cloud.SchemeInternal
 	loadBalancerName := g.GetLoadBalancerName(context.TODO(), clusterName, svc)
 	backendServiceName := makeBackendServiceName(loadBalancerName, clusterID, shareBackendService(svc), scheme, protocol, svc.Spec.SessionAffinity)
@@ -226,7 +242,7 @@ func (g *Cloud) updateInternalLoadBalancer(clusterName, clusterID string, svc *v
 
 func (g *Cloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID string, svc *v1.Service) error {
 	loadBalancerName := g.GetLoadBalancerName(context.TODO(), clusterName, svc)
-	_, protocol := getPortsAndProtocol(svc.Spec.Ports)
+	_, _, protocol := getPortsAndProtocol(svc.Spec.Ports)
 	scheme := cloud.SchemeInternal
 	sharedBackend := shareBackendService(svc)
 	sharedHealthCheck := !servicehelpers.RequestsOnlyLocalTraffic(svc)
@@ -248,14 +264,26 @@ func (g *Cloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID string,
 		return err
 	}
 
-	klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting firewall for traffic", loadBalancerName)
-	if err := ignoreNotFound(g.DeleteFirewall(loadBalancerName)); err != nil {
-		if isForbidden(err) && g.OnXPN() {
-			klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): could not delete traffic firewall on XPN cluster. Raising event.", loadBalancerName)
-			g.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudDeleteCmd(loadBalancerName, g.NetworkProjectID()))
-		} else {
+	deleteFunc := func(fwName string) error {
+		if err := ignoreNotFound(g.DeleteFirewall(fwName)); err != nil {
+			if isForbidden(err) && g.OnXPN() {
+				klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): could not delete traffic firewall on XPN cluster. Raising event.", loadBalancerName)
+				g.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudDeleteCmd(fwName, g.NetworkProjectID()))
+				return nil
+			}
 			return err
 		}
+		return nil
+	}
+	fwName := MakeFirewallName(loadBalancerName)
+	klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting firewall %s for traffic",
+		loadBalancerName, fwName)
+	if err := deleteFunc(fwName); err != nil {
+		return err
+	}
+	klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting legacy name firewall for traffic", loadBalancerName)
+	if err := deleteFunc(loadBalancerName); err != nil {
+		return err
 	}
 
 	hcName := makeHealthCheckName(loadBalancerName, clusterID, sharedHealthCheck)
@@ -317,7 +345,7 @@ func (g *Cloud) teardownInternalHealthCheckAndFirewall(svc *v1.Service, hcName s
 	return nil
 }
 
-func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, sourceRanges []string, ports []string, protocol v1.Protocol, nodes []*v1.Node) error {
+func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, sourceRanges []string, portRanges []string, protocol v1.Protocol, nodes []*v1.Node, legacyFwName string) error {
 	klog.V(2).Infof("ensureInternalFirewall(%v): checking existing firewall", fwName)
 	targetTags, err := g.GetNodeTags(nodeNames(nodes))
 	if err != nil {
@@ -327,6 +355,29 @@ func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, s
 	existingFirewall, err := g.GetFirewall(fwName)
 	if err != nil && !isNotFound(err) {
 		return err
+	}
+	// TODO(84821) Remove legacyFwName logic after 3 releases, so there would have been atleast 2 master upgrades that would
+	// have triggered service sync and deletion of the legacy rules.
+	if legacyFwName != "" {
+		// Check for firewall named with the legacy naming scheme and delete if found.
+		legacyFirewall, err := g.GetFirewall(legacyFwName)
+		if err != nil && !isNotFound(err) {
+			return err
+		}
+		if legacyFirewall != nil && existingFirewall != nil {
+			// Delete the legacyFirewall rule if the new one was already created. If not, it will be deleted in the
+			// next sync or when the service is deleted.
+			defer func() {
+				err = g.DeleteFirewall(legacyFwName)
+				if err != nil {
+					klog.Errorf("Failed to delete legacy firewall %s for service %s/%s, err %v",
+						legacyFwName, svc.Namespace, svc.Name, err)
+				} else {
+					klog.V(2).Infof("Successfully deleted legacy firewall %s for service %s/%s",
+						legacyFwName, svc.Namespace, svc.Name)
+				}
+			}()
+		}
 	}
 
 	expectedFirewall := &compute.Firewall{
@@ -338,7 +389,7 @@ func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, s
 		Allowed: []*compute.FirewallAllowed{
 			{
 				IPProtocol: strings.ToLower(string(protocol)),
-				Ports:      ports,
+				Ports:      portRanges,
 			},
 		},
 	}
@@ -371,20 +422,20 @@ func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, s
 func (g *Cloud) ensureInternalFirewalls(loadBalancerName, ipAddress, clusterID string, nm types.NamespacedName, svc *v1.Service, healthCheckPort string, sharedHealthCheck bool, nodes []*v1.Node) error {
 	// First firewall is for ingress traffic
 	fwDesc := makeFirewallDescription(nm.String(), ipAddress)
-	ports, protocol := getPortsAndProtocol(svc.Spec.Ports)
+	_, portRanges, protocol := getPortsAndProtocol(svc.Spec.Ports)
 	sourceRanges, err := servicehelpers.GetLoadBalancerSourceRanges(svc)
 	if err != nil {
 		return err
 	}
-	err = g.ensureInternalFirewall(svc, loadBalancerName, fwDesc, sourceRanges.StringSlice(), ports, protocol, nodes)
+	err = g.ensureInternalFirewall(svc, MakeFirewallName(loadBalancerName), fwDesc, sourceRanges.StringSlice(), portRanges, protocol, nodes, loadBalancerName)
 	if err != nil {
 		return err
 	}
 
 	// Second firewall is for health checking nodes / services
 	fwHCName := makeHealthCheckFirewallName(loadBalancerName, clusterID, sharedHealthCheck)
-	hcSrcRanges := LoadBalancerSrcRanges()
-	return g.ensureInternalFirewall(svc, fwHCName, "", hcSrcRanges, []string{healthCheckPort}, v1.ProtocolTCP, nodes)
+	hcSrcRanges := L4LoadBalancerSrcRanges()
+	return g.ensureInternalFirewall(svc, fwHCName, "", hcSrcRanges, []string{healthCheckPort}, v1.ProtocolTCP, nodes, "")
 }
 
 func (g *Cloud) ensureInternalHealthCheck(name string, svcName types.NamespacedName, shared bool, path string, port int32) (*compute.HealthCheck, error) {
@@ -697,17 +748,62 @@ func backendSvcEqual(a, b *compute.BackendService) bool {
 		backendsListEqual(a.Backends, b.Backends)
 }
 
-func getPortsAndProtocol(svcPorts []v1.ServicePort) (ports []string, protocol v1.Protocol) {
+func getPortsAndProtocol(svcPorts []v1.ServicePort) (ports []string, portRanges []string, protocol v1.Protocol) {
 	if len(svcPorts) == 0 {
-		return []string{}, v1.ProtocolUDP
+		return []string{}, []string{}, v1.ProtocolUDP
 	}
 
 	// GCP doesn't support multiple protocols for a single load balancer
 	protocol = svcPorts[0].Protocol
+	portInts := []int{}
 	for _, p := range svcPorts {
 		ports = append(ports, strconv.Itoa(int(p.Port)))
+		portInts = append(portInts, int(p.Port))
 	}
-	return ports, protocol
+
+	return ports, getPortRanges(portInts), protocol
+}
+
+func getPortRanges(ports []int) (ranges []string) {
+	if len(ports) < 1 {
+		return ranges
+	}
+	sort.Ints(ports)
+
+	start := ports[0]
+	prev := ports[0]
+	for ix, current := range ports {
+		switch {
+		case current == prev:
+			// Loop over duplicates, except if the end of list is reached.
+			if ix == len(ports)-1 {
+				if start == current {
+					ranges = append(ranges, fmt.Sprintf("%d", current))
+				} else {
+					ranges = append(ranges, fmt.Sprintf("%d-%d", start, current))
+				}
+			}
+		case current == prev+1:
+			// continue the streak, create the range if this is the last element in the list.
+			if ix == len(ports)-1 {
+				ranges = append(ranges, fmt.Sprintf("%d-%d", start, current))
+			}
+		default:
+			// current is not prev + 1, streak is broken. Construct the range and handle last element case.
+			if start == prev {
+				ranges = append(ranges, fmt.Sprintf("%d", prev))
+			} else {
+				ranges = append(ranges, fmt.Sprintf("%d-%d", start, prev))
+			}
+			if ix == len(ports)-1 {
+				ranges = append(ranges, fmt.Sprintf("%d", current))
+			}
+			// reset start element
+			start = current
+		}
+		prev = current
+	}
+	return ranges
 }
 
 func (g *Cloud) getBackendServiceLink(name string) string {
@@ -723,20 +819,27 @@ func getNameFromLink(link string) string {
 	return fields[len(fields)-1]
 }
 
-func determineRequestedIP(svc *v1.Service, fwdRule *compute.ForwardingRule) string {
+// ilbIPToUse determines which IP address needs to be used in the ForwardingRule. If an IP has been
+// specified by the user, that is used. If there is an existing ForwardingRule, the ip address from
+// that is reused. In case a subnetwork change is requested, the existing ForwardingRule IP is ignored.
+func ilbIPToUse(svc *v1.Service, fwdRule *compute.ForwardingRule, requestedSubnet string) string {
 	if svc.Spec.LoadBalancerIP != "" {
 		return svc.Spec.LoadBalancerIP
 	}
-
-	if fwdRule != nil {
-		return fwdRule.IPAddress
+	if fwdRule == nil {
+		return ""
 	}
-
-	return ""
+	if requestedSubnet != fwdRule.Subnetwork {
+		// reset ip address since subnet is being changed.
+		return ""
+	}
+	return fwdRule.IPAddress
 }
 
 func getILBOptions(svc *v1.Service) ILBOptions {
-	return ILBOptions{AllowGlobalAccess: GetLoadBalancerAnnotationAllowGlobalAccess(svc)}
+	return ILBOptions{AllowGlobalAccess: GetLoadBalancerAnnotationAllowGlobalAccess(svc),
+		SubnetName: GetLoadBalancerAnnotationSubnet(svc),
+	}
 }
 
 // forwardingRuleComposite is a composite type encapsulating both the GA and Beta ForwardingRules.
@@ -765,7 +868,8 @@ func (f *forwardingRuleComposite) Equal(other *forwardingRuleComposite) bool {
 		f.lbScheme == other.lbScheme &&
 		equalStringSets(f.ports, other.ports) &&
 		f.backendService == other.backendService &&
-		f.allowGlobalAccess == other.allowGlobalAccess
+		f.allowGlobalAccess == other.allowGlobalAccess &&
+		f.subnetwork == other.subnetwork
 }
 
 // toForwardingRuleComposite converts a compute beta or GA ForwardingRule into the composite type

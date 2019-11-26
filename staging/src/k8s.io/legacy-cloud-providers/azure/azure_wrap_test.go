@@ -263,6 +263,14 @@ func TestIsBackendPoolOnSameLB(t *testing.T) {
 			},
 			expectError: true,
 		},
+		{
+			backendPoolID: "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/malformed-lb1-internal/backendAddressPools/pool1",
+			existingBackendPools: []string{
+				"/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/malformed-lb1-lanretni/backendAddressPools/pool2",
+			},
+			expected:       false,
+			expectedLBName: "malformed-lb1-lanretni",
+		},
 	}
 
 	for _, test := range tests {

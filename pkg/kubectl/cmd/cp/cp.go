@@ -470,7 +470,7 @@ func (o *CopyOptions) untarAll(src fileSpec, reader io.Reader, destDir, prefix s
 
 		if mode&os.ModeSymlink != 0 {
 			if !symlinkWarningPrinted && len(o.ExecParentCmdName) > 0 {
-				fmt.Fprintf(o.IOStreams.ErrOut, "warning: file %q is a symlink, skipping (consider using \"%s exec -n %q %q -- tar cf - %q | tar xf -\")\n", destFileName, o.ExecParentCmdName, src.PodNamespace, src.PodName, src.File)
+				fmt.Fprintf(o.IOStreams.ErrOut, "warning: skipping symlink: %q -> %q (consider using \"%s exec -n %q %q -- tar cf - %q | tar xf -\")\n", destFileName, header.Linkname, o.ExecParentCmdName, src.PodNamespace, src.PodName, src.File)
 				symlinkWarningPrinted = true
 				continue
 			}

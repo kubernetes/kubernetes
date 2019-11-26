@@ -21,9 +21,9 @@ import (
 	"net"
 	"sync"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -61,7 +61,7 @@ type rangeAllocator struct {
 	// This increases a throughput of CIDR assignment by not blocking on long operations.
 	nodeCIDRUpdateChannel chan nodeReservedCIDRs
 	recorder              record.EventRecorder
-	// Keep a set of nodes that are currectly being processed to avoid races in CIDR allocation
+	// Keep a set of nodes that are currently being processed to avoid races in CIDR allocation
 	lock              sync.Mutex
 	nodesInProcessing sets.String
 }
@@ -71,7 +71,7 @@ type rangeAllocator struct {
 // Caller must always pass in a list of existing nodes so the new allocator.
 // Caller must ensure that ClusterCIDRs are semantically correct e.g (1 for non DualStack, 2 for DualStack etc..)
 // can initialize its CIDR map. NodeList is only nil in testing.
-func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.NodeInformer, clusterCIDRs []*net.IPNet, serviceCIDR *net.IPNet, secondaryServiceCIDR *net.IPNet, subNetMaskSize int, nodeList *v1.NodeList) (CIDRAllocator, error) {
+func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.NodeInformer, allocatorParams CIDRAllocatorParams, nodeList *v1.NodeList) (CIDRAllocator, error) {
 	if client == nil {
 		klog.Fatalf("kubeClient is nil when starting NodeController")
 	}
@@ -84,9 +84,9 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 
 	// create a cidrSet for each cidr we operate on
 	// cidrSet are mapped to clusterCIDR by index
-	cidrSets := make([]*cidrset.CidrSet, len(clusterCIDRs))
-	for idx, cidr := range clusterCIDRs {
-		cidrSet, err := cidrset.NewCIDRSet(cidr, subNetMaskSize)
+	cidrSets := make([]*cidrset.CidrSet, len(allocatorParams.ClusterCIDRs))
+	for idx, cidr := range allocatorParams.ClusterCIDRs {
+		cidrSet, err := cidrset.NewCIDRSet(cidr, allocatorParams.NodeCIDRMaskSizes[idx])
 		if err != nil {
 			return nil, err
 		}
@@ -95,7 +95,7 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 
 	ra := &rangeAllocator{
 		client:                client,
-		clusterCIDRs:          clusterCIDRs,
+		clusterCIDRs:          allocatorParams.ClusterCIDRs,
 		cidrSets:              cidrSets,
 		nodeLister:            nodeInformer.Lister(),
 		nodesSynced:           nodeInformer.Informer().HasSynced,
@@ -104,14 +104,14 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 		nodesInProcessing:     sets.NewString(),
 	}
 
-	if serviceCIDR != nil {
-		ra.filterOutServiceRange(serviceCIDR)
+	if allocatorParams.ServiceCIDR != nil {
+		ra.filterOutServiceRange(allocatorParams.ServiceCIDR)
 	} else {
 		klog.V(0).Info("No Service CIDR provided. Skipping filtering out service addresses.")
 	}
 
-	if secondaryServiceCIDR != nil {
-		ra.filterOutServiceRange(secondaryServiceCIDR)
+	if allocatorParams.SecondaryServiceCIDR != nil {
+		ra.filterOutServiceRange(allocatorParams.SecondaryServiceCIDR)
 	} else {
 		klog.V(0).Info("No Secondary Service CIDR provided. Skipping filtering out secondary service addresses.")
 	}
@@ -228,6 +228,13 @@ func (r *rangeAllocator) occupyCIDRs(node *v1.Node) error {
 		if err != nil {
 			return fmt.Errorf("failed to parse node %s, CIDR %s", node.Name, node.Spec.PodCIDR)
 		}
+		// If node has a pre allocate cidr that does not exist in our cidrs.
+		// This will happen if cluster went from dualstack(multi cidrs) to non-dualstack
+		// then we have now way of locking it
+		if idx >= len(r.cidrSets) {
+			return fmt.Errorf("node:%s has an allocated cidr: %v at index:%v that does not exist in cluster cidrs configuration", node.Name, cidr, idx)
+		}
+
 		if err := r.cidrSets[idx].Occupy(podCIDR); err != nil {
 			return fmt.Errorf("failed to mark cidr[%v] at idx [%v] as occupied for node: %v: %v", podCIDR, idx, node.Name, err)
 		}
@@ -282,6 +289,13 @@ func (r *rangeAllocator) ReleaseCIDR(node *v1.Node) error {
 		_, podCIDR, err := net.ParseCIDR(cidr)
 		if err != nil {
 			return fmt.Errorf("failed to parse CIDR %s on Node %v: %v", cidr, node.Name, err)
+		}
+
+		// If node has a pre allocate cidr that does not exist in our cidrs.
+		// This will happen if cluster went from dualstack(multi cidrs) to non-dualstack
+		// then we have now way of locking it
+		if idx >= len(r.cidrSets) {
+			return fmt.Errorf("node:%s has an allocated cidr: %v at index:%v that does not exist in cluster cidrs configuration", node.Name, cidr, idx)
 		}
 
 		klog.V(4).Infof("release CIDR %s for node:%v", cidr, node.Name)
@@ -346,7 +360,7 @@ func (r *rangeAllocator) updateCIDRsAllocation(data nodeReservedCIDRs) error {
 	if len(node.Spec.PodCIDRs) != 0 {
 		klog.Errorf("Node %v already has a CIDR allocated %v. Releasing the new one.", node.Name, node.Spec.PodCIDRs)
 		for idx, cidr := range data.allocatedCIDRs {
-			if releaseErr := r.cidrSets[idx].Release(cidr); err != nil {
+			if releaseErr := r.cidrSets[idx].Release(cidr); releaseErr != nil {
 				klog.Errorf("Error when releasing CIDR idx:%v value: %v err:%v", idx, cidr, releaseErr)
 			}
 		}

@@ -56,7 +56,7 @@ type Indexer interface {
 type IndexFunc func(obj interface{}) ([]string, error)
 
 // IndexFuncToKeyFuncAdapter adapts an indexFunc to a keyFunc.  This is only useful if your index function returns
-// unique values for every object.  This is conversion can create errors when more than one key is found.  You
+// unique values for every object.  This conversion can create errors when more than one key is found.  You
 // should prefer to make proper key and index functions.
 func IndexFuncToKeyFuncAdapter(indexFunc IndexFunc) KeyFunc {
 	return func(obj interface{}) (string, error) {

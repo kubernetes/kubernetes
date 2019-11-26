@@ -162,7 +162,7 @@ func SSH(cmd, host, provider string) (Result, error) {
 	}
 
 	if bastion := os.Getenv("KUBE_SSH_BASTION"); len(bastion) > 0 {
-		stdout, stderr, code, err := RunSSHCommandViaBastion(cmd, result.User, bastion, host, signer)
+		stdout, stderr, code, err := runSSHCommandViaBastion(cmd, result.User, bastion, host, signer)
 		result.Stdout = stdout
 		result.Stderr = stderr
 		result.Code = code
@@ -177,11 +177,11 @@ func SSH(cmd, host, provider string) (Result, error) {
 	return result, err
 }
 
-// RunSSHCommandViaBastion returns the stdout, stderr, and exit code from running cmd on
+// runSSHCommandViaBastion returns the stdout, stderr, and exit code from running cmd on
 // host as specific user, along with any SSH-level error. It uses an SSH proxy to connect
 // to bastion, then via that tunnel connects to the remote host. Similar to
 // sshutil.RunSSHCommand but scoped to the needs of the test infrastructure.
-func RunSSHCommandViaBastion(cmd, user, bastion, host string, signer ssh.Signer) (string, string, int, error) {
+func runSSHCommandViaBastion(cmd, user, bastion, host string, signer ssh.Signer) (string, string, int, error) {
 	// Setup the config, dial the server, and open a session.
 	config := &ssh.ClientConfig{
 		User:            user,

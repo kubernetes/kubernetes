@@ -17,11 +17,13 @@ limitations under the License.
 package metrics
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/procfs"
-	"k8s.io/klog"
 	"os"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/procfs"
+
+	"k8s.io/klog"
 )
 
 var processStartTime = prometheus.NewGaugeVec(

@@ -20,10 +20,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"strings"
 
-	"github.com/prometheus/common/model"
-
+	"k8s.io/component-base/metrics/testutil"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
@@ -57,45 +55,25 @@ func (m *ComponentCollection) filterMetrics() {
 	(*m).KubeletMetrics = kubeletMetrics
 }
 
-func printSample(sample *model.Sample) string {
-	buf := make([]string, 0)
-	// Id is a VERY special label. For 'normal' container it's useless, but it's necessary
-	// for 'system' containers (e.g. /docker-daemon, /kubelet, etc.). We know if that's the
-	// case by checking if there's a label "kubernetes_container_name" present. It's hacky
-	// but it works...
-	_, normalContainer := sample.Metric["kubernetes_container_name"]
-	for k, v := range sample.Metric {
-		if strings.HasPrefix(string(k), "__") {
-			continue
-		}
-
-		if string(k) == "id" && normalContainer {
-			continue
-		}
-		buf = append(buf, fmt.Sprintf("%v=%v", string(k), v))
-	}
-	return fmt.Sprintf("[%v] = %v", strings.Join(buf, ","), sample.Value)
-}
-
 // PrintHumanReadable returns e2e metrics with JSON format.
 func (m *ComponentCollection) PrintHumanReadable() string {
 	buf := bytes.Buffer{}
 	for _, interestingMetric := range interestingAPIServerMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
 		for _, sample := range (*m).APIServerMetrics[interestingMetric] {
-			buf.WriteString(fmt.Sprintf("\t%v\n", printSample(sample)))
+			buf.WriteString(fmt.Sprintf("\t%v\n", testutil.PrintSample(sample)))
 		}
 	}
 	for _, interestingMetric := range interestingControllerManagerMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
 		for _, sample := range (*m).ControllerManagerMetrics[interestingMetric] {
-			buf.WriteString(fmt.Sprintf("\t%v\n", printSample(sample)))
+			buf.WriteString(fmt.Sprintf("\t%v\n", testutil.PrintSample(sample)))
 		}
 	}
 	for _, interestingMetric := range interestingClusterAutoscalerMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
 		for _, sample := range (*m).ClusterAutoscalerMetrics[interestingMetric] {
-			buf.WriteString(fmt.Sprintf("\t%v\n", printSample(sample)))
+			buf.WriteString(fmt.Sprintf("\t%v\n", testutil.PrintSample(sample)))
 		}
 	}
 	for kubelet, grabbed := range (*m).KubeletMetrics {
@@ -103,7 +81,7 @@ func (m *ComponentCollection) PrintHumanReadable() string {
 		for _, interestingMetric := range interestingKubeletMetrics {
 			buf.WriteString(fmt.Sprintf("\tFor %v:\n", interestingMetric))
 			for _, sample := range grabbed[interestingMetric] {
-				buf.WriteString(fmt.Sprintf("\t\t%v\n", printSample(sample)))
+				buf.WriteString(fmt.Sprintf("\t\t%v\n", testutil.PrintSample(sample)))
 			}
 		}
 	}
@@ -111,6 +89,8 @@ func (m *ComponentCollection) PrintHumanReadable() string {
 }
 
 // PrettyPrintJSON converts metrics to JSON format.
+// TODO: This function should be replaced with framework.PrettyPrintJSON after solving
+// circulary dependency between core framework and this metrics subpackage.
 func PrettyPrintJSON(metrics interface{}) string {
 	output := &bytes.Buffer{}
 	if err := json.NewEncoder(output).Encode(metrics); err != nil {
@@ -136,25 +116,12 @@ func (m *ComponentCollection) SummaryKind() string {
 	return "ComponentCollection"
 }
 
-func makeKey(a, b model.LabelValue) string {
-	return string(a) + "___" + string(b)
-}
-
 // ComputeClusterAutoscalerMetricsDelta computes the change in cluster
 // autoscaler metrics.
 func (m *ComponentCollection) ComputeClusterAutoscalerMetricsDelta(before Collection) {
 	if beforeSamples, found := before.ClusterAutoscalerMetrics[caFunctionMetric]; found {
 		if afterSamples, found := m.ClusterAutoscalerMetrics[caFunctionMetric]; found {
-			beforeSamplesMap := make(map[string]*model.Sample)
-			for _, bSample := range beforeSamples {
-				beforeSamplesMap[makeKey(bSample.Metric[caFunctionMetricLabel], bSample.Metric["le"])] = bSample
-			}
-			for _, aSample := range afterSamples {
-				if bSample, found := beforeSamplesMap[makeKey(aSample.Metric[caFunctionMetricLabel], aSample.Metric["le"])]; found {
-					aSample.Value = aSample.Value - bSample.Value
-				}
-
-			}
+			testutil.ComputeHistogramDelta(beforeSamples, afterSamples, caFunctionMetricLabel)
 		}
 	}
 }

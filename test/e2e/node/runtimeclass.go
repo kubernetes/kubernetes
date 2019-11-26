@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/node/v1beta1"
+	nodev1beta1 "k8s.io/api/node/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeclasstest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
@@ -38,7 +38,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
 
 	ginkgo.It("should reject a Pod requesting a RuntimeClass with conflicting node selector", func() {
-		scheduling := &v1beta1.Scheduling{
+		scheduling := &nodev1beta1.Scheduling{
 			NodeSelector: map[string]string{
 				"foo": "conflict",
 			},
@@ -58,7 +58,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 		gomega.Expect(apierrs.IsForbidden(err)).To(gomega.BeTrue(), "should be forbidden error")
 	})
 
-	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling [NodeFeature:RuntimeHandler] ", func() {
+	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling [NodeFeature:RuntimeHandler] [Disruptive] ", func() {
 		nodeName := scheduling.GetNodeThatCanRunPod(f)
 		nodeSelector := map[string]string{
 			"foo":  "bar",
@@ -72,7 +72,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 				Effect:   v1.TaintEffectNoSchedule,
 			},
 		}
-		scheduling := &v1beta1.Scheduling{
+		scheduling := &nodev1beta1.Scheduling{
 			NodeSelector: nodeSelector,
 			Tolerations:  tolerations,
 		}
@@ -118,7 +118,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 })
 
 // newRuntimeClass returns a test runtime class.
-func newRuntimeClass(namespace, name string) *v1beta1.RuntimeClass {
+func newRuntimeClass(namespace, name string) *nodev1beta1.RuntimeClass {
 	uniqueName := fmt.Sprintf("%s-%s", namespace, name)
 	return runtimeclasstest.NewRuntimeClass(uniqueName, framework.PreconfiguredRuntimeClassHandler())
 }

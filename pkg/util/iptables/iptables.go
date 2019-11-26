@@ -33,14 +33,17 @@ import (
 	utiltrace "k8s.io/utils/trace"
 )
 
+// RulePosition holds the -I/-A flags for iptable
 type RulePosition string
 
 const (
+	// Prepend is the insert flag for iptable
 	Prepend RulePosition = "-I"
-	Append  RulePosition = "-A"
+	// Append is the append flag for iptable
+	Append RulePosition = "-A"
 )
 
-// An injectable interface for running iptables commands.  Implementations must be goroutine-safe.
+// Interface is an injectable interface for running iptables commands.  Implementations must be goroutine-safe.
 type Interface interface {
 	// EnsureChain checks if the specified chain exists and, if not, creates it.  If the chain existed, return true.
 	EnsureChain(table Table, chain Chain) (bool, error)
@@ -83,29 +86,42 @@ type Interface interface {
 	HasRandomFully() bool
 }
 
+// Protocol defines the ip protocol either ipv4 or ipv6
 type Protocol byte
 
 const (
+	// ProtocolIpv4 represents ipv4 protocol in iptables
 	ProtocolIpv4 Protocol = iota + 1
+	// ProtocolIpv6 represents ipv6 protocol in iptables
 	ProtocolIpv6
 )
 
+// Table represents different iptable like filter,nat, mangle and raw
 type Table string
 
 const (
-	TableNAT    Table = "nat"
+	// TableNAT represents the built-in nat table
+	TableNAT Table = "nat"
+	// TableFilter represents the built-in filter table
 	TableFilter Table = "filter"
+	// TableMangle represents the built-in mangle table
 	TableMangle Table = "mangle"
 )
 
+// Chain represents the different rules
 type Chain string
 
 const (
+	// ChainPostrouting used for source NAT in nat table
 	ChainPostrouting Chain = "POSTROUTING"
-	ChainPrerouting  Chain = "PREROUTING"
-	ChainOutput      Chain = "OUTPUT"
-	ChainInput       Chain = "INPUT"
-	ChainForward     Chain = "FORWARD"
+	// ChainPrerouting used for DNAT (destination NAT) in nat table
+	ChainPrerouting Chain = "PREROUTING"
+	// ChainOutput used for the packets going out from local
+	ChainOutput Chain = "OUTPUT"
+	// ChainInput used for incoming packets
+	ChainInput Chain = "INPUT"
+	// ChainForward used for the packets for another NIC
+	ChainForward Chain = "FORWARD"
 )
 
 const (
@@ -117,32 +133,49 @@ const (
 	cmdIP6Tables        string = "ip6tables"
 )
 
-// Option flag for Restore
+// RestoreCountersFlag is an option flag for Restore
 type RestoreCountersFlag bool
 
+// RestoreCounters a boolean true constant for the option flag RestoreCountersFlag
 const RestoreCounters RestoreCountersFlag = true
+
+// NoRestoreCounters a boolean false constant for the option flag RestoreCountersFlag
 const NoRestoreCounters RestoreCountersFlag = false
 
-// Option flag for Flush
+// FlushFlag an option flag for Flush
 type FlushFlag bool
 
+// FlushTables a boolean true constant for option flag FlushFlag
 const FlushTables FlushFlag = true
+
+// NoFlushTables a boolean false constant for option flag FlushFlag
 const NoFlushTables FlushFlag = false
 
+// MinCheckVersion minimum version to be checked
 // Versions of iptables less than this do not support the -C / --check flag
 // (test whether a rule exists).
 var MinCheckVersion = utilversion.MustParseGeneric("1.4.11")
 
+// RandomFullyMinVersion is the minimum version from which the --random-fully flag is supported,
+// used for port mapping to be fully randomized
 var RandomFullyMinVersion = utilversion.MustParseGeneric("1.6.2")
 
-// Minimum iptables versions supporting the -w and -w<seconds> flags
+// WaitMinVersion a minimum iptables versions supporting the -w and -w<seconds> flags
 var WaitMinVersion = utilversion.MustParseGeneric("1.4.20")
+
+// WaitSecondsMinVersion a minimum iptables versions supporting the wait seconds
 var WaitSecondsMinVersion = utilversion.MustParseGeneric("1.4.22")
+
+// WaitRestoreMinVersion a minimum iptables versions supporting the wait restore seconds
 var WaitRestoreMinVersion = utilversion.MustParseGeneric("1.6.2")
 
+// WaitString a constant for specifying the wait flag
 const WaitString = "-w"
+
+// WaitSecondsValue a constant for specifying the default wait seconds
 const WaitSecondsValue = "5"
 
+// LockfilePath16x is the iptables lock file acquired by any process that's making any change in the iptable rule
 const LockfilePath16x = "/run/xtables.lock"
 
 // runner implements Interface in terms of exec("iptables").
@@ -397,7 +430,7 @@ func (runner *runner) runContext(ctx context.Context, op operation, args []strin
 	iptablesCmd := iptablesCommand(runner.protocol)
 	fullArgs := append(runner.waitFlag, string(op))
 	fullArgs = append(fullArgs, args...)
-	klog.V(5).Infof("running iptables %s %v", string(op), args)
+	klog.V(5).Infof("running iptables: %s %v", iptablesCmd, fullArgs)
 	if ctx == nil {
 		return runner.exec.Command(iptablesCmd, fullArgs...).CombinedOutput()
 	}
@@ -502,16 +535,22 @@ const (
 // Monitor is part of Interface
 func (runner *runner) Monitor(canary Chain, tables []Table, reloadFunc func(), interval time.Duration, stopCh <-chan struct{}) {
 	for {
-		for _, table := range tables {
-			if _, err := runner.EnsureChain(table, canary); err != nil {
-				klog.Warningf("Could not set up iptables canary %s/%s: %v", string(table), string(canary), err)
-				return
+		_ = utilwait.PollImmediateUntil(interval, func() (bool, error) {
+			for _, table := range tables {
+				if _, err := runner.EnsureChain(table, canary); err != nil {
+					klog.Warningf("Could not set up iptables canary %s/%s: %v", string(table), string(canary), err)
+					return false, nil
+				}
 			}
-		}
+			return true, nil
+		}, stopCh)
 
 		// Poll until stopCh is closed or iptables is flushed
 		err := utilwait.PollUntil(interval, func() (bool, error) {
-			if runner.chainExists(tables[0], canary) {
+			if exists, err := runner.chainExists(tables[0], canary); exists {
+				return false, nil
+			} else if isResourceError(err) {
+				klog.Warningf("Could not check for iptables canary %s/%s: %v", string(tables[0]), string(canary), err)
 				return false, nil
 			}
 			klog.V(2).Infof("iptables canary %s/%s deleted", string(tables[0]), string(canary))
@@ -520,7 +559,7 @@ func (runner *runner) Monitor(canary Chain, tables []Table, reloadFunc func(), i
 			// so we don't start reloading too soon.
 			err := utilwait.PollImmediate(iptablesFlushPollTime, iptablesFlushTimeout, func() (bool, error) {
 				for i := 1; i < len(tables); i++ {
-					if runner.chainExists(tables[i], canary) {
+					if exists, err := runner.chainExists(tables[i], canary); exists || isResourceError(err) {
 						return false, nil
 					}
 				}
@@ -547,14 +586,14 @@ func (runner *runner) Monitor(canary Chain, tables []Table, reloadFunc func(), i
 
 // chainExists is used internally by Monitor; none of the public Interface methods can be
 // used to distinguish "chain exists" from "chain does not exist" with no side effects
-func (runner *runner) chainExists(table Table, chain Chain) bool {
+func (runner *runner) chainExists(table Table, chain Chain) (bool, error) {
 	fullArgs := makeFullArgs(table, chain)
 
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
 	_, err := runner.run(opListChain, fullArgs)
-	return err == nil
+	return err == nil, err
 }
 
 type operation string
@@ -573,6 +612,8 @@ func makeFullArgs(table Table, chain Chain, args ...string) []string {
 	return append([]string{string(chain), "-t", string(table)}, args...)
 }
 
+const iptablesVersionPattern = `v([0-9]+(\.[0-9]+)+)`
+
 // getIPTablesVersion runs "iptables --version" and parses the returned version
 func getIPTablesVersion(exec utilexec.Interface, protocol Protocol) (*utilversion.Version, error) {
 	// this doesn't access mutable state so we don't need to use the interface / runner
@@ -581,7 +622,7 @@ func getIPTablesVersion(exec utilexec.Interface, protocol Protocol) (*utilversio
 	if err != nil {
 		return nil, err
 	}
-	versionMatcher := regexp.MustCompile("v([0-9]+(\\.[0-9]+)+)")
+	versionMatcher := regexp.MustCompile(iptablesVersionPattern)
 	match := versionMatcher.FindStringSubmatch(string(bytes))
 	if match == nil {
 		return nil, fmt.Errorf("no iptables version found in string: %s", bytes)
@@ -641,7 +682,7 @@ func getIPTablesRestoreVersionString(exec utilexec.Interface, protocol Protocol)
 	if err != nil {
 		return "", err
 	}
-	versionMatcher := regexp.MustCompile("v([0-9]+(\\.[0-9]+)+)")
+	versionMatcher := regexp.MustCompile(iptablesVersionPattern)
 	match := versionMatcher.FindStringSubmatch(string(bytes))
 	if match == nil {
 		return "", fmt.Errorf("no iptables version found in string: %s", bytes)
@@ -686,6 +727,18 @@ func IsNotFoundError(err error) bool {
 		if strings.Contains(es, str) {
 			return true
 		}
+	}
+	return false
+}
+
+const iptablesStatusResourceProblem = 4
+
+// isResourceError returns true if the error indicates that iptables ran into a "resource
+// problem" and was unable to attempt the request. In particular, this will be true if it
+// times out trying to get the iptables lock.
+func isResourceError(err error) bool {
+	if ee, isExitError := err.(utilexec.ExitError); isExitError {
+		return ee.ExitStatus() == iptablesStatusResourceProblem
 	}
 	return false
 }

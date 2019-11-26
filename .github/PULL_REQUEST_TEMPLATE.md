@@ -5,12 +5,11 @@
 https://git.k8s.io/community/contributors/devel/sig-release/release.md#issuepr-kind-label
 3. Ensure you have added or ran the appropriate tests for your PR: https://git.k8s.io/community/contributors/devel/sig-testing/testing.md
 4. If you want *faster* PR reviews, read how: https://git.k8s.io/community/contributors/guide/pull-requests.md#best-practices-for-faster-reviews
-5. Follow the instructions for writing a release note: https://git.k8s.io/community/contributors/guide/release-notes.md
-6. If the PR is unfinished, see how to mark it: https://git.k8s.io/community/contributors/guide/pull-requests.md#marking-unfinished-pull-requests
+5. If the PR is unfinished, see how to mark it: https://git.k8s.io/community/contributors/guide/pull-requests.md#marking-unfinished-pull-requests
 -->
 
 **What type of PR is this?**
-> Uncomment only one ` /kind <>` line, hit enter to put that in a new line, and remove leading whitespaces from that line:
+> Uncomment only one ` /kind <>` line, hit enter to put that in a new line, and remove leading whitespace from that line:
 >
 > /kind api-change
 > /kind bug
@@ -38,6 +37,8 @@ Fixes #
 If no, just write "NONE" in the release-note block below.
 If yes, a release note is required:
 Enter your extended release note in the block below. If the PR requires additional action from users switching to the new release, include the string "action required".
+
+For more information on release notes see: https://git.k8s.io/community/contributors/guide/release-notes.md
 -->
 ```release-note
 

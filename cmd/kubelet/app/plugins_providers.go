@@ -19,21 +19,61 @@ limitations under the License.
 package app
 
 import (
+	"k8s.io/component-base/featuregate"
+	"k8s.io/csi-translation-lib/plugins"
+	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
 	"k8s.io/kubernetes/pkg/volume/azure_file"
 	"k8s.io/kubernetes/pkg/volume/cinder"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/gcepd"
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
 )
 
-func appendLegacyProviderVolumes(allPlugins []volume.VolumePlugin) []volume.VolumePlugin {
-	allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, azure_file.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
+type probeFn func() []volume.VolumePlugin
+
+func appendPluginBasedOnMigrationFeatureFlags(plugins []volume.VolumePlugin, inTreePluginName string, featureGate featuregate.FeatureGate, pluginMigration, pluginMigrationComplete featuregate.Feature, fn probeFn) ([]volume.VolumePlugin, error) {
+	// Skip appending the in-tree plugin to the list of plugins to be probed/initialized
+	// if the CSIMigration feature flag and plugin specific feature flag indicating
+	// CSI migration is complete
+	err := csimigration.CheckMigrationFeatureFlags(featureGate, pluginMigration, pluginMigrationComplete)
+	if err != nil {
+		klog.Warningf("Unexpected CSI Migration Feature Flags combination detected: %v. CSI Migration may not take effect", err)
+		// TODO: fail and return here once alpha only tests can set the feature flags for a plugin correctly
+	}
+	if featureGate.Enabled(features.CSIMigration) && featureGate.Enabled(pluginMigration) && featureGate.Enabled(pluginMigrationComplete) {
+		klog.Infof("Skip registration of plugin %s since feature flag %v is enabled", inTreePluginName, pluginMigrationComplete)
+		return plugins, nil
+	}
+	plugins = append(plugins, fn()...)
+	return plugins, nil
+}
+
+type pluginInfo struct {
+	pluginMigrationFeature         featuregate.Feature
+	pluginMigrationCompleteFeature featuregate.Feature
+	pluginProbeFunction            probeFn
+}
+
+func appendLegacyProviderVolumes(allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
+	pluginMigrationStatus := make(map[string]pluginInfo)
+	pluginMigrationStatus[plugins.AWSEBSInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAWS, pluginMigrationCompleteFeature: features.CSIMigrationAWSComplete, pluginProbeFunction: awsebs.ProbeVolumePlugins}
+	pluginMigrationStatus[plugins.GCEPDInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationGCE, pluginMigrationCompleteFeature: features.CSIMigrationGCEComplete, pluginProbeFunction: gcepd.ProbeVolumePlugins}
+	pluginMigrationStatus[plugins.CinderInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationOpenStack, pluginMigrationCompleteFeature: features.CSIMigrationOpenStackComplete, pluginProbeFunction: cinder.ProbeVolumePlugins}
+	pluginMigrationStatus[plugins.AzureDiskInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAzureDisk, pluginMigrationCompleteFeature: features.CSIMigrationAzureDiskComplete, pluginProbeFunction: azure_dd.ProbeVolumePlugins}
+	pluginMigrationStatus[plugins.AzureFileInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationAzureFile, pluginMigrationCompleteFeature: features.CSIMigrationAzureFileComplete, pluginProbeFunction: azure_file.ProbeVolumePlugins}
+
+	var err error
+	for pluginName, pluginInfo := range pluginMigrationStatus {
+		allPlugins, err = appendPluginBasedOnMigrationFeatureFlags(allPlugins, pluginName, featureGate, pluginInfo.pluginMigrationFeature, pluginInfo.pluginMigrationCompleteFeature, pluginInfo.pluginProbeFunction)
+		if err != nil {
+			return allPlugins, err
+		}
+	}
+
 	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
-	return allPlugins
+	return allPlugins, nil
 }

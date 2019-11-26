@@ -5,6 +5,7 @@ import (
 	"syscall"
 
 	"github.com/vishvananda/netlink/nl"
+	"golang.org/x/sys/unix"
 )
 
 func LinkGetProtinfo(link Link) (Protinfo, error) {
@@ -15,10 +16,10 @@ func (h *Handle) LinkGetProtinfo(link Link) (Protinfo, error) {
 	base := link.Attrs()
 	h.ensureIndex(base)
 	var pi Protinfo
-	req := h.newNetlinkRequest(syscall.RTM_GETLINK, syscall.NLM_F_DUMP)
-	msg := nl.NewIfInfomsg(syscall.AF_BRIDGE)
+	req := h.newNetlinkRequest(unix.RTM_GETLINK, unix.NLM_F_DUMP)
+	msg := nl.NewIfInfomsg(unix.AF_BRIDGE)
 	req.AddData(msg)
-	msgs, err := req.Execute(syscall.NETLINK_ROUTE, 0)
+	msgs, err := req.Execute(unix.NETLINK_ROUTE, 0)
 	if err != nil {
 		return pi, err
 	}
@@ -33,7 +34,7 @@ func (h *Handle) LinkGetProtinfo(link Link) (Protinfo, error) {
 			return pi, err
 		}
 		for _, attr := range attrs {
-			if attr.Attr.Type != syscall.IFLA_PROTINFO|syscall.NLA_F_NESTED {
+			if attr.Attr.Type != unix.IFLA_PROTINFO|unix.NLA_F_NESTED {
 				continue
 			}
 			infos, err := nl.ParseRouteAttr(attr.Value)

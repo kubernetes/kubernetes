@@ -39,9 +39,12 @@ var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]"
 		var count int
 		for count < 1000 {
 			pod, err := createTerminatingPod(f)
+			if err != nil {
+				framework.Failf("err creating pod: %v", err)
+			}
 			pod.ResourceVersion = ""
 			pod.Status.Phase = v1.PodFailed
-			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).UpdateStatus(pod)
+			_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).UpdateStatus(pod)
 			if err != nil {
 				framework.Failf("err failing pod: %v", err)
 			}

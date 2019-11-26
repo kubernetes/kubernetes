@@ -38,6 +38,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/util/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
@@ -64,6 +65,8 @@ func createAggregatorConfig(
 	// make a shallow copy to let us twiddle a few things
 	// most of the config actually remains the same.  We only need to mess with a couple items related to the particulars of the aggregator
 	genericConfig := kubeAPIServerConfig
+	genericConfig.PostStartHooks = map[string]genericapiserver.PostStartHookConfigEntry{}
+	genericConfig.RESTOptionsGetter = nil
 
 	// override genericConfig.AdmissionControl with kube-aggregator's scheme,
 	// because aggregator apiserver should use its own scheme to convert its own resources.
@@ -71,6 +74,7 @@ func createAggregatorConfig(
 		&genericConfig,
 		externalInformers,
 		genericConfig.LoopbackClientConfig,
+		feature.DefaultFeatureGate,
 		pluginInitializers...)
 	if err != nil {
 		return nil, err
@@ -281,6 +285,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "auditregistration.k8s.io", Version: "v1alpha1"}:    {group: 16400, version: 1},
 	{Group: "node.k8s.io", Version: "v1alpha1"}:                 {group: 16300, version: 1},
 	{Group: "node.k8s.io", Version: "v1beta1"}:                  {group: 16300, version: 9},
+	{Group: "discovery.k8s.io", Version: "v1beta1"}:             {group: 16200, version: 12},
 	{Group: "discovery.k8s.io", Version: "v1alpha1"}:            {group: 16200, version: 9},
 	// Append a new group to the end of the list if unsure.
 	// You can use min(existing group)-100 as the initial value for a group.

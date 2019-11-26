@@ -98,7 +98,6 @@ package_group(
     name = "pkg_kubectl_cmd_CONSUMERS_BAD",
     packages = [
         "//cmd/clicheck",
-        "//cmd/hyperkube",
     ],
 )
 
@@ -241,7 +240,6 @@ package_group(
         "//pkg/kubectl/cmd/auth",
         "//pkg/kubectl/cmd/convert",
         "//pkg/kubectl/cmd/cp",
-        "//pkg/kubectl/cmd/get",
         "//pkg/kubectl/explain",
         "//staging/src/k8s.io/kubectl/pkg/cmd",
         "//staging/src/k8s.io/kubectl/pkg/cmd/annotate",
@@ -256,6 +254,7 @@ package_group(
         "//staging/src/k8s.io/kubectl/pkg/cmd/edit",
         "//staging/src/k8s.io/kubectl/pkg/cmd/exec",
         "//staging/src/k8s.io/kubectl/pkg/cmd/expose",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/get",
         "//staging/src/k8s.io/kubectl/pkg/cmd/label",
         "//staging/src/k8s.io/kubectl/pkg/cmd/logs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/patch",

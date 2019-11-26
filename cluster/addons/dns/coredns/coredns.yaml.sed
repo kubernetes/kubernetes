@@ -63,7 +63,9 @@ data:
   Corefile: |
     .:53 {
         errors
-        health
+        health {
+            lameduck 5s
+        }
         ready
         kubernetes $DNS_DOMAIN in-addr.arpa ip6.arpa {
             pods insecure
@@ -105,7 +107,7 @@ spec:
       labels:
         k8s-app: kube-dns
       annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+        seccomp.security.alpha.kubernetes.io/pod: 'runtime/default'
     spec:
       priorityClassName: system-cluster-critical
       serviceAccountName: coredns
@@ -116,7 +118,7 @@ spec:
         beta.kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: k8s.gcr.io/coredns:1.6.2
+        image: k8s.gcr.io/coredns:1.6.5
         imagePullPolicy: IfNotPresent
         resources:
           limits:

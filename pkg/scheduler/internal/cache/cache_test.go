@@ -26,18 +26,18 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 func deepEqualWithoutGeneration(t *testing.T, testcase int, actual *nodeInfoListItem, expected *schedulernodeinfo.NodeInfo) {
 	if (actual == nil) != (expected == nil) {
-		t.Error("One of the actual or expeted is nil and the other is not!")
+		t.Error("One of the actual or expected is nil and the other is not!")
 	}
 	// Ignore generation field.
 	if actual != nil {
@@ -386,7 +386,7 @@ func TestSnapshot(t *testing.T) {
 
 		snapshot := cache.Snapshot()
 		if len(snapshot.Nodes) != len(cache.nodes) {
-			t.Errorf("Unequal number of nodes in the cache and its snapshot. expeted: %v, got: %v", len(cache.nodes), len(snapshot.Nodes))
+			t.Errorf("Unequal number of nodes in the cache and its snapshot. expected: %v, got: %v", len(cache.nodes), len(snapshot.Nodes))
 		}
 		for name, ni := range snapshot.Nodes {
 			nItem := cache.nodes[name]
@@ -1066,7 +1066,7 @@ func TestNodeOperators(t *testing.T) {
 		if !found {
 			t.Errorf("Failed to find node %v in internalcache.", node.Name)
 		}
-		if cache.nodeTree.NumNodes() != 1 || cache.nodeTree.Next() != node.Name {
+		if cache.nodeTree.numNodes != 1 || cache.nodeTree.next() != node.Name {
 			t.Errorf("cache.nodeTree is not updated correctly after adding node: %v", node.Name)
 		}
 
@@ -1077,7 +1077,7 @@ func TestNodeOperators(t *testing.T) {
 		}
 
 		// Case 2: dump cached nodes successfully.
-		cachedNodes := schedulernodeinfo.NewSnapshot()
+		cachedNodes := nodeinfosnapshot.NewEmptySnapshot()
 		cache.UpdateNodeInfoSnapshot(cachedNodes)
 		newNode, found := cachedNodes.NodeInfoMap[node.Name]
 		if !found || len(cachedNodes.NodeInfoMap) != 1 {
@@ -1109,7 +1109,7 @@ func TestNodeOperators(t *testing.T) {
 			t.Errorf("Failed to update node in schedulernodeinfo:\n got: %+v \nexpected: %+v", got, expected)
 		}
 		// Check nodeTree after update
-		if cache.nodeTree.NumNodes() != 1 || cache.nodeTree.Next() != node.Name {
+		if cache.nodeTree.numNodes != 1 || cache.nodeTree.next() != node.Name {
 			t.Errorf("unexpected cache.nodeTree after updating node: %v", node.Name)
 		}
 
@@ -1120,7 +1120,7 @@ func TestNodeOperators(t *testing.T) {
 		}
 		// Check nodeTree after remove. The node should be removed from the nodeTree even if there are
 		// still pods on it.
-		if cache.nodeTree.NumNodes() != 0 || cache.nodeTree.Next() != "" {
+		if cache.nodeTree.numNodes != 0 || cache.nodeTree.next() != "" {
 			t.Errorf("unexpected cache.nodeTree after removing node: %v", node.Name)
 		}
 	}
@@ -1180,7 +1180,7 @@ func TestSchedulerCache_UpdateNodeInfoSnapshot(t *testing.T) {
 	}
 
 	var cache *schedulerCache
-	var snapshot *schedulernodeinfo.Snapshot
+	var snapshot *nodeinfosnapshot.Snapshot
 	type operation = func()
 
 	addNode := func(i int) operation {
@@ -1333,7 +1333,7 @@ func TestSchedulerCache_UpdateNodeInfoSnapshot(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			cache = newSchedulerCache(time.Second, time.Second, nil)
-			snapshot = schedulernodeinfo.NewSnapshot()
+			snapshot = nodeinfosnapshot.NewEmptySnapshot()
 
 			for _, op := range test.operations {
 				op()
@@ -1364,7 +1364,7 @@ func TestSchedulerCache_UpdateNodeInfoSnapshot(t *testing.T) {
 	}
 }
 
-func compareCacheWithNodeInfoSnapshot(cache *schedulerCache, snapshot *schedulernodeinfo.Snapshot) error {
+func compareCacheWithNodeInfoSnapshot(cache *schedulerCache, snapshot *nodeinfosnapshot.Snapshot) error {
 	if len(snapshot.NodeInfoMap) != len(cache.nodes) {
 		return fmt.Errorf("unexpected number of nodes in the snapshot. Expected: %v, got: %v", len(cache.nodes), len(snapshot.NodeInfoMap))
 	}
@@ -1376,21 +1376,13 @@ func compareCacheWithNodeInfoSnapshot(cache *schedulerCache, snapshot *scheduler
 	return nil
 }
 
-func BenchmarkList1kNodes30kPods(b *testing.B) {
-	cache := setupCacheOf1kNodes30kPods(b)
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		cache.List(labels.Everything())
-	}
-}
-
 func BenchmarkUpdate1kNodes30kPods(b *testing.B) {
 	// Enable volumesOnNodeForBalancing to do balanced resource allocation
 	defer featuregatetesting.SetFeatureGateDuringTest(nil, utilfeature.DefaultFeatureGate, features.BalanceAttachedNodeVolumes, true)()
 	cache := setupCacheOf1kNodes30kPods(b)
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		cachedNodes := schedulernodeinfo.NewSnapshot()
+		cachedNodes := nodeinfosnapshot.NewEmptySnapshot()
 		cache.UpdateNodeInfoSnapshot(cachedNodes)
 	}
 }

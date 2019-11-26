@@ -58,8 +58,8 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 		framework.SkipUnlessSSHKeyPresent()
 
 		ginkgo.By("Getting all nodes and their SSH-able IP addresses")
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		framework.ExpectNotEqual(len(nodes.Items), 0)
+		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		framework.ExpectNoError(err)
 		hosts := []string{}
 		for _, node := range nodes.Items {
 			for _, addr := range node.Status.Addresses {
@@ -281,7 +281,9 @@ func getCPUStat(f *framework.Framework, host string) (usage, uptime float64) {
 	lines := strings.Split(result.Stdout, "\n")
 
 	usage, err = strconv.ParseFloat(lines[0], 64)
+	framework.ExpectNoError(err, "Cannot parse float for usage")
 	uptime, err = strconv.ParseFloat(lines[1], 64)
+	framework.ExpectNoError(err, "Cannot parse float for uptime")
 
 	// Convert from nanoseconds to seconds
 	usage *= 1e-9

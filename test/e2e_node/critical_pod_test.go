@@ -97,7 +97,7 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 			framework.ExpectNoError(err)
 			for _, p := range updatedPodList.Items {
 				if p.Name == nonCriticalBestEffort.Name {
-					gomega.Expect(p.Status.Phase).NotTo(gomega.Equal(v1.PodFailed), fmt.Sprintf("pod: %v should be preempted", p.Name))
+					framework.ExpectNotEqual(p.Status.Phase, v1.PodFailed, fmt.Sprintf("pod: %v should be preempted", p.Name))
 				} else {
 					framework.ExpectEqual(p.Status.Phase, v1.PodFailed, fmt.Sprintf("pod: %v should not be preempted", p.Name))
 				}

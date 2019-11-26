@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"reflect"
 	"testing"
 
@@ -71,7 +70,7 @@ func TestCreateClusterRoleBinding(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	ns := scheme.Codecs
+	ns := scheme.Codecs.WithoutConversion()
 
 	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	encoder := ns.EncoderForVersion(info.Serializer, groupVersion)
@@ -79,6 +78,7 @@ func TestCreateClusterRoleBinding(t *testing.T) {
 
 	tf.Client = &ClusterRoleBindingRESTClient{
 		RESTClient: &fake.RESTClient{
+			GroupVersion:         schema.GroupVersion{Group: "rbac.authorization.k8s.io", Version: "v1beta1"},
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
@@ -101,7 +101,7 @@ func TestCreateClusterRoleBinding(t *testing.T) {
 
 					responseBinding := &rbac.ClusterRoleBinding{}
 					responseBinding.Name = "fake-binding"
-					return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseBinding))))}, nil
+					return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseBinding))))}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -129,19 +129,5 @@ type ClusterRoleBindingRESTClient struct {
 }
 
 func (c *ClusterRoleBindingRESTClient) Post() *restclient.Request {
-	config := restclient.ContentConfig{
-		ContentType:          runtime.ContentTypeJSON,
-		NegotiatedSerializer: c.NegotiatedSerializer,
-	}
-
-	info, _ := runtime.SerializerInfoForMediaType(c.NegotiatedSerializer.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	serializers := restclient.Serializers{
-		Encoder: c.NegotiatedSerializer.EncoderForVersion(info.Serializer, schema.GroupVersion{Group: "rbac.authorization.k8s.io", Version: "v1beta1"}),
-		Decoder: c.NegotiatedSerializer.DecoderToVersion(info.Serializer, schema.GroupVersion{Group: "rbac.authorization.k8s.io", Version: "v1beta1"}),
-	}
-	if info.StreamSerializer != nil {
-		serializers.StreamingSerializer = info.StreamSerializer.Serializer
-		serializers.Framer = info.StreamSerializer.Framer
-	}
-	return restclient.NewRequest(c, "POST", &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil, 0)
+	return c.RESTClient.Verb("POST")
 }

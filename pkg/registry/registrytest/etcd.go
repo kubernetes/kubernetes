@@ -44,7 +44,7 @@ func NewEtcdStorageForResource(t *testing.T, resource schema.GroupResource) (*st
 	if err != nil {
 		t.Fatal(err)
 	}
-	completedConfig.ApiResourceConfig = serverstorage.NewResourceConfig()
+	completedConfig.APIResourceConfig = serverstorage.NewResourceConfig()
 	factory, err := completedConfig.New()
 	if err != nil {
 		t.Fatal(err)

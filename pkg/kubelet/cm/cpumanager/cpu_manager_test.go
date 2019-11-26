@@ -27,7 +27,7 @@ import (
 	"os"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -101,6 +101,10 @@ func (p *mockPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Cont
 
 func (p *mockPolicy) RemoveContainer(s state.State, containerID string) error {
 	return p.err
+}
+
+func (p *mockPolicy) GetTopologyHints(s state.State, pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint {
+	return nil
 }
 
 type mockRuntimeService struct {
@@ -196,7 +200,10 @@ func TestCPUManagerAdd(t *testing.T) {
 				2: {CoreID: 2, SocketID: 0},
 				3: {CoreID: 3, SocketID: 0},
 			},
-		}, 0, topologymanager.NewFakeManager())
+		},
+		0,
+		cpuset.NewCPUSet(),
+		topologymanager.NewFakeManager())
 	testCases := []struct {
 		description string
 		updateErr   error
@@ -343,7 +350,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 			}
 			defer os.RemoveAll(sDir)
 
-			mgr, err := NewManager(testCase.cpuPolicyName, 5*time.Second, machineInfo, nil, testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
+			mgr, err := NewManager(testCase.cpuPolicyName, 5*time.Second, machineInfo, nil, cpuset.NewCPUSet(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
 			if testCase.expectedError != nil {
 				if !strings.Contains(err.Error(), testCase.expectedError.Error()) {
 					t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), testCase.expectedError.Error())
@@ -631,7 +638,7 @@ func TestReconcileState(t *testing.T) {
 				found:     testCase.pspFound,
 			},
 		}
-
+		mgr.sourcesReady = &sourcesReadyStub{}
 		success, failure := mgr.reconcileState()
 
 		if testCase.expectSucceededContainerName != "" {
@@ -662,6 +669,75 @@ func TestReconcileState(t *testing.T) {
 				t.Errorf("%v", testCase.description)
 				t.Errorf("Expected reconciliation failure for container: %s", testCase.expectFailedContainerName)
 			}
+		}
+	}
+}
+
+// above test cases are without kubelet --reserved-cpus cmd option
+// the following tests are with --reserved-cpus configured
+func TestCPUManagerAddWithResvList(t *testing.T) {
+	testPolicy := NewStaticPolicy(
+		&topology.CPUTopology{
+			NumCPUs:    4,
+			NumSockets: 1,
+			NumCores:   4,
+			CPUDetails: map[int]topology.CPUInfo{
+				0: {CoreID: 0, SocketID: 0},
+				1: {CoreID: 1, SocketID: 0},
+				2: {CoreID: 2, SocketID: 0},
+				3: {CoreID: 3, SocketID: 0},
+			},
+		},
+		1,
+		cpuset.NewCPUSet(0),
+		topologymanager.NewFakeManager())
+	testCases := []struct {
+		description string
+		updateErr   error
+		policy      Policy
+		expCPUSet   cpuset.CPUSet
+		expErr      error
+	}{
+		{
+			description: "cpu manager add - no error",
+			updateErr:   nil,
+			policy:      testPolicy,
+			expCPUSet:   cpuset.NewCPUSet(0, 3),
+			expErr:      nil,
+		},
+		{
+			description: "cpu manager add - container update error",
+			updateErr:   fmt.Errorf("fake update error"),
+			policy:      testPolicy,
+			expCPUSet:   cpuset.NewCPUSet(0, 1, 2, 3),
+			expErr:      fmt.Errorf("fake update error"),
+		},
+	}
+
+	for _, testCase := range testCases {
+		mgr := &manager{
+			policy: testCase.policy,
+			state: &mockState{
+				assignments:   state.ContainerCPUAssignments{},
+				defaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3),
+			},
+			containerRuntime: mockRuntimeService{
+				err: testCase.updateErr,
+			},
+			activePods:        func() []*v1.Pod { return nil },
+			podStatusProvider: mockPodStatusProvider{},
+		}
+
+		pod := makePod("2", "2")
+		container := &pod.Spec.Containers[0]
+		err := mgr.AddContainer(pod, container, "fakeID")
+		if !reflect.DeepEqual(err, testCase.expErr) {
+			t.Errorf("CPU Manager AddContainer() error (%v). expected error: %v but got: %v",
+				testCase.description, testCase.expErr, err)
+		}
+		if !testCase.expCPUSet.Equals(mgr.state.GetDefaultCPUSet()) {
+			t.Errorf("CPU Manager AddContainer() error (%v). expected cpuset: %v but got: %v",
+				testCase.description, testCase.expCPUSet, mgr.state.GetDefaultCPUSet())
 		}
 	}
 }

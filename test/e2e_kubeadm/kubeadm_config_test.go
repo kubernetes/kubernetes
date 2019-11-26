@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
 	yaml "gopkg.in/yaml.v2"
@@ -47,7 +47,7 @@ var (
 // Define container for all the test specification aimed at verifying
 // that kubeadm creates the cluster-info ConfigMap, that it is properly configured
 // and that all the related RBAC rules are in place
-var _ = KubeadmDescribe("kubeadm-config ConfigMap", func() {
+var _ = Describe("kubeadm-config ConfigMap", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("kubeadm-config")
@@ -91,7 +91,7 @@ var _ = KubeadmDescribe("kubeadm-config ConfigMap", func() {
 		)
 	})
 
-	ginkgo.It("should be accessible for for nodes", func() {
+	ginkgo.It("should be accessible for nodes", func() {
 		ExpectSubjectHasAccessToResource(f.ClientSet,
 			rbacv1.GroupKind, nodesGroup,
 			kubeadmConfigConfigMapResource,

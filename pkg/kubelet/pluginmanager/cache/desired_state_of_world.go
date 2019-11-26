@@ -34,9 +34,9 @@ import (
 // all plugins attached to this node.
 type DesiredStateOfWorld interface {
 	// AddOrUpdatePlugin add the given plugin in the cache if it doesn't already exist.
-	// If it does exist in the cache, then the timestamp and foundInDeprecatedDir of the PluginInfo object in the cache will be updated.
+	// If it does exist in the cache, then the timestamp of the PluginInfo object in the cache will be updated.
 	// An error will be returned if socketPath is empty.
-	AddOrUpdatePlugin(socketPath string, foundInDeprecatedDir bool) error
+	AddOrUpdatePlugin(socketPath string) error
 
 	// RemovePlugin deletes the plugin with the given socket path from the desired
 	// state of world.
@@ -120,7 +120,7 @@ func errSuffix(err error) string {
 	return errStr
 }
 
-func (dsw *desiredStateOfWorld) AddOrUpdatePlugin(socketPath string, foundInDeprecatedDir bool) error {
+func (dsw *desiredStateOfWorld) AddOrUpdatePlugin(socketPath string) error {
 	dsw.Lock()
 	defer dsw.Unlock()
 
@@ -131,14 +131,13 @@ func (dsw *desiredStateOfWorld) AddOrUpdatePlugin(socketPath string, foundInDepr
 		klog.V(2).Infof("Plugin (Path %s) exists in actual state cache, timestamp will be updated", socketPath)
 	}
 
-	// Update the the PluginInfo object.
+	// Update the PluginInfo object.
 	// Note that we only update the timestamp in the desired state of world, not the actual state of world
 	// because in the reconciler, we need to check if the plugin in the actual state of world is the same
 	// version as the plugin in the desired state of world
 	dsw.socketFileToInfo[socketPath] = PluginInfo{
-		SocketPath:           socketPath,
-		FoundInDeprecatedDir: foundInDeprecatedDir,
-		Timestamp:            time.Now(),
+		SocketPath: socketPath,
+		Timestamp:  time.Now(),
 	}
 	return nil
 }

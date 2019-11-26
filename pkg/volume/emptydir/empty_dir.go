@@ -21,17 +21,18 @@ import (
 	"os"
 	"path/filepath"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog"
+	"k8s.io/utils/mount"
+	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/fsquota"
-	utilstrings "k8s.io/utils/strings"
 )
 
 // TODO: in the near future, this will be changed to be more restrictive
@@ -87,10 +88,6 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 	if spec.Volume != nil && spec.Volume.EmptyDir != nil {
 		return true
 	}
-	return false
-}
-
-func (plugin *emptyDirPlugin) IsMigratedToCSI() bool {
 	return false
 }
 

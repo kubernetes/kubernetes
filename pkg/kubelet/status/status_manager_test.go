@@ -335,9 +335,9 @@ func TestSyncPodNoDeadlock(t *testing.T) {
 	client.AddReactor("*", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		switch action := action.(type) {
 		case core.GetAction:
-			assert.Equal(t, pod.Name, action.GetName(), "Unexpeted GetAction: %+v", action)
+			assert.Equal(t, pod.Name, action.GetName(), "Unexpected GetAction: %+v", action)
 		case core.UpdateAction:
-			assert.Equal(t, pod.Name, action.GetObject().(*v1.Pod).Name, "Unexpeted UpdateAction: %+v", action)
+			assert.Equal(t, pod.Name, action.GetObject().(*v1.Pod).Name, "Unexpected UpdateAction: %+v", action)
 		default:
 			assert.Fail(t, "Unexpected Action: %+v", action)
 		}
@@ -537,7 +537,7 @@ func TestStaticPod(t *testing.T) {
 
 	t.Logf("Create the mirror pod")
 	m.podManager.AddPod(mirrorPod)
-	assert.True(t, kubepod.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
+	assert.True(t, kubetypes.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
 	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID), kubetypes.ResolvedPodUID(staticPod.UID))
 
 	t.Logf("Should be able to get the mirror pod status from status manager")
@@ -890,7 +890,7 @@ func TestDoNotDeleteMirrorPods(t *testing.T) {
 	m.podManager.AddPod(mirrorPod)
 	t.Logf("Verify setup.")
 	assert.True(t, kubetypes.IsStaticPod(staticPod), "SetUp error: staticPod")
-	assert.True(t, kubepod.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
+	assert.True(t, kubetypes.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
 	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID), kubetypes.ResolvedPodUID(staticPod.UID))
 
 	status := getRandomPodStatus()

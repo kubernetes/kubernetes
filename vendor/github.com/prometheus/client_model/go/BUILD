@@ -5,7 +5,7 @@ go_library(
     srcs = ["metrics.pb.go"],
     importmap = "k8s.io/kubernetes/vendor/github.com/prometheus/client_model/go",
     importpath = "github.com/prometheus/client_model/go",
-    visibility = ["//visibility:public"],
+    visibility = ["//staging/src/k8s.io/component-base/metrics:prometheus_import_allow_list"],
     deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],
 )
 

@@ -150,7 +150,13 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 			return err
 		}
 
-		*t = Time(v + va)
+		// If the value was something like -0.1 the negative is lost in the
+		// parsing because of the leading zero, this ensures that we capture it.
+		if len(p[0]) > 0 && p[0][0] == '-' && v+va > 0 {
+			*t = Time(v+va) * -1
+		} else {
+			*t = Time(v + va)
+		}
 
 	default:
 		return fmt.Errorf("invalid time %q", string(b))

@@ -22,6 +22,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/klog"
+	"k8s.io/utils/mount"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,10 +36,8 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -84,7 +85,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
@@ -128,7 +129,7 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
@@ -206,7 +207,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
@@ -285,7 +286,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
@@ -375,7 +376,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
@@ -502,7 +503,7 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
@@ -527,7 +528,7 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 		1 /* expectedAttachCallCount */, fakePlugin))
 	assert.NoError(t, volumetesting.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, fakePlugin))
-	assert.NoError(t, volumetesting.VerifyGetMapDeviceCallCount(
+	assert.NoError(t, volumetesting.VerifyGetMapPodDeviceCallCount(
 		1 /* expectedGetMapDeviceCallCount */, fakePlugin))
 	assert.NoError(t, volumetesting.VerifyZeroTearDownDeviceCallCount(fakePlugin))
 	assert.NoError(t, volumetesting.VerifyZeroDetachCallCount(fakePlugin))
@@ -608,7 +609,7 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
@@ -631,7 +632,7 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 	assert.NoError(t, volumetesting.VerifyZeroAttachCalls(fakePlugin))
 	assert.NoError(t, volumetesting.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, fakePlugin))
-	assert.NoError(t, volumetesting.VerifyGetMapDeviceCallCount(
+	assert.NoError(t, volumetesting.VerifyGetMapPodDeviceCallCount(
 		1 /* expectedGetMapDeviceCallCount */, fakePlugin))
 	assert.NoError(t, volumetesting.VerifyZeroTearDownDeviceCallCount(fakePlugin))
 	assert.NoError(t, volumetesting.VerifyZeroDetachCallCount(fakePlugin))
@@ -709,7 +710,7 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
@@ -731,7 +732,7 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 		1 /* expectedAttachCallCount */, fakePlugin))
 	assert.NoError(t, volumetesting.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, fakePlugin))
-	assert.NoError(t, volumetesting.VerifyGetMapDeviceCallCount(
+	assert.NoError(t, volumetesting.VerifyGetMapPodDeviceCallCount(
 		1 /* expectedGetMapDeviceCallCount */, fakePlugin))
 	assert.NoError(t, volumetesting.VerifyZeroTearDownDeviceCallCount(fakePlugin))
 	assert.NoError(t, volumetesting.VerifyZeroDetachCallCount(fakePlugin))
@@ -823,7 +824,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
@@ -847,7 +848,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 	assert.NoError(t, volumetesting.VerifyZeroAttachCalls(fakePlugin))
 	assert.NoError(t, volumetesting.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, fakePlugin))
-	assert.NoError(t, volumetesting.VerifyGetMapDeviceCallCount(
+	assert.NoError(t, volumetesting.VerifyGetMapPodDeviceCallCount(
 		1 /* expectedGetMapDeviceCallCount */, fakePlugin))
 	assert.NoError(t, volumetesting.VerifyZeroTearDownDeviceCallCount(fakePlugin))
 	assert.NoError(t, volumetesting.VerifyZeroDetachCallCount(fakePlugin))
@@ -1096,7 +1097,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 				asw,
 				hasAddedPods,
 				oex,
-				&mount.FakeMounter{},
+				mount.NewFakeMounter(nil),
 				hostutil.NewFakeHostUtil(nil),
 				volumePluginMgr,
 				kubeletPodsDir)
@@ -1278,7 +1279,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)

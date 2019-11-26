@@ -26,9 +26,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -449,23 +449,23 @@ func TestValidateInitConfiguration(t *testing.T) {
 						},
 					},
 					ComponentConfigs: kubeadm.ComponentConfigs{
-						KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
+						KubeProxy: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
 							BindAddress:        "192.168.59.103",
 							HealthzBindAddress: "0.0.0.0:10256",
 							MetricsBindAddress: "127.0.0.1:10249",
 							ClusterCIDR:        "192.168.59.0/24",
 							UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
 							ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
-							IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+							IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
 								MasqueradeAll: true,
 								SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 								MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 							},
-							IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
+							IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
 								SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
 								MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 							},
-							Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+							Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
 								MaxPerCore:            utilpointer.Int32Ptr(1),
 								Min:                   utilpointer.Int32Ptr(1),
 								TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
@@ -495,23 +495,23 @@ func TestValidateInitConfiguration(t *testing.T) {
 						},
 					},
 					ComponentConfigs: kubeadm.ComponentConfigs{
-						KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
+						KubeProxy: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
 							BindAddress:        "192.168.59.103",
 							HealthzBindAddress: "0.0.0.0:10256",
 							MetricsBindAddress: "127.0.0.1:10249",
 							ClusterCIDR:        "192.168.59.0/24",
 							UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
 							ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
-							IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+							IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
 								MasqueradeAll: true,
 								SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 								MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 							},
-							IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
+							IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
 								SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
 								MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 							},
-							Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+							Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
 								MaxPerCore:            utilpointer.Int32Ptr(1),
 								Min:                   utilpointer.Int32Ptr(1),
 								TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},

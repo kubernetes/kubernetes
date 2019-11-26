@@ -25,15 +25,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
 func TestCreateConfigMap(t *testing.T) {
 	nodeName := "fake-node"
 	client := fake.NewSimpleClientset()
 	k8sVersionStr := constants.CurrentKubernetesVersion.String()
-	cfg := &kubeletconfig.KubeletConfiguration{}
+	cfg := &kubeletconfigv1beta1.KubeletConfiguration{}
 
 	client.PrependReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		return true, &v1.Node{

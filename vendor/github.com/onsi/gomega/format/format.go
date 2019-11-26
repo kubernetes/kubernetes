@@ -1,6 +1,9 @@
 /*
 Gomega's format package pretty-prints objects.  It explores input objects recursively and generates formatted, indented output with type information.
 */
+
+// untested sections: 4
+
 package format
 
 import (
@@ -33,7 +36,15 @@ var PrintContextObjects = false
 // TruncatedDiff choose if we should display a truncated pretty diff or not
 var TruncatedDiff = true
 
-// Ctx interface defined here to keep backwards compatability with go < 1.7
+// TruncateThreshold (default 50) specifies the maximum length string to print in string comparison assertion error
+// messages.
+var TruncateThreshold uint = 50
+
+// CharactersAroundMismatchToInclude (default 5) specifies how many contextual characters should be printed before and
+// after the first diff location in a truncated string assertion error message.
+var CharactersAroundMismatchToInclude uint = 5
+
+// Ctx interface defined here to keep backwards compatibility with go < 1.7
 // It matches the context.Context interface
 type Ctx interface {
 	Deadline() (deadline time.Time, ok bool)
@@ -58,7 +69,7 @@ Generates a formatted matcher success/failure message of the form:
 	<message>
 		<pretty printed expected>
 
-If expected is omited, then the message looks like:
+If expected is omitted, then the message looks like:
 
 	Expected
 		<pretty printed actual>
@@ -85,7 +96,7 @@ to equal               |
 */
 
 func MessageWithDiff(actual, message, expected string) string {
-	if TruncatedDiff && len(actual) >= truncateThreshold && len(expected) >= truncateThreshold {
+	if TruncatedDiff && len(actual) >= int(TruncateThreshold) && len(expected) >= int(TruncateThreshold) {
 		diffPoint := findFirstMismatch(actual, expected)
 		formattedActual := truncateAndFormat(actual, diffPoint)
 		formattedExpected := truncateAndFormat(expected, diffPoint)
@@ -97,14 +108,23 @@ func MessageWithDiff(actual, message, expected string) string {
 		padding := strings.Repeat(" ", spaceFromMessageToActual+spacesBeforeFormattedMismatch) + "|"
 		return Message(formattedActual, message+padding, formattedExpected)
 	}
+
+	actual = escapedWithGoSyntax(actual)
+	expected = escapedWithGoSyntax(expected)
+
 	return Message(actual, message, expected)
+}
+
+func escapedWithGoSyntax(str string) string {
+	withQuotes := fmt.Sprintf("%q", str)
+	return withQuotes[1 : len(withQuotes)-1]
 }
 
 func truncateAndFormat(str string, index int) string {
 	leftPadding := `...`
 	rightPadding := `...`
 
-	start := index - charactersAroundMismatchToInclude
+	start := index - int(CharactersAroundMismatchToInclude)
 	if start < 0 {
 		start = 0
 		leftPadding = ""
@@ -112,7 +132,7 @@ func truncateAndFormat(str string, index int) string {
 
 	// slice index must include the mis-matched character
 	lengthOfMismatchedCharacter := 1
-	end := index + charactersAroundMismatchToInclude + lengthOfMismatchedCharacter
+	end := index + int(CharactersAroundMismatchToInclude) + lengthOfMismatchedCharacter
 	if end > len(str) {
 		end = len(str)
 		rightPadding = ""
@@ -140,11 +160,6 @@ func findFirstMismatch(a, b string) int {
 
 	return 0
 }
-
-const (
-	truncateThreshold                 = 50
-	charactersAroundMismatchToInclude = 5
-)
 
 /*
 Pretty prints the passed in object at the passed in indentation level.
@@ -288,7 +303,7 @@ func formatString(object interface{}, indentation uint) string {
 			}
 		}
 
-		return fmt.Sprintf("%s", result)
+		return result
 	} else {
 		return fmt.Sprintf("%q", object)
 	}

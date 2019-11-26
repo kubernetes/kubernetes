@@ -31,7 +31,7 @@ import (
 // TestCheckReadyForTests specifically is concerned about the multi-node logic
 // since single node checks are in TestReadyForTests.
 func TestCheckReadyForTests(t *testing.T) {
-	// This is a duplicate definition of the constant in pkg/controller/service/service_controller.go
+	// This is a duplicate definition of the constant in pkg/controller/service/controller.go
 	labelNodeRoleMaster := "node-role.kubernetes.io/master"
 
 	fromVanillaNode := func(f func(*v1.Node)) v1.Node {

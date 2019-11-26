@@ -29,6 +29,7 @@ import (
 type RegistryList struct {
 	GcAuthenticatedRegistry string `yaml:"gcAuthenticatedRegistry"`
 	DockerLibraryRegistry   string `yaml:"dockerLibraryRegistry"`
+	DockerGluster           string `yaml:"dockerGluster"`
 	E2eRegistry             string `yaml:"e2eRegistry"`
 	InvalidRegistry         string `yaml:"invalidRegistry"`
 	GcRegistry              string `yaml:"gcRegistry"`
@@ -37,6 +38,7 @@ type RegistryList struct {
 	PrivateRegistry         string `yaml:"privateRegistry"`
 	SampleRegistry          string `yaml:"sampleRegistry"`
 	QuayK8sCSI              string `yaml:"quayK8sCSI"`
+	QuayIncubator           string `yaml:"quayIncubator"`
 }
 
 // Config holds an images registry, name, and version
@@ -65,6 +67,7 @@ func initReg() RegistryList {
 	registry := RegistryList{
 		GcAuthenticatedRegistry: "gcr.io/authenticated-image-pulling",
 		DockerLibraryRegistry:   "docker.io/library",
+		DockerGluster:           "docker.io/gluster",
 		E2eRegistry:             "gcr.io/kubernetes-e2e-test-images",
 		InvalidRegistry:         "invalid.com/invalid",
 		GcRegistry:              "k8s.gcr.io",
@@ -73,6 +76,7 @@ func initReg() RegistryList {
 		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
 		SampleRegistry:          "gcr.io/google-samples",
 		QuayK8sCSI:              "quay.io/k8scsi",
+		QuayIncubator:           "quay.io/kubernetes_incubator",
 	}
 	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
 	if repoList == "" {
@@ -94,14 +98,15 @@ func initReg() RegistryList {
 var (
 	registry                = initReg()
 	dockerLibraryRegistry   = registry.DockerLibraryRegistry
+	dockerGluster           = registry.DockerGluster
 	e2eRegistry             = registry.E2eRegistry
-	e2eGcRegistry           = "gcr.io/kubernetes-e2e-test-images"
 	gcAuthenticatedRegistry = registry.GcAuthenticatedRegistry
 	gcRegistry              = registry.GcRegistry
 	gcrReleaseRegistry      = registry.GcrReleaseRegistry
 	googleContainerRegistry = registry.GoogleContainerRegistry
 	invalidRegistry         = registry.InvalidRegistry
 	quayK8sCSI              = registry.QuayK8sCSI
+	quayIncubator           = registry.QuayIncubator
 	// PrivateRegistry is an image repository that requires authentication
 	PrivateRegistry = registry.PrivateRegistry
 	sampleRegistry  = registry.SampleRegistry
@@ -113,8 +118,8 @@ var (
 const (
 	// Agnhost image
 	Agnhost = iota
-	// Alpine image
-	Alpine
+	// AgnhostPrivate image
+	AgnhostPrivate
 	// APIServer image
 	APIServer
 	// AppArmorLoader image
@@ -133,20 +138,16 @@ const (
 	CudaVectorAdd2
 	// Dnsutils image
 	Dnsutils
-	// DebianBase image
-	DebianBase
 	// EchoServer image
 	EchoServer
 	// Etcd image
 	Etcd
-	// GBFrontend image
-	GBFrontend
+	// GlusterDynamicProvisioner image
+	GlusterDynamicProvisioner
 	// Httpd image
 	Httpd
 	// HttpdNew image
 	HttpdNew
-	// Invalid image
-	Invalid
 	// InvalidRegistryImage image
 	InvalidRegistryImage
 	// IpcUtils image
@@ -161,6 +162,8 @@ const (
 	MounttestUser
 	// Nautilus image
 	Nautilus
+	// NFSProvisioner image
+	NFSProvisioner
 	// Nginx image
 	Nginx
 	// NginxNew image
@@ -180,6 +183,8 @@ const (
 	PrometheusToSd
 	// Redis image
 	Redis
+	// RegressionIssue74839 image
+	RegressionIssue74839
 	// ResourceConsumer image
 	ResourceConsumer
 	// ResourceController image
@@ -198,14 +203,12 @@ const (
 	VolumeGlusterServer
 	// VolumeRBDServer image
 	VolumeRBDServer
-	// WindowsNanoServer image
-	WindowsNanoServer
 )
 
 func initImageConfigs() map[int]Config {
 	configs := map[int]Config{}
-	configs[Agnhost] = Config{e2eRegistry, "agnhost", "2.6"}
-	configs[Alpine] = Config{dockerLibraryRegistry, "alpine", "3.7"}
+	configs[Agnhost] = Config{e2eRegistry, "agnhost", "2.8"}
+	configs[AgnhostPrivate] = Config{PrivateRegistry, "agnhost", "2.6"}
 	configs[AuthenticatedAlpine] = Config{gcAuthenticatedRegistry, "alpine", "3.7"}
 	configs[AuthenticatedWindowsNanoServer] = Config{gcAuthenticatedRegistry, "windows-nanoserver", "v1"}
 	configs[APIServer] = Config{e2eRegistry, "sample-apiserver", "1.10"}
@@ -215,13 +218,11 @@ func initImageConfigs() map[int]Config {
 	configs[CudaVectorAdd] = Config{e2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{e2eRegistry, "cuda-vector-add", "2.0"}
 	configs[Dnsutils] = Config{e2eRegistry, "dnsutils", "1.1"}
-	configs[DebianBase] = Config{googleContainerRegistry, "debian-base", "0.4.1"}
 	configs[EchoServer] = Config{e2eRegistry, "echoserver", "2.2"}
-	configs[Etcd] = Config{gcRegistry, "etcd", "3.3.15"}
-	configs[GBFrontend] = Config{sampleRegistry, "gb-frontend", "v6"}
+	configs[Etcd] = Config{gcRegistry, "etcd", "3.4.3"}
+	configs[GlusterDynamicProvisioner] = Config{dockerGluster, "glusterdynamic-provisioner", "v1.0"}
 	configs[Httpd] = Config{dockerLibraryRegistry, "httpd", "2.4.38-alpine"}
 	configs[HttpdNew] = Config{dockerLibraryRegistry, "httpd", "2.4.39-alpine"}
-	configs[Invalid] = Config{gcRegistry, "invalid-image", "invalid-tag"}
 	configs[InvalidRegistryImage] = Config{invalidRegistry, "alpine", "3.1"}
 	configs[IpcUtils] = Config{e2eRegistry, "ipc-utils", "1.0"}
 	configs[JessieDnsutils] = Config{e2eRegistry, "jessie-dnsutils", "1.0"}
@@ -229,6 +230,7 @@ func initImageConfigs() map[int]Config {
 	configs[Mounttest] = Config{e2eRegistry, "mounttest", "1.0"}
 	configs[MounttestUser] = Config{e2eRegistry, "mounttest-user", "1.0"}
 	configs[Nautilus] = Config{e2eRegistry, "nautilus", "1.0"}
+	configs[NFSProvisioner] = Config{quayIncubator, "nfs-provisioner", "v2.2.2"}
 	configs[Nginx] = Config{dockerLibraryRegistry, "nginx", "1.14-alpine"}
 	configs[NginxNew] = Config{dockerLibraryRegistry, "nginx", "1.15-alpine"}
 	configs[Nonewprivs] = Config{e2eRegistry, "nonewprivs", "1.0"}
@@ -239,6 +241,7 @@ func initImageConfigs() map[int]Config {
 	configs[PrometheusDummyExporter] = Config{gcRegistry, "prometheus-dummy-exporter", "v0.1.0"}
 	configs[PrometheusToSd] = Config{gcRegistry, "prometheus-to-sd", "v0.5.0"}
 	configs[Redis] = Config{dockerLibraryRegistry, "redis", "5.0.5-alpine"}
+	configs[RegressionIssue74839] = Config{e2eRegistry, "regression-issue-74839-amd64", "1.0"}
 	configs[ResourceConsumer] = Config{e2eRegistry, "resource-consumer", "1.5"}
 	configs[ResourceController] = Config{e2eRegistry, "resource-consumer-controller", "1.0"}
 	configs[SdDummyExporter] = Config{gcRegistry, "sd-dummy-exporter", "v0.2.0"}
@@ -248,7 +251,6 @@ func initImageConfigs() map[int]Config {
 	configs[VolumeISCSIServer] = Config{e2eRegistry, "volume/iscsi", "2.0"}
 	configs[VolumeGlusterServer] = Config{e2eRegistry, "volume/gluster", "1.0"}
 	configs[VolumeRBDServer] = Config{e2eRegistry, "volume/rbd", "1.0.1"}
-	configs[WindowsNanoServer] = Config{e2eGcRegistry, "windows-nanoserver", "v1"}
 	return configs
 }
 

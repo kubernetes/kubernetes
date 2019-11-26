@@ -36,13 +36,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -80,6 +81,54 @@ func getServeHostnameService(name string) *v1.Service {
 	svc.ObjectMeta.Name = name
 	svc.Spec.Selector["name"] = name
 	return svc
+}
+
+// restartKubeProxy restarts kube-proxy on the given host.
+func restartKubeProxy(host string) error {
+	// TODO: Make it work for all providers.
+	if !framework.ProviderIs("gce", "gke", "aws") {
+		return fmt.Errorf("unsupported provider for restartKubeProxy: %s", framework.TestContext.Provider)
+	}
+	// kubelet will restart the kube-proxy since it's running in a static pod
+	framework.Logf("Killing kube-proxy on node %v", host)
+	result, err := e2essh.SSH("sudo pkill kube-proxy", host, framework.TestContext.Provider)
+	if err != nil || result.Code != 0 {
+		e2essh.LogResult(result)
+		return fmt.Errorf("couldn't restart kube-proxy: %v", err)
+	}
+	// wait for kube-proxy to come back up
+	sshCmd := "sudo /bin/sh -c 'pgrep kube-proxy | wc -l'"
+	err = wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+		framework.Logf("Waiting for kubeproxy to come back up with %v on %v", sshCmd, host)
+		result, err := e2essh.SSH(sshCmd, host, framework.TestContext.Provider)
+		if err != nil {
+			return false, err
+		}
+		if result.Code != 0 {
+			e2essh.LogResult(result)
+			return false, fmt.Errorf("failed to run command, exited %d", result.Code)
+		}
+		if result.Stdout == "0\n" {
+			return false, nil
+		}
+		framework.Logf("kube-proxy is back up.")
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("kube-proxy didn't recover: %v", err)
+	}
+	return nil
+}
+
+// waitForApiserverUp waits for the kube-apiserver to be up.
+func waitForApiserverUp(c clientset.Interface) error {
+	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
+		body, err := c.CoreV1().RESTClient().Get().AbsPath("/healthz").Do().Raw()
+		if err == nil && string(body) == "ok" {
+			return nil
+		}
+	}
+	return fmt.Errorf("waiting for apiserver timed out")
 }
 
 var _ = SIGDescribe("Services", func() {
@@ -124,24 +173,15 @@ var _ = SIGDescribe("Services", func() {
 	framework.ConformanceIt("should serve a basic endpoint from pods ", func() {
 		serviceName := "endpoint-test2"
 		ns := f.Namespace.Name
-		jig := e2eservice.NewTestJig(cs, serviceName)
-		labels := map[string]string{
-			"foo": "bar",
-			"baz": "blah",
-		}
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 
 		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
 		defer func() {
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 		}()
-		ports := []v1.ServicePort{{
-			Port:       80,
-			TargetPort: intstr.FromInt(80),
-		}}
-		_, err := jig.CreateServiceWithServicePort(labels, ns, ports)
-
-		framework.ExpectNoError(err, "failed to create service with ServicePorts in namespace: %s", ns)
+		_, err := jig.CreateTCPServiceWithPort(nil, 80)
+		framework.ExpectNoError(err)
 
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
@@ -157,12 +197,12 @@ var _ = SIGDescribe("Services", func() {
 		name1 := "pod1"
 		name2 := "pod2"
 
-		e2epod.CreatePodOrFail(cs, ns, name1, labels, []v1.ContainerPort{{ContainerPort: 80}})
+		createPodOrFail(cs, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: 80}})
 		names[name1] = true
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{name1: {80}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
-		e2epod.CreatePodOrFail(cs, ns, name2, labels, []v1.ContainerPort{{ContainerPort: 80}})
+		createPodOrFail(cs, ns, name2, jig.Labels, []v1.ContainerPort{{ContainerPort: 80}})
 		names[name2] = true
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{name1: {80}, name2: {80}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
@@ -187,33 +227,33 @@ var _ = SIGDescribe("Services", func() {
 		// repacking functionality is intentionally not tested here - it's better to test it in an integration test.
 		serviceName := "multi-endpoint-test"
 		ns := f.Namespace.Name
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 
 		defer func() {
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 		}()
 
-		labels := map[string]string{"foo": "bar"}
-
 		svc1port := "svc1"
 		svc2port := "svc2"
 
 		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
-		ports := []v1.ServicePort{
-			{
-				Name:       "portname1",
-				Port:       80,
-				TargetPort: intstr.FromString(svc1port),
-			},
-			{
-				Name:       "portname2",
-				Port:       81,
-				TargetPort: intstr.FromString(svc2port),
-			},
-		}
-		_, err := jig.CreateServiceWithServicePort(labels, ns, ports)
-		framework.ExpectNoError(err, "failed to create service with ServicePorts in namespace: %s", ns)
+		_, err := jig.CreateTCPService(func(service *v1.Service) {
+			service.Spec.Ports = []v1.ServicePort{
+				{
+					Name:       "portname1",
+					Port:       80,
+					TargetPort: intstr.FromString(svc1port),
+				},
+				{
+					Name:       "portname2",
+					Port:       81,
+					TargetPort: intstr.FromString(svc2port),
+				},
+			}
+		})
+		framework.ExpectNoError(err)
+
 		port1 := 100
 		port2 := 101
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{})
@@ -243,12 +283,12 @@ var _ = SIGDescribe("Services", func() {
 		podname1 := "pod1"
 		podname2 := "pod2"
 
-		e2epod.CreatePodOrFail(cs, ns, podname1, labels, containerPorts1)
+		createPodOrFail(cs, ns, podname1, jig.Labels, containerPorts1)
 		names[podname1] = true
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{podname1: {port1}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
-		e2epod.CreatePodOrFail(cs, ns, podname2, labels, containerPorts2)
+		createPodOrFail(cs, ns, podname2, jig.Labels, containerPorts2)
 		names[podname2] = true
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{podname1: {port1}, podname2: {port2}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
@@ -270,7 +310,7 @@ var _ = SIGDescribe("Services", func() {
 
 		// This behavior is not supported if Kube-proxy is in "userspace" mode.
 		// So we check the kube-proxy mode and skip this test if that's the case.
-		if proxyMode, err := framework.ProxyMode(f); err == nil {
+		if proxyMode, err := proxyMode(f); err == nil {
 			if proxyMode == "userspace" {
 				framework.Skipf("The test doesn't work with kube-proxy in userspace mode")
 			}
@@ -282,10 +322,10 @@ var _ = SIGDescribe("Services", func() {
 		ns := f.Namespace.Name
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		servicePort := 8080
-		tcpService := jig.CreateTCPServiceWithPort(ns, nil, int32(servicePort))
-		jig.SanityCheckService(tcpService, v1.ServiceTypeClusterIP)
+		tcpService, err := jig.CreateTCPServiceWithPort(nil, int32(servicePort))
+		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("Cleaning up the sourceip test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
@@ -295,7 +335,8 @@ var _ = SIGDescribe("Services", func() {
 		framework.Logf("sourceip-test cluster ip: %s", serviceIP)
 
 		ginkgo.By("Picking 2 Nodes to test whether source IP is preserved or not")
-		nodes := jig.GetNodes(2)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, 2)
+		framework.ExpectNoError(err)
 		nodeCounts := len(nodes.Items)
 		if nodeCounts < 2 {
 			framework.Skipf("The test requires at least two ready nodes on %s, but found %v", framework.TestContext.Provider, nodeCounts)
@@ -305,9 +346,9 @@ var _ = SIGDescribe("Services", func() {
 		serverPodName := "echo-sourceip"
 		pod := f.NewAgnhostPod(serverPodName, "netexec", "--http-port", strconv.Itoa(servicePort))
 		pod.Labels = jig.Labels
-		_, err := cs.CoreV1().Pods(ns).Create(pod)
+		_, err = cs.CoreV1().Pods(ns).Create(pod)
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(f.WaitForPodReady(pod.Name))
 		defer func() {
 			framework.Logf("Cleaning up the echo server pod")
 			err := cs.CoreV1().Pods(ns).Delete(serverPodName, nil)
@@ -352,10 +393,10 @@ var _ = SIGDescribe("Services", func() {
 		ns := f.Namespace.Name
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		servicePort := 8080
-		svc := jig.CreateTCPServiceWithPort(ns, nil, int32(servicePort))
-		jig.SanityCheckService(svc, v1.ServiceTypeClusterIP)
+		svc, err := jig.CreateTCPServiceWithPort(nil, int32(servicePort))
+		framework.ExpectNoError(err)
 		serviceIP := svc.Spec.ClusterIP
 		framework.Logf("hairpin-test cluster ip: %s", serviceIP)
 
@@ -365,13 +406,15 @@ var _ = SIGDescribe("Services", func() {
 		podTemplate.Labels = jig.Labels
 		pod, err := cs.CoreV1().Pods(ns).Create(podTemplate)
 		framework.ExpectNoError(err)
+		framework.ExpectNoError(f.WaitForPodReady(pod.Name))
 
 		ginkgo.By("waiting for the service to expose an endpoint")
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{serverPodName: {servicePort}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		ginkgo.By("Checking if the pod can reach itself")
-		jig.CheckServiceReachability(ns, svc, pod)
+		err = jig.CheckServiceReachability(svc, pod)
+		framework.ExpectNoError(err)
 	})
 
 	ginkgo.It("should be able to up and down services", func() {
@@ -471,7 +514,7 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
 
 		ginkgo.By(fmt.Sprintf("Restarting kube-proxy on %v", host))
-		if err := framework.RestartKubeProxy(host); err != nil {
+		if err := restartKubeProxy(host); err != nil {
 			framework.Failf("error restarting kube-proxy: %v", err)
 		}
 		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
@@ -510,7 +553,7 @@ var _ = SIGDescribe("Services", func() {
 			framework.Failf("error restarting apiserver: %v", err)
 		}
 		ginkgo.By("Waiting for apiserver to come up by polling /healthz")
-		if err := framework.WaitForApiserverUp(cs); err != nil {
+		if err := waitForApiserverUp(cs); err != nil {
 			framework.Failf("error while waiting for apiserver up: %v", err)
 		}
 		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
@@ -540,18 +583,21 @@ var _ = SIGDescribe("Services", func() {
 		serviceName := "nodeport-test"
 		ns := f.Namespace.Name
 
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 
 		ginkgo.By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
-		nodePortService := jig.CreateTCPServiceOrFail(ns, func(svc *v1.Service) {
+		nodePortService, err := jig.CreateTCPService(func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeNodePort
 			svc.Spec.Ports = []v1.ServicePort{
 				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(9376)},
 			}
 		})
-		jig.CreateServicePods(cs, ns, 2)
+		framework.ExpectNoError(err)
+		err = jig.CreateServicePods(2)
+		framework.ExpectNoError(err)
 		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
-		jig.CheckServiceReachability(ns, nodePortService, execPod)
+		err = jig.CheckServiceReachability(nodePortService, execPod)
+		framework.ExpectNoError(err)
 	})
 
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
@@ -565,10 +611,7 @@ var _ = SIGDescribe("Services", func() {
 		if framework.ProviderIs("aws") {
 			loadBalancerLagTimeout = e2eservice.LoadBalancerLagTimeoutAWS
 		}
-		loadBalancerCreateTimeout := e2eservice.LoadBalancerCreateTimeoutDefault
-		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > e2eservice.LargeClusterMinNodesNumber {
-			loadBalancerCreateTimeout = e2eservice.LoadBalancerCreateTimeoutLarge
-		}
+		loadBalancerCreateTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
 
 		// This test is more monolithic than we'd like because LB turnup can be
 		// very slow, so we lumped all the tests into one LB lifecycle.
@@ -583,24 +626,21 @@ var _ = SIGDescribe("Services", func() {
 		ns2 := namespacePtr.Name // LB2 in ns2 on UDP
 		framework.Logf("namespace for UDP test: %s", ns2)
 
-		jig := e2eservice.NewTestJig(cs, serviceName)
-		nodeIP, err := e2enode.PickIP(jig.Client) // for later
-		if err != nil {
-			framework.Logf("Unexpected error occurred: %v", err)
-		}
-		// TODO: write a wrapper for ExpectNoErrorWithOffset()
-		framework.ExpectNoErrorWithOffset(0, err)
+		nodeIP, err := e2enode.PickIP(cs) // for later
+		framework.ExpectNoError(err)
 
 		// Test TCP and UDP Services.  Services with the same name in different
 		// namespaces should get different node ports and load balancers.
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns1)
-		tcpService := jig.CreateTCPServiceOrFail(ns1, nil)
-		jig.SanityCheckService(tcpService, v1.ServiceTypeClusterIP)
+		tcpJig := e2eservice.NewTestJig(cs, ns1, serviceName)
+		tcpService, err := tcpJig.CreateTCPService(nil)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("creating a UDP service " + serviceName + " with type=ClusterIP in namespace " + ns2)
-		udpService := jig.CreateUDPServiceOrFail(ns2, nil)
-		jig.SanityCheckService(udpService, v1.ServiceTypeClusterIP)
+		udpJig := e2eservice.NewTestJig(cs, ns2, serviceName)
+		udpService, err := udpJig.CreateUDPService(nil)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("verifying that TCP and UDP use the same port")
 		if tcpService.Spec.Ports[0].Port != udpService.Spec.Ports[0].Port {
@@ -610,26 +650,28 @@ var _ = SIGDescribe("Services", func() {
 		framework.Logf("service port (TCP and UDP): %d", svcPort)
 
 		ginkgo.By("creating a pod to be part of the TCP service " + serviceName)
-		jig.RunOrFail(ns1, nil)
+		_, err = tcpJig.Run(nil)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("creating a pod to be part of the UDP service " + serviceName)
-		jig.RunOrFail(ns2, nil)
+		_, err = udpJig.Run(nil)
+		framework.ExpectNoError(err)
 
 		// Change the services to NodePort.
 
 		ginkgo.By("changing the TCP service to type=NodePort")
-		tcpService = jig.UpdateServiceOrFail(ns1, tcpService.Name, func(s *v1.Service) {
+		tcpService, err = tcpJig.UpdateService(func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeNodePort
 		})
-		jig.SanityCheckService(tcpService, v1.ServiceTypeNodePort)
+		framework.ExpectNoError(err)
 		tcpNodePort := int(tcpService.Spec.Ports[0].NodePort)
 		framework.Logf("TCP node port: %d", tcpNodePort)
 
 		ginkgo.By("changing the UDP service to type=NodePort")
-		udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *v1.Service) {
+		udpService, err = udpJig.UpdateService(func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeNodePort
 		})
-		jig.SanityCheckService(udpService, v1.ServiceTypeNodePort)
+		framework.ExpectNoError(err)
 		udpNodePort := int(udpService.Spec.Ports[0].NodePort)
 		framework.Logf("UDP node port: %d", udpNodePort)
 
@@ -669,16 +711,18 @@ var _ = SIGDescribe("Services", func() {
 		}
 
 		ginkgo.By("changing the TCP service to type=LoadBalancer")
-		tcpService = jig.UpdateServiceOrFail(ns1, tcpService.Name, func(s *v1.Service) {
+		tcpService, err = tcpJig.UpdateService(func(s *v1.Service) {
 			s.Spec.LoadBalancerIP = requestedIP // will be "" if not applicable
 			s.Spec.Type = v1.ServiceTypeLoadBalancer
 		})
+		framework.ExpectNoError(err)
 
 		if loadBalancerSupportsUDP {
 			ginkgo.By("changing the UDP service to type=LoadBalancer")
-			udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *v1.Service) {
+			udpService, err = udpJig.UpdateService(func(s *v1.Service) {
 				s.Spec.Type = v1.ServiceTypeLoadBalancer
 			})
+			framework.ExpectNoError(err)
 		}
 		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(tcpService))
 		if loadBalancerSupportsUDP {
@@ -687,8 +731,8 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("waiting for the TCP service to have a load balancer")
 		// Wait for the load balancer to be created asynchronously
-		tcpService = jig.WaitForLoadBalancerOrFail(ns1, tcpService.Name, loadBalancerCreateTimeout)
-		jig.SanityCheckService(tcpService, v1.ServiceTypeLoadBalancer)
+		tcpService, err = tcpJig.WaitForLoadBalancer(loadBalancerCreateTimeout)
+		framework.ExpectNoError(err)
 		if int(tcpService.Spec.Ports[0].NodePort) != tcpNodePort {
 			framework.Failf("TCP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", tcpNodePort, tcpService.Spec.Ports[0].NodePort)
 		}
@@ -720,8 +764,8 @@ var _ = SIGDescribe("Services", func() {
 		if loadBalancerSupportsUDP {
 			ginkgo.By("waiting for the UDP service to have a load balancer")
 			// 2nd one should be faster since they ran in parallel.
-			udpService = jig.WaitForLoadBalancerOrFail(ns2, udpService.Name, loadBalancerCreateTimeout)
-			jig.SanityCheckService(udpService, v1.ServiceTypeLoadBalancer)
+			udpService, err = udpJig.WaitForLoadBalancer(loadBalancerCreateTimeout)
+			framework.ExpectNoError(err)
 			if int(udpService.Spec.Ports[0].NodePort) != udpNodePort {
 				framework.Failf("UDP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", udpNodePort, udpService.Spec.Ports[0].NodePort)
 			}
@@ -751,8 +795,8 @@ var _ = SIGDescribe("Services", func() {
 		// Change the services' node ports.
 
 		ginkgo.By("changing the TCP service's NodePort")
-		tcpService = jig.ChangeServiceNodePortOrFail(ns1, tcpService.Name, tcpNodePort)
-		jig.SanityCheckService(tcpService, v1.ServiceTypeLoadBalancer)
+		tcpService, err = tcpJig.ChangeServiceNodePort(tcpNodePort)
+		framework.ExpectNoError(err)
 		tcpNodePortOld := tcpNodePort
 		tcpNodePort = int(tcpService.Spec.Ports[0].NodePort)
 		if tcpNodePort == tcpNodePortOld {
@@ -764,12 +808,8 @@ var _ = SIGDescribe("Services", func() {
 		framework.Logf("TCP node port: %d", tcpNodePort)
 
 		ginkgo.By("changing the UDP service's NodePort")
-		udpService = jig.ChangeServiceNodePortOrFail(ns2, udpService.Name, udpNodePort)
-		if loadBalancerSupportsUDP {
-			jig.SanityCheckService(udpService, v1.ServiceTypeLoadBalancer)
-		} else {
-			jig.SanityCheckService(udpService, v1.ServiceTypeNodePort)
-		}
+		udpService, err = udpJig.ChangeServiceNodePort(udpNodePort)
+		framework.ExpectNoError(err)
 		udpNodePortOld := udpNodePort
 		udpNodePort = int(udpService.Spec.Ports[0].NodePort)
 		if udpNodePort == udpNodePortOld {
@@ -803,10 +843,10 @@ var _ = SIGDescribe("Services", func() {
 		// Change the services' main ports.
 
 		ginkgo.By("changing the TCP service's port")
-		tcpService = jig.UpdateServiceOrFail(ns1, tcpService.Name, func(s *v1.Service) {
+		tcpService, err = tcpJig.UpdateService(func(s *v1.Service) {
 			s.Spec.Ports[0].Port++
 		})
-		jig.SanityCheckService(tcpService, v1.ServiceTypeLoadBalancer)
+		framework.ExpectNoError(err)
 		svcPortOld := svcPort
 		svcPort = int(tcpService.Spec.Ports[0].Port)
 		if svcPort == svcPortOld {
@@ -820,14 +860,10 @@ var _ = SIGDescribe("Services", func() {
 		}
 
 		ginkgo.By("changing the UDP service's port")
-		udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *v1.Service) {
+		udpService, err = udpJig.UpdateService(func(s *v1.Service) {
 			s.Spec.Ports[0].Port++
 		})
-		if loadBalancerSupportsUDP {
-			jig.SanityCheckService(udpService, v1.ServiceTypeLoadBalancer)
-		} else {
-			jig.SanityCheckService(udpService, v1.ServiceTypeNodePort)
-		}
+		framework.ExpectNoError(err)
 		if int(udpService.Spec.Ports[0].Port) != svcPort {
 			framework.Failf("UDP Spec.Ports[0].Port (%d) did not change", udpService.Spec.Ports[0].Port)
 		}
@@ -855,8 +891,10 @@ var _ = SIGDescribe("Services", func() {
 		}
 
 		ginkgo.By("Scaling the pods to 0")
-		jig.Scale(ns1, 0)
-		jig.Scale(ns2, 0)
+		err = tcpJig.Scale(0)
+		framework.ExpectNoError(err)
+		err = udpJig.Scale(0)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("looking for ICMP REJECT on the TCP service's NodePort")
 		e2eservice.TestRejectedHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
@@ -873,8 +911,10 @@ var _ = SIGDescribe("Services", func() {
 		}
 
 		ginkgo.By("Scaling the pods to 1")
-		jig.Scale(ns1, 1)
-		jig.Scale(ns2, 1)
+		err = tcpJig.Scale(1)
+		framework.ExpectNoError(err)
+		err = udpJig.Scale(1)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the TCP service's NodePort")
 		e2eservice.TestReachableHTTP(nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout)
@@ -893,23 +933,25 @@ var _ = SIGDescribe("Services", func() {
 		// Change the services back to ClusterIP.
 
 		ginkgo.By("changing TCP service back to type=ClusterIP")
-		tcpService = jig.UpdateServiceOrFail(ns1, tcpService.Name, func(s *v1.Service) {
+		tcpService, err = tcpJig.UpdateService(func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeClusterIP
 			s.Spec.Ports[0].NodePort = 0
 		})
+		framework.ExpectNoError(err)
 		// Wait for the load balancer to be destroyed asynchronously
-		tcpService = jig.WaitForLoadBalancerDestroyOrFail(ns1, tcpService.Name, tcpIngressIP, svcPort, loadBalancerCreateTimeout)
-		jig.SanityCheckService(tcpService, v1.ServiceTypeClusterIP)
+		tcpService, err = tcpJig.WaitForLoadBalancerDestroy(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("changing UDP service back to type=ClusterIP")
-		udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *v1.Service) {
+		udpService, err = udpJig.UpdateService(func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeClusterIP
 			s.Spec.Ports[0].NodePort = 0
 		})
+		framework.ExpectNoError(err)
 		if loadBalancerSupportsUDP {
 			// Wait for the load balancer to be destroyed asynchronously
-			udpService = jig.WaitForLoadBalancerDestroyOrFail(ns2, udpService.Name, udpIngressIP, svcPort, loadBalancerCreateTimeout)
-			jig.SanityCheckService(udpService, v1.ServiceTypeClusterIP)
+			udpService, err = udpJig.WaitForLoadBalancerDestroy(udpIngressIP, svcPort, loadBalancerCreateTimeout)
+			framework.ExpectNoError(err)
 		}
 
 		ginkgo.By("checking the TCP NodePort is closed")
@@ -929,53 +971,73 @@ var _ = SIGDescribe("Services", func() {
 
 	/*
 		Testname: Service, update NodePort, same port different protocol
-		Description: Create a service of type ClusterIP to accept TCP requests. Service creation MUST be successful by assigning ClusterIP to the service.
-		When service type is updated to NodePort to support two protocols i.e. TCP and UDP for same assigned service port 80, service update MUST be successful by allocating two NodePorts to the service.
-		TODO: Test Service reachability, good to include this check in Conformance perspective.
+		Description: Create a service to accept TCP requests. By default, created service MUST be of type ClusterIP and an ClusterIP MUST be assigned to the service.
+		When service type is updated to NodePort supporting TCP protocol, it MUST be reachable on nodeIP over allocated NodePort to serve TCP requests.
+		When this NodePort service is updated to use two protocols i.e. TCP and UDP for same assigned service port 80, service update MUST be successful by allocating two NodePorts to the service and
+		service MUST be able to serve both TCP and UDP requests over same service port 80.
 	*/
-	ginkgo.It("should be able to update NodePorts with two same port numbers but different protocols", func() {
+	ginkgo.It("should be able to update service type to NodePort listening on same port number but different protocols", func() {
 		serviceName := "nodeport-update-service"
 		ns := f.Namespace.Name
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
-		tcpService := jig.CreateTCPServiceOrFail(ns, nil)
+		tcpService, err := jig.CreateTCPService(nil)
+		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("Cleaning up the updating NodePorts test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 		}()
-		jig.SanityCheckService(tcpService, v1.ServiceTypeClusterIP)
-		svcPort := int(tcpService.Spec.Ports[0].Port)
-		framework.Logf("service port TCP: %d", svcPort)
+		framework.Logf("Service Port TCP: %v", tcpService.Spec.Ports[0].Port)
 
-		// Change the services to NodePort and add a UDP port.
-		ginkgo.By("changing the TCP service to type=NodePort and add a UDP port")
-		newService := jig.UpdateServiceOrFail(ns, tcpService.Name, func(s *v1.Service) {
+		ginkgo.By("changing the TCP service to type=NodePort")
+		nodePortService, err := jig.UpdateService(func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeNodePort
 			s.Spec.Ports = []v1.ServicePort{
 				{
-					Name:     "tcp-port",
-					Port:     80,
-					Protocol: v1.ProtocolTCP,
-				},
-				{
-					Name:     "udp-port",
-					Port:     80,
-					Protocol: v1.ProtocolUDP,
+					Name:       "tcp-port",
+					Port:       80,
+					Protocol:   v1.ProtocolTCP,
+					TargetPort: intstr.FromInt(9376),
 				},
 			}
 		})
-		jig.SanityCheckService(newService, v1.ServiceTypeNodePort)
-		if len(newService.Spec.Ports) != 2 {
-			framework.Failf("new service should have two Ports")
-		}
-		for _, port := range newService.Spec.Ports {
-			if port.NodePort == 0 {
-				framework.Failf("new service failed to allocate NodePort for Port %s", port.Name)
-			}
+		framework.ExpectNoError(err)
 
-			framework.Logf("new service allocates NodePort %d for Port %s", port.NodePort, port.Name)
+		err = jig.CreateTCPUDPServicePods(2)
+		framework.ExpectNoError(err)
+		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
+		err = jig.CheckServiceReachability(nodePortService, execPod)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Updating NodePort service to listen TCP and UDP based requests over same Port")
+		nodePortService, err = jig.UpdateService(func(s *v1.Service) {
+			s.Spec.Type = v1.ServiceTypeNodePort
+			s.Spec.Ports = []v1.ServicePort{
+				{
+					Name:       "tcp-port",
+					Port:       80,
+					Protocol:   v1.ProtocolTCP,
+					TargetPort: intstr.FromInt(9376),
+				},
+				{
+					Name:       "udp-port",
+					Port:       80,
+					Protocol:   v1.ProtocolUDP,
+					TargetPort: intstr.FromInt(9376),
+				},
+			}
+		})
+		framework.ExpectNoError(err)
+		err = jig.CheckServiceReachability(nodePortService, execPod)
+		framework.ExpectNoError(err)
+		nodePortCounts := len(nodePortService.Spec.Ports)
+		framework.ExpectEqual(nodePortCounts, 2, "updated service should have two Ports but found %d Ports", nodePortCounts)
+
+		for _, port := range nodePortService.Spec.Ports {
+			framework.ExpectNotEqual(port.NodePort, 0, "NodePort service failed to allocate NodePort for Port %s", port.Name)
+			framework.Logf("NodePort service allocates NodePort: %d for Port: %s over Protocol: %s", port.NodePort, port.Name, port.Protocol)
 		}
 	})
 
@@ -989,29 +1051,32 @@ var _ = SIGDescribe("Services", func() {
 	framework.ConformanceIt("should be able to change the type from ExternalName to ClusterIP", func() {
 		serviceName := "externalname-service"
 		ns := f.Namespace.Name
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 
 		ginkgo.By("creating a service " + serviceName + " with the type=ExternalName in namespace " + ns)
-		externalNameService := jig.CreateExternalNameServiceOrFail(ns, nil)
+		_, err := jig.CreateExternalNameService(nil)
+		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("Cleaning up the ExternalName to ClusterIP test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			framework.ExpectNoError(err, "failed to delete service %s in namespace %s", serviceName, ns)
 		}()
-		jig.SanityCheckService(externalNameService, v1.ServiceTypeExternalName)
 
 		ginkgo.By("changing the ExternalName service to type=ClusterIP")
-		clusterIPService := jig.UpdateServiceOrFail(ns, externalNameService.Name, func(s *v1.Service) {
+		clusterIPService, err := jig.UpdateService(func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeClusterIP
 			s.Spec.ExternalName = ""
 			s.Spec.Ports = []v1.ServicePort{
 				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(9376)},
 			}
 		})
+		framework.ExpectNoError(err)
 
-		jig.CreateServicePods(cs, ns, 2)
+		err = jig.CreateServicePods(2)
+		framework.ExpectNoError(err)
 		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
-		jig.CheckServiceReachability(ns, clusterIPService, execPod)
+		err = jig.CheckServiceReachability(clusterIPService, execPod)
+		framework.ExpectNoError(err)
 	})
 
 	/*
@@ -1025,29 +1090,32 @@ var _ = SIGDescribe("Services", func() {
 	framework.ConformanceIt("should be able to change the type from ExternalName to NodePort", func() {
 		serviceName := "externalname-service"
 		ns := f.Namespace.Name
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 
 		ginkgo.By("creating a service " + serviceName + " with the type=ExternalName in namespace " + ns)
-		externalNameService := jig.CreateExternalNameServiceOrFail(ns, nil)
+		_, err := jig.CreateExternalNameService(nil)
+		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("Cleaning up the ExternalName to NodePort test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			framework.ExpectNoError(err, "failed to delete service %s in namespace %s", serviceName, ns)
 		}()
-		jig.SanityCheckService(externalNameService, v1.ServiceTypeExternalName)
 
 		ginkgo.By("changing the ExternalName service to type=NodePort")
-		nodePortService := jig.UpdateServiceOrFail(ns, externalNameService.Name, func(s *v1.Service) {
+		nodePortService, err := jig.UpdateService(func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeNodePort
 			s.Spec.ExternalName = ""
 			s.Spec.Ports = []v1.ServicePort{
 				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(9376)},
 			}
 		})
-		jig.CreateServicePods(cs, ns, 2)
+		framework.ExpectNoError(err)
+		err = jig.CreateServicePods(2)
+		framework.ExpectNoError(err)
 
 		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
-		jig.CheckServiceReachability(ns, nodePortService, execPod)
+		err = jig.CheckServiceReachability(nodePortService, execPod)
+		framework.ExpectNoError(err)
 	})
 
 	/*
@@ -1060,16 +1128,16 @@ var _ = SIGDescribe("Services", func() {
 	framework.ConformanceIt("should be able to change the type from ClusterIP to ExternalName", func() {
 		serviceName := "clusterip-service"
 		ns := f.Namespace.Name
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 
 		ginkgo.By("creating a service " + serviceName + " with the type=ClusterIP in namespace " + ns)
-		clusterIPService := jig.CreateTCPServiceOrFail(ns, nil)
+		_, err := jig.CreateTCPService(nil)
+		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("Cleaning up the ClusterIP to ExternalName test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			framework.ExpectNoError(err, "failed to delete service %s in namespace %s", serviceName, ns)
 		}()
-		jig.SanityCheckService(clusterIPService, v1.ServiceTypeClusterIP)
 
 		ginkgo.By("Creating active service to test reachability when its FQDN is referred as externalName for another service")
 		externalServiceName := "externalsvc"
@@ -1079,13 +1147,15 @@ var _ = SIGDescribe("Services", func() {
 		}()
 
 		ginkgo.By("changing the ClusterIP service to type=ExternalName")
-		externalNameService := jig.UpdateServiceOrFail(ns, clusterIPService.Name, func(s *v1.Service) {
+		externalNameService, err := jig.UpdateService(func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeExternalName
 			s.Spec.ExternalName = externalServiceFQDN
 			s.Spec.ClusterIP = ""
 		})
+		framework.ExpectNoError(err)
 		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
-		jig.CheckServiceReachability(ns, externalNameService, execPod)
+		err = jig.CheckServiceReachability(externalNameService, execPod)
+		framework.ExpectNoError(err)
 	})
 
 	/*
@@ -1098,18 +1168,18 @@ var _ = SIGDescribe("Services", func() {
 	framework.ConformanceIt("should be able to change the type from NodePort to ExternalName", func() {
 		serviceName := "nodeport-service"
 		ns := f.Namespace.Name
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 
 		ginkgo.By("creating a service " + serviceName + " with the type=NodePort in namespace " + ns)
-		nodePortService := jig.CreateTCPServiceOrFail(ns, func(svc *v1.Service) {
+		_, err := jig.CreateTCPService(func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeNodePort
 		})
+		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("Cleaning up the NodePort to ExternalName test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
 			framework.ExpectNoError(err, "failed to delete service %s in namespace %s", serviceName, ns)
 		}()
-		jig.SanityCheckService(nodePortService, v1.ServiceTypeNodePort)
 
 		ginkgo.By("Creating active service to test reachability when its FQDN is referred as externalName for another service")
 		externalServiceName := "externalsvc"
@@ -1119,68 +1189,16 @@ var _ = SIGDescribe("Services", func() {
 		}()
 
 		ginkgo.By("changing the NodePort service to type=ExternalName")
-		externalNameService := jig.UpdateServiceOrFail(ns, nodePortService.Name, func(s *v1.Service) {
+		externalNameService, err := jig.UpdateService(func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeExternalName
 			s.Spec.ExternalName = externalServiceFQDN
 			s.Spec.ClusterIP = ""
 			s.Spec.Ports[0].NodePort = 0
 		})
+		framework.ExpectNoError(err)
 		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
-		jig.CheckServiceReachability(ns, externalNameService, execPod)
-
-	})
-
-	/*
-		Testname: Service, NodePort, same port different protocols
-		Description: Create a service of type NodePort listening on port 53 for two protocols TCP and UDP.
-		Service creation MUST be successful by assigning a ClusterIP and two unique nodePorts for each protocol, making service reachable on every node's IP and nodePort.
-		TODO: Test Service reachability, good to include this check in Conformance perspective.
-	*/
-	ginkgo.It("should use same NodePort with same port but different protocols", func() {
-		serviceName := "nodeports"
-		ns := f.Namespace.Name
-
-		t := e2eservice.NewServerTest(cs, ns, serviceName)
-		defer func() {
-			defer ginkgo.GinkgoRecover()
-			errs := t.Cleanup()
-			if len(errs) != 0 {
-				framework.Failf("errors in cleanup: %v", errs)
-			}
-		}()
-
-		ginkgo.By("creating service " + serviceName + " with same NodePort but different protocols in namespace " + ns)
-		service := &v1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      t.ServiceName,
-				Namespace: t.Namespace,
-			},
-			Spec: v1.ServiceSpec{
-				Selector: t.Labels,
-				Type:     v1.ServiceTypeNodePort,
-				Ports: []v1.ServicePort{
-					{
-						Name:     "tcp-port",
-						Port:     53,
-						Protocol: v1.ProtocolTCP,
-					},
-					{
-						Name:     "udp-port",
-						Port:     53,
-						Protocol: v1.ProtocolUDP,
-					},
-				},
-			},
-		}
-		result, err := t.CreateService(service)
-		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
-
-		if len(result.Spec.Ports) != 2 {
-			framework.Failf("got unexpected len(Spec.Ports) for new service: %v", result)
-		}
-		if result.Spec.Ports[0].NodePort != result.Spec.Ports[1].NodePort {
-			framework.Failf("should use same NodePort for new service: %v", result)
-		}
+		err = jig.CheckServiceReachability(externalNameService, execPod)
+		framework.ExpectNoError(err)
 	})
 
 	ginkgo.It("should prevent NodePort collisions", func() {
@@ -1344,7 +1362,7 @@ var _ = SIGDescribe("Services", func() {
 		err = t.DeleteService(serviceName)
 		framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 
-		hostExec := e2epod.LaunchHostExecPod(f.ClientSet, f.Namespace.Name, "hostexec")
+		hostExec := launchHostExecPod(f.ClientSet, f.Namespace.Name, "hostexec")
 		cmd := fmt.Sprintf(`! ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN`, nodePort)
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
@@ -1387,9 +1405,8 @@ var _ = SIGDescribe("Services", func() {
 
 		service := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:        t.ServiceName,
-				Namespace:   t.Namespace,
-				Annotations: map[string]string{endpoint.TolerateUnreadyEndpointsAnnotation: "true"},
+				Name:      t.ServiceName,
+				Namespace: t.Namespace,
 			},
 			Spec: v1.ServiceSpec{
 				Selector: t.Labels,
@@ -1398,9 +1415,10 @@ var _ = SIGDescribe("Services", func() {
 					Port:       int32(port),
 					TargetPort: intstr.FromInt(port),
 				}},
+				PublishNotReadyAddresses: true,
 			},
 		}
-		rcSpec := framework.RcByNameContainer(t.Name, 1, t.Image, t.Labels, v1.Container{
+		rcSpec := e2erc.ByNameContainer(t.Name, 1, t.Image, t.Labels, v1.Container{
 			Args:  []string{"netexec", fmt.Sprintf("--http-port=%d", port)},
 			Name:  t.Name,
 			Image: t.Image,
@@ -1453,11 +1471,11 @@ var _ = SIGDescribe("Services", func() {
 		}
 
 		ginkgo.By("Scaling down replication controller to zero")
-		framework.ScaleRC(f.ClientSet, f.ScalesGetter, t.Namespace, rcSpec.Name, 0, false)
+		e2erc.ScaleRC(f.ClientSet, f.ScalesGetter, t.Namespace, rcSpec.Name, 0, false)
 
 		ginkgo.By("Update service to not tolerate unready services")
 		_, err = e2eservice.UpdateService(f.ClientSet, t.Namespace, t.ServiceName, func(s *v1.Service) {
-			s.ObjectMeta.Annotations[endpoint.TolerateUnreadyEndpointsAnnotation] = "false"
+			s.Spec.PublishNotReadyAddresses = false
 		})
 		framework.ExpectNoError(err)
 
@@ -1477,7 +1495,7 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("Update service to tolerate unready services again")
 		_, err = e2eservice.UpdateService(f.ClientSet, t.Namespace, t.ServiceName, func(s *v1.Service) {
-			s.ObjectMeta.Annotations[endpoint.TolerateUnreadyEndpointsAnnotation] = "true"
+			s.Spec.PublishNotReadyAddresses = true
 		})
 		framework.ExpectNoError(err)
 
@@ -1521,14 +1539,11 @@ var _ = SIGDescribe("Services", func() {
 		if framework.ProviderIs("aws") {
 			loadBalancerLagTimeout = e2eservice.LoadBalancerLagTimeoutAWS
 		}
-		loadBalancerCreateTimeout := e2eservice.LoadBalancerCreateTimeoutDefault
-		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > e2eservice.LargeClusterMinNodesNumber {
-			loadBalancerCreateTimeout = e2eservice.LoadBalancerCreateTimeoutLarge
-		}
+		loadBalancerCreateTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
 
 		namespace := f.Namespace.Name
 		serviceName := "lb-sourcerange"
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
 
 		ginkgo.By("Prepare allow source ips")
 		// prepare the exec pods
@@ -1539,8 +1554,8 @@ var _ = SIGDescribe("Services", func() {
 		ginkgo.By("creating a pod to be part of the service " + serviceName)
 		// This container is an nginx container listening on port 80
 		// See kubernetes/contrib/ingress/echoheaders/nginx.conf for content of response
-		jig.RunOrFail(namespace, nil)
-		var err error
+		_, err := jig.Run(nil)
+		framework.ExpectNoError(err)
 		// Make sure acceptPod is running. There are certain chances that pod might be teminated due to unexpected reasons.
 		acceptPod, err = cs.CoreV1().Pods(namespace).Get(acceptPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Unable to get pod %s", acceptPod.Name)
@@ -1548,18 +1563,19 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNotEqual(acceptPod.Status.PodIP, "")
 
 		// Create loadbalancer service with source range from node[0] and podAccept
-		svc := jig.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
+		svc, err := jig.CreateTCPService(func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
 			svc.Spec.LoadBalancerSourceRanges = []string{acceptPod.Status.PodIP + "/32"}
 		})
+		framework.ExpectNoError(err)
 
 		defer func() {
 			ginkgo.By("Clean up loadbalancer service")
 			e2eservice.WaitForServiceDeletedWithFinalizer(cs, svc.Namespace, svc.Name)
 		}()
 
-		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, loadBalancerCreateTimeout)
-		jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
+		svc, err = jig.WaitForLoadBalancer(loadBalancerCreateTimeout)
+		framework.ExpectNoError(err)
 
 		// timeout when we haven't just created the load balancer
 		normalReachabilityTimeout := 2 * time.Minute
@@ -1568,8 +1584,8 @@ var _ = SIGDescribe("Services", func() {
 		svcIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 		// Wait longer as this is our first request after creation.  We can't check using a separate method,
 		// because the LB should only be reachable from the "accept" pod
-		framework.CheckReachabilityFromPod(true, loadBalancerLagTimeout, namespace, acceptPod.Name, svcIP)
-		framework.CheckReachabilityFromPod(false, normalReachabilityTimeout, namespace, dropPod.Name, svcIP)
+		checkReachabilityFromPod(true, loadBalancerLagTimeout, namespace, acceptPod.Name, svcIP)
+		checkReachabilityFromPod(false, normalReachabilityTimeout, namespace, dropPod.Name, svcIP)
 
 		// Make sure dropPod is running. There are certain chances that the pod might be teminated due to unexpected reasons.		dropPod, err = cs.CoreV1().Pods(namespace).Get(dropPod.Name, metav1.GetOptions{})
 		dropPod, err = cs.CoreV1().Pods(namespace).Get(dropPod.Name, metav1.GetOptions{})
@@ -1578,38 +1594,37 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNotEqual(acceptPod.Status.PodIP, "")
 
 		ginkgo.By("Update service LoadBalancerSourceRange and check reachability")
-		jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+		_, err = jig.UpdateService(func(svc *v1.Service) {
 			// only allow access from dropPod
 			svc.Spec.LoadBalancerSourceRanges = []string{dropPod.Status.PodIP + "/32"}
 		})
-		framework.CheckReachabilityFromPod(false, normalReachabilityTimeout, namespace, acceptPod.Name, svcIP)
-		framework.CheckReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPod.Name, svcIP)
+		framework.ExpectNoError(err)
+		checkReachabilityFromPod(false, normalReachabilityTimeout, namespace, acceptPod.Name, svcIP)
+		checkReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPod.Name, svcIP)
 
 		ginkgo.By("Delete LoadBalancerSourceRange field and check reachability")
-		jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+		_, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.LoadBalancerSourceRanges = nil
 		})
-		framework.CheckReachabilityFromPod(true, normalReachabilityTimeout, namespace, acceptPod.Name, svcIP)
-		framework.CheckReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPod.Name, svcIP)
+		framework.ExpectNoError(err)
+		checkReachabilityFromPod(true, normalReachabilityTimeout, namespace, acceptPod.Name, svcIP)
+		checkReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPod.Name, svcIP)
 	})
 
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 	ginkgo.It("should be able to create an internal type load balancer [Slow] [DisabledForLargeClusters]", func() {
 		framework.SkipUnlessProviderIs("azure", "gke", "gce")
 
-		createTimeout := e2eservice.LoadBalancerCreateTimeoutDefault
-		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > e2eservice.LargeClusterMinNodesNumber {
-			createTimeout = e2eservice.LoadBalancerCreateTimeoutLarge
-		}
-
+		createTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
 		pollInterval := framework.Poll * 10
 
 		namespace := f.Namespace.Name
 		serviceName := "lb-internal"
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
 
 		ginkgo.By("creating pod to be part of service " + serviceName)
-		jig.RunOrFail(namespace, nil)
+		_, err := jig.Run(nil)
+		framework.ExpectNoError(err)
 
 		enableILB, disableILB := e2eservice.EnableAndDisableInternalLB()
 
@@ -1620,18 +1635,19 @@ var _ = SIGDescribe("Services", func() {
 		}
 
 		ginkgo.By("creating a service with type LoadBalancer and cloud specific Internal-LB annotation enabled")
-		svc := jig.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
+		svc, err := jig.CreateTCPService(func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
 			enableILB(svc)
 		})
+		framework.ExpectNoError(err)
 
 		defer func() {
 			ginkgo.By("Clean up loadbalancer service")
 			e2eservice.WaitForServiceDeletedWithFinalizer(cs, svc.Namespace, svc.Name)
 		}()
 
-		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, createTimeout)
-		jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
+		svc, err = jig.WaitForLoadBalancer(createTimeout)
+		framework.ExpectNoError(err)
 		lbIngress := &svc.Status.LoadBalancer.Ingress[0]
 		svcPort := int(svc.Spec.Ports[0].Port)
 		// should have an internal IP.
@@ -1641,7 +1657,7 @@ var _ = SIGDescribe("Services", func() {
 		//  a pod to test the service.
 		ginkgo.By("hitting the internal load balancer from pod")
 		framework.Logf("creating pod with host network")
-		hostExec := e2epod.LaunchHostExecPod(f.ClientSet, f.Namespace.Name, "ilb-host-exec")
+		hostExec := launchHostExecPod(f.ClientSet, f.Namespace.Name, "ilb-host-exec")
 
 		framework.Logf("Waiting up to %v for service %q's internal LB to respond to requests", createTimeout, serviceName)
 		tcpIngressIP := e2eservice.GetIngressPoint(lbIngress)
@@ -1665,12 +1681,13 @@ var _ = SIGDescribe("Services", func() {
 		}
 
 		ginkgo.By("switching to external type LoadBalancer")
-		svc = jig.UpdateServiceOrFail(namespace, serviceName, func(svc *v1.Service) {
+		svc, err = jig.UpdateService(func(svc *v1.Service) {
 			disableILB(svc)
 		})
+		framework.ExpectNoError(err)
 		framework.Logf("Waiting up to %v for service %q to have an external LoadBalancer", createTimeout, serviceName)
 		if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
-			svc, err := jig.Client.CoreV1().Services(namespace).Get(serviceName, metav1.GetOptions{})
+			svc, err := cs.CoreV1().Services(namespace).Get(serviceName, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -1680,7 +1697,6 @@ var _ = SIGDescribe("Services", func() {
 			framework.Failf("Loadbalancer IP not changed to external.")
 		}
 		// should have an external IP.
-		jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 		gomega.Expect(isInternalEndpoint(lbIngress)).To(gomega.BeFalse())
 
 		ginkgo.By("hitting the external load balancer")
@@ -1693,13 +1709,14 @@ var _ = SIGDescribe("Services", func() {
 		if framework.ProviderIs("azure") {
 			ginkgo.By("switching back to interal type LoadBalancer, with static IP specified.")
 			internalStaticIP := "10.240.11.11"
-			svc = jig.UpdateServiceOrFail(namespace, serviceName, func(svc *v1.Service) {
+			svc, err = jig.UpdateService(func(svc *v1.Service) {
 				svc.Spec.LoadBalancerIP = internalStaticIP
 				enableILB(svc)
 			})
+			framework.ExpectNoError(err)
 			framework.Logf("Waiting up to %v for service %q to have an internal LoadBalancer", createTimeout, serviceName)
 			if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
-				svc, err := jig.Client.CoreV1().Services(namespace).Get(serviceName, metav1.GetOptions{})
+				svc, err := cs.CoreV1().Services(namespace).Get(serviceName, metav1.GetOptions{})
 				if err != nil {
 					return false, err
 				}
@@ -1709,7 +1726,6 @@ var _ = SIGDescribe("Services", func() {
 				framework.Failf("Loadbalancer IP not changed to internal.")
 			}
 			// should have the given static internal IP.
-			jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 			framework.ExpectEqual(e2eservice.GetIngressPoint(lbIngress), internalStaticIP)
 		}
 	})
@@ -1735,20 +1751,22 @@ var _ = SIGDescribe("Services", func() {
 
 		namespace := f.Namespace.Name
 		serviceName := "lb-hc-int"
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
 
 		ginkgo.By("create load balancer service")
 		// Create loadbalancer service with source range from node[0] and podAccept
-		svc := jig.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
+		svc, err := jig.CreateTCPService(func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		})
+		framework.ExpectNoError(err)
 
 		defer func() {
 			ginkgo.By("Clean up loadbalancer service")
 			e2eservice.WaitForServiceDeletedWithFinalizer(cs, svc.Namespace, svc.Name)
 		}()
 
-		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, e2eservice.LoadBalancerCreateTimeoutDefault)
+		svc, err = jig.WaitForLoadBalancer(e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
+		framework.ExpectNoError(err)
 
 		hcName := gcecloud.MakeNodesHealthCheckName(clusterID)
 		hc, err := gceCloud.GetHTTPHealthCheck(hcName)
@@ -1773,7 +1791,7 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("health check should be reconciled")
 		pollInterval := framework.Poll * 10
-		if pollErr := wait.PollImmediate(pollInterval, e2eservice.LoadBalancerCreateTimeoutDefault, func() (bool, error) {
+		if pollErr := wait.PollImmediate(pollInterval, e2eservice.LoadBalancerPropagationTimeoutDefault, func() (bool, error) {
 			hc, err := gceCloud.GetHTTPHealthCheck(hcName)
 			if err != nil {
 				framework.Logf("ginkgo.Failed to get HttpHealthCheck(%q): %v", hcName, err)
@@ -1786,32 +1804,37 @@ var _ = SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should have session affinity work for service with type clusterIP", func() {
+	// [LinuxOnly]: Windows does not support session affinity.
+	ginkgo.It("should have session affinity work for service with type clusterIP [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-clusterip")
 		svc.Spec.Type = v1.ServiceTypeClusterIP
 		execAffinityTestForNonLBService(f, cs, svc)
 	})
 
-	ginkgo.It("should be able to switch session affinity for service with type clusterIP", func() {
+	// [LinuxOnly]: Windows does not support session affinity.
+	ginkgo.It("should be able to switch session affinity for service with type clusterIP [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-clusterip-transition")
 		svc.Spec.Type = v1.ServiceTypeClusterIP
 		execAffinityTestForNonLBServiceWithTransition(f, cs, svc)
 	})
 
-	ginkgo.It("should have session affinity work for NodePort service", func() {
+	// [LinuxOnly]: Windows does not support session affinity.
+	ginkgo.It("should have session affinity work for NodePort service [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-nodeport")
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		execAffinityTestForNonLBService(f, cs, svc)
 	})
 
-	ginkgo.It("should be able to switch session affinity for NodePort service", func() {
+	// [LinuxOnly]: Windows does not support session affinity.
+	ginkgo.It("should be able to switch session affinity for NodePort service [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-nodeport-transition")
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		execAffinityTestForNonLBServiceWithTransition(f, cs, svc)
 	})
 
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
-	ginkgo.It("should have session affinity work for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters]", func() {
+	// [LinuxOnly]: Windows does not support session affinity.
+	ginkgo.It("should have session affinity work for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters] [LinuxOnly]", func() {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
 		framework.SkipIfProviderIs("aws")
 
@@ -1822,7 +1845,8 @@ var _ = SIGDescribe("Services", func() {
 	})
 
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
-	ginkgo.It("should be able to switch session affinity for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters]", func() {
+	// [LinuxOnly]: Windows does not support session affinity.
+	ginkgo.It("should be able to switch session affinity for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters] [LinuxOnly]", func() {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
 		framework.SkipIfProviderIs("aws")
 
@@ -1833,7 +1857,8 @@ var _ = SIGDescribe("Services", func() {
 	})
 
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
-	ginkgo.It("should have session affinity work for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters]", func() {
+	// [LinuxOnly]: Windows does not support session affinity.
+	ginkgo.It("should have session affinity work for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters] [LinuxOnly]", func() {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
 		framework.SkipIfProviderIs("aws")
 
@@ -1844,7 +1869,8 @@ var _ = SIGDescribe("Services", func() {
 	})
 
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
-	ginkgo.It("should be able to switch session affinity for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters]", func() {
+	// [LinuxOnly]: Windows does not support session affinity.
+	ginkgo.It("should be able to switch session affinity for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters] [LinuxOnly]", func() {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
 		framework.SkipIfProviderIs("aws")
 
@@ -1880,7 +1906,7 @@ var _ = SIGDescribe("Services", func() {
 		podToggledNames, svcToggledIP, err := e2eservice.StartServeHostnameService(cs, svcToggled, ns, numPods)
 		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svcToggledIP, ns)
 
-		jig := e2eservice.NewTestJig(cs, svcToggled.ObjectMeta.Name)
+		jig := e2eservice.NewTestJig(cs, ns, svcToggled.ObjectMeta.Name)
 
 		hosts, err := e2essh.NodeSSHHosts(cs)
 		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
@@ -1896,17 +1922,19 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceDown(cs, host, svcDisabledIP, servicePort))
 
 		ginkgo.By("adding service-proxy-name label")
-		jig.UpdateServiceOrFail(ns, svcToggled.ObjectMeta.Name, func(svc *v1.Service) {
+		_, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.ObjectMeta.Labels = serviceProxyNameLabels
 		})
+		framework.ExpectNoError(err)
 
 		ginkgo.By("verifying service is not up")
 		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceDown(cs, host, svcToggledIP, servicePort))
 
 		ginkgo.By("removing service-proxy-name annotation")
-		jig.UpdateServiceOrFail(ns, svcToggled.ObjectMeta.Name, func(svc *v1.Service) {
+		_, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.ObjectMeta.Labels = nil
 		})
+		framework.ExpectNoError(err)
 
 		ginkgo.By("verifying service is up")
 		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceUp(cs, ns, host, podToggledNames, svcToggledIP, servicePort))
@@ -1942,7 +1970,7 @@ var _ = SIGDescribe("Services", func() {
 		podHeadlessToggledNames, svcHeadlessToggledIP, err := e2eservice.StartServeHostnameService(cs, svcHeadlessToggled, ns, numPods)
 		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svcHeadlessToggledIP, ns)
 
-		jig := e2eservice.NewTestJig(cs, svcHeadlessToggled.ObjectMeta.Name)
+		jig := e2eservice.NewTestJig(cs, ns, svcHeadlessToggled.ObjectMeta.Name)
 
 		hosts, err := e2essh.NodeSSHHosts(cs)
 		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
@@ -1958,17 +1986,19 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceDown(cs, host, svcHeadlessIP, servicePort))
 
 		ginkgo.By("adding service.kubernetes.io/headless label")
-		jig.UpdateServiceOrFail(ns, svcHeadlessToggled.ObjectMeta.Name, func(svc *v1.Service) {
+		_, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.ObjectMeta.Labels = serviceHeadlessLabels
 		})
+		framework.ExpectNoError(err)
 
 		ginkgo.By("verifying service is not up")
 		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceDown(cs, host, svcHeadlessToggledIP, servicePort))
 
 		ginkgo.By("removing service.kubernetes.io/headless annotation")
-		jig.UpdateServiceOrFail(ns, svcHeadlessToggled.ObjectMeta.Name, func(svc *v1.Service) {
+		_, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.ObjectMeta.Labels = nil
 		})
+		framework.ExpectNoError(err)
 
 		ginkgo.By("verifying service is up")
 		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceUp(cs, ns, host, podHeadlessToggledNames, svcHeadlessToggledIP, servicePort))
@@ -1980,22 +2010,14 @@ var _ = SIGDescribe("Services", func() {
 	ginkgo.It("should be rejected when no endpoints exist", func() {
 		namespace := f.Namespace.Name
 		serviceName := "no-pods"
-		jig := e2eservice.NewTestJig(cs, serviceName)
-		nodes := jig.GetNodes(e2eservice.MaxNodesForEndpointsTests)
-		labels := map[string]string{
-			"nopods": "nopods",
-		}
+		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
+		framework.ExpectNoError(err)
 		port := 80
-		ports := []v1.ServicePort{{
-			Port:       int32(port),
-			TargetPort: intstr.FromInt(80),
-		}}
 
 		ginkgo.By("creating a service with no endpoints")
-		_, err := jig.CreateServiceWithServicePort(labels, namespace, ports)
-		if err != nil {
-			framework.Failf("ginkgo.Failed to create service: %v", err)
-		}
+		_, err = jig.CreateTCPServiceWithPort(nil, int32(port))
+		framework.ExpectNoError(err)
 
 		nodeName := nodes.Items[0].Name
 		podName := "execpod-noendpoints"
@@ -2035,12 +2057,13 @@ var _ = SIGDescribe("Services", func() {
 	// 3. Update service to type=LoadBalancer. Finalizer should be added.
 	// 4. Delete service with type=LoadBalancer. Finalizer should be removed.
 	ginkgo.It("should handle load balancer cleanup finalizer for service [Slow]", func() {
-		jig := e2eservice.NewTestJig(cs, "lb-finalizer")
+		jig := e2eservice.NewTestJig(cs, f.Namespace.Name, "lb-finalizer")
 
 		ginkgo.By("Create load balancer service")
-		svc := jig.CreateTCPServiceOrFail(f.Namespace.Name, func(svc *v1.Service) {
+		svc, err := jig.CreateTCPService(func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		})
+		framework.ExpectNoError(err)
 
 		defer func() {
 			ginkgo.By("Check that service can be deleted with finalizer")
@@ -2048,17 +2071,20 @@ var _ = SIGDescribe("Services", func() {
 		}()
 
 		ginkgo.By("Wait for load balancer to serve traffic")
-		svc = jig.WaitForLoadBalancerOrFail(svc.Namespace, svc.Name, e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
+		svc, err = jig.WaitForLoadBalancer(e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Check if finalizer presents on service with type=LoadBalancer")
 		e2eservice.WaitForServiceUpdatedWithFinalizer(cs, svc.Namespace, svc.Name, true)
 
 		ginkgo.By("Check if finalizer is removed on service after changed to type=ClusterIP")
-		jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
+		err = jig.ChangeServiceType(v1.ServiceTypeClusterIP, e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
+		framework.ExpectNoError(err)
 		e2eservice.WaitForServiceUpdatedWithFinalizer(cs, svc.Namespace, svc.Name, false)
 
 		ginkgo.By("Check if finalizer is added back to service after changed to type=LoadBalancer")
-		jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeLoadBalancer, e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
+		err = jig.ChangeServiceType(v1.ServiceTypeLoadBalancer, e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
+		framework.ExpectNoError(err)
 		e2eservice.WaitForServiceUpdatedWithFinalizer(cs, svc.Namespace, svc.Name, true)
 	})
 })
@@ -2066,7 +2092,7 @@ var _ = SIGDescribe("Services", func() {
 // TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 	f := framework.NewDefaultFramework("esipp")
-	loadBalancerCreateTimeout := e2eservice.LoadBalancerCreateTimeoutDefault
+	var loadBalancerCreateTimeout time.Duration
 
 	var cs clientset.Interface
 	serviceLBNames := []string{}
@@ -2076,9 +2102,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 
 		cs = f.ClientSet
-		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > e2eservice.LargeClusterMinNodesNumber {
-			loadBalancerCreateTimeout = e2eservice.LoadBalancerCreateTimeoutLarge
-		}
+		loadBalancerCreateTimeout = e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -2096,24 +2120,28 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 	ginkgo.It("should work for type=LoadBalancer", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-lb"
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
 
-		svc := jig.CreateOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, true, nil)
+		svc, err := jig.CreateOnlyLocalLoadBalancerService(loadBalancerCreateTimeout, true, nil)
+		framework.ExpectNoError(err)
 		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
 		healthCheckNodePort := int(svc.Spec.HealthCheckNodePort)
 		if healthCheckNodePort == 0 {
 			framework.Failf("Service HealthCheck NodePort was not allocated")
 		}
 		defer func() {
-			jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
+			err = jig.ChangeServiceType(v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
+			framework.ExpectNoError(err)
 
 			// Make sure we didn't leak the health check node port.
 			threshold := 2
-			for _, ips := range jig.GetEndpointNodes(svc) {
+			nodes, err := jig.GetEndpointNodes()
+			framework.ExpectNoError(err)
+			for _, ips := range nodes {
 				err := e2eservice.TestHTTPHealthCheckNodePort(ips[0], healthCheckNodePort, "/healthz", e2eservice.KubeProxyEndpointLagTimeout, false, threshold)
 				framework.ExpectNoError(err)
 			}
-			err := cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
+			err = cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
 			framework.ExpectNoError(err)
 		}()
 
@@ -2134,16 +2162,18 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 	ginkgo.It("should work for type=NodePort", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-nodeport"
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
 
-		svc := jig.CreateOnlyLocalNodePortService(namespace, serviceName, true)
+		svc, err := jig.CreateOnlyLocalNodePortService(true)
+		framework.ExpectNoError(err)
 		defer func() {
 			err := cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
 			framework.ExpectNoError(err)
 		}()
 
 		tcpNodePort := int(svc.Spec.Ports[0].NodePort)
-		endpointsNodeMap := jig.GetEndpointNodes(svc)
+		endpointsNodeMap, err := jig.GetEndpointNodes()
+		framework.ExpectNoError(err)
 		path := "/clientip"
 
 		for nodeName, nodeIPs := range endpointsNodeMap {
@@ -2161,10 +2191,11 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 	ginkgo.It("should only target nodes with endpoints", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-nodes"
-		jig := e2eservice.NewTestJig(cs, serviceName)
-		nodes := jig.GetNodes(e2eservice.MaxNodesForEndpointsTests)
+		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
+		framework.ExpectNoError(err)
 
-		svc := jig.CreateOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, false,
+		svc, err := jig.CreateOnlyLocalLoadBalancerService(loadBalancerCreateTimeout, false,
 			func(svc *v1.Service) {
 				// Change service port to avoid collision with opened hostPorts
 				// in other tests that run in parallel.
@@ -2174,9 +2205,11 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 				}
 
 			})
+		framework.ExpectNoError(err)
 		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
 		defer func() {
-			jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
+			err = jig.ChangeServiceType(v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
+			framework.ExpectNoError(err)
 			err := cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
 			framework.ExpectNoError(err)
 		}()
@@ -2197,15 +2230,17 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 			endpointNodeName := nodes.Items[i].Name
 
 			ginkgo.By("creating a pod to be part of the service " + serviceName + " on node " + endpointNodeName)
-			jig.RunOrFail(namespace, func(rc *v1.ReplicationController) {
+			_, err = jig.Run(func(rc *v1.ReplicationController) {
 				rc.Name = serviceName
 				if endpointNodeName != "" {
 					rc.Spec.Template.Spec.NodeName = endpointNodeName
 				}
 			})
+			framework.ExpectNoError(err)
 
 			ginkgo.By(fmt.Sprintf("waiting for service endpoint on node %v", endpointNodeName))
-			jig.WaitForEndpointOnNode(namespace, serviceName, endpointNodeName)
+			err = jig.WaitForEndpointOnNode(endpointNodeName)
+			framework.ExpectNoError(err)
 
 			// HealthCheck should pass only on the node where num(endpoints) > 0
 			// All other nodes should fail the healthcheck on the service healthCheckNodePort
@@ -2220,7 +2255,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 				err := e2eservice.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, path, e2eservice.KubeProxyEndpointLagTimeout, expectedSuccess, threshold)
 				framework.ExpectNoError(err)
 			}
-			framework.ExpectNoError(framework.DeleteRCAndWaitForGC(f.ClientSet, namespace, serviceName))
+			framework.ExpectNoError(e2erc.DeleteRCAndWaitForGC(f.ClientSet, namespace, serviceName))
 		}
 	})
 
@@ -2228,12 +2263,14 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		var err error
 		namespace := f.Namespace.Name
 		serviceName := "external-local-pods"
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
 
-		svc := jig.CreateOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, true, nil)
+		svc, err := jig.CreateOnlyLocalLoadBalancerService(loadBalancerCreateTimeout, true, nil)
+		framework.ExpectNoError(err)
 		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
 		defer func() {
-			jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
+			err = jig.ChangeServiceType(v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
+			framework.ExpectNoError(err)
 			err := cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
 			framework.ExpectNoError(err)
 		}()
@@ -2267,7 +2304,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 
 		var srcIP string
 		ginkgo.By(fmt.Sprintf("Hitting external lb %v from pod %v on node %v", ingressIP, pausePod.Name, pausePod.Spec.NodeName))
-		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.LoadBalancerCreateTimeoutDefault, func() (bool, error) {
+		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.LoadBalancerPropagationTimeoutDefault, func() (bool, error) {
 			stdout, err := framework.RunHostCmd(pausePod.Namespace, pausePod.Name, cmd)
 			if err != nil {
 				framework.Logf("got err: %v, retry until timeout", err)
@@ -2283,17 +2320,20 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 	ginkgo.It("should handle updates to ExternalTrafficPolicy field", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-update"
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
 
-		nodes := jig.GetNodes(e2eservice.MaxNodesForEndpointsTests)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
+		framework.ExpectNoError(err)
 		if len(nodes.Items) < 2 {
 			framework.Failf("Need at least 2 nodes to verify source ip from a node without endpoint")
 		}
 
-		svc := jig.CreateOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, true, nil)
+		svc, err := jig.CreateOnlyLocalLoadBalancerService(loadBalancerCreateTimeout, true, nil)
+		framework.ExpectNoError(err)
 		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
 		defer func() {
-			jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
+			err = jig.ChangeServiceType(v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
+			framework.ExpectNoError(err)
 			err := cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
 			framework.ExpectNoError(err)
 		}()
@@ -2302,14 +2342,16 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		healthCheckNodePort := int(svc.Spec.HealthCheckNodePort)
 
 		ginkgo.By("turning ESIPP off")
-		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+		svc, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
 		})
+		framework.ExpectNoError(err)
 		if svc.Spec.HealthCheckNodePort > 0 {
 			framework.Failf("Service HealthCheck NodePort still present")
 		}
 
-		endpointNodeMap := jig.GetEndpointNodes(svc)
+		endpointNodeMap, err := jig.GetEndpointNodes()
+		framework.ExpectNoError(err)
 		noEndpointNodeMap := map[string][]string{}
 		for _, n := range nodes.Items {
 			if _, ok := endpointNodeMap[n.Name]; ok {
@@ -2333,7 +2375,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 			ginkgo.By(fmt.Sprintf("checking kube-proxy health check fails on node with endpoint (%s), public IP %s", nodeName, nodeIPs[0]))
 			var body bytes.Buffer
 			pollfn := func() (bool, error) {
-				result := framework.PokeHTTP(nodeIPs[0], healthCheckNodePort, "/healthz", nil)
+				result := e2enetwork.PokeHTTP(nodeIPs[0], healthCheckNodePort, "/healthz", nil)
 				if result.Code == 0 {
 					return true, nil
 				}
@@ -2369,11 +2411,12 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		// creation will fail.
 
 		ginkgo.By("setting ExternalTraffic field back to OnlyLocal")
-		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+		svc, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 			// Request the same healthCheckNodePort as before, to test the user-requested allocation path
 			svc.Spec.HealthCheckNodePort = int32(healthCheckNodePort)
 		})
+		framework.ExpectNoError(err)
 		pollErr = wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
 			content := e2eservice.GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, path)
 			clientIP = content.String()
@@ -2445,12 +2488,13 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(f *framework.Framewor
 	defer func() {
 		e2eservice.StopServeHostnameService(cs, ns, serviceName)
 	}()
-	jig := e2eservice.NewTestJig(cs, serviceName)
+	jig := e2eservice.NewTestJig(cs, ns, serviceName)
 	svc, err = jig.Client.CoreV1().Services(ns).Get(serviceName, metav1.GetOptions{})
 	framework.ExpectNoError(err, "failed to fetch service: %s in namespace: %s", serviceName, ns)
 	var svcIP string
 	if serviceType == v1.ServiceTypeNodePort {
-		nodes := framework.GetReadySchedulableNodesOrDie(cs)
+		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		framework.ExpectNoError(err)
 		addrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
 		gomega.Expect(len(addrs)).To(gomega.BeNumerically(">", 0), "ginkgo.Failed to get Node internal IP")
 		svcIP = addrs[0]
@@ -2465,20 +2509,22 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(f *framework.Framewor
 		err := cs.CoreV1().Pods(ns).Delete(execPod.Name, nil)
 		framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", execPod.Name, ns)
 	}()
-	jig.CheckServiceReachability(ns, svc, execPod)
-	framework.ExpectNoError(err, "failed to fetch pod: %s in namespace: %s", execPod.Name, ns)
+	err = jig.CheckServiceReachability(svc, execPod)
+	framework.ExpectNoError(err)
 
 	if !isTransitionTest {
 		gomega.Expect(e2eservice.CheckAffinity(execPod, svcIP, servicePort, true)).To(gomega.BeTrue())
 	}
 	if isTransitionTest {
-		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+		svc, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityNone
 		})
+		framework.ExpectNoError(err)
 		gomega.Expect(e2eservice.CheckAffinity(execPod, svcIP, servicePort, false)).To(gomega.BeTrue())
-		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+		svc, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		})
+		framework.ExpectNoError(err)
 		gomega.Expect(e2eservice.CheckAffinity(execPod, svcIP, servicePort, true)).To(gomega.BeTrue())
 	}
 }
@@ -2501,10 +2547,10 @@ func execAffinityTestForLBServiceWithOptionalTransition(f *framework.Framework, 
 	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 	_, _, err := e2eservice.StartServeHostnameService(cs, svc, ns, numPods)
 	framework.ExpectNoError(err, "failed to create replication controller with service in the namespace: %s", ns)
-	jig := e2eservice.NewTestJig(cs, serviceName)
+	jig := e2eservice.NewTestJig(cs, ns, serviceName)
 	ginkgo.By("waiting for loadbalancer for service " + ns + "/" + serviceName)
-	svc = jig.WaitForLoadBalancerOrFail(ns, serviceName, e2eservice.LoadBalancerCreateTimeoutDefault)
-	jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
+	svc, err = jig.WaitForLoadBalancer(e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
+	framework.ExpectNoError(err)
 	defer func() {
 		podNodePairs, err := e2enode.PodNodePairs(cs, ns)
 		framework.Logf("[pod,node] pairs: %+v; err: %v", podNodePairs, err)
@@ -2520,13 +2566,15 @@ func execAffinityTestForLBServiceWithOptionalTransition(f *framework.Framework, 
 		gomega.Expect(e2eservice.CheckAffinity(nil, ingressIP, port, true)).To(gomega.BeTrue())
 	}
 	if isTransitionTest {
-		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+		svc, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityNone
 		})
+		framework.ExpectNoError(err)
 		gomega.Expect(e2eservice.CheckAffinity(nil, ingressIP, port, false)).To(gomega.BeTrue())
-		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+		svc, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		})
+		framework.ExpectNoError(err)
 		gomega.Expect(e2eservice.CheckAffinity(nil, ingressIP, port, true)).To(gomega.BeTrue())
 	}
 }
@@ -2561,4 +2609,90 @@ func createPausePodDeployment(cs clientset.Interface, name, ns string, replicas 
 	deployment, err := cs.AppsV1().Deployments(ns).Create(pauseDeployment)
 	framework.ExpectNoError(err, "Error in creating deployment for pause pod")
 	return deployment
+}
+
+// createPodOrFail creates a pod with the specified containerPorts.
+func createPodOrFail(c clientset.Interface, ns, name string, labels map[string]string, containerPorts []v1.ContainerPort) {
+	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", name, ns))
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "pause",
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"pause"},
+					Ports: containerPorts,
+					// Add a dummy environment variable to work around a docker issue.
+					// https://github.com/docker/docker/issues/14203
+					Env: []v1.EnvVar{{Name: "FOO", Value: " "}},
+				},
+			},
+		},
+	}
+	_, err := c.CoreV1().Pods(ns).Create(pod)
+	framework.ExpectNoError(err, "failed to create pod %s in namespace %s", name, ns)
+}
+
+// launchHostExecPod launches a hostexec pod in the given namespace and waits
+// until it's Running
+func launchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
+	hostExecPod := e2epod.NewExecPodSpec(ns, name, true)
+	pod, err := client.CoreV1().Pods(ns).Create(hostExecPod)
+	framework.ExpectNoError(err)
+	err = e2epod.WaitForPodRunningInNamespace(client, pod)
+	framework.ExpectNoError(err)
+	return pod
+}
+
+// checkReachabilityFromPod checks reachability from the specified pod.
+func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {
+	cmd := fmt.Sprintf("wget -T 5 -qO- %q", target)
+	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+		_, err := framework.RunHostCmd(namespace, pod, cmd)
+		if expectToBeReachable && err != nil {
+			framework.Logf("Expect target to be reachable. But got err: %v. Retry until timeout", err)
+			return false, nil
+		}
+
+		if !expectToBeReachable && err == nil {
+			framework.Logf("Expect target NOT to be reachable. But it is reachable. Retry until timeout")
+			return false, nil
+		}
+		return true, nil
+	})
+	framework.ExpectNoError(err)
+}
+
+// proxyMode returns a proxyMode of a kube-proxy.
+func proxyMode(f *framework.Framework) (string, error) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kube-proxy-mode-detector",
+			Namespace: f.Namespace.Name,
+		},
+		Spec: v1.PodSpec{
+			HostNetwork: true,
+			Containers: []v1.Container{
+				{
+					Name:  "detector",
+					Image: framework.AgnHostImage,
+					Args:  []string{"pause"},
+				},
+			},
+		},
+	}
+	f.PodClient().CreateSync(pod)
+	defer f.PodClient().DeleteSync(pod.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+
+	cmd := "curl -q -s --connect-timeout 1 http://localhost:10249/proxyMode"
+	stdout, err := framework.RunHostCmd(pod.Namespace, pod.Name, cmd)
+	if err != nil {
+		return "", err
+	}
+	framework.Logf("proxyMode: %s", stdout)
+	return stdout, nil
 }

@@ -21,7 +21,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	policy "k8s.io/api/policy/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -39,7 +39,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	policyclientset "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	appsv1listers "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
@@ -52,8 +51,6 @@ import (
 
 	"k8s.io/klog"
 )
-
-const statusUpdateRetries = 2
 
 // DeletionTimeout sets maximum time from the moment a pod is added to DisruptedPods in PDB.Status
 // to the time when the pod is expected to be seen by PDB controller as having been marked for deletion.
@@ -363,7 +360,19 @@ func (dc *DisruptionController) updateDb(old, cur interface{}) {
 }
 
 func (dc *DisruptionController) removeDb(obj interface{}) {
-	pdb := obj.(*policy.PodDisruptionBudget)
+	pdb, ok := obj.(*policy.PodDisruptionBudget)
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			klog.Errorf("Couldn't get object from tombstone %+v", obj)
+			return
+		}
+		pdb, ok = tombstone.Obj.(*policy.PodDisruptionBudget)
+		if !ok {
+			klog.Errorf("Tombstone contained object that is not a pdb %+v", obj)
+			return
+		}
+	}
 	klog.V(4).Infof("remove DB %q", pdb.Name)
 	dc.enqueuePdb(pdb)
 }
@@ -532,7 +541,13 @@ func (dc *DisruptionController) sync(key string) error {
 		return err
 	}
 
-	if err := dc.trySync(pdb); err != nil {
+	err = dc.trySync(pdb)
+	// If the reason for failure was a conflict, then allow this PDB update to be
+	// requeued without triggering the failSafe logic.
+	if errors.IsConflict(err) {
+		return err
+	}
+	if err != nil {
 		klog.Errorf("Failed to sync pdb %s/%s: %v", pdb.Namespace, pdb.Name, err)
 		return dc.failSafe(pdb)
 	}
@@ -699,7 +714,7 @@ func (dc *DisruptionController) buildDisruptedPodMap(pods []*v1.Pod, pdb *policy
 	result := make(map[string]metav1.Time)
 	var recheckTime *time.Time
 
-	if disruptedPods == nil || len(disruptedPods) == 0 {
+	if disruptedPods == nil {
 		return result, recheckTime
 	}
 	for _, pod := range pods {
@@ -773,29 +788,9 @@ func (dc *DisruptionController) updatePdbStatus(pdb *policy.PodDisruptionBudget,
 	return dc.getUpdater()(newPdb)
 }
 
-// refresh tries to re-GET the given PDB.  If there are any errors, it just
-// returns the old PDB.  Intended to be used in a retry loop where it runs a
-// bounded number of times.
-func refresh(pdbClient policyclientset.PodDisruptionBudgetInterface, pdb *policy.PodDisruptionBudget) *policy.PodDisruptionBudget {
-	newPdb, err := pdbClient.Get(pdb.Name, metav1.GetOptions{})
-	if err == nil {
-		return newPdb
-	}
-	return pdb
-
-}
-
 func (dc *DisruptionController) writePdbStatus(pdb *policy.PodDisruptionBudget) error {
-	pdbClient := dc.kubeClient.PolicyV1beta1().PodDisruptionBudgets(pdb.Namespace)
-	st := pdb.Status
-
-	var err error
-	for i, pdb := 0, pdb; i < statusUpdateRetries; i, pdb = i+1, refresh(pdbClient, pdb) {
-		pdb.Status = st
-		if _, err = pdbClient.UpdateStatus(pdb); err == nil {
-			break
-		}
-	}
-
+	// If this update fails, don't retry it. Allow the failure to get handled &
+	// retried in `processNextWorkItem()`.
+	_, err := dc.kubeClient.PolicyV1beta1().PodDisruptionBudgets(pdb.Namespace).UpdateStatus(pdb)
 	return err
 }

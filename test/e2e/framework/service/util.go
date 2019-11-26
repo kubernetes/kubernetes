@@ -22,11 +22,13 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 )
 
 // TestReachableHTTP tests that the given host serves HTTP on the given port.
@@ -37,12 +39,12 @@ func TestReachableHTTP(host string, port int, timeout time.Duration) {
 // TestReachableHTTPWithRetriableErrorCodes tests that the given host serves HTTP on the given port with the given retriableErrCodes.
 func TestReachableHTTPWithRetriableErrorCodes(host string, port int, retriableErrCodes []int, timeout time.Duration) {
 	pollfn := func() (bool, error) {
-		result := framework.PokeHTTP(host, port, "/echo?msg=hello",
-			&framework.HTTPPokeParams{
+		result := e2enetwork.PokeHTTP(host, port, "/echo?msg=hello",
+			&e2enetwork.HTTPPokeParams{
 				BodyContains:   "hello",
 				RetriableCodes: retriableErrCodes,
 			})
-		if result.Status == framework.HTTPSuccess {
+		if result.Status == e2enetwork.HTTPSuccess {
 			return true, nil
 		}
 		return false, nil // caller can retry
@@ -60,7 +62,7 @@ func TestReachableHTTPWithRetriableErrorCodes(host string, port int, retriableEr
 // TestNotReachableHTTP tests that a HTTP request doesn't connect to the given host and port.
 func TestNotReachableHTTP(host string, port int, timeout time.Duration) {
 	pollfn := func() (bool, error) {
-		result := framework.PokeHTTP(host, port, "/", nil)
+		result := e2enetwork.PokeHTTP(host, port, "/", nil)
 		if result.Code == 0 {
 			return true, nil
 		}
@@ -75,8 +77,8 @@ func TestNotReachableHTTP(host string, port int, timeout time.Duration) {
 // TestRejectedHTTP tests that the given host rejects a HTTP request on the given port.
 func TestRejectedHTTP(host string, port int, timeout time.Duration) {
 	pollfn := func() (bool, error) {
-		result := framework.PokeHTTP(host, port, "/", nil)
-		if result.Status == framework.HTTPRefused {
+		result := e2enetwork.PokeHTTP(host, port, "/", nil)
+		if result.Status == e2enetwork.HTTPRefused {
 			return true, nil
 		}
 		return false, nil // caller can retry
@@ -90,11 +92,11 @@ func TestRejectedHTTP(host string, port int, timeout time.Duration) {
 // TestReachableUDP tests that the given host serves UDP on the given port.
 func TestReachableUDP(host string, port int, timeout time.Duration) {
 	pollfn := func() (bool, error) {
-		result := framework.PokeUDP(host, port, "echo hello", &framework.UDPPokeParams{
+		result := pokeUDP(host, port, "echo hello", &UDPPokeParams{
 			Timeout:  3 * time.Second,
 			Response: "hello",
 		})
-		if result.Status == framework.UDPSuccess {
+		if result.Status == UDPSuccess {
 			return true, nil
 		}
 		return false, nil // caller can retry
@@ -108,8 +110,8 @@ func TestReachableUDP(host string, port int, timeout time.Duration) {
 // TestNotReachableUDP tests that the given host doesn't serve UDP on the given port.
 func TestNotReachableUDP(host string, port int, timeout time.Duration) {
 	pollfn := func() (bool, error) {
-		result := framework.PokeUDP(host, port, "echo hello", &framework.UDPPokeParams{Timeout: 3 * time.Second})
-		if result.Status != framework.UDPSuccess && result.Status != framework.UDPError {
+		result := pokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
+		if result.Status != UDPSuccess && result.Status != UDPError {
 			return true, nil
 		}
 		return false, nil // caller can retry
@@ -122,8 +124,8 @@ func TestNotReachableUDP(host string, port int, timeout time.Duration) {
 // TestRejectedUDP tests that the given host rejects a UDP request on the given port.
 func TestRejectedUDP(host string, port int, timeout time.Duration) {
 	pollfn := func() (bool, error) {
-		result := framework.PokeUDP(host, port, "echo hello", &framework.UDPPokeParams{Timeout: 3 * time.Second})
-		if result.Status == framework.UDPRefused {
+		result := pokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
+		if result.Status == UDPRefused {
 			return true, nil
 		}
 		return false, nil // caller can retry
@@ -200,8 +202,8 @@ func httpGetNoConnectionPoolTimeout(url string, timeout time.Duration) (*http.Re
 func GetHTTPContent(host string, port int, timeout time.Duration, url string) bytes.Buffer {
 	var body bytes.Buffer
 	if pollErr := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		result := framework.PokeHTTP(host, port, url, nil)
-		if result.Status == framework.HTTPSuccess {
+		result := e2enetwork.PokeHTTP(host, port, url, nil)
+		if result.Status == e2enetwork.HTTPSuccess {
 			body.Write(result.Body)
 			return true, nil
 		}
@@ -210,4 +212,134 @@ func GetHTTPContent(host string, port int, timeout time.Duration, url string) by
 		framework.Failf("Could not reach HTTP service through %v:%v%v after %v: %v", host, port, url, timeout, pollErr)
 	}
 	return body
+}
+
+// UDPPokeParams is a struct for UDP poke parameters.
+type UDPPokeParams struct {
+	Timeout  time.Duration
+	Response string
+}
+
+// UDPPokeResult is a struct for UDP poke result.
+type UDPPokeResult struct {
+	Status   UDPPokeStatus
+	Error    error  // if there was any error
+	Response []byte // if code != 0
+}
+
+// UDPPokeStatus is string for representing UDP poke status.
+type UDPPokeStatus string
+
+const (
+	// UDPSuccess is UDP poke status which is success.
+	UDPSuccess UDPPokeStatus = "Success"
+	// UDPError is UDP poke status which is error.
+	UDPError UDPPokeStatus = "UnknownError"
+	// UDPTimeout is UDP poke status which is timeout.
+	UDPTimeout UDPPokeStatus = "TimedOut"
+	// UDPRefused is UDP poke status which is connection refused.
+	UDPRefused UDPPokeStatus = "ConnectionRefused"
+	// UDPBadResponse is UDP poke status which is bad response.
+	UDPBadResponse UDPPokeStatus = "BadResponse"
+	// Any time we add new errors, we should audit all callers of this.
+)
+
+// pokeUDP tries to connect to a host on a port and send the given request. Callers
+// can specify additional success parameters, if desired.
+//
+// The result status will be characterized as precisely as possible, given the
+// known users of this.
+//
+// The result error will be populated for any status other than Success.
+//
+// The result response will be populated if the UDP transaction was completed, even
+// if the other test params make this a failure).
+func pokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPokeResult {
+	hostPort := net.JoinHostPort(host, strconv.Itoa(port))
+	url := fmt.Sprintf("udp://%s", hostPort)
+
+	ret := UDPPokeResult{}
+
+	// Sanity check inputs, because it has happened.  These are the only things
+	// that should hard fail the test - they are basically ASSERT()s.
+	if host == "" {
+		framework.Failf("Got empty host for UDP poke (%s)", url)
+		return ret
+	}
+	if port == 0 {
+		framework.Failf("Got port==0 for UDP poke (%s)", url)
+		return ret
+	}
+
+	// Set default params.
+	if params == nil {
+		params = &UDPPokeParams{}
+	}
+
+	framework.Logf("Poking %v", url)
+
+	con, err := net.Dial("udp", hostPort)
+	if err != nil {
+		ret.Status = UDPError
+		ret.Error = err
+		framework.Logf("Poke(%q): %v", url, err)
+		return ret
+	}
+
+	_, err = con.Write([]byte(fmt.Sprintf("%s\n", request)))
+	if err != nil {
+		ret.Error = err
+		neterr, ok := err.(net.Error)
+		if ok && neterr.Timeout() {
+			ret.Status = UDPTimeout
+		} else if strings.Contains(err.Error(), "connection refused") {
+			ret.Status = UDPRefused
+		} else {
+			ret.Status = UDPError
+		}
+		framework.Logf("Poke(%q): %v", url, err)
+		return ret
+	}
+
+	if params.Timeout != 0 {
+		err = con.SetDeadline(time.Now().Add(params.Timeout))
+		if err != nil {
+			ret.Status = UDPError
+			ret.Error = err
+			framework.Logf("Poke(%q): %v", url, err)
+			return ret
+		}
+	}
+
+	bufsize := len(params.Response) + 1
+	if bufsize == 0 {
+		bufsize = 4096
+	}
+	var buf = make([]byte, bufsize)
+	n, err := con.Read(buf)
+	if err != nil {
+		ret.Error = err
+		neterr, ok := err.(net.Error)
+		if ok && neterr.Timeout() {
+			ret.Status = UDPTimeout
+		} else if strings.Contains(err.Error(), "connection refused") {
+			ret.Status = UDPRefused
+		} else {
+			ret.Status = UDPError
+		}
+		framework.Logf("Poke(%q): %v", url, err)
+		return ret
+	}
+	ret.Response = buf[0:n]
+
+	if params.Response != "" && string(ret.Response) != params.Response {
+		ret.Status = UDPBadResponse
+		ret.Error = fmt.Errorf("response does not match expected string: %q", string(ret.Response))
+		framework.Logf("Poke(%q): %v", url, ret.Error)
+		return ret
+	}
+
+	ret.Status = UDPSuccess
+	framework.Logf("Poke(%q): success", url)
+	return ret
 }

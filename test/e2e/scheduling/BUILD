@@ -47,6 +47,7 @@ go_library(
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/providers/gce:go_default_library",
         "//test/e2e/framework/pv:go_default_library",
+        "//test/e2e/framework/rc:go_default_library",
         "//test/e2e/framework/replicaset:go_default_library",
         "//test/e2e/framework/service:go_default_library",
         "//test/utils:go_default_library",
@@ -55,6 +56,7 @@ go_library(
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 

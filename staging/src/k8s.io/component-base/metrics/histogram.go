@@ -46,10 +46,8 @@ type Histogram struct {
 // NewHistogram returns an object which is Histogram-like. However, nothing
 // will be measured until the histogram is registered somewhere.
 func NewHistogram(opts *HistogramOpts) *Histogram {
-	// todo: handle defaulting better
-	if opts.StabilityLevel == "" {
-		opts.StabilityLevel = ALPHA
-	}
+	opts.StabilityLevel.setDefaults()
+
 	h := &Histogram{
 		HistogramOpts: opts,
 		lazyMetric:    lazyMetric{},
@@ -98,10 +96,8 @@ type HistogramVec struct {
 // prometheus.HistogramVec object. However, the object returned will not measure
 // anything unless the collector is first registered, since the metric is lazily instantiated.
 func NewHistogramVec(opts *HistogramOpts, labels []string) *HistogramVec {
-	// todo: handle defaulting better
-	if opts.StabilityLevel == "" {
-		opts.StabilityLevel = ALPHA
-	}
+	opts.StabilityLevel.setDefaults()
+
 	v := &HistogramVec{
 		HistogramVec:   noopHistogramVec,
 		HistogramOpts:  opts,
@@ -150,7 +146,7 @@ func (v *HistogramVec) WithLabelValues(lvs ...string) ObserverMetric {
 // must match those of the VariableLabels in Desc). If that label map is
 // accessed for the first time, a new ObserverMetric is created IFF the HistogramVec has
 // been registered to a metrics registry.
-func (v *HistogramVec) With(labels prometheus.Labels) ObserverMetric {
+func (v *HistogramVec) With(labels map[string]string) ObserverMetric {
 	if !v.IsCreated() {
 		return noop
 	}
@@ -164,9 +160,18 @@ func (v *HistogramVec) With(labels prometheus.Labels) ObserverMetric {
 // with those of the VariableLabels in Desc. However, such inconsistent Labels
 // can never match an actual metric, so the method will always return false in
 // that case.
-func (v *HistogramVec) Delete(labels prometheus.Labels) bool {
+func (v *HistogramVec) Delete(labels map[string]string) bool {
 	if !v.IsCreated() {
 		return false // since we haven't created the metric, we haven't deleted a metric with the passed in values
 	}
 	return v.HistogramVec.Delete(labels)
+}
+
+// Reset deletes all metrics in this vector.
+func (v *HistogramVec) Reset() {
+	if !v.IsCreated() {
+		return
+	}
+
+	v.HistogramVec.Reset()
 }

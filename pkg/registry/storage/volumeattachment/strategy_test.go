@@ -114,7 +114,7 @@ func TestVolumeAttachmentStrategy(t *testing.T) {
 	Strategy.PrepareForUpdate(ctx, statusVolumeAttachment, volumeAttachment)
 
 	if !apiequality.Semantic.DeepEqual(statusVolumeAttachment, volumeAttachment) {
-		t.Errorf("unexpected objects difference after modfying status: %v", diff.ObjectDiff(statusVolumeAttachment, volumeAttachment))
+		t.Errorf("unexpected objects difference after modifying status: %v", diff.ObjectDiff(statusVolumeAttachment, volumeAttachment))
 	}
 }
 

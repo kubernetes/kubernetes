@@ -1,10 +1,10 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- piosz
+- sig-instrumentation-approvers
 - x13n
 reviewers:
-- piosz
-- x13n
+- sig-instrumentation-reviewers
 labels:
 - sig/gcp
+- sig/instrumentation

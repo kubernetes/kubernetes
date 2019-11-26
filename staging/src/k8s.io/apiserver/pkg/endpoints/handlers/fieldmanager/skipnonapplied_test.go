@@ -28,20 +28,29 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 )
 
-type fakeObjectCreater struct{}
+type fakeObjectCreater struct {
+	gvk schema.GroupVersionKind
+}
 
 var _ runtime.ObjectCreater = &fakeObjectCreater{}
 
-func (*fakeObjectCreater) New(_ schema.GroupVersionKind) (runtime.Object, error) {
-	return &unstructured.Unstructured{Object: map[string]interface{}{}}, nil
+func (f *fakeObjectCreater) New(_ schema.GroupVersionKind) (runtime.Object, error) {
+	u := unstructured.Unstructured{Object: map[string]interface{}{}}
+	u.SetAPIVersion(f.gvk.GroupVersion().String())
+	u.SetKind(f.gvk.Kind)
+	return &u, nil
 }
 
 func TestNoUpdateBeforeFirstApply(t *testing.T) {
-	f := NewTestFieldManager()
-	f.fieldManager = fieldmanager.NewSkipNonAppliedManager(f.fieldManager, &fakeObjectCreater{}, schema.GroupVersionKind{})
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
+	f.fieldManager = fieldmanager.NewSkipNonAppliedManager(
+		f.fieldManager,
+		&fakeObjectCreater{gvk: schema.GroupVersionKind{Version: "v1", Kind: "Pod"}},
+		schema.GroupVersionKind{},
+	)
 
 	if err := f.Apply([]byte(`{
-		"apiVersion": "apps/v1",
+		"apiVersion": "v1",
 		"kind": "Pod",
 		"metadata": {
 			"name": "pod",
@@ -66,12 +75,18 @@ func TestNoUpdateBeforeFirstApply(t *testing.T) {
 	}
 }
 
-func TestUpateBeforeFirstApply(t *testing.T) {
-	f := NewTestFieldManager()
-	f.fieldManager = fieldmanager.NewSkipNonAppliedManager(f.fieldManager, &fakeObjectCreater{}, schema.GroupVersionKind{})
+func TestUpdateBeforeFirstApply(t *testing.T) {
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
+	f.fieldManager = fieldmanager.NewSkipNonAppliedManager(
+		f.fieldManager,
+		&fakeObjectCreater{gvk: schema.GroupVersionKind{Version: "v1", Kind: "Pod"}},
+		schema.GroupVersionKind{},
+	)
 
 	updatedObj := &corev1.Pod{}
-	updatedObj.ObjectMeta.Labels = map[string]string{"app": "nginx"}
+	updatedObj.Kind = "Pod"
+	updatedObj.APIVersion = "v1"
+	updatedObj.ObjectMeta.Labels = map[string]string{"app": "my-nginx"}
 
 	if err := f.Update(updatedObj, "fieldmanager_test_update"); err != nil {
 		t.Fatalf("failed to update object: %v", err)
@@ -82,7 +97,7 @@ func TestUpateBeforeFirstApply(t *testing.T) {
 	}
 
 	appliedBytes := []byte(`{
-		"apiVersion": "apps/v1",
+		"apiVersion": "v1",
 		"kind": "Pod",
 		"metadata": {
 			"name": "pod",
@@ -102,7 +117,7 @@ func TestUpateBeforeFirstApply(t *testing.T) {
 		t.Fatalf("Expecting to get one conflict but got %v", err)
 	}
 
-	if e, a := ".spec.containers", apiStatus.Status().Details.Causes[0].Field; e != a {
+	if e, a := ".metadata.labels.app", apiStatus.Status().Details.Causes[0].Field; e != a {
 		t.Fatalf("Expecting to conflict on field %q but conflicted on field %q: %v", e, a, err)
 	}
 

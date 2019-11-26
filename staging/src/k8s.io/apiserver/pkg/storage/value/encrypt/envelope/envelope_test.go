@@ -94,7 +94,7 @@ func TestEnvelopeCaching(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not decrypt Envelope transformer's encrypted data even once: %v", err)
 	}
-	if bytes.Compare(untransformedData, originalText) != 0 {
+	if !bytes.Equal(untransformedData, originalText) {
 		t.Fatalf("envelopeTransformer transformed data incorrectly. Expected: %v, got %v", originalText, untransformedData)
 	}
 
@@ -104,7 +104,7 @@ func TestEnvelopeCaching(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not decrypt Envelope transformer's encrypted data using just cache: %v", err)
 	}
-	if bytes.Compare(untransformedData, originalText) != 0 {
+	if !bytes.Equal(untransformedData, originalText) {
 		t.Fatalf("envelopeTransformer transformed data incorrectly using cache. Expected: %v, got %v", originalText, untransformedData)
 	}
 }
@@ -139,7 +139,7 @@ func TestEnvelopeCacheLimit(t *testing.T) {
 			t.Fatalf("envelopeTransformer: error while transforming data (%v) from storage: %s", transformedOutputs[i], err)
 		}
 
-		if bytes.Compare(numberText, output) != 0 {
+		if !bytes.Equal(numberText, output) {
 			t.Fatalf("envelopeTransformer transformed data incorrectly using cache. Expected: %v, got %v", numberText, output)
 		}
 	}
@@ -221,7 +221,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not decrypt Envelope transformer's encrypted data even once: %v", err)
 	}
-	if bytes.Compare(untransformedData, originalText) != 0 {
+	if !bytes.Equal(untransformedData, originalText) {
 		t.Fatalf("envelopeTransformer transformed data incorrectly. Expected: %v, got %v", originalText, untransformedData)
 	}
 
@@ -231,7 +231,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not decrypt Envelope transformer's encrypted data using just cache: %v", err)
 	}
-	if bytes.Compare(untransformedData, originalText) != 0 {
+	if !bytes.Equal(untransformedData, originalText) {
 		t.Fatalf("envelopeTransformer transformed data incorrectly using cache. Expected: %v, got %v", originalText, untransformedData)
 	}
 }

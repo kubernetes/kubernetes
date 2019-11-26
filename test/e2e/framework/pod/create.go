@@ -50,11 +50,21 @@ func CreateWaitAndDeletePod(c clientset.Interface, ns string, pvc *v1.Persistent
 		}
 	}()
 
-	err = TestPodSuccessOrFail(c, ns, runPod)
+	err = testPodSuccessOrFail(c, ns, runPod)
 	if err != nil {
 		return fmt.Errorf("pod %q did not exit with Success: %v", runPod.Name, err)
 	}
 	return // note: named return value
+}
+
+// testPodSuccessOrFail tests whether the pod's exit code is zero.
+func testPodSuccessOrFail(c clientset.Interface, ns string, pod *v1.Pod) error {
+	e2elog.Logf("Pod should terminate with exitcode 0 (success)")
+	if err := WaitForPodSuccessInNamespace(c, pod.Name, ns); err != nil {
+		return fmt.Errorf("pod %q failed to reach Success: %v", pod.Name, err)
+	}
+	e2elog.Logf("Pod %v succeeded ", pod.Name)
+	return nil
 }
 
 // CreateUnschedulablePod with given claims based on node selector
@@ -85,26 +95,6 @@ func CreateClientPod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeC
 // CreatePod with given claims based on node selector
 func CreatePod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
 	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command)
-	pod, err := client.CoreV1().Pods(namespace).Create(pod)
-	if err != nil {
-		return nil, fmt.Errorf("pod Create API error: %v", err)
-	}
-	// Waiting for pod to be running
-	err = WaitForPodNameRunningInNamespace(client, pod.Name, namespace)
-	if err != nil {
-		return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
-	}
-	// get fresh pod info
-	pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
-	if err != nil {
-		return pod, fmt.Errorf("pod Get API error: %v", err)
-	}
-	return pod, nil
-}
-
-// CreateNginxPod creates an enginx pod.
-func CreateNginxPod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim) (*v1.Pod, error) {
-	pod := MakeNginxPod(namespace, nodeSelector, pvclaims)
 	pod, err := client.CoreV1().Pods(namespace).Create(pod)
 	if err != nil {
 		return nil, fmt.Errorf("pod Create API error: %v", err)
@@ -181,47 +171,6 @@ func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.Persisten
 				},
 			},
 			RestartPolicy: v1.RestartPolicyOnFailure,
-		},
-	}
-	var volumeMounts = make([]v1.VolumeMount, len(pvclaims))
-	var volumes = make([]v1.Volume, len(pvclaims))
-	for index, pvclaim := range pvclaims {
-		volumename := fmt.Sprintf("volume%v", index+1)
-		volumeMounts[index] = v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename}
-		volumes[index] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
-	}
-	podSpec.Spec.Containers[0].VolumeMounts = volumeMounts
-	podSpec.Spec.Volumes = volumes
-	if nodeSelector != nil {
-		podSpec.Spec.NodeSelector = nodeSelector
-	}
-	return podSpec
-}
-
-// MakeNginxPod returns a pod definition based on the namespace using nginx image
-func MakeNginxPod(ns string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim) *v1.Pod {
-	podSpec := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "pvc-tester-",
-			Namespace:    ns,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "write-pod",
-					Image: "nginx",
-					Ports: []v1.ContainerPort{
-						{
-							Name:          "http-server",
-							ContainerPort: 80,
-						},
-					},
-				},
-			},
 		},
 	}
 	var volumeMounts = make([]v1.VolumeMount, len(pvclaims))

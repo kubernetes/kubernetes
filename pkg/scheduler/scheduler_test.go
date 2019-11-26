@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -45,25 +46,23 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 var (
 	emptyPluginRegistry = framework.Registry{}
-	// emptyPluginConfig is an empty plugin config used in tests.
-	emptyPluginConfig []kubeschedulerconfig.PluginConfig
 	// emptyFramework is an empty framework used in tests.
 	// Note: If the test runs in goroutine, please don't use this variable to avoid a race condition.
-	emptyFramework, _ = framework.NewFramework(emptyPluginRegistry, nil, emptyPluginConfig)
+	emptyFramework, _ = framework.NewFramework(emptyPluginRegistry, nil, nil)
+	emptySnapshot     = nodeinfosnapshot.NewEmptySnapshot()
 )
 
 type fakeBinder struct {
@@ -74,25 +73,25 @@ func (fb fakeBinder) Bind(binding *v1.Binding) error { return fb.b(binding) }
 
 type fakePodConditionUpdater struct{}
 
-func (fc fakePodConditionUpdater) Update(pod *v1.Pod, podCondition *v1.PodCondition) error {
+func (fc fakePodConditionUpdater) update(pod *v1.Pod, podCondition *v1.PodCondition) error {
 	return nil
 }
 
 type fakePodPreemptor struct{}
 
-func (fp fakePodPreemptor) GetUpdatedPod(pod *v1.Pod) (*v1.Pod, error) {
+func (fp fakePodPreemptor) getUpdatedPod(pod *v1.Pod) (*v1.Pod, error) {
 	return pod, nil
 }
 
-func (fp fakePodPreemptor) DeletePod(pod *v1.Pod) error {
+func (fp fakePodPreemptor) deletePod(pod *v1.Pod) error {
 	return nil
 }
 
-func (fp fakePodPreemptor) SetNominatedNodeName(pod *v1.Pod, nomNodeName string) error {
+func (fp fakePodPreemptor) setNominatedNodeName(pod *v1.Pod, nomNodeName string) error {
 	return nil
 }
 
-func (fp fakePodPreemptor) RemoveNominatedNodeName(pod *v1.Pod) error {
+func (fp fakePodPreemptor) removeNominatedNodeName(pod *v1.Pod) error {
 	return nil
 }
 
@@ -140,12 +139,12 @@ func podWithResources(id, desiredHost string, limits v1.ResourceList, requests v
 	return pod
 }
 
-func PredicateOne(pod *v1.Pod, meta predicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
+func PredicateOne(pod *v1.Pod, meta predicates.Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
-func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	return []schedulerapi.HostPriority{}, nil
+func PriorityOne(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
+	return framework.NodeScore{}, nil
 }
 
 type mockScheduler struct {
@@ -153,7 +152,12 @@ type mockScheduler struct {
 	err    error
 }
 
-func (es mockScheduler) Schedule(pc *framework.PluginContext, pod *v1.Pod) (core.ScheduleResult, error) {
+func (es mockScheduler) PredicateMetadataProducer() predicates.MetadataProducer {
+	return nil
+
+}
+
+func (es mockScheduler) Schedule(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (core.ScheduleResult, error) {
 	return es.result, es.err
 }
 
@@ -163,8 +167,11 @@ func (es mockScheduler) Predicates() map[string]predicates.FitPredicate {
 func (es mockScheduler) Prioritizers() []priorities.PriorityConfig {
 	return nil
 }
+func (es mockScheduler) Extenders() []algorithm.SchedulerExtender {
+	return nil
+}
 
-func (es mockScheduler) Preempt(pc *framework.PluginContext, pod *v1.Pod, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
+func (es mockScheduler) Preempt(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
 	return nil, nil, nil, nil
 }
 
@@ -175,32 +182,21 @@ func TestSchedulerCreation(t *testing.T) {
 	testSource := "testProvider"
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")})
 
-	defaultBindTimeout := int64(30)
-	factory.RegisterFitPredicate("PredicateOne", PredicateOne)
-	factory.RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
-	factory.RegisterAlgorithmProvider(testSource, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
+	RegisterFitPredicate("PredicateOne", PredicateOne)
+	RegisterPriorityMapReduceFunction("PriorityOne", PriorityOne, nil, 1)
+	RegisterAlgorithmProvider(testSource, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	_, err := New(client,
-		informerFactory.Core().V1().Nodes(),
-		factory.NewPodInformer(client, 0),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Apps().V1().ReplicaSets(),
-		informerFactory.Apps().V1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		informerFactory.Storage().V1().StorageClasses(),
-		informerFactory.Storage().V1beta1().CSINodes(),
+		informerFactory,
+		NewPodInformer(client, 0),
 		eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
-		kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &testSource},
 		stopCh,
-		emptyPluginRegistry,
-		nil,
-		emptyPluginConfig,
-		WithBindTimeoutSeconds(defaultBindTimeout))
+		WithAlgorithmSource(schedulerapi.SchedulerAlgorithmSource{Provider: &testSource}),
+		WithPodInitialBackoffSeconds(1),
+		WithPodMaxBackoffSeconds(10),
+	)
 
 	if err != nil {
 		t.Fatalf("Failed to create scheduler: %v", err)
@@ -283,27 +279,27 @@ func TestScheduler(t *testing.T) {
 				},
 			}
 
-			s := NewFromConfig(&factory.Config{
+			s := &Scheduler{
 				SchedulerCache: sCache,
 				Algorithm:      item.algo,
-				GetBinder: func(pod *v1.Pod) factory.Binder {
+				GetBinder: func(pod *v1.Pod) Binder {
 					return fakeBinder{func(b *v1.Binding) error {
 						gotBinding = b
 						return item.injectBindError
 					}}
 				},
-				PodConditionUpdater: fakePodConditionUpdater{},
-				Error: func(p *v1.Pod, err error) {
-					gotPod = p
+				podConditionUpdater: fakePodConditionUpdater{},
+				Error: func(p *framework.PodInfo, err error) {
+					gotPod = p.Pod
 					gotError = err
 				},
-				NextPod: func() *v1.Pod {
-					return item.sendPod
+				NextPod: func() *framework.PodInfo {
+					return &framework.PodInfo{Pod: item.sendPod}
 				},
 				Framework:    emptyFramework,
 				Recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
 				VolumeBinder: volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
-			})
+			}
 			called := make(chan struct{})
 			stopFunc := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
 				e, _ := obj.(*v1beta1.Event)
@@ -312,7 +308,7 @@ func TestScheduler(t *testing.T) {
 				}
 				close(called)
 			})
-			s.scheduleOne()
+			s.scheduleOne(context.Background())
 			<-called
 			if e, a := item.expectAssumedPod, gotAssumedPod; !reflect.DeepEqual(e, a) {
 				t.Errorf("assumed pod: wanted %v, got %v", e, a)
@@ -349,6 +345,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 
 	waitPodExpireChan := make(chan struct{})
 	timeout := make(chan struct{})
+	errChan := make(chan error)
 	go func() {
 		for {
 			select {
@@ -358,7 +355,8 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 			}
 			pods, err := scache.List(labels.Everything())
 			if err != nil {
-				t.Fatalf("cache.List failed: %v", err)
+				errChan <- fmt.Errorf("cache.List failed: %v", err)
+				return
 			}
 			if len(pods) == 0 {
 				close(waitPodExpireChan)
@@ -369,6 +367,8 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 	}()
 	// waiting for the assumed pod to expire
 	select {
+	case err := <-errChan:
+		t.Fatal(err)
 	case <-waitPodExpireChan:
 	case <-time.After(wait.ForeverTestTimeout):
 		close(timeout)
@@ -378,7 +378,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 	// We use conflicted pod ports to incur fit predicate failure if first pod not removed.
 	secondPod := podWithPort("bar", "", 8080)
 	queuedPodStore.Add(secondPod)
-	scheduler.scheduleOne()
+	scheduler.scheduleOne(context.Background())
 	select {
 	case b := <-bindingChan:
 		expectBinding := &v1.Binding{
@@ -412,7 +412,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	// queuedPodStore: [bar:8080]
 	// cache: [(assumed)foo:8080]
 
-	scheduler.scheduleOne()
+	scheduler.scheduleOne(context.Background())
 	select {
 	case err := <-errChan:
 		expectErr := &core.FitError{
@@ -443,7 +443,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	}
 
 	queuedPodStore.Add(secondPod)
-	scheduler.scheduleOne()
+	scheduler.scheduleOne(context.Background())
 	select {
 	case b := <-bindingChan:
 		expectBinding := &v1.Binding{
@@ -503,7 +503,7 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 			informerFactory.Start(stop)
 			informerFactory.WaitForCacheSync(stop)
 
-			scheduler.Run()
+			go scheduler.Run(context.Background())
 			queuedPodStore.Add(firstPod)
 			queuedPodStore.Add(conflictPod)
 
@@ -541,7 +541,7 @@ func setupTestSchedulerWithOnePodOnNode(t *testing.T, queuedPodStore *clientcach
 	// queuedPodStore: [foo:8080]
 	// cache: []
 
-	scheduler.scheduleOne()
+	scheduler.scheduleOne(context.Background())
 	// queuedPodStore: []
 	// cache: [(assumed)foo:8080]
 
@@ -620,7 +620,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	informerFactory.WaitForCacheSync(stop)
 
 	queuedPodStore.Add(podWithTooBigResourceRequests)
-	scheduler.scheduleOne()
+	scheduler.scheduleOne(context.Background())
 	select {
 	case err := <-errChan:
 		expectErr := &core.FitError{
@@ -647,9 +647,10 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		scache,
 		internalqueue.NewSchedulingQueue(nil, nil),
 		predicateMap,
-		predicates.EmptyPredicateMetadataProducer,
+		predicates.EmptyMetadataProducer,
 		[]priorities.PriorityConfig{},
-		priorities.EmptyPriorityMetadataProducer,
+		priorities.EmptyMetadataProducer,
+		emptySnapshot,
 		emptyFramework,
 		[]algorithm.SchedulerExtender{},
 		nil,
@@ -663,47 +664,45 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 	bindingChan := make(chan *v1.Binding, 1)
 	errChan := make(chan error, 1)
 
-	config := &factory.Config{
+	sched := &Scheduler{
 		SchedulerCache: scache,
 		Algorithm:      algo,
-		GetBinder: func(pod *v1.Pod) factory.Binder {
+		GetBinder: func(pod *v1.Pod) Binder {
 			return fakeBinder{func(b *v1.Binding) error {
 				bindingChan <- b
 				return nil
 			}}
 		},
-		NextPod: func() *v1.Pod {
-			return clientcache.Pop(queuedPodStore).(*v1.Pod)
+		NextPod: func() *framework.PodInfo {
+			return &framework.PodInfo{Pod: clientcache.Pop(queuedPodStore).(*v1.Pod)}
 		},
-		Error: func(p *v1.Pod, err error) {
+		Error: func(p *framework.PodInfo, err error) {
 			errChan <- err
 		},
 		Recorder:            &events.FakeRecorder{},
-		PodConditionUpdater: fakePodConditionUpdater{},
-		PodPreemptor:        fakePodPreemptor{},
+		podConditionUpdater: fakePodConditionUpdater{},
+		podPreemptor:        fakePodPreemptor{},
 		Framework:           emptyFramework,
 		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
 	}
 
 	if recorder != nil {
-		config.Recorder = recorder
+		sched.Recorder = recorder
 	}
-
-	sched := NewFromConfig(config)
 
 	return sched, bindingChan, errChan
 }
 
 func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
-	framework, _ := framework.NewFramework(emptyPluginRegistry, nil, []kubeschedulerconfig.PluginConfig{})
 	algo := core.NewGenericScheduler(
 		scache,
 		internalqueue.NewSchedulingQueue(nil, nil),
 		predicateMap,
-		predicates.EmptyPredicateMetadataProducer,
+		predicates.EmptyMetadataProducer,
 		[]priorities.PriorityConfig{},
-		priorities.EmptyPriorityMetadataProducer,
-		framework,
+		priorities.EmptyMetadataProducer,
+		emptySnapshot,
+		emptyFramework,
 		[]algorithm.SchedulerExtender{},
 		nil,
 		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
@@ -715,32 +714,32 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 	)
 	bindingChan := make(chan *v1.Binding, 2)
 
-	sched := NewFromConfig(&factory.Config{
+	sched := &Scheduler{
 		SchedulerCache: scache,
 		Algorithm:      algo,
-		GetBinder: func(pod *v1.Pod) factory.Binder {
+		GetBinder: func(pod *v1.Pod) Binder {
 			return fakeBinder{func(b *v1.Binding) error {
 				time.Sleep(bindingTime)
 				bindingChan <- b
 				return nil
 			}}
 		},
-		WaitForCacheSync: func() bool {
+		scheduledPodsHasSynced: func() bool {
 			return true
 		},
-		NextPod: func() *v1.Pod {
-			return clientcache.Pop(queuedPodStore).(*v1.Pod)
+		NextPod: func() *framework.PodInfo {
+			return &framework.PodInfo{Pod: clientcache.Pop(queuedPodStore).(*v1.Pod)}
 		},
-		Error: func(p *v1.Pod, err error) {
+		Error: func(p *framework.PodInfo, err error) {
 			queuedPodStore.AddIfNotPresent(p)
 		},
 		Recorder:            &events.FakeRecorder{},
-		PodConditionUpdater: fakePodConditionUpdater{},
-		PodPreemptor:        fakePodPreemptor{},
+		podConditionUpdater: fakePodConditionUpdater{},
+		podPreemptor:        fakePodPreemptor{},
 		StopEverything:      stop,
-		Framework:           framework,
+		Framework:           emptyFramework,
 		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
-	})
+	}
 
 	return sched, bindingChan
 }
@@ -899,7 +898,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 				}
 				close(eventChan)
 			})
-			s.scheduleOne()
+			s.scheduleOne(context.Background())
 			// Wait for pod to succeed or fail scheduling
 			select {
 			case <-eventChan:

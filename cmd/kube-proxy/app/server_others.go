@@ -26,7 +26,7 @@ import (
 	"net"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -125,11 +125,9 @@ func newProxyServer(
 		Namespace: "",
 	}
 
-	var healthzServer *healthcheck.HealthzServer
-	var healthzUpdater healthcheck.HealthzUpdater
+	var healthzServer *healthcheck.ProxierHealthServer
 	if len(config.HealthzBindAddress) > 0 {
-		healthzServer = healthcheck.NewDefaultHealthzServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration, recorder, nodeRef)
-		healthzUpdater = healthzServer
+		healthzServer = healthcheck.NewProxierHealthServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration, recorder, nodeRef)
 	}
 
 	var proxier proxy.Provider
@@ -139,7 +137,8 @@ func newProxyServer(
 	if nodeIP.IsUnspecified() {
 		nodeIP = utilnode.GetNodeIP(client, hostname)
 		if nodeIP == nil {
-			return nil, fmt.Errorf("unable to get node IP for hostname %s", hostname)
+			klog.V(0).Infof("can't determine this node's IP, assuming 127.0.0.1; if this is incorrect, please set the --bind-address flag")
+			nodeIP = net.ParseIP("127.0.0.1")
 		}
 	}
 	if proxyMode == proxyModeIPTables {
@@ -162,7 +161,7 @@ func newProxyServer(
 			hostname,
 			nodeIP,
 			recorder,
-			healthzUpdater,
+			healthzServer,
 			config.NodePortAddresses,
 		)
 		if err != nil {

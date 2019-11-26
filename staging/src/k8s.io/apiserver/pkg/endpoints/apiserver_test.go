@@ -2675,16 +2675,25 @@ func TestGetWithOptions(t *testing.T) {
 			t.Errorf("%s: unexpected response: %#v", test.name, resp)
 			continue
 		}
-		var itemOut genericapitesting.Simple
-		body, err := extractBody(resp, &itemOut)
+
+		var itemOut runtime.Object
+		if test.rootScoped {
+			itemOut = &genericapitesting.SimpleRoot{}
+		} else {
+			itemOut = &genericapitesting.Simple{}
+		}
+		body, err := extractBody(resp, itemOut)
 		if err != nil {
 			t.Errorf("%s: %v", test.name, err)
 			continue
 		}
-
-		if itemOut.Name != simpleStorage.item.Name {
-			t.Errorf("%s: Unexpected data: %#v, expected %#v (%s)", test.name, itemOut, simpleStorage.item, string(body))
-			continue
+		if metadata, err := meta.Accessor(itemOut); err == nil {
+			if metadata.GetName() != simpleStorage.item.Name {
+				t.Errorf("%s: Unexpected data: %#v, expected %#v (%s)", test.name, itemOut, simpleStorage.item, string(body))
+				continue
+			}
+		} else {
+			t.Errorf("%s: Couldn't get name from %#v: %v", test.name, itemOut, err)
 		}
 
 		var opts *genericapitesting.SimpleGetOptions

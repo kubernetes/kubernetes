@@ -15,7 +15,7 @@
 # Build the etcd image
 #
 # Usage:
-# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.12 3.2.24 3.3.15] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.12 3.2.24 3.3.17 3.4.3] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 #
 # The image contains different etcd versions to simplify
 # upgrades. Thus be careful when removing any versions from here.
@@ -26,10 +26,10 @@
 # Except from etcd-$(version) and etcdctl-$(version) binaries, we also
 # need etcd and etcdctl binaries for backward compatibility reasons.
 # That binary will be set to the last version from $(BUNDLED_ETCD_VERSIONS).
-BUNDLED_ETCD_VERSIONS?=3.0.17 3.1.12 3.2.24 3.3.15
+BUNDLED_ETCD_VERSIONS?=3.0.17 3.1.12 3.2.24 3.3.17 3.4.3
 
 # LATEST_ETCD_VERSION identifies the most recent etcd version available.
-LATEST_ETCD_VERSION?=3.3.15
+LATEST_ETCD_VERSION?=3.4.3
 
 # REVISION provides a version number fo this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
@@ -113,11 +113,16 @@ else
 		arch_prefix="GOARM=$(GOARM)"
         endif
 
+	# use '/go/src/go.etcd.io/etcd' to build etcd 3.4 and later.
 	for version in $(BUNDLED_ETCD_VERSIONS); do \
 		etcd_release_tmp_dir=$(shell mktemp -d); \
+		etcd_build_dir="/go/src/github.com/coreos/etcd"; \
+		if [ $$(echo $$version | cut -d. -f2) -gt 3 ]; then \
+			etcd_build_dir="/go/src/go.etcd.io/etcd"; \
+		fi; \
 		docker run --interactive -v $${etcd_release_tmp_dir}:/etcdbin golang:$(GOLANG_VERSION)$(DOCKER_VOL_OPTS) /bin/bash -c \
-			"git clone https://github.com/coreos/etcd /go/src/github.com/coreos/etcd \
-			&& cd /go/src/github.com/coreos/etcd \
+			"git clone https://github.com/coreos/etcd $$etcd_build_dir \
+			&& cd $$etcd_build_dir \
 			&& git checkout v$${version} \
 			&& $(arch_prefix) GOARCH=$(ARCH) ./build \
 			&& cp -f bin/$(ARCH)/etcd* bin/etcd* /etcdbin; echo 'done'"; \

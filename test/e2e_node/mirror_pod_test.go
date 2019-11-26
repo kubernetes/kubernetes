@@ -23,17 +23,20 @@ import (
 	"path/filepath"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var _ = framework.KubeDescribe("MirrorPod", func() {
@@ -188,7 +191,7 @@ func checkMirrorPodRunning(cl clientset.Interface, name, namespace string) error
 	if pod.Status.Phase != v1.PodRunning {
 		return fmt.Errorf("expected the mirror pod %q to be running, got %q", name, pod.Status.Phase)
 	}
-	return nil
+	return validateMirrorPod(cl, pod)
 }
 
 func checkMirrorPodRecreatedAndRunning(cl clientset.Interface, name, namespace string, oUID types.UID) error {
@@ -202,5 +205,49 @@ func checkMirrorPodRecreatedAndRunning(cl clientset.Interface, name, namespace s
 	if pod.Status.Phase != v1.PodRunning {
 		return fmt.Errorf("expected the mirror pod %q to be running, got %q", name, pod.Status.Phase)
 	}
+	return validateMirrorPod(cl, pod)
+}
+
+func validateMirrorPod(cl clientset.Interface, mirrorPod *v1.Pod) error {
+	hash, ok := mirrorPod.Annotations[kubetypes.ConfigHashAnnotationKey]
+	if !ok || hash == "" {
+		return fmt.Errorf("expected mirror pod %q to have a hash annotation", mirrorPod.Name)
+	}
+	mirrorHash, ok := mirrorPod.Annotations[kubetypes.ConfigMirrorAnnotationKey]
+	if !ok || mirrorHash == "" {
+		return fmt.Errorf("expected mirror pod %q to have a mirror pod annotation", mirrorPod.Name)
+	}
+	if hash != mirrorHash {
+		return fmt.Errorf("expected mirror pod %q to have a matching mirror pod hash: got %q; expected %q", mirrorPod.Name, mirrorHash, hash)
+	}
+	source, ok := mirrorPod.Annotations[kubetypes.ConfigSourceAnnotationKey]
+	if !ok {
+		return fmt.Errorf("expected mirror pod %q to have a source annotation", mirrorPod.Name)
+	}
+	if source == kubetypes.ApiserverSource {
+		return fmt.Errorf("expected mirror pod %q source to not be 'api'; got: %q", mirrorPod.Name, source)
+	}
+
+	if len(mirrorPod.OwnerReferences) != 1 {
+		return fmt.Errorf("expected mirror pod %q to have a single owner reference: got %d", mirrorPod.Name, len(mirrorPod.OwnerReferences))
+	}
+	node, err := cl.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to fetch test node: %v", err)
+	}
+
+	controller := true
+	expectedOwnerRef := metav1.OwnerReference{
+		APIVersion: "v1",
+		Kind:       "Node",
+		Name:       framework.TestContext.NodeName,
+		UID:        node.UID,
+		Controller: &controller,
+	}
+	ref := mirrorPod.OwnerReferences[0]
+	if !apiequality.Semantic.DeepEqual(ref, expectedOwnerRef) {
+		return fmt.Errorf("unexpected mirror pod %q owner ref: %v", mirrorPod.Name, cmp.Diff(expectedOwnerRef, ref))
+	}
+
 	return nil
 }

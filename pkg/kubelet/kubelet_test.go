@@ -27,20 +27,21 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/utils/mount"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/component-base/featuregate"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -68,7 +69,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
@@ -162,7 +162,7 @@ func newTestKubeletWithImageList(
 	kubelet.kubeClient = fakeKubeClient
 	kubelet.heartbeatClient = fakeKubeClient
 	kubelet.os = &containertest.FakeOS{}
-	kubelet.mounter = &mount.FakeMounter{}
+	kubelet.mounter = mount.NewFakeMounter(nil)
 	kubelet.hostutil = hostutil.NewFakeHostUtil(nil)
 	kubelet.subpather = &subpath.FakeSubpath{}
 
@@ -181,7 +181,7 @@ func newTestKubeletWithImageList(
 	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return true })
 	kubelet.masterServiceNamespace = metav1.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
-	kubelet.nodeInfo = testNodeInfo{
+	kubelet.nodeLister = testNodeLister{
 		nodes: []*v1.Node{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -236,6 +236,7 @@ func newTestKubeletWithImageList(
 
 	kubelet.probeManager = probetest.FakeManager{}
 	kubelet.livenessManager = proberesults.NewManager()
+	kubelet.startupManager = proberesults.NewManager()
 
 	kubelet.containerManager = cm.NewStubContainerManager()
 	fakeNodeRef := &v1.ObjectReference{
@@ -332,7 +333,6 @@ func newTestKubeletWithImageList(
 
 	kubelet.pluginManager = pluginmanager.NewPluginManager(
 		kubelet.getPluginsRegistrationDir(), /* sockDir */
-		kubelet.getPluginsDir(),             /* deprecatedSockDir */
 		kubelet.recorder,
 	)
 	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
@@ -429,17 +429,25 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	fakeRuntime.AssertKilledPods([]string{"12345678"})
 }
 
-type testNodeInfo struct {
+type testNodeLister struct {
 	nodes []*v1.Node
 }
 
-func (ls testNodeInfo) GetNodeInfo(id string) (*v1.Node, error) {
-	for _, node := range ls.nodes {
-		if node.Name == id {
+func (nl testNodeLister) Get(name string) (*v1.Node, error) {
+	for _, node := range nl.nodes {
+		if node.Name == name {
 			return node, nil
 		}
 	}
-	return nil, fmt.Errorf("Node with name: %s does not exist", id)
+	return nil, fmt.Errorf("Node with name: %s does not exist", name)
+}
+
+func (nl testNodeLister) List(_ labels.Selector) (ret []*v1.Node, err error) {
+	return nl.nodes, nil
+}
+
+func (nl testNodeLister) ListWithPredicate(_ corelisters.NodeConditionPredicate) ([]*v1.Node, error) {
+	return nl.nodes, nil
 }
 
 func checkPodStatus(t *testing.T, kl *Kubelet, pod *v1.Pod, phase v1.PodPhase) {
@@ -454,7 +462,7 @@ func TestHandlePortConflicts(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 
-	kl.nodeInfo = testNodeInfo{nodes: []*v1.Node{
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
@@ -500,7 +508,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 
-	kl.nodeInfo = testNodeInfo{nodes: []*v1.Node{
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "127.0.0.1"},
 			Status: v1.NodeStatus{
@@ -552,7 +560,7 @@ func TestHandleNodeSelector(t *testing.T) {
 			},
 		},
 	}
-	kl.nodeInfo = testNodeInfo{nodes: nodes}
+	kl.nodeLister = testNodeLister{nodes: nodes}
 
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
@@ -592,7 +600,7 @@ func TestHandleMemExceeded(t *testing.T) {
 				v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
 			}}},
 	}
-	kl.nodeInfo = testNodeInfo{nodes: nodes}
+	kl.nodeLister = testNodeLister{nodes: nodes}
 
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
@@ -653,7 +661,7 @@ func TestHandlePluginResources(t *testing.T) {
 				v1.ResourcePods:  allowedPodQuantity,
 			}}},
 	}
-	kl.nodeInfo = testNodeInfo{nodes: nodes}
+	kl.nodeLister = testNodeLister{nodes: nodes}
 
 	updatePluginResourcesFunc := func(node *schedulernodeinfo.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 		// Maps from resourceName to the value we use to set node.allocatableResource[resourceName].
@@ -1804,7 +1812,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
-	kl.nodeInfo = testNodeInfo{nodes: []*v1.Node{
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
 			Status: v1.NodeStatus{
@@ -2029,17 +2037,6 @@ func runVolumeManager(kubelet *Kubelet) chan struct{} {
 	stopCh := make(chan struct{})
 	go kubelet.volumeManager.Run(kubelet.sourcesReady, stopCh)
 	return stopCh
-}
-
-func forEachFeatureGate(t *testing.T, fs []featuregate.Feature, tf func(t *testing.T)) {
-	for _, fg := range fs {
-		for _, f := range []bool{true, false} {
-			func() {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, f)()
-				t.Run(fmt.Sprintf("%v(%t)", fg, f), tf)
-			}()
-		}
-	}
 }
 
 // Sort pods by UID.

@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -518,6 +519,10 @@ func (fopg *fakeOperationGenerator) GenerateUnmapDeviceFunc(deviceToDetach Attac
 
 func (fopg *fakeOperationGenerator) GetVolumePluginMgr() *volume.VolumePluginMgr {
 	return nil
+}
+
+func (fopg *fakeOperationGenerator) GetCSITranslator() InTreeToCSITranslator {
+	return csitrans.New()
 }
 
 func getTestPodWithSecret(podName, secretName string) *v1.Pod {

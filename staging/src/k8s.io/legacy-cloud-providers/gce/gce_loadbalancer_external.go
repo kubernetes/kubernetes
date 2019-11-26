@@ -876,7 +876,7 @@ func (g *Cloud) ensureHTTPHealthCheckFirewall(svc *v1.Service, serviceName, ipAd
 	if !isNodesHealthCheck {
 		desc = makeFirewallDescription(serviceName, ipAddress)
 	}
-	sourceRanges := lbSrcRngsFlag.ipn
+	sourceRanges := l4LbSrcRngsFlag.ipn
 	ports := []v1.ServicePort{{Protocol: "tcp", Port: hcPort}}
 
 	fwName := MakeHealthCheckFirewallName(clusterID, hcName, isNodesHealthCheck)

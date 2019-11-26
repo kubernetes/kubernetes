@@ -21,6 +21,7 @@ limitations under the License.
 package app
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -29,19 +30,24 @@ import (
 
 	"k8s.io/klog"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
+	storagev1informer "k8s.io/client-go/informers/storage/v1"
+	storagev1beta1informer "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
+	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/controller"
 	cloudcontroller "k8s.io/kubernetes/pkg/controller/cloud"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
 	nodeipamcontroller "k8s.io/kubernetes/pkg/controller/nodeipam"
+	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	lifecyclecontroller "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/controller/podgc"
@@ -61,8 +67,15 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/generic"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
-	"k8s.io/kubernetes/pkg/util/metrics"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 	netutils "k8s.io/utils/net"
+)
+
+const (
+	// defaultNodeMaskCIDRIPv4 is default mask size for IPv4 node cidr
+	defaultNodeMaskCIDRIPv4 = 24
+	// defaultNodeMaskCIDRIPv6 is default mask size for IPv6 node cidr
+	defaultNodeMaskCIDRIPv6 = 64
 )
 
 func startServiceController(ctx ControllerContext) (http.Handler, bool, error) {
@@ -81,6 +94,7 @@ func startServiceController(ctx ControllerContext) (http.Handler, bool, error) {
 	go serviceController.Run(ctx.Stop, int(ctx.ComponentConfig.ServiceController.ConcurrentServiceSyncs))
 	return nil, true, nil
 }
+
 func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) {
 	var serviceCIDR *net.IPNet
 	var secondaryServiceCIDR *net.IPNet
@@ -143,6 +157,24 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 		}
 	}
 
+	var nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6 int
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack) {
+		// only --node-cidr-mask-size-ipv4 and --node-cidr-mask-size-ipv6 supported with dual stack clusters.
+		// --node-cidr-mask-size flag is incompatible with dual stack clusters.
+		nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6, err = setNodeCIDRMaskSizesDualStack(ctx.ComponentConfig.NodeIPAMController)
+	} else {
+		// only --node-cidr-mask-size supported with single stack clusters.
+		// --node-cidr-mask-size-ipv4 and --node-cidr-mask-size-ipv6 flags are incompatible with dual stack clusters.
+		nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6, err = setNodeCIDRMaskSizes(ctx.ComponentConfig.NodeIPAMController)
+	}
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	// get list of node cidr mask sizes
+	nodeCIDRMaskSizes := getNodeCIDRMaskSizes(clusterCIDRs, nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6)
+
 	nodeIpamController, err := nodeipamcontroller.NewNodeIpamController(
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.Cloud,
@@ -150,7 +182,7 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 		clusterCIDRs,
 		serviceCIDR,
 		secondaryServiceCIDR,
-		int(ctx.ComponentConfig.NodeIPAMController.NodeCIDRMaskSize),
+		nodeCIDRMaskSizes,
 		ipam.CIDRAllocatorType(ctx.ComponentConfig.KubeCloudShared.CIDRAllocatorType),
 	)
 	if err != nil {
@@ -162,7 +194,7 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 
 func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, error) {
 	lifecycleController, err := lifecyclecontroller.NewNodeLifecycleController(
-		ctx.InformerFactory.Coordination().V1beta1().Leases(),
+		ctx.InformerFactory.Coordination().V1().Leases(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.InformerFactory.Apps().V1().DaemonSets(),
@@ -178,7 +210,6 @@ func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, er
 		ctx.ComponentConfig.NodeLifecycleController.UnhealthyZoneThreshold,
 		ctx.ComponentConfig.NodeLifecycleController.EnableTaintManager,
 		utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions),
-		utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition),
 	)
 	if err != nil {
 		return nil, true, err
@@ -252,10 +283,14 @@ func startRouteController(ctx ControllerContext) (http.Handler, bool, error) {
 }
 
 func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler, bool, error) {
+	plugins, err := ProbeControllerVolumePlugins(ctx.Cloud, ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to probe volume plugins when starting persistentvolume controller: %v", err)
+	}
 	params := persistentvolumecontroller.ControllerParameters{
 		KubeClient:                ctx.ClientBuilder.ClientOrDie("persistent-volume-binder"),
 		SyncPeriod:                ctx.ComponentConfig.PersistentVolumeBinderController.PVClaimBinderSyncPeriod.Duration,
-		VolumePlugins:             ProbeControllerVolumePlugins(ctx.Cloud, ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
+		VolumePlugins:             plugins,
 		Cloud:                     ctx.Cloud,
 		ClusterName:               ctx.ComponentConfig.KubeCloudShared.ClusterName,
 		VolumeInformer:            ctx.InformerFactory.Core().V1().PersistentVolumes(),
@@ -278,6 +313,22 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 		return nil, true, fmt.Errorf("duration time must be greater than one second as set via command line option reconcile-sync-loop-period")
 	}
 
+	var (
+		csiNodeInformer   storagev1informer.CSINodeInformer
+		csiDriverInformer storagev1beta1informer.CSIDriverInformer
+	)
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		csiNodeInformer = ctx.InformerFactory.Storage().V1().CSINodes()
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+		csiDriverInformer = ctx.InformerFactory.Storage().V1beta1().CSIDrivers()
+	}
+
+	plugins, err := ProbeAttachableVolumePlugins()
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to probe volume plugins when starting attach/detach controller: %v", err)
+	}
+
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
 			ctx.ClientBuilder.ClientOrDie("attachdetach-controller"),
@@ -285,10 +336,10 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 			ctx.InformerFactory.Core().V1().Nodes(),
 			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 			ctx.InformerFactory.Core().V1().PersistentVolumes(),
-			ctx.InformerFactory.Storage().V1beta1().CSINodes(),
-			ctx.InformerFactory.Storage().V1beta1().CSIDrivers(),
+			csiNodeInformer,
+			csiDriverInformer,
 			ctx.Cloud,
-			ProbeAttachableVolumePlugins(),
+			plugins,
 			GetDynamicPluginProber(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
 			ctx.ComponentConfig.AttachDetachController.DisableAttachDetachReconcilerSync,
 			ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
@@ -303,16 +354,23 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 
 func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, error) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+		plugins, err := ProbeExpandableVolumePlugins(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
+		if err != nil {
+			return nil, true, fmt.Errorf("failed to probe volume plugins when starting volume expand controller: %v", err)
+		}
+		csiTranslator := csitrans.New()
 		expandController, expandControllerErr := expand.NewExpandController(
 			ctx.ClientBuilder.ClientOrDie("expand-controller"),
 			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 			ctx.InformerFactory.Core().V1().PersistentVolumes(),
 			ctx.InformerFactory.Storage().V1().StorageClasses(),
 			ctx.Cloud,
-			ProbeExpandableVolumePlugins(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration))
+			plugins,
+			csiTranslator,
+			csimigration.NewPluginManager(csiTranslator))
 
 		if expandControllerErr != nil {
-			return nil, true, fmt.Errorf("failed to start volume expand controller : %v", expandControllerErr)
+			return nil, true, fmt.Errorf("failed to start volume expand controller: %v", expandControllerErr)
 		}
 		go expandController.Run(ctx.Stop)
 		return nil, true, nil
@@ -345,6 +403,7 @@ func startPodGCController(ctx ControllerContext) (http.Handler, bool, error) {
 	go podgc.NewPodGC(
 		ctx.ClientBuilder.ClientOrDie("pod-garbage-collector"),
 		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.InformerFactory.Core().V1().Nodes(),
 		int(ctx.ComponentConfig.PodGCController.TerminatedPodGCThreshold),
 	).Run(ctx.Stop)
 	return nil, true, nil
@@ -368,7 +427,7 @@ func startResourceQuotaController(ctx ControllerContext) (http.Handler, bool, er
 		Registry:                  generic.NewRegistry(quotaConfiguration.Evaluators()),
 	}
 	if resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
 			return nil, true, err
 		}
 	}
@@ -530,4 +589,52 @@ func processCIDRs(cidrsList string) ([]*net.IPNet, bool, error) {
 	dualstack, _ := netutils.IsDualStackCIDRs(cidrs)
 
 	return cidrs, dualstack, nil
+}
+
+// setNodeCIDRMaskSizes returns the IPv4 and IPv6 node cidr mask sizes.
+// If --node-cidr-mask-size not set, then it will return default IPv4 and IPv6 cidr mask sizes.
+func setNodeCIDRMaskSizes(cfg nodeipamconfig.NodeIPAMControllerConfiguration) (int, int, error) {
+	ipv4Mask, ipv6Mask := defaultNodeMaskCIDRIPv4, defaultNodeMaskCIDRIPv6
+	// NodeCIDRMaskSizeIPv4 and NodeCIDRMaskSizeIPv6 can be used only for dual-stack clusters
+	if cfg.NodeCIDRMaskSizeIPv4 != 0 || cfg.NodeCIDRMaskSizeIPv6 != 0 {
+		return ipv4Mask, ipv6Mask, errors.New("usage of --node-cidr-mask-size-ipv4 and --node-cidr-mask-size-ipv6 are not allowed with non dual-stack clusters")
+	}
+	if cfg.NodeCIDRMaskSize != 0 {
+		ipv4Mask = int(cfg.NodeCIDRMaskSize)
+		ipv6Mask = int(cfg.NodeCIDRMaskSize)
+	}
+	return ipv4Mask, ipv6Mask, nil
+}
+
+// setNodeCIDRMaskSizesDualStack returns the IPv4 and IPv6 node cidr mask sizes to the value provided
+// for --node-cidr-mask-size-ipv4 and --node-cidr-mask-size-ipv6 respectively. If value not provided,
+// then it will return default IPv4 and IPv6 cidr mask sizes.
+func setNodeCIDRMaskSizesDualStack(cfg nodeipamconfig.NodeIPAMControllerConfiguration) (int, int, error) {
+	ipv4Mask, ipv6Mask := defaultNodeMaskCIDRIPv4, defaultNodeMaskCIDRIPv6
+	// NodeCIDRMaskSize can be used only for single stack clusters
+	if cfg.NodeCIDRMaskSize != 0 {
+		return ipv4Mask, ipv6Mask, errors.New("usage of --node-cidr-mask-size is not allowed with dual-stack clusters")
+	}
+	if cfg.NodeCIDRMaskSizeIPv4 != 0 {
+		ipv4Mask = int(cfg.NodeCIDRMaskSizeIPv4)
+	}
+	if cfg.NodeCIDRMaskSizeIPv6 != 0 {
+		ipv6Mask = int(cfg.NodeCIDRMaskSizeIPv6)
+	}
+	return ipv4Mask, ipv6Mask, nil
+}
+
+// getNodeCIDRMaskSizes is a helper function that helps the generate the node cidr mask
+// sizes slice based on the cluster cidr slice
+func getNodeCIDRMaskSizes(clusterCIDRs []*net.IPNet, maskSizeIPv4, maskSizeIPv6 int) []int {
+	nodeMaskCIDRs := make([]int, len(clusterCIDRs))
+
+	for idx, clusterCIDR := range clusterCIDRs {
+		if netutils.IsIPv6CIDR(clusterCIDR) {
+			nodeMaskCIDRs[idx] = maskSizeIPv6
+		} else {
+			nodeMaskCIDRs[idx] = maskSizeIPv4
+		}
+	}
+	return nodeMaskCIDRs
 }

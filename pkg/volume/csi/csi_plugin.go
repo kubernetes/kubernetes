@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"sort"
 	"strings"
 	"time"
 
@@ -60,8 +59,6 @@ const (
 	CsiResyncPeriod = time.Minute
 )
 
-var deprecatedSocketDirVersions = []string{"0.1.0", "0.2.0", "0.3.0", "0.4.0"}
-
 type csiPlugin struct {
 	host            volume.VolumeHost
 	blockEnabled    bool
@@ -97,21 +94,15 @@ var PluginHandler = &RegistrationHandler{}
 
 // ValidatePlugin is called by kubelet's plugin watcher upon detection
 // of a new registration socket opened by CSI Driver registrar side car.
-func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string, versions []string, foundInDeprecatedDir bool) error {
-	klog.Infof(log("Trying to validate a new CSI Driver with name: %s endpoint: %s versions: %s, foundInDeprecatedDir: %v",
-		pluginName, endpoint, strings.Join(versions, ","), foundInDeprecatedDir))
-
-	if foundInDeprecatedDir {
-		// CSI 0.x drivers used /var/lib/kubelet/plugins as the socket dir.
-		// This was deprecated as the socket dir for kubelet drivers, in lieu of a dedicated dir /var/lib/kubelet/plugins_registry
-		// The deprecated dir will only be allowed for a whitelisted set of old versions.
-		// CSI 1.x drivers should use the /var/lib/kubelet/plugins_registry
-		if !isDeprecatedSocketDirAllowed(versions) {
-			return errors.New(log("socket for CSI driver %q versions %v was found in a deprecated dir. Drivers implementing CSI 1.x+ must use the new dir", pluginName, versions))
-		}
-	}
+func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
+	klog.Infof(log("Trying to validate a new CSI Driver with name: %s endpoint: %s versions: %s",
+		pluginName, endpoint, strings.Join(versions, ",")))
 
 	_, err := h.validateVersions("ValidatePlugin", pluginName, endpoint, versions)
+	if err != nil {
+		return fmt.Errorf("validation failed for CSI Driver %s at endpoint %s: %v", pluginName, endpoint, err)
+	}
+
 	return err
 }
 
@@ -321,10 +312,6 @@ func (p *csiPlugin) CanSupport(spec *volume.Spec) bool {
 	}
 
 	return spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil
-}
-
-func (p *csiPlugin) IsMigratedToCSI() bool {
-	return false
 }
 
 func (p *csiPlugin) RequiresRemount() bool {
@@ -745,7 +732,9 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 
 	kletHost, ok := p.host.(volume.KubeletVolumeHost)
 	if ok {
-		kletHost.WaitForCacheSync()
+		if err := kletHost.WaitForCacheSync(); err != nil {
+			return false, err
+		}
 	}
 
 	if p.csiDriverLister == nil {
@@ -784,7 +773,9 @@ func (p *csiPlugin) supportsVolumeLifecycleMode(driver string, volumeMode storag
 	if p.csiDriverLister != nil {
 		kletHost, ok := p.host.(volume.KubeletVolumeHost)
 		if ok {
-			kletHost.WaitForCacheSync()
+			if err := kletHost.WaitForCacheSync(); err != nil {
+				return err
+			}
 		}
 
 		c, err := p.csiDriverLister.Get(driver)
@@ -892,46 +883,36 @@ func highestSupportedVersion(versions []string) (*utilversion.Version, error) {
 		return nil, errors.New(log("CSI driver reporting empty array for supported versions"))
 	}
 
-	// Sort by lowest to highest version
-	sort.Slice(versions, func(i, j int) bool {
-		parsedVersionI, err := utilversion.ParseGeneric(versions[i])
-		if err != nil {
-			// Push bad values to the bottom
-			return true
-		}
-
-		parsedVersionJ, err := utilversion.ParseGeneric(versions[j])
-		if err != nil {
-			// Push bad values to the bottom
-			return false
-		}
-
-		return parsedVersionI.LessThan(parsedVersionJ)
-	})
-
+	var highestSupportedVersion *utilversion.Version
+	var theErr error
 	for i := len(versions) - 1; i >= 0; i-- {
-		highestSupportedVersion, err := utilversion.ParseGeneric(versions[i])
+		currentHighestVer, err := utilversion.ParseGeneric(versions[i])
 		if err != nil {
-			return nil, err
+			theErr = err
+			continue
 		}
-
-		if highestSupportedVersion.Major() <= 1 {
-			return highestSupportedVersion, nil
+		if currentHighestVer.Major() > 1 {
+			// CSI currently only has version 0.x and 1.x (see https://github.com/container-storage-interface/spec/releases).
+			// Therefore any driver claiming version 2.x+ is ignored as an unsupported versions.
+			// Future 1.x versions of CSI are supposed to be backwards compatible so this version of Kubernetes will work with any 1.x driver
+			// (or 0.x), but it may not work with 2.x drivers (because 2.x does not have to be backwards compatible with 1.x).
+			continue
 		}
-	}
-
-	return nil, errors.New(log("None of the CSI versions reported by this driver are supported"))
-}
-
-// Only drivers that implement CSI 0.x are allowed to use deprecated socket dir.
-func isDeprecatedSocketDirAllowed(versions []string) bool {
-	for _, version := range versions {
-		if isV0Version(version) {
-			return true
+		if highestSupportedVersion == nil || highestSupportedVersion.LessThan(currentHighestVer) {
+			highestSupportedVersion = currentHighestVer
 		}
 	}
 
-	return false
+	if highestSupportedVersion == nil {
+		return nil, fmt.Errorf("could not find a highest supported version from versions (%v) reported by this driver: %v", versions, theErr)
+	}
+
+	if highestSupportedVersion.Major() != 1 {
+		// CSI v0.x is no longer supported as of Kubernetes v1.17 in
+		// accordance with deprecation policy set out in Kubernetes v1.13
+		return nil, fmt.Errorf("highest supported version reported by driver is %v, must be v1.x", highestSupportedVersion)
+	}
+	return highestSupportedVersion, nil
 }
 
 func isV0Version(version string) bool {

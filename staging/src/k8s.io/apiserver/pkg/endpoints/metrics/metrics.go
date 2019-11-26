@@ -28,7 +28,6 @@ import (
 	"time"
 
 	restful "github.com/emicklei/go-restful"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/types"
@@ -77,9 +76,10 @@ var (
 	)
 	deprecatedRequestCounter = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_request_count",
-			Help:           "(Deprecated) Counter of apiserver requests broken out for each verb, group, version, resource, scope, component, client, and HTTP response contentType and code.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Name:              "apiserver_request_count",
+			Help:              "Counter of apiserver requests broken out for each verb, group, version, resource, scope, component, client, and HTTP response contentType and code.",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component", "client", "contentType", "code"},
 	)
@@ -107,21 +107,23 @@ var (
 	deprecatedRequestLatencies = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Name: "apiserver_request_latencies",
-			Help: "(Deprecated) Response latency distribution in microseconds for each verb, group, version, resource, subresource, scope and component.",
+			Help: "Response latency distribution in microseconds for each verb, group, version, resource, subresource, scope and component.",
 			// Use buckets ranging from 125 ms to 8 seconds.
-			Buckets:        prometheus.ExponentialBuckets(125000, 2.0, 7),
-			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:           compbasemetrics.ExponentialBuckets(125000, 2.0, 7),
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
 	deprecatedRequestLatenciesSummary = compbasemetrics.NewSummaryVec(
 		&compbasemetrics.SummaryOpts{
 			Name: "apiserver_request_latencies_summary",
-			Help: "(Deprecated) Response latency summary in microseconds for each verb, group, version, resource, subresource, scope and component.",
+			Help: "Response latency summary in microseconds for each verb, group, version, resource, subresource, scope and component.",
 			// Make the sliding window of 5h.
 			// TODO: The value for this should be based on our SLI definition (medium term).
-			MaxAge:         5 * time.Hour,
-			StabilityLevel: compbasemetrics.ALPHA,
+			MaxAge:            5 * time.Hour,
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
@@ -130,7 +132,7 @@ var (
 			Name: "apiserver_response_sizes",
 			Help: "Response size distribution in bytes for each group, version, verb, resource, subresource, scope and component.",
 			// Use buckets ranging from 1000 bytes (1KB) to 10^9 bytes (1GB).
-			Buckets:        prometheus.ExponentialBuckets(1000, 10.0, 7),
+			Buckets:        compbasemetrics.ExponentialBuckets(1000, 10.0, 7),
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
@@ -146,9 +148,10 @@ var (
 	)
 	DeprecatedDroppedRequests = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_dropped_requests",
-			Help:           "(Deprecated) Number of requests dropped with 'Try again later' response",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Name:              "apiserver_dropped_requests",
+			Help:              "Number of requests dropped with 'Try again later' response",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 		[]string{"requestKind"},
 	)
@@ -173,12 +176,12 @@ var (
 		&compbasemetrics.HistogramOpts{
 			Name:           "apiserver_watch_events_sizes",
 			Help:           "Watch event size distribution in bytes",
-			Buckets:        prometheus.ExponentialBuckets(1024, 2.0, 8), // 1K, 2K, 4K, 8K, ..., 128K.
+			Buckets:        compbasemetrics.ExponentialBuckets(1024, 2.0, 8), // 1K, 2K, 4K, 8K, ..., 128K.
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"group", "version", "kind"},
 	)
-	// Because of volatality of the base metric this is pre-aggregated one. Instead of reporing current usage all the time
+	// Because of volatility of the base metric this is pre-aggregated one. Instead of reporting current usage all the time
 	// it reports maximal usage during the last second.
 	currentInflightRequests = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
@@ -187,6 +190,15 @@ var (
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"requestKind"},
+	)
+
+	requestTerminationsTotal = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_request_terminations_total",
+			Help:           "Number of requests which apiserver terminated in self-defense.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component", "code"},
 	)
 	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
 
@@ -204,6 +216,7 @@ var (
 		WatchEvents,
 		WatchEventsSizes,
 		currentInflightRequests,
+		requestTerminationsTotal,
 	}
 )
 
@@ -237,10 +250,11 @@ func UpdateInflightRequestMetrics(nonmutating, mutating int) {
 	currentInflightRequests.WithLabelValues(MutatingKind).Set(float64(mutating))
 }
 
-// Record records a single request to the standard metrics endpoints. For use by handlers that perform their own
-// processing. All API paths should use InstrumentRouteFunc implicitly. Use this instead of MonitorRequest if
-// you already have a RequestInfo object.
-func Record(req *http.Request, requestInfo *request.RequestInfo, component, contentType string, code int, responseSizeInBytes int, elapsed time.Duration) {
+// RecordRequestTermination records that the request was terminated early as part of a resource
+// preservation or apiserver self-defense mechanism (e.g. timeouts, maxinflight throttling,
+// proxyHandler errors). RecordRequestTermination should only be called zero or one times
+// per request.
+func RecordRequestTermination(req *http.Request, requestInfo *request.RequestInfo, component string, code int) {
 	if requestInfo == nil {
 		requestInfo = &request.RequestInfo{Verb: req.Method, Path: req.URL.Path}
 	}
@@ -252,9 +266,9 @@ func Record(req *http.Request, requestInfo *request.RequestInfo, component, cont
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
 	verb := canonicalVerb(strings.ToUpper(req.Method), scope)
 	if requestInfo.IsResourceRequest {
-		MonitorRequest(req, verb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, contentType, code, responseSizeInBytes, elapsed)
+		requestTerminationsTotal.WithLabelValues(cleanVerb(verb, req), requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
 	} else {
-		MonitorRequest(req, verb, "", "", "", requestInfo.Path, scope, component, contentType, code, responseSizeInBytes, elapsed)
+		requestTerminationsTotal.WithLabelValues(cleanVerb(verb, req), "", "", "", requestInfo.Path, scope, component, codeToString(code)).Inc()
 	}
 }
 

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -28,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -782,7 +784,7 @@ func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
 				},
 			}
 			endpoints.serviceStore.Add(service)
-			endpoints.enqueueService(service)
+			endpoints.onServiceUpdate(service)
 			endpoints.podsSynced = test.podsSynced
 			endpoints.servicesSynced = test.servicesSynced
 			endpoints.endpointsSynced = test.endpointsSynced
@@ -825,14 +827,16 @@ func TestSyncEndpointsHeadlessService(t *testing.T) {
 		}},
 	})
 	addPods(endpoints.podStore, ns, 1, 1, 0, false)
-	endpoints.serviceStore.Add(&v1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns, Labels: map[string]string{"a": "b"}},
 		Spec: v1.ServiceSpec{
 			Selector:  map[string]string{},
 			ClusterIP: api.ClusterIPNone,
 			Ports:     []v1.ServicePort{},
 		},
-	})
+	}
+	originalService := service.DeepCopy()
+	endpoints.serviceStore.Add(service)
 	endpoints.syncService(ns + "/foo")
 	data := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -840,6 +844,7 @@ func TestSyncEndpointsHeadlessService(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				"a":                  "b",
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -848,6 +853,9 @@ func TestSyncEndpointsHeadlessService(t *testing.T) {
 			Ports:     []v1.EndpointPort{},
 		}},
 	})
+	if !reflect.DeepEqual(originalService, service) {
+		t.Fatalf("syncing endpoints changed service: %s", diff.ObjectReflectDiff(service, originalService))
+	}
 	endpointsHandler.ValidateRequestCount(t, 1)
 	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }

@@ -26,8 +26,8 @@
         "k8s.io/api/batch/v1beta1",
         "k8s.io/api/certificates/v1beta1",
         "k8s.io/api/core/v1",
-        "k8s.io/api/coordination/v1beta1",
-        "k8s.io/api/discovery/v1alpha1",
+        "k8s.io/api/coordination/v1",
+        "k8s.io/api/discovery/v1beta1",
         "k8s.io/api/extensions/v1beta1",
         "k8s.io/api/policy/v1beta1",
         "k8s.io/api/rbac/v1",
@@ -118,6 +118,7 @@
     {
       "SelectorRegexp": "k8s[.]io/client-go/",
       "AllowedPrefixes": [
+	"k8s.io/client-go/util/keyutil",
         "k8s.io/client-go/discovery",
         "k8s.io/client-go/dynamic",
         "k8s.io/client-go/informers",
@@ -146,9 +147,11 @@
         "k8s.io/client-go/listers/autoscaling/v1",
         "k8s.io/client-go/listers/batch/v1",
         "k8s.io/client-go/listers/certificates/v1beta1",
+        "k8s.io/client-go/listers/coordination/v1",
         "k8s.io/client-go/listers/core/v1",
         "k8s.io/client-go/listers/discovery/v1alpha1",
-        "k8s.io/client-go/listers/coordination/v1beta1",
+        "k8s.io/client-go/listers/discovery/v1beta1",
+        "k8s.io/client-go/listers/coordination/v1",
         "k8s.io/client-go/listers/extensions/v1beta1",
         "k8s.io/client-go/listers/policy/v1beta1",
         "k8s.io/client-go/listers/rbac/v1",
@@ -164,12 +167,12 @@
         "k8s.io/client-go/tools/record",
         "k8s.io/client-go/tools/reference",
         "k8s.io/client-go/tools/watch",
+        "k8s.io/client-go/transport",
         "k8s.io/client-go/util/cert",
         "k8s.io/client-go/util/flowcontrol",
         "k8s.io/client-go/util/retry",
-        "k8s.io/client-go/util/workqueue",
         "k8s.io/client-go/util/testing",
-        "k8s.io/client-go/transport"
+        "k8s.io/client-go/util/workqueue"
       ]
     },
     {
@@ -244,8 +247,6 @@
         "k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff",
         "k8s.io/kubernetes/pkg/util/hash",
         "k8s.io/kubernetes/pkg/util/labels",
-        "k8s.io/kubernetes/pkg/util/metrics",
-        "k8s.io/kubernetes/pkg/util/mount",
         "k8s.io/kubernetes/pkg/util/node",
         "k8s.io/kubernetes/pkg/util/slice",
         "k8s.io/kubernetes/pkg/util/taints",
@@ -262,6 +263,7 @@
         "k8s.io/kubernetes/pkg/master/ports",
         "k8s.io/kubernetes/pkg/scheduler/api",
         "k8s.io/kubernetes/pkg/scheduler/util",
+        "k8s.io/kubernetes/pkg/scheduler/listers",
         "k8s.io/kubernetes/pkg/security/apparmor",
         "k8s.io/kubernetes/pkg/util/parsers",
         "k8s.io/kubernetes/pkg/fieldpath",
@@ -284,14 +286,15 @@
         "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1",
         "k8s.io/metrics/pkg/client/custom_metrics",
         "k8s.io/metrics/pkg/client/external_metrics",
-        "k8s.io/utils/nsenter",
+        "k8s.io/utils/exec",
         "k8s.io/utils/integer",
         "k8s.io/utils/io",
+        "k8s.io/utils/mount",
+        "k8s.io/utils/net",
+        "k8s.io/utils/nsenter",
         "k8s.io/utils/path",
         "k8s.io/utils/pointer",
-        "k8s.io/utils/exec",
-        "k8s.io/utils/strings",
-        "k8s.io/utils/net"
+        "k8s.io/utils/strings"
       ]
     },
     {

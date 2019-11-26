@@ -28,12 +28,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	netlinktest "k8s.io/kubernetes/pkg/proxy/ipvs/testing"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
@@ -59,18 +60,6 @@ func (f *fakeIPGetter) NodeIPs() ([]net.IP, error) {
 	return f.nodeIPs, nil
 }
 
-type fakeHealthChecker struct {
-	services  map[types.NamespacedName]uint16
-	Endpoints map[types.NamespacedName]int
-}
-
-func newFakeHealthChecker() *fakeHealthChecker {
-	return &fakeHealthChecker{
-		services:  map[types.NamespacedName]uint16{},
-		Endpoints: map[types.NamespacedName]int{},
-	}
-}
-
 // fakePortOpener implements portOpener.
 type fakePortOpener struct {
 	openPorts []*utilproxy.LocalPort
@@ -81,16 +70,6 @@ type fakePortOpener struct {
 func (f *fakePortOpener) OpenLocalPort(lp *utilproxy.LocalPort) (utilproxy.Closeable, error) {
 	f.openPorts = append(f.openPorts, lp)
 	return nil, nil
-}
-
-func (fake *fakeHealthChecker) SyncServices(newServices map[types.NamespacedName]uint16) error {
-	fake.services = newServices
-	return nil
-}
-
-func (fake *fakeHealthChecker) SyncEndpoints(newEndpoints map[types.NamespacedName]int) error {
-	fake.Endpoints = newEndpoints
-	return nil
 }
 
 // fakeKernelHandler implements KernelHandler.
@@ -151,7 +130,7 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		hostname:              testHostname,
 		portsMap:              make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		portMapper:            &fakePortOpener{[]*utilproxy.LocalPort{}},
-		healthChecker:         newFakeHealthChecker(),
+		serviceHealthServer:   healthcheck.NewFakeServiceHealthServer(),
 		ipvsScheduler:         DefaultScheduler,
 		ipGetter:              &fakeIPGetter{nodeIPs: nodeIPs},
 		iptablesData:          bytes.NewBuffer(nil),
@@ -458,8 +437,9 @@ func TestNodePort(t *testing.T) {
 							IP: "1002:ab8::2:10",
 						}},
 						Ports: []v1.EndpointPort{{
-							Name: "p80",
-							Port: int32(80),
+							Name:     "p80",
+							Port:     int32(80),
+							Protocol: v1.ProtocolTCP,
 						}},
 					}}
 				}),
@@ -575,8 +555,9 @@ func TestNodePort(t *testing.T) {
 							IP: "10.180.0.1",
 						}},
 						Ports: []v1.EndpointPort{{
-							Name: "p80",
-							Port: int32(80),
+							Name:     "p80",
+							Port:     int32(80),
+							Protocol: v1.ProtocolUDP,
 						}},
 					}}
 				}),
@@ -726,8 +707,9 @@ func TestNodePort(t *testing.T) {
 							IP: "10.180.0.1",
 						}},
 						Ports: []v1.EndpointPort{{
-							Name: "p80",
-							Port: int32(80),
+							Name:     "p80",
+							Port:     int32(80),
+							Protocol: v1.ProtocolSCTP,
 						}},
 					}}
 				}),
@@ -1001,8 +983,9 @@ func TestClusterIP(t *testing.T) {
 							IP: "10.180.0.1",
 						}},
 						Ports: []v1.EndpointPort{{
-							Name: "p80",
-							Port: int32(80),
+							Name:     "p80",
+							Port:     int32(80),
+							Protocol: v1.ProtocolTCP,
 						}},
 					}}
 				}),
@@ -1012,8 +995,9 @@ func TestClusterIP(t *testing.T) {
 							IP: "1009:ab8::5:6",
 						}},
 						Ports: []v1.EndpointPort{{
-							Name: "p8080",
-							Port: int32(8080),
+							Name:     "p8080",
+							Port:     int32(8080),
+							Protocol: v1.ProtocolTCP,
 						}},
 					}}
 				}),
@@ -1386,8 +1370,9 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 						NodeName: &thisHostname,
 					}},
 					Ports: []v1.EndpointPort{{
-						Name: svcPortName.Port,
-						Port: int32(svcPort),
+						Name:     svcPortName.Port,
+						Port:     int32(svcPort),
+						Protocol: v1.ProtocolTCP,
 					}}},
 				{ // **remote** endpoint address, should not be added as RS
 					Addresses: []v1.EndpointAddress{{
@@ -1395,8 +1380,9 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 						NodeName: &otherHostname,
 					}},
 					Ports: []v1.EndpointPort{{
-						Name: svcPortName.Port,
-						Port: int32(svcPort),
+						Name:     svcPortName.Port,
+						Port:     int32(svcPort),
+						Protocol: v1.ProtocolTCP,
 					}},
 				}}
 		}),
@@ -1483,8 +1469,9 @@ func TestLoadBalanceSourceRanges(t *testing.T) {
 					NodeName: nil,
 				}},
 				Ports: []v1.EndpointPort{{
-					Name: svcPortName.Port,
-					Port: int32(svcPort),
+					Name:     svcPortName.Port,
+					Port:     int32(svcPort),
+					Protocol: v1.ProtocolTCP,
 				}},
 			}}
 		}),
@@ -1651,8 +1638,9 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 						NodeName: &thisHostname,
 					}},
 					Ports: []v1.EndpointPort{{
-						Name: svcPortName.Port,
-						Port: int32(svcPort),
+						Name:     svcPortName.Port,
+						Port:     int32(svcPort),
+						Protocol: v1.ProtocolTCP,
 					}}},
 				{ // **remote** endpoint address, should not be added as RS
 					Addresses: []v1.EndpointAddress{{
@@ -1660,8 +1648,9 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 						NodeName: &otherHostname,
 					}},
 					Ports: []v1.EndpointPort{{
-						Name: svcPortName.Port,
-						Port: int32(svcPort),
+						Name:     svcPortName.Port,
+						Port:     int32(svcPort),
+						Protocol: v1.ProtocolTCP,
 					}},
 				}}
 		}),
@@ -2030,10 +2019,11 @@ func TestSessionAffinity(t *testing.T) {
 	}
 }
 
-func makeServicePortName(ns, name, port string) proxy.ServicePortName {
+func makeServicePortName(ns, name, port string, protocol v1.Protocol) proxy.ServicePortName {
 	return proxy.ServicePortName{
 		NamespacedName: makeNSN(ns, name),
 		Port:           port,
+		Protocol:       protocol,
 	}
 }
 
@@ -2049,7 +2039,8 @@ func Test_updateEndpointsMap(t *testing.T) {
 				IP: "1.1.1.1",
 			}},
 			Ports: []v1.EndpointPort{{
-				Port: 11,
+				Port:     11,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}}
 	}
@@ -2060,7 +2051,8 @@ func Test_updateEndpointsMap(t *testing.T) {
 				NodeName: &nodeName,
 			}},
 			Ports: []v1.EndpointPort{{
-				Port: 11,
+				Port:     11,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}}
 	}
@@ -2071,8 +2063,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 				NodeName: &nodeName,
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p11",
-				Port: 11,
+				Name:     "p11",
+				Port:     11,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}}
 	}
@@ -2082,8 +2075,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 				IP: "1.1.1.1",
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p11",
-				Port: 11,
+				Name:     "p11",
+				Port:     11,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}}
 	}
@@ -2093,8 +2087,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 				IP: "1.1.1.1",
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p11-2",
-				Port: 11,
+				Name:     "p11-2",
+				Port:     11,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}}
 	}
@@ -2104,8 +2099,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 				IP: "1.1.1.1",
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p11",
-				Port: 22,
+				Name:     "p11",
+				Port:     22,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}}
 	}
@@ -2118,11 +2114,13 @@ func Test_updateEndpointsMap(t *testing.T) {
 				NodeName: &nodeName,
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p11",
-				Port: 11,
+				Name:     "p11",
+				Port:     11,
+				Protocol: v1.ProtocolUDP,
 			}, {
-				Name: "p12",
-				Port: 12,
+				Name:     "p12",
+				Port:     12,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}}
 	}
@@ -2132,16 +2130,18 @@ func Test_updateEndpointsMap(t *testing.T) {
 				IP: "1.1.1.1",
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p11",
-				Port: 11,
+				Name:     "p11",
+				Port:     11,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}, {
 			Addresses: []v1.EndpointAddress{{
 				IP: "1.1.1.2",
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p12",
-				Port: 12,
+				Name:     "p12",
+				Port:     12,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}}
 	}
@@ -2151,8 +2151,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 				IP: "1.1.1.1",
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p11",
-				Port: 11,
+				Name:     "p11",
+				Port:     11,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}, {
 			Addresses: []v1.EndpointAddress{{
@@ -2160,8 +2161,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 				NodeName: &nodeName,
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p12",
-				Port: 12,
+				Name:     "p12",
+				Port:     12,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}}
 	}
@@ -2172,19 +2174,22 @@ func Test_updateEndpointsMap(t *testing.T) {
 				NodeName: &nodeName,
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p11",
-				Port: 11,
+				Name:     "p11",
+				Port:     11,
+				Protocol: v1.ProtocolUDP,
 			}, {
-				Name: "p12",
-				Port: 12,
+				Name:     "p12",
+				Port:     12,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}, {
 			Addresses: []v1.EndpointAddress{{
 				IP: "1.1.1.3",
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p13",
-				Port: 13,
+				Name:     "p13",
+				Port:     13,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}}
 	}
@@ -2197,11 +2202,13 @@ func Test_updateEndpointsMap(t *testing.T) {
 				NodeName: &nodeName,
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p11",
-				Port: 11,
+				Name:     "p11",
+				Port:     11,
+				Protocol: v1.ProtocolUDP,
 			}, {
-				Name: "p12",
-				Port: 12,
+				Name:     "p12",
+				Port:     12,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}, {
 			Addresses: []v1.EndpointAddress{{
@@ -2211,11 +2218,13 @@ func Test_updateEndpointsMap(t *testing.T) {
 				NodeName: &nodeName,
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p13",
-				Port: 13,
+				Name:     "p13",
+				Port:     13,
+				Protocol: v1.ProtocolUDP,
 			}, {
-				Name: "p14",
-				Port: 14,
+				Name:     "p14",
+				Port:     14,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}}
 	}
@@ -2228,11 +2237,13 @@ func Test_updateEndpointsMap(t *testing.T) {
 				NodeName: &nodeName,
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p21",
-				Port: 21,
+				Name:     "p21",
+				Port:     21,
+				Protocol: v1.ProtocolUDP,
 			}, {
-				Name: "p22",
-				Port: 22,
+				Name:     "p22",
+				Port:     22,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}}
 	}
@@ -2242,8 +2253,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 				IP: "1.1.1.1",
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p11",
-				Port: 11,
+				Name:     "p11",
+				Port:     11,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}}
 	}
@@ -2257,8 +2269,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 				NodeName: &nodeName,
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p22",
-				Port: 22,
+				Name:     "p22",
+				Port:     22,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}, {
 			Addresses: []v1.EndpointAddress{{
@@ -2266,8 +2279,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 				NodeName: &nodeName,
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p23",
-				Port: 23,
+				Name:     "p23",
+				Port:     23,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}}
 	}
@@ -2281,8 +2295,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 				NodeName: &nodeName,
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p44",
-				Port: 44,
+				Name:     "p44",
+				Port:     44,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}, {
 			Addresses: []v1.EndpointAddress{{
@@ -2290,8 +2305,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 				NodeName: &nodeName,
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p45",
-				Port: 45,
+				Name:     "p45",
+				Port:     45,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}}
 	}
@@ -2303,19 +2319,22 @@ func Test_updateEndpointsMap(t *testing.T) {
 				IP: "1.1.1.11",
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p11",
-				Port: 11,
+				Name:     "p11",
+				Port:     11,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}, {
 			Addresses: []v1.EndpointAddress{{
 				IP: "1.1.1.2",
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p12",
-				Port: 12,
+				Name:     "p12",
+				Port:     12,
+				Protocol: v1.ProtocolUDP,
 			}, {
-				Name: "p122",
-				Port: 122,
+				Name:     "p122",
+				Port:     122,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}}
 	}
@@ -2325,8 +2344,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 				IP: "3.3.3.3",
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p33",
-				Port: 33,
+				Name:     "p33",
+				Port:     33,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}}
 	}
@@ -2337,8 +2357,9 @@ func Test_updateEndpointsMap(t *testing.T) {
 				NodeName: &nodeName,
 			}},
 			Ports: []v1.EndpointPort{{
-				Name: "p44",
-				Port: 44,
+				Name:     "p44",
+				Port:     44,
+				Protocol: v1.ProtocolUDP,
 			}},
 		}}
 	}
@@ -2370,12 +2391,12 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeTestEndpoints("ns1", "ep1", unnamedPort),
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", ""): {
+			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", ""): {
+			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
@@ -2391,12 +2412,12 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeTestEndpoints("ns1", "ep1", namedPortLocal),
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: true},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: true},
 			},
 		},
@@ -2414,18 +2435,18 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeTestEndpoints("ns1", "ep1", multipleSubsets),
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
-			makeServicePortName("ns1", "ep1", "p12"): {
+			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.2:12", IsLocal: false},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
-			makeServicePortName("ns1", "ep1", "p12"): {
+			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.2:12", IsLocal: false},
 			},
 		},
@@ -2441,24 +2462,24 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeTestEndpoints("ns1", "ep1", multipleSubsetsMultiplePortsLocal),
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: true},
 			},
-			makeServicePortName("ns1", "ep1", "p12"): {
+			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:12", IsLocal: true},
 			},
-			makeServicePortName("ns1", "ep1", "p13"): {
+			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.3:13", IsLocal: false},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: true},
 			},
-			makeServicePortName("ns1", "ep1", "p12"): {
+			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:12", IsLocal: true},
 			},
-			makeServicePortName("ns1", "ep1", "p13"): {
+			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.3:13", IsLocal: false},
 			},
 		},
@@ -2478,53 +2499,53 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeTestEndpoints("ns2", "ep2", multipleSubsetsIPsPorts2),
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 				{Endpoint: "1.1.1.2:11", IsLocal: true},
 			},
-			makeServicePortName("ns1", "ep1", "p12"): {
+			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:12", IsLocal: false},
 				{Endpoint: "1.1.1.2:12", IsLocal: true},
 			},
-			makeServicePortName("ns1", "ep1", "p13"): {
+			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.3:13", IsLocal: false},
 				{Endpoint: "1.1.1.4:13", IsLocal: true},
 			},
-			makeServicePortName("ns1", "ep1", "p14"): {
+			makeServicePortName("ns1", "ep1", "p14", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.3:14", IsLocal: false},
 				{Endpoint: "1.1.1.4:14", IsLocal: true},
 			},
-			makeServicePortName("ns2", "ep2", "p21"): {
+			makeServicePortName("ns2", "ep2", "p21", v1.ProtocolUDP): {
 				{Endpoint: "2.2.2.1:21", IsLocal: false},
 				{Endpoint: "2.2.2.2:21", IsLocal: true},
 			},
-			makeServicePortName("ns2", "ep2", "p22"): {
+			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
 				{Endpoint: "2.2.2.1:22", IsLocal: false},
 				{Endpoint: "2.2.2.2:22", IsLocal: true},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 				{Endpoint: "1.1.1.2:11", IsLocal: true},
 			},
-			makeServicePortName("ns1", "ep1", "p12"): {
+			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:12", IsLocal: false},
 				{Endpoint: "1.1.1.2:12", IsLocal: true},
 			},
-			makeServicePortName("ns1", "ep1", "p13"): {
+			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.3:13", IsLocal: false},
 				{Endpoint: "1.1.1.4:13", IsLocal: true},
 			},
-			makeServicePortName("ns1", "ep1", "p14"): {
+			makeServicePortName("ns1", "ep1", "p14", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.3:14", IsLocal: false},
 				{Endpoint: "1.1.1.4:14", IsLocal: true},
 			},
-			makeServicePortName("ns2", "ep2", "p21"): {
+			makeServicePortName("ns2", "ep2", "p21", v1.ProtocolUDP): {
 				{Endpoint: "2.2.2.1:21", IsLocal: false},
 				{Endpoint: "2.2.2.2:21", IsLocal: true},
 			},
-			makeServicePortName("ns2", "ep2", "p22"): {
+			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
 				{Endpoint: "2.2.2.1:22", IsLocal: false},
 				{Endpoint: "2.2.2.2:22", IsLocal: true},
 			},
@@ -2545,13 +2566,13 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", ""): {
+			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: true},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", ""): true,
+			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): true,
 		},
 		expectedHealthchecks: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
@@ -2565,14 +2586,14 @@ func Test_updateEndpointsMap(t *testing.T) {
 			nil,
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", ""): {
+			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: true},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{{
 			Endpoint:        "1.1.1.1:11",
-			ServicePortName: makeServicePortName("ns1", "ep1", ""),
+			ServicePortName: makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
 		expectedHealthchecks:      map[types.NamespacedName]int{},
@@ -2585,23 +2606,23 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeTestEndpoints("ns1", "ep1", namedPortsLocalNoLocal),
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 				{Endpoint: "1.1.1.2:11", IsLocal: true},
 			},
-			makeServicePortName("ns1", "ep1", "p12"): {
+			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:12", IsLocal: false},
 				{Endpoint: "1.1.1.2:12", IsLocal: true},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", "p12"): true,
+			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): true,
 		},
 		expectedHealthchecks: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
@@ -2615,29 +2636,29 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeTestEndpoints("ns1", "ep1", namedPort),
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 				{Endpoint: "1.1.1.2:11", IsLocal: true},
 			},
-			makeServicePortName("ns1", "ep1", "p12"): {
+			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:12", IsLocal: false},
 				{Endpoint: "1.1.1.2:12", IsLocal: true},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{{
 			Endpoint:        "1.1.1.2:11",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p11"),
+			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
 		}, {
 			Endpoint:        "1.1.1.1:12",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p12"),
+			ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
 		}, {
 			Endpoint:        "1.1.1.2:12",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p12"),
+			ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
 		expectedHealthchecks:      map[types.NamespacedName]int{},
@@ -2650,21 +2671,21 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeTestEndpoints("ns1", "ep1", multipleSubsetsWithLocal),
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
-			makeServicePortName("ns1", "ep1", "p12"): {
+			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.2:12", IsLocal: true},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", "p12"): true,
+			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): true,
 		},
 		expectedHealthchecks: map[types.NamespacedName]int{
 			makeNSN("ns1", "ep1"): 1,
@@ -2678,21 +2699,21 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeTestEndpoints("ns1", "ep1", namedPort),
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
-			makeServicePortName("ns1", "ep1", "p12"): {
+			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.2:12", IsLocal: false},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{{
 			Endpoint:        "1.1.1.2:12",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p12"),
+			ServicePortName: makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
 		expectedHealthchecks:      map[types.NamespacedName]int{},
@@ -2705,21 +2726,21 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeTestEndpoints("ns1", "ep1", namedPortRenamed),
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11-2"): {
+			makeServicePortName("ns1", "ep1", "p11-2", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{{
 			Endpoint:        "1.1.1.1:11",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p11"),
+			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", "p11-2"): true,
+			makeServicePortName("ns1", "ep1", "p11-2", v1.ProtocolUDP): true,
 		},
 		expectedHealthchecks: map[types.NamespacedName]int{},
 	}, {
@@ -2731,18 +2752,18 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeTestEndpoints("ns1", "ep1", namedPortRenumbered),
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:22", IsLocal: false},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{{
 			Endpoint:        "1.1.1.1:11",
-			ServicePortName: makeServicePortName("ns1", "ep1", "p11"),
+			ServicePortName: makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{},
 		expectedHealthchecks:      map[types.NamespacedName]int{},
@@ -2761,62 +2782,62 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeTestEndpoints("ns4", "ep4", complexAfter4),
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
-			makeServicePortName("ns2", "ep2", "p22"): {
+			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
 				{Endpoint: "2.2.2.2:22", IsLocal: true},
 				{Endpoint: "2.2.2.22:22", IsLocal: true},
 			},
-			makeServicePortName("ns2", "ep2", "p23"): {
+			makeServicePortName("ns2", "ep2", "p23", v1.ProtocolUDP): {
 				{Endpoint: "2.2.2.3:23", IsLocal: true},
 			},
-			makeServicePortName("ns4", "ep4", "p44"): {
+			makeServicePortName("ns4", "ep4", "p44", v1.ProtocolUDP): {
 				{Endpoint: "4.4.4.4:44", IsLocal: true},
 				{Endpoint: "4.4.4.5:44", IsLocal: true},
 			},
-			makeServicePortName("ns4", "ep4", "p45"): {
+			makeServicePortName("ns4", "ep4", "p45", v1.ProtocolUDP): {
 				{Endpoint: "4.4.4.6:45", IsLocal: true},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", "p11"): {
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 				{Endpoint: "1.1.1.11:11", IsLocal: false},
 			},
-			makeServicePortName("ns1", "ep1", "p12"): {
+			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.2:12", IsLocal: false},
 			},
-			makeServicePortName("ns1", "ep1", "p122"): {
+			makeServicePortName("ns1", "ep1", "p122", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.2:122", IsLocal: false},
 			},
-			makeServicePortName("ns3", "ep3", "p33"): {
+			makeServicePortName("ns3", "ep3", "p33", v1.ProtocolUDP): {
 				{Endpoint: "3.3.3.3:33", IsLocal: false},
 			},
-			makeServicePortName("ns4", "ep4", "p44"): {
+			makeServicePortName("ns4", "ep4", "p44", v1.ProtocolUDP): {
 				{Endpoint: "4.4.4.4:44", IsLocal: true},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{{
 			Endpoint:        "2.2.2.2:22",
-			ServicePortName: makeServicePortName("ns2", "ep2", "p22"),
+			ServicePortName: makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP),
 		}, {
 			Endpoint:        "2.2.2.22:22",
-			ServicePortName: makeServicePortName("ns2", "ep2", "p22"),
+			ServicePortName: makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP),
 		}, {
 			Endpoint:        "2.2.2.3:23",
-			ServicePortName: makeServicePortName("ns2", "ep2", "p23"),
+			ServicePortName: makeServicePortName("ns2", "ep2", "p23", v1.ProtocolUDP),
 		}, {
 			Endpoint:        "4.4.4.5:44",
-			ServicePortName: makeServicePortName("ns4", "ep4", "p44"),
+			ServicePortName: makeServicePortName("ns4", "ep4", "p44", v1.ProtocolUDP),
 		}, {
 			Endpoint:        "4.4.4.6:45",
-			ServicePortName: makeServicePortName("ns4", "ep4", "p45"),
+			ServicePortName: makeServicePortName("ns4", "ep4", "p45", v1.ProtocolUDP),
 		}},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", "p12"):  true,
-			makeServicePortName("ns1", "ep1", "p122"): true,
-			makeServicePortName("ns3", "ep3", "p33"):  true,
+			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP):  true,
+			makeServicePortName("ns1", "ep1", "p122", v1.ProtocolUDP): true,
+			makeServicePortName("ns3", "ep3", "p33", v1.ProtocolUDP):  true,
 		},
 		expectedHealthchecks: map[types.NamespacedName]int{
 			makeNSN("ns4", "ep4"): 1,
@@ -2831,13 +2852,13 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
-			makeServicePortName("ns1", "ep1", ""): {
+			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
 				{Endpoint: "1.1.1.1:11", IsLocal: false},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{},
 		expectedStaleServiceNames: map[proxy.ServicePortName]bool{
-			makeServicePortName("ns1", "ep1", ""): true,
+			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): true,
 		},
 		expectedHealthchecks: map[types.NamespacedName]int{},
 	},
@@ -2930,7 +2951,7 @@ func compareEndpointsMaps(t *testing.T, tci int, newMap proxy.EndpointsMap, expe
 					t.Errorf("Failed to cast proxy.BaseEndpointInfo")
 					continue
 				}
-				if *newEp != *(expected[x][i]) {
+				if !reflect.DeepEqual(*newEp, *(expected[x][i])) {
 					t.Errorf("[%d] expected new[%v][%d] to be %v, got %v", tci, x, i, expected[x][i], newEp)
 				}
 			}
@@ -3681,18 +3702,17 @@ func TestEndpointSliceE2E(t *testing.T) {
 	// Add initial service
 	serviceName := "svc1"
 	namespaceName := "ns1"
-
 	fp.OnServiceAdd(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
 		Spec: v1.ServiceSpec{
 			ClusterIP: "172.20.1.1",
 			Selector:  map[string]string{"foo": "bar"},
-			Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80)}},
+			Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
 		},
 	})
 
 	// Add initial endpoint slice
-	ipAddressType := discovery.AddressTypeIP
+	tcpProtocol := v1.ProtocolTCP
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-1", serviceName),
@@ -3700,10 +3720,11 @@ func TestEndpointSliceE2E(t *testing.T) {
 			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
 		},
 		Ports: []discovery.EndpointPort{{
-			Name: utilpointer.StringPtr(""),
-			Port: utilpointer.Int32Ptr(80),
+			Name:     utilpointer.StringPtr(""),
+			Port:     utilpointer.Int32Ptr(80),
+			Protocol: &tcpProtocol,
 		}},
-		AddressType: &ipAddressType,
+		AddressType: discovery.AddressTypeIPv4,
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"10.0.1.1"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},

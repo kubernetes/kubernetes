@@ -35,7 +35,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
@@ -238,7 +237,7 @@ func createAuthReaderRoleBindingForCRDConversion(f *framework.Framework, namespa
 		},
 	})
 	if err != nil && errors.IsAlreadyExists(err) {
-		e2elog.Logf("role binding %s already exists", roleBindingCRDName)
+		framework.Logf("role binding %s already exists", roleBindingCRDName)
 	} else {
 		framework.ExpectNoError(err, "creating role binding %s:webhook to access configMap", namespace)
 	}
@@ -506,7 +505,7 @@ func waitWebhookConversionReady(f *framework.Framework, crd *apiextensionsv1.Cus
 		if err != nil {
 			// tolerate clusters that do not set --enable-aggregator-routing and have to wait for kube-proxy
 			// to program the service network, during which conversion requests return errors
-			e2elog.Logf("error waiting for conversion to succeed during setup: %v", err)
+			framework.Logf("error waiting for conversion to succeed during setup: %v", err)
 			return false, nil
 		}
 

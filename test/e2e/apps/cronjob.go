@@ -269,8 +269,11 @@ var _ = SIGDescribe("CronJob", func() {
 			ginkgo.By("Ensuring a finished job exists by listing jobs explicitly")
 			jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 			framework.ExpectNoError(err, "Failed to ensure a finished cronjob exists by listing jobs explicitly in namespace %s", f.Namespace.Name)
-			_, finishedJobs := filterActiveJobs(jobs)
-			framework.ExpectEqual(len(finishedJobs), 1)
+			activeJobs, finishedJobs := filterActiveJobs(jobs)
+			if len(finishedJobs) != 1 {
+				framework.Logf("Expected one finished job in namespace %s; activeJobs=%v; finishedJobs=%v", f.Namespace.Name, activeJobs, finishedJobs)
+				framework.ExpectEqual(len(finishedJobs), 1)
+			}
 
 			// Job should get deleted when the next job finishes the next minute
 			ginkgo.By("Ensuring this job and its pods does not exist anymore")

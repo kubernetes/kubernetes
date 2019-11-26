@@ -18,11 +18,10 @@ package fake
 
 import (
 	v1 "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 // Cache is used for testing
@@ -76,17 +75,8 @@ func (c *Cache) UpdateNode(oldNode, newNode *v1.Node) error { return nil }
 // RemoveNode is a fake method for testing.
 func (c *Cache) RemoveNode(node *v1.Node) error { return nil }
 
-// AddCSINode is a fake method for testing.
-func (c *Cache) AddCSINode(csiNode *storagev1beta1.CSINode) error { return nil }
-
-// UpdateCSINode is a fake method for testing.
-func (c *Cache) UpdateCSINode(oldCSINode, newCSINode *storagev1beta1.CSINode) error { return nil }
-
-// RemoveCSINode is a fake method for testing.
-func (c *Cache) RemoveCSINode(csiNode *storagev1beta1.CSINode) error { return nil }
-
 // UpdateNodeInfoSnapshot is a fake method for testing.
-func (c *Cache) UpdateNodeInfoSnapshot(nodeSnapshot *schedulernodeinfo.Snapshot) error {
+func (c *Cache) UpdateNodeInfoSnapshot(nodeSnapshot *nodeinfosnapshot.Snapshot) error {
 	return nil
 }
 
@@ -94,7 +84,7 @@ func (c *Cache) UpdateNodeInfoSnapshot(nodeSnapshot *schedulernodeinfo.Snapshot)
 func (c *Cache) List(s labels.Selector) ([]*v1.Pod, error) { return nil, nil }
 
 // FilteredList is a fake method for testing.
-func (c *Cache) FilteredList(filter algorithm.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
+func (c *Cache) FilteredList(filter schedulerlisters.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
 	return nil, nil
 }
 
@@ -102,9 +92,6 @@ func (c *Cache) FilteredList(filter algorithm.PodFilter, selector labels.Selecto
 func (c *Cache) Snapshot() *internalcache.Snapshot {
 	return &internalcache.Snapshot{}
 }
-
-// NodeTree is a fake method for testing.
-func (c *Cache) NodeTree() *internalcache.NodeTree { return nil }
 
 // GetNodeInfo is a fake method for testing.
 func (c *Cache) GetNodeInfo(nodeName string) (*v1.Node, error) {
@@ -114,9 +101,4 @@ func (c *Cache) GetNodeInfo(nodeName string) (*v1.Node, error) {
 // ListNodes is a fake method for testing.
 func (c *Cache) ListNodes() []*v1.Node {
 	return nil
-}
-
-// GetCSINodeInfo is a fake method for testing.
-func (c *Cache) GetCSINodeInfo(nodeName string) (*storagev1beta1.CSINode, error) {
-	return nil, nil
 }

@@ -25,8 +25,10 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericrest "k8s.io/apiserver/pkg/registry/generic/rest"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
 )
@@ -67,6 +69,10 @@ func (r *LogREST) Get(ctx context.Context, name string, opts runtime.Object) (ru
 	if !ok {
 		return nil, fmt.Errorf("invalid options object: %#v", opts)
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.AllowInsecureBackendProxy) {
+		logOpts.InsecureSkipTLSVerifyBackend = false
+	}
+
 	if errs := validation.ValidatePodLogOptions(logOpts); len(errs) > 0 {
 		return nil, errors.NewInvalid(api.Kind("PodLogOptions"), name, errs)
 	}

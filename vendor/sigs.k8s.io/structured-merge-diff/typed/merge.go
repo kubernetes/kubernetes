@@ -104,7 +104,7 @@ func (w *mergingWalker) doLeaf() {
 	w.rule(w)
 }
 
-func (w *mergingWalker) doScalar(t schema.Scalar) (errs ValidationErrors) {
+func (w *mergingWalker) doScalar(t *schema.Scalar) (errs ValidationErrors) {
 	errs = append(errs, w.validateScalar(t, w.lhs, "lhs: ")...)
 	errs = append(errs, w.validateScalar(t, w.rhs, "rhs: ")...)
 	if len(errs) > 0 {
@@ -158,7 +158,7 @@ func (w *mergingWalker) derefMap(prefix string, v *value.Value, dest **value.Map
 	return nil
 }
 
-func (w *mergingWalker) visitListItems(t schema.List, lhs, rhs *value.List) (errs ValidationErrors) {
+func (w *mergingWalker) visitListItems(t *schema.List, lhs, rhs *value.List) (errs ValidationErrors) {
 	out := &value.List{}
 
 	// TODO: ordering is totally wrong.
@@ -168,8 +168,9 @@ func (w *mergingWalker) visitListItems(t schema.List, lhs, rhs *value.List) (err
 	rhsOrder := []fieldpath.PathElement{}
 
 	// First, collect all RHS children.
-	observedRHS := map[string]value.Value{}
+	var observedRHS fieldpath.PathElementValueMap
 	if rhs != nil {
+		observedRHS = fieldpath.MakePathElementValueMap(len(rhs.Items))
 		for i, child := range rhs.Items {
 			pe, err := listItemToPathElement(t, i, child)
 			if err != nil {
@@ -179,18 +180,18 @@ func (w *mergingWalker) visitListItems(t schema.List, lhs, rhs *value.List) (err
 				// this element.
 				continue
 			}
-			keyStr := pe.String()
-			if _, found := observedRHS[keyStr]; found {
-				errs = append(errs, w.errorf("rhs: duplicate entries for key %v", keyStr)...)
+			if _, ok := observedRHS.Get(pe); ok {
+				errs = append(errs, w.errorf("rhs: duplicate entries for key %v", pe.String())...)
 			}
-			observedRHS[keyStr] = child
+			observedRHS.Insert(pe, child)
 			rhsOrder = append(rhsOrder, pe)
 		}
 	}
 
 	// Then merge with LHS children.
-	observedLHS := map[string]struct{}{}
+	var observedLHS fieldpath.PathElementSet
 	if lhs != nil {
+		observedLHS = fieldpath.MakePathElementSet(len(lhs.Items))
 		for i, child := range lhs.Items {
 			pe, err := listItemToPathElement(t, i, child)
 			if err != nil {
@@ -200,15 +201,14 @@ func (w *mergingWalker) visitListItems(t schema.List, lhs, rhs *value.List) (err
 				// this element.
 				continue
 			}
-			keyStr := pe.String()
-			if _, found := observedLHS[keyStr]; found {
-				errs = append(errs, w.errorf("lhs: duplicate entries for key %v", keyStr)...)
+			if observedLHS.Has(pe) {
+				errs = append(errs, w.errorf("lhs: duplicate entries for key %v", pe.String())...)
 				continue
 			}
-			observedLHS[keyStr] = struct{}{}
+			observedLHS.Insert(pe)
 			w2 := w.prepareDescent(pe, t.ElementType)
 			w2.lhs = &child
-			if rchild, ok := observedRHS[keyStr]; ok {
+			if rchild, ok := observedRHS.Get(pe); ok {
 				w2.rhs = &rchild
 			}
 			if newErrs := w2.merge(); len(newErrs) > 0 {
@@ -217,22 +217,22 @@ func (w *mergingWalker) visitListItems(t schema.List, lhs, rhs *value.List) (err
 				out.Items = append(out.Items, *w2.out)
 			}
 			w.finishDescent(w2)
-			// Keep track of children that have been handled
-			delete(observedRHS, keyStr)
 		}
 	}
 
-	for _, rhsToCheck := range rhsOrder {
-		if unmergedChild, ok := observedRHS[rhsToCheck.String()]; ok {
-			w2 := w.prepareDescent(rhsToCheck, t.ElementType)
-			w2.rhs = &unmergedChild
-			if newErrs := w2.merge(); len(newErrs) > 0 {
-				errs = append(errs, newErrs...)
-			} else if w2.out != nil {
-				out.Items = append(out.Items, *w2.out)
-			}
-			w.finishDescent(w2)
+	for _, pe := range rhsOrder {
+		if observedLHS.Has(pe) {
+			continue
 		}
+		value, _ := observedRHS.Get(pe)
+		w2 := w.prepareDescent(pe, t.ElementType)
+		w2.rhs = &value
+		if newErrs := w2.merge(); len(newErrs) > 0 {
+			errs = append(errs, newErrs...)
+		} else if w2.out != nil {
+			out.Items = append(out.Items, *w2.out)
+		}
+		w.finishDescent(w2)
 	}
 
 	if len(out.Items) > 0 {
@@ -255,7 +255,7 @@ func (w *mergingWalker) derefList(prefix string, v *value.Value, dest **value.Li
 	return nil
 }
 
-func (w *mergingWalker) doList(t schema.List) (errs ValidationErrors) {
+func (w *mergingWalker) doList(t *schema.List) (errs ValidationErrors) {
 	var lhs, rhs *value.List
 	w.derefList("lhs: ", w.lhs, &lhs)
 	w.derefList("rhs: ", w.rhs, &rhs)
@@ -280,23 +280,15 @@ func (w *mergingWalker) doList(t schema.List) (errs ValidationErrors) {
 	return errs
 }
 
-func (w *mergingWalker) visitMapItems(t schema.Map, lhs, rhs *value.Map) (errs ValidationErrors) {
+func (w *mergingWalker) visitMapItems(t *schema.Map, lhs, rhs *value.Map) (errs ValidationErrors) {
 	out := &value.Map{}
-
-	fieldTypes := map[string]schema.TypeRef{}
-	for i := range t.Fields {
-		// I don't want to use the loop variable since a reference
-		// might outlive the loop iteration (in an error message).
-		f := t.Fields[i]
-		fieldTypes[f.Name] = f.Type
-	}
 
 	if lhs != nil {
 		for i := range lhs.Items {
 			litem := &lhs.Items[i]
 			fieldType := t.ElementType
-			if ft, ok := fieldTypes[litem.Name]; ok {
-				fieldType = ft
+			if sf, ok := t.FindField(litem.Name); ok {
+				fieldType = sf.Type
 			}
 			w2 := w.prepareDescent(fieldpath.PathElement{FieldName: &litem.Name}, fieldType)
 			w2.lhs = &litem.Value
@@ -324,8 +316,8 @@ func (w *mergingWalker) visitMapItems(t schema.Map, lhs, rhs *value.Map) (errs V
 			}
 
 			fieldType := t.ElementType
-			if ft, ok := fieldTypes[ritem.Name]; ok {
-				fieldType = ft
+			if sf, ok := t.FindField(ritem.Name); ok {
+				fieldType = sf.Type
 			}
 			w2 := w.prepareDescent(fieldpath.PathElement{FieldName: &ritem.Name}, fieldType)
 			w2.rhs = &ritem.Value
@@ -344,7 +336,7 @@ func (w *mergingWalker) visitMapItems(t schema.Map, lhs, rhs *value.Map) (errs V
 	return errs
 }
 
-func (w *mergingWalker) doMap(t schema.Map) (errs ValidationErrors) {
+func (w *mergingWalker) doMap(t *schema.Map) (errs ValidationErrors) {
 	var lhs, rhs *value.Map
 	w.derefMap("lhs: ", w.lhs, &lhs)
 	w.derefMap("rhs: ", w.rhs, &rhs)

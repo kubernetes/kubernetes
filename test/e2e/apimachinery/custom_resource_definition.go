@@ -17,6 +17,9 @@ limitations under the License.
 package apimachinery
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -26,13 +29,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin]", func() {
@@ -116,13 +121,13 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 				}
 				framework.ExpectNotEqual(expected, nil)
 				if !equality.Semantic.DeepEqual(actual.Spec, expected.Spec) {
-					e2elog.Failf("Expected CustomResourceDefinition in list with name %s to match crd created with same name, but got different specs:\n%s",
+					framework.Failf("Expected CustomResourceDefinition in list with name %s to match crd created with same name, but got different specs:\n%s",
 						actual.Name, diff.ObjectReflectDiff(expected.Spec, actual.Spec))
 				}
 			}
 
 			// Use delete collection to remove the CRDs
-			err = fixtures.DeleteCustomResourceDefinitions(selectorListOpts, apiExtensionClient)
+			err = fixtures.DeleteV1CustomResourceDefinitions(selectorListOpts, apiExtensionClient)
 			framework.ExpectNoError(err, "deleting CustomResourceDefinitions")
 			_, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "getting remaining CustomResourceDefinition")
@@ -161,7 +166,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 				framework.ExpectNoError(err, "getting CustomResourceDefinition status")
 				status := unstructuredToCRD(u)
 				if !equality.Semantic.DeepEqual(status.Spec, crd.Spec) {
-					e2elog.Failf("Expected CustomResourceDefinition Spec to match status sub-resource Spec, but got:\n%s", diff.ObjectReflectDiff(status.Spec, crd.Spec))
+					framework.Failf("Expected CustomResourceDefinition Spec to match status sub-resource Spec, but got:\n%s", diff.ObjectReflectDiff(status.Spec, crd.Spec))
 				}
 				status.Status.Conditions = append(status.Status.Conditions, updateCondition)
 				updated, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().UpdateStatus(status)
@@ -252,6 +257,128 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		}
 	})
 
+	/*
+		Release : v1.17
+		Testname: Custom Resource Definition, defaulting
+		Description: Create a custom resource definition without default. Create CR. Add default and read CR until
+		the default is applied. Create another CR. Remove default, add default for another field and read CR until
+		new field is defaulted, but old default stays.
+	*/
+	framework.ConformanceIt("custom resource defaulting for requests and from storage works ", func() {
+		config, err := framework.LoadConfig()
+		framework.ExpectNoError(err, "loading config")
+		apiExtensionClient, err := clientset.NewForConfig(config)
+		framework.ExpectNoError(err, "initializing apiExtensionClient")
+		dynamicClient, err := dynamic.NewForConfig(config)
+		framework.ExpectNoError(err, "initializing dynamic client")
+
+		// Create CRD without default and waits for the resource to be recognized and available.
+		crd := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
+		if crd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties == nil {
+			crd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties = map[string]v1.JSONSchemaProps{}
+		}
+		crd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["a"] = v1.JSONSchemaProps{Type: "string"}
+		crd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["b"] = v1.JSONSchemaProps{Type: "string"}
+		crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+		framework.ExpectNoError(err, "creating CustomResourceDefinition")
+		defer func() {
+			err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
+			framework.ExpectNoError(err, "deleting CustomResourceDefinition")
+		}()
+
+		// create CR without default in storage
+		name1 := names.SimpleNameGenerator.GenerateName("cr-1")
+		gvr := schema.GroupVersionResource{
+			Group:    crd.Spec.Group,
+			Version:  crd.Spec.Versions[0].Name,
+			Resource: crd.Spec.Names.Plural,
+		}
+		crClient := dynamicClient.Resource(gvr)
+		_, err = crClient.Create(&unstructured.Unstructured{Object: map[string]interface{}{
+			"apiVersion": gvr.Group + "/" + gvr.Version,
+			"kind":       crd.Spec.Names.Kind,
+			"metadata": map[string]interface{}{
+				"name": name1,
+			},
+		}}, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "creating CR")
+
+		// Setting default for a to "A" and waiting for the CR to get defaulted on read
+		crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Patch(crd.Name, types.JSONPatchType, []byte(`[
+			{"op":"add","path":"/spec/versions/0/schema/openAPIV3Schema/properties/a/default", "value": "A"}
+		]`))
+		framework.ExpectNoError(err, "setting default for a to \"A\" in schema")
+
+		err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
+			u1, err := crClient.Get(name1, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			a, found, err := unstructured.NestedFieldNoCopy(u1.Object, "a")
+			if err != nil {
+				return false, err
+			}
+			if !found {
+				return false, nil
+			}
+			if a != "A" {
+				return false, fmt.Errorf("expected a:\"A\", but got a:%q", a)
+			}
+			return true, nil
+		})
+		framework.ExpectNoError(err, "waiting for CR to be defaulted on read")
+
+		// create CR with default in storage
+		name2 := names.SimpleNameGenerator.GenerateName("cr-2")
+		u2, err := crClient.Create(&unstructured.Unstructured{Object: map[string]interface{}{
+			"apiVersion": gvr.Group + "/" + gvr.Version,
+			"kind":       crd.Spec.Names.Kind,
+			"metadata": map[string]interface{}{
+				"name": name2,
+			},
+		}}, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "creating CR")
+		v, found, err := unstructured.NestedFieldNoCopy(u2.Object, "a")
+		framework.ExpectEqual(found, true, "\"a\" is defaulted")
+		framework.ExpectEqual(v, "A", "\"a\" is defaulted to \"A\"")
+
+		// Deleting default for a, adding default "B" for b and waiting for the CR to get defaulted on read for b
+		crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Patch(crd.Name, types.JSONPatchType, []byte(`[
+			{"op":"remove","path":"/spec/versions/0/schema/openAPIV3Schema/properties/a/default"},
+			{"op":"add","path":"/spec/versions/0/schema/openAPIV3Schema/properties/b/default", "value": "B"}
+		]`))
+		framework.ExpectNoError(err, "setting default for b to \"B\" and remove default for a")
+
+		err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
+			u2, err := crClient.Get(name2, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			b, found, err := unstructured.NestedFieldNoCopy(u2.Object, "b")
+			if err != nil {
+				return false, err
+			}
+			if !found {
+				return false, nil
+			}
+			if b != "B" {
+				return false, fmt.Errorf("expected b:\"B\", but got b:%q", b)
+			}
+			a, found, err := unstructured.NestedFieldNoCopy(u2.Object, "a")
+			if err != nil {
+				return false, err
+			}
+			if !found {
+				return false, fmt.Errorf("expected a:\"A\" to be unchanged, but it was removed")
+			}
+			if a != "A" {
+				return false, fmt.Errorf("expected a:\"A\" to be unchanged, but it changed to %q", a)
+			}
+			return true, nil
+		})
+		framework.ExpectNoError(err, "waiting for CR to be defaulted on read for b and a staying the same")
+	})
+
 })
 
 func unstructuredToCRD(obj *unstructured.Unstructured) *v1.CustomResourceDefinition {
@@ -267,5 +394,5 @@ func expectCondition(conditions []v1.CustomResourceDefinitionCondition, expected
 			return
 		}
 	}
-	e2elog.Failf("Condition %#v not found in conditions %#v", expected, conditions)
+	framework.Failf("Condition %#v not found in conditions %#v", expected, conditions)
 }

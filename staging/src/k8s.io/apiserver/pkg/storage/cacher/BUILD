@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cacher.go",
+        "caching_object.go",
         "time_budget.go",
         "util.go",
         "watch_cache.go",
@@ -19,6 +20,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
@@ -38,6 +41,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "cacher_whitebox_test.go",
+        "caching_object_test.go",
         "time_budget_test.go",
         "util_test.go",
         "watch_cache_test.go",

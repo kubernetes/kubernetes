@@ -47,7 +47,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"gopkg.in/gcfg.v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -63,7 +63,7 @@ import (
 	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/cloud-provider"
+	cloudprovider "k8s.io/cloud-provider"
 	nodehelpers "k8s.io/cloud-provider/node/helpers"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	cloudvolume "k8s.io/cloud-provider/volume"
@@ -219,13 +219,15 @@ const nodeWithImpairedVolumes = "NodeWithImpairedVolumes"
 const (
 	// volumeAttachmentConsecutiveErrorLimit is the number of consecutive errors we will ignore when waiting for a volume to attach/detach
 	volumeAttachmentStatusConsecutiveErrorLimit = 10
-	// most attach/detach operations on AWS finish within 1-4 seconds
-	// By using 1 second starting interval with a backoff of 1.8
-	// we get -  [1, 1.8, 3.24, 5.832000000000001, 10.4976]
-	// in total we wait for 2601 seconds
-	volumeAttachmentStatusInitialDelay = 1 * time.Second
-	volumeAttachmentStatusFactor       = 1.8
-	volumeAttachmentStatusSteps        = 13
+
+	// Attach typically takes 2-5 seconds (average is 2). Asking before 2 seconds is just waste of API quota.
+	volumeAttachmentStatusInitialDelay = 2 * time.Second
+	// Detach typically takes 5-10 seconds (average is 6). Asking before 5 seconds is just waste of API quota.
+	volumeDetachmentStatusInitialDelay = 5 * time.Second
+	// After the initial delay, poll attach/detach with exponential backoff (2046 seconds total)
+	volumeAttachmentStatusPollDelay = 2 * time.Second
+	volumeAttachmentStatusFactor    = 2
+	volumeAttachmentStatusSteps     = 11
 
 	// createTag* is configuration of exponential backoff for CreateTag call. We
 	// retry mainly because if we create an object, we cannot tag it until it is
@@ -1404,14 +1406,35 @@ func (c *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.No
 			return nil, fmt.Errorf("error querying AWS metadata for %q: %q", "network/interfaces/macs", err)
 		}
 
+		// We want the IPs to end up in order by interface (in particular, we want eth0's
+		// IPs first), but macs isn't necessarily sorted in that order so we have to
+		// explicitly order by device-number (device-number == the "0" in "eth0").
+		macIPs := make(map[int]string)
 		for _, macID := range strings.Split(macs, "\n") {
 			if macID == "" {
 				continue
 			}
-			macPath := path.Join("network/interfaces/macs/", macID, "local-ipv4s")
-			internalIPs, err := c.metadata.GetMetadata(macPath)
+			numPath := path.Join("network/interfaces/macs/", macID, "device-number")
+			numStr, err := c.metadata.GetMetadata(numPath)
 			if err != nil {
-				return nil, fmt.Errorf("error querying AWS metadata for %q: %q", macPath, err)
+				return nil, fmt.Errorf("error querying AWS metadata for %q: %q", numPath, err)
+			}
+			num, err := strconv.Atoi(strings.TrimSpace(numStr))
+			if err != nil {
+				klog.Warningf("Bad device-number %q for interface %s\n", numStr, macID)
+				continue
+			}
+			ipPath := path.Join("network/interfaces/macs/", macID, "local-ipv4s")
+			macIPs[num], err = c.metadata.GetMetadata(ipPath)
+			if err != nil {
+				return nil, fmt.Errorf("error querying AWS metadata for %q: %q", ipPath, err)
+			}
+		}
+
+		for i := 0; i < len(macIPs); i++ {
+			internalIPs := macIPs[i]
+			if internalIPs == "" {
+				continue
 			}
 			for _, internalIP := range strings.Split(internalIPs, "\n") {
 				if internalIP == "" {
@@ -1840,6 +1863,7 @@ func (c *Cloud) getMountDevice(
 	assign bool) (assigned mountDevice, alreadyAttached bool, err error) {
 
 	deviceMappings := map[mountDevice]EBSVolumeID{}
+	volumeStatus := map[EBSVolumeID]string{} // for better logging of volume status
 	for _, blockDevice := range info.BlockDeviceMappings {
 		name := aws.StringValue(blockDevice.DeviceName)
 		if strings.HasPrefix(name, "/dev/sd") {
@@ -1851,6 +1875,10 @@ func (c *Cloud) getMountDevice(
 		if len(name) < 1 || len(name) > 2 {
 			klog.Warningf("Unexpected EBS DeviceName: %q", aws.StringValue(blockDevice.DeviceName))
 		}
+		if blockDevice.Ebs != nil && blockDevice.Ebs.VolumeId != nil {
+			volumeStatus[EBSVolumeID(*blockDevice.Ebs.VolumeId)] = aws.StringValue(blockDevice.Ebs.Status)
+		}
+
 		deviceMappings[mountDevice(name)] = EBSVolumeID(aws.StringValue(blockDevice.Ebs.VolumeId))
 	}
 
@@ -1868,7 +1896,15 @@ func (c *Cloud) getMountDevice(
 	for mountDevice, mappingVolumeID := range deviceMappings {
 		if volumeID == mappingVolumeID {
 			if assign {
-				klog.Warningf("Got assignment call for already-assigned volume: %s@%s", mountDevice, mappingVolumeID)
+				// DescribeInstances shows the volume as attached / detaching, while Kubernetes
+				// cloud provider thinks it's detached.
+				// This can happened when the volume has just been detached from the same node
+				// and AWS API returns stale data in this DescribeInstances ("eventual consistency").
+				// Fail the attachment and let A/D controller retry in a while, hoping that
+				// AWS API returns consistent result next time (i.e. the volume is detached).
+				status := volumeStatus[mappingVolumeID]
+				klog.Warningf("Got assignment call for already-assigned volume: %s@%s, volume status: %s", mountDevice, mappingVolumeID, status)
+				return mountDevice, false, fmt.Errorf("volume is still being detached from the node")
 			}
 			return mountDevice, true, nil
 		}
@@ -2071,7 +2107,7 @@ func (c *Cloud) applyUnSchedulableTaint(nodeName types.NodeName, reason string) 
 // On success, it returns the last attachment state.
 func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment, error) {
 	backoff := wait.Backoff{
-		Duration: volumeAttachmentStatusInitialDelay,
+		Duration: volumeAttachmentStatusPollDelay,
 		Factor:   volumeAttachmentStatusFactor,
 		Steps:    volumeAttachmentStatusSteps,
 	}
@@ -2080,6 +2116,12 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 	// So we tolerate a limited number of failures.
 	// But once we see more than 10 errors in a row, we return the error
 	describeErrorCount := 0
+
+	// Attach/detach usually takes time. It does not make sense to start
+	// polling DescribeVolumes before some initial delay to let AWS
+	// process the request.
+	time.Sleep(getInitialAttachDetachDelay(status))
+
 	var attachment *ec2.VolumeAttachment
 
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
@@ -2143,7 +2185,6 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 		klog.V(2).Infof("Waiting for volume %q state: actual=%s, desired=%s", d.awsID, attachmentStatus, status)
 		return false, nil
 	})
-
 	return attachment, err
 }
 
@@ -4606,4 +4647,11 @@ func setNodeDisk(
 		nodeDiskMap[nodeName] = volumeMap
 	}
 	volumeMap[volumeID] = check
+}
+
+func getInitialAttachDetachDelay(status string) time.Duration {
+	if status == "detached" {
+		return volumeDetachmentStatusInitialDelay
+	}
+	return volumeAttachmentStatusInitialDelay
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -24,15 +25,15 @@ import (
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	"k8s.io/klog"
+	"k8s.io/utils/mount"
+	utilpath "k8s.io/utils/path"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/util/mount"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
-	utilpath "k8s.io/utils/path"
 )
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -225,9 +226,9 @@ func (kl *Kubelet) getRuntime() kubecontainer.Runtime {
 // GetNode returns the node info for the configured node name of this Kubelet.
 func (kl *Kubelet) GetNode() (*v1.Node, error) {
 	if kl.kubeClient == nil {
-		return kl.initialNode()
+		return kl.initialNode(context.TODO())
 	}
-	return kl.nodeInfo.GetNodeInfo(string(kl.nodeName))
+	return kl.nodeLister.Get(string(kl.nodeName))
 }
 
 // getNodeAnyWay() must return a *v1.Node which is required by RunGeneralPredicates().
@@ -237,11 +238,11 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 // zero capacity, and the default labels.
 func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
 	if kl.kubeClient != nil {
-		if n, err := kl.nodeInfo.GetNodeInfo(string(kl.nodeName)); err == nil {
+		if n, err := kl.nodeLister.Get(string(kl.nodeName)); err == nil {
 			return n, nil
 		}
 	}
-	return kl.initialNode()
+	return kl.initialNode(context.TODO())
 }
 
 // GetNodeConfig returns the container manager node config.

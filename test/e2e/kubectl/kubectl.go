@@ -46,16 +46,23 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/controller"
 	commonutils "k8s.io/kubernetes/test/e2e/common"
@@ -67,6 +74,7 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
+	"k8s.io/kubernetes/test/integration/etcd"
 	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -79,32 +87,31 @@ import (
 )
 
 const (
-	updateDemoSelector       = "name=update-demo"
-	guestbookStartupTimeout  = 10 * time.Minute
-	guestbookResponseTimeout = 3 * time.Minute
-	simplePodSelector        = "name=httpd"
-	simplePodName            = "httpd"
-	simplePodResourceName    = "pod/httpd"
-	httpdDefaultOutput       = "It works!"
-	simplePodPort            = 80
-	pausePodSelector         = "name=pause"
-	pausePodName             = "pause"
-	busyboxPodSelector       = "app=busybox1"
-	busyboxPodName           = "busybox1"
-	runJobTimeout            = 5 * time.Minute
-	kubeCtlManifestPath      = "test/e2e/testing-manifests/kubectl"
-	redisControllerFilename  = "redis-master-controller.json.in"
-	redisServiceFilename     = "redis-master-service.json"
-	httpdDeployment1Filename = "httpd-deployment1.yaml.in"
-	httpdDeployment2Filename = "httpd-deployment2.yaml.in"
-	httpdDeployment3Filename = "httpd-deployment3.yaml.in"
-	metaPattern              = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
+	updateDemoSelector        = "name=update-demo"
+	guestbookStartupTimeout   = 10 * time.Minute
+	guestbookResponseTimeout  = 3 * time.Minute
+	simplePodSelector         = "name=httpd"
+	simplePodName             = "httpd"
+	simplePodResourceName     = "pod/httpd"
+	httpdDefaultOutput        = "It works!"
+	simplePodPort             = 80
+	pausePodSelector          = "name=pause"
+	pausePodName              = "pause"
+	busyboxPodSelector        = "app=busybox1"
+	busyboxPodName            = "busybox1"
+	runJobTimeout             = 5 * time.Minute
+	kubeCtlManifestPath       = "test/e2e/testing-manifests/kubectl"
+	agnhostControllerFilename = "agnhost-master-controller.json.in"
+	agnhostServiceFilename    = "agnhost-master-service.json"
+	httpdDeployment1Filename  = "httpd-deployment1.yaml.in"
+	httpdDeployment2Filename  = "httpd-deployment2.yaml.in"
+	httpdDeployment3Filename  = "httpd-deployment3.yaml.in"
+	metaPattern               = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
 )
 
 var (
 	nautilusImage = imageutils.GetE2EImage(imageutils.Nautilus)
 	kittenImage   = imageutils.GetE2EImage(imageutils.Kitten)
-	redisImage    = imageutils.GetE2EImage(imageutils.Redis)
 	httpdImage    = imageutils.GetE2EImage(imageutils.Httpd)
 	busyboxImage  = imageutils.GetE2EImage(imageutils.BusyBox)
 	agnhostImage  = imageutils.GetE2EImage(imageutils.Agnhost)
@@ -116,6 +123,53 @@ var (
 	cronJobGroupVersionResourceAlpha = schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}
 	cronJobGroupVersionResourceBeta  = schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}
 )
+
+var schemaFoo = []byte(`description: Foo CRD for Testing
+type: object
+properties:
+  spec:
+    type: object
+    description: Specification of Foo
+    properties:
+      bars:
+        description: List of Bars and their specs.
+        type: array
+        items:
+          type: object
+          required:
+          - name
+          properties:
+            name:
+              description: Name of Bar.
+              type: string
+            age:
+              description: Age of Bar.
+              type: string
+            bazs:
+              description: List of Bazs.
+              items:
+                type: string
+              type: array
+  status:
+    description: Status of Foo
+    type: object
+    properties:
+      bars:
+        description: List of Bars and their statuses.
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              description: Name of Bar.
+              type: string
+            available:
+              description: Whether the Bar is installed.
+              type: boolean
+            quxType:
+              description: Indicates to external qux type.
+              pattern: in-tree|out-of-tree
+              type: string`)
 
 // Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
 // Aware of the kubectl example files map.
@@ -211,7 +265,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		return f.NewClusterVerification(
 			f.Namespace,
 			framework.PodStateVerification{
-				Selectors:   map[string]string{"app": "redis"},
+				Selectors:   map[string]string{"app": "agnhost"},
 				ValidPhases: []v1.PodPhase{v1.PodRunning /*v1.PodPending*/},
 			})
 	}
@@ -287,7 +341,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			ginkgo.By("creating a replication controller")
 			framework.RunKubectlOrDieInput(nautilus, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
+			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
 
 		/*
@@ -300,15 +354,15 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			ginkgo.By("creating a replication controller")
 			framework.RunKubectlOrDieInput(nautilus, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
+			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			ginkgo.By("scaling down the replication controller")
 			debugDiscovery()
 			framework.RunKubectlOrDie("scale", "rc", "update-demo-nautilus", "--replicas=1", "--timeout=5m", fmt.Sprintf("--namespace=%v", ns))
-			framework.ValidateController(c, nautilusImage, 1, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
+			validateController(c, nautilusImage, 1, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			ginkgo.By("scaling up the replication controller")
 			debugDiscovery()
 			framework.RunKubectlOrDie("scale", "rc", "update-demo-nautilus", "--replicas=2", "--timeout=5m", fmt.Sprintf("--namespace=%v", ns))
-			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
+			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
 
 		/*
@@ -319,11 +373,11 @@ var _ = SIGDescribe("Kubectl client", func() {
 		framework.ConformanceIt("should do a rolling update of a replication controller ", func() {
 			ginkgo.By("creating the initial replication controller")
 			framework.RunKubectlOrDieInput(string(nautilus[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
+			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			ginkgo.By("rolling-update to new replication controller")
 			debugDiscovery()
 			framework.RunKubectlOrDieInput(string(kitten[:]), "rolling-update", "update-demo-nautilus", "--update-period=1s", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			framework.ValidateController(c, kittenImage, 2, "update-demo", updateDemoSelector, getUDData("kitten.jpg", ns), ns)
+			validateController(c, kittenImage, 2, "update-demo", updateDemoSelector, getUDData("kitten.jpg", ns), ns)
 			// Everything will hopefully be cleaned up when the namespace is deleted.
 		})
 	})
@@ -332,12 +386,12 @@ var _ = SIGDescribe("Kubectl client", func() {
 		forEachGBFile := func(run func(s string)) {
 			guestbookRoot := "test/e2e/testing-manifests/guestbook"
 			for _, gbAppFile := range []string{
-				"redis-slave-service.yaml",
-				"redis-master-service.yaml",
+				"agnhost-slave-service.yaml",
+				"agnhost-master-service.yaml",
 				"frontend-service.yaml",
 				"frontend-deployment.yaml.in",
-				"redis-master-deployment.yaml.in",
-				"redis-slave-deployment.yaml.in",
+				"agnhost-master-deployment.yaml.in",
+				"agnhost-slave-deployment.yaml.in",
 			} {
 				contents := commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile))))
 				run(contents)
@@ -347,7 +401,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		/*
 			Release : v1.9
 			Testname: Kubectl, guestbook application
-			Description: Create Guestbook application that contains redis server, 2 instances of redis slave, frontend application, frontend service and redis master service and redis slave service. Using frontend service, the test will write an entry into the guestbook application which will store the entry into the backend redis database. Application flow MUST work as expected and the data written MUST be available to read.
+			Description: Create Guestbook application that contains an agnhost master server, 2 agnhost slaves, frontend application, frontend service and agnhost master service and agnhost slave service. Using frontend service, the test will write an entry into the guestbook application which will store the entry into the backend agnhost store. Application flow MUST work as expected and the data written MUST be available to read.
 		*/
 		framework.ConformanceIt("should create and stop a working application ", func() {
 			defer forEachGBFile(func(contents string) {
@@ -361,6 +415,88 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			ginkgo.By("validating guestbook app")
 			validateGuestbookApp(c, ns)
+		})
+	})
+
+	ginkgo.Describe("kubectl get output", func() {
+		ginkgo.It("should contain custom columns for each resource", func() {
+			randString := rand.String(10)
+
+			ignoredResources := map[string]bool{
+				// ignored for intentionally using standard fields.
+				// This assumption is based on a lack of TableColumnDefinition
+				// in pkg/printers/internalversion/printers.go
+				"ClusterRole": true,
+				"LimitRange":  true,
+				"PodPreset":   true,
+
+				// ignored for being disruptive in an e2e, and getting automatically deleted by a controller
+				"Node": true,
+
+				// ignored temporarily while waiting for bug fix.
+				"ComponentStatus":    true,
+				"ClusterRoleBinding": true,
+				"ResourceQuota":      true,
+
+				// ignored because no test data exists.
+				// Do not add anything to this list, instead add fixtures in
+				// the test/integration/etcd package.
+				"BackendConfig":         true,
+				"NodeMetrics":           true,
+				"PodMetrics":            true,
+				"VolumeSnapshotClass":   true,
+				"VolumeSnapshotContent": true,
+				"VolumeSnapshot":        true,
+			}
+
+			apiGroups, err := c.Discovery().ServerPreferredResources()
+			framework.ExpectNoError(err)
+
+			testableResources := etcd.GetEtcdStorageDataForNamespace(f.Namespace.Name)
+
+			for _, group := range apiGroups {
+				// This limits the scope of this test to exclude CRDs. This
+				// assumes that CRDs will not have a .k8s.io group and will have
+				// a . in their name.
+				if !strings.Contains(group.GroupVersion, ".k8s.io") && strings.Contains(group.GroupVersion, ".") {
+					continue
+				}
+
+				for _, resource := range group.APIResources {
+					if !verbsContain(resource.Verbs, "get") || ignoredResources[resource.Kind] || strings.HasPrefix(resource.Name, "e2e-test") {
+						continue
+					}
+
+					// compute gvr
+					gv, err := schema.ParseGroupVersion(group.GroupVersion)
+					framework.ExpectNoError(err)
+					gvr := gv.WithResource(resource.Name)
+
+					// assert test data exists
+					testData := testableResources[gvr]
+					gomega.ExpectWithOffset(1, testData).ToNot(gomega.BeZero(), "No test data available for %s", gvr)
+
+					// create test resource
+					mapping := &meta.RESTMapping{
+						Resource:         gvr,
+						GroupVersionKind: gv.WithKind(resource.Kind),
+					}
+
+					if resource.Namespaced {
+						mapping.Scope = meta.RESTScopeNamespace
+					} else {
+						mapping.Scope = meta.RESTScopeRoot
+					}
+
+					client, obj, err := etcd.JSONToUnstructured(testData.Stub, f.Namespace.Name, mapping, f.DynamicClient)
+					framework.ExpectNoError(err)
+					if resource.Kind != "APIService" && resource.Kind != "CustomResourceDefinition" {
+						obj.SetName(obj.GetName() + randString)
+					}
+
+					createObjValidateOutputAndCleanup(client, obj, resource)
+				}
+			}
 		})
 	})
 
@@ -763,10 +899,10 @@ metadata:
 
 	ginkgo.Describe("Kubectl apply", func() {
 		ginkgo.It("should apply a new configuration to an existing RC", func() {
-			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
+			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
 
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
-			ginkgo.By("creating Redis RC")
+			ginkgo.By("creating Agnhost RC")
 			framework.RunKubectlOrDieInput(controllerJSON, "create", "-f", "-", nsFlag)
 			ginkgo.By("applying a modified configuration")
 			stdin := modifyReplicationControllerConfiguration(controllerJSON)
@@ -774,23 +910,23 @@ metadata:
 				WithStdinReader(stdin).
 				ExecOrDie()
 			ginkgo.By("checking the result")
-			forEachReplicationController(c, ns, "app", "redis", validateReplicationControllerConfiguration)
+			forEachReplicationController(c, ns, "app", "agnhost", validateReplicationControllerConfiguration)
 		})
 		ginkgo.It("should reuse port when apply to an existing SVC", func() {
-			serviceJSON := readTestFileOrDie(redisServiceFilename)
+			serviceJSON := readTestFileOrDie(agnhostServiceFilename)
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
-			ginkgo.By("creating Redis SVC")
+			ginkgo.By("creating Agnhost SVC")
 			framework.RunKubectlOrDieInput(string(serviceJSON[:]), "create", "-f", "-", nsFlag)
 
 			ginkgo.By("getting the original port")
-			originalNodePort := framework.RunKubectlOrDie("get", "service", "redis-master", nsFlag, "-o", "jsonpath={.spec.ports[0].port}")
+			originalNodePort := framework.RunKubectlOrDie("get", "service", "agnhost-master", nsFlag, "-o", "jsonpath={.spec.ports[0].port}")
 
 			ginkgo.By("applying the same configuration")
 			framework.RunKubectlOrDieInput(string(serviceJSON[:]), "apply", "-f", "-", nsFlag)
 
 			ginkgo.By("getting the port after applying configuration")
-			currentNodePort := framework.RunKubectlOrDie("get", "service", "redis-master", nsFlag, "-o", "jsonpath={.spec.ports[0].port}")
+			currentNodePort := framework.RunKubectlOrDie("get", "service", "agnhost-master", nsFlag, "-o", "jsonpath={.spec.ports[0].port}")
 
 			ginkgo.By("checking the result")
 			if originalNodePort != currentNodePort {
@@ -999,33 +1135,33 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, describe pod or rc
-			Description: Deploy a redis controller and a redis service. Kubectl describe pods SHOULD return the name, namespace, labels, state and other information as expected. Kubectl describe on rc, service, node and namespace SHOULD also return proper information.
+			Description: Deploy an agnhost controller and an agnhost service. Kubectl describe pods SHOULD return the name, namespace, labels, state and other information as expected. Kubectl describe on rc, service, node and namespace SHOULD also return proper information.
 		*/
 		framework.ConformanceIt("should check if kubectl describe prints relevant information for rc and pods ", func() {
-			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
-			serviceJSON := readTestFileOrDie(redisServiceFilename)
+			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
+			serviceJSON := readTestFileOrDie(agnhostServiceFilename)
 
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDieInput(controllerJSON, "create", "-f", "-", nsFlag)
 			framework.RunKubectlOrDieInput(string(serviceJSON[:]), "create", "-f", "-", nsFlag)
 
-			ginkgo.By("Waiting for Redis master to start.")
+			ginkgo.By("Waiting for Agnhost master to start.")
 			waitForOrFailWithDebug(1)
 
 			// Pod
 			forEachPod(func(pod v1.Pod) {
 				output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
 				requiredStrings := [][]string{
-					{"Name:", "redis-master-"},
+					{"Name:", "agnhost-master-"},
 					{"Namespace:", ns},
 					{"Node:"},
-					{"Labels:", "app=redis"},
+					{"Labels:", "app=agnhost"},
 					{"role=master"},
 					{"Annotations:"},
 					{"Status:", "Running"},
 					{"IP:"},
-					{"Controlled By:", "ReplicationController/redis-master"},
-					{"Image:", redisImage},
+					{"Controlled By:", "ReplicationController/agnhost-master"},
+					{"Image:", agnhostImage},
 					{"State:", "Running"},
 					{"QoS Class:", "BestEffort"},
 				}
@@ -1034,28 +1170,28 @@ metadata:
 
 			// Rc
 			requiredStrings := [][]string{
-				{"Name:", "redis-master"},
+				{"Name:", "agnhost-master"},
 				{"Namespace:", ns},
-				{"Selector:", "app=redis,role=master"},
-				{"Labels:", "app=redis"},
+				{"Selector:", "app=agnhost,role=master"},
+				{"Labels:", "app=agnhost"},
 				{"role=master"},
 				{"Annotations:"},
 				{"Replicas:", "1 current", "1 desired"},
 				{"Pods Status:", "1 Running", "0 Waiting", "0 Succeeded", "0 Failed"},
 				{"Pod Template:"},
-				{"Image:", redisImage},
+				{"Image:", agnhostImage},
 				{"Events:"}}
-			checkKubectlOutputWithRetry(requiredStrings, "describe", "rc", "redis-master", nsFlag)
+			checkKubectlOutputWithRetry(requiredStrings, "describe", "rc", "agnhost-master", nsFlag)
 
 			// Service
-			output := framework.RunKubectlOrDie("describe", "service", "redis-master", nsFlag)
+			output := framework.RunKubectlOrDie("describe", "service", "agnhost-master", nsFlag)
 			requiredStrings = [][]string{
-				{"Name:", "redis-master"},
+				{"Name:", "agnhost-master"},
 				{"Namespace:", ns},
-				{"Labels:", "app=redis"},
+				{"Labels:", "app=agnhost"},
 				{"role=master"},
 				{"Annotations:"},
-				{"Selector:", "app=redis", "role=master"},
+				{"Selector:", "app=agnhost", "role=master"},
 				{"Type:", "ClusterIP"},
 				{"IP:"},
 				{"Port:", "<unset>", "6379/TCP"},
@@ -1098,31 +1234,67 @@ metadata:
 
 			// Quota and limitrange are skipped for now.
 		})
+
+		ginkgo.It("should check if kubectl describe prints relevant information for cronjob", func() {
+			ginkgo.By("creating a cronjob")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			cronjobYaml := commonutils.SubstituteImageName(string(readTestFileOrDie("busybox-cronjob.yaml")))
+			framework.RunKubectlOrDieInput(cronjobYaml, "create", "-f", "-", nsFlag)
+
+			ginkgo.By("waiting for cronjob to start.")
+			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+				cj, err := c.BatchV1beta1().CronJobs(ns).List(metav1.ListOptions{})
+				if err != nil {
+					return false, fmt.Errorf("Failed getting CronJob %s: %v", ns, err)
+				}
+				return len(cj.Items) > 0, nil
+			})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("verifying kubectl describe prints")
+			output := framework.RunKubectlOrDie("describe", "cronjob", "cronjob-test", nsFlag)
+			requiredStrings := [][]string{
+				{"Name:", "cronjob-test"},
+				{"Namespace:", ns},
+				{"Labels:"},
+				{"Annotations:"},
+				{"Schedule:", "*/1 * * * *"},
+				{"Concurrency Policy:", "Allow"},
+				{"Suspend:", "False"},
+				{"Successful Job History Limit:", "3"},
+				{"Failed Job History Limit:", "1"},
+				{"Starting Deadline Seconds:", "30s"},
+				{"Selector:"},
+				{"Parallelism:"},
+				{"Completions:"},
+			}
+			checkOutput(output, requiredStrings)
+		})
 	})
 
 	ginkgo.Describe("Kubectl expose", func() {
 		/*
 			Release : v1.9
 			Testname: Kubectl, create service, replication controller
-			Description: Create a Pod running redis master listening to port 6379. Using kubectl expose the redis master  replication controllers at port 1234. Validate that the replication controller is listening on port 1234 and the target port is set to 6379, port that redis master is listening. Using kubectl expose the redis master as a service at port 2345. The service MUST be listening on port 2345 and the target port is set to 6379, port that redis master is listening.
+			Description: Create a Pod running agnhost listening to port 6379. Using kubectl expose the agnhost master replication controllers at port 1234. Validate that the replication controller is listening on port 1234 and the target port is set to 6379, port that agnhost master is listening. Using kubectl expose the agnhost master as a service at port 2345. The service MUST be listening on port 2345 and the target port is set to 6379, port that agnhost master is listening.
 		*/
 		framework.ConformanceIt("should create services for rc ", func() {
-			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
+			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
-			redisPort := 6379
+			agnhostPort := 6379
 
-			ginkgo.By("creating Redis RC")
+			ginkgo.By("creating Agnhost RC")
 
 			framework.Logf("namespace %v", ns)
 			framework.RunKubectlOrDieInput(controllerJSON, "create", "-f", "-", nsFlag)
 
 			// It may take a while for the pods to get registered in some cases, wait to be sure.
-			ginkgo.By("Waiting for Redis master to start.")
+			ginkgo.By("Waiting for Agnhost master to start.")
 			waitForOrFailWithDebug(1)
 			forEachPod(func(pod v1.Pod) {
-				framework.Logf("wait on redis-master startup in %v ", ns)
-				framework.LookForStringInLog(ns, pod.Name, "redis-master", "Ready to accept connections", framework.PodStartTimeout)
+				framework.Logf("wait on agnhost-master startup in %v ", ns)
+				framework.LookForStringInLog(ns, pod.Name, "agnhost-master", "Paused", framework.PodStartTimeout)
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
 				err := wait.Poll(framework.Poll, timeout, func() (bool, error) {
@@ -1149,7 +1321,7 @@ metadata:
 						framework.Failf("Too many endpoints found")
 					}
 					for _, port := range uidToPort {
-						if port[0] != redisPort {
+						if port[0] != agnhostPort {
 							framework.Failf("Wrong endpoint port: %d", port[0])
 						}
 					}
@@ -1167,18 +1339,18 @@ metadata:
 				if port.Port != int32(servicePort) {
 					framework.Failf("Wrong service port: %d", port.Port)
 				}
-				if port.TargetPort.IntValue() != redisPort {
+				if port.TargetPort.IntValue() != agnhostPort {
 					framework.Failf("Wrong target port: %d", port.TargetPort.IntValue())
 				}
 			}
 
 			ginkgo.By("exposing RC")
-			framework.RunKubectlOrDie("expose", "rc", "redis-master", "--name=rm2", "--port=1234", fmt.Sprintf("--target-port=%d", redisPort), nsFlag)
+			framework.RunKubectlOrDie("expose", "rc", "agnhost-master", "--name=rm2", "--port=1234", fmt.Sprintf("--target-port=%d", agnhostPort), nsFlag)
 			framework.WaitForService(c, ns, "rm2", true, framework.Poll, framework.ServiceStartTimeout)
 			validateService("rm2", 1234, framework.ServiceStartTimeout)
 
 			ginkgo.By("exposing service")
-			framework.RunKubectlOrDie("expose", "service", "rm2", "--name=rm3", "--port=2345", fmt.Sprintf("--target-port=%d", redisPort), nsFlag)
+			framework.RunKubectlOrDie("expose", "service", "rm2", "--name=rm3", "--port=2345", fmt.Sprintf("--target-port=%d", agnhostPort), nsFlag)
 			framework.WaitForService(c, ns, "rm3", true, framework.Poll, framework.ServiceStartTimeout)
 			validateService("rm3", 2345, framework.ServiceStartTimeout)
 		})
@@ -1348,14 +1520,14 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, patch to annotate
-			Description: Start running a redis master and a replication controller. When the pod is running, using ‘kubectl patch’ command add annotations. The annotation MUST be added to running pods and SHOULD be able to read added annotations from each of the Pods running under the replication controller.
+			Description: Start running agnhost and a replication controller. When the pod is running, using ‘kubectl patch’ command add annotations. The annotation MUST be added to running pods and SHOULD be able to read added annotations from each of the Pods running under the replication controller.
 		*/
 		framework.ConformanceIt("should add annotations for pods in rc ", func() {
-			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
+			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
-			ginkgo.By("creating Redis RC")
+			ginkgo.By("creating Agnhost RC")
 			framework.RunKubectlOrDieInput(controllerJSON, "create", "-f", "-", nsFlag)
-			ginkgo.By("Waiting for Redis master to start.")
+			ginkgo.By("Waiting for Agnhost master to start.")
 			waitForOrFailWithDebug(1)
 			ginkgo.By("patching all pods")
 			forEachPod(func(pod v1.Pod) {
@@ -1524,13 +1696,13 @@ metadata:
 			if checkContainersImage(containers, httpdImage) {
 				framework.Failf("Failed creating rc %s for 1 pod with expected image %s", rcName, httpdImage)
 			}
-			framework.WaitForRCToStabilize(c, ns, rcName, framework.PodStartTimeout)
+			waitForRCToStabilize(c, ns, rcName, framework.PodStartTimeout)
 
 			ginkgo.By("rolling-update to same image controller")
 
 			debugDiscovery()
 			runKubectlRetryOrDie("rolling-update", rcName, "--update-period=1s", "--image="+httpdImage, "--image-pull-policy="+string(v1.PullIfNotPresent), nsFlag)
-			framework.ValidateController(c, httpdImage, 1, rcName, "run="+rcName, noOpValidatorFn, ns)
+			validateController(c, httpdImage, 1, rcName, "run="+rcName, noOpValidatorFn, ns)
 		})
 	})
 
@@ -2134,17 +2306,17 @@ func validateGuestbookApp(c clientset.Interface, ns string) {
 	err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
 	framework.ExpectNoError(err)
 	framework.Logf("Waiting for frontend to serve content.")
-	if !waitForGuestbookResponse(c, "get", "", `{"data": ""}`, guestbookStartupTimeout, ns) {
+	if !waitForGuestbookResponse(c, "get", "", `{"data":""}`, guestbookStartupTimeout, ns) {
 		framework.Failf("Frontend service did not start serving content in %v seconds.", guestbookStartupTimeout.Seconds())
 	}
 
 	framework.Logf("Trying to add a new entry to the guestbook.")
-	if !waitForGuestbookResponse(c, "set", "TestEntry", `{"message": "Updated"}`, guestbookResponseTimeout, ns) {
+	if !waitForGuestbookResponse(c, "set", "TestEntry", `{"message":"Updated"}`, guestbookResponseTimeout, ns) {
 		framework.Failf("Cannot added new entry in %v seconds.", guestbookResponseTimeout.Seconds())
 	}
 
 	framework.Logf("Verifying that added entry can be retrieved.")
-	if !waitForGuestbookResponse(c, "get", "", `{"data": "TestEntry"}`, guestbookResponseTimeout, ns) {
+	if !waitForGuestbookResponse(c, "get", "", `{"data":"TestEntry"}`, guestbookResponseTimeout, ns) {
 		framework.Failf("Entry to guestbook wasn't correctly added in %v seconds.", guestbookResponseTimeout.Seconds())
 	}
 }
@@ -2173,7 +2345,7 @@ func makeRequestToGuestbook(c clientset.Interface, cmd, value string, ns string)
 	result, err := proxyRequest.Namespace(ns).
 		Context(ctx).
 		Name("frontend").
-		Suffix("/guestbook.php").
+		Suffix("/guestbook").
 		Param("cmd", cmd).
 		Param("key", "messages").
 		Param("value", value).
@@ -2233,7 +2405,7 @@ func forEachReplicationController(c clientset.Interface, ns, selectorKey, select
 }
 
 func validateReplicationControllerConfiguration(rc v1.ReplicationController) {
-	if rc.Name == "redis-master" {
+	if rc.Name == "agnhost-master" {
 		if _, ok := rc.Annotations[v1.LastAppliedConfigAnnotation]; !ok {
 			framework.Failf("Annotation not found in modified configuration:\n%v\n", rc)
 		}
@@ -2332,49 +2504,143 @@ func createApplyCustomResource(resource, namespace, name string, crd *crd.TestCr
 	return nil
 }
 
-var schemaFoo = []byte(`description: Foo CRD for Testing
-type: object
-properties:
-  spec:
-    type: object
-    description: Specification of Foo
-    properties:
-      bars:
-        description: List of Bars and their specs.
-        type: array
-        items:
-          type: object
-          required:
-          - name
-          properties:
-            name:
-              description: Name of Bar.
-              type: string
-            age:
-              description: Age of Bar.
-              type: string
-            bazs:
-              description: List of Bazs.
-              items:
-                type: string
-              type: array
-  status:
-    description: Status of Foo
-    type: object
-    properties:
-      bars:
-        description: List of Bars and their statuses.
-        type: array
-        items:
-          type: object
-          properties:
-            name:
-              description: Name of Bar.
-              type: string
-            available:
-              description: Whether the Bar is installed.
-              type: boolean
-            quxType:
-              description: Indicates to external qux type.
-              pattern: in-tree|out-of-tree
-              type: string`)
+// trimDockerRegistry is the function for trimming the docker.io/library from the beginning of the imagename.
+// If community docker installed it will not prefix the registry names with the dockerimages vs registry names prefixed with other runtimes or docker installed via RHEL extra repo.
+// So this function will help to trim the docker.io/library if exists
+func trimDockerRegistry(imagename string) string {
+	imagename = strings.Replace(imagename, "docker.io/", "", 1)
+	return strings.Replace(imagename, "library/", "", 1)
+}
+
+// validatorFn is the function which is individual tests will implement.
+// we may want it to return more than just an error, at some point.
+type validatorFn func(c clientset.Interface, podID string) error
+
+// validateController is a generic mechanism for testing RC's that are running.
+// It takes a container name, a test name, and a validator function which is plugged in by a specific test.
+// "containername": this is grepped for.
+// "containerImage" : this is the name of the image we expect to be launched.  Not to confuse w/ images (kitten.jpg)  which are validated.
+// "testname":  which gets bubbled up to the logging/failure messages if errors happen.
+// "validator" function: This function is given a podID and a client, and it can do some specific validations that way.
+func validateController(c clientset.Interface, containerImage string, replicas int, containername string, testname string, validator validatorFn, ns string) {
+	containerImage = trimDockerRegistry(containerImage)
+	getPodsTemplate := "--template={{range.items}}{{.metadata.name}} {{end}}"
+
+	getContainerStateTemplate := fmt.Sprintf(`--template={{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if (and (eq .name "%s") (exists . "state" "running"))}}true{{end}}{{end}}{{end}}`, containername)
+
+	getImageTemplate := fmt.Sprintf(`--template={{if (exists . "spec" "containers")}}{{range .spec.containers}}{{if eq .name "%s"}}{{.image}}{{end}}{{end}}{{end}}`, containername)
+
+	ginkgo.By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
+waitLoop:
+	for start := time.Now(); time.Since(start) < framework.PodStartTimeout; time.Sleep(5 * time.Second) {
+		getPodsOutput := framework.RunKubectlOrDie("get", "pods", "-o", "template", getPodsTemplate, "-l", testname, fmt.Sprintf("--namespace=%v", ns))
+		pods := strings.Fields(getPodsOutput)
+		if numPods := len(pods); numPods != replicas {
+			ginkgo.By(fmt.Sprintf("Replicas for %s: expected=%d actual=%d", testname, replicas, numPods))
+			continue
+		}
+		var runningPods []string
+		for _, podID := range pods {
+			running := framework.RunKubectlOrDie("get", "pods", podID, "-o", "template", getContainerStateTemplate, fmt.Sprintf("--namespace=%v", ns))
+			if running != "true" {
+				framework.Logf("%s is created but not running", podID)
+				continue waitLoop
+			}
+
+			currentImage := framework.RunKubectlOrDie("get", "pods", podID, "-o", "template", getImageTemplate, fmt.Sprintf("--namespace=%v", ns))
+			currentImage = trimDockerRegistry(currentImage)
+			if currentImage != containerImage {
+				framework.Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, containerImage, currentImage)
+				continue waitLoop
+			}
+
+			// Call the generic validator function here.
+			// This might validate for example, that (1) getting a url works and (2) url is serving correct content.
+			if err := validator(c, podID); err != nil {
+				framework.Logf("%s is running right image but validator function failed: %v", podID, err)
+				continue waitLoop
+			}
+
+			framework.Logf("%s is verified up and running", podID)
+			runningPods = append(runningPods, podID)
+		}
+		// If we reach here, then all our checks passed.
+		if len(runningPods) == replicas {
+			return
+		}
+	}
+	// Reaching here means that one of more checks failed multiple times.  Assuming its not a race condition, something is broken.
+	framework.Failf("Timed out after %v seconds waiting for %s pods to reach valid state", framework.PodStartTimeout.Seconds(), testname)
+}
+
+// verbsContain returns true if the provided list of verbs contain the provided
+// verb string.
+func verbsContain(verbs metav1.Verbs, str string) bool {
+	for _, v := range verbs {
+		if v == str {
+			return true
+		}
+	}
+	return false
+}
+
+// deleteObj deletes an Object with the provided client and name.
+func deleteObj(client dynamic.ResourceInterface, name string) {
+	err := client.Delete(name, &metav1.DeleteOptions{})
+	framework.ExpectNoError(err)
+}
+
+// createObjValidateOutputAndCleanup creates an object using the provided client
+// and then verifies that the kubectl get output provides custom columns. Once
+// the test has completed, it deletes the object.
+func createObjValidateOutputAndCleanup(client dynamic.ResourceInterface, obj *unstructured.Unstructured, resource metav1.APIResource) {
+	_, err := client.Create(obj, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+	defer deleteObj(client, obj.GetName())
+
+	// get test resource
+	output := framework.RunKubectlOrDie("get", resource.Name, "--all-namespaces")
+	if output == "" {
+		framework.Failf("No stdout from kubectl get for %s (likely need to define test resources)", resource.Name)
+	}
+
+	splitOutput := strings.SplitN(output, "\n", 2)
+	fields := strings.Fields(splitOutput[0])
+	if resource.Namespaced {
+		framework.ExpectNotEqual(fields, []string{"NAMESPACE", "NAME", "CREATED", "AT"}, fmt.Sprintf("expected non-default fields for namespaced resource: %s", resource.Name))
+	} else {
+		framework.ExpectNotEqual(fields, []string{"NAME", "AGE"}, fmt.Sprintf("expected non-default fields for resource: %s", resource.Name))
+	}
+}
+
+// waitForRCToStabilize waits till the RC has a matching generation/replica count between spec and status.
+func waitForRCToStabilize(c clientset.Interface, ns, name string, timeout time.Duration) error {
+	options := metav1.ListOptions{FieldSelector: fields.Set{
+		"metadata.name":      name,
+		"metadata.namespace": ns,
+	}.AsSelector().String()}
+	w, err := c.CoreV1().ReplicationControllers(ns).Watch(options)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+	defer cancel()
+	_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
+		switch event.Type {
+		case watch.Deleted:
+			return false, apierrs.NewNotFound(schema.GroupResource{Resource: "replicationcontrollers"}, "")
+		}
+		switch rc := event.Object.(type) {
+		case *v1.ReplicationController:
+			if rc.Name == name && rc.Namespace == ns &&
+				rc.Generation <= rc.Status.ObservedGeneration &&
+				*(rc.Spec.Replicas) == rc.Status.Replicas {
+				return true, nil
+			}
+			framework.Logf("Waiting for rc %s to stabilize, generation %v observed generation %v spec.replicas %d status.replicas %d",
+				name, rc.Generation, rc.Status.ObservedGeneration, *(rc.Spec.Replicas), rc.Status.Replicas)
+		}
+		return false, nil
+	})
+	return err
+}

@@ -93,6 +93,9 @@ the cloud specific control loops shipped with Kubernetes.`,
 		// the gce cloudprovider is removed.
 		globalflag.Register(namedFlagSets.FlagSet("generic"), "cloud-provider-gce-lb-src-cidrs")
 	}
+	if flag.CommandLine.Lookup("cloud-provider-gce-l7lb-src-cidrs") != nil {
+		globalflag.Register(namedFlagSets.FlagSet("generic"), "cloud-provider-gce-l7lb-src-cidrs")
+	}
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}

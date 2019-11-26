@@ -267,5 +267,6 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	framework.ExpectNoError(err, "Error waiting for pod to run %v", pod)
 
 	content, err = f.ReadFileViaContainer(pod.Name, "test-container", testFilePath)
+	framework.ExpectNoError(err, "Error reading file via container")
 	gomega.Expect(content).NotTo(gomega.ContainSubstring(testContent))
 }

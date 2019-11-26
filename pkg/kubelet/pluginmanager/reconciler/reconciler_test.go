@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
+	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/operationexecutor"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher"
@@ -121,7 +121,7 @@ func NewDummyImpl() *DummyImpl {
 }
 
 // ValidatePlugin is a dummy implementation
-func (d *DummyImpl) ValidatePlugin(pluginName string, endpoint string, versions []string, foundInDeprecatedDir bool) error {
+func (d *DummyImpl) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
 	return nil
 }
 
@@ -193,7 +193,7 @@ func Test_Run_Positive_Register(t *testing.T) {
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 	timestampBeforeRegistration := time.Now()
-	dsw.AddOrUpdatePlugin(socketPath, false /* foundInDeprecatedDir */)
+	dsw.AddOrUpdatePlugin(socketPath)
 	waitForRegistration(t, socketPath, timestampBeforeRegistration, asw)
 
 	// Get asw plugins; it should contain the added plugin
@@ -239,7 +239,7 @@ func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 	timestampBeforeRegistration := time.Now()
-	dsw.AddOrUpdatePlugin(socketPath, false /* foundInDeprecatedDir */)
+	dsw.AddOrUpdatePlugin(socketPath)
 	waitForRegistration(t, socketPath, timestampBeforeRegistration, asw)
 
 	// Get asw plugins; it should contain the added plugin
@@ -294,12 +294,12 @@ func Test_Run_Positive_ReRegister(t *testing.T) {
 	p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 	timestampBeforeRegistration := time.Now()
-	dsw.AddOrUpdatePlugin(socketPath, false /* foundInDeprecatedDir */)
+	dsw.AddOrUpdatePlugin(socketPath)
 	waitForRegistration(t, socketPath, timestampBeforeRegistration, asw)
 
 	timeStampBeforeReRegistration := time.Now()
 	// Add the plugin again to update the timestamp
-	dsw.AddOrUpdatePlugin(socketPath, false /* foundInDeprecatedDir */)
+	dsw.AddOrUpdatePlugin(socketPath)
 	// This should trigger a deregistration and a regitration
 	// The process of unregistration and reregistration can happen so fast that
 	// we are not able to catch it with waitForUnregistration, so here we are checking

@@ -60,15 +60,12 @@ func ReadEgressSelectorConfiguration(configFilePath string) (*apiserver.EgressSe
 	if decodedConfig.Kind != "EgressSelectorConfiguration" {
 		return nil, fmt.Errorf("invalid service configuration object %q", decodedConfig.Kind)
 	}
-	config, err := cfgScheme.ConvertToVersion(&decodedConfig, apiserver.SchemeGroupVersion)
-	if err != nil {
+	internalConfig := &apiserver.EgressSelectorConfiguration{}
+	if err := cfgScheme.Convert(&decodedConfig, internalConfig, nil); err != nil {
 		// we got an error where the decode wasn't related to a missing type
 		return nil, err
 	}
-	if internalConfig, ok := config.(*apiserver.EgressSelectorConfiguration); ok {
-		return internalConfig, nil
-	}
-	return nil, fmt.Errorf("unable to convert %T to *apiserver.EgressSelectorConfiguration", config)
+	return internalConfig, nil
 }
 
 // ValidateEgressSelectorConfiguration checks the apiserver.EgressSelectorConfiguration for

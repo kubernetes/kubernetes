@@ -19,7 +19,6 @@ go_library(
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/kubelet/config:go_default_library",
-        "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/volumepathhandler:go_default_library",
@@ -30,6 +29,7 @@ go_library(
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/keymutex:go_default_library",
+        "//vendor/k8s.io/utils/mount:go_default_library",
         "//vendor/k8s.io/utils/strings:go_default_library",
     ],
 )
@@ -42,7 +42,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -50,6 +49,8 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
+        "//vendor/k8s.io/utils/exec/testing:go_default_library",
+        "//vendor/k8s.io/utils/mount:go_default_library",
     ],
 )
 

@@ -31,17 +31,14 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"k8s.io/klog"
 )
 
 const (
-	warning3K    = 100
-	threshold3K  = 30
-	threshold30K = 30
-	threshold60K = 30
+	warning3K   = 100
+	threshold3K = 30
 )
 
 var (
@@ -118,12 +115,13 @@ type testConfig struct {
 
 // getBaseConfig returns baseConfig after initializing number of nodes and pods.
 func getBaseConfig(nodes int, pods int) *testConfig {
-	destroyFunc, clientset := mustSetupScheduler()
+	destroyFunc, podInformer, clientset := mustSetupScheduler()
 	return &testConfig{
 		clientset:   clientset,
 		destroyFunc: destroyFunc,
 		numNodes:    nodes,
 		numPods:     pods,
+		podInformer: podInformer,
 	}
 }
 
@@ -140,11 +138,10 @@ func schedulePods(config *testConfig) int32 {
 	minQPS := int32(math.MaxInt32)
 	start := time.Now()
 
-	podInformer := factory.NewPodInformer(config.clientset, 0)
 	// Bake in time for the first pod scheduling event.
 	for {
 		time.Sleep(50 * time.Millisecond)
-		scheduled, err := getScheduledPods(podInformer)
+		scheduled, err := getScheduledPods(config.podInformer)
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}

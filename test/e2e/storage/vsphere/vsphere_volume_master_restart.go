@@ -18,6 +18,8 @@ package vsphere
 
 import (
 	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -26,10 +28,28 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
+
+// waitForKubeletUp waits for the kubelet on the given host to be up.
+func waitForKubeletUp(host string) error {
+	cmd := "curl http://localhost:" + strconv.Itoa(ports.KubeletReadOnlyPort) + "/healthz"
+	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
+		result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
+		if err != nil || result.Code != 0 {
+			e2essh.LogResult(result)
+		}
+		if result.Stdout == "ok" {
+			return nil
+		}
+	}
+	return fmt.Errorf("waiting for kubelet timed out")
+}
 
 /*
 	Test to verify volume remains attached after kubelet restart on master node
@@ -63,7 +83,8 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 		namespace = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
 
-		nodes := framework.GetReadySchedulableNodesOrDie(client)
+		nodes, err := e2enode.GetReadySchedulableNodes(client)
+		framework.ExpectNoError(err)
 		numNodes = len(nodes.Items)
 		if numNodes < 2 {
 			framework.Skipf("Requires at least %d nodes (not %d)", 2, len(nodes.Items))
@@ -115,7 +136,7 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 		framework.ExpectNoError(err, "Unable to restart kubelet on master node")
 
 		ginkgo.By("Verifying the kubelet on master node is up")
-		err = framework.WaitForKubeletUp(masterAddress)
+		err = waitForKubeletUp(masterAddress)
 		framework.ExpectNoError(err)
 
 		for i, pod := range pods {

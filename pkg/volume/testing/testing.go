@@ -20,12 +20,16 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"k8s.io/utils/exec"
+	testingexec "k8s.io/utils/exec/testing"
+	"k8s.io/utils/mount"
+	utilstrings "k8s.io/utils/strings"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -33,21 +37,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/util/mount"
 	. "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
-	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -68,58 +72,61 @@ const (
 type fakeVolumeHost struct {
 	rootDir         string
 	kubeClient      clientset.Interface
-	pluginMgr       VolumePluginMgr
+	pluginMgr       *VolumePluginMgr
 	cloud           cloudprovider.Interface
 	mounter         mount.Interface
 	hostUtil        hostutil.HostUtils
-	exec            mount.Exec
+	exec            *testingexec.FakeExec
 	nodeLabels      map[string]string
 	nodeName        string
 	subpather       subpath.Interface
 	csiDriverLister storagelisters.CSIDriverLister
 	informerFactory informers.SharedInformerFactory
+	kubeletErr      error
+	mux             sync.Mutex
 }
 
 var _ VolumeHost = &fakeVolumeHost{}
 var _ AttachDetachVolumeHost = &fakeVolumeHost{}
 
-func NewFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeVolumeHost {
-	return newFakeVolumeHost(rootDir, kubeClient, plugins, nil, nil)
+func NewFakeVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeVolumeHost {
+	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, nil, "", nil)
 }
 
-func NewFakeVolumeHostWithCloudProvider(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface) *fakeVolumeHost {
-	return newFakeVolumeHost(rootDir, kubeClient, plugins, cloud, nil)
+func NewFakeVolumeHostWithCloudProvider(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface) *fakeVolumeHost {
+	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, cloud, nil, "", nil)
 }
 
-func NewFakeVolumeHostWithNodeLabels(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, labels map[string]string) *fakeVolumeHost {
-	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil, nil)
+func NewFakeVolumeHostWithNodeLabels(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, labels map[string]string) *fakeVolumeHost {
+	volHost := newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, nil, "", nil)
 	volHost.nodeLabels = labels
 	return volHost
 }
 
-func NewFakeVolumeHostWithCSINodeName(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelisters.CSIDriverLister) *fakeVolumeHost {
-	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil, nil)
-	volHost.nodeName = nodeName
-	if driverLister != nil {
-		volHost.csiDriverLister = driverLister
-	}
-	return volHost
+func NewFakeVolumeHostWithCSINodeName(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string, driverLister storagelisters.CSIDriverLister) *fakeVolumeHost {
+	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, nil, nodeName, driverLister)
 }
 
-func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface, pathToTypeMap map[string]hostutil.FileType) *fakeVolumeHost {
-	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: cloud}
-	host.mounter = &mount.FakeMounter{}
+func NewFakeVolumeHostWithMounterFSType(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType) *fakeVolumeHost {
+	return newFakeVolumeHost(t, rootDir, kubeClient, plugins, nil, pathToTypeMap, "", nil)
+}
+
+func newFakeVolumeHost(t *testing.T, rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface, pathToTypeMap map[string]hostutil.FileType, nodeName string, driverLister storagelisters.CSIDriverLister) *fakeVolumeHost {
+	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: cloud, nodeName: nodeName, csiDriverLister: driverLister}
+	host.mounter = mount.NewFakeMounter(nil)
 	host.hostUtil = hostutil.NewFakeHostUtil(pathToTypeMap)
-	host.exec = mount.NewFakeExec(nil)
-	host.pluginMgr.InitPlugins(plugins, nil /* prober */, host)
+	host.exec = &testingexec.FakeExec{DisableScripts: true}
+	host.pluginMgr = &VolumePluginMgr{}
+	if err := host.pluginMgr.InitPlugins(plugins, nil /* prober */, host); err != nil {
+		t.Fatalf("Failed to init plugins while creating fake volume host: %v", err)
+	}
 	host.subpather = &subpath.FakeSubpath{}
 	host.informerFactory = informers.NewSharedInformerFactory(kubeClient, time.Minute)
+	// Wait until the InitPlugins setup is finished before returning from this setup func
+	if err := host.WaitForKubeletErrNil(); err != nil {
+		t.Fatalf("Failed to wait for kubelet err to be nil while creating fake volume host: %v", err)
+	}
 	return host
-}
-
-func NewFakeVolumeHostWithMounterFSType(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType) *fakeVolumeHost {
-	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil, pathToTypeMap)
-	return volHost
 }
 
 func (f *fakeVolumeHost) GetPluginDir(podUID string) string {
@@ -164,6 +171,10 @@ func (f *fakeVolumeHost) GetHostUtil() hostutil.HostUtils {
 
 func (f *fakeVolumeHost) GetSubpather() subpath.Interface {
 	return f.subpather
+}
+
+func (f *fakeVolumeHost) GetPluginMgr() *VolumePluginMgr {
+	return f.pluginMgr
 }
 
 func (f *fakeVolumeHost) NewWrapperMounter(volName string, spec Spec, pod *v1.Pod, opts VolumeOptions) (Mounter, error) {
@@ -212,7 +223,7 @@ func (f *fakeVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secre
 	}
 }
 
-func (f *fakeVolumeHost) GetExec(pluginName string) mount.Exec {
+func (f *fakeVolumeHost) GetExec(pluginName string) exec.Interface {
 	return f.exec
 }
 
@@ -245,6 +256,64 @@ func (f *fakeVolumeHost) GetNodeName() types.NodeName {
 
 func (f *fakeVolumeHost) GetEventRecorder() record.EventRecorder {
 	return nil
+}
+
+func (f *fakeVolumeHost) ScriptCommands(scripts []CommandScript) {
+	ScriptCommands(f.exec, scripts)
+}
+
+// CommandScript is used to pre-configure a command that will be executed and
+// optionally set it's output (stdout and stderr combined) and return code.
+type CommandScript struct {
+	// Cmd is the command to execute, e.g. "ls"
+	Cmd string
+	// Args is a slice of arguments to pass to the command, e.g. "-a"
+	Args []string
+	// Output is the combined stdout and stderr of the command to return
+	Output string
+	// ReturnCode is the exit code for the command. Setting this to non-zero will
+	// cause the command to return an error with this exit code set.
+	ReturnCode int
+}
+
+// ScriptCommands configures fe, the FakeExec, to have a pre-configured list of
+// commands to expect. Calling more commands using fe than those scripted will
+// result in a panic. By default, the fe does not enforce command argument checking
+// or order -- if you have given an Output to the command, the first command scripted
+// will return its output on the first command call, even if the command called is
+// different than the one scripted. This is mostly useful to make sure that the
+// right number of commands were called. If you want to check the exact commands
+// and arguments were called, set fe.ExectOrder to true.
+func ScriptCommands(fe *testingexec.FakeExec, scripts []CommandScript) {
+	fe.DisableScripts = false
+	for _, script := range scripts {
+		fakeCmd := &testingexec.FakeCmd{}
+		cmdAction := makeFakeCmd(fakeCmd, script.Cmd, script.Args...)
+		outputAction := makeFakeOutput(script.Output, script.ReturnCode)
+		fakeCmd.CombinedOutputScript = append(fakeCmd.CombinedOutputScript, outputAction)
+		fe.CommandScript = append(fe.CommandScript, cmdAction)
+	}
+}
+
+func makeFakeCmd(fakeCmd *testingexec.FakeCmd, cmd string, args ...string) testingexec.FakeCommandAction {
+	fc := fakeCmd
+	c := cmd
+	a := args
+	return func(cmd string, args ...string) exec.Cmd {
+		command := testingexec.InitFakeCmd(fc, c, a...)
+		return command
+	}
+}
+
+func makeFakeOutput(output string, rc int) testingexec.FakeCombinedOutputAction {
+	o := output
+	var e error
+	if rc != 0 {
+		e = testingexec.FakeExitError{Status: rc}
+	}
+	return func() ([]byte, error) {
+		return []byte(o), e
+	}
 }
 
 func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
@@ -348,10 +417,6 @@ func (plugin *FakeVolumePlugin) GetVolumeName(spec *Spec) (string, error) {
 func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
 	// TODO: maybe pattern-match on spec.Name() to decide?
 	return true
-}
-
-func (plugin *FakeVolumePlugin) IsMigratedToCSI() bool {
-	return false
 }
 
 func (plugin *FakeVolumePlugin) RequiresRemount() bool {
@@ -592,10 +657,6 @@ func (f *FakeBasicVolumePlugin) CanSupport(spec *Spec) bool {
 	return strings.HasPrefix(spec.Name(), f.GetPluginName())
 }
 
-func (plugin *FakeBasicVolumePlugin) IsMigratedToCSI() bool {
-	return false
-}
-
 func (f *FakeBasicVolumePlugin) ConstructVolumeSpec(ame, mountPath string) (*Spec, error) {
 	return f.Plugin.ConstructVolumeSpec(ame, mountPath)
 }
@@ -689,10 +750,6 @@ func (plugin *FakeFileVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *FakeFileVolumePlugin) IsMigratedToCSI() bool {
-	return false
-}
-
 func (plugin *FakeFileVolumePlugin) RequiresRemount() bool {
 	return false
 }
@@ -743,7 +800,8 @@ type FakeVolume struct {
 	GetDeviceMountPathCallCount int
 	SetUpDeviceCallCount        int
 	TearDownDeviceCallCount     int
-	MapDeviceCallCount          int
+	MapPodDeviceCallCount       int
+	UnmapPodDeviceCallCount     int
 	GlobalMapPathCallCount      int
 	PodDeviceMapPathCallCount   int
 }
@@ -819,11 +877,11 @@ func (fv *FakeVolume) TearDownAt(dir string) error {
 }
 
 // Block volume support
-func (fv *FakeVolume) SetUpDevice() (string, error) {
+func (fv *FakeVolume) SetUpDevice() error {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.SetUpDeviceCallCount++
-	return "", nil
+	return nil
 }
 
 // Block volume support
@@ -889,18 +947,33 @@ func (fv *FakeVolume) GetTearDownDeviceCallCount() int {
 }
 
 // Block volume support
-func (fv *FakeVolume) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, pod types.UID) error {
+func (fv *FakeVolume) UnmapPodDevice() error {
 	fv.Lock()
 	defer fv.Unlock()
-	fv.MapDeviceCallCount++
+	fv.UnmapPodDeviceCallCount++
 	return nil
 }
 
 // Block volume support
-func (fv *FakeVolume) GetMapDeviceCallCount() int {
+func (fv *FakeVolume) GetUnmapPodDeviceCallCount() int {
 	fv.RLock()
 	defer fv.RUnlock()
-	return fv.MapDeviceCallCount
+	return fv.UnmapPodDeviceCallCount
+}
+
+// Block volume support
+func (fv *FakeVolume) MapPodDevice() (string, error) {
+	fv.Lock()
+	defer fv.Unlock()
+	fv.MapPodDeviceCallCount++
+	return "", nil
+}
+
+// Block volume support
+func (fv *FakeVolume) GetMapPodDeviceCallCount() int {
+	fv.RLock()
+	defer fv.RUnlock()
+	return fv.MapPodDeviceCallCount
 }
 
 func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error) {
@@ -1077,12 +1150,12 @@ type FakeVolumePathHandler struct {
 	sync.RWMutex
 }
 
-func (fv *FakeVolumePathHandler) MapDevice(devicePath string, mapDir string, linkName string) error {
+func (fv *FakeVolumePathHandler) MapDevice(devicePath string, mapDir string, linkName string, bindMount bool) error {
 	// nil is success, else error
 	return nil
 }
 
-func (fv *FakeVolumePathHandler) UnmapDevice(mapDir string, linkName string) error {
+func (fv *FakeVolumePathHandler) UnmapDevice(mapDir string, linkName string, bindMount bool) error {
 	// nil is success, else error
 	return nil
 }
@@ -1097,7 +1170,12 @@ func (fv *FakeVolumePathHandler) IsSymlinkExist(mapPath string) (bool, error) {
 	return true, nil
 }
 
-func (fv *FakeVolumePathHandler) GetDeviceSymlinkRefs(devPath string, mapPath string) ([]string, error) {
+func (fv *FakeVolumePathHandler) IsDeviceBindMountExist(mapPath string) (bool, error) {
+	// nil is success, else error
+	return true, nil
+}
+
+func (fv *FakeVolumePathHandler) GetDeviceBindMountRefs(devPath string, mapPath string) ([]string, error) {
 	// nil is success, else error
 	return []string{}, nil
 }
@@ -1112,14 +1190,14 @@ func (fv *FakeVolumePathHandler) AttachFileDevice(path string) (string, error) {
 	return "", nil
 }
 
+func (fv *FakeVolumePathHandler) DetachFileDevice(path string) error {
+	// nil is success, else error
+	return nil
+}
+
 func (fv *FakeVolumePathHandler) GetLoopDevice(path string) (string, error) {
 	// nil is success, else error
 	return "/dev/loop1", nil
-}
-
-func (fv *FakeVolumePathHandler) RemoveLoopDevice(device string) error {
-	// nil is success, else error
-	return nil
 }
 
 // FindEmptyDirectoryUsageOnTmpfs finds the expected usage of an empty directory existing on
@@ -1130,7 +1208,7 @@ func FindEmptyDirectoryUsageOnTmpfs() (*resource.Quantity, error) {
 		return nil, err
 	}
 	defer os.RemoveAll(tmpDir)
-	out, err := exec.Command("nice", "-n", "19", "du", "-x", "-s", "-B", "1", tmpDir).CombinedOutput()
+	out, err := exec.New().Command("nice", "-n", "19", "du", "-x", "-s", "-B", "1", tmpDir).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed command 'du' on %s with error %v", tmpDir, err)
 	}
@@ -1427,39 +1505,36 @@ func VerifyGetPodDeviceMapPathCallCount(
 		expectedPodDeviceMapPathCallCount)
 }
 
-// VerifyGetMapDeviceCallCount ensures that at least one of the Mappers for this
-// plugin has the expectedMapDeviceCallCount number of calls. Otherwise it
+// VerifyGetMapPodDeviceCallCount ensures that at least one of the Mappers for this
+// plugin has the expectedMapPodDeviceCallCount number of calls. Otherwise it
 // returns an error.
-func VerifyGetMapDeviceCallCount(
-	expectedMapDeviceCallCount int,
+func VerifyGetMapPodDeviceCallCount(
+	expectedMapPodDeviceCallCount int,
 	fakeVolumePlugin *FakeVolumePlugin) error {
 	for _, mapper := range fakeVolumePlugin.GetBlockVolumeMapper() {
-		actualCallCount := mapper.GetMapDeviceCallCount()
-		if actualCallCount >= expectedMapDeviceCallCount {
+		actualCallCount := mapper.GetMapPodDeviceCallCount()
+		if actualCallCount >= expectedMapPodDeviceCallCount {
 			return nil
 		}
 	}
 
 	return fmt.Errorf(
-		"No Mapper have expected MapdDeviceCallCount. Expected: <%v>.",
-		expectedMapDeviceCallCount)
+		"No Mapper have expected MapPodDeviceCallCount. Expected: <%v>.",
+		expectedMapPodDeviceCallCount)
 }
 
 // GetTestVolumePluginMgr creates, initializes, and returns a test volume plugin
 // manager and fake volume plugin using a fake volume host.
 func GetTestVolumePluginMgr(
 	t *testing.T) (*VolumePluginMgr, *FakeVolumePlugin) {
-	v := NewFakeVolumeHost(
-		"",  /* rootDir */
-		nil, /* kubeClient */
-		nil, /* plugins */
-	)
 	plugins := ProbeVolumePlugins(VolumeConfig{})
-	if err := v.pluginMgr.InitPlugins(plugins, nil /* prober */, v); err != nil {
-		t.Fatal(err)
-	}
-
-	return &v.pluginMgr, plugins[0].(*FakeVolumePlugin)
+	v := NewFakeVolumeHost(
+		t,
+		"",      /* rootDir */
+		nil,     /* kubeClient */
+		plugins, /* plugins */
+	)
+	return v.pluginMgr, plugins[0].(*FakeVolumePlugin)
 }
 
 // CreateTestPVC returns a provisionable PVC for tests
@@ -1509,7 +1584,7 @@ func (f *fakeVolumeHost) CSIDriversSynced() cache.InformerSynced {
 	return nil
 }
 
-func (f *fakeVolumeHost) CSINodeLister() storagelisters.CSINodeLister {
+func (f *fakeVolumeHost) CSINodeLister() storagelistersv1.CSINodeLister {
 	// not needed for testing
 	return nil
 }
@@ -1523,9 +1598,20 @@ func (f *fakeVolumeHost) IsAttachDetachController() bool {
 }
 
 func (f *fakeVolumeHost) SetKubeletError(err error) {
+	f.mux.Lock()
+	defer f.mux.Unlock()
+	f.kubeletErr = err
 	return
 }
 
 func (f *fakeVolumeHost) WaitForCacheSync() error {
 	return nil
+}
+
+func (f *fakeVolumeHost) WaitForKubeletErrNil() error {
+	return wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+		f.mux.Lock()
+		defer f.mux.Unlock()
+		return f.kubeletErr == nil, nil
+	})
 }

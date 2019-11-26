@@ -43,7 +43,6 @@ import (
 // TODO(yankaiz): Create shared error types for both test/non-test codes.
 const (
 	eventReasonManualChange = "LoadBalancerManualChange"
-	eventMsgFirewallChange  = "Firewall change required by network admin"
 	errPrefixGetTargetPool  = "error getting load balancer's target pool:"
 	wrongTier               = "SupremeLuxury"
 	errStrUnsupportedTier   = "unsupported network tier: \"" + wrongTier + "\""
@@ -207,7 +206,7 @@ func assertInternalLbResources(t *testing.T, gce *Cloud, apiService *v1.Service,
 
 	// Check that Firewalls are created for the LoadBalancer and the HealthCheck
 	fwNames := []string{
-		lbName, // Firewalls for internal LBs are named the same name as the loadbalancer.
+		MakeFirewallName(lbName),
 		makeHealthCheckFirewallName(lbName, vals.ClusterID, true),
 	}
 

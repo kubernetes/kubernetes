@@ -332,8 +332,8 @@ type DeploymentSpec struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// DEPRECATED.
 // DeploymentRollback stores the information required to rollback a deployment.
+// DEPRECATED.
 type DeploymentRollback struct {
 	metav1.TypeMeta
 	// Required: This must match the Name of a deployment.
@@ -503,7 +503,6 @@ type DeploymentList struct {
 // DaemonSetUpdateStrategy defines a strategy to update a daemon set.
 type DaemonSetUpdateStrategy struct {
 	// Type of daemon set update. Can be "RollingUpdate" or "OnDelete".
-	// Default is OnDelete.
 	// +optional
 	Type DaemonSetUpdateStrategyType
 
@@ -680,10 +679,10 @@ type DaemonSet struct {
 }
 
 const (
-	// DEPRECATED: DefaultDaemonSetUniqueLabelKey is used instead.
 	// DaemonSetTemplateGenerationKey is the key of the labels that is added
 	// to daemon set pods to distinguish between old and new pod templates
 	// during DaemonSet template update.
+	// DEPRECATED: DefaultDaemonSetUniqueLabelKey is used instead.
 	DaemonSetTemplateGenerationKey string = "pod-template-generation"
 )
 

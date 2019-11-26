@@ -148,11 +148,35 @@ func TestInsecureOverridesCA(t *testing.T) {
 
 	actualCfg, err := clientBuilder.ClientConfig()
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	matchBoolArg(true, actualCfg.Insecure, t)
 	matchStringArg("", actualCfg.TLSClientConfig.CAFile, t)
+	matchByteArg(nil, actualCfg.TLSClientConfig.CAData, t)
+}
+
+func TestCAOverridesCAData(t *testing.T) {
+	file, err := ioutil.TempFile("", "my.ca")
+	if err != nil {
+		t.Fatalf("could not create tempfile: %v", err)
+	}
+	defer os.Remove(file.Name())
+
+	config := createCAValidTestConfig()
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			CertificateAuthority: file.Name(),
+		},
+	}, nil)
+
+	actualCfg, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	matchBoolArg(false, actualCfg.Insecure, t)
+	matchStringArg(file.Name(), actualCfg.TLSClientConfig.CAFile, t)
 	matchByteArg(nil, actualCfg.TLSClientConfig.CAData, t)
 }
 

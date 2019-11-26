@@ -23,10 +23,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
+	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
 
 type mockAffinityStore struct {
@@ -44,28 +45,25 @@ func makeNUMADevice(id string, numa int) pluginapi.Device {
 	}
 }
 
-func topologyHintLessThan(a topologymanager.TopologyHint, b topologymanager.TopologyHint) bool {
-	if a.Preferred != b.Preferred {
-		return a.Preferred == true
-	}
-	return a.NUMANodeAffinity.IsNarrowerThan(b.NUMANodeAffinity)
-}
-
-func makeSocketMask(sockets ...int) socketmask.SocketMask {
-	mask, _ := socketmask.NewSocketMask(sockets...)
+func makeSocketMask(sockets ...int) bitmask.BitMask {
+	mask, _ := bitmask.NewBitMask(sockets...)
 	return mask
 }
 
 func TestGetTopologyHints(t *testing.T) {
 	tcases := []struct {
 		description      string
+		podUID           string
+		containerName    string
 		request          map[string]string
 		devices          map[string][]pluginapi.Device
-		allocatedDevices map[string][]string
+		allocatedDevices map[string]map[string]map[string][]string
 		expectedHints    map[string][]topologymanager.TopologyHint
 	}{
 		{
-			description: "Single Request, no alignment",
+			description:   "Single Request, no alignment",
+			podUID:        "fakePod",
+			containerName: "fakeContainer",
 			request: map[string]string{
 				"testdevice": "1",
 			},
@@ -80,7 +78,9 @@ func TestGetTopologyHints(t *testing.T) {
 			},
 		},
 		{
-			description: "Single Request, only one with alignment",
+			description:   "Single Request, only one with alignment",
+			podUID:        "fakePod",
+			containerName: "fakeContainer",
 			request: map[string]string{
 				"testdevice": "1",
 			},
@@ -104,7 +104,9 @@ func TestGetTopologyHints(t *testing.T) {
 			},
 		},
 		{
-			description: "Single Request, one device per socket",
+			description:   "Single Request, one device per socket",
+			podUID:        "fakePod",
+			containerName: "fakeContainer",
 			request: map[string]string{
 				"testdevice": "1",
 			},
@@ -132,7 +134,9 @@ func TestGetTopologyHints(t *testing.T) {
 			},
 		},
 		{
-			description: "Request for 2, one device per socket",
+			description:   "Request for 2, one device per socket",
+			podUID:        "fakePod",
+			containerName: "fakeContainer",
 			request: map[string]string{
 				"testdevice": "2",
 			},
@@ -152,7 +156,9 @@ func TestGetTopologyHints(t *testing.T) {
 			},
 		},
 		{
-			description: "Request for 2, 2 devices per socket",
+			description:   "Request for 2, 2 devices per socket",
+			podUID:        "fakePod",
+			containerName: "fakeContainer",
 			request: map[string]string{
 				"testdevice": "2",
 			},
@@ -182,7 +188,9 @@ func TestGetTopologyHints(t *testing.T) {
 			},
 		},
 		{
-			description: "Request for 2, optimal on 1 NUMA node, forced cross-NUMA",
+			description:   "Request for 2, optimal on 1 NUMA node, forced cross-NUMA",
+			podUID:        "fakePod",
+			containerName: "fakeContainer",
 			request: map[string]string{
 				"testdevice": "2",
 			},
@@ -194,8 +202,12 @@ func TestGetTopologyHints(t *testing.T) {
 					makeNUMADevice("Dev4", 1),
 				},
 			},
-			allocatedDevices: map[string][]string{
-				"testdevice": {"Dev1", "Dev2"},
+			allocatedDevices: map[string]map[string]map[string][]string{
+				"fakePod": {
+					"fakeOtherContainer": {
+						"testdevice": {"Dev1", "Dev2"},
+					},
+				},
 			},
 			expectedHints: map[string][]topologymanager.TopologyHint{
 				"testdevice": {
@@ -207,7 +219,9 @@ func TestGetTopologyHints(t *testing.T) {
 			},
 		},
 		{
-			description: "2 device types, mixed configuration",
+			description:   "2 device types, mixed configuration",
+			podUID:        "fakePod",
+			containerName: "fakeContainer",
 			request: map[string]string{
 				"testdevice1": "2",
 				"testdevice2": "1",
@@ -250,6 +264,110 @@ func TestGetTopologyHints(t *testing.T) {
 				},
 			},
 		},
+		{
+			description:   "Single device type, more requested than available",
+			podUID:        "fakePod",
+			containerName: "fakeContainer",
+			request: map[string]string{
+				"testdevice": "6",
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 0),
+					makeNUMADevice("Dev3", 1),
+					makeNUMADevice("Dev4", 1),
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice": {},
+			},
+		},
+		{
+			description:   "Single device type, all already allocated to container",
+			podUID:        "fakePod",
+			containerName: "fakeContainer",
+			request: map[string]string{
+				"testdevice": "2",
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 0),
+				},
+			},
+			allocatedDevices: map[string]map[string]map[string][]string{
+				"fakePod": {
+					"fakeContainer": {
+						"testdevice": {"Dev1", "Dev2"},
+					},
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice": {
+					{
+						NUMANodeAffinity: makeSocketMask(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+		},
+		{
+			description:   "Single device type, less already allocated to container than requested",
+			podUID:        "fakePod",
+			containerName: "fakeContainer",
+			request: map[string]string{
+				"testdevice": "4",
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 0),
+					makeNUMADevice("Dev3", 1),
+					makeNUMADevice("Dev4", 1),
+				},
+			},
+			allocatedDevices: map[string]map[string]map[string][]string{
+				"fakePod": {
+					"fakeContainer": {
+						"testdevice": {"Dev1", "Dev2"},
+					},
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice": {},
+			},
+		},
+		{
+			description:   "Single device type, more already allocated to container than requested",
+			podUID:        "fakePod",
+			containerName: "fakeContainer",
+			request: map[string]string{
+				"testdevice": "2",
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 0),
+					makeNUMADevice("Dev3", 1),
+					makeNUMADevice("Dev4", 1),
+				},
+			},
+			allocatedDevices: map[string]map[string]map[string][]string{
+				"fakePod": {
+					"fakeContainer": {
+						"testdevice": {"Dev1", "Dev2", "Dev3", "Dev4"},
+					},
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice": {},
+			},
+		},
 	}
 
 	for _, tc := range tcases {
@@ -259,6 +377,8 @@ func TestGetTopologyHints(t *testing.T) {
 		}
 
 		pod := makePod(resourceList)
+		pod.UID = types.UID(tc.podUID)
+		pod.Spec.Containers[0].Name = tc.containerName
 
 		m := ManagerImpl{
 			allDevices:       make(map[string]map[string]pluginapi.Device),
@@ -266,7 +386,7 @@ func TestGetTopologyHints(t *testing.T) {
 			allocatedDevices: make(map[string]sets.String),
 			podDevices:       make(podDevices),
 			sourcesReady:     &sourcesReadyStub{},
-			activePods:       func() []*v1.Pod { return []*v1.Pod{} },
+			activePods:       func() []*v1.Pod { return []*v1.Pod{pod} },
 			numaNodes:        []int{0, 1},
 		}
 
@@ -280,11 +400,16 @@ func TestGetTopologyHints(t *testing.T) {
 			}
 		}
 
-		for r := range tc.allocatedDevices {
-			m.allocatedDevices[r] = sets.NewString()
+		for p := range tc.allocatedDevices {
+			for c := range tc.allocatedDevices[p] {
+				for r, devices := range tc.allocatedDevices[p][c] {
+					m.podDevices.insert(p, c, r, sets.NewString(devices...), nil)
 
-			for _, d := range tc.allocatedDevices[r] {
-				m.allocatedDevices[r].Insert(d)
+					m.allocatedDevices[r] = sets.NewString()
+					for _, d := range devices {
+						m.allocatedDevices[r].Insert(d)
+					}
+				}
 			}
 		}
 
@@ -292,10 +417,10 @@ func TestGetTopologyHints(t *testing.T) {
 
 		for r := range tc.expectedHints {
 			sort.SliceStable(hints[r], func(i, j int) bool {
-				return topologyHintLessThan(hints[r][i], hints[r][j])
+				return hints[r][i].LessThan(hints[r][j])
 			})
 			sort.SliceStable(tc.expectedHints[r], func(i, j int) bool {
-				return topologyHintLessThan(tc.expectedHints[r][i], tc.expectedHints[r][j])
+				return tc.expectedHints[r][i].LessThan(tc.expectedHints[r][j])
 			})
 			if !reflect.DeepEqual(hints[r], tc.expectedHints[r]) {
 				t.Errorf("%v: Expected result to be %v, got %v", tc.description, tc.expectedHints[r], hints[r])

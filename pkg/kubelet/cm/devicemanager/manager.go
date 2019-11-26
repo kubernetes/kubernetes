@@ -31,18 +31,19 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	cputopology "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -189,6 +190,7 @@ func (m *ManagerImpl) removeContents(dir string) error {
 	if err != nil {
 		return err
 	}
+	var errs []error
 	for _, name := range names {
 		filePath := filepath.Join(dir, name)
 		if filePath == m.checkpointFile() {
@@ -204,10 +206,12 @@ func (m *ManagerImpl) removeContents(dir string) error {
 		}
 		err = os.RemoveAll(filePath)
 		if err != nil {
-			return err
+			errs = append(errs, err)
+			klog.Errorf("Failed to remove file %s: %v", filePath, err)
+			continue
 		}
 	}
-	return nil
+	return errorsutil.NewAggregate(errs)
 }
 
 // checkpointFile returns device plugin checkpoint file path.
@@ -231,7 +235,9 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 	}
 
 	socketPath := filepath.Join(m.socketdir, m.socketname)
-	os.MkdirAll(m.socketdir, 0755)
+	if err = os.MkdirAll(m.socketdir, 0750); err != nil {
+		return err
+	}
 	if selinux.SELinuxEnabled() {
 		if err := selinux.SetFileLabel(m.socketdir, config.KubeletPluginsDirSELinuxLabel); err != nil {
 			klog.Warningf("Unprivileged containerized plugins might not work. Could not set selinux context on %s: %v", m.socketdir, err)
@@ -277,7 +283,7 @@ func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
 }
 
 // ValidatePlugin validates a plugin if the version is correct and the name has the format of an extended resource
-func (m *ManagerImpl) ValidatePlugin(pluginName string, endpoint string, versions []string, foundInDeprecatedDir bool) error {
+func (m *ManagerImpl) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
 	klog.V(2).Infof("Got Plugin %s at endpoint %s with versions %v", pluginName, endpoint, versions)
 
 	if !m.isVersionCompatibleWithPlugin(versions) {
@@ -552,7 +558,9 @@ func (m *ManagerImpl) writeCheckpoint() error {
 	m.mutex.Unlock()
 	err := m.checkpointManager.CreateCheckpoint(kubeletDeviceManagerCheckpoint, data)
 	if err != nil {
-		return fmt.Errorf("failed to write checkpoint file %q: %v", kubeletDeviceManagerCheckpoint, err)
+		err2 := fmt.Errorf("failed to write checkpoint file %q: %v", kubeletDeviceManagerCheckpoint, err)
+		klog.Warning(err2)
+		return err2
 	}
 	return nil
 }
@@ -674,8 +682,8 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	return devices, nil
 }
 
-func (m *ManagerImpl) takeByTopology(resource string, available sets.String, affinity socketmask.SocketMask, request int) []string {
-	// Build a map of of NUMA Nodes to the devices associated with them. A
+func (m *ManagerImpl) takeByTopology(resource string, available sets.String, affinity bitmask.BitMask, request int) []string {
+	// Build a map of NUMA Nodes to the devices associated with them. A
 	// device may be associated to multiple NUMA nodes at the same time. If an
 	// available device does not have any NUMA Nodes associated with it, add it
 	// to a list of NUMA Nodes for the fake NUMANode -1.
@@ -853,7 +861,9 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 	}
 	if needsReAllocate {
 		klog.V(2).Infof("needs re-allocate device plugin resources for pod %s", podUID)
-		m.allocatePodResources(pod)
+		if err := m.allocatePodResources(pod); err != nil {
+			return nil, err
+		}
 	}
 	m.mutex.Lock()
 	defer m.mutex.Unlock()

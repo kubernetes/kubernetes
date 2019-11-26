@@ -357,30 +357,6 @@ func (n *NodeInfo) SetTaints(newTaints []v1.Taint) {
 	n.taints = newTaints
 }
 
-// MemoryPressureCondition returns the memory pressure condition status on this node.
-func (n *NodeInfo) MemoryPressureCondition() v1.ConditionStatus {
-	if n == nil {
-		return v1.ConditionUnknown
-	}
-	return n.memoryPressureCondition
-}
-
-// DiskPressureCondition returns the disk pressure condition status on this node.
-func (n *NodeInfo) DiskPressureCondition() v1.ConditionStatus {
-	if n == nil {
-		return v1.ConditionUnknown
-	}
-	return n.diskPressureCondition
-}
-
-// PIDPressureCondition returns the pid pressure condition status on this node.
-func (n *NodeInfo) PIDPressureCondition() v1.ConditionStatus {
-	if n == nil {
-		return v1.ConditionUnknown
-	}
-	return n.pidPressureCondition
-}
-
 // RequestedResource returns aggregated resource request of pods on this node.
 func (n *NodeInfo) RequestedResource() Resource {
 	if n == nil {

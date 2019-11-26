@@ -76,6 +76,9 @@ type Options struct {
 	// Strip value validation.
 	StripValueValidation bool
 
+	// Strip nullable.
+	StripNullable bool
+
 	// AllowNonStructural indicates swagger should be built for a schema that fits into the structural type but does not meet all structural invariants
 	AllowNonStructural bool
 }
@@ -100,6 +103,9 @@ func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string, o
 					}
 					if opts.StripValueValidation {
 						schema = schema.StripValueValidations()
+					}
+					if opts.StripNullable {
+						schema = schema.StripNullable()
 					}
 
 					schema = schema.Unfold()

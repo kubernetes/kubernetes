@@ -20,11 +20,10 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 func TestResourceLimitsPriority(t *testing.T) {
@@ -102,57 +101,55 @@ func TestResourceLimitsPriority(t *testing.T) {
 		// input pod
 		pod          *v1.Pod
 		nodes        []*v1.Node
-		expectedList schedulerapi.HostPriorityList
+		expectedList framework.NodeScoreList
 		name         string
 	}{
 		{
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 0), makeNode("machine3", 0, 10000), makeNode("machine4", 0, 0)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}, {Host: "machine4", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: 0}, {Name: "machine4", Score: 0}},
 			name:         "pod does not specify its resource limits",
 		},
 		{
 			pod:          &v1.Pod{Spec: cpuOnly},
 			nodes:        []*v1.Node{makeNode("machine1", 3000, 10000), makeNode("machine2", 2000, 10000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 1}, {Host: "machine2", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 1}, {Name: "machine2", Score: 0}},
 			name:         "pod only specifies  cpu limits",
 		},
 		{
 			pod:          &v1.Pod{Spec: memOnly},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 4000), makeNode("machine2", 5000, 10000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 1}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 1}},
 			name:         "pod only specifies  mem limits",
 		},
 		{
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 4000), makeNode("machine2", 5000, 10000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 1}, {Host: "machine2", Score: 1}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 1}, {Name: "machine2", Score: 1}},
 			name:         "pod specifies both cpu and  mem limits",
 		},
 		{
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 0, 0)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}},
 			name:         "node does not advertise its allocatables",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(nil, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(nil, test.nodes))
 			metadata := &priorityMetadata{
 				podLimits: getResourceLimits(test.pod),
 			}
 
 			for _, hasMeta := range []bool{true, false} {
-				var function PriorityFunction
-				if hasMeta {
-					function = priorityFunction(ResourceLimitsPriorityMap, nil, metadata)
-				} else {
-					function = priorityFunction(ResourceLimitsPriorityMap, nil, nil)
+				meta := metadata
+				if !hasMeta {
+					meta = nil
 				}
 
-				list, err := function(test.pod, nodeNameToInfo, test.nodes)
+				list, err := runMapReducePriority(ResourceLimitsPriorityMap, nil, meta, test.pod, snapshot, test.nodes)
 
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)

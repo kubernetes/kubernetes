@@ -155,6 +155,59 @@ func TestRESTClientRequires(t *testing.T) {
 	}
 }
 
+func TestRESTClientLimiter(t *testing.T) {
+	testCases := []struct {
+		Name    string
+		Config  Config
+		Limiter flowcontrol.RateLimiter
+	}{
+		{
+			Config:  Config{},
+			Limiter: flowcontrol.NewTokenBucketRateLimiter(5, 10),
+		},
+		{
+			Config:  Config{QPS: 10},
+			Limiter: flowcontrol.NewTokenBucketRateLimiter(10, 10),
+		},
+		{
+			Config:  Config{QPS: -1},
+			Limiter: nil,
+		},
+		{
+			Config: Config{
+				RateLimiter: flowcontrol.NewTokenBucketRateLimiter(11, 12),
+			},
+			Limiter: flowcontrol.NewTokenBucketRateLimiter(11, 12),
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run("Versioned_"+testCase.Name, func(t *testing.T) {
+			config := testCase.Config
+			config.Host = "127.0.0.1"
+			config.ContentConfig = ContentConfig{GroupVersion: &v1.SchemeGroupVersion, NegotiatedSerializer: scheme.Codecs}
+			client, err := RESTClientFor(&config)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(testCase.Limiter, client.rateLimiter) {
+				t.Fatalf("unexpected rate limiter: %#v", client.rateLimiter)
+			}
+		})
+		t.Run("Unversioned_"+testCase.Name, func(t *testing.T) {
+			config := testCase.Config
+			config.Host = "127.0.0.1"
+			config.ContentConfig = ContentConfig{GroupVersion: &v1.SchemeGroupVersion, NegotiatedSerializer: scheme.Codecs}
+			client, err := UnversionedRESTClientFor(&config)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(testCase.Limiter, client.rateLimiter) {
+				t.Fatalf("unexpected rate limiter: %#v", client.rateLimiter)
+			}
+		})
+	}
+}
+
 type fakeLimiter struct {
 	FakeSaturation float64
 	FakeQPS        float32
@@ -188,6 +241,10 @@ func (c *fakeCodec) Decode([]byte, *schema.GroupVersionKind, runtime.Object) (ru
 
 func (c *fakeCodec) Encode(obj runtime.Object, stream io.Writer) error {
 	return nil
+}
+
+func (c *fakeCodec) Identifier() runtime.Identifier {
+	return runtime.Identifier("fake")
 }
 
 type fakeRoundTripper struct{}

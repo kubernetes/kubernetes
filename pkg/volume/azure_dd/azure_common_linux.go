@@ -26,7 +26,7 @@ import (
 	libstrings "strings"
 
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
+	utilexec "k8s.io/utils/exec"
 )
 
 // exclude those used by azure as resource and OS root in /dev/disk/azure
@@ -69,7 +69,7 @@ func getDiskLinkByDevName(io ioHandler, devLinkPath, devName string) (string, er
 	return "", fmt.Errorf("read %s error: %v", devLinkPath, err)
 }
 
-func scsiHostRescan(io ioHandler, exec mount.Exec) {
+func scsiHostRescan(io ioHandler, exec utilexec.Interface) {
 	scsi_path := "/sys/class/scsi_host/"
 	if dirs, err := io.ReadDir(scsi_path); err == nil {
 		for _, f := range dirs {
@@ -84,7 +84,7 @@ func scsiHostRescan(io ioHandler, exec mount.Exec) {
 	}
 }
 
-func findDiskByLun(lun int, io ioHandler, exec mount.Exec) (string, error) {
+func findDiskByLun(lun int, io ioHandler, exec utilexec.Interface) (string, error) {
 	azureDisks := listAzureDiskPath(io)
 	return findDiskByLunWithConstraint(lun, io, azureDisks)
 }

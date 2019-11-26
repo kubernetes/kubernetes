@@ -94,11 +94,6 @@ type DynamicPVTestDriver interface {
 	// It will set fsType to the StorageClass, if TestDriver supports it.
 	// It will return nil, if the TestDriver doesn't support it.
 	GetDynamicProvisionStorageClass(config *PerTestConfig, fsType string) *storagev1.StorageClass
-
-	// GetClaimSize returns the size of the volume that is to be provisioned ("5Gi", "1Mi").
-	// The size must be chosen so that the resulting volume is large enough for all
-	// enabled tests and within the range supported by the underlying storage.
-	GetClaimSize() string
 }
 
 // EphemeralTestDriver represents an interface for a TestDriver that supports ephemeral inline volumes.
@@ -157,6 +152,7 @@ const (
 	CapNodeExpansion       Capability = "nodeExpansion"       // support volume expansion for node
 	CapVolumeLimits        Capability = "volumeLimits"        // support volume limits (can be *very* slow)
 	CapSingleNodeVolume    Capability = "singleNodeVolume"    // support volume that can run on single node (like hostpath)
+	CapTopology            Capability = "topology"            // support topology
 )
 
 // DriverInfo represents static information about a TestDriver.
@@ -170,8 +166,10 @@ type DriverInfo struct {
 	InTreePluginName string
 	FeatureTag       string // FeatureTag for the driver
 
-	// Max file size to be tested for this driver
+	// Maximum single file size supported by this driver
 	MaxFileSize int64
+	// The range of disk size supported by this driver
+	SupportedSizeRange volume.SizeRange
 	// Map of string for supported fs type
 	SupportedFsType sets.String
 	// Map of string for supported mount option
@@ -183,6 +181,12 @@ type DriverInfo struct {
 	// [Optional] List of access modes required for provisioning, defaults to
 	// RWO if unset
 	RequiredAccessModes []v1.PersistentVolumeAccessMode
+	// [Optional] List of topology keys driver supports
+	TopologyKeys []string
+	// [Optional] Number of allowed topologies the driver requires.
+	// Only relevant if TopologyKeys is set. Defaults to 1.
+	// Example: multi-zonal disk requires at least 2 allowed topologies.
+	NumAllowedTopologies int
 }
 
 // PerTestConfig represents parameters that control test execution.

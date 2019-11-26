@@ -18,12 +18,13 @@ package endpointslice
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -37,12 +38,12 @@ import (
 )
 
 func TestNewEndpointSlice(t *testing.T) {
-	ipAddressType := discovery.AddressTypeIP
+	ipAddressType := discovery.AddressTypeIPv4
 	portName := "foo"
 	protocol := v1.ProtocolTCP
 	endpointMeta := endpointMeta{
 		Ports:       []discovery.EndpointPort{{Name: &portName, Protocol: &protocol}},
-		AddressType: &ipAddressType,
+		AddressType: ipAddressType,
 	}
 	service := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
@@ -57,7 +58,10 @@ func TestNewEndpointSlice(t *testing.T) {
 
 	expectedSlice := discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:          map[string]string{discovery.LabelServiceName: service.Name},
+			Labels: map[string]string{
+				discovery.LabelServiceName: service.Name,
+				discovery.LabelManagedBy:   controllerName,
+			},
 			GenerateName:    fmt.Sprintf("%s-", service.Name),
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Namespace:       service.Namespace,
@@ -73,11 +77,17 @@ func TestNewEndpointSlice(t *testing.T) {
 
 func TestPodToEndpoint(t *testing.T) {
 	ns := "test"
+	svc, _ := newServiceAndEndpointMeta("foo", ns)
+	svcPublishNotReady, _ := newServiceAndEndpointMeta("publishnotready", ns)
+	svcPublishNotReady.Spec.PublishNotReadyAddresses = true
 
 	readyPod := newPod(1, ns, true, 1)
+	readyPodHostname := newPod(1, ns, true, 1)
+	readyPodHostname.Spec.Subdomain = svc.Name
+	readyPodHostname.Spec.Hostname = "example-hostname"
+
 	unreadyPod := newPod(1, ns, false, 1)
 	multiIPPod := newPod(1, ns, true, 1)
-
 	multiIPPod.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}, {IP: "1234::5678:0000:0000:9abc:def0"}}
 
 	node1 := &v1.Node{
@@ -91,14 +101,34 @@ func TestPodToEndpoint(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name             string
-		pod              *v1.Pod
-		node             *v1.Node
-		expectedEndpoint discovery.Endpoint
+		name                     string
+		pod                      *v1.Pod
+		node                     *v1.Node
+		svc                      *v1.Service
+		expectedEndpoint         discovery.Endpoint
+		publishNotReadyAddresses bool
 	}{
 		{
 			name: "Ready pod",
 			pod:  readyPod,
+			svc:  &svc,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses:  []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
+				TargetRef: &v1.ObjectReference{
+					Kind:            "Pod",
+					Namespace:       ns,
+					Name:            readyPod.Name,
+					UID:             readyPod.UID,
+					ResourceVersion: readyPod.ResourceVersion,
+				},
+			},
+		},
+		{
+			name: "Ready pod + publishNotReadyAddresses",
+			pod:  readyPod,
+			svc:  &svcPublishNotReady,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
@@ -115,6 +145,7 @@ func TestPodToEndpoint(t *testing.T) {
 		{
 			name: "Unready pod",
 			pod:  unreadyPod,
+			svc:  &svc,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
@@ -129,9 +160,27 @@ func TestPodToEndpoint(t *testing.T) {
 			},
 		},
 		{
+			name: "Unready pod + publishNotReadyAddresses",
+			pod:  unreadyPod,
+			svc:  &svcPublishNotReady,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses:  []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
+				TargetRef: &v1.ObjectReference{
+					Kind:            "Pod",
+					Namespace:       ns,
+					Name:            readyPod.Name,
+					UID:             readyPod.UID,
+					ResourceVersion: readyPod.ResourceVersion,
+				},
+			},
+		},
+		{
 			name: "Ready pod + node labels",
 			pod:  readyPod,
 			node: node1,
+			svc:  &svc,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
@@ -153,8 +202,9 @@ func TestPodToEndpoint(t *testing.T) {
 			name: "Multi IP Ready pod + node labels",
 			pod:  multiIPPod,
 			node: node1,
+			svc:  &svc,
 			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.4", "1234::5678:0000:0000:9abc:def0"},
+				Addresses:  []string{"1.2.3.4"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
 				Topology: map[string]string{
 					"kubernetes.io/hostname":        "node-1",
@@ -170,17 +220,42 @@ func TestPodToEndpoint(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Ready pod + hostname",
+			pod:  readyPodHostname,
+			node: node1,
+			svc:  &svc,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses:  []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Hostname:   &readyPodHostname.Spec.Hostname,
+				Topology: map[string]string{
+					"kubernetes.io/hostname":        "node-1",
+					"topology.kubernetes.io/zone":   "us-central1-a",
+					"topology.kubernetes.io/region": "us-central1",
+				},
+				TargetRef: &v1.ObjectReference{
+					Kind:            "Pod",
+					Namespace:       ns,
+					Name:            readyPodHostname.Name,
+					UID:             readyPodHostname.UID,
+					ResourceVersion: readyPodHostname.ResourceVersion,
+				},
+			},
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			endpoint := podToEndpoint(testCase.pod, testCase.node)
-			assert.EqualValues(t, testCase.expectedEndpoint, endpoint, "Test case failed: %s", testCase.name)
+			endpoint := podToEndpoint(testCase.pod, testCase.node, testCase.svc)
+			if !reflect.DeepEqual(testCase.expectedEndpoint, endpoint) {
+				t.Errorf("Expected endpoint: %v, got: %v", testCase.expectedEndpoint, endpoint)
+			}
 		})
 	}
 }
 
-func TestPodChangedWithpodEndpointChanged(t *testing.T) {
+func TestPodChangedWithPodEndpointChanged(t *testing.T) {
 	podStore := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 	ns := "test"
 	podStore.Add(newPod(1, ns, true, 1))
@@ -208,11 +283,11 @@ func TestPodChangedWithpodEndpointChanged(t *testing.T) {
 	}
 	newPod.ObjectMeta.ResourceVersion = oldPod.ObjectMeta.ResourceVersion
 
-	newPod.Status.PodIP = "1.2.3.1"
+	newPod.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.1"}}
 	if !podChangedHelper(oldPod, newPod, podEndpointChanged) {
 		t.Errorf("Expected pod to be changed with pod IP address change")
 	}
-	newPod.Status.PodIP = oldPod.Status.PodIP
+	newPod.Status.PodIPs = oldPod.Status.PodIPs
 
 	newPod.ObjectMeta.Name = "wrong-name"
 	if !podChangedHelper(oldPod, newPod, podEndpointChanged) {
@@ -258,6 +333,9 @@ func newPod(n int, namespace string, ready bool, nPorts int) *v1.Pod {
 		},
 		Status: v1.PodStatus{
 			PodIP: fmt.Sprintf("1.2.3.%d", 4+n),
+			PodIPs: []v1.PodIP{{
+				IP: fmt.Sprintf("1.2.3.%d", 4+n),
+			}},
 			Conditions: []v1.PodCondition{
 				{
 					Type:   v1.PodReady,
@@ -287,7 +365,7 @@ func newClientset() *fake.Clientset {
 	return client
 }
 
-func newServiceAndendpointMeta(name, namespace string) (v1.Service, endpointMeta) {
+func newServiceAndEndpointMeta(name, namespace string) (v1.Service, endpointMeta) {
 	portNum := int32(80)
 	portNameIntStr := intstr.IntOrString{
 		Type:   intstr.Int,
@@ -306,10 +384,10 @@ func newServiceAndendpointMeta(name, namespace string) (v1.Service, endpointMeta
 		},
 	}
 
-	ipAddressType := discovery.AddressTypeIP
+	addressType := discovery.AddressTypeIPv4
 	protocol := v1.ProtocolTCP
 	endpointMeta := endpointMeta{
-		AddressType: &ipAddressType,
+		AddressType: addressType,
 		Ports:       []discovery.EndpointPort{{Name: &name, Port: &portNum, Protocol: &protocol}},
 	}
 

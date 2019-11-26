@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
 )
 
@@ -129,7 +130,6 @@ func TestDecode(t *testing.T) {
 	decodable1 := &testDecodable{}
 	decodable2 := &testDecodable{}
 	decodable3 := &testDecodable{}
-	versionedDecodable1 := &runtime.VersionedObjects{Objects: []runtime.Object{decodable1}}
 
 	testCases := []struct {
 		serializer runtime.Serializer
@@ -180,39 +180,6 @@ func TestDecode(t *testing.T) {
 			expectedGVK: gvk1,
 			sameObject:  decodable3,
 		},
-		{
-			into:        versionedDecodable1,
-			serializer:  &mockSerializer{actual: gvk1, obj: decodable3},
-			convertor:   &checkConvertor{in: decodable3, obj: decodable1, directConvert: true},
-			expectedGVK: gvk1,
-			sameObject:  versionedDecodable1,
-		},
-		// returns directly when serializer returns into
-		{
-			into:        decodable3,
-			serializer:  &mockSerializer{actual: gvk1, obj: decodable3},
-			expectedGVK: gvk1,
-			sameObject:  decodable3,
-		},
-		// returns directly when serializer returns into
-		{
-			into:        versionedDecodable1,
-			serializer:  &mockSerializer{actual: gvk1, obj: decodable1},
-			expectedGVK: gvk1,
-			sameObject:  versionedDecodable1,
-		},
-
-		// runtime.VersionedObjects are decoded
-		{
-			into: &runtime.VersionedObjects{Objects: []runtime.Object{}},
-
-			serializer:     &mockSerializer{actual: gvk1, obj: decodable1},
-			convertor:      &checkConvertor{in: decodable1, obj: decodable2, groupVersion: schema.GroupVersion{Group: "other", Version: runtime.APIVersionInternal}},
-			expectedGVK:    gvk1,
-			expectedObject: &runtime.VersionedObjects{Objects: []runtime.Object{decodable1, decodable2}},
-			decodes:        schema.GroupVersion{Group: "other", Version: runtime.APIVersionInternal},
-		},
-
 		// decode into the same version as the serialized object
 		{
 			decodes: schema.GroupVersions{gvk1.GroupVersion()},
@@ -221,34 +188,6 @@ func TestDecode(t *testing.T) {
 			convertor:      &checkConvertor{in: decodable1, obj: decodable1, groupVersion: schema.GroupVersions{{Group: "other", Version: "blah"}}},
 			expectedGVK:    gvk1,
 			expectedObject: decodable1,
-		},
-		{
-			into:    &runtime.VersionedObjects{Objects: []runtime.Object{}},
-			decodes: schema.GroupVersions{gvk1.GroupVersion()},
-
-			serializer:     &mockSerializer{actual: gvk1, obj: decodable1},
-			convertor:      &checkConvertor{in: decodable1, obj: decodable1, groupVersion: schema.GroupVersions{{Group: "other", Version: "blah"}}},
-			expectedGVK:    gvk1,
-			expectedObject: &runtime.VersionedObjects{Objects: []runtime.Object{decodable1}},
-		},
-
-		// codec with non matching version skips conversion altogether
-		{
-			decodes: schema.GroupVersions{{Group: "something", Version: "else"}},
-
-			serializer:     &mockSerializer{actual: gvk1, obj: decodable1},
-			convertor:      &checkConvertor{in: decodable1, obj: decodable1, groupVersion: schema.GroupVersions{{Group: "something", Version: "else"}}},
-			expectedGVK:    gvk1,
-			expectedObject: decodable1,
-		},
-		{
-			into:    &runtime.VersionedObjects{Objects: []runtime.Object{}},
-			decodes: schema.GroupVersions{{Group: "something", Version: "else"}},
-
-			serializer:     &mockSerializer{actual: gvk1, obj: decodable1},
-			convertor:      &checkConvertor{in: decodable1, obj: decodable1, groupVersion: schema.GroupVersions{{Group: "something", Version: "else"}}},
-			expectedGVK:    gvk1,
-			expectedObject: &runtime.VersionedObjects{Objects: []runtime.Object{decodable1}},
 		},
 	}
 
@@ -376,6 +315,10 @@ func (s *mockSerializer) Encode(obj runtime.Object, w io.Writer) error {
 	return s.err
 }
 
+func (s *mockSerializer) Identifier() runtime.Identifier {
+	return runtime.Identifier("mock")
+}
+
 type mockCreater struct {
 	err error
 	obj runtime.Object
@@ -422,5 +365,32 @@ func TestDirectCodecEncode(t *testing.T) {
 	c.Encode(&testDecodable{}, ioutil.Discard)
 	if e, a := "expected_group", serializer.encodingObjGVK.Group; e != a {
 		t.Errorf("expected group to be %v, got %v", e, a)
+	}
+}
+
+func TestCacheableObject(t *testing.T) {
+	gvk1 := schema.GroupVersionKind{Group: "group", Version: "version1", Kind: "MockCacheableObject"}
+	gvk2 := schema.GroupVersionKind{Group: "group", Version: "version2", Kind: "MockCacheableObject"}
+
+	encoder := NewCodec(
+		&mockSerializer{}, &mockSerializer{},
+		&mockConvertor{}, nil,
+		&mockTyper{gvks: []schema.GroupVersionKind{gvk1, gvk2}}, nil,
+		gvk1.GroupVersion(), gvk2.GroupVersion(),
+		"TestCacheableObject")
+
+	runtimetesting.CacheableObjectTest(t, encoder)
+}
+
+func BenchmarkIdentifier(b *testing.B) {
+	encoder := &mockSerializer{}
+	gv := schema.GroupVersion{Group: "group", Version: "version"}
+
+	for i := 0; i < b.N; i++ {
+		id := identifier(gv, encoder)
+		// Avoid optimizing by compiler.
+		if id[0] != '{' {
+			b.Errorf("unexpected identifier: %s", id)
+		}
 	}
 }

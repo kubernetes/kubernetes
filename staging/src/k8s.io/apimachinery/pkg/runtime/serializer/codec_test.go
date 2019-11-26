@@ -346,6 +346,9 @@ func TestDirectCodec(t *testing.T) {
 		t.Fatal(string(out))
 	}
 	a, _, err := directDecoder.Decode(out, nil, nil)
+	if err != nil {
+		t.Fatalf("error on Decode: %v", err)
+	}
 	e := &serializertesting.ExternalTestType1{
 		MyWeirdCustomEmbeddedVersionKindField: serializertesting.MyWeirdCustomEmbeddedVersionKindField{
 			APIVersion: "v1",

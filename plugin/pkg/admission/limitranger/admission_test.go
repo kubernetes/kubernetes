@@ -657,9 +657,9 @@ func TestPodLimitFuncApplyDefault(t *testing.T) {
 	for i := range testPod.Spec.Containers {
 		container := testPod.Spec.Containers[i]
 		limitMemory := container.Resources.Limits.Memory().String()
-		limitCPU := container.Resources.Limits.Cpu().String()
+		limitCPU := container.Resources.Limits.CPU().String()
 		requestMemory := container.Resources.Requests.Memory().String()
-		requestCPU := container.Resources.Requests.Cpu().String()
+		requestCPU := container.Resources.Requests.CPU().String()
 
 		if limitMemory != "10Mi" {
 			t.Errorf("Unexpected limit memory value %s", limitMemory)
@@ -678,9 +678,9 @@ func TestPodLimitFuncApplyDefault(t *testing.T) {
 	for i := range testPod.Spec.InitContainers {
 		container := testPod.Spec.InitContainers[i]
 		limitMemory := container.Resources.Limits.Memory().String()
-		limitCPU := container.Resources.Limits.Cpu().String()
+		limitCPU := container.Resources.Limits.CPU().String()
 		requestMemory := container.Resources.Requests.Memory().String()
-		requestCPU := container.Resources.Requests.Cpu().String()
+		requestCPU := container.Resources.Requests.CPU().String()
 
 		if limitMemory != "10Mi" {
 			t.Errorf("Unexpected limit memory value %s", limitMemory)
@@ -790,7 +790,7 @@ func newHandlerForTest(c clientset.Interface) (*LimitRanger, informers.SharedInf
 	if err != nil {
 		return nil, f, err
 	}
-	pluginInitializer := genericadmissioninitializer.New(c, f, nil)
+	pluginInitializer := genericadmissioninitializer.New(c, f, nil, nil)
 	pluginInitializer.Initialize(handler)
 	err = admission.ValidateInitialization(handler)
 	return handler, f, err

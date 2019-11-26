@@ -44,9 +44,10 @@ import (
 	coordinationapiv1 "k8s.io/api/coordination/v1"
 	coordinationapiv1beta1 "k8s.io/api/coordination/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
-	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
+	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	networkingapiv1 "k8s.io/api/networking/v1"
 	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
@@ -64,20 +65,24 @@ import (
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/healthz"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1"
+	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
+	"k8s.io/kubernetes/pkg/master/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/routes"
@@ -101,6 +106,7 @@ import (
 	discoveryrest "k8s.io/kubernetes/pkg/registry/discovery/rest"
 	eventsrest "k8s.io/kubernetes/pkg/registry/events/rest"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
+	flowcontrolrest "k8s.io/kubernetes/pkg/registry/flowcontrol/rest"
 	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
 	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
@@ -118,8 +124,9 @@ const (
 	DefaultEndpointReconcilerTTL = 15 * time.Second
 )
 
+// ExtraConfig defines extra configuration for the master
 type ExtraConfig struct {
-	ClientCARegistrationHook ClientCARegistrationHook
+	ClusterAuthenticationInfo clusterauthenticationtrust.ClusterAuthenticationInfo
 
 	APIResourceConfigSource  serverstorage.APIResourceConfigSource
 	StorageFactory           serverstorage.StorageFactory
@@ -189,6 +196,7 @@ type ExtraConfig struct {
 	VersionedInformers informers.SharedInformerFactory
 }
 
+// Config defines configuration for the master
 type Config struct {
 	GenericConfig *genericapiserver.Config
 	ExtraConfig   ExtraConfig
@@ -199,8 +207,8 @@ type completedConfig struct {
 	ExtraConfig   *ExtraConfig
 }
 
+// CompletedConfig embeds a private pointer that cannot be instantiated outside of this package
 type CompletedConfig struct {
-	// Embed a private pointer that cannot be instantiated outside of this package.
 	*completedConfig
 }
 
@@ -215,7 +223,7 @@ type EndpointReconcilerConfig struct {
 type Master struct {
 	GenericAPIServer *genericapiserver.GenericAPIServer
 
-	ClientCARegistrationHook ClientCARegistrationHook
+	ClusterAuthenticationInfo clusterauthenticationtrust.ClusterAuthenticationInfo
 }
 
 func (c *Config) createMasterCountReconciler() reconcilers.EndpointReconciler {
@@ -272,50 +280,50 @@ func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
-func (cfg *Config) Complete() CompletedConfig {
-	c := completedConfig{
-		cfg.GenericConfig.Complete(cfg.ExtraConfig.VersionedInformers),
-		&cfg.ExtraConfig,
+func (c *Config) Complete() CompletedConfig {
+	cfg := completedConfig{
+		c.GenericConfig.Complete(c.ExtraConfig.VersionedInformers),
+		&c.ExtraConfig,
 	}
 
-	serviceIPRange, apiServerServiceIP, err := ServiceIPRange(c.ExtraConfig.ServiceIPRange)
+	serviceIPRange, apiServerServiceIP, err := ServiceIPRange(cfg.ExtraConfig.ServiceIPRange)
 	if err != nil {
 		klog.Fatalf("Error determining service IP ranges: %v", err)
 	}
-	if c.ExtraConfig.ServiceIPRange.IP == nil {
-		c.ExtraConfig.ServiceIPRange = serviceIPRange
+	if cfg.ExtraConfig.ServiceIPRange.IP == nil {
+		cfg.ExtraConfig.ServiceIPRange = serviceIPRange
 	}
-	if c.ExtraConfig.APIServerServiceIP == nil {
-		c.ExtraConfig.APIServerServiceIP = apiServerServiceIP
+	if cfg.ExtraConfig.APIServerServiceIP == nil {
+		cfg.ExtraConfig.APIServerServiceIP = apiServerServiceIP
 	}
 
-	discoveryAddresses := discovery.DefaultAddresses{DefaultAddress: c.GenericConfig.ExternalAddress}
+	discoveryAddresses := discovery.DefaultAddresses{DefaultAddress: cfg.GenericConfig.ExternalAddress}
 	discoveryAddresses.CIDRRules = append(discoveryAddresses.CIDRRules,
-		discovery.CIDRRule{IPRange: c.ExtraConfig.ServiceIPRange, Address: net.JoinHostPort(c.ExtraConfig.APIServerServiceIP.String(), strconv.Itoa(c.ExtraConfig.APIServerServicePort))})
-	c.GenericConfig.DiscoveryAddresses = discoveryAddresses
+		discovery.CIDRRule{IPRange: cfg.ExtraConfig.ServiceIPRange, Address: net.JoinHostPort(cfg.ExtraConfig.APIServerServiceIP.String(), strconv.Itoa(cfg.ExtraConfig.APIServerServicePort))})
+	cfg.GenericConfig.DiscoveryAddresses = discoveryAddresses
 
-	if c.ExtraConfig.ServiceNodePortRange.Size == 0 {
+	if cfg.ExtraConfig.ServiceNodePortRange.Size == 0 {
 		// TODO: Currently no way to specify an empty range (do we need to allow this?)
 		// We should probably allow this for clouds that don't require NodePort to do load-balancing (GCE)
 		// but then that breaks the strict nestedness of ServiceType.
 		// Review post-v1
-		c.ExtraConfig.ServiceNodePortRange = kubeoptions.DefaultServiceNodePortRange
-		klog.Infof("Node port range unspecified. Defaulting to %v.", c.ExtraConfig.ServiceNodePortRange)
+		cfg.ExtraConfig.ServiceNodePortRange = kubeoptions.DefaultServiceNodePortRange
+		klog.Infof("Node port range unspecified. Defaulting to %v.", cfg.ExtraConfig.ServiceNodePortRange)
 	}
 
-	if c.ExtraConfig.EndpointReconcilerConfig.Interval == 0 {
-		c.ExtraConfig.EndpointReconcilerConfig.Interval = DefaultEndpointReconcilerInterval
+	if cfg.ExtraConfig.EndpointReconcilerConfig.Interval == 0 {
+		cfg.ExtraConfig.EndpointReconcilerConfig.Interval = DefaultEndpointReconcilerInterval
 	}
 
-	if c.ExtraConfig.MasterEndpointReconcileTTL == 0 {
-		c.ExtraConfig.MasterEndpointReconcileTTL = DefaultEndpointReconcilerTTL
+	if cfg.ExtraConfig.MasterEndpointReconcileTTL == 0 {
+		cfg.ExtraConfig.MasterEndpointReconcileTTL = DefaultEndpointReconcilerTTL
 	}
 
-	if c.ExtraConfig.EndpointReconcilerConfig.Reconciler == nil {
-		c.ExtraConfig.EndpointReconcilerConfig.Reconciler = cfg.createEndpointReconciler()
+	if cfg.ExtraConfig.EndpointReconcilerConfig.Reconciler == nil {
+		cfg.ExtraConfig.EndpointReconcilerConfig.Reconciler = c.createEndpointReconciler()
 	}
 
-	return CompletedConfig{&c}
+	return CompletedConfig{&cfg}
 }
 
 // New returns a new instance of Master from the given config.
@@ -337,7 +345,8 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	m := &Master{
-		GenericAPIServer: s,
+		GenericAPIServer:          s,
+		ClusterAuthenticationInfo: c.ExtraConfig.ClusterAuthenticationInfo,
 	}
 
 	// install legacy rest storage
@@ -384,6 +393,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		schedulingrest.RESTStorageProvider{},
 		settingsrest.RESTStorageProvider{},
 		storagerest.RESTStorageProvider{},
+		flowcontrolrest.RESTStorageProvider{},
 		// keep apps after extensions so legacy clients resolve the extensions versions of shared resource names.
 		// See https://github.com/kubernetes/kubernetes/issues/42392
 		appsrest.RESTStorageProvider{},
@@ -398,11 +408,47 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		m.installTunneler(c.ExtraConfig.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
 	}
 
-	m.GenericAPIServer.AddPostStartHookOrDie("ca-registration", c.ExtraConfig.ClientCARegistrationHook.PostStartHook)
+	m.GenericAPIServer.AddPostStartHookOrDie("start-cluster-authentication-info-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+		kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
+		if err != nil {
+			return err
+		}
+		controller := clusterauthenticationtrust.NewClusterAuthenticationTrustController(m.ClusterAuthenticationInfo, kubeClient)
+
+		// prime values and start listeners
+		if m.ClusterAuthenticationInfo.ClientCA != nil {
+			if notifier, ok := m.ClusterAuthenticationInfo.ClientCA.(dynamiccertificates.Notifier); ok {
+				notifier.AddListener(controller)
+			}
+			if controller, ok := m.ClusterAuthenticationInfo.ClientCA.(dynamiccertificates.ControllerRunner); ok {
+				// runonce to be sure that we have a value.
+				if err := controller.RunOnce(); err != nil {
+					runtime.HandleError(err)
+				}
+				go controller.Run(1, hookContext.StopCh)
+			}
+		}
+		if m.ClusterAuthenticationInfo.RequestHeaderCA != nil {
+			if notifier, ok := m.ClusterAuthenticationInfo.RequestHeaderCA.(dynamiccertificates.Notifier); ok {
+				notifier.AddListener(controller)
+			}
+			if controller, ok := m.ClusterAuthenticationInfo.RequestHeaderCA.(dynamiccertificates.ControllerRunner); ok {
+				// runonce to be sure that we have a value.
+				if err := controller.RunOnce(); err != nil {
+					runtime.HandleError(err)
+				}
+				go controller.Run(1, hookContext.StopCh)
+			}
+		}
+
+		go controller.Run(1, hookContext.StopCh)
+		return nil
+	})
 
 	return m, nil
 }
 
+// InstallLegacyAPI will install the legacy APIs for the restStorageProviders if they are enabled.
 func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) error {
 	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
 	if err != nil {
@@ -452,7 +498,7 @@ func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceCo
 		}
 		apiGroupInfo, enabled, err := restStorageBuilder.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
 		if err != nil {
-			return fmt.Errorf("problem initializing API group %q : %v.", groupName, err)
+			return fmt.Errorf("problem initializing API group %q : %v", groupName, err)
 		}
 		if !enabled {
 			klog.Warningf("API group %q is not enabled, skipping.", groupName)
@@ -512,6 +558,7 @@ func (n nodeAddressProvider) externalAddresses() ([]string, error) {
 	return addrs, nil
 }
 
+// DefaultAPIResourceConfigSource returns default configuration for an APIResource.
 func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret := serverstorage.NewResourceConfig()
 	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
@@ -532,6 +579,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		certificatesapiv1beta1.SchemeGroupVersion,
 		coordinationapiv1.SchemeGroupVersion,
 		coordinationapiv1beta1.SchemeGroupVersion,
+		discoveryv1beta1.SchemeGroupVersion,
 		eventsv1beta1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,
 		networkingapiv1.SchemeGroupVersion,
@@ -567,12 +615,12 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret.DisableVersions(
 		auditregistrationv1alpha1.SchemeGroupVersion,
 		batchapiv2alpha1.SchemeGroupVersion,
-		discoveryv1alpha1.SchemeGroupVersion,
 		nodev1alpha1.SchemeGroupVersion,
 		rbacv1alpha1.SchemeGroupVersion,
 		schedulingv1alpha1.SchemeGroupVersion,
 		settingsv1alpha1.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
+		flowcontrolv1alpha1.SchemeGroupVersion,
 	)
 
 	return ret

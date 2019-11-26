@@ -7,6 +7,8 @@ go_library(
         "blobcontainers.go",
         "blobservices.go",
         "client.go",
+        "fileservices.go",
+        "fileshares.go",
         "managementpolicies.go",
         "models.go",
         "operations.go",

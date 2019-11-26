@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog"
@@ -426,7 +426,7 @@ func processDNSQueryPacket(
 	}
 
 	// Query - Response bit that specifies whether this message is a query (0) or a response (1).
-	if msg.MsgHdr.Response == true {
+	if msg.MsgHdr.Response {
 		return length, fmt.Errorf("DNS packet should be a query message")
 	}
 
@@ -473,7 +473,7 @@ func processDNSResponsePacket(
 	}
 
 	// Query - Response bit that specifies whether this message is a query (0) or a response (1).
-	if msg.MsgHdr.Response == false {
+	if !msg.MsgHdr.Response {
 		return drop, length, fmt.Errorf("DNS packet should be a response message")
 	}
 

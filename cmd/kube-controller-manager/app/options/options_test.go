@@ -117,6 +117,8 @@ func TestAddFlags(t *testing.T) {
 		"--min-resync-period=8h",
 		"--namespace-sync-period=10m",
 		"--node-cidr-mask-size=48",
+		"--node-cidr-mask-size-ipv4=48",
+		"--node-cidr-mask-size-ipv6=108",
 		"--node-eviction-rate=0.2",
 		"--node-monitor-grace-period=30s",
 		"--node-monitor-period=10s",
@@ -279,7 +281,9 @@ func TestAddFlags(t *testing.T) {
 		},
 		NodeIPAMController: &NodeIPAMControllerOptions{
 			&nodeipamconfig.NodeIPAMControllerConfiguration{
-				NodeCIDRMaskSize: 48,
+				NodeCIDRMaskSize:     48,
+				NodeCIDRMaskSizeIPv4: 48,
+				NodeCIDRMaskSizeIPv6: 108,
 			},
 		},
 		NodeLifecycleController: &NodeLifecycleControllerOptions{

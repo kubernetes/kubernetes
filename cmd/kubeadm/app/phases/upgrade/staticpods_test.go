@@ -28,14 +28,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/etcd/pkg/transport"
 	"github.com/pkg/errors"
+	"go.etcd.io/etcd/pkg/transport"
 
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
@@ -432,7 +431,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			moveFileFunc: func(oldPath, newPath string) error {
 				return os.Rename(oldPath, newPath)
 			},
-			skipKubeConfig:       kubeadmconstants.SchedulerKubeConfigFileName,
+			skipKubeConfig:       constants.SchedulerKubeConfigFileName,
 			expectedErr:          true,
 			manifestShouldChange: false,
 		},
@@ -446,7 +445,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			moveFileFunc: func(oldPath, newPath string) error {
 				return os.Rename(oldPath, newPath)
 			},
-			skipKubeConfig:       kubeadmconstants.AdminKubeConfigFileName,
+			skipKubeConfig:       constants.AdminKubeConfigFileName,
 			expectedErr:          true,
 			manifestShouldChange: false,
 		},
@@ -488,9 +487,9 @@ func TestStaticPodControlPlane(t *testing.T) {
 			}
 
 			for _, kubeConfig := range []string{
-				kubeadmconstants.AdminKubeConfigFileName,
-				kubeadmconstants.SchedulerKubeConfigFileName,
-				kubeadmconstants.ControllerManagerKubeConfigFileName,
+				constants.AdminKubeConfigFileName,
+				constants.SchedulerKubeConfigFileName,
+				constants.ControllerManagerKubeConfigFileName,
 			} {
 				if rt.skipKubeConfig == kubeConfig {
 					continue
@@ -743,14 +742,14 @@ func TestRenewCertsByComponent(t *testing.T) {
 			name:      "all CA exist, should be rotated for scheduler",
 			component: constants.KubeScheduler,
 			kubeConfigShouldExist: []string{
-				kubeadmconstants.SchedulerKubeConfigFileName,
+				constants.SchedulerKubeConfigFileName,
 			},
 		},
 		{
 			name:      "all CA exist, should be rotated for controller manager",
 			component: constants.KubeControllerManager,
 			kubeConfigShouldExist: []string{
-				kubeadmconstants.ControllerManagerKubeConfigFileName,
+				constants.ControllerManagerKubeConfigFileName,
 			},
 		},
 		{
@@ -850,7 +849,7 @@ func TestRenewCertsByComponent(t *testing.T) {
 					t.Errorf("couldn't load new certificate %q: %v", kubeCert.Name, err)
 					continue
 				}
-				oldSerial, _ := certMaps[kubeCert.Name]
+				oldSerial := certMaps[kubeCert.Name]
 
 				shouldBeRenewed := true
 				if test.certsShouldBeRenewed != nil {
@@ -876,7 +875,7 @@ func TestRenewCertsByComponent(t *testing.T) {
 				if err != nil {
 					t.Fatalf("error reading embedded certs from %s: %v", kubeConfig, err)
 				}
-				oldSerial, _ := certMaps[kubeConfig]
+				oldSerial := certMaps[kubeConfig]
 				if oldSerial.Cmp(newCerts[0].SerialNumber) == 0 {
 					t.Errorf("certifitate %v was not reissued", kubeConfig)
 				}

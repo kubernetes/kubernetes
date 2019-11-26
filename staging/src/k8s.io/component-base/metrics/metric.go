@@ -17,11 +17,13 @@ limitations under the License.
 package metrics
 
 import (
+	"sync"
+
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+
 	"k8s.io/klog"
-	"sync"
 )
 
 /*
@@ -99,8 +101,9 @@ func (r *lazyMetric) determineDeprecationStatus(version semver.Version) {
 			klog.Warningf("Hidden metrics have been manually overridden, showing this very deprecated metric.")
 			return
 		}
-		if selfVersion.LT(version) {
-			klog.Warningf("This metric has been deprecated for more than one release, hiding.")
+		if shouldHide(&version, selfVersion) {
+			// TODO(RainbowMango): Remove this log temporarily. https://github.com/kubernetes/kubernetes/issues/85369
+			// klog.Warningf("This metric has been deprecated for more than one release, hiding.")
 			r.isHidden = true
 		}
 	})
@@ -138,6 +141,19 @@ func (r *lazyMetric) Create(version *semver.Version) bool {
 		}
 	})
 	return r.IsCreated()
+}
+
+// ClearState will clear all the states marked by Create.
+// It intends to be used for re-register a hidden metric.
+func (r *lazyMetric) ClearState() {
+	r.createLock.Lock()
+	defer r.createLock.Unlock()
+
+	r.isDeprecated = false
+	r.isHidden = false
+	r.isCreated = false
+	r.markDeprecationOnce = *(new(sync.Once))
+	r.createOnce = *(new(sync.Once))
 }
 
 /*

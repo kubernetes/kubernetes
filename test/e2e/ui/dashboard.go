@@ -42,7 +42,6 @@ var _ = SIGDescribe("Kubernetes Dashboard [Feature:Dashboard]", func() {
 		uiServiceName = "kubernetes-dashboard"
 		uiAppName     = uiServiceName
 		uiNamespace   = metav1.NamespaceSystem
-		uiRedirect    = "/ui"
 
 		serverStartTimeout = 1 * time.Minute
 	)

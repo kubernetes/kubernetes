@@ -147,6 +147,21 @@ func CreateOrUpdateDeployment(client clientset.Interface, deploy *apps.Deploymen
 	return nil
 }
 
+// CreateOrRetainDeployment creates a Deployment if the target resource doesn't exist. If the resource exists already, this function will retain the resource instead.
+func CreateOrRetainDeployment(client clientset.Interface, deploy *apps.Deployment, deployName string) error {
+	if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Get(deployName, metav1.GetOptions{}); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil
+		}
+		if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Create(deploy); err != nil {
+			if !apierrors.IsAlreadyExists(err) {
+				return errors.Wrap(err, "unable to create deployment")
+			}
+		}
+	}
+	return nil
+}
+
 // CreateOrUpdateDaemonSet creates a DaemonSet if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateDaemonSet(client clientset.Interface, ds *apps.DaemonSet) error {
 	if _, err := client.AppsV1().DaemonSets(ds.ObjectMeta.Namespace).Create(ds); err != nil {

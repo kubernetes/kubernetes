@@ -117,9 +117,9 @@ func (s *ServerRunOptions) Validate() []error {
 	}
 
 	if s.EnableInflightQuotaHandler {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.RequestManagement) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) {
 			errors = append(errors, fmt.Errorf("--enable-inflight-quota-handler can not be set if feature "+
-				"gate RequestManagement is disabled"))
+				"gate APIPriorityAndFairness is disabled"))
 		}
 		if s.MaxMutatingRequestsInFlight != 0 {
 			errors = append(errors, fmt.Errorf("--max-mutating-requests-inflight=%v "+
@@ -215,7 +215,7 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 
 	fs.DurationVar(&s.ShutdownDelayDuration, "shutdown-delay-duration", s.ShutdownDelayDuration, ""+
 		"Time to delay the termination. During that time the server keeps serving requests normally and /healthz "+
-		"returns success, but /readzy immediately returns failure. Graceful termination starts after this delay "+
+		"returns success, but /readyz immediately returns failure. Graceful termination starts after this delay "+
 		"has elapsed. This can be used to allow load balancer to stop sending traffic to this server.")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)

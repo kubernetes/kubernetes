@@ -941,7 +941,8 @@ spec:
           storagePolicyName: "103"
           volumePath: "101"
   updateStrategy:
-    rollingUpdate: {}
+    rollingUpdate:
+      maxUnavailable: 2
     type: 荥ơ'禧ǵŊ)TiD¢ƿ媴h5
 status:
   collisionCount: -449319810

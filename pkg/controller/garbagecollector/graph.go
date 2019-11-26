@@ -83,7 +83,7 @@ func (n *node) markObserved() {
 func (n *node) isObserved() bool {
 	n.virtualLock.RLock()
 	defer n.virtualLock.RUnlock()
-	return n.virtual == false
+	return !n.virtual
 }
 
 func (n *node) markDeletingDependents() {

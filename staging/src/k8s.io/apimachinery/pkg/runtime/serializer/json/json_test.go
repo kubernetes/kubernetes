@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
 )
 
@@ -225,39 +226,6 @@ func TestDecode(t *testing.T) {
 				Value: 1,
 			},
 		},
-
-		// runtime.VersionedObjects are decoded
-		{
-			data:        []byte(`{"value":1,"Other":"test"}`),
-			into:        &runtime.VersionedObjects{Objects: []runtime.Object{}},
-			creater:     &mockCreater{obj: &testDecodable{}},
-			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
-			defaultGVK:  &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
-			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
-			expectedObject: &runtime.VersionedObjects{
-				Objects: []runtime.Object{
-					&testDecodable{
-						Other: "test",
-						Value: 1,
-					},
-				},
-			},
-		},
-		// runtime.VersionedObjects with an object are decoded into
-		{
-			data:        []byte(`{"Other":"test"}`),
-			into:        &runtime.VersionedObjects{Objects: []runtime.Object{&testDecodable{Value: 2}}},
-			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
-			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
-			expectedObject: &runtime.VersionedObjects{
-				Objects: []runtime.Object{
-					&testDecodable{
-						Other: "test",
-						Value: 2,
-					},
-				},
-			},
-		},
 		// Error on invalid number
 		{
 			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","interface":1e1000}`),
@@ -454,6 +422,15 @@ func TestDecode(t *testing.T) {
 			t.Errorf("%d: unexpected object:\n%s", i, diff.ObjectGoPrintSideBySide(test.expectedObject, obj))
 		}
 	}
+}
+
+func TestCacheableObject(t *testing.T) {
+	gvk := schema.GroupVersionKind{Group: "group", Version: "version", Kind: "MockCacheableObject"}
+	creater := &mockCreater{obj: &runtimetesting.MockCacheableObject{}}
+	typer := &mockTyper{gvk: &gvk}
+	serializer := json.NewSerializer(json.DefaultMetaFactory, creater, typer, false)
+
+	runtimetesting.CacheableObjectTest(t, serializer)
 }
 
 type mockCreater struct {

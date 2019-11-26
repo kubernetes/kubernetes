@@ -31,7 +31,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/duration"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientset "k8s.io/client-go/kubernetes"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
@@ -39,6 +41,8 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
+	outputapiv1alpha1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -46,6 +50,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 // NewCmdToken returns cobra.Command for token management
@@ -93,6 +98,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 
 	var cfgPath string
 	var printJoinCommand bool
+	var certificateKey string
 	bto := options.NewBootstrapTokenOptions()
 
 	createCmd := &cobra.Command{
@@ -127,13 +133,15 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 				return err
 			}
 
-			return RunCreateToken(out, client, cfgPath, cfg, printJoinCommand, kubeConfigFile)
+			return RunCreateToken(out, client, cfgPath, cfg, printJoinCommand, certificateKey, kubeConfigFile)
 		},
 	}
 
 	options.AddConfigFlag(createCmd.Flags(), &cfgPath)
 	createCmd.Flags().BoolVar(&printJoinCommand,
 		"print-join-command", false, "Instead of printing only the token, print the full 'kubeadm join' flag needed to join the cluster using the token.")
+	createCmd.Flags().StringVar(&certificateKey,
+		options.CertificateKey, "", "When used together with '--print-join-command', print the full 'kubeadm join' flag needed to join the cluster as a control-plane. To create a new certificate key you must use 'kubeadm init phase upload-certs --upload-certs'.")
 	bto.AddTTLFlagWithName(createCmd.Flags(), "ttl")
 	bto.AddUsagesFlag(createCmd.Flags())
 	bto.AddGroupsFlag(createCmd.Flags())
@@ -141,6 +149,8 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 
 	tokenCmd.AddCommand(createCmd)
 	tokenCmd.AddCommand(NewCmdTokenGenerate(out))
+
+	outputFlags := output.NewOutputFlags(&tokenTextPrintFlags{}).WithTypeSetter(outputapischeme.Scheme).WithDefaultOutput(output.TextOutput)
 
 	listCmd := &cobra.Command{
 		Use:   "list",
@@ -155,9 +165,17 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 				return err
 			}
 
-			return RunListTokens(out, errW, client)
+			printer, err := outputFlags.ToPrinter()
+			if err != nil {
+				return err
+			}
+
+			return RunListTokens(out, errW, client, printer)
 		},
 	}
+
+	outputFlags.AddFlags(listCmd)
+
 	tokenCmd.AddCommand(listCmd)
 
 	deleteCmd := &cobra.Command{
@@ -211,7 +229,7 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 }
 
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
-func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, initCfg *kubeadmapiv1beta2.InitConfiguration, printJoinCommand bool, kubeConfigFile string) error {
+func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, initCfg *kubeadmapiv1beta2.InitConfiguration, printJoinCommand bool, certificateKey string, kubeConfigFile string) error {
 	// ClusterConfiguration is needed just for the call to LoadOrDefaultInitConfiguration
 	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{
 		// KubernetesVersion is not used, but we set this explicitly to avoid
@@ -242,14 +260,28 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 	// otherwise, just print the token
 	if printJoinCommand {
 		skipTokenPrint := false
-		joinCommand, err := cmdutil.GetJoinWorkerCommand(kubeConfigFile, internalcfg.BootstrapTokens[0].Token.String(), skipTokenPrint)
-		if err != nil {
-			return errors.Wrap(err, "failed to get join command")
+		if certificateKey != "" {
+			skipCertificateKeyPrint := false
+			joinCommand, err := cmdutil.GetJoinControlPlaneCommand(kubeConfigFile, internalcfg.BootstrapTokens[0].Token.String(), certificateKey, skipTokenPrint, skipCertificateKeyPrint)
+			if err != nil {
+				return errors.Wrap(err, "failed to get join command")
+			}
+			joinCommand = strings.ReplaceAll(joinCommand, "\\\n", "")
+			joinCommand = strings.ReplaceAll(joinCommand, "\t", "")
+			fmt.Fprintln(out, joinCommand)
+		} else {
+			joinCommand, err := cmdutil.GetJoinWorkerCommand(kubeConfigFile, internalcfg.BootstrapTokens[0].Token.String(), skipTokenPrint)
+			if err != nil {
+				return errors.Wrap(err, "failed to get join command")
+			}
+			joinCommand = strings.ReplaceAll(joinCommand, "\\\n", "")
+			joinCommand = strings.ReplaceAll(joinCommand, "\t", "")
+			fmt.Fprintln(out, joinCommand)
 		}
-		joinCommand = strings.ReplaceAll(joinCommand, "\\\n", "")
-		joinCommand = strings.ReplaceAll(joinCommand, "\t", "")
-		fmt.Fprintln(out, joinCommand)
 	} else {
+		if certificateKey != "" {
+			return errors.Wrap(err, "cannot use --certificate-key without --print-join-command")
+		}
 		fmt.Fprintln(out, internalcfg.BootstrapTokens[0].Token.String())
 	}
 
@@ -268,8 +300,71 @@ func RunGenerateToken(out io.Writer) error {
 	return nil
 }
 
+func formatBootstrapToken(obj *outputapiv1alpha1.BootstrapToken) string {
+	ttl := "<forever>"
+	expires := "<never>"
+	if obj.Expires != nil {
+		ttl = duration.ShortHumanDuration(time.Until(obj.Expires.Time))
+		expires = obj.Expires.Format(time.RFC3339)
+	}
+	ttl = fmt.Sprintf("%-9s", ttl)
+
+	usages := strings.Join(obj.Usages, ",")
+	if len(usages) == 0 {
+		usages = "<none>"
+	}
+	usages = fmt.Sprintf("%-22s", usages)
+
+	description := obj.Description
+	if len(description) == 0 {
+		description = "<none>"
+	}
+	description = fmt.Sprintf("%-56s", description)
+
+	groups := strings.Join(obj.Groups, ",")
+	if len(groups) == 0 {
+		groups = "<none>"
+	}
+
+	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s\n", obj.Token, ttl, expires, usages, description, groups)
+}
+
+// tokenTextPrinter prints bootstrap token in a text form
+type tokenTextPrinter struct {
+	output.TextPrinter
+	columns         []string
+	headerIsPrinted bool
+}
+
+// PrintObj is an implementation of ResourcePrinter.PrintObj for plain text output
+func (ttp *tokenTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) error {
+	tabw := tabwriter.NewWriter(writer, 10, 4, 3, ' ', 0)
+
+	// Print header
+	if !ttp.headerIsPrinted {
+		fmt.Fprintln(tabw, strings.Join(ttp.columns, "\t"))
+		ttp.headerIsPrinted = true
+	}
+
+	// Print token
+	fmt.Fprint(tabw, formatBootstrapToken(obj.(*outputapiv1alpha1.BootstrapToken)))
+
+	return tabw.Flush()
+}
+
+// tokenTextPrintFlags provides flags necessary for printing bootstrap token in a text form.
+type tokenTextPrintFlags struct{}
+
+// ToPrinter returns kubeadm printer for the text output format
+func (tpf *tokenTextPrintFlags) ToPrinter(outputFormat string) (output.Printer, error) {
+	if outputFormat == output.TextOutput {
+		return &tokenTextPrinter{columns: []string{"TOKEN", "TTL", "EXPIRES", "USAGES", "DESCRIPTION", "EXTRA GROUPS"}}, nil
+	}
+	return nil, genericclioptions.NoCompatiblePrinterError{OutputFormat: &outputFormat, AllowedFormats: []string{output.TextOutput}}
+}
+
 // RunListTokens lists details on all existing bootstrap tokens on the server.
-func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) error {
+func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, printer output.Printer) error {
 	// First, build our selector for bootstrap tokens only
 	klog.V(1).Infoln("[token] preparing selector for bootstrap token")
 	tokenSelector := fields.SelectorFromSet(
@@ -284,16 +379,13 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) er
 		FieldSelector: tokenSelector.String(),
 	}
 
-	klog.V(1).Infoln("[token] retrieving list of bootstrap tokens")
+	klog.V(1).Info("[token] retrieving list of bootstrap tokens")
 	secrets, err := client.CoreV1().Secrets(metav1.NamespaceSystem).List(listOptions)
 	if err != nil {
 		return errors.Wrap(err, "failed to list bootstrap tokens")
 	}
 
-	w := tabwriter.NewWriter(out, 10, 4, 3, ' ', 0)
-	fmt.Fprintln(w, "TOKEN\tTTL\tEXPIRES\tUSAGES\tDESCRIPTION\tEXTRA GROUPS")
 	for _, secret := range secrets.Items {
-
 		// Get the BootstrapToken struct representation from the Secret object
 		token, err := kubeadmapi.BootstrapTokenFromSecret(&secret)
 		if err != nil {
@@ -301,11 +393,22 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) er
 			continue
 		}
 
-		// Get the human-friendly string representation for the token
-		humanFriendlyTokenOutput := humanReadableBootstrapToken(token)
-		fmt.Fprintln(w, humanFriendlyTokenOutput)
+		// Convert token into versioned output structure
+		outputToken := outputapiv1alpha1.BootstrapToken{
+			BootstrapToken: kubeadmapiv1beta2.BootstrapToken{
+				Token:       &kubeadmapiv1beta2.BootstrapTokenString{ID: token.Token.ID, Secret: token.Token.Secret},
+				Description: token.Description,
+				TTL:         token.TTL,
+				Expires:     token.Expires,
+				Usages:      token.Usages,
+				Groups:      token.Groups,
+			},
+		}
+
+		if err := printer.PrintObj(&outputToken, out); err != nil {
+			return errors.Wrapf(err, "unable to print token %s", token.Token)
+		}
 	}
-	w.Flush()
 	return nil
 }
 
@@ -333,32 +436,6 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 		fmt.Fprintf(out, "bootstrap token %q deleted\n", tokenID)
 	}
 	return nil
-}
-
-func humanReadableBootstrapToken(token *kubeadmapi.BootstrapToken) string {
-	description := token.Description
-	if len(description) == 0 {
-		description = "<none>"
-	}
-
-	ttl := "<forever>"
-	expires := "<never>"
-	if token.Expires != nil {
-		ttl = duration.ShortHumanDuration(token.Expires.Sub(time.Now()))
-		expires = token.Expires.Format(time.RFC3339)
-	}
-
-	usagesString := strings.Join(token.Usages, ",")
-	if len(usagesString) == 0 {
-		usagesString = "<none>"
-	}
-
-	groupsString := strings.Join(token.Groups, ",")
-	if len(groupsString) == 0 {
-		groupsString = "<none>"
-	}
-
-	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s", token.Token.String(), ttl, expires, usagesString, description, groupsString)
 }
 
 func getClientset(file string, dryRun bool) (clientset.Interface, error) {

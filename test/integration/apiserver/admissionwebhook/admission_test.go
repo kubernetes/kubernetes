@@ -1390,9 +1390,6 @@ func getStubObj(gvr schema.GroupVersionResource, resource metav1.APIResource) (*
 
 func createOrGetResource(client dynamic.Interface, gvr schema.GroupVersionResource, resource metav1.APIResource) (*unstructured.Unstructured, error) {
 	stubObj, err := getStubObj(gvr, resource)
-	if gvr.Group == "discovery.k8s.io" {
-		fmt.Printf("stubObj =====> %v\n", stubObj)
-	}
 	if err != nil {
 		return nil, err
 	}

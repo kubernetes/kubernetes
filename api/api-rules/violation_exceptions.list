@@ -214,6 +214,7 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceAccountList,Item
 API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceList,Items
 API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceSpec,ExternalIPs
 API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceSpec,LoadBalancerSourceRanges
+API rule violation: list_type_missing,k8s.io/api/core/v1,ServiceSpec,TopologyKeys
 API rule violation: list_type_missing,k8s.io/api/core/v1,TopologySelectorLabelRequirement,Values
 API rule violation: list_type_missing,k8s.io/api/core/v1,TopologySelectorTerm,MatchLabelExpressions
 API rule violation: list_type_missing,k8s.io/api/events/v1beta1,EventList,Items
@@ -339,6 +340,9 @@ API rule violation: list_type_missing,k8s.io/api/settings/v1alpha1,PodPresetSpec
 API rule violation: list_type_missing,k8s.io/api/settings/v1alpha1,PodPresetSpec,EnvFrom
 API rule violation: list_type_missing,k8s.io/api/settings/v1alpha1,PodPresetSpec,VolumeMounts
 API rule violation: list_type_missing,k8s.io/api/settings/v1alpha1,PodPresetSpec,Volumes
+API rule violation: list_type_missing,k8s.io/api/storage/v1,CSINodeDriver,TopologyKeys
+API rule violation: list_type_missing,k8s.io/api/storage/v1,CSINodeList,Items
+API rule violation: list_type_missing,k8s.io/api/storage/v1,CSINodeSpec,Drivers
 API rule violation: list_type_missing,k8s.io/api/storage/v1,StorageClass,AllowedTopologies
 API rule violation: list_type_missing,k8s.io/api/storage/v1,StorageClass,MountOptions
 API rule violation: list_type_missing,k8s.io/api/storage/v1,StorageClassList,Items
@@ -475,6 +479,17 @@ API rule violation: list_type_missing,k8s.io/kube-controller-manager/config/v1al
 API rule violation: list_type_missing,k8s.io/kube-controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Controllers
 API rule violation: list_type_missing,k8s.io/kube-proxy/config/v1alpha1,KubeProxyConfiguration,NodePortAddresses
 API rule violation: list_type_missing,k8s.io/kube-proxy/config/v1alpha1,KubeProxyIPVSConfiguration,ExcludeCIDRs
+API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,Extender,ManagedResources
+API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,ExtenderTLSConfig,CAData
+API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,ExtenderTLSConfig,CertData
+API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,ExtenderTLSConfig,KeyData
+API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,LabelsPresence,Labels
+API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,Policy,Extenders
+API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,Policy,Predicates
+API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,Policy,Priorities
+API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,RequestedToCapacityRatioArguments,Resources
+API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,RequestedToCapacityRatioArguments,Shape
+API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,ServiceAffinity,Labels
 API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1alpha1,KubeSchedulerConfiguration,PluginConfig
 API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1alpha1,PluginSet,Disabled
 API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1alpha1,PluginSet,Enabled
@@ -505,7 +520,7 @@ API rule violation: names_match,k8s.io/api/core/v1,ISCSIPersistentVolumeSource,S
 API rule violation: names_match,k8s.io/api/core/v1,ISCSIVolumeSource,DiscoveryCHAPAuth
 API rule violation: names_match,k8s.io/api/core/v1,ISCSIVolumeSource,SessionCHAPAuth
 API rule violation: names_match,k8s.io/api/core/v1,NodeResources,Capacity
-API rule violation: names_match,k8s.io/api/core/v1,NodeSpec,DoNotUse_ExternalID
+API rule violation: names_match,k8s.io/api/core/v1,NodeSpec,DoNotUseExternalID
 API rule violation: names_match,k8s.io/api/core/v1,PersistentVolumeSource,CephFS
 API rule violation: names_match,k8s.io/api/core/v1,PersistentVolumeSource,StorageOS
 API rule violation: names_match,k8s.io/api/core/v1,PodSpec,DeprecatedServiceAccount
@@ -527,6 +542,7 @@ API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiexten
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XIntOrString
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XListMapKeys
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XListType
+API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XMapType
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XPreserveUnknownFields
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaPropsOrArray,JSONSchemas
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaPropsOrArray,Schema
@@ -542,6 +558,7 @@ API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiexten
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XIntOrString
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XListMapKeys
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XListType
+API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XMapType
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XPreserveUnknownFields
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaPropsOrArray,JSONSchemas
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaPropsOrArray,Schema
@@ -646,6 +663,8 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,K
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NamespaceControllerConfiguration,ConcurrentNamespaceSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NamespaceControllerConfiguration,NamespaceSyncPeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeIPAMControllerConfiguration,NodeCIDRMaskSize
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeIPAMControllerConfiguration,NodeCIDRMaskSizeIPv4
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeIPAMControllerConfiguration,NodeCIDRMaskSizeIPv6
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeIPAMControllerConfiguration,SecondaryServiceCIDR
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeIPAMControllerConfiguration,ServiceCIDR
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeLifecycleControllerConfiguration,EnableTaintManager
@@ -681,6 +700,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,V
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,VolumeConfiguration,FlexVolumePluginDir
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,VolumeConfiguration,PersistentVolumeRecyclerConfiguration
 API rule violation: names_match,k8s.io/kube-proxy/config/v1alpha1,KubeProxyConfiguration,IPTables
+API rule violation: names_match,k8s.io/kube-scheduler/config/v1,Extender,EnableHTTPS
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,IPTablesDropBit
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,IPTablesMasqueradeBit
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,ResolverConfig

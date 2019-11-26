@@ -51,16 +51,27 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 
 	expectedGlobalPath := filepath.Join(tmpVDir, testGlobalPath)
 
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpVDir, nil, nil))
+	plug, err := plugMgr.FindMapperPluginByName(awsElasticBlockStorePluginName)
+	if err != nil {
+		os.RemoveAll(tmpVDir)
+		t.Fatalf("Can't find the plugin by name: %q", awsElasticBlockStorePluginName)
+	}
+
 	//Bad Path
-	badspec, err := getVolumeSpecFromGlobalMapPath("")
+	badspec, err := plug.(*awsElasticBlockStorePlugin).getVolumeSpecFromGlobalMapPath("", "")
 	if badspec != nil || err == nil {
 		t.Fatalf("Expected not to get spec from GlobalMapPath but did")
 	}
 
 	// Good Path
-	spec, err := getVolumeSpecFromGlobalMapPath(expectedGlobalPath)
+	spec, err := plug.(*awsElasticBlockStorePlugin).getVolumeSpecFromGlobalMapPath("myVolume", expectedGlobalPath)
 	if spec == nil || err != nil {
 		t.Fatalf("Failed to get spec from GlobalMapPath: %v", err)
+	}
+	if spec.PersistentVolume.Name != "myVolume" {
+		t.Errorf("Invalid PV name from GlobalMapPath spec: %s", spec.PersistentVolume.Name)
 	}
 	if spec.PersistentVolume.Spec.AWSElasticBlockStore.VolumeID != testVolName {
 		t.Errorf("Invalid volumeID from GlobalMapPath spec: %s", spec.PersistentVolume.Spec.AWSElasticBlockStore.VolumeID)
@@ -109,7 +120,7 @@ func TestGetPodAndPluginMapPaths(t *testing.T) {
 
 	spec := getTestVolume(false, true /*isBlock*/)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpVDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpVDir, nil, nil))
 	plug, err := plugMgr.FindMapperPluginByName(awsElasticBlockStorePluginName)
 	if err != nil {
 		os.RemoveAll(tmpVDir)

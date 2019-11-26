@@ -65,6 +65,7 @@ func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinitio
 		requireValidPropertyType:                 requireValidPropertyType(requestGV, nil),
 		requireStructuralSchema:                  requireStructuralSchema(requestGV, nil),
 		requirePrunedDefaults:                    true,
+		requireAtomicSetType:                     true,
 	}
 
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, nameValidationFn, field.NewPath("metadata"))
@@ -92,6 +93,8 @@ type validationOptions struct {
 	requireStructuralSchema bool
 	// requirePrunedDefaults indicates that defaults must be pruned
 	requirePrunedDefaults bool
+	// requireAtomicSetType indicates that the items type for a x-kubernetes-list-type=set list must be atomic.
+	requireAtomicSetType bool
 }
 
 // ValidateCustomResourceDefinitionUpdate statically validates
@@ -104,6 +107,7 @@ func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomRes
 		requireValidPropertyType:                 requireValidPropertyType(requestGV, &oldObj.Spec),
 		requireStructuralSchema:                  requireStructuralSchema(requestGV, &oldObj.Spec),
 		requirePrunedDefaults:                    requirePrunedDefaults(&oldObj.Spec),
+		requireAtomicSetType:                     requireAtomicSetType(&oldObj.Spec),
 	}
 
 	allErrs := genericvalidation.ValidateObjectMetaUpdate(&obj.ObjectMeta, &oldObj.ObjectMeta, field.NewPath("metadata"))
@@ -660,7 +664,7 @@ func validateCustomResourceDefinitionValidation(customResourceValidation *apiext
 			requireValidPropertyType: opts.requireValidPropertyType,
 		}
 
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true)...)
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true, &opts)...)
 
 		if opts.requireStructuralSchema {
 			if ss, err := structuralschema.NewStructural(schema); err != nil {
@@ -691,7 +695,7 @@ func validateCustomResourceDefinitionValidation(customResourceValidation *apiext
 var metaFields = sets.NewString("metadata", "kind", "apiVersion")
 
 // ValidateCustomResourceDefinitionOpenAPISchema statically validates
-func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool) field.ErrorList {
+func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool, opts *validationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if schema == nil {
@@ -726,7 +730,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			// we have to forbid defaults inside additionalProperties because pruning without actual value is ambiguous
 			subSsv = ssv.withForbiddenDefaults("inside additionalProperties applying to object metadata")
 		}
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalProperties.Schema, fldPath.Child("additionalProperties"), subSsv, false)...)
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalProperties.Schema, fldPath.Child("additionalProperties"), subSsv, false, opts)...)
 	}
 
 	if len(schema.Properties) != 0 {
@@ -740,48 +744,48 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 					subSsv = subSsv.withForbiddenDefaults(fmt.Sprintf("in top-level %s", property))
 				}
 			}
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("properties").Key(property), subSsv, false)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("properties").Key(property), subSsv, false, opts)...)
 		}
 	}
 
-	allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Not, fldPath.Child("not"), ssv, false)...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Not, fldPath.Child("not"), ssv, false, opts)...)
 
 	if len(schema.AllOf) != 0 {
 		for i, jsonSchema := range schema.AllOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("allOf").Index(i), ssv, false)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("allOf").Index(i), ssv, false, opts)...)
 		}
 	}
 
 	if len(schema.OneOf) != 0 {
 		for i, jsonSchema := range schema.OneOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("oneOf").Index(i), ssv, false)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("oneOf").Index(i), ssv, false, opts)...)
 		}
 	}
 
 	if len(schema.AnyOf) != 0 {
 		for i, jsonSchema := range schema.AnyOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("anyOf").Index(i), ssv, false)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("anyOf").Index(i), ssv, false, opts)...)
 		}
 	}
 
 	if len(schema.Definitions) != 0 {
 		for definition, jsonSchema := range schema.Definitions {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("definitions").Key(definition), ssv, false)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("definitions").Key(definition), ssv, false, opts)...)
 		}
 	}
 
 	if schema.Items != nil {
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Items.Schema, fldPath.Child("items"), ssv, false)...)
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Items.Schema, fldPath.Child("items"), ssv, false, opts)...)
 		if len(schema.Items.JSONSchemas) != 0 {
 			for i, jsonSchema := range schema.Items.JSONSchemas {
-				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items").Index(i), ssv, false)...)
+				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items").Index(i), ssv, false, opts)...)
 			}
 		}
 	}
 
 	if schema.Dependencies != nil {
 		for dependency, jsonSchemaPropsOrStringArray := range schema.Dependencies {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(jsonSchemaPropsOrStringArray.Schema, fldPath.Child("dependencies").Key(dependency), ssv, false)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(jsonSchemaPropsOrStringArray.Schema, fldPath.Child("dependencies").Key(dependency), ssv, false, opts)...)
 		}
 	}
 
@@ -789,11 +793,35 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-preserve-unknown-fields"), *schema.XPreserveUnknownFields, "must be true or undefined"))
 	}
 
+	if schema.XMapType != nil && schema.Type != "object" {
+		if len(schema.Type) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must be object if x-kubernetes-map-type is specified"))
+		} else {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), schema.Type, "must be object if x-kubernetes-map-type is specified"))
+		}
+	}
+
+	if schema.XMapType != nil && *schema.XMapType != "atomic" && *schema.XMapType != "granular" {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("x-kubernetes-map-type"), *schema.XMapType, []string{"atomic", "granular"}))
+	}
+
 	if schema.XListType != nil && schema.Type != "array" {
 		if len(schema.Type) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must be array if x-kubernetes-list-type is set"))
+			allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must be array if x-kubernetes-list-type is specified"))
 		} else {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), schema.Type, "must be array if x-kubernetes-list-type is set"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), schema.Type, "must be array if x-kubernetes-list-type is specified"))
+		}
+	} else if opts.requireAtomicSetType && schema.XListType != nil && *schema.XListType == "set" && schema.Items != nil && schema.Items.Schema != nil { // by structural schema items are present
+		is := schema.Items.Schema
+		switch is.Type {
+		case "array":
+			if is.XListType != nil && *is.XListType != "atomic" { // atomic is the implicit default behaviour if unset, hence != atomic is wrong
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("items").Child("x-kubernetes-list-type"), is.XListType, "must be atomic as item of a list with x-kubernetes-list-type=set"))
+			}
+		case "object":
+			if is.XMapType == nil || *is.XMapType != "atomic" { // granular is the implicit default behaviour if unset, hence nil and != atomic are wrong
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("items").Child("x-kubernetes-map-type"), is.XListType, "must be atomic as item of a list with x-kubernetes-list-type=set"))
+			}
 		}
 	}
 
@@ -1036,9 +1064,6 @@ func allowDefaults(requestGV schema.GroupVersion, oldCRDSpec *apiextensions.Cust
 		// don't tighten validation on existing persisted data
 		return true
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceDefaulting) {
-		return false
-	}
 	if requestGV == apiextensionsv1beta1.SchemeGroupVersion {
 		return false
 	}
@@ -1046,81 +1071,91 @@ func allowDefaults(requestGV schema.GroupVersion, oldCRDSpec *apiextensions.Cust
 }
 
 func specHasDefaults(spec *apiextensions.CustomResourceDefinitionSpec) bool {
-	if spec.Validation != nil && schemaHasDefaults(spec.Validation.OpenAPIV3Schema) {
+	return hasSchemaWith(spec, schemaHasDefaults)
+}
+
+func schemaHasDefaults(s *apiextensions.JSONSchemaProps) bool {
+	return schemaHas(s, func(s *apiextensions.JSONSchemaProps) bool {
+		return s.Default != nil
+	})
+}
+
+func hasSchemaWith(spec *apiextensions.CustomResourceDefinitionSpec, pred func(s *apiextensions.JSONSchemaProps) bool) bool {
+	if spec.Validation != nil && spec.Validation.OpenAPIV3Schema != nil && pred(spec.Validation.OpenAPIV3Schema) {
 		return true
 	}
 	for _, v := range spec.Versions {
-		if v.Schema != nil && schemaHasDefaults(v.Schema.OpenAPIV3Schema) {
+		if v.Schema != nil && v.Schema.OpenAPIV3Schema != nil && pred(v.Schema.OpenAPIV3Schema) {
 			return true
 		}
 	}
 	return false
 }
 
-func schemaHasDefaults(s *apiextensions.JSONSchemaProps) bool {
+func schemaHas(s *apiextensions.JSONSchemaProps, pred func(s *apiextensions.JSONSchemaProps) bool) bool {
 	if s == nil {
 		return false
 	}
 
-	if s.Default != nil {
+	if pred(s) {
 		return true
 	}
 
 	if s.Items != nil {
-		if s.Items != nil && schemaHasDefaults(s.Items.Schema) {
+		if s.Items != nil && schemaHas(s.Items.Schema, pred) {
 			return true
 		}
 		for _, s := range s.Items.JSONSchemas {
-			if schemaHasDefaults(&s) {
+			if schemaHas(&s, pred) {
 				return true
 			}
 		}
 	}
 	for _, s := range s.AllOf {
-		if schemaHasDefaults(&s) {
+		if schemaHas(&s, pred) {
 			return true
 		}
 	}
 	for _, s := range s.AnyOf {
-		if schemaHasDefaults(&s) {
+		if schemaHas(&s, pred) {
 			return true
 		}
 	}
 	for _, s := range s.OneOf {
-		if schemaHasDefaults(&s) {
+		if schemaHas(&s, pred) {
 			return true
 		}
 	}
-	if schemaHasDefaults(s.Not) {
+	if schemaHas(s.Not, pred) {
 		return true
 	}
 	for _, s := range s.Properties {
-		if schemaHasDefaults(&s) {
+		if schemaHas(&s, pred) {
 			return true
 		}
 	}
 	if s.AdditionalProperties != nil {
-		if schemaHasDefaults(s.AdditionalProperties.Schema) {
+		if schemaHas(s.AdditionalProperties.Schema, pred) {
 			return true
 		}
 	}
 	for _, s := range s.PatternProperties {
-		if schemaHasDefaults(&s) {
+		if schemaHas(&s, pred) {
 			return true
 		}
 	}
 	if s.AdditionalItems != nil {
-		if schemaHasDefaults(s.AdditionalItems.Schema) {
+		if schemaHas(s.AdditionalItems.Schema, pred) {
 			return true
 		}
 	}
 	for _, s := range s.Definitions {
-		if schemaHasDefaults(&s) {
+		if schemaHas(&s, pred) {
 			return true
 		}
 	}
 	for _, d := range s.Dependencies {
-		if schemaHasDefaults(d.Schema) {
+		if schemaHas(d.Schema, pred) {
 			return true
 		}
 	}
@@ -1141,74 +1176,9 @@ func specHasKubernetesExtensions(spec *apiextensions.CustomResourceDefinitionSpe
 }
 
 func schemaHasKubernetesExtensions(s *apiextensions.JSONSchemaProps) bool {
-	if s == nil {
-		return false
-	}
-
-	if s.XEmbeddedResource || s.XPreserveUnknownFields != nil || s.XIntOrString || len(s.XListMapKeys) > 0 || s.XListType != nil {
-		return true
-	}
-
-	if s.Items != nil {
-		if s.Items != nil && schemaHasKubernetesExtensions(s.Items.Schema) {
-			return true
-		}
-		for _, s := range s.Items.JSONSchemas {
-			if schemaHasKubernetesExtensions(&s) {
-				return true
-			}
-		}
-	}
-	for _, s := range s.AllOf {
-		if schemaHasKubernetesExtensions(&s) {
-			return true
-		}
-	}
-	for _, s := range s.AnyOf {
-		if schemaHasKubernetesExtensions(&s) {
-			return true
-		}
-	}
-	for _, s := range s.OneOf {
-		if schemaHasKubernetesExtensions(&s) {
-			return true
-		}
-	}
-	if schemaHasKubernetesExtensions(s.Not) {
-		return true
-	}
-	for _, s := range s.Properties {
-		if schemaHasKubernetesExtensions(&s) {
-			return true
-		}
-	}
-	if s.AdditionalProperties != nil {
-		if schemaHasKubernetesExtensions(s.AdditionalProperties.Schema) {
-			return true
-		}
-	}
-	for _, s := range s.PatternProperties {
-		if schemaHasKubernetesExtensions(&s) {
-			return true
-		}
-	}
-	if s.AdditionalItems != nil {
-		if schemaHasKubernetesExtensions(s.AdditionalItems.Schema) {
-			return true
-		}
-	}
-	for _, s := range s.Definitions {
-		if schemaHasKubernetesExtensions(&s) {
-			return true
-		}
-	}
-	for _, d := range s.Dependencies {
-		if schemaHasKubernetesExtensions(d.Schema) {
-			return true
-		}
-	}
-
-	return false
+	return schemaHas(s, func(s *apiextensions.JSONSchemaProps) bool {
+		return s.XEmbeddedResource || s.XPreserveUnknownFields != nil || s.XIntOrString || len(s.XListMapKeys) > 0 || s.XListType != nil
+	})
 }
 
 // requireStructuralSchema returns true if schemas specified must be structural
@@ -1279,6 +1249,29 @@ func schemaHasUnprunedDefaults(schema *apiextensions.JSONSchemaProps) (bool, err
 		return false, err
 	}
 	return !reflect.DeepEqual(ss, pruned), nil
+}
+
+// requireAtomicSetType returns true if the old CRD spec as at least one x-kubernetes-list-type=set with non-atomic items type.
+func requireAtomicSetType(oldCRDSpec *apiextensions.CustomResourceDefinitionSpec) bool {
+	return !hasSchemaWith(oldCRDSpec, hasNonAtomicSetType)
+}
+
+// hasNonAtomicSetType recurses over the schema and returns whether any list of type "set" as non-atomic item types.
+func hasNonAtomicSetType(schema *apiextensions.JSONSchemaProps) bool {
+	return schemaHas(schema, func(schema *apiextensions.JSONSchemaProps) bool {
+		if schema.XListType != nil && *schema.XListType == "set" && schema.Items != nil && schema.Items.Schema != nil { // we don't support schema.Items.JSONSchemas
+			is := schema.Items.Schema
+			switch is.Type {
+			case "array":
+				return is.XListType != nil && *is.XListType != "atomic" // atomic is the implicit default behaviour if unset, hence != atomic is wrong
+			case "object":
+				return is.XMapType == nil || *is.XMapType != "atomic" // granular is the implicit default behaviour if unset, hence nil and != atomic are wrong
+			default:
+				return false // scalar types are always atomic
+			}
+		}
+		return false
+	})
 }
 
 // requireValidPropertyType returns true if valid openapi v3 types should be required for the given API version
@@ -1368,72 +1361,7 @@ func specHasInvalidTypes(spec *apiextensions.CustomResourceDefinitionSpec) bool 
 
 // SchemaHasInvalidTypes returns true if it contains invalid offending openapi-v3 specification.
 func SchemaHasInvalidTypes(s *apiextensions.JSONSchemaProps) bool {
-	if s == nil {
-		return false
-	}
-
-	if len(s.Type) > 0 && !openapiV3Types.Has(s.Type) {
-		return true
-	}
-
-	if s.Items != nil {
-		if s.Items != nil && SchemaHasInvalidTypes(s.Items.Schema) {
-			return true
-		}
-		for _, s := range s.Items.JSONSchemas {
-			if SchemaHasInvalidTypes(&s) {
-				return true
-			}
-		}
-	}
-	for _, s := range s.AllOf {
-		if SchemaHasInvalidTypes(&s) {
-			return true
-		}
-	}
-	for _, s := range s.AnyOf {
-		if SchemaHasInvalidTypes(&s) {
-			return true
-		}
-	}
-	for _, s := range s.OneOf {
-		if SchemaHasInvalidTypes(&s) {
-			return true
-		}
-	}
-	if SchemaHasInvalidTypes(s.Not) {
-		return true
-	}
-	for _, s := range s.Properties {
-		if SchemaHasInvalidTypes(&s) {
-			return true
-		}
-	}
-	if s.AdditionalProperties != nil {
-		if SchemaHasInvalidTypes(s.AdditionalProperties.Schema) {
-			return true
-		}
-	}
-	for _, s := range s.PatternProperties {
-		if SchemaHasInvalidTypes(&s) {
-			return true
-		}
-	}
-	if s.AdditionalItems != nil {
-		if SchemaHasInvalidTypes(s.AdditionalItems.Schema) {
-			return true
-		}
-	}
-	for _, s := range s.Definitions {
-		if SchemaHasInvalidTypes(&s) {
-			return true
-		}
-	}
-	for _, d := range s.Dependencies {
-		if SchemaHasInvalidTypes(d.Schema) {
-			return true
-		}
-	}
-
-	return false
+	return schemaHas(s, func(s *apiextensions.JSONSchemaProps) bool {
+		return len(s.Type) > 0 && !openapiV3Types.Has(s.Type)
+	})
 }

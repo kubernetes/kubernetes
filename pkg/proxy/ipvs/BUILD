@@ -16,6 +16,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/proxy:go_default_library",
+        "//pkg/proxy/healthcheck:go_default_library",
         "//pkg/proxy/ipvs/testing:go_default_library",
         "//pkg/proxy/util:go_default_library",
         "//pkg/proxy/util/testing:go_default_library",
@@ -27,7 +28,7 @@ go_test(
         "//pkg/util/ipvs:go_default_library",
         "//pkg/util/ipvs/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/discovery/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/api/discovery/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
@@ -55,6 +56,7 @@ go_library(
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/proxy:go_default_library",
+        "//pkg/proxy/config:go_default_library",
         "//pkg/proxy/healthcheck:go_default_library",
         "//pkg/proxy/metrics:go_default_library",
         "//pkg/proxy/util:go_default_library",
@@ -65,7 +67,7 @@ go_library(
         "//pkg/util/ipvs:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/discovery/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/api/discovery/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
@@ -76,6 +78,10 @@ go_library(
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/vishvananda/netlink:go_default_library",
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/vishvananda/netlink:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",

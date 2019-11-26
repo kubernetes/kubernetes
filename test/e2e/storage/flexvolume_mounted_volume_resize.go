@@ -31,6 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
@@ -49,6 +50,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 		err               error
 		pvc               *v1.PersistentVolumeClaim
 		resizableSc       *storagev1.StorageClass
+		node              *v1.Node
 		nodeName          string
 		isNodeLabeled     bool
 		nodeKeyValueLabel map[string]string
@@ -66,12 +68,9 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 		ns = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		if len(nodeList.Items) != 0 {
-			nodeName = nodeList.Items[0].Name
-		} else {
-			framework.Failf("Unable to find ready and schedulable Node")
-		}
+		node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
+		nodeName = node.Name
 
 		nodeKey = "mounted_flexvolume_expand"
 
@@ -125,10 +124,8 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 
 	ginkgo.It("Should verify mounted flex volumes can be resized", func() {
 		driver := "dummy-attachable"
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		node := nodeList.Items[0]
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driver))
-		installFlex(c, &node, "k8s", driver, path.Join(driverDir, driver))
+		installFlex(c, node, "k8s", driver, path.Join(driverDir, driver))
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on (master) node %s as %s", path.Join(driverDir, driver), node.Name, driver))
 		installFlex(c, nil, "k8s", driver, path.Join(driverDir, driver))
 

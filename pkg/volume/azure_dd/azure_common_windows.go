@@ -26,22 +26,22 @@ import (
 	"strings"
 
 	"k8s.io/klog"
-
-	"k8s.io/kubernetes/pkg/util/mount"
+	utilexec "k8s.io/utils/exec"
+	"k8s.io/utils/mount"
 )
 
-func scsiHostRescan(io ioHandler, exec mount.Exec) {
+func scsiHostRescan(io ioHandler, exec utilexec.Interface) {
 	cmd := "Update-HostStorageCache"
-	output, err := exec.Run("powershell", "/c", cmd)
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
 		klog.Errorf("Update-HostStorageCache failed in scsiHostRescan, error: %v, output: %q", err, string(output))
 	}
 }
 
 // search Windows disk number by LUN
-func findDiskByLun(lun int, iohandler ioHandler, exec mount.Exec) (string, error) {
+func findDiskByLun(lun int, iohandler ioHandler, exec utilexec.Interface) (string, error) {
 	cmd := `Get-Disk | select number, location | ConvertTo-Json`
-	output, err := exec.Run("powershell", "/c", cmd)
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
 		klog.Errorf("Get-Disk failed in findDiskByLun, error: %v, output: %q", err, string(output))
 		return "", err
@@ -98,7 +98,7 @@ func findDiskByLun(lun int, iohandler ioHandler, exec mount.Exec) (string, error
 	return "", nil
 }
 
-func formatIfNotFormatted(disk string, fstype string, exec mount.Exec) {
+func formatIfNotFormatted(disk string, fstype string, exec utilexec.Interface) {
 	if err := mount.ValidateDiskNumber(disk); err != nil {
 		klog.Errorf("azureDisk Mount: formatIfNotFormatted failed, err: %v\n", err)
 		return
@@ -110,7 +110,7 @@ func formatIfNotFormatted(disk string, fstype string, exec mount.Exec) {
 	}
 	cmd := fmt.Sprintf("Get-Disk -Number %s | Where partitionstyle -eq 'raw' | Initialize-Disk -PartitionStyle MBR -PassThru", disk)
 	cmd += fmt.Sprintf(" | New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem %s -Confirm:$false", fstype)
-	output, err := exec.Run("powershell", "/c", cmd)
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
 		klog.Errorf("azureDisk Mount: Get-Disk failed, error: %v, output: %q", err, string(output))
 	} else {

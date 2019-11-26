@@ -950,9 +950,6 @@ function print-common-kubelet-config {
   declare quoted_dns_server_ip
   declare quoted_dns_domain
   quoted_dns_server_ip=$(yaml-quote "${DNS_SERVER_IP}")
-  if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
-    quoted_dns_server_ip=$(yaml-quote "${LOCAL_DNS_IP}")
-  fi
   quoted_dns_domain=$(yaml-quote "${DNS_DOMAIN}")
   cat <<EOF
 kind: KubeletConfiguration
@@ -1124,7 +1121,6 @@ SERVICE_CLUSTER_IP_RANGE: $(yaml-quote ${SERVICE_CLUSTER_IP_RANGE})
 KUBERNETES_MASTER_NAME: $(yaml-quote ${KUBERNETES_MASTER_NAME})
 ALLOCATE_NODE_CIDRS: $(yaml-quote ${ALLOCATE_NODE_CIDRS:-false})
 ENABLE_CLUSTER_MONITORING: $(yaml-quote ${ENABLE_CLUSTER_MONITORING:-none})
-ENABLE_PROMETHEUS_MONITORING: $(yaml-quote ${ENABLE_PROMETHEUS_MONITORING:-false})
 ENABLE_METRICS_SERVER: $(yaml-quote ${ENABLE_METRICS_SERVER:-false})
 ENABLE_METADATA_AGENT: $(yaml-quote ${ENABLE_METADATA_AGENT:-none})
 METADATA_AGENT_CPU_REQUEST: $(yaml-quote ${METADATA_AGENT_CPU_REQUEST:-})
@@ -1175,6 +1171,7 @@ MULTIZONE: $(yaml-quote ${MULTIZONE:-})
 MULTIMASTER: $(yaml-quote ${MULTIMASTER:-})
 NON_MASQUERADE_CIDR: $(yaml-quote ${NON_MASQUERADE_CIDR:-})
 ENABLE_DEFAULT_STORAGE_CLASS: $(yaml-quote ${ENABLE_DEFAULT_STORAGE_CLASS:-})
+ENABLE_VOLUME_SNAPSHOTS: $(yaml-quote ${ENABLE_VOLUME_SNAPSHOTS:-})
 ENABLE_APISERVER_ADVANCED_AUDIT: $(yaml-quote ${ENABLE_APISERVER_ADVANCED_AUDIT:-})
 ENABLE_APISERVER_DYNAMIC_AUDIT: $(yaml-quote ${ENABLE_APISERVER_DYNAMIC_AUDIT:-})
 ENABLE_CACHE_MUTATION_DETECTOR: $(yaml-quote ${ENABLE_CACHE_MUTATION_DETECTOR:-false})
@@ -2130,6 +2127,7 @@ function create-node-template() {
   local template_name="$1"
   local metadata_values="$4"
   local os="$5"
+  local machine_type="$6"
 
   # First, ensure the template doesn't exist.
   # TODO(zmerlynn): To make this really robust, we need to parse the output and
@@ -2216,7 +2214,7 @@ function create-node-template() {
     if ! ${gcloud} compute instance-templates create \
       "${template_name}" \
       --project "${PROJECT}" \
-      --machine-type "${NODE_SIZE}" \
+      --machine-type "${machine_type}" \
       --boot-disk-type "${NODE_DISK_TYPE}" \
       --boot-disk-size "${NODE_DISK_SIZE}" \
       ${node_image_flags} \
@@ -2287,8 +2285,8 @@ function kube-up() {
     create-loadbalancer
     # If replication of master fails, we need to ensure that the replica is removed from etcd clusters.
     if ! replicate-master; then
-      remove-replica-from-etcd 2379 || true
-      remove-replica-from-etcd 4002 || true
+      remove-replica-from-etcd 2379 true || true
+      remove-replica-from-etcd 4002 false || true
     fi
   else
     check-existing
@@ -2494,6 +2492,10 @@ function detect-subnetworks() {
 #   NETWORK
 function create-cloud-nat-router() {
   if [[ ${GCE_PRIVATE_CLUSTER:-} == "true" ]]; then
+    if gcloud compute routers describe "$NETWORK-nat-router" --project $NETWORK_PROJECT --region $REGION &>/dev/null; then
+      echo "Cloud nat already exists"
+      return 0
+    fi
     gcloud compute routers create "$NETWORK-nat-router" \
       --project $NETWORK_PROJECT \
       --region $REGION \
@@ -2502,8 +2504,9 @@ function create-cloud-nat-router() {
       --project $NETWORK_PROJECT \
       --router-region $REGION \
       --router "$NETWORK-nat-router" \
-      --nat-all-subnet-ip-ranges \
-      --auto-allocate-nat-external-ips
+      --nat-primary-subnet-ip-ranges \
+      --auto-allocate-nat-external-ips \
+      ${GCE_PRIVATE_CLUSTER_PORTS_PER_VM:+--min-ports-per-vm ${GCE_PRIVATE_CLUSTER_PORTS_PER_VM}}
   fi
 }
 
@@ -2750,17 +2753,21 @@ function create-master() {
 #
 # $1: etcd client port
 # $2: etcd internal port
+# $3: whether etcd communication should use mtls
 # returns the result of ssh command which adds replica
-#### WARNING: THIS DOESN'T WORK IN CLUSTERS WITH MTLS ENABLED.
-# TODO(mborsz): Fix this
 function add-replica-to-etcd() {
   local -r client_port="${1}"
   local -r internal_port="${2}"
-  gcloud compute ssh "${EXISTING_MASTER_NAME}" \
-    --project "${PROJECT}" \
-    --zone "${EXISTING_MASTER_ZONE}" \
-    --command \
-      "curl localhost:${client_port}/v2/members -XPOST -H \"Content-Type: application/json\" -d '{\"peerURLs\":[\"https://${REPLICA_NAME}:${internal_port}\"]}' -s"
+  local -r use_mtls="${3}"
+
+  TLSARG=""
+  PROTO="http://"
+  if [[ "${use_mtls}" == "true" ]]; then
+    # Keep in sync with ETCD_APISERVER_CA_CERT_PATH, ETCD_APISERVER_CLIENT_CERT_PATH and ETCD_APISERVER_CLIENT_KEY_PATH in configure-helper.sh.
+    TLSARG="--cacert /etc/srv/kubernetes/pki/etcd-apiserver-ca.crt --cert /etc/srv/kubernetes/pki/etcd-apiserver-client.crt --key /etc/srv/kubernetes/pki/etcd-apiserver-client.key"
+    PROTO="https://"
+  fi
+  run-gcloud-command "${EXISTING_MASTER_NAME}" "${EXISTING_MASTER_ZONE}" "curl ${TLSARG} ${PROTO}127.0.0.1:${client_port}/v2/members -XPOST -H \"Content-Type: application/json\" -d '{\"peerURLs\":[\"https://${REPLICA_NAME}:${internal_port}\"]}' -s"
   return $?
 }
 
@@ -2786,11 +2793,11 @@ function replicate-master() {
   echo "Experimental: replicating existing master ${EXISTING_MASTER_ZONE}/${EXISTING_MASTER_NAME} as ${ZONE}/${REPLICA_NAME}"
 
   # Before we do anything else, we should configure etcd to expect more replicas.
-  if ! add-replica-to-etcd 2379 2380; then
+  if ! add-replica-to-etcd 2379 2380 true; then
     echo "Failed to add master replica to etcd cluster."
     return 1
   fi
-  if ! add-replica-to-etcd 4002 2381; then
+  if ! add-replica-to-etcd 4002 2381 false; then
     echo "Failed to add master replica to etcd events cluster."
     return 1
   fi
@@ -3068,6 +3075,10 @@ function create-nodes-template() {
   local windows_template_name="${WINDOWS_NODE_INSTANCE_PREFIX}-template"
   create-linux-node-instance-template $linux_template_name
   create-windows-node-instance-template $windows_template_name "${scope_flags[*]}"
+  if [[ -n "${ADDITIONAL_MACHINE_TYPE:-}" ]]; then
+    local linux_extra_template_name="${NODE_INSTANCE_PREFIX}-extra-template"
+    create-linux-node-instance-template $linux_extra_template_name "${ADDITIONAL_MACHINE_TYPE}"
+  fi
 }
 
 # Assumes:
@@ -3096,13 +3107,38 @@ function set_num_migs() {
 # - ZONE
 function create-linux-nodes() {
   local template_name="${NODE_INSTANCE_PREFIX}-template"
+  local extra_template_name="${NODE_INSTANCE_PREFIX}-extra-template"
 
-  if [[ -z "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
-    local -r nodes="${NUM_NODES}"
-  else
+  local nodes="${NUM_NODES}"
+  if [[ ! -z "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
     echo "Creating a special node for heapster with machine-type ${HEAPSTER_MACHINE_TYPE}"
     create-heapster-node
-    local -r nodes=$(( NUM_NODES - 1 ))
+    nodes=$(( nodes - 1 ))
+  fi
+
+  if [[ -n "${ADDITIONAL_MACHINE_TYPE:-}" && "${NUM_ADDITIONAL_NODES:-}" -gt 0 ]]; then
+    local num_additional="${NUM_ADDITIONAL_NODES}"
+    if [[ "${NUM_ADDITIONAL_NODES:-}" -gt "${nodes}" ]]; then
+      echo "Capping NUM_ADDITIONAL_NODES to ${nodes}"
+      num_additional="${nodes}"
+    fi
+    if [[ "${num_additional:-}" -gt 0 ]]; then
+      echo "Creating ${num_additional} special nodes with machine-type ${ADDITIONAL_MACHINE_TYPE}"
+      local extra_group_name="${NODE_INSTANCE_PREFIX}-extra"
+      gcloud compute instance-groups managed \
+          create "${extra_group_name}" \
+          --project "${PROJECT}" \
+          --zone "${ZONE}" \
+          --base-instance-name "${extra_group_name}" \
+          --size "${num_additional}" \
+          --template "${extra_template_name}" || true;
+      gcloud compute instance-groups managed wait-until-stable \
+          "${extra_group_name}" \
+          --zone "${ZONE}" \
+          --project "${PROJECT}" \
+          --timeout "${MIG_WAIT_UNTIL_STABLE_TIMEOUT}" || true
+      nodes=$(( nodes - $num_additional ))
+    fi
   fi
 
   local instances_left=${nodes}
@@ -3371,17 +3407,21 @@ function check-cluster() {
 #   EXISTING_MASTER_ZONE
 #
 # $1: etcd client port
+# $2: whether etcd communication should use mtls
 # returns the result of ssh command which removes replica
-#### WARNING: THIS DOESN'T WORK IN CLUSTERS WITH MTLS ENABLED.
-# TODO(mborsz): Fix this
 function remove-replica-from-etcd() {
   local -r port="${1}"
+  local -r use_mtls="${2}"
+
+  TLSARG=""
+  PROTO="http://"
+  if [[ "${use_mtls}" == "true" ]]; then
+    # Keep in sync with ETCD_APISERVER_CA_CERT_PATH, ETCD_APISERVER_CLIENT_CERT_PATH and ETCD_APISERVER_CLIENT_KEY_PATH in configure-helper.sh.
+    TLSARG="--cacert /etc/srv/kubernetes/pki/etcd-apiserver-ca.crt --cert /etc/srv/kubernetes/pki/etcd-apiserver-client.crt --key /etc/srv/kubernetes/pki/etcd-apiserver-client.key"
+    PROTO="https://"
+  fi
   [[ -n "${EXISTING_MASTER_NAME}" ]] || return
-  gcloud compute ssh "${EXISTING_MASTER_NAME}" \
-    --project "${PROJECT}" \
-    --zone "${EXISTING_MASTER_ZONE}" \
-    --command \
-    "curl -s localhost:${port}/v2/members/\$(curl -s localhost:${port}/v2/members -XGET | sed 's/{\\\"id/\n/g' | grep ${REPLICA_NAME}\\\" | cut -f 3 -d \\\") -XDELETE -L 2>/dev/null"
+  run-gcloud-command "${EXISTING_MASTER_NAME}" "${EXISTING_MASTER_ZONE}" "curl -s ${TLSARG} ${PROTO}127.0.0.1:${port}/v2/members/\$(curl -s ${TLSARG} ${PROTO}127.0.0.1:${port}/v2/members -XGET | sed 's/{\\\"id/\n/g' | grep ${REPLICA_NAME}\\\" | cut -f 3 -d \\\") -XDELETE -L 2>/dev/null"
   local -r res=$?
   echo "Removing etcd replica, name: ${REPLICA_NAME}, port: ${port}, result: ${res}"
   return "${res}"
@@ -3414,13 +3454,15 @@ function kube-down() {
 
     local all_instance_groups=(${INSTANCE_GROUPS[@]:-} ${WINDOWS_INSTANCE_GROUPS[@]:-})
     for group in ${all_instance_groups[@]:-}; do
-      if gcloud compute instance-groups managed describe "${group}" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
-        gcloud compute instance-groups managed delete \
-          --project "${PROJECT}" \
-          --quiet \
-          --zone "${ZONE}" \
-          "${group}" &
-      fi
+      {
+        if gcloud compute instance-groups managed describe "${group}" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
+          gcloud compute instance-groups managed delete \
+            --project "${PROJECT}" \
+            --quiet \
+            --zone "${ZONE}" \
+            "${group}"
+        fi
+      } &
     done
 
     # Wait for last batch of jobs
@@ -3429,13 +3471,20 @@ function kube-down() {
     }
 
     for template in ${templates[@]:-}; do
-      if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
-        gcloud compute instance-templates delete \
-          --project "${PROJECT}" \
-          --quiet \
-          "${template}"
-      fi
+      {
+        if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
+          gcloud compute instance-templates delete \
+            --project "${PROJECT}" \
+            --quiet \
+            "${template}"
+        fi
+      } &
     done
+
+    # Wait for last batch of jobs
+    kube::util::wait-for-jobs || {
+      echo -e "Failed to delete instance template(s)." >&2
+    }
 
     # Delete the special heapster node (if it exists).
     if [[ -n "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
@@ -3457,8 +3506,8 @@ function kube-down() {
   set-existing-master
 
   # Un-register the master replica from etcd and events etcd.
-  remove-replica-from-etcd 2379
-  remove-replica-from-etcd 4002
+  remove-replica-from-etcd 2379 true
+  remove-replica-from-etcd 4002 false
 
   # Delete the master replica (if it exists).
   if gcloud compute instances describe "${REPLICA_NAME}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
@@ -3717,7 +3766,7 @@ function set-replica-name() {
 #
 # $1: project
 function get-template() {
-  local linux_filter="${NODE_INSTANCE_PREFIX}-template(-(${KUBE_RELEASE_VERSION_DASHED_REGEX}|${KUBE_CI_VERSION_DASHED_REGEX}))?"
+  local linux_filter="${NODE_INSTANCE_PREFIX}-(extra-)?template(-(${KUBE_RELEASE_VERSION_DASHED_REGEX}|${KUBE_CI_VERSION_DASHED_REGEX}))?"
   local windows_filter="${WINDOWS_NODE_INSTANCE_PREFIX}-template(-(${KUBE_RELEASE_VERSION_DASHED_REGEX}|${KUBE_CI_VERSION_DASHED_REGEX}))?"
 
   gcloud compute instance-templates list \
@@ -3804,19 +3853,12 @@ function check-resources() {
     return 1
   fi
 
-  if [[ ${GCE_PRIVATE_CLUSTER:-} == "true" ]]; then
-    if gcloud compute routers describe --project "${NETWORK_PROJECT}" --region "${REGION}" "${NETWORK}-nat-router" &>/dev/null; then
-      KUBE_RESOURCE_FOUND="Cloud NAT router"
-      return 1
-    fi
-  fi
-
   # No resources found.
   return 0
 }
 
 # -----------------------------------------------------------------------------
-# Cluster specific test helpers used from hack/e2e.go
+# Cluster specific test helpers
 
 # Execute prior to running tests to build a release if required for env.
 #
@@ -3827,8 +3869,7 @@ function test-build-release() {
   "${KUBE_ROOT}/build/release.sh"
 }
 
-# Execute prior to running tests to initialize required structure. This is
-# called from hack/e2e.go only when running -up.
+# Execute prior to running tests to initialize required structure.
 #
 # Assumed vars:
 #   Variables from config.sh
@@ -3884,8 +3925,7 @@ function test-setup() {
   done
 }
 
-# Execute after running tests to perform any required clean-up. This is called
-# from hack/e2e.go
+# Execute after running tests to perform any required clean-up.
 function test-teardown() {
   detect-project
   echo "Shutting down test cluster in background."

@@ -143,7 +143,7 @@ func NewUserConnection() (*Conn, error) {
 func NewSystemdConnection() (*Conn, error) {
 	return NewConnection(func() (*dbus.Conn, error) {
 		// We skip Hello when talking directly to systemd.
-		return dbusAuthConnection(func() (*dbus.Conn, error) {
+		return dbusAuthConnection(func(opts ...dbus.ConnOption) (*dbus.Conn, error) {
 			return dbus.Dial("unix:path=/run/systemd/private")
 		})
 	})
@@ -201,7 +201,7 @@ func (c *Conn) GetManagerProperty(prop string) (string, error) {
 	return variant.String(), nil
 }
 
-func dbusAuthConnection(createBus func() (*dbus.Conn, error)) (*dbus.Conn, error) {
+func dbusAuthConnection(createBus func(opts ...dbus.ConnOption) (*dbus.Conn, error)) (*dbus.Conn, error) {
 	conn, err := createBus()
 	if err != nil {
 		return nil, err
@@ -221,7 +221,7 @@ func dbusAuthConnection(createBus func() (*dbus.Conn, error)) (*dbus.Conn, error
 	return conn, nil
 }
 
-func dbusAuthHelloConnection(createBus func() (*dbus.Conn, error)) (*dbus.Conn, error) {
+func dbusAuthHelloConnection(createBus func(opts ...dbus.ConnOption) (*dbus.Conn, error)) (*dbus.Conn, error) {
 	conn, err := dbusAuthConnection(createBus)
 	if err != nil {
 		return nil, err

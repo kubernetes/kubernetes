@@ -67,7 +67,7 @@ type RequestScope struct {
 	EquivalentResourceMapper runtime.EquivalentResourceMapper
 
 	TableConvertor rest.TableConvertor
-	FieldManager   fieldmanager.FieldManager
+	FieldManager   *fieldmanager.FieldManager
 
 	Resource    schema.GroupVersionResource
 	Kind        schema.GroupVersionKind
@@ -409,7 +409,8 @@ func parseTimeout(str string) time.Duration {
 		}
 		klog.Errorf("Failed to parse %q: %v", str, err)
 	}
-	return 30 * time.Second
+	// 34 chose as a number close to 30 that is likely to be unique enough to jump out at me the next time I see a timeout.  Everyone chooses 30.
+	return 34 * time.Second
 }
 
 func isDryRun(url *url.URL) bool {

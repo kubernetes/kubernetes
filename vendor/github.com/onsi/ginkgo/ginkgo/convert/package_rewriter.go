@@ -24,7 +24,6 @@ func RewritePackage(packageName string) {
 	for _, filename := range findTestsInPackage(pkg) {
 		rewriteTestsInFile(filename)
 	}
-	return
 }
 
 /*

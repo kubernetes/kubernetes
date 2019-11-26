@@ -42,7 +42,9 @@ func NewServiceTagsClientWithBaseURI(baseURI string, subscriptionID string) Serv
 
 // List gets a list of service tag information resources.
 // Parameters:
-// location - the location.
+// location - the location that will be used as a reference for version (not as a filter based on location, you
+// will get the list of service tags with prefix details across all regions but limited to the cloud that your
+// subscription belongs to).
 func (client ServiceTagsClient) List(ctx context.Context, location string) (result ServiceTagsListResult, err error) {
 	if tracing.IsEnabled() {
 		ctx = tracing.StartSpan(ctx, fqdn+"/ServiceTagsClient.List")

@@ -19,6 +19,7 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 // +k8s:conversion-gen=k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm
 
+// Package v1beta1 has been deprecated by v1beta2
 // Package v1beta1 defines the v1beta1 version of the kubeadm configuration file format.
 // This version graduates the configuration format to BETA and is a big step towards GA.
 //

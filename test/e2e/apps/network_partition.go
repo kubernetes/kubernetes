@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -267,9 +268,9 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// Finally, it checks that the replication controller recreates the
 			// pods on another node and that now the number of replicas is equal 'replicas'.
 			ginkgo.By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
-			framework.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
+			e2enetwork.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
 				framework.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
-				err := framework.WaitForRCPodToDisappear(c, ns, name, pods.Items[0].Name)
+				err := waitForRCPodToDisappear(c, ns, name, pods.Items[0].Name)
 				framework.ExpectNoError(err)
 
 				ginkgo.By("verifying whether the pod from the unreachable node is recreated")
@@ -336,9 +337,9 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// Finally, it checks that the replication controller recreates the
 			// pods on another node and that now the number of replicas is equal 'replicas + 1'.
 			ginkgo.By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
-			framework.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
+			e2enetwork.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
 				framework.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
-				err := framework.WaitForRCPodToDisappear(c, ns, name, pods.Items[0].Name)
+				err := waitForRCPodToDisappear(c, ns, name, pods.Items[0].Name)
 				framework.ExpectEqual(err, wait.ErrWaitTimeout, "Pod was not deleted during network partition.")
 
 				ginkgo.By(fmt.Sprintf("verifying that there are %v running pods during partition", replicas))
@@ -412,7 +413,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// Blocks outgoing network traffic on 'node'. Then verifies that 'podNameToDisappear',
 			// that belongs to StatefulSet 'statefulSetName', **does not** disappear due to forced deletion from the apiserver.
 			// The grace period on the stateful pods is set to a value > 0.
-			framework.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
+			e2enetwork.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
 				framework.Logf("Checking that the NodeController does not force delete stateful pods %v", pod.Name)
 				err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(c, pod.Name, ns, 10*time.Minute)
 				framework.ExpectEqual(err, wait.ErrWaitTimeout, "Pod was not deleted during network partition.")
@@ -458,7 +459,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// This creates a temporary network partition, verifies that the job has 'parallelism' number of
 			// running pods after the node-controller detects node unreachable.
 			ginkgo.By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
-			framework.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
+			e2enetwork.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
 				framework.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
 				err := e2epod.WaitForPodToDisappear(c, ns, pods.Items[0].Name, label, 20*time.Second, 10*time.Minute)
 				framework.ExpectEqual(err, wait.ErrWaitTimeout, "Pod was not deleted during network partition.")
@@ -492,7 +493,8 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				framework.SkipUnlessSSHKeyPresent()
 				ginkgo.By("choose a node - we will block all network traffic on this node")
 				var podOpts metav1.ListOptions
-				nodes := framework.GetReadySchedulableNodesOrDie(c)
+				nodes, err := e2enode.GetReadySchedulableNodes(c)
+				framework.ExpectNoError(err)
 				e2enode.Filter(nodes, func(node v1.Node) bool {
 					if !e2enode.IsConditionSetAsExpected(&node, v1.NodeReady, true) {
 						return false
@@ -657,3 +659,13 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 		})
 	})
 })
+
+// waitForRCPodToDisappear returns nil if the pod from the given replication controller (described by rcName) no longer exists.
+// In case of failure or too long waiting time, an error is returned.
+func waitForRCPodToDisappear(c clientset.Interface, ns, rcName, podName string) error {
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
+	// NodeController evicts pod after 5 minutes, so we need timeout greater than that to observe effects.
+	// The grace period must be set to 0 on the pod for it to be deleted during the partition.
+	// Otherwise, it goes to the 'Terminating' state till the kubelet confirms deletion.
+	return e2epod.WaitForPodToDisappear(c, ns, podName, label, 20*time.Second, 10*time.Minute)
+}

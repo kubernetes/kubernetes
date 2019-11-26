@@ -90,10 +90,6 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 				// Driver name is expected to be the same
 				// as the provisioner here.
 				container.Args = append(container.Args, "--provisioner="+o.NewDriverName)
-			case o.SnapshotterContainerName:
-				// Driver name is expected to be the same
-				// as the snapshotter here.
-				container.Args = append(container.Args, "--snapshotter="+o.NewDriverName)
 			}
 		}
 	}

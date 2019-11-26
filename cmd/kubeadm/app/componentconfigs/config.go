@@ -25,10 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
+	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
 
 // GetFromKubeletConfigMap returns the pointer to the ComponentConfig API object read from the kubelet-config-version
@@ -49,7 +49,7 @@ func GetFromKubeletConfigMap(client clientset.Interface, version *version.Versio
 	}
 
 	// Decodes the kubeletConfigData into the internal component config
-	obj := &kubeletconfig.KubeletConfiguration{}
+	obj := &kubeletconfigv1beta1.KubeletConfiguration{}
 	err = unmarshalObject(obj, []byte(kubeletConfigData))
 	if err != nil {
 		return nil, err
@@ -82,7 +82,7 @@ func GetFromKubeProxyConfigMap(client clientset.Interface, version *version.Vers
 	}
 
 	// Decodes the Config map dat into the internal component config
-	obj := &kubeproxyconfig.KubeProxyConfiguration{}
+	obj := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
 	err = unmarshalObject(obj, []byte(kubeproxyConfigData))
 	if err != nil {
 		return nil, err

@@ -52,7 +52,6 @@ const (
 	optionReadWrite      = "kubernetes.io/readwrite"
 	optionKeySecret      = "kubernetes.io/secret"
 	optionFSGroup        = "kubernetes.io/mounterArgs.FsGroup"
-	optionMountsDir      = "kubernetes.io/mountsDir"
 	optionPVorVolumeName = "kubernetes.io/pvOrVolumeName"
 
 	optionKeyPodName      = "kubernetes.io/pod.name"
