@@ -86,8 +86,11 @@ type ConfigFlags struct {
 	APIServer        *string
 	Insecure         *bool
 	CertFile         *string
+	CertData         []byte
 	KeyFile          *string
+	KeyData          []byte
 	CAFile           *string
+	CAData           []byte
 	BearerToken      *string
 	Impersonate      *string
 	ImpersonateGroup *[]string
@@ -137,8 +140,14 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	if f.CertFile != nil {
 		overrides.AuthInfo.ClientCertificate = *f.CertFile
 	}
+	if f.CertData != nil {
+		overrides.AuthInfo.ClientCertificateData = f.CertData
+	}
 	if f.KeyFile != nil {
 		overrides.AuthInfo.ClientKey = *f.KeyFile
+	}
+	if f.KeyData != nil {
+		overrides.AuthInfo.ClientKeyData = f.KeyData
 	}
 	if f.BearerToken != nil {
 		overrides.AuthInfo.Token = *f.BearerToken
@@ -162,6 +171,9 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	}
 	if f.CAFile != nil {
 		overrides.ClusterInfo.CertificateAuthority = *f.CAFile
+	}
+	if f.CAData != nil {
+		overrides.ClusterInfo.CertificateAuthorityData = f.CAData
 	}
 	if f.Insecure != nil {
 		overrides.ClusterInfo.InsecureSkipTLSVerify = *f.Insecure
