@@ -341,7 +341,7 @@ function kube::release::create_docker_images_for_server() {
     # provide `--pull` argument to `docker build` if `KUBE_BUILD_PULL_LATEST_IMAGES`
     # is set to y or Y; otherwise try to build the image without forcefully
     # pulling the latest base image.
-    local DOCKER_BUILD_OPTS=()
+    local DOCKER_BUILD_OPTS=("")
     if [[ "${KUBE_BUILD_PULL_LATEST_IMAGES}" =~ [yY] ]]; then
         DOCKER_BUILD_OPTS+=("--pull")
     fi
