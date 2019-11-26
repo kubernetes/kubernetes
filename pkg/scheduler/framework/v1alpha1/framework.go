@@ -177,9 +177,17 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		return f, nil
 	}
 
-	pluginConfig := make(map[string]*runtime.Unknown, 0)
+	pluginConfig := make(map[string]*runtime.Unknown, len(args))
+	duplicatePluginConfig := make(map[string]*runtime.Unknown, 0)
 	for i := range args {
-		pluginConfig[args[i].Name] = &args[i].Args
+		name := args[i].Name
+		if _, ok := pluginConfig[name]; ok {
+			duplicatePluginConfig[name] = &args[i].Args
+		}
+		pluginConfig[name] = &args[i].Args
+	}
+	for name, args := range duplicatePluginConfig {
+		klog.Warningf("found duplicate configurations for plugin %q, [%v] is enabled", name, args)
 	}
 
 	pluginsMap := make(map[string]Plugin)
