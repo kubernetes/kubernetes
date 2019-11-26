@@ -24,7 +24,6 @@ import (
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
@@ -99,6 +98,8 @@ type Lister interface {
 	NewList() runtime.Object
 	// List selects resources in the storage which match to the selector. 'options' can be nil.
 	List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error)
+	// TableConvertor ensures all list implementers also implement table conversion
+	TableConvertor
 }
 
 // Exporter is an object that knows how to strip a RESTful resource for export. A store should implement this interface
@@ -141,7 +142,7 @@ type GetterWithOptions interface {
 }
 
 type TableConvertor interface {
-	ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error)
+	ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error)
 }
 
 // GracefulDeleter knows how to pass deletion options to allow delayed deletion of a

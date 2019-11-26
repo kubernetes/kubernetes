@@ -30,7 +30,6 @@ import (
 	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -266,7 +265,7 @@ func TestColumns(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	tbl, err := storage.CustomResource.ConvertToTable(ctx, gottenList, &metav1beta1.TableOptions{})
+	tbl, err := storage.CustomResource.ConvertToTable(ctx, gottenList, &metav1.TableOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -377,7 +377,7 @@ func (storage *SimpleRESTStorage) Export(ctx context.Context, name string, opts 
 	return obj, storage.errors["export"]
 }
 
-func (storage *SimpleRESTStorage) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+func (storage *SimpleRESTStorage) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return rest.NewDefaultTableConvertor(schema.GroupResource{Resource: "simple"}).ConvertToTable(ctx, obj, tableOptions)
 }
 
@@ -892,6 +892,10 @@ func (OnlyGetRESTStorage) NewList() runtime.Object {
 }
 
 func (OnlyGetRESTStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+	return nil, nil
+}
+
+func (OnlyGetRESTStorage) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return nil, nil
 }
 
@@ -1900,7 +1904,7 @@ func TestGetTable(t *testing.T) {
 		accept     string
 		params     url.Values
 		pretty     bool
-		expected   *metav1beta1.Table
+		expected   *metav1.Table
 		statusCode int
 		item       bool
 	}{
@@ -1935,14 +1939,14 @@ func TestGetTable(t *testing.T) {
 		{
 			item:   true,
 			accept: "application/json;as=Table;v=v1beta1;g=meta.k8s.io",
-			expected: &metav1beta1.Table{
+			expected: &metav1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
-				ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+				ColumnDefinitions: []metav1.TableColumnDefinition{
 					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
-				Rows: []metav1beta1.TableRow{
+				Rows: []metav1.TableRow{
 					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body}},
 				},
 			},
@@ -1953,14 +1957,14 @@ func TestGetTable(t *testing.T) {
 				runtime.ContentTypeProtobuf + ";as=Table;v=v1beta1;g=meta.k8s.io",
 				"application/json;as=Table;v=v1beta1;g=meta.k8s.io",
 			}, ","),
-			expected: &metav1beta1.Table{
+			expected: &metav1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
-				ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+				ColumnDefinitions: []metav1.TableColumnDefinition{
 					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
-				Rows: []metav1beta1.TableRow{
+				Rows: []metav1.TableRow{
 					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body}},
 				},
 			},
@@ -1969,14 +1973,14 @@ func TestGetTable(t *testing.T) {
 			item:   true,
 			accept: "application/json;as=Table;v=v1beta1;g=meta.k8s.io",
 			params: url.Values{"includeObject": []string{"Metadata"}},
-			expected: &metav1beta1.Table{
+			expected: &metav1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
-				ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+				ColumnDefinitions: []metav1.TableColumnDefinition{
 					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
-				Rows: []metav1beta1.TableRow{
+				Rows: []metav1.TableRow{
 					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body}},
 				},
 			},
@@ -1984,14 +1988,14 @@ func TestGetTable(t *testing.T) {
 		{
 			accept: "application/json;as=Table;v=v1beta1;g=meta.k8s.io",
 			params: url.Values{"includeObject": []string{"Metadata"}},
-			expected: &metav1beta1.Table{
+			expected: &metav1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 				ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/test/link"},
-				ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+				ColumnDefinitions: []metav1.TableColumnDefinition{
 					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
-				Rows: []metav1beta1.TableRow{
+				Rows: []metav1.TableRow{
 					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body}},
 				},
 			},
@@ -2051,7 +2055,7 @@ func TestGetTable(t *testing.T) {
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("%d: unexpected response: %#v", i, resp)
 			}
-			var itemOut metav1beta1.Table
+			var itemOut metav1.Table
 			body, err := extractBody(resp, &itemOut)
 			if err != nil {
 				t.Fatal(err)
@@ -2117,14 +2121,14 @@ func TestWatchTable(t *testing.T) {
 				{
 					Type: "ADDED",
 					Object: runtime.RawExtension{
-						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1beta1.Table{
+						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1.Table{
 							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
-							ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+							ColumnDefinitions: []metav1.TableColumnDefinition{
 								{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 								{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 							},
-							Rows: []metav1beta1.TableRow{
+							Rows: []metav1.TableRow{
 								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
 							},
 						}))),
@@ -2142,14 +2146,14 @@ func TestWatchTable(t *testing.T) {
 				{
 					Type: "ADDED",
 					Object: runtime.RawExtension{
-						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1beta1.Table{
+						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1.Table{
 							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
-							ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+							ColumnDefinitions: []metav1.TableColumnDefinition{
 								{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 								{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 							},
-							Rows: []metav1beta1.TableRow{
+							Rows: []metav1.TableRow{
 								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
 							},
 						}))),
@@ -2158,10 +2162,10 @@ func TestWatchTable(t *testing.T) {
 				{
 					Type: "MODIFIED",
 					Object: runtime.RawExtension{
-						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1beta1.Table{
+						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1.Table{
 							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1beta1"},
 							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
-							Rows: []metav1beta1.TableRow{
+							Rows: []metav1.TableRow{
 								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
 							},
 						}))),
@@ -2182,7 +2186,7 @@ func TestWatchTable(t *testing.T) {
 						Raw: []byte(strings.TrimSpace(runtime.EncodeOrDie(s, &metav1.Table{
 							TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1"},
 							ListMeta: metav1.ListMeta{ResourceVersion: "10", SelfLink: "/blah"},
-							ColumnDefinitions: []metav1beta1.TableColumnDefinition{
+							ColumnDefinitions: []metav1.TableColumnDefinition{
 								{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 								{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 							},

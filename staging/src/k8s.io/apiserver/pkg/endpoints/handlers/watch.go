@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -125,7 +124,7 @@ func serveWatch(watcher watch.Interface, scope *RequestScope, mediaTypeOptions n
 			// When we are transformed to a table, use the table options as the state for whether we
 			// should print headers - on watch, we only want to print table headers on the first object
 			// and omit them on subsequent events.
-			if tableOptions, ok := options.(*metav1beta1.TableOptions); ok {
+			if tableOptions, ok := options.(*metav1.TableOptions); ok {
 				tableOptions.NoHeaders = true
 			}
 			return result
