@@ -18,7 +18,6 @@ pkg/kubelet/cm/devicemanager
 pkg/kubelet/pluginmanager/operationexecutor
 pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/remote
-pkg/master
 pkg/printers
 pkg/probe/http
 pkg/proxy/healthcheck
