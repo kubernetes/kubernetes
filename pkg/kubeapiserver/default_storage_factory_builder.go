@@ -55,8 +55,6 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 	resources := []schema.GroupVersionResource{
 		batch.Resource("cronjobs").WithVersion("v1beta1"),
 		networking.Resource("ingresses").WithVersion("v1beta1"),
-		// TODO #83513 csinodes override can be removed in 1.18
-		apisstorage.Resource("csinodes").WithVersion("v1beta1"),
 		apisstorage.Resource("csidrivers").WithVersion("v1beta1"),
 	}
 
