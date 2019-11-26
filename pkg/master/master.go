@@ -452,7 +452,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) error {
 	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
 	if err != nil {
-		return fmt.Errorf("Error building core storage: %v", err)
+		return fmt.Errorf("error building core storage: %v", err)
 	}
 
 	controllerName := "bootstrap-controller"
@@ -462,7 +462,7 @@ func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.
 	m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)
 
 	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
-		return fmt.Errorf("Error in registering group versions: %v", err)
+		return fmt.Errorf("error in registering group versions: %v", err)
 	}
 	return nil
 }
@@ -518,7 +518,7 @@ func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceCo
 	}
 
 	if err := m.GenericAPIServer.InstallAPIGroups(apiGroupsInfo...); err != nil {
-		return fmt.Errorf("Error in registering group versions: %v", err)
+		return fmt.Errorf("error in registering group versions: %v", err)
 	}
 	return nil
 }
