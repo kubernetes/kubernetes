@@ -92,6 +92,9 @@ func createAPIExtensionsConfig(
 		},
 	}
 
+	// we need to clear the poststarthooks so we don't add them multiple times to all the servers (that fails)
+	apiextensionsConfig.GenericConfig.PostStartHooks = map[string]genericapiserver.PostStartHookConfigEntry{}
+
 	return apiextensionsConfig, nil
 }
 
