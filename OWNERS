@@ -9,6 +9,7 @@ filters:
       - smarterclayton
       - thockin
       - liggitt
+      - dims
     approvers:
       - bgrant0607
       - brendandburns
@@ -18,6 +19,7 @@ filters:
       - thockin
       - wojtek-t
       - liggitt
+      - dims
     emeritus_approvers:
       - jbeda
 

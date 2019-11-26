@@ -460,6 +460,7 @@ aliases:
     - deads2k         # API Machinery
     - derekwaynecarr  # Node
     - dghubble        # On Premise
+    - dims            # Architecture
     - jdumars         # Architecture, Cluster Ops, Release
     - kow3ns          # Apps
     - lavalamp        # API Machinery
