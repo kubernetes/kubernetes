@@ -36,7 +36,6 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
         "//test/e2e/framework:go_default_library",
-        "//test/e2e/framework/kubelet:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/framework/network:go_default_library",
         "//test/e2e/framework/node:go_default_library",
