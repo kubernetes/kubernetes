@@ -43,8 +43,9 @@ type StableCollector interface {
 // is a convenient assistant for custom collectors.
 // It is recommend that inherit BaseStableCollector when implementing custom collectors.
 type BaseStableCollector struct {
-	descriptors []*Desc // stores all Desc collected from DescribeWithStability().
-	registrable []*Desc // stores registrable Desc(not be hidden), is a subset of descriptors.
+	descriptors map[string]*Desc // stores all descriptors by pair<fqName, Desc>, these are collected from DescribeWithStability().
+	registrable map[string]*Desc // stores registrable descriptors by pair<fqName, Desc>, is a subset of descriptors.
+	hidden      map[string]*Desc // stores hidden descriptors by pair<fqName, Desc>, is a subset of descriptors.
 	self        StableCollector
 }
 
@@ -88,7 +89,19 @@ func (bsc *BaseStableCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (bsc *BaseStableCollector) add(d *Desc) {
-	bsc.descriptors = append(bsc.descriptors, d)
+	if len(d.fqName) == 0 {
+		panic("nameless metrics will be not allowed")
+	}
+
+	if bsc.descriptors == nil {
+		bsc.descriptors = make(map[string]*Desc)
+	}
+
+	if _, exist := bsc.descriptors[d.fqName]; exist {
+		panic(fmt.Sprintf("duplicate metrics (%s) will be not allowed", d.fqName))
+	}
+
+	bsc.descriptors[d.fqName] = d
 }
 
 // Init intends to be called by registry.
@@ -108,6 +121,22 @@ func (bsc *BaseStableCollector) init(self StableCollector) {
 	}
 }
 
+func (bsc *BaseStableCollector) trackRegistrableDescriptor(d *Desc) {
+	if bsc.registrable == nil {
+		bsc.registrable = make(map[string]*Desc)
+	}
+
+	bsc.registrable[d.fqName] = d
+}
+
+func (bsc *BaseStableCollector) trackHiddenDescriptor(d *Desc) {
+	if bsc.hidden == nil {
+		bsc.hidden = make(map[string]*Desc)
+	}
+
+	bsc.hidden[d.fqName] = d
+}
+
 // Create intends to be called by registry.
 // Create will return true as long as there is one or more metrics not be hidden.
 // Otherwise return false, that means the whole collector will be ignored by registry.
@@ -117,9 +146,9 @@ func (bsc *BaseStableCollector) Create(version *semver.Version, self StableColle
 	for _, d := range bsc.descriptors {
 		d.create(version)
 		if d.IsHidden() {
-			// do nothing for hidden metrics
+			bsc.trackHiddenDescriptor(d)
 		} else {
-			bsc.registrable = append(bsc.registrable, d)
+			bsc.trackRegistrableDescriptor(d)
 		}
 	}
 

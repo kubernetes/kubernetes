@@ -17,10 +17,13 @@ limitations under the License.
 package metrics
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/stretchr/testify/assert"
+
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
@@ -90,5 +93,44 @@ func TestBaseCustomCollector(t *testing.T) {
 		stableDesc.fqName, deprecatedDesc.fqName, hiddenDesc.fqName)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestInvalidCustomCollector(t *testing.T) {
+	var currentVersion = apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "17",
+		GitVersion: "v1.17.0-alpha-1.12345",
+	}
+	var namelessDesc = NewDesc("", "this is a nameless metric", nil, nil, ALPHA, "")
+	var duplicatedDescA = NewDesc("test_duplicated_metric", "this is a duplicated metric A", nil, nil, ALPHA, "")
+	var duplicatedDescB = NewDesc("test_duplicated_metric", "this is a duplicated metric B", nil, nil, ALPHA, "")
+
+	var tests = []struct {
+		name        string
+		descriptors []*Desc
+		panicStr    string
+	}{
+		{
+			name:        "nameless metric will be not allowed",
+			descriptors: []*Desc{namelessDesc},
+			panicStr:    "nameless metrics will be not allowed",
+		},
+		{
+			name:        "duplicated metric will be not allowed",
+			descriptors: []*Desc{duplicatedDescA, duplicatedDescB},
+			panicStr:    fmt.Sprintf("duplicate metrics (%s) will be not allowed", duplicatedDescA.fqName),
+		},
+	}
+
+	for _, test := range tests {
+		tc := test
+		t.Run(tc.name, func(t *testing.T) {
+			registry := newKubeRegistry(currentVersion)
+			customCollector := newTestCustomCollector(tc.descriptors...)
+			assert.Panics(t, func() {
+				registry.CustomMustRegister(customCollector)
+			}, tc.panicStr)
+		})
 	}
 }
