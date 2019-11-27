@@ -192,6 +192,12 @@ const (
 	// Enables container Checkpoint support in the kubelet
 	ContainerCheckpoint featuregate.Feature = "ContainerCheckpoint"
 
+	// owner: @bhcleek @wzshiming
+	// GA: v1.25
+	//
+	// Normalize HttpGet URL and Header passing for lifecycle handlers with probers.
+	ConsistentHTTPGetHandlers featuregate.Feature = "ConsistentHTTPGetHandlers"
+
 	// owner: @jiahuif
 	// alpha: v1.21
 	// beta:  v1.22
@@ -841,6 +847,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIVolumeHealth: {Default: false, PreRelease: featuregate.Alpha},
 
 	ContainerCheckpoint: {Default: false, PreRelease: featuregate.Alpha},
+
+	ConsistentHTTPGetHandlers: {Default: true, PreRelease: featuregate.GA},
 
 	ControllerManagerLeaderMigration: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
