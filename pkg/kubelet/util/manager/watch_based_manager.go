@@ -39,11 +39,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+
+	"reflect"
+	"k8s.io/klog"
 )
 
 type listObjectFunc func(string, metav1.ListOptions) (runtime.Object, error)
 type watchObjectFunc func(string, metav1.ListOptions) (watch.Interface, error)
 type newObjectFunc func() runtime.Object
+type isObjectImmutableFunc func(runtime.Object) bool
 
 // objectCacheItem is a single item stored in objectCache.
 type objectCacheItem struct {
@@ -53,26 +57,39 @@ type objectCacheItem struct {
 	stopCh    chan struct{}
 }
 
+// FIXME: Assumes locking on higher layers.
+func (i *objectCacheItem) closeChannel() bool {
+	select {
+	case <-i.stopCh:
+		return false
+	default:
+		close(i.stopCh)
+		return true
+	}
+}
+
 // objectCache is a local cache of objects propagated via
 // individual watches.
 type objectCache struct {
-	listObject    listObjectFunc
-	watchObject   watchObjectFunc
-	newObject     newObjectFunc
-	groupResource schema.GroupResource
+	listObject        listObjectFunc
+	watchObject       watchObjectFunc
+	newObject         newObjectFunc
+	isObjectImmutable isObjectImmutableFunc
+	groupResource     schema.GroupResource
 
 	lock  sync.RWMutex
 	items map[objectKey]*objectCacheItem
 }
 
 // NewObjectCache returns a new watch-based instance of Store interface.
-func NewObjectCache(listObject listObjectFunc, watchObject watchObjectFunc, newObject newObjectFunc, groupResource schema.GroupResource) Store {
+func NewObjectCache(listObject listObjectFunc, watchObject watchObjectFunc, newObject newObjectFunc, isObjectImmutable isObjectImmutableFunc, groupResource schema.GroupResource) Store {
 	return &objectCache{
-		listObject:    listObject,
-		watchObject:   watchObject,
-		newObject:     newObject,
-		groupResource: groupResource,
-		items:         make(map[objectKey]*objectCacheItem),
+		listObject:        listObject,
+		watchObject:       watchObject,
+		newObject:         newObject,
+		isObjectImmutable: isObjectImmutable,
+		groupResource:     groupResource,
+		items:             make(map[objectKey]*objectCacheItem),
 	}
 }
 
@@ -86,6 +103,8 @@ func (c *objectCache) newStore() cache.Store {
 }
 
 func (c *objectCache) newReflector(namespace, name string) *objectCacheItem {
+	klog.Errorf("START(GET(%s)): %s/%s", reflect.TypeOf(c.newObject()), namespace, name)
+
 	fieldSelector := fields.Set{"metadata.name": name}.AsSelector().String()
 	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
 		options.FieldSelector = fieldSelector
@@ -140,7 +159,7 @@ func (c *objectCache) DeleteReference(namespace, name string) {
 		item.refCount--
 		if item.refCount == 0 {
 			// Stop the underlying reflector.
-			close(item.stopCh)
+			item.closeChannel()
 			delete(c.items, key)
 		}
 	}
@@ -156,6 +175,7 @@ func (c *objectCache) key(namespace, name string) string {
 }
 
 func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
+	klog.Errorf("AAA(GET(%s)): %s/%s", reflect.TypeOf(c.newObject()), namespace, name)
 	key := objectKey{namespace: namespace, name: name}
 
 	c.lock.RLock()
@@ -177,6 +197,15 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 		return nil, apierrors.NewNotFound(c.groupResource, name)
 	}
 	if object, ok := obj.(runtime.Object); ok {
+		// TODO: If object is immutable, stop the reflector.
+		if c.isObjectImmutable(object) {
+			// FIXME: Close channel - this should happen under some lock.
+			c.lock.Lock()
+			if item.closeChannel() {
+				klog.Errorf("STOP(%s): %s/%s", reflect.TypeOf(c.newObject()), namespace, name)
+			}
+			c.lock.Unlock()
+		}
 		return object, nil
 	}
 	return nil, fmt.Errorf("unexpected object type: %v", obj)
@@ -188,7 +217,13 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 // - whenever a pod is created or updated, we start individual watches for all
 //   referenced objects that aren't referenced from other registered pods
 // - every GetObject() returns a value from local cache propagated via watches
-func NewWatchBasedManager(listObject listObjectFunc, watchObject watchObjectFunc, newObject newObjectFunc, groupResource schema.GroupResource, getReferencedObjects func(*v1.Pod) sets.String) Manager {
-	objectStore := NewObjectCache(listObject, watchObject, newObject, groupResource)
+func NewWatchBasedManager(
+	listObject listObjectFunc,
+	watchObject watchObjectFunc,
+	newObject newObjectFunc,
+	isObjectImmutable isObjectImmutableFunc,
+	groupResource schema.GroupResource,
+	getReferencedObjects func(*v1.Pod) sets.String) Manager {
+	objectStore := NewObjectCache(listObject, watchObject, newObject, isObjectImmutable, groupResource)
 	return NewCacheBasedManager(objectStore, getReferencedObjects)
 }

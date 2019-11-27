@@ -56,7 +56,10 @@ func TestWatchBasedManager(t *testing.T) {
 		return client.CoreV1().Secrets(namespace).Watch(options)
 	}
 	newObj := func() runtime.Object { return &v1.Secret{} }
-	store := manager.NewObjectCache(listObj, watchObj, newObj, schema.GroupResource{Group: "v1", Resource: "secrets"})
+	// Set isImmutable to false - we really want all the watches to be up
+	// and running and not be optimized for immutable secrets.
+	noImmutable := func(runtime.Object) bool { return false}
+	store := manager.NewObjectCache(listObj, watchObj, newObj, noImmutable, schema.GroupResource{Group: "v1", Resource: "secrets"})
 
 	// create 1000 secrets in parallel
 	t.Log(time.Now(), "creating 1000 secrets")

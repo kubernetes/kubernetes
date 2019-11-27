@@ -50,13 +50,21 @@ func watchSecret(fakeClient clientset.Interface) watchObjectFunc {
 	}
 }
 
+func isSecretImmutable(object runtime.Object) bool {
+	if secret, ok := object.(*v1.Secret); ok {
+		return secret.Immutable != nil && *secret.Immutable
+	}
+	return false
+}
+
 func newSecretCache(fakeClient clientset.Interface) *objectCache {
 	return &objectCache{
-		listObject:    listSecret(fakeClient),
-		watchObject:   watchSecret(fakeClient),
-		newObject:     func() runtime.Object { return &v1.Secret{} },
-		groupResource: corev1.Resource("secret"),
-		items:         make(map[objectKey]*objectCacheItem),
+		listObject:        listSecret(fakeClient),
+		watchObject:       watchSecret(fakeClient),
+		newObject:         func() runtime.Object { return &v1.Secret{} },
+		isObjectImmutable: isSecretImmutable,
+		groupResource:     corev1.Resource("secret"),
+		items:             make(map[objectKey]*objectCacheItem),
 	}
 }
 
