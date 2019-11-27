@@ -49,19 +49,17 @@ var (
 // BenchmarkScheduling benchmarks the scheduling rate when the cluster has
 // various quantities of nodes and scheduled pods.
 func BenchmarkScheduling(b *testing.B) {
-	tests := []struct{ nodes, existingPods, minPods int }{
-		{nodes: 100, existingPods: 0, minPods: 100},
-		{nodes: 100, existingPods: 1000, minPods: 100},
-		{nodes: 1000, existingPods: 0, minPods: 100},
-		{nodes: 1000, existingPods: 1000, minPods: 100},
-		{nodes: 5000, existingPods: 1000, minPods: 1000},
+	tests := []benchmarkCase{
+		{
+			nodes: []nodeCase{{num: 1000},},
+			initPods: []podCase{{num: 1000}},
+			podsToSchedule: []podCase{{num: 1000}},
+		},
 	}
-	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("rc1")
-	testStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("rc2")
 	for _, test := range tests {
-		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
+		name := fmt.Sprintf("%vNodes/%vPods", len(test.nodes), len(test.initPods))
 		b.Run(name, func(b *testing.B) {
-			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, defaultNodeStrategy, setupStrategy, testStrategy, b)
+			benchmarkSchedulingNew(test, b)
 		})
 	}
 }
@@ -347,6 +345,54 @@ func makeBasePodWithNodeAffinity(key string, vals []string) *v1.Pod {
 		},
 	}
 	return basePod
+}
+
+func benchmarkSchedulingNew(c benchmarkCase, b *testing.B) {
+	// get node strategy,  assuming all nodes are the same,, i.e., len(c.nodes) = 1
+	var nodeStrategy testutils.PrepareNodeStrategy
+	nodeStrategy = defaultNodeStrategy
+
+	if (c.nodes[0].nodeAllocatableStrategy != nil) {
+		nodeStrategy = c.nodes[0].nodeAllocatableStrategy
+	} else if (c.nodes[0].labelNodePrepareStrategy != nil) {
+		nodeStrategy = c.nodes[0].labelNodePrepareStrategy
+	}
+
+	// get setupPodStrategy, assuming all init pods are the same, i.e., len(c.initPods)=1
+	setupPodStrategy := getPodStrategy(c.initPods[0])
+
+	// get testPodStrategy, assuming all test pods are the same, i.e., len(c.podsToSchedule)=1
+	testPodStrategy := getPodStrategy(c.podsToSchedule[0])
+
+	benchmarkScheduling(len(c.nodes), len(c.initPods), len(c.podsToSchedule), nodeStrategy, setupPodStrategy, testPodStrategy, b)
+
+	// collect metrics
+	summaries := []summary{}
+	throughputCollector := &scheduleThroughputCollector{}
+	prometheusCollector := &prometheusMetricCollector{metrics:[]string{"scheduling_duration_seconds"}}
+	if c.prometheusMetricCollector != nil {
+		prometheusCollector = c.prometheusMetricCollector
+	}
+	summaries = append(summaries, throughputCollector.collectMetrics()...)
+	summaries = append(summaries, prometheusCollector.collectMetrics()...)
+	summaries = append(summaries, c.myCollector.collectMetrics()...)
+	// Save summaries
+	// We can just print the summaries to stdout, and have a script to read and save to the $ARTIFACTS folder as we do today.
+	// Alternatively, we can consider writing to the file directly.
+	// The summary file will be uploaded to GCS, we will need to update the corresponding parser in
+	// perf-dash to parse the file and present to the performance dashboard.
+}
+
+func getPodStrategy(pc podCase) testutils.TestPodCreateStrategy {
+	basePod := makeBasePod()
+	if pc.podTemplate != nil {
+		basePod = pc.podTemplate
+	}
+	if pc.pvcClaimTemplate == nil {
+		return testutils.NewCustomCreatePodStrategy(basePod)
+	} else {
+		return testutils.NewCreatePodWithPersistentVolumeStrategy(pc.pvcClaimTemplate, csiVolumeFactory, basePod)
+	}
 }
 
 // benchmarkScheduling benchmarks scheduling rate with specific number of nodes

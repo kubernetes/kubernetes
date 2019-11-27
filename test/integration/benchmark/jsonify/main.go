@@ -42,7 +42,6 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	json.Unmarshal()
 	data := perftype.PerfData{Version: "v1"}
 	for _, benchMarks := range benchmarkSet {
 		for _, benchMark := range benchMarks {
