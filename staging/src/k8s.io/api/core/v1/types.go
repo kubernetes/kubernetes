@@ -5430,7 +5430,7 @@ type Secret struct {
 	// Defaulted to nil.
 	// This is an alpha field enabled by ImmutableEphemeralVolumes feature gate.
 	// +optional
-	Immutable *bool `json:"immutable,omitempty"`
+	Immutable *bool `json:"immutable,omitempty" protobuf:"varint,5,opt,name=immutable"`
 
 	// Data contains the secret data. Each key must consist of alphanumeric
 	// characters, '-', '_' or '.'. The serialized form of the secret data is a
@@ -5571,7 +5571,7 @@ type ConfigMap struct {
 	// Defaulted to nil.
 	// This is an alpha field enabled by ImmutableEphemeralVolumes feature gate.
 	// +optional
-	Immutable *bool `json:"immutable,omitempty"`
+	Immutable *bool `json:"immutable,omitempty" protobuf:"varint,4,opt,name=immutable"`
 
 	// Data contains the configuration data.
 	// Each key must consist of alphanumeric characters, '-', '_' or '.'.
