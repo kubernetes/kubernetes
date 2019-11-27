@@ -156,7 +156,6 @@ func (es mockScheduler) PredicateMetadataProducer() predicates.MetadataProducer 
 	return nil
 
 }
-
 func (es mockScheduler) Schedule(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (core.ScheduleResult, error) {
 	return es.result, es.err
 }
@@ -170,9 +169,12 @@ func (es mockScheduler) Prioritizers() []priorities.PriorityConfig {
 func (es mockScheduler) Extenders() []algorithm.SchedulerExtender {
 	return nil
 }
-
 func (es mockScheduler) Preempt(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
 	return nil, nil, nil, nil
+}
+func (es mockScheduler) Snapshot() error {
+	return nil
+
 }
 
 func TestSchedulerCreation(t *testing.T) {
