@@ -17,137 +17,78 @@ limitations under the License.
 package metrics
 
 import (
+	"strings"
 	"testing"
 
-	dto "github.com/prometheus/client_model/go"
-
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
 type testCustomCollector struct {
 	BaseStableCollector
+
+	descriptors []*Desc
 }
 
-var (
-	currentVersion = apimachineryversion.Info{
+func newTestCustomCollector(ds ...*Desc) *testCustomCollector {
+	c := &testCustomCollector{}
+	c.descriptors = append(c.descriptors, ds...)
+
+	return c
+}
+
+func (tc *testCustomCollector) DescribeWithStability(ch chan<- *Desc) {
+	for i := range tc.descriptors {
+		ch <- tc.descriptors[i]
+	}
+}
+
+func (tc *testCustomCollector) CollectWithStability(ch chan<- Metric) {
+	for i := range tc.descriptors {
+		ch <- NewLazyConstMetric(tc.descriptors[i], GaugeValue, 1, "value")
+	}
+}
+
+func TestBaseCustomCollector(t *testing.T) {
+	var currentVersion = apimachineryversion.Info{
 		Major:      "1",
 		Minor:      "17",
 		GitVersion: "v1.17.0-alpha-1.12345",
 	}
-	alphaDesc = NewDesc("metric_alpha", "alpha metric", []string{"name"}, nil,
-		ALPHA, "")
-	stableDesc = NewDesc("metric_stable", "stable metrics", []string{"name"}, nil,
-		STABLE, "")
-	deprecatedDesc = NewDesc("metric_deprecated", "stable deprecated metrics", []string{"name"}, nil,
-		STABLE, "1.17.0")
-	hiddenDesc = NewDesc("metric_hidden", "stable hidden metrics", []string{"name"}, nil,
-		STABLE, "1.16.0")
-)
 
-func (tc *testCustomCollector) DescribeWithStability(ch chan<- *Desc) {
-	ch <- alphaDesc
-	ch <- stableDesc
-	ch <- deprecatedDesc
-	ch <- hiddenDesc
-}
-
-func (tc *testCustomCollector) CollectWithStability(ch chan<- Metric) {
-	ch <- NewLazyConstMetric(
-		alphaDesc,
-		GaugeValue,
-		1,
-		"value",
+	var (
+		alphaDesc = NewDesc("metric_alpha", "alpha metric", []string{"name"}, nil,
+			ALPHA, "")
+		stableDesc = NewDesc("metric_stable", "stable metrics", []string{"name"}, nil,
+			STABLE, "")
+		deprecatedDesc = NewDesc("metric_deprecated", "stable deprecated metrics", []string{"name"}, nil,
+			STABLE, "1.17.0")
+		hiddenDesc = NewDesc("metric_hidden", "stable hidden metrics", []string{"name"}, nil,
+			STABLE, "1.16.0")
 	)
-	ch <- NewLazyConstMetric(
-		stableDesc,
-		GaugeValue,
-		1,
-		"value",
-	)
-	ch <- NewLazyConstMetric(
-		deprecatedDesc,
-		GaugeValue,
-		1,
-		"value",
-	)
-	ch <- NewLazyConstMetric(
-		hiddenDesc,
-		GaugeValue,
-		1,
-		"value",
-	)
-
-}
-
-func getMetric(metrics []*dto.MetricFamily, fqName string) *dto.MetricFamily {
-	for _, m := range metrics {
-		if *m.Name == fqName {
-			return m
-		}
-	}
-
-	return nil
-}
-
-func TestBaseCustomCollector(t *testing.T) {
-	var tests = []struct {
-		name         string
-		d            *Desc
-		shouldHidden bool
-		expectedHelp string
-	}{
-		{
-			name:         "alpha metric should contains stability metadata",
-			d:            alphaDesc,
-			shouldHidden: false,
-			expectedHelp: "[ALPHA] alpha metric",
-		},
-		{
-			name:         "stable metric should contains stability metadata",
-			d:            stableDesc,
-			shouldHidden: false,
-			expectedHelp: "[STABLE] stable metrics",
-		},
-		{
-			name:         "deprecated metric should contains stability metadata",
-			d:            deprecatedDesc,
-			shouldHidden: false,
-			expectedHelp: "[STABLE] (Deprecated since 1.17.0) stable deprecated metrics",
-		},
-		{
-			name:         "hidden metric should be ignored",
-			d:            hiddenDesc,
-			shouldHidden: true,
-			expectedHelp: "[STABLE] stable hidden metrics",
-		},
-	}
 
 	registry := newKubeRegistry(currentVersion)
-	customCollector := &testCustomCollector{}
+	customCollector := newTestCustomCollector(alphaDesc, stableDesc, deprecatedDesc, hiddenDesc)
 
 	if err := registry.CustomRegister(customCollector); err != nil {
 		t.Fatalf("register collector failed with err: %v", err)
 	}
 
-	metrics, err := registry.Gather()
+	expectedMetrics := `
+        # HELP metric_alpha [ALPHA] alpha metric
+        # TYPE metric_alpha gauge
+        metric_alpha{name="value"} 1
+        # HELP metric_stable [STABLE] stable metrics
+        # TYPE metric_stable gauge
+        metric_stable{name="value"} 1
+        # HELP metric_deprecated [STABLE] (Deprecated since 1.17.0) stable deprecated metrics
+        # TYPE metric_deprecated gauge
+        metric_deprecated{name="value"} 1
+	`
+
+	err := testutil.GatherAndCompare(registry, strings.NewReader(expectedMetrics), alphaDesc.fqName,
+		stableDesc.fqName, deprecatedDesc.fqName, hiddenDesc.fqName)
 	if err != nil {
-		t.Fatalf("failed to get metrics from collector, %v", err)
-	}
-
-	for _, test := range tests {
-		tc := test
-		t.Run(tc.name, func(t *testing.T) {
-			m := getMetric(metrics, tc.d.fqName)
-			if m == nil {
-				if !tc.shouldHidden {
-					t.Fatalf("Want metric: %s", tc.d.fqName)
-				}
-			} else {
-				if m.GetHelp() != tc.expectedHelp {
-					t.Fatalf("Metric(%s) HELP(%s) not contains: %s", tc.d.fqName, *m.Help, tc.expectedHelp)
-				}
-			}
-
-		})
+		t.Fatal(err)
 	}
 }
