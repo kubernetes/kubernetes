@@ -217,7 +217,6 @@ pkg/ssh
 pkg/util/config
 pkg/util/ebtables
 pkg/util/goroutinemap/exponentialbackoff
-pkg/util/iptables/testing
 pkg/util/labels # See previous effort in PR #80685
 pkg/util/oom
 pkg/util/procfs
