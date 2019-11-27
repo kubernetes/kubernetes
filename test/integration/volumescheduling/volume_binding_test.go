@@ -215,6 +215,20 @@ func TestVolumeBinding(t *testing.T) {
 			}
 		}
 
+		// Wait for PVs to become available to avoid race condition in PV controller
+		// https://github.com/kubernetes/kubernetes/issues/85320
+		for _, pvConfig := range test.pvs {
+			if err := waitForPVPhase(config.client, pvConfig.name, v1.VolumeAvailable); err != nil {
+				t.Fatalf("PersistentVolume %q failed to become available: %v", pvConfig.name, err)
+			}
+		}
+
+		for _, pvConfig := range test.unboundPvs {
+			if err := waitForPVPhase(config.client, pvConfig.name, v1.VolumeAvailable); err != nil {
+				t.Fatalf("PersistentVolume %q failed to become available: %v", pvConfig.name, err)
+			}
+		}
+
 		// Create PVCs
 		for _, pvcConfig := range test.pvcs {
 			pvc := makePVC(pvcConfig.name, config.ns, &classes[pvcConfig.scName].Name, pvcConfig.preboundPV)
@@ -1178,6 +1192,20 @@ func validatePVPhase(t *testing.T, client clientset.Interface, pvName string, ph
 	if pv.Status.Phase != phase {
 		t.Errorf("PV %v phase not %v, got %v", pvName, phase, pv.Status.Phase)
 	}
+}
+
+func waitForPVPhase(client clientset.Interface, pvName string, phase v1.PersistentVolumePhase) error {
+	return wait.PollImmediate(time.Second, 30*time.Second, func() (bool, error) {
+		pv, err := client.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		if pv.Status.Phase == phase {
+			return true, nil
+		}
+		return false, nil
+	})
 }
 
 func waitForPVCBound(client clientset.Interface, pvc *v1.PersistentVolumeClaim) error {
