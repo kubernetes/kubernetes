@@ -873,7 +873,7 @@ function construct-windows-kubelet-flags {
   flags+=" --logtostderr=false"
 
   # Configure the file path for host dns configuration
-  flags+=" --resolv-conf=${WINDOWS_CNI_CONFIG_DIR}\hostdns.conf"
+  flags+=" --resolv-conf=${WINDOWS_CNI_DIR}\hostdns.conf"
 
   # Both --cgroups-per-qos and --enforce-node-allocatable should be disabled on
   # windows; the latter requires the former to be enabled to work.

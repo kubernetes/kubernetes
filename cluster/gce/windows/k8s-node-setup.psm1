@@ -990,7 +990,9 @@ function Configure-HostDnsConf {
 	$conf = $conf + "nameserver $ip`r`n"
   }
   $conf = $conf + "search $search_list"
-  $hostdns_conf = "${env:CNI_CONFIG_DIR}\hostdns.conf"
+  # Do not put hostdns.conf into the CNI config directory so as to
+  # avoid the container runtime treating it as CNI config.
+  $hostdns_conf = "${env:CNI_DIR}\hostdns.conf"
   New-Item -Force -ItemType file ${hostdns_conf} | Out-Null
   Set-Content ${hostdns_conf} $conf
   Log-Output "HOST dns conf:`n$(Get-Content -Raw ${hostdns_conf})"
