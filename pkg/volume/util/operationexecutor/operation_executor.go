@@ -25,13 +25,14 @@ import (
 	"time"
 
 	"k8s.io/klog"
+	"k8s.io/utils/mount"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
@@ -123,7 +124,7 @@ type OperationExecutor interface {
 	// global map path. If number of reference is zero, remove global map path
 	// directory and free a volume for detach.
 	// It then updates the actual state of the world to reflect that.
-	UnmountDevice(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, hostutil mount.HostUtils) error
+	UnmountDevice(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, hostutil hostutil.HostUtils) error
 
 	// VerifyControllerAttachedVolume checks if the specified volume is present
 	// in the specified nodes AttachedVolumes Status field. It uses kubeClient
@@ -542,10 +543,12 @@ type MountedVolume struct {
 
 	// Mounter is the volume mounter used to mount this volume. It is required
 	// by kubelet to create container.VolumeMap.
+	// Mounter is only required for file system volumes and not required for block volumes.
 	Mounter volume.Mounter
 
 	// BlockVolumeMapper is the volume mapper used to map this volume. It is required
 	// by kubelet to create container.VolumeMap.
+	// BlockVolumeMapper is only required for block volumes and not required for file system volumes.
 	BlockVolumeMapper volume.BlockVolumeMapper
 
 	// VolumeGidValue contains the value of the GID annotation, if present.
@@ -635,16 +638,25 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 				klog.Errorf("VerifyVolumesAreAttached: nil spec for volume %s", volumeAttached.VolumeName)
 				continue
 			}
+
 			volumePlugin, err :=
 				oe.operationGenerator.GetVolumePluginMgr().FindPluginBySpec(volumeAttached.VolumeSpec)
-
-			if err != nil || volumePlugin == nil {
+			if err != nil {
 				klog.Errorf(
 					"VolumesAreAttached.FindPluginBySpec failed for volume %q (spec.Name: %q) on node %q with error: %v",
 					volumeAttached.VolumeName,
 					volumeAttached.VolumeSpec.Name(),
 					volumeAttached.NodeName,
 					err)
+				continue
+			}
+			if volumePlugin == nil {
+				// should never happen since FindPluginBySpec always returns error if volumePlugin = nil
+				klog.Errorf(
+					"Failed to find volume plugin for volume %q (spec.Name: %q) on node %q",
+					volumeAttached.VolumeName,
+					volumeAttached.VolumeSpec.Name(),
+					volumeAttached.NodeName)
 				continue
 			}
 
@@ -678,9 +690,8 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 			// If node doesn't support Bulk volume polling it is best to poll individually
 			nodeError := oe.VerifyVolumesAreAttachedPerNode(nodeAttachedVolumes, node, actualStateOfWorld)
 			if nodeError != nil {
-				klog.Errorf("BulkVerifyVolumes.VerifyVolumesAreAttached verifying volumes on node %q with %v", node, nodeError)
+				klog.Errorf("VerifyVolumesAreAttached failed for volumes %v, node %q with error %v", nodeAttachedVolumes, node, nodeError)
 			}
-			break
 		}
 	}
 
@@ -792,7 +803,7 @@ func (oe *operationExecutor) UnmountVolume(
 func (oe *operationExecutor) UnmountDevice(
 	deviceToDetach AttachedVolume,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
-	hostutil mount.HostUtils) error {
+	hostutil hostutil.HostUtils) error {
 	fsVolume, err := util.CheckVolumeModeFilesystem(deviceToDetach.VolumeSpec)
 	if err != nil {
 		return err
@@ -867,13 +878,7 @@ func (oe *operationExecutor) ReconstructVolumeOperation(
 	// Block Volume case
 	// Create volumeSpec from mount path
 	klog.V(5).Infof("Starting operationExecutor.ReconstructVolume")
-	if mapperPlugin == nil {
-		return nil, fmt.Errorf("Could not find block volume plugin %q (spec.Name: %q) pod %q (UID: %q)",
-			pluginName,
-			volumeSpecName,
-			podName,
-			uid)
-	}
+
 	// volumePath contains volumeName on the path. In the case of block volume, {volumeName} is symbolic link
 	// corresponding to raw block device.
 	// ex. volumePath: pods/{podUid}}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName}
@@ -905,6 +910,9 @@ func (oe *operationExecutor) CheckVolumeExistenceOperation(
 		if attachable != nil {
 			var isNotMount bool
 			var mountCheckErr error
+			if mounter == nil {
+				return false, fmt.Errorf("mounter was not set for a filesystem volume")
+			}
 			if isNotMount, mountCheckErr = mounter.IsLikelyNotMountPoint(mountPath); mountCheckErr != nil {
 				return false, fmt.Errorf("Could not check whether the volume %q (spec.Name: %q) pod %q (UID: %q) is mounted with: %v",
 					uniqueVolumeName,

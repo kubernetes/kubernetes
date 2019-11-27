@@ -34,7 +34,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/replicaset"
@@ -86,7 +85,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		e2enode.WaitForTotalHealthy(cs, time.Minute)
 		masterNodes, nodeList, err = e2enode.GetMasterAndWorkerNodes(cs)
 		if err != nil {
-			e2elog.Logf("Unexpected error occurred: %v", err)
+			framework.Logf("Unexpected error occurred: %v", err)
 		}
 		// TODO: write a wrapper for ExpectNoErrorWithOffset()
 		framework.ExpectNoErrorWithOffset(0, err)
@@ -126,7 +125,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 					Requests: podRes,
 				},
 			})
-			e2elog.Logf("Created pod: %v", pods[i].Name)
+			framework.Logf("Created pod: %v", pods[i].Name)
 		}
 		ginkgo.By("Wait for pods to be scheduled.")
 		for _, pod := range pods {
@@ -186,7 +185,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 					Requests: podRes,
 				},
 			})
-			e2elog.Logf("Created pod: %v", pods[i].Name)
+			framework.Logf("Created pod: %v", pods[i].Name)
 		}
 		ginkgo.By("Wait for pods to be scheduled.")
 		for _, pod := range pods {
@@ -220,168 +219,6 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			gomega.Expect(livePod.DeletionTimestamp).To(gomega.BeNil())
 		}
 	})
-
-	// This test verifies that when a high priority pod is pending and its
-	// scheduling violates a medium priority pod anti-affinity, the medium priority
-	// pod is preempted to allow the higher priority pod schedule.
-	// It also verifies that existing low priority pods are not preempted as their
-	// preemption wouldn't help.
-	ginkgo.It("validates pod anti-affinity works in preemption", func() {
-		var podRes v1.ResourceList
-		// Create a few pods that uses a small amount of resources.
-		ginkgo.By("Create pods that use 10% of node resources.")
-		numPods := 4
-		if len(nodeList.Items) < numPods {
-			numPods = len(nodeList.Items)
-		}
-		pods := make([]*v1.Pod, numPods)
-		for i := 0; i < numPods; i++ {
-			node := nodeList.Items[i]
-			cpuAllocatable, found := node.Status.Allocatable["cpu"]
-			gomega.Expect(found).To(gomega.BeTrue())
-			milliCPU := cpuAllocatable.MilliValue() * 10 / 100
-			memAllocatable, found := node.Status.Allocatable["memory"]
-			gomega.Expect(found).To(gomega.BeTrue())
-			memory := memAllocatable.Value() * 10 / 100
-			podRes = v1.ResourceList{}
-			podRes[v1.ResourceCPU] = *resource.NewMilliQuantity(int64(milliCPU), resource.DecimalSI)
-			podRes[v1.ResourceMemory] = *resource.NewQuantity(int64(memory), resource.BinarySI)
-
-			// Apply node label to each node
-			framework.AddOrUpdateLabelOnNode(cs, node.Name, "node", node.Name)
-			framework.ExpectNodeHasLabel(cs, node.Name, "node", node.Name)
-
-			// make the first pod medium priority and the rest low priority.
-			priorityName := lowPriorityClassName
-			if i == 0 {
-				priorityName = mediumPriorityClassName
-			}
-			pods[i] = createPausePod(f, pausePodConfig{
-				Name:              fmt.Sprintf("pod%d-%v", i, priorityName),
-				PriorityClassName: priorityName,
-				Resources: &v1.ResourceRequirements{
-					Requests: podRes,
-				},
-				Affinity: &v1.Affinity{
-					PodAntiAffinity: &v1.PodAntiAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
-										{
-											Key:      "service",
-											Operator: metav1.LabelSelectorOpIn,
-											Values:   []string{"blah", "foo"},
-										},
-									},
-								},
-								TopologyKey: "node",
-							},
-						},
-					},
-					NodeAffinity: &v1.NodeAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-							NodeSelectorTerms: []v1.NodeSelectorTerm{
-								{
-									MatchExpressions: []v1.NodeSelectorRequirement{
-										{
-											Key:      "node",
-											Operator: v1.NodeSelectorOpIn,
-											Values:   []string{node.Name},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			})
-			e2elog.Logf("Created pod: %v", pods[i].Name)
-		}
-		defer func() { // Remove added labels
-			for i := 0; i < numPods; i++ {
-				framework.RemoveLabelOffNode(cs, nodeList.Items[i].Name, "node")
-			}
-		}()
-
-		ginkgo.By("Wait for pods to be scheduled.")
-		for _, pod := range pods {
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, pod))
-		}
-
-		ginkgo.By("Run a high priority pod with node affinity to the first node.")
-		// Create a high priority pod and make sure it is scheduled.
-		runPausePod(f, pausePodConfig{
-			Name:              "preemptor-pod",
-			PriorityClassName: highPriorityClassName,
-			Labels:            map[string]string{"service": "blah"},
-			Affinity: &v1.Affinity{
-				NodeAffinity: &v1.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-						NodeSelectorTerms: []v1.NodeSelectorTerm{
-							{
-								MatchExpressions: []v1.NodeSelectorRequirement{
-									{
-										Key:      "node",
-										Operator: v1.NodeSelectorOpIn,
-										Values:   []string{nodeList.Items[0].Name},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		})
-		// Make sure that the medium priority pod on the first node is preempted.
-		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(pods[0].Name, metav1.GetOptions{})
-		podDeleted := (err != nil && errors.IsNotFound(err)) ||
-			(err == nil && preemptedPod.DeletionTimestamp != nil)
-		gomega.Expect(podDeleted).To(gomega.BeTrue())
-		// Other pods (low priority ones) should be present.
-		for i := 1; i < len(pods); i++ {
-			livePod, err := cs.CoreV1().Pods(pods[i].Namespace).Get(pods[i].Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
-			gomega.Expect(livePod.DeletionTimestamp).To(gomega.BeNil())
-		}
-	})
-})
-
-var _ = SIGDescribe("PodPriorityResolution [Serial]", func() {
-	var cs clientset.Interface
-	var ns string
-	f := framework.NewDefaultFramework("sched-pod-priority")
-
-	ginkgo.BeforeEach(func() {
-		cs = f.ClientSet
-		ns = f.Namespace.Name
-
-		err := framework.CheckTestingNSDeletedExcept(cs, ns)
-		framework.ExpectNoError(err)
-	})
-
-	// This test verifies that system critical priorities are created automatically and resolved properly.
-	ginkgo.It("validates critical system priorities are created and resolved", func() {
-		// Create pods that use system critical priorities and
-		ginkgo.By("Create pods that use critical system priorities.")
-		systemPriorityClasses := []string{
-			scheduling.SystemNodeCritical, scheduling.SystemClusterCritical,
-		}
-		for i, spc := range systemPriorityClasses {
-			pod := createPausePod(f, pausePodConfig{
-				Name:              fmt.Sprintf("pod%d-%v", i, spc),
-				Namespace:         metav1.NamespaceSystem,
-				PriorityClassName: spc,
-			})
-			defer func() {
-				// Clean-up the pod.
-				err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
-				framework.ExpectNoError(err)
-			}()
-			gomega.Expect(pod.Spec.Priority).NotTo(gomega.BeNil())
-			e2elog.Logf("Created pod: %v", pod.Name)
-		}
-	})
 })
 
 // construct a fakecpu so as to set it to status of Node object
@@ -402,11 +239,11 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			// list existing priorities
 			priorityList, err := cs.SchedulingV1().PriorityClasses().List(metav1.ListOptions{})
 			if err != nil {
-				e2elog.Logf("Unable to list priorities: %v", err)
+				framework.Logf("Unable to list priorities: %v", err)
 			} else {
-				e2elog.Logf("List existing priorities:")
+				framework.Logf("List existing priorities:")
 				for _, p := range priorityList.Items {
-					e2elog.Logf("%v/%v created at %v", p.Name, p.Value, p.CreationTimestamp)
+					framework.Logf("%v/%v created at %v", p.Name, p.Value, p.CreationTimestamp)
 				}
 			}
 		}
@@ -431,18 +268,18 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		// find an available node
 		ginkgo.By("Finding an available node")
 		nodeName := GetNodeThatCanRunPod(f)
-		e2elog.Logf("found a healthy node: %s", nodeName)
+		framework.Logf("found a healthy node: %s", nodeName)
 
 		// get the node API object
 		var err error
 		node, err = cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 		if err != nil {
-			e2elog.Failf("error getting node %q: %v", nodeName, err)
+			framework.Failf("error getting node %q: %v", nodeName, err)
 		}
 		var ok bool
 		nodeHostNameLabel, ok = node.GetObjectMeta().GetLabels()["kubernetes.io/hostname"]
 		if !ok {
-			e2elog.Failf("error getting kubernetes.io/hostname label on node %s", nodeName)
+			framework.Failf("error getting kubernetes.io/hostname label on node %s", nodeName)
 		}
 
 		// update Node API object with a fake resource
@@ -460,8 +297,8 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			priorityPairs = append(priorityPairs, priorityPair{name: priorityName, value: priorityVal})
 			_, err := cs.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: priorityName}, Value: priorityVal})
 			if err != nil {
-				e2elog.Logf("Failed to create priority '%v/%v': %v", priorityName, priorityVal, err)
-				e2elog.Logf("Reason: %v. Msg: %v", errors.ReasonForError(err), err)
+				framework.Logf("Failed to create priority '%v/%v': %v", priorityName, priorityVal, err)
+				framework.Logf("Reason: %v. Msg: %v", errors.ReasonForError(err), err)
 			}
 			framework.ExpectEqual(err == nil || errors.IsAlreadyExists(err), true)
 		}
@@ -560,16 +397,16 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			runPauseRS(f, rsConfs[i])
 		}
 
-		e2elog.Logf("pods created so far: %v", podNamesSeen)
-		e2elog.Logf("length of pods created so far: %v", len(podNamesSeen))
+		framework.Logf("pods created so far: %v", podNamesSeen)
+		framework.Logf("length of pods created so far: %v", len(podNamesSeen))
 
 		// create ReplicaSet4
 		// if runPauseRS failed, it means ReplicaSet4 cannot be scheduled even after 1 minute
 		// which is unacceptable
 		runPauseRS(f, rsConfs[rsNum-1])
 
-		e2elog.Logf("pods created so far: %v", podNamesSeen)
-		e2elog.Logf("length of pods created so far: %v", len(podNamesSeen))
+		framework.Logf("pods created so far: %v", podNamesSeen)
+		framework.Logf("length of pods created so far: %v", len(podNamesSeen))
 
 		// count pods number of ReplicaSet{1,2,3}, if it's more than expected replicas
 		// then it denotes its pods have been over-preempted
@@ -588,7 +425,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		for i, got := range rsPodsSeen {
 			expected := maxRSPodsSeen[i]
 			if got > expected {
-				e2elog.Failf("pods of ReplicaSet%d have been over-preempted: expect %v pod names, but got %d", i+1, expected, got)
+				framework.Failf("pods of ReplicaSet%d have been over-preempted: expect %v pod names, but got %d", i+1, expected, got)
 			}
 		}
 	})

@@ -192,11 +192,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*kubeadm.InitConfiguration)(nil), (*InitConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_kubeadm_InitConfiguration_To_v1beta1_InitConfiguration(a.(*kubeadm.InitConfiguration), b.(*InitConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*JoinConfiguration)(nil), (*kubeadm.JoinConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_JoinConfiguration_To_kubeadm_JoinConfiguration(a.(*JoinConfiguration), b.(*kubeadm.JoinConfiguration), scope)
 	}); err != nil {
@@ -209,11 +204,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*JoinControlPlane)(nil), (*kubeadm.JoinControlPlane)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_JoinControlPlane_To_kubeadm_JoinControlPlane(a.(*JoinControlPlane), b.(*kubeadm.JoinControlPlane), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*kubeadm.JoinControlPlane)(nil), (*JoinControlPlane)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_kubeadm_JoinControlPlane_To_v1beta1_JoinControlPlane(a.(*kubeadm.JoinControlPlane), b.(*JoinControlPlane), scope)
 	}); err != nil {
 		return err
 	}
@@ -239,11 +229,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*NodeRegistrationOptions)(nil), (*kubeadm.NodeRegistrationOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(a.(*NodeRegistrationOptions), b.(*kubeadm.NodeRegistrationOptions), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*kubeadm.NodeRegistrationOptions)(nil), (*NodeRegistrationOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_kubeadm_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(a.(*kubeadm.NodeRegistrationOptions), b.(*NodeRegistrationOptions), scope)
 	}); err != nil {
 		return err
 	}

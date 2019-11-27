@@ -25,11 +25,11 @@ export GOBIN="${KUBE_OUTPUT_BINPATH}"
 PATH="${GOBIN}:${PATH}"
 
 # Install tools we need, but only from vendor/...
-pushd "${KUBE_ROOT}/vendor"
-  go install ./github.com/bazelbuild/bazel-gazelle/cmd/gazelle
-  go install ./github.com/bazelbuild/buildtools/buildozer
-  go install ./k8s.io/repo-infra/kazel
-popd
+pushd "${KUBE_ROOT}" >/dev/null
+  GO111MODULE=on GOFLAGS=-mod=vendor go install github.com/bazelbuild/bazel-gazelle/cmd/gazelle
+  GO111MODULE=on GOFLAGS=-mod=vendor go install github.com/bazelbuild/buildtools/buildozer
+  GO111MODULE=on GOFLAGS=-mod=vendor go install k8s.io/repo-infra/cmd/kazel
+popd >/dev/null
 
 # Find all of the staging repos.
 while IFS='' read -r repo; do staging_repos+=("${repo}"); done <\
@@ -87,6 +87,13 @@ fi
 # mark all ./test/integration/* targets as integration
 # see comment above re: buildozer exit codes
 buildozer -quiet 'add tags integration' '//test/integration/...:%go_test' && ret=$? || ret=$?
+if [[ $ret != 0 && $ret != 3 ]]; then
+  exit 1
+fi
+
+# restrict ./vendor/github.com/prometheus/* targets visibility
+# see comment above re: buildozer exit codes
+buildozer -quiet 'set visibility //staging/src/k8s.io/component-base/metrics:prometheus_import_allow_list' '//vendor/github.com/prometheus/...:go_default_library' && ret=$? || ret=$?
 if [[ $ret != 0 && $ret != 3 ]]; then
   exit 1
 fi

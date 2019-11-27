@@ -17,21 +17,47 @@ limitations under the License.
 package converter
 
 import (
+	"bytes"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 )
 
-func TestConverter(t *testing.T) {
-	sampleObj := `kind: ConversionReview
-apiVersion: apiextensions.k8s.io/v1beta1
+func TestConverterYAML(t *testing.T) {
+	cases := []struct {
+		apiVersion     string
+		contentType    string
+		expected400Err string
+	}{
+		{
+			apiVersion:     "apiextensions.k8s.io/v1beta1",
+			contentType:    "application/json",
+			expected400Err: "json parse error",
+		},
+		{
+			apiVersion:  "apiextensions.k8s.io/v1beta1",
+			contentType: "application/yaml",
+		},
+		{
+			apiVersion:     "apiextensions.k8s.io/v1",
+			contentType:    "application/json",
+			expected400Err: "json parse error",
+		},
+		{
+			apiVersion:  "apiextensions.k8s.io/v1",
+			contentType: "application/yaml",
+		},
+	}
+	sampleObjTemplate := `kind: ConversionReview
+apiVersion: %s
 request:
   uid: 0000-0000-0000-0000
   desiredAPIVersion: stable.example.com/v2
@@ -45,53 +71,47 @@ request:
         image: my-awesome-cron-image
       hostPort: "localhost:7070"
 `
-	// First try json, it should fail as the data is taml
-	response := httptest.NewRecorder()
-	request, err := http.NewRequest("POST", "/convert", strings.NewReader(sampleObj))
-	if err != nil {
-		t.Fatal(err)
-	}
-	request.Header.Add("Content-Type", "application/json")
-	ServeExampleConvert(response, request)
-	convertReview := v1beta1.ConversionReview{}
-	scheme := runtime.NewScheme()
-	jsonSerializer := json.NewSerializer(json.DefaultMetaFactory, scheme, scheme, false)
-	if _, _, err := jsonSerializer.Decode(response.Body.Bytes(), nil, &convertReview); err != nil {
-		t.Fatal(err)
-	}
-	if convertReview.Response.Result.Status != v1.StatusFailure {
-		t.Fatalf("expected the operation to fail when yaml is provided with json header")
-	} else if !strings.Contains(convertReview.Response.Result.Message, "json parse error") {
-		t.Fatalf("expected to fail on json parser, but it failed with: %v", convertReview.Response.Result.Message)
-	}
+	for _, tc := range cases {
+		t.Run(tc.apiVersion+" "+tc.contentType, func(t *testing.T) {
+			sampleObj := fmt.Sprintf(sampleObjTemplate, tc.apiVersion)
+			// First try json, it should fail as the data is taml
+			response := httptest.NewRecorder()
+			request, err := http.NewRequest("POST", "/convert", strings.NewReader(sampleObj))
+			if err != nil {
+				t.Fatal(err)
+			}
+			request.Header.Add("Content-Type", tc.contentType)
+			ServeExampleConvert(response, request)
+			convertReview := apiextensionsv1.ConversionReview{}
+			scheme := runtime.NewScheme()
+			if len(tc.expected400Err) > 0 {
+				body := response.Body.Bytes()
+				if !bytes.Contains(body, []byte(tc.expected400Err)) {
+					t.Fatalf("expected to fail on '%s', but it failed with: %s", tc.expected400Err, string(body))
+				}
+				return
+			}
 
-	// Now try yaml, and it should successfully convert
-	response = httptest.NewRecorder()
-	request, err = http.NewRequest("POST", "/convert", strings.NewReader(sampleObj))
-	if err != nil {
-		t.Fatal(err)
-	}
-	request.Header.Add("Content-Type", "application/yaml")
-	ServeExampleConvert(response, request)
-	convertReview = v1beta1.ConversionReview{}
-	yamlSerializer := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme, scheme)
-	if _, _, err := yamlSerializer.Decode(response.Body.Bytes(), nil, &convertReview); err != nil {
-		t.Fatalf("cannot decode data: \n %v\n Error: %v", response.Body, err)
-	}
-	if convertReview.Response.Result.Status != v1.StatusSuccess {
-		t.Fatalf("cr conversion failed: %v", convertReview.Response)
-	}
-	convertedObj := unstructured.Unstructured{}
-	if _, _, err := yamlSerializer.Decode(convertReview.Response.ConvertedObjects[0].Raw, nil, &convertedObj); err != nil {
-		t.Fatal(err)
-	}
-	if e, a := "stable.example.com/v2", convertedObj.GetAPIVersion(); e != a {
-		t.Errorf("expected= %v, actual= %v", e, a)
-	}
-	if e, a := "localhost", convertedObj.Object["host"]; e != a {
-		t.Errorf("expected= %v, actual= %v", e, a)
-	}
-	if e, a := "7070", convertedObj.Object["port"]; e != a {
-		t.Errorf("expected= %v, actual= %v", e, a)
+			yamlSerializer := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme, scheme)
+			if _, _, err := yamlSerializer.Decode(response.Body.Bytes(), nil, &convertReview); err != nil {
+				t.Fatalf("cannot decode data: \n %v\n Error: %v", response.Body, err)
+			}
+			if convertReview.Response.Result.Status != v1.StatusSuccess {
+				t.Fatalf("cr conversion failed: %v", convertReview.Response)
+			}
+			convertedObj := unstructured.Unstructured{}
+			if _, _, err := yamlSerializer.Decode(convertReview.Response.ConvertedObjects[0].Raw, nil, &convertedObj); err != nil {
+				t.Fatal(err)
+			}
+			if e, a := "stable.example.com/v2", convertedObj.GetAPIVersion(); e != a {
+				t.Errorf("expected= %v, actual= %v", e, a)
+			}
+			if e, a := "localhost", convertedObj.Object["host"]; e != a {
+				t.Errorf("expected= %v, actual= %v", e, a)
+			}
+			if e, a := "7070", convertedObj.Object["port"]; e != a {
+				t.Errorf("expected= %v, actual= %v", e, a)
+			}
+		})
 	}
 }

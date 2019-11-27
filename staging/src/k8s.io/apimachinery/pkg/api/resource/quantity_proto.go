@@ -19,6 +19,7 @@ package resource
 import (
 	"fmt"
 	"io"
+	"math/bits"
 
 	"github.com/gogo/protobuf/proto"
 )
@@ -28,7 +29,7 @@ var _ proto.Sizer = &Quantity{}
 func (m *Quantity) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
-	n, err := m.MarshalTo(data)
+	n, err := m.MarshalToSizedBuffer(data[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -38,30 +39,40 @@ func (m *Quantity) Marshal() (data []byte, err error) {
 // MarshalTo is a customized version of the generated Protobuf unmarshaler for a struct
 // with a single string field.
 func (m *Quantity) MarshalTo(data []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(data[:size])
+}
+
+// MarshalToSizedBuffer is a customized version of the generated
+// Protobuf unmarshaler for a struct with a single string field.
+func (m *Quantity) MarshalToSizedBuffer(data []byte) (int, error) {
+	i := len(data)
 	_ = i
 	var l int
 	_ = l
 
-	data[i] = 0xa
-	i++
 	// BEGIN CUSTOM MARSHAL
 	out := m.String()
+	i -= len(out)
+	copy(data[i:], out)
 	i = encodeVarintGenerated(data, i, uint64(len(out)))
-	i += copy(data[i:], out)
 	// END CUSTOM MARSHAL
+	i--
+	data[i] = 0xa
 
-	return i, nil
+	return len(data) - i, nil
 }
 
 func encodeVarintGenerated(data []byte, offset int, v uint64) int {
+	offset -= sovGenerated(v)
+	base := offset
 	for v >= 1<<7 {
 		data[offset] = uint8(v&0x7f | 0x80)
 		v >>= 7
 		offset++
 	}
 	data[offset] = uint8(v)
-	return offset + 1
+	return base
 }
 
 func (m *Quantity) Size() (n int) {
@@ -77,14 +88,7 @@ func (m *Quantity) Size() (n int) {
 }
 
 func sovGenerated(x uint64) (n int) {
-	for {
-		n++
-		x >>= 7
-		if x == 0 {
-			break
-		}
-	}
-	return n
+	return (bits.Len64(x|1) + 6) / 7
 }
 
 // Unmarshal is a customized version of the generated Protobuf unmarshaler for a struct

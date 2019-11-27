@@ -28,7 +28,6 @@ import (
 
 	"github.com/spf13/cobra"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
@@ -61,7 +60,7 @@ func TestCommandsGenerated(t *testing.T) {
 		"renew controller-manager.conf",
 	}
 
-	renewCmd := newCmdCertsRenewal()
+	renewCmd := newCmdCertsRenewal(os.Stdout)
 
 	fakeRoot := &cobra.Command{}
 	fakeRoot.AddCommand(renewCmd)
@@ -237,7 +236,7 @@ func TestRunRenewCommands(t *testing.T) {
 			}
 
 			// exec renew
-			renewCmds := getRenewSubCommands(tmpDir)
+			renewCmds := getRenewSubCommands(os.Stdout, tmpDir)
 			cmdtestutil.RunSubCommand(t, renewCmds, test.command, fmt.Sprintf("--cert-dir=%s", tmpDir))
 
 			// check the file is modified
@@ -266,7 +265,7 @@ func TestRunRenewCommands(t *testing.T) {
 func TestRenewUsingCSR(t *testing.T) {
 	tmpDir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpDir)
-	cert := &certs.KubeadmCertEtcdServer
+	cert := &certsphase.KubeadmCertEtcdServer
 
 	cfg := testutil.GetDefaultInternalConfig(t)
 	cfg.CertificatesDir = tmpDir
@@ -280,7 +279,7 @@ func TestRenewUsingCSR(t *testing.T) {
 		t.Fatalf("couldn't write certificate %s: %v", cert.Name, err)
 	}
 
-	renewCmds := getRenewSubCommands(tmpDir)
+	renewCmds := getRenewSubCommands(os.Stdout, tmpDir)
 	cmdtestutil.RunSubCommand(t, renewCmds, cert.Name, "--csr-only", "--csr-dir="+tmpDir, fmt.Sprintf("--cert-dir=%s", tmpDir))
 
 	if _, _, err := pkiutil.TryLoadCSRAndKeyFromDisk(tmpDir, cert.Name); err != nil {

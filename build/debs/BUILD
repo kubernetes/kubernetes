@@ -85,7 +85,6 @@ genrule(
     goarch = arch,
     tags = ["manual"],
 ) for binary in [
-    "cloud-controller-manager",
     "kube-apiserver",
     "kube-controller-manager",
     "kube-proxy",
@@ -149,16 +148,8 @@ genrule(
     name = "cri-tools-data-%s" % goarch,
     package_dir = "/usr/bin",
     tags = ["manual"],
-    deps = ["@cri_tools_%s//file" % goarch],
+    deps = ["@cri_tools_linux-%s//file" % goarch],
 ) for goarch in NODE_PLATFORMS["linux"]]
-
-[k8s_deb(
-    name = "cloud-controller-manager",
-    description = "Kubernetes Cloud Controller Manager",
-    goarch = arch,
-    tags = ["manual"],
-    version_file = "//build:os_package_version",
-) for arch in SERVER_PLATFORMS["linux"]]
 
 [k8s_deb(
     name = "kubectl",

@@ -26,10 +26,10 @@ set -o pipefail
 ### Hardcoded constants
 DEFAULT_CNI_VERSION="v0.7.5"
 DEFAULT_CNI_SHA1="52e9d2de8a5f927307d9397308735658ee44ab8d"
-DEFAULT_NPD_VERSION="v0.6.3"
-DEFAULT_NPD_SHA1="3a6ac56be6c121f1b94450bfd1a81ad28d532369"
-DEFAULT_CRICTL_VERSION="v1.14.0"
-DEFAULT_CRICTL_SHA1="1f93c6183d0a4e186708efe7899da7a7bce9c736"
+DEFAULT_NPD_VERSION="v0.8.0"
+DEFAULT_NPD_SHA1="9406c975b1b035995a137029a004622b905b4e7f"
+DEFAULT_CRICTL_VERSION="v1.16.1"
+DEFAULT_CRICTL_SHA1="8d7b788bf0a52bd3248407c6ebf779ffead27c99"
 DEFAULT_MOUNTER_TAR_SHA="8003b798cf33c7f91320cd6ee5cec4fa22244571"
 ###
 
@@ -126,12 +126,12 @@ function validate-hash {
 # Get default service account credentials of the VM.
 GCE_METADATA_INTERNAL="http://metadata.google.internal/computeMetadata/v1/instance"
 function get-credentials {
-  curl "${GCE_METADATA_INTERNAL}/service-accounts/default/token" -H "Metadata-Flavor: Google" -s | python -c \
+  curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error "${GCE_METADATA_INTERNAL}/service-accounts/default/token" -H "Metadata-Flavor: Google" -s | python -c \
     'import sys; import json; print(json.loads(sys.stdin.read())["access_token"])'
 }
 
 function valid-storage-scope {
-  curl "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" -H "Metadata-Flavor: Google" -s | grep -q "auth/devstorage"
+  curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" -H "Metadata-Flavor: Google" -s | grep -E "auth/devstorage|auth/cloud-platform"
 }
 
 # Retry a download until we get it. Takes a hash and a set of URLs.
@@ -336,6 +336,7 @@ function install-kube-manifests {
       xargs sed -ri "s@(image\":\s+\")k8s.gcr.io@\1${kube_addon_registry}@"
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_BIN}/configure-helper.sh"
+  cp "${dst_dir}/kubernetes/gci-trusty/configure-kubeapiserver.sh" "${KUBE_BIN}/configure-kubeapiserver.sh"
   if [[ -e "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure-helper.sh" ]]; then
     cp "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure-helper.sh" "${KUBE_BIN}/"
   fi

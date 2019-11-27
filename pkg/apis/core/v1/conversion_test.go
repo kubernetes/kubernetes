@@ -208,12 +208,12 @@ func TestResourceListConversion(t *testing.T) {
 		},
 		{ // Large values should still be accurate.
 			input: v1.ResourceList{
-				v1.ResourceCPU:     *bigMilliQuantity.Copy(),
-				v1.ResourceStorage: *bigMilliQuantity.Copy(),
+				v1.ResourceCPU:     bigMilliQuantity.DeepCopy(),
+				v1.ResourceStorage: bigMilliQuantity.DeepCopy(),
 			},
 			expected: core.ResourceList{
-				core.ResourceCPU:     *bigMilliQuantity.Copy(),
-				core.ResourceStorage: *bigMilliQuantity.Copy(),
+				core.ResourceCPU:     bigMilliQuantity.DeepCopy(),
+				core.ResourceStorage: bigMilliQuantity.DeepCopy(),
 			},
 		},
 	}
@@ -338,13 +338,7 @@ func roundTripRS(t *testing.T, rs *apps.ReplicaSet) *apps.ReplicaSet {
 		t.Errorf("%v\nData: %s\nSource: %#v", err, string(data), rs)
 		return nil
 	}
-	obj3 := &apps.ReplicaSet{}
-	err = legacyscheme.Scheme.Convert(obj2, obj3, nil)
-	if err != nil {
-		t.Errorf("%v\nSource: %#v", err, obj2)
-		return nil
-	}
-	return obj3
+	return obj2.(*apps.ReplicaSet)
 }
 
 func Test_core_PodStatus_to_v1_PodStatus(t *testing.T) {

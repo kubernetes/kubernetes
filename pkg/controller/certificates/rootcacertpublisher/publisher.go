@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -31,9 +31,8 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
 // RootCACertConfigMapName is name of the configmap which stores certificates
@@ -50,7 +49,7 @@ func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinf
 		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "root_ca_cert_publisher"),
 	}
 	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("root_ca_cert_publisher", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("root_ca_cert_publisher", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
 			return nil, err
 		}
 	}
@@ -98,7 +97,7 @@ func (c *Publisher) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting root CA certificate configmap publisher")
 	defer klog.Infof("Shutting down root CA certificate configmap publisher")
 
-	if !controller.WaitForCacheSync("crt configmap", stopCh, c.cmListerSynced) {
+	if !cache.WaitForNamedCacheSync("crt configmap", stopCh, c.cmListerSynced) {
 		return
 	}
 
@@ -211,11 +210,11 @@ func convertToCM(obj interface{}) (*v1.ConfigMap, error) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			return nil, fmt.Errorf("Couldn't get object from tombstone %#v", obj)
+			return nil, fmt.Errorf("couldn't get object from tombstone %#v", obj)
 		}
 		cm, ok = tombstone.Obj.(*v1.ConfigMap)
 		if !ok {
-			return nil, fmt.Errorf("Tombstone contained object that is not a ConfigMap %#v", obj)
+			return nil, fmt.Errorf("tombstone contained object that is not a ConfigMap %#v", obj)
 		}
 	}
 	return cm, nil

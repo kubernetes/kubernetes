@@ -17,7 +17,7 @@ limitations under the License.
 package testpatterns
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 )
@@ -44,6 +44,8 @@ var (
 	PreprovisionedPV TestVolType = "PreprovisionedPV"
 	// DynamicPV represents a volume type for dynamic provisioned Persistent Volume
 	DynamicPV TestVolType = "DynamicPV"
+	// CSIInlineVolume represents a volume type that is defined inline and provided by a CSI driver.
+	CSIInlineVolume TestVolType = "CSIInlineVolume"
 )
 
 // TestSnapshotType represents a snapshot type to be tested in a TestSuite
@@ -219,7 +221,6 @@ var (
 	DefaultFsDynamicPVAllowExpansion = TestPattern{
 		Name:           "Dynamic PV (default fs)(allowExpansion)",
 		VolType:        DynamicPV,
-		BindingMode:    storagev1.VolumeBindingWaitForFirstConsumer,
 		AllowExpansion: true,
 	}
 	// BlockVolModeDynamicPVAllowExpansion is TestPattern for "Dynamic PV (block volmode)(allowExpansion)"
@@ -227,7 +228,31 @@ var (
 		Name:           "Dynamic PV (block volmode)(allowExpansion)",
 		VolType:        DynamicPV,
 		VolMode:        v1.PersistentVolumeBlock,
-		BindingMode:    storagev1.VolumeBindingWaitForFirstConsumer,
 		AllowExpansion: true,
 	}
+
+	// Definitions for topology tests
+
+	// TopologyImmediate is TestPattern for immediate binding
+	TopologyImmediate = TestPattern{
+		Name:        "Dynamic PV (immediate binding)",
+		VolType:     DynamicPV,
+		BindingMode: storagev1.VolumeBindingImmediate,
+	}
+
+	// TopologyDelayed is TestPattern for delayed binding
+	TopologyDelayed = TestPattern{
+		Name:        "Dynamic PV (delayed binding)",
+		VolType:     DynamicPV,
+		BindingMode: storagev1.VolumeBindingWaitForFirstConsumer,
+	}
 )
+
+// NewVolTypeMap creates a map with the given TestVolTypes enabled
+func NewVolTypeMap(types ...TestVolType) map[TestVolType]bool {
+	m := map[TestVolType]bool{}
+	for _, t := range types {
+		m[t] = true
+	}
+	return m
+}

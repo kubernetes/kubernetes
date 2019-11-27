@@ -21,14 +21,10 @@ import (
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
 // GroupName is the group name for this API.
 const GroupName = "meta.k8s.io"
-
-// Scheme is the registry for any type that adheres to the meta API spec.
-var scheme = runtime.NewScheme()
 
 var (
 	// TODO: move SchemeBuilder with zz_generated.deepcopy.go to k8s.io/api.
@@ -38,14 +34,8 @@ var (
 	AddToScheme        = localSchemeBuilder.AddToScheme
 )
 
-// Codecs provides access to encoding and decoding for the scheme.
-var Codecs = serializer.NewCodecFactory(scheme)
-
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
-
-// ParameterCodec handles versioning of objects that are converted to query parameters.
-var ParameterCodec = runtime.NewParameterCodec(scheme)
 
 // Kind takes an unqualified kind and returns a Group qualified GroupKind
 func Kind(kind string) schema.GroupKind {
@@ -53,7 +43,7 @@ func Kind(kind string) schema.GroupKind {
 }
 
 // addToGroupVersion registers common meta types into schemas.
-func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion) error {
+func addToGroupVersion(scheme *runtime.Scheme) error {
 	if err := scheme.AddIgnoredConversionType(&metav1.TypeMeta{}, &metav1.TypeMeta{}); err != nil {
 		return err
 	}
@@ -104,7 +94,6 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 // Unlike other API groups, meta internal knows about all meta external versions, but keeps
 // the logic for conversion private.
 func init() {
-	if err := addToGroupVersion(scheme, SchemeGroupVersion); err != nil {
-		panic(err)
-	}
+	localSchemeBuilder.Register(addToGroupVersion)
+	localSchemeBuilder.Register(metav1.RegisterConversions)
 }

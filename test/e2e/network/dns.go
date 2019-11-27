@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 
 	"github.com/onsi/ginkgo"
 )
@@ -48,17 +48,31 @@ var _ = SIGDescribe("DNS", func() {
 		namesToResolve := []string{
 			fmt.Sprintf("kubernetes.default.svc.%s", framework.TestContext.ClusterDNSDomain),
 		}
-		// Added due to #8512. This is critical for GCE and GKE deployments.
-		if framework.ProviderIs("gce", "gke") {
-			namesToResolve = append(namesToResolve, "google.com")
-			// Windows containers do not have a route to the GCE
-			// metadata server by default.
-			if !framework.NodeOSDistroIs("windows") {
-				namesToResolve = append(namesToResolve, "metadata")
-			}
+		// TODO: Validate both IPv4 and IPv6 families for dual-stack
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+
+		// Run a pod which probes DNS and exposes the results by HTTP.
+		ginkgo.By("creating a pod to probe DNS")
+		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
+		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
+	})
+
+	// Added due to #8512. This is critical for GCE and GKE deployments.
+	ginkgo.It("should provide DNS for the cluster [Provider:GCE]", func() {
+		framework.SkipUnlessProviderIs("gce", "gke")
+
+		namesToResolve := []string{"google.com"}
+		// Windows containers do not have a route to the GCE metadata server by default.
+		if !framework.NodeOSDistroIs("windows") {
+			namesToResolve = append(namesToResolve, "metadata")
 		}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+
+		// TODO: Validate both IPv4 and IPv6 families for dual-stack
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -71,24 +85,15 @@ var _ = SIGDescribe("DNS", func() {
 	// [LinuxOnly]: As Windows currently does not support resolving PQDNs.
 	ginkgo.It("should resolve DNS of partial qualified names for the cluster [LinuxOnly]", func() {
 		// All the names we need to be able to resolve.
-		// TODO: Spin up a separate test service and test that dns works for that service.
 		namesToResolve := []string{
 			"kubernetes.default",
 			"kubernetes.default.svc",
 		}
-		// Added due to #8512. This is critical for GCE and GKE deployments.
-		if framework.ProviderIs("gce", "gke") {
-			namesToResolve = append(namesToResolve, "google.com")
-			// Windows containers do not have a route to the GCE
-			// metadata server by default.
-			if !framework.NodeOSDistroIs("windows") {
-				namesToResolve = append(namesToResolve, "metadata")
-			}
-		}
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		hostEntries := []string{hostFQDN, dnsTestPodHostName}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		// TODO: Validate both IPv4 and IPv6 families for dual-stack
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -106,8 +111,9 @@ var _ = SIGDescribe("DNS", func() {
 	framework.ConformanceIt("should provide /etc/hosts entries for the cluster [LinuxOnly]", func() {
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		hostEntries := []string{hostFQDN, dnsTestPodHostName}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(nil, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		// TODO: Validate both IPv4 and IPv6 families for dual-stack
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(nil, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -129,7 +135,7 @@ var _ = SIGDescribe("DNS", func() {
 		testServiceSelector := map[string]string{
 			"dns-test": "true",
 		}
-		headlessService := framework.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
+		headlessService := e2eservice.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
 		framework.ExpectNoError(err, "failed to create headless service: %s", dnsTestServiceName)
 		defer func() {
@@ -139,7 +145,7 @@ var _ = SIGDescribe("DNS", func() {
 		}()
 
 		regularServiceName := "test-service-2"
-		regularService := framework.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
+		regularService := e2eservice.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
 		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(regularService)
 		framework.ExpectNoError(err, "failed to create regular service: %s", regularServiceName)
 
@@ -158,8 +164,9 @@ var _ = SIGDescribe("DNS", func() {
 			fmt.Sprintf("_http._tcp.%s.%s.svc.%s", regularService.Name, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
 		}
 
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		// TODO: Validate both IPv4 and IPv6 families for dual-stack
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -171,14 +178,19 @@ var _ = SIGDescribe("DNS", func() {
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
-	// [LinuxOnly]: As Windows currently does not support resolving PQDNs.
-	ginkgo.It("should resolve DNS of partial qualified names for services [LinuxOnly]", func() {
+	/*
+		Release: v1.17
+		Testname: DNS, PQDN for services
+		Description: Create a headless service and normal service. Both the services MUST be able to resolve partial qualified DNS entries of their service endpoints by serving A records and SRV records.
+		[LinuxOnly]: As Windows currently does not support resolving PQDNs.
+	*/
+	framework.ConformanceIt("should resolve DNS of partial qualified names for services [LinuxOnly]", func() {
 		// Create a test headless service.
 		ginkgo.By("Creating a test headless service")
 		testServiceSelector := map[string]string{
 			"dns-test": "true",
 		}
-		headlessService := framework.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
+		headlessService := e2eservice.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
 		framework.ExpectNoError(err, "failed to create headless service: %s", dnsTestServiceName)
 		defer func() {
@@ -188,7 +200,7 @@ var _ = SIGDescribe("DNS", func() {
 		}()
 
 		regularServiceName := "test-service-2"
-		regularService := framework.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
+		regularService := e2eservice.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
 		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(regularService)
 		framework.ExpectNoError(err, "failed to create regular service: %s", regularServiceName)
 		defer func() {
@@ -198,7 +210,6 @@ var _ = SIGDescribe("DNS", func() {
 		}()
 
 		// All the names we need to be able to resolve.
-		// TODO: Create more endpoints and ensure that multiple A records are returned
 		// for headless service.
 		namesToResolve := []string{
 			fmt.Sprintf("%s", headlessService.Name),
@@ -208,8 +219,9 @@ var _ = SIGDescribe("DNS", func() {
 			fmt.Sprintf("_http._tcp.%s.%s.svc", regularService.Name, f.Namespace.Name),
 		}
 
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		// TODO: Validate both IPv4 and IPv6 families for dual-stack
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -235,7 +247,7 @@ var _ = SIGDescribe("DNS", func() {
 		}
 		serviceName := "dns-test-service-2"
 		podHostname := "dns-querier-2"
-		headlessService := framework.CreateServiceSpec(serviceName, "", true, testServiceSelector)
+		headlessService := e2eservice.CreateServiceSpec(serviceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
 		framework.ExpectNoError(err, "failed to create headless service: %s", serviceName)
 
@@ -247,8 +259,9 @@ var _ = SIGDescribe("DNS", func() {
 
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", podHostname, serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		hostNames := []string{hostFQDN, podHostname}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(nil, hostNames, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostNames, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		// TODO: Validate both IPv4 and IPv6 families for dual-stack
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(nil, hostNames, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostNames, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -276,7 +289,7 @@ var _ = SIGDescribe("DNS", func() {
 		}
 		serviceName := "dns-test-service-2"
 		podHostname := "dns-querier-2"
-		headlessService := framework.CreateServiceSpec(serviceName, "", true, testServiceSelector)
+		headlessService := e2eservice.CreateServiceSpec(serviceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
 		framework.ExpectNoError(err, "failed to create headless service: %s", serviceName)
 
@@ -289,8 +302,9 @@ var _ = SIGDescribe("DNS", func() {
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", podHostname, serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		subdomain := fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		namesToResolve := []string{hostFQDN, subdomain}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		// TODO: Validate both IPv4 and IPv6 families for dual-stack
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -314,7 +328,7 @@ var _ = SIGDescribe("DNS", func() {
 		// Create a test ExternalName service.
 		ginkgo.By("Creating a test externalName service")
 		serviceName := "dns-test-service-3"
-		externalNameService := framework.CreateServiceSpec(serviceName, "foo.example.com", false, nil)
+		externalNameService := e2eservice.CreateServiceSpec(serviceName, "foo.example.com", false, nil)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(externalNameService)
 		framework.ExpectNoError(err, "failed to create ExternalName service: %s", serviceName)
 
@@ -337,7 +351,7 @@ var _ = SIGDescribe("DNS", func() {
 
 		// Test changing the externalName field
 		ginkgo.By("changing the externalName to bar.example.com")
-		_, err = framework.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
+		_, err = e2eservice.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
 			s.Spec.ExternalName = "bar.example.com"
 		})
 		framework.ExpectNoError(err, "failed to change externalName of service: %s", serviceName)
@@ -354,15 +368,21 @@ var _ = SIGDescribe("DNS", func() {
 
 		// Test changing type from ExternalName to ClusterIP
 		ginkgo.By("changing the service to type=ClusterIP")
-		_, err = framework.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
+		_, err = e2eservice.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeClusterIP
 			s.Spec.Ports = []v1.ServicePort{
 				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP},
 			}
 		})
 		framework.ExpectNoError(err, "failed to change service type to ClusterIP for service: %s", serviceName)
-		wheezyProbeCmd, wheezyFileName = createTargetedProbeCommand(hostFQDN, "A", "wheezy")
-		jessieProbeCmd, jessieFileName = createTargetedProbeCommand(hostFQDN, "A", "jessie")
+		targetRecord := "A"
+		if framework.TestContext.ClusterIsIPv6() {
+			targetRecord = "AAAA"
+		}
+		// TODO: For dual stack we can run from here two createTargetedProbeCommand()
+		// one looking for an A record and another one for an AAAA record
+		wheezyProbeCmd, wheezyFileName = createTargetedProbeCommand(hostFQDN, targetRecord, "wheezy")
+		jessieProbeCmd, jessieFileName = createTargetedProbeCommand(hostFQDN, targetRecord, "jessie")
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -376,7 +396,13 @@ var _ = SIGDescribe("DNS", func() {
 		validateTargetedProbeOutput(f, pod3, []string{wheezyFileName, jessieFileName}, svc.Spec.ClusterIP)
 	})
 
-	ginkgo.It("should support configurable pod DNS nameservers", func() {
+	/*
+		Release: v1.17
+		Testname: DNS, custom dnsConfig
+		Description: Create a Pod with DNSPolicy as None and custom DNS configuration, specifying nameservers and search path entries.
+		Pod creation MUST be successful and provided DNS configuration MUST be configured in the Pod.
+	*/
+	framework.ConformanceIt("should support configurable pod DNS nameservers", func() {
 		ginkgo.By("Creating a pod with dnsPolicy=None and customized dnsConfig...")
 		testServerIP := "1.1.1.1"
 		testSearchPath := "resolv.conf.local"
@@ -388,14 +414,14 @@ var _ = SIGDescribe("DNS", func() {
 		}
 		testAgnhostPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testAgnhostPod)
 		framework.ExpectNoError(err, "failed to create pod: %s", testAgnhostPod.Name)
-		e2elog.Logf("Created pod %v", testAgnhostPod)
+		framework.Logf("Created pod %v", testAgnhostPod)
 		defer func() {
-			e2elog.Logf("Deleting pod %s...", testAgnhostPod.Name)
+			framework.Logf("Deleting pod %s...", testAgnhostPod.Name)
 			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(testAgnhostPod.Name, metav1.NewDeleteOptions(0)); err != nil {
-				e2elog.Failf("ginkgo.Failed to delete pod %s: %v", testAgnhostPod.Name, err)
+				framework.Failf("ginkgo.Failed to delete pod %s: %v", testAgnhostPod.Name, err)
 			}
 		}()
-		err = f.WaitForPodRunning(testAgnhostPod.Name)
+		err = f.WaitForPodReady(testAgnhostPod.Name)
 		framework.ExpectNoError(err, "failed to wait for pod %s to be running", testAgnhostPod.Name)
 
 		runCommand := func(arg string) string {
@@ -415,13 +441,13 @@ var _ = SIGDescribe("DNS", func() {
 		ginkgo.By("Verifying customized DNS suffix list is configured on pod...")
 		stdout := runCommand("dns-suffix")
 		if !strings.Contains(stdout, testSearchPath) {
-			e2elog.Failf("customized DNS suffix list not found configured in pod, expected to contain: %s, got: %s", testSearchPath, stdout)
+			framework.Failf("customized DNS suffix list not found configured in pod, expected to contain: %s, got: %s", testSearchPath, stdout)
 		}
 
 		ginkgo.By("Verifying customized DNS server is configured on pod...")
 		stdout = runCommand("dns-server-list")
 		if !strings.Contains(stdout, testServerIP) {
-			e2elog.Failf("customized DNS server not found in configured in pod, expected to contain: %s, got: %s", testServerIP, stdout)
+			framework.Failf("customized DNS server not found in configured in pod, expected to contain: %s, got: %s", testServerIP, stdout)
 		}
 	})
 
@@ -437,11 +463,11 @@ var _ = SIGDescribe("DNS", func() {
 		})
 		testServerPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testServerPod)
 		framework.ExpectNoError(err, "failed to create pod: %s", testServerPod.Name)
-		e2elog.Logf("Created pod %v", testServerPod)
+		framework.Logf("Created pod %v", testServerPod)
 		defer func() {
-			e2elog.Logf("Deleting pod %s...", testServerPod.Name)
+			framework.Logf("Deleting pod %s...", testServerPod.Name)
 			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(testServerPod.Name, metav1.NewDeleteOptions(0)); err != nil {
-				e2elog.Failf("ginkgo.Failed to delete pod %s: %v", testServerPod.Name, err)
+				framework.Failf("ginkgo.Failed to delete pod %s: %v", testServerPod.Name, err)
 			}
 		}()
 		err = f.WaitForPodRunning(testServerPod.Name)
@@ -451,7 +477,7 @@ var _ = SIGDescribe("DNS", func() {
 		testServerPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(testServerPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get pod %v", testServerPod.Name)
 		testServerIP := testServerPod.Status.PodIP
-		e2elog.Logf("testServerIP is %s", testServerIP)
+		framework.Logf("testServerIP is %s", testServerIP)
 
 		ginkgo.By("Creating a pod with dnsPolicy=None and customized dnsConfig...")
 		testUtilsPod := generateDNSUtilsPod()
@@ -469,11 +495,11 @@ var _ = SIGDescribe("DNS", func() {
 		}
 		testUtilsPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testUtilsPod)
 		framework.ExpectNoError(err, "failed to create pod: %s", testUtilsPod.Name)
-		e2elog.Logf("Created pod %v", testUtilsPod)
+		framework.Logf("Created pod %v", testUtilsPod)
 		defer func() {
-			e2elog.Logf("Deleting pod %s...", testUtilsPod.Name)
+			framework.Logf("Deleting pod %s...", testUtilsPod.Name)
 			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(testUtilsPod.Name, metav1.NewDeleteOptions(0)); err != nil {
-				e2elog.Failf("ginkgo.Failed to delete pod %s: %v", testUtilsPod.Name, err)
+				framework.Failf("ginkgo.Failed to delete pod %s: %v", testUtilsPod.Name, err)
 			}
 		}()
 		err = f.WaitForPodRunning(testUtilsPod.Name)
@@ -492,7 +518,7 @@ var _ = SIGDescribe("DNS", func() {
 		})
 		framework.ExpectNoError(err, "failed to examine resolv,conf file on pod, stdout: %v, stderr: %v, err: %v", stdout, stderr, err)
 		if !strings.Contains(stdout, "ndots:2") {
-			e2elog.Failf("customized DNS options not found in resolv.conf, got: %s", stdout)
+			framework.Failf("customized DNS options not found in resolv.conf, got: %s", stdout)
 		}
 
 		ginkgo.By("Verifying customized name server and search path are working...")
@@ -511,12 +537,12 @@ var _ = SIGDescribe("DNS", func() {
 				CaptureStderr: true,
 			})
 			if err != nil {
-				e2elog.Logf("ginkgo.Failed to execute dig command, stdout:%v, stderr: %v, err: %v", stdout, stderr, err)
+				framework.Logf("ginkgo.Failed to execute dig command, stdout:%v, stderr: %v, err: %v", stdout, stderr, err)
 				return false, nil
 			}
 			res := strings.Split(stdout, "\n")
 			if len(res) != 1 || res[0] != testInjectedIP {
-				e2elog.Logf("Expect command `%v` to return %s, got: %v", cmd, testInjectedIP, res)
+				framework.Logf("Expect command `%v` to return %s, got: %v", cmd, testInjectedIP, res)
 				return false, nil
 			}
 			return true, nil

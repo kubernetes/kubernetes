@@ -18,10 +18,12 @@ package discovery
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog"
 )
 
 const APIGroupPrefix = "/apis"
@@ -36,9 +38,39 @@ func keepUnversioned(group string) bool {
 type stripVersionEncoder struct {
 	encoder    runtime.Encoder
 	serializer runtime.Serializer
+	identifier runtime.Identifier
+}
+
+func newStripVersionEncoder(e runtime.Encoder, s runtime.Serializer) runtime.Encoder {
+	return stripVersionEncoder{
+		encoder:    e,
+		serializer: s,
+		identifier: identifier(e),
+	}
+}
+
+func identifier(e runtime.Encoder) runtime.Identifier {
+	result := map[string]string{
+		"name": "stripVersion",
+	}
+	if e != nil {
+		result["encoder"] = string(e.Identifier())
+	}
+	identifier, err := json.Marshal(result)
+	if err != nil {
+		klog.Fatalf("Failed marshaling identifier for stripVersionEncoder: %v", err)
+	}
+	return runtime.Identifier(identifier)
 }
 
 func (c stripVersionEncoder) Encode(obj runtime.Object, w io.Writer) error {
+	if co, ok := obj.(runtime.CacheableObject); ok {
+		return co.CacheEncode(c.Identifier(), c.doEncode, w)
+	}
+	return c.doEncode(obj, w)
+}
+
+func (c stripVersionEncoder) doEncode(obj runtime.Object, w io.Writer) error {
 	buf := bytes.NewBuffer([]byte{})
 	err := c.encoder.Encode(obj, buf)
 	if err != nil {
@@ -52,6 +84,11 @@ func (c stripVersionEncoder) Encode(obj runtime.Object, w io.Writer) error {
 	gvk.Version = ""
 	roundTrippedObj.GetObjectKind().SetGroupVersionKind(*gvk)
 	return c.serializer.Encode(roundTrippedObj, w)
+}
+
+// Identifier implements runtime.Encoder interface.
+func (c stripVersionEncoder) Identifier() runtime.Identifier {
+	return c.identifier
 }
 
 // stripVersionNegotiatedSerializer will return stripVersionEncoder when
@@ -69,5 +106,5 @@ func (n stripVersionNegotiatedSerializer) EncoderForVersion(encoder runtime.Enco
 		panic(fmt.Sprintf("Unable to extract serializer from %#v", encoder))
 	}
 	versioned := n.NegotiatedSerializer.EncoderForVersion(encoder, gv)
-	return stripVersionEncoder{versioned, serializer}
+	return newStripVersionEncoder(versioned, serializer)
 }

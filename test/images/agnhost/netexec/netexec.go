@@ -288,7 +288,7 @@ func dialUDP(request string, remoteAddress *net.UDPAddr) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("udp connection write failed. err:%v", err)
 	}
-	udpResponse := make([]byte, 1024)
+	udpResponse := make([]byte, 2048)
 	Conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	count, err := Conn.Read(udpResponse)
 	if err != nil || count == 0 {
@@ -393,7 +393,7 @@ func startUDPServer(udpPort int) {
 	serverConn, err := net.ListenUDP("udp", serverAddress)
 	assertNoError(err)
 	defer serverConn.Close()
-	buf := make([]byte, 1024)
+	buf := make([]byte, 2048)
 
 	log.Printf("Started UDP server")
 	// Start responding to readiness probes.

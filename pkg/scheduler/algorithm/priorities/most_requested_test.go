@@ -20,11 +20,11 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 func TestMostRequested(t *testing.T) {
@@ -108,58 +108,58 @@ func TestMostRequested(t *testing.T) {
 		pod          *v1.Pod
 		pods         []*v1.Pod
 		nodes        []*v1.Node
-		expectedList schedulerapi.HostPriorityList
+		expectedList framework.NodeScoreList
 		name         string
 	}{
 		{
 			/*
 				Node1 scores (used resources) on 0-10 scale
-				CPU Score: (0 * 10  / 4000 = 0
-				Memory Score: (0 * 10) / 10000 = 0
+				CPU Score: (0 * 100)  / 4000 = 0
+				Memory Score: (0 * 100) / 10000 = 0
 				Node1 Score: (0 + 0) / 2 = 0
 
 				Node2 scores (used resources) on 0-10 scale
-				CPU Score: (0 * 10 / 4000 = 0
-				Memory Score: (0 * 10 / 10000 = 0
+				CPU Score: (0 * 100) / 4000 = 0
+				Memory Score: (0 * 100) / 10000 = 0
 				Node2 Score: (0 + 0) / 2 = 0
 			*/
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
 			name:         "nothing scheduled, nothing requested",
 		},
 		{
 			/*
 				Node1 scores on 0-10 scale
-				CPU Score: (3000 * 10 / 4000 = 7.5
-				Memory Score: (5000 * 10) / 10000 = 5
-				Node1 Score: (7.5 + 5) / 2 = 6
+				CPU Score: (3000 * 100) / 4000 = 75
+				Memory Score: (5000 * 100) / 10000 = 50
+				Node1 Score: (75 + 50) / 2 = 6
 
 				Node2 scores on 0-10 scale
-				CPU Score: (3000 * 10 / 6000 = 5
-				Memory Score: (5000 * 10 / 10000 = 5
-				Node2 Score: (5 + 5) / 2 = 5
+				CPU Score: (3000 * 100) / 6000 = 50
+				Memory Score: (5000 * 100) / 10000 = 50
+				Node2 Score: (50 + 50) / 2 = 50
 			*/
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 6}, {Host: "machine2", Score: 5}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 62}, {Name: "machine2", Score: 50}},
 			name:         "nothing scheduled, resources requested, differently sized machines",
 		},
 		{
 			/*
 				Node1 scores on 0-10 scale
-				CPU Score: (6000 * 10) / 10000 = 6
-				Memory Score: (0 * 10) / 20000 = 10
-				Node1 Score: (6 + 0) / 2 = 3
+				CPU Score: (6000 * 100) / 10000 = 60
+				Memory Score: (0 * 100) / 20000 = 100
+				Node1 Score: (60 + 0) / 2 = 30
 
 				Node2 scores on 0-10 scale
-				CPU Score: (6000 * 10) / 10000 = 6
-				Memory Score: (5000 * 10) / 20000 = 2.5
-				Node2 Score: (6 + 2.5) / 2 = 4
+				CPU Score: (6000 * 100) / 10000 = 60
+				Memory Score: (5000 * 100) / 20000 = 25
+				Node2 Score: (60 + 25) / 2 = 42
 			*/
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 3}, {Host: "machine2", Score: 4}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 30}, {Name: "machine2", Score: 42}},
 			name:         "no resources requested, pods scheduled with resources",
 			pods: []*v1.Pod{
 				{Spec: cpuOnly, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
@@ -171,18 +171,18 @@ func TestMostRequested(t *testing.T) {
 		{
 			/*
 				Node1 scores on 0-10 scale
-				CPU Score: (6000 * 10) / 10000 = 6
-				Memory Score: (5000 * 10) / 20000 = 2.5
-				Node1 Score: (6 + 2.5) / 2 = 4
+				CPU Score: (6000 * 100) / 10000 = 60
+				Memory Score: (5000 * 100) / 20000 = 25
+				Node1 Score: (60 + 25) / 2 = 42
 
 				Node2 scores on 0-10 scale
-				CPU Score: (6000 * 10) / 10000 = 6
-				Memory Score: (10000 * 10) / 20000 = 5
-				Node2 Score: (6 + 5) / 2 = 5
+				CPU Score: (6000 * 100) / 10000 = 60
+				Memory Score: (10000 * 100) / 20000 = 50
+				Node2 Score: (60 + 50) / 2 = 55
 			*/
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 4}, {Host: "machine2", Score: 5}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 42}, {Name: "machine2", Score: 55}},
 			name:         "resources requested, pods scheduled with resources",
 			pods: []*v1.Pod{
 				{Spec: cpuOnly},
@@ -193,25 +193,25 @@ func TestMostRequested(t *testing.T) {
 			/*
 				Node1 scores on 0-10 scale
 				CPU Score: 5000 > 4000 return 0
-				Memory Score: (9000 * 10) / 10000 = 9
-				Node1 Score: (0 + 9) / 2 = 4
+				Memory Score: (9000 * 100) / 10000 = 90
+				Node1 Score: (0 + 90) / 2 = 45
 
 				Node2 scores on 0-10 scale
-				CPU Score: (5000 * 10) / 10000 = 5
+				CPU Score: (5000 * 100) / 10000 = 50
 				Memory Score: 9000 > 8000 return 0
-				Node2 Score: (5 + 0) / 2 = 2
+				Node2 Score: (50 + 0) / 2 = 25
 			*/
 			pod:          &v1.Pod{Spec: bigCPUAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 10000, 8000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 4}, {Host: "machine2", Score: 2}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 45}, {Name: "machine2", Score: 25}},
 			name:         "resources requested with more than the node, pods scheduled with resources",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
-			list, err := priorityFunction(MostRequestedPriorityMap, nil, nil)(test.pod, nodeNameToInfo, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
+			list, err := runMapReducePriority(MostRequestedPriorityMap, nil, nil, test.pod, snapshot, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

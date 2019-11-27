@@ -23,8 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
-
-	"github.com/onsi/ginkgo"
 )
 
 const (
@@ -54,7 +52,7 @@ func NumberOfSampleResources(node *v1.Node) int64 {
 
 // GetSampleDevicePluginPod returns the Device Plugin pod for sample resources in e2e tests
 func GetSampleDevicePluginPod() *v1.Pod {
-	ds := ReadDaemonSetV1OrDie(testfiles.ReadOrDie(sampleDevicePluginDSYAML, ginkgo.Fail))
+	ds := ReadDaemonSetV1OrDie(testfiles.ReadOrDie(sampleDevicePluginDSYAML))
 	p := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      sampleDevicePluginName,

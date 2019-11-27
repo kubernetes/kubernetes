@@ -74,7 +74,11 @@ else
     prepare-e2e
 
     detect-master >/dev/null
-    KUBE_MASTER_URL="${KUBE_MASTER_URL:-https://${KUBE_MASTER_IP:-}}"
+
+    KUBE_MASTER_URL="${KUBE_MASTER_URL:-}"
+    if [[ -z "${KUBE_MASTER_URL:-}" && -n "${KUBE_MASTER_IP:-}" ]]; then
+      KUBE_MASTER_URL="https://${KUBE_MASTER_IP}"
+    fi
 
     auth_config=(
       "--kubeconfig=${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
@@ -163,7 +167,6 @@ export PATH
   --node-tag="${NODE_TAG:-}" \
   --master-tag="${MASTER_TAG:-}" \
   --cluster-monitoring-mode="${KUBE_ENABLE_CLUSTER_MONITORING:-standalone}" \
-  --prometheus-monitoring="${KUBE_ENABLE_PROMETHEUS_MONITORING:-false}" \
   --dns-domain="${KUBE_DNS_DOMAIN:-cluster.local}" \
   --ginkgo.slowSpecThreshold="${GINKGO_SLOW_SPEC_THRESHOLD:-300}" \
   ${KUBE_CONTAINER_RUNTIME:+"--container-runtime=${KUBE_CONTAINER_RUNTIME}"} \

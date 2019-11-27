@@ -35,22 +35,39 @@ type Pattern struct {
 	tailLen int
 	// verb is the VERB part of the path pattern. It is empty if the pattern does not have VERB part.
 	verb string
+	// assumeColonVerb indicates whether a path suffix after a final
+	// colon may only be interpreted as a verb.
+	assumeColonVerb bool
 }
+
+type patternOptions struct {
+	assumeColonVerb bool
+}
+
+// PatternOpt is an option for creating Patterns.
+type PatternOpt func(*patternOptions)
 
 // NewPattern returns a new Pattern from the given definition values.
 // "ops" is a sequence of op codes. "pool" is a constant pool.
 // "verb" is the verb part of the pattern. It is empty if the pattern does not have the part.
 // "version" must be 1 for now.
 // It returns an error if the given definition is invalid.
-func NewPattern(version int, ops []int, pool []string, verb string) (Pattern, error) {
+func NewPattern(version int, ops []int, pool []string, verb string, opts ...PatternOpt) (Pattern, error) {
+	options := patternOptions{
+		assumeColonVerb: true,
+	}
+	for _, o := range opts {
+		o(&options)
+	}
+
 	if version != 1 {
-		grpclog.Printf("unsupported version: %d", version)
+		grpclog.Infof("unsupported version: %d", version)
 		return Pattern{}, ErrInvalidPattern
 	}
 
 	l := len(ops)
 	if l%2 != 0 {
-		grpclog.Printf("odd number of ops codes: %d", l)
+		grpclog.Infof("odd number of ops codes: %d", l)
 		return Pattern{}, ErrInvalidPattern
 	}
 
@@ -73,14 +90,14 @@ func NewPattern(version int, ops []int, pool []string, verb string) (Pattern, er
 			stack++
 		case utilities.OpPushM:
 			if pushMSeen {
-				grpclog.Printf("pushM appears twice")
+				grpclog.Infof("pushM appears twice")
 				return Pattern{}, ErrInvalidPattern
 			}
 			pushMSeen = true
 			stack++
 		case utilities.OpLitPush:
 			if op.operand < 0 || len(pool) <= op.operand {
-				grpclog.Printf("negative literal index: %d", op.operand)
+				grpclog.Infof("negative literal index: %d", op.operand)
 				return Pattern{}, ErrInvalidPattern
 			}
 			if pushMSeen {
@@ -89,7 +106,7 @@ func NewPattern(version int, ops []int, pool []string, verb string) (Pattern, er
 			stack++
 		case utilities.OpConcatN:
 			if op.operand <= 0 {
-				grpclog.Printf("negative concat size: %d", op.operand)
+				grpclog.Infof("negative concat size: %d", op.operand)
 				return Pattern{}, ErrInvalidPattern
 			}
 			stack -= op.operand
@@ -100,7 +117,7 @@ func NewPattern(version int, ops []int, pool []string, verb string) (Pattern, er
 			stack++
 		case utilities.OpCapture:
 			if op.operand < 0 || len(pool) <= op.operand {
-				grpclog.Printf("variable name index out of bound: %d", op.operand)
+				grpclog.Infof("variable name index out of bound: %d", op.operand)
 				return Pattern{}, ErrInvalidPattern
 			}
 			v := pool[op.operand]
@@ -108,11 +125,11 @@ func NewPattern(version int, ops []int, pool []string, verb string) (Pattern, er
 			vars = append(vars, v)
 			stack--
 			if stack < 0 {
-				grpclog.Printf("stack underflow")
+				grpclog.Infof("stack underflow")
 				return Pattern{}, ErrInvalidPattern
 			}
 		default:
-			grpclog.Printf("invalid opcode: %d", op.code)
+			grpclog.Infof("invalid opcode: %d", op.code)
 			return Pattern{}, ErrInvalidPattern
 		}
 
@@ -122,12 +139,13 @@ func NewPattern(version int, ops []int, pool []string, verb string) (Pattern, er
 		typedOps = append(typedOps, op)
 	}
 	return Pattern{
-		ops:       typedOps,
-		pool:      pool,
-		vars:      vars,
-		stacksize: maxstack,
-		tailLen:   tailLen,
-		verb:      verb,
+		ops:             typedOps,
+		pool:            pool,
+		vars:            vars,
+		stacksize:       maxstack,
+		tailLen:         tailLen,
+		verb:            verb,
+		assumeColonVerb: options.assumeColonVerb,
 	}, nil
 }
 
@@ -144,7 +162,16 @@ func MustPattern(p Pattern, err error) Pattern {
 // If otherwise, the function returns an error.
 func (p Pattern) Match(components []string, verb string) (map[string]string, error) {
 	if p.verb != verb {
-		return nil, ErrNotMatch
+		if p.assumeColonVerb || p.verb != "" {
+			return nil, ErrNotMatch
+		}
+		if len(components) == 0 {
+			components = []string{":" + verb}
+		} else {
+			components = append([]string{}, components...)
+			components[len(components)-1] += ":" + verb
+		}
+		verb = ""
 	}
 
 	var pos int
@@ -224,4 +251,12 @@ func (p Pattern) String() string {
 		return fmt.Sprintf("/%s:%s", segs, p.verb)
 	}
 	return "/" + segs
+}
+
+// AssumeColonVerbOpt indicates whether a path suffix after a final
+// colon may only be interpreted as a verb.
+func AssumeColonVerbOpt(val bool) PatternOpt {
+	return PatternOpt(func(o *patternOptions) {
+		o.assumeColonVerb = val
+	})
 }

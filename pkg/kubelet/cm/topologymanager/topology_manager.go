@@ -17,10 +17,25 @@ limitations under the License.
 package topologymanager
 
 import (
+	"fmt"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
+	cputopology "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+)
+
+const (
+	// maxAllowableNUMANodes specifies the maximum number of NUMA Nodes that
+	// the TopologyManager supports on the underlying machine.
+	//
+	// At present, having more than this number of NUMA Nodes will result in a
+	// state explosion when trying to enumerate possible NUMAAffinity masks and
+	// generate hints for them. As such, if more NUMA Nodes than this are
+	// present on a machine and the TopologyManager is enabled, an error will
+	// be returned and the TopologyManager will not be loaded.
+	maxAllowableNUMANodes = 8
 )
 
 //Manager interface provides methods for Kubelet to manage pod topology hints
@@ -50,9 +65,18 @@ type manager struct {
 	policy Policy
 }
 
-//HintProvider interface is to be implemented by Hint Providers
+// HintProvider is an interface for components that want to collaborate to
+// achieve globally optimal concrete resource alignment with respect to
+// NUMA locality.
 type HintProvider interface {
-	GetTopologyHints(pod v1.Pod, container v1.Container) []TopologyHint
+	// GetTopologyHints returns a map of resource names to a list of possible
+	// concrete resource allocations in terms of NUMA locality hints. Each hint
+	// is optionally marked "preferred" and indicates the set of NUMA nodes
+	// involved in the hypothetical allocation. The topology manager calls
+	// this function for each hint provider, and merges the hints to produce
+	// a consensus "best" hint. The hint providers may subsequently query the
+	// topology manager to influence actual resource assignment.
+	GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]TopologyHint
 }
 
 //Store interface is to allow Hint Providers to retrieve pod affinity
@@ -60,35 +84,67 @@ type Store interface {
 	GetAffinity(podUID string, containerName string) TopologyHint
 }
 
-//TopologyHint is a struct containing a SocketMask for a Container
+//TopologyHint is a struct containing the NUMANodeAffinity for a Container
 type TopologyHint struct {
-	SocketAffinity socketmask.SocketMask
-	// Preferred is set to true when the SocketMask encodes a preferred
+	NUMANodeAffinity bitmask.BitMask
+	// Preferred is set to true when the NUMANodeAffinity encodes a preferred
 	// allocation for the Container. It is set to false otherwise.
 	Preferred bool
+}
+
+// IsEqual checks if TopologyHint are equal
+func (th *TopologyHint) IsEqual(topologyHint TopologyHint) bool {
+	if th.Preferred == topologyHint.Preferred {
+		if th.NUMANodeAffinity == nil || topologyHint.NUMANodeAffinity == nil {
+			return th.NUMANodeAffinity == topologyHint.NUMANodeAffinity
+		}
+		return th.NUMANodeAffinity.IsEqual(topologyHint.NUMANodeAffinity)
+	}
+	return false
+}
+
+// LessThan checks if TopologyHint `a` is less than TopologyHint `b`
+// this means that either `a` is a preferred hint and `b` is not
+// or `a` NUMANodeAffinity attribute is narrower than `b` NUMANodeAffinity attribute.
+func (th *TopologyHint) LessThan(other TopologyHint) bool {
+	if th.Preferred != other.Preferred {
+		return th.Preferred == true
+	}
+	return th.NUMANodeAffinity.IsNarrowerThan(other.NUMANodeAffinity)
 }
 
 var _ Manager = &manager{}
 
 //NewManager creates a new TopologyManager based on provided policy
-func NewManager(topologyPolicyName string) Manager {
+func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string) (Manager, error) {
 	klog.Infof("[topologymanager] Creating topology manager with %s policy", topologyPolicyName)
-	var policy Policy
 
+	var numaNodes []int
+	for node := range numaNodeInfo {
+		numaNodes = append(numaNodes, node)
+	}
+
+	if len(numaNodes) > maxAllowableNUMANodes {
+		return nil, fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", maxAllowableNUMANodes)
+	}
+
+	var policy Policy
 	switch topologyPolicyName {
 
 	case PolicyNone:
 		policy = NewNonePolicy()
 
-	case PolicyPreferred:
-		policy = NewPreferredPolicy()
+	case PolicyBestEffort:
+		policy = NewBestEffortPolicy(numaNodes)
 
-	case PolicyStrict:
-		policy = NewStrictPolicy()
+	case PolicyRestricted:
+		policy = NewRestrictedPolicy(numaNodes)
+
+	case PolicySingleNumaNode:
+		policy = NewSingleNumaNodePolicy(numaNodes)
 
 	default:
-		klog.Errorf("[topologymanager] Unknown policy %s, using default policy %s", topologyPolicyName, PolicyNone)
-		policy = NewNonePolicy()
+		return nil, fmt.Errorf("unknown policy: \"%s\"", topologyPolicyName)
 	}
 
 	var hp []HintProvider
@@ -101,144 +157,31 @@ func NewManager(topologyPolicyName string) Manager {
 		policy:           policy,
 	}
 
-	return manager
+	return manager, nil
 }
 
 func (m *manager) GetAffinity(podUID string, containerName string) TopologyHint {
 	return m.podTopologyHints[podUID][containerName]
 }
 
-// Iterate over all permutations of hints in 'allProviderHints [][]TopologyHint'.
-//
-// This procedure is implemented as a recursive function over the set of hints
-// in 'allproviderHints[i]'. It applies the function 'callback' to each
-// permutation as it is found. It is the equivalent of:
-//
-// for i := 0; i < len(providerHints[0]); i++
-//     for j := 0; j < len(providerHints[1]); j++
-//         for k := 0; k < len(providerHints[2]); k++
-//             ...
-//             for z := 0; z < len(providerHints[-1]); z++
-//                 permutation := []TopologyHint{
-//                     providerHints[0][i],
-//                     providerHints[1][j],
-//                     providerHints[2][k],
-//                     ...
-//                     provideryHints[-1][z]
-//                 }
-//                 callback(permutation)
-func (m *manager) iterateAllProviderTopologyHints(allProviderHints [][]TopologyHint, callback func([]TopologyHint)) {
-	// Internal helper function to accumulate the permutation before calling the callback.
-	var iterate func(i int, accum []TopologyHint)
-	iterate = func(i int, accum []TopologyHint) {
-		// Base case: we have looped through all providers and have a full permutation.
-		if i == len(allProviderHints) {
-			callback(accum)
-			return
-		}
-
-		// Loop through all hints for provider 'i', and recurse to build the
-		// the permutation of this hint with all hints from providers 'i++'.
-		for j := range allProviderHints[i] {
-			iterate(i+1, append(accum, allProviderHints[i][j]))
-		}
-	}
-	iterate(0, []TopologyHint{})
-}
-
-// Merge the hints from all hint providers to find the best one.
-func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) TopologyHint {
-	// Set the default hint to return from this function as an any-socket
-	// affinity with an unpreferred allocation. This will only be returned if
-	// no better hint can be found when merging hints from each hint provider.
-	defaultAffinity, _ := socketmask.NewSocketMask()
-	defaultAffinity.Fill()
-	defaultHint := TopologyHint{defaultAffinity, false}
-
+func (m *manager) accumulateProvidersHints(pod v1.Pod, container v1.Container) (providersHints []map[string][]TopologyHint) {
 	// Loop through all hint providers and save an accumulated list of the
-	// hints returned by each hint provider. If no hints are provided, assume
-	// that provider has no preference for topology-aware allocation.
-	var allProviderHints [][]TopologyHint
+	// hints returned by each hint provider.
 	for _, provider := range m.hintProviders {
 		// Get the TopologyHints from a provider.
 		hints := provider.GetTopologyHints(pod, container)
-
-		// If hints is nil, overwrite 'hints' with a preferred any-socket affinity.
-		if hints == nil || len(hints) == 0 {
-			klog.Infof("[topologymanager] Hint Provider has no preference for socket affinity")
-			affinity, _ := socketmask.NewSocketMask()
-			affinity.Fill()
-			hints = []TopologyHint{{affinity, true}}
-		}
-
-		// Accumulate the sorted hints into a [][]TopologyHint slice
-		allProviderHints = append(allProviderHints, hints)
+		providersHints = append(providersHints, hints)
+		klog.Infof("[topologymanager] TopologyHints for pod '%v', container '%v': %v", pod.Name, container.Name, hints)
 	}
+	return providersHints
+}
 
-	// Iterate over all permutations of hints in 'allProviderHints'. Merge the
-	// hints in each permutation by taking the bitwise-and of their affinity masks.
-	// Return the hint with the narrowest SocketAffinity of all merged
-	// permutations that have at least one socket set. If no merged mask can be
-	// found that has at least one socket set, return the 'defaultHint'.
-	bestHint := defaultHint
-	m.iterateAllProviderTopologyHints(allProviderHints, func(permutation []TopologyHint) {
-		// Get the SocketAffinity from each hint in the permutation and see if any
-		// of them encode unpreferred allocations.
-		preferred := true
-		var socketAffinities []socketmask.SocketMask
-		for _, hint := range permutation {
-			// Only consider hints that have an actual SocketAffinity set.
-			if hint.SocketAffinity != nil {
-				if !hint.Preferred {
-					preferred = false
-				}
-				socketAffinities = append(socketAffinities, hint.SocketAffinity)
-			}
-		}
-
-		// Merge the affinities using a bitwise-and operation.
-		mergedAffinity, _ := socketmask.NewSocketMask()
-		mergedAffinity.Fill()
-		mergedAffinity.And(socketAffinities...)
-
-		// Build a mergedHintfrom the merged affinity mask, indicating if an
-		// preferred allocation was used to generate the affinity mask or not.
-		mergedHint := TopologyHint{mergedAffinity, preferred}
-
-		// Only consider mergedHints that result in a SocketAffinity > 0 to
-		// replace the current bestHint.
-		if mergedHint.SocketAffinity.Count() == 0 {
-			return
-		}
-
-		// If the current bestHint is non-preferred and the new mergedHint is
-		// preferred, always choose the preferred hint over the non-preferred one.
-		if mergedHint.Preferred && !bestHint.Preferred {
-			bestHint = mergedHint
-			return
-		}
-
-		// If the current bestHint is preferred and the new mergedHint is
-		// non-preferred, never update bestHint, regardless of mergedHint's
-		// narowness.
-		if !mergedHint.Preferred && bestHint.Preferred {
-			return
-		}
-
-		// If mergedHint and bestHint has the same preference, only consider
-		// mergedHints that have a narrower SocketAffinity than the
-		// SocketAffinity in the current bestHint.
-		if !mergedHint.SocketAffinity.IsNarrowerThan(bestHint.SocketAffinity) {
-			return
-		}
-
-		// In all other cases, update bestHint to the current mergedHint
-		bestHint = mergedHint
-	})
-
+// Collect Hints from hint providers and pass to policy to retrieve the best one.
+func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) (TopologyHint, lifecycle.PodAdmitResult) {
+	providersHints := m.accumulateProvidersHints(pod, container)
+	bestHint, admit := m.policy.Merge(providersHints)
 	klog.Infof("[topologymanager] ContainerTopologyHint: %v", bestHint)
-
-	return bestHint
+	return bestHint, admit
 }
 
 func (m *manager) AddHintProvider(h HintProvider) {
@@ -268,23 +211,16 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 	}
 	pod := attrs.Pod
 	c := make(map[string]TopologyHint)
-	klog.Infof("[topologymanager] Pod QoS Level: %v", pod.Status.QOSClass)
 
-	if pod.Status.QOSClass == v1.PodQOSGuaranteed {
-		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			result := m.calculateAffinity(*pod, container)
-			admitPod := m.policy.CanAdmitPodResult(result.Preferred)
-			if admitPod.Admit == false {
-				return admitPod
-			}
-			c[container.Name] = result
+	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		result, admitPod := m.calculateAffinity(*pod, container)
+		if !admitPod.Admit {
+			return admitPod
 		}
-		m.podTopologyHints[string(pod.UID)] = c
-		klog.Infof("[topologymanager] Topology Affinity for Pod: %v are %v", pod.UID, m.podTopologyHints[string(pod.UID)])
-
-	} else {
-		klog.Infof("[topologymanager] Topology Manager only affinitises Guaranteed pods.")
+		c[container.Name] = result
 	}
+	m.podTopologyHints[string(pod.UID)] = c
+	klog.Infof("[topologymanager] Topology Affinity for Pod: %v are %v", pod.UID, m.podTopologyHints[string(pod.UID)])
 
 	return lifecycle.PodAdmitResult{
 		Admit: true,

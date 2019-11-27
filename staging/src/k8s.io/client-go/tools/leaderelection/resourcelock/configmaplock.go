@@ -41,22 +41,23 @@ type ConfigMapLock struct {
 }
 
 // Get returns the election record from a ConfigMap Annotation
-func (cml *ConfigMapLock) Get() (*LeaderElectionRecord, error) {
+func (cml *ConfigMapLock) Get() (*LeaderElectionRecord, []byte, error) {
 	var record LeaderElectionRecord
 	var err error
 	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Get(cml.ConfigMapMeta.Name, metav1.GetOptions{})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if cml.cm.Annotations == nil {
 		cml.cm.Annotations = make(map[string]string)
 	}
-	if recordBytes, found := cml.cm.Annotations[LeaderElectionRecordAnnotationKey]; found {
+	recordBytes, found := cml.cm.Annotations[LeaderElectionRecordAnnotationKey]
+	if found {
 		if err := json.Unmarshal([]byte(recordBytes), &record); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
-	return &record, nil
+	return &record, []byte(recordBytes), nil
 }
 
 // Create attempts to create a LeaderElectionRecord annotation
@@ -106,7 +107,7 @@ func (cml *ConfigMapLock) Describe() string {
 	return fmt.Sprintf("%v/%v", cml.ConfigMapMeta.Namespace, cml.ConfigMapMeta.Name)
 }
 
-// returns the Identity of the lock
+// Identity returns the Identity of the lock
 func (cml *ConfigMapLock) Identity() string {
 	return cml.LockConfig.Identity
 }

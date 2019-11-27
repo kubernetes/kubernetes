@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/klog"
@@ -78,7 +79,7 @@ var (
 	csiNodeResource   = storageapi.Resource("csinodes")
 )
 
-func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	nodeName, isNode := r.identifier.NodeIdentity(attrs.GetUser())
 	if !isNode {
 		// reject requests from non-nodes
@@ -115,10 +116,7 @@ func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Deci
 			}
 			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.TokenRequest), nil
 		case leaseResource:
-			if r.features.Enabled(features.NodeLease) {
-				return r.authorizeLease(nodeName, attrs)
-			}
-			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.NodeLease), nil
+			return r.authorizeLease(nodeName, attrs)
 		case csiNodeResource:
 			if r.features.Enabled(features.CSINodeInfo) {
 				return r.authorizeCSINode(nodeName, attrs)

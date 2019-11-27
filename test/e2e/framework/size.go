@@ -19,13 +19,6 @@ package framework
 import (
 	"fmt"
 	"time"
-
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-)
-
-const (
-	resizeNodeReadyTimeout    = 2 * time.Minute
-	resizeNodeNotReadyTimeout = 2 * time.Minute
 )
 
 // ResizeGroup resizes an instance group
@@ -53,14 +46,14 @@ func WaitForGroupSize(group string, size int32) error {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
 		currentSize, err := GroupSize(group)
 		if err != nil {
-			e2elog.Logf("Failed to get node instance group size: %v", err)
+			Logf("Failed to get node instance group size: %v", err)
 			continue
 		}
 		if currentSize != int(size) {
-			e2elog.Logf("Waiting for node instance group size %d, current size %d", size, currentSize)
+			Logf("Waiting for node instance group size %d, current size %d", size, currentSize)
 			continue
 		}
-		e2elog.Logf("Node instance group has reached the desired size %d", size)
+		Logf("Node instance group has reached the desired size %d", size)
 		return nil
 	}
 	return fmt.Errorf("timeout waiting %v for node instance group size to be %d", timeout, size)

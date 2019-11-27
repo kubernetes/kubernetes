@@ -15,6 +15,7 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
+        "//test/e2e/framework/pv:go_default_library",
         "//test/e2e/storage/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",

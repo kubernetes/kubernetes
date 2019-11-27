@@ -316,29 +316,29 @@ func (p *criStatsProvider) ImageFsStats() (*statsapi.FsStats, error) {
 	// return the first one.
 	//
 	// TODO(yguo0905): Support returning stats of multiple image filesystems.
-	for _, fs := range resp {
-		s := &statsapi.FsStats{
-			Time:      metav1.NewTime(time.Unix(0, fs.Timestamp)),
-			UsedBytes: &fs.UsedBytes.Value,
-		}
-		if fs.InodesUsed != nil {
-			s.InodesUsed = &fs.InodesUsed.Value
-		}
-		imageFsInfo := p.getFsInfo(fs.GetFsId())
-		if imageFsInfo != nil {
-			// The image filesystem id is unknown to the local node or there's
-			// an error on retrieving the stats. In these cases, we omit those
-			// stats and return the best-effort partial result. See
-			// https://github.com/kubernetes/heapster/issues/1793.
-			s.AvailableBytes = &imageFsInfo.Available
-			s.CapacityBytes = &imageFsInfo.Capacity
-			s.InodesFree = imageFsInfo.InodesFree
-			s.Inodes = imageFsInfo.Inodes
-		}
-		return s, nil
+	if len(resp) == 0 {
+		return nil, fmt.Errorf("imageFs information is unavailable")
 	}
-
-	return nil, fmt.Errorf("imageFs information is unavailable")
+	fs := resp[0]
+	s := &statsapi.FsStats{
+		Time:      metav1.NewTime(time.Unix(0, fs.Timestamp)),
+		UsedBytes: &fs.UsedBytes.Value,
+	}
+	if fs.InodesUsed != nil {
+		s.InodesUsed = &fs.InodesUsed.Value
+	}
+	imageFsInfo := p.getFsInfo(fs.GetFsId())
+	if imageFsInfo != nil {
+		// The image filesystem id is unknown to the local node or there's
+		// an error on retrieving the stats. In these cases, we omit those
+		// stats and return the best-effort partial result. See
+		// https://github.com/kubernetes/heapster/issues/1793.
+		s.AvailableBytes = &imageFsInfo.Available
+		s.CapacityBytes = &imageFsInfo.Capacity
+		s.InodesFree = imageFsInfo.InodesFree
+		s.Inodes = imageFsInfo.Inodes
+	}
+	return s, nil
 }
 
 // ImageFsDevice returns name of the device where the image filesystem locates,
@@ -661,7 +661,8 @@ func (p *criStatsProvider) getAndUpdateContainerUsageNanoCores(stats *runtimeapi
 		if nanoSeconds <= 0 {
 			return nil, fmt.Errorf("zero or negative interval (%v - %v)", newStats.Timestamp, cachedStats.Timestamp)
 		}
-		usageNanoCores := (newStats.UsageCoreNanoSeconds.Value - cachedStats.UsageCoreNanoSeconds.Value) * uint64(time.Second/time.Nanosecond) / uint64(nanoSeconds)
+		usageNanoCores := uint64(float64(newStats.UsageCoreNanoSeconds.Value-cachedStats.UsageCoreNanoSeconds.Value) /
+			float64(nanoSeconds) * float64(time.Second/time.Nanosecond))
 
 		// Update cache with new value.
 		usageToUpdate := usageNanoCores
@@ -671,7 +672,7 @@ func (p *criStatsProvider) getAndUpdateContainerUsageNanoCores(stats *runtimeapi
 	}()
 
 	if err != nil {
-		// This should not happen. Log now to raise visiblity
+		// This should not happen. Log now to raise visibility
 		klog.Errorf("failed updating cpu usage nano core: %v", err)
 	}
 	return usage

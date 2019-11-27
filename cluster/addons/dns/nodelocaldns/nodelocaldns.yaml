@@ -22,7 +22,29 @@ metadata:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 ---
-
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-dns-upstream
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/name: "KubeDNSUpstream"
+spec:
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+    targetPort: 53
+  - name: dns-tcp
+    port: 53
+    protocol: TCP
+    targetPort: 53
+  selector:
+    k8s-app: kube-dns
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -40,8 +62,8 @@ data:
         }
         reload
         loop
-        bind __PILLAR__LOCAL__DNS__
-        forward . __PILLAR__DNS__SERVER__ {
+        bind __PILLAR__LOCAL__DNS__ __PILLAR__DNS__SERVER__
+        forward . __PILLAR__CLUSTER__DNS__ {
                 force_tcp
         }
         prometheus :9253
@@ -52,8 +74,8 @@ data:
         cache 30
         reload
         loop
-        bind __PILLAR__LOCAL__DNS__
-        forward . __PILLAR__DNS__SERVER__ {
+        bind __PILLAR__LOCAL__DNS__ __PILLAR__DNS__SERVER__
+        forward . __PILLAR__CLUSTER__DNS__ {
                 force_tcp
         }
         prometheus :9253
@@ -63,8 +85,8 @@ data:
         cache 30
         reload
         loop
-        bind __PILLAR__LOCAL__DNS__
-        forward . __PILLAR__DNS__SERVER__ {
+        bind __PILLAR__LOCAL__DNS__ __PILLAR__DNS__SERVER__
+        forward . __PILLAR__CLUSTER__DNS__ {
                 force_tcp
         }
         prometheus :9253
@@ -74,8 +96,8 @@ data:
         cache 30
         reload
         loop
-        bind __PILLAR__LOCAL__DNS__
-        forward . /etc/resolv.conf {
+        bind __PILLAR__LOCAL__DNS__ __PILLAR__DNS__SERVER__
+        forward . __PILLAR__UPSTREAM__SERVERS__ {
                 force_tcp
         }
         prometheus :9253
@@ -111,14 +133,12 @@ spec:
         operator: "Exists"
       containers:
       - name: node-cache
-        image: k8s.gcr.io/k8s-dns-node-cache:1.15.3
+        image: k8s.gcr.io/k8s-dns-node-cache:1.15.7
         resources:
-          limits:
-            memory: 30Mi
           requests:
             cpu: 25m
             memory: 5Mi
-        args: [ "-localip", "__PILLAR__LOCAL__DNS__", "-conf", "/etc/coredns/Corefile" ]
+        args: [ "-localip", "__PILLAR__LOCAL__DNS__,__PILLAR__DNS__SERVER__", "-conf", "/etc/Corefile", "-upstreamsvc", "kube-dns-upstream" ]
         securityContext:
           privileged: true
         ports:
@@ -144,14 +164,20 @@ spec:
           readOnly: false
         - name: config-volume
           mountPath: /etc/coredns
+        - name: kube-dns-config
+          mountPath: /etc/kube-dns
       volumes:
       - name: xtables-lock
         hostPath:
           path: /run/xtables.lock
           type: FileOrCreate
+      - name: kube-dns-config
+        configMap:
+          name: kube-dns
+          optional: true
       - name: config-volume
         configMap:
           name: node-local-dns
           items:
             - key: Corefile
-              path: Corefile
+              path: Corefile.base

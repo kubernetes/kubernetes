@@ -113,8 +113,17 @@ type Config struct {
 	// quickly replaced with a unique cert/key pair.
 	BootstrapKeyPEM []byte
 	// CertificateExpiration will record a metric that shows the remaining
-	// lifetime of the certificate.
+	// lifetime of the certificate. This metric is a gauge because only the
+	// current cert expiry time is really useful. Reading this metric at any
+	// time simply gives the next expiration date, no need to keep some
+	// history (histogram) of all previous expiry dates.
 	CertificateExpiration Gauge
+	// CertificateRotation will record a metric showing the time in seconds
+	// that certificates lived before being rotated. This metric is a histogram
+	// because there is value in keeping a history of rotation cadences. It
+	// allows one to setup monitoring and alerting of unexpected rotation
+	// behavior and track trends in rotation frequency.
+	CertificateRotation Histogram
 }
 
 // Store is responsible for getting and updating the current certificate.
@@ -137,6 +146,12 @@ type Store interface {
 // updated.
 type Gauge interface {
 	Set(float64)
+}
+
+// Histogram will record the time a rotated certificate was used before being
+// rotated.
+type Histogram interface {
+	Observe(float64)
 }
 
 // NoCertKeyError indicates there is no cert/key currently available.
@@ -163,6 +178,7 @@ type manager struct {
 	certStore Store
 
 	certificateExpiration Gauge
+	certificateRotation   Histogram
 
 	// the following variables must only be accessed under certAccessLock
 	certAccessLock sync.RWMutex
@@ -174,6 +190,9 @@ type manager struct {
 	clientFn         CSRClientFunc
 	stopCh           chan struct{}
 	stopped          bool
+
+	// Set to time.Now but can be stubbed out for testing
+	now func() time.Time
 }
 
 // NewManager returns a new certificate manager. A certificate manager is
@@ -203,6 +222,8 @@ func NewManager(config *Config) (Manager, error) {
 		cert:                  cert,
 		forceRotation:         forceRotation,
 		certificateExpiration: config.CertificateExpiration,
+		certificateRotation:   config.CertificateRotation,
+		now:                   time.Now,
 	}
 
 	return &m, nil
@@ -215,7 +236,7 @@ func NewManager(config *Config) (Manager, error) {
 func (m *manager) Current() *tls.Certificate {
 	m.certAccessLock.RLock()
 	defer m.certAccessLock.RUnlock()
-	if m.cert != nil && m.cert.Leaf != nil && time.Now().After(m.cert.Leaf.NotAfter) {
+	if m.cert != nil && m.cert.Leaf != nil && m.now().After(m.cert.Leaf.NotAfter) {
 		klog.V(2).Infof("Current certificate is expired.")
 		return nil
 	}
@@ -256,7 +277,7 @@ func (m *manager) Start() {
 	templateChanged := make(chan struct{})
 	go wait.Until(func() {
 		deadline := m.nextRotationDeadline()
-		if sleepInterval := deadline.Sub(time.Now()); sleepInterval > 0 {
+		if sleepInterval := deadline.Sub(m.now()); sleepInterval > 0 {
 			klog.V(2).Infof("Waiting %v for next certificate rotation", sleepInterval)
 
 			timer := time.NewTimer(sleepInterval)
@@ -421,7 +442,10 @@ func (m *manager) rotateCerts() (bool, error) {
 		return false, nil
 	}
 
-	m.updateCached(cert)
+	if old := m.updateCached(cert); old != nil && m.certificateRotation != nil {
+		m.certificateRotation.Observe(m.now().Sub(old.Leaf.NotBefore).Seconds())
+	}
+
 	return true, nil
 }
 
@@ -490,14 +514,14 @@ func (m *manager) nextRotationDeadline() time.Time {
 	// forceRotation is not protected by locks
 	if m.forceRotation {
 		m.forceRotation = false
-		return time.Now()
+		return m.now()
 	}
 
 	m.certAccessLock.RLock()
 	defer m.certAccessLock.RUnlock()
 
 	if !m.certSatisfiesTemplateLocked() {
-		return time.Now()
+		return m.now()
 	}
 
 	notAfter := m.cert.Leaf.NotAfter
@@ -523,13 +547,15 @@ var jitteryDuration = func(totalDuration float64) time.Duration {
 	return wait.Jitter(time.Duration(totalDuration), 0.2) - time.Duration(totalDuration*0.3)
 }
 
-// updateCached sets the most recent retrieved cert. It also sets the server
-// as assumed healthy.
-func (m *manager) updateCached(cert *tls.Certificate) {
+// updateCached sets the most recent retrieved cert and returns the old cert.
+// It also sets the server as assumed healthy.
+func (m *manager) updateCached(cert *tls.Certificate) *tls.Certificate {
 	m.certAccessLock.Lock()
 	defer m.certAccessLock.Unlock()
 	m.serverHealth = true
+	old := m.cert
 	m.cert = cert
+	return old
 }
 
 // updateServerError takes an error returned by the server and infers

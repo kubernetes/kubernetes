@@ -175,8 +175,8 @@ func checkAction(expected, actual core.Action, t *testing.T) {
 	}
 
 	switch a := actual.(type) {
-	case core.CreateAction:
-		e, _ := expected.(core.CreateAction)
+	case core.CreateActionImpl:
+		e, _ := expected.(core.CreateActionImpl)
 		expObject := e.GetObject()
 		object := a.GetObject()
 
@@ -184,8 +184,8 @@ func checkAction(expected, actual core.Action, t *testing.T) {
 			t.Errorf("Action %s %s has wrong object\nDiff:\n %s",
 				a.GetVerb(), a.GetResource().Resource, diff.ObjectGoPrintSideBySide(expObject, object))
 		}
-	case core.UpdateAction:
-		e, _ := expected.(core.UpdateAction)
+	case core.UpdateActionImpl:
+		e, _ := expected.(core.UpdateActionImpl)
 		expObject := e.GetObject()
 		object := a.GetObject()
 
@@ -193,8 +193,8 @@ func checkAction(expected, actual core.Action, t *testing.T) {
 			t.Errorf("Action %s %s has wrong object\nDiff:\n %s",
 				a.GetVerb(), a.GetResource().Resource, diff.ObjectGoPrintSideBySide(expObject, object))
 		}
-	case core.PatchAction:
-		e, _ := expected.(core.PatchAction)
+	case core.PatchActionImpl:
+		e, _ := expected.(core.PatchActionImpl)
 		expPatch := e.GetPatch()
 		patch := a.GetPatch()
 
@@ -202,6 +202,9 @@ func checkAction(expected, actual core.Action, t *testing.T) {
 			t.Errorf("Action %s %s has wrong patch\nDiff:\n %s",
 				a.GetVerb(), a.GetResource().Resource, diff.ObjectGoPrintSideBySide(expPatch, patch))
 		}
+	default:
+		t.Errorf("Uncaptured Action %s %s, you should explicitly add a case to capture it",
+			actual.GetVerb(), actual.GetResource().Resource)
 	}
 }
 

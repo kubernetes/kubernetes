@@ -22,16 +22,16 @@ limitations under the License.
 package framework
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
-	"os"
+	"path"
 	"strings"
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -46,21 +46,21 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+
+	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 const (
 	maxKubectlExecRetries = 5
 	// DefaultNamespaceDeletionTimeout is timeout duration for waiting for a namespace deletion.
-	// TODO(mikedanese): reset this to 5 minutes once #47135 is resolved.
-	// ref https://github.com/kubernetes/kubernetes/issues/47135
-	DefaultNamespaceDeletionTimeout = 10 * time.Minute
+	DefaultNamespaceDeletionTimeout = 5 * time.Minute
 )
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
@@ -163,14 +163,6 @@ func (f *Framework) BeforeEach() {
 		ginkgo.By("Creating a kubernetes client")
 		config, err := LoadConfig()
 		ExpectNoError(err)
-		testDesc := ginkgo.CurrentGinkgoTestDescription()
-		if len(testDesc.ComponentTexts) > 0 {
-			componentTexts := strings.Join(testDesc.ComponentTexts, " ")
-			config.UserAgent = fmt.Sprintf(
-				"%v -- %v",
-				rest.DefaultKubernetesUserAgent(),
-				componentTexts)
-		}
 
 		config.QPS = f.Options.ClientQPS
 		config.Burst = f.Options.ClientBurst
@@ -224,7 +216,7 @@ func (f *Framework) BeforeEach() {
 			err = WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
 			ExpectNoError(err)
 		} else {
-			e2elog.Logf("Skipping waiting for service account")
+			Logf("Skipping waiting for service account")
 		}
 		f.UniqueName = f.Namespace.GetName()
 	} else {
@@ -252,7 +244,7 @@ func (f *Framework) BeforeEach() {
 			PrintVerboseLogs:            false,
 		}, nil)
 		if err != nil {
-			e2elog.Logf("Error while creating NewResourceUsageGatherer: %v", err)
+			Logf("Error while creating NewResourceUsageGatherer: %v", err)
 		} else {
 			go f.gatherer.StartGatheringData()
 		}
@@ -273,19 +265,56 @@ func (f *Framework) BeforeEach() {
 	if gatherMetricsAfterTest && TestContext.IncludeClusterAutoscalerMetrics {
 		grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, !ProviderIs("kubemark"), false, false, false, TestContext.IncludeClusterAutoscalerMetrics)
 		if err != nil {
-			e2elog.Logf("Failed to create MetricsGrabber (skipping ClusterAutoscaler metrics gathering before test): %v", err)
+			Logf("Failed to create MetricsGrabber (skipping ClusterAutoscaler metrics gathering before test): %v", err)
 		} else {
 			f.clusterAutoscalerMetricsBeforeTest, err = grabber.Grab()
 			if err != nil {
-				e2elog.Logf("MetricsGrabber failed to grab CA metrics before test (skipping metrics gathering): %v", err)
+				Logf("MetricsGrabber failed to grab CA metrics before test (skipping metrics gathering): %v", err)
 			} else {
-				e2elog.Logf("Gathered ClusterAutoscaler metrics before test")
+				Logf("Gathered ClusterAutoscaler metrics before test")
 			}
 		}
 
 	}
 
 	f.flakeReport = NewFlakeReport()
+}
+
+// printSummaries prints summaries of tests.
+func printSummaries(summaries []TestDataSummary, testBaseName string) {
+	now := time.Now()
+	for i := range summaries {
+		Logf("Printing summary: %v", summaries[i].SummaryKind())
+		switch TestContext.OutputPrintType {
+		case "hr":
+			if TestContext.ReportDir == "" {
+				Logf(summaries[i].PrintHumanReadable())
+			} else {
+				// TODO: learn to extract test name and append it to the kind instead of timestamp.
+				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".txt")
+				if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintHumanReadable()), 0644); err != nil {
+					Logf("Failed to write file %v with test performance data: %v", filePath, err)
+				}
+			}
+		case "json":
+			fallthrough
+		default:
+			if TestContext.OutputPrintType != "json" {
+				Logf("Unknown output type: %v. Printing JSON", TestContext.OutputPrintType)
+			}
+			if TestContext.ReportDir == "" {
+				Logf("%v JSON\n%v", summaries[i].SummaryKind(), summaries[i].PrintJSON())
+				Logf("Finished")
+			} else {
+				// TODO: learn to extract test name and append it to the kind instead of timestamp.
+				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".json")
+				Logf("Writing to %s", filePath)
+				if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintJSON()), 0644); err != nil {
+					Logf("Failed to write file %v with test performance data: %v", filePath, err)
+				}
+			}
+		}
+	}
 }
 
 // AfterEach deletes the namespace, after reading its events.
@@ -302,23 +331,19 @@ func (f *Framework) AfterEach() {
 		if TestContext.DeleteNamespace && (TestContext.DeleteNamespaceOnFailure || !ginkgo.CurrentGinkgoTestDescription().Failed) {
 			for _, ns := range f.namespacesToDelete {
 				ginkgo.By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
-				timeout := DefaultNamespaceDeletionTimeout
-				if f.NamespaceDeletionTimeout != 0 {
-					timeout = f.NamespaceDeletionTimeout
-				}
-				if err := deleteNS(f.ClientSet, f.DynamicClient, ns.Name, timeout); err != nil {
+				if err := f.ClientSet.CoreV1().Namespaces().Delete(ns.Name, nil); err != nil {
 					if !apierrors.IsNotFound(err) {
 						nsDeletionErrors[ns.Name] = err
 					} else {
-						e2elog.Logf("Namespace %v was already deleted", ns.Name)
+						Logf("Namespace %v was already deleted", ns.Name)
 					}
 				}
 			}
 		} else {
 			if !TestContext.DeleteNamespace {
-				e2elog.Logf("Found DeleteNamespace=false, skipping namespace deletion!")
+				Logf("Found DeleteNamespace=false, skipping namespace deletion!")
 			} else {
-				e2elog.Logf("Found DeleteNamespaceOnFailure=false and current test failed, skipping namespace deletion!")
+				Logf("Found DeleteNamespaceOnFailure=false and current test failed, skipping namespace deletion!")
 			}
 		}
 
@@ -333,7 +358,7 @@ func (f *Framework) AfterEach() {
 			for namespaceKey, namespaceErr := range nsDeletionErrors {
 				messages = append(messages, fmt.Sprintf("Couldn't delete ns: %q: %s (%#v)", namespaceKey, namespaceErr, namespaceErr))
 			}
-			e2elog.Failf(strings.Join(messages, ","))
+			Failf(strings.Join(messages, ","))
 		}
 	}()
 
@@ -365,14 +390,14 @@ func (f *Framework) AfterEach() {
 		grabMetricsFromKubelets := TestContext.GatherMetricsAfterTest != "master" && !ProviderIs("kubemark")
 		grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, grabMetricsFromKubelets, true, true, true, TestContext.IncludeClusterAutoscalerMetrics)
 		if err != nil {
-			e2elog.Logf("Failed to create MetricsGrabber (skipping metrics gathering): %v", err)
+			Logf("Failed to create MetricsGrabber (skipping metrics gathering): %v", err)
 		} else {
 			received, err := grabber.Grab()
 			if err != nil {
-				e2elog.Logf("MetricsGrabber failed to grab some of the metrics: %v", err)
+				Logf("MetricsGrabber failed to grab some of the metrics: %v", err)
 			}
-			(*e2emetrics.MetricsForE2E)(&received).ComputeClusterAutoscalerMetricsDelta(f.clusterAutoscalerMetricsBeforeTest)
-			f.TestSummaries = append(f.TestSummaries, (*e2emetrics.MetricsForE2E)(&received))
+			(*e2emetrics.ComponentCollection)(&received).ComputeClusterAutoscalerMetricsDelta(f.clusterAutoscalerMetricsBeforeTest)
+			f.TestSummaries = append(f.TestSummaries, (*e2emetrics.ComponentCollection)(&received))
 		}
 	}
 
@@ -384,13 +409,13 @@ func (f *Framework) AfterEach() {
 		f.flakeReport = nil
 	}
 
-	PrintSummaries(f.TestSummaries, f.BaseName)
+	printSummaries(f.TestSummaries, f.BaseName)
 
 	// Check whether all nodes are ready after the test.
 	// This is explicitly done at the very end of the test, to avoid
 	// e.g. not removing namespace in case of this failure.
 	if err := AllNodesReady(f.ClientSet, 3*time.Minute); err != nil {
-		e2elog.Failf("All nodes should be ready after test, %v", err)
+		Failf("All nodes should be ready after test, %v", err)
 	}
 }
 
@@ -406,7 +431,7 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 	f.AddNamespacesToDelete(ns)
 
 	if err == nil && !f.SkipPrivilegedPSPBinding {
-		createPrivilegedPSPBinding(f, ns.Name)
+		CreatePrivilegedPSPBinding(f.ClientSet, ns.Name)
 	}
 
 	return ns, err
@@ -486,10 +511,10 @@ func (f *Framework) WriteFileViaContainer(podName, containerName string, path st
 			return fmt.Errorf("Unsupported character in string to write: %v", c)
 		}
 	}
-	command := fmt.Sprintf("echo '%s' > '%s'", contents, path)
+	command := fmt.Sprintf("echo '%s' > '%s'; sync", contents, path)
 	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "/bin/sh", "-c", command)
 	if err != nil {
-		e2elog.Logf("error running kubectl exec to write file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
+		Logf("error running kubectl exec to write file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
 	}
 	return err
 }
@@ -500,7 +525,7 @@ func (f *Framework) ReadFileViaContainer(podName, containerName string, path str
 
 	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "cat", path)
 	if err != nil {
-		e2elog.Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
+		Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
 	}
 	return string(stdout), err
 }
@@ -511,7 +536,7 @@ func (f *Framework) CheckFileSizeViaContainer(podName, containerName, path strin
 
 	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "ls", "-l", path)
 	if err != nil {
-		e2elog.Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
+		Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
 	}
 	return string(stdout), err
 }
@@ -548,7 +573,7 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 			TargetPort: intstr.FromInt(contPort),
 		}}
 	}
-	e2elog.Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)
+	Logf("Creating a service-for-%v for selecting app=%v-pod", appName, appName)
 	service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "service-for-" + appName,
@@ -567,25 +592,23 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 
 // CreatePodsPerNodeForSimpleApp creates pods w/ labels.  Useful for tests which make a bunch of pods w/o any networking.
 func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n v1.Node) v1.PodSpec, maxCount int) map[string]string {
-	nodes := GetReadySchedulableNodesOrDie(f.ClientSet)
-	labels := map[string]string{
+	nodes, err := e2enode.GetBoundedReadySchedulableNodes(f.ClientSet, maxCount)
+	ExpectNoError(err)
+	podLabels := map[string]string{
 		"app": appName + "-pod",
 	}
 	for i, node := range nodes.Items {
-		// one per node, but no more than maxCount.
-		if i <= maxCount {
-			e2elog.Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
-			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(&v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   fmt.Sprintf(appName+"-pod-%v", i),
-					Labels: labels,
-				},
-				Spec: podSpec(node),
-			})
-			ExpectNoError(err)
-		}
+		Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
+		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   fmt.Sprintf(appName+"-pod-%v", i),
+				Labels: podLabels,
+			},
+			Spec: podSpec(node),
+		})
+		ExpectNoError(err)
 	}
-	return labels
+	return podLabels
 }
 
 // KubeUser is a struct for managing kubernetes user info.
@@ -645,19 +668,19 @@ func (kc *KubeConfig) FindCluster(name string) *KubeCluster {
 func kubectlExecWithRetry(namespace string, podName, containerName string, args ...string) ([]byte, []byte, error) {
 	for numRetries := 0; numRetries < maxKubectlExecRetries; numRetries++ {
 		if numRetries > 0 {
-			e2elog.Logf("Retrying kubectl exec (retry count=%v/%v)", numRetries+1, maxKubectlExecRetries)
+			Logf("Retrying kubectl exec (retry count=%v/%v)", numRetries+1, maxKubectlExecRetries)
 		}
 
 		stdOutBytes, stdErrBytes, err := kubectlExec(namespace, podName, containerName, args...)
 		if err != nil {
 			if strings.Contains(strings.ToLower(string(stdErrBytes)), "i/o timeout") {
 				// Retry on "i/o timeout" errors
-				e2elog.Logf("Warning: kubectl exec encountered i/o timeout.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
+				Logf("Warning: kubectl exec encountered i/o timeout.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
 				continue
 			}
 			if strings.Contains(strings.ToLower(string(stdErrBytes)), "container not found") {
 				// Retry on "container not found" errors
-				e2elog.Logf("Warning: kubectl exec encountered container not found.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
+				Logf("Warning: kubectl exec encountered container not found.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
 				time.Sleep(2 * time.Second)
 				continue
 			}
@@ -682,7 +705,7 @@ func kubectlExec(namespace string, podName, containerName string, args ...string
 	cmd := KubectlCmd(cmdArgs...)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
-	e2elog.Logf("Running '%s %s'", cmd.Path, strings.Join(cmdArgs, " "))
+	Logf("Running '%s %s'", cmd.Path, strings.Join(cmdArgs, " "))
 	err := cmd.Run()
 	return stdout.Bytes(), stderr.Bytes(), err
 }
@@ -789,7 +812,7 @@ func (p *PodStateVerification) filter(c clientset.Interface, namespace *v1.Names
 
 	ns := namespace.Name
 	pl, err := filterLabels(p.Selectors, c, ns) // Build an v1.PodList to operate against.
-	e2elog.Logf("Selector matched %v pods for %v", len(pl.Items), p.Selectors)
+	Logf("Selector matched %v pods for %v", len(pl.Items), p.Selectors)
 	if len(pl.Items) == 0 || err != nil {
 		return pl.Items, err
 	}
@@ -804,7 +827,7 @@ ReturnPodsSoFar:
 		}
 		passesVerify, err := passesVerifyFilter(pod, p.Verify)
 		if err != nil {
-			e2elog.Logf("Error detected on %v : %v !", pod.Name, err)
+			Logf("Error detected on %v : %v !", pod.Name, err)
 			break ReturnPodsSoFar
 		}
 		if passesVerify {
@@ -825,12 +848,12 @@ func (cl *ClusterVerification) WaitFor(atLeast int, timeout time.Duration) ([]v1
 
 		// Failure
 		if returnedErr != nil {
-			e2elog.Logf("Cutting polling short: We got an error from the pod filtering layer.")
+			Logf("Cutting polling short: We got an error from the pod filtering layer.")
 			// stop polling if the pod filtering returns an error.  that should never happen.
 			// it indicates, for example, that the client is broken or something non-pod related.
 			return false, returnedErr
 		}
-		e2elog.Logf("Found %v / %v", len(pods), atLeast)
+		Logf("Found %v / %v", len(pods), atLeast)
 
 		// Success
 		if len(pods) >= atLeast {
@@ -839,7 +862,7 @@ func (cl *ClusterVerification) WaitFor(atLeast int, timeout time.Duration) ([]v1
 		// Keep trying...
 		return false, nil
 	})
-	e2elog.Logf("WaitFor completed with timeout %v.  Pods found = %v out of %v", timeout, len(pods), atLeast)
+	Logf("WaitFor completed with timeout %v.  Pods found = %v out of %v", timeout, len(pods), atLeast)
 	return pods, err
 }
 
@@ -847,7 +870,7 @@ func (cl *ClusterVerification) WaitFor(atLeast int, timeout time.Duration) ([]v1
 func (cl *ClusterVerification) WaitForOrFail(atLeast int, timeout time.Duration) {
 	pods, err := cl.WaitFor(atLeast, timeout)
 	if err != nil || len(pods) < atLeast {
-		e2elog.Failf("Verified %v of %v pods , error : %v", len(pods), atLeast, err)
+		Failf("Verified %v of %v pods , error : %v", len(pods), atLeast, err)
 	}
 }
 
@@ -860,27 +883,30 @@ func (cl *ClusterVerification) ForEach(podFunc func(v1.Pod)) error {
 	pods, err := cl.podState.filter(cl.client, cl.namespace)
 	if err == nil {
 		if len(pods) == 0 {
-			e2elog.Failf("No pods matched the filter.")
+			Failf("No pods matched the filter.")
 		}
-		e2elog.Logf("ForEach: Found %v pods from the filter.  Now looping through them.", len(pods))
+		Logf("ForEach: Found %v pods from the filter.  Now looping through them.", len(pods))
 		for _, p := range pods {
 			podFunc(p)
 		}
 	} else {
-		e2elog.Logf("ForEach: Something went wrong when filtering pods to execute against: %v", err)
+		Logf("ForEach: Something went wrong when filtering pods to execute against: %v", err)
 	}
 
 	return err
 }
 
-// GetLogToFileFunc is a convenience function that returns a function that have the same interface as
-// e2elog.Logf, but writes to a specified file.
-func GetLogToFileFunc(file *os.File) func(format string, args ...interface{}) {
-	return func(format string, args ...interface{}) {
-		writer := bufio.NewWriter(file)
-		if _, err := fmt.Fprintf(writer, format, args...); err != nil {
-			e2elog.Logf("Failed to write file %v with test performance data: %v", file.Name(), err)
-		}
-		writer.Flush()
+const (
+	// preconfiguredRuntimeHandler is the name of the runtime handler that is expected to be
+	// preconfigured in the test environment.
+	preconfiguredRuntimeHandler = "test-handler"
+)
+
+// PreconfiguredRuntimeClassHandler returns configured runtime handler.
+func PreconfiguredRuntimeClassHandler() string {
+	if TestContext.ContainerRuntime == "docker" {
+		return TestContext.ContainerRuntime
 	}
+
+	return preconfiguredRuntimeHandler
 }

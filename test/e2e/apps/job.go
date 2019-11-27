@@ -26,7 +26,6 @@ import (
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/onsi/ginkgo"
@@ -39,7 +38,7 @@ var _ = SIGDescribe("Job", func() {
 	completions := int32(4)
 	backoffLimit := int32(6) // default value
 
-	// Simplest case: all pods succeed promptly
+	// Simplest case: N pods succeed
 	ginkgo.It("should run a job to completion when tasks succeed", func() {
 		ginkgo.By("Creating a job")
 		job := jobutil.NewTestJob("succeed", "all-succeed", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
@@ -53,10 +52,13 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By("Ensuring pods for job exist")
 		pods, err := jobutil.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
 		framework.ExpectNoError(err, "failed to get pod list for job in namespace: %s", f.Namespace.Name)
-		framework.ExpectEqual(len(pods.Items), int(completions), "failed to ensure sufficient pod for job: got %d, want %d", len(pods.Items), completions)
+		successes := int32(0)
 		for _, pod := range pods.Items {
-			framework.ExpectEqual(pod.Status.Phase, v1.PodSucceeded, "failed to ensure pod status: pod %s status %s", pod.Name, pod.Status.Phase)
+			if pod.Status.Phase == v1.PodSucceeded {
+				successes++
+			}
 		}
+		framework.ExpectEqual(successes, completions, "epected %d successful job pods, but got  %d", completions, successes)
 	})
 
 	/*
@@ -83,8 +85,13 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to get PodList for job %s in namespace: %s", job.Name, f.Namespace.Name)
 	})
 
-	// Pods sometimes fail, but eventually succeed.
-	ginkgo.It("should run a job to completion when tasks sometimes fail and are locally restarted", func() {
+	/*
+		Release : v1.16
+		Testname: Jobs, completion after task failure
+		Description: Explicitly cause the tasks to fail once initially. After restarting, the Job MUST
+		execute to completion.
+	*/
+	framework.ConformanceIt("should run a job to completion when tasks sometimes fail and are locally restarted", func() {
 		ginkgo.By("Creating a job")
 		// One failure, then a success, local restarts.
 		// We can't use the random failure approach used by the
@@ -158,7 +165,14 @@ var _ = SIGDescribe("Job", func() {
 		gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
 	})
 
-	ginkgo.It("should adopt matching orphans and release non-matching pods", func() {
+	/*
+		Release : v1.16
+		Testname: Jobs, orphan pods, re-adoption
+		Description: Create a parallel job. The number of Pods MUST equal the level of parallelism.
+		Orphan a Pod by modifying its owner reference. The Job MUST re-adopt the orphan pod.
+		Modify the labels of one of the Job's Pods. The Job MUST release the Pod.
+	*/
+	framework.ConformanceIt("should adopt matching orphans and release non-matching pods", func() {
 		ginkgo.By("Creating a job")
 		job := jobutil.NewTestJob("notTerminate", "adopt-release", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		// Replace job with the one returned from Create() so it has the UID.
@@ -231,7 +245,7 @@ var _ = SIGDescribe("Job", func() {
 		// updates we need to allow more than backoff+1
 		// TODO revert this back to above when https://github.com/kubernetes/kubernetes/issues/64787 gets fixed
 		if len(pods.Items) < backoff+1 {
-			e2elog.Failf("Not enough pod created expected at least %d, got %#v", backoff+1, pods.Items)
+			framework.Failf("Not enough pod created expected at least %d, got %#v", backoff+1, pods.Items)
 		}
 		for _, pod := range pods.Items {
 			framework.ExpectEqual(pod.Status.Phase, v1.PodFailed)

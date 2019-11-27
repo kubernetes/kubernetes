@@ -119,7 +119,7 @@ func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.Va
 					// wrong type
 					return nil, fmt.Errorf("expected *apiextensions.CustomResourceDefinition, got %v", existing)
 				}
-				if err := deleteValidation(existingCRD); err != nil {
+				if err := deleteValidation(ctx, existingCRD); err != nil {
 					return nil, err
 				}
 

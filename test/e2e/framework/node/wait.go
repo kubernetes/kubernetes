@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/util/system"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/system"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -83,7 +83,7 @@ func WaitForTotalHealthy(c clientset.Interface, timeout time.Duration) error {
 		}
 		missingPodsPerNode = make(map[string][]string)
 		for _, node := range nodes.Items {
-			if !system.IsMasterNode(node.Name) {
+			if !system.DeprecatedMightBeMasterNode(node.Name) {
 				for _, requiredPod := range requiredPerNodePods {
 					foundRequired := false
 					for _, presentPod := range systemPodsPerNode[node.Name] {
@@ -205,4 +205,77 @@ func checkWaitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) 
 		return nil, fmt.Errorf("error: %s. Non-retryable failure or timed out while listing nodes for e2e cluster", err)
 	}
 	return nodes, nil
+}
+
+// CheckReadyForTests returns a method usable in polling methods which will check that the nodes are
+// in a testable state based on schedulability.
+func CheckReadyForTests(c clientset.Interface, nonblockingTaints string, allowedNotReadyNodes, largeClusterThreshold int) func() (bool, error) {
+	attempt := 0
+	var notSchedulable []*v1.Node
+	return func() (bool, error) {
+		attempt++
+		notSchedulable = nil
+		opts := metav1.ListOptions{
+			ResourceVersion: "0",
+			FieldSelector:   fields.Set{"spec.unschedulable": "false"}.AsSelector().String(),
+		}
+		nodes, err := c.CoreV1().Nodes().List(opts)
+		if err != nil {
+			e2elog.Logf("Unexpected error listing nodes: %v", err)
+			if testutils.IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		for i := range nodes.Items {
+			node := &nodes.Items[i]
+			if !readyForTests(node, nonblockingTaints) {
+				notSchedulable = append(notSchedulable, node)
+			}
+		}
+		// Framework allows for <TestContext.AllowedNotReadyNodes> nodes to be non-ready,
+		// to make it possible e.g. for incorrect deployment of some small percentage
+		// of nodes (which we allow in cluster validation). Some nodes that are not
+		// provisioned correctly at startup will never become ready (e.g. when something
+		// won't install correctly), so we can't expect them to be ready at any point.
+		//
+		// However, we only allow non-ready nodes with some specific reasons.
+		if len(notSchedulable) > 0 {
+			// In large clusters, log them only every 10th pass.
+			if len(nodes.Items) < largeClusterThreshold || attempt%10 == 0 {
+				e2elog.Logf("Unschedulable nodes:")
+				for i := range notSchedulable {
+					e2elog.Logf("-> %s Ready=%t Network=%t Taints=%v NonblockingTaints:%v",
+						notSchedulable[i].Name,
+						IsConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeReady, true),
+						IsConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeNetworkUnavailable, false),
+						notSchedulable[i].Spec.Taints,
+						nonblockingTaints,
+					)
+
+				}
+				e2elog.Logf("================================")
+			}
+		}
+		return len(notSchedulable) <= allowedNotReadyNodes, nil
+	}
+}
+
+// readyForTests determines whether or not we should continue waiting for the nodes
+// to enter a testable state. By default this means it is schedulable, NodeReady, and untainted.
+// Nodes with taints nonblocking taints are permitted to have that taint and
+// also have their node.Spec.Unschedulable field ignored for the purposes of this function.
+func readyForTests(node *v1.Node, nonblockingTaints string) bool {
+	if hasNonblockingTaint(node, nonblockingTaints) {
+		// If the node has one of the nonblockingTaints taints; just check that it is ready
+		// and don't require node.Spec.Unschedulable to be set either way.
+		if !IsNodeReady(node) || !isNodeUntaintedWithNonblocking(node, nonblockingTaints) {
+			return false
+		}
+	} else {
+		if !IsNodeSchedulable(node) || !IsNodeUntainted(node) {
+			return false
+		}
+	}
+	return true
 }

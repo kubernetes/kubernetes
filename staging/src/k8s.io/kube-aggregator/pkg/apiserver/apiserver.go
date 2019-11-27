@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -190,9 +191,18 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil, err
 	}
 
+	enabledVersions := sets.NewString()
+	for v := range apiGroupInfo.VersionedResourcesStorageMap {
+		enabledVersions.Insert(v)
+	}
+	if !enabledVersions.Has(v1.SchemeGroupVersion.Version) {
+		return nil, fmt.Errorf("API group/version %s must be enabled", v1.SchemeGroupVersion.String())
+	}
+
 	apisHandler := &apisHandler{
-		codecs: aggregatorscheme.Codecs,
-		lister: s.lister,
+		codecs:         aggregatorscheme.Codecs,
+		lister:         s.lister,
+		discoveryGroup: discoveryGroup(enabledVersions),
 	}
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)

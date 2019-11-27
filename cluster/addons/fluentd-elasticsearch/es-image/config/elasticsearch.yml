@@ -4,11 +4,9 @@ node.name: ${NODE_NAME}
 node.master: ${NODE_MASTER}
 node.data: ${NODE_DATA}
 
-transport.tcp.port: ${TRANSPORT_PORT}
+transport.profiles.default.port: ${TRANSPORT_PORT}
 http.port: ${HTTP_PORT}
 
 path.data: /data
 
 network.host: 0.0.0.0
-
-discovery.zen.minimum_master_nodes: ${MINIMUM_MASTER_NODES}

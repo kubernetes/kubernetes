@@ -64,7 +64,7 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 	defer os.RemoveAll(tmpdir)
 
 	// Adds a pki folder with a ca certs to the temp folder
-	pkidir := testutil.SetupPkiDirWithCertificateAuthorithy(t, tmpdir)
+	pkidir := testutil.SetupPkiDirWithCertificateAuthority(t, tmpdir)
 
 	// Creates InitConfigurations pointing to the pkidir folder
 	cfgs := []*kubeadmapi.InitConfiguration{
@@ -185,7 +185,7 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 
 func TestBuildKubeConfigFromSpecWithClientAuth(t *testing.T) {
 	// Creates a CA
-	caCert, caKey := certstestutil.SetupCertificateAuthorithy(t)
+	caCert, caKey := certstestutil.SetupCertificateAuthority(t)
 
 	// Executes buildKubeConfigFromSpec passing a KubeConfigSpec with a ClientAuth
 	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "myClientName", "test-cluster", "myOrg1", "myOrg2")
@@ -197,7 +197,7 @@ func TestBuildKubeConfigFromSpecWithClientAuth(t *testing.T) {
 
 func TestBuildKubeConfigFromSpecWithTokenAuth(t *testing.T) {
 	// Creates a CA
-	caCert, _ := certstestutil.SetupCertificateAuthorithy(t)
+	caCert, _ := certstestutil.SetupCertificateAuthority(t)
 
 	// Executes buildKubeConfigFromSpec passing a KubeConfigSpec with a Token
 	config := setupdKubeConfigWithTokenAuth(t, caCert, "https://1.2.3.4:1234", "myClientName", "123456", "test-cluster")
@@ -210,8 +210,8 @@ func TestBuildKubeConfigFromSpecWithTokenAuth(t *testing.T) {
 func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 
 	// Creates a CAs
-	caCert, caKey := certstestutil.SetupCertificateAuthorithy(t)
-	anotherCaCert, anotherCaKey := certstestutil.SetupCertificateAuthorithy(t)
+	caCert, caKey := certstestutil.SetupCertificateAuthority(t)
+	anotherCaCert, anotherCaKey := certstestutil.SetupCertificateAuthority(t)
 
 	// build kubeconfigs (to be used to test kubeconfigs equality/not equality)
 	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1", "myOrg2")
@@ -307,7 +307,7 @@ func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 			defer os.RemoveAll(tmpdir)
 
 			// Adds a pki folder with a ca certs to the temp folder
-			pkidir := testutil.SetupPkiDirWithCertificateAuthorithy(t, tmpdir)
+			pkidir := testutil.SetupPkiDirWithCertificateAuthority(t, tmpdir)
 
 			// Creates an InitConfiguration pointing to the pkidir folder
 			cfg := &kubeadmapi.InitConfiguration{
@@ -382,7 +382,7 @@ func TestWriteKubeConfig(t *testing.T) {
 	defer os.RemoveAll(tmpdir)
 
 	// Adds a pki folder with a ca cert to the temp folder
-	pkidir := testutil.SetupPkiDirWithCertificateAuthorithy(t, tmpdir)
+	pkidir := testutil.SetupPkiDirWithCertificateAuthority(t, tmpdir)
 
 	// Retrieves ca cert for assertions
 	caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(pkidir, kubeadmconstants.CACertAndKeyBaseName)
@@ -454,8 +454,8 @@ func TestWriteKubeConfig(t *testing.T) {
 }
 
 func TestValidateKubeConfig(t *testing.T) {
-	caCert, caKey := certstestutil.SetupCertificateAuthorithy(t)
-	anotherCaCert, anotherCaKey := certstestutil.SetupCertificateAuthorithy(t)
+	caCert, caKey := certstestutil.SetupCertificateAuthority(t)
+	anotherCaCert, anotherCaKey := certstestutil.SetupCertificateAuthority(t)
 
 	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
 	configWithAnotherClusterCa := setupdKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
@@ -528,7 +528,7 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 	}
 
 	// creates CA, write to pkiDir and remove ca.key to get into external CA condition
-	caCert, caKey := certstestutil.SetupCertificateAuthorithy(t)
+	caCert, caKey := certstestutil.SetupCertificateAuthority(t)
 	if err := pkiutil.WriteCertAndKey(pkiDir, kubeadmconstants.CACertAndKeyBaseName, caCert, caKey); err != nil {
 		t.Fatalf("failure while saving CA certificate and key: %v", err)
 	}
@@ -540,7 +540,7 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
 
 	// create a config with another CA
-	anotherCaCert, anotherCaKey := certstestutil.SetupCertificateAuthorithy(t)
+	anotherCaCert, anotherCaKey := certstestutil.SetupCertificateAuthority(t)
 	configWithAnotherClusterCa := setupdKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
 
 	// create a config with another server URL

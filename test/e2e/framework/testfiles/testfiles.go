@@ -33,6 +33,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 var filesources []FileSource
@@ -64,20 +66,14 @@ type FileSource interface {
 	DescribeFiles() string
 }
 
-// Fail is an error handler function with the same prototype and
-// semantic as ginkgo.Fail. Typically ginkgo.Fail is what callers
-// of ReadOrDie and Exists will pass. This way this package
-// avoids depending on Ginkgo.
-type Fail func(failure string, callerSkip ...int)
-
 // ReadOrDie tries to retrieve the desired file content from
 // one of the registered file sources. In contrast to FileSource, it
 // will either return a valid slice or abort the test by calling the fatal function,
 // i.e. the caller doesn't have to implement error checking.
-func ReadOrDie(filePath string, fail Fail) []byte {
+func ReadOrDie(filePath string) []byte {
 	data, err := Read(filePath)
 	if err != nil {
-		fail(err.Error(), 1)
+		e2elog.Fail(err.Error(), 1)
 	}
 	return data
 }
@@ -110,11 +106,11 @@ func Read(filePath string) ([]byte, error) {
 // Exists checks whether a file could be read. Unexpected errors
 // are handled by calling the fail function, which then should
 // abort the current test.
-func Exists(filePath string, fail Fail) bool {
+func Exists(filePath string) bool {
 	for _, filesource := range filesources {
 		data, err := filesource.ReadTestFile(filePath)
 		if err != nil {
-			fail(fmt.Sprintf("fatal error looking for test file %s: %s", filePath, err), 1)
+			e2elog.Fail(fmt.Sprintf("fatal error looking for test file %s: %s", filePath, err), 1)
 		}
 		if data != nil {
 			return true

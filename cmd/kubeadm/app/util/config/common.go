@@ -63,7 +63,9 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated bool) erro
 	}
 
 	// Deprecated API versions are supported by us, but can only be used for migration.
-	deprecatedAPIVersions := map[string]struct{}{}
+	deprecatedAPIVersions := map[string]struct{}{
+		"kubeadm.k8s.io/v1beta1": {},
+	}
 
 	gvString := gv.String()
 
@@ -72,7 +74,7 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated bool) erro
 	}
 
 	if _, present := deprecatedAPIVersions[gvString]; present && !allowDeprecated {
-		return errors.Errorf("your configuration file uses a deprecated API spec: %q. Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv.String())
+		klog.Warningf("your configuration file uses a deprecated API spec: %q. Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv)
 	}
 
 	return nil
@@ -123,16 +125,24 @@ func VerifyAPIServerBindAddress(address string) error {
 	if ip == nil {
 		return errors.Errorf("cannot parse IP address: %s", address)
 	}
+	// There are users with network setups where default routes are present, but network interfaces
+	// use only link-local addresses (e.g. as described in RFC5549).
+	// In many cases that matching global unicast IP address can be found on loopback interface,
+	// so kubeadm allows users to specify address=Loopback for handling supporting the scenario above.
+	// Nb. SetAPIEndpointDynamicDefaults will try to translate loopback to a valid address afterwards
+	if ip.IsLoopback() {
+		return nil
+	}
 	if !ip.IsGlobalUnicast() {
 		return errors.Errorf("cannot use %q as the bind address for the API Server", address)
 	}
 	return nil
 }
 
-// ChooseAPIServerBindAddress is a wrapper for netutil.ChooseBindAddress that also handles
-// the case where no default routes were found and an IP for the API server could not be obatained.
+// ChooseAPIServerBindAddress is a wrapper for netutil.ResolveBindAddress that also handles
+// the case where no default routes were found and an IP for the API server could not be obtained.
 func ChooseAPIServerBindAddress(bindAddress net.IP) (net.IP, error) {
-	ip, err := netutil.ChooseBindAddress(bindAddress)
+	ip, err := netutil.ResolveBindAddress(bindAddress)
 	if err != nil {
 		if netutil.IsNoRoutesError(err) {
 			klog.Warningf("WARNING: could not obtain a bind address for the API Server: %v; using: %s", err, constants.DefaultAPIServerBindAddress)

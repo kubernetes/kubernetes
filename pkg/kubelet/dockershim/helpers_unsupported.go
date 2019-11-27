@@ -54,6 +54,6 @@ func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {
 	return "", fmt.Errorf("unsupported platform")
 }
 
-// applyExperimentalCreateConfig applys experimental configures from sandbox annotations.
+// applyExperimentalCreateConfig applies experimental configures from sandbox annotations.
 func applyExperimentalCreateConfig(createConfig *dockertypes.ContainerCreateConfig, annotations map[string]string) {
 }

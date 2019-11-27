@@ -117,7 +117,7 @@ var (
 	// ApprovalForce forces the users to view the consent dialog
 	// and confirm the permissions request at the URL returned
 	// from AuthCodeURL, even if they've already done so.
-	ApprovalForce AuthCodeOption = SetAuthURLParam("approval_prompt", "force")
+	ApprovalForce AuthCodeOption = SetAuthURLParam("prompt", "consent")
 )
 
 // An AuthCodeOption is passed to Config.AuthCodeURL.

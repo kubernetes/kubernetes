@@ -63,33 +63,6 @@ func TestSortStrings(t *testing.T) {
 	}
 }
 
-func TestShuffleStrings(t *testing.T) {
-	var src []string
-	dest := ShuffleStrings(src)
-
-	if dest != nil {
-		t.Errorf("ShuffleStrings for a nil slice got a non-nil slice")
-	}
-
-	src = []string{"a", "b", "c", "d", "e", "f"}
-	dest = ShuffleStrings(src)
-
-	if len(src) != len(dest) {
-		t.Errorf("Shuffled slice is wrong length, expected %v got %v", len(src), len(dest))
-	}
-
-	m := make(map[string]bool, len(dest))
-	for _, s := range dest {
-		m[s] = true
-	}
-
-	for _, k := range src {
-		if _, exists := m[k]; !exists {
-			t.Errorf("Element %v missing from shuffled slice", k)
-		}
-	}
-}
-
 func TestContainsString(t *testing.T) {
 	src := []string{"aa", "bb", "cc"}
 	if !ContainsString(src, "bb", nil) {

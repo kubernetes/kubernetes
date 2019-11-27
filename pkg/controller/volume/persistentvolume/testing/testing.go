@@ -466,34 +466,6 @@ func (r *VolumeReactor) DeleteClaimEvent(claim *v1.PersistentVolumeClaim) {
 	}
 }
 
-// addVolumeEvent simulates that a volume has been added in etcd and the
-// controller receives 'volume added' event.
-func (r *VolumeReactor) addVolumeEvent(volume *v1.PersistentVolume) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	r.volumes[volume.Name] = volume
-	// Generate event. No cloning is needed, this claim is not stored in the
-	// controller cache yet.
-	if r.fakeVolumeWatch != nil {
-		r.fakeVolumeWatch.Add(volume)
-	}
-}
-
-// modifyVolumeEvent simulates that a volume has been modified in etcd and the
-// controller receives 'volume modified' event.
-func (r *VolumeReactor) modifyVolumeEvent(volume *v1.PersistentVolume) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	r.volumes[volume.Name] = volume
-	// Generate deletion event. Cloned volume is needed to prevent races (and we
-	// would get a clone from etcd too).
-	if r.fakeVolumeWatch != nil {
-		r.fakeVolumeWatch.Modify(volume.DeepCopy())
-	}
-}
-
 // AddClaimEvent simulates that a claim has been deleted in etcd and the
 // controller receives 'claim added' event.
 func (r *VolumeReactor) AddClaimEvent(claim *v1.PersistentVolumeClaim) {
@@ -557,8 +529,8 @@ func (r *VolumeReactor) AddClaimBoundToVolume(claim *v1.PersistentVolumeClaim) {
 	}
 }
 
-// MarkVolumeAvaiable marks a PV available by name.
-func (r *VolumeReactor) MarkVolumeAvaiable(name string) {
+// MarkVolumeAvailable marks a PV available by name.
+func (r *VolumeReactor) MarkVolumeAvailable(name string) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	if volume, ok := r.volumes[name]; ok {

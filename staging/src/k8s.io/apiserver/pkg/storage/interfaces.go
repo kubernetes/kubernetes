@@ -95,10 +95,10 @@ type UpdateFunc func(input runtime.Object, res ResponseMeta) (output runtime.Obj
 // ValidateObjectFunc is a function to act on a given object. An error may be returned
 // if the hook cannot be completed. The function may NOT transform the provided
 // object.
-type ValidateObjectFunc func(obj runtime.Object) error
+type ValidateObjectFunc func(ctx context.Context, obj runtime.Object) error
 
 // ValidateAllObjectFunc is a "admit everything" instance of ValidateObjectFunc.
-func ValidateAllObjectFunc(obj runtime.Object) error {
+func ValidateAllObjectFunc(ctx context.Context, obj runtime.Object) error {
 	return nil
 }
 

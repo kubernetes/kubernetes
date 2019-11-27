@@ -15,13 +15,21 @@ package adal
 //  limitations under the License.
 
 import (
+	"crypto/tls"
 	"net/http"
+	"net/http/cookiejar"
+	"sync"
+
+	"github.com/Azure/go-autorest/tracing"
 )
 
 const (
 	contentType      = "Content-Type"
 	mimeTypeFormPost = "application/x-www-form-urlencoded"
 )
+
+var defaultSender Sender
+var defaultSenderInit = &sync.Once{}
 
 // Sender is the interface that wraps the Do method to send HTTP requests.
 //
@@ -45,7 +53,7 @@ type SendDecorator func(Sender) Sender
 
 // CreateSender creates, decorates, and returns, as a Sender, the default http.Client.
 func CreateSender(decorators ...SendDecorator) Sender {
-	return DecorateSender(&http.Client{}, decorators...)
+	return DecorateSender(sender(), decorators...)
 }
 
 // DecorateSender accepts a Sender and a, possibly empty, set of SendDecorators, which is applies to
@@ -57,4 +65,31 @@ func DecorateSender(s Sender, decorators ...SendDecorator) Sender {
 		s = decorate(s)
 	}
 	return s
+}
+
+func sender() Sender {
+	// note that we can't init defaultSender in init() since it will
+	// execute before calling code has had a chance to enable tracing
+	defaultSenderInit.Do(func() {
+		// Use behaviour compatible with DefaultTransport, but require TLS minimum version.
+		defaultTransport := http.DefaultTransport.(*http.Transport)
+		transport := &http.Transport{
+			Proxy:                 defaultTransport.Proxy,
+			DialContext:           defaultTransport.DialContext,
+			MaxIdleConns:          defaultTransport.MaxIdleConns,
+			IdleConnTimeout:       defaultTransport.IdleConnTimeout,
+			TLSHandshakeTimeout:   defaultTransport.TLSHandshakeTimeout,
+			ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
+		}
+		var roundTripper http.RoundTripper = transport
+		if tracing.IsEnabled() {
+			roundTripper = tracing.NewTransport(transport)
+		}
+		j, _ := cookiejar.New(nil)
+		defaultSender = &http.Client{Jar: j, Transport: roundTripper}
+	})
+	return defaultSender
 }

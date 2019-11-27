@@ -538,8 +538,6 @@ const (
 	// ISO111ECMACyrillic is the MIB identifier with IANA name ECMA-cyrillic.
 	//
 	// ISO registry
-	// (formerly ECMA
-	// registry )
 	ISO111ECMACyrillic MIB = 77
 
 	// ISO121Canadian1 is the MIB identifier with IANA name CSA_Z243.4-1985-1.
@@ -732,18 +730,18 @@ const (
 
 	// ISO885913 is the MIB identifier with IANA name ISO-8859-13.
 	//
-	// ISO See http://www.iana.org/assignments/charset-reg/ISO-8859-13 http://www.iana.org/assignments/charset-reg/ISO-8859-13
+	// ISO See https://www.iana.org/assignments/charset-reg/ISO-8859-13 https://www.iana.org/assignments/charset-reg/ISO-8859-13
 	ISO885913 MIB = 109
 
 	// ISO885914 is the MIB identifier with IANA name ISO-8859-14.
 	//
-	// ISO See http://www.iana.org/assignments/charset-reg/ISO-8859-14
+	// ISO See https://www.iana.org/assignments/charset-reg/ISO-8859-14
 	ISO885914 MIB = 110
 
 	// ISO885915 is the MIB identifier with IANA name ISO-8859-15.
 	//
 	// ISO
-	// Please see: http://www.iana.org/assignments/charset-reg/ISO-8859-15
+	// Please see: https://www.iana.org/assignments/charset-reg/ISO-8859-15
 	ISO885915 MIB = 111
 
 	// ISO885916 is the MIB identifier with IANA name ISO-8859-16.
@@ -754,41 +752,41 @@ const (
 	// GBK is the MIB identifier with IANA name GBK.
 	//
 	// Chinese IT Standardization Technical Committee
-	// Please see: http://www.iana.org/assignments/charset-reg/GBK
+	// Please see: https://www.iana.org/assignments/charset-reg/GBK
 	GBK MIB = 113
 
 	// GB18030 is the MIB identifier with IANA name GB18030.
 	//
 	// Chinese IT Standardization Technical Committee
-	// Please see: http://www.iana.org/assignments/charset-reg/GB18030
+	// Please see: https://www.iana.org/assignments/charset-reg/GB18030
 	GB18030 MIB = 114
 
 	// OSDEBCDICDF0415 is the MIB identifier with IANA name OSD_EBCDIC_DF04_15.
 	//
 	// Fujitsu-Siemens standard mainframe EBCDIC encoding
-	// Please see: http://www.iana.org/assignments/charset-reg/OSD-EBCDIC-DF04-15
+	// Please see: https://www.iana.org/assignments/charset-reg/OSD-EBCDIC-DF04-15
 	OSDEBCDICDF0415 MIB = 115
 
 	// OSDEBCDICDF03IRV is the MIB identifier with IANA name OSD_EBCDIC_DF03_IRV.
 	//
 	// Fujitsu-Siemens standard mainframe EBCDIC encoding
-	// Please see: http://www.iana.org/assignments/charset-reg/OSD-EBCDIC-DF03-IRV
+	// Please see: https://www.iana.org/assignments/charset-reg/OSD-EBCDIC-DF03-IRV
 	OSDEBCDICDF03IRV MIB = 116
 
 	// OSDEBCDICDF041 is the MIB identifier with IANA name OSD_EBCDIC_DF04_1.
 	//
 	// Fujitsu-Siemens standard mainframe EBCDIC encoding
-	// Please see: http://www.iana.org/assignments/charset-reg/OSD-EBCDIC-DF04-1
+	// Please see: https://www.iana.org/assignments/charset-reg/OSD-EBCDIC-DF04-1
 	OSDEBCDICDF041 MIB = 117
 
 	// ISO115481 is the MIB identifier with IANA name ISO-11548-1.
 	//
-	// See http://www.iana.org/assignments/charset-reg/ISO-11548-1
+	// See https://www.iana.org/assignments/charset-reg/ISO-11548-1
 	ISO115481 MIB = 118
 
 	// KZ1048 is the MIB identifier with IANA name KZ-1048.
 	//
-	// See http://www.iana.org/assignments/charset-reg/KZ-1048
+	// See https://www.iana.org/assignments/charset-reg/KZ-1048
 	KZ1048 MIB = 119
 
 	// Unicode is the MIB identifier with IANA name ISO-10646-UCS-2.
@@ -855,7 +853,7 @@ const (
 
 	// SCSU is the MIB identifier with IANA name SCSU.
 	//
-	// SCSU See http://www.iana.org/assignments/charset-reg/SCSU
+	// SCSU See https://www.iana.org/assignments/charset-reg/SCSU
 	SCSU MIB = 1011
 
 	// UTF7 is the MIB identifier with IANA name UTF-7.
@@ -884,22 +882,22 @@ const (
 
 	// CESU8 is the MIB identifier with IANA name CESU-8.
 	//
-	// https://www.unicode.org/unicode/reports/tr26
+	// https://www.unicode.org/reports/tr26
 	CESU8 MIB = 1016
 
 	// UTF32 is the MIB identifier with IANA name UTF-32.
 	//
-	// https://www.unicode.org/unicode/reports/tr19/
+	// https://www.unicode.org/reports/tr19/
 	UTF32 MIB = 1017
 
 	// UTF32BE is the MIB identifier with IANA name UTF-32BE.
 	//
-	// https://www.unicode.org/unicode/reports/tr19/
+	// https://www.unicode.org/reports/tr19/
 	UTF32BE MIB = 1018
 
 	// UTF32LE is the MIB identifier with IANA name UTF-32LE.
 	//
-	// https://www.unicode.org/unicode/reports/tr19/
+	// https://www.unicode.org/reports/tr19/
 	UTF32LE MIB = 1019
 
 	// BOCU1 is the MIB identifier with IANA name BOCU-1.
@@ -1461,152 +1459,152 @@ const (
 
 	// IBM00858 is the MIB identifier with IANA name IBM00858.
 	//
-	// IBM See http://www.iana.org/assignments/charset-reg/IBM00858
+	// IBM See https://www.iana.org/assignments/charset-reg/IBM00858
 	IBM00858 MIB = 2089
 
 	// IBM00924 is the MIB identifier with IANA name IBM00924.
 	//
-	// IBM See http://www.iana.org/assignments/charset-reg/IBM00924
+	// IBM See https://www.iana.org/assignments/charset-reg/IBM00924
 	IBM00924 MIB = 2090
 
 	// IBM01140 is the MIB identifier with IANA name IBM01140.
 	//
-	// IBM See http://www.iana.org/assignments/charset-reg/IBM01140
+	// IBM See https://www.iana.org/assignments/charset-reg/IBM01140
 	IBM01140 MIB = 2091
 
 	// IBM01141 is the MIB identifier with IANA name IBM01141.
 	//
-	// IBM See http://www.iana.org/assignments/charset-reg/IBM01141
+	// IBM See https://www.iana.org/assignments/charset-reg/IBM01141
 	IBM01141 MIB = 2092
 
 	// IBM01142 is the MIB identifier with IANA name IBM01142.
 	//
-	// IBM See http://www.iana.org/assignments/charset-reg/IBM01142
+	// IBM See https://www.iana.org/assignments/charset-reg/IBM01142
 	IBM01142 MIB = 2093
 
 	// IBM01143 is the MIB identifier with IANA name IBM01143.
 	//
-	// IBM See http://www.iana.org/assignments/charset-reg/IBM01143
+	// IBM See https://www.iana.org/assignments/charset-reg/IBM01143
 	IBM01143 MIB = 2094
 
 	// IBM01144 is the MIB identifier with IANA name IBM01144.
 	//
-	// IBM See http://www.iana.org/assignments/charset-reg/IBM01144
+	// IBM See https://www.iana.org/assignments/charset-reg/IBM01144
 	IBM01144 MIB = 2095
 
 	// IBM01145 is the MIB identifier with IANA name IBM01145.
 	//
-	// IBM See http://www.iana.org/assignments/charset-reg/IBM01145
+	// IBM See https://www.iana.org/assignments/charset-reg/IBM01145
 	IBM01145 MIB = 2096
 
 	// IBM01146 is the MIB identifier with IANA name IBM01146.
 	//
-	// IBM See http://www.iana.org/assignments/charset-reg/IBM01146
+	// IBM See https://www.iana.org/assignments/charset-reg/IBM01146
 	IBM01146 MIB = 2097
 
 	// IBM01147 is the MIB identifier with IANA name IBM01147.
 	//
-	// IBM See http://www.iana.org/assignments/charset-reg/IBM01147
+	// IBM See https://www.iana.org/assignments/charset-reg/IBM01147
 	IBM01147 MIB = 2098
 
 	// IBM01148 is the MIB identifier with IANA name IBM01148.
 	//
-	// IBM See http://www.iana.org/assignments/charset-reg/IBM01148
+	// IBM See https://www.iana.org/assignments/charset-reg/IBM01148
 	IBM01148 MIB = 2099
 
 	// IBM01149 is the MIB identifier with IANA name IBM01149.
 	//
-	// IBM See http://www.iana.org/assignments/charset-reg/IBM01149
+	// IBM See https://www.iana.org/assignments/charset-reg/IBM01149
 	IBM01149 MIB = 2100
 
 	// Big5HKSCS is the MIB identifier with IANA name Big5-HKSCS.
 	//
-	// See http://www.iana.org/assignments/charset-reg/Big5-HKSCS
+	// See https://www.iana.org/assignments/charset-reg/Big5-HKSCS
 	Big5HKSCS MIB = 2101
 
 	// IBM1047 is the MIB identifier with IANA name IBM1047.
 	//
-	// IBM1047 (EBCDIC Latin 1/Open Systems) http://www-1.ibm.com/servers/eserver/iseries/software/globalization/pdf/cp01047z.pdf
+	// IBM1047 (EBCDIC Latin 1/Open Systems) https://www-1.ibm.com/servers/eserver/iseries/software/globalization/pdf/cp01047z.pdf
 	IBM1047 MIB = 2102
 
 	// PTCP154 is the MIB identifier with IANA name PTCP154.
 	//
-	// See http://www.iana.org/assignments/charset-reg/PTCP154
+	// See https://www.iana.org/assignments/charset-reg/PTCP154
 	PTCP154 MIB = 2103
 
 	// Amiga1251 is the MIB identifier with IANA name Amiga-1251.
 	//
-	// See http://www.amiga.ultranet.ru/Amiga-1251.html
+	// See https://www.amiga.ultranet.ru/Amiga-1251.html
 	Amiga1251 MIB = 2104
 
 	// KOI7switched is the MIB identifier with IANA name KOI7-switched.
 	//
-	// See http://www.iana.org/assignments/charset-reg/KOI7-switched
+	// See https://www.iana.org/assignments/charset-reg/KOI7-switched
 	KOI7switched MIB = 2105
 
 	// BRF is the MIB identifier with IANA name BRF.
 	//
-	// See http://www.iana.org/assignments/charset-reg/BRF
+	// See https://www.iana.org/assignments/charset-reg/BRF
 	BRF MIB = 2106
 
 	// TSCII is the MIB identifier with IANA name TSCII.
 	//
-	// See http://www.iana.org/assignments/charset-reg/TSCII
+	// See https://www.iana.org/assignments/charset-reg/TSCII
 	TSCII MIB = 2107
 
 	// CP51932 is the MIB identifier with IANA name CP51932.
 	//
-	// See http://www.iana.org/assignments/charset-reg/CP51932
+	// See https://www.iana.org/assignments/charset-reg/CP51932
 	CP51932 MIB = 2108
 
 	// Windows874 is the MIB identifier with IANA name windows-874.
 	//
-	// See http://www.iana.org/assignments/charset-reg/windows-874
+	// See https://www.iana.org/assignments/charset-reg/windows-874
 	Windows874 MIB = 2109
 
 	// Windows1250 is the MIB identifier with IANA name windows-1250.
 	//
-	// Microsoft http://www.iana.org/assignments/charset-reg/windows-1250
+	// Microsoft https://www.iana.org/assignments/charset-reg/windows-1250
 	Windows1250 MIB = 2250
 
 	// Windows1251 is the MIB identifier with IANA name windows-1251.
 	//
-	// Microsoft http://www.iana.org/assignments/charset-reg/windows-1251
+	// Microsoft https://www.iana.org/assignments/charset-reg/windows-1251
 	Windows1251 MIB = 2251
 
 	// Windows1252 is the MIB identifier with IANA name windows-1252.
 	//
-	// Microsoft http://www.iana.org/assignments/charset-reg/windows-1252
+	// Microsoft https://www.iana.org/assignments/charset-reg/windows-1252
 	Windows1252 MIB = 2252
 
 	// Windows1253 is the MIB identifier with IANA name windows-1253.
 	//
-	// Microsoft http://www.iana.org/assignments/charset-reg/windows-1253
+	// Microsoft https://www.iana.org/assignments/charset-reg/windows-1253
 	Windows1253 MIB = 2253
 
 	// Windows1254 is the MIB identifier with IANA name windows-1254.
 	//
-	// Microsoft http://www.iana.org/assignments/charset-reg/windows-1254
+	// Microsoft https://www.iana.org/assignments/charset-reg/windows-1254
 	Windows1254 MIB = 2254
 
 	// Windows1255 is the MIB identifier with IANA name windows-1255.
 	//
-	// Microsoft http://www.iana.org/assignments/charset-reg/windows-1255
+	// Microsoft https://www.iana.org/assignments/charset-reg/windows-1255
 	Windows1255 MIB = 2255
 
 	// Windows1256 is the MIB identifier with IANA name windows-1256.
 	//
-	// Microsoft http://www.iana.org/assignments/charset-reg/windows-1256
+	// Microsoft https://www.iana.org/assignments/charset-reg/windows-1256
 	Windows1256 MIB = 2256
 
 	// Windows1257 is the MIB identifier with IANA name windows-1257.
 	//
-	// Microsoft http://www.iana.org/assignments/charset-reg/windows-1257
+	// Microsoft https://www.iana.org/assignments/charset-reg/windows-1257
 	Windows1257 MIB = 2257
 
 	// Windows1258 is the MIB identifier with IANA name windows-1258.
 	//
-	// Microsoft http://www.iana.org/assignments/charset-reg/windows-1258
+	// Microsoft https://www.iana.org/assignments/charset-reg/windows-1258
 	Windows1258 MIB = 2258
 
 	// TIS620 is the MIB identifier with IANA name TIS-620.
@@ -1616,6 +1614,6 @@ const (
 
 	// CP50220 is the MIB identifier with IANA name CP50220.
 	//
-	// See http://www.iana.org/assignments/charset-reg/CP50220
+	// See https://www.iana.org/assignments/charset-reg/CP50220
 	CP50220 MIB = 2260
 )

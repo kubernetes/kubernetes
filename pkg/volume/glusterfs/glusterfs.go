@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -29,7 +30,11 @@ import (
 
 	gcli "github.com/heketi/heketi/client/api/go-client"
 	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
-	"k8s.io/api/core/v1"
+	"k8s.io/klog"
+	"k8s.io/utils/mount"
+	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,12 +44,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
-	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -88,13 +90,12 @@ const (
 	// default values, but they play a different role and
 	// could take a different value. Only thing we need is:
 	// absGidMin <= defGidMin <= defGidMax <= absGidMax
-	absoluteGidMin          = 2000
-	absoluteGidMax          = math.MaxInt32
-	linuxGlusterMountBinary = "mount.glusterfs"
-	heketiAnn               = "heketi-dynamic-provisioner"
-	glusterTypeAnn          = "gluster.org/type"
-	glusterDescAnn          = "Gluster-Internal: Dynamically provisioned PV"
-	heketiVolIDAnn          = "gluster.kubernetes.io/heketi-volume-id"
+	absoluteGidMin = 2000
+	absoluteGidMax = math.MaxInt32
+	heketiAnn      = "heketi-dynamic-provisioner"
+	glusterTypeAnn = "gluster.org/type"
+	glusterDescAnn = "Gluster-Internal: Dynamically provisioned PV"
+	heketiVolIDAnn = "gluster.kubernetes.io/heketi-volume-id"
 
 	// Error string returned by heketi
 	errIDNotFound = "Id not found"
@@ -116,10 +117,6 @@ func (plugin *glusterfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) 
 func (plugin *glusterfsPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Glusterfs != nil) ||
 		(spec.Volume != nil && spec.Volume.Glusterfs != nil)
-}
-
-func (plugin *glusterfsPlugin) IsMigratedToCSI() bool {
-	return false
 }
 
 func (plugin *glusterfsPlugin) RequiresRemount() bool {
@@ -264,7 +261,7 @@ func (b *glusterfsMounter) CanMount() error {
 	exe := b.plugin.host.GetExec(b.plugin.GetPluginName())
 	switch runtime.GOOS {
 	case "linux":
-		if _, err := exe.Run("test", "-x", gciLinuxGlusterMountBinaryPath); err != nil {
+		if _, err := exe.Command("test", "-x", gciLinuxGlusterMountBinaryPath).CombinedOutput(); err != nil {
 			return fmt.Errorf("required binary %s is missing", gciLinuxGlusterMountBinaryPath)
 		}
 	}
@@ -969,6 +966,11 @@ func getClusterNodes(cli *gcli.Client, cluster string) (dynamicHostIps []string,
 			return nil, fmt.Errorf("failed to get host ipaddress: %v", err)
 		}
 		ipaddr := dstrings.Join(nodeInfo.NodeAddRequest.Hostnames.Storage, "")
+		// IP validates if a string is a valid IP address.
+		ip := net.ParseIP(ipaddr)
+		if ip == nil {
+			return nil, fmt.Errorf("glusterfs server node ip address %s must be a valid IP address, (e.g. 10.9.8.7)", ipaddr)
+		}
 		dynamicHostIps = append(dynamicHostIps, ipaddr)
 	}
 	klog.V(3).Infof("host list :%v", dynamicHostIps)

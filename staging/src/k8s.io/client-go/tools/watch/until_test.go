@@ -35,7 +35,6 @@ import (
 )
 
 type fakePod struct {
-	name string
 }
 
 func (obj *fakePod) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }

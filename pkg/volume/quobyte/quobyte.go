@@ -22,16 +22,17 @@ import (
 	"path/filepath"
 	gostrings "strings"
 
-	"github.com/pborman/uuid"
-	"k8s.io/api/core/v1"
+	"github.com/google/uuid"
+	"k8s.io/klog"
+	"k8s.io/utils/mount"
+	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -102,15 +103,11 @@ func (plugin *quobytePlugin) CanSupport(spec *volume.Spec) bool {
 	}
 
 	exec := plugin.host.GetExec(plugin.GetPluginName())
-	if out, err := exec.Run("ls", "/sbin/mount.quobyte"); err == nil {
+	if out, err := exec.Command("ls", "/sbin/mount.quobyte").CombinedOutput(); err == nil {
 		klog.V(4).Infof("quobyte: can support: %s", string(out))
 		return true
 	}
 
-	return false
-}
-
-func (plugin *quobytePlugin) IsMigratedToCSI() bool {
 	return false
 }
 
@@ -408,7 +405,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision(selectedNode *v1.Node, al
 	}
 
 	// create random image name
-	provisioner.volume = fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
+	provisioner.volume = fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.New().String())
 
 	manager := &quobyteVolumeManager{
 		config: cfg,

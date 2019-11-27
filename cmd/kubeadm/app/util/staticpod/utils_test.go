@@ -25,9 +25,12 @@ import (
 	"strconv"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	"github.com/lithammer/dedent"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
@@ -112,130 +115,86 @@ func TestGetControllerManagerProbeAddress(t *testing.T) {
 	}
 }
 
-func TestEtcdProbe(t *testing.T) {
+func TestGetEtcdProbeEndpoint(t *testing.T) {
 	var tests = []struct {
-		name     string
-		cfg      *kubeadmapi.Etcd
-		port     int
-		certsDir string
-		cacert   string
-		cert     string
-		key      string
-		expected string
+		name             string
+		cfg              *kubeadmapi.Etcd
+		expectedHostname string
+		expectedPort     int
+		expectedScheme   v1.URIScheme
 	}{
 		{
-			name: "valid etcd probe using listen-client-urls IPv4 addresses",
+			name: "etcd probe URL from two URLs",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
 					ExtraArgs: map[string]string{
-						"listen-client-urls": "http://1.2.3.4:2379,http://4.3.2.1:2379"},
+						"listen-metrics-urls": "https://1.2.3.4:1234,https://4.3.2.1:2381"},
 				},
 			},
-			port:     1,
-			certsDir: "secretsA",
-			cacert:   "ca1",
-			cert:     "cert1",
-			key:      "key1",
-			expected: "ETCDCTL_API=3 etcdctl --endpoints=https://[1.2.3.4]:1 --cacert=secretsA/ca1 --cert=secretsA/cert1 --key=secretsA/key1 get foo",
+			expectedHostname: "1.2.3.4",
+			expectedPort:     1234,
+			expectedScheme:   v1.URISchemeHTTPS,
 		},
 		{
-			name: "valid etcd probe using listen-client-urls unspecified IPv6 address",
+			name: "etcd probe URL with HTTP scheme",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
 					ExtraArgs: map[string]string{
-						"listen-client-urls": "http://[0:0:0:0:0:0:0:0]:2379"},
+						"listen-metrics-urls": "http://1.2.3.4:1234"},
 				},
 			},
-			port:     1,
-			certsDir: "secretsB",
-			cacert:   "ca2",
-			cert:     "cert2",
-			key:      "key2",
-			expected: "ETCDCTL_API=3 etcdctl --endpoints=https://[::1]:1 --cacert=secretsB/ca2 --cert=secretsB/cert2 --key=secretsB/key2 get foo",
+			expectedHostname: "1.2.3.4",
+			expectedPort:     1234,
+			expectedScheme:   v1.URISchemeHTTP,
 		},
 		{
-			name: "valid etcd probe using listen-client-urls unspecified IPv6 address 2",
+			name: "etcd probe URL without scheme should result in defaults",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
 					ExtraArgs: map[string]string{
-						"listen-client-urls": "http://[::0:0]:2379"},
+						"listen-metrics-urls": "1.2.3.4"},
 				},
 			},
-			port:     1,
-			certsDir: "secretsB",
-			cacert:   "ca2",
-			cert:     "cert2",
-			key:      "key2",
-			expected: "ETCDCTL_API=3 etcdctl --endpoints=https://[::1]:1 --cacert=secretsB/ca2 --cert=secretsB/cert2 --key=secretsB/key2 get foo",
+			expectedHostname: "127.0.0.1",
+			expectedPort:     kubeadmconstants.EtcdMetricsPort,
+			expectedScheme:   v1.URISchemeHTTP,
 		},
 		{
-			name: "valid etcd probe using listen-client-urls unspecified IPv6 address 3",
+			name: "etcd probe URL without port",
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
 					ExtraArgs: map[string]string{
-						"listen-client-urls": "http://[::]:2379"},
+						"listen-metrics-urls": "https://1.2.3.4"},
 				},
 			},
-			port:     1,
-			certsDir: "secretsB",
-			cacert:   "ca2",
-			cert:     "cert2",
-			key:      "key2",
-			expected: "ETCDCTL_API=3 etcdctl --endpoints=https://[::1]:1 --cacert=secretsB/ca2 --cert=secretsB/cert2 --key=secretsB/key2 get foo",
+			expectedHostname: "1.2.3.4",
+			expectedPort:     kubeadmconstants.EtcdMetricsPort,
+			expectedScheme:   v1.URISchemeHTTPS,
 		},
 		{
-			name: "valid etcd probe using listen-client-urls unspecified IPv4 address",
+			name: "etcd probe URL from defaults",
 			cfg: &kubeadmapi.Etcd{
-				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-client-urls": "http://1.2.3.4:2379,http://4.3.2.1:2379"},
-				},
+				Local: &kubeadmapi.LocalEtcd{},
 			},
-			port:     1,
-			certsDir: "secretsA",
-			cacert:   "ca1",
-			cert:     "cert1",
-			key:      "key1",
-			expected: "ETCDCTL_API=3 etcdctl --endpoints=https://[1.2.3.4]:1 --cacert=secretsA/ca1 --cert=secretsA/cert1 --key=secretsA/key1 get foo",
-		},
-		{
-			name: "valid etcd probe using listen-client-urls IPv6 addresses",
-			cfg: &kubeadmapi.Etcd{
-				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-client-urls": "http://[2001:db8::1]:2379,http://[2001:db8::2]:2379"},
-				},
-			},
-			port:     1,
-			certsDir: "secretsB",
-			cacert:   "ca2",
-			cert:     "cert2",
-			key:      "key2",
-			expected: "ETCDCTL_API=3 etcdctl --endpoints=https://[2001:db8::1]:1 --cacert=secretsB/ca2 --cert=secretsB/cert2 --key=secretsB/key2 get foo",
-		},
-		{
-			name: "valid IPv4 etcd probe using hostname for listen-client-urls",
-			cfg: &kubeadmapi.Etcd{
-				Local: &kubeadmapi.LocalEtcd{
-					ExtraArgs: map[string]string{
-						"listen-client-urls": "http://localhost:2379"},
-				},
-			},
-			port:     1,
-			certsDir: "secretsC",
-			cacert:   "ca3",
-			cert:     "cert3",
-			key:      "key3",
-			expected: "ETCDCTL_API=3 etcdctl --endpoints=https://[127.0.0.1]:1 --cacert=secretsC/ca3 --cert=secretsC/cert3 --key=secretsC/key3 get foo",
+			expectedHostname: "127.0.0.1",
+			expectedPort:     kubeadmconstants.EtcdMetricsPort,
+			expectedScheme:   v1.URISchemeHTTP,
 		},
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			actual := EtcdProbe(rt.cfg, rt.port, rt.certsDir, rt.cacert, rt.cert, rt.key)
-			if actual.Handler.Exec.Command[2] != rt.expected {
-				t.Errorf("%s test case failed:\n\texpected: %s\n\t  actual: %s",
-					rt.name, rt.expected,
-					actual.Handler.Exec.Command[2])
+			hostname, port, scheme := GetEtcdProbeEndpoint(rt.cfg)
+			if hostname != rt.expectedHostname {
+				t.Errorf("%q test case failed:\n\texpected hostname: %s\n\tgot: %s",
+					rt.name, rt.expectedHostname, hostname)
+			}
+			if port != rt.expectedPort {
+				t.Errorf("%q test case failed:\n\texpected port: %d\n\tgot: %d",
+					rt.name, rt.expectedPort, port)
+			}
+			if scheme != rt.expectedScheme {
+				t.Errorf("%q test case failed:\n\texpected scheme: %v\n\tgot: %v",
+					rt.name, rt.expectedScheme, scheme)
 			}
 		})
 	}
@@ -602,5 +561,46 @@ func TestManifestFilesAreEqual(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+func TestKustomizeStaticPod(t *testing.T) {
+	// Create temp folder for the test case
+	tmpdir := testutil.SetupTempDir(t)
+	defer os.RemoveAll(tmpdir)
+
+	patchString := dedent.Dedent(`
+    apiVersion: v1
+    kind: Pod
+    metadata:
+        name: kube-apiserver
+        namespace: kube-system
+        annotations:
+            kustomize: patch for kube-apiserver
+    `)
+
+	err := ioutil.WriteFile(filepath.Join(tmpdir, "patch.yaml"), []byte(patchString), 0644)
+	if err != nil {
+		t.Fatalf("WriteFile returned unexpected error: %v", err)
+	}
+
+	pod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Pod",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kube-apiserver",
+			Namespace: "kube-system",
+		},
+	}
+
+	kpod, err := KustomizeStaticPod(pod, tmpdir)
+	if err != nil {
+		t.Errorf("KustomizeStaticPod returned unexpected error: %v", err)
+	}
+
+	if _, ok := kpod.ObjectMeta.Annotations["kustomize"]; !ok {
+		t.Error("Kustomize did not apply patches corresponding to the resource")
 	}
 }

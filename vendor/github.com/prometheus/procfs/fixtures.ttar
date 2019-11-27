@@ -1,45 +1,48 @@
 # Archive created by ttar -c -f fixtures.ttar fixtures/
 Directory: fixtures
+Mode: 775
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/proc
 Mode: 755
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Directory: fixtures/26231
+Directory: fixtures/proc/26231
 Mode: 755
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26231/cmdline
+Path: fixtures/proc/26231/cmdline
 Lines: 1
 vimNULLBYTEtest.goNULLBYTE+10NULLBYTEEOF
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26231/comm
+Path: fixtures/proc/26231/comm
 Lines: 1
 vim
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26231/cwd
+Path: fixtures/proc/26231/cwd
 SymlinkTo: /usr/bin
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26231/exe
+Path: fixtures/proc/26231/exe
 SymlinkTo: /usr/bin/vim
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Directory: fixtures/26231/fd
+Directory: fixtures/proc/26231/fd
 Mode: 755
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26231/fd/0
+Path: fixtures/proc/26231/fd/0
 SymlinkTo: ../../symlinktargets/abc
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26231/fd/1
+Path: fixtures/proc/26231/fd/1
 SymlinkTo: ../../symlinktargets/def
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26231/fd/10
+Path: fixtures/proc/26231/fd/10
 SymlinkTo: ../../symlinktargets/xyz
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26231/fd/2
+Path: fixtures/proc/26231/fd/2
 SymlinkTo: ../../symlinktargets/ghi
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26231/fd/3
+Path: fixtures/proc/26231/fd/3
 SymlinkTo: ../../symlinktargets/uvw
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26231/io
+Path: fixtures/proc/26231/io
 Lines: 7
 rchar: 750339
 wchar: 818609
@@ -50,7 +53,7 @@ write_bytes: 2048
 cancelled_write_bytes: -1024
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26231/limits
+Path: fixtures/proc/26231/limits
 Lines: 17
 Limit                     Soft Limit           Hard Limit           Units
 Max cpu time              unlimited            unlimited            seconds
@@ -71,14 +74,14 @@ Max realtime priority     0                    0
 Max realtime timeout      unlimited            unlimited            us
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26231/mountstats
-Lines: 19
+Path: fixtures/proc/26231/mountstats
+Lines: 20
 device rootfs mounted on / with fstype rootfs
 device sysfs mounted on /sys with fstype sysfs
 device proc mounted on /proc with fstype proc
 device /dev/sda1 mounted on / with fstype ext4
 device 192.168.1.1:/srv/test mounted on /mnt/nfs/test with fstype nfs4 statvers=1.1
-	opts:	rw,vers=4.0,rsize=1048576,wsize=1048576,namlen=255,acregmin=3,acregmax=60,acdirmin=30,acdirmax=60,hard,proto=tcp,port=0,timeo=600,retrans=2,sec=sys,clientaddr=192.168.1.5,local_lock=none
+	opts:	rw,vers=4.0,rsize=1048576,wsize=1048576,namlen=255,acregmin=3,acregmax=60,acdirmin=30,acdirmax=60,hard,proto=tcp,port=0,timeo=600,retrans=2,sec=sys,mountaddr=192.168.1.1,clientaddr=192.168.1.5,local_lock=none
 	age:	13968
 	caps:	caps=0xfff7,wtmult=512,dtsize=32768,bsize=0,namlen=255
 	nfsv4:	bm0=0xfdffafff,bm1=0xf9be3e,bm2=0x0,acl=0x0,pnfs=not configured
@@ -91,13 +94,14 @@ device 192.168.1.1:/srv/test mounted on /mnt/nfs/test with fstype nfs4 statvers=
 	        NULL: 0 0 0 0 0 0 0 0
 	        READ: 1298 1298 0 207680 1210292152 6 79386 79407
 	       WRITE: 0 0 0 0 0 0 0 0
+	      ACCESS: 2927395007 2927394995 0 526931094212 362996810236 18446743919241604546 1667369447 1953587717
 
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Directory: fixtures/26231/net
+Directory: fixtures/proc/26231/net
 Mode: 755
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26231/net/dev
+Path: fixtures/proc/26231/net/dev
 Lines: 4
 Inter-|   Receive                                                |  Transmit
  face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
@@ -105,142 +109,226 @@ Inter-|   Receive                                                |  Transmit
   eth0:     438       5    0    0    0     0          0         0      648       8    0    0    0     0       0          0
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Directory: fixtures/26231/ns
+Directory: fixtures/proc/26231/ns
 Mode: 755
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26231/ns/mnt
+Path: fixtures/proc/26231/ns/mnt
 SymlinkTo: mnt:[4026531840]
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26231/ns/net
+Path: fixtures/proc/26231/ns/net
 SymlinkTo: net:[4026531993]
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26231/root
+Path: fixtures/proc/26231/root
 SymlinkTo: /
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26231/stat
+Path: fixtures/proc/26231/stat
 Lines: 1
 26231 (vim) R 5392 7446 5392 34835 7446 4218880 32533 309516 26 82 1677 44 158 99 20 0 1 0 82375 56274944 1981 18446744073709551615 4194304 6294284 140736914091744 140736914087944 139965136429984 0 0 12288 1870679807 0 0 0 17 0 0 0 31 0 0 8391624 8481048 16420864 140736914093252 140736914093279 140736914093279 140736914096107 0
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Directory: fixtures/26232
+Path: fixtures/proc/26231/status
+Lines: 53
+
+Name:	prometheus
+Umask:	0022
+State:	S (sleeping)
+Tgid:	1
+Ngid:	0
+Pid:	1
+PPid:	0
+TracerPid:	0
+Uid:	0	0	0	0
+Gid:	0	0	0	0
+FDSize:	128
+Groups:
+NStgid:	1
+NSpid:	1
+NSpgid:	1
+NSsid:	1
+VmPeak:	   58472 kB
+VmSize:	   58440 kB
+VmLck:	       0 kB
+VmPin:	       0 kB
+VmHWM:	    8028 kB
+VmRSS:	    6716 kB
+RssAnon:	    2092 kB
+RssFile:	    4624 kB
+RssShmem:	       0 kB
+VmData:	    2580 kB
+VmStk:	     136 kB
+VmExe:	     948 kB
+VmLib:	    6816 kB
+VmPTE:	     128 kB
+VmPMD:	      12 kB
+VmSwap:	     660 kB
+HugetlbPages:	       0 kB
+Threads:	1
+SigQ:	8/63965
+SigPnd:	0000000000000000
+ShdPnd:	0000000000000000
+SigBlk:	7be3c0fe28014a03
+SigIgn:	0000000000001000
+SigCgt:	00000001800004ec
+CapInh:	0000000000000000
+CapPrm:	0000003fffffffff
+CapEff:	0000003fffffffff
+CapBnd:	0000003fffffffff
+CapAmb:	0000000000000000
+Seccomp:	0
+Cpus_allowed:	ff
+Cpus_allowed_list:	0-7
+Mems_allowed:	00000000,00000001
+Mems_allowed_list:	0
+voluntary_ctxt_switches:	4742839
+nonvoluntary_ctxt_switches:	1727500
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/proc/26232
 Mode: 755
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26232/cmdline
+Path: fixtures/proc/26232/cmdline
 Lines: 0
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26232/comm
+Path: fixtures/proc/26232/comm
 Lines: 1
 ata_sff
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26232/cwd
+Path: fixtures/proc/26232/cwd
 SymlinkTo: /does/not/exist
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Directory: fixtures/26232/fd
+Directory: fixtures/proc/26232/fd
 Mode: 755
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26232/fd/0
+Path: fixtures/proc/26232/fd/0
 SymlinkTo: ../../symlinktargets/abc
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26232/fd/1
+Path: fixtures/proc/26232/fd/1
 SymlinkTo: ../../symlinktargets/def
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26232/fd/2
+Path: fixtures/proc/26232/fd/2
 SymlinkTo: ../../symlinktargets/ghi
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26232/fd/3
+Path: fixtures/proc/26232/fd/3
 SymlinkTo: ../../symlinktargets/uvw
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26232/fd/4
+Path: fixtures/proc/26232/fd/4
 SymlinkTo: ../../symlinktargets/xyz
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26232/limits
+Path: fixtures/proc/26232/limits
 Lines: 17
-Limit                     Soft Limit           Hard Limit           Units     
-Max cpu time              unlimited            unlimited            seconds   
-Max file size             unlimited            unlimited            bytes     
-Max data size             unlimited            unlimited            bytes     
-Max stack size            8388608              unlimited            bytes     
-Max core file size        0                    unlimited            bytes     
-Max resident set          unlimited            unlimited            bytes     
-Max processes             29436                29436                processes 
-Max open files            1024                 4096                 files     
-Max locked memory         65536                65536                bytes     
-Max address space         unlimited            unlimited            bytes     
-Max file locks            unlimited            unlimited            locks     
-Max pending signals       29436                29436                signals   
-Max msgqueue size         819200               819200               bytes     
-Max nice priority         0                    0                    
-Max realtime priority     0                    0                    
-Max realtime timeout      unlimited            unlimited            us        
+Limit                     Soft Limit           Hard Limit           Units
+Max cpu time              unlimited            unlimited            seconds
+Max file size             unlimited            unlimited            bytes
+Max data size             unlimited            unlimited            bytes
+Max stack size            8388608              unlimited            bytes
+Max core file size        0                    unlimited            bytes
+Max resident set          unlimited            unlimited            bytes
+Max processes             29436                29436                processes
+Max open files            1024                 4096                 files
+Max locked memory         65536                65536                bytes
+Max address space         unlimited            unlimited            bytes
+Max file locks            unlimited            unlimited            locks
+Max pending signals       29436                29436                signals
+Max msgqueue size         819200               819200               bytes
+Max nice priority         0                    0
+Max realtime priority     0                    0
+Max realtime timeout      unlimited            unlimited            us
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26232/root
+Path: fixtures/proc/26232/root
 SymlinkTo: /does/not/exist
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26232/stat
+Path: fixtures/proc/26232/stat
 Lines: 1
 33 (ata_sff) S 2 0 0 0 -1 69238880 0 0 0 0 0 0 0 0 0 -20 1 0 5 0 0 18446744073709551615 0 0 0 0 0 0 0 2147483647 0 18446744073709551615 0 0 17 1 0 0 0 0 0 0 0 0 0 0 0 0 0
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Directory: fixtures/26233
+Directory: fixtures/proc/26233
 Mode: 755
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/26233/cmdline
+Path: fixtures/proc/26233/cmdline
 Lines: 1
 com.github.uiautomatorNULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTENULLBYTEEOF
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Directory: fixtures/584
+Directory: fixtures/proc/584
 Mode: 755
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/584/stat
+Path: fixtures/proc/584/stat
 Lines: 2
 1020 ((a b ) ( c d) ) R 28378 1020 28378 34842 1020 4218880 286 0 0 0 0 0 0 0 20 0 1 0 10839175 10395648 155 18446744073709551615 4194304 4238788 140736466511168 140736466511168 140609271124624 0 0 0 0 0 0 0 17 5 0 0 0 0 0 6336016 6337300 25579520 140736466515030 140736466515061 140736466515061 140736466518002 0
 #!/bin/cat /proc/self/stat
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Directory: fixtures/buddyinfo
-Mode: 755
-# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Directory: fixtures/buddyinfo/short
-Mode: 755
-# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/buddyinfo/short/buddyinfo
+Path: fixtures/proc/buddyinfo
 Lines: 3
-Node 0, zone
-Node 0, zone
-Node 0, zone
+Node 0, zone      DMA      1      0      1      0      2      1      1      0      1      1      3
+Node 0, zone    DMA32    759    572    791    475    194     45     12      0      0      0      0
+Node 0, zone   Normal   4381   1093    185   1530    567    102      4      0      0      0      0
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Directory: fixtures/buddyinfo/sizemismatch
+Path: fixtures/proc/diskstats
+Lines: 49
+   1       0 ram0 0 0 0 0 0 0 0 0 0 0 0
+   1       1 ram1 0 0 0 0 0 0 0 0 0 0 0
+   1       2 ram2 0 0 0 0 0 0 0 0 0 0 0
+   1       3 ram3 0 0 0 0 0 0 0 0 0 0 0
+   1       4 ram4 0 0 0 0 0 0 0 0 0 0 0
+   1       5 ram5 0 0 0 0 0 0 0 0 0 0 0
+   1       6 ram6 0 0 0 0 0 0 0 0 0 0 0
+   1       7 ram7 0 0 0 0 0 0 0 0 0 0 0
+   1       8 ram8 0 0 0 0 0 0 0 0 0 0 0
+   1       9 ram9 0 0 0 0 0 0 0 0 0 0 0
+   1      10 ram10 0 0 0 0 0 0 0 0 0 0 0
+   1      11 ram11 0 0 0 0 0 0 0 0 0 0 0
+   1      12 ram12 0 0 0 0 0 0 0 0 0 0 0
+   1      13 ram13 0 0 0 0 0 0 0 0 0 0 0
+   1      14 ram14 0 0 0 0 0 0 0 0 0 0 0
+   1      15 ram15 0 0 0 0 0 0 0 0 0 0 0
+   7       0 loop0 0 0 0 0 0 0 0 0 0 0 0
+   7       1 loop1 0 0 0 0 0 0 0 0 0 0 0
+   7       2 loop2 0 0 0 0 0 0 0 0 0 0 0
+   7       3 loop3 0 0 0 0 0 0 0 0 0 0 0
+   7       4 loop4 0 0 0 0 0 0 0 0 0 0 0
+   7       5 loop5 0 0 0 0 0 0 0 0 0 0 0
+   7       6 loop6 0 0 0 0 0 0 0 0 0 0 0
+   7       7 loop7 0 0 0 0 0 0 0 0 0 0 0
+   8       0 sda 25354637 34367663 1003346126 18492372 28444756 11134226 505697032 63877960 0 9653880 82621804
+   8       1 sda1 250 0 2000 36 0 0 0 0 0 36 36
+   8       2 sda2 246 0 1968 32 0 0 0 0 0 32 32
+   8       3 sda3 340 13 2818 52 11 8 152 8 0 56 60
+   8       4 sda4 25353629 34367650 1003337964 18492232 27448755 11134218 505696880 61593380 0 7576432 80332428
+ 252       0 dm-0 59910002 0 1003337218 46229572 39231014 0 505696880 1158557800 0 11325968 1206301256
+ 252       1 dm-1 388 0 3104 84 74 0 592 0 0 76 84
+ 252       2 dm-2 11571 0 308350 6536 153522 0 5093416 122884 0 65400 129416
+ 252       3 dm-3 3870 0 3870 104 0 0 0 0 0 16 104
+ 252       4 dm-4 392 0 1034 28 38 0 137 16 0 24 44
+ 252       5 dm-5 3729 0 84279 924 98918 0 1151688 104684 0 58848 105632
+ 179       0 mmcblk0 192 3 1560 156 0 0 0 0 0 136 156
+ 179       1 mmcblk0p1 17 3 160 24 0 0 0 0 0 24 24
+ 179       2 mmcblk0p2 95 0 760 68 0 0 0 0 0 68 68
+   2       0 fd0 2 0 16 80 0 0 0 0 0 80 80
+ 254       0 vda 1775784 15386 32670882 8655768 6038856 20711856 213637440 2069221364 0 41614592 2077872228
+ 254       1 vda1 668 85 5984 956 207 4266 35784 32772 0 8808 33720
+ 254       2 vda2 1774936 15266 32663262 8654692 5991028 20707590 213601656 2069152216 0 41607628 2077801992
+  11       0 sr0 0 0 0 0 0 0 0 0 0 0 0
+ 259       0 nvme0n1 47114 4 4643973 21650 1078320 43950 39451633 1011053 0 222766 1032546
+ 259       1 nvme0n1p1 1140 0 9370 16 1 0 1 0 0 16 16
+ 259       2 nvme0n1p2 45914 4 4631243 21626 1036885 43950 39451632 919480 0 131580 940970
+   8       0 sdb 326552 841 9657779 84 41822 2895 1972905 5007 0 60730 67070 68851 0 1925173784 11130
+   8       1 sdb1 231 3 34466 4 24 23 106 0 0 64 64 0 0 0 0
+   8       2 sdb2 326310 838 9622281 67 40726 2872 1972799 4924 0 58250 64567 68851 0 1925173784 11130
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/proc/fs
 Mode: 755
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/buddyinfo/sizemismatch/buddyinfo
-Lines: 3
-Node 0, zone      DMA      1      0      1      0      2      1      1      0      1      1      3 
-Node 0, zone    DMA32    759    572    791    475    194     45     12      0      0      0      0      0
-Node 0, zone   Normal   4381   1093    185   1530    567    102      4      0      0      0
-Mode: 644
-# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Directory: fixtures/buddyinfo/valid
+Directory: fixtures/proc/fs/xfs
 Mode: 755
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/buddyinfo/valid/buddyinfo
-Lines: 3
-Node 0, zone      DMA      1      0      1      0      2      1      1      0      1      1      3 
-Node 0, zone    DMA32    759    572    791    475    194     45     12      0      0      0      0 
-Node 0, zone   Normal   4381   1093    185   1530    567    102      4      0      0      0      0 
-Mode: 644
-# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Directory: fixtures/fs
-Mode: 755
-# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Directory: fixtures/fs/xfs
-Mode: 755
-# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/fs/xfs/stat
+Path: fixtures/proc/fs/xfs/stat
 Lines: 23
 extent_alloc 92447 97589 92448 93751
 abt 0 0 0 0
@@ -267,18 +355,18 @@ xpc 399724544 92823103 86219234
 debug 0
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/mdstat
+Path: fixtures/proc/mdstat
 Lines: 26
 Personalities : [linear] [multipath] [raid0] [raid1] [raid6] [raid5] [raid4] [raid10]
 md3 : active raid6 sda1[8] sdh1[7] sdg1[6] sdf1[5] sde1[11] sdd1[3] sdc1[10] sdb1[9]
       5853468288 blocks super 1.2 level 6, 64k chunk, algorithm 2 [8/8] [UUUUUUUU]
-      
+
 md127 : active raid1 sdi2[0] sdj2[1]
       312319552 blocks [2/2] [UU]
-      
+
 md0 : active raid1 sdk[2](S) sdi1[0] sdj1[1]
       248896 blocks [2/2] [UU]
-      
+
 md4 : inactive raid1 sda3[0] sdb3[1]
       4883648 blocks [2/2] [UU]
 
@@ -297,10 +385,10 @@ md7 : active raid6 sdb1[0] sde1[3] sdd1[2] sdc1[1]
 unused devices: <none>
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Directory: fixtures/net
+Directory: fixtures/proc/net
 Mode: 755
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/net/dev
+Path: fixtures/proc/net/dev
 Lines: 6
 Inter-|   Receive                                                |  Transmit
  face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
@@ -310,7 +398,7 @@ docker0:    2568      38    0    0    0     0          0         0      438     
   eth0: 874354587 1036395    0    0    0     0          0         0 563352563  732147    0    0    0     0       0          0
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/net/ip_vs
+Path: fixtures/proc/net/ip_vs
 Lines: 21
 IP Virtual Server version 1.2.1 (size=4096)
 Prot LocalAddress:Port Scheduler Flags
@@ -335,7 +423,7 @@ FWM  10001000 wlc
   -> C0A83215:0CEA      Route   0      0          2
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/net/ip_vs_stats
+Path: fixtures/proc/net/ip_vs_stats
 Lines: 6
    Total Incoming Outgoing         Incoming         Outgoing
    Conns  Packets  Packets            Bytes            Bytes
@@ -345,10 +433,10 @@ Lines: 6
        4    1FB3C        0          1282A8F                0
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Directory: fixtures/net/rpc
+Directory: fixtures/proc/net/rpc
 Mode: 755
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/net/rpc/nfs
+Path: fixtures/proc/net/rpc/nfs
 Lines: 5
 net 18628 0 18628 6
 rpc 4329785 0 4338291
@@ -357,7 +445,7 @@ proc3 22 1 4084749 29200 94754 32580 186 47747 7981 8639 0 6356 0 6962 0 7958 0 
 proc4 61 1 0 0 0 0 0 0 0 0 0 0 0 1 1 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/net/rpc/nfsd
+Path: fixtures/proc/net/rpc/nfsd
 Lines: 11
 rc 0 6 18622
 fh 0 0 0 0 0
@@ -372,7 +460,27 @@ proc4 2 2 10853
 proc4ops 72 0 0 0 1098 2 0 0 0 0 8179 5896 0 0 0 0 5900 0 0 2 0 2 0 9609 0 2 150 1272 0 0 0 1236 0 0 0 0 3 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/net/xfrm_stat
+Path: fixtures/proc/net/unix
+Lines: 6
+Num       RefCount Protocol Flags    Type St Inode Path
+0000000000000000: 00000002 00000000 00010000 0001 01 3442596 /var/run/postgresql/.s.PGSQL.5432
+0000000000000000: 0000000a 00000000 00010000 0005 01 10061 /run/udev/control
+0000000000000000: 00000007 00000000 00000000 0002 01 12392 /dev/log
+0000000000000000: 00000003 00000000 00000000 0001 03 4787297 /var/run/postgresql/.s.PGSQL.5432
+0000000000000000: 00000003 00000000 00000000 0001 03 5091797
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/proc/net/unix_without_inode
+Lines: 6
+Num       RefCount Protocol Flags    Type St Path
+0000000000000000: 00000002 00000000 00010000 0001 01 /var/run/postgresql/.s.PGSQL.5432
+0000000000000000: 0000000a 00000000 00010000 0005 01 /run/udev/control
+0000000000000000: 00000007 00000000 00000000 0002 01 /dev/log
+0000000000000000: 00000003 00000000 00000000 0001 03 /var/run/postgresql/.s.PGSQL.5432
+0000000000000000: 00000003 00000000 00000000 0001 03
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/proc/net/xfrm_stat
 Lines: 28
 XfrmInError                     1
 XfrmInBufferError               2
@@ -404,10 +512,30 @@ XfrmOutStateInvalid             28765
 XfrmAcquireError                24532
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/self
+Directory: fixtures/proc/pressure
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/proc/pressure/cpu
+Lines: 1
+some avg10=0.10 avg60=2.00 avg300=3.85 total=15
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/proc/pressure/io
+Lines: 2
+some avg10=0.10 avg60=2.00 avg300=3.85 total=15
+full avg10=0.20 avg60=3.00 avg300=4.95 total=25
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/proc/pressure/memory
+Lines: 2
+some avg10=0.10 avg60=2.00 avg300=3.85 total=15
+full avg10=0.20 avg60=3.00 avg300=4.95 total=25
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/proc/self
 SymlinkTo: 26231
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/stat
+Path: fixtures/proc/stat
 Lines: 16
 cpu  301854 612 111922 8979004 3552 2 3944 0 0 0
 cpu0 44490 19 21045 1087069 220 1 3410 0 0 0
@@ -427,36 +555,1254 @@ procs_blocked 1
 softirq 5057579 250191 1481983 1647 211099 186066 0 1783454 622196 12499 508444
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Directory: fixtures/symlinktargets
+Directory: fixtures/proc/symlinktargets
 Mode: 755
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/symlinktargets/README
+Path: fixtures/proc/symlinktargets/README
 Lines: 2
 This directory contains some empty files that are the symlinks the files in the "fd" directory point to.
 They are otherwise ignored by the tests
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/symlinktargets/abc
+Path: fixtures/proc/symlinktargets/abc
 Lines: 0
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/symlinktargets/def
+Path: fixtures/proc/symlinktargets/def
 Lines: 0
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/symlinktargets/ghi
+Path: fixtures/proc/symlinktargets/ghi
 Lines: 0
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/symlinktargets/uvw
+Path: fixtures/proc/symlinktargets/uvw
 Lines: 0
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/symlinktargets/xyz
+Path: fixtures/proc/symlinktargets/xyz
 Lines: 0
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Path: fixtures/.unpacked
-Lines: 0
+Directory: fixtures/sys
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/block
+Mode: 775
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/block/dm-0
+Mode: 775
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/block/dm-0/stat
+Lines: 1
+6447303        0 710266738  1529043   953216        0 31201176  4557464        0   796160  6088971
 Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/block/sda
+Mode: 775
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/block/sda/stat
+Lines: 1
+9652963   396792 759304206   412943  8422549  6731723 286915323 13947418        0  5658367 19174573 1 2 3 12
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/class
+Mode: 775
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/class/net
+Mode: 775
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/class/net/eth0
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/addr_assign_type
+Lines: 1
+3
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/addr_len
+Lines: 1
+6
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/address
+Lines: 1
+01:01:01:01:01:01
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/broadcast
+Lines: 1
+ff:ff:ff:ff:ff:ff
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/carrier
+Lines: 1
+1
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/carrier_changes
+Lines: 1
+2
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/carrier_down_count
+Lines: 1
+1
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/carrier_up_count
+Lines: 1
+1
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/dev_id
+Lines: 1
+0x20
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/dormant
+Lines: 1
+1
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/duplex
+Lines: 1
+full
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/flags
+Lines: 1
+0x1303
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/ifalias
+Lines: 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/ifindex
+Lines: 1
+2
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/iflink
+Lines: 1
+2
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/link_mode
+Lines: 1
+1
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/mtu
+Lines: 1
+1500
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/name_assign_type
+Lines: 1
+2
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/netdev_group
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/operstate
+Lines: 1
+up
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/phys_port_id
+Lines: 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/phys_port_name
+Lines: 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/phys_switch_id
+Lines: 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/speed
+Lines: 1
+1000
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/tx_queue_len
+Lines: 1
+1000
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/net/eth0/type
+Lines: 1
+1
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/class/power_supply
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/class/power_supply/AC
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/AC/online
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/AC/type
+Lines: 1
+Mains
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/AC/uevent
+Lines: 2
+POWER_SUPPLY_NAME=AC
+POWER_SUPPLY_ONLINE=0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/class/power_supply/BAT0
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/alarm
+Lines: 1
+2503000
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/capacity
+Lines: 1
+98
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/capacity_level
+Lines: 1
+Normal
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/charge_start_threshold
+Lines: 1
+95
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/charge_stop_threshold
+Lines: 1
+100
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/cycle_count
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/energy_full
+Lines: 1
+50060000
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/energy_full_design
+Lines: 1
+47520000
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/energy_now
+Lines: 1
+49450000
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/manufacturer
+Lines: 1
+LGC
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/model_name
+Lines: 1
+LNV-45N1
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/power_now
+Lines: 1
+4830000
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/present
+Lines: 1
+1
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/serial_number
+Lines: 1
+38109
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/status
+Lines: 1
+Discharging
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/technology
+Lines: 1
+Li-ion
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/type
+Lines: 1
+Battery
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/uevent
+Lines: 16
+POWER_SUPPLY_NAME=BAT0
+POWER_SUPPLY_STATUS=Discharging
+POWER_SUPPLY_PRESENT=1
+POWER_SUPPLY_TECHNOLOGY=Li-ion
+POWER_SUPPLY_CYCLE_COUNT=0
+POWER_SUPPLY_VOLTAGE_MIN_DESIGN=10800000
+POWER_SUPPLY_VOLTAGE_NOW=12229000
+POWER_SUPPLY_POWER_NOW=4830000
+POWER_SUPPLY_ENERGY_FULL_DESIGN=47520000
+POWER_SUPPLY_ENERGY_FULL=50060000
+POWER_SUPPLY_ENERGY_NOW=49450000
+POWER_SUPPLY_CAPACITY=98
+POWER_SUPPLY_CAPACITY_LEVEL=Normal
+POWER_SUPPLY_MODEL_NAME=LNV-45N1
+POWER_SUPPLY_MANUFACTURER=LGC
+POWER_SUPPLY_SERIAL_NUMBER=38109
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/voltage_min_design
+Lines: 1
+10800000
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/power_supply/BAT0/voltage_now
+Lines: 1
+12229000
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/class/thermal
+Mode: 775
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/class/thermal/thermal_zone0
+Mode: 775
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/thermal/thermal_zone0/policy
+Lines: 1
+step_wise
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/thermal/thermal_zone0/temp
+Lines: 1
+49925
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/thermal/thermal_zone0/type
+Lines: 1
+bcm2835_thermal
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/class/thermal/thermal_zone1
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/thermal/thermal_zone1/mode
+Lines: 1
+enabled
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/thermal/thermal_zone1/passive
+Lines: 1
+0
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/thermal/thermal_zone1/policy
+Lines: 1
+step_wise
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/thermal/thermal_zone1/temp
+Lines: 1
+44000
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/thermal/thermal_zone1/type
+Lines: 1
+acpitz
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/dirty_data
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_day
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_day/bypassed
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_day/cache_bypass_hits
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_day/cache_bypass_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_day/cache_hit_ratio
+Lines: 1
+100
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_day/cache_hits
+Lines: 1
+289
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_day/cache_miss_collisions
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_day/cache_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_day/cache_readaheads
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_five_minute
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_five_minute/bypassed
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_five_minute/cache_bypass_hits
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_five_minute/cache_bypass_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_five_minute/cache_hit_ratio
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_five_minute/cache_hits
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_five_minute/cache_miss_collisions
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_five_minute/cache_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_five_minute/cache_readaheads
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_hour
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_hour/bypassed
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_hour/cache_bypass_hits
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_hour/cache_bypass_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_hour/cache_hit_ratio
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_hour/cache_hits
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_hour/cache_miss_collisions
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_hour/cache_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_hour/cache_readaheads
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_total
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_total/bypassed
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_total/cache_bypass_hits
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_total/cache_bypass_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_total/cache_hit_ratio
+Lines: 1
+100
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_total/cache_hits
+Lines: 1
+546
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_total/cache_miss_collisions
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_total/cache_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata4/host3/target3:0:0/3:0:0:0/block/sdb/bcache/stats_total/cache_readaheads
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata5
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata5/host4
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata5/host4/target4:0:0
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata5/host4/target4:0:0/4:0:0:0
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata5/host4/target4:0:0/4:0:0:0/block
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata5/host4/target4:0:0/4:0:0:0/block/sdc
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata5/host4/target4:0:0/4:0:0:0/block/sdc/bcache
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata5/host4/target4:0:0/4:0:0:0/block/sdc/bcache/io_errors
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata5/host4/target4:0:0/4:0:0:0/block/sdc/bcache/metadata_written
+Lines: 1
+512
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata5/host4/target4:0:0/4:0:0:0/block/sdc/bcache/priority_stats
+Lines: 5
+Unused:		99%
+Metadata:	0%
+Average:	10473
+Sectors per Q:	64
+Quantiles:	[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 20946 20946 20946 20946 20946 20946 20946 20946 20946 20946 20946 20946 20946 20946 20946 20946]
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/pci0000:00/0000:00:0d.0/ata5/host4/target4:0:0/4:0:0:0/block/sdc/bcache/written
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/system
+Mode: 775
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/system/clocksource
+Mode: 775
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/system/clocksource/clocksource0
+Mode: 775
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/clocksource/clocksource0/available_clocksource
+Lines: 1
+tsc hpet acpi_pm 
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/clocksource/clocksource0/current_clocksource
+Lines: 1
+tsc
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/system/cpu
+Mode: 775
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/system/cpu/cpu0
+Mode: 775
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpu0/cpufreq
+SymlinkTo: ../cpufreq/policy0
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/system/cpu/cpu1
+Mode: 775
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/system/cpu/cpu1/cpufreq
+Mode: 775
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpu1/cpufreq/cpuinfo_cur_freq
+Lines: 1
+1200195
+Mode: 400
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpu1/cpufreq/cpuinfo_max_freq
+Lines: 1
+3300000
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpu1/cpufreq/cpuinfo_min_freq
+Lines: 1
+1200000
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpu1/cpufreq/cpuinfo_transition_latency
+Lines: 1
+4294967295
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpu1/cpufreq/related_cpus
+Lines: 1
+1
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpu1/cpufreq/scaling_available_governors
+Lines: 1
+performance powersave
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpu1/cpufreq/scaling_driver
+Lines: 1
+intel_pstate
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpu1/cpufreq/scaling_governor
+Lines: 1
+powersave
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpu1/cpufreq/scaling_max_freq
+Lines: 1
+3300000
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpu1/cpufreq/scaling_min_freq
+Lines: 1
+1200000
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpu1/cpufreq/scaling_setspeed
+Lines: 1
+<unsupported>
+Mode: 664
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/system/cpu/cpufreq
+Mode: 775
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/system/cpu/cpufreq/policy0
+Mode: 775
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpufreq/policy0/affected_cpus
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpufreq/policy0/cpuinfo_max_freq
+Lines: 1
+2400000
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpufreq/policy0/cpuinfo_min_freq
+Lines: 1
+800000
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpufreq/policy0/cpuinfo_transition_latency
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpufreq/policy0/related_cpus
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpufreq/policy0/scaling_available_governors
+Lines: 1
+performance powersave
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpufreq/policy0/scaling_cur_freq
+Lines: 1
+1219917
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpufreq/policy0/scaling_driver
+Lines: 1
+intel_pstate
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpufreq/policy0/scaling_governor
+Lines: 1
+powersave
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpufreq/policy0/scaling_max_freq
+Lines: 1
+2400000
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpufreq/policy0/scaling_min_freq
+Lines: 1
+800000
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/devices/system/cpu/cpufreq/policy0/scaling_setspeed
+Lines: 1
+<unsupported>
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/devices/system/cpu/cpufreq/policy1
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/bcache
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/average_key_size
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0
+Mode: 777
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/dirty_data
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_day
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_day/bypassed
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_day/cache_bypass_hits
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_day/cache_bypass_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_day/cache_hit_ratio
+Lines: 1
+100
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_day/cache_hits
+Lines: 1
+289
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_day/cache_miss_collisions
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_day/cache_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_day/cache_readaheads
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_five_minute
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_five_minute/bypassed
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_five_minute/cache_bypass_hits
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_five_minute/cache_bypass_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_five_minute/cache_hit_ratio
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_five_minute/cache_hits
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_five_minute/cache_miss_collisions
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_five_minute/cache_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_five_minute/cache_readaheads
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_hour
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_hour/bypassed
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_hour/cache_bypass_hits
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_hour/cache_bypass_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_hour/cache_hit_ratio
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_hour/cache_hits
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_hour/cache_miss_collisions
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_hour/cache_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_hour/cache_readaheads
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_total
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_total/bypassed
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_total/cache_bypass_hits
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_total/cache_bypass_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_total/cache_hit_ratio
+Lines: 1
+100
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_total/cache_hits
+Lines: 1
+546
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_total/cache_miss_collisions
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_total/cache_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/bdev0/stats_total/cache_readaheads
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/btree_cache_size
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/cache0
+Mode: 777
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/cache0/io_errors
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/cache0/metadata_written
+Lines: 1
+512
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/cache0/priority_stats
+Lines: 5
+Unused:		99%
+Metadata:	0%
+Average:	10473
+Sectors per Q:	64
+Quantiles:	[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 20946 20946 20946 20946 20946 20946 20946 20946 20946 20946 20946 20946 20946 20946 20946 20946]
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/cache0/written
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/cache_available_percent
+Lines: 1
+100
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/congested
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/internal
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/internal/active_journal_entries
+Lines: 1
+1
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/internal/btree_nodes
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/internal/btree_read_average_duration_us
+Lines: 1
+1305
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/internal/cache_read_races
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/root_usage_percent
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_day
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_day/bypassed
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_day/cache_bypass_hits
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_day/cache_bypass_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_day/cache_hit_ratio
+Lines: 1
+100
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_day/cache_hits
+Lines: 1
+289
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_day/cache_miss_collisions
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_day/cache_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_day/cache_readaheads
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_five_minute
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_five_minute/bypassed
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_five_minute/cache_bypass_hits
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_five_minute/cache_bypass_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_five_minute/cache_hit_ratio
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_five_minute/cache_hits
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_five_minute/cache_miss_collisions
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_five_minute/cache_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_five_minute/cache_readaheads
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_hour
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_hour/bypassed
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_hour/cache_bypass_hits
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_hour/cache_bypass_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_hour/cache_hit_ratio
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_hour/cache_hits
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_hour/cache_miss_collisions
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_hour/cache_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_hour/cache_readaheads
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_total
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_total/bypassed
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_total/cache_bypass_hits
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_total/cache_bypass_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_total/cache_hit_ratio
+Lines: 1
+100
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_total/cache_hits
+Lines: 1
+546
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_total/cache_miss_collisions
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_total/cache_misses
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/stats_total/cache_readaheads
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/bcache/deaddd54-c735-46d5-868e-f331c5fd7c74/tree_depth
+Lines: 1
+0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/xfs
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/xfs/sda1
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/xfs/sda1/stats
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/xfs/sda1/stats/stats
+Lines: 1
+extent_alloc 1 0 0 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/xfs/sdb1
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/fs/xfs/sdb1/stats
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/fs/xfs/sdb1/stats/stats
+Lines: 1
+extent_alloc 2 0 0 0
+Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

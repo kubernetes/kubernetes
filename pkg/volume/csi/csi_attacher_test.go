@@ -26,9 +26,11 @@ import (
 	"testing"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -221,6 +223,8 @@ func TestAttacherAttach(t *testing.T) {
 				status.AttachError = &storage.VolumeError{
 					Message: "attacher error",
 				}
+				errStatus := apierrs.NewInternalError(fmt.Errorf("we got an error")).Status()
+				fakeWatcher.Error(&errStatus)
 			} else {
 				status.Attached = true
 			}
@@ -340,9 +344,9 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fakeclient.NewSimpleClientset(
-				getTestCSIDriver("not-attachable", nil, &bFalse),
-				getTestCSIDriver("attachable", nil, &bTrue),
-				getTestCSIDriver("nil", nil, nil),
+				getTestCSIDriver("not-attachable", nil, &bFalse, nil),
+				getTestCSIDriver("attachable", nil, &bTrue, nil),
+				getTestCSIDriver("nil", nil, nil, nil),
 			)
 			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
@@ -369,7 +373,7 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 			var wg sync.WaitGroup
 			wg.Add(1)
 			go func(volSpec *volume.Spec, expectAttach bool) {
-				attachID, err := csiAttacher.Attach(volSpec, types.NodeName("node"))
+				attachID, err := csiAttacher.Attach(volSpec, types.NodeName("fakeNode"))
 				defer wg.Done()
 
 				if err != nil {
@@ -381,7 +385,7 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 			}(spec, test.expectVolumeAttachment)
 
 			if test.expectVolumeAttachment {
-				expectedAttachID := getAttachmentName("test-vol", test.driver, "node")
+				expectedAttachID := getAttachmentName("test-vol", test.driver, "fakeNode")
 				status := storage.VolumeAttachmentStatus{
 					Attached: true,
 				}
@@ -428,9 +432,15 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fakeclient.NewSimpleClientset(
-				getTestCSIDriver("not-attachable", nil, &bFalse),
-				getTestCSIDriver("attachable", nil, &bTrue),
-				getTestCSIDriver("nil", nil, nil),
+				getTestCSIDriver("not-attachable", nil, &bFalse, nil),
+				getTestCSIDriver("attachable", nil, &bTrue, nil),
+				getTestCSIDriver("nil", nil, nil, nil),
+				&v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "fakeNode",
+					},
+					Spec: v1.NodeSpec{},
+				},
 			)
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
@@ -476,21 +486,21 @@ func TestAttacherWaitForAttach(t *testing.T) {
 			driver: "attachable",
 			makeAttachment: func() *storage.VolumeAttachment {
 
-				testAttachID := getAttachmentName("test-vol", "attachable", "node")
-				successfulAttachment := makeTestAttachment(testAttachID, "node", "test-pv")
+				testAttachID := getAttachmentName("test-vol", "attachable", "fakeNode")
+				successfulAttachment := makeTestAttachment(testAttachID, "fakeNode", "test-pv")
 				successfulAttachment.Status.Attached = true
 				return successfulAttachment
 			},
 			spec:             volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "attachable", "test-vol"), false),
-			expectedAttachID: getAttachmentName("test-vol", "attachable", "node"),
+			expectedAttachID: getAttachmentName("test-vol", "attachable", "fakeNode"),
 			expectError:      false,
 		},
 		{
 			name: "failed attach with vol source",
 			makeAttachment: func() *storage.VolumeAttachment {
 
-				testAttachID := getAttachmentName("test-vol", "attachable", "node")
-				successfulAttachment := makeTestAttachment(testAttachID, "node", "volSrc01")
+				testAttachID := getAttachmentName("test-vol", "attachable", "fakeNode")
+				successfulAttachment := makeTestAttachment(testAttachID, "fakeNode", "volSrc01")
 				successfulAttachment.Status.Attached = true
 				return successfulAttachment
 			},
@@ -557,21 +567,21 @@ func TestAttacherWaitForAttachWithInline(t *testing.T) {
 			name: "successful attach with PV",
 			makeAttachment: func() *storage.VolumeAttachment {
 
-				testAttachID := getAttachmentName("test-vol", "attachable", "node")
-				successfulAttachment := makeTestAttachment(testAttachID, "node", "test-pv")
+				testAttachID := getAttachmentName("test-vol", "attachable", "fakeNode")
+				successfulAttachment := makeTestAttachment(testAttachID, "fakeNode", "test-pv")
 				successfulAttachment.Status.Attached = true
 				return successfulAttachment
 			},
 			spec:             volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "attachable", "test-vol"), false),
-			expectedAttachID: getAttachmentName("test-vol", "attachable", "node"),
+			expectedAttachID: getAttachmentName("test-vol", "attachable", "fakeNode"),
 			expectError:      false,
 		},
 		{
 			name: "failed attach with volSrc",
 			makeAttachment: func() *storage.VolumeAttachment {
 
-				testAttachID := getAttachmentName("test-vol", "attachable", "node")
-				successfulAttachment := makeTestAttachment(testAttachID, "node", "volSrc01")
+				testAttachID := getAttachmentName("test-vol", "attachable", "fakeNode")
+				successfulAttachment := makeTestAttachment(testAttachID, "fakeNode", "volSrc01")
 				successfulAttachment.Status.Attached = true
 				return successfulAttachment
 			},
@@ -623,7 +633,7 @@ func TestAttacherWaitForAttachWithInline(t *testing.T) {
 }
 
 func TestAttacherWaitForVolumeAttachment(t *testing.T) {
-	nodeName := "test-node"
+	nodeName := "fakeNode"
 	testCases := []struct {
 		name                 string
 		initAttached         bool
@@ -779,7 +789,7 @@ func TestAttacherVolumesAreAttached(t *testing.T) {
 				t.Fatalf("failed to create new attacher: %v", err)
 			}
 			csiAttacher := attacher.(*csiAttacher)
-			nodeName := "test-node"
+			nodeName := "fakeNode"
 
 			var specs []*volume.Spec
 			// create and save volume attchments
@@ -850,7 +860,7 @@ func TestAttacherVolumesAreAttachedWithInline(t *testing.T) {
 				t.Fatalf("failed to create new attacher: %v", err)
 			}
 			csiAttacher := attacher.(*csiAttacher)
-			nodeName := "test-node"
+			nodeName := "fakeNode"
 
 			var specs []*volume.Spec
 			// create and save volume attchments
@@ -889,14 +899,14 @@ func TestAttacherVolumesAreAttachedWithInline(t *testing.T) {
 }
 
 func TestAttacherDetach(t *testing.T) {
-
-	nodeName := "test-node"
+	nodeName := "fakeNode"
 	testCases := []struct {
-		name       string
-		volID      string
-		attachID   string
-		shouldFail bool
-		reactor    func(action core.Action) (handled bool, ret runtime.Object, err error)
+		name         string
+		volID        string
+		attachID     string
+		shouldFail   bool
+		watcherError bool
+		reactor      func(action core.Action) (handled bool, ret runtime.Object, err error)
 	}{
 		{name: "normal test", volID: "vol-001", attachID: getAttachmentName("vol-001", testDriver, nodeName)},
 		{name: "normal test 2", volID: "vol-002", attachID: getAttachmentName("vol-002", testDriver, nodeName)},
@@ -910,6 +920,19 @@ func TestAttacherDetach(t *testing.T) {
 				// return Forbidden to all DELETE requests
 				if action.Matches("delete", "volumeattachments") {
 					return true, nil, apierrs.NewForbidden(action.GetResource().GroupResource(), action.GetNamespace(), fmt.Errorf("mock error"))
+				}
+				return false, nil, nil
+			},
+		},
+		{
+			name:         "API watch error happen",
+			volID:        "vol-005",
+			attachID:     getAttachmentName("vol-005", testDriver, nodeName),
+			shouldFail:   true,
+			watcherError: true,
+			reactor: func(action core.Action) (handled bool, ret runtime.Object, err error) {
+				if action.Matches("get", "volumeattachments") {
+					return true, makeTestAttachment(getAttachmentName("vol-005", testDriver, nodeName), nodeName, "vol-005"), nil
 				}
 				return false, nil, nil
 			},
@@ -942,7 +965,14 @@ func TestAttacherDetach(t *testing.T) {
 			if err != nil {
 				t.Errorf("test case %s failed: %v", tc.name, err)
 			}
+			watchError := tc.watcherError
+			csiAttacher.waitSleepTime = 100 * time.Millisecond
 			go func() {
+				if watchError {
+					errStatus := apierrs.NewInternalError(fmt.Errorf("we got an error")).Status()
+					fakeWatcher.Error(&errStatus)
+					return
+				}
 				fakeWatcher.Delete(attachment)
 			}()
 			err = csiAttacher.Detach(volumeName, types.NodeName(nodeName))
@@ -1469,6 +1499,12 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset) (*csiPlu
 	if fakeClient == nil {
 		fakeClient = fakeclient.NewSimpleClientset()
 	}
+	fakeClient.Tracker().Add(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fakeNode",
+		},
+		Spec: v1.NodeSpec{},
+	})
 	fakeWatcher := watch.NewRaceFreeFake()
 	fakeClient.Fake.PrependWatchReactor("volumeattachments", core.DefaultWatchReactor(fakeWatcher, nil))
 
@@ -1478,15 +1514,14 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset) (*csiPlu
 	csiDriverLister := csiDriverInformer.Lister()
 	factory.Start(wait.NeverStop)
 
-	host := volumetest.NewFakeVolumeHostWithCSINodeName(
+	host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
 		tmpDir,
 		fakeClient,
-		nil,
-		"node",
+		ProbeVolumePlugins(),
+		"fakeNode",
 		csiDriverLister,
 	)
-	plugMgr := &volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+	plugMgr := host.GetPluginMgr()
 
 	plug, err := plugMgr.FindPluginByName(CSIPluginName)
 	if err != nil {

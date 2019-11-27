@@ -27,15 +27,15 @@ import (
 // Scale represents a scaling request for a resource.
 type Scale struct {
 	metav1.TypeMeta
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta
 
-	// defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
+	// defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
 	// +optional
 	Spec ScaleSpec
 
-	// current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only.
+	// current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
 	// +optional
 	Status ScaleStatus
 }
@@ -62,7 +62,7 @@ type ScaleStatus struct {
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 type CrossVersionObjectReference struct {
-	// Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
+	// Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
 	Kind string
 	// Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
 	Name string
@@ -100,7 +100,7 @@ type HorizontalPodAutoscalerSpec struct {
 // MetricSourceType indicates the type of metric.
 type MetricSourceType string
 
-var (
+const (
 	// ObjectMetricSourceType is a metric describing a kubernetes object
 	// (for example, hits-per-second on an Ingress object).
 	ObjectMetricSourceType MetricSourceType = "Object"
@@ -228,7 +228,7 @@ type MetricTarget struct {
 // "Value", "AverageValue", or "Utilization"
 type MetricTargetType string
 
-var (
+const (
 	// UtilizationMetricType is a possible value for MetricTarget.Type.
 	UtilizationMetricType MetricTargetType = "Utilization"
 	// ValueMetricType is a possible value for MetricTarget.Type.
@@ -282,7 +282,7 @@ const (
 // a HorizontalPodAutoscaler.
 type HorizontalPodAutoscalerConditionType string
 
-var (
+const (
 	// ScalingActive indicates that the HPA controller is able to scale if necessary:
 	// it's correctly configured, can fetch the desired metrics, and isn't disabled.
 	ScalingActive HorizontalPodAutoscalerConditionType = "ScalingActive"
@@ -394,12 +394,12 @@ type MetricValueStatus struct {
 type HorizontalPodAutoscaler struct {
 	metav1.TypeMeta
 	// Metadata is the standard object metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
 	// Spec is the specification for the behaviour of the autoscaler.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
 	// +optional
 	Spec HorizontalPodAutoscalerSpec
 

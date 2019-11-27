@@ -19,9 +19,9 @@ package priorities
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -52,10 +52,10 @@ func getAllTolerationPreferNoSchedule(tolerations []v1.Toleration) (tolerationLi
 }
 
 // ComputeTaintTolerationPriorityMap prepares the priority list for all the nodes based on the number of intolerable taints on the node
-func ComputeTaintTolerationPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
+func ComputeTaintTolerationPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
+		return framework.NodeScore{}, fmt.Errorf("node not found")
 	}
 	// To hold all the tolerations with Effect PreferNoSchedule
 	var tolerationsPreferNoSchedule []v1.Toleration
@@ -66,11 +66,11 @@ func ComputeTaintTolerationPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *
 		tolerationsPreferNoSchedule = getAllTolerationPreferNoSchedule(pod.Spec.Tolerations)
 	}
 
-	return schedulerapi.HostPriority{
-		Host:  node.Name,
-		Score: countIntolerableTaintsPreferNoSchedule(node.Spec.Taints, tolerationsPreferNoSchedule),
+	return framework.NodeScore{
+		Name:  node.Name,
+		Score: int64(countIntolerableTaintsPreferNoSchedule(node.Spec.Taints, tolerationsPreferNoSchedule)),
 	}, nil
 }
 
 // ComputeTaintTolerationPriorityReduce calculates the source of each node based on the number of intolerable taints on the node
-var ComputeTaintTolerationPriorityReduce = NormalizeReduce(schedulerapi.MaxPriority, true)
+var ComputeTaintTolerationPriorityReduce = NormalizeReduce(framework.MaxNodeScore, true)

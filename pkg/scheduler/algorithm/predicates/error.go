@@ -75,10 +75,44 @@ var (
 	ErrVolumeNodeConflict = newPredicateFailureError("VolumeNodeAffinityConflict", "node(s) had volume node affinity conflict")
 	// ErrVolumeBindConflict is used for VolumeBindingNoMatch predicate error.
 	ErrVolumeBindConflict = newPredicateFailureError("VolumeBindingNoMatch", "node(s) didn't find available persistent volumes to bind")
+	// ErrTopologySpreadConstraintsNotMatch is used for EvenPodsSpread predicate error.
+	ErrTopologySpreadConstraintsNotMatch = newPredicateFailureError("EvenPodsSpreadNotMatch", "node(s) didn't match pod topology spread constraints")
 	// ErrFakePredicate is used for test only. The fake predicates returning false also returns error
 	// as ErrFakePredicate.
 	ErrFakePredicate = newPredicateFailureError("FakePredicateError", "Nodes failed the fake predicate")
 )
+
+var unresolvablePredicateFailureErrors = map[PredicateFailureReason]struct{}{
+	ErrNodeSelectorNotMatch:      {},
+	ErrPodAffinityRulesNotMatch:  {},
+	ErrPodNotMatchHostName:       {},
+	ErrTaintsTolerationsNotMatch: {},
+	ErrNodeLabelPresenceViolated: {},
+	// Node conditions won't change when scheduler simulates removal of preemption victims.
+	// So, it is pointless to try nodes that have not been able to host the pod due to node
+	// conditions. These include ErrNodeNotReady, ErrNodeUnderPIDPressure, ErrNodeUnderMemoryPressure, ....
+	ErrNodeNotReady:            {},
+	ErrNodeNetworkUnavailable:  {},
+	ErrNodeUnderDiskPressure:   {},
+	ErrNodeUnderPIDPressure:    {},
+	ErrNodeUnderMemoryPressure: {},
+	ErrNodeUnschedulable:       {},
+	ErrNodeUnknownCondition:    {},
+	ErrVolumeZoneConflict:      {},
+	ErrVolumeNodeConflict:      {},
+	ErrVolumeBindConflict:      {},
+}
+
+// UnresolvablePredicateExists checks if there is at least one unresolvable predicate failure reason, if true
+// returns the first one in the list.
+func UnresolvablePredicateExists(reasons []PredicateFailureReason) PredicateFailureReason {
+	for _, r := range reasons {
+		if _, ok := unresolvablePredicateFailureErrors[r]; ok {
+			return r
+		}
+	}
+	return nil
+}
 
 // InsufficientResourceError is an error type that indicates what kind of resource limit is
 // hit and caused the unfitting failure.

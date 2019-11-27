@@ -20,21 +20,19 @@ package webhook
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
-	authentication "k8s.io/api/authentication/v1beta1"
+	authenticationv1 "k8s.io/api/authentication/v1"
+	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/kubernetes/scheme"
-	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
+	authenticationv1client "k8s.io/client-go/kubernetes/typed/authentication/v1"
 	"k8s.io/klog"
-)
-
-var (
-	groupVersions = []schema.GroupVersion{authentication.SchemeGroupVersion}
 )
 
 const retryBackoff = 500 * time.Millisecond
@@ -42,8 +40,12 @@ const retryBackoff = 500 * time.Millisecond
 // Ensure WebhookTokenAuthenticator implements the authenticator.Token interface.
 var _ authenticator.Token = (*WebhookTokenAuthenticator)(nil)
 
+type tokenReviewer interface {
+	CreateContext(ctx context.Context, review *authenticationv1.TokenReview) (*authenticationv1.TokenReview, error)
+}
+
 type WebhookTokenAuthenticator struct {
-	tokenReview    authenticationclient.TokenReviewInterface
+	tokenReview    tokenReviewer
 	initialBackoff time.Duration
 	implicitAuds   authenticator.Audiences
 }
@@ -52,7 +54,7 @@ type WebhookTokenAuthenticator struct {
 // client. It is recommend to wrap this authenticator with the token cache
 // authenticator implemented in
 // k8s.io/apiserver/pkg/authentication/token/cache.
-func NewFromInterface(tokenReview authenticationclient.TokenReviewInterface, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
+func NewFromInterface(tokenReview authenticationv1client.TokenReviewInterface, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
 	return newWithBackoff(tokenReview, retryBackoff, implicitAuds)
 }
 
@@ -60,8 +62,8 @@ func NewFromInterface(tokenReview authenticationclient.TokenReviewInterface, imp
 // file. It is recommend to wrap this authenticator with the token cache
 // authenticator implemented in
 // k8s.io/apiserver/pkg/authentication/token/cache.
-func New(kubeConfigFile string, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
-	tokenReview, err := tokenReviewInterfaceFromKubeconfig(kubeConfigFile)
+func New(kubeConfigFile string, version string, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
+	tokenReview, err := tokenReviewInterfaceFromKubeconfig(kubeConfigFile, version)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +71,7 @@ func New(kubeConfigFile string, implicitAuds authenticator.Audiences) (*WebhookT
 }
 
 // newWithBackoff allows tests to skip the sleep.
-func newWithBackoff(tokenReview authenticationclient.TokenReviewInterface, initialBackoff time.Duration, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
+func newWithBackoff(tokenReview tokenReviewer, initialBackoff time.Duration, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
 	return &WebhookTokenAuthenticator{tokenReview, initialBackoff, implicitAuds}, nil
 }
 
@@ -87,21 +89,21 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 	//     intersection in the response.
 	//   * otherwise return unauthenticated.
 	wantAuds, checkAuds := authenticator.AudiencesFrom(ctx)
-	r := &authentication.TokenReview{
-		Spec: authentication.TokenReviewSpec{
+	r := &authenticationv1.TokenReview{
+		Spec: authenticationv1.TokenReviewSpec{
 			Token:     token,
 			Audiences: wantAuds,
 		},
 	}
 	var (
-		result *authentication.TokenReview
+		result *authenticationv1.TokenReview
 		err    error
 		auds   authenticator.Audiences
 	)
-	webhook.WithExponentialBackoff(w.initialBackoff, func() error {
-		result, err = w.tokenReview.Create(r)
+	webhook.WithExponentialBackoff(ctx, w.initialBackoff, func() error {
+		result, err = w.tokenReview.CreateContext(ctx, r)
 		return err
-	})
+	}, webhook.DefaultShouldRetry)
 	if err != nil {
 		// An error here indicates bad configuration or an outage. Log for debugging.
 		klog.Errorf("Failed to make webhook authenticator request: %v", err)
@@ -150,28 +152,99 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 // tokenReviewInterfaceFromKubeconfig builds a client from the specified kubeconfig file,
 // and returns a TokenReviewInterface that uses that client. Note that the client submits TokenReview
 // requests to the exact path specified in the kubeconfig file, so arbitrary non-API servers can be targeted.
-func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string) (authenticationclient.TokenReviewInterface, error) {
+func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string) (tokenReviewer, error) {
 	localScheme := runtime.NewScheme()
 	if err := scheme.AddToScheme(localScheme); err != nil {
 		return nil, err
 	}
-	if err := localScheme.SetVersionPriority(groupVersions...); err != nil {
-		return nil, err
+
+	switch version {
+	case authenticationv1.SchemeGroupVersion.Version:
+		groupVersions := []schema.GroupVersion{authenticationv1.SchemeGroupVersion}
+		if err := localScheme.SetVersionPriority(groupVersions...); err != nil {
+			return nil, err
+		}
+		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0)
+		if err != nil {
+			return nil, err
+		}
+		return &tokenReviewV1Client{gw}, nil
+
+	case authenticationv1beta1.SchemeGroupVersion.Version:
+		groupVersions := []schema.GroupVersion{authenticationv1beta1.SchemeGroupVersion}
+		if err := localScheme.SetVersionPriority(groupVersions...); err != nil {
+			return nil, err
+		}
+		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0)
+		if err != nil {
+			return nil, err
+		}
+		return &tokenReviewV1beta1Client{gw}, nil
+
+	default:
+		return nil, fmt.Errorf(
+			"unsupported authentication webhook version %q, supported versions are %q, %q",
+			version,
+			authenticationv1.SchemeGroupVersion.Version,
+			authenticationv1beta1.SchemeGroupVersion.Version,
+		)
 	}
 
-	gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0)
-	if err != nil {
-		return nil, err
-	}
-	return &tokenReviewClient{gw}, nil
 }
 
-type tokenReviewClient struct {
+type tokenReviewV1Client struct {
 	w *webhook.GenericWebhook
 }
 
-func (t *tokenReviewClient) Create(tokenReview *authentication.TokenReview) (*authentication.TokenReview, error) {
-	result := &authentication.TokenReview{}
-	err := t.w.RestClient.Post().Body(tokenReview).Do().Into(result)
+func (t *tokenReviewV1Client) CreateContext(ctx context.Context, review *authenticationv1.TokenReview) (*authenticationv1.TokenReview, error) {
+	result := &authenticationv1.TokenReview{}
+	err := t.w.RestClient.Post().Context(ctx).Body(review).Do().Into(result)
 	return result, err
+}
+
+type tokenReviewV1beta1Client struct {
+	w *webhook.GenericWebhook
+}
+
+func (t *tokenReviewV1beta1Client) CreateContext(ctx context.Context, review *authenticationv1.TokenReview) (*authenticationv1.TokenReview, error) {
+	v1beta1Review := &authenticationv1beta1.TokenReview{Spec: v1SpecToV1beta1Spec(&review.Spec)}
+	v1beta1Result := &authenticationv1beta1.TokenReview{}
+	err := t.w.RestClient.Post().Context(ctx).Body(v1beta1Review).Do().Into(v1beta1Result)
+	if err != nil {
+		return nil, err
+	}
+	review.Status = v1beta1StatusToV1Status(&v1beta1Result.Status)
+	return review, nil
+}
+
+func v1SpecToV1beta1Spec(in *authenticationv1.TokenReviewSpec) authenticationv1beta1.TokenReviewSpec {
+	return authenticationv1beta1.TokenReviewSpec{
+		Token:     in.Token,
+		Audiences: in.Audiences,
+	}
+}
+
+func v1beta1StatusToV1Status(in *authenticationv1beta1.TokenReviewStatus) authenticationv1.TokenReviewStatus {
+	return authenticationv1.TokenReviewStatus{
+		Authenticated: in.Authenticated,
+		User:          v1beta1UserToV1User(in.User),
+		Audiences:     in.Audiences,
+		Error:         in.Error,
+	}
+}
+
+func v1beta1UserToV1User(u authenticationv1beta1.UserInfo) authenticationv1.UserInfo {
+	var extra map[string]authenticationv1.ExtraValue
+	if u.Extra != nil {
+		extra = make(map[string]authenticationv1.ExtraValue, len(u.Extra))
+		for k, v := range u.Extra {
+			extra[k] = authenticationv1.ExtraValue(v)
+		}
+	}
+	return authenticationv1.UserInfo{
+		Username: u.Username,
+		UID:      u.UID,
+		Groups:   u.Groups,
+		Extra:    extra,
+	}
 }

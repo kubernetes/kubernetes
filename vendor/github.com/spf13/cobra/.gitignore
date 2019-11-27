@@ -34,3 +34,5 @@ tags
 *.exe
 
 cobra.test
+
+.idea/*

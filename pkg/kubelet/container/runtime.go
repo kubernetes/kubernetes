@@ -63,6 +63,9 @@ type Runtime interface {
 	// Type returns the type of the container runtime.
 	Type() string
 
+	//SupportsSingleFileMapping returns whether the container runtime supports single file mappings or not.
+	SupportsSingleFileMapping() bool
+
 	// Version returns the version information of the container runtime.
 	Version() (Version, error)
 

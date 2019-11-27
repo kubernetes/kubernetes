@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 )
 
 func TestAddAnnotation(t *testing.T) {
@@ -28,13 +29,13 @@ func TestAddAnnotation(t *testing.T) {
 	// test AddAnnotation
 	attr.AddAnnotation("podsecuritypolicy.admission.k8s.io/validate-policy", "privileged")
 	attr.AddAnnotation("podsecuritypolicy.admission.k8s.io/admit-policy", "privileged")
-	annotations := attr.getAnnotations()
+	annotations := attr.getAnnotations(auditinternal.LevelMetadata)
 	assert.Equal(t, annotations["podsecuritypolicy.admission.k8s.io/validate-policy"], "privileged")
 
 	// test overwrite
 	assert.Error(t, attr.AddAnnotation("podsecuritypolicy.admission.k8s.io/validate-policy", "privileged-overwrite"),
 		"admission annotations should not be allowd to be overwritten")
-	annotations = attr.getAnnotations()
+	annotations = attr.getAnnotations(auditinternal.LevelMetadata)
 	assert.Equal(t, annotations["podsecuritypolicy.admission.k8s.io/validate-policy"], "privileged", "admission annotations should not be overwritten")
 
 	// test invalid plugin names
@@ -47,7 +48,7 @@ func TestAddAnnotation(t *testing.T) {
 	for name, invalidKey := range testCases {
 		err := attr.AddAnnotation(invalidKey, "value-foo")
 		assert.Error(t, err)
-		annotations = attr.getAnnotations()
+		annotations = attr.getAnnotations(auditinternal.LevelMetadata)
 		assert.Equal(t, annotations[invalidKey], "", name+": invalid pluginName is not allowed ")
 	}
 

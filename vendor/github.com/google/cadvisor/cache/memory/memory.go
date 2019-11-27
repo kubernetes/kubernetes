@@ -70,7 +70,7 @@ type InMemoryCache struct {
 	lock              sync.RWMutex
 	containerCacheMap map[string]*containerCache
 	maxAge            time.Duration
-	backend           storage.StorageDriver
+	backend           []storage.StorageDriver
 }
 
 func (self *InMemoryCache) AddStats(cInfo *info.ContainerInfo, stats *info.ContainerStats) error {
@@ -86,11 +86,11 @@ func (self *InMemoryCache) AddStats(cInfo *info.ContainerInfo, stats *info.Conta
 		}
 	}()
 
-	if self.backend != nil {
+	for _, backend := range self.backend {
 		// TODO(monnand): To deal with long delay write operations, we
 		// may want to start a pool of goroutines to do write
 		// operations.
-		if err := self.backend.AddStats(cInfo, stats); err != nil {
+		if err := backend.AddStats(cInfo, stats); err != nil {
 			klog.Error(err)
 		}
 	}
@@ -131,7 +131,7 @@ func (self *InMemoryCache) RemoveContainer(containerName string) error {
 
 func New(
 	maxAge time.Duration,
-	backend storage.StorageDriver,
+	backend []storage.StorageDriver,
 ) *InMemoryCache {
 	ret := &InMemoryCache{
 		containerCacheMap: make(map[string]*containerCache, 32),

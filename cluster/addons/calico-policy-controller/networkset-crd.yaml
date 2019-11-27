@@ -1,0 +1,15 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: networksets.crd.projectcalico.org
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  scope: Namespaced
+  group: crd.projectcalico.org
+  version: v1
+  names:
+    kind: NetworkSet
+    plural: networksets
+    singular: networkset

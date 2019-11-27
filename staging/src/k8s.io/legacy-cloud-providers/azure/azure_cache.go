@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -24,6 +26,20 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+// cacheReadType defines the read type for cache data
+type cacheReadType int
+
+const (
+	// cacheReadTypeDefault returns data from cache if cache entry not expired
+	// if cache entry expired, then it will refetch the data using getter
+	// save the entry in cache and then return
+	cacheReadTypeDefault cacheReadType = iota
+	// cacheReadTypeUnsafe returns data from cache even if the cache entry is
+	// active/expired. If entry doesn't exist in cache, then data is fetched
+	// using getter, saved in cache and returned
+	cacheReadTypeUnsafe
+)
+
 // getFunc defines a getter function for timedCache.
 type getFunc func(key string) (interface{}, error)
 
@@ -34,6 +50,8 @@ type cacheEntry struct {
 
 	// The lock to ensure not updating same entry simultaneously.
 	lock sync.Mutex
+	// time when entry was fetched and created
+	createdOn time.Time
 }
 
 // cacheKeyFunc defines the key function required in TTLStore.
@@ -46,6 +64,7 @@ type timedCache struct {
 	store  cache.Store
 	lock   sync.Mutex
 	getter getFunc
+	ttl    time.Duration
 }
 
 // newTimedcache creates a new timedCache.
@@ -56,7 +75,11 @@ func newTimedcache(ttl time.Duration, getter getFunc) (*timedCache, error) {
 
 	return &timedCache{
 		getter: getter,
-		store:  cache.NewTTLStore(cacheKeyFunc, ttl),
+		// switch to using NewStore instead of NewTTLStore so that we can
+		// reuse entries for calls that are fine with reading expired/stalled data.
+		// with NewTTLStore, entries are not returned if they have already expired.
+		store: cache.NewStore(cacheKeyFunc),
+		ttl:   ttl,
 	}, nil
 }
 
@@ -67,19 +90,15 @@ func (t *timedCache) getInternal(key string) (*cacheEntry, error) {
 	if err != nil {
 		return nil, err
 	}
+	// if entry exists, return the entry
 	if exists {
 		return entry.(*cacheEntry), nil
 	}
 
+	// lock here to ensure if entry doesn't exist, we add a new entry
+	// avoiding overwrites
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	entry, exists, err = t.store.GetByKey(key)
-	if err != nil {
-		return nil, err
-	}
-	if exists {
-		return entry.(*cacheEntry), nil
-	}
 
 	// Still not found, add new entry with nil data.
 	// Note the data will be filled later by getter.
@@ -92,26 +111,38 @@ func (t *timedCache) getInternal(key string) (*cacheEntry, error) {
 }
 
 // Get returns the requested item by key.
-func (t *timedCache) Get(key string) (interface{}, error) {
+func (t *timedCache) Get(key string, crt cacheReadType) (interface{}, error) {
 	entry, err := t.getInternal(key)
 	if err != nil {
 		return nil, err
 	}
 
-	// Data is still not cached yet, cache it by getter.
-	if entry.data == nil {
-		entry.lock.Lock()
-		defer entry.lock.Unlock()
+	entry.lock.Lock()
+	defer entry.lock.Unlock()
 
-		if entry.data == nil {
-			data, err := t.getter(key)
-			if err != nil {
-				return nil, err
-			}
-
-			entry.data = data
+	// entry exists
+	if entry.data != nil {
+		// allow unsafe read, so return data even if expired
+		if crt == cacheReadTypeUnsafe {
+			return entry.data, nil
+		}
+		// if cached data is not expired, return cached data
+		if time.Since(entry.createdOn) < t.ttl {
+			return entry.data, nil
 		}
 	}
+	// Data is not cached yet or cache data is expired, cache it by getter.
+	// entry is locked before getting to ensure concurrent gets don't result in
+	// multiple ARM calls.
+	data, err := t.getter(key)
+	if err != nil {
+		return nil, err
+	}
+
+	// set the data in cache and also set the last update time
+	// to now as the data was recently fetched
+	entry.data = data
+	entry.createdOn = time.Now().UTC()
 
 	return entry.data, nil
 }
@@ -127,7 +158,8 @@ func (t *timedCache) Delete(key string) error {
 // It is only used for testing.
 func (t *timedCache) Set(key string, data interface{}) {
 	t.store.Add(&cacheEntry{
-		key:  key,
-		data: data,
+		key:       key,
+		data:      data,
+		createdOn: time.Now().UTC(),
 	})
 }

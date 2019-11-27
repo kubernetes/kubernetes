@@ -173,13 +173,6 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	cn, ok := w.(http.CloseNotifier)
-	if !ok {
-		err := fmt.Errorf("unable to start watch - can't get http.CloseNotifier: %#v", w)
-		utilruntime.HandleError(err)
-		s.Scope.err(errors.NewInternalError(err), w, req)
-		return
-	}
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		err := fmt.Errorf("unable to start watch - can't get http.Flusher: %#v", w)
@@ -214,9 +207,11 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	outEvent := &metav1.WatchEvent{}
 	buf := &bytes.Buffer{}
 	ch := s.Watching.ResultChan()
+	done := req.Context().Done()
+
 	for {
 		select {
-		case <-cn.CloseNotify():
+		case <-done:
 			return
 		case <-timeoutCh:
 			return
@@ -238,6 +233,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			// type
 			unknown.Raw = buf.Bytes()
 			event.Object = &unknown
+			metrics.WatchEventsSizes.WithLabelValues(kind.Group, kind.Version, kind.Kind).Observe(float64(len(unknown.Raw)))
 
 			*outEvent = metav1.WatchEvent{}
 
@@ -284,10 +280,12 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 	buf := &bytes.Buffer{}
 	streamBuf := &bytes.Buffer{}
 	ch := s.Watching.ResultChan()
+
+	defer s.Watching.Stop()
+
 	for {
 		select {
 		case <-done:
-			s.Watching.Stop()
 			return
 		case event, ok := <-ch:
 			if !ok {
@@ -316,25 +314,21 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to convert watch object: %v", err))
 				// client disconnect.
-				s.Watching.Stop()
 				return
 			}
 			if err := s.Encoder.Encode(outEvent, streamBuf); err != nil {
 				// encoding error
 				utilruntime.HandleError(fmt.Errorf("unable to encode event: %v", err))
-				s.Watching.Stop()
 				return
 			}
 			if s.UseTextFraming {
 				if err := websocket.Message.Send(ws, streamBuf.String()); err != nil {
 					// Client disconnect.
-					s.Watching.Stop()
 					return
 				}
 			} else {
 				if err := websocket.Message.Send(ws, streamBuf.Bytes()); err != nil {
 					// Client disconnect.
-					s.Watching.Stop()
 					return
 				}
 			}

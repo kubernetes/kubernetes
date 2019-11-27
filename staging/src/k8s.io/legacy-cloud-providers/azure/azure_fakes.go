@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -24,15 +26,15 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	cloudprovider "k8s.io/cloud-provider"
-
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-04-01/storage"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 var (
@@ -192,7 +194,21 @@ func (fAPC *fakeAzurePIPClient) Get(ctx context.Context, resourceGroupName strin
 	}
 	return result, autorest.DetailedError{
 		StatusCode: http.StatusNotFound,
-		Message:    "Not such PIP",
+		Message:    "No such PIP",
+	}
+}
+
+func (fAPC *fakeAzurePIPClient) GetVirtualMachineScaleSetPublicIPAddress(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error) {
+	fAPC.mutex.Lock()
+	defer fAPC.mutex.Unlock()
+	if _, ok := fAPC.FakeStore[resourceGroupName]; ok {
+		if entity, ok := fAPC.FakeStore[resourceGroupName][publicIPAddressName]; ok {
+			return entity, nil
+		}
+	}
+	return result, autorest.DetailedError{
+		StatusCode: http.StatusNotFound,
+		Message:    "No such PIP",
 	}
 }
 
@@ -297,6 +313,17 @@ func (fVMC *fakeAzureVirtualMachinesClient) CreateOrUpdate(ctx context.Context, 
 		fVMC.FakeStore[resourceGroupName] = make(map[string]compute.VirtualMachine)
 	}
 	fVMC.FakeStore[resourceGroupName][VMName] = parameters
+
+	return nil, nil
+}
+
+func (fVMC *fakeAzureVirtualMachinesClient) Update(ctx context.Context, resourceGroupName string, VMName string, parameters compute.VirtualMachineUpdate, source string) (resp *http.Response, err error) {
+	fVMC.mutex.Lock()
+	defer fVMC.mutex.Unlock()
+
+	if _, ok := fVMC.FakeStore[resourceGroupName]; !ok {
+		fVMC.FakeStore[resourceGroupName] = make(map[string]compute.VirtualMachine)
+	}
 
 	return nil, nil
 }
@@ -522,7 +549,7 @@ func (fVMC *fakeVirtualMachineScaleSetVMsClient) List(ctx context.Context, resou
 	return result, nil
 }
 
-func (fVMC *fakeVirtualMachineScaleSetVMsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVM, err error) {
+func (fVMC *fakeVirtualMachineScaleSetVMsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, expand compute.InstanceViewTypes) (result compute.VirtualMachineScaleSetVM, err error) {
 	fVMC.mutex.Lock()
 	defer fVMC.mutex.Unlock()
 
@@ -537,15 +564,6 @@ func (fVMC *fakeVirtualMachineScaleSetVMsClient) Get(ctx context.Context, resour
 		StatusCode: http.StatusNotFound,
 		Message:    "No such VirtualMachineScaleSetVM",
 	}
-}
-
-func (fVMC *fakeVirtualMachineScaleSetVMsClient) GetInstanceView(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVMInstanceView, err error) {
-	_, err = fVMC.Get(ctx, resourceGroupName, VMScaleSetName, instanceID)
-	if err != nil {
-		return result, err
-	}
-
-	return result, nil
 }
 
 func (fVMC *fakeVirtualMachineScaleSetVMsClient) Update(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, parameters compute.VirtualMachineScaleSetVM, source string) (resp *http.Response, err error) {
@@ -924,7 +942,7 @@ func (f *fakeVMSet) EnsureBackendPoolDeleted(service *v1.Service, backendPoolID,
 	return fmt.Errorf("unimplemented")
 }
 
-func (f *fakeVMSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error {
+func (f *fakeVMSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes, diskEncryptionSetID string) error {
 	return fmt.Errorf("unimplemented")
 }
 
@@ -932,7 +950,7 @@ func (f *fakeVMSet) DetachDisk(diskName, diskURI string, nodeName types.NodeName
 	return nil, fmt.Errorf("unimplemented")
 }
 
-func (f *fakeVMSet) GetDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error) {
+func (f *fakeVMSet) GetDataDisks(nodeName types.NodeName, crt cacheReadType) ([]compute.DataDisk, error) {
 	return nil, fmt.Errorf("unimplemented")
 }
 

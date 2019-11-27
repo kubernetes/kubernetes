@@ -21,6 +21,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
@@ -68,6 +69,7 @@ func TestCheckpointToFileCompatibility(t *testing.T) {
 	defer cpm.RemoveCheckpoint(compatibilityTestingCheckpoint)
 
 	checkpointState, err := NewCheckpointState(testingDir, compatibilityTestingCheckpoint, "none")
+	require.NoError(t, err)
 
 	checkpointState.SetDefaultCPUSet(state.defaultCPUSet)
 	checkpointState.SetCPUAssignments(state.assignments)

@@ -24,6 +24,7 @@ go_test(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
@@ -54,6 +55,7 @@ go_library(
         "types.go",
         "types_swagger_doc_generated.go",
         "watch.go",
+        "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
         "zz_generated.defaults.go",
     ],

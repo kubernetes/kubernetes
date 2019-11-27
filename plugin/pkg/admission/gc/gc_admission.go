@@ -17,6 +17,7 @@ limitations under the License.
 package gc
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -84,7 +85,7 @@ func (a *gcPermissionsEnforcement) isWhiteListed(groupResource schema.GroupResou
 	return false
 }
 
-func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (a *gcPermissionsEnforcement) Validate(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	// // if the request is in the whitelist, we skip mutation checks for this resource.
 	if a.isWhiteListed(attributes.GetResource().GroupResource(), attributes.GetSubresource()) {
 		return nil
@@ -111,7 +112,7 @@ func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes, o a
 			ResourceRequest: true,
 			Path:            "",
 		}
-		decision, reason, err := a.authorizer.Authorize(deleteAttributes)
+		decision, reason, err := a.authorizer.Authorize(ctx, deleteAttributes)
 		if decision != authorizer.DecisionAllow {
 			return admission.NewForbidden(attributes, fmt.Errorf("cannot set an ownerRef on a resource you can't delete: %v, %v", reason, err))
 		}
@@ -130,7 +131,7 @@ func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes, o a
 		// resources. User needs to have delete permission on all the
 		// matched Resources.
 		for _, record := range records {
-			decision, reason, err := a.authorizer.Authorize(record)
+			decision, reason, err := a.authorizer.Authorize(ctx, record)
 			if decision != authorizer.DecisionAllow {
 				return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't set finalizers on: %v, %v", reason, err))
 			}

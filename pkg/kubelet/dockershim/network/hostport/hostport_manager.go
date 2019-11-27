@@ -21,11 +21,12 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog"
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
@@ -40,7 +41,7 @@ type HostPortManager interface {
 	// Add implements port mappings.
 	// id should be a unique identifier for a pod, e.g. podSandboxID.
 	// podPortMapping is the associated port mapping information for the pod.
-	// natInterfaceName is the interface that localhost used to talk to the given pod.
+	// natInterfaceName is the interface that localhost uses to talk to the given pod, if known.
 	Add(id string, podPortMapping *PodPortMapping, natInterfaceName string) error
 	// Remove cleans up matching port mappings
 	// Remove must be able to clean up port mappings without pod IP
@@ -82,10 +83,16 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 		return nil
 	}
 
-	if podPortMapping.IP.To4() == nil {
+	// IP.To16() returns nil if IP is not a valid IPv4 or IPv6 address
+	if podPortMapping.IP.To16() == nil {
 		return fmt.Errorf("invalid or missing IP of pod %s", podFullName)
 	}
 	podIP := podPortMapping.IP.String()
+	isIpv6 := utilnet.IsIPv6(podPortMapping.IP)
+
+	if isIpv6 != hm.iptables.IsIpv6() {
+		return fmt.Errorf("HostPortManager IP family mismatch: %v, isIPv6 - %v", podIP, isIpv6)
+	}
 
 	if err = ensureKubeHostportChains(hm.iptables, natInterfaceName); err != nil {
 		return err
@@ -142,10 +149,11 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 			"-j", string(iptablesproxy.KubeMarkMasqChain))
 
 		// DNAT to the podIP:containerPort
+		hostPortBinding := net.JoinHostPort(podIP, strconv.Itoa(int(pm.ContainerPort)))
 		writeLine(natRules, "-A", string(chain),
 			"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, podFullName, pm.HostPort),
 			"-m", protocol, "-p", protocol,
-			"-j", "DNAT", fmt.Sprintf("--to-destination=%s:%d", podIP, pm.ContainerPort))
+			"-j", "DNAT", fmt.Sprintf("--to-destination=%s", hostPortBinding))
 	}
 
 	// getHostportChain should be able to provide unique hostport chain name using hash
@@ -166,7 +174,6 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 		// clean up opened host port if encounter any error
 		return utilerrors.NewAggregate([]error{err, hm.closeHostports(hostportMappings)})
 	}
-	isIpv6 := utilnet.IsIPv6(podPortMapping.IP)
 
 	// Remove conntrack entries just after adding the new iptables rules. If the conntrack entry is removed along with
 	// the IP tables rule, it can be the case that the packets received by the node after iptables rule removal will
@@ -249,7 +256,7 @@ func (hm *hostportManager) syncIPTables(lines []byte) error {
 	klog.V(3).Infof("Restoring iptables rules: %s", lines)
 	err := hm.iptables.RestoreAll(lines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
-		return fmt.Errorf("Failed to execute iptables-restore: %v", err)
+		return fmt.Errorf("failed to execute iptables-restore: %v", err)
 	}
 	return nil
 }
@@ -351,7 +358,7 @@ func getExistingHostportIPTablesRules(iptables utiliptables.Interface) (map[util
 		}
 	}
 
-	for _, line := range strings.Split(string(iptablesData.Bytes()), "\n") {
+	for _, line := range strings.Split(iptablesData.String(), "\n") {
 		if strings.HasPrefix(line, fmt.Sprintf("-A %s", kubeHostportChainPrefix)) ||
 			strings.HasPrefix(line, fmt.Sprintf("-A %s", string(kubeHostportsChain))) {
 			existingHostportRules = append(existingHostportRules, line)
@@ -382,8 +389,6 @@ func filterRules(rules []string, filters []utiliptables.Chain) []string {
 // filterChains deletes all entries of filter chains from chain map
 func filterChains(chains map[utiliptables.Chain]string, filterChains []utiliptables.Chain) {
 	for _, chain := range filterChains {
-		if _, ok := chains[chain]; ok {
-			delete(chains, chain)
-		}
+		delete(chains, chain)
 	}
 }

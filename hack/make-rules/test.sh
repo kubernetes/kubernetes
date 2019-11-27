@@ -72,6 +72,9 @@ kube::test::find_dirs() {
 KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout=120s}
 KUBE_COVER=${KUBE_COVER:-n} # set to 'y' to enable coverage collection
 KUBE_COVERMODE=${KUBE_COVERMODE:-atomic}
+# The directory to save test coverage reports to, if generating them. If unset,
+# a semi-predictable temporary directory will be used.
+KUBE_COVER_REPORT_DIR="${KUBE_COVER_REPORT_DIR:-}"
 # How many 'go test' instances to run simultaneously when running tests in
 # coverage mode.
 KUBE_COVERPROCS=${KUBE_COVERPROCS:-4}
@@ -149,10 +152,11 @@ eval "testargs=(${KUBE_TEST_ARGS:-})"
 # Used to filter verbose test output.
 go_test_grep_pattern=".*"
 
-# The go-junit-report tool needs full test case information to produce a
+# The junit report tool needs full test case information to produce a
 # meaningful report.
 if [[ -n "${KUBE_JUNIT_REPORT_DIR}" ]] ; then
   goflags+=(-v)
+  goflags+=(-json)
   # Show only summary lines by matching lines like "status package/test"
   go_test_grep_pattern="^[^[:space:]]\+[[:space:]]\+[^[:space:]]\+/[^[[:space:]]\+"
 fi
@@ -241,19 +245,19 @@ produceJUnitXMLReport() {
     return
   fi
 
-  local test_stdout_filenames
   local junit_xml_filename
-  test_stdout_filenames=$(ls "${junit_filename_prefix}"*.stdout)
   junit_xml_filename="${junit_filename_prefix}.xml"
-  if ! command -v go-junit-report >/dev/null 2>&1; then
-    kube::log::error "go-junit-report not found; please install with " \
-      "go get -u github.com/jstemmer/go-junit-report"
+
+  if ! command -v gotestsum >/dev/null 2>&1; then
+    kube::log::error "gotestsum not found; please install with " \
+      "GO111MODULE=off go install k8s.io/kubernetes/vendor/gotest.tools/gotestsum"
     return
   fi
-  go-junit-report < "${test_stdout_filenames}" > "${junit_xml_filename}"
+  gotestsum --junitfile "${junit_xml_filename}" --raw-command cat "${junit_filename_prefix}"*.stdout
   if [[ ! ${KUBE_KEEP_VERBOSE_TEST_OUTPUT} =~ ^[yY]$ ]]; then
-    rm "${test_stdout_filenames}"
+    rm "${junit_filename_prefix}"*.stdout
   fi
+
   kube::log::status "Saved JUnit XML test report to ${junit_xml_filename}"
 }
 
@@ -278,7 +282,11 @@ runTests() {
 
   # Create coverage report directories.
   KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"| ${SHA1SUM} |awk '{print $1}')"
-  cover_report_dir="/tmp/k8s_coverage/${KUBE_TEST_API_HASH}/$(kube::util::sortable_date)"
+  if [[ -z "${KUBE_COVER_REPORT_DIR}" ]]; then
+    cover_report_dir="/tmp/k8s_coverage/${KUBE_TEST_API_HASH}/$(kube::util::sortable_date)"
+  else
+    cover_report_dir="${KUBE_COVER_REPORT_DIR}"
+  fi
   cover_profile="coverage.out"  # Name for each individual coverage profile
   kube::log::status "Saving coverage output in '${cover_report_dir}'"
   mkdir -p "${@+${@/#/${cover_report_dir}/}}"

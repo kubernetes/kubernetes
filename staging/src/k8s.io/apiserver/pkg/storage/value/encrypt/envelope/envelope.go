@@ -94,13 +94,17 @@ func (t *envelopeTransformer) TransformFromStorage(data []byte, context value.Co
 		value.RecordCacheMiss()
 		key, err := t.envelopeService.Decrypt(encKey)
 		if err != nil {
-			return nil, false, fmt.Errorf("error while decrypting key: %q", err)
+			// Do NOT wrap this err using fmt.Errorf() or similar functions
+			// because this gRPC status error has useful error code when
+			// record the metric.
+			return nil, false, err
 		}
 		transformer, err = t.addTransformer(encKey, key)
 		if err != nil {
 			return nil, false, err
 		}
 	}
+
 	return transformer.TransformFromStorage(encData, context)
 }
 
@@ -113,6 +117,9 @@ func (t *envelopeTransformer) TransformToStorage(data []byte, context value.Cont
 
 	encKey, err := t.envelopeService.Encrypt(newKey)
 	if err != nil {
+		// Do NOT wrap this err using fmt.Errorf() or similar functions
+		// because this gRPC status error has useful error code when
+		// record the metric.
 		return nil, err
 	}
 

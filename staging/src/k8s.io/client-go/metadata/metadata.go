@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/klog"
 
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -63,7 +63,7 @@ func ConfigFor(inConfig *rest.Config) *rest.Config {
 	config := rest.CopyConfig(inConfig)
 	config.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
 	config.ContentType = "application/vnd.kubernetes.protobuf"
-	config.NegotiatedSerializer = metainternalversion.Codecs.WithoutConversion()
+	config.NegotiatedSerializer = metainternalversionscheme.Codecs.WithoutConversion()
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}

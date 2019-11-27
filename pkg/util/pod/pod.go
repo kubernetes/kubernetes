@@ -28,7 +28,7 @@ import (
 
 // PatchPodStatus patches pod status.
 func PatchPodStatus(c clientset.Interface, namespace, name string, oldPodStatus, newPodStatus v1.PodStatus) (*v1.Pod, []byte, error) {
-	patchBytes, err := preparePatchBytesforPodStatus(namespace, name, oldPodStatus, newPodStatus)
+	patchBytes, err := preparePatchBytesForPodStatus(namespace, name, oldPodStatus, newPodStatus)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -40,7 +40,7 @@ func PatchPodStatus(c clientset.Interface, namespace, name string, oldPodStatus,
 	return updatedPod, patchBytes, nil
 }
 
-func preparePatchBytesforPodStatus(namespace, name string, oldPodStatus, newPodStatus v1.PodStatus) ([]byte, error) {
+func preparePatchBytesForPodStatus(namespace, name string, oldPodStatus, newPodStatus v1.PodStatus) ([]byte, error) {
 	oldData, err := json.Marshal(v1.Pod{
 		Status: oldPodStatus,
 	})

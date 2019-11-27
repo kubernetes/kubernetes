@@ -19,23 +19,23 @@ package priorities
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // NodeLabelPrioritizer contains information to calculate node label priority.
 type NodeLabelPrioritizer struct {
-	label    string
-	presence bool
+	presentLabelsPreference []string
+	absentLabelsPreference  []string
 }
 
 // NewNodeLabelPriority creates a NodeLabelPrioritizer.
-func NewNodeLabelPriority(label string, presence bool) (PriorityMapFunction, PriorityReduceFunction) {
+func NewNodeLabelPriority(presentLabelsPreference []string, absentLabelsPreference []string) (PriorityMapFunction, PriorityReduceFunction) {
 	labelPrioritizer := &NodeLabelPrioritizer{
-		label:    label,
-		presence: presence,
+		presentLabelsPreference: presentLabelsPreference,
+		absentLabelsPreference:  absentLabelsPreference,
 	}
 	return labelPrioritizer.CalculateNodeLabelPriorityMap, nil
 }
@@ -43,19 +43,28 @@ func NewNodeLabelPriority(label string, presence bool) (PriorityMapFunction, Pri
 // CalculateNodeLabelPriorityMap checks whether a particular label exists on a node or not, regardless of its value.
 // If presence is true, prioritizes nodes that have the specified label, regardless of value.
 // If presence is false, prioritizes nodes that do not have the specified label.
-func (n *NodeLabelPrioritizer) CalculateNodeLabelPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
+func (n *NodeLabelPrioritizer) CalculateNodeLabelPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
+		return framework.NodeScore{}, fmt.Errorf("node not found")
 	}
 
-	exists := labels.Set(node.Labels).Has(n.label)
-	score := 0
-	if (exists && n.presence) || (!exists && !n.presence) {
-		score = schedulerapi.MaxPriority
+	score := int64(0)
+	for _, label := range n.presentLabelsPreference {
+		if labels.Set(node.Labels).Has(label) {
+			score += framework.MaxNodeScore
+		}
 	}
-	return schedulerapi.HostPriority{
-		Host:  node.Name,
+	for _, label := range n.absentLabelsPreference {
+		if !labels.Set(node.Labels).Has(label) {
+			score += framework.MaxNodeScore
+		}
+	}
+	// Take average score for each label to ensure the score doesn't exceed MaxNodeScore.
+	score /= int64(len(n.presentLabelsPreference) + len(n.absentLabelsPreference))
+
+	return framework.NodeScore{
+		Name:  node.Name,
 		Score: score,
 	}, nil
 }

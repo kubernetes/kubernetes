@@ -23,14 +23,14 @@ import (
 	"time"
 
 	flockerapi "github.com/clusterhq/flocker-go"
-
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/env"
-	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/util/env"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -105,10 +105,6 @@ func (p *flockerPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 func (p *flockerPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Flocker != nil) ||
 		(spec.Volume != nil && spec.Volume.Flocker != nil)
-}
-
-func (p *flockerPlugin) IsMigratedToCSI() bool {
-	return false
 }
 
 func (p *flockerPlugin) RequiresRemount() bool {

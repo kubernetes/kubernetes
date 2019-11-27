@@ -40,8 +40,8 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
 const (
@@ -153,20 +153,20 @@ func WriteKey(pkiPath, name string, key crypto.Signer) error {
 }
 
 // WriteCSR writes the pem-encoded CSR data to csrPath.
-// The CSR file will be created with file mode 0644.
+// The CSR file will be created with file mode 0600.
 // If the CSR file already exists, it will be overwritten.
-// The parent directory of the csrPath will be created as needed with file mode 0755.
+// The parent directory of the csrPath will be created as needed with file mode 0700.
 func WriteCSR(csrDir, name string, csr *x509.CertificateRequest) error {
 	if csr == nil {
 		return errors.New("certificate request cannot be nil when writing to file")
 	}
 
 	csrPath := pathForCSR(csrDir, name)
-	if err := os.MkdirAll(filepath.Dir(csrPath), os.FileMode(0755)); err != nil {
+	if err := os.MkdirAll(filepath.Dir(csrPath), os.FileMode(0700)); err != nil {
 		return errors.Wrapf(err, "failed to make directory %s", filepath.Dir(csrPath))
 	}
 
-	if err := ioutil.WriteFile(csrPath, EncodeCSRPEM(csr), os.FileMode(0644)); err != nil {
+	if err := ioutil.WriteFile(csrPath, EncodeCSRPEM(csr), os.FileMode(0600)); err != nil {
 		return errors.Wrapf(err, "unable to write CSR to file %s", csrPath)
 	}
 
@@ -198,7 +198,7 @@ func CertOrKeyExist(pkiPath, name string) bool {
 	_, certErr := os.Stat(certificatePath)
 	_, keyErr := os.Stat(privateKeyPath)
 	if os.IsNotExist(certErr) && os.IsNotExist(keyErr) {
-		// The cert or the key did not exist
+		// The cert and the key do not exist
 		return false
 	}
 
@@ -357,15 +357,9 @@ func GetAPIServerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames
 			cfg.LocalAPIEndpoint.AdvertiseAddress)
 	}
 
-	// internal IP address for the API server
-	_, svcSubnet, err := net.ParseCIDR(cfg.Networking.ServiceSubnet)
+	internalAPIServerVirtualIP, err := kubeadmconstants.GetAPIServerVirtualIP(cfg.Networking.ServiceSubnet, features.Enabled(cfg.FeatureGates, features.IPv6DualStack))
 	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing CIDR %q", cfg.Networking.ServiceSubnet)
-	}
-
-	internalAPIServerVirtualIP, err := ipallocator.GetIndexedIP(svcSubnet, 1)
-	if err != nil {
-		return nil, errors.Wrapf(err, "unable to get first IP address from the given CIDR (%s)", svcSubnet.String())
+		return nil, errors.Wrapf(err, "unable to get first IP address from the given CIDR: %v", cfg.Networking.ServiceSubnet)
 	}
 
 	// create AltNames with defaults DNSNames/IPs
@@ -480,8 +474,7 @@ func parseCSRPEM(pemCSR []byte) (*x509.CertificateRequest, error) {
 	}
 
 	if block.Type != certutil.CertificateRequestBlockType {
-		var block *pem.Block
-		return nil, errors.Errorf("expected block type %q, but PEM had type %v", certutil.CertificateRequestBlockType, block.Type)
+		return nil, errors.Errorf("expected block type %q, but PEM had type %q", certutil.CertificateRequestBlockType, block.Type)
 	}
 
 	return x509.ParseCertificateRequest(block.Bytes)

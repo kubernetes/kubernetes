@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/utils/integer"
 )
 
@@ -41,7 +41,10 @@ func EnsureLoggingAgentDeployment(f *framework.Framework, appName string) error 
 		agentPerNode[pod.Spec.NodeName]++
 	}
 
-	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+	if err != nil {
+		return fmt.Errorf("failed to get nodes: %v", err)
+	}
 	for _, node := range nodeList.Items {
 		agentPodsCount, ok := agentPerNode[node.Name]
 
@@ -68,13 +71,13 @@ func EnsureLoggingAgentRestartsCount(f *framework.Framework, appName string, max
 	for _, pod := range agentPods.Items {
 		contStatuses := pod.Status.ContainerStatuses
 		if len(contStatuses) == 0 {
-			e2elog.Logf("There are no container statuses for pod %s", pod.Name)
+			framework.Logf("There are no container statuses for pod %s", pod.Name)
 			continue
 		}
 		restartCount := int(contStatuses[0].RestartCount)
 		maxRestartCount = integer.IntMax(maxRestartCount, restartCount)
 
-		e2elog.Logf("Logging agent %s on node %s was restarted %d times",
+		framework.Logf("Logging agent %s on node %s was restarted %d times",
 			pod.Name, pod.Spec.NodeName, restartCount)
 	}
 

@@ -26,9 +26,10 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	netutil "k8s.io/apimachinery/pkg/util/net"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -112,6 +113,22 @@ func SetAPIEndpointDynamicDefaults(cfg *kubeadmapi.APIEndpoint) error {
 	if addressIP == nil && cfg.AdvertiseAddress != "" {
 		return errors.Errorf("couldn't use \"%s\" as \"apiserver-advertise-address\", must be ipv4 or ipv6 address", cfg.AdvertiseAddress)
 	}
+
+	// kubeadm allows users to specify address=Loopback as a selector for global unicast IP address that can be found on loopback interface.
+	// e.g. This is required for network setups where default routes are present, but network interfaces use only link-local addresses (e.g. as described in RFC5549).
+	if addressIP.IsLoopback() {
+		loopbackIP, err := netutil.ChooseBindAddressForInterface(netutil.LoopbackInterfaceName)
+		if err != nil {
+			return err
+		}
+		if loopbackIP != nil {
+			klog.V(4).Infof("Found active IP %v on loopback interface", loopbackIP.String())
+			cfg.AdvertiseAddress = loopbackIP.String()
+			return nil
+		}
+		return errors.New("unable to resolve link-local addresses")
+	}
+
 	// This is the same logic as the API Server uses, except that if no interface is found the address is set to 0.0.0.0, which is invalid and cannot be used
 	// for bootstrapping a cluster.
 	ip, err := ChooseAPIServerBindAddress(addressIP)
@@ -165,10 +182,14 @@ func DefaultedInitConfiguration(versionedInitCfg *kubeadmapiv1beta2.InitConfigur
 	// Takes passed flags into account; the defaulting is executed once again enforcing assignment of
 	// static default values to cfg only for values not provided with flags
 	kubeadmscheme.Scheme.Default(versionedInitCfg)
-	kubeadmscheme.Scheme.Convert(versionedInitCfg, internalcfg, nil)
+	if err := kubeadmscheme.Scheme.Convert(versionedInitCfg, internalcfg, nil); err != nil {
+		return nil, err
+	}
 
 	kubeadmscheme.Scheme.Default(versionedClusterCfg)
-	kubeadmscheme.Scheme.Convert(versionedClusterCfg, &internalcfg.ClusterConfiguration, nil)
+	if err := kubeadmscheme.Scheme.Convert(versionedClusterCfg, &internalcfg.ClusterConfiguration, nil); err != nil {
+		return nil, err
+	}
 
 	// Applies dynamic defaults to settings not provided with flags
 	if err := SetInitDynamicDefaults(internalcfg); err != nil {
@@ -195,7 +216,7 @@ func LoadInitConfigurationFromFile(cfgPath string) (*kubeadmapi.InitConfiguratio
 
 // LoadOrDefaultInitConfiguration takes a path to a config file and a versioned configuration that can serve as the default config
 // If cfgPath is specified, the versioned configs will always get overridden with the one in the file (specified by cfgPath).
-// The the external, versioned configuration is defaulted and converted to the internal type.
+// The external, versioned configuration is defaulted and converted to the internal type.
 // Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
 // Lastly, the internal config is validated and returned.
 func LoadOrDefaultInitConfiguration(cfgPath string, versionedInitCfg *kubeadmapiv1beta2.InitConfiguration, versionedClusterCfg *kubeadmapiv1beta2.ClusterConfiguration) (*kubeadmapi.InitConfiguration, error) {
@@ -283,7 +304,9 @@ func documentMapToInitConfiguration(gvkmap map[schema.GroupVersionKind][]byte, a
 		kubeadmscheme.Scheme.Default(extinitcfg)
 		// Set initcfg to an empty struct value the deserializer will populate
 		initcfg = &kubeadmapi.InitConfiguration{}
-		kubeadmscheme.Scheme.Convert(extinitcfg, initcfg, nil)
+		if err := kubeadmscheme.Scheme.Convert(extinitcfg, initcfg, nil); err != nil {
+			return nil, err
+		}
 	}
 	// If ClusterConfiguration was given, populate it in the InitConfiguration struct
 	if clustercfg != nil {
@@ -313,18 +336,6 @@ func documentMapToInitConfiguration(gvkmap map[schema.GroupVersionKind][]byte, a
 	}
 
 	return initcfg, nil
-}
-
-func defaultedInternalConfig() *kubeadmapi.ClusterConfiguration {
-	externalcfg := &kubeadmapiv1beta2.ClusterConfiguration{}
-	internalcfg := &kubeadmapi.ClusterConfiguration{}
-
-	kubeadmscheme.Scheme.Default(externalcfg)
-	kubeadmscheme.Scheme.Convert(externalcfg, internalcfg, nil)
-
-	// Default the embedded ComponentConfig structs
-	componentconfigs.Known.Default(internalcfg)
-	return internalcfg
 }
 
 // MarshalInitConfigurationToBytes marshals the internal InitConfiguration object to bytes. It writes the embedded

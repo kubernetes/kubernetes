@@ -17,6 +17,7 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
         "//pkg/capabilities:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/registry/core/pod:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

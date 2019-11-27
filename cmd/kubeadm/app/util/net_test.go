@@ -19,6 +19,7 @@ package util
 import (
 	"errors"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -38,6 +39,12 @@ func TestGetHostname(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
+			desc:        "overridden hostname uppercase",
+			hostname:    "OVERRIDDEN",
+			result:      "overridden",
+			expectedErr: nil,
+		},
+		{
 			desc:        "hostname contains only spaces",
 			hostname:    " ",
 			result:      "",
@@ -46,7 +53,7 @@ func TestGetHostname(t *testing.T) {
 		{
 			desc:        "empty parameter",
 			hostname:    "",
-			result:      hostname,
+			result:      strings.ToLower(hostname),
 			expectedErr: err,
 		},
 	}

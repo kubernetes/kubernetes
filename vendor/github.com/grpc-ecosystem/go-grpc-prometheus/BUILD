@@ -4,8 +4,11 @@ go_library(
     name = "go_default_library",
     srcs = [
         "client.go",
+        "client_metrics.go",
         "client_reporter.go",
+        "metric_options.go",
         "server.go",
+        "server_metrics.go",
         "server_reporter.go",
         "util.go",
     ],
@@ -17,6 +20,7 @@ go_library(
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/google.golang.org/grpc/codes:go_default_library",
+        "//vendor/google.golang.org/grpc/status:go_default_library",
     ],
 )
 

@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "doc.go",
         "event_broadcaster.go",
         "event_recorder.go",
         "fake.go",
@@ -42,6 +43,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/reference:go_default_library",
     ],
 )

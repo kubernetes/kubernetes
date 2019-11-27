@@ -106,6 +106,7 @@ var supportedSubsystems map[string]struct{} = map[string]struct{}{
 	"cpu":     {},
 	"cpuacct": {},
 	"memory":  {},
+	"pids":    {},
 	"cpuset":  {},
 	"blkio":   {},
 	"devices": {},

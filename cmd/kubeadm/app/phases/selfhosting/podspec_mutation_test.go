@@ -21,7 +21,7 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -531,6 +531,8 @@ func TestSetSelfHostedVolumesForScheduler(t *testing.T) {
 						},
 						Command: []string{
 							"--kubeconfig=/etc/kubernetes/scheduler.conf",
+							"--authentication-kubeconfig=/etc/kubernetes/scheduler.conf",
+							"--authorization-kubeconfig=/etc/kubernetes/scheduler.conf",
 							"--foo=bar",
 						},
 					},
@@ -558,6 +560,8 @@ func TestSetSelfHostedVolumesForScheduler(t *testing.T) {
 						},
 						Command: []string{
 							"--kubeconfig=/etc/kubernetes/kubeconfig/scheduler.conf",
+							"--authentication-kubeconfig=/etc/kubernetes/kubeconfig/scheduler.conf",
+							"--authorization-kubeconfig=/etc/kubernetes/kubeconfig/scheduler.conf",
 							"--foo=bar",
 						},
 					},

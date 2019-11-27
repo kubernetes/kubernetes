@@ -27,7 +27,6 @@ go_library(
         "//cmd/kubeadm/app/phases/kubelet:go_default_library",
         "//cmd/kubeadm/app/phases/selfhosting:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
-        "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",

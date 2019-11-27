@@ -22,16 +22,16 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/features"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 var (
@@ -73,7 +73,7 @@ type schedulerCache struct {
 	// headNode points to the most recently updated NodeInfo in "nodes". It is the
 	// head of the linked list.
 	headNode *nodeInfoListItem
-	nodeTree *NodeTree
+	nodeTree *nodeTree
 	// A map from image name to its imageState.
 	imageStates map[string]*imageState
 }
@@ -119,13 +119,6 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 func newNodeInfoListItem(ni *schedulernodeinfo.NodeInfo) *nodeInfoListItem {
 	return &nodeInfoListItem{
 		info: ni,
-	}
-}
-
-// NewNodeInfoSnapshot initializes a NodeInfoSnapshot struct and returns it.
-func NewNodeInfoSnapshot() *NodeInfoSnapshot {
-	return &NodeInfoSnapshot{
-		NodeInfoMap: make(map[string]*schedulernodeinfo.NodeInfo),
 	}
 }
 
@@ -208,12 +201,12 @@ func (cache *schedulerCache) Snapshot() *Snapshot {
 // beginning of every scheduling cycle.
 // This function tracks generation number of NodeInfo and updates only the
 // entries of an existing snapshot that have changed after the snapshot was taken.
-func (cache *schedulerCache) UpdateNodeInfoSnapshot(nodeSnapshot *NodeInfoSnapshot) error {
+func (cache *schedulerCache) UpdateNodeInfoSnapshot(nodeSnapshot *nodeinfosnapshot.Snapshot) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	balancedVolumesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes)
 
-	// Get the last generation of the the snapshot.
+	// Get the last generation of the snapshot.
 	snapshotGeneration := nodeSnapshot.Generation
 
 	// Start from the head of the NodeInfo doubly linked list and update snapshot
@@ -243,6 +236,21 @@ func (cache *schedulerCache) UpdateNodeInfoSnapshot(nodeSnapshot *NodeInfoSnapsh
 			}
 		}
 	}
+
+	// Take a snapshot of the nodes order in the tree
+	nodeSnapshot.NodeInfoList = make([]*schedulernodeinfo.NodeInfo, 0, cache.nodeTree.numNodes)
+	nodeSnapshot.HavePodsWithAffinityNodeInfoList = make([]*schedulernodeinfo.NodeInfo, 0, cache.nodeTree.numNodes)
+	for i := 0; i < cache.nodeTree.numNodes; i++ {
+		nodeName := cache.nodeTree.next()
+		if n := nodeSnapshot.NodeInfoMap[nodeName]; n != nil {
+			nodeSnapshot.NodeInfoList = append(nodeSnapshot.NodeInfoList, n)
+			if len(n.PodsWithAffinity()) > 0 {
+				nodeSnapshot.HavePodsWithAffinityNodeInfoList = append(nodeSnapshot.HavePodsWithAffinityNodeInfoList, n)
+			}
+		} else {
+			klog.Errorf("node %q exist in nodeTree but not in NodeInfoMap, this should not happen.", nodeName)
+		}
+	}
 	return nil
 }
 
@@ -251,7 +259,7 @@ func (cache *schedulerCache) List(selector labels.Selector) ([]*v1.Pod, error) {
 	return cache.FilteredList(alwaysTrue, selector)
 }
 
-func (cache *schedulerCache) FilteredList(podFilter algorithm.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
+func (cache *schedulerCache) FilteredList(podFilter schedulerlisters.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
 	cache.mu.RLock()
 	defer cache.mu.RUnlock()
 	// podFilter is expected to return true for most or all of the pods. We
@@ -521,7 +529,7 @@ func (cache *schedulerCache) AddNode(node *v1.Node) error {
 	}
 	cache.moveNodeInfoToHead(node.Name)
 
-	cache.nodeTree.AddNode(node)
+	cache.nodeTree.addNode(node)
 	cache.addNodeImageStates(node, n.info)
 	return n.info.SetNode(node)
 }
@@ -539,7 +547,7 @@ func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) error {
 	}
 	cache.moveNodeInfoToHead(newNode.Name)
 
-	cache.nodeTree.UpdateNode(oldNode, newNode)
+	cache.nodeTree.updateNode(oldNode, newNode)
 	cache.addNodeImageStates(newNode, n.info)
 	return n.info.SetNode(newNode)
 }
@@ -565,49 +573,10 @@ func (cache *schedulerCache) RemoveNode(node *v1.Node) error {
 		cache.moveNodeInfoToHead(node.Name)
 	}
 
-	cache.nodeTree.RemoveNode(node)
+	if err := cache.nodeTree.removeNode(node); err != nil {
+		return err
+	}
 	cache.removeNodeImageStates(node)
-	return nil
-}
-
-func (cache *schedulerCache) AddCSINode(csiNode *storagev1beta1.CSINode) error {
-	cache.mu.Lock()
-	defer cache.mu.Unlock()
-
-	n, ok := cache.nodes[csiNode.Name]
-	if !ok {
-		n = newNodeInfoListItem(schedulernodeinfo.NewNodeInfo())
-		cache.nodes[csiNode.Name] = n
-	}
-	n.info.SetCSINode(csiNode)
-	cache.moveNodeInfoToHead(csiNode.Name)
-	return nil
-}
-
-func (cache *schedulerCache) UpdateCSINode(oldCSINode, newCSINode *storagev1beta1.CSINode) error {
-	cache.mu.Lock()
-	defer cache.mu.Unlock()
-
-	n, ok := cache.nodes[newCSINode.Name]
-	if !ok {
-		n = newNodeInfoListItem(schedulernodeinfo.NewNodeInfo())
-		cache.nodes[newCSINode.Name] = n
-	}
-	n.info.SetCSINode(newCSINode)
-	cache.moveNodeInfoToHead(newCSINode.Name)
-	return nil
-}
-
-func (cache *schedulerCache) RemoveCSINode(csiNode *storagev1beta1.CSINode) error {
-	cache.mu.Lock()
-	defer cache.mu.Unlock()
-
-	n, ok := cache.nodes[csiNode.Name]
-	if !ok {
-		return fmt.Errorf("node %v is not found", csiNode.Name)
-	}
-	n.info.SetCSINode(nil)
-	cache.moveNodeInfoToHead(csiNode.Name)
 	return nil
 }
 
@@ -671,9 +640,11 @@ func (cache *schedulerCache) cleanupExpiredAssumedPods() {
 }
 
 // cleanupAssumedPods exists for making test deterministic by taking time as input argument.
+// It also reports metrics on the cache size for nodes, pods, and assumed pods.
 func (cache *schedulerCache) cleanupAssumedPods(now time.Time) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
+	defer cache.updateMetrics()
 
 	// The size of assumedPods should be small
 	for key := range cache.assumedPods {
@@ -704,10 +675,6 @@ func (cache *schedulerCache) expirePod(key string, ps *podState) error {
 	return nil
 }
 
-func (cache *schedulerCache) NodeTree() *NodeTree {
-	return cache.nodeTree
-}
-
 // GetNodeInfo returns cached data for the node name.
 func (cache *schedulerCache) GetNodeInfo(nodeName string) (*v1.Node, error) {
 	cache.mu.RLock()
@@ -715,8 +682,15 @@ func (cache *schedulerCache) GetNodeInfo(nodeName string) (*v1.Node, error) {
 
 	n, ok := cache.nodes[nodeName]
 	if !ok {
-		return nil, fmt.Errorf("error retrieving node '%v' from cache", nodeName)
+		return nil, fmt.Errorf("node %q not found in cache", nodeName)
 	}
 
 	return n.info.Node(), nil
+}
+
+// updateMetrics updates cache size metric values for pods, assumed pods, and nodes
+func (cache *schedulerCache) updateMetrics() {
+	metrics.CacheSize.WithLabelValues("assumed_pods").Set(float64(len(cache.assumedPods)))
+	metrics.CacheSize.WithLabelValues("pods").Set(float64(len(cache.podStates)))
+	metrics.CacheSize.WithLabelValues("nodes").Set(float64(len(cache.nodes)))
 }

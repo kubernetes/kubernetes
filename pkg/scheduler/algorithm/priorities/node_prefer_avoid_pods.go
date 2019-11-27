@@ -19,19 +19,19 @@ package priorities
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // CalculateNodePreferAvoidPodsPriorityMap priorities nodes according to the node annotation
 // "scheduler.alpha.kubernetes.io/preferAvoidPods".
-func CalculateNodePreferAvoidPodsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
+func CalculateNodePreferAvoidPodsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
+		return framework.NodeScore{}, fmt.Errorf("node not found")
 	}
 	var controllerRef *metav1.OwnerReference
 	if priorityMeta, ok := meta.(*priorityMetadata); ok {
@@ -49,19 +49,19 @@ func CalculateNodePreferAvoidPodsPriorityMap(pod *v1.Pod, meta interface{}, node
 		}
 	}
 	if controllerRef == nil {
-		return schedulerapi.HostPriority{Host: node.Name, Score: schedulerapi.MaxPriority}, nil
+		return framework.NodeScore{Name: node.Name, Score: framework.MaxNodeScore}, nil
 	}
 
 	avoids, err := v1helper.GetAvoidPodsFromNodeAnnotations(node.Annotations)
 	if err != nil {
 		// If we cannot get annotation, assume it's schedulable there.
-		return schedulerapi.HostPriority{Host: node.Name, Score: schedulerapi.MaxPriority}, nil
+		return framework.NodeScore{Name: node.Name, Score: framework.MaxNodeScore}, nil
 	}
 	for i := range avoids.PreferAvoidPods {
 		avoid := &avoids.PreferAvoidPods[i]
 		if avoid.PodSignature.PodController.Kind == controllerRef.Kind && avoid.PodSignature.PodController.UID == controllerRef.UID {
-			return schedulerapi.HostPriority{Host: node.Name, Score: 0}, nil
+			return framework.NodeScore{Name: node.Name, Score: 0}, nil
 		}
 	}
-	return schedulerapi.HostPriority{Host: node.Name, Score: schedulerapi.MaxPriority}, nil
+	return framework.NodeScore{Name: node.Name, Score: framework.MaxNodeScore}, nil
 }

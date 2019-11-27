@@ -18,15 +18,16 @@ package benchmark
 
 import (
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/csi-translation-lib/plugins"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
@@ -359,12 +360,11 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	if b.N < minPods {
 		b.N = minPods
 	}
-	schedulerConfigFactory, finalFunc := mustSetupScheduler()
+	finalFunc, podInformer, clientset := mustSetupScheduler()
 	defer finalFunc()
-	c := schedulerConfigFactory.GetClient()
 
 	nodePreparer := framework.NewIntegrationTestNodePreparer(
-		c,
+		clientset,
 		[]testutils.CountToStrategy{{Count: numNodes, Strategy: nodeStrategy}},
 		"scheduler-perf-",
 	)
@@ -375,40 +375,47 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 
 	config := testutils.NewTestPodCreatorConfig()
 	config.AddStrategy("sched-test", numExistingPods, setupPodStrategy)
-	podCreator := testutils.NewTestPodCreator(c, config)
+	podCreator := testutils.NewTestPodCreator(clientset, config)
 	podCreator.CreatePods()
 
 	for {
-		scheduled, err := schedulerConfigFactory.GetScheduledPodLister().List(labels.Everything())
+		scheduled, err := getScheduledPods(podInformer)
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
 		if len(scheduled) >= numExistingPods {
 			break
 		}
+		klog.Infof("got %d existing pods, required: %d", len(scheduled), numExistingPods)
 		time.Sleep(1 * time.Second)
 	}
+
+	scheduled := int32(0)
+	completedCh := make(chan struct{})
+	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		UpdateFunc: func(old, cur interface{}) {
+			curPod := cur.(*v1.Pod)
+			oldPod := old.(*v1.Pod)
+
+			if len(oldPod.Spec.NodeName) == 0 && len(curPod.Spec.NodeName) > 0 {
+				if atomic.AddInt32(&scheduled, 1) >= int32(b.N) {
+					completedCh <- struct{}{}
+				}
+			}
+		},
+	})
+
 	// start benchmark
 	b.ResetTimer()
 	config = testutils.NewTestPodCreatorConfig()
 	config.AddStrategy("sched-test", b.N, testPodStrategy)
-	podCreator = testutils.NewTestPodCreator(c, config)
+	podCreator = testutils.NewTestPodCreator(clientset, config)
 	podCreator.CreatePods()
-	for {
-		// This can potentially affect performance of scheduler, since List() is done under mutex.
-		// TODO: Setup watch on apiserver and wait until all pods scheduled.
-		scheduled, err := schedulerConfigFactory.GetScheduledPodLister().List(labels.Everything())
-		if err != nil {
-			klog.Fatalf("%v", err)
-		}
-		if len(scheduled) >= numExistingPods+b.N {
-			break
-		}
 
-		// Note: This might introduce slight deviation in accuracy of benchmark results.
-		// Since the total amount of time is relatively large, it might not be a concern.
-		time.Sleep(100 * time.Millisecond)
-	}
+	<-completedCh
+
+	// Note: without this line we're taking the overhead of defer() into account.
+	b.StopTimer()
 }
 
 // makeBasePodWithSecrets creates a Pod object to be used as a template.

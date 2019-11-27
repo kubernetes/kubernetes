@@ -83,6 +83,9 @@ func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID stri
 		return nil, nil
 	}
 	for _, usage := range usages {
+		if usage == nil {
+			continue
+		}
 		unit := usage.GetUnit()
 		switch unit {
 		case csipbv1.VolumeUsage_BYTES:
@@ -661,14 +664,16 @@ func TestVolumeStats(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
-		ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
-		defer cancel()
-		csiSource, _ := getCSISourceFromSpec(tc.volumeData.VolumeSpec)
-		csClient := setupClientWithVolumeStats(t, tc.volumeStatsSet)
-		_, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
-		if err != nil && tc.success {
-			t.Errorf("For %s : expected %v got %v", tc.name, tc.success, err)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+			defer cancel()
+			csiSource, _ := getCSISourceFromSpec(tc.volumeData.VolumeSpec)
+			csClient := setupClientWithVolumeStats(t, tc.volumeStatsSet)
+			_, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
+			if err != nil && tc.success {
+				t.Errorf("For %s : expected %v got %v", tc.name, tc.success, err)
+			}
+		})
 	}
 
 }

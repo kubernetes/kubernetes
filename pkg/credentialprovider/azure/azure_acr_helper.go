@@ -68,7 +68,6 @@ type acrAuthResponse struct {
 }
 
 // 5 minutes buffer time to allow timeshift between local machine and AAD
-const timeShiftBuffer = 300
 const userAgentHeader = "User-Agent"
 const userAgent = "kubernetes-credentialprovider-acr"
 
@@ -92,22 +91,22 @@ func receiveChallengeFromLoginServer(serverAddress string) (*authDirective, erro
 
 	var challenge *http.Response
 	if challenge, err = client.Do(r); err != nil {
-		return nil, fmt.Errorf("Error reaching registry endpoint %s, error: %s", challengeURL.String(), err)
+		return nil, fmt.Errorf("error reaching registry endpoint %s, error: %s", challengeURL.String(), err)
 	}
 	defer challenge.Body.Close()
 
 	if challenge.StatusCode != 401 {
-		return nil, fmt.Errorf("Registry did not issue a valid AAD challenge, status: %d", challenge.StatusCode)
+		return nil, fmt.Errorf("registry did not issue a valid AAD challenge, status: %d", challenge.StatusCode)
 	}
 
 	var authHeader []string
 	var ok bool
 	if authHeader, ok = challenge.Header["Www-Authenticate"]; !ok {
-		return nil, fmt.Errorf("Challenge response does not contain header 'Www-Authenticate'")
+		return nil, fmt.Errorf("challenge response does not contain header 'Www-Authenticate'")
 	}
 
 	if len(authHeader) != 1 {
-		return nil, fmt.Errorf("Registry did not issue a valid AAD challenge, authenticate header [%s]",
+		return nil, fmt.Errorf("registry did not issue a valid AAD challenge, authenticate header [%s]",
 			strings.Join(authHeader, ", "))
 	}
 
@@ -115,7 +114,7 @@ func receiveChallengeFromLoginServer(serverAddress string) (*authDirective, erro
 	authType := strings.ToLower(authSections[0])
 	var authParams *map[string]string
 	if authParams, err = parseAssignments(authSections[1]); err != nil {
-		return nil, fmt.Errorf("Unable to understand the contents of Www-Authenticate header %s", authSections[1])
+		return nil, fmt.Errorf("unable to understand the contents of Www-Authenticate header %s", authSections[1])
 	}
 
 	// verify headers

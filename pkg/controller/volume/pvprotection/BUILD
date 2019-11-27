@@ -6,9 +6,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/controller/volume/pvprotection",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/controller:go_default_library",
         "//pkg/controller/volume/protectionutil:go_default_library",
-        "//pkg/util/metrics:go_default_library",
         "//pkg/util/slice:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -20,6 +18,7 @@ go_library(
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/prometheus/ratelimiter:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

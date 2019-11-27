@@ -49,7 +49,10 @@ func newStorage(t *testing.T) (ControllerStorage, *etcd3testing.EtcdTestServer) 
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "replicationcontrollers",
 	}
-	storage := NewStorage(restOptions)
+	storage, err := NewStorage(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 	return storage, server
 }
 

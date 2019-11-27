@@ -53,15 +53,18 @@ type DeploymentStorage struct {
 	Rollback   *RollbackREST
 }
 
-func NewStorage(optsGetter generic.RESTOptionsGetter) DeploymentStorage {
-	deploymentRest, deploymentStatusRest, deploymentRollbackRest := NewREST(optsGetter)
+func NewStorage(optsGetter generic.RESTOptionsGetter) (DeploymentStorage, error) {
+	deploymentRest, deploymentStatusRest, deploymentRollbackRest, err := NewREST(optsGetter)
+	if err != nil {
+		return DeploymentStorage{}, err
+	}
 
 	return DeploymentStorage{
 		Deployment: deploymentRest,
 		Status:     deploymentStatusRest,
 		Scale:      &ScaleREST{store: deploymentRest.Store},
 		Rollback:   deploymentRollbackRest,
-	}
+	}, nil
 }
 
 type REST struct {
@@ -70,7 +73,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against deployments.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *RollbackREST) {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *RollbackREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &apps.Deployment{} },
 		NewListFunc:              func() runtime.Object { return &apps.DeploymentList{} },
@@ -84,12 +87,12 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Rollbac
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, nil, nil, err
 	}
 
 	statusStore := *store
 	statusStore.UpdateStrategy = deployment.StatusStrategy
-	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}, &RollbackREST{store: store}
+	return &REST{store, []string{"all"}}, &StatusREST{store: &statusStore}, &RollbackREST{store: store}, nil
 }
 
 // Implement ShortNamesProvider
@@ -174,7 +177,7 @@ func (r *RollbackREST) Create(ctx context.Context, name string, obj runtime.Obje
 	}
 
 	if createValidation != nil {
-		if err := createValidation(obj.DeepCopyObject()); err != nil {
+		if err := createValidation(ctx, obj.DeepCopyObject()); err != nil {
 			return nil, err
 		}
 	}
@@ -317,17 +320,17 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 }
 
 func toScaleCreateValidation(f rest.ValidateObjectFunc) rest.ValidateObjectFunc {
-	return func(obj runtime.Object) error {
+	return func(ctx context.Context, obj runtime.Object) error {
 		scale, err := scaleFromDeployment(obj.(*apps.Deployment))
 		if err != nil {
 			return err
 		}
-		return f(scale)
+		return f(ctx, scale)
 	}
 }
 
 func toScaleUpdateValidation(f rest.ValidateObjectUpdateFunc) rest.ValidateObjectUpdateFunc {
-	return func(obj, old runtime.Object) error {
+	return func(ctx context.Context, obj, old runtime.Object) error {
 		newScale, err := scaleFromDeployment(obj.(*apps.Deployment))
 		if err != nil {
 			return err
@@ -336,7 +339,7 @@ func toScaleUpdateValidation(f rest.ValidateObjectUpdateFunc) rest.ValidateObjec
 		if err != nil {
 			return err
 		}
-		return f(newScale, oldScale)
+		return f(ctx, newScale, oldScale)
 	}
 }
 

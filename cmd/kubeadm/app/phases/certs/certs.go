@@ -113,7 +113,7 @@ func CreateCACertAndKeyFiles(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfigur
 		return err
 	}
 
-	return writeCertificateAuthorithyFilesIfNotExist(
+	return writeCertificateAuthorityFilesIfNotExist(
 		cfg.CertificatesDir,
 		certSpec.BaseName,
 		caCert,
@@ -176,11 +176,11 @@ func LoadCertificateAuthority(pkiDir string, baseName string) (*x509.Certificate
 	return caCert, caKey, nil
 }
 
-// writeCertificateAuthorithyFilesIfNotExist write a new certificate Authority to the given path.
+// writeCertificateAuthorityFilesIfNotExist write a new certificate Authority to the given path.
 // If there already is a certificate file at the given path; kubeadm tries to load it and check if the values in the
 // existing and the expected certificate equals. If they do; kubeadm will just skip writing the file as it's up-to-date,
 // otherwise this function returns an error.
-func writeCertificateAuthorithyFilesIfNotExist(pkiDir string, baseName string, caCert *x509.Certificate, caKey crypto.Signer) error {
+func writeCertificateAuthorityFilesIfNotExist(pkiDir string, baseName string, caCert *x509.Certificate, caKey crypto.Signer) error {
 
 	// If cert or key exists, we should try to load them
 	if pkiutil.CertOrKeyExist(pkiDir, baseName) {

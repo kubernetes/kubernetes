@@ -88,3 +88,8 @@ func AddKubeadmOtherFlags(flagSet *pflag.FlagSet, rootfsPath *string) {
 		"[EXPERIMENTAL] The path to the 'real' host root filesystem.",
 	)
 }
+
+// AddKustomizePodsFlag adds the --kustomize flag to the given flagset
+func AddKustomizePodsFlag(fs *pflag.FlagSet, kustomizeDir *string) {
+	fs.StringVarP(kustomizeDir, Kustomize, "k", *kustomizeDir, "The path where kustomize patches for static pod manifests are stored.")
+}

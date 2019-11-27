@@ -19,6 +19,7 @@ go_test(
         "desired_state_of_world_test.go",
     ],
     embed = [":go_default_library"],
+    deps = ["//vendor/github.com/stretchr/testify/require:go_default_library"],
 )
 
 filegroup(

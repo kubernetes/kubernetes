@@ -3,7 +3,6 @@
 approvers:
 - luxas
 - sttts
-- jbeda
 - lavalamp
 reviewers:
 - luxas
@@ -12,6 +11,8 @@ reviewers:
 - dims
 - dixudx
 - rosti
+emeritus_approvers:
+- jbeda
 labels:
 - sig/cluster-lifecycle
 - sig/api-machinery

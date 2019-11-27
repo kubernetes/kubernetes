@@ -111,7 +111,7 @@ type EtcdVersionPair struct {
 func ParseEtcdVersionPair(s string) (*EtcdVersionPair, error) {
 	parts := strings.Split(s, "/")
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("Malformed version file, expected <major>.<minor>.<patch>/<storage> but got %s", s)
+		return nil, fmt.Errorf("malformed version file, expected <major>.<minor>.<patch>/<storage> but got %s", s)
 	}
 	version, err := ParseEtcdVersion(parts[0])
 	if err != nil {

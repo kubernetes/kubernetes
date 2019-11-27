@@ -29,7 +29,13 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Sysctls [NodeFeature:Sysctls]", func() {
+var _ = framework.KubeDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func() {
+
+	ginkgo.BeforeEach(func() {
+		// sysctl is not supported on Windows.
+		framework.SkipIfNodeOSDistroIs("windows")
+	})
+
 	f := framework.NewDefaultFramework("sysctl")
 	var podClient *framework.PodClient
 

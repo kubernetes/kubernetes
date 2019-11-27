@@ -103,26 +103,6 @@ func newAnalyzer(platform string) *analyzer {
 }
 
 func (a *analyzer) handleError(err error) {
-	if e, ok := err.(types.Error); ok {
-		// useful for some ignores:
-		// path := e.Fset.Position(e.Pos).String()
-		ignore := false
-		// TODO(rmmh): read ignores from a file, so this code can
-		// be Kubernetes-agnostic. Unused ignores should be treated as
-		// errors, to ensure coverage isn't overly broad.
-		if strings.Contains(e.Msg, "GetOpenAPIDefinitions") {
-			// TODO(rmmh): figure out why this happens.
-			// cmd/kube-apiserver/app/server.go:392:70
-			// test/integration/framework/master_utils.go:131:84
-			ignore = true
-		}
-		if ignore {
-			if *verbose {
-				fmt.Println("ignoring error:", err)
-			}
-			return
-		}
-	}
 	a.errors = append(a.errors, err.Error())
 	if *serial {
 		fmt.Fprintf(os.Stderr, "%sERROR(%s) %s\n", logPrefix, a.platform, err)

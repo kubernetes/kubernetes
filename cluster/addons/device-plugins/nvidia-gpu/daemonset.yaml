@@ -14,8 +14,6 @@ spec:
     metadata:
       labels:
         k8s-app: nvidia-gpu-device-plugin
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-node-critical
       affinity:

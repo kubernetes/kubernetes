@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -17,6 +19,8 @@ limitations under the License.
 package aws
 
 import (
+	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -333,7 +337,13 @@ func (m *FakeMetadata) GetMetadata(key string) (string, error) {
 		return aws.StringValue(i.PublicIpAddress), nil
 	} else if strings.HasPrefix(key, networkInterfacesPrefix) {
 		if key == networkInterfacesPrefix {
-			return strings.Join(m.aws.networkInterfacesMacs, "/\n") + "/\n", nil
+			// Return the MACs sorted lexically rather than in device-number
+			// order; this matches AWS's observed behavior and lets us test
+			// that we fix up the ordering correctly in NodeAddresses().
+			macs := make([]string, len(m.aws.networkInterfacesMacs))
+			copy(macs, m.aws.networkInterfacesMacs)
+			sort.Strings(macs)
+			return strings.Join(macs, "/\n") + "/\n", nil
 		}
 
 		keySplit := strings.Split(key, "/")
@@ -342,6 +352,13 @@ func (m *FakeMetadata) GetMetadata(key string) (string, error) {
 			for i, macElem := range m.aws.networkInterfacesMacs {
 				if macParam == macElem {
 					return m.aws.networkInterfacesVpcIDs[i], nil
+				}
+			}
+		}
+		if len(keySplit) == 5 && keySplit[4] == "device-number" {
+			for i, macElem := range m.aws.networkInterfacesMacs {
+				if macParam == macElem {
+					return fmt.Sprintf("%d\n", i), nil
 				}
 			}
 		}

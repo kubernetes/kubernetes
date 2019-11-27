@@ -22,7 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
@@ -129,6 +129,9 @@ func createKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client clientse
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), daemonSetbytes, kubeproxyDaemonSet); err != nil {
 		return errors.Wrap(err, "unable to decode kube-proxy daemonset")
 	}
+	// Propagate the http/https proxy host environment variables to the container
+	env := &kubeproxyDaemonSet.Spec.Template.Spec.Containers[0].Env
+	*env = append(*env, kubeadmutil.GetProxyEnvVars()...)
 
 	// Create the DaemonSet for kube-proxy or update it in case it already exists
 	return apiclient.CreateOrUpdateDaemonSet(client, kubeproxyDaemonSet)

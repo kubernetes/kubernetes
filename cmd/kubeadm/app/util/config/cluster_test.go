@@ -449,7 +449,6 @@ func TestGetComponentConfigs(t *testing.T) {
 					},
 				},
 			},
-			expectedError: true,
 		},
 	}
 
@@ -482,9 +481,6 @@ func TestGetComponentConfigs(t *testing.T) {
 			// Test expected values in InitConfiguration
 			if cfg.ComponentConfigs.Kubelet == nil {
 				t.Errorf("invalid cfg.ComponentConfigs.Kubelet")
-			}
-			if cfg.ComponentConfigs.KubeProxy == nil {
-				t.Errorf("invalid cfg.ComponentConfigs.KubeProxy")
 			}
 		})
 	}

@@ -32,11 +32,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var _ = SIGDescribe("Pods Extended", func() {
@@ -142,9 +141,9 @@ var _ = SIGDescribe("Pods Extended", func() {
 			ginkgo.By("verifying the kubelet observed the termination notice")
 
 			err = wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
-				podList, err := framework.GetKubeletPods(f.ClientSet, pod.Spec.NodeName)
+				podList, err := e2ekubelet.GetKubeletPods(f.ClientSet, pod.Spec.NodeName)
 				if err != nil {
-					e2elog.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
+					framework.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
 					return false, nil
 				}
 				for _, kubeletPod := range podList.Items {
@@ -152,18 +151,18 @@ var _ = SIGDescribe("Pods Extended", func() {
 						continue
 					}
 					if kubeletPod.ObjectMeta.DeletionTimestamp == nil {
-						e2elog.Logf("deletion has not yet been observed")
+						framework.Logf("deletion has not yet been observed")
 						return false, nil
 					}
 					return false, nil
 				}
-				e2elog.Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
+				framework.Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
 				return true, nil
 			})
 			framework.ExpectNoError(err, "kubelet never observed the termination notice")
 
-			gomega.Expect(lastPod.DeletionTimestamp).ToNot(gomega.BeNil())
-			gomega.Expect(lastPod.Spec.TerminationGracePeriodSeconds).ToNot(gomega.BeZero())
+			framework.ExpectNotEqual(lastPod.DeletionTimestamp, nil)
+			framework.ExpectNotEqual(lastPod.Spec.TerminationGracePeriodSeconds, 0)
 
 			selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 			options = metav1.ListOptions{LabelSelector: selector.String()}
@@ -221,7 +220,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			ginkgo.By("verifying QOS class is set on the pod")
 			pod, err := podClient.Get(name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to query for pod")
-			gomega.Expect(pod.Status.QOSClass == v1.PodQOSGuaranteed)
+			framework.ExpectEqual(pod.Status.QOSClass, v1.PodQOSGuaranteed)
 		})
 	})
 })

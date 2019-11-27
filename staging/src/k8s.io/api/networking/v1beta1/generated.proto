@@ -64,17 +64,17 @@ message HTTPIngressRuleValue {
 // based virtual hosting etc.
 message Ingress {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec is the desired state of the Ingress.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional IngressSpec spec = 2;
 
   // Status is the current state of the Ingress.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional IngressStatus status = 3;
 }
@@ -91,7 +91,7 @@ message IngressBackend {
 // IngressList is a collection of Ingress.
 message IngressList {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 

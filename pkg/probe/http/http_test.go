@@ -17,6 +17,7 @@ limitations under the License.
 package http
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"net/http"
@@ -367,4 +368,71 @@ func TestHTTPProbeChecker_HostHeaderPreservedAfterRedirect(t *testing.T) {
 			assert.Equal(t, test.expectedResult, result)
 		})
 	}
+}
+
+func TestHTTPProbeChecker_PayloadTruncated(t *testing.T) {
+	successHostHeader := "www.success.com"
+	oversizePayload := bytes.Repeat([]byte("a"), maxRespBodyLength+1)
+	truncatedPayload := bytes.Repeat([]byte("a"), maxRespBodyLength)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/success":
+			if r.Host == successHostHeader {
+				w.WriteHeader(http.StatusOK)
+				w.Write(oversizePayload)
+			} else {
+				http.Error(w, "", http.StatusBadRequest)
+			}
+		default:
+			http.Error(w, "", http.StatusInternalServerError)
+		}
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	headers := http.Header{}
+	headers.Add("Host", successHostHeader)
+	t.Run("truncated payload", func(t *testing.T) {
+		prober := New(false)
+		target, err := url.Parse(server.URL + "/success")
+		require.NoError(t, err)
+		result, body, err := prober.Probe(target, headers, wait.ForeverTestTimeout)
+		assert.NoError(t, err)
+		assert.Equal(t, result, probe.Success)
+		assert.Equal(t, body, string(truncatedPayload))
+	})
+}
+
+func TestHTTPProbeChecker_PayloadNormal(t *testing.T) {
+	successHostHeader := "www.success.com"
+	normalPayload := bytes.Repeat([]byte("a"), maxRespBodyLength-1)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/success":
+			if r.Host == successHostHeader {
+				w.WriteHeader(http.StatusOK)
+				w.Write(normalPayload)
+			} else {
+				http.Error(w, "", http.StatusBadRequest)
+			}
+		default:
+			http.Error(w, "", http.StatusInternalServerError)
+		}
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	headers := http.Header{}
+	headers.Add("Host", successHostHeader)
+	t.Run("normal payload", func(t *testing.T) {
+		prober := New(false)
+		target, err := url.Parse(server.URL + "/success")
+		require.NoError(t, err)
+		result, body, err := prober.Probe(target, headers, wait.ForeverTestTimeout)
+		assert.NoError(t, err)
+		assert.Equal(t, result, probe.Success)
+		assert.Equal(t, body, string(normalPayload))
+	})
 }

@@ -25,6 +25,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -141,6 +142,15 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	default:
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for HairpinMode (--hairpin-mode). Valid options are %q, %q or %q",
 			kc.HairpinMode, kubeletconfig.HairpinNone, kubeletconfig.HairpinVeth, kubeletconfig.PromiscuousBridge))
+	}
+	if kc.ReservedSystemCPUs != "" {
+		// --reserved-cpus does not support --system-reserved-cgroup or --kube-reserved-cgroup
+		if kc.SystemReservedCgroup != "" || kc.KubeReservedCgroup != "" {
+			allErrors = append(allErrors, fmt.Errorf("can't use --reserved-cpus with --system-reserved-cgroup or --kube-reserved-cgroup"))
+		}
+		if _, err := cpuset.Parse(kc.ReservedSystemCPUs); err != nil {
+			allErrors = append(allErrors, fmt.Errorf("unable to parse --reserved-cpus, error: %v", err))
+		}
 	}
 
 	if err := validateKubeletOSConfiguration(kc); err != nil {

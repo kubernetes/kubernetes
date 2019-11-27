@@ -42,16 +42,20 @@ func getPodFromClientset(clientset *fake.Clientset) GetPodFunc {
 }
 
 func getPodsAssignedToNode(c *fake.Clientset) GetPodsByNodeNameFunc {
-	return func(nodeName string) ([]v1.Pod, error) {
+	return func(nodeName string) ([]*v1.Pod, error) {
 		selector := fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName})
 		pods, err := c.CoreV1().Pods(v1.NamespaceAll).List(metav1.ListOptions{
 			FieldSelector: selector.String(),
 			LabelSelector: labels.Everything().String(),
 		})
 		if err != nil {
-			return []v1.Pod{}, fmt.Errorf("failed to get Pods assigned to node %v", nodeName)
+			return []*v1.Pod{}, fmt.Errorf("failed to get Pods assigned to node %v", nodeName)
 		}
-		return pods.Items, nil
+		rPods := make([]*v1.Pod, len(pods.Items))
+		for i := range pods.Items {
+			rPods[i] = &pods.Items[i]
+		}
+		return rPods, nil
 	}
 }
 
@@ -218,7 +222,7 @@ func TestCreatePod(t *testing.T) {
 			}
 		}
 		if podDeleted != item.expectDelete {
-			t.Errorf("%v: Unexepected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
+			t.Errorf("%v: Unexpected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
 		}
 		close(stopCh)
 	}
@@ -315,7 +319,7 @@ func TestUpdatePod(t *testing.T) {
 			}
 		}
 		if podDeleted != item.expectDelete {
-			t.Errorf("%v: Unexepected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
+			t.Errorf("%v: Unexpected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
 		}
 		close(stopCh)
 	}
@@ -371,7 +375,7 @@ func TestCreateNode(t *testing.T) {
 			}
 		}
 		if podDeleted != item.expectDelete {
-			t.Errorf("%v: Unexepected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
+			t.Errorf("%v: Unexpected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
 		}
 		close(stopCh)
 	}
@@ -495,7 +499,7 @@ func TestUpdateNode(t *testing.T) {
 			}
 		}
 		if podDeleted != item.expectDelete {
-			t.Errorf("%v: Unexepected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
+			t.Errorf("%v: Unexpected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
 		}
 		close(stopCh)
 	}
@@ -617,6 +621,7 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 
 func TestGetMinTolerationTime(t *testing.T) {
 	one := int64(1)
+	two := int64(2)
 	oneSec := 1 * time.Second
 
 	tests := []struct {
@@ -627,6 +632,26 @@ func TestGetMinTolerationTime(t *testing.T) {
 			tolerations: []v1.Toleration{},
 			expected:    0,
 		},
+		{
+			tolerations: []v1.Toleration{
+				{
+					TolerationSeconds: nil,
+				},
+			},
+			expected: -1,
+		},
+		{
+			tolerations: []v1.Toleration{
+				{
+					TolerationSeconds: &one,
+				},
+				{
+					TolerationSeconds: &two,
+				},
+			},
+			expected: oneSec,
+		},
+
 		{
 			tolerations: []v1.Toleration{
 				{
@@ -662,7 +687,7 @@ func TestGetMinTolerationTime(t *testing.T) {
 // TestEventualConsistency verifies if getPodsAssignedToNode returns incomplete data
 // (e.g. due to watch latency), it will reconcile the remaining pods eventually.
 // This scenario is partially covered by TestUpdatePods, but given this is an important
-// property of TaitManager, it's better to have explicit test for this.
+// property of TaintManager, it's better to have explicit test for this.
 func TestEventualConsistency(t *testing.T) {
 	testCases := []struct {
 		description  string

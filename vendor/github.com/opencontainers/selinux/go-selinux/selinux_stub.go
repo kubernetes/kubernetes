@@ -97,6 +97,14 @@ func SetExecLabel(label string) error {
 }
 
 /*
+SetTaskLabel sets the SELinux label for the current thread, or an error.
+This requires the dyntransition permission.
+*/
+func SetTaskLabel(label string) error {
+        return nil
+}
+
+/*
 SetSocketLabel sets the SELinux label that the kernel will use for any programs
 that are executed by the current process thread, or an error.
 */
@@ -106,6 +114,11 @@ func SetSocketLabel(label string) error {
 
 // SocketLabel retrieves the current socket label setting
 func SocketLabel() (string, error) {
+	return "", nil
+}
+
+// PeerLabel retrieves the label of the client on the other side of a socket
+func PeerLabel(fd uintptr) (string, error) {
 	return "", nil
 }
 

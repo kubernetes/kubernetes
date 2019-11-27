@@ -106,7 +106,7 @@ genrule(
 [pkg_rpm_for_goarch(
     name = "cri-tools",
     data = [
-        "@cri_tools_{GOARCH}//file",
+        "@cri_tools_linux-{GOARCH}//file",
     ],
     goarch = arch,
     spec_file = "cri-tools.spec",

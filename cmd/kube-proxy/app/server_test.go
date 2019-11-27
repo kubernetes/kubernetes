@@ -30,55 +30,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	utilpointer "k8s.io/utils/pointer"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	componentbaseconfig "k8s.io/component-base/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/util/configz"
-	utilpointer "k8s.io/utils/pointer"
 )
-
-type fakeIPTablesVersioner struct {
-	version string // what to return
-	err     error  // what to return
-}
-
-func (fake *fakeIPTablesVersioner) GetVersion() (string, error) {
-	return fake.version, fake.err
-}
-
-func (fake *fakeIPTablesVersioner) IsCompatible() error {
-	return fake.err
-}
-
-type fakeIPSetVersioner struct {
-	version string // what to return
-	err     error  // what to return
-}
-
-func (fake *fakeIPSetVersioner) GetVersion() (string, error) {
-	return fake.version, fake.err
-}
-
-type fakeKernelCompatTester struct {
-	ok bool
-}
-
-func (fake *fakeKernelCompatTester) IsCompatible() error {
-	if !fake.ok {
-		return fmt.Errorf("error")
-	}
-	return nil
-}
-
-// fakeKernelHandler implements KernelHandler.
-type fakeKernelHandler struct {
-	modules []string
-}
-
-func (fake *fakeKernelHandler) GetModules() ([]string, error) {
-	return fake.modules, nil
-}
 
 // This test verifies that NewProxyServer does not crash when CleanupAndExit is true.
 func TestProxyServerWithCleanupAndExit(t *testing.T) {
@@ -201,6 +160,7 @@ nodePortAddresses:
 		clusterCIDR        string
 		healthzBindAddress string
 		metricsBindAddress string
+		extraConfig        string
 	}{
 		{
 			name:               "iptables mode, IPv4 all-zeros bind address",
@@ -259,6 +219,30 @@ nodePortAddresses:
 			healthzBindAddress: "[fd00:1::5]:12345",
 			metricsBindAddress: "[fd00:2::5]:23456",
 		},
+		{
+			// Test for unknown field within config.
+			// For v1alpha1 a lenient path is implemented and will throw a
+			// strict decoding warning instead of failing to load
+			name:               "unknown field",
+			mode:               "iptables",
+			bindAddress:        "9.8.7.6",
+			clusterCIDR:        "1.2.3.0/24",
+			healthzBindAddress: "1.2.3.4:12345",
+			metricsBindAddress: "2.3.4.5:23456",
+			extraConfig:        "foo: bar",
+		},
+		{
+			// Test for duplicate field within config.
+			// For v1alpha1 a lenient path is implemented and will throw a
+			// strict decoding warning instead of failing to load
+			name:               "duplicate field",
+			mode:               "iptables",
+			bindAddress:        "9.8.7.6",
+			clusterCIDR:        "1.2.3.0/24",
+			healthzBindAddress: "1.2.3.4:12345",
+			metricsBindAddress: "2.3.4.5:23456",
+			extraConfig:        "bindAddress: 9.8.7.6",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -308,11 +292,17 @@ nodePortAddresses:
 
 		options := NewOptions()
 
-		yaml := fmt.Sprintf(
+		baseYAML := fmt.Sprintf(
 			yamlTemplate, tc.bindAddress, tc.clusterCIDR,
 			tc.healthzBindAddress, tc.metricsBindAddress, tc.mode)
+
+		// Append additional configuration to the base yaml template
+		yaml := fmt.Sprintf("%s\n%s", baseYAML, tc.extraConfig)
+
 		config, err := options.loadConfig([]byte(yaml))
+
 		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
+
 		if !reflect.DeepEqual(expected, config) {
 			t.Fatalf("unexpected config for %s, diff = %s", tc.name, diff.ObjectDiff(config, expected))
 		}
@@ -321,10 +311,21 @@ nodePortAddresses:
 
 // TestLoadConfigFailures tests failure modes for loadConfig()
 func TestLoadConfigFailures(t *testing.T) {
+	// TODO(phenixblue): Uncomment below template when v1alpha2+ of kube-proxy config is
+	// released with strict decoding. These associated tests will fail with
+	// the lenient codec and only one config API version.
+	/*
+			yamlTemplate := `bindAddress: 0.0.0.0
+		clusterCIDR: "1.2.3.0/24"
+		configSyncPeriod: 15s
+		kind: KubeProxyConfiguration`
+	*/
+
 	testCases := []struct {
-		name   string
-		config string
-		expErr string
+		name    string
+		config  string
+		expErr  string
+		checkFn func(err error) bool
 	}{
 		{
 			name:   "Decode error test",
@@ -341,15 +342,39 @@ func TestLoadConfigFailures(t *testing.T) {
 			config: "bindAddress: ::",
 			expErr: "mapping values are not allowed in this context",
 		},
+		// TODO(phenixblue): Uncomment below tests when v1alpha2+ of kube-proxy config is
+		// released with strict decoding. These tests will fail with the
+		// lenient codec and only one config API version.
+		/*
+			{
+				name:    "Duplicate fields",
+				config:  fmt.Sprintf("%s\nbindAddress: 1.2.3.4", yamlTemplate),
+				checkFn: kuberuntime.IsStrictDecodingError,
+			},
+			{
+				name:    "Unknown field",
+				config:  fmt.Sprintf("%s\nfoo: bar", yamlTemplate),
+				checkFn: kuberuntime.IsStrictDecodingError,
+			},
+		*/
 	}
+
 	version := "apiVersion: kubeproxy.config.k8s.io/v1alpha1"
 	for _, tc := range testCases {
-		options := NewOptions()
-		config := fmt.Sprintf("%s\n%s", version, tc.config)
-		_, err := options.loadConfig([]byte(config))
-		if assert.Error(t, err, tc.name) {
-			assert.Contains(t, err.Error(), tc.expErr, tc.name)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			options := NewOptions()
+			config := fmt.Sprintf("%s\n%s", version, tc.config)
+			_, err := options.loadConfig([]byte(config))
+
+			if assert.Error(t, err, tc.name) {
+				if tc.expErr != "" {
+					assert.Contains(t, err.Error(), tc.expErr)
+				}
+				if tc.checkFn != nil {
+					assert.True(t, tc.checkFn(err), tc.name)
+				}
+			}
+		})
 	}
 }
 
@@ -359,16 +384,24 @@ func TestProcessHostnameOverrideFlag(t *testing.T) {
 		name                 string
 		hostnameOverrideFlag string
 		expectedHostname     string
+		expectError          bool
 	}{
 		{
 			name:                 "Hostname from config file",
 			hostnameOverrideFlag: "",
 			expectedHostname:     "foo",
+			expectError:          false,
 		},
 		{
 			name:                 "Hostname from flag",
 			hostnameOverrideFlag: "  bar ",
 			expectedHostname:     "bar",
+			expectError:          false,
+		},
+		{
+			name:                 "Hostname is space",
+			hostnameOverrideFlag: "   ",
+			expectError:          true,
 		},
 	}
 	for _, tc := range testCases {
@@ -381,9 +414,15 @@ func TestProcessHostnameOverrideFlag(t *testing.T) {
 			options.hostnameOverride = tc.hostnameOverrideFlag
 
 			err := options.processHostnameOverrideFlag()
-			assert.NoError(t, err, "unexpected error %v", err)
-			if tc.expectedHostname != options.config.HostnameOverride {
-				t.Fatalf("expected hostname: %s, but got: %s", tc.expectedHostname, options.config.HostnameOverride)
+			if tc.expectError {
+				if err == nil {
+					t.Fatalf("should error for this case %s", tc.name)
+				}
+			} else {
+				assert.NoError(t, err, "unexpected error %v", err)
+				if tc.expectedHostname != options.config.HostnameOverride {
+					t.Fatalf("expected hostname: %s, but got: %s", tc.expectedHostname, options.config.HostnameOverride)
+				}
 			}
 		})
 	}
@@ -393,7 +432,7 @@ func TestConfigChange(t *testing.T) {
 	setUp := func() (*os.File, string, error) {
 		tempDir, err := ioutil.TempDir("", "kubeproxy-config-change")
 		if err != nil {
-			return nil, "", fmt.Errorf("Unable to create temporary directory: %v", err)
+			return nil, "", fmt.Errorf("unable to create temporary directory: %v", err)
 		}
 		fullPath := filepath.Join(tempDir, "kube-proxy-config")
 		file, err := os.Create(fullPath)

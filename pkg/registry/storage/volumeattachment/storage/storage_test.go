@@ -42,7 +42,10 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer)
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "volumeattachments",
 	}
-	volumeAttachmentStorage := NewStorage(restOptions)
+	volumeAttachmentStorage, err := NewStorage(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 	return volumeAttachmentStorage.VolumeAttachment, volumeAttachmentStorage.Status, server
 }
 

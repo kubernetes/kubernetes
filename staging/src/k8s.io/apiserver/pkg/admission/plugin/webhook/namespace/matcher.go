@@ -95,8 +95,7 @@ func (m *Matcher) MatchNamespaceSelector(h webhook.WebhookAccessor, attr admissi
 		// Also update the comment in types.go
 		return true, nil
 	}
-	// TODO: adding an LRU cache to cache the translation
-	selector, err := metav1.LabelSelectorAsSelector(h.GetNamespaceSelector())
+	selector, err := h.GetParsedNamespaceSelector()
 	if err != nil {
 		return false, apierrors.NewInternalError(err)
 	}

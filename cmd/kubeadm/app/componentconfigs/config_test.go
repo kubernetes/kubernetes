@@ -47,6 +47,7 @@ func TestGetFromConfigMap(t *testing.T) {
 		component     RegistrationKind
 		configMap     *fakeConfigMap
 		expectedError bool
+		expectedNil   bool
 	}{
 		{
 			name:      "valid kube-proxy",
@@ -59,10 +60,10 @@ func TestGetFromConfigMap(t *testing.T) {
 			},
 		},
 		{
-			name:          "invalid kube-proxy - missing ConfigMap",
-			component:     KubeProxyConfigurationKind,
-			configMap:     nil,
-			expectedError: true,
+			name:        "valid kube-proxy - missing ConfigMap",
+			component:   KubeProxyConfigurationKind,
+			configMap:   nil,
+			expectedNil: true,
 		},
 		{
 			name:      "invalid kube-proxy - missing key",
@@ -123,8 +124,8 @@ func TestGetFromConfigMap(t *testing.T) {
 				return
 			}
 
-			if obj == nil {
-				t.Error("unexpected nil return value")
+			if rt.expectedNil != (obj == nil) {
+				t.Error("unexpected return value")
 			}
 		})
 	}

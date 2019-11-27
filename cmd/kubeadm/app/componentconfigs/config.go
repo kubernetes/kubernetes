@@ -18,15 +18,17 @@ package componentconfigs
 
 import (
 	"github.com/pkg/errors"
+	"k8s.io/klog"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
+	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
 
 // GetFromKubeletConfigMap returns the pointer to the ComponentConfig API object read from the kubelet-config-version
@@ -47,7 +49,7 @@ func GetFromKubeletConfigMap(client clientset.Interface, version *version.Versio
 	}
 
 	// Decodes the kubeletConfigData into the internal component config
-	obj := &kubeletconfig.KubeletConfiguration{}
+	obj := &kubeletconfigv1beta1.KubeletConfiguration{}
 	err = unmarshalObject(obj, []byte(kubeletConfigData))
 	if err != nil {
 		return nil, err
@@ -63,6 +65,13 @@ func GetFromKubeProxyConfigMap(client clientset.Interface, version *version.Vers
 	// Read the ConfigMap from the cluster
 	kubeproxyCfg, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, kubeadmconstants.KubeProxyConfigMap)
 	if err != nil {
+		// The Kube-Proxy config map may be non-existent, because the user has decided to manage it by themselves
+		// or to use other proxy solution. It may also be forbidden - if the kube-proxy phase was skipped we have neither
+		// the config map, nor the RBAC rules allowing join access to it.
+		if apierrors.IsNotFound(err) || apierrors.IsForbidden(err) {
+			klog.Warningf("Warning: No kube-proxy config is loaded. Continuing without it: %v", err)
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -73,7 +82,7 @@ func GetFromKubeProxyConfigMap(client clientset.Interface, version *version.Vers
 	}
 
 	// Decodes the Config map dat into the internal component config
-	obj := &kubeproxyconfig.KubeProxyConfiguration{}
+	obj := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
 	err = unmarshalObject(obj, []byte(kubeproxyConfigData))
 	if err != nil {
 		return nil, err

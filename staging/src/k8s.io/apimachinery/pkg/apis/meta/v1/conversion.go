@@ -18,6 +18,7 @@ package v1
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -35,12 +37,17 @@ func AddConversionFuncs(scheme *runtime.Scheme) error {
 
 		Convert_v1_ListMeta_To_v1_ListMeta,
 
+		Convert_v1_DeleteOptions_To_v1_DeleteOptions,
+
 		Convert_intstr_IntOrString_To_intstr_IntOrString,
+		Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString,
+		Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString,
 
 		Convert_Pointer_v1_Duration_To_v1_Duration,
 		Convert_v1_Duration_To_Pointer_v1_Duration,
 
 		Convert_Slice_string_To_v1_Time,
+		Convert_Slice_string_To_Pointer_v1_Time,
 
 		Convert_v1_Time_To_v1_Time,
 		Convert_v1_MicroTime_To_v1_MicroTime,
@@ -76,7 +83,7 @@ func AddConversionFuncs(scheme *runtime.Scheme) error {
 
 		Convert_Slice_string_To_Slice_int32,
 
-		Convert_Slice_string_To_v1_DeletionPropagation,
+		Convert_Slice_string_To_Pointer_v1_DeletionPropagation,
 
 		Convert_Slice_string_To_v1_IncludeObjectPolicy,
 	)
@@ -195,8 +202,29 @@ func Convert_v1_ListMeta_To_v1_ListMeta(in, out *ListMeta, s conversion.Scope) e
 }
 
 // +k8s:conversion-fn=copy-only
+func Convert_v1_DeleteOptions_To_v1_DeleteOptions(in, out *DeleteOptions, s conversion.Scope) error {
+	*out = *in
+	return nil
+}
+
+// +k8s:conversion-fn=copy-only
 func Convert_intstr_IntOrString_To_intstr_IntOrString(in, out *intstr.IntOrString, s conversion.Scope) error {
 	*out = *in
+	return nil
+}
+
+func Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(in **intstr.IntOrString, out *intstr.IntOrString, s conversion.Scope) error {
+	if *in == nil {
+		*out = intstr.IntOrString{} // zero value
+		return nil
+	}
+	*out = **in // copy
+	return nil
+}
+
+func Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(in *intstr.IntOrString, out **intstr.IntOrString, s conversion.Scope) error {
+	temp := *in // copy
+	*out = &temp
 	return nil
 }
 
@@ -230,12 +258,28 @@ func Convert_v1_Duration_To_Pointer_v1_Duration(in *Duration, out **Duration, s 
 }
 
 // Convert_Slice_string_To_v1_Time allows converting a URL query parameter value
-func Convert_Slice_string_To_v1_Time(input *[]string, out *Time, s conversion.Scope) error {
+func Convert_Slice_string_To_v1_Time(in *[]string, out *Time, s conversion.Scope) error {
 	str := ""
-	if len(*input) > 0 {
-		str = (*input)[0]
+	if len(*in) > 0 {
+		str = (*in)[0]
 	}
 	return out.UnmarshalQueryParameter(str)
+}
+
+func Convert_Slice_string_To_Pointer_v1_Time(in *[]string, out **Time, s conversion.Scope) error {
+	if in == nil {
+		return nil
+	}
+	str := ""
+	if len(*in) > 0 {
+		str = (*in)[0]
+	}
+	temp := Time{}
+	if err := temp.UnmarshalQueryParameter(str); err != nil {
+		return err
+	}
+	*out = &temp
+	return nil
 }
 
 func Convert_string_To_labels_Selector(in *string, out *labels.Selector, s conversion.Scope) error {
@@ -310,20 +354,53 @@ func Convert_Slice_string_To_Slice_int32(in *[]string, out *[]int32, s conversio
 	return nil
 }
 
-// Convert_Slice_string_To_v1_DeletionPropagation allows converting a URL query parameter propagationPolicy
-func Convert_Slice_string_To_v1_DeletionPropagation(input *[]string, out *DeletionPropagation, s conversion.Scope) error {
-	if len(*input) > 0 {
-		*out = DeletionPropagation((*input)[0])
+// Convert_Slice_string_To_Pointer_v1_DeletionPropagation allows converting a URL query parameter propagationPolicy
+func Convert_Slice_string_To_Pointer_v1_DeletionPropagation(in *[]string, out **DeletionPropagation, s conversion.Scope) error {
+	var str string
+	if len(*in) > 0 {
+		str = (*in)[0]
 	} else {
-		*out = ""
+		str = ""
 	}
+	temp := DeletionPropagation(str)
+	*out = &temp
 	return nil
 }
 
 // Convert_Slice_string_To_v1_IncludeObjectPolicy allows converting a URL query parameter value
-func Convert_Slice_string_To_v1_IncludeObjectPolicy(input *[]string, out *IncludeObjectPolicy, s conversion.Scope) error {
-	if len(*input) > 0 {
-		*out = IncludeObjectPolicy((*input)[0])
+func Convert_Slice_string_To_v1_IncludeObjectPolicy(in *[]string, out *IncludeObjectPolicy, s conversion.Scope) error {
+	if len(*in) > 0 {
+		*out = IncludeObjectPolicy((*in)[0])
+	}
+	return nil
+}
+
+// Convert_url_Values_To_v1_DeleteOptions allows converting a URL to DeleteOptions.
+func Convert_url_Values_To_v1_DeleteOptions(in *url.Values, out *DeleteOptions, s conversion.Scope) error {
+	if err := autoConvert_url_Values_To_v1_DeleteOptions(in, out, s); err != nil {
+		return err
+	}
+
+	uid := types.UID("")
+	if values, ok := (*in)["uid"]; ok && len(values) > 0 {
+		uid = types.UID(values[0])
+	}
+
+	resourceVersion := ""
+	if values, ok := (*in)["resourceVersion"]; ok && len(values) > 0 {
+		resourceVersion = values[0]
+	}
+
+	if len(uid) > 0 || len(resourceVersion) > 0 {
+		if out.Preconditions == nil {
+			out.Preconditions = &Preconditions{}
+		}
+		if len(uid) > 0 {
+			out.Preconditions.UID = &uid
+		}
+		if len(resourceVersion) > 0 {
+			out.Preconditions.ResourceVersion = &resourceVersion
+		}
 	}
 	return nil
 }

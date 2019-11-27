@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -32,6 +33,7 @@ import (
 	v1listers "k8s.io/client-go/listers/core/v1"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
@@ -103,6 +105,103 @@ func newRemoteAPIService(name string) *apiregistration.APIService {
 	}
 }
 
+func setupAPIServices(apiServices []*apiregistration.APIService) (*AvailableConditionController, *fake.Clientset) {
+	fakeClient := fake.NewSimpleClientset()
+	apiServiceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	endpointsIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer testServer.Close()
+
+	for _, o := range apiServices {
+		apiServiceIndexer.Add(o)
+	}
+
+	c := AvailableConditionController{
+		apiServiceClient: fakeClient.ApiregistrationV1(),
+		apiServiceLister: listers.NewAPIServiceLister(apiServiceIndexer),
+		serviceLister:    v1listers.NewServiceLister(serviceIndexer),
+		endpointsLister:  v1listers.NewEndpointsLister(endpointsIndexer),
+		discoveryClient:  testServer.Client(),
+		serviceResolver:  &fakeServiceResolver{url: testServer.URL},
+		queue: workqueue.NewNamedRateLimitingQueue(
+			// We want a fairly tight requeue time.  The controller listens to the API, but because it relies on the routability of the
+			// service network, it is possible for an external, non-watchable factor to affect availability.  This keeps
+			// the maximum disruption time to a minimum, but it does prevent hot loops.
+			workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second),
+			"AvailableConditionController"),
+	}
+	for _, svc := range apiServices {
+		c.addAPIService(svc)
+	}
+	return &c, fakeClient
+}
+
+func BenchmarkBuildCache(b *testing.B) {
+	apiServiceName := "remote.group"
+	// model 1 APIService pointing at a given service, and 30 pointing at local group/versions
+	apiServices := []*apiregistration.APIService{newRemoteAPIService(apiServiceName)}
+	for i := 0; i < 30; i++ {
+		apiServices = append(apiServices, newLocalAPIService(fmt.Sprintf("local.group%d", i)))
+	}
+	// model one service backing an API service, and 100 unrelated services
+	services := []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)}
+	for i := 0; i < 100; i++ {
+		services = append(services, newService("foo", fmt.Sprintf("bar%d", i), testServicePort, testServicePortName))
+	}
+	c, _ := setupAPIServices(apiServices)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for n := 1; n <= b.N; n++ {
+		for _, svc := range services {
+			c.addService(svc)
+		}
+		for _, svc := range services {
+			c.updateService(svc, svc)
+		}
+		for _, svc := range services {
+			c.deleteService(svc)
+		}
+	}
+}
+
+func TestBuildCache(t *testing.T) {
+	tests := []struct {
+		name string
+
+		apiServiceName string
+		apiServices    []*apiregistration.APIService
+		services       []*v1.Service
+		endpoints      []*v1.Endpoints
+
+		expectedAvailability apiregistration.APIServiceCondition
+	}{
+		{
+			name:           "api service",
+			apiServiceName: "remote.group",
+			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
+			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c, fakeClient := setupAPIServices(tc.apiServices)
+			for _, svc := range tc.services {
+				c.addService(svc)
+			}
+
+			c.sync(tc.apiServiceName)
+
+			// ought to have one action writing status
+			if e, a := 1, len(fakeClient.Actions()); e != a {
+				t.Fatalf("%v expected %v, got %v", tc.name, e, fakeClient.Actions())
+			}
+		})
+	}
+}
 func TestSync(t *testing.T) {
 	tests := []struct {
 		name string

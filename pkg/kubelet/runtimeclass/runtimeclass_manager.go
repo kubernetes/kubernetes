@@ -71,7 +71,7 @@ func (m *Manager) LookupRuntimeHandler(runtimeClassName *string) (string, error)
 		if errors.IsNotFound(err) {
 			return "", err
 		}
-		return "", fmt.Errorf("Failed to lookup RuntimeClass %s: %v", name, err)
+		return "", fmt.Errorf("failed to lookup RuntimeClass %s: %v", name, err)
 	}
 
 	return rc.Handler, nil

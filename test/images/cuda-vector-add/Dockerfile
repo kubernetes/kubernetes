@@ -23,4 +23,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /usr/local/cuda/samples/0_Simple/vectorAdd
 RUN make
 
-CMD ./vectorAdd
+CMD nvidia-smi && ./vectorAdd

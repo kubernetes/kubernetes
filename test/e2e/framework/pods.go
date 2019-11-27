@@ -33,11 +33,12 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+
+	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 // DefaultPodDeletionTimeout is the default timeout for deleting pod
@@ -80,32 +81,6 @@ func (c *PodClient) Create(pod *v1.Pod) *v1.Pod {
 	p, err := c.PodInterface.Create(pod)
 	ExpectNoError(err, "Error creating Pod")
 	return p
-}
-
-// CreateEventually retries pod creation for a while before failing
-// the test with the most recent error. This mimicks the behavior
-// of a controller (like the one for DaemonSet) and is necessary
-// because pod creation can fail while its service account is still
-// getting provisioned
-// (https://github.com/kubernetes/kubernetes/issues/68776).
-//
-// Both the timeout and polling interval are configurable as optional
-// arguments:
-// - The first optional argument is the timeout.
-// - The second optional argument is the polling interval.
-//
-// Both intervals can either be specified as time.Duration, parsable
-// duration strings or as floats/integers. In the last case they are
-// interpreted as seconds.
-func (c *PodClient) CreateEventually(pod *v1.Pod, opts ...interface{}) *v1.Pod {
-	c.mungeSpec(pod)
-	var ret *v1.Pod
-	gomega.Eventually(func() error {
-		p, err := c.PodInterface.Create(pod)
-		ret = p
-		return err
-	}, opts...).ShouldNot(gomega.HaveOccurred(), "Failed to create %q pod", pod.GetName())
-	return ret
 }
 
 // CreateSyncInNamespace creates a new pod according to the framework specifications in the given namespace, and waits for it to start.
@@ -151,11 +126,11 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 		updateFn(pod)
 		_, err = c.PodInterface.Update(pod)
 		if err == nil {
-			e2elog.Logf("Successfully updated pod %q", name)
+			Logf("Successfully updated pod %q", name)
 			return true, nil
 		}
 		if errors.IsConflict(err) {
-			e2elog.Logf("Conflicting update to pod %q, re-get and re-update: %v", name, err)
+			Logf("Conflicting update to pod %q, re-get and re-update: %v", name, err)
 			return false, nil
 		}
 		return false, fmt.Errorf("failed to update pod %q: %v", name, err)
@@ -173,7 +148,7 @@ func (c *PodClient) DeleteSync(name string, options *metav1.DeleteOptions, timeo
 func (c *PodClient) DeleteSyncInNamespace(name string, namespace string, options *metav1.DeleteOptions, timeout time.Duration) {
 	err := c.Delete(name, options)
 	if err != nil && !errors.IsNotFound(err) {
-		e2elog.Failf("Failed to delete pod %q: %v", name, err)
+		Failf("Failed to delete pod %q: %v", name, err)
 	}
 	gomega.Expect(e2epod.WaitForPodToDisappear(c.f.ClientSet, namespace, name, labels.Everything(),
 		2*time.Second, timeout)).To(gomega.Succeed(), "wait for pod %q to disappear", name)

@@ -183,6 +183,14 @@ func (v *Version) WithPreRelease(preRelease string) *Version {
 	return &result
 }
 
+// WithBuildMetadata returns copy of the version object with requested buildMetadata
+func (v *Version) WithBuildMetadata(buildMetadata string) *Version {
+	result := *v
+	result.components = []uint{v.Major(), v.Minor(), v.Patch()}
+	result.buildMetadata = buildMetadata
+	return &result
+}
+
 // String converts a Version back to a string; note that for versions parsed with
 // ParseGeneric, this will not include the trailing uninterpreted portion of the version
 // number.

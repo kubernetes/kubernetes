@@ -199,7 +199,7 @@ func TestControllerSyncJob(t *testing.T) {
 		},
 		"too few active pods, with controller error": {
 			2, 5, 6, false, 0,
-			fmt.Errorf("Fake error"), true, 0, 1, 1, 0,
+			fmt.Errorf("fake error"), true, 0, 1, 1, 0,
 			1, 0, 1, 1, 0, nil, "",
 		},
 		"too many active pods": {
@@ -209,17 +209,17 @@ func TestControllerSyncJob(t *testing.T) {
 		},
 		"too many active pods, with controller error": {
 			2, 5, 6, false, 0,
-			fmt.Errorf("Fake error"), true, 0, 3, 0, 0,
+			fmt.Errorf("fake error"), true, 0, 3, 0, 0,
 			0, 1, 3, 0, 0, nil, "",
 		},
 		"failed + succeed pods: reset backoff delay": {
 			2, 5, 6, false, 0,
-			fmt.Errorf("Fake error"), true, 0, 1, 1, 1,
+			fmt.Errorf("fake error"), true, 0, 1, 1, 1,
 			1, 0, 1, 1, 1, nil, "",
 		},
 		"only new failed pod": {
 			2, 5, 6, false, 0,
-			fmt.Errorf("Fake error"), false, 0, 1, 0, 1,
+			fmt.Errorf("fake error"), false, 0, 1, 0, 1,
 			1, 0, 1, 0, 1, nil, "",
 		},
 		"job finish": {
@@ -575,7 +575,7 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
-	updateError := fmt.Errorf("Update error")
+	updateError := fmt.Errorf("update error")
 	manager.updateHandler = func(job *batch.Job) error {
 		manager.queue.AddRateLimited(testutil.GetKey(job, t))
 		return updateError

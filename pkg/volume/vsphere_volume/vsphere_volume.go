@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -20,20 +22,22 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog"
+	"k8s.io/utils/mount"
+	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	utilstrings "k8s.io/utils/strings"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -80,10 +84,6 @@ func (plugin *vsphereVolumePlugin) GetVolumeName(spec *volume.Spec) (string, err
 func (plugin *vsphereVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.VsphereVolume != nil) ||
 		(spec.Volume != nil && spec.Volume.VsphereVolume != nil)
-}
-
-func (plugin *vsphereVolumePlugin) IsMigratedToCSI() bool {
-	return false
 }
 
 func (plugin *vsphereVolumePlugin) RequiresRemount() bool {
@@ -171,7 +171,7 @@ func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath str
 // Abstract interface to disk operations.
 type vdManager interface {
 	// Creates a volume
-	CreateVolume(provisioner *vsphereVolumeProvisioner, selectedZone []string) (volSpec *VolumeSpec, err error)
+	CreateVolume(provisioner *vsphereVolumeProvisioner, selectedNode *v1.Node, selectedZone []string) (volSpec *VolumeSpec, err error)
 	// Deletes a volume
 	DeleteVolume(deleter *vsphereVolumeDeleter) error
 }
@@ -239,9 +239,13 @@ func (b *vsphereVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 		return nil
 	}
 
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		klog.V(4).Infof("Could not create directory %s: %v", dir, err)
-		return err
+	if runtime.GOOS != "windows" {
+		// On Windows, Mount will create the parent of dir and mklink (create a symbolic link) at dir later, so don't create a
+		// directory at dir now. Otherwise mklink will error: "Cannot create a file when that file already exists".
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			klog.Errorf("Could not create directory %s: %v", dir, err)
+			return err
+		}
 	}
 
 	options := []string{"bind"}
@@ -368,14 +372,14 @@ func (v *vsphereVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopol
 	if !util.AccessModesContainedInAll(v.plugin.GetAccessModes(), v.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", v.options.PVC.Spec.AccessModes, v.plugin.GetAccessModes())
 	}
-	klog.V(1).Infof("Provision with allowedTopologies : %s", allowedTopologies)
+	klog.V(1).Infof("Provision with selectedNode: %s and allowedTopologies : %s", getNodeName(selectedNode), allowedTopologies)
 	selectedZones, err := volumehelpers.ZonesFromAllowedTopologies(allowedTopologies)
 	if err != nil {
 		return nil, err
 	}
 
 	klog.V(4).Infof("Selected zones for volume : %s", selectedZones)
-	volSpec, err := v.manager.CreateVolume(v, selectedZones.List())
+	volSpec, err := v.manager.CreateVolume(v, selectedNode, selectedZones.List())
 	if err != nil {
 		return nil, err
 	}
@@ -464,4 +468,11 @@ func getVolumeSource(
 	}
 
 	return nil, false, fmt.Errorf("Spec does not reference a VSphere volume type")
+}
+
+func getNodeName(node *v1.Node) string {
+	if node == nil {
+		return ""
+	}
+	return node.Name
 }

@@ -20,7 +20,6 @@ filegroup(
         "//cmd/genswaggertypedocs:all-srcs",
         "//cmd/genutils:all-srcs",
         "//cmd/genyaml:all-srcs",
-        "//cmd/hyperkube:all-srcs",
         "//cmd/importverifier:all-srcs",
         "//cmd/kube-apiserver:all-srcs",
         "//cmd/kube-controller-manager:all-srcs",

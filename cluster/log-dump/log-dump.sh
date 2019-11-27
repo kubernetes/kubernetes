@@ -218,17 +218,33 @@ function export-windows-docker-event-log() {
     done
 }
 
-# Save log files and serial console output from Windows node $1 into local
-# directory $2.
-# This function shouldn't ever trigger errexit.
-function save-logs-windows() {
-    local -r node="${1}"
-    local -r dest_dir="${2}"
+# Saves log files from diagnostics tool.(https://github.com/GoogleCloudPlatform/compute-image-tools/tree/master/cli_tools/diagnostics)
+function save-windows-logs-via-diagnostics-tool() {
+    local node="${1}"
+    local dest_dir="${2}"
+    
+    gcloud compute instances add-metadata ${node} --metadata enable-diagnostics=true --project=${PROJECT} --zone=${ZONE}
+    local logs_archive_in_gcs=$(gcloud alpha compute diagnose export-logs ${node} --zone=${ZONE} --project=${PROJECT} | tail -n 1)
+    local temp_local_path="${node}.zip"
+    for retry in {1..20}; do
+      if gsutil mv "${logs_archive_in_gcs}" "${temp_local_path}"  > /dev/null 2>&1; then
+        echo "Downloaded diagnostics log from ${logs_archive_in_gcs}"
+        break
+      else
+        sleep 10
+      fi
+    done
 
-    if [[ ! "${gcloud_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
-      echo "Not saving logs for ${node}, Windows log dumping requires gcloud support"
-      return
+    if [[ -f "${temp_local_path}" ]]; then
+      unzip ${temp_local_path} -d "${dest_dir}" > /dev/null
+      rm -f ${temp_local_path}
     fi
+}
+
+# Saves log files from SSH
+function save-windows-logs-via-ssh() {
+    local node="${1}"
+    local dest_dir="${2}"
 
     export-windows-docker-event-log "${node}"
 
@@ -253,6 +269,25 @@ function save-logs-windows() {
         fi
       done
     done
+}
+
+# Save log files and serial console output from Windows node $1 into local
+# directory $2.
+# This function shouldn't ever trigger errexit.
+function save-logs-windows() {
+    local -r node="${1}"
+    local -r dest_dir="${2}"
+
+    if [[ ! "${gcloud_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
+      echo "Not saving logs for ${node}, Windows log dumping requires gcloud support"
+      return
+    fi
+
+    if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+      save-windows-logs-via-diagnostics-tool "${node}" "${dest_dir}"
+    else
+      save-windows-logs-via-ssh "${node}" "${dest_dir}"
+    fi
 
     # Serial port 1 contains the Windows console output.
     gcloud compute instances get-serial-port-output --project "${PROJECT}" \
@@ -545,7 +580,7 @@ function detect_node_failures() {
                               --project "${PROJECT}" \
                               --zone "${ZONE}" \
                               --format='value(creationTimestamp)')
-    echo "Failures for ${group}"
+    echo "Failures for ${group} (if any):"
     gcloud logging read --order=asc \
           --format='table(timestamp,jsonPayload.resource.name,jsonPayload.event_subtype)' \
           --project "${PROJECT}" \

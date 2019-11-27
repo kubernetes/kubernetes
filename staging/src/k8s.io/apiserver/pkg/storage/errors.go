@@ -19,6 +19,8 @@ package storage
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -167,4 +169,32 @@ func NewInternalError(reason string) InternalError {
 
 func NewInternalErrorf(format string, a ...interface{}) InternalError {
 	return InternalError{fmt.Sprintf(format, a...)}
+}
+
+var tooLargeResourceVersionCauseMsg = "Too large resource version"
+
+// NewTooLargeResourceVersionError returns a timeout error with the given retrySeconds for a request for
+// a minimum resource version that is larger than the largest currently available resource version for a requested resource.
+func NewTooLargeResourceVersionError(minimumResourceVersion, currentRevision uint64, retrySeconds int) error {
+	err := errors.NewTimeoutError(fmt.Sprintf("Too large resource version: %d, current: %d", minimumResourceVersion, currentRevision), retrySeconds)
+	err.ErrStatus.Details.Causes = []metav1.StatusCause{{Message: tooLargeResourceVersionCauseMsg}}
+	return err
+}
+
+// IsTooLargeResourceVersion returns true if the error is a TooLargeResourceVersion error.
+func IsTooLargeResourceVersion(err error) bool {
+	if !errors.IsTimeout(err) {
+		return false
+	}
+	switch t := err.(type) {
+	case errors.APIStatus:
+		if d := t.Status().Details; d != nil {
+			for _, cause := range d.Causes {
+				if cause.Message == tooLargeResourceVersionCauseMsg {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

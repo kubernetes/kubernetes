@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -51,19 +50,19 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			ginkgo.By("waiting for a single token reference")
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
-				e2elog.Logf("default service account was not found")
+				framework.Logf("default service account was not found")
 				return false, nil
 			}
 			if err != nil {
-				e2elog.Logf("error getting default service account: %v", err)
+				framework.Logf("error getting default service account: %v", err)
 				return false, err
 			}
 			switch len(sa.Secrets) {
 			case 0:
-				e2elog.Logf("default service account has no secret references")
+				framework.Logf("default service account has no secret references")
 				return false, nil
 			case 1:
-				e2elog.Logf("default service account has a single secret reference")
+				framework.Logf("default service account has a single secret reference")
 				secrets = sa.Secrets
 				return true, nil
 			default:
@@ -89,19 +88,19 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			ginkgo.By("waiting for a new token reference")
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			if err != nil {
-				e2elog.Logf("error getting default service account: %v", err)
+				framework.Logf("error getting default service account: %v", err)
 				return false, err
 			}
 			switch len(sa.Secrets) {
 			case 0:
-				e2elog.Logf("default service account has no secret references")
+				framework.Logf("default service account has no secret references")
 				return false, nil
 			case 1:
 				if sa.Secrets[0] == secrets[0] {
-					e2elog.Logf("default service account still has the deleted secret reference")
+					framework.Logf("default service account still has the deleted secret reference")
 					return false, nil
 				}
-				e2elog.Logf("default service account has a new single secret reference")
+				framework.Logf("default service account has a new single secret reference")
 				secrets = sa.Secrets
 				return true, nil
 			default:
@@ -133,15 +132,15 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			ginkgo.By("waiting for a new token to be created and added")
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			if err != nil {
-				e2elog.Logf("error getting default service account: %v", err)
+				framework.Logf("error getting default service account: %v", err)
 				return false, err
 			}
 			switch len(sa.Secrets) {
 			case 0:
-				e2elog.Logf("default service account has no secret references")
+				framework.Logf("default service account has no secret references")
 				return false, nil
 			case 1:
-				e2elog.Logf("default service account has a new single secret reference")
+				framework.Logf("default service account has a new single secret reference")
 				secrets = sa.Secrets
 				return true, nil
 			default:
@@ -179,21 +178,21 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			ginkgo.By("getting the auto-created API token")
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("mount-test", metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
-				e2elog.Logf("mount-test service account was not found")
+				framework.Logf("mount-test service account was not found")
 				return false, nil
 			}
 			if err != nil {
-				e2elog.Logf("error getting mount-test service account: %v", err)
+				framework.Logf("error getting mount-test service account: %v", err)
 				return false, err
 			}
 			if len(sa.Secrets) == 0 {
-				e2elog.Logf("mount-test service account has no secret references")
+				framework.Logf("mount-test service account has no secret references")
 				return false, nil
 			}
 			for _, secretRef := range sa.Secrets {
 				secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(secretRef.Name, metav1.GetOptions{})
 				if err != nil {
-					e2elog.Logf("Error getting secret %s: %v", secretRef.Name, err)
+					framework.Logf("Error getting secret %s: %v", secretRef.Name, err)
 					continue
 				}
 				if secret.Type == v1.SecretTypeServiceAccountToken {
@@ -202,7 +201,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				}
 			}
 
-			e2elog.Logf("default service account has no secret references to valid service account tokens")
+			framework.Logf("default service account has no secret references to valid service account tokens")
 			return false, nil
 		}))
 
@@ -290,21 +289,21 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			ginkgo.By("getting the auto-created API token")
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(mountSA.Name, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
-				e2elog.Logf("mount service account was not found")
+				framework.Logf("mount service account was not found")
 				return false, nil
 			}
 			if err != nil {
-				e2elog.Logf("error getting mount service account: %v", err)
+				framework.Logf("error getting mount service account: %v", err)
 				return false, err
 			}
 			if len(sa.Secrets) == 0 {
-				e2elog.Logf("mount service account has no secret references")
+				framework.Logf("mount service account has no secret references")
 				return false, nil
 			}
 			for _, secretRef := range sa.Secrets {
 				secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(secretRef.Name, metav1.GetOptions{})
 				if err != nil {
-					e2elog.Logf("Error getting secret %s: %v", secretRef.Name, err)
+					framework.Logf("Error getting secret %s: %v", secretRef.Name, err)
 					continue
 				}
 				if secret.Type == v1.SecretTypeServiceAccountToken {
@@ -312,7 +311,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				}
 			}
 
-			e2elog.Logf("default service account has no secret references to valid service account tokens")
+			framework.Logf("default service account has no secret references to valid service account tokens")
 			return false, nil
 		}))
 
@@ -394,7 +393,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			}
 			createdPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 			framework.ExpectNoError(err)
-			e2elog.Logf("created pod %s", tc.PodName)
+			framework.Logf("created pod %s", tc.PodName)
 
 			hasServiceAccountTokenVolume := false
 			for _, c := range createdPod.Spec.Containers {
@@ -406,9 +405,9 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			}
 
 			if hasServiceAccountTokenVolume != tc.ExpectTokenVolume {
-				e2elog.Failf("%s: expected volume=%v, got %v (%#v)", tc.PodName, tc.ExpectTokenVolume, hasServiceAccountTokenVolume, createdPod)
+				framework.Failf("%s: expected volume=%v, got %v (%#v)", tc.PodName, tc.ExpectTokenVolume, hasServiceAccountTokenVolume, createdPod)
 			} else {
-				e2elog.Logf("pod %s service account token volume mount: %v", tc.PodName, hasServiceAccountTokenVolume)
+				framework.Logf("pod %s service account token volume mount: %v", tc.PodName, hasServiceAccountTokenVolume)
 			}
 		}
 	})
@@ -425,7 +424,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				"ca.crt": string(cfg.TLSClientConfig.CAData),
 			},
 		}); err != nil && !apierrors.IsAlreadyExists(err) {
-			e2elog.Failf("Unexpected err creating kube-ca-crt: %v", err)
+			framework.Failf("Unexpected err creating kube-ca-crt: %v", err)
 		}
 
 		tenMin := int64(10 * 60)
@@ -490,19 +489,19 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		framework.ExpectNoError(err)
 
-		e2elog.Logf("created pod")
+		framework.Logf("created pod")
 		if !e2epod.CheckPodsRunningReady(f.ClientSet, f.Namespace.Name, []string{pod.Name}, time.Minute) {
-			e2elog.Failf("pod %q in ns %q never became ready", pod.Name, f.Namespace.Name)
+			framework.Failf("pod %q in ns %q never became ready", pod.Name, f.Namespace.Name)
 		}
 
-		e2elog.Logf("pod is ready")
+		framework.Logf("pod is ready")
 
 		var logs string
 		if err := wait.Poll(1*time.Minute, 20*time.Minute, func() (done bool, err error) {
-			e2elog.Logf("polling logs")
+			framework.Logf("polling logs")
 			logs, err = e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, "inclusterclient", "inclusterclient")
 			if err != nil {
-				e2elog.Logf("Error pulling logs: %v", err)
+				framework.Logf("Error pulling logs: %v", err)
 				return false, nil
 			}
 			tokenCount, err := parseInClusterClientLogs(logs)
@@ -510,12 +509,12 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				return false, fmt.Errorf("inclusterclient reported an error: %v", err)
 			}
 			if tokenCount < 2 {
-				e2elog.Logf("Retrying. Still waiting to see more unique tokens: got=%d, want=2", tokenCount)
+				framework.Logf("Retrying. Still waiting to see more unique tokens: got=%d, want=2", tokenCount)
 				return false, nil
 			}
 			return true, nil
 		}); err != nil {
-			e2elog.Failf("Unexpected error: %v\n%s", err, logs)
+			framework.Failf("Unexpected error: %v\n%s", err, logs)
 		}
 	})
 })

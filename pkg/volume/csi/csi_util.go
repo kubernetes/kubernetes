@@ -18,6 +18,7 @@ package csi
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -44,8 +45,7 @@ func getCredentialsFromSecret(k8s kubernetes.Interface, secretRef *api.SecretRef
 	credentials := map[string]string{}
 	secret, err := k8s.CoreV1().Secrets(secretRef.Namespace).Get(secretRef.Name, meta.GetOptions{})
 	if err != nil {
-		klog.Errorf("failed to find the secret %s in the namespace %s with error: %v\n", secretRef.Name, secretRef.Namespace, err)
-		return credentials, err
+		return credentials, errors.New(log("failed to find the secret %s in the namespace %s with error: %v", secretRef.Name, secretRef.Namespace, err))
 	}
 	for key, value := range secret.Data {
 		credentials[key] = string(value)
@@ -60,13 +60,11 @@ func saveVolumeData(dir string, fileName string, data map[string]string) error {
 	klog.V(4).Info(log("saving volume data file [%s]", dataFilePath))
 	file, err := os.Create(dataFilePath)
 	if err != nil {
-		klog.Error(log("failed to save volume data file %s: %v", dataFilePath, err))
-		return err
+		return errors.New(log("failed to save volume data file %s: %v", dataFilePath, err))
 	}
 	defer file.Close()
 	if err := json.NewEncoder(file).Encode(data); err != nil {
-		klog.Error(log("failed to save volume data file %s: %v", dataFilePath, err))
-		return err
+		return errors.New(log("failed to save volume data file %s: %v", dataFilePath, err))
 	}
 	klog.V(4).Info(log("volume data file saved successfully [%s]", dataFilePath))
 	return nil
@@ -80,14 +78,12 @@ func loadVolumeData(dir string, fileName string) (map[string]string, error) {
 
 	file, err := os.Open(dataFileName)
 	if err != nil {
-		klog.Error(log("failed to open volume data file [%s]: %v", dataFileName, err))
-		return nil, err
+		return nil, errors.New(log("failed to open volume data file [%s]: %v", dataFileName, err))
 	}
 	defer file.Close()
 	data := map[string]string{}
 	if err := json.NewDecoder(file).Decode(&data); err != nil {
-		klog.Error(log("failed to parse volume data file [%s]: %v", dataFileName, err))
-		return nil, err
+		return nil, errors.New(log("failed to parse volume data file [%s]: %v", dataFileName, err))
 	}
 
 	return data, nil

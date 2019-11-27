@@ -1,5 +1,7 @@
 module fake/import/path
 
+go 1.13
+
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/distribution v2.7.1+incompatible // indirect
@@ -23,12 +25,12 @@ require (
 	golang.org/x/time v0.0.0-20181108054448-85acf8d2951c // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.2.2 // indirect
-	k8s.io/api v0.0.0-20190111032252-67edc246be36 // indirect
+	k8s.io/api v0.0.0-20190111032252-67edc246be36
 	k8s.io/apiextensions-apiserver v0.0.0-20190111034747-7d26de67f177 // indirect
 	k8s.io/apimachinery v0.0.0-20181127025237-2b1284ed4c93
 	k8s.io/apiserver v0.0.0-20190111033246-d50e9ac5404f // indirect
 	k8s.io/client-go v10.0.0+incompatible
-	k8s.io/klog v0.1.0
+	k8s.io/klog v1.0.0
 	k8s.io/kubernetes v1.13.2
 	k8s.io/utils v0.0.0-20181221173059-8a16e7dd8fb6 // indirect
 	sigs.k8s.io/yaml v1.1.0 // indirect

@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
@@ -76,23 +75,24 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 		Short:   "Output a kubeconfig file for an additional user",
 		Long:    userKubeconfigLongDesc,
 		Example: userKubeconfigExample,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if clientName == "" {
-				kubeadmutil.CheckErr(errors.New("missing required argument --client-name"))
+				return errors.New("missing required argument --client-name")
 			}
 
 			// This call returns the ready-to-use configuration based on the defaults populated by flags
 			internalcfg, err := configutil.DefaultedInitConfiguration(initCfg, clusterCfg)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
 			// if the kubeconfig file for an additional user has to use a token, use it
 			if token != "" {
-				kubeadmutil.CheckErr(kubeconfigphase.WriteKubeConfigWithToken(out, internalcfg, clientName, token))
-				return
+				return kubeconfigphase.WriteKubeConfigWithToken(out, internalcfg, clientName, token)
 			}
 
 			// Otherwise, write a kubeconfig file with a generate client cert
-			kubeadmutil.CheckErr(kubeconfigphase.WriteKubeConfigWithClientCert(out, internalcfg, clientName, organizations))
+			return kubeconfigphase.WriteKubeConfigWithClientCert(out, internalcfg, clientName, organizations)
 		},
 	}
 

@@ -1045,7 +1045,42 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 					return metricValues{{value: float64(s.Processes.FdCount), timestamp: s.Timestamp}}
 				},
 			},
+			{
+				name:      "container_sockets",
+				help:      "Number of open sockets for the container.",
+				valueType: prometheus.GaugeValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Processes.SocketCount), timestamp: s.Timestamp}}
+				},
+			},
+			{
+				name:      "container_threads_max",
+				help:      "Maximum number of threads allowed inside the container, infinity if value is zero",
+				valueType: prometheus.GaugeValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{
+						{
+							value:     float64(s.Processes.ThreadsMax),
+							timestamp: s.Timestamp,
+						},
+					}
+				},
+			},
+			{
+				name:      "container_threads",
+				help:      "Number of threads running inside the container",
+				valueType: prometheus.GaugeValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{
+						{
+							value:     float64(s.Processes.ThreadsCurrent),
+							timestamp: s.Timestamp,
+						},
+					}
+				},
+			},
 		}...)
+
 	}
 
 	return c
@@ -1156,8 +1191,18 @@ func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric)
 		labels := make([]string, 0, len(rawLabels))
 		containerLabels := c.containerLabelsFunc(cont)
 		for l := range rawLabels {
-			labels = append(labels, sanitizeLabelName(l))
-			values = append(values, containerLabels[l])
+			duplicate := false
+			sl := sanitizeLabelName(l)
+			for _, x := range labels {
+				if sl == x {
+					duplicate = true
+					break
+				}
+			}
+			if !duplicate {
+				labels = append(labels, sl)
+				values = append(values, containerLabels[l])
+			}
 		}
 
 		// Container spec

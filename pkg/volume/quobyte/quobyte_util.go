@@ -39,7 +39,7 @@ func (manager *quobyteVolumeManager) createVolume(provisioner *quobyteVolumeProv
 	if err != nil {
 		return nil, 0, err
 	}
-	// Quobyte has the concept of Volumes which doen't have a specific size (they can grow unlimited)
+	// Quobyte has the concept of Volumes which doesn't have a specific size (they can grow unlimited)
 	// to simulate a size constraint we set here a Quota for logical space
 	volumeRequest := &quobyteapi.CreateVolumeRequest{
 		Name:              provisioner.volume,

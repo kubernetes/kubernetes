@@ -42,8 +42,9 @@ func TestEviction(t *testing.T) {
 	testcases := []struct {
 		name     string
 		pdbs     []runtime.Object
-		pod      *api.Pod
 		eviction *policy.Eviction
+
+		badNameInURL bool
 
 		expectError   bool
 		expectDeleted bool
@@ -55,12 +56,6 @@ func TestEviction(t *testing.T) {
 				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
 				Status:     policyv1beta1.PodDisruptionBudgetStatus{PodDisruptionsAllowed: 0},
 			}},
-			pod: func() *api.Pod {
-				pod := validNewPod()
-				pod.Labels = map[string]string{"a": "true"}
-				pod.Spec.NodeName = "foo"
-				return pod
-			}(),
 			eviction:    &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
 			expectError: true,
 		},
@@ -71,12 +66,6 @@ func TestEviction(t *testing.T) {
 				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
 				Status:     policyv1beta1.PodDisruptionBudgetStatus{PodDisruptionsAllowed: 1},
 			}},
-			pod: func() *api.Pod {
-				pod := validNewPod()
-				pod.Labels = map[string]string{"a": "true"}
-				pod.Spec.NodeName = "foo"
-				return pod
-			}(),
 			eviction:      &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
 			expectDeleted: true,
 		},
@@ -87,14 +76,19 @@ func TestEviction(t *testing.T) {
 				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"b": "true"}}},
 				Status:     policyv1beta1.PodDisruptionBudgetStatus{PodDisruptionsAllowed: 0},
 			}},
-			pod: func() *api.Pod {
-				pod := validNewPod()
-				pod.Labels = map[string]string{"a": "true"}
-				pod.Spec.NodeName = "foo"
-				return pod
-			}(),
 			eviction:      &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
 			expectDeleted: true,
+		},
+		{
+			name: "matching pdbs with disruptions allowed but bad name in Url",
+			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1beta1.PodDisruptionBudgetStatus{PodDisruptionsAllowed: 1},
+			}},
+			badNameInURL: true,
+			eviction:     &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError:  true,
 		},
 	}
 
@@ -104,43 +98,58 @@ func TestEviction(t *testing.T) {
 			storage, _, _, server := newStorage(t)
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
-			if tc.pod != nil {
-				if _, err := storage.Create(testContext, tc.pod, nil, &metav1.CreateOptions{}); err != nil {
-					t.Error(err)
-				}
+
+			pod := validNewPod()
+			pod.Labels = map[string]string{"a": "true"}
+			pod.Spec.NodeName = "foo"
+
+			if _, err := storage.Create(testContext, pod, nil, &metav1.CreateOptions{}); err != nil {
+				t.Error(err)
 			}
 
 			client := fake.NewSimpleClientset(tc.pdbs...)
 			evictionRest := newEvictionStorage(storage.Store, client.PolicyV1beta1())
-			_, err := evictionRest.Create(testContext, tc.eviction, nil, &metav1.CreateOptions{})
+
+			name := pod.Name
+			if tc.badNameInURL {
+				name += "bad-name"
+			}
+			_, err := evictionRest.Create(testContext, name, tc.eviction, nil, &metav1.CreateOptions{})
 			if (err != nil) != tc.expectError {
 				t.Errorf("expected error=%v, got %v", tc.expectError, err)
 				return
+			}
+			if tc.badNameInURL {
+				if err == nil {
+					t.Error("expected error here, but got nil")
+					return
+				}
+				if err.Error() != "name in URL does not match name in Eviction object" {
+					t.Errorf("got unexpected error: %v", err)
+				}
 			}
 			if tc.expectError {
 				return
 			}
 
-			if tc.pod != nil {
-				existingPod, err := storage.Get(testContext, tc.pod.Name, &metav1.GetOptions{})
-				if tc.expectDeleted {
-					if !apierrors.IsNotFound(err) {
-						t.Errorf("expected to be deleted, lookup returned %#v", existingPod)
-					}
-					return
-				} else if apierrors.IsNotFound(err) {
-					t.Errorf("expected graceful deletion, got %v", err)
-					return
+			existingPod, err := storage.Get(testContext, pod.Name, &metav1.GetOptions{})
+			if tc.expectDeleted {
+				if !apierrors.IsNotFound(err) {
+					t.Errorf("expected to be deleted, lookup returned %#v", existingPod)
 				}
+				return
+			} else if apierrors.IsNotFound(err) {
+				t.Errorf("expected graceful deletion, got %v", err)
+				return
+			}
 
-				if err != nil {
-					t.Errorf("%#v", err)
-					return
-				}
+			if err != nil {
+				t.Errorf("%#v", err)
+				return
+			}
 
-				if existingPod.(*api.Pod).DeletionTimestamp == nil {
-					t.Errorf("expected gracefully deleted pod with deletionTimestamp set, got %#v", existingPod)
-				}
+			if existingPod.(*api.Pod).DeletionTimestamp == nil {
+				t.Errorf("expected gracefully deleted pod with deletionTimestamp set, got %#v", existingPod)
 			}
 		})
 	}
@@ -170,7 +179,10 @@ func newFailDeleteUpdateStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServ
 		DeleteCollectionWorkers: 3,
 		ResourcePrefix:          "pods",
 	}
-	storage := NewStorage(restOptions, nil, nil, nil)
+	storage, err := NewStorage(restOptions, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 	storage.Pod.Store.Storage = genericregistry.DryRunnableStorage{
 		Storage: FailDeleteUpdateStorage{storage.Pod.Store.Storage.Storage},
 		Codec:   apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion),
@@ -183,52 +195,27 @@ func TestEvictionDryRun(t *testing.T) {
 		name            string
 		evictionOptions *metav1.DeleteOptions
 		requestOptions  *metav1.CreateOptions
-		pod             *api.Pod
 		pdbs            []runtime.Object
 	}{
 		{
 			name:            "just request-options",
 			requestOptions:  &metav1.CreateOptions{DryRun: []string{"All"}},
 			evictionOptions: &metav1.DeleteOptions{},
-			pod: func() *api.Pod {
-				pod := validNewPod()
-				pod.Labels = map[string]string{"a": "true"}
-				pod.Spec.NodeName = "foo"
-				return pod
-			}(),
 		},
 		{
 			name:            "just eviction-options",
 			requestOptions:  &metav1.CreateOptions{},
 			evictionOptions: &metav1.DeleteOptions{DryRun: []string{"All"}},
-			pod: func() *api.Pod {
-				pod := validNewPod()
-				pod.Labels = map[string]string{"a": "true"}
-				pod.Spec.NodeName = "foo"
-				return pod
-			}(),
 		},
 		{
 			name:            "both options",
 			evictionOptions: &metav1.DeleteOptions{DryRun: []string{"All"}},
 			requestOptions:  &metav1.CreateOptions{DryRun: []string{"All"}},
-			pod: func() *api.Pod {
-				pod := validNewPod()
-				pod.Labels = map[string]string{"a": "true"}
-				pod.Spec.NodeName = "foo"
-				return pod
-			}(),
 		},
 		{
 			name:            "with pdbs",
 			evictionOptions: &metav1.DeleteOptions{DryRun: []string{"All"}},
 			requestOptions:  &metav1.CreateOptions{DryRun: []string{"All"}},
-			pod: func() *api.Pod {
-				pod := validNewPod()
-				pod.Labels = map[string]string{"a": "true"}
-				pod.Spec.NodeName = "foo"
-				return pod
-			}(),
 			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
 				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
@@ -254,7 +241,7 @@ func TestEvictionDryRun(t *testing.T) {
 			client := fake.NewSimpleClientset(tc.pdbs...)
 			evictionRest := newEvictionStorage(storage.Store, client.PolicyV1beta1())
 			eviction := &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}, DeleteOptions: tc.evictionOptions}
-			_, err := evictionRest.Create(testContext, eviction, nil, tc.requestOptions)
+			_, err := evictionRest.Create(testContext, pod.Name, eviction, nil, tc.requestOptions)
 			if err != nil {
 				t.Fatalf("Failed to run eviction: %v", err)
 			}

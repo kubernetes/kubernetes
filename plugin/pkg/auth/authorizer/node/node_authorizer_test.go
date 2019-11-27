@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 	"runtime/pprof"
@@ -42,8 +43,6 @@ import (
 var (
 	trEnabledFeature           = featuregate.NewFeatureGate()
 	trDisabledFeature          = featuregate.NewFeatureGate()
-	leaseEnabledFeature        = featuregate.NewFeatureGate()
-	leaseDisabledFeature       = featuregate.NewFeatureGate()
 	csiNodeInfoEnabledFeature  = featuregate.NewFeatureGate()
 	csiNodeInfoDisabledFeature = featuregate.NewFeatureGate()
 )
@@ -53,12 +52,6 @@ func init() {
 		panic(err)
 	}
 	if err := trDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.TokenRequest: {Default: false}}); err != nil {
-		panic(err)
-	}
-	if err := leaseEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.NodeLease: {Default: true}}); err != nil {
-		panic(err)
-	}
-	if err := leaseDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.NodeLease: {Default: false}}); err != nil {
 		panic(err)
 	}
 	if err := csiNodeInfoEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSINodeInfo: {Default: true}}); err != nil {
@@ -225,106 +218,84 @@ func TestAuthorizer(t *testing.T) {
 			expect:   authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed node lease - feature disabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: corev1.NamespaceNodeLease},
-			features: leaseDisabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed get lease in namespace other than kube-node-lease - feature enabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: "foo"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed get lease in namespace other than kube-node-lease - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: "foo"},
-			features: leaseEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed create lease in namespace other than kube-node-lease - feature enabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: "foo"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed create lease in namespace other than kube-node-lease - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: "foo"},
-			features: leaseEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed update lease in namespace other than kube-node-lease - feature enabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: "foo"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed update lease in namespace other than kube-node-lease - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: "foo"},
-			features: leaseEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed patch lease in namespace other than kube-node-lease - feature enabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: "foo"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed patch lease in namespace other than kube-node-lease - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: "foo"},
-			features: leaseEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed delete lease in namespace other than kube-node-lease - feature enabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: "foo"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed delete lease in namespace other than kube-node-lease - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: "foo"},
-			features: leaseEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed get another node's lease - feature enabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node1", Namespace: corev1.NamespaceNodeLease},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed get another node's lease - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node1", Namespace: corev1.NamespaceNodeLease},
-			features: leaseEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed update another node's lease - feature enabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node1", Namespace: corev1.NamespaceNodeLease},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed update another node's lease - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node1", Namespace: corev1.NamespaceNodeLease},
-			features: leaseEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed patch another node's lease - feature enabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node1", Namespace: corev1.NamespaceNodeLease},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed patch another node's lease - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node1", Namespace: corev1.NamespaceNodeLease},
-			features: leaseEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed delete another node's lease - feature enabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node1", Namespace: corev1.NamespaceNodeLease},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed delete another node's lease - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node1", Namespace: corev1.NamespaceNodeLease},
-			features: leaseEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed list node leases - feature enabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "leases", APIGroup: "coordination.k8s.io", Namespace: corev1.NamespaceNodeLease},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed list node leases - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "leases", APIGroup: "coordination.k8s.io", Namespace: corev1.NamespaceNodeLease},
-			features: leaseEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed watch node leases - feature enabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "leases", APIGroup: "coordination.k8s.io", Namespace: corev1.NamespaceNodeLease},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed watch node leases - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "leases", APIGroup: "coordination.k8s.io", Namespace: corev1.NamespaceNodeLease},
-			features: leaseEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "allowed get node lease - feature enabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: corev1.NamespaceNodeLease},
+			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:     "allowed get node lease - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: corev1.NamespaceNodeLease},
-			features: leaseEnabledFeature,
-			expect:   authorizer.DecisionAllow,
+			name:   "allowed create node lease - feature enabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: corev1.NamespaceNodeLease},
+			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:     "allowed create node lease - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: corev1.NamespaceNodeLease},
-			features: leaseEnabledFeature,
-			expect:   authorizer.DecisionAllow,
+			name:   "allowed update node lease - feature enabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: corev1.NamespaceNodeLease},
+			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:     "allowed update node lease - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: corev1.NamespaceNodeLease},
-			features: leaseEnabledFeature,
-			expect:   authorizer.DecisionAllow,
+			name:   "allowed patch node lease - feature enabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: corev1.NamespaceNodeLease},
+			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:     "allowed patch node lease - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: corev1.NamespaceNodeLease},
-			features: leaseEnabledFeature,
-			expect:   authorizer.DecisionAllow,
-		},
-		{
-			name:     "allowed delete node lease - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: corev1.NamespaceNodeLease},
-			features: leaseEnabledFeature,
-			expect:   authorizer.DecisionAllow,
+			name:   "allowed delete node lease - feature enabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "leases", APIGroup: "coordination.k8s.io", Name: "node0", Namespace: corev1.NamespaceNodeLease},
+			expect: authorizer.DecisionAllow,
 		},
 		// CSINode
 		{
@@ -414,7 +385,7 @@ func TestAuthorizer(t *testing.T) {
 			} else {
 				authz.features = tc.features
 			}
-			decision, _, _ := authz.Authorize(tc.attrs)
+			decision, _, _ := authz.Authorize(context.Background(), tc.attrs)
 			if decision != tc.expect {
 				t.Errorf("expected %v, got %v", tc.expect, decision)
 			}
@@ -504,13 +475,13 @@ func TestAuthorizerSharedResources(t *testing.T) {
 		)
 
 		if len(tc.Secret) > 0 {
-			decision, _, err = authz.Authorize(authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
+			decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
 			if err != nil {
 				t.Errorf("%d: unexpected error: %v", i, err)
 				continue
 			}
 		} else if len(tc.ConfigMap) > 0 {
-			decision, _, err = authz.Authorize(authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "configmaps", Namespace: "ns1", Name: tc.ConfigMap})
+			decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "configmaps", Namespace: "ns1", Name: tc.ConfigMap})
 			if err != nil {
 				t.Errorf("%d: unexpected error: %v", i, err)
 				continue
@@ -527,7 +498,7 @@ func TestAuthorizerSharedResources(t *testing.T) {
 	{
 		node3SharedSecretGet := authorizer.AttributesRecord{User: node3, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: "shared-all"}
 
-		decision, _, err := authz.Authorize(node3SharedSecretGet)
+		decision, _, err := authz.Authorize(context.Background(), node3SharedSecretGet)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -539,7 +510,7 @@ func TestAuthorizerSharedResources(t *testing.T) {
 		pod3.Spec.Volumes = nil
 		g.AddPod(pod3)
 
-		decision, _, err = authz.Authorize(node3SharedSecretGet)
+		decision, _, err = authz.Authorize(context.Background(), node3SharedSecretGet)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -833,7 +804,7 @@ func BenchmarkAuthorization(b *testing.B) {
 				b.SetParallelism(5000)
 				b.RunParallel(func(pb *testing.PB) {
 					for pb.Next() {
-						decision, _, _ := authz.Authorize(tc.attrs)
+						decision, _, _ := authz.Authorize(context.Background(), tc.attrs)
 						if decision != tc.expect {
 							b.Errorf("expected %v, got %v", tc.expect, decision)
 						}

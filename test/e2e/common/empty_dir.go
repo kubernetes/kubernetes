@@ -19,10 +19,9 @@ package common
 import (
 	"fmt"
 	"path"
-	"time"
 
 	"github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -41,7 +40,13 @@ var (
 var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 	f := framework.NewDefaultFramework("emptydir")
 
-	ginkgo.Context("when FSGroup is specified [NodeFeature:FSGroup]", func() {
+	ginkgo.Context("when FSGroup is specified [LinuxOnly] [NodeFeature:FSGroup]", func() {
+
+		ginkgo.BeforeEach(func() {
+			// Windows does not support the FSGroup SecurityContext option.
+			framework.SkipIfNodeOSDistroIs("windows")
+		})
+
 		ginkgo.It("new files should be created with FSGroup ownership when container is root", func() {
 			doTestSetgidFSGroup(f, testImageRootUid, v1.StorageMediumMemory)
 		})
@@ -284,8 +289,8 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 		framework.ExpectNoError(err, "failed to get pod %s", pod.Name)
 
 		ginkgo.By("Reading file content from the nginx-container")
-		resultString, err = framework.LookForStringInFile(f.Namespace.Name, pod.Name, busyBoxMainContainerName, busyBoxMainVolumeFilePath, message, 30*time.Second)
-		framework.ExpectNoError(err, "failed to match expected string %s with %s", message, resultString)
+		result := f.ExecShellInContainer(pod.Name, busyBoxMainContainerName, fmt.Sprintf("cat %s", busyBoxMainVolumeFilePath))
+		framework.ExpectEqual(result, message, "failed to match expected string %s with %s", message, resultString)
 	})
 })
 

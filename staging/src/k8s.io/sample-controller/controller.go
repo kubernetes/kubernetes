@@ -284,7 +284,7 @@ func (c *Controller) syncHandler(key string) error {
 	}
 
 	// If the Deployment is not controlled by this Foo resource, we should log
-	// a warning to the event recorder and ret
+	// a warning to the event recorder and return error msg.
 	if !metav1.IsControlledBy(deployment, foo) {
 		msg := fmt.Sprintf(MessageResourceExists, deployment.Name)
 		c.recorder.Event(foo, corev1.EventTypeWarning, ErrResourceExists, msg)
@@ -300,7 +300,7 @@ func (c *Controller) syncHandler(key string) error {
 	}
 
 	// If an error occurs during Update, we'll requeue the item so we can
-	// attempt processing again later. THis could have been caused by a
+	// attempt processing again later. This could have been caused by a
 	// temporary network failure, or any other transient reason.
 	if err != nil {
 		return err

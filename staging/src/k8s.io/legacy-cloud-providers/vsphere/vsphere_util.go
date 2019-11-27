@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -306,6 +308,10 @@ func getDatastoresForZone(ctx context.Context, nodeManager *NodeManager, selecte
 				sharedDatastoresPerZone = dsObjList
 			} else {
 				sharedDatastoresPerZone = intersect(sharedDatastoresPerZone, dsObjList)
+				if len(sharedDatastoresPerZone) == 0 {
+					klog.V(4).Infof("No shared datastores found among hosts %s", hosts)
+					return nil, fmt.Errorf("No matching datastores found in the kubernetes cluster for zone %s", zone)
+				}
 			}
 			klog.V(9).Infof("Shared datastore list after processing host %s : %s", host, sharedDatastoresPerZone)
 		}
@@ -314,6 +320,9 @@ func getDatastoresForZone(ctx context.Context, nodeManager *NodeManager, selecte
 			sharedDatastores = sharedDatastoresPerZone
 		} else {
 			sharedDatastores = intersect(sharedDatastores, sharedDatastoresPerZone)
+			if len(sharedDatastores) == 0 {
+				return nil, fmt.Errorf("No matching datastores found in the kubernetes cluster across zones %s", selectedZones)
+			}
 		}
 	}
 	klog.V(1).Infof("Returning selected datastores : %s", sharedDatastores)

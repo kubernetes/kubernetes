@@ -38,11 +38,7 @@ type containerCleanupInfo struct {
 
 // applyPlatformSpecificDockerConfig applies platform-specific configurations to a dockertypes.ContainerCreateConfig struct.
 // The containerCleanupInfo struct it returns will be passed as is to performPlatformSpecificContainerCleanup
-// after either:
-//   * the container creation has failed
-//   * the container has been successfully started
-//   * the container has been removed
-// whichever happens first.
+// after either the container creation has failed or the container has been removed.
 func (ds *dockerService) applyPlatformSpecificDockerConfig(request *runtimeapi.CreateContainerRequest, createConfig *dockertypes.ContainerCreateConfig) (*containerCleanupInfo, error) {
 	cleanupInfo := &containerCleanupInfo{}
 
@@ -163,13 +159,7 @@ func randomString(length int) (string, error) {
 }
 
 // performPlatformSpecificContainerCleanup is responsible for doing any platform-specific cleanup
-// after either:
-//   * the container creation has failed
-//   * the container has been successfully started
-//   * the container has been removed
-// whichever happens first.
-// Any errors it returns are simply logged, but do not prevent the container from being started or
-// removed.
+// after either the container creation has failed or the container has been removed.
 func (ds *dockerService) performPlatformSpecificContainerCleanup(cleanupInfo *containerCleanupInfo) (errors []error) {
 	if err := removeGMSARegistryValue(cleanupInfo); err != nil {
 		errors = append(errors, err)

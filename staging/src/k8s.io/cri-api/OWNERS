@@ -8,6 +8,8 @@ approvers:
 - dchen1107
 - yujuhong
 - resouer
+- sig-node-api-approvers
+- api-approvers
 reviewers:
 - sig-node-reviewers
 - dims

@@ -20,6 +20,7 @@ import (
 	"math/rand"
 	"testing"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	admissionregv1 "k8s.io/api/admissionregistration/v1"
 	admissionregv1beta1 "k8s.io/api/admissionregistration/v1beta1"
@@ -69,6 +70,7 @@ import (
 
 var groups = []runtime.SchemeBuilder{
 	admissionv1beta1.SchemeBuilder,
+	admissionv1.SchemeBuilder,
 	admissionregv1beta1.SchemeBuilder,
 	admissionregv1.SchemeBuilder,
 	appsv1beta1.SchemeBuilder,

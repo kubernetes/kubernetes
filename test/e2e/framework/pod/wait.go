@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"text/tabwriter"
 	"time"
@@ -346,27 +345,6 @@ func WaitForPodRunningInNamespace(c clientset.Interface, pod *v1.Pod) error {
 		return nil
 	}
 	return WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, podStartTimeout)
-}
-
-// WaitTimeoutForPodEvent waits the given timeout duration for a pod event to occur.
-func WaitTimeoutForPodEvent(c clientset.Interface, podName, namespace, eventSelector, msg string, timeout time.Duration) error {
-	return wait.PollImmediate(poll, timeout, eventOccurred(c, podName, namespace, eventSelector, msg))
-}
-
-func eventOccurred(c clientset.Interface, podName, namespace, eventSelector, msg string) wait.ConditionFunc {
-	options := metav1.ListOptions{FieldSelector: eventSelector}
-	return func() (bool, error) {
-		events, err := c.CoreV1().Events(namespace).List(options)
-		if err != nil {
-			return false, fmt.Errorf("got error while getting pod events: %s", err)
-		}
-		for _, event := range events.Items {
-			if strings.Contains(event.Message, msg) {
-				return true, nil
-			}
-		}
-		return false, nil
-	}
 }
 
 // WaitTimeoutForPodNoLongerRunningInNamespace waits the given timeout duration for the specified pod to stop.

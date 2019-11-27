@@ -26,10 +26,6 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	kubeletconfigv1beta1scheme "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
-	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	kubeproxyconfigv1alpha1scheme "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1"
 )
 
 // AddToSchemeFunc is a function that adds known types and API GroupVersions to a scheme
@@ -96,15 +92,15 @@ var Known Registrations = map[RegistrationKind]Registration{
 		// TODO: When a beta version of the kube-proxy ComponentConfig API is available, start using it
 		MarshalGroupVersion: kubeproxyconfigv1alpha1.SchemeGroupVersion,
 		// AddToSchemeFuncs must use v1alpha1scheme defined in k8s.io/kubernetes, because the schema defined in k8s.io/kube-proxy doesn't have defaulting functions
-		AddToSchemeFuncs: []AddToSchemeFunc{kubeproxyconfig.AddToScheme, kubeproxyconfigv1alpha1scheme.AddToScheme},
+		AddToSchemeFuncs: []AddToSchemeFunc{kubeproxyconfigv1alpha1.AddToScheme},
 		DefaulterFunc:    DefaultKubeProxyConfiguration,
-		ValidateFunc:     ValidateKubeProxyConfiguration,
-		EmptyValue:       &kubeproxyconfig.KubeProxyConfiguration{},
+		ValidateFunc:     NoValidator("kube-proxy"),
+		EmptyValue:       &kubeproxyconfigv1alpha1.KubeProxyConfiguration{},
 		GetFromInternalConfig: func(cfg *kubeadmapi.ClusterConfiguration) (runtime.Object, bool) {
 			return cfg.ComponentConfigs.KubeProxy, cfg.ComponentConfigs.KubeProxy != nil
 		},
 		SetToInternalConfig: func(obj runtime.Object, cfg *kubeadmapi.ClusterConfiguration) bool {
-			kubeproxyConfig, ok := obj.(*kubeproxyconfig.KubeProxyConfiguration)
+			kubeproxyConfig, ok := obj.(*kubeproxyconfigv1alpha1.KubeProxyConfiguration)
 			if ok {
 				cfg.ComponentConfigs.KubeProxy = kubeproxyConfig
 			}
@@ -115,15 +111,15 @@ var Known Registrations = map[RegistrationKind]Registration{
 	KubeletConfigurationKind: {
 		MarshalGroupVersion: kubeletconfigv1beta1.SchemeGroupVersion,
 		// PAddToSchemeFuncs must use v1alpha1scheme defined in k8s.io/kubernetes, because the schema defined in k8s.io/kubelet doesn't have defaulting functions
-		AddToSchemeFuncs: []AddToSchemeFunc{kubeletconfig.AddToScheme, kubeletconfigv1beta1scheme.AddToScheme},
+		AddToSchemeFuncs: []AddToSchemeFunc{kubeletconfigv1beta1.AddToScheme},
 		DefaulterFunc:    DefaultKubeletConfiguration,
-		ValidateFunc:     ValidateKubeletConfiguration,
-		EmptyValue:       &kubeletconfig.KubeletConfiguration{},
+		ValidateFunc:     NoValidator("kubelet"),
+		EmptyValue:       &kubeletconfigv1beta1.KubeletConfiguration{},
 		GetFromInternalConfig: func(cfg *kubeadmapi.ClusterConfiguration) (runtime.Object, bool) {
 			return cfg.ComponentConfigs.Kubelet, cfg.ComponentConfigs.Kubelet != nil
 		},
 		SetToInternalConfig: func(obj runtime.Object, cfg *kubeadmapi.ClusterConfiguration) bool {
-			kubeletConfig, ok := obj.(*kubeletconfig.KubeletConfiguration)
+			kubeletConfig, ok := obj.(*kubeletconfigv1beta1.KubeletConfiguration)
 			if ok {
 				cfg.ComponentConfigs.Kubelet = kubeletConfig
 			}

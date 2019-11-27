@@ -34,7 +34,7 @@ option go_package = "v1alpha1";
 // integer value. The value can be any valid integer.
 message PriorityClass {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -66,7 +66,7 @@ message PriorityClass {
 // PriorityClassList is a collection of priority classes.
 message PriorityClassList {
   // Standard list metadata
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 

@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
-	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
+	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
 // DelegatingAuthorizerConfig is the minimal configuration needed to create an authenticator

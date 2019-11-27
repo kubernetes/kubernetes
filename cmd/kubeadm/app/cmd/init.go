@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -64,21 +63,21 @@ var (
 		{{if .ControlPlaneEndpoint -}}
 		{{if .UploadCerts -}}
 		You can now join any number of the control-plane node running the following command on each as root:
-					  
+
 		  {{.joinControlPlaneCommand}}
-					
+
 		Please note that the certificate-key gives access to cluster sensitive data, keep it secret!
-		As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you can use 
+		As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you can use
 		"kubeadm init phase upload-certs --upload-certs" to reload certs afterward.
-		  
+
 		{{else -}}
-		You can now join any number of control-plane nodes by copying certificate authorities 
+		You can now join any number of control-plane nodes by copying certificate authorities
 		and service account keys on each node and then running the following as root:
-				  
-		  {{.joinControlPlaneCommand}}	  
-		  
+
+		  {{.joinControlPlaneCommand}}
+
 		{{end}}{{end}}Then you can join any number of worker nodes by running the following on each as root:
-						  
+
 		{{.joinWorkerCommand}}
 		`)))
 )
@@ -99,6 +98,7 @@ type initOptions struct {
 	externalClusterCfg      *kubeadmapiv1beta2.ClusterConfiguration
 	uploadCerts             bool
 	skipCertificateKeyPrint bool
+	kustomizeDir            string
 }
 
 // compile-time assert that the local data object satisfies the phases data interface.
@@ -120,6 +120,7 @@ type initData struct {
 	outputWriter            io.Writer
 	uploadCerts             bool
 	skipCertificateKeyPrint bool
+	kustomizeDir            string
 }
 
 // NewCmdInit returns "kubeadm init" command.
@@ -134,18 +135,20 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Run this command in order to set up the Kubernetes control plane",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := initRunner.InitData(args)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
 			data := c.(*initData)
 			fmt.Printf("[init] Using Kubernetes version: %s\n", data.cfg.KubernetesVersion)
 
-			err = initRunner.Run(args)
-			kubeadmutil.CheckErr(err)
+			if err := initRunner.Run(args); err != nil {
+				return err
+			}
 
-			err = showJoinCommand(data, out)
-			kubeadmutil.CheckErr(err)
+			return showJoinCommand(data, out)
 		},
 		Args: cobra.NoArgs,
 	}
@@ -179,6 +182,7 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	initRunner.AppendPhase(phases.NewUploadCertsPhase())
 	initRunner.AppendPhase(phases.NewMarkControlPlanePhase())
 	initRunner.AppendPhase(phases.NewBootstrapTokenPhase())
+	initRunner.AppendPhase(phases.NewKubeletFinalizePhase())
 	initRunner.AppendPhase(phases.NewAddonPhase())
 
 	// sets the data builder function, that will be used by the runner
@@ -272,6 +276,7 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions) {
 		&initOptions.skipCertificateKeyPrint, options.SkipCertificateKeyPrint, initOptions.skipCertificateKeyPrint,
 		"Don't print the key used to encrypt the control-plane certificates.",
 	)
+	options.AddKustomizePodsFlag(flagSet, &initOptions.kustomizeDir)
 }
 
 // newInitOptions returns a struct ready for being used for creating cmd init flags.
@@ -404,6 +409,7 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		outputWriter:            out,
 		uploadCerts:             options.uploadCerts,
 		skipCertificateKeyPrint: options.skipCertificateKeyPrint,
+		kustomizeDir:            options.kustomizeDir,
 	}, nil
 }
 
@@ -508,8 +514,12 @@ func (d *initData) OutputWriter() io.Writer {
 func (d *initData) Client() (clientset.Interface, error) {
 	if d.client == nil {
 		if d.dryRun {
+			svcSubnetCIDR, err := kubeadmconstants.GetKubernetesServiceCIDR(d.cfg.Networking.ServiceSubnet, features.Enabled(d.cfg.FeatureGates, features.IPv6DualStack))
+			if err != nil {
+				return nil, errors.Wrapf(err, "unable to get internal Kubernetes Service IP from the given service CIDR (%s)", d.cfg.Networking.ServiceSubnet)
+			}
 			// If we're dry-running, we should create a faked client that answers some GETs in order to be able to do the full init flow and just logs the rest of requests
-			dryRunGetter := apiclient.NewInitDryRunGetter(d.cfg.NodeRegistration.Name, d.cfg.Networking.ServiceSubnet)
+			dryRunGetter := apiclient.NewInitDryRunGetter(d.cfg.NodeRegistration.Name, svcSubnetCIDR.String())
 			d.client = apiclient.NewDryRunClient(dryRunGetter, os.Stdout)
 		} else {
 			// If we're acting for real, we should create a connection to the API server and wait for it to come up
@@ -530,6 +540,11 @@ func (d *initData) Tokens() []string {
 		tokens = append(tokens, bt.Token.String())
 	}
 	return tokens
+}
+
+// KustomizeDir returns the folder where kustomize patches for static pod manifest are stored
+func (d *initData) KustomizeDir() string {
+	return d.kustomizeDir
 }
 
 func printJoinCommand(out io.Writer, adminKubeConfigPath, token string, i *initData) error {

@@ -23,9 +23,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// ContainerRuntimeOptions defines options for the container runtime.
 type ContainerRuntimeOptions struct {
-
-	// General options.
+	// General Options.
 
 	// ContainerRuntime is the container runtime to use.
 	ContainerRuntime string
@@ -78,6 +78,7 @@ type ContainerRuntimeOptions struct {
 	CNICacheDir string
 }
 
+// AddFlags adds flags to the container runtime, according to ContainerRuntimeOptions.
 func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	dockerOnlyWarning := "This docker-specific flag only works when container-runtime is set to docker."
 

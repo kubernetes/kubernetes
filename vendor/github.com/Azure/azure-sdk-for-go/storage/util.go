@@ -17,6 +17,7 @@ package storage
 import (
 	"bytes"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/xml"
@@ -29,6 +30,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	uuid "github.com/satori/go.uuid"
 )
 
 var (
@@ -241,4 +244,17 @@ func getMetadataFromHeaders(header http.Header) map[string]string {
 	}
 
 	return metadata
+}
+
+// newUUID returns a new uuid using RFC 4122 algorithm.
+func newUUID() (uuid.UUID, error) {
+	u := [16]byte{}
+	// Set all bits to randomly (or pseudo-randomly) chosen values.
+	_, err := rand.Read(u[:])
+	if err != nil {
+		return uuid.UUID{}, err
+	}
+	u[8] = (u[8]&(0xff>>2) | (0x02 << 6)) // u.setVariant(ReservedRFC4122)
+	u[6] = (u[6] & 0xF) | (uuid.V4 << 4)  // u.setVersion(V4)
+	return uuid.FromBytes(u[:])
 }

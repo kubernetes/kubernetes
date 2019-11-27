@@ -18,8 +18,15 @@ package cache
 
 import (
 	"context"
-	"fmt"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/binary"
+	"hash"
+	"io"
+	"sync"
 	"time"
+	"unsafe"
 
 	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -40,6 +47,11 @@ type cachedTokenAuthenticator struct {
 	failureTTL time.Duration
 
 	cache cache
+
+	// hashPool is a per authenticator pool of hash.Hash (to avoid allocations from building the Hash)
+	// HMAC with SHA-256 and a random key is used to prevent precomputation and length extension attacks
+	// It also mitigates hash map DOS attacks via collisions (the inputs are supplied by untrusted users)
+	hashPool *sync.Pool
 }
 
 type cache interface {
@@ -57,12 +69,30 @@ func New(authenticator authenticator.Token, cacheErrs bool, successTTL, failureT
 }
 
 func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL, failureTTL time.Duration, clock utilclock.Clock) authenticator.Token {
+	randomCacheKey := make([]byte, 32)
+	if _, err := rand.Read(randomCacheKey); err != nil {
+		panic(err) // rand should never fail
+	}
+
 	return &cachedTokenAuthenticator{
 		authenticator: authenticator,
 		cacheErrs:     cacheErrs,
 		successTTL:    successTTL,
 		failureTTL:    failureTTL,
-		cache:         newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(128, clock) }),
+		// Cache performance degrades noticeably when the number of
+		// tokens in operation exceeds the size of the cache. It is
+		// cheap to make the cache big in the second dimension below,
+		// the memory is only consumed when that many tokens are being
+		// used. Currently we advertise support 5k nodes and 10k
+		// namespaces; a 32k entry cache is therefore a 2x safety
+		// margin.
+		cache: newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(clock) }),
+
+		hashPool: &sync.Pool{
+			New: func() interface{} {
+				return hmac.New(sha256.New, randomCacheKey)
+			},
+		},
 	}
 }
 
@@ -70,7 +100,7 @@ func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL,
 func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 	auds, _ := authenticator.AudiencesFrom(ctx)
 
-	key := keyFunc(auds, token)
+	key := keyFunc(a.hashPool, auds, token)
 	if record, ok := a.cache.get(key); ok {
 		return record.resp, record.ok, record.err
 	}
@@ -90,6 +120,55 @@ func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token 
 	return resp, ok, err
 }
 
-func keyFunc(auds []string, token string) string {
-	return fmt.Sprintf("%#v|%v", auds, token)
+// keyFunc generates a string key by hashing the inputs.
+// This lowers the memory requirement of the cache and keeps tokens out of memory.
+func keyFunc(hashPool *sync.Pool, auds []string, token string) string {
+	h := hashPool.Get().(hash.Hash)
+
+	h.Reset()
+
+	// try to force stack allocation
+	var a [4]byte
+	b := a[:]
+
+	writeLengthPrefixedString(h, b, token)
+	// encode the length of audiences to avoid ambiguities
+	writeLength(h, b, len(auds))
+	for _, aud := range auds {
+		writeLengthPrefixedString(h, b, aud)
+	}
+
+	key := toString(h.Sum(nil)) // skip base64 encoding to save an allocation
+
+	hashPool.Put(h)
+
+	return key
+}
+
+// writeLengthPrefixedString writes s with a length prefix to prevent ambiguities, i.e. "xy" + "z" == "x" + "yz"
+// the length of b is assumed to be 4 (b is mutated by this function to store the length of s)
+func writeLengthPrefixedString(w io.Writer, b []byte, s string) {
+	writeLength(w, b, len(s))
+	if _, err := w.Write(toBytes(s)); err != nil {
+		panic(err) // Write() on hash never fails
+	}
+}
+
+// writeLength encodes length into b and then writes it via the given writer
+// the length of b is assumed to be 4
+func writeLength(w io.Writer, b []byte, length int) {
+	binary.BigEndian.PutUint32(b, uint32(length))
+	if _, err := w.Write(b); err != nil {
+		panic(err) // Write() on hash never fails
+	}
+}
+
+// toBytes performs unholy acts to avoid allocations
+func toBytes(s string) []byte {
+	return *(*[]byte)(unsafe.Pointer(&s))
+}
+
+// toString performs unholy acts to avoid allocations
+func toString(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
 }

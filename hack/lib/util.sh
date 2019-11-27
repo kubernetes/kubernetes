@@ -64,6 +64,24 @@ kube::util::wait_for_url() {
   return 1
 }
 
+# Example:  kube::util::wait_for_success 120 5 "kubectl get nodes|grep localhost"
+# arguments: wait time, sleep time, shell command
+# returns 0 if the shell command get output, 1 otherwise.
+kube::util::wait_for_success(){
+  local wait_time="$1"
+  local sleep_time="$2"
+  local cmd="$3"
+  while [ "$wait_time" -gt 0 ]; do
+    if eval "$cmd"; then
+      return 0
+    else
+      sleep "$sleep_time"
+      wait_time=$((wait_time-sleep_time))
+    fi
+  done
+  return 1
+}
+
 # Example:  kube::util::trap_add 'echo "in trap DEBUG"' DEBUG
 # See: http://stackoverflow.com/questions/3338030/multiple-bash-traps-for-the-same-signal
 kube::util::trap_add() {
@@ -223,7 +241,6 @@ kube::util::gen-docs() {
   mkdir -p "${dest}/docs/admin/"
   "${genkubedocs}" "${dest}/docs/admin/" "kube-apiserver"
   "${genkubedocs}" "${dest}/docs/admin/" "kube-controller-manager"
-  "${genkubedocs}" "${dest}/docs/admin/" "cloud-controller-manager"
   "${genkubedocs}" "${dest}/docs/admin/" "kube-proxy"
   "${genkubedocs}" "${dest}/docs/admin/" "kube-scheduler"
   "${genkubedocs}" "${dest}/docs/admin/" "kubelet"
@@ -232,7 +249,6 @@ kube::util::gen-docs() {
   mkdir -p "${dest}/docs/man/man1/"
   "${genman}" "${dest}/docs/man/man1/" "kube-apiserver"
   "${genman}" "${dest}/docs/man/man1/" "kube-controller-manager"
-  "${genman}" "${dest}/docs/man/man1/" "cloud-controller-manager"
   "${genman}" "${dest}/docs/man/man1/" "kube-proxy"
   "${genman}" "${dest}/docs/man/man1/" "kube-scheduler"
   "${genman}" "${dest}/docs/man/man1/" "kubelet"

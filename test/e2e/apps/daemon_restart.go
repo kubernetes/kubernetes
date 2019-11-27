@@ -33,8 +33,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -74,7 +74,7 @@ type RestartDaemonConfig struct {
 // NewRestartConfig creates a RestartDaemonConfig for the given node and daemon.
 func NewRestartConfig(nodeName, daemonName string, healthzPort int, pollInterval, pollTimeout time.Duration) *RestartDaemonConfig {
 	if !framework.ProviderIs("gce") {
-		e2elog.Logf("WARNING: SSH through the restart config might not work on %s", framework.TestContext.Provider)
+		framework.Logf("WARNING: SSH through the restart config might not work on %s", framework.TestContext.Provider)
 	}
 	return &RestartDaemonConfig{
 		nodeName:     nodeName,
@@ -91,7 +91,7 @@ func (r *RestartDaemonConfig) String() string {
 
 // waitUp polls healthz of the daemon till it returns "ok" or the polling hits the pollTimeout
 func (r *RestartDaemonConfig) waitUp() {
-	e2elog.Logf("Checking if %v is up by polling for a 200 on its /healthz endpoint", r)
+	framework.Logf("Checking if %v is up by polling for a 200 on its /healthz endpoint", r)
 	healthzCheck := fmt.Sprintf(
 		"curl -s -o /dev/null -I -w \"%%{http_code}\" http://localhost:%v/healthz", r.healthzPort)
 
@@ -101,12 +101,12 @@ func (r *RestartDaemonConfig) waitUp() {
 		if result.Code == 0 {
 			httpCode, err := strconv.Atoi(result.Stdout)
 			if err != nil {
-				e2elog.Logf("Unable to parse healthz http return code: %v", err)
+				framework.Logf("Unable to parse healthz http return code: %v", err)
 			} else if httpCode == 200 {
 				return true, nil
 			}
 		}
-		e2elog.Logf("node %v exec command, '%v' failed with exitcode %v: \n\tstdout: %v\n\tstderr: %v",
+		framework.Logf("node %v exec command, '%v' failed with exitcode %v: \n\tstdout: %v\n\tstderr: %v",
 			r.nodeName, healthzCheck, result.Code, result.Stdout, result.Stderr)
 		return false, nil
 	})
@@ -115,7 +115,7 @@ func (r *RestartDaemonConfig) waitUp() {
 
 // kill sends a SIGTERM to the daemon
 func (r *RestartDaemonConfig) kill() {
-	e2elog.Logf("Killing %v", r)
+	framework.Logf("Killing %v", r)
 	_, err := e2essh.NodeExec(r.nodeName, fmt.Sprintf("pgrep %v | xargs -I {} sudo kill {}", r.daemonName), framework.TestContext.Provider)
 	framework.ExpectNoError(err)
 }
@@ -210,7 +210,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 			Replicas:    numPods,
 			CreatedPods: &[]*v1.Pod{},
 		}
-		framework.ExpectNoError(framework.RunRC(config))
+		framework.ExpectNoError(e2erc.RunRC(config))
 		replacePods(*config.CreatedPods, existingPods)
 
 		stopCh = make(chan struct{})
@@ -261,7 +261,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		// that it had the opportunity to create/delete pods, if it were going to do so. Scaling the RC
 		// to the same size achieves this, because the scale operation advances the RC's sequence number
 		// and awaits it to be observed and reported back in the RC's status.
-		framework.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rcName, numPods, true)
+		e2erc.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rcName, numPods, true)
 
 		// Only check the keys, the pods can be different if the kubelet updated it.
 		// TODO: Can it really?
@@ -275,7 +275,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		}
 		if len(newKeys.List()) != len(existingKeys.List()) ||
 			!newKeys.IsSuperset(existingKeys) {
-			e2elog.Failf("RcManager created/deleted pods after restart \n\n %+v", tracker)
+			framework.Failf("RcManager created/deleted pods after restart \n\n %+v", tracker)
 		}
 	})
 
@@ -292,22 +292,21 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		restarter.kill()
 		// This is best effort to try and create pods while the scheduler is down,
 		// since we don't know exactly when it is restarted after the kill signal.
-		framework.ExpectNoError(framework.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, false))
+		framework.ExpectNoError(e2erc.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, false))
 		restarter.waitUp()
-		framework.ExpectNoError(framework.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, true))
+		framework.ExpectNoError(e2erc.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rcName, numPods+5, true))
 	})
 
 	ginkgo.It("Kubelet should not restart containers across restart", func() {
-
 		nodeIPs, err := e2enode.GetPublicIps(f.ClientSet)
 		if err != nil {
-			e2elog.Logf("Unexpected error occurred: %v", err)
+			framework.Logf("Unexpected error occurred: %v", err)
 		}
 		// TODO: write a wrapper for ExpectNoErrorWithOffset()
 		framework.ExpectNoErrorWithOffset(0, err)
 		preRestarts, badNodes := getContainerRestarts(f.ClientSet, ns, labelSelector)
 		if preRestarts != 0 {
-			e2elog.Logf("WARNING: Non-zero container restart count: %d across nodes %v", preRestarts, badNodes)
+			framework.Logf("WARNING: Non-zero container restart count: %d across nodes %v", preRestarts, badNodes)
 		}
 		for _, ip := range nodeIPs {
 			restarter := NewRestartConfig(
@@ -316,8 +315,8 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		}
 		postRestarts, badNodes := getContainerRestarts(f.ClientSet, ns, labelSelector)
 		if postRestarts != preRestarts {
-			framework.DumpNodeDebugInfo(f.ClientSet, badNodes, e2elog.Logf)
-			e2elog.Failf("Net container restart count went from %v -> %v after kubelet restart on nodes %v \n\n %+v", preRestarts, postRestarts, badNodes, tracker)
+			framework.DumpNodeDebugInfo(f.ClientSet, badNodes, framework.Logf)
+			framework.Failf("Net container restart count went from %v -> %v after kubelet restart on nodes %v \n\n %+v", preRestarts, postRestarts, badNodes, tracker)
 		}
 	})
 })

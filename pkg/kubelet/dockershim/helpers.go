@@ -43,7 +43,7 @@ const (
 )
 
 var (
-	conflictRE = regexp.MustCompile(`Conflict. (?:.)+ is already in use by container ([0-9a-z]+)`)
+	conflictRE = regexp.MustCompile(`Conflict. (?:.)+ is already in use by container \"?([0-9a-z]+)\"?`)
 
 	// this is hacky, but extremely common.
 	// if a container starts but the executable file is not found, runc gives a message that matches

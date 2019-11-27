@@ -19,7 +19,6 @@ spec:
         k8s-app: influxGrafana
         version: v4
       annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       priorityClassName: system-cluster-critical

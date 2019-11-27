@@ -906,6 +906,9 @@ func yaml_parser_remove_simple_key(parser *yaml_parser_t) bool {
 	return true
 }
 
+// max_flow_level limits the flow_level
+const max_flow_level = 10000
+
 // Increase the flow level and resize the simple key list if needed.
 func yaml_parser_increase_flow_level(parser *yaml_parser_t) bool {
 	// Reset the simple key on the next level.
@@ -913,6 +916,11 @@ func yaml_parser_increase_flow_level(parser *yaml_parser_t) bool {
 
 	// Increase the flow level.
 	parser.flow_level++
+	if parser.flow_level > max_flow_level {
+		return yaml_parser_set_scanner_error(parser,
+			"while increasing flow level", parser.simple_keys[len(parser.simple_keys)-1].mark,
+			fmt.Sprintf("exceeded max depth of %d", max_flow_level))
+	}
 	return true
 }
 
@@ -924,6 +932,9 @@ func yaml_parser_decrease_flow_level(parser *yaml_parser_t) bool {
 	}
 	return true
 }
+
+// max_indents limits the indents stack size
+const max_indents = 10000
 
 // Push the current indentation level to the stack and set the new level
 // the current column is greater than the indentation level.  In this case,
@@ -939,6 +950,11 @@ func yaml_parser_roll_indent(parser *yaml_parser_t, column, number int, typ yaml
 		// indentation level.
 		parser.indents = append(parser.indents, parser.indent)
 		parser.indent = column
+		if len(parser.indents) > max_indents {
+			return yaml_parser_set_scanner_error(parser,
+				"while increasing indent level", parser.simple_keys[len(parser.simple_keys)-1].mark,
+				fmt.Sprintf("exceeded max depth of %d", max_indents))
+		}
 
 		// Create a token and insert it into the queue.
 		token := yaml_token_t{

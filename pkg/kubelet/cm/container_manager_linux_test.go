@@ -27,12 +27,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/mount"
 )
 
 func fakeContainerMgrMountInt() mount.Interface {
-	return &mount.FakeMounter{
-		MountPoints: []mount.MountPoint{
+	return mount.NewFakeMounter(
+		[]mount.MountPoint{
 			{
 				Device: "cgroup",
 				Type:   "cgroup",
@@ -53,8 +53,7 @@ func fakeContainerMgrMountInt() mount.Interface {
 				Type:   "cgroup",
 				Opts:   []string{"rw", "relatime", "memory"},
 			},
-		},
-	}
+		})
 }
 
 func TestCgroupMountValidationSuccess(t *testing.T) {
@@ -64,8 +63,8 @@ func TestCgroupMountValidationSuccess(t *testing.T) {
 }
 
 func TestCgroupMountValidationMemoryMissing(t *testing.T) {
-	mountInt := &mount.FakeMounter{
-		MountPoints: []mount.MountPoint{
+	mountInt := mount.NewFakeMounter(
+		[]mount.MountPoint{
 			{
 				Device: "cgroup",
 				Type:   "cgroup",
@@ -81,15 +80,14 @@ func TestCgroupMountValidationMemoryMissing(t *testing.T) {
 				Type:   "cgroup",
 				Opts:   []string{"rw", "relatime", "cpuacct"},
 			},
-		},
-	}
+		})
 	_, err := validateSystemRequirements(mountInt)
 	assert.Error(t, err)
 }
 
 func TestCgroupMountValidationMultipleSubsystem(t *testing.T) {
-	mountInt := &mount.FakeMounter{
-		MountPoints: []mount.MountPoint{
+	mountInt := mount.NewFakeMounter(
+		[]mount.MountPoint{
 			{
 				Device: "cgroup",
 				Type:   "cgroup",
@@ -105,8 +103,7 @@ func TestCgroupMountValidationMultipleSubsystem(t *testing.T) {
 				Type:   "cgroup",
 				Opts:   []string{"rw", "relatime", "cpuacct"},
 			},
-		},
-	}
+		})
 	_, err := validateSystemRequirements(mountInt)
 	assert.Nil(t, err)
 }
@@ -118,8 +115,8 @@ func TestSoftRequirementsValidationSuccess(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 	req.NoError(ioutil.WriteFile(path.Join(tempDir, "cpu.cfs_period_us"), []byte("0"), os.ModePerm))
 	req.NoError(ioutil.WriteFile(path.Join(tempDir, "cpu.cfs_quota_us"), []byte("0"), os.ModePerm))
-	mountInt := &mount.FakeMounter{
-		MountPoints: []mount.MountPoint{
+	mountInt := mount.NewFakeMounter(
+		[]mount.MountPoint{
 			{
 				Device: "cgroup",
 				Type:   "cgroup",
@@ -136,8 +133,7 @@ func TestSoftRequirementsValidationSuccess(t *testing.T) {
 				Type:   "cgroup",
 				Opts:   []string{"rw", "relatime", "cpuacct", "memory"},
 			},
-		},
-	}
+		})
 	f, err := validateSystemRequirements(mountInt)
 	assert.NoError(t, err)
 	assert.True(t, f.cpuHardcapping, "cpu hardcapping is expected to be enabled")

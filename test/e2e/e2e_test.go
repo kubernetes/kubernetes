@@ -31,6 +31,7 @@ import (
 	// "github.com/onsi/ginkgo"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/framework/viperconfig"
 	"k8s.io/kubernetes/test/e2e/generated"
@@ -49,7 +50,6 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/lifecycle/bootstrap"
 	_ "k8s.io/kubernetes/test/e2e/network"
 	_ "k8s.io/kubernetes/test/e2e/node"
-	_ "k8s.io/kubernetes/test/e2e/scalability"
 	_ "k8s.io/kubernetes/test/e2e/scheduling"
 	_ "k8s.io/kubernetes/test/e2e/servicecatalog"
 	_ "k8s.io/kubernetes/test/e2e/storage"
@@ -60,9 +60,17 @@ import (
 
 var viperConfig = flag.String("viper-config", "", "The name of a viper config file (https://github.com/spf13/viper#what-is-viper). All e2e command line parameters can also be configured in such a file. May contain a path and may or may not contain the file suffix. The default is to look for an optional file with `e2e` as base name. If a file is specified explicitly, it must be present.")
 
-func init() {
-	// Register framework and test flags, then parse flags.
-	framework.HandleFlags()
+// handleFlags sets up all flags and parses the command line.
+func handleFlags() {
+	config.CopyFlags(config.Flags, flag.CommandLine)
+	framework.RegisterCommonFlags(flag.CommandLine)
+	framework.RegisterClusterFlags(flag.CommandLine)
+	flag.Parse()
+}
+
+func TestMain(m *testing.M) {
+	// Register test flags, then parse flags.
+	handleFlags()
 
 	// Now that we know which Viper config (if any) was chosen,
 	// parse it and update those options which weren't already set via command line flags
@@ -96,9 +104,6 @@ func init() {
 		AssetNames: generated.AssetNames,
 	})
 
-}
-
-func TestMain(m *testing.M) {
 	rand.Seed(time.Now().UnixNano())
 	os.Exit(m.Run())
 }

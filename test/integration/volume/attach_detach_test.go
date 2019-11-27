@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -168,8 +168,9 @@ func TestPodDeletionWithDswp(t *testing.T) {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
-	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
+	stopCh := make(chan struct{})
 
+	go informers.Core().V1().Nodes().Informer().Run(stopCh)
 	if _, err := testClient.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
@@ -178,11 +179,11 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	go podInformer.Run(podStopCh)
 
 	// start controller loop
-	stopCh := make(chan struct{})
 	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
 	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
 	initCSIObjects(stopCh, informers)
 	go ctrl.Run(stopCh)
+	defer close(stopCh)
 
 	waitToObservePods(t, podInformer, 1)
 	podKey, err := cache.MetaNamespaceKeyFunc(pod)
@@ -207,13 +208,12 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	waitToObservePods(t, podInformer, 0)
 	// the populator loop turns every 1 minute
 	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 80*time.Second, "expected 0 pods in dsw after pod delete", 0)
-	close(stopCh)
 }
 
 func initCSIObjects(stopCh chan struct{}, informers clientgoinformers.SharedInformerFactory) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		go informers.Storage().V1beta1().CSINodes().Informer().Run(stopCh)
+		go informers.Storage().V1().CSINodes().Informer().Run(stopCh)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		go informers.Storage().V1beta1().CSIDrivers().Informer().Run(stopCh)
@@ -408,7 +408,7 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 	resyncPeriod := 12 * time.Hour
 	testClient := clientset.NewForConfigOrDie(&config)
 
-	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil)
+	host := volumetest.NewFakeVolumeHost(t, "/tmp/fake", nil, nil)
 	plugin := &volumetest.FakeVolumePlugin{
 		PluginName:             provisionerPluginName,
 		Host:                   host,
@@ -430,7 +430,7 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 		informers.Core().V1().Nodes(),
 		informers.Core().V1().PersistentVolumeClaims(),
 		informers.Core().V1().PersistentVolumes(),
-		informers.Storage().V1beta1().CSINodes(),
+		informers.Storage().V1().CSINodes(),
 		informers.Storage().V1beta1().CSIDrivers(),
 		cloud,
 		plugins,

@@ -58,6 +58,10 @@ func TestTar(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			err := tarDir(tc.dir, tc.outpath)
+			if err == nil {
+				defer os.Remove(tc.outpath)
+			}
+
 			switch {
 			case err != nil && len(tc.expectErr) == 0:
 				t.Fatalf("Expected nil error but got %q", err)
@@ -73,6 +77,10 @@ func TestTar(t *testing.T) {
 			}
 
 			data, err := readAllTar(tc.outpath)
+			if err != nil {
+				t.Fatalf("Failed to read tarball: %v", err)
+			}
+
 			if !reflect.DeepEqual(data, tc.expect) {
 				t.Errorf("Expected data %v but got %v", tc.expect, data)
 			}

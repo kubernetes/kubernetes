@@ -31,7 +31,7 @@ How to use klog
 - Use `klog.InitFlags(nil)` explicitly for initializing global flags as we no longer use `init()` method to register the flags
 - You can now use `log-file` instead of `log-dir` for logging to a single file (See `examples/log_file/usage_log_file.go`)
 - If you want to redirect everything logged using klog somewhere else (say syslog!), you can use `klog.SetOutput()` method and supply a `io.Writer`. (See `examples/set_output/usage_set_output.go`)
-- For more logging conventions (See [Logging Conventions](https://github.com/kubernetes/community/blob/master/contributors/devel/logging.md))
+- For more logging conventions (See [Logging Conventions](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/logging.md))
 
 ### Coexisting with glog
 This package can be used side by side with glog. [This example](examples/coexist_glog/coexist_glog.go) shows how to initialize and syncronize flags from the global `flag.CommandLine` FlagSet. In addition, the example makes use of stderr as combined output by setting `alsologtostderr` (or `logtostderr`) to `true`.
