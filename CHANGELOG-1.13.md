@@ -1152,7 +1152,7 @@ In v1.13 we worked on tighter integrations of Kubernetes API objects with AWS se
 For detailed release notes on the three alpha features from SIG AWS, please refer to the following Changelogs:
 
 - [aws-alb-ingress-controller v1.0.0](https://github.com/kubernetes-sigs/aws-alb-ingress-controller/releases/tag/v1.0.0)
-- [aws-ebs-csi-driver v0.1](https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/CHANGELOG-0.1.md)
+- [aws-ebs-csi-driver v0.1](https://github.com/kubernetes-sigs/aws-ebs-csi-driver/releases/tag/v0.1.0)
 - [cloudprovider-aws external v0.1.0](https://github.com/kubernetes/cloud-provider-aws/blob/master/changelogs/CHANGELOG-0.1.md)
 
 ### SIG Azure

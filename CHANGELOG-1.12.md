@@ -1518,7 +1518,7 @@ is now under 'kubescheduler.config.k8s.io/v1alpha1'.  ([#66916](https://github.c
 - Upgraded crictl on GCE to v1.11.1, up from 1.11.0 on v1.11.  ([#66152](https://github.com/kubernetes/kubernetes/pull/66152))
 - CoreDNS has been updated to v1.2.2, up from v1.1.3 in v1.11 ([#68076](https://github.com/kubernetes/kubernetes/pull/68076))
 - Setup dns servers and search domains for Windows Pods in dockershim. Docker EE version >= 17.10.0 is required for propagating DNS to containers. ([#63905](https://github.com/kubernetes/kubernetes/pull/63905))
-- Istio addon is unchanged from v1.11, at  0.8.0. See [full Istio release notes](https://istio.io/about/notes/0.6.html) ([#64537](https://github.com/kubernetes/kubernetes/pull/64537))
+- Istio addon is unchanged from v1.11, at  0.8.0. See [full Istio release notes](https://istio.io/news/releases/0.x/announcing-0.6/) ([#64537](https://github.com/kubernetes/kubernetes/pull/64537))
 - cadvisor godeps is unchanged from v1.11, at  v0.30.0 ([#64800](https://github.com/kubernetes/kubernetes/pull/64800))
 - event-exporter to version v0.2.2, compared to v0.2.0 in v1.11. ([#66157](https://github.com/kubernetes/kubernetes/pull/66157))
 - Rev the Azure SDK for networking to 2017-06-01 ([#61955](https://github.com/kubernetes/kubernetes/pull/61955))
