@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/component-base/metrics/testutil"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -646,6 +647,72 @@ func TestRelistIPChange(t *testing.T) {
 		assert.Nil(t, actualErr, tc.name)
 		assert.Exactly(t, []*PodLifecycleEvent{event}, actualEvents)
 	}
+}
+
+// Test_getPodIPs try to make the pod IP address be consistent at its whole lifecycle
+func Test_getPodIPs(t *testing.T) {
+	pleg, runtimeMock := newTestGenericPLEGWithRuntimeMock()
+	ch := pleg.Watch()
+
+	infraContainer := createTestContainer("infra", kubecontainer.ContainerStateRunning)
+	container := createTestContainer("c1", kubecontainer.ContainerStateRunning)
+
+	// case 1: every thing is ok
+	podID := types.UID("test-pod")
+	podIPs := []string{"192.168.1.5"}
+	pod := &kubecontainer.Pod{
+		ID:         podID,
+		Containers: []*kubecontainer.Container{container},
+		Sandboxes:  []*kubecontainer.Container{infraContainer},
+	}
+	runningPodStatus := &kubecontainer.PodStatus{
+		ID:                podID,
+		IPs:               podIPs,
+		ContainerStatuses: []*kubecontainer.ContainerStatus{{ID: container.ID, State: kubecontainer.ContainerStateRunning}},
+		SandboxStatuses:   []*runtimeapi.PodSandboxStatus{{State: runtimeapi.PodSandboxState_SANDBOX_READY}},
+	}
+	runtimeMock.On("GetPods", true).Return([]*kubecontainer.Pod{pod}, nil).Once()
+	runtimeMock.On("GetPodStatus", podID, "", "").Return(runningPodStatus, nil).Once()
+
+	expectedEvents := []*PodLifecycleEvent{
+		{ID: pod.ID, Type: ContainerStarted, Data: "c1"},
+		{ID: pod.ID, Type: ContainerStarted, Data: "infra"},
+	}
+
+	pleg.relist()
+	actualEvents := getEventsFromChannel(ch)
+	actualStatus, actualErr := pleg.cache.Get(podID)
+	assert.Equal(t, runningPodStatus, actualStatus)
+	assert.Equal(t, nil, actualErr)
+	assert.Exactly(t, expectedEvents, actualEvents)
+
+	// case 2: pod status returned from runtime with empty IPs and READY sandbox state,
+	// which mostly happened when we have torn down the network, but have not stopped the sandbox yet.
+	container = createTestContainer("c1", kubecontainer.ContainerStateExited)
+	pod = &kubecontainer.Pod{
+		ID:         podID,
+		Containers: []*kubecontainer.Container{container},
+		Sandboxes:  []*kubecontainer.Container{infraContainer},
+	}
+	exitingPodStatus := &kubecontainer.PodStatus{
+		ID:                podID,
+		ContainerStatuses: []*kubecontainer.ContainerStatus{{ID: container.ID, State: kubecontainer.ContainerStateExited}},
+		SandboxStatuses:   []*runtimeapi.PodSandboxStatus{{State: runtimeapi.PodSandboxState_SANDBOX_READY}},
+	}
+	runtimeMock.On("GetPods", true).Return([]*kubecontainer.Pod{pod}, nil).Once()
+	runtimeMock.On("GetPodStatus", podID, "", "").Return(exitingPodStatus, nil).Once()
+
+	expectedEvents = []*PodLifecycleEvent{
+		{ID: pod.ID, Type: ContainerDied, Data: "c1"},
+	}
+	pleg.relist()
+	actualEvents = getEventsFromChannel(ch)
+	actualStatus, actualErr = pleg.cache.Get(podID)
+	statusCopy := *exitingPodStatus
+	statusCopy.IPs = podIPs
+	assert.Equal(t, &statusCopy, actualStatus)
+	assert.Equal(t, nil, actualErr)
+	assert.Exactly(t, expectedEvents, actualEvents)
 }
 
 func TestRunningPodAndContainerCount(t *testing.T) {
