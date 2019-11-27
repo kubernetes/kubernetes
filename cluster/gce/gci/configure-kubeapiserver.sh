@@ -134,11 +134,10 @@ function start-kube-apiserver {
   local audit_policy_config_volume=""
   local audit_webhook_config_mount=""
   local audit_webhook_config_volume=""
-  if [[ "${ENABLE_APISERVER_ADVANCED_AUDIT:-}" == "true" ]]; then
+  if [[ "${ENABLE_APISERVER_ADVANCED_AUDIT:-}" == "true" && -n ${ADVANCED_AUDIT_POLICY} ]]; then
     local -r audit_policy_file="/etc/audit_policy.config"
     params+=" --audit-policy-file=${audit_policy_file}"
-    # Create the audit policy file, and mount it into the apiserver pod.
-    create-master-audit-policy "${audit_policy_file}" "${ADVANCED_AUDIT_POLICY:-}"
+    echo "${ADVANCED_AUDIT_POLICY:-}" > "${audit_policy_file}"
     audit_policy_config_mount="{\"name\": \"auditpolicyconfigmount\",\"mountPath\": \"${audit_policy_file}\", \"readOnly\": true},"
     audit_policy_config_volume="{\"name\": \"auditpolicyconfigmount\",\"hostPath\": {\"path\": \"${audit_policy_file}\", \"type\": \"FileOrCreate\"}},"
 
