@@ -43,7 +43,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		systemPods, err := e2epod.GetPodsInNamespace(c, ns, map[string]string{})
-		gomega.Expect(err).To(gomega.BeNil())
+		framework.ExpectEqual(err, nil)
 		systemPodsNo = int32(len(systemPods))
 		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
 			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
@@ -94,13 +94,13 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 			// the cluster is restored to health.
 			ginkgo.By("waiting for system pods to successfully restart")
 			err := e2epod.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, map[string]string{})
-			gomega.Expect(err).To(gomega.BeNil())
+			framework.ExpectEqual(err, nil)
 		})
 
 		ginkgo.It("node lease should be deleted when corresponding node is deleted", func() {
 			leaseClient := c.CoordinationV1().Leases(v1.NamespaceNodeLease)
 			err := e2enode.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute)
-			gomega.Expect(err).To(gomega.BeNil())
+			framework.ExpectEqual(err, nil)
 
 			ginkgo.By("verify node lease exists for every nodes")
 			originalNodes, err := e2enode.GetReadySchedulableNodes(c)
@@ -124,11 +124,11 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes - 1)
 			ginkgo.By(fmt.Sprintf("decreasing cluster size to %d", targetNumNodes))
 			err = framework.ResizeGroup(group, targetNumNodes)
-			gomega.Expect(err).To(gomega.BeNil())
+			framework.ExpectEqual(err, nil)
 			err = framework.WaitForGroupSize(group, targetNumNodes)
-			gomega.Expect(err).To(gomega.BeNil())
+			framework.ExpectEqual(err, nil)
 			err = e2enode.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes-1, 10*time.Minute)
-			gomega.Expect(err).To(gomega.BeNil())
+			framework.ExpectEqual(err, nil)
 			targetNodes, err := e2enode.GetReadySchedulableNodes(c)
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(targetNodes.Items), int(targetNumNodes))

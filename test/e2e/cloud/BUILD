@@ -16,7 +16,6 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/node:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
-        "//vendor/github.com/onsi/gomega:go_default_library",
     ],
 )
 

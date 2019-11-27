@@ -35,7 +35,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 // TODO: it would probably be slightly better to build up the objects
@@ -247,7 +246,7 @@ var _ = SIGDescribe("Addon update", func() {
 		framework.SkipUnlessProviderIs("gce")
 
 		//these tests are long, so I squeezed several cases in one scenario
-		gomega.Expect(sshClient).NotTo(gomega.BeNil())
+		framework.ExpectNotEqual(sshClient, nil)
 		dir = f.Namespace.Name // we use it only to give a unique string for each test execution
 
 		temporaryRemotePathPrefix := "addon-test-dir"
