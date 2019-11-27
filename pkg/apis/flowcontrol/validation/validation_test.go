@@ -978,7 +978,56 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			name: "forbid queuing details when not queuing",
 			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "system-foo",
+					Name: flowcontrol.PriorityLevelConfigurationNameExempt,
+				},
+				Spec: flowcontrol.PriorityLevelConfigurationSpec{
+					Type: flowcontrol.PriorityLevelEnablementExempt,
+				},
+			},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "wrong exempt should fail",
+			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: flowcontrol.PriorityLevelConfigurationNameExempt,
+				},
+				Spec: badSpec,
+			},
+			expectedErrors: field.ErrorList{field.Invalid(field.NewPath("spec"), badSpec, "spec of 'exempt' must equal the fixed value")},
+		},
+		{
+			name: "max-in-flight should work",
+			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "max-in-flight",
+				},
+				Spec: flowcontrol.PriorityLevelConfigurationSpec{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+						AssuredConcurrencyShares: 42,
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeReject},
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "wrong backstop should fail",
+			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: flowcontrol.PriorityLevelConfigurationNameCatchAll,
+				},
+				Spec: badSpec,
+			},
+			expectedErrors: field.ErrorList{field.Invalid(field.NewPath("spec"), badSpec, "spec of 'catch-all' must equal the fixed value")},
+		},
+		{
+			name: "backstop should work",
+			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: flowcontrol.PriorityLevelConfigurationNameCatchAll,
 				},
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
 					Type: flowcontrol.PriorityLevelEnablementLimited,
@@ -987,8 +1036,8 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeReject,
 							Queuing: &flowcontrol.QueuingConfiguration{
-								Queues:           512,
-								HandSize:         4,
+								Queues:           128,
+								HandSize:         6,
 								QueueLengthLimit: 100,
 							}}}},
 			},
