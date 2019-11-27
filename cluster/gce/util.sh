@@ -796,7 +796,12 @@ function construct-linux-kubelet-flags {
   fi
   if [[ "${CONTAINER_RUNTIME:-}" != "docker" ]]; then
     flags+=" --container-runtime=remote"
+    if [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
+      CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
+      flags+=" --runtime-cgroups=/system.slice/containerd.service"
+    fi
   fi
+
   if [[ -n "${CONTAINER_RUNTIME_ENDPOINT:-}" ]]; then
     flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
   fi
@@ -885,6 +890,14 @@ function construct-windows-kubelet-flags {
   # TODO(#78628): Re-enable KubeletPodResources when the issue is fixed.
   # Force disable KubeletPodResources feature on Windows until #78628 is fixed.
   flags+=" --feature-gates=KubeletPodResources=false"
+
+  if [[ "${CONTAINER_RUNTIME:-}" != "docker" ]]; then
+    flags+=" --container-runtime=remote"
+    if [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
+      CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-npipe:////./pipe/containerd-containerd}
+      flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
+    fi
+  fi
 
   KUBELET_ARGS="${flags}"
 }
