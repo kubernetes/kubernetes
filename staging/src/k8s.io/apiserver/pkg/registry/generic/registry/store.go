@@ -930,6 +930,15 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 	// TODO: remove the check, because we support no-op updates now.
 	if graceful || pendingFinalizers || shouldUpdateFinalizers {
 		err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletionAndFinalizers(ctx, name, key, options, preconditions, deleteValidation, obj)
+		// Update the preconditions.ResourceVersion if set since we updated the object.
+		if err == nil && deleteImmediately && preconditions.ResourceVersion != nil {
+			accessor, err = meta.Accessor(out)
+			if err != nil {
+				return out, false, kubeerr.NewInternalError(err)
+			}
+			resourceVersion := accessor.GetResourceVersion()
+			preconditions.ResourceVersion = &resourceVersion
+		}
 	}
 
 	// !deleteImmediately covers all cases where err != nil. We keep both to be future-proof.
