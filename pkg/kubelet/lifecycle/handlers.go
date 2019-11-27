@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	v1 "k8s.io/api/core/v1"
@@ -105,6 +106,20 @@ func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int
 	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
 }
 
+// formatURL formats a URL from args.
+func formatURL(scheme string, host string, port int, path string) *url.URL {
+	u, err := url.Parse(path)
+	// Something is bustsed with the path, but it's too late to reject it. Pass it along as is.
+	if err != nil {
+		u = &url.URL{
+			Path: path,
+		}
+	}
+	u.Scheme = scheme
+	u.Host = net.JoinHostPort(host, strconv.Itoa(port))
+	return u
+}
+
 func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler) (string, error) {
 	host := handler.HTTPGet.Host
 	if len(host) == 0 {
@@ -128,9 +143,10 @@ func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 			return "", err
 		}
 	}
-	url := fmt.Sprintf("http://%s/%s", net.JoinHostPort(host, strconv.Itoa(port)), handler.HTTPGet.Path)
-	resp, err := hr.httpGetter.Get(url)
-	return getHTTPRespBody(resp), err
+	path := handler.HTTPGet.Path
+	url := formatURL("http", host, port, path)
+	resp, err := hr.httpGetter.Get(url.String())
+	return getHttpRespBody(resp), err
 }
 
 func getHTTPRespBody(resp *http.Response) string {
