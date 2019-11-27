@@ -57,7 +57,7 @@ var (
 	DefaultFlowSchemaExempt = NewFSAllGroups(
 		rmv1a1.FlowSchemaNameExempt,
 		rmv1a1.PriorityLevelConfigurationNameExempt,
-		1500, "",
+		0, "",
 		user.SystemPrivilegedGroup,
 	)
 	DefaultFlowSchemaDefault = NewFSAllGroups(
