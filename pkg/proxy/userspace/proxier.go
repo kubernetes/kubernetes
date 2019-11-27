@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/conntrack"
 	"k8s.io/kubernetes/pkg/util/iptables"
 	utilexec "k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 )
 
 type portal struct {
@@ -127,7 +128,7 @@ type Proxier struct {
 	listenIP        net.IP
 	iptables        iptables.Interface
 	hostIP          net.IP
-	localAddrs      []net.IP
+	localAddrs      netutils.IPSet
 	proxyPorts      PortAllocator
 	makeProxySocket ProxySocketFunc
 	exec            utilexec.Interface
@@ -378,7 +379,10 @@ func (proxier *Proxier) syncProxyRules() {
 	} else if len(localAddrs) == 0 {
 		klog.Warning("No local addresses were found, assuming all external IPs are not local")
 	}
-	proxier.localAddrs = localAddrs
+
+	localAddrSet := netutils.IPSet{}
+	localAddrSet.Insert(localAddrs...)
+	proxier.localAddrs = localAddrSet
 
 	proxier.ensurePortals()
 	proxier.cleanupStaleStickySessions()
@@ -734,7 +738,7 @@ func (proxier *Proxier) openPortal(service proxy.ServicePortName, info *ServiceI
 }
 
 func (proxier *Proxier) openOnePortal(portal portal, protocol v1.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) error {
-	if len(proxier.localAddrs) > 0 && utilproxy.ContainsIP(proxier.localAddrs, portal.ip) {
+	if proxier.localAddrs.Len() > 0 && proxier.localAddrs.Has(portal.ip) {
 		err := proxier.claimNodePort(portal.ip, portal.port, protocol, name)
 		if err != nil {
 			return err
@@ -910,7 +914,7 @@ func (proxier *Proxier) closePortal(service proxy.ServicePortName, info *Service
 
 func (proxier *Proxier) closeOnePortal(portal portal, protocol v1.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) []error {
 	el := []error{}
-	if len(proxier.localAddrs) > 0 && utilproxy.ContainsIP(proxier.localAddrs, portal.ip) {
+	if proxier.localAddrs.Len() > 0 && proxier.localAddrs.Has(portal.ip) {
 		if err := proxier.releaseNodePort(portal.ip, portal.port, protocol, name); err != nil {
 			el = append(el, err)
 		}

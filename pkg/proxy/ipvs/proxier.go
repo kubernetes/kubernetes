@@ -1016,6 +1016,9 @@ func (proxier *Proxier) syncProxyRules() {
 		klog.Warning("No local addresses found, assuming all external IPs are not local")
 	}
 
+	localAddrSet := utilnet.IPSet{}
+	localAddrSet.Insert(localAddrs...)
+
 	// We assume that if this was called, we really want to sync them,
 	// even if nothing changed in the meantime. In other words, callers are
 	// responsible for detecting no-op changes and not calling this function.
@@ -1200,7 +1203,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// If the "external" IP happens to be an IP that is local to this
 			// machine, hold the local port open so no other process can open it
 			// (because the socket might open but it would never work).
-			if len(localAddrs) > 0 && (svcInfo.Protocol() != v1.ProtocolSCTP) && utilproxy.ContainsIP(localAddrs, net.ParseIP(externalIP)) {
+			if localAddrSet.Len() > 0 && (svcInfo.Protocol() != v1.ProtocolSCTP) && localAddrSet.Has(net.ParseIP(externalIP)) {
 				// We do not start listening on SCTP ports, according to our agreement in the SCTP support KEP
 				lp := utilproxy.LocalPort{
 					Description: "externalIP for " + svcNameString,
