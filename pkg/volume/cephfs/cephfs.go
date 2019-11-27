@@ -361,7 +361,7 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 		payload[fileName] = fileProjection
 
 		writerContext := fmt.Sprintf("cephfuse:%v.keyring", cephfsVolume.id)
-		writer, err := util.NewAtomicWriter(keyringPath, writerContext)
+		writer, err := util.NewAtomicWriter(keyringPath, writerContext, nil)
 		if err != nil {
 			klog.Errorf("failed to create atomic writer: %v", err)
 			return err

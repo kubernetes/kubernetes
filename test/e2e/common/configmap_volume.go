@@ -77,6 +77,14 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		doConfigMapE2EWithoutMappings(f, true, 1001, nil)
 	})
 
+	ginkgo.It("should be consumable from pods in volume with FSGroup with file mode applied [LinuxOnly] [NodeFeature:FSGroup]", func() {
+		// Windows does not support RunAsUser / FSGroup SecurityContext options.
+		framework.SkipIfNodeOSDistroIs("windows")
+
+		mode := int32(0400)
+		doConfigMapE2EWithoutMappings(f, false, 1001, &mode)
+	})
+
 	/*
 		Release : v1.9
 		Testname: ConfigMap Volume, with mapping

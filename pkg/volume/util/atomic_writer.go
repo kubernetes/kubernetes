@@ -59,6 +59,7 @@ const (
 type AtomicWriter struct {
 	targetDir  string
 	logContext string
+	fsGroup    *int64
 }
 
 // FileProjection contains file Data and access Mode
@@ -69,13 +70,13 @@ type FileProjection struct {
 
 // NewAtomicWriter creates a new AtomicWriter configured to write to the given
 // target directory, or returns an error if the target directory does not exist.
-func NewAtomicWriter(targetDir string, logContext string) (*AtomicWriter, error) {
+func NewAtomicWriter(targetDir string, logContext string, fsGroup *int64) (*AtomicWriter, error) {
 	_, err := os.Stat(targetDir)
 	if os.IsNotExist(err) {
 		return nil, err
 	}
 
-	return &AtomicWriter{targetDir: targetDir, logContext: logContext}, nil
+	return &AtomicWriter{targetDir: targetDir, logContext: logContext, fsGroup: fsGroup}, nil
 }
 
 const (
@@ -366,6 +367,12 @@ func (w *AtomicWriter) newTimestampDir() (string, error) {
 		return "", err
 	}
 
+	err = w.chown(tsDir)
+	if err != nil {
+		klog.Errorf("%s: unable to change owner on new temp directory: %v", w.logContext, err)
+		return "", err
+	}
+
 	return tsDir, nil
 }
 
@@ -396,6 +403,13 @@ func (w *AtomicWriter) writePayloadToDir(payload map[string]FileProjection, dir 
 		err = os.Chmod(fullPath, mode)
 		if err != nil {
 			klog.Errorf("%s: unable to write file %s with mode %v: %v", w.logContext, fullPath, mode, err)
+			return err
+		}
+
+		err = w.chown(fullPath)
+		if err != nil {
+			klog.Errorf("%s: unable to update owner on file %s: %v ", w.logContext, fullPath, err)
+			return err
 		}
 	}
 

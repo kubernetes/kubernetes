@@ -215,7 +215,7 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 	}()
 
 	writerContext := fmt.Sprintf("pod %v/%v volume %v", b.pod.Namespace, b.pod.Name, b.volName)
-	writer, err := volumeutil.NewAtomicWriter(dir, writerContext)
+	writer, err := volumeutil.NewAtomicWriter(dir, writerContext, mounterArgs.FsGroup)
 	if err != nil {
 		klog.Errorf("Error creating atomic writer: %v", err)
 		return err
@@ -224,12 +224,6 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 	err = writer.Write(data)
 	if err != nil {
 		klog.Errorf("Error writing payload to dir: %v", err)
-		return err
-	}
-
-	err = volume.SetVolumeOwnership(b, mounterArgs.FsGroup)
-	if err != nil {
-		klog.Errorf("Error applying volume ownership settings for group: %v", mounterArgs.FsGroup)
 		return err
 	}
 

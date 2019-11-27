@@ -38,7 +38,7 @@ func TestNewAtomicWriter(t *testing.T) {
 	}
 	defer os.RemoveAll(targetDir)
 
-	_, err = NewAtomicWriter(targetDir, "-test-")
+	_, err = NewAtomicWriter(targetDir, "-test-", nil)
 	if err != nil {
 		t.Fatalf("unexpected error creating writer for existing target dir: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestNewAtomicWriter(t *testing.T) {
 		t.Fatalf("unexpected error ensuring dir %v does not exist: %v", nonExistentDir, err)
 	}
 
-	_, err = NewAtomicWriter(nonExistentDir, "-test-")
+	_, err = NewAtomicWriter(nonExistentDir, "-test-", nil)
 	if err == nil {
 		t.Fatalf("unexpected success creating writer for nonexistent target dir: %v", err)
 	}
