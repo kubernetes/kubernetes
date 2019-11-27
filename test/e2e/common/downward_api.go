@@ -19,7 +19,7 @@ package common
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -356,6 +356,37 @@ var _ = framework.KubeDescribe("Downward API [Serial] [Disruptive] [NodeFeature:
 		})
 	})
 
+})
+
+var _ = framework.KubeDescribe("Downward API [Serial] [Feature:IPv6DualStackAlphaFeature]", func() {
+	f := framework.NewDefaultFramework("downward-api")
+
+	ginkgo.Context("Downward API test for IPv4/IPv6 dualstack feature", func() {
+		ginkgo.It("should provide pod IPs as an env var if dualstack cluster [LinuxOnly] [Feature:IPv6DualStackAlphaFeature:Phase3]", func() {
+			podName := "downward-api-" + string(uuid.NewUUID())
+			env := []v1.EnvVar{
+				{
+					Name: "POD_IPS",
+					ValueFrom: &v1.EnvVarSource{
+						FieldRef: &v1.ObjectFieldSelector{
+							APIVersion: "v1",
+							FieldPath:  "status.podIPs",
+						},
+					},
+				},
+			}
+
+			a := []interface{}{e2enetwork.RegexIPv4, e2enetwork.RegexIPv6}
+			if framework.TestContext.ClusterIsIPv6() {
+				a = []interface{}{e2enetwork.RegexIPv6, e2enetwork.RegexIPv4}
+			}
+			expectations := []string{
+				fmt.Sprintf("POD_IPS=%v,%v", a...),
+			}
+
+			testDownwardAPI(f, podName, env, expectations)
+		})
+	})
 })
 
 func testDownwardAPI(f *framework.Framework, podName string, env []v1.EnvVar, expectations []string) {
