@@ -780,7 +780,9 @@ function Configure-HostNetworkingService {
     netsh interface ipv4 set interface "${vnic_name}" forwarding=enabled
   }
 
-  Get-HNSPolicyList | Remove-HnsPolicyList
+  Try {
+    Get-HNSPolicyList | Remove-HnsPolicyList
+  } Catch { }
 
   # Add a route from the management NIC to the pod CIDR.
   #
