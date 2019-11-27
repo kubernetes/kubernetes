@@ -347,7 +347,7 @@ func isBackendPoolOnSameLB(newBackendPoolID string, existingBackendPools []strin
 	}
 
 	newLBName := matches[1]
-	newLBNameTrimmed := strings.TrimRight(newLBName, InternalLoadBalancerNameSuffix)
+	newLBNameTrimmed := strings.TrimSuffix(newLBName, InternalLoadBalancerNameSuffix)
 	for _, backendPool := range existingBackendPools {
 		matches := backendPoolIDRE.FindStringSubmatch(backendPool)
 		if len(matches) != 2 {
@@ -355,7 +355,7 @@ func isBackendPoolOnSameLB(newBackendPoolID string, existingBackendPools []strin
 		}
 
 		lbName := matches[1]
-		if !strings.EqualFold(strings.TrimRight(lbName, InternalLoadBalancerNameSuffix), newLBNameTrimmed) {
+		if !strings.EqualFold(strings.TrimSuffix(lbName, InternalLoadBalancerNameSuffix), newLBNameTrimmed) {
 			return false, lbName, nil
 		}
 	}
