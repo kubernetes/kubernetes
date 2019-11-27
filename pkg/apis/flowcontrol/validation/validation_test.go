@@ -997,6 +997,18 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			expectedErrors: field.ErrorList{field.Invalid(field.NewPath("spec"), badSpec, "spec of 'exempt' must equal the fixed value")},
 		},
 		{
+			name: "limited requires more details",
+			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "broken-limited",
+				},
+				Spec: flowcontrol.PriorityLevelConfigurationSpec{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+				},
+			},
+			expectedErrors: field.ErrorList{field.Required(field.NewPath("spec").Child("limited"), "must not be empty when type is Limited")},
+		},
+		{
 			name: "max-in-flight should work",
 			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1014,7 +1026,27 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			expectedErrors: field.ErrorList{},
 		},
 		{
-			name: "wrong backstop should fail",
+			name: "forbid queuing details when not queuing",
+			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo",
+				},
+				Spec: flowcontrol.PriorityLevelConfigurationSpec{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+						AssuredConcurrencyShares: 100,
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeReject,
+							Queuing: &flowcontrol.QueuingConfiguration{
+								Queues:           512,
+								HandSize:         4,
+								QueueLengthLimit: 100,
+							}}}},
+			},
+			expectedErrors: field.ErrorList{field.Forbidden(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing"), "must be nil if limited.limitResponse.type is not Limited")},
+		},
+		{
+			name: "wrong backstop spec should fail",
 			priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: flowcontrol.PriorityLevelConfigurationNameCatchAll,
