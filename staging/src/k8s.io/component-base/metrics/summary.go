@@ -44,7 +44,7 @@ func NewSummary(opts *SummaryOpts) *Summary {
 		lazyMetric:  lazyMetric{},
 	}
 	s.setPrometheusSummary(noopMetric{})
-	s.lazyInit(s)
+	s.lazyInit(s, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return s
 }
 
@@ -98,7 +98,7 @@ func NewSummaryVec(opts *SummaryOpts, labels []string) *SummaryVec {
 		originalLabels: labels,
 		lazyMetric:     lazyMetric{},
 	}
-	v.lazyInit(v)
+	v.lazyInit(v, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return v
 }
 
