@@ -752,6 +752,7 @@ func newReconciler(client *fake.Clientset, nodes []*corev1.Node, maxEndpointsPer
 		client:               client,
 		nodeLister:           corelisters.NewNodeLister(indexer),
 		maxEndpointsPerSlice: maxEndpointsPerSlice,
+		endpointSliceTracker: newEndpointSliceTracker(),
 		metricsCache:         metrics.NewCache(maxEndpointsPerSlice),
 	}
 }

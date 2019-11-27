@@ -310,6 +310,49 @@ func TestPodChangedWithPodEndpointChanged(t *testing.T) {
 	newPod.ObjectMeta.DeletionTimestamp = oldPod.ObjectMeta.DeletionTimestamp.DeepCopy()
 }
 
+func TestServiceControllerKey(t *testing.T) {
+	testCases := map[string]struct {
+		endpointSlice *discovery.EndpointSlice
+		expectedKey   string
+		expectedErr   error
+	}{
+		"nil EndpointSlice": {
+			endpointSlice: nil,
+			expectedKey:   "",
+			expectedErr:   fmt.Errorf("nil EndpointSlice passed to serviceControllerKey()"),
+		},
+		"empty EndpointSlice": {
+			endpointSlice: &discovery.EndpointSlice{},
+			expectedKey:   "",
+			expectedErr:   fmt.Errorf("EndpointSlice missing kubernetes.io/service-name label"),
+		},
+		"valid EndpointSlice": {
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Labels: map[string]string{
+						discovery.LabelServiceName: "svc",
+					},
+				},
+			},
+			expectedKey: "ns/svc",
+			expectedErr: nil,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			actualKey, actualErr := serviceControllerKey(tc.endpointSlice)
+			if !reflect.DeepEqual(actualErr, tc.expectedErr) {
+				t.Errorf("Expected %s, got %s", tc.expectedErr, actualErr)
+			}
+			if actualKey != tc.expectedKey {
+				t.Errorf("Expected %s, got %s", tc.expectedKey, actualKey)
+			}
+		})
+	}
+}
+
 // Test helpers
 
 func newPod(n int, namespace string, ready bool, nPorts int) *v1.Pod {
