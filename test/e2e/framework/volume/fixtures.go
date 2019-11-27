@@ -51,7 +51,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -419,7 +418,7 @@ func CleanUpVolumeServerWithSecret(f *framework.Framework, serverPod *v1.Pod, se
 		}
 	}
 
-	e2elog.Logf("Deleting server pod %q...", serverPod.Name)
+	framework.Logf("Deleting server pod %q...", serverPod.Name)
 	err := e2epod.DeletePodWithWait(cs, serverPod)
 	if err != nil {
 		framework.Logf("Server pod delete failed: %v", err)

@@ -5,7 +5,7 @@ go_library(
     srcs = ["testfiles.go"],
     importpath = "k8s.io/kubernetes/test/e2e/framework/testfiles",
     visibility = ["//visibility:public"],
-    deps = ["//test/e2e/framework/log:go_default_library"],
+    deps = ["//test/e2e/framework:go_default_library"],
 )
 
 filegroup(
