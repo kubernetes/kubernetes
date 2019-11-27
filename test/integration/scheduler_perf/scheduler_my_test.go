@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"testing"
-	"time"
 
 	"k8s.io/klog"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -37,7 +36,6 @@ func TestBenchmarkScheduling(t *testing.T) {
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("rc1")
 	testStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("rc2")
 
-	histograms := make(histogramSet, 0)
 	dataItems := DataItems{
 		Version: "v1",
 	}
@@ -45,42 +43,20 @@ func TestBenchmarkScheduling(t *testing.T) {
 	for _, test := range tests {
 		name := fmt.Sprintf("%vNodes_%vExistingPods_%vPods", test.nodes, test.existingPods, test.minPods)
 		klog.Infof("Running %q\n", name)
+		// for i := 0; i < 10; i++ {
 		benchmarkScheduling(test.nodes, test.existingPods, test.minPods, defaultNodeStrategy, setupStrategy, testStrategy, &testing.B{})
+		// }
 		metrics := []string{
 			"scheduler_scheduling_algorithm_predicate_evaluation_seconds",
 			"scheduler_scheduling_algorithm_priority_evaluation_seconds",
 			"scheduler_scheduling_algorithm_preemption_evaluation_seconds",
 			"scheduler_binding_duration_seconds",
 		}
-		histograms[name] = collectRelativeMetrics(metrics)
 
-		for _, metricName := range metrics {
-			// Set scheduler_scheduling_algorithm_preemption_evaluation_seconds only when enabled.
-			// Otherwise, the values are -inf.
-			q50 := bucketQuantile(0.50, histograms[name][metricName].buckets)
-			q90 := bucketQuantile(0.90, histograms[name][metricName].buckets)
-			q99 := bucketQuantile(0.95, histograms[name][metricName].buckets)
-
-			latency := LatencyMetric{
-				Perc50: time.Duration(int64(q50 * float64(time.Second))),
-				Perc90: time.Duration(int64(q90 * float64(time.Second))),
-				Perc99: time.Duration(int64(q99 * float64(time.Second))),
-			}
-
-			dataItem := latency.ToPerfData(metricName)
-			dataItem.Labels["Name"] = name
-			dataItems.DataItems = append(dataItems.DataItems, dataItem)
-		}
+		dataItems.DataItems = append(dataItems.DataItems, metrics2dataItems(metrics, map[string]string{"Name": name})...)
 	}
 
 	b, _ := json.Marshal(dataItems)
-	fmt.Printf("dataItems: %v\n", string(b))
-	ioutil.WriteFile(fmt.Sprintf("SchedulingMetrics_density_%v.json", time.Now().Format("2006-01-02T15:04:05Z")), b, 0644)
-
-	// fmt.Printf("histograms: %#v\n", histograms)
-
-	// ioutil.WriteFile("scheduler_pod_scheduling_duration_seconds.dat", []byte(histograms.string("scheduler_pod_scheduling_duration_seconds")), 0644)
-	// ioutil.WriteFile("scheduler_e2e_scheduling_duration_seconds.dat", []byte(histograms.string("scheduler_e2e_scheduling_duration_seconds")), 0644)
-	// ioutil.WriteFile("scheduler_scheduling_algorithm_duration_seconds.dat", []byte(histograms.string("scheduler_scheduling_algorithm_duration_seconds")), 0644)
-	// ioutil.WriteFile("scheduler_binding_duration_seconds.dat", []byte(histograms.string("scheduler_binding_duration_seconds")), 0644)
+	// ioutil.WriteFile(fmt.Sprintf("SchedulingMetrics_density_%v.json", time.Now().Format("2006-01-02T15:04:05Z")), b, 0644)
+	ioutil.WriteFile("SchedulingMetrics_density.json", b, 0644)
 }

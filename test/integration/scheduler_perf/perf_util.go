@@ -1,13 +1,13 @@
 package benchmark
 
 import (
-	"fmt"
 	"math"
 	"sort"
-	"strings"
 	"time"
 
 	"k8s.io/component-base/metrics/legacyregistry"
+
+	dto "github.com/prometheus/client_model/go"
 )
 
 // LatencyMetric represent 50th, 90th and 99th duration quantiles.
@@ -190,124 +190,71 @@ func ensureMonotonic(buckets buckets) {
 	}
 }
 
-type histogram struct {
-	sampleCount uint64
-	sampleSum   float64
-	buckets     []bucket
-}
+func promHist2LatencyMetric(hist *dto.Histogram) *LatencyMetric {
+	buckets := []bucket{}
 
-func (h *histogram) string() string {
-	var lines []string
-	var last float64
-	for _, b := range h.buckets {
-		lines = append(lines, fmt.Sprintf("%v %v", b.upperBound, b.count-last))
-		last = b.count
-	}
-	return strings.Join(lines, "\n")
-}
-
-func (h *histogram) subtract(y *histogram) {
-	h.sampleCount -= y.sampleCount
-	h.sampleSum -= y.sampleSum
-	for i := range h.buckets {
-		h.buckets[i].count -= y.buckets[i].count
-	}
-}
-
-func (h *histogram) deepCopy() *histogram {
-	var buckets []bucket
-	for _, b := range h.buckets {
+	for _, bckt := range hist.Bucket {
+		b := bucket{
+			count:      float64(*bckt.CumulativeCount),
+			upperBound: *bckt.UpperBound,
+		}
 		buckets = append(buckets, b)
 	}
-	return &histogram{
-		sampleCount: h.sampleCount,
-		sampleSum:   h.sampleSum,
-		buckets:     buckets,
+
+	q50 := bucketQuantile(0.50, buckets)
+	q90 := bucketQuantile(0.90, buckets)
+	q99 := bucketQuantile(0.95, buckets)
+
+	return &LatencyMetric{
+		Perc50: time.Duration(int64(q50 * float64(time.Second))),
+		Perc90: time.Duration(int64(q90 * float64(time.Second))),
+		Perc99: time.Duration(int64(q99 * float64(time.Second))),
 	}
 }
 
-type histogramSet map[string]map[string]*histogram
-
-func (hs histogramSet) string(metricName string) string {
-	sets := make(map[string][]float64)
-	names := []string{}
-	labels := []string{}
-	hLen := 0
-	for name, h := range hs {
-		sets[name] = []float64{}
-		names = append(names, name)
-		var last float64
-		for _, b := range h[metricName].buckets {
-			sets[name] = append(sets[name], b.count-last)
-			last = b.count
-			if hLen == 0 {
-				labels = append(labels, fmt.Sprintf("%v", b.upperBound))
-			}
-		}
-
-		hLen = len(h[metricName].buckets)
+func clearPromHistogram(hist *dto.Histogram) {
+	if hist.SampleCount != nil {
+		*hist.SampleCount = 0
 	}
-
-	sort.Strings(names)
-
-	lines := []string{"# " + strings.Join(names, " ")}
-	for i := 0; i < hLen; i++ {
-		counts := []string{}
-		for _, name := range names {
-			counts = append(counts, fmt.Sprintf("%v", sets[name][i]))
-		}
-		lines = append(lines, fmt.Sprintf("%v %v", labels[i], strings.Join(counts, " ")))
+	if hist.SampleSum != nil {
+		*hist.SampleSum = 0
 	}
-
-	return strings.Join(lines, "\n")
+	for _, b := range hist.Bucket {
+		if b.CumulativeCount != nil {
+			*b.CumulativeCount = 0
+		}
+		if b.UpperBound != nil {
+			*b.UpperBound = 0
+		}
+	}
 }
 
-var prevHistogram = make(map[string]*histogram)
+func metrics2dataItems(metrics []string, labels map[string]string) []DataItem {
+	dataItems := []DataItem{}
 
-func collectRelativeMetrics(metrics []string) map[string]*histogram {
-	rh := make(map[string]*histogram)
+	cache := make(map[string]*dto.MetricFamily)
+
 	m, _ := legacyregistry.DefaultGatherer.Gather()
 	for _, mFamily := range m {
 		if mFamily.Name == nil {
 			continue
 		}
-		if !strings.HasPrefix(*mFamily.Name, "scheduler") {
-			continue
-		}
-
-		metricFound := false
-		for _, metricsName := range metrics {
-			if *mFamily.Name == metricsName {
-				metricFound = true
-				break
-			}
-		}
-
-		if !metricFound {
-			continue
-		}
-
-		hist := mFamily.GetMetric()[0].GetHistogram()
-		h := &histogram{
-			sampleCount: *hist.SampleCount,
-			sampleSum:   *hist.SampleSum,
-		}
-
-		for _, bckt := range hist.Bucket {
-			b := bucket{
-				count:      float64(*bckt.CumulativeCount),
-				upperBound: *bckt.UpperBound,
-			}
-			h.buckets = append(h.buckets, b)
-		}
-
-		rh[*mFamily.Name] = h.deepCopy()
-		if prevHistogram[*mFamily.Name] != nil {
-			rh[*mFamily.Name].subtract(prevHistogram[*mFamily.Name])
-		}
-		prevHistogram[*mFamily.Name] = h
-
+		cache[*mFamily.Name] = mFamily
 	}
 
-	return rh
+	for _, metricName := range metrics {
+		if _, exists := cache[metricName]; !exists {
+			continue
+		}
+		dataItem := promHist2LatencyMetric(cache[metricName].GetMetric()[0].GetHistogram()).ToPerfData(metricName)
+		for key, value := range labels {
+			dataItem.Labels[key] = value
+		}
+		dataItems = append(dataItems, dataItem)
+
+		// clear the metrics since it's shared among all tests run inside the same binary
+		clearPromHistogram(cache[metricName].GetMetric()[0].GetHistogram())
+	}
+
+	return dataItems
 }
