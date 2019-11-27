@@ -81,11 +81,6 @@ var (
 	predicateMetadataProducerFactory PredicateMetadataProducerFactory
 )
 
-const (
-	// DefaultProvider defines the default algorithm provider name.
-	DefaultProvider = "DefaultProvider"
-)
-
 // AlgorithmProviderConfig is used to store the configuration of algorithm providers.
 type AlgorithmProviderConfig struct {
 	FitPredicateKeys     sets.String

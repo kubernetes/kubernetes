@@ -240,7 +240,7 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 	RegisterFitPredicate("PredicateOne", PredicateFunc)
 	RegisterPriorityMapReduceFunction("PriorityOne", PriorityFunc, nil, 1)
 
-	RegisterAlgorithmProvider(DefaultProvider, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
+	RegisterAlgorithmProvider(schedulerapi.SchedulerDefaultProviderName, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
 
 	configData := []byte(`{
 		"kind" : "Policy",
@@ -256,10 +256,10 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 		t.Fatalf("Failed to create scheduler from configuration: %v", err)
 	}
 	if _, found := c.Algorithm.Predicates()["PredicateOne"]; !found {
-		t.Errorf("Expected predicate PredicateOne from %q", DefaultProvider)
+		t.Errorf("Expected predicate PredicateOne from %q", schedulerapi.SchedulerDefaultProviderName)
 	}
 	if len(c.Algorithm.Prioritizers()) != 1 || c.Algorithm.Prioritizers()[0].Name != "PriorityOne" {
-		t.Errorf("Expected priority PriorityOne from %q", DefaultProvider)
+		t.Errorf("Expected priority PriorityOne from %q", schedulerapi.SchedulerDefaultProviderName)
 	}
 }
 
@@ -275,7 +275,7 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 	RegisterFitPredicate("PredicateOne", PredicateFunc)
 	RegisterPriorityMapReduceFunction("PriorityOne", PriorityFunc, nil, 1)
 
-	RegisterAlgorithmProvider(DefaultProvider, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
+	RegisterAlgorithmProvider(schedulerapi.SchedulerDefaultProviderName, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
 
 	configData := []byte(`{
 		"kind" : "Policy",

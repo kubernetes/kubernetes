@@ -17,7 +17,10 @@ go_test(
     name = "go_default_test",
     srcs = ["plugins_test.go"],
     embed = [":go_default_library"],
-    deps = ["//pkg/scheduler:go_default_library"],
+    deps = [
+        "//pkg/scheduler:go_default_library",
+        "//pkg/scheduler/apis/config:go_default_library",
+    ],
 )
 
 filegroup(

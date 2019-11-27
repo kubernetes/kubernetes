@@ -119,7 +119,7 @@ func (c *Configurator) GetHardPodAffinitySymmetricWeight() int32 {
 
 // Create creates a scheduler with the default algorithm provider.
 func (c *Configurator) Create() (*Scheduler, error) {
-	return c.CreateFromProvider(DefaultProvider)
+	return c.CreateFromProvider(schedulerapi.SchedulerDefaultProviderName)
 }
 
 // CreateFromProvider creates a scheduler from the name of a registered algorithm provider.
@@ -143,8 +143,8 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Scheduler,
 
 	predicateKeys := sets.NewString()
 	if policy.Predicates == nil {
-		klog.V(2).Infof("Using predicates from algorithm provider '%v'", DefaultProvider)
-		provider, err := GetAlgorithmProvider(DefaultProvider)
+		klog.V(2).Infof("Using predicates from algorithm provider '%v'", schedulerapi.SchedulerDefaultProviderName)
+		provider, err := GetAlgorithmProvider(schedulerapi.SchedulerDefaultProviderName)
 		if err != nil {
 			return nil, err
 		}
@@ -158,8 +158,8 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Scheduler,
 
 	priorityKeys := sets.NewString()
 	if policy.Priorities == nil {
-		klog.V(2).Infof("Using priorities from algorithm provider '%v'", DefaultProvider)
-		provider, err := GetAlgorithmProvider(DefaultProvider)
+		klog.V(2).Infof("Using priorities from algorithm provider '%v'", schedulerapi.SchedulerDefaultProviderName)
+		provider, err := GetAlgorithmProvider(schedulerapi.SchedulerDefaultProviderName)
 		if err != nil {
 			return nil, err
 		}
