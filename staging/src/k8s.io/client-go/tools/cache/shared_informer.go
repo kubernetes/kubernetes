@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -190,6 +191,13 @@ const (
 	initialBufferSize = 1024
 )
 
+// WaitForNamedCacheSyncWithContext is a wrapper around WaitForCacheSyncWithContext that generates log messages
+// indicating that the caller identified by name is waiting for syncs, followed by
+// either a successful or failed sync.
+func WaitForNamedCacheSyncWithContext(ctx context.Context, controllerName string, cacheSyncs ...InformerSynced) bool {
+	return WaitForNamedCacheSync(controllerName, ctx.Done(), cacheSyncs...)
+}
+
 // WaitForNamedCacheSync is a wrapper around WaitForCacheSync that generates log messages
 // indicating that the caller identified by name is waiting for syncs, followed by
 // either a successful or failed sync.
@@ -203,6 +211,12 @@ func WaitForNamedCacheSync(controllerName string, stopCh <-chan struct{}, cacheS
 
 	klog.Infof("Caches are synced for %s ", controllerName)
 	return true
+}
+
+// WaitForCacheSyncWithContext waits for caches to populate.  It returns true if it was successful, false
+// if the controller should shutdown
+func WaitForCacheSyncWithContext(ctx context.Context, cacheSyncs ...InformerSynced) bool {
+	return WaitForCacheSync(ctx.Done(), cacheSyncs...)
 }
 
 // WaitForCacheSync waits for caches to populate.  It returns true if it was successful, false
