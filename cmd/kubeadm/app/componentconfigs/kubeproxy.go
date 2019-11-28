@@ -47,7 +47,7 @@ var kubeProxyHandler = handler{
 }
 
 func kubeProxyConfigFromCluster(h *handler, clientset clientset.Interface, _ *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, error) {
-	return h.fromConfigMap(clientset, kubeadmconstants.KubeProxyConfigMap, kubeadmconstants.KubeProxyConfigMapKey, false)
+	return h.fromConfigMap(clientset, kubeadmconstants.KubeProxyConfigMap, kubeadmconstants.KubeProxyConfigMapKey)
 }
 
 // kubeProxyConfig implements the kubeadmapi.ComponentConfig interface for kube-proxy
@@ -111,4 +111,9 @@ func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAP
 	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {
 		kp.config.FeatureGates[features.IPv6DualStack] = enabled
 	}
+}
+
+func (*kubeProxyConfig) UserSupplied() bool {
+	// This is not applicable to addon component configs, hence we always return true here as this is safer
+	return true
 }

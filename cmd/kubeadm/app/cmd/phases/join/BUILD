@@ -31,7 +31,6 @@ go_library(
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd/api:go_default_library",

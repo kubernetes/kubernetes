@@ -47,7 +47,8 @@ var kubeletMarshalCases = []struct {
 	{
 		name: "Empty config",
 		obj: &kubeletConfig{
-			config: kubeletconfig.KubeletConfiguration{},
+			userSupplied: true,
+			config:       kubeletconfig.KubeletConfiguration{},
 		},
 		yaml: dedent.Dedent(`
 			apiVersion: kubelet.config.k8s.io/v1beta1
@@ -77,6 +78,7 @@ var kubeletMarshalCases = []struct {
 	{
 		name: "Non empty config",
 		obj: &kubeletConfig{
+			userSupplied: true,
 			config: kubeletconfig.KubeletConfiguration{
 				Address:            "1.2.3.4",
 				Port:               12345,
@@ -383,6 +385,7 @@ func runKubeletFromTest(t *testing.T, perform func(t *testing.T, in string) (kub
 				rotateCertificates: true
 			`),
 			out: &kubeletConfig{
+				userSupplied: true,
 				config: kubeletconfig.KubeletConfiguration{
 					TypeMeta: metav1.TypeMeta{
 						APIVersion: kubeletHandler.GroupVersion.String(),
@@ -407,6 +410,7 @@ func runKubeletFromTest(t *testing.T, perform func(t *testing.T, in string) (kub
 				rotateCertificates: true
 			`),
 			out: &kubeletConfig{
+				userSupplied: true,
 				config: kubeletconfig.KubeletConfiguration{
 					TypeMeta: metav1.TypeMeta{
 						APIVersion: kubeletHandler.GroupVersion.String(),

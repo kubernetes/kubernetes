@@ -22,7 +22,6 @@ import (
 
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
@@ -118,23 +117,13 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 		}
 	}
 
-	kubeletVersion, err := version.ParseSemantic(initCfg.ClusterConfiguration.KubernetesVersion)
-	if err != nil {
-		return err
-	}
-
-	bootstrapClient, err := kubeconfigutil.ClientSetFromFile(bootstrapKubeConfigFile)
-	if err != nil {
-		return errors.Errorf("couldn't create client from kubeconfig file %q", bootstrapKubeConfigFile)
-	}
-
 	// Configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
 	// Try to stop the kubelet service so no race conditions occur when configuring it
 	klog.V(1).Infoln("[kubelet-start] Stopping the kubelet")
 	kubeletphase.TryStopKubelet()
 
 	// Write the configuration for the kubelet (using the bootstrap token credentials) to disk so the kubelet can start
-	if err := kubeletphase.DownloadConfig(bootstrapClient, kubeletVersion, kubeadmconstants.KubeletRunDirectory); err != nil {
+	if err := kubeletphase.WriteConfigToDisk(&initCfg.ClusterConfiguration, kubeadmconstants.KubeletRunDirectory); err != nil {
 		return err
 	}
 

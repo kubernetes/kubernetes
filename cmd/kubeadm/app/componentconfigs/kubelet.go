@@ -69,16 +69,19 @@ func kubeletConfigFromCluster(h *handler, clientset clientset.Interface, cluster
 	}
 
 	configMapName := constants.GetKubeletConfigMapName(k8sVersion)
-	return h.fromConfigMap(clientset, configMapName, constants.KubeletBaseConfigurationConfigMapKey, true)
+	return h.fromConfigMap(clientset, configMapName, constants.KubeletBaseConfigurationConfigMapKey)
 }
 
 // kubeletConfig implements the kubeadmapi.ComponentConfig interface for kubelet
 type kubeletConfig struct {
-	config kubeletconfig.KubeletConfiguration
+	userSupplied bool
+	config       kubeletconfig.KubeletConfiguration
 }
 
 func (kc *kubeletConfig) DeepCopy() kubeadmapi.ComponentConfig {
-	result := &kubeletConfig{}
+	result := &kubeletConfig{
+		userSupplied: kc.userSupplied,
+	}
 	kc.config.DeepCopyInto(&result.config)
 	return result
 }
@@ -88,7 +91,13 @@ func (kc *kubeletConfig) Marshal() ([]byte, error) {
 }
 
 func (kc *kubeletConfig) Unmarshal(docmap kubeadmapi.DocumentMap) error {
-	return kubeletHandler.Unmarshal(docmap, &kc.config)
+	if err := kubeletHandler.Unmarshal(docmap, &kc.config); err != nil {
+		return err
+	}
+
+	// If we have successfully unmarshalled something, then this is no longer a generated config
+	kc.userSupplied = true
+	return nil
 }
 
 func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubeadmapi.APIEndpoint) {
@@ -173,4 +182,8 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 	// We cannot show a warning for RotateCertificates==false and we must hardcode it to true.
 	// There is no way to determine if the user has set this or not, given the field is a non-pointer.
 	kc.config.RotateCertificates = kubeletRotateCertificates
+}
+
+func (kc *kubeletConfig) UserSupplied() bool {
+	return kc.userSupplied
 }

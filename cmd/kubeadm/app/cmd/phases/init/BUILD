@@ -27,7 +27,6 @@ go_library(
         "//cmd/kubeadm/app/cmd/options:go_default_library",
         "//cmd/kubeadm/app/cmd/phases/workflow:go_default_library",
         "//cmd/kubeadm/app/cmd/util:go_default_library",
-        "//cmd/kubeadm/app/componentconfigs:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/phases/addons/dns:go_default_library",
         "//cmd/kubeadm/app/phases/addons/proxy:go_default_library",
