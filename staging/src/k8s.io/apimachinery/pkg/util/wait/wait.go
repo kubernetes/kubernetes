@@ -311,13 +311,13 @@ func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
 //
 // If you want to Poll something forever, see PollInfinite.
 func Poll(interval, timeout time.Duration, condition ConditionFunc) error {
-	return pollInternal(poller(interval, timeout), condition)
+	return pollInternalWithContext(pollerWithContext(interval, timeout), condition)
 }
 
-func pollInternal(wait WaitFunc, condition ConditionFunc) error {
-	done := make(chan struct{})
-	defer close(done)
-	return WaitFor(wait, condition, done)
+func pollInternalWithContext(wait WaitWithContextFunc, condition ConditionFunc) error {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+	return WaitForWithContext(ctx, wait, condition)
 }
 
 // PollImmediate tries a condition func until it returns true, an error, or the timeout
@@ -331,10 +331,10 @@ func pollInternal(wait WaitFunc, condition ConditionFunc) error {
 //
 // If you want to immediately Poll something forever, see PollImmediateInfinite.
 func PollImmediate(interval, timeout time.Duration, condition ConditionFunc) error {
-	return pollImmediateInternal(poller(interval, timeout), condition)
+	return pollImmediateInternalWithContext(pollerWithContext(interval, timeout), condition)
 }
 
-func pollImmediateInternal(wait WaitFunc, condition ConditionFunc) error {
+func pollImmediateInternalWithContext(wait WaitWithContextFunc, condition ConditionFunc) error {
 	done, err := condition()
 	if err != nil {
 		return err
@@ -342,7 +342,7 @@ func pollImmediateInternal(wait WaitFunc, condition ConditionFunc) error {
 	if done {
 		return nil
 	}
-	return pollInternal(wait, condition)
+	return pollInternalWithContext(wait, condition)
 }
 
 // PollInfinite tries a condition func until it returns true or an error
@@ -352,9 +352,9 @@ func pollImmediateInternal(wait WaitFunc, condition ConditionFunc) error {
 // Some intervals may be missed if the condition takes too long or the time
 // window is too short.
 func PollInfinite(interval time.Duration, condition ConditionFunc) error {
-	done := make(chan struct{})
-	defer close(done)
-	return PollUntil(interval, condition, done)
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+	return PollUntilWithContext(ctx, interval, condition)
 }
 
 // PollImmediateInfinite tries a condition func until it returns true or an error
@@ -374,22 +374,32 @@ func PollImmediateInfinite(interval time.Duration, condition ConditionFunc) erro
 	return PollInfinite(interval, condition)
 }
 
+// PollUntilWithContext tries a condition func until it returns true, an error or context is
+// done.
+//
+// PollUntil always waits interval before the first run of 'condition'.
+// 'condition' will always be invoked at least once.
+func PollUntilWithContext(ctx context.Context, interval time.Duration, condition ConditionFunc) error {
+	return WaitForWithContext(ctx, pollerWithContext(interval, 0), condition)
+}
+
 // PollUntil tries a condition func until it returns true, an error or stopCh is
 // closed.
 //
 // PollUntil always waits interval before the first run of 'condition'.
 // 'condition' will always be invoked at least once.
+// DEPRECATED: Use the PollUntilWithContext instead
 func PollUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
 	ctx, cancel := contextForChannel(stopCh)
 	defer cancel()
-	return WaitFor(poller(interval, 0), condition, ctx.Done())
+	return PollUntilWithContext(ctx, interval, condition)
 }
 
-// PollImmediateUntil tries a condition func until it returns true, an error or stopCh is closed.
+// PollImmediateUntilWithContext tries a condition func until it returns true, an error or context is done.
 //
-// PollImmediateUntil runs the 'condition' before waiting for the interval.
+// PollImmediateUntilWithContext runs the 'condition' before waiting for the interval.
 // 'condition' will always be invoked at least once.
-func PollImmediateUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
+func PollImmediateUntilWithContext(ctx context.Context, interval time.Duration, condition ConditionFunc) error {
 	done, err := condition()
 	if err != nil {
 		return err
@@ -398,10 +408,59 @@ func PollImmediateUntil(interval time.Duration, condition ConditionFunc, stopCh 
 		return nil
 	}
 	select {
-	case <-stopCh:
+	case <-ctx.Done():
 		return ErrWaitTimeout
 	default:
-		return PollUntil(interval, condition, stopCh)
+		return PollUntilWithContext(ctx, interval, condition)
+	}
+}
+
+// PollImmediateUntil tries a condition func until it returns true, an error or stopCh is closed.
+//
+// PollImmediateUntil runs the 'condition' before waiting for the interval.
+// 'condition' will always be invoked at least once.
+// DEPRECATED: Use the PollImmediateUntilWithContext instead
+func PollImmediateUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
+	ctx, _ := contextForChannel(stopCh)
+	return PollImmediateUntilWithContext(ctx, interval, condition)
+}
+
+// WaitWithContextFunc creates a channel that receives an item every time a test
+// should be executed and is closed when the last test should be invoked.
+// The context passed to the wait function can be used to detect parent context deadline.
+type WaitWithContextFunc func(ctx context.Context) <-chan struct{}
+
+// WaitForWithContext continually checks 'fn' as driven by 'wait'.
+//
+// WaitForWithContext gets a channel from 'wait()'', and then invokes 'fn' once for every value
+// placed on the channel and once more when the channel is closed. If the channel is closed
+// and 'fn' returns false without error, WaitForWithContext returns ErrWaitTimeout.
+//
+// If 'fn' returns an error the loop ends and that error is returned. If
+// 'fn' returns true the loop ends and nil is returned.
+//
+// ErrWaitTimeout will be returned if the context is done without fn ever
+// returning true.
+func WaitForWithContext(ctx context.Context, wait WaitWithContextFunc, fn ConditionFunc) error {
+	stopCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	c := wait(stopCtx)
+	for {
+		select {
+		case _, open := <-c:
+			ok, err := fn()
+			if err != nil {
+				return err
+			}
+			if ok {
+				return nil
+			}
+			if !open {
+				return ErrWaitTimeout
+			}
+		case <-ctx.Done():
+			return ErrWaitTimeout
+		}
 	}
 }
 
@@ -424,6 +483,7 @@ type WaitFunc func(done <-chan struct{}) <-chan struct{}
 // When the done channel is closed, because the golang `select` statement is
 // "uniform pseudo-random", the `fn` might still run one or multiple time,
 // though eventually `WaitFor` will return.
+// DEPRECATED: Use WaitForWithContext instead
 func WaitFor(wait WaitFunc, fn ConditionFunc, done <-chan struct{}) error {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -447,7 +507,7 @@ func WaitFor(wait WaitFunc, fn ConditionFunc, done <-chan struct{}) error {
 	}
 }
 
-// poller returns a WaitFunc that will send to the channel every interval until
+// pollerWithContext returns a WaitWithContextFunc that will send to the channel every interval until
 // timeout has elapsed and then closes the channel.
 //
 // Over very short intervals you may receive no ticks before the channel is
@@ -457,8 +517,8 @@ func WaitFor(wait WaitFunc, fn ConditionFunc, done <-chan struct{}) error {
 //
 // Output ticks are not buffered. If the channel is not ready to receive an
 // item, the tick is skipped.
-func poller(interval, timeout time.Duration) WaitFunc {
-	return WaitFunc(func(done <-chan struct{}) <-chan struct{} {
+func pollerWithContext(interval, timeout time.Duration) WaitWithContextFunc {
+	return func(ctx context.Context) <-chan struct{} {
 		ch := make(chan struct{})
 
 		go func() {
@@ -488,14 +548,14 @@ func poller(interval, timeout time.Duration) WaitFunc {
 					}
 				case <-after:
 					return
-				case <-done:
+				case <-ctx.Done():
 					return
 				}
 			}
 		}()
 
 		return ch
-	})
+	}
 }
 
 // resetOrReuseTimer avoids allocating a new timer if one is already in use.

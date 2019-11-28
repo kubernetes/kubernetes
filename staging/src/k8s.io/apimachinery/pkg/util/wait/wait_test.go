@@ -281,10 +281,10 @@ func TestExponentialBackoff(t *testing.T) {
 }
 
 func TestPoller(t *testing.T) {
-	done := make(chan struct{})
-	defer close(done)
-	w := poller(time.Millisecond, 2*time.Millisecond)
-	ch := w(done)
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+	w := pollerWithContext(time.Millisecond, 2*time.Millisecond)
+	ch := w(ctx)
 	count := 0
 DRAIN:
 	for {
@@ -330,9 +330,30 @@ func fakeTicker(max int, used *int32, doneFunc func()) WaitFunc {
 	}
 }
 
-func (fp *fakePoller) GetWaitFunc() WaitFunc {
+func fakeContextTicker(max int, used *int32, doneFunc func()) WaitWithContextFunc {
+	return func(done context.Context) <-chan struct{} {
+		ch := make(chan struct{})
+		go func() {
+			defer doneFunc()
+			defer close(ch)
+			for i := 0; i < max; i++ {
+				select {
+				case ch <- struct{}{}:
+				case <-done.Done():
+					return
+				}
+				if used != nil {
+					atomic.AddInt32(used, 1)
+				}
+			}
+		}()
+		return ch
+	}
+}
+
+func (fp *fakePoller) GetWaitFunc() WaitWithContextFunc {
 	fp.wg.Add(1)
-	return fakeTicker(fp.max, &fp.used, fp.wg.Done)
+	return fakeContextTicker(fp.max, &fp.used, fp.wg.Done)
 }
 
 func TestPoll(t *testing.T) {
@@ -342,7 +363,7 @@ func TestPoll(t *testing.T) {
 		return true, nil
 	})
 	fp := fakePoller{max: 1}
-	if err := pollInternal(fp.GetWaitFunc(), f); err != nil {
+	if err := pollInternalWithContext(fp.GetWaitFunc(), f); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 	fp.wg.Wait()
@@ -361,7 +382,7 @@ func TestPollError(t *testing.T) {
 		return false, expectedError
 	})
 	fp := fakePoller{max: 1}
-	if err := pollInternal(fp.GetWaitFunc(), f); err == nil || err != expectedError {
+	if err := pollInternalWithContext(fp.GetWaitFunc(), f); err == nil || err != expectedError {
 		t.Fatalf("Expected error %v, got none %v", expectedError, err)
 	}
 	fp.wg.Wait()
@@ -378,7 +399,7 @@ func TestPollImmediate(t *testing.T) {
 		return true, nil
 	})
 	fp := fakePoller{max: 0}
-	if err := pollImmediateInternal(fp.GetWaitFunc(), f); err != nil {
+	if err := pollImmediateInternalWithContext(fp.GetWaitFunc(), f); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 	// We don't need to wait for fp.wg, as pollImmediate shouldn't call WaitFunc at all.
@@ -397,7 +418,7 @@ func TestPollImmediateError(t *testing.T) {
 		return false, expectedError
 	})
 	fp := fakePoller{max: 0}
-	if err := pollImmediateInternal(fp.GetWaitFunc(), f); err == nil || err != expectedError {
+	if err := pollImmediateInternalWithContext(fp.GetWaitFunc(), f); err == nil || err != expectedError {
 		t.Fatalf("Expected error %v, got none %v", expectedError, err)
 	}
 	// We don't need to wait for fp.wg, as pollImmediate shouldn't call WaitFunc at all.
@@ -517,6 +538,64 @@ func TestWaitFor(t *testing.T) {
 	}
 }
 
+func TestWaitForWithContext(t *testing.T) {
+	var invocations int
+	testCases := map[string]struct {
+		F       ConditionFunc
+		Ticks   int
+		Invoked int
+		Err     bool
+	}{
+		"invoked once": {
+			ConditionFunc(func() (bool, error) {
+				invocations++
+				return true, nil
+			}),
+			2,
+			1,
+			false,
+		},
+		"invoked and returns a timeout": {
+			ConditionFunc(func() (bool, error) {
+				invocations++
+				return false, nil
+			}),
+			2,
+			3, // the contract of WaitForWithContext() says the func is called once more at the end of the wait
+			true,
+		},
+		"returns immediately on error": {
+			ConditionFunc(func() (bool, error) {
+				invocations++
+				return false, errors.New("test")
+			}),
+			2,
+			1,
+			true,
+		},
+	}
+	for k, c := range testCases {
+		invocations = 0
+		ticker := fakeContextTicker(c.Ticks, nil, func() {})
+		err := func() error {
+			ctx, cancel := context.WithCancel(context.TODO())
+			defer cancel()
+			return WaitForWithContext(ctx, ticker, c.F)
+		}()
+		switch {
+		case c.Err && err == nil:
+			t.Errorf("%s: Expected error, got nil", k)
+			continue
+		case !c.Err && err != nil:
+			t.Errorf("%s: Expected no error, got: %#v", k, err)
+			continue
+		}
+		if invocations != c.Invoked {
+			t.Errorf("%s: Expected %d invocations, got %d", k, c.Invoked, invocations)
+		}
+	}
+}
+
 // TestWaitForWithEarlyClosingWaitFunc tests WaitFor when the WaitFunc closes its channel. The WaitFor should
 // always return ErrWaitTimeout.
 func TestWaitForWithEarlyClosingWaitFunc(t *testing.T) {
@@ -568,18 +647,18 @@ func TestWaitForWithClosedChannel(t *testing.T) {
 
 // TestWaitForClosesStopCh verifies that after the condition func returns true, WaitFor() closes the stop channel it supplies to the WaitFunc.
 func TestWaitForClosesStopCh(t *testing.T) {
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	waitFunc := poller(time.Millisecond, ForeverTestTimeout)
+	outerCtx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+	waitFunc := pollerWithContext(time.Millisecond, ForeverTestTimeout)
 	var doneCh <-chan struct{}
 
-	WaitFor(func(done <-chan struct{}) <-chan struct{} {
-		doneCh = done
-		return waitFunc(done)
+	WaitForWithContext(outerCtx, func(ctx context.Context) <-chan struct{} {
+		doneCh = ctx.Done()
+		return waitFunc(ctx)
 	}, func() (bool, error) {
 		time.Sleep(10 * time.Millisecond)
 		return true, nil
-	}, stopCh)
+	})
 	// The polling goroutine should be closed after WaitFor returning.
 	select {
 	case _, ok := <-doneCh:
