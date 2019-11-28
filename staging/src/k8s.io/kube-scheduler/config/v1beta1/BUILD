@@ -4,18 +4,18 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "legacy_types.go",
         "register.go",
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/scheduler/apis/config",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-scheduler/config/v1beta1",
+    importpath = "k8s.io/kube-scheduler/config/v1beta1",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/component-base/config:go_default_library",
+        "//staging/src/k8s.io/component-base/config/v1alpha1:go_default_library",
     ],
 )
 
@@ -28,15 +28,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/scheduler/apis/config/scheme:all-srcs",
-        "//pkg/scheduler/apis/config/testing:all-srcs",
-        "//pkg/scheduler/apis/config/v1:all-srcs",
-        "//pkg/scheduler/apis/config/v1alpha1:all-srcs",
-        "//pkg/scheduler/apis/config/v1beta1:all-srcs",
-        "//pkg/scheduler/apis/config/validation:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )
