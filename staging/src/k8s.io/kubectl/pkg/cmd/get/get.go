@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -351,7 +352,7 @@ func (r *RuntimeSorter) Sort() error {
 		return nil
 	}
 	if len(r.objects) == 1 {
-		_, isTable := r.objects[0].(*metav1beta1.Table)
+		_, isTable := r.objects[0].(*metav1.Table)
 		if !isTable {
 			return nil
 		}
@@ -362,7 +363,7 @@ func (r *RuntimeSorter) Sort() error {
 
 	for _, obj := range r.objects {
 		switch t := obj.(type) {
-		case *metav1beta1.Table:
+		case *metav1.Table:
 			includesTable = true
 
 			if sorter, err := NewTableSorter(t, r.field); err != nil {
@@ -433,11 +434,11 @@ func (o *GetOptions) transformRequests(req *rest.Request) {
 		return
 	}
 
-	group := metav1beta1.GroupName
-	version := metav1beta1.SchemeGroupVersion.Version
-
-	tableParam := fmt.Sprintf("application/json;as=Table;v=%s;g=%s, application/json", version, group)
-	req.SetHeader("Accept", tableParam)
+	req.SetHeader("Accept", strings.Join([]string{
+		fmt.Sprintf("application/json;as=Table;v=%s;g=%s", metav1.SchemeGroupVersion.Version, metav1.GroupName),
+		fmt.Sprintf("application/json;as=Table;v=%s;g=%s", metav1beta1.SchemeGroupVersion.Version, metav1beta1.GroupName),
+		"application/json",
+	}, ","))
 
 	// if sorting, ensure we receive the full object in order to introspect its fields via jsonpath
 	if o.Sort {

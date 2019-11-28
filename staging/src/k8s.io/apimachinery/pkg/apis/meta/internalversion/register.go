@@ -71,8 +71,8 @@ func addToGroupVersion(scheme *runtime.Scheme) error {
 		&metav1.UpdateOptions{},
 	)
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&metav1beta1.Table{},
-		&metav1beta1.TableOptions{},
+		&metav1.Table{},
+		&metav1.TableOptions{},
 		&metav1beta1.PartialObjectMetadata{},
 		&metav1beta1.PartialObjectMetadataList{},
 	)
