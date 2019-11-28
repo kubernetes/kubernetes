@@ -17,7 +17,6 @@ go_test(
     tags = ["integration"],
     deps = [
         "//pkg/controller/volume/persistentvolume:go_default_library",
-        "//pkg/controller/volume/persistentvolume/options:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
