@@ -42,6 +42,11 @@ var DefaultBackoff = wait.Backoff{
 	Jitter:   0.1,
 }
 
+// AlwaysRetry when passed to OnError, allows it to keep trying regardless of the error.
+func AlwaysRetry(err error) bool {
+	return true
+}
+
 // OnError allows the caller to retry fn in case the error returned by fn is retriable
 // according to the provided function. backoff defines the maximum retries and the wait
 // interval between two retries.
