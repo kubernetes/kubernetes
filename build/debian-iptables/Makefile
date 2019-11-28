@@ -18,6 +18,7 @@ REGISTRY?="staging-k8s.gcr.io"
 IMAGE=$(REGISTRY)/debian-iptables
 TAG?=v12.0.1
 ARCH?=amd64
+SKIP_REGISTER_MULTIARCH?=
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
 BASEIMAGE?=k8s.gcr.io/debian-base-$(ARCH):v2.0.0
@@ -25,13 +26,14 @@ BASEIMAGE?=k8s.gcr.io/debian-base-$(ARCH):v2.0.0
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
 
-build:
-	@echo '## Building $(ARCH) image'
-
-ifneq ($(ARCH),amd64)
+register-multiarch:
 	@# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
+ifeq ($(shell [ '$(ARCH)' != 'amd64' ] && [ -z '$(SKIP_REGISTER_MULTIARCH)' ] && echo 'true'), true)
 	../../third_party/multiarch/qemu-user-static/register/register.sh --reset
 endif
+
+build: register-multiarch
+	@echo '## Building $(ARCH) image'
 
 	docker build --pull --build-arg BASEIMAGE=$(BASEIMAGE) -t $(IMAGE)-$(ARCH):$(TAG) .
 

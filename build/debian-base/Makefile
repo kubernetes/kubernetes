@@ -20,6 +20,7 @@ IMAGE ?= $(REGISTRY)/debian-base
 TAG ?= v2.0.0
 
 ARCH?=amd64
+SKIP_REGISTER_MULTIARCH?=
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
 TEMP_DIR:=$(shell mktemp -d)
@@ -70,14 +71,18 @@ push-manifest:
 	@for arch in $(ALL_ARCH); do docker manifest annotate --arch $${arch} ${IMAGE}:${TAG} ${IMAGE}-$${arch}:${TAG}; done
 	docker manifest push --purge ${IMAGE}:${TAG}
 
-build: clean
+register-multiarch:
+	@# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
+ifeq ($(shell [ '$(ARCH)' != 'amd64' ] && [ -z '$(SKIP_REGISTER_MULTIARCH)' ] && echo 'true'), true)
+	../../third_party/multiarch/qemu-user-static/register/register.sh --reset
+endif
+
+build: clean register-multiarch
 	@echo '## Building $(ARCH) image'
 
 	@cp ./* $(TEMP_DIR)
 
 ifneq ($(ARCH),amd64)
-	@# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
-	../../third_party/multiarch/qemu-user-static/register/register.sh --reset
 	@# The Dockerfile expects to find the qemu emulator binary in a 'qemu.tar.gz' in the build context
 	curl -sSL $(QEMU_URL) > $(TEMP_DIR)/qemu.tar.gz
 endif
