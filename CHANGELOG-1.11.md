@@ -1505,7 +1505,7 @@ You can now bind tokens to service requests. ([ref](https://github.com/kubernete
 * Update crictl on GCE to v1.11.0. ([#65254](https://github.com/kubernetes/kubernetes/pull/65254))
 * CoreDNS is now v1.1.3 ([#64258](https://github.com/kubernetes/kubernetes/pull/64258))
 * Setup dns servers and search domains for Windows Pods in dockershim. Docker EE version >= 17.10.0 is required for propagating DNS to containers. ([#63905](https://github.com/kubernetes/kubernetes/pull/63905))
-* Update version of Istio addon from 0.5.1 to 0.8.0. See [full Istio release notes](https://istio.io/about/notes/0.6.html).([#64537](https://github.com/kubernetes/kubernetes/pull/64537))
+* Update version of Istio addon from 0.5.1 to 0.8.0. See [full Istio release notes](https://istio.io/news/releases/0.x/announcing-0.6/).([#64537](https://github.com/kubernetes/kubernetes/pull/64537))
 * Update cadvisor godeps to v0.30.0 ([#64800](https://github.com/kubernetes/kubernetes/pull/64800))
 * Update event-exporter to version v0.2.0  that supports old (gke_container/gce_instance) and new (k8s_container/k8s_node/k8s_pod) stackdriver resources. ([#63918](https://github.com/kubernetes/kubernetes/pull/63918))
 * Rev the Azure SDK for networking to 2017-06-01 ([#61955](https://github.com/kubernetes/kubernetes/pull/61955))
@@ -2431,7 +2431,7 @@ filename | sha256 hash
     * Fix a bug in DNS resolution for externalName services
     * and PTR records that need to query from upstream nameserver.
 * Update version of Istio addon from 0.5.1 to 0.6.0. ([#61911](https://github.com/kubernetes/kubernetes/pull/61911), [@ostromart](https://github.com/ostromart))
-    * See https://istio.io/about/notes/0.6.html for full Isto release notes.
+    * See https://istio.io/news/releases/0.x/announcing-0.6/ for full Isto release notes.
 * Phase `kubeadm alpha phase kubelet` is added to support dynamic kubelet configuration in kubeadm. ([#57224](https://github.com/kubernetes/kubernetes/pull/57224), [@xiangpengzhao](https://github.com/xiangpengzhao))
 * `kubeadm alpha phase kubeconfig user` supports groups (organizations) to be specified in client cert. ([#62627](https://github.com/kubernetes/kubernetes/pull/62627), [@xiangpengzhao](https://github.com/xiangpengzhao))
 * Fix user visible files creation for windows ([#62375](https://github.com/kubernetes/kubernetes/pull/62375), [@feiskyer](https://github.com/feiskyer))
