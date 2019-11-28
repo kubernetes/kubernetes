@@ -546,6 +546,22 @@ func (c *Converter) callCustom(sv, dv, custom reflect.Value, scope *scope) error
 	return ret.(error)
 }
 
+// callUntyped calls predefined conversion func.
+func (c *Converter) callUntyped(sv, dv reflect.Value, f ConversionFunc, scope *scope) error {
+	if !dv.CanAddr() {
+		return scope.errorf("cant addr dest")
+	}
+	var svPointer reflect.Value
+	if sv.CanAddr() {
+		svPointer = sv.Addr()
+	} else {
+		svPointer = reflect.New(sv.Type())
+		svPointer.Elem().Set(sv)
+	}
+	dvPointer := dv.Addr()
+	return f(svPointer.Interface(), dvPointer.Interface(), scope)
+}
+
 // convert recursively copies sv into dv, calling an appropriate conversion function if
 // one is registered.
 func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
@@ -572,6 +588,14 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 			c.Debug.Logf("Calling generated conversion of '%v' to '%v'", st, dt)
 		}
 		return c.callCustom(sv, dv, fv, scope)
+	}
+
+	pair = typePair{reflect.PtrTo(sv.Type()), reflect.PtrTo(dv.Type())}
+	if f, ok := c.conversionFuncs.untyped[pair]; ok {
+		return c.callUntyped(sv, dv, f, scope)
+	}
+	if f, ok := c.generatedConversionFuncs.untyped[pair]; ok {
+		return c.callUntyped(sv, dv, f, scope)
 	}
 
 	return c.defaultConvert(sv, dv, scope)
