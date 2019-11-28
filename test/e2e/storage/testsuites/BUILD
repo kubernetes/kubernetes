@@ -76,7 +76,13 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["base_test.go"],
+    srcs = [
+        "api_test.go",
+        "base_test.go",
+    ],
     embed = [":go_default_library"],
-    deps = ["//test/e2e/framework/volume:go_default_library"],
+    deps = [
+        "//test/e2e/framework/volume:go_default_library",
+        "//test/e2e/storage/testpatterns:go_default_library",
+    ],
 )
