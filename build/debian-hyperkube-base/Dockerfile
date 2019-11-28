@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
+ARG BASEIMAGE
+FROM ${BASEIMAGE}
 
 # TODO(#69896): deprecate the shortened aliases in /
 RUN ln -s /hyperkube /apiserver \
@@ -30,7 +31,9 @@ RUN ln -s /hyperkube /apiserver \
  && ln -s /hyperkube /usr/local/bin/kubectl \
  && ln -s /hyperkube /usr/local/bin/kubelet
 
-RUN echo CACHEBUST>/dev/null && clean-install \
+ARG CACHEBUST
+
+RUN echo ${CACHEBUST}>/dev/null && clean-install \
     bash
 
 # The samba-common, cifs-utils, and nfs-common packages depend on
@@ -38,7 +41,7 @@ RUN echo CACHEBUST>/dev/null && clean-install \
 RUN echo "dash dash/sh boolean false" | debconf-set-selections
 RUN DEBIAN_FRONTEND=noninteractive dpkg-reconfigure dash
 
-RUN echo CACHEBUST>/dev/null && clean-install \
+RUN echo ${CACHEBUST}>/dev/null && clean-install \
     ca-certificates \
     ceph-common \
     cifs-utils \
@@ -60,4 +63,5 @@ RUN echo CACHEBUST>/dev/null && clean-install \
     udev \
     util-linux
 
-COPY cni-bin/bin /opt/cni/bin
+ARG CNI_BIN_TAR
+ADD ${CNI_BIN_TAR} /opt/cni/bin

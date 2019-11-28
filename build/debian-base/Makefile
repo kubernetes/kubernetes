@@ -16,24 +16,23 @@ all: all-build
 
 REGISTRY ?= staging-k8s.gcr.io
 IMAGE ?= $(REGISTRY)/debian-base
-BUILD_IMAGE ?= debian-build
 
 TAG ?= v2.0.0
 
-TAR_FILE ?= rootfs.tar
 ARCH?=amd64
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
 TEMP_DIR:=$(shell mktemp -d)
 QEMUVERSION=v2.9.1
 
-SUDO=$(if $(filter 0,$(shell id -u)),,sudo)
-
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
 
+BUILD_BASE=buildBaseWithQemu
+
 ifeq ($(ARCH),amd64)
 	BASEIMAGE?=debian:buster-slim
+	BUILD_BASE=$(BASEIMAGE)
 endif
 ifeq ($(ARCH),arm)
 	BASEIMAGE?=arm32v7/debian:buster-slim
@@ -51,6 +50,8 @@ ifeq ($(ARCH),s390x)
 	BASEIMAGE?=s390x/debian:buster-slim
 	QEMUARCH=s390x
 endif
+
+QEMU_URL=https://github.com/multiarch/qemu-user-static/releases/download/$(QEMUVERSION)/x86_64_qemu-$(QEMUARCH)-static.tar.gz
 
 sub-build-%:
 	$(MAKE) ARCH=$* build
@@ -70,36 +71,26 @@ push-manifest:
 	docker manifest push --purge ${IMAGE}:${TAG}
 
 build: clean
-	cp ./* $(TEMP_DIR)
-	cat Dockerfile.build \
-		| sed "s|BASEIMAGE|$(BASEIMAGE)|g" \
-		| sed "s|ARCH|$(QEMUARCH)|g" \
-		> $(TEMP_DIR)/Dockerfile.build
+	@echo '## Building $(ARCH) image'
 
-ifeq ($(ARCH),amd64)
-	# When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
-	sed "/CROSS_BUILD_/d" $(TEMP_DIR)/Dockerfile.build > $(TEMP_DIR)/Dockerfile.build.tmp
-else
-	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
-	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
-	$(SUDO) ../../third_party/multiarch/qemu-user-static/register/register.sh --reset
-	curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/$(QEMUVERSION)/x86_64_qemu-$(QEMUARCH)-static.tar.gz | tar -xz -C $(TEMP_DIR)
-	# Ensure we don't get surprised by umask settings
-	chmod 0755 $(TEMP_DIR)/qemu-$(QEMUARCH)-static
-	sed "s/CROSS_BUILD_//g" $(TEMP_DIR)/Dockerfile.build > $(TEMP_DIR)/Dockerfile.build.tmp
+	@cp ./* $(TEMP_DIR)
+
+ifneq ($(ARCH),amd64)
+	@# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
+	../../third_party/multiarch/qemu-user-static/register/register.sh --reset
+	@# The Dockerfile expects to find the qemu emulator binary in a 'qemu.tar.gz' in the build context
+	curl -sSL $(QEMU_URL) > $(TEMP_DIR)/qemu.tar.gz
 endif
-	mv $(TEMP_DIR)/Dockerfile.build.tmp $(TEMP_DIR)/Dockerfile.build
 
-	docker build --pull -t $(BUILD_IMAGE) -f $(TEMP_DIR)/Dockerfile.build $(TEMP_DIR)
-	docker create --name $(BUILD_IMAGE) $(BUILD_IMAGE)
-	docker export $(BUILD_IMAGE) > $(TEMP_DIR)/$(TAR_FILE)
-	docker build -t $(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
-	rm -rf $(TEMP_DIR)
+	docker build --pull \
+		--build-arg BASEIMAGE=$(BASEIMAGE) --build-arg BUILD_BASE=$(BUILD_BASE) \
+		--tag $(IMAGE)-$(ARCH):$(TAG) \
+		--target main $(TEMP_DIR)
+
+	@rm -rf $(TEMP_DIR)
 
 push: build
 	docker push $(IMAGE)-$(ARCH):$(TAG)
 
 clean:
-	docker rmi -f $(IMAGE)-$(ARCH):$(TAG) || true
-	docker rmi -f $(BUILD_IMAGE)   || true
-	docker rm  -f $(BUILD_IMAGE)   || true
+	2>/dev/null docker image rm -f $(IMAGE)-$(ARCH):$(TAG) || true

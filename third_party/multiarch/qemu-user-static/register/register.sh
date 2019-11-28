@@ -1,7 +1,20 @@
 #!/usr/bin/env bash
 
-QEMU_BIN_DIR=${QEMU_BIN_DIR:-/usr/bin}
+if [ "$( uname -s )" = 'Darwin' ]; then
+    {
+        echo 'You are running on Darwin, which has no binfmt_misc support.'
+        echo 'However Docker Desktop for Mac has (some of) those binfmt_misc rules already set up.'
+        echo 'Make sure you have Docker Desktop for Mac 2.1.0.0+ installed.'
+    } >&2
+    exit 0
+fi
 
+if [ "$EUID" -ne 0 ]; then
+    exec sudo "$0" "$@"
+    exit $?  # just in case exec fails
+fi
+
+QEMU_BIN_DIR=${QEMU_BIN_DIR:-/usr/bin}
 
 if [ ! -d /proc/sys/fs/binfmt_misc ]; then
     echo "No binfmt support in the kernel."
