@@ -2105,7 +2105,7 @@ func (c *Cloud) applyUnSchedulableTaint(nodeName types.NodeName, reason string) 
 
 // waitForAttachmentStatus polls until the attachment status is the expected value
 // On success, it returns the last attachment state.
-func (d *awsDisk) waitForAttachmentStatus(status string, expectedDevice string) (*ec2.VolumeAttachment, error) {
+func (d *awsDisk) waitForAttachmentStatus(status string, expectedInstance, expectedDevice string) (*ec2.VolumeAttachment, error) {
 	backoff := wait.Backoff{
 		Duration: volumeAttachmentStatusPollDelay,
 		Factor:   volumeAttachmentStatusFactor,
@@ -2176,14 +2176,24 @@ func (d *awsDisk) waitForAttachmentStatus(status string, expectedDevice string) 
 		if attachmentStatus == "" {
 			attachmentStatus = "detached"
 		}
-		if attachment != nil && expectedDevice != "" {
+		if attachment != nil {
+			// AWS eventual consistency can go back in time.
+			// For example, we're waiting for a volume to be attached as /dev/xvdba, but AWS can tell us it's
+			// attached as /dev/xvdbb, where it was attached before and it was already detached.
+			// Retry couple of times, hoping AWS starts reporting the right status.
 			device := aws.StringValue(attachment.Device)
-			if device != "" && device != expectedDevice {
-				// AWS eventual consistency can go back in time.
-				// For example, we're waiting for a volume to be attached as /dev/xvdba, but AWS can tell us it's
-				// attached as /dev/xvdbb, where it was attached before and it was already detached.
-				// Retry couple of times, hoping AWS starts reporting the right status.
-				klog.Warningf("Expected device %s %s, but found device %s %s", expectedDevice, status, device, attachmentStatus)
+			if expectedDevice != "" && device != "" && device != expectedDevice {
+				klog.Warningf("Expected device %s %s for volume %s, but found device %s %s", expectedDevice, status, d.name, device, attachmentStatus)
+				errorCount++
+				if errorCount > volumeAttachmentStatusConsecutiveErrorLimit {
+					// report the error
+					return false, fmt.Errorf("attachment of disk %q failed: requested device %q but found %q", d.name, expectedDevice, device)
+				}
+				return false, nil
+			}
+			instanceID := aws.StringValue(attachment.InstanceId)
+			if expectedInstance != "" && instanceID != "" && instanceID != expectedInstance {
+				klog.Warningf("Expected instance %s/%s for volume %s, but found instance %s/%s", expectedInstance, status, d.name, instanceID, attachmentStatus)
 				errorCount++
 				if errorCount > volumeAttachmentStatusConsecutiveErrorLimit {
 					// report the error
@@ -2338,7 +2348,7 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 		klog.V(2).Infof("AttachVolume volume=%q instance=%q request returned %v", disk.awsID, awsInstance.awsID, attachResponse)
 	}
 
-	attachment, err := disk.waitForAttachmentStatus("attached", ec2Device)
+	attachment, err := disk.waitForAttachmentStatus("attached", awsInstance.awsID, ec2Device)
 
 	if err != nil {
 		if err == wait.ErrWaitTimeout {
@@ -2416,7 +2426,7 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 		return "", errors.New("no response from DetachVolume")
 	}
 
-	attachment, err := diskInfo.disk.waitForAttachmentStatus("detached", "")
+	attachment, err := diskInfo.disk.waitForAttachmentStatus("detached", awsInstance.awsID, "")
 	if err != nil {
 		return "", err
 	}
