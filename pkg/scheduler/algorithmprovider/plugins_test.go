@@ -21,16 +21,17 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/scheduler"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
 var (
 	algorithmProviderNames = []string{
-		scheduler.DefaultProvider,
+		schedulerapi.SchedulerDefaultProviderName,
 	}
 )
 
 func TestDefaultConfigExists(t *testing.T) {
-	p, err := scheduler.GetAlgorithmProvider(scheduler.DefaultProvider)
+	p, err := scheduler.GetAlgorithmProvider(schedulerapi.SchedulerDefaultProviderName)
 	if err != nil {
 		t.Errorf("error retrieving default provider: %v", err)
 	}
