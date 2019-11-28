@@ -173,6 +173,63 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 			expected: new(spec.Schema),
 		},
 		{
+			name: "nullable required",
+			in: &apiextensions.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"a": {
+						Nullable: true,
+						Type:     "string",
+					},
+					"b": {
+						Nullable: true,
+						Type:     "string",
+					},
+					"c": {
+						Type: "string",
+					},
+				},
+				Required: []string{"a", "c"},
+			},
+			expected: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"object"},
+					Properties: map[string]spec.Schema{
+						"a": {},
+						"b": {},
+						"c": {
+							SchemaProps: spec.SchemaProps{
+								Type: []string{"string"},
+							},
+						},
+					},
+					Required: []string{"c"},
+				},
+			},
+		},
+		{
+			name: "nullable required additionalProperties",
+			in: &apiextensions.JSONSchemaProps{
+				Type: "object",
+				AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+					Schema: &apiextensions.JSONSchemaProps{
+						Nullable: true,
+						Type:     "string",
+					},
+				},
+				Required: []string{"a", "c"},
+			},
+			expected: &spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"object"},
+					AdditionalProperties: &spec.SchemaOrBool{
+						Allows: false,
+						Schema: &spec.Schema{},
+					},
+				},
+			},
+		},
+		{
 			name: "title",
 			in: &apiextensions.JSONSchemaProps{
 				Title: testStr,
@@ -827,6 +884,34 @@ func fuzzFuncs(f *fuzz.Fuzzer, refFunc func(ref *spec.Ref, c fuzz.Continue, visi
 			// do nothing for examples and defaults. These are free form JSON fields.
 		},
 	)
+}
+
+func TestFilterOut(t *testing.T) {
+	type Test struct {
+		name            string
+		input           []string
+		x               string
+		expected        []string
+		expectedChanged bool
+	}
+	for _, tt := range []Test{
+		{"nil", nil, "foo", nil, false},
+		{"empty", []string{}, "foo", []string{}, false},
+		{"foo", []string{"foo"}, "foo", nil, true},
+		{"aaa", []string{"a", "a", "a"}, "a", nil, true},
+		{"abc", []string{"a", "b", "c"}, "c", []string{"a", "b"}, true},
+		{"abbbcc", []string{"a", "b", "b", "b", "c", "c"}, "b", []string{"a", "c", "c"}, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotChanged := filterOut(tt.input, tt.x)
+			if !reflect.DeepEqual(tt.expected, got) {
+				t.Errorf("expected slice %v, got %v", tt.expected, got)
+			}
+			if tt.expectedChanged != gotChanged {
+				t.Errorf("expected changed %v, got %v", tt.expected, got)
+			}
+		})
+	}
 }
 
 func max(i, j int) int {
