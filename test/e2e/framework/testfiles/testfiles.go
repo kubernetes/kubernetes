@@ -34,7 +34,7 @@ import (
 	"sort"
 	"strings"
 
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 var filesources []FileSource
@@ -73,7 +73,7 @@ type FileSource interface {
 func ReadOrDie(filePath string) []byte {
 	data, err := Read(filePath)
 	if err != nil {
-		e2elog.Fail(err.Error(), 1)
+		framework.Fail(err.Error(), 1)
 	}
 	return data
 }
@@ -110,7 +110,7 @@ func Exists(filePath string) bool {
 	for _, filesource := range filesources {
 		data, err := filesource.ReadTestFile(filePath)
 		if err != nil {
-			e2elog.Fail(fmt.Sprintf("fatal error looking for test file %s: %s", filePath, err), 1)
+			framework.Fail(fmt.Sprintf("fatal error looking for test file %s: %s", filePath, err), 1)
 		}
 		if data != nil {
 			return true
