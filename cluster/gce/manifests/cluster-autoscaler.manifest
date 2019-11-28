@@ -17,7 +17,7 @@
         "containers": [
             {
                 "name": "cluster-autoscaler",
-                "image": "gcr.io/lukaszos-gke-dev/cluster-autoscaler:test-1.17-with-fixes9",
+                "image": "gcr.io/google-containers/cluster-autoscaler:v1.17.0-beta.2",
                 "livenessProbe": {
                     "httpGet": {
                         "path": "/health-check",
