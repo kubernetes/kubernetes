@@ -53,7 +53,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -122,7 +121,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			coreCount += quantity.Value()
 		}
 		ginkgo.By(fmt.Sprintf("Initial number of schedulable nodes: %v", nodeCount))
-		gomega.Expect(nodeCount).NotTo(gomega.BeZero())
+		framework.ExpectNotEqual(nodeCount, 0)
 		mem := nodes.Items[0].Status.Allocatable[v1.ResourceMemory]
 		memAllocatableMb = int((&mem).Value() / 1024 / 1024)
 
@@ -856,7 +855,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, nodeCount-minSize+1, resizeTimeout))
 		ngNodes, err := framework.GetGroupNodes(minMig)
 		framework.ExpectNoError(err)
-		gomega.Expect(len(ngNodes) == 1).To(gomega.BeTrue())
+		framework.ExpectEqual(len(ngNodes) == 1, true)
 		node, err := f.ClientSet.CoreV1().Nodes().Get(ngNodes[0], metav1.GetOptions{})
 		ginkgo.By(fmt.Sprintf("Target node for scale-down: %s", node.Name))
 		framework.ExpectNoError(err)
@@ -909,7 +908,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
 		framework.ExpectNoError(err)
-		gomega.Expect(nodesToBreakCount <= len(nodes.Items)).To(gomega.BeTrue())
+		framework.ExpectEqual(nodesToBreakCount <= len(nodes.Items), true)
 		nodesToBreak := nodes.Items[:nodesToBreakCount]
 
 		// TestUnderTemporaryNetworkFailure only removes connectivity to a single node,
