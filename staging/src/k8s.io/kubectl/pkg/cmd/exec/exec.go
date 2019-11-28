@@ -17,9 +17,14 @@ limitations under the License.
 package exec
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	dockerterm "github.com/docker/docker/pkg/term"
@@ -27,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
@@ -65,6 +71,9 @@ var (
 
 		# Get output from running 'date' command from the first pod of the service myservice, using the first container by default
 		kubectl exec svc/myservice date
+
+		# Get interactive table of available pods based on a filter
+		kubectl exec --like mypod date
 		`))
 )
 
@@ -99,6 +108,7 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", options.ContainerName, "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", options.Stdin, "Pass stdin to the container")
 	cmd.Flags().BoolVarP(&options.TTY, "tty", "t", options.TTY, "Stdin is a TTY")
+	cmd.Flags().BoolVarP(&options.Like, "like", "l", options.Like, "Get interactive table of available pods based on a filter")
 	return cmd
 }
 
@@ -130,6 +140,7 @@ type StreamOptions struct {
 	ContainerName string
 	Stdin         bool
 	TTY           bool
+	Like          bool
 	// minimize unnecessary output
 	Quiet bool
 	// InterruptParent, if set, is used to handle interrupts while attached
@@ -290,6 +301,11 @@ func (p *ExecOptions) Run() error {
 			return err
 		}
 	} else {
+
+		if p.Like {
+			p.ResourceName = selectPod(p.PodClient, p.Out, p.ResourceName, p.Namespace)
+		}
+
 		builder := p.Builder().
 			WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 			NamespaceParam(p.Namespace).DefaultNamespace().ResourceNames("pods", p.ResourceName)
@@ -364,4 +380,93 @@ func (p *ExecOptions) Run() error {
 	}
 
 	return nil
+}
+
+// selectResourceName will show interactive table to select a specific pod
+func selectPod(client coreclient.PodsGetter, io io.Writer, resourceLike, namespace string) string {
+
+	out := printers.GetNewTabWriter(io)
+
+	pods, err := client.Pods(namespace).List(metav1.ListOptions{
+		FieldSelector: "status.phase=Running",
+	})
+
+	if err != nil {
+		return resourceLike
+	}
+
+	allErrs := []error{}
+	err = addContextHeaders(out)
+	if err != nil {
+		allErrs = append(allErrs, err)
+	}
+	filteredPods := filterPods(pods.Items, resourceLike)
+
+	if len(filteredPods) == 0 {
+		return resourceLike
+	}
+
+	addPrintContext(filteredPods, out)
+	out.Flush()
+
+	selectedInstance := 1
+	if len(filteredPods) > 1 {
+		fmt.Printf("Enter a pod number [%d - %d] > \n", 1, len(filteredPods))
+		for {
+			selectedIndex, err := promptPodList(len(filteredPods), nil)
+
+			if err == nil {
+				selectedInstance = selectedIndex
+				break
+			}
+			fmt.Printf("Number must be between %d - %d\n", 1, len(filteredPods))
+		}
+	}
+
+	return filteredPods[selectedInstance-1]
+
+}
+
+// printContextHeaders append header fields to given writer
+func addContextHeaders(out io.Writer) error {
+	columnNames := []string{"#", "NAME"}
+
+	_, err := fmt.Fprintf(out, "%s\n", strings.Join(columnNames, "\t"))
+	return err
+}
+
+// printContext will append to given writer pod list + index table position
+func addPrintContext(pods []string, w io.Writer) {
+	for i, pod := range pods {
+		fmt.Fprintf(w, "%d\t%s\t\n", i+1, pod)
+	}
+}
+
+// promptPodList prompt to user selection question to select number between 0 - maxSelect given field
+func promptPodList(maxSelect int, in *os.File) (int, error) {
+	if in == nil {
+		in = os.Stdin
+	}
+
+	inputNumber := 0
+	reader := bufio.NewReader(in)
+	input, _ := reader.ReadString('\n')
+	inputNumber, _ = strconv.Atoi(strings.TrimSuffix(input, "\n"))
+	if inputNumber > maxSelect || inputNumber == 0 {
+		return 0, errors.New("Invalid number")
+	}
+
+	return inputNumber, nil
+}
+
+// filterPods filter pods that contine the given value
+func filterPods(pods []corev1.Pod, value string) []string {
+	podsList := []string{}
+	for _, pod := range pods {
+		if strings.Contains(pod.Name, value) {
+			podsList = append(podsList, pod.Name)
+		}
+	}
+
+	return podsList
 }
