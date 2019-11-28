@@ -115,26 +115,12 @@ func (bsc *BaseStableCollector) Create(version *semver.Version, self StableColle
 	bsc.init(self)
 
 	for _, d := range bsc.descriptors {
-		if version != nil {
-			d.determineDeprecationStatus(*version)
+		d.create(version)
+		if d.IsHidden() {
+			// do nothing for hidden metrics
+		} else {
+			bsc.registrable = append(bsc.registrable, d)
 		}
-
-		d.createOnce.Do(func() {
-			d.createLock.Lock()
-			defer d.createLock.Unlock()
-
-			if d.IsHidden() {
-				// do nothing for hidden metrics
-			} else if d.IsDeprecated() {
-				d.initializeDeprecatedDesc()
-				bsc.registrable = append(bsc.registrable, d)
-				d.isCreated = true
-			} else {
-				d.initialize()
-				bsc.registrable = append(bsc.registrable, d)
-				d.isCreated = true
-			}
-		})
 	}
 
 	if len(bsc.registrable) > 0 {
