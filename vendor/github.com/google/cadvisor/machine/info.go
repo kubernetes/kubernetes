@@ -17,10 +17,8 @@ package machine
 import (
 	"bytes"
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/docker/docker/pkg/parsers/operatingsystem"
@@ -54,45 +52,6 @@ func getInfoFromFiles(filePaths string) string {
 	return ""
 }
 
-// GetHugePagesInfo returns information about pre-allocated huge pages
-func GetHugePagesInfo() ([]info.HugePagesInfo, error) {
-	var hugePagesInfo []info.HugePagesInfo
-	files, err := ioutil.ReadDir(hugepagesDirectory)
-	if err != nil {
-		// treat as non-fatal since kernels and machine can be
-		// configured to disable hugepage support
-		return hugePagesInfo, nil
-	}
-	for _, st := range files {
-		nameArray := strings.Split(st.Name(), "-")
-		pageSizeArray := strings.Split(nameArray[1], "kB")
-		pageSize, err := strconv.ParseUint(string(pageSizeArray[0]), 10, 64)
-		if err != nil {
-			return hugePagesInfo, err
-		}
-
-		numFile := hugepagesDirectory + st.Name() + "/nr_hugepages"
-		val, err := ioutil.ReadFile(numFile)
-		if err != nil {
-			return hugePagesInfo, err
-		}
-		var numPages uint64
-		// we use sscanf as the file as a new-line that trips up ParseUint
-		// it returns the number of tokens successfully parsed, so if
-		// n != 1, it means we were unable to parse a number from the file
-		n, err := fmt.Sscanf(string(val), "%d", &numPages)
-		if err != nil || n != 1 {
-			return hugePagesInfo, fmt.Errorf("could not parse file %v contents %q", numFile, string(val))
-		}
-
-		hugePagesInfo = append(hugePagesInfo, info.HugePagesInfo{
-			NumPages: numPages,
-			PageSize: pageSize,
-		})
-	}
-	return hugePagesInfo, nil
-}
-
 func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.MachineInfo, error) {
 	rootFs := "/"
 	if !inHostNamespace {
@@ -100,6 +59,9 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 	}
 
 	cpuinfo, err := ioutil.ReadFile(filepath.Join(rootFs, "/proc/cpuinfo"))
+	if err != nil {
+		return nil, err
+	}
 	clockSpeed, err := GetClockSpeed(cpuinfo)
 	if err != nil {
 		return nil, err
@@ -110,7 +72,7 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 		return nil, err
 	}
 
-	hugePagesInfo, err := GetHugePagesInfo()
+	hugePagesInfo, err := GetHugePagesInfo(hugepagesDirectory)
 	if err != nil {
 		return nil, err
 	}
