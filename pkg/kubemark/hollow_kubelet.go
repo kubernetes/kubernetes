@@ -159,6 +159,7 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	f.MinimumGCAge = metav1.Duration{Duration: 1 * time.Minute}
 	f.MaxContainerCount = 100
 	f.MaxPerPodContainerCount = 2
+	f.NodeLabels = opt.NodeLabels
 	f.RegisterNode = true
 	f.RegisterSchedulable = true
 	f.ProviderID = fmt.Sprintf("kubemark://%v", opt.NodeName)
