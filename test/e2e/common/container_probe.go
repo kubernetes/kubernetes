@@ -66,7 +66,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		framework.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
-		gomega.Expect(isReady).To(gomega.BeTrue(), "pod should be ready")
+		framework.ExpectEqual(isReady, true, "pod should be ready")
 
 		// We assume the pod became ready when the container became ready. This
 		// is true for a single container pod.
@@ -105,7 +105,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		framework.ExpectNoError(err)
 
 		isReady, _ := testutils.PodRunningReady(p)
-		gomega.Expect(isReady).NotTo(gomega.BeTrue(), "pod should be not ready")
+		framework.ExpectNotEqual(isReady, true, "pod should be not ready")
 
 		restartCount := getRestartCount(p)
 		gomega.Expect(restartCount == 0).To(gomega.BeTrue(), "pod should have a restart count of 0 but got %v", restartCount)

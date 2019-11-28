@@ -34,7 +34,6 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
@@ -125,7 +124,7 @@ func expectPodRejection(f *framework.Framework, pod *v1.Pod) {
 	} else {
 		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		framework.ExpectError(err, "should be forbidden")
-		gomega.Expect(apierrs.IsForbidden(err)).To(gomega.BeTrue(), "should be forbidden error")
+		framework.ExpectEqual(apierrs.IsForbidden(err), true, "should be forbidden error")
 	}
 }
 
