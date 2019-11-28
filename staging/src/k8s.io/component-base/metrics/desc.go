@@ -18,7 +18,6 @@ package metrics
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/blang/semver"
@@ -42,7 +41,8 @@ type Desc struct {
 	variableLabels []string
 
 	// promDesc is the descriptor used by every Prometheus Metric.
-	promDesc *prometheus.Desc
+	promDesc      *prometheus.Desc
+	annotatedHelp string
 
 	// stabilityLevel represents the API guarantees for a given defined metric.
 	stabilityLevel StabilityLevel
@@ -73,6 +73,7 @@ func NewDesc(fqName string, help string, variableLabels []string, constLabels La
 	d := &Desc{
 		fqName:            fqName,
 		help:              help,
+		annotatedHelp:     help,
 		variableLabels:    variableLabels,
 		constLabels:       constLabels,
 		stabilityLevel:    stabilityLevel,
@@ -86,6 +87,7 @@ func NewDesc(fqName string, help string, variableLabels []string, constLabels La
 // String formats the Desc as a string.
 // The stability metadata maybe annotated in 'HELP' section if called after registry,
 // otherwise not.
+// e.g. "Desc{fqName: "normal_stable_descriptor", help: "[STABLE] this is a stable descriptor", constLabels: {}, variableLabels: []}"
 func (d *Desc) String() string {
 	if d.isCreated {
 		return d.promDesc.String()
@@ -136,22 +138,76 @@ func (d *Desc) IsDeprecated() bool {
 	return d.isDeprecated
 }
 
+// IsCreated returns if metric has been created.
+func (d *Desc) IsCreated() bool {
+	d.createLock.RLock()
+	defer d.createLock.RUnlock()
+
+	return d.isCreated
+}
+
+// create forces the initialization of Desc which has been deferred until
+// the point at which this method is invoked. This method will determine whether
+// the Desc is deprecated or hidden, no-opting if the Desc should be considered
+// hidden. Furthermore, this function no-opts and returns true if Desc is already
+// created.
+func (d *Desc) create(version *semver.Version) bool {
+	if version != nil {
+		d.determineDeprecationStatus(*version)
+	}
+
+	// let's not create if this metric is slated to be hidden
+	if d.IsHidden() {
+		return false
+	}
+	d.createOnce.Do(func() {
+		d.createLock.Lock()
+		defer d.createLock.Unlock()
+
+		d.isCreated = true
+		if d.IsDeprecated() {
+			d.initializeDeprecatedDesc()
+		} else {
+			d.initialize()
+		}
+	})
+	return d.IsCreated()
+}
+
+// ClearState will clear all the states marked by Create.
+// It intends to be used for re-register a hidden metric.
+func (d *Desc) ClearState() {
+	d.isDeprecated = false
+	d.isHidden = false
+	d.isCreated = false
+
+	d.markDeprecationOnce = *new(sync.Once)
+	d.createOnce = *new(sync.Once)
+	d.deprecateOnce = *new(sync.Once)
+	d.hideOnce = *new(sync.Once)
+	d.annotateOnce = *new(sync.Once)
+
+	d.annotatedHelp = d.help
+	d.promDesc = nil
+}
+
 func (d *Desc) markDeprecated() {
 	d.deprecateOnce.Do(func() {
-		d.help = fmt.Sprintf("(Deprecated since %s) %s", d.deprecatedVersion, d.help)
+		d.annotatedHelp = fmt.Sprintf("(Deprecated since %s) %s", d.deprecatedVersion, d.annotatedHelp)
 	})
 }
 
 func (d *Desc) annotateStabilityLevel() {
 	d.annotateOnce.Do(func() {
-		d.help = fmt.Sprintf("[%v] %v", d.stabilityLevel, d.help)
+		d.annotatedHelp = fmt.Sprintf("[%v] %v", d.stabilityLevel, d.annotatedHelp)
 	})
 }
 
 func (d *Desc) initialize() {
 	d.annotateStabilityLevel()
+
 	// this actually creates the underlying prometheus desc.
-	d.promDesc = prometheus.NewDesc(d.fqName, d.help, d.variableLabels, prometheus.Labels(d.constLabels))
+	d.promDesc = prometheus.NewDesc(d.fqName, d.annotatedHelp, d.variableLabels, prometheus.Labels(d.constLabels))
 }
 
 func (d *Desc) initializeDeprecatedDesc() {
@@ -165,9 +221,5 @@ func (d *Desc) initializeDeprecatedDesc() {
 //   1. Desc `D` is registered to registry 'A' in TestA (Note: `D` maybe created)
 //   2. Desc `D` is registered to registry 'B' in TestB (Note: since 'D' has been created once, thus will be ignored by registry 'B')
 func (d *Desc) GetRawDesc() *Desc {
-	// remove stability from help if any
-	stabilityStr := fmt.Sprintf("[%v] ", d.stabilityLevel)
-	rawHelp := strings.Replace(d.help, stabilityStr, "", -1)
-
-	return NewDesc(d.fqName, rawHelp, d.variableLabels, d.constLabels, d.stabilityLevel, d.deprecatedVersion)
+	return NewDesc(d.fqName, d.help, d.variableLabels, d.constLabels, d.stabilityLevel, d.deprecatedVersion)
 }
