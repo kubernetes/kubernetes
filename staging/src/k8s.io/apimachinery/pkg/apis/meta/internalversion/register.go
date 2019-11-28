@@ -87,6 +87,7 @@ func addToGroupVersion(scheme *runtime.Scheme) error {
 		&metav1.DeleteOptions{},
 		&metav1.CreateOptions{},
 		&metav1.UpdateOptions{})
+
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
 	return nil
 }
@@ -95,5 +96,4 @@ func addToGroupVersion(scheme *runtime.Scheme) error {
 // the logic for conversion private.
 func init() {
 	localSchemeBuilder.Register(addToGroupVersion)
-	localSchemeBuilder.Register(metav1.RegisterConversions)
 }
