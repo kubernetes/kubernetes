@@ -257,6 +257,9 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) || utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportNodePidsLimit) {
 		whitelistControllers.Insert("pids")
 	}
+	if _, ok := m.subsystems.MountPoints["hugetlb"]; ok {
+		whitelistControllers.Insert("hugetlb")
+	}
 	var missingPaths []string
 	// If even one cgroup path doesn't exist, then the cgroup doesn't exist.
 	for controller, path := range cgroupPaths {

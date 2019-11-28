@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -75,8 +74,6 @@ var _ = SIGDescribe("[Feature:Windows] Density [Serial] [Slow]", func() {
 type densityTest struct {
 	// number of pods
 	podsNr int
-	// number of background pods
-	bgPodsNr int
 	// interval between creating pod (rate control)
 	interval time.Duration
 	// create pods in 'batch' or 'sequence'
@@ -84,8 +81,6 @@ type densityTest struct {
 	// API QPS limit
 	APIQPSLimit int
 	// performance limits
-	cpuLimits            e2ekubelet.ContainersCPUSummary
-	memLimits            e2ekubelet.ResourceUsagePerContainer
 	podStartupLimits     e2emetrics.LatencyMetric
 	podBatchStartupLimit time.Duration
 }
@@ -97,7 +92,7 @@ func runDensityBatchTest(f *framework.Framework, testArg densityTest) (time.Dura
 	)
 	var (
 		mutex      = &sync.Mutex{}
-		watchTimes = make(map[string]metav1.Time, 0)
+		watchTimes = make(map[string]metav1.Time)
 		stopCh     = make(chan struct{})
 	)
 
@@ -278,5 +273,4 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 		}(pod)
 	}
 	wg.Wait()
-	return
 }

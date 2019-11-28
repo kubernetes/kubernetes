@@ -126,7 +126,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	}
 
 	// Run healthchecks against the cluster
-	if err := upgrade.CheckClusterHealth(client, ignorePreflightErrorsSet); err != nil {
+	if err := upgrade.CheckClusterHealth(client, &cfg.ClusterConfiguration, ignorePreflightErrorsSet); err != nil {
 		return nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
 

@@ -19,6 +19,7 @@ go_test(
         "//cmd/kubeadm/app/phases/certs:go_default_library",
         "//cmd/kubeadm/app/util/staticpod:go_default_library",
         "//cmd/kubeadm/test:go_default_library",
+        "//pkg/features:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/github.com/lithammer/dedent:go_default_library",

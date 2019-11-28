@@ -867,7 +867,7 @@ Kubeadm: Automate certificate copy between control planes in HA setups
 - Joining control plane nodes to a HA cluster can now be simplified by enabling the optional automatic copy of certificates from an existing control plane node.
 - You can now use `kubeadm init --experimental-upload-certs` and `kubeadm join --experimental-control-plane --certificate-key`.
 kubernetes/kubeadm: [#1373](https://github.com/kubernetes/kubeadm/issues/1373)
-kubernetes/enhancements: [#357](https://github.com/kubernetes/enhancements/issues/357) [[kep](https://github.com/kubernetes/enhancements/blob/master/keps/sig-cluster-lifecycle/kubeadm/20190122-Certificates-copy-for-kubeadm-join--control-plane.md)]
+kubernetes/enhancements: [#357](https://github.com/kubernetes/enhancements/issues/357) [kep](https://github.com/kubernetes/enhancements/blob/master/keps/sig-cluster-lifecycle/kubeadm/20190122-Certificates-copy-for-kubeadm-join--control-plane.md)]
 
 Kubeadm: Expose the `kubeadm join` workflow as phases
 

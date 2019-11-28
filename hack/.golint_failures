@@ -118,7 +118,6 @@ pkg/kubelet/dockershim/network/hostport
 pkg/kubelet/dockershim/network/hostport/testing
 pkg/kubelet/dockershim/network/kubenet
 pkg/kubelet/dockershim/network/testing
-pkg/kubelet/events
 pkg/kubelet/lifecycle
 pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/pod/testing
@@ -137,7 +136,6 @@ pkg/proxy/winkernel
 pkg/proxy/winuserspace
 pkg/registry/admissionregistration/rest
 pkg/registry/apps/deployment/storage
-pkg/registry/apps/replicaset
 pkg/registry/apps/replicaset/storage
 pkg/registry/apps/rest
 pkg/registry/apps/statefulset/storage
@@ -219,8 +217,6 @@ pkg/ssh
 pkg/util/config
 pkg/util/ebtables
 pkg/util/goroutinemap/exponentialbackoff
-pkg/util/iptables
-pkg/util/iptables/testing
 pkg/util/labels # See previous effort in PR #80685
 pkg/util/oom
 pkg/util/procfs
@@ -324,7 +320,6 @@ staging/src/k8s.io/apimachinery/pkg/runtime/testing
 staging/src/k8s.io/apimachinery/pkg/selection
 staging/src/k8s.io/apimachinery/pkg/test
 staging/src/k8s.io/apimachinery/pkg/types
-staging/src/k8s.io/apimachinery/pkg/util/clock
 staging/src/k8s.io/apimachinery/pkg/util/errors
 staging/src/k8s.io/apimachinery/pkg/util/framer
 staging/src/k8s.io/apimachinery/pkg/util/httpstream
@@ -539,7 +534,6 @@ staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 test/e2e/common
 test/e2e/lifecycle/bootstrap
 test/e2e/storage/vsphere
-test/e2e_node
 test/e2e_node/remote
 test/e2e_node/runner/remote
 test/utils

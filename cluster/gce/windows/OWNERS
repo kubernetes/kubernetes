@@ -4,9 +4,11 @@ reviewers:
   - mtaufen
   - pjh
   - yujuhong
+  - yliaog
 approvers:
   - mtaufen
   - pjh
   - yujuhong
+  - yliaog
 labels:
   - sig/gcp

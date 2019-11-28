@@ -1218,8 +1218,14 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// If nodePort is specified, user should be able to use nodeIP:nodePort to reach the backend endpoints
 		if svcInfo.nodePort > 0 {
+			// If the preserve-destination service annotation is present, we will disable routing mesh for NodePort.
+			// This means that health services can use Node Port without falsely getting results from a different node.
+			nodePortEndpoints := hnsEndpoints
+			if svcInfo.preserveDIP {
+				nodePortEndpoints = hnsLocalEndpoints
+			}
 			hnsLoadBalancer, err := hns.getLoadBalancer(
-				hnsEndpoints,
+				nodePortEndpoints,
 				loadBalancerFlags{localRoutedVIP: true},
 				sourceVip,
 				"",

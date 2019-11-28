@@ -39,6 +39,7 @@ filegroup(
         "//test/integration/apimachinery:all-srcs",
         "//test/integration/apiserver:all-srcs",
         "//test/integration/auth:all-srcs",
+        "//test/integration/benchmark/extractlog:all-srcs",
         "//test/integration/benchmark/jsonify:all-srcs",
         "//test/integration/client:all-srcs",
         "//test/integration/configmap:all-srcs",

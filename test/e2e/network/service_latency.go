@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -138,7 +139,7 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptab
 		Replicas:     1,
 		PollInterval: time.Second,
 	}
-	if err := framework.RunRC(cfg); err != nil {
+	if err := e2erc.RunRC(cfg); err != nil {
 		return nil, err
 	}
 

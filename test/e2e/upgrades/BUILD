@@ -37,6 +37,7 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/autoscaling:go_default_library",
         "//test/e2e/framework/job:go_default_library",
+        "//test/e2e/framework/kubectl:go_default_library",
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/security:go_default_library",
         "//test/e2e/framework/service:go_default_library",

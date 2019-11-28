@@ -63,6 +63,7 @@ implements kubeCollector to get deferred registration behavior. You must call la
 with the kubeCollector itself as an argument.
 */
 type lazyMetric struct {
+	fqName              string
 	isDeprecated        bool
 	isHidden            bool
 	isCreated           bool
@@ -81,7 +82,8 @@ func (r *lazyMetric) IsCreated() bool {
 // lazyInit provides the lazyMetric with a reference to the kubeCollector it is supposed
 // to allow lazy initialization for. It should be invoked in the factory function which creates new
 // kubeCollector type objects.
-func (r *lazyMetric) lazyInit(self kubeCollector) {
+func (r *lazyMetric) lazyInit(self kubeCollector, fqName string) {
+	r.fqName = fqName
 	r.self = self
 }
 
@@ -98,7 +100,7 @@ func (r *lazyMetric) determineDeprecationStatus(version semver.Version) {
 			r.isDeprecated = true
 		}
 		if ShouldShowHidden() {
-			klog.Warningf("Hidden metrics have been manually overridden, showing this very deprecated metric.")
+			klog.Warningf("Hidden metrics (%s) have been manually overridden, showing this very deprecated metric.", r.fqName)
 			return
 		}
 		if shouldHide(&version, selfVersion) {
@@ -141,6 +143,24 @@ func (r *lazyMetric) Create(version *semver.Version) bool {
 		}
 	})
 	return r.IsCreated()
+}
+
+// ClearState will clear all the states marked by Create.
+// It intends to be used for re-register a hidden metric.
+func (r *lazyMetric) ClearState() {
+	r.createLock.Lock()
+	defer r.createLock.Unlock()
+
+	r.isDeprecated = false
+	r.isHidden = false
+	r.isCreated = false
+	r.markDeprecationOnce = *(new(sync.Once))
+	r.createOnce = *(new(sync.Once))
+}
+
+// FQName returns the fully-qualified metric name of the collector.
+func (r *lazyMetric) FQName() string {
+	return r.fqName
 }
 
 /*

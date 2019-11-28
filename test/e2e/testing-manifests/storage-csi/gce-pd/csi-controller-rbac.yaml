@@ -29,6 +29,12 @@ rules:
   - apiGroups: [""]
     resources: ["nodes"]
     verbs: ["get", "list", "watch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots"]
+    verbs: ["get", "list"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotcontents"]
+    verbs: ["get", "list"]
 
 ---
 
@@ -113,6 +119,39 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 
 ---
+# xref: https://github.com/kubernetes-csi/external-snapshotter/blob/master/deploy/kubernetes/csi-snapshotter/rbac-csi-snapshotter.yaml
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-gce-pd-snapshotter-role
+rules:
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list", "watch", "create", "update", "patch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotcontents"]
+    verbs: ["get", "list", "watch", "update", "delete", "patch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotcontents/status"]
+    verbs: ["update", "patch"]
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-gce-pd-controller-snapshotter-binding
+subjects:
+  - kind: ServiceAccount
+    name: csi-gce-pd-controller-sa
+roleRef:
+  kind: ClusterRole
+  name: csi-gce-pd-snapshotter-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
 # priviledged Pod Security Policy, previously defined via PrivilegedTestPSPClusterRoleBinding()
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -121,7 +160,6 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: csi-gce-pd-controller-sa
-    namespace: default
 roleRef:
   kind: ClusterRole
   name: e2e-test-privileged-psp

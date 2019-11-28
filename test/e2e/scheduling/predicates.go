@@ -32,6 +32,7 @@ import (
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	k8utilnet "k8s.io/utils/net"
@@ -78,7 +79,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		rc, err := cs.CoreV1().ReplicationControllers(ns).Get(RCName, metav1.GetOptions{})
 		if err == nil && *(rc.Spec.Replicas) != 0 {
 			ginkgo.By("Cleaning up the replication controller")
-			err := framework.DeleteRCAndWaitForGC(f.ClientSet, ns, RCName)
+			err := e2erc.DeleteRCAndWaitForGC(f.ClientSet, ns, RCName)
 			framework.ExpectNoError(err)
 		}
 	})
@@ -783,7 +784,7 @@ func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectR
 		Replicas:  replicas,
 		HostPorts: map[string]int{"port1": 4321},
 	}
-	err := framework.RunRC(*config)
+	err := e2erc.RunRC(*config)
 	if expectRunning {
 		framework.ExpectNoError(err)
 	}
@@ -803,7 +804,7 @@ func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nod
 		HostPorts:    map[string]int{"port1": 4321},
 		NodeSelector: nodeSelector,
 	}
-	err := framework.RunRC(*config)
+	err := e2erc.RunRC(*config)
 	if expectRunning {
 		return err
 	}

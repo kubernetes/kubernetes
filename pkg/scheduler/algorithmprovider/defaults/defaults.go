@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
 const (
@@ -93,7 +94,7 @@ func ApplyFeatureGates() (restore func()) {
 func registerAlgorithmProvider(predSet, priSet sets.String) {
 	// Registers algorithm providers. By default we use 'DefaultProvider', but user can specify one to be used
 	// by specifying flag.
-	scheduler.RegisterAlgorithmProvider(scheduler.DefaultProvider, predSet, priSet)
+	scheduler.RegisterAlgorithmProvider(schedulerapi.SchedulerDefaultProviderName, predSet, priSet)
 	// Cluster autoscaler friendly scheduling algorithm.
 	scheduler.RegisterAlgorithmProvider(ClusterAutoscalerProvider, predSet,
 		copyAndReplace(priSet, priorities.LeastRequestedPriority, priorities.MostRequestedPriority))
