@@ -511,6 +511,11 @@ func (in *LocalEtcd) DeepCopyInto(out *LocalEtcd) {
 			(*out)[key] = val
 		}
 	}
+        if in.ExtraVolumes != nil {
+                in, out := &in.ExtraVolumes, &out.ExtraVolumes
+                *out = make([]HostPathMount, len(*in))
+                copy(*out, *in)
+        }
 	if in.ServerCertSANs != nil {
 		in, out := &in.ServerCertSANs, &out.ServerCertSANs
 		*out = make([]string, len(*in))

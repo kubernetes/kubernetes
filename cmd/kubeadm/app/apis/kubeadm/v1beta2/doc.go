@@ -191,6 +191,12 @@ limitations under the License.
 // 	    dataDir: "/var/lib/etcd"
 // 	    extraArgs:
 // 	      listen-client-urls: "http://10.100.0.1:2379"
+//          extraVolumes:
+//          - name: "some-volume"
+//            hostPath: "/etc/some-path"
+//            mountPath: "/etc/some-pod-path"
+//            readOnly: false
+//            pathType: File
 // 	    serverCertSANs:
 // 	    -  "ec2-10-100-0-1.compute-1.amazonaws.com"
 // 	    peerCertSANs:

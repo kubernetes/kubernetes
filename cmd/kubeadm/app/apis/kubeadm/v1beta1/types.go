@@ -274,6 +274,9 @@ type LocalEtcd struct {
 	// when run inside a static pod.
 	ExtraArgs map[string]string `json:"extraArgs,omitempty"`
 
+        //ExtraVolumes is an extra set of host volumes, mounted to the etcd
+        ExtraVolumes []HostPathMount `json:"extraVolumes,omitempty"`
+
 	// ServerCertSANs sets extra Subject Alternative Names for the etcd server signing cert.
 	ServerCertSANs []string `json:"serverCertSANs,omitempty"`
 	// PeerCertSANs sets extra Subject Alternative Names for the etcd peer signing cert.

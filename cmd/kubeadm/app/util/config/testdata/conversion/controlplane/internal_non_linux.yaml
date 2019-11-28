@@ -180,6 +180,7 @@ Etcd:
     ExtraArgs: null
     ImageRepository: ""
     ImageTag: ""
+    ExtraVolumes: null
     PeerCertSANs: null
     ServerCertSANs: null
 FeatureGates: null

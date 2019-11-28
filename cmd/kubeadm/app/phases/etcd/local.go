@@ -172,23 +172,41 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 // NB. GetEtcdPodSpec methods holds the information about how kubeadm creates etcd static pod manifests.
 func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, nodeName string, initialCluster []etcdutil.Member) v1.Pod {
 	pathType := v1.HostPathDirectoryOrCreate
-	etcdMounts := map[string]v1.Volume{
-		etcdVolumeName:  staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.Local.DataDir, &pathType),
-		certsVolumeName: staticpodutil.NewVolume(certsVolumeName, cfg.CertificatesDir+"/etcd", &pathType),
+	etcdVolumes := make(map[string]v1.Volume)
+	etcdVolumeMount := make(map[string]v1.VolumeMount)
+
+	for _, extraVol := range cfg.Etcd.Local.ExtraVolumes {
+		etcdVolumes[extraVol.Name] = v1.Volume{
+			Name: extraVol.Name,
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: extraVol.HostPath,
+					Type: &extraVol.PathType,
+				},
+			},
+		}
+		fmt.Printf("[LocalEtcd] Adding extra host path mount %q to %q\n", extraVol.Name, kubeadmconstants.Etcd)
+		etcdVolumeMount[extraVol.Name] = v1.VolumeMount{
+			Name: extraVol.Name,
+			ReadOnly: extraVol.ReadOnly,
+			MountPath: extraVol.MountPath,
+		}
 	}
+	// Mount the etcd datadir path read-write so etcd can store data in a more persistent manner
+	etcdVolumes[etcdVolumeName] = staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.Local.DataDir, &pathType)
+	etcdVolumes[certsVolumeName] = staticpodutil.NewVolume(certsVolumeName, cfg.CertificatesDir+"/etcd", &pathType)
+	etcdVolumeMount[etcdVolumeName] = staticpodutil.NewVolumeMount(etcdVolumeName, cfg.Etcd.Local.DataDir, false)
+	etcdVolumeMount[certsVolumeName] = staticpodutil.NewVolumeMount(certsVolumeName, cfg.CertificatesDir+"/etcd", false)
+
 	probeHostname, probePort, probeScheme := staticpodutil.GetEtcdProbeEndpoint(&cfg.Etcd)
 	return staticpodutil.ComponentPod(v1.Container{
 		Name:            kubeadmconstants.Etcd,
 		Command:         getEtcdCommand(cfg, endpoint, nodeName, initialCluster),
 		Image:           images.GetEtcdImage(cfg),
 		ImagePullPolicy: v1.PullIfNotPresent,
-		// Mount the etcd datadir path read-write so etcd can store data in a more persistent manner
-		VolumeMounts: []v1.VolumeMount{
-			staticpodutil.NewVolumeMount(etcdVolumeName, cfg.Etcd.Local.DataDir, false),
-			staticpodutil.NewVolumeMount(certsVolumeName, cfg.CertificatesDir+"/etcd", false),
-		},
+		VolumeMounts: staticpodutil.VolumeMountMapToSlice(etcdVolumeMount),
 		LivenessProbe: staticpodutil.LivenessProbe(probeHostname, "/health", probePort, probeScheme),
-	}, etcdMounts)
+	}, etcdVolumes)
 }
 
 // getEtcdCommand builds the right etcd command from the given config object

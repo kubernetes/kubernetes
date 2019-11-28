@@ -145,8 +145,7 @@ func (c *controlPlaneHostPathMounts) AddHostPathMounts(component string, vols []
 func (c *controlPlaneHostPathMounts) AddExtraHostPathMounts(component string, extraVols []kubeadmapi.HostPathMount) {
 	for _, extraVol := range extraVols {
 		fmt.Printf("[controlplane] Adding extra host path mount %q to %q\n", extraVol.Name, component)
-		hostPathType := extraVol.PathType
-		c.NewHostPathMount(component, extraVol.Name, extraVol.HostPath, extraVol.MountPath, extraVol.ReadOnly, &hostPathType)
+		c.NewHostPathMount(component, extraVol.Name, extraVol.HostPath, extraVol.MountPath, extraVol.ReadOnly, &extraVol.PathType)
 	}
 }
 
