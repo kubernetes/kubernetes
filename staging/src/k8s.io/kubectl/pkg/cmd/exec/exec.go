@@ -442,7 +442,7 @@ func addPrintContext(pods []string, w io.Writer) {
 	}
 }
 
-// promptPodList prompt to user selection question to select number between 0 - maxSelect given field
+// promptPodList prompt to user selection question to select number between 0-maxSelect given field
 func promptPodList(maxSelect int, in *os.File) (int, error) {
 	if in == nil {
 		in = os.Stdin
