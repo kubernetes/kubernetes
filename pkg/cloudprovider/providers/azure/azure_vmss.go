@@ -30,7 +30,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	cloudprovider "k8s.io/cloud-provider"
@@ -401,16 +401,55 @@ func (az *Cloud) getVmssMachineID(resourceGroup, scaleSetName, instanceID string
 		instanceID)
 }
 
-// machineName is composed of computerNamePrefix and 36-based instanceID.
-// And instanceID part if in fixed length of 6 characters.
-// Refer https://msftstack.wordpress.com/2017/05/10/figuring-out-azure-vm-scale-set-machine-names/.
+// machineName can be formated like:
+// - vm000ZC7 -> vm<36-based instanceID>
+// - vm_167 -> vm_<10-based instanceID>
 func getScaleSetVMInstanceID(machineName string) (string, error) {
+	instanceID, err := getScaleSetVMInstanceIDBase10(machineName)
+	if err == nil {
+		return instanceID, nil
+	}
+
+	instanceID, err = getScaleSetVMInstanceIDBase36(machineName)
+	if err == nil {
+		return instanceID, nil
+	}
+
+	klog.Errorf("Couldn't parse VMSS VM Instance name %s to retrieve instance ID", machineName)
+
+	return "", ErrorNotVmssInstance
+}
+
+// machineName format looks like vm000ZC7
+func getScaleSetVMInstanceIDBase36(machineName string) (string, error) {
 	nameLength := len(machineName)
-	if nameLength < 6 {
+
+	// 7 because 6 chars for the base36 instance ID and at least 1 char
+	// for the VMSS name
+	if nameLength < 7 {
 		return "", ErrorNotVmssInstance
 	}
 
 	instanceID, err := strconv.ParseUint(machineName[nameLength-6:], 36, 64)
+
+	if err != nil {
+		return "", ErrorNotVmssInstance
+	}
+
+	return fmt.Sprintf("%d", instanceID), nil
+}
+
+// machineName format looks like vm_167
+func getScaleSetVMInstanceIDBase10(machineName string) (string, error) {
+	machineNameRegexp, _ := regexp.Compile("^.*_(\\d+)$")
+	matches := machineNameRegexp.FindStringSubmatch(machineName)
+
+	if len(matches) == 0 {
+		return "", ErrorNotVmssInstance
+	}
+
+	instanceID, err := strconv.ParseUint(matches[1], 10, 0)
+
 	if err != nil {
 		return "", ErrorNotVmssInstance
 	}

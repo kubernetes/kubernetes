@@ -163,25 +163,32 @@ func TestGetScaleSetVMInstanceID(t *testing.T) {
 		machineName        string
 		expectError        bool
 		expectedInstanceID string
-	}{{
-		msg:         "invalid vmss instance name",
-		machineName: "vmvm",
-		expectError: true,
-	},
+	}{
+		{
+			msg:         "invalid vmss instance name",
+			machineName: "vmvm",
+			expectError: true,
+		},
 		{
 			msg:                "valid vmss instance name",
 			machineName:        "vm00000Z",
 			expectError:        false,
 			expectedInstanceID: "35",
 		},
+		{
+			msg:                "valid vmss instance name",
+			machineName:        "vm_13",
+			expectError:        false,
+			expectedInstanceID: "13",
+		},
 	}
 
 	for i, test := range tests {
 		instanceID, err := getScaleSetVMInstanceID(test.machineName)
 		if test.expectError {
-			assert.Error(t, err, fmt.Sprintf("TestCase[%d]: %s", i, test.msg))
+			assert.Error(t, err, fmt.Sprintf("TestCase[%d]: %s -> %s", i, test.msg, instanceID))
 		} else {
-			assert.Equal(t, test.expectedInstanceID, instanceID, fmt.Sprintf("TestCase[%d]: %s", i, test.msg))
+			assert.Equal(t, test.expectedInstanceID, instanceID, fmt.Sprintf("TestCase[%d]: %s -> %s", i, test.msg, instanceID))
 		}
 	}
 }
