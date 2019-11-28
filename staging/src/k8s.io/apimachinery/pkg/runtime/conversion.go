@@ -53,14 +53,6 @@ func JSONKeyMapper(key string, sourceTag, destTag reflect.StructTag) (string, st
 	return key, key
 }
 
-// DefaultStringConversions are helpers for converting []string and string to real values.
-var DefaultStringConversions = []interface{}{
-	Convert_Slice_string_To_string,
-	Convert_Slice_string_To_int,
-	Convert_Slice_string_To_bool,
-	Convert_Slice_string_To_int64,
-}
-
 func Convert_Slice_string_To_string(in *[]string, out *string, s conversion.Scope) error {
 	if len(*in) == 0 {
 		*out = ""
@@ -176,5 +168,29 @@ func Convert_Slice_string_To_Pointer_int64(in *[]string, out **int64, s conversi
 		return err
 	}
 	*out = &i
+	return nil
+}
+
+func RegisterStringConversions(s *Scheme) error {
+	if err := s.AddConversionFunc((*[]string)(nil), (*string)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_Slice_string_To_string(a.(*[]string), b.(*string), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*[]string)(nil), (*int)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_Slice_string_To_int(a.(*[]string), b.(*int), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*[]string)(nil), (*bool)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_Slice_string_To_bool(a.(*[]string), b.(*bool), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*[]string)(nil), (*int64)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_Slice_string_To_int64(a.(*[]string), b.(*int64), scope)
+	}); err != nil {
+		return err
+	}
 	return nil
 }
