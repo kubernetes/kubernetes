@@ -27,7 +27,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
@@ -62,7 +61,7 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 		}
 
 		newNodes, err := e2enode.CheckReady(c, len(origNodes.Items)-1, 5*time.Minute)
-		gomega.Expect(err).To(gomega.BeNil())
+		framework.ExpectEqual(err, nil)
 		framework.ExpectEqual(len(newNodes), len(origNodes.Items)-1)
 
 		_, err = c.CoreV1().Nodes().Get(nodeToDelete.Name, metav1.GetOptions{})

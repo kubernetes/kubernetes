@@ -29,7 +29,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
@@ -75,7 +74,7 @@ var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 // checks whether the target port is closed
 func portClosedTest(f *framework.Framework, pickNode *v1.Node, port int) {
 	nodeAddrs := e2enode.GetAddresses(pickNode, v1.NodeExternalIP)
-	gomega.Expect(len(nodeAddrs)).NotTo(gomega.BeZero())
+	framework.ExpectNotEqual(len(nodeAddrs), 0)
 
 	for _, addr := range nodeAddrs {
 		conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", addr, port), 1*time.Minute)
