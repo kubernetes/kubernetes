@@ -84,5 +84,26 @@ items:
     - list
     - watch
 
+- apiVersion: apiextensions.k8s.io/v1
+  kind: CustomResourceDefinition
+  metadata:
+    name: foos.crds.example.com
+  spec:
+    group: crds.example.com
+    versions:
+      - name: v1
+        served: true
+        storage: true
+        schema:
+          openAPIV3Schema:
+            type: object
+            properties:
+              aField:
+                type: string
+    scope: Cluster
+    names:
+      kind: Foo
+      plural: foos
+
 kind: List
 metadata: {}
