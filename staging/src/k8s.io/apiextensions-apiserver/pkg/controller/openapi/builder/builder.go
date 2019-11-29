@@ -28,7 +28,7 @@ import (
 	v1 "k8s.io/api/autoscaling/v1"
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	openapiv2 "k8s.io/apiextensions-apiserver/pkg/controller/openapi/v2"
@@ -86,7 +86,7 @@ type Options struct {
 }
 
 // BuildSwagger builds swagger for the given crd in the given version
-func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string, opts Options) (*spec.Swagger, error) {
+func BuildSwagger(crd *apiextensionsv1.CustomResourceDefinition, version string, opts Options) (*spec.Swagger, error) {
 	var schema *structuralschema.Structural
 	s, err := apiextensionshelpers.GetSchemaForVersion(crd, version)
 	if err != nil {
@@ -95,7 +95,7 @@ func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string, o
 
 	if s != nil && s.OpenAPIV3Schema != nil {
 		internalCRDSchema := &apiextensionsinternal.CustomResourceValidation{}
-		if err := apiextensions.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(s, internalCRDSchema, nil); err != nil {
+		if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(s, internalCRDSchema, nil); err != nil {
 			return nil, fmt.Errorf("failed converting CRD validation to internal version: %v", err)
 		}
 		if !validation.SchemaHasInvalidTypes(internalCRDSchema.OpenAPIV3Schema) {
@@ -504,7 +504,7 @@ func (b *builder) getOpenAPIConfig() *common.Config {
 	}
 }
 
-func newBuilder(crd *apiextensions.CustomResourceDefinition, version string, schema *structuralschema.Structural, v2 bool) *builder {
+func newBuilder(crd *apiextensionsv1.CustomResourceDefinition, version string, schema *structuralschema.Structural, v2 bool) *builder {
 	b := &builder{
 		schema: &spec.Schema{
 			SchemaProps: spec.SchemaProps{Type: []string{"object"}},
@@ -518,7 +518,7 @@ func newBuilder(crd *apiextensions.CustomResourceDefinition, version string, sch
 		listKind: crd.Spec.Names.ListKind,
 		plural:   crd.Spec.Names.Plural,
 	}
-	if crd.Spec.Scope == apiextensions.NamespaceScoped {
+	if crd.Spec.Scope == apiextensionsv1.NamespaceScoped {
 		b.namespaced = true
 	}
 

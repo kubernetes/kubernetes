@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"reflect"
 
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metatable "k8s.io/apimachinery/pkg/api/meta/table"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +36,7 @@ var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
 
 // New creates a new table convertor for the provided CRD column definition. If the printer definition cannot be parsed,
 // error will be returned along with a default table convertor.
-func New(crdColumns []apiextensions.CustomResourceColumnDefinition) (rest.TableConvertor, error) {
+func New(crdColumns []apiextensionsv1.CustomResourceColumnDefinition) (rest.TableConvertor, error) {
 	headers := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: swaggerMetadataDescriptions["name"]},
 	}

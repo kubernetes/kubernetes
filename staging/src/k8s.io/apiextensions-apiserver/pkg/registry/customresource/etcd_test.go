@@ -40,7 +40,7 @@ import (
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apiextensions-apiserver/pkg/crdserverscheme"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
@@ -76,7 +76,7 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testi
 
 	status := &apiextensionsinternal.CustomResourceSubresourceStatus{}
 
-	headers := []apiextensions.CustomResourceColumnDefinition{
+	headers := []apiextensionsv1.CustomResourceColumnDefinition{
 		{Name: "Age", Type: "date", JSONPath: ".metadata.creationTimestamp"},
 		{Name: "Replicas", Type: "integer", JSONPath: ".spec.replicas"},
 		{Name: "Missing", Type: "string", JSONPath: ".spec.missing"},

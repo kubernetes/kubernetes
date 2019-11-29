@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"k8s.io/apiextensions-apiserver/pkg/apihelpers"
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
@@ -77,7 +77,7 @@ func NewKubernetesAPIApprovalPolicyConformantConditionController(
 }
 
 // calculateCondition determines the new KubernetesAPIApprovalPolicyConformant condition
-func calculateCondition(crd *apiextensions.CustomResourceDefinition) *apiextensions.CustomResourceDefinitionCondition {
+func calculateCondition(crd *apiextensionsv1.CustomResourceDefinition) *apiextensionsv1.CustomResourceDefinitionCondition {
 	if !apihelpers.IsProtectedCommunityGroup(crd.Spec.Group) {
 		return nil
 	}
@@ -85,37 +85,37 @@ func calculateCondition(crd *apiextensions.CustomResourceDefinition) *apiextensi
 	approvalState, reason := apihelpers.GetAPIApprovalState(crd.Annotations)
 	switch approvalState {
 	case apihelpers.APIApprovalInvalid:
-		return &apiextensions.CustomResourceDefinitionCondition{
-			Type:    apiextensions.KubernetesAPIApprovalPolicyConformant,
-			Status:  apiextensions.ConditionFalse,
+		return &apiextensionsv1.CustomResourceDefinitionCondition{
+			Type:    apiextensionsv1.KubernetesAPIApprovalPolicyConformant,
+			Status:  apiextensionsv1.ConditionFalse,
 			Reason:  "InvalidAnnotation",
 			Message: reason,
 		}
 	case apihelpers.APIApprovalMissing:
-		return &apiextensions.CustomResourceDefinitionCondition{
-			Type:    apiextensions.KubernetesAPIApprovalPolicyConformant,
-			Status:  apiextensions.ConditionFalse,
+		return &apiextensionsv1.CustomResourceDefinitionCondition{
+			Type:    apiextensionsv1.KubernetesAPIApprovalPolicyConformant,
+			Status:  apiextensionsv1.ConditionFalse,
 			Reason:  "MissingAnnotation",
 			Message: reason,
 		}
 	case apihelpers.APIApproved:
-		return &apiextensions.CustomResourceDefinitionCondition{
-			Type:    apiextensions.KubernetesAPIApprovalPolicyConformant,
-			Status:  apiextensions.ConditionTrue,
+		return &apiextensionsv1.CustomResourceDefinitionCondition{
+			Type:    apiextensionsv1.KubernetesAPIApprovalPolicyConformant,
+			Status:  apiextensionsv1.ConditionTrue,
 			Reason:  "ApprovedAnnotation",
 			Message: reason,
 		}
 	case apihelpers.APIApprovalBypassed:
-		return &apiextensions.CustomResourceDefinitionCondition{
-			Type:    apiextensions.KubernetesAPIApprovalPolicyConformant,
-			Status:  apiextensions.ConditionFalse,
+		return &apiextensionsv1.CustomResourceDefinitionCondition{
+			Type:    apiextensionsv1.KubernetesAPIApprovalPolicyConformant,
+			Status:  apiextensionsv1.ConditionFalse,
 			Reason:  "UnapprovedAnnotation",
 			Message: reason,
 		}
 	default:
-		return &apiextensions.CustomResourceDefinitionCondition{
-			Type:    apiextensions.KubernetesAPIApprovalPolicyConformant,
-			Status:  apiextensions.ConditionUnknown,
+		return &apiextensionsv1.CustomResourceDefinitionCondition{
+			Type:    apiextensionsv1.KubernetesAPIApprovalPolicyConformant,
+			Status:  apiextensionsv1.ConditionUnknown,
 			Reason:  "UnknownAnnotation",
 			Message: reason,
 		}
@@ -132,7 +132,7 @@ func (c *KubernetesAPIApprovalPolicyConformantConditionController) sync(key stri
 	}
 
 	// avoid repeated calculation for the same annotation
-	protectionAnnotationValue := inCustomResourceDefinition.Annotations[apiextensions.KubeAPIApprovedAnnotation]
+	protectionAnnotationValue := inCustomResourceDefinition.Annotations[apiextensionsv1.KubeAPIApprovedAnnotation]
 	c.lastSeenProtectedAnnotationLock.Lock()
 	lastSeen, seenBefore := c.lastSeenProtectedAnnotation[inCustomResourceDefinition.Name]
 	c.lastSeenProtectedAnnotationLock.Unlock()
@@ -146,7 +146,7 @@ func (c *KubernetesAPIApprovalPolicyConformantConditionController) sync(key stri
 		// because group is immutable, if we have no condition now, we have no need to remove a condition.
 		return nil
 	}
-	old := apihelpers.FindCRDCondition(inCustomResourceDefinition, apiextensions.KubernetesAPIApprovalPolicyConformant)
+	old := apihelpers.FindCRDCondition(inCustomResourceDefinition, apiextensionsv1.KubernetesAPIApprovalPolicyConformant)
 
 	// don't attempt a write if all the condition details are the same
 	if old != nil && old.Status == cond.Status && old.Reason == cond.Reason && old.Message == cond.Message {
@@ -220,7 +220,7 @@ func (c *KubernetesAPIApprovalPolicyConformantConditionController) processNextWo
 	return true
 }
 
-func (c *KubernetesAPIApprovalPolicyConformantConditionController) enqueue(obj *apiextensions.CustomResourceDefinition) {
+func (c *KubernetesAPIApprovalPolicyConformantConditionController) enqueue(obj *apiextensionsv1.CustomResourceDefinition) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", obj, err))
@@ -231,26 +231,26 @@ func (c *KubernetesAPIApprovalPolicyConformantConditionController) enqueue(obj *
 }
 
 func (c *KubernetesAPIApprovalPolicyConformantConditionController) addCustomResourceDefinition(obj interface{}) {
-	castObj := obj.(*apiextensions.CustomResourceDefinition)
+	castObj := obj.(*apiextensionsv1.CustomResourceDefinition)
 	klog.V(4).Infof("Adding %s", castObj.Name)
 	c.enqueue(castObj)
 }
 
 func (c *KubernetesAPIApprovalPolicyConformantConditionController) updateCustomResourceDefinition(obj, _ interface{}) {
-	castObj := obj.(*apiextensions.CustomResourceDefinition)
+	castObj := obj.(*apiextensionsv1.CustomResourceDefinition)
 	klog.V(4).Infof("Updating %s", castObj.Name)
 	c.enqueue(castObj)
 }
 
 func (c *KubernetesAPIApprovalPolicyConformantConditionController) deleteCustomResourceDefinition(obj interface{}) {
-	castObj, ok := obj.(*apiextensions.CustomResourceDefinition)
+	castObj, ok := obj.(*apiextensionsv1.CustomResourceDefinition)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			klog.Errorf("Couldn't get object from tombstone %#v", obj)
 			return
 		}
-		castObj, ok = tombstone.Obj.(*apiextensions.CustomResourceDefinition)
+		castObj, ok = tombstone.Obj.(*apiextensionsv1.CustomResourceDefinition)
 		if !ok {
 			klog.Errorf("Tombstone contained object that is not expected %#v", obj)
 			return

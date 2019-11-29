@@ -31,7 +31,7 @@ import (
 
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	structuraldefaulting "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting"
@@ -137,8 +137,8 @@ type crdHandler struct {
 type crdInfo struct {
 	// spec and acceptedNames are used to compare against if a change is made on a CRD. We only update
 	// the storage if one of these changes.
-	spec          *apiextensions.CustomResourceDefinitionSpec
-	acceptedNames *apiextensions.CustomResourceDefinitionNames
+	spec          *apiextensionsv1.CustomResourceDefinitionSpec
+	acceptedNames *apiextensionsv1.CustomResourceDefinitionNames
 
 	// Storage per version
 	storages map[string]customresource.CustomResourceStorage
@@ -279,7 +279,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// if the scope in the CRD and the scope in request differ (with exception of the verbs in possiblyAcrossAllNamespacesVerbs
 	// for namespaced resources), pass request to the delegate, which is supposed to lead to a 404.
-	namespacedCRD, namespacedReq := crd.Spec.Scope == apiextensions.NamespaceScoped, len(requestInfo.Namespace) > 0
+	namespacedCRD, namespacedReq := crd.Spec.Scope == apiextensionsv1.NamespaceScoped, len(requestInfo.Namespace) > 0
 	if !namespacedCRD && namespacedReq {
 		r.delegate.ServeHTTP(w, req)
 		return
@@ -298,13 +298,13 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// but it becomes "unserved" because another names update leads to a conflict
 	// and EstablishingController wasn't fast enough to put the CRD into the Established condition.
 	// We accept this as the problem is small and self-healing.
-	if !apiextensionshelpers.IsCRDConditionTrue(crd, apiextensions.NamesAccepted) &&
-		!apiextensionshelpers.IsCRDConditionTrue(crd, apiextensions.Established) {
+	if !apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.NamesAccepted) &&
+		!apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Established) {
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
 
-	terminating := apiextensionshelpers.IsCRDConditionTrue(crd, apiextensions.Terminating)
+	terminating := apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Terminating)
 
 	crdInfo, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
 	if apierrors.IsNotFound(err) {
@@ -450,7 +450,7 @@ func (r *crdHandler) serveScale(w http.ResponseWriter, req *http.Request, reques
 
 // createCustomResourceDefinition removes potentially stale storage so it gets re-created
 func (r *crdHandler) createCustomResourceDefinition(obj interface{}) {
-	crd := obj.(*apiextensions.CustomResourceDefinition)
+	crd := obj.(*apiextensionsv1.CustomResourceDefinition)
 	r.customStorageLock.Lock()
 	defer r.customStorageLock.Unlock()
 	// this could happen if the create event is merged from create-update events
@@ -459,8 +459,8 @@ func (r *crdHandler) createCustomResourceDefinition(obj interface{}) {
 
 // updateCustomResourceDefinition removes potentially stale storage so it gets re-created
 func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) {
-	oldCRD := oldObj.(*apiextensions.CustomResourceDefinition)
-	newCRD := newObj.(*apiextensions.CustomResourceDefinition)
+	oldCRD := oldObj.(*apiextensionsv1.CustomResourceDefinition)
+	newCRD := newObj.(*apiextensionsv1.CustomResourceDefinition)
 
 	r.customStorageLock.Lock()
 	defer r.customStorageLock.Unlock()
@@ -469,8 +469,8 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 	// For HA clusters, we want to prevent race conditions when changing status to Established,
 	// so we want to be sure that CRD is Installing at least for 5 seconds before Establishing it.
 	// TODO: find a real HA safe checkpointing mechanism instead of an arbitrary wait.
-	if !apiextensionshelpers.IsCRDConditionTrue(newCRD, apiextensions.Established) &&
-		apiextensionshelpers.IsCRDConditionTrue(newCRD, apiextensions.NamesAccepted) {
+	if !apiextensionshelpers.IsCRDConditionTrue(newCRD, apiextensionsv1.Established) &&
+		apiextensionshelpers.IsCRDConditionTrue(newCRD, apiextensionsv1.NamesAccepted) {
 		if r.masterCount > 1 {
 			r.establishingController.QueueCRD(newCRD.Name, 5*time.Second)
 		} else {
@@ -577,7 +577,7 @@ func (r *crdHandler) tearDown(oldInfo *crdInfo) {
 
 // GetCustomResourceListerCollectionDeleter returns the ListerCollectionDeleter of
 // the given crd.
-func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions.CustomResourceDefinition) (finalizer.ListerCollectionDeleter, error) {
+func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensionsv1.CustomResourceDefinition) (finalizer.ListerCollectionDeleter, error) {
 	info, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
 	if err != nil {
 		return nil, err
@@ -633,7 +633,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			continue
 		}
 		internalValidation := &apiextensionsinternal.CustomResourceValidation{}
-		if err := apiextensions.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(val, internalValidation, nil); err != nil {
+		if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(val, internalValidation, nil); err != nil {
 			return nil, fmt.Errorf("failed converting CRD validation to internal version: %v", err)
 		}
 		s, err := structuralschema.NewStructural(internalValidation.OpenAPIV3Schema)
@@ -693,7 +693,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		var internalValidationSchema *apiextensionsinternal.CustomResourceValidation
 		if validationSchema != nil {
 			internalValidationSchema = &apiextensionsinternal.CustomResourceValidation{}
-			if err := apiextensions.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(validationSchema, internalValidationSchema, nil); err != nil {
+			if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(validationSchema, internalValidationSchema, nil); err != nil {
 				return nil, fmt.Errorf("failed to convert CRD validation to internal version: %v", err)
 			}
 		}
@@ -712,7 +712,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && subresources != nil && subresources.Status != nil {
 			equivalentResourceRegistry.RegisterKindFor(resource, "status", kind)
 			statusSpec = &apiextensionsinternal.CustomResourceSubresourceStatus{}
-			if err := apiextensions.Convert_v1_CustomResourceSubresourceStatus_To_apiextensions_CustomResourceSubresourceStatus(subresources.Status, statusSpec, nil); err != nil {
+			if err := apiextensionsv1.Convert_v1_CustomResourceSubresourceStatus_To_apiextensions_CustomResourceSubresourceStatus(subresources.Status, statusSpec, nil); err != nil {
 				return nil, fmt.Errorf("failed converting CRD status subresource to internal version: %v", err)
 			}
 			// for the status subresource, validate only against the status schema
@@ -731,7 +731,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && subresources != nil && subresources.Scale != nil {
 			equivalentResourceRegistry.RegisterKindFor(resource, "scale", autoscalingv1.SchemeGroupVersion.WithKind("Scale"))
 			scaleSpec = &apiextensionsinternal.CustomResourceSubresourceScale{}
-			if err := apiextensions.Convert_v1_CustomResourceSubresourceScale_To_apiextensions_CustomResourceSubresourceScale(subresources.Scale, scaleSpec, nil); err != nil {
+			if err := apiextensionsv1.Convert_v1_CustomResourceSubresourceScale_To_apiextensions_CustomResourceSubresourceScale(subresources.Scale, scaleSpec, nil); err != nil {
 				return nil, fmt.Errorf("failed converting CRD status subresource to internal version: %v", err)
 			}
 		}
@@ -752,7 +752,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			schema.GroupVersionKind{Group: crd.Spec.Group, Version: v.Name, Kind: crd.Status.AcceptedNames.ListKind},
 			customresource.NewStrategy(
 				typer,
-				crd.Spec.Scope == apiextensions.NamespaceScoped,
+				crd.Spec.Scope == apiextensionsv1.NamespaceScoped,
 				kind,
 				validator,
 				statusValidator,
@@ -775,13 +775,13 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 
 		selfLinkPrefix := ""
 		switch crd.Spec.Scope {
-		case apiextensions.ClusterScoped:
+		case apiextensionsv1.ClusterScoped:
 			selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, v.Name) + "/" + crd.Status.AcceptedNames.Plural + "/"
-		case apiextensions.NamespaceScoped:
+		case apiextensionsv1.NamespaceScoped:
 			selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, v.Name, "namespaces") + "/"
 		}
 
-		clusterScoped := crd.Spec.Scope == apiextensions.ClusterScoped
+		clusterScoped := crd.Spec.Scope == apiextensionsv1.ClusterScoped
 
 		// CRDs explicitly do not support protobuf, but some objects returned by the API server do
 		negotiatedSerializer := unstructuredNegotiatedSerializer{
@@ -1222,7 +1222,7 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 }
 
 // hasServedCRDVersion returns true if the given version is in the list of CRD's versions and the Served flag is set.
-func hasServedCRDVersion(spec *apiextensions.CustomResourceDefinitionSpec, version string) bool {
+func hasServedCRDVersion(spec *apiextensionsv1.CustomResourceDefinitionSpec, version string) bool {
 	for _, v := range spec.Versions {
 		if v.Name == version {
 			return v.Served
@@ -1246,7 +1246,7 @@ func serverStartingError() error {
 // buildOpenAPIModelsForApply constructs openapi models from any validation schemas specified in the custom resource,
 // and merges it with the models defined in the static OpenAPI spec.
 // Returns nil models if the ServerSideApply feature is disabled, or the static spec is nil, or an error is encountered.
-func buildOpenAPIModelsForApply(staticOpenAPISpec *spec.Swagger, crd *apiextensions.CustomResourceDefinition) (proto.Models, error) {
+func buildOpenAPIModelsForApply(staticOpenAPISpec *spec.Swagger, crd *apiextensionsv1.CustomResourceDefinition) (proto.Models, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 		return nil, nil
 	}

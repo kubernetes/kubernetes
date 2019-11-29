@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -55,7 +55,7 @@ func NewCRConverterFactory(serviceResolver webhook.ServiceResolver, authResolver
 }
 
 // NewConverter returns a new CR converter based on the conversion settings in crd object.
-func (m *CRConverterFactory) NewConverter(crd *apiextensions.CustomResourceDefinition) (safe, unsafe runtime.ObjectConvertor, err error) {
+func (m *CRConverterFactory) NewConverter(crd *apiextensionsv1.CustomResourceDefinition) (safe, unsafe runtime.ObjectConvertor, err error) {
 	validVersions := map[schema.GroupVersion]bool{}
 	for _, version := range crd.Spec.Versions {
 		validVersions[schema.GroupVersion{Group: crd.Spec.Group, Version: version.Name}] = true
@@ -63,9 +63,9 @@ func (m *CRConverterFactory) NewConverter(crd *apiextensions.CustomResourceDefin
 
 	var converter crConverterInterface
 	switch crd.Spec.Conversion.Strategy {
-	case apiextensions.NoneConverter:
+	case apiextensionsv1.NoneConverter:
 		converter = &nopConverter{}
-	case apiextensions.WebhookConverter:
+	case apiextensionsv1.WebhookConverter:
 		if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceWebhookConversion) {
 			return nil, nil, fmt.Errorf("webhook conversion is disabled on this cluster")
 		}
@@ -94,7 +94,7 @@ func (m *CRConverterFactory) NewConverter(crd *apiextensions.CustomResourceDefin
 	unsafe = &crConverter{
 		convertScale:  convertScale,
 		validVersions: validVersions,
-		clusterScoped: crd.Spec.Scope == apiextensions.ClusterScoped,
+		clusterScoped: crd.Spec.Scope == apiextensionsv1.ClusterScoped,
 		converter:     converter,
 	}
 	return &safeConverterWrapper{unsafe}, unsafe, nil

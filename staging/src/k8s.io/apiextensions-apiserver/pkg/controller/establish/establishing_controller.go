@@ -28,7 +28,7 @@ import (
 	"k8s.io/klog"
 
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
@@ -120,15 +120,15 @@ func (ec *EstablishingController) sync(key string) error {
 		return err
 	}
 
-	if !apiextensionshelpers.IsCRDConditionTrue(cachedCRD, apiextensions.NamesAccepted) ||
-		apiextensionshelpers.IsCRDConditionTrue(cachedCRD, apiextensions.Established) {
+	if !apiextensionshelpers.IsCRDConditionTrue(cachedCRD, apiextensionsv1.NamesAccepted) ||
+		apiextensionshelpers.IsCRDConditionTrue(cachedCRD, apiextensionsv1.Established) {
 		return nil
 	}
 
 	crd := cachedCRD.DeepCopy()
-	establishedCondition := apiextensions.CustomResourceDefinitionCondition{
-		Type:    apiextensions.Established,
-		Status:  apiextensions.ConditionTrue,
+	establishedCondition := apiextensionsv1.CustomResourceDefinitionCondition{
+		Type:    apiextensionsv1.Established,
+		Status:  apiextensionsv1.ConditionTrue,
 		Reason:  "InitialNamesAccepted",
 		Message: "the initial names have been accepted",
 	}
