@@ -62,7 +62,6 @@ var (
 	// emptyFramework is an empty framework used in tests.
 	// Note: If the test runs in goroutine, please don't use this variable to avoid a race condition.
 	emptyFramework, _ = framework.NewFramework(emptyPluginRegistry, nil, nil)
-	emptySnapshot     = nodeinfosnapshot.NewEmptySnapshot()
 )
 
 type fakeBinder struct {
@@ -652,7 +651,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		predicates.EmptyMetadataProducer,
 		[]priorities.PriorityConfig{},
 		priorities.EmptyMetadataProducer,
-		emptySnapshot,
+		nodeinfosnapshot.NewEmptySnapshot(),
 		emptyFramework,
 		[]algorithm.SchedulerExtender{},
 		nil,
@@ -703,7 +702,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		predicates.EmptyMetadataProducer,
 		[]priorities.PriorityConfig{},
 		priorities.EmptyMetadataProducer,
-		emptySnapshot,
+		nodeinfosnapshot.NewEmptySnapshot(),
 		emptyFramework,
 		[]algorithm.SchedulerExtender{},
 		nil,
