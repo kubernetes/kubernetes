@@ -175,6 +175,12 @@ const WaitString = "-w"
 // WaitSecondsValue a constant for specifying the default wait seconds
 const WaitSecondsValue = "5"
 
+// WaitIntervalString a constant for specifying the wait interval flag
+const WaitIntervalString = "-W"
+
+// WaitIntervalUsecondsValue a constant for specifying the default wait interval useconds
+const WaitIntervalUsecondsValue = "10000"
+
 // LockfilePath16x is the iptables lock file acquired by any process that's making any change in the iptable rule
 const LockfilePath16x = "/run/xtables.lock"
 
@@ -639,7 +645,7 @@ func getIPTablesVersion(exec utilexec.Interface, protocol Protocol) (*utilversio
 func getIPTablesWaitFlag(version *utilversion.Version) []string {
 	switch {
 	case version.AtLeast(WaitSecondsMinVersion):
-		return []string{WaitString, WaitSecondsValue}
+		return []string{WaitString, WaitSecondsValue, WaitIntervalString, WaitIntervalUsecondsValue}
 	case version.AtLeast(WaitMinVersion):
 		return []string{WaitString}
 	default:
@@ -650,7 +656,7 @@ func getIPTablesWaitFlag(version *utilversion.Version) []string {
 // Checks if iptables-restore has a "wait" flag
 func getIPTablesRestoreWaitFlag(version *utilversion.Version, exec utilexec.Interface, protocol Protocol) []string {
 	if version.AtLeast(WaitRestoreMinVersion) {
-		return []string{WaitString, WaitSecondsValue}
+		return []string{WaitString, WaitSecondsValue, WaitIntervalString, WaitIntervalUsecondsValue}
 	}
 
 	// Older versions may have backported features; if iptables-restore supports
