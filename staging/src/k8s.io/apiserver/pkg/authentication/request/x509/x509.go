@@ -163,7 +163,6 @@ func NewVerifier(opts x509.VerifyOptions, auth authenticator.Request, allowedCom
 }
 
 // NewDynamicCAVerifier create a request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth
-// TODO make the allowedCommonNames dynamic
 func NewDynamicCAVerifier(verifyOptionsFn VerifyOptionFunc, auth authenticator.Request, allowedCommonNames StringSliceProvider) authenticator.Request {
 	return &Verifier{verifyOptionsFn, auth, allowedCommonNames}
 }
