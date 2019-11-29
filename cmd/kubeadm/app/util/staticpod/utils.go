@@ -269,8 +269,11 @@ func GetSchedulerProbeAddress(cfg *kubeadmapi.ClusterConfiguration) string {
 // GetEtcdProbeEndpoint takes a kubeadm Etcd configuration object and attempts to parse
 // the first URL in the listen-metrics-urls argument, returning an etcd probe hostname,
 // port and scheme
-func GetEtcdProbeEndpoint(cfg *kubeadmapi.Etcd) (string, int, v1.URIScheme) {
+func GetEtcdProbeEndpoint(cfg *kubeadmapi.Etcd, isIPv6 bool) (string, int, v1.URIScheme) {
 	localhost := "127.0.0.1"
+	if isIPv6 {
+		localhost = "::1"
+	}
 	if cfg.Local == nil || cfg.Local.ExtraArgs == nil {
 		return localhost, kubeadmconstants.EtcdMetricsPort, v1.URISchemeHTTP
 	}
