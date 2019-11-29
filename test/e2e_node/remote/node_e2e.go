@@ -34,6 +34,7 @@ import (
 // NodeE2ERemote contains the specific functions in the node e2e test suite.
 type NodeE2ERemote struct{}
 
+// InitNodeE2ERemote initializes the node e2e test suite.
 func InitNodeE2ERemote() TestSuite {
 	// TODO: Register flags.
 	return &NodeE2ERemote{}
