@@ -214,6 +214,13 @@ func TestDecodeDockerConfigFieldAuth(t *testing.T) {
 			password: "bar",
 		},
 
+		// some test as before but with new line characters
+		{
+			input:    "Zm9vOm\nJhcg==\n",
+			username: "foo",
+			password: "bar",
+		},
+
 		// standard encoding (with padding)
 		{
 			input:    base64.StdEncoding.EncodeToString([]byte("foo:bar")),
@@ -238,6 +245,12 @@ func TestDecodeDockerConfigFieldAuth(t *testing.T) {
 		// good base64 data, but no colon separating username & password
 		{
 			input: "cGFudHM=",
+			fail:  true,
+		},
+
+		// only new line characters are ignored
+		{
+			input: "Zm9vOmJhcg== ",
 			fail:  true,
 		},
 
