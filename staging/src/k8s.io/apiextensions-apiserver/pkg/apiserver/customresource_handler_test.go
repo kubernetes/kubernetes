@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/yaml"
 	"testing"
 
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -78,18 +78,18 @@ func TestConvertFieldLabel(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 
-			crd := apiextensions.CustomResourceDefinition{
-				Spec: apiextensions.CustomResourceDefinitionSpec{
-					Conversion: &apiextensions.CustomResourceConversion{
+			crd := apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Conversion: &apiextensionsv1.CustomResourceConversion{
 						Strategy: "None",
 					},
 				},
 			}
 
 			if test.clusterScoped {
-				crd.Spec.Scope = apiextensions.ClusterScoped
+				crd.Spec.Scope = apiextensionsv1.ClusterScoped
 			} else {
-				crd.Spec.Scope = apiextensions.NamespaceScoped
+				crd.Spec.Scope = apiextensionsv1.NamespaceScoped
 			}
 			f, err := conversion.NewCRConverterFactory(nil, nil)
 			if err != nil {

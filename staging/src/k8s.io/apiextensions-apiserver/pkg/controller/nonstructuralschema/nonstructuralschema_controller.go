@@ -32,7 +32,7 @@ import (
 
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
@@ -81,10 +81,10 @@ func NewConditionController(
 	return c
 }
 
-func calculateCondition(in *apiextensions.CustomResourceDefinition) *apiextensions.CustomResourceDefinitionCondition {
-	cond := &apiextensions.CustomResourceDefinitionCondition{
-		Type:   apiextensions.NonStructuralSchema,
-		Status: apiextensions.ConditionUnknown,
+func calculateCondition(in *apiextensionsv1.CustomResourceDefinition) *apiextensionsv1.CustomResourceDefinitionCondition {
+	cond := &apiextensionsv1.CustomResourceDefinitionCondition{
+		Type:   apiextensionsv1.NonStructuralSchema,
+		Status: apiextensionsv1.ConditionUnknown,
 	}
 
 	allErrs := field.ErrorList{}
@@ -95,7 +95,7 @@ func calculateCondition(in *apiextensions.CustomResourceDefinition) *apiextensio
 		}
 
 		internalSchema := &apiextensionsinternal.CustomResourceValidation{}
-		if err := apiextensions.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(v.Schema, internalSchema, nil); err != nil {
+		if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(v.Schema, internalSchema, nil); err != nil {
 			klog.Errorf("failed to convert CRD validation to internal version: %v", err)
 			continue
 		}
@@ -115,7 +115,7 @@ func calculateCondition(in *apiextensions.CustomResourceDefinition) *apiextensio
 		return nil
 	}
 
-	cond.Status = apiextensions.ConditionTrue
+	cond.Status = apiextensionsv1.ConditionTrue
 	cond.Reason = "Violations"
 	cond.Message = allErrs.ToAggregate().Error()
 
@@ -141,7 +141,7 @@ func (c *ConditionController) sync(key string) error {
 
 	// check old condition
 	cond := calculateCondition(inCustomResourceDefinition)
-	old := apiextensionshelpers.FindCRDCondition(inCustomResourceDefinition, apiextensions.NonStructuralSchema)
+	old := apiextensionshelpers.FindCRDCondition(inCustomResourceDefinition, apiextensionsv1.NonStructuralSchema)
 
 	if cond == nil && old == nil {
 		return nil
@@ -153,7 +153,7 @@ func (c *ConditionController) sync(key string) error {
 	// update condition
 	crd := inCustomResourceDefinition.DeepCopy()
 	if cond == nil {
-		apiextensionshelpers.RemoveCRDCondition(crd, apiextensions.NonStructuralSchema)
+		apiextensionshelpers.RemoveCRDCondition(crd, apiextensionsv1.NonStructuralSchema)
 	} else {
 		cond.LastTransitionTime = metav1.NewTime(time.Now())
 		apiextensionshelpers.SetCRDCondition(crd, *cond)
@@ -221,7 +221,7 @@ func (c *ConditionController) processNextWorkItem() bool {
 	return true
 }
 
-func (c *ConditionController) enqueue(obj *apiextensions.CustomResourceDefinition) {
+func (c *ConditionController) enqueue(obj *apiextensionsv1.CustomResourceDefinition) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", obj, err))
@@ -232,26 +232,26 @@ func (c *ConditionController) enqueue(obj *apiextensions.CustomResourceDefinitio
 }
 
 func (c *ConditionController) addCustomResourceDefinition(obj interface{}) {
-	castObj := obj.(*apiextensions.CustomResourceDefinition)
+	castObj := obj.(*apiextensionsv1.CustomResourceDefinition)
 	klog.V(4).Infof("Adding %s", castObj.Name)
 	c.enqueue(castObj)
 }
 
 func (c *ConditionController) updateCustomResourceDefinition(obj, _ interface{}) {
-	castObj := obj.(*apiextensions.CustomResourceDefinition)
+	castObj := obj.(*apiextensionsv1.CustomResourceDefinition)
 	klog.V(4).Infof("Updating %s", castObj.Name)
 	c.enqueue(castObj)
 }
 
 func (c *ConditionController) deleteCustomResourceDefinition(obj interface{}) {
-	castObj, ok := obj.(*apiextensions.CustomResourceDefinition)
+	castObj, ok := obj.(*apiextensionsv1.CustomResourceDefinition)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			klog.Errorf("Couldn't get object from tombstone %#v", obj)
 			return
 		}
-		castObj, ok = tombstone.Obj.(*apiextensions.CustomResourceDefinition)
+		castObj, ok = tombstone.Obj.(*apiextensionsv1.CustomResourceDefinition)
 		if !ok {
 			klog.Errorf("Tombstone contained object that is not expected %#v", obj)
 			return

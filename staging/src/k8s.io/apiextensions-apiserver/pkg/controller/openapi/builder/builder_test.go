@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -352,12 +352,12 @@ func TestNewBuilder(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var schema *structuralschema.Structural
 			if len(tt.schema) > 0 {
-				v1beta1Schema := &apiextensions.JSONSchemaProps{}
+				v1beta1Schema := &apiextensionsv1.JSONSchemaProps{}
 				if err := json.Unmarshal([]byte(tt.schema), &v1beta1Schema); err != nil {
 					t.Fatal(err)
 				}
 				internalSchema := &apiextensionsinternal.JSONSchemaProps{}
-				apiextensions.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v1beta1Schema, internalSchema, nil)
+				apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v1beta1Schema, internalSchema, nil)
 				var err error
 				schema, err = structuralschema.NewStructural(internalSchema)
 				if err != nil {
@@ -369,21 +369,21 @@ func TestNewBuilder(t *testing.T) {
 				schema = schema.Unfold()
 			}
 
-			got := newBuilder(&apiextensions.CustomResourceDefinition{
-				Spec: apiextensions.CustomResourceDefinitionSpec{
+			got := newBuilder(&apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
 					Group: "bar.k8s.io",
-					Versions: []apiextensions.CustomResourceDefinitionVersion{
+					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 						{
 							Name: "v1",
 						},
 					},
-					Names: apiextensions.CustomResourceDefinitionNames{
+					Names: apiextensionsv1.CustomResourceDefinitionNames{
 						Plural:   "foos",
 						Singular: "foo",
 						Kind:     "Foo",
 						ListKind: "FooList",
 					},
-					Scope: apiextensions.NamespaceScoped,
+					Scope: apiextensionsv1.NamespaceScoped,
 				},
 			}, "v1", schema, tt.v2)
 
@@ -434,7 +434,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 	testCRDResourceName := "foos"
 
 	testCases := []struct {
-		scope apiextensions.ResourceScope
+		scope apiextensionsv1.ResourceScope
 		paths map[string]struct {
 			expectNamespaceParam bool
 			expectNameParam      bool
@@ -442,7 +442,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 		}
 	}{
 		{
-			scope: apiextensions.NamespaceScoped,
+			scope: apiextensionsv1.NamespaceScoped,
 			paths: map[string]struct {
 				expectNamespaceParam bool
 				expectNameParam      bool
@@ -456,7 +456,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 			},
 		},
 		{
-			scope: apiextensions.ClusterScoped,
+			scope: apiextensionsv1.ClusterScoped,
 			paths: map[string]struct {
 				expectNamespaceParam bool
 				expectNameParam      bool
@@ -471,20 +471,20 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		testNamespacedCRD := &apiextensions.CustomResourceDefinition{
-			Spec: apiextensions.CustomResourceDefinitionSpec{
+		testNamespacedCRD := &apiextensionsv1.CustomResourceDefinition{
+			Spec: apiextensionsv1.CustomResourceDefinitionSpec{
 				Scope: testCase.scope,
 				Group: testCRDGroup,
-				Names: apiextensions.CustomResourceDefinitionNames{
+				Names: apiextensionsv1.CustomResourceDefinitionNames{
 					Kind:   testCRDKind,
 					Plural: testCRDResourceName,
 				},
-				Versions: []apiextensions.CustomResourceDefinitionVersion{
+				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 					{
 						Name: testCRDVersion,
-						Subresources: &apiextensions.CustomResourceSubresources{
-							Status: &apiextensions.CustomResourceSubresourceStatus{},
-							Scale:  &apiextensions.CustomResourceSubresourceScale{},
+						Subresources: &apiextensionsv1.CustomResourceSubresources{
+							Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+							Scale:  &apiextensionsv1.CustomResourceSubresourceScale{},
 						},
 					},
 				},
@@ -631,13 +631,13 @@ func TestBuildSwagger(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var validation *apiextensions.CustomResourceValidation
+			var validation *apiextensionsv1.CustomResourceValidation
 			if len(tt.schema) > 0 {
-				v1Schema := &apiextensions.JSONSchemaProps{}
+				v1Schema := &apiextensionsv1.JSONSchemaProps{}
 				if err := json.Unmarshal([]byte(tt.schema), &v1Schema); err != nil {
 					t.Fatal(err)
 				}
-				validation = &apiextensions.CustomResourceValidation{
+				validation = &apiextensionsv1.CustomResourceValidation{
 					OpenAPIV3Schema: v1Schema,
 				}
 			}
@@ -646,22 +646,22 @@ func TestBuildSwagger(t *testing.T) {
 			}
 
 			// TODO: mostly copied from the test above. reuse code to cleanup
-			got, err := BuildSwagger(&apiextensions.CustomResourceDefinition{
-				Spec: apiextensions.CustomResourceDefinitionSpec{
+			got, err := BuildSwagger(&apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
 					Group: "bar.k8s.io",
-					Versions: []apiextensions.CustomResourceDefinitionVersion{
+					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 						{
 							Name:   "v1",
 							Schema: validation,
 						},
 					},
-					Names: apiextensions.CustomResourceDefinitionNames{
+					Names: apiextensionsv1.CustomResourceDefinitionNames{
 						Plural:   "foos",
 						Singular: "foo",
 						Kind:     "Foo",
 						ListKind: "FooList",
 					},
-					Scope: apiextensions.NamespaceScoped,
+					Scope: apiextensionsv1.NamespaceScoped,
 				},
 			}, "v1", tt.opts)
 			if err != nil {
