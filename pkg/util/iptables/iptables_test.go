@@ -620,7 +620,7 @@ func TestIPTablesWaitFlag(t *testing.T) {
 		{"1.4.21", []string{WaitString}},
 		{"1.4.22", []string{WaitString, WaitSecondsValue}},
 		{"1.5.0", []string{WaitString, WaitSecondsValue}},
-		{"2.0.0", []string{WaitString, WaitSecondsValue}},
+		{"2.0.0", []string{WaitString, WaitSecondsValue, WaitIntervalString, WaitIntervalUsecondsValue}},
 	}
 
 	for _, testCase := range testCases {
@@ -725,6 +725,37 @@ func TestWaitFlagNew(t *testing.T) {
 		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
 	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", WaitString, WaitSecondsValue) {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
+	}
+}
+
+func TestWaitIntervalFlagNew(t *testing.T) {
+	fcmd := fakeexec.FakeCmd{
+		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+			// iptables version check
+			func() ([]byte, error) { return []byte("iptables v1.6.1"), nil },
+			// iptables-restore version check
+			func() ([]byte, error) { return []byte{}, nil },
+			// Success.
+			func() ([]byte, error) { return []byte{}, nil },
+		},
+	}
+	fexec := fakeexec.FakeExec{
+		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	runner := New(&fexec, ProtocolIpv4)
+	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
+	if err != nil {
+		t.Errorf("expected success, got %v", err)
+	}
+	if fcmd.CombinedOutputCalls != 3 {
+		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	}
+	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", WaitString, WaitSecondsValue, WaitIntervalString, WaitIntervalUsecondsValue) {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
 }
@@ -963,7 +994,7 @@ func TestRestoreAllWait(t *testing.T) {
 	}
 
 	commandSet := sets.NewString(fcmd.CombinedOutputLog[1]...)
-	if !commandSet.HasAll("iptables-restore", WaitString, WaitSecondsValue, "--counters", "--noflush") {
+	if !commandSet.HasAll("iptables-restore", WaitString, WaitSecondsValue, WaitIntervalString, WaitIntervalUsecondsValue, "--counters", "--noflush") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
 
