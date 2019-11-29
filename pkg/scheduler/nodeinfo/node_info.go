@@ -548,11 +548,21 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			n.UpdateUsedPorts(pod, false)
 
 			n.generation = nextGeneration()
-
+			n.resetSlicesIfEmpty()
 			return nil
 		}
 	}
 	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
+}
+
+// resets the slices to nil so that we can do DeepEqual in unit tests.
+func (n *NodeInfo) resetSlicesIfEmpty() {
+	if len(n.podsWithAffinity) == 0 {
+		n.podsWithAffinity = nil
+	}
+	if len(n.pods) == 0 {
+		n.pods = nil
+	}
 }
 
 func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64) {
