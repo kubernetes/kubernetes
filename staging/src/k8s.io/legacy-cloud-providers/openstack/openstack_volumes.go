@@ -105,11 +105,6 @@ const (
 	volumeInUseStatus     = "in-use"
 	volumeDeletedStatus   = "deleted"
 	volumeErrorStatus     = "error"
-
-	// On some environments, we need to query the metadata service in order
-	// to locate disks. We'll use the Newton version, which includes device
-	// metadata.
-	newtonMetadataVersion = "2016-06-30"
 )
 
 func (volumes *VolumesV1) createVolume(opts volumeCreateOpts) (string, string, error) {
@@ -515,11 +510,7 @@ func (os *OpenStack) getDevicePathFromInstanceMetadata(volumeID string) string {
 	// volumes, we're querying the metadata service. Note that the Hyper-V
 	// driver will include device metadata for untagged volumes as well.
 	//
-	// We're avoiding using cached metadata (or the configdrive),
-	// relying on the metadata service.
-	instanceMetadata, err := getMetadataFromMetadataService(
-		newtonMetadataVersion)
-
+	instanceMetadata, err := getMetadata(os.metadataOpts.SearchOrder)
 	if err != nil {
 		klog.V(4).Infof(
 			"Could not retrieve instance metadata. Error: %v", err)
