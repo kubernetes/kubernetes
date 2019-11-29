@@ -437,7 +437,7 @@ func testHost(host string, deleteFiles bool, imageDesc, junitFilePrefix, ginkgoF
 	}
 	externalIp := getExternalIp(instance)
 	if len(externalIp) > 0 {
-		remote.AddHostnameIp(host, externalIp)
+		remote.AddHostnameIP(host, externalIp)
 	}
 
 	path, err := arc.getArchive()
@@ -648,7 +648,7 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 		}
 		externalIp := getExternalIp(instance)
 		if len(externalIp) > 0 {
-			remote.AddHostnameIp(name, externalIp)
+			remote.AddHostnameIP(name, externalIp)
 		}
 		// TODO(random-liu): Remove the docker version check. Use some other command to check
 		// instance readiness.
