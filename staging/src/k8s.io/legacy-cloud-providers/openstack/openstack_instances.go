@@ -81,6 +81,39 @@ func (i *Instances) AddSSHKeyToAllInstances(ctx context.Context, user string, ke
 func (i *Instances) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
 	klog.V(4).Infof("NodeAddresses(%v) called", name)
 
+	// check if the node is local, in this case we can get its addresses from the metadata service
+	// without additional requests to Nova.
+	md, err := getMetadata(i.opts.SearchOrder)
+	if err != nil {
+		return nil, err
+	}
+	localName := types.NodeName(md.Name)
+	if localName == name {
+		addrs := []v1.NodeAddress{
+			{
+				Type:    v1.NodeHostName,
+				Address: md.Name,
+			},
+		}
+
+		if md.LocalIP != "" {
+			addrs = append(addrs, v1.NodeAddress{
+				Type:    v1.NodeInternalIP,
+				Address: md.LocalIP,
+			})
+		}
+
+		if md.PublicIP != "" {
+			addrs = append(addrs, v1.NodeAddress{
+				Type:    v1.NodeExternalIP,
+				Address: md.PublicIP,
+			})
+		}
+
+		klog.V(4).Infof("NodeAddresses(%v) => %v", name, addrs)
+		return addrs, nil
+	}
+
 	addrs, err := getAddressesByName(i.compute, name)
 	if err != nil {
 		return nil, err
@@ -199,6 +232,17 @@ func (i *Instances) InstanceTypeByProviderID(ctx context.Context, providerID str
 
 // InstanceType returns the type of the specified instance.
 func (i *Instances) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
+	// check if the node is local, in this case we can get its type from the metadata service
+	// without additional requests to Nova.
+	md, err := getMetadata(i.opts.SearchOrder)
+	if err != nil {
+		return "", err
+	}
+	localName := types.NodeName(md.Name)
+	if localName == name {
+		return md.InstanceType, nil
+	}
+
 	srv, err := getServerByName(i.compute, name)
 
 	if err != nil {
