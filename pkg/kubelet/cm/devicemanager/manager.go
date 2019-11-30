@@ -177,7 +177,9 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 		}
 	}
 	m.mutex.Unlock()
-	m.writeCheckpoint()
+	if err := m.writeCheckpoint(); err != nil {
+		klog.Errorf("writing checkpoint encountered %v", err)
+	}
 }
 
 func (m *ManagerImpl) removeContents(dir string) error {
@@ -541,7 +543,9 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 	}
 	m.mutex.Unlock()
 	if needsUpdateCheckpoint {
-		m.writeCheckpoint()
+		if err := m.writeCheckpoint(); err != nil {
+			klog.Errorf("writing checkpoint encountered %v", err)
+		}
 	}
 	return capacity, allocatable, deletedResources.UnsortedList()
 }
