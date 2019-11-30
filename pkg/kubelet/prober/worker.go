@@ -219,11 +219,6 @@ func (w *worker) doProbe() (keepGoing bool) {
 			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever
 	}
 
-	// Probe disabled for InitialDelaySeconds.
-	if int32(time.Since(c.State.Running.StartedAt.Time).Seconds()) < w.spec.InitialDelaySeconds {
-		return true
-	}
-
 	if c.Started != nil && *c.Started {
 		// Stop probing for startup once container has started.
 		if w.probeType == startup {
