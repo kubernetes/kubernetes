@@ -1739,6 +1739,7 @@ func (c *Cloud) GetCandidateZonesForDynamicVolume() (sets.String, error) {
 			tagKey := aws.StringValue(tag.Key)
 			if awsTagNameMasterRoles.Has(tagKey) {
 				master = true
+				break
 			}
 		}
 
