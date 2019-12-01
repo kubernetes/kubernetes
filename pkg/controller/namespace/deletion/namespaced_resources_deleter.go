@@ -129,12 +129,15 @@ func (d *namespacedResourcesDeleter) Delete(nsName string) error {
 	}
 
 	// there may still be content for us to remove
-	estimate, err := d.deleteAllContent(namespace)
+	estimate, remainingResources, err := d.deleteAllContent(namespace)
 	if err != nil {
 		return err
 	}
 	if estimate > 0 {
-		return &ResourcesRemainingError{estimate}
+		return &ResourcesRemainingError{
+			Estimate:  estimate,
+			Resources: remainingResources,
+		}
 	}
 
 	// we have removed content, so mark it finalized by us
@@ -190,11 +193,12 @@ func (d *namespacedResourcesDeleter) initOpCache() {
 
 // ResourcesRemainingError is used to inform the caller that all resources are not yet fully removed from the namespace.
 type ResourcesRemainingError struct {
-	Estimate int64
+	Resources sets.String
+	Estimate  int64
 }
 
 func (e *ResourcesRemainingError) Error() string {
-	return fmt.Sprintf("some content remains in the namespace, estimate %d seconds before it is removed", e.Estimate)
+	return fmt.Sprintf("some content (%v) remains in the namespace, estimate %d seconds before it is removed", e.Resources.List(), e.Estimate)
 }
 
 // operation is used for caching if an operation is supported on a dynamic client.
@@ -497,12 +501,13 @@ type allGVRDeletionMetadata struct {
 // deleteAllContent will use the dynamic client to delete each resource identified in groupVersionResources.
 // It returns an estimate of the time remaining before the remaining resources are deleted.
 // If estimate > 0, not all resources are guaranteed to be gone.
-func (d *namespacedResourcesDeleter) deleteAllContent(ns *v1.Namespace) (int64, error) {
+func (d *namespacedResourcesDeleter) deleteAllContent(ns *v1.Namespace) (int64, sets.String, error) {
 	namespace := ns.Name
 	namespaceDeletedAt := *ns.DeletionTimestamp
 	var errs []error
 	conditionUpdater := namespaceConditionUpdater{}
 	estimate := int64(0)
+	remainingResources := sets.String{}
 	klog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s", namespace)
 
 	resources, err := d.discoverResourcesFn()
@@ -534,6 +539,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ns *v1.Namespace) (int64, 
 		}
 		if gvrDeletionMetadata.finalizerEstimateSeconds > estimate {
 			estimate = gvrDeletionMetadata.finalizerEstimateSeconds
+			remainingResources.Insert(gvr.String())
 		}
 		if gvrDeletionMetadata.numRemaining > 0 {
 			numRemainingTotals.gvrToNumRemaining[gvr] = gvrDeletionMetadata.numRemaining
@@ -558,7 +564,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ns *v1.Namespace) (int64, 
 
 	// if len(errs)==0, NewAggregate returns nil.
 	klog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, estimate: %v, errors: %v", namespace, estimate, utilerrors.NewAggregate(errs))
-	return estimate, utilerrors.NewAggregate(errs)
+	return estimate, remainingResources, utilerrors.NewAggregate(errs)
 }
 
 // estimateGrracefulTermination will estimate the graceful termination required for the specific entity in the namespace
