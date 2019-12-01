@@ -22,6 +22,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -1121,6 +1122,15 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 		k.Run(podCfg.Updates())
 	}, 0, wait.NeverStop)
 
+	// start logging the iptables lock
+	go func() {
+		klog.Info("Started kubelet iptables lock watcher")
+		for {
+			getPIDsIptablesLock()
+			time.Sleep(1 * time.Second)
+		}
+	}()
+
 	// start the kubelet server
 	if enableServer {
 		go k.ListenAndServe(net.ParseIP(kubeCfg.Address), uint(kubeCfg.Port), kubeDeps.TLSOptions, kubeDeps.Auth, enableCAdvisorJSONEndpoints, kubeCfg.EnableDebuggingHandlers, kubeCfg.EnableContentionProfiling)
@@ -1307,4 +1317,28 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 	}
 	<-stopCh
 	return nil
+}
+
+func getPIDsIptablesLock() {
+	// read the /proc filesystem
+	files, _ := ioutil.ReadDir("/proc")
+	for _, pid := range files {
+		// only check the PID folders
+		m, _ := filepath.Match("[0-9]*", pid.Name())
+		if pid.IsDir() && m {
+			fdpath := filepath.Join("/proc", pid.Name(), "fd")
+			ffiles, _ := ioutil.ReadDir(fdpath)
+			for _, fd := range ffiles {
+				// dereference the file
+				fpath, err := os.Readlink(filepath.Join(fdpath, fd.Name()))
+				if err != nil {
+					continue
+				}
+				cmd, _ := ioutil.ReadFile(filepath.Join("/proc", pid.Name(), "cmdline"))
+				if fpath == "/run/xtables.lock" {
+					klog.Infof("IPTABLES lock acquired by %q", string(cmd))
+				}
+			}
+		}
+	}
 }
