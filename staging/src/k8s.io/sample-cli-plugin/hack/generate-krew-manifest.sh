@@ -24,7 +24,7 @@ archive="$out_dirname/archive.tar.gz"
 mkdir -p "$out_dirname"
 
 if ! hash envsubst 2>/dev/null; then
-  echo >&2 'This script requires `envsubst` from the gettext package.'
+  echo >&2 'This script requires "envsubst" from the gettext package.'
   exit 1
 fi
 
@@ -33,7 +33,7 @@ if [[ ! -f "$archive" ]]; then
   exit 1
 fi
 
-ARCHIVE_SHASUM=$(sha256sum "$archive" | sed 's/ .*//') envsubst '$ARCHIVE_SHASUM' \
+ARCHIVE_SHASUM=$(sha256sum "$archive" | sed 's/ .*//') envsubst "\${ARCHIVE_SHASUM}" \
   < "${SCRIPTDIR}/sample-plugin-template.yaml" \
   > "$out_dirname/sample-plugin.yaml"
 
