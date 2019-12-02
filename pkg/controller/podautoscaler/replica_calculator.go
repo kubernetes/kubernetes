@@ -35,7 +35,7 @@ const (
 	// defaultTestingTolerance is default value for calculating when to
 	// scale up/scale down.
 	defaultTestingTolerance                     = 0.1
-	defaultTestingCpuInitializationPeriod       = 2 * time.Minute
+	defaultTestingCPUInitializationPeriod       = 2 * time.Minute
 	defaultTestingDelayOfInitialReadinessStatus = 10 * time.Second
 )
 
