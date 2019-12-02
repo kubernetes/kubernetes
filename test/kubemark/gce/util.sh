@@ -107,3 +107,7 @@ function delete-kubemark-master {
     "${KUBE_ROOT}/hack/e2e-internal/e2e-down.sh"
   )
 }
+
+function calculate-node-labels {
+  echo "cloud.google.com/metadata-proxy-ready=true"
+}

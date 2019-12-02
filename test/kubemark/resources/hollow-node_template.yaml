@@ -58,6 +58,7 @@ spec:
           "$(CONTENT_TYPE)",
           "--log-file=/var/log/kubelet-$(NODE_NAME).log",
           "--logtostderr=false",
+          "--node-labels={{hollow_node_labels}}",
           {{hollow_kubelet_params}}
         ]
         volumeMounts:

@@ -35,6 +35,11 @@ function delete-kubemark-master {
   echo "Deleting cluster..."
 }
 
+# This function should return node labels.
+function calculate-node-labels {
+  echo ""
+}
+
 # Common colors used throughout the kubemark scripts
 if [[ -z "${color_start-}" ]]; then
   declare -r color_start="\033["
