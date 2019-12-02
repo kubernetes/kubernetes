@@ -779,10 +779,8 @@ func (ss *scaleSet) EnsureHostInPool(service *v1.Service, nodeName types.NodeNam
 		return err
 	}
 
-	// Invalidate the cache since we would update it.
-	if err = ss.deleteCacheForNode(vmName); err != nil {
-		return err
-	}
+	// Invalidate the cache since right after update
+	defer ss.deleteCacheForNode(vmName)
 
 	// Update vmssVM with backoff.
 	ctx, cancel := getContextWithCancel()
@@ -1054,10 +1052,8 @@ func (ss *scaleSet) ensureBackendPoolDeletedFromNode(service *v1.Service, nodeNa
 		return err
 	}
 
-	// Invalidate the cache since we would update it.
-	if err = ss.deleteCacheForNode(nodeName); err != nil {
-		return err
-	}
+	// Invalidate the cache since right after update
+	defer ss.deleteCacheForNode(nodeName)
 
 	// Update vmssVM with backoff.
 	ctx, cancel := getContextWithCancel()
