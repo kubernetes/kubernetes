@@ -22,7 +22,7 @@ import (
 
 	"regexp"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -97,12 +97,12 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			pod1 := f.PodClient().CreateSync(makeBusyboxPod(resourceName, podRECMD))
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
 			devID1 := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
-			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")))
+			framework.ExpectNotEqual(devID1, "")
 
 			podResources, err := getNodeDevices()
 			var resourcesForOurPod *kubeletpodresourcesv1alpha1.PodResources
 			framework.Logf("pod resources %v", podResources)
-			gomega.Expect(err).To(gomega.BeNil())
+			framework.ExpectEqual(err, nil)
 			framework.ExpectEqual(len(podResources.PodResources), 2)
 			for _, res := range podResources.GetPodResources() {
 				if res.Name == pod1.Name {
@@ -110,7 +110,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				}
 			}
 			framework.Logf("resourcesForOurPod %v", resourcesForOurPod)
-			gomega.Expect(resourcesForOurPod).NotTo(gomega.BeNil())
+			framework.ExpectNotEqual(resourcesForOurPod, nil)
 			framework.ExpectEqual(resourcesForOurPod.Name, pod1.Name)
 			framework.ExpectEqual(resourcesForOurPod.Namespace, pod1.Namespace)
 			framework.ExpectEqual(len(resourcesForOurPod.Containers), 1)
@@ -181,7 +181,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			ginkgo.By("Checking that pod got a different fake device")
 			devID2 := parseLog(f, pod2.Name, pod2.Name, deviceIDRE)
 
-			gomega.Expect(devID1).To(gomega.Not(gomega.Equal(devID2)))
+			framework.ExpectNotEqual(devID1, devID2)
 
 			ginkgo.By("By deleting the pods and waiting for container removal")
 			err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(dp.Name, &deleteOptions)
