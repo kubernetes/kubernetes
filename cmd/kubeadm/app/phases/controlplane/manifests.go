@@ -162,7 +162,12 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 		}
 	} else {
 		// Default to etcd static pod on localhost
-		defaultArguments["etcd-servers"] = fmt.Sprintf("https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort)
+		// localhost IP family should be the same that the AdvertiseAddress
+		etcdLocalhostAddress := "127.0.0.1"
+		if utilsnet.IsIPv6String(localAPIEndpoint.AdvertiseAddress) {
+			etcdLocalhostAddress = "::1"
+		}
+		defaultArguments["etcd-servers"] = fmt.Sprintf("https://%s", net.JoinHostPort(etcdLocalhostAddress, strconv.Itoa(kubeadmconstants.EtcdListenClientPort)))
 		defaultArguments["etcd-cafile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName)
 		defaultArguments["etcd-certfile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientCertName)
 		defaultArguments["etcd-keyfile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientKeyName)
@@ -175,7 +180,7 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 		}
 	}
 
-	// TODO: The following code should be remvoved after dual-stack is GA.
+	// TODO: The following code should be removed after dual-stack is GA.
 	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
 	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {
 		defaultArguments["feature-gates"] = fmt.Sprintf("%s=%t", features.IPv6DualStack, enabled)
