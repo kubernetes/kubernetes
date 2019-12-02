@@ -18,6 +18,8 @@ package benchmark
 
 import (
 	"fmt"
+	"math"
+	"sort"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -44,11 +46,13 @@ var (
 	testCSIDriver = plugins.AWSEBSDriverName
 	// From PV controller
 	annBindCompleted = "pv.kubernetes.io/bind-completed"
+
+	defaultWaitForPodsInterval = 1 * time.Second
 )
 
 // BenchmarkScheduling benchmarks the scheduling rate when the cluster has
 // various quantities of nodes and scheduled pods.
-func BenchmarkScheduling(b *testing.B) {
+func TestBenchmarkScheduling(t *testing.T) {
 	tests := []struct{ nodes, existingPods, minPods int }{
 		{nodes: 100, existingPods: 0, minPods: 100},
 		{nodes: 100, existingPods: 1000, minPods: 100},
@@ -56,26 +60,33 @@ func BenchmarkScheduling(b *testing.B) {
 		{nodes: 1000, existingPods: 1000, minPods: 100},
 		{nodes: 5000, existingPods: 1000, minPods: 1000},
 	}
+	dataItems := DataItems{Version: "v1"}
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("rc1")
 	testStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("rc2")
 	for _, test := range tests {
-		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
-		b.Run(name, func(b *testing.B) {
-			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, defaultNodeStrategy, setupStrategy, testStrategy, b)
+		name := fmt.Sprintf("%vNodes_%vExistingPods_%vPods", test.nodes, test.existingPods, test.minPods)
+		t.Run(name, func(t *testing.T) {
+			schedulingThroughput := benchmarkScheduling(test.nodes, test.existingPods, test.minPods, defaultNodeStrategy, setupStrategy, testStrategy)
+			dataItems.DataItems = append(dataItems.DataItems, throughput2dataItem(schedulingThroughput, map[string]string{"Name": name}))
+			dataItems.DataItems = append(dataItems.DataItems, metrics2dataItems(metrics, map[string]string{"Name": name})...)
 		})
+	}
+	if err := DateItem2JSONFile(dataItems, t.Name()); err != nil {
+		klog.Fatalf("%v: unable to write measured data: %v", t.Name(), err)
 	}
 }
 
 // BenchmarkSchedulingPodAntiAffinity benchmarks the scheduling rate of pods with
 // PodAntiAffinity rules when the cluster has various quantities of nodes and
 // scheduled pods.
-func BenchmarkSchedulingPodAntiAffinity(b *testing.B) {
+func TestBenchmarkSchedulingPodAntiAffinity(t *testing.T) {
 	tests := []struct{ nodes, existingPods, minPods int }{
 		{nodes: 500, existingPods: 250, minPods: 250},
 		{nodes: 500, existingPods: 5000, minPods: 250},
 		{nodes: 1000, existingPods: 1000, minPods: 500},
 		{nodes: 5000, existingPods: 1000, minPods: 1000},
 	}
+	dataItems := DataItems{Version: "v1"}
 	// The setup strategy creates pods with no affinity rules.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
 	testBasePod := makeBasePodWithPodAntiAffinity(
@@ -84,10 +95,15 @@ func BenchmarkSchedulingPodAntiAffinity(b *testing.B) {
 	// The test strategy creates pods with anti-affinity for each other.
 	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
 	for _, test := range tests {
-		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
-		b.Run(name, func(b *testing.B) {
-			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, defaultNodeStrategy, setupStrategy, testStrategy, b)
+		name := fmt.Sprintf("%vNodes_%vExistingPods_%vPods", test.nodes, test.existingPods, test.minPods)
+		t.Run(name, func(t *testing.T) {
+			schedulingThroughput := benchmarkScheduling(test.nodes, test.existingPods, test.minPods, defaultNodeStrategy, setupStrategy, testStrategy)
+			dataItems.DataItems = append(dataItems.DataItems, throughput2dataItem(schedulingThroughput, map[string]string{"Name": name}))
+			dataItems.DataItems = append(dataItems.DataItems, metrics2dataItems(metrics, map[string]string{"Name": name})...)
 		})
+	}
+	if err := DateItem2JSONFile(dataItems, t.Name()); err != nil {
+		klog.Fatalf("%v: unable to write measured data: %v", t.Name(), err)
 	}
 }
 
@@ -95,36 +111,43 @@ func BenchmarkSchedulingPodAntiAffinity(b *testing.B) {
 // volumes that don't require any special handling, such as Secrets.
 // It can be used to compare scheduler efficiency with the other benchmarks
 // that use volume scheduling predicates.
-func BenchmarkSchedulingSecrets(b *testing.B) {
+func TestBenchmarkSchedulingSecrets(t *testing.T) {
 	tests := []struct{ nodes, existingPods, minPods int }{
 		{nodes: 500, existingPods: 250, minPods: 250},
 		{nodes: 500, existingPods: 5000, minPods: 250},
 		{nodes: 1000, existingPods: 1000, minPods: 500},
 		{nodes: 5000, existingPods: 1000, minPods: 1000},
 	}
+	dataItems := DataItems{Version: "v1"}
 	// The setup strategy creates pods with no volumes.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
 	// The test strategy creates pods with a secret.
 	testBasePod := makeBasePodWithSecret()
 	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
 	for _, test := range tests {
-		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
-		b.Run(name, func(b *testing.B) {
-			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, defaultNodeStrategy, setupStrategy, testStrategy, b)
+		name := fmt.Sprintf("%vNodes_%vExistingPods_%vPods", test.nodes, test.existingPods, test.minPods)
+		t.Run(name, func(t *testing.T) {
+			schedulingThroughput := benchmarkScheduling(test.nodes, test.existingPods, test.minPods, defaultNodeStrategy, setupStrategy, testStrategy)
+			dataItems.DataItems = append(dataItems.DataItems, throughput2dataItem(schedulingThroughput, map[string]string{"Name": name}))
+			dataItems.DataItems = append(dataItems.DataItems, metrics2dataItems(metrics, map[string]string{"Name": name})...)
 		})
+	}
+	if err := DateItem2JSONFile(dataItems, t.Name()); err != nil {
+		klog.Fatalf("%v: unable to write measured data: %v", t.Name(), err)
 	}
 }
 
 // BenchmarkSchedulingInTreePVs benchmarks the scheduling rate of pods with
 // in-tree volumes (used via PV/PVC). Nodes have default hardcoded attach limits
 // (39 for AWS EBS).
-func BenchmarkSchedulingInTreePVs(b *testing.B) {
+func TestBenchmarkSchedulingInTreePVs(t *testing.T) {
 	tests := []struct{ nodes, existingPods, minPods int }{
 		{nodes: 500, existingPods: 250, minPods: 250},
 		{nodes: 500, existingPods: 5000, minPods: 250},
 		{nodes: 1000, existingPods: 1000, minPods: 500},
 		{nodes: 5000, existingPods: 1000, minPods: 1000},
 	}
+	dataItems := DataItems{Version: "v1"}
 	// The setup strategy creates pods with no volumes.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
 
@@ -133,23 +156,29 @@ func BenchmarkSchedulingInTreePVs(b *testing.B) {
 	basePod := makeBasePod()
 	testStrategy := testutils.NewCreatePodWithPersistentVolumeStrategy(baseClaim, awsVolumeFactory, basePod)
 	for _, test := range tests {
-		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
-		b.Run(name, func(b *testing.B) {
-			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, defaultNodeStrategy, setupStrategy, testStrategy, b)
+		name := fmt.Sprintf("%vNodes_%vExistingPods_%vPods", test.nodes, test.existingPods, test.minPods)
+		t.Run(name, func(t *testing.T) {
+			schedulingThroughput := benchmarkScheduling(test.nodes, test.existingPods, test.minPods, defaultNodeStrategy, setupStrategy, testStrategy)
+			dataItems.DataItems = append(dataItems.DataItems, throughput2dataItem(schedulingThroughput, map[string]string{"Name": name}))
+			dataItems.DataItems = append(dataItems.DataItems, metrics2dataItems(metrics, map[string]string{"Name": name})...)
 		})
+	}
+	if err := DateItem2JSONFile(dataItems, t.Name()); err != nil {
+		klog.Fatalf("%v: unable to write measured data: %v", t.Name(), err)
 	}
 }
 
 // BenchmarkSchedulingMigratedInTreePVs benchmarks the scheduling rate of pods with
 // in-tree volumes (used via PV/PVC) that are migrated to CSI. CSINode instances exist
 // for all nodes and have proper annotation that AWS is migrated.
-func BenchmarkSchedulingMigratedInTreePVs(b *testing.B) {
+func TestBenchmarkSchedulingMigratedInTreePVs(t *testing.T) {
 	tests := []struct{ nodes, existingPods, minPods int }{
 		{nodes: 500, existingPods: 250, minPods: 250},
 		{nodes: 500, existingPods: 5000, minPods: 250},
 		{nodes: 1000, existingPods: 1000, minPods: 500},
 		{nodes: 5000, existingPods: 1000, minPods: 1000},
 	}
+	dataItems := DataItems{Version: "v1"}
 	// The setup strategy creates pods with no volumes.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
 
@@ -172,24 +201,29 @@ func BenchmarkSchedulingMigratedInTreePVs(b *testing.B) {
 	}
 	nodeStrategy := testutils.NewNodeAllocatableStrategy(allocatable, csiAllocatable, []string{csilibplugins.AWSEBSInTreePluginName})
 	for _, test := range tests {
-		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
-		b.Run(name, func(b *testing.B) {
-			defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
-			defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, true)()
-			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, nodeStrategy, setupStrategy, testStrategy, b)
+		name := fmt.Sprintf("%vNodes_%vExistingPods_%vPods", test.nodes, test.existingPods, test.minPods)
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(&testing.B{}, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(&testing.B{}, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, true)()
+			schedulingThroughput := benchmarkScheduling(test.nodes, test.existingPods, test.minPods, nodeStrategy, setupStrategy, testStrategy)
+			dataItems.DataItems = append(dataItems.DataItems, throughput2dataItem(schedulingThroughput, map[string]string{"Name": name}))
+			dataItems.DataItems = append(dataItems.DataItems, metrics2dataItems(metrics, map[string]string{"Name": name})...)
 		})
+	}
+	if err := DateItem2JSONFile(dataItems, t.Name()); err != nil {
+		klog.Fatalf("%v: unable to write measured data: %v", t.Name(), err)
 	}
 }
 
 // node.status.allocatable.
-func BenchmarkSchedulingCSIPVs(b *testing.B) {
+func TestBenchmarkSchedulingCSIPVs(t *testing.T) {
 	tests := []struct{ nodes, existingPods, minPods int }{
 		{nodes: 500, existingPods: 250, minPods: 250},
 		{nodes: 500, existingPods: 5000, minPods: 250},
 		{nodes: 1000, existingPods: 1000, minPods: 500},
 		{nodes: 5000, existingPods: 1000, minPods: 1000},
 	}
-
+	dataItems := DataItems{Version: "v1"}
 	// The setup strategy creates pods with no volumes.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
 
@@ -212,23 +246,29 @@ func BenchmarkSchedulingCSIPVs(b *testing.B) {
 	}
 	nodeStrategy := testutils.NewNodeAllocatableStrategy(allocatable, csiAllocatable, []string{})
 	for _, test := range tests {
-		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
-		b.Run(name, func(b *testing.B) {
-			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, nodeStrategy, setupStrategy, testStrategy, b)
+		name := fmt.Sprintf("%vNodes_%vExistingPods_%vPods", test.nodes, test.existingPods, test.minPods)
+		t.Run(name, func(t *testing.T) {
+			schedulingThroughput := benchmarkScheduling(test.nodes, test.existingPods, test.minPods, nodeStrategy, setupStrategy, testStrategy)
+			dataItems.DataItems = append(dataItems.DataItems, throughput2dataItem(schedulingThroughput, map[string]string{"Name": name}))
+			dataItems.DataItems = append(dataItems.DataItems, metrics2dataItems(metrics, map[string]string{"Name": name})...)
 		})
+	}
+	if err := DateItem2JSONFile(dataItems, t.Name()); err != nil {
+		klog.Fatalf("%v: unable to write measured data: %v", t.Name(), err)
 	}
 }
 
 // BenchmarkSchedulingPodAffinity benchmarks the scheduling rate of pods with
 // PodAffinity rules when the cluster has various quantities of nodes and
 // scheduled pods.
-func BenchmarkSchedulingPodAffinity(b *testing.B) {
+func TestBenchmarkSchedulingPodAffinity(t *testing.T) {
 	tests := []struct{ nodes, existingPods, minPods int }{
 		{nodes: 500, existingPods: 250, minPods: 250},
 		{nodes: 500, existingPods: 5000, minPods: 250},
 		{nodes: 1000, existingPods: 1000, minPods: 500},
 		{nodes: 5000, existingPods: 1000, minPods: 1000},
 	}
+	dataItems := DataItems{Version: "v1"}
 	// The setup strategy creates pods with no affinity rules.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
 	testBasePod := makeBasePodWithPodAffinity(
@@ -239,23 +279,29 @@ func BenchmarkSchedulingPodAffinity(b *testing.B) {
 	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
 	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelZoneFailureDomain, "zone1")
 	for _, test := range tests {
-		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
-		b.Run(name, func(b *testing.B) {
-			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, nodeStrategy, setupStrategy, testStrategy, b)
+		name := fmt.Sprintf("%vNodes_%vExistingPods_%vPods", test.nodes, test.existingPods, test.minPods)
+		t.Run(name, func(t *testing.T) {
+			schedulingThroughput := benchmarkScheduling(test.nodes, test.existingPods, test.minPods, nodeStrategy, setupStrategy, testStrategy)
+			dataItems.DataItems = append(dataItems.DataItems, throughput2dataItem(schedulingThroughput, map[string]string{"Name": name}))
+			dataItems.DataItems = append(dataItems.DataItems, metrics2dataItems(metrics, map[string]string{"Name": name})...)
 		})
+	}
+	if err := DateItem2JSONFile(dataItems, t.Name()); err != nil {
+		klog.Fatalf("%v: unable to write measured data: %v", t.Name(), err)
 	}
 }
 
 // BenchmarkSchedulingNodeAffinity benchmarks the scheduling rate of pods with
 // NodeAffinity rules when the cluster has various quantities of nodes and
 // scheduled pods.
-func BenchmarkSchedulingNodeAffinity(b *testing.B) {
+func TestBenchmarkSchedulingNodeAffinity(t *testing.T) {
 	tests := []struct{ nodes, existingPods, minPods int }{
 		{nodes: 500, existingPods: 250, minPods: 250},
 		{nodes: 500, existingPods: 5000, minPods: 250},
 		{nodes: 1000, existingPods: 1000, minPods: 500},
 		{nodes: 5000, existingPods: 1000, minPods: 1000},
 	}
+	dataItems := DataItems{Version: "v1"}
 	// The setup strategy creates pods with no affinity rules.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
 	testBasePod := makeBasePodWithNodeAffinity(v1.LabelZoneFailureDomain, []string{"zone1", "zone2"})
@@ -263,10 +309,15 @@ func BenchmarkSchedulingNodeAffinity(b *testing.B) {
 	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
 	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelZoneFailureDomain, "zone1")
 	for _, test := range tests {
-		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
-		b.Run(name, func(b *testing.B) {
-			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, nodeStrategy, setupStrategy, testStrategy, b)
+		name := fmt.Sprintf("%vNodes_%vExistingPods_%vPods", test.nodes, test.existingPods, test.minPods)
+		t.Run(name, func(t *testing.T) {
+			schedulingThroughput := benchmarkScheduling(test.nodes, test.existingPods, test.minPods, nodeStrategy, setupStrategy, testStrategy)
+			dataItems.DataItems = append(dataItems.DataItems, throughput2dataItem(schedulingThroughput, map[string]string{"Name": name}))
+			dataItems.DataItems = append(dataItems.DataItems, metrics2dataItems(metrics, map[string]string{"Name": name})...)
 		})
+	}
+	if err := DateItem2JSONFile(dataItems, t.Name()); err != nil {
+		klog.Fatalf("%v: unable to write measured data: %v", t.Name(), err)
 	}
 }
 
@@ -356,10 +407,7 @@ func makeBasePodWithNodeAffinity(key string, vals []string) *v1.Pod {
 func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	nodeStrategy testutils.PrepareNodeStrategy,
 	setupPodStrategy, testPodStrategy testutils.TestPodCreateStrategy,
-	b *testing.B) {
-	if b.N < minPods {
-		b.N = minPods
-	}
+) *SchedulingThroughput {
 	finalFunc, podInformer, clientset := mustSetupScheduler()
 	defer finalFunc()
 
@@ -398,24 +446,60 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 			oldPod := old.(*v1.Pod)
 
 			if len(oldPod.Spec.NodeName) == 0 && len(curPod.Spec.NodeName) > 0 {
-				if atomic.AddInt32(&scheduled, 1) >= int32(b.N) {
+				if atomic.AddInt32(&scheduled, 1) >= int32(minPods) {
 					completedCh <- struct{}{}
 				}
 			}
 		},
 	})
 
+	// Start measuring throughput
+	stopCh := make(chan struct{})
+	schedulingThroughputs := []float64{}
+	go func() {
+		lastScheduledCount := 0
+		for {
+			select {
+			case <-stopCh:
+				return
+			case <-time.After(defaultWaitForPodsInterval):
+				podsScheduled, err := getScheduledPods(podInformer)
+				if err != nil {
+					klog.Fatalf("%v", err)
+				}
+				scheduled := len(podsScheduled) - numExistingPods
+				throughput := float64(scheduled-lastScheduledCount) / float64(defaultWaitForPodsInterval/time.Second)
+				schedulingThroughputs = append(schedulingThroughputs, throughput)
+				lastScheduledCount = scheduled
+				klog.Infof("%d pods scheduled", lastScheduledCount)
+			}
+		}
+	}()
+
 	// start benchmark
-	b.ResetTimer()
 	config = testutils.NewTestPodCreatorConfig()
-	config.AddStrategy("sched-test", b.N, testPodStrategy)
+	config.AddStrategy("sched-test", minPods, testPodStrategy)
 	podCreator = testutils.NewTestPodCreator(clientset, config)
 	podCreator.CreatePods()
 
 	<-completedCh
 
-	// Note: without this line we're taking the overhead of defer() into account.
-	b.StopTimer()
+	close(stopCh)
+
+	throughputSummary := &SchedulingThroughput{}
+	if length := len(schedulingThroughputs); length > 0 {
+		sort.Float64s(schedulingThroughputs)
+		sum := 0.0
+		for i := range schedulingThroughputs {
+			sum += schedulingThroughputs[i]
+		}
+		throughputSummary.Average = sum / float64(length)
+		throughputSummary.Perc50 = schedulingThroughputs[int(math.Ceil(float64(length*50)/100))-1]
+		throughputSummary.Perc90 = schedulingThroughputs[int(math.Ceil(float64(length*90)/100))-1]
+		throughputSummary.Perc99 = schedulingThroughputs[int(math.Ceil(float64(length*99)/100))-1]
+	}
+
+	return throughputSummary
 }
 
 // makeBasePodWithSecrets creates a Pod object to be used as a template.

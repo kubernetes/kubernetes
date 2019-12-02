@@ -1,6 +1,9 @@
 package benchmark
 
 import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"math"
 	"sort"
 	"time"
@@ -10,11 +13,20 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
+var dateFormat = "2006-01-02T15:04:05Z"
+
 // LatencyMetric represent 50th, 90th and 99th duration quantiles.
 type LatencyMetric struct {
 	Perc50 time.Duration `json:"Perc50"`
 	Perc90 time.Duration `json:"Perc90"`
 	Perc99 time.Duration `json:"Perc99"`
+}
+
+type SchedulingThroughput struct {
+	Average float64 `json:"Average"`
+	Perc50  float64 `json:"Perc50"`
+	Perc90  float64 `json:"Perc90"`
+	Perc99  float64 `json:"Perc99"`
 }
 
 // DataItem is the data point.
@@ -33,6 +45,15 @@ type DataItem struct {
 type DataItems struct {
 	Version   string     `json:"version"`
 	DataItems []DataItem `json:"dataItems"`
+}
+
+func DateItem2JSONFile(dataItems DataItems, namePrefix string) error {
+	b, err := json.Marshal(dataItems)
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(fmt.Sprintf("%v_%v.json", namePrefix, time.Now().Format(dateFormat)), b, 0644)
 }
 
 // ToPerfData converts latency metric to PerfData.
@@ -193,6 +214,10 @@ func ensureMonotonic(buckets buckets) {
 func promHist2LatencyMetric(hist *dto.Histogram) *LatencyMetric {
 	buckets := []bucket{}
 
+	if hist.SampleCount != nil && *hist.SampleCount == 0 {
+		return &LatencyMetric{}
+	}
+
 	for _, bckt := range hist.Bucket {
 		b := bucket{
 			count:      float64(*bckt.CumulativeCount),
@@ -257,4 +282,23 @@ func metrics2dataItems(metrics []string, labels map[string]string) []DataItem {
 	}
 
 	return dataItems
+}
+
+func throughput2dataItem(throughput *SchedulingThroughput, labels map[string]string) DataItem {
+	dataItem := DataItem{
+		Data: map[string]float64{
+			"Average": throughput.Average,
+			"Perc50":  throughput.Perc50,
+			"Perc90":  throughput.Perc90,
+			"Perc99":  throughput.Perc99,
+		},
+		Unit: "s",
+		Labels: map[string]string{
+			"Metric": "scheduler_throughput",
+		},
+	}
+	for key, value := range labels {
+		dataItem.Labels[key] = value
+	}
+	return dataItem
 }
