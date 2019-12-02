@@ -48,7 +48,7 @@ func NewCacheMutationDetector(name string) MutationDetector {
 		return dummyMutationDetector{}
 	}
 	klog.Warningln("Mutation detector is enabled, this will result in memory leakage.")
-	return &defaultCacheMutationDetector{name: name, period: 1 * time.Second}
+	return &defaultCacheMutationDetector{name: name, period: 1 * time.Second, retainDuration: 2 * time.Minute}
 }
 
 type dummyMutationDetector struct{}
@@ -68,6 +68,10 @@ type defaultCacheMutationDetector struct {
 	lock       sync.Mutex
 	cachedObjs []cacheObj
 
+	retainDuration     time.Duration
+	lastRotated        time.Time
+	retainedCachedObjs []cacheObj
+
 	// failureFunc is injectable for unit testing.  If you don't have it, the process will panic.
 	// This panic is intentional, since turning on this detection indicates you want a strong
 	// failure signal.  This failure is effectively a p0 bug and you can't trust process results
@@ -84,6 +88,14 @@ type cacheObj struct {
 func (d *defaultCacheMutationDetector) Run(stopCh <-chan struct{}) {
 	// we DON'T want protection from panics.  If we're running this code, we want to die
 	for {
+		if d.lastRotated.IsZero() {
+			d.lastRotated = time.Now()
+		} else if time.Now().Sub(d.lastRotated) > d.retainDuration {
+			d.retainedCachedObjs = d.cachedObjs
+			d.cachedObjs = nil
+			d.lastRotated = time.Now()
+		}
+
 		d.CompareObjects()
 
 		select {
@@ -115,6 +127,12 @@ func (d *defaultCacheMutationDetector) CompareObjects() {
 
 	altered := false
 	for i, obj := range d.cachedObjs {
+		if !reflect.DeepEqual(obj.cached, obj.copied) {
+			fmt.Printf("CACHE %s[%d] ALTERED!\n%v\n", d.name, i, diff.ObjectGoPrintSideBySide(obj.cached, obj.copied))
+			altered = true
+		}
+	}
+	for i, obj := range d.retainedCachedObjs {
 		if !reflect.DeepEqual(obj.cached, obj.copied) {
 			fmt.Printf("CACHE %s[%d] ALTERED!\n%v\n", d.name, i, diff.ObjectGoPrintSideBySide(obj.cached, obj.copied))
 			altered = true
