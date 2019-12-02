@@ -266,7 +266,6 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 	}
 
 	podQueue := internalqueue.NewSchedulingQueue(
-		c.StopEverything,
 		framework,
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(c.podInitialBackoffSeconds)*time.Second),
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(c.podMaxBackoffSeconds)*time.Second),
@@ -280,11 +279,6 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		podQueue,
 	)
 	debugger.ListenForSignal(c.StopEverything)
-
-	go func() {
-		<-c.StopEverything
-		podQueue.Close()
-	}()
 
 	algo := core.NewGenericScheduler(
 		c.schedulerCache,
