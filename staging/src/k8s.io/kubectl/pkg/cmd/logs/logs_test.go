@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -31,9 +33,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	"k8s.io/kubectl/pkg/scheme"
 )
 
 func TestLog(t *testing.T) {
@@ -714,4 +719,99 @@ func (l *logTestMock) mockLogsForObject(restClientGetter genericclioptions.RESTC
 	default:
 		return nil, fmt.Errorf("cannot get the logs from %T", object)
 	}
+}
+
+func TestGetSelectedPod(t *testing.T) {
+
+	namespace := "test"
+	tf := cmdtesting.NewTestFactory().WithNamespace(namespace)
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	ns := scheme.Codecs.WithoutConversion()
+
+	podList := &corev1.PodList{
+		Items: []corev1.Pod{
+			{ObjectMeta: metav1.ObjectMeta{Name: "foo-1"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "baz"}},
+		},
+	}
+
+	tf.Client = &fake.RESTClient{
+		GroupVersion:         schema.GroupVersion{Version: "v1"},
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, podList)}, nil
+		}),
+	}
+
+	builder := tf.NewBuilder().
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
+		NamespaceParam(namespace).DefaultNamespace().
+		SingleResourceType()
+
+	buf := new(bytes.Buffer)
+	selectedPod := getSelectedPod(*builder, "foo", buf)
+
+	expected := "foo-1"
+	if selectedPod != expected {
+		t.Errorf("unexpected pod resource selection, got %s expected %s", selectedPod, expected)
+	}
+
+}
+
+func TestPrintContext(t *testing.T) {
+
+	pods := []string{"foo", "foo-1"}
+	buf := new(bytes.Buffer)
+	addPrintContext(pods, buf)
+
+	expected := `1	foo	
+2	foo-1	
+`
+
+	if expected != buf.String() {
+		t.Errorf("unexpected table content")
+	}
+}
+
+func TestContextHeaders(t *testing.T) {
+
+	buf := new(bytes.Buffer)
+	addContextHeaders(buf)
+
+	expected := `#	NAME
+`
+	if expected != buf.String() {
+		t.Errorf("unexpected table header content")
+	}
+
+}
+
+func TestPromptPodList(t *testing.T) {
+
+	t.Run("valid_number", func(t *testing.T) {
+		in, _ := ioutil.TempFile("", "")
+		defer in.Close()
+		io.WriteString(in, "2")
+		in.Seek(0, os.SEEK_SET)
+		selectedIndex, _ := promptPodList(4, in)
+		if selectedIndex != 2 {
+			t.Errorf("unexpected promp response")
+		}
+	})
+
+	t.Run("invalid_number", func(t *testing.T) {
+		in, _ := ioutil.TempFile("", "")
+		defer in.Close()
+		io.WriteString(in, "foo")
+		in.Seek(0, os.SEEK_SET)
+		_, err := promptPodList(4, in)
+		if err == nil {
+			t.Errorf("unexpected error promp response")
+		}
+
+	})
+
 }

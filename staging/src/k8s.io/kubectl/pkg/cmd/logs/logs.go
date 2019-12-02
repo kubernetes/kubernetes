@@ -21,7 +21,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"regexp"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,6 +34,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
@@ -77,7 +82,10 @@ var (
 		kubectl logs job/hello
 
 		# Return snapshot logs from container nginx-1 of a deployment named nginx
-		kubectl logs deployment/nginx -c nginx-1`))
+		kubectl logs deployment/nginx -c nginx-1
+		
+		# Get interactive table of available pods based on a filter
+		kubectl logs --like nginx`))
 
 	selectorTail    int64 = 10
 	logsUsageErrStr       = fmt.Sprintf("expected '%s'.\nPOD or TYPE/NAME is a required argument for the logs command", logsUsageStr)
@@ -107,6 +115,7 @@ type LogsOptions struct {
 	Tail                         int64
 	Container                    string
 	InsecureSkipTLSVerifyBackend bool
+	Like                         bool
 
 	// whether or not a container name was given via --container
 	ContainerNameSpecified bool
@@ -169,6 +178,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on.")
 	cmd.Flags().IntVar(&o.MaxFollowConcurrency, "max-log-requests", o.MaxFollowConcurrency, "Specify maximum number of concurrent logs to follow when using by a selector. Defaults to 5.")
 	cmd.Flags().BoolVar(&o.Prefix, "prefix", o.Prefix, "Prefix each log line with the log source (pod name and container name)")
+	cmd.Flags().BoolVar(&o.Like, "like", o.Like, "Get interactive table of available pods based on a filter")
 	return cmd
 }
 
@@ -257,6 +267,9 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 			NamespaceParam(o.Namespace).DefaultNamespace().
 			SingleResourceType()
 		if o.ResourceArg != "" {
+			if o.Like {
+				o.ResourceArg = getSelectedPod(*builder, o.ResourceArg, o.Out)
+			}
 			builder.ResourceNames("pods", o.ResourceArg)
 		}
 		if o.Selector != "" {
@@ -442,4 +455,93 @@ func (pw *prefixingWriter) Write(p []byte) (int, error) {
 		return len(p), err
 	}
 	return n, err
+}
+
+// getSelectedPod will show interactive table to select a specific pod
+func getSelectedPod(builder resource.Builder, resourceLike string, io io.Writer) string {
+
+	out := printers.GetNewTabWriter(io)
+	r := builder.SelectAllParam(true).ResourceTypes("pods").Flatten().Latest().Do()
+
+	if err := r.Err(); err != nil {
+		return resourceLike
+	}
+
+	infos, _ := r.Infos()
+
+	filteredPods := filterPods(infos, resourceLike)
+
+	if len(filteredPods) == 0 {
+		return resourceLike
+	}
+
+	allErrs := []error{}
+	err := addContextHeaders(out)
+	if err != nil {
+		allErrs = append(allErrs, err)
+	}
+
+	addPrintContext(filteredPods, out)
+	out.Flush()
+
+	selectedInstance := 1
+	if len(filteredPods) > 1 {
+		fmt.Printf("Enter a pod number [%d - %d]: ", 1, len(filteredPods))
+		for {
+			selectedIndex, err := promptPodList(len(filteredPods), nil)
+
+			if err == nil {
+				selectedInstance = selectedIndex
+				break
+			}
+			fmt.Printf("Number must be between %d - %d: ", 1, len(filteredPods))
+		}
+	}
+
+	return filteredPods[selectedInstance-1]
+
+}
+
+// addContextHeaders append headers fields to given writer
+func addContextHeaders(out io.Writer) error {
+	columnNames := []string{"#", "NAME"}
+
+	_, err := fmt.Fprintf(out, "%s\n", strings.Join(columnNames, "\t"))
+	return err
+}
+
+// addPrintContext will append to given writer pod list + index table position
+func addPrintContext(pods []string, w io.Writer) {
+	for i, pod := range pods {
+		fmt.Fprintf(w, "%d\t%s\t\n", i+1, pod)
+	}
+}
+
+// filterPods filter pods that continue the given value
+func filterPods(pods []*resource.Info, value string) []string {
+	podsList := []string{}
+	for _, pod := range pods {
+		if strings.Contains(pod.Name, value) {
+			podsList = append(podsList, pod.Name)
+		}
+	}
+
+	return podsList
+}
+
+// promptPodList prompt to user selection question to select number between 0-maxSelect given field
+func promptPodList(maxSelect int, in *os.File) (int, error) {
+	if in == nil {
+		in = os.Stdin
+	}
+
+	inputNumber := 0
+	reader := bufio.NewReader(in)
+	input, _ := reader.ReadString('\n')
+	inputNumber, _ = strconv.Atoi(strings.TrimSuffix(input, "\n"))
+	if inputNumber > maxSelect || inputNumber == 0 {
+		return 0, errors.New("Invalid number")
+	}
+
+	return inputNumber, nil
 }
