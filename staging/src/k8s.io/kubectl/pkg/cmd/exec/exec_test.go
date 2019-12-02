@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -31,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	kfake "k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/remotecommand"
@@ -403,5 +405,95 @@ func TestSetupTTY(t *testing.T) {
 	}
 	if tty.Out != o.Out {
 		t.Errorf("attach stdin, TTY, is a terminal: tty.Out should equal o.Out")
+	}
+}
+
+func TestFilterPods(t *testing.T) {
+
+	pods := []corev1.Pod{
+		{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "foo-1"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "none"}},
+	}
+
+	response := filterPods(pods, "foo")
+
+	if len(response) != 2 {
+		t.Errorf("unexpected pod filter count, got %d expected %d", len(response), 2)
+	}
+
+}
+
+func TestPrintContext(t *testing.T) {
+
+	pods := []string{"foo", "foo-1"}
+	buf := new(bytes.Buffer)
+	addPrintContext(pods, buf)
+
+	expected := `1	foo	
+2	foo-1	
+`
+
+	if expected != buf.String() {
+		t.Errorf("unexpected table content")
+	}
+}
+
+func TestContextHeaders(t *testing.T) {
+
+	buf := new(bytes.Buffer)
+	addContextHeaders(buf)
+
+	expected := `#	NAME
+`
+	if expected != buf.String() {
+		t.Errorf("unexpected table header content")
+	}
+
+}
+
+func TestPromptPodList(t *testing.T) {
+
+	t.Run("valid_number", func(t *testing.T) {
+		in, _ := ioutil.TempFile("", "")
+		defer in.Close()
+		io.WriteString(in, "2")
+		in.Seek(0, os.SEEK_SET)
+		selectedIndex, _ := promptPodList(4, in)
+		if selectedIndex != 2 {
+			t.Errorf("unexpected promp response")
+		}
+	})
+
+	t.Run("invalid_number", func(t *testing.T) {
+		in, _ := ioutil.TempFile("", "")
+		defer in.Close()
+		io.WriteString(in, "foo")
+		in.Seek(0, os.SEEK_SET)
+		_, err := promptPodList(4, in)
+		if err == nil {
+			t.Errorf("unexpected error promp response")
+		}
+
+	})
+
+}
+func TestSelectResourceName(t *testing.T) {
+
+	client := kfake.NewSimpleClientset()
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo-pod",
+		},
+	}
+
+	client.CoreV1().Pods("").Create(pod)
+
+	buf := new(bytes.Buffer)
+	podResourceName := selectPod(client.CoreV1(), buf, "foo", "")
+
+	if podResourceName != "foo-pod" {
+		t.Errorf("unexpected pod resource selection")
 	}
 }
