@@ -292,6 +292,8 @@ const (
 	NamespaceSystem string = "kube-system"
 	// NamespacePublic is the namespace where we place public info (ConfigMaps)
 	NamespacePublic string = "kube-public"
+	// NamespaceNodeLease is the namespace where we place node lease objects (used for node heartbeats)
+	NamespaceNodeLease = "kube-node-lease"
 )
 
 // OwnerReference contains enough information to let you identify an owning
