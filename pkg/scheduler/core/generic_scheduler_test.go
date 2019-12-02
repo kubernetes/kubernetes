@@ -662,7 +662,7 @@ func TestGenericScheduler(t *testing.T) {
 			}
 			scheduler := NewGenericScheduler(
 				cache,
-				internalqueue.NewSchedulingQueue(nil, nil),
+				internalqueue.NewSchedulingQueue(nil),
 				test.predicates,
 				predMetaProducer,
 				test.prioritizers,
@@ -702,7 +702,7 @@ func makeScheduler(predicates map[string]algorithmpredicates.FitPredicate, nodes
 
 	s := NewGenericScheduler(
 		cache,
-		internalqueue.NewSchedulingQueue(nil, nil),
+		internalqueue.NewSchedulingQueue(nil),
 		predicates,
 		algorithmpredicates.EmptyMetadataProducer,
 		nil,
@@ -819,7 +819,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			cache.AddNode(n)
 		}
 
-		queue := internalqueue.NewSchedulingQueue(nil, nil)
+		queue := internalqueue.NewSchedulingQueue(nil)
 		scheduler := NewGenericScheduler(
 			cache,
 			queue,
@@ -1412,7 +1412,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			filterPlugin.failedNodeReturnCodeMap = filterFailedNodeReturnCodeMap
 			scheduler := NewGenericScheduler(
 				nil,
-				internalqueue.NewSchedulingQueue(nil, nil),
+				internalqueue.NewSchedulingQueue(nil),
 				test.predicates,
 				factory.GetPredicateMetadata,
 				nil,
@@ -2160,7 +2160,7 @@ func TestPreempt(t *testing.T) {
 			}
 			scheduler := NewGenericScheduler(
 				cache,
-				internalqueue.NewSchedulingQueue(nil, nil),
+				internalqueue.NewSchedulingQueue(nil),
 				map[string]algorithmpredicates.FitPredicate{"matches": predicate},
 				predMetaProducer,
 				[]priorities.PriorityConfig{{Map: numericMapPriority, Weight: 1}},

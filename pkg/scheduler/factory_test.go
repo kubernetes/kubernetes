@@ -319,7 +319,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	defer close(stopCh)
 
 	timestamp := time.Now()
-	queue := internalqueue.NewPriorityQueue(nil, nil, internalqueue.WithClock(clock.NewFakeClock(timestamp)))
+	queue := internalqueue.NewPriorityQueue(nil, internalqueue.WithClock(clock.NewFakeClock(timestamp)))
 	schedulerCache := internalcache.New(30*time.Second, stopCh)
 	errFunc := MakeDefaultErrorFunc(client, queue, schedulerCache)
 

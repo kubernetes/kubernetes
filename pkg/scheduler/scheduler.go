@@ -420,8 +420,9 @@ func (sched *Scheduler) Run(ctx context.Context) {
 	if !cache.WaitForCacheSync(ctx.Done(), sched.scheduledPodsHasSynced) {
 		return
 	}
-
+	sched.SchedulingQueue.Run()
 	wait.UntilWithContext(ctx, sched.scheduleOne, 0)
+	sched.SchedulingQueue.Close()
 }
 
 // recordFailedSchedulingEvent records an event for the pod that indicates the
