@@ -68,7 +68,7 @@ define ALL_HELP_INFO
 #
 # Args:
 #   WHAT: Directory names to build.  If any of these directories has a 'main'
-#     package, the build will produce executable files under $(OUT_DIR)/go/bin.
+#     package, the build will produce executable files under $(OUT_DIR)/bin.
 #     If not specified, "everything" will be built.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
 #   GOLDFLAGS: Extra linking flags passed to 'go' when building.
