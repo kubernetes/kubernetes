@@ -67,6 +67,7 @@ var args = []string{
 	"--cluster-signing-cert-file=/cluster-signing-cert",
 	"--cluster-signing-key-file=/cluster-signing-key",
 	"--concurrent-deployment-syncs=10",
+	"--concurrent-job-syncs=10",
 	"--concurrent-statefulset-syncs=15",
 	"--concurrent-endpoint-syncs=10",
 	"--concurrent-service-endpoint-syncs=10",
@@ -272,7 +273,7 @@ func TestAddFlags(t *testing.T) {
 		},
 		JobController: &JobControllerOptions{
 			&jobconfig.JobControllerConfiguration{
-				ConcurrentJobSyncs: 5,
+				ConcurrentJobSyncs: 10,
 			},
 		},
 		NamespaceController: &NamespaceControllerOptions{
@@ -497,7 +498,7 @@ func TestApplyTo(t *testing.T) {
 				HorizontalPodAutoscalerUseRESTClients:               true,
 			},
 			JobController: jobconfig.JobControllerConfiguration{
-				ConcurrentJobSyncs: 5,
+				ConcurrentJobSyncs: 10,
 			},
 			NamespaceController: namespaceconfig.NamespaceControllerConfiguration{
 				NamespaceSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
