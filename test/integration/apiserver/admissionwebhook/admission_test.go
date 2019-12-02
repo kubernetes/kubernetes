@@ -439,8 +439,7 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 		// turn off admission plugins that add finalizers
 		"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection",
 		// force enable all resources so we can check storage.
-		// TODO: drop these once we stop allowing them to be served.
-		"--runtime-config=api/all=true,extensions/v1beta1/deployments=true,extensions/v1beta1/daemonsets=true,extensions/v1beta1/replicasets=true,extensions/v1beta1/podsecuritypolicies=true,extensions/v1beta1/networkpolicies=true",
+		"--runtime-config=api/all=true",
 	}, etcdConfig)
 	defer server.TearDownFn()
 

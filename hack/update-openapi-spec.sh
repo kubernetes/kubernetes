@@ -67,7 +67,7 @@ kube::log::status "Starting kube-apiserver"
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
-  --runtime-config="api/all=true,extensions/v1beta1/daemonsets=true,extensions/v1beta1/deployments=true,extensions/v1beta1/replicasets=true,extensions/v1beta1/networkpolicies=true,extensions/v1beta1/podsecuritypolicies=true,extensions/v1beta1/replicationcontrollers=true" \
+  --runtime-config="api/all=true" \
   --token-auth-file="${TMP_DIR}/tokenauth.csv" \
   --service-account-issuer="https://kubernetes.devault.svc/" \
   --service-account-signing-key-file="${KUBE_ROOT}/staging/src/k8s.io/client-go/util/cert/testdata/dontUseThisKey.pem" \
