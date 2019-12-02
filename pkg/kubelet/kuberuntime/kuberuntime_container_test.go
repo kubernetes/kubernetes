@@ -19,6 +19,7 @@ package kuberuntime
 import (
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -300,11 +301,11 @@ func TestLifeCycleHook(t *testing.T) {
 
 	// Configured and working HTTP hook
 	t.Run("PreStop-HTTPGet", func(t *testing.T) {
-		defer func() { fakeHTTP.url = "" }()
+		defer func() { fakeHTTP.req, _ = http.NewRequest(http.MethodGet, "", nil) }()
 		testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
 		m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriod)
 
-		if !strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.HTTPGet.Host) {
+		if !strings.Contains(fakeHTTP.req.URL.String(), httpLifeCycle.PreStop.HTTPGet.Host) {
 			t.Errorf("HTTP Prestop hook was not invoked")
 		}
 	})
@@ -318,8 +319,8 @@ func TestLifeCycleHook(t *testing.T) {
 
 		m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriodLocal)
 
-		if strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.HTTPGet.Host) {
-			t.Errorf("HTTP Should not execute when gracePeriod is 0")
+		if fakeHTTP.req != nil {
+			t.Errorf("HTTP Prestop hook Should not execute when gracePeriod is 0")
 		}
 	})
 

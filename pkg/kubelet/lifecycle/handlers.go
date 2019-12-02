@@ -38,9 +38,9 @@ const (
 	maxRespBodyLength = 10 * 1 << 10 // 10KB
 )
 
-type handlerRunner struct {
-	httpGetter       kubetypes.HTTPGetter
-	commandRunner    kubecontainer.CommandRunner
+type HandlerRunner struct {
+	httpDoer         kubetypes.HttpDoer
+	commandRunner    kubecontainer.ContainerCommandRunner
 	containerManager podStatusProvider
 }
 
@@ -48,10 +48,9 @@ type podStatusProvider interface {
 	GetPodStatus(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
 }
 
-// NewHandlerRunner returns a configured lifecycle handler for a container.
-func NewHandlerRunner(httpGetter kubetypes.HTTPGetter, commandRunner kubecontainer.CommandRunner, containerManager podStatusProvider) kubecontainer.HandlerRunner {
-	return &handlerRunner{
-		httpGetter:       httpGetter,
+func NewHandlerRunner(httpDoer kubetypes.HttpDoer, commandRunner kubecontainer.ContainerCommandRunner, containerManager podStatusProvider) kubecontainer.HandlerRunner {
+	return &HandlerRunner{
+		httpDoer:         httpDoer,
 		commandRunner:    commandRunner,
 		containerManager: containerManager,
 	}
@@ -109,7 +108,7 @@ func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int
 // formatURL formats a URL from args.
 func formatURL(scheme string, host string, port int, path string) *url.URL {
 	u, err := url.Parse(path)
-	// Something is bustsed with the path, but it's too late to reject it. Pass it along as is.
+	// Something is busted with the path, but it's too late to reject it. Pass it along as is.
 	if err != nil {
 		u = &url.URL{
 			Path: path,
@@ -118,6 +117,16 @@ func formatURL(scheme string, host string, port int, path string) *url.URL {
 	u.Scheme = scheme
 	u.Host = net.JoinHostPort(host, strconv.Itoa(port))
 	return u
+}
+
+// buildHeader takes a list of HTTPHeader <name, value> string pairs
+// and returns a populated string->[]string http.Header map.
+func buildHeader(headerList []v1.HTTPHeader) http.Header {
+	headers := make(http.Header)
+	for _, header := range headerList {
+		headers[header.Name] = append(headers[header.Name], header.Value)
+	}
+	return headers
 }
 
 func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler) (string, error) {
@@ -145,7 +154,14 @@ func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 	}
 	path := handler.HTTPGet.Path
 	url := formatURL("http", host, port, path)
-	resp, err := hr.httpGetter.Get(url.String())
+
+	req, err := http.NewRequest(http.MethodGet, url.String(), nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header = buildHeader(handler.HTTPGet.HTTPHeaders)
+	resp, err := hr.httpDoer.Do(req)
+
 	return getHttpRespBody(resp), err
 }
 

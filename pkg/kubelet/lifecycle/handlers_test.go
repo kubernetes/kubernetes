@@ -122,13 +122,15 @@ func TestRunHandlerExec(t *testing.T) {
 }
 
 type fakeHTTP struct {
-	url  string
-	err  error
-	resp *http.Response
+	url     string
+	headers http.Header
+	err     error
+	resp    *http.Response
 }
 
-func (f *fakeHTTP) Get(url string) (*http.Response, error) {
-	f.url = url
+func (f *fakeHTTP) Do(req *http.Request) (*http.Response, error) {
+	f.url = req.URL.String()
+	f.headers = req.Header.Clone()
 	return f.resp, f.err
 }
 
@@ -162,6 +164,45 @@ func TestRunHandlerHttp(t *testing.T) {
 	}
 	if fakeHTTPGetter.url != "http://foo:8080/bar" {
 		t.Errorf("unexpected url: %s", fakeHTTPGetter.url)
+	}
+}
+
+func TestRunHandlerHttpWithHeaders(t *testing.T) {
+	fakeHttp := fakeHTTP{}
+	handlerRunner := NewHandlerRunner(&fakeHttp, &fakeContainerCommandRunner{}, nil)
+
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
+	containerName := "containerFoo"
+
+	container := v1.Container{
+		Name: containerName,
+		Lifecycle: &v1.Lifecycle{
+			PostStart: &v1.Handler{
+				HTTPGet: &v1.HTTPGetAction{
+					Host: "foo",
+					Port: intstr.FromInt(8080),
+					Path: "/bar",
+					HTTPHeaders: []v1.HTTPHeader{
+						{Name: "foo", Value: "bar"},
+					},
+				},
+			},
+		},
+	}
+	pod := v1.Pod{}
+	pod.ObjectMeta.Name = "podFoo"
+	pod.ObjectMeta.Namespace = "nsFoo"
+	pod.Spec.Containers = []v1.Container{container}
+	_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if fakeHttp.url != "http://foo:8080/bar" {
+		t.Errorf("unexpected url: %s", fakeHttp.url)
+	}
+	if fakeHttp.headers["foo"][0] != "bar" {
+		t.Errorf("missing http header: %s", fakeHttp.headers)
 	}
 }
 
