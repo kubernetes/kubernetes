@@ -776,7 +776,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
 			framework.ExpectNoError(err)
 			e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
-			ss = e2esset.WaitForStatus(c, ss)
 
 			ginkgo.By("getting scale subresource")
 			scale, err := c.AppsV1().StatefulSets(ns).GetScale(ssName, metav1.GetOptions{})
@@ -1083,7 +1082,7 @@ func rollbackTest(c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 	e2esset.SortStatefulPods(pods)
 	err = e2esset.BreakPodHTTPProbe(ss, &pods.Items[1])
 	framework.ExpectNoError(err)
-	ss, pods = e2esset.WaitForPodNotReady(c, ss, pods.Items[1].Name)
+	ss, _ = e2esset.WaitForPodNotReady(c, ss, pods.Items[1].Name)
 	newImage := NewWebserverImage
 	oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
@@ -1104,7 +1103,7 @@ func rollbackTest(c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 	e2esset.SortStatefulPods(pods)
 	err = e2esset.RestorePodHTTPProbe(ss, &pods.Items[1])
 	framework.ExpectNoError(err)
-	ss, pods = e2esset.WaitForPodReady(c, ss, pods.Items[1].Name)
+	ss, _ = e2esset.WaitForPodReady(c, ss, pods.Items[1].Name)
 	ss, pods = e2esset.WaitForRollingUpdate(c, ss)
 	framework.ExpectEqual(ss.Status.CurrentRevision, updateRevision, fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal update revision %s on update completion",
 		ss.Namespace,
@@ -1127,9 +1126,8 @@ func rollbackTest(c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 	ginkgo.By("Rolling back to a previous revision")
 	err = e2esset.BreakPodHTTPProbe(ss, &pods.Items[1])
 	framework.ExpectNoError(err)
-	ss, pods = e2esset.WaitForPodNotReady(c, ss, pods.Items[1].Name)
+	ss, _ = e2esset.WaitForPodNotReady(c, ss, pods.Items[1].Name)
 	priorRevision := currentRevision
-	currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
 	ss, err = e2esset.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 		update.Spec.Template.Spec.Containers[0].Image = oldImage
 	})
@@ -1143,7 +1141,7 @@ func rollbackTest(c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 	pods = e2esset.GetPodList(c, ss)
 	e2esset.SortStatefulPods(pods)
 	e2esset.RestorePodHTTPProbe(ss, &pods.Items[1])
-	ss, pods = e2esset.WaitForPodReady(c, ss, pods.Items[1].Name)
+	ss, _ = e2esset.WaitForPodReady(c, ss, pods.Items[1].Name)
 	ss, pods = e2esset.WaitForRollingUpdate(c, ss)
 	framework.ExpectEqual(ss.Status.CurrentRevision, priorRevision, fmt.Sprintf("StatefulSet %s/%s current revision %s does not equal prior revision %s on rollback completion",
 		ss.Namespace,

@@ -27,7 +27,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -181,14 +180,6 @@ func failureTrap(c clientset.Interface, ns string) {
 func intOrStrP(num int) *intstr.IntOrString {
 	intstr := intstr.FromInt(num)
 	return &intstr
-}
-
-func newDeploymentRollback(name string, annotations map[string]string, revision int64) *extensionsv1beta1.DeploymentRollback {
-	return &extensionsv1beta1.DeploymentRollback{
-		Name:               name,
-		UpdatedAnnotations: annotations,
-		RollbackTo:         extensionsv1beta1.RollbackConfig{Revision: revision},
-	}
 }
 
 func stopDeployment(c clientset.Interface, ns, deploymentName string) {
@@ -377,7 +368,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 		numPodCreation := 1
 		for {
 			select {
-			case event, _ := <-w.ResultChan():
+			case event := <-w.ResultChan():
 				if event.Type != watch.Added {
 					continue
 				}
@@ -454,6 +445,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	framework.Logf("Make sure deployment %q performs scaling operations", deploymentName)
 	// Make sure the deployment starts to scale up and down replica sets by checking if its updated replicas >= 1
 	err = e2edeploy.WaitForDeploymentUpdatedReplicasGTE(c, ns, deploymentName, deploymentReplicas, deployment.Generation)
+	framework.ExpectNoError(err)
 	// Check if it's updated to revision 1 correctly
 	framework.Logf("Check revision of new replica set for deployment %q", deploymentName)
 	err = e2edeploy.CheckDeploymentRevisionAndImage(c, ns, deploymentName, "1", deploymentImage)
@@ -625,6 +617,7 @@ func testIterativeDeployments(f *framework.Framework) {
 		deployment, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *appsv1.Deployment) {
 			update.Spec.Paused = false
 		})
+		framework.ExpectNoError(err)
 	}
 
 	framework.Logf("Waiting for deployment %q to be observed by the controller", deploymentName)
@@ -798,7 +791,7 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	// Scale the deployment to 30 replicas.
 	newReplicas = int32(30)
 	framework.Logf("Scaling up the deployment %q from %d to %d", deploymentName, replicas, newReplicas)
-	deployment, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *appsv1.Deployment) {
+	_, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *appsv1.Deployment) {
 		update.Spec.Replicas = &newReplicas
 	})
 	framework.ExpectNoError(err)
