@@ -131,6 +131,10 @@ func (cm *ClientManager) HookClient(cc ClientConfig) (*rest.RESTClient, error) {
 	}
 
 	complete := func(cfg *rest.Config) (*rest.RESTClient, error) {
+		// Avoid client-side rate limiting talking to the webhook backend.
+		// Rate limiting should happen when deciding how many requests to serve.
+		cfg.QPS = -1
+
 		// Combine CAData from the config with any existing CA bundle provided
 		if len(cfg.TLSClientConfig.CAData) > 0 {
 			cfg.TLSClientConfig.CAData = append(cfg.TLSClientConfig.CAData, '\n')
