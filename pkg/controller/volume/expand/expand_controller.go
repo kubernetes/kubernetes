@@ -102,7 +102,8 @@ func NewExpandController(
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	cloud cloudprovider.Interface,
-	plugins []volume.VolumePlugin) (ExpandController, error) {
+	plugins []volume.VolumePlugin,
+	prober volume.DynamicPluginProber) (ExpandController, error) {
 
 	expc := &expandController{
 		kubeClient: kubeClient,
@@ -113,7 +114,7 @@ func NewExpandController(
 		pvSynced:   pvInformer.Informer().HasSynced,
 	}
 
-	if err := expc.volumePluginMgr.InitPlugins(plugins, nil, expc); err != nil {
+	if err := expc.volumePluginMgr.InitPlugins(plugins, prober, expc); err != nil {
 		return nil, fmt.Errorf("Could not initialize volume plugins for Expand Controller : %+v", err)
 	}
 
