@@ -398,9 +398,20 @@ func (h *DefaultPluginHandler) Execute(executablePath string, cmdArgs, environme
 func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string) error {
 	remainingArgs := []string{} // all "non-flag" arguments
 
+	flag := false
 	for idx := range cmdArgs {
+		if flag {
+			flag = false
+			continue
+		}
+		if strings.HasPrefix(cmdArgs[idx], "--") {
+			if !strings.Contains(cmdArgs[idx], "=") {
+				flag = true
+			}
+			continue
+		}
 		if strings.HasPrefix(cmdArgs[idx], "-") {
-			break
+			continue
 		}
 		remainingArgs = append(remainingArgs, strings.Replace(cmdArgs[idx], "-", "_", -1))
 	}
@@ -424,7 +435,19 @@ func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string) error {
 	}
 
 	// invoke cmd binary relaying the current environment and args given
-	if err := pluginHandler.Execute(foundBinaryPath, cmdArgs[len(remainingArgs):], os.Environ()); err != nil {
+	pluginCmdArgs := []string{}
+	for _, arg := range cmdArgs {
+		replacedArg := arg
+		if !strings.HasPrefix(arg, "-") {
+			replacedArg = strings.Replace(arg, "-", "_", -1)
+		}
+		for _, remainingArg := range remainingArgs {
+			if replacedArg != remainingArg {
+				pluginCmdArgs = append(pluginCmdArgs, arg)
+			}
+		}
+	}
+	if err := pluginHandler.Execute(foundBinaryPath, pluginCmdArgs, os.Environ()); err != nil {
 		return err
 	}
 

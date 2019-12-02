@@ -74,6 +74,12 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			expectPluginArgs: []string{"--bar"},
 		},
 		{
+			name:             "test that a plugin executable handles command args correctly",
+			args:             []string{"kubectl", "--context", "dev", "foo", "--bar"},
+			expectPlugin:     "plugin/testdata/kubectl-foo",
+			expectPluginArgs: []string{"--context", "dev", "--bar"},
+		},
+		{
 			name: "test that a plugin does not execute over an existing command by the same name",
 			args: []string{"kubectl", "version"},
 		},
