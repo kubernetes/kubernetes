@@ -112,6 +112,7 @@ func NewExpandController(
 	scInformer storageclassinformer.StorageClassInformer,
 	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
+	prober volume.DynamicPluginProber,
 	translator CSINameTranslator,
 	csiMigratedPluginManager csimigration.PluginManager) (ExpandController, error) {
 
@@ -129,7 +130,7 @@ func NewExpandController(
 		csiMigratedPluginManager: csiMigratedPluginManager,
 	}
 
-	if err := expc.volumePluginMgr.InitPlugins(plugins, nil, expc); err != nil {
+	if err := expc.volumePluginMgr.InitPlugins(plugins, prober, expc); err != nil {
 		return nil, fmt.Errorf("could not initialize volume plugins for Expand Controller : %+v", err)
 	}
 

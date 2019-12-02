@@ -365,6 +365,7 @@ func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, err
 			ctx.InformerFactory.Storage().V1().StorageClasses(),
 			ctx.Cloud,
 			plugins,
+			GetDynamicPluginProber(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
 			csiTranslator,
 			csimigration.NewPluginManager(csiTranslator))
 
