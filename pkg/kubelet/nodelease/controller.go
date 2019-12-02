@@ -213,7 +213,7 @@ func (c *controller) newLease(base *coordinationv1.Lease) *coordinationv1.Lease 
 	// kubelet.nodeRef.UID. When lease is initially created, it is possible that
 	// the connection between master and node is not ready yet. So try to set
 	// owner reference every time when renewing the lease, until successful.
-	if lease.OwnerReferences == nil || len(lease.OwnerReferences) == 0 {
+	if len(lease.OwnerReferences) == 0 {
 		if node, err := c.client.CoreV1().Nodes().Get(c.holderIdentity, metav1.GetOptions{}); err == nil {
 			lease.OwnerReferences = []metav1.OwnerReference{
 				{
