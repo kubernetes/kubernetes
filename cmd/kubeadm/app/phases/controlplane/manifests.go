@@ -324,6 +324,11 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string 
 		}
 	}
 
+	// Set cluster name
+	if cfg.ClusterName != "" {
+		defaultArguments["cluster-name"] = cfg.ClusterName
+	}
+
 	// TODO: The following code should be remvoved after dual-stack is GA.
 	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
 	enabled, present := cfg.FeatureGates[features.IPv6DualStack]
