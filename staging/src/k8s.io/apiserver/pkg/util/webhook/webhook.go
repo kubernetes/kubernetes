@@ -88,6 +88,10 @@ func newGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFact
 	// Set this to something reasonable so request to webhooks don't hang forever.
 	clientConfig.Timeout = requestTimeout
 
+	// Avoid client-side rate limiting talking to the webhook backend.
+	// Rate limiting should happen when deciding how many requests to serve.
+	clientConfig.QPS = -1
+
 	codec := codecFactory.LegacyCodec(groupVersions...)
 	clientConfig.ContentConfig.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 
