@@ -73,12 +73,12 @@ func (ps *pdbStates) VerifyPdbStatus(t *testing.T, key string, disruptionsAllowe
 	disruptedPodMap map[string]metav1.Time) {
 	actualPDB := ps.Get(key)
 	expectedStatus := policy.PodDisruptionBudgetStatus{
-		PodDisruptionsAllowed: disruptionsAllowed,
-		CurrentHealthy:        currentHealthy,
-		DesiredHealthy:        desiredHealthy,
-		ExpectedPods:          expectedPods,
-		DisruptedPods:         disruptedPodMap,
-		ObservedGeneration:    actualPDB.Generation,
+		DisruptionsAllowed: disruptionsAllowed,
+		CurrentHealthy:     currentHealthy,
+		DesiredHealthy:     desiredHealthy,
+		ExpectedPods:       expectedPods,
+		DisruptedPods:      disruptedPodMap,
+		ObservedGeneration: actualPDB.Generation,
 	}
 	actualStatus := actualPDB.Status
 	if !apiequality.Semantic.DeepEqual(actualStatus, expectedStatus) {
@@ -89,9 +89,9 @@ func (ps *pdbStates) VerifyPdbStatus(t *testing.T, key string, disruptionsAllowe
 
 func (ps *pdbStates) VerifyDisruptionAllowed(t *testing.T, key string, disruptionsAllowed int32) {
 	pdb := ps.Get(key)
-	if pdb.Status.PodDisruptionsAllowed != disruptionsAllowed {
+	if pdb.Status.DisruptionsAllowed != disruptionsAllowed {
 		debug.PrintStack()
-		t.Fatalf("PodDisruptionAllowed mismatch for PDB %q.  Expected %v but got %v.", key, disruptionsAllowed, pdb.Status.PodDisruptionsAllowed)
+		t.Fatalf("PodDisruptionAllowed mismatch for PDB %q.  Expected %v but got %v.", key, disruptionsAllowed, pdb.Status.DisruptionsAllowed)
 	}
 }
 
@@ -1043,15 +1043,15 @@ func TestDeploymentFinderFunction(t *testing.T) {
 // This test checks that the disruption controller does not write stale data to
 // a PDB status during race conditions with the eviction handler. Specifically,
 // failed updates due to ResourceVersion conflict should not cause a stale value
-// of PodDisruptionsAllowed to be written.
+// of DisruptionsAllowed to be written.
 //
-// In this test, PodDisruptionsAllowed starts at 2.
+// In this test, DisruptionsAllowed starts at 2.
 // (A) We will delete 1 pod and trigger DisruptionController to set
-// PodDisruptionsAllowed to 1.
+// DisruptionsAllowed to 1.
 // (B) As the DisruptionController attempts this write, we will evict the
-// remaining 2 pods and update PodDisruptionsAllowed to 0. (The real eviction
-// handler would allow this because it still sees PodDisruptionsAllowed=2.)
-// (C) If the DisruptionController writes PodDisruptionsAllowed=1 despite the
+// remaining 2 pods and update DisruptionsAllowed to 0. (The real eviction
+// handler would allow this because it still sees DisruptionsAllowed=2.)
+// (C) If the DisruptionController writes DisruptionsAllowed=1 despite the
 // resource conflict error, then there is a bug.
 func TestUpdatePDBStatusRetries(t *testing.T) {
 	dc, _ := newFakeDisruptionController()
@@ -1106,10 +1106,10 @@ func TestUpdatePDBStatusRetries(t *testing.T) {
 		}
 		updatedPDB := obj.(*policy.PodDisruptionBudget)
 		// Each eviction,
-		// - decrements PodDisruptionsAllowed
+		// - decrements DisruptionsAllowed
 		// - adds the pod to DisruptedPods
 		// - deletes the pod
-		updatedPDB.Status.PodDisruptionsAllowed -= int32(len(podNames))
+		updatedPDB.Status.DisruptionsAllowed -= int32(len(podNames))
 		updatedPDB.Status.DisruptedPods = make(map[string]metav1.Time)
 		for _, name := range podNames {
 			updatedPDB.Status.DisruptedPods[name] = metav1.NewTime(time.Now())
@@ -1161,8 +1161,8 @@ func TestUpdatePDBStatusRetries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get PDB: %v", err)
 	}
-	if expected, actual := int32(0), finalPDB.Status.PodDisruptionsAllowed; expected != actual {
-		t.Errorf("PodDisruptionsAllowed should be %d, got %d", expected, actual)
+	if expected, actual := int32(0), finalPDB.Status.DisruptionsAllowed; expected != actual {
+		t.Errorf("DisruptionsAllowed should be %d, got %d", expected, actual)
 	}
 }
 

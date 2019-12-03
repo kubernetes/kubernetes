@@ -24,7 +24,7 @@ import (
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -71,7 +71,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			if err != nil {
 				return false, err
 			}
-			return pdb.Status.PodDisruptionsAllowed > 0, nil
+			return pdb.Status.DisruptionsAllowed > 0, nil
 		})
 		framework.ExpectNoError(err)
 	})

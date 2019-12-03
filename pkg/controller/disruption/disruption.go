@@ -743,14 +743,14 @@ func (dc *DisruptionController) buildDisruptedPodMap(pods []*v1.Pod, pdb *policy
 	return result, recheckTime
 }
 
-// failSafe is an attempt to at least update the PodDisruptionsAllowed field to
+// failSafe is an attempt to at least update the DisruptionsAllowed field to
 // 0 if everything else has failed.  This is one place we
 // implement the  "fail open" part of the design since if we manage to update
 // this field correctly, we will prevent the /evict handler from approving an
 // eviction when it may be unsafe to do so.
 func (dc *DisruptionController) failSafe(pdb *policy.PodDisruptionBudget) error {
 	newPdb := pdb.DeepCopy()
-	newPdb.Status.PodDisruptionsAllowed = 0
+	newPdb.Status.DisruptionsAllowed = 0
 	return dc.getUpdater()(newPdb)
 }
 
@@ -769,7 +769,7 @@ func (dc *DisruptionController) updatePdbStatus(pdb *policy.PodDisruptionBudget,
 	if pdb.Status.CurrentHealthy == currentHealthy &&
 		pdb.Status.DesiredHealthy == desiredHealthy &&
 		pdb.Status.ExpectedPods == expectedCount &&
-		pdb.Status.PodDisruptionsAllowed == disruptionsAllowed &&
+		pdb.Status.DisruptionsAllowed == disruptionsAllowed &&
 		apiequality.Semantic.DeepEqual(pdb.Status.DisruptedPods, disruptedPods) &&
 		pdb.Status.ObservedGeneration == pdb.Generation {
 		return nil
@@ -777,12 +777,12 @@ func (dc *DisruptionController) updatePdbStatus(pdb *policy.PodDisruptionBudget,
 
 	newPdb := pdb.DeepCopy()
 	newPdb.Status = policy.PodDisruptionBudgetStatus{
-		CurrentHealthy:        currentHealthy,
-		DesiredHealthy:        desiredHealthy,
-		ExpectedPods:          expectedCount,
-		PodDisruptionsAllowed: disruptionsAllowed,
-		DisruptedPods:         disruptedPods,
-		ObservedGeneration:    pdb.Generation,
+		CurrentHealthy:     currentHealthy,
+		DesiredHealthy:     desiredHealthy,
+		ExpectedPods:       expectedCount,
+		DisruptionsAllowed: disruptionsAllowed,
+		DisruptedPods:      disruptedPods,
+		ObservedGeneration: pdb.Generation,
 	}
 
 	return dc.getUpdater()(newPdb)
