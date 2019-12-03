@@ -20,6 +20,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	apiserverconfigv1 "k8s.io/apiserver/pkg/apis/config/v1"
+	"k8s.io/apiserver/pkg/apis/config/validation"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
@@ -46,7 +48,6 @@ const (
 	aesGCMTransformerPrefixV1    = "k8s:enc:aesgcm:v1:"
 	secretboxTransformerPrefixV1 = "k8s:enc:secretbox:v1:"
 	kmsTransformerPrefixV1       = "k8s:enc:kms:v1:"
-	kmsPluginConnectionTimeout   = 3 * time.Second
 	kmsPluginHealthzTTL          = 3 * time.Second
 )
 
@@ -104,15 +105,7 @@ func getKMSPluginProbes(reader io.Reader) ([]*kmsPluginProbe, error) {
 	for _, r := range config.Resources {
 		for _, p := range r.Providers {
 			if p.KMS != nil {
-				timeout := kmsPluginConnectionTimeout
-				if p.KMS.Timeout != nil {
-					if p.KMS.Timeout.Duration <= 0 {
-						return nil, fmt.Errorf("could not configure KMS-Plugin's probe %q, timeout should be a positive value", p.KMS.Name)
-					}
-					timeout = p.KMS.Timeout.Duration
-				}
-
-				s, err := envelope.NewGRPCService(p.KMS.Endpoint, timeout)
+				s, err := envelope.NewGRPCService(p.KMS.Endpoint, p.KMS.Timeout.Duration)
 				if err != nil {
 					return nil, fmt.Errorf("could not configure KMS-Plugin's probe %q, error: %v", p.KMS.Name, err)
 				}
@@ -221,7 +214,8 @@ func loadConfig(data []byte) (*apiserverconfig.EncryptionConfiguration, error) {
 	if !ok {
 		return nil, fmt.Errorf("got unexpected config type: %v", gvk)
 	}
-	return config, nil
+
+	return config, validation.ValidateEncryptionConfiguration(config).ToAggregate()
 }
 
 // The factory to create kms service. This is to make writing test easier.
@@ -231,82 +225,38 @@ var envelopeServiceFactory = envelope.NewGRPCService
 func GetPrefixTransformers(config *apiserverconfig.ResourceConfiguration) ([]value.PrefixTransformer, error) {
 	var result []value.PrefixTransformer
 	for _, provider := range config.Providers {
-		found := false
+		var (
+			transformer value.PrefixTransformer
+			err         error
+		)
 
-		var transformer value.PrefixTransformer
-		var err error
-
-		if provider.AESGCM != nil {
+		switch {
+		case provider.AESGCM != nil:
 			transformer, err = GetAESPrefixTransformer(provider.AESGCM, aestransformer.NewGCMTransformer, aesGCMTransformerPrefixV1)
-			if err != nil {
-				return result, err
-			}
-			found = true
-		}
-
-		if provider.AESCBC != nil {
-			if found == true {
-				return result, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
-			}
+		case provider.AESCBC != nil:
 			transformer, err = GetAESPrefixTransformer(provider.AESCBC, aestransformer.NewCBCTransformer, aesCBCTransformerPrefixV1)
-			found = true
-		}
-
-		if provider.Secretbox != nil {
-			if found == true {
-				return result, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
-			}
+		case provider.Secretbox != nil:
 			transformer, err = GetSecretboxPrefixTransformer(provider.Secretbox)
-			found = true
-		}
-
-		if provider.Identity != nil {
-			if found == true {
-				return result, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
-			}
-			transformer = value.PrefixTransformer{
-				Transformer: identity.NewEncryptCheckTransformer(),
-				Prefix:      []byte{},
-			}
-			found = true
-		}
-
-		if provider.KMS != nil {
-			if found == true {
-				return nil, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
-			}
-
-			// Ensure the endpoint is provided.
-			if len(provider.KMS.Endpoint) == 0 {
-				return nil, fmt.Errorf("remote KMS provider can't use empty string as endpoint")
-			}
-
-			timeout := kmsPluginConnectionTimeout
-			if provider.KMS.Timeout != nil {
-				if provider.KMS.Timeout.Duration <= 0 {
-					return nil, fmt.Errorf("could not configure KMS plugin %q, timeout should be a positive value", provider.KMS.Name)
-				}
-				timeout = provider.KMS.Timeout.Duration
-			}
-
-			// Get gRPC client service with endpoint.
-			envelopeService, err := envelopeServiceFactory(provider.KMS.Endpoint, timeout)
+		case provider.KMS != nil:
+			envelopeService, err := envelopeServiceFactory(provider.KMS.Endpoint, provider.KMS.Timeout.Duration)
 			if err != nil {
 				return nil, fmt.Errorf("could not configure KMS plugin %q, error: %v", provider.KMS.Name, err)
 			}
 
 			transformer, err = getEnvelopePrefixTransformer(provider.KMS, envelopeService, kmsTransformerPrefixV1)
-			found = true
+		case provider.Identity != nil:
+			transformer = value.PrefixTransformer{
+				Transformer: identity.NewEncryptCheckTransformer(),
+				Prefix:      []byte{},
+			}
+		default:
+			return nil, errors.New("provider does not contain any of the expected providers: KMS, AESGCM, AESCBC, Secretbox, Identity")
 		}
 
 		if err != nil {
 			return result, err
 		}
 		result = append(result, transformer)
-
-		if found == false {
-			return result, fmt.Errorf("invalid provider configuration: at least one provider must be specified")
-		}
 	}
 	return result, nil
 }
@@ -417,7 +367,7 @@ func GetSecretboxPrefixTransformer(config *apiserverconfig.SecretboxConfiguratio
 // getEnvelopePrefixTransformer returns a prefix transformer from the provided config.
 // envelopeService is used as the root of trust.
 func getEnvelopePrefixTransformer(config *apiserverconfig.KMSConfiguration, envelopeService envelope.Service, prefix string) (value.PrefixTransformer, error) {
-	envelopeTransformer, err := envelope.NewEnvelopeTransformer(envelopeService, int(config.CacheSize), aestransformer.NewCBCTransformer)
+	envelopeTransformer, err := envelope.NewEnvelopeTransformer(envelopeService, int(*config.CacheSize), aestransformer.NewCBCTransformer)
 	if err != nil {
 		return value.PrefixTransformer{}, err
 	}

@@ -22,15 +22,12 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"reflect"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
@@ -82,6 +79,7 @@ func newMockEnvelopeService(endpoint string, timeout time.Duration) (envelope.Se
 func TestLegacyConfig(t *testing.T) {
 	legacyV1Config := "testdata/valid-configs/legacy.yaml"
 	legacyConfigObject, err := loadConfig(mustReadConfig(t, legacyV1Config))
+	cacheSize := int32(10)
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, legacyV1Config)
 	}
@@ -101,7 +99,8 @@ func TestLegacyConfig(t *testing.T) {
 					{KMS: &apiserverconfig.KMSConfiguration{
 						Name:      "testprovider",
 						Endpoint:  "unix:///tmp/testprovider.sock",
-						CacheSize: 10,
+						CacheSize: &cacheSize,
+						Timeout:   &metav1.Duration{Duration: 3 * time.Second},
 					}},
 					{AESCBC: &apiserverconfig.AESConfiguration{
 						Keys: []apiserverconfig.Key{
@@ -118,8 +117,8 @@ func TestLegacyConfig(t *testing.T) {
 			},
 		},
 	}
-	if !reflect.DeepEqual(legacyConfigObject, expected) {
-		t.Fatal(diff.ObjectReflectDiff(expected, legacyConfigObject))
+	if d := cmp.Diff(expected, legacyConfigObject); d != "" {
+		t.Fatalf("EncryptionConfig mismatch (-want +got):\n%s", d)
 	}
 }
 
@@ -206,80 +205,8 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 	}
 }
 
-// Throw error if key has no secret
-func TestEncryptionProviderConfigNoSecretForKey(t *testing.T) {
-	incorrectConfigNoSecretForKey := "testdata/invalid-configs/aes/no-key.yaml"
-	if _, err := ParseEncryptionConfiguration(mustConfigReader(t, incorrectConfigNoSecretForKey)); err == nil {
-		t.Fatalf("invalid configuration file (one key has no secret) got parsed:\n%s", incorrectConfigNoSecretForKey)
-	}
-}
-
-// Throw error if invalid key for AES
-func TestEncryptionProviderConfigInvalidKey(t *testing.T) {
-	incorrectConfigInvalidKey := "testdata/invalid-configs/aes/invalid-key.yaml"
-	if _, err := ParseEncryptionConfiguration(mustConfigReader(t, incorrectConfigInvalidKey)); err == nil {
-		t.Fatalf("invalid configuration file (bad AES key) got parsed:\n%s", incorrectConfigInvalidKey)
-	}
-}
-
-// Throw error if kms has no endpoint
-func TestEncryptionProviderConfigNoEndpointForKMS(t *testing.T) {
-	incorrectConfigNoEndpointForKMS := "testdata/invalid-configs/kms/no-endpoint.yaml"
-	if _, err := ParseEncryptionConfiguration(mustConfigReader(t, incorrectConfigNoEndpointForKMS)); err == nil {
-		t.Fatalf("invalid configuration file (kms has no endpoint) got parsed:\n%s", incorrectConfigNoEndpointForKMS)
-	}
-}
-
-func TestKMSConfigTimeout(t *testing.T) {
-	testCases := []struct {
-		desc    string
-		config  string
-		want    time.Duration
-		wantErr string
-	}{
-		{
-			desc:   "duration explicitly provided",
-			config: "testdata/valid-configs/kms/valid-timeout.yaml",
-			want:   15 * time.Second,
-		},
-		{
-			desc:    "duration explicitly provided as 0 which is an invalid value, error should be returned",
-			config:  "testdata/invalid-configs/kms/zero-timeout.yaml",
-			wantErr: "timeout should be a positive value",
-		},
-		{
-			desc:   "duration is not provided, default will be supplied",
-			config: "testdata/valid-configs/kms/default-timeout.yaml",
-			want:   kmsPluginConnectionTimeout,
-		},
-		{
-			desc:    "duration is invalid (negative), error should be returned",
-			config:  "testdata/invalid-configs/kms/negative-timeout.yaml",
-			wantErr: "timeout should be a positive value",
-		},
-	}
-
-	for _, tt := range testCases {
-		t.Run(tt.desc, func(t *testing.T) {
-			// mocking envelopeServiceFactory to sense the value of the supplied timeout.
-			envelopeServiceFactory = func(endpoint string, callTimeout time.Duration) (envelope.Service, error) {
-				if callTimeout != tt.want {
-					t.Fatalf("got timeout: %v, want %v", callTimeout, tt.want)
-				}
-
-				return newMockEnvelopeService(endpoint, callTimeout)
-			}
-
-			// mocked envelopeServiceFactory is called during ParseEncryptionConfiguration.
-			if _, err := ParseEncryptionConfiguration(mustConfigReader(t, tt.config)); err != nil && !strings.Contains(err.Error(), tt.wantErr) {
-				t.Fatalf("unable to parse yaml\n%s\nerror: %v", tt.config, err)
-			}
-		})
-	}
-}
-
 func TestKMSPluginHealthz(t *testing.T) {
-	service, err := envelope.NewGRPCService("unix:///tmp/testprovider.sock", kmsPluginConnectionTimeout)
+	service, err := envelope.NewGRPCService("unix:///tmp/testprovider.sock", 3*time.Second)
 	if err != nil {
 		t.Fatalf("Could not initialize envelopeService, error: %v", err)
 	}
