@@ -250,7 +250,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		for _, key := range volumeStatKeys {
 			kubeletKeyName := fmt.Sprintf("%s_%s", kubeletmetrics.KubeletSubsystem, key)
 			found := findVolumeStatMetric(kubeletKeyName, pvc.Namespace, pvc.Name, kubeMetrics)
-			gomega.Expect(found).To(gomega.BeTrue(), "PVC %s, Namespace %s not found for %s", pvc.Name, pvc.Namespace, kubeletKeyName)
+			framework.ExpectEqual(found, true, "PVC %s, Namespace %s not found for %s", pvc.Name, pvc.Namespace, kubeletKeyName)
 		}
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
@@ -282,7 +282,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		metricKey := "volume_operation_total_seconds_count"
 		dimensions := []string{"operation_name", "plugin_name"}
 		valid := hasValidMetrics(testutil.Metrics(controllerMetrics), metricKey, dimensions...)
-		gomega.Expect(valid).To(gomega.BeTrue(), "Invalid metric in P/V Controller metrics: %q", metricKey)
+		framework.ExpectEqual(valid, true, "Invalid metric in P/V Controller metrics: %q", metricKey)
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
 		framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
@@ -312,7 +312,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		totalVolumesKey := "volume_manager_total_volumes"
 		dimensions := []string{"state", "plugin_name"}
 		valid := hasValidMetrics(testutil.Metrics(kubeMetrics), totalVolumesKey, dimensions...)
-		gomega.Expect(valid).To(gomega.BeTrue(), "Invalid metric in Volume Manager metrics: %q", totalVolumesKey)
+		framework.ExpectEqual(valid, true, "Invalid metric in Volume Manager metrics: %q", totalVolumesKey)
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
 		framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
@@ -350,7 +350,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		// Forced detach metric should be present
 		forceDetachKey := "attachdetach_controller_forced_detaches"
 		_, ok := updatedControllerMetrics[forceDetachKey]
-		gomega.Expect(ok).To(gomega.BeTrue(), "Key %q not found in A/D Controller metrics", forceDetachKey)
+		framework.ExpectEqual(ok, true, "Key %q not found in A/D Controller metrics", forceDetachKey)
 
 		// Wait and validate
 		totalVolumesKey := "attachdetach_controller_total_volumes"
@@ -588,10 +588,10 @@ func verifyMetricCount(oldMetrics, newMetrics *storageControllerMetrics, metricN
 
 	newLatencyCount, ok := newMetrics.latencyMetrics[metricName]
 	if !expectFailure {
-		gomega.Expect(ok).To(gomega.BeTrue(), "Error getting updated latency metrics for %s", metricName)
+		framework.ExpectEqual(ok, true, "Error getting updated latency metrics for %s", metricName)
 	}
 	newStatusCounts, ok := newMetrics.statusMetrics[metricName]
-	gomega.Expect(ok).To(gomega.BeTrue(), "Error getting updated status metrics for %s", metricName)
+	framework.ExpectEqual(ok, true, "Error getting updated status metrics for %s", metricName)
 
 	newStatusCount := int64(0)
 	if expectFailure {

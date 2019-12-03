@@ -81,7 +81,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		}
 		resizableSc, err = c.StorageV1().StorageClasses().Create(newStorageClass(test, ns, "resizing"))
 		framework.ExpectNoError(err, "Error creating resizable storage class")
-		gomega.Expect(*resizableSc.AllowVolumeExpansion).To(gomega.BeTrue())
+		framework.ExpectEqual(*resizableSc.AllowVolumeExpansion, true)
 
 		pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			ClaimSize:        test.ClaimSize,

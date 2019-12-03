@@ -199,7 +199,7 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 				break
 			}
 		}
-		gomega.Expect(isPidChanged).To(gomega.BeTrue(), "Kubelet PID remained unchanged after restarting Kubelet")
+		framework.ExpectEqual(isPidChanged, true, "Kubelet PID remained unchanged after restarting Kubelet")
 		framework.Logf("Noticed that kubelet PID is changed. Waiting for 30 Seconds for Kubelet to come back")
 		time.Sleep(30 * time.Second)
 	}

@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -105,7 +104,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		ginkgo.By("Verify disk should be attached to the node")
 		isAttached, err := diskIsAttached(volumePath, node)
 		framework.ExpectNoError(err)
-		gomega.Expect(isAttached).To(gomega.BeTrue(), "disk is not attached with the node")
+		framework.ExpectEqual(isAttached, true, "disk is not attached with the node")
 	})
 
 	ginkgo.AfterEach(func() {

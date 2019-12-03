@@ -324,7 +324,7 @@ func (t StorageClassTest) checkProvisioning(client clientset.Interface, claim *v
 				break
 			}
 		}
-		gomega.Expect(found).To(gomega.BeTrue())
+		framework.ExpectEqual(found, true)
 	}
 
 	framework.ExpectEqual(pv.Spec.ClaimRef.Name, claim.ObjectMeta.Name)

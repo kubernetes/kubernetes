@@ -369,7 +369,7 @@ func createPodWithVolumeAndNodeSelector(client clientset.Interface, namespace st
 	for _, volumePath := range volumePaths {
 		isAttached, err := diskIsAttached(volumePath, nodeName)
 		framework.ExpectNoError(err)
-		gomega.Expect(isAttached).To(gomega.BeTrue(), "disk:"+volumePath+" is not attached with the node")
+		framework.ExpectEqual(isAttached, true, "disk:"+volumePath+" is not attached with the node")
 	}
 	return pod
 }
