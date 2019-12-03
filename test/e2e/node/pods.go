@@ -17,15 +17,11 @@ limitations under the License.
 package node
 
 import (
-	"crypto/tls"
-	"encoding/json"
-	"fmt"
 	"net/http"
-	"regexp"
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -50,7 +46,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 		/*
 			Release : v1.15
 			Testname: Pods, delete grace period
-			Description: Create a pod, make sure it is running. Create a 'kubectl local proxy', capture the port the proxy is listening. Using the http client send a ‘delete’ with gracePeriodSeconds=30. Pod SHOULD get deleted within 30 seconds.
+			Description: Create a pod, make sure it is running. Using the http client send a ‘delete’ with gracePeriodSeconds=30. Pod SHOULD get deleted within 30 seconds.
 		*/
 		framework.ConformanceIt("should be submitted and removed", func() {
 			ginkgo.By("creating the pod")
@@ -103,41 +99,12 @@ var _ = SIGDescribe("Pods Extended", func() {
 			pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to GET scheduled pod")
 
-			// start local proxy, so we can send graceful deletion over query string, rather than body parameter
-			cmd := framework.KubectlCmd("proxy", "-p", "0")
-			stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
-			framework.ExpectNoError(err, "failed to start up proxy")
-			defer stdout.Close()
-			defer stderr.Close()
-			defer framework.TryKill(cmd)
-			buf := make([]byte, 128)
-			var n int
-			n, err = stdout.Read(buf)
-			framework.ExpectNoError(err, "failed to read from kubectl proxy stdout")
-			output := string(buf[:n])
-			proxyRegexp := regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
-			match := proxyRegexp.FindStringSubmatch(output)
-			framework.ExpectEqual(len(match), 2)
-			port, err := strconv.Atoi(match[1])
-			framework.ExpectNoError(err, "failed to convert port into string")
-
-			endpoint := fmt.Sprintf("http://localhost:%d/api/v1/namespaces/%s/pods/%s?gracePeriodSeconds=30", port, pod.Namespace, pod.Name)
-			tr := &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			}
-			client := &http.Client{Transport: tr}
-			req, err := http.NewRequest("DELETE", endpoint, nil)
-			framework.ExpectNoError(err, "failed to create http request")
-
 			ginkgo.By("deleting the pod gracefully")
-			rsp, err := client.Do(req)
-			framework.ExpectNoError(err, "failed to use http client to send delete")
-			framework.ExpectEqual(rsp.StatusCode, http.StatusOK, "failed to delete gracefully by client request")
 			var lastPod v1.Pod
-			err = json.NewDecoder(rsp.Body).Decode(&lastPod)
-			framework.ExpectNoError(err, "failed to decode graceful termination proxy response")
-
-			defer rsp.Body.Close()
+			var statusCode int
+			err = f.ClientSet.CoreV1().RESTClient().Delete().AbsPath("/api/v1/namespaces", pod.Namespace, "pods", pod.Name).Param("gracePeriodSeconds", "30").Do().StatusCode(&statusCode).Into(&lastPod)
+			framework.ExpectNoError(err, "failed to use http client to send delete")
+			framework.ExpectEqual(statusCode, http.StatusOK, "failed to delete gracefully by client request")
 
 			ginkgo.By("verifying the kubelet observed the termination notice")
 
@@ -148,7 +115,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 					return false, nil
 				}
 				for _, kubeletPod := range podList.Items {
-					if pod.Name != kubeletPod.Name {
+					if pod.Name != kubeletPod.Name || pod.Namespace != kubeletPod.Namespace {
 						continue
 					}
 					if kubeletPod.ObjectMeta.DeletionTimestamp == nil {
