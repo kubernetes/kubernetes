@@ -14,29 +14,40 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager_test
+package fieldmanager
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"k8s.io/kube-openapi/pkg/util/proto"
+	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
+	"sigs.k8s.io/structured-merge-diff/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/merge"
+	"sigs.k8s.io/structured-merge-diff/typed"
+	"sigs.k8s.io/structured-merge-diff/value"
+	"sigs.k8s.io/yaml"
+
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
-	"k8s.io/kube-openapi/pkg/util/proto"
-	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
-	"sigs.k8s.io/yaml"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 )
 
 var fakeSchema = prototesting.Fake{
@@ -45,14 +56,26 @@ var fakeSchema = prototesting.Fake{
 		"api", "openapi-spec", "swagger.json"),
 }
 
-type fakeObjectConvertor struct{}
+// TODO(jpbetz): Is there a pre-existing converter for this sort of thing?
+type fakeObjectConvertor struct{
+	converter  merge.Converter
+	apiVersion fieldpath.APIVersion
+}
 
 func (c *fakeObjectConvertor) Convert(in, out, context interface{}) error {
+	if typedValue, ok := in.(*typed.TypedValue); ok {
+		fmt.Printf("typedValue found")
+		var err error
+		out, err = c.converter.Convert(typedValue, c.apiVersion)
+		return err
+	}
+	fmt.Printf("typedValue not found")
 	out = in
 	return nil
 }
 
 func (c *fakeObjectConvertor) ConvertToVersion(in runtime.Object, _ runtime.GroupVersioner) (runtime.Object, error) {
+	// TODO: use type converter
 	return in, nil
 }
 
@@ -65,7 +88,7 @@ type fakeObjectDefaulter struct{}
 func (d *fakeObjectDefaulter) Default(in runtime.Object) {}
 
 type TestFieldManager struct {
-	fieldManager fieldmanager.Manager
+	fieldManager Manager
 	emptyObj     runtime.Object
 	liveObj      runtime.Object
 }
@@ -80,9 +103,11 @@ func NewTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
 		panic(err)
 	}
 
-	f, err := fieldmanager.NewStructuredMergeManager(
+	converter := internal.NewVersionConverter(internal.DeducedTypeConverter{}, &fakeObjectConvertor{}, gvk.GroupVersion())
+	apiVersion := fieldpath.APIVersion(gvk.GroupVersion().String())
+	f, err := NewStructuredMergeManager(
 		m,
-		&fakeObjectConvertor{},
+		&fakeObjectConvertor{converter, apiVersion},
 		&fakeObjectDefaulter{},
 		gvk.GroupVersion(),
 		gvk.GroupVersion(),
@@ -93,8 +118,8 @@ func NewTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
 	live := &unstructured.Unstructured{}
 	live.SetKind(gvk.Kind)
 	live.SetAPIVersion(gvk.GroupVersion().String())
-	f = fieldmanager.NewStripMetaManager(f)
-	f = fieldmanager.NewBuildManagerInfoManager(f, gvk.GroupVersion())
+	f = NewStripMetaManager(f)
+	f = NewBuildManagerInfoManager(f, gvk.GroupVersion())
 	return TestFieldManager{
 		fieldManager: f,
 		emptyObj:     live,
@@ -107,7 +132,7 @@ func (f *TestFieldManager) Reset() {
 }
 
 func (f *TestFieldManager) Apply(obj []byte, manager string, force bool) error {
-	out, err := fieldmanager.NewFieldManager(f.fieldManager).Apply(f.liveObj, obj, manager, force)
+	out, err := NewFieldManager(f.fieldManager).Apply(f.liveObj, obj, manager, force)
 	if err == nil {
 		f.liveObj = out
 	}
@@ -115,7 +140,7 @@ func (f *TestFieldManager) Apply(obj []byte, manager string, force bool) error {
 }
 
 func (f *TestFieldManager) Update(obj runtime.Object, manager string) error {
-	out, err := fieldmanager.NewFieldManager(f.fieldManager).Update(f.liveObj, obj, manager)
+	out, err := NewFieldManager(f.fieldManager).Update(f.liveObj, obj, manager)
 	if err == nil {
 		f.liveObj = out
 	}
@@ -165,8 +190,8 @@ func TestUpdateApplyConflict(t *testing.T) {
                         }
 		}
 	}`)
-	newObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
-	if err := yaml.Unmarshal(patch, &newObj.Object); err != nil {
+	newObj := &appsv1.Deployment{}
+	if err := yaml.Unmarshal(patch, &newObj); err != nil {
 		t.Fatalf("error decoding YAML: %v", err)
 	}
 
@@ -190,15 +215,11 @@ func TestUpdateApplyConflict(t *testing.T) {
 }
 
 func TestApplyStripsFields(t *testing.T) {
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
+	gvk := schema.FromAPIVersionAndKind("apps/v1", "Deployment")
+	f := NewTestFieldManager(gvk)
 
-	newObj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "apps/v1",
-			"kind":       "Deployment",
-		},
-	}
-
+	newObj := &appsv1.Deployment{}
+	newObj.SetGroupVersionKind(gvk)
 	newObj.SetName("b")
 	newObj.SetNamespace("b")
 	newObj.SetUID("b")
@@ -331,15 +352,24 @@ func BenchmarkNewObject(b *testing.B) {
 		},
 	}
 
+	scheme := runtime.NewScheme()
+	if err :=corev1.AddToScheme(scheme); err != nil {
+		b.Fatalf("Failed to add to scheme: %v", err)
+	}
+
 	for _, test := range tests {
 		b.Run(test.gvk.Kind, func(b *testing.B) {
 			f := NewTestFieldManager(test.gvk)
-
-			newObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
-			if err := yaml.Unmarshal(test.obj, &newObj.Object); err != nil {
+			decoder := serializer.NewCodecFactory(scheme).UniversalDecoder(test.gvk.GroupVersion())
+			newObj, err := runtime.Decode(decoder, test.obj)
+			if err != nil {
 				b.Fatalf("Failed to parse yaml object: %v", err)
 			}
-			newObj.SetManagedFields([]metav1.ManagedFieldsEntry{
+			objMeta, err := meta.Accessor(newObj)
+			if err != nil {
+				b.Fatalf("Failed to get object meta: %v", err)
+			}
+			objMeta.SetManagedFields([]metav1.ManagedFieldsEntry{
 				{
 					Manager:    "default",
 					Operation:  "Update",
@@ -442,5 +472,45 @@ func TestApplySuccessWithNoManagedFields(t *testing.T) {
 
 	if err != nil {
 		t.Fatalf("failed to apply object: %v", err)
+	}
+}
+
+func TestValueFormats(t *testing.T) {
+	toRaw := func(v value.Value) map[string]interface{} {
+		raw := map[string]interface{}{}
+		js, err := value.ToJSON(v)
+		if err != nil {
+			t.Fatalf("Failed to serialize to json: %v", err)
+		}
+		err = json.Unmarshal(js, &raw)
+		if err != nil {
+			t.Fatalf("Failed to deserialize from json: %v", err)
+		}
+		return raw
+	}
+
+	for i := 0; i < 1000; i++ {
+		t.Run(fmt.Sprintf("run %d", i), func(t *testing.T) {
+			native := &appsv1.Deployment{}
+			fuzzer.ValueFuzz(native)
+
+			nativeData, err := yaml.Marshal(native)
+			if err != nil {
+				t.Fatalf("Failed to serialize nativeData: %v", err)
+			}
+
+			var v interface{}
+			if err := yaml.Unmarshal(nativeData, &v); err != nil {
+				t.Fatalf("error decoding YAML: %v", err)
+			}
+
+			raw1 := toRaw(value.MustReflect(native))
+			raw2 := toRaw(value.NewValueInterface(v))
+
+			// TODO: Use value.Equals once it has been fixed
+			if !reflect.DeepEqual(raw1, raw2) {
+				t.Errorf("Expected reflection and unstructured values to match, but got:\n%s\n!=\n%s\ndiff:\n%s", raw1, raw2, cmp.Diff(raw1, raw2))
+			}
+		})
 	}
 }

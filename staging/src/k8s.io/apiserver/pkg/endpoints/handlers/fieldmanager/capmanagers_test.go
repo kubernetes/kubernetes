@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager_test
+package fieldmanager
 
 import (
 	"bytes"
@@ -29,26 +29,25 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 )
 
 type fakeManager struct{}
 
-var _ fieldmanager.Manager = &fakeManager{}
+var _ Manager = &fakeManager{}
 
-func (*fakeManager) Update(_, newObj runtime.Object, managed fieldmanager.Managed, _ string) (runtime.Object, fieldmanager.Managed, error) {
+func (*fakeManager) Update(_, newObj runtime.Object, managed Managed, _ string) (runtime.Object, Managed, error) {
 	return newObj, managed, nil
 }
 
-func (*fakeManager) Apply(_ runtime.Object, _ []byte, _ fieldmanager.Managed, _ string, force bool) (runtime.Object, fieldmanager.Managed, error) {
+func (*fakeManager) Apply(_ runtime.Object, _ []byte, _ Managed, _ string, force bool) (runtime.Object, Managed, error) {
 	panic("not implemented")
 	return nil, nil, nil
 }
 
 func TestCapManagersManagerMergesEntries(t *testing.T) {
 	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
-	f.fieldManager = fieldmanager.NewCapManagersManager(f.fieldManager, 3)
+	f.fieldManager = NewCapManagersManager(f.fieldManager, 3)
 
 	podWithLabels := func(labels ...string) runtime.Object {
 		labelMap := map[string]interface{}{}
@@ -111,7 +110,7 @@ func TestCapManagersManagerMergesEntries(t *testing.T) {
 
 func TestCapUpdateManagers(t *testing.T) {
 	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
-	f.fieldManager = fieldmanager.NewCapManagersManager(&fakeManager{}, 3)
+	f.fieldManager = NewCapManagersManager(&fakeManager{}, 3)
 
 	set := func(fields ...string) *metav1.FieldsV1 {
 		s := fieldpath.NewSet()
