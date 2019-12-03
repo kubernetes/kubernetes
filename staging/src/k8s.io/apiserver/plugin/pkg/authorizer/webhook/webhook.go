@@ -257,7 +257,7 @@ func subjectAccessReviewInterfaceFromKubeconfig(kubeConfigFile string, version s
 		if err := localScheme.SetVersionPriority(groupVersions...); err != nil {
 			return nil, err
 		}
-		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0)
+		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -268,7 +268,7 @@ func subjectAccessReviewInterfaceFromKubeconfig(kubeConfigFile string, version s
 		if err := localScheme.SetVersionPriority(groupVersions...); err != nil {
 			return nil, err
 		}
-		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0)
+		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0, nil)
 		if err != nil {
 			return nil, err
 		}

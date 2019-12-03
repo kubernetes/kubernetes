@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/kubernetes/scheme"
 	authenticationv1client "k8s.io/client-go/kubernetes/typed/authentication/v1"
@@ -63,8 +64,8 @@ func NewFromInterface(tokenReview authenticationv1client.TokenReviewInterface, i
 // file. It is recommend to wrap this authenticator with the token cache
 // authenticator implemented in
 // k8s.io/apiserver/pkg/authentication/token/cache.
-func New(kubeConfigFile string, version string, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
-	tokenReview, err := tokenReviewInterfaceFromKubeconfig(kubeConfigFile, version)
+func New(kubeConfigFile string, version string, implicitAuds authenticator.Audiences, egressLookup egressselector.Lookup) (*WebhookTokenAuthenticator, error) {
+	tokenReview, err := tokenReviewInterfaceFromKubeconfig(kubeConfigFile, version, egressLookup)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +154,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 // tokenReviewInterfaceFromKubeconfig builds a client from the specified kubeconfig file,
 // and returns a TokenReviewInterface that uses that client. Note that the client submits TokenReview
 // requests to the exact path specified in the kubeconfig file, so arbitrary non-API servers can be targeted.
-func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string) (tokenReviewer, error) {
+func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string, egressLookup egressselector.Lookup) (tokenReviewer, error) {
 	localScheme := runtime.NewScheme()
 	if err := scheme.AddToScheme(localScheme); err != nil {
 		return nil, err
@@ -165,7 +166,7 @@ func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string) (
 		if err := localScheme.SetVersionPriority(groupVersions...); err != nil {
 			return nil, err
 		}
-		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0)
+		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0, egressLookup)
 		if err != nil {
 			return nil, err
 		}
@@ -176,7 +177,7 @@ func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string) (
 		if err := localScheme.SetVersionPriority(groupVersions...); err != nil {
 			return nil, err
 		}
-		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0)
+		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0, egressLookup)
 		if err != nil {
 			return nil, err
 		}

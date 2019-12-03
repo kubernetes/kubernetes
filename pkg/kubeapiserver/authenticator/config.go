@@ -34,6 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	tokenunion "k8s.io/apiserver/pkg/authentication/token/union"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile"
 	"k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth"
@@ -83,6 +84,9 @@ type Config struct {
 	// Generally this is the CA bundle file used to authenticate client certificates
 	// If this value is nil, then mutual TLS is disabled.
 	ClientCAContentProvider dynamiccertificates.CAContentProvider
+
+	// Lookup will give us a dialer if the egress selector is configured for it
+	EgressLookup egressselector.Lookup
 }
 
 // New returns an authenticator.Request or an error that supports the standard
@@ -179,10 +183,11 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		tokenAuthenticators = append(tokenAuthenticators, authenticator.WrapAudienceAgnosticToken(config.APIAudiences, oidcAuth))
 	}
 	if len(config.WebhookTokenAuthnConfigFile) > 0 {
-		webhookTokenAuth, err := newWebhookTokenAuthenticator(config.WebhookTokenAuthnConfigFile, config.WebhookTokenAuthnVersion, config.WebhookTokenAuthnCacheTTL, config.APIAudiences)
+		webhookTokenAuth, err := newWebhookTokenAuthenticator(config)
 		if err != nil {
 			return nil, nil, err
 		}
+
 		tokenAuthenticators = append(tokenAuthenticators, webhookTokenAuth)
 	}
 
@@ -305,8 +310,13 @@ func newServiceAccountAuthenticator(iss string, keyfiles []string, apiAudiences 
 	return tokenAuthenticator, nil
 }
 
-func newWebhookTokenAuthenticator(webhookConfigFile string, version string, ttl time.Duration, implicitAuds authenticator.Audiences) (authenticator.Token, error) {
-	webhookTokenAuthenticator, err := webhook.New(webhookConfigFile, version, implicitAuds)
+func newWebhookTokenAuthenticator(config Config) (authenticator.Token, error) {
+	webhookConfigFile := config.WebhookTokenAuthnConfigFile
+	version := config.WebhookTokenAuthnVersion
+	ttl := config.WebhookTokenAuthnCacheTTL
+	implicitAuds := config.APIAudiences
+
+	webhookTokenAuthenticator, err := webhook.New(webhookConfigFile, version, implicitAuds, config.EgressLookup)
 	if err != nil {
 		return nil, err
 	}

@@ -62,7 +62,7 @@ func retryOnError(err error) bool {
 
 func loadWebhook(configFile string, groupVersion schema.GroupVersion, initialBackoff time.Duration) (*webhook.GenericWebhook, error) {
 	w, err := webhook.NewGenericWebhook(audit.Scheme, audit.Codecs, configFile,
-		[]schema.GroupVersion{groupVersion}, initialBackoff)
+		[]schema.GroupVersion{groupVersion}, initialBackoff, nil)
 	w.ShouldRetry = retryOnError
 	return w, err
 }
