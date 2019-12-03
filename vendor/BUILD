@@ -14,7 +14,7 @@ filegroup(
         "//vendor/github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute:all-srcs",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry:all-srcs",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network:all-srcs",
-        "//vendor/github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-04-01/storage:all-srcs",
+        "//vendor/github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage:all-srcs",
         "//vendor/github.com/Azure/azure-sdk-for-go/storage:all-srcs",
         "//vendor/github.com/Azure/azure-sdk-for-go/version:all-srcs",
         "//vendor/github.com/Azure/go-ansiterm:all-srcs",
