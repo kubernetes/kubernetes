@@ -1398,7 +1398,7 @@ func (v *vSphereVolume) DeleteVolume() {
 	v.nodeInfo.VSphere.DeleteVolume(v.volumePath, v.nodeInfo.DataCenterRef)
 }
 
-// Azure
+// Azure Disk
 type azureDiskDriver struct {
 	driverInfo testsuites.DriverInfo
 }
