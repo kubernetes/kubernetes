@@ -80,7 +80,7 @@ func TestGetCgroupStats(t *testing.T) {
 		assert  = assert.New(t)
 		options = cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false}
 
-		containerInfo    = getTestContainerInfo(containerInfoSeed, "test-pod", "test-ns", "test-container")
+		containerInfo    = getTestContainerInfo(containerInfoSeed, "test-pod", "test-ns", "test-container", "")
 		containerInfoMap = map[string]cadvisorapiv2.ContainerInfo{cgroupName: containerInfo}
 	)
 
@@ -114,7 +114,7 @@ func TestGetCgroupCPUAndMemoryStats(t *testing.T) {
 		assert  = assert.New(t)
 		options = cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false}
 
-		containerInfo    = getTestContainerInfo(containerInfoSeed, "test-pod", "test-ns", "test-container")
+		containerInfo    = getTestContainerInfo(containerInfoSeed, "test-pod", "test-ns", "test-container", "")
 		containerInfoMap = map[string]cadvisorapiv2.ContainerInfo{cgroupName: containerInfo}
 	)
 
@@ -147,7 +147,7 @@ func TestRootFsStats(t *testing.T) {
 		options = cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false}
 
 		rootFsInfo       = getTestFsInfo(rootFsInfoSeed)
-		containerInfo    = getTestContainerInfo(containerInfoSeed, "test-pod", "test-ns", "test-container")
+		containerInfo    = getTestContainerInfo(containerInfoSeed, "test-pod", "test-ns", "test-container", "")
 		containerInfoMap = map[string]cadvisorapiv2.ContainerInfo{"/": containerInfo}
 	)
 
@@ -430,19 +430,22 @@ func TestHasDedicatedImageFs(t *testing.T) {
 	}
 }
 
-func getTerminatedContainerInfo(seed int, podName string, podNamespace string, containerName string) cadvisorapiv2.ContainerInfo {
-	cinfo := getTestContainerInfo(seed, podName, podNamespace, containerName)
+func getTerminatedContainerInfo(seed int, podName string, podNamespace string, containerName string, uid string) cadvisorapiv2.ContainerInfo {
+	cinfo := getTestContainerInfo(seed, podName, podNamespace, containerName, uid)
 	cinfo.Stats[0].Memory.RSS = 0
 	cinfo.Stats[0].CpuInst.Usage.Total = 0
 	return cinfo
 }
 
-func getTestContainerInfo(seed int, podName string, podNamespace string, containerName string) cadvisorapiv2.ContainerInfo {
+func getTestContainerInfo(seed int, podName string, podNamespace string, containerName string, uid string) cadvisorapiv2.ContainerInfo {
 	labels := map[string]string{}
+	if uid == "" {
+		uid = "UID" + podName
+	}
 	if podName != "" {
 		labels = map[string]string{
 			"io.kubernetes.pod.name":       podName,
-			"io.kubernetes.pod.uid":        "UID" + podName,
+			"io.kubernetes.pod.uid":        uid,
 			"io.kubernetes.pod.namespace":  podNamespace,
 			"io.kubernetes.container.name": containerName,
 		}
