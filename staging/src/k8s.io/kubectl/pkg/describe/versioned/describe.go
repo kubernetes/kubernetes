@@ -3187,7 +3187,7 @@ func describeStatefulSet(ps *appsv1.StatefulSet, selector labels.Selector, event
 		if ps.Spec.UpdateStrategy.RollingUpdate != nil {
 			ru := ps.Spec.UpdateStrategy.RollingUpdate
 			if ru.Partition != nil {
-				w.Write(LEVEL_1, "Partition:\t%d\n", ru.Partition)
+				w.Write(LEVEL_1, "Partition:\t%d\n", *ru.Partition)
 			}
 		}
 
