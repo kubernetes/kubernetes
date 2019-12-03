@@ -780,7 +780,6 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, allNodes []*sched
 		return newTopologyPairsMaps(), newTopologyPairsMaps(), nil
 	}
 
-	errCh := schedutil.NewErrorChannel()
 	var lock sync.Mutex
 	topologyPairsAffinityPodsMaps = newTopologyPairsMaps()
 	topologyPairsAntiAffinityPodsMaps = newTopologyPairsMaps()
@@ -802,8 +801,10 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, allNodes []*sched
 	}
 
 	antiAffinityTerms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity)
-
-	ctx, cancel := context.WithCancel(context.Background())
+	antiAffinityProperties, err := getAffinityTermProperties(pod, antiAffinityTerms)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]
@@ -825,14 +826,9 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, allNodes []*sched
 				}
 			}
 			// Check anti-affinity properties.
-			for _, term := range antiAffinityTerms {
-				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term)
-				selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
-				if err != nil {
-					errCh.SendErrorWithCancel(err, cancel)
-					return
-				}
-				if priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, namespaces, selector) {
+			for i, term := range antiAffinityTerms {
+				p := antiAffinityProperties[i]
+				if priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, p.namespaces, p.selector) {
 					if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
 						pair := topologyPair{key: term.TopologyKey, value: topologyValue}
 						nodeTopologyPairsAntiAffinityPodsMaps.addTopologyPair(pair, existingPod)
@@ -845,11 +841,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, allNodes []*sched
 			appendResult(node.Name, nodeTopologyPairsAffinityPodsMaps, nodeTopologyPairsAntiAffinityPodsMaps)
 		}
 	}
-	workqueue.ParallelizeUntil(ctx, 16, len(allNodes), processNode)
-
-	if err := errCh.ReceiveError(); err != nil {
-		return nil, nil, err
-	}
+	workqueue.ParallelizeUntil(context.Background(), 16, len(allNodes), processNode)
 
 	return topologyPairsAffinityPodsMaps, topologyPairsAntiAffinityPodsMaps, nil
 }
