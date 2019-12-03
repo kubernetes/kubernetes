@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -372,7 +373,7 @@ func (s *Controller) syncLoadBalancerIfNeeded(service *v1.Service, key string) (
 }
 
 func (s *Controller) ensureLoadBalancer(service *v1.Service) (*v1.LoadBalancerStatus, error) {
-	nodes, err := s.nodeLister.ListWithPredicate(getNodeConditionPredicate())
+	nodes, err := listWithPredicate(s.nodeLister, getNodeConditionPredicate())
 	if err != nil {
 		return nil, err
 	}
@@ -601,7 +602,7 @@ func nodeSlicesEqualForLB(x, y []*v1.Node) bool {
 	return nodeNames(x).Equal(nodeNames(y))
 }
 
-func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
+func getNodeConditionPredicate() NodeConditionPredicate {
 	return func(node *v1.Node) bool {
 		// We add the master to the node list, but its unschedulable.  So we use this to filter
 		// the master.
@@ -645,7 +646,7 @@ func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
 // nodeSyncLoop handles updating the hosts pointed to by all load
 // balancers whenever the set of nodes in the cluster changes.
 func (s *Controller) nodeSyncLoop() {
-	newHosts, err := s.nodeLister.ListWithPredicate(getNodeConditionPredicate())
+	newHosts, err := listWithPredicate(s.nodeLister, getNodeConditionPredicate())
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("Failed to retrieve current set of nodes from node lister: %v", err))
 		return
@@ -846,4 +847,25 @@ func (s *Controller) patchStatus(service *v1.Service, previousStatus, newStatus 
 	klog.V(2).Infof("Patching status for service %s/%s", updated.Namespace, updated.Name)
 	_, err := patch(s.kubeClient.CoreV1(), service, updated)
 	return err
+}
+
+// NodeConditionPredicate is a function that indicates whether the given node's conditions meet
+// some set of criteria defined by the function.
+type NodeConditionPredicate func(node *v1.Node) bool
+
+// listWithPredicate gets nodes that matches predicate function.
+func listWithPredicate(nodeLister corelisters.NodeLister, predicate NodeConditionPredicate) ([]*v1.Node, error) {
+	nodes, err := nodeLister.List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+
+	var filtered []*v1.Node
+	for i := range nodes {
+		if predicate(nodes[i]) {
+			filtered = append(filtered, nodes[i])
+		}
+	}
+
+	return filtered, nil
 }

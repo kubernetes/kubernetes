@@ -25,3 +25,11 @@ type ControllerRevisionListerExpansion interface{}
 // ControllerRevisionNamespaceListerExpansion allows custom methods to be added to
 // ControllerRevisionNamespaceLister.
 type ControllerRevisionNamespaceListerExpansion interface{}
+
+// DeploymentListerExpansion allows custom methods to be added to
+// DeploymentLister.
+type DeploymentListerExpansion interface{}
+
+// DeploymentNamespaceListerExpansion allows custom methods to be added to
+// DeploymentNamespaceLister.
+type DeploymentNamespaceListerExpansion interface{}

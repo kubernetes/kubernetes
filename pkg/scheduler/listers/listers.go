@@ -19,6 +19,7 @@ package listers
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	v1listers "k8s.io/client-go/listers/core/v1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -48,4 +49,28 @@ type NodeInfoLister interface {
 type SharedLister interface {
 	Pods() PodLister
 	NodeInfos() NodeInfoLister
+}
+
+// GetPodServices gets the services that have the selector that match the labels on the given pod.
+// TODO: this should be moved to ServiceAffinity plugin once that plugin is ready.
+func GetPodServices(serviceLister v1listers.ServiceLister, pod *v1.Pod) ([]*v1.Service, error) {
+	allServices, err := serviceLister.Services(pod.Namespace).List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+
+	var services []*v1.Service
+	for i := range allServices {
+		service := allServices[i]
+		if service.Spec.Selector == nil {
+			// services with nil selectors match nothing, not everything.
+			continue
+		}
+		selector := labels.Set(service.Spec.Selector).AsSelectorPreValidated()
+		if selector.Matches(labels.Set(pod.Labels)) {
+			services = append(services, service)
+		}
+	}
+
+	return services, nil
 }

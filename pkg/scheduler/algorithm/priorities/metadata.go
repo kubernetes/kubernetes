@@ -105,7 +105,7 @@ func (pmf *MetadataFactory) PriorityMetadata(
 
 // getFirstServiceSelector returns one selector of services the given pod.
 func getFirstServiceSelector(pod *v1.Pod, sl corelisters.ServiceLister) (firstServiceSelector labels.Selector) {
-	if services, err := sl.GetPodServices(pod); err == nil && len(services) > 0 {
+	if services, err := schedulerlisters.GetPodServices(sl, pod); err == nil && len(services) > 0 {
 		return labels.SelectorFromSet(services[0].Spec.Selector)
 	}
 	return nil
@@ -117,7 +117,7 @@ func getSelector(pod *v1.Pod, sl corelisters.ServiceLister, cl corelisters.Repli
 	// Since services, RCs, RSs and SSs match the pod, they won't have conflicting
 	// labels. Merging is safe.
 
-	if services, err := sl.GetPodServices(pod); err == nil {
+	if services, err := schedulerlisters.GetPodServices(sl, pod); err == nil {
 		for _, service := range services {
 			labelSet = labels.Merge(labelSet, service.Spec.Selector)
 		}
