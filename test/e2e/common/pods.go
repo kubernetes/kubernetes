@@ -27,7 +27,7 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -52,10 +52,6 @@ var (
 	buildBackOffDuration = time.Minute
 	syncLoopFrequency    = 10 * time.Second
 	maxBackOffTolerance  = time.Duration(1.3 * float64(kubelet.MaxContainerBackOff))
-	// maxReadyStatusUpdateTolerance specifies the latency that allows kubelet to update pod status.
-	// When kubelet is under heavy load (tests may be parallelized), the delay may be longer, hence
-	// causing tests to be flaky.
-	maxReadyStatusUpdateTolerance = 10 * time.Second
 )
 
 // testHostIP tests that a pod gets a host IP
@@ -816,7 +812,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}
 
 		validatePodReadiness := func(expectReady bool) {
-			err := wait.Poll(time.Second, maxReadyStatusUpdateTolerance, func() (bool, error) {
+			err := wait.Poll(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 				podReady := podClient.PodIsReady(podName)
 				res := expectReady == podReady
 				if !res {
@@ -835,7 +831,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 		_, err := podClient.Patch(podName, types.StrategicMergePatchType, []byte(fmt.Sprintf(patchStatusFmt, readinessGate1, "True")), "status")
 		framework.ExpectNoError(err)
 		// Sleep for 10 seconds.
-		time.Sleep(maxReadyStatusUpdateTolerance)
+		time.Sleep(syncLoopFrequency)
+		// Verify the pod is still not ready
 		framework.ExpectEqual(podClient.PodIsReady(podName), false, "Expect pod's Ready condition to be false with only one condition in readinessGates equal to True")
 
 		ginkgo.By(fmt.Sprintf("patching pod status with condition %q to true", readinessGate2))
