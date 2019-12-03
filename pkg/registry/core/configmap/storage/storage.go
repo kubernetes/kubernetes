@@ -39,6 +39,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.ConfigMap{} },
 		NewListFunc:              func() runtime.Object { return &api.ConfigMapList{} },
+		PredicateFunc:            configmap.Matcher,
 		DefaultQualifiedResource: api.Resource("configmaps"),
 
 		CreateStrategy: configmap.Strategy,
