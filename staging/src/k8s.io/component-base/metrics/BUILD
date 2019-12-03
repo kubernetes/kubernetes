@@ -40,6 +40,7 @@ go_test(
     srcs = [
         "collector_test.go",
         "counter_test.go",
+        "desc_test.go",
         "gauge_test.go",
         "histogram_test.go",
         "opts_test.go",
