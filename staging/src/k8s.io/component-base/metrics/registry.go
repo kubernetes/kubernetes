@@ -131,7 +131,9 @@ type kubeRegistry struct {
 	PromRegistry
 	version              semver.Version
 	hiddenCollectors     map[string]Registerable // stores all collectors that has been hidden
+	stableCollectors     []StableCollector       // stores all stable collector
 	hiddenCollectorsLock sync.RWMutex
+	stableCollectorsLock sync.RWMutex
 }
 
 // Register registers a new Collector to be included in metrics
@@ -166,10 +168,11 @@ func (kr *kubeRegistry) MustRegister(cs ...Registerable) {
 
 // CustomRegister registers a new custom collector.
 func (kr *kubeRegistry) CustomRegister(c StableCollector) error {
+	kr.trackStableCollectors(c)
+
 	if c.Create(&kr.version, c) {
 		return kr.PromRegistry.Register(c)
 	}
-
 	return nil
 }
 
@@ -177,6 +180,8 @@ func (kr *kubeRegistry) CustomRegister(c StableCollector) error {
 // StableCollectors and panics upon the first registration that causes an
 // error.
 func (kr *kubeRegistry) CustomMustRegister(cs ...StableCollector) {
+	kr.trackStableCollectors(cs...)
+
 	collectors := make([]prometheus.Collector, 0, len(cs))
 	for _, c := range cs {
 		if c.Create(&kr.version, c) {
@@ -232,6 +237,14 @@ func (kr *kubeRegistry) trackHiddenCollector(c Registerable) {
 	defer kr.hiddenCollectorsLock.Unlock()
 
 	kr.hiddenCollectors[c.FQName()] = c
+}
+
+// trackStableCollectors stores all custom collectors.
+func (kr *kubeRegistry) trackStableCollectors(cs ...StableCollector) {
+	kr.stableCollectorsLock.Lock()
+	defer kr.stableCollectorsLock.Unlock()
+
+	kr.stableCollectors = append(kr.stableCollectors, cs...)
 }
 
 // enableHiddenCollectors will re-register all of the hidden collectors.
