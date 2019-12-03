@@ -78,9 +78,9 @@ export KUBERNETES_NODE_PLATFORM=windows
 export LOGGING_STACKDRIVER_RESOURCE_TYPES=new
 ```
 
-Now bring up a cluster using kube-up script:
+Now bring up a cluster using one of the following two methods:
 
-#### 2. Create a regular Kubernetes cluster
+#### 2a. Create a regular Kubernetes cluster
 
 ```
 # Invoke kube-up.sh with these environment variables:
@@ -94,6 +94,44 @@ To teardown the cluster run:
 ```
 PROJECT=${CLOUDSDK_CORE_PROJECT} KUBERNETES_SKIP_CONFIRM=y ./cluster/kube-down.sh
 ```
+
+#### 2b. Create a Kubernetes end-to-end (E2E) test cluster	
+
+Install or update `kubetest` as follows:
+```
+go get -u k8s.io/test-infra/kubetest
+```
+*   If you see the error below, it's due to `github.com/Azure/go-autorest` dependencies are incompatible between different versions of go modules: 
+
+    ```
+    build k8s.io/test-infra/kubetest: cannot load github.com/Azure/go-autorest/autorest: ambiguous import: found github.com/Azure/go-autorest/autorest in multiple modules:
+            github.com/Azure/go-autorest v11.1.2+incompatible (/usr/local/google/home/yluu/go/pkg/mod/github.com/!azure/go-autorest@v11.1.2+incompatible/autorest)
+            github.com/Azure/go-autorest/autorest v0.9.0 (/usr/local/google/home/yluu/go/pkg/mod/github.com/!azure/go-autorest/autorest@v0.9.0)
+    ```
+
+    Add `github.com/Azure/go-autorest v12.2.0+incompatible` into require block of `go.mod` and try again.
+
+If you have built your own release binaries following step 1, run the following	
+command:	
+```	
+PROJECT=${CLOUDSDK_CORE_PROJECT} $GOPATH/bin/kubetest --up	
+```	
+
+Otherwise, you can specify what branch from which to get the release artifacts:	
+```	
+# Get the latest build from the stable1 branch	
+PROJECT=${CLOUDSDK_CORE_PROJECT} $GOPATH/bin/kubetest --up --extract=ci/k8s-stable1	
+# Or Get the latest build from master	
+PROJECT=${CLOUDSDK_CORE_PROJECT} $GOPATH/bin/kubetest --up --extract=ci-cross/latest	
+```
+
+This command, by default, tears down any existing E2E cluster and creates a new	
+one. To teardown the cluster run the same command with `--down` instead of	
+`--up`.	
+
+No matter what type of cluster you chose to create, the result should be a	
+Kubernetes cluster with one Linux master node, `NUM_NODES` Linux worker nodes	
+and `NUM_WINDOWS_NODES` Windows worker nodes.	
 
 ## Validating the cluster
 
