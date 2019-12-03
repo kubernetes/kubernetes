@@ -37,6 +37,9 @@ type StableCollector interface {
 
 	// Create will initialize all Desc and it intends to be called by registry.
 	Create(version *semver.Version, self StableCollector) bool
+
+	// HiddenMetrics tells the list of hidden metrics with fqName.
+	HiddenMetrics() []string
 }
 
 // BaseStableCollector which implements almost all of the methods defined by StableCollector
@@ -157,6 +160,14 @@ func (bsc *BaseStableCollector) Create(version *semver.Version, self StableColle
 	}
 
 	return false
+}
+
+// HiddenMetrics tells the list of hidden metrics with fqName.
+func (bsc *BaseStableCollector) HiddenMetrics() (fqNames []string) {
+	for i := range bsc.hidden {
+		fqNames = append(fqNames, bsc.hidden[i].fqName)
+	}
+	return
 }
 
 // Check if our BaseStableCollector implements necessary interface
