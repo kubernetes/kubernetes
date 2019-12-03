@@ -99,7 +99,7 @@ func TestValidateMinAvailablePodAndMaxUnavailableDisruptionBudgetSpec(t *testing
 
 func TestValidatePodDisruptionBudgetStatus(t *testing.T) {
 	successCases := []policy.PodDisruptionBudgetStatus{
-		{PodDisruptionsAllowed: 10},
+		{DisruptionsAllowed: 10},
 		{CurrentHealthy: 5},
 		{DesiredHealthy: 3},
 		{ExpectedPods: 2}}
@@ -110,7 +110,7 @@ func TestValidatePodDisruptionBudgetStatus(t *testing.T) {
 		}
 	}
 	failureCases := []policy.PodDisruptionBudgetStatus{
-		{PodDisruptionsAllowed: -10},
+		{DisruptionsAllowed: -10},
 		{CurrentHealthy: -5},
 		{DesiredHealthy: -3},
 		{ExpectedPods: -2}}
