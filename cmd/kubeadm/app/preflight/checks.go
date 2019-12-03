@@ -1017,6 +1017,7 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 			FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 			FileContentCheck{Path: ipv4Forward, Content: []byte{'1'}},
 			SwapCheck{},
+			InPathCheck{executable: "conntrack", mandatory: true, exec: execer},
 			InPathCheck{executable: "ip", mandatory: true, exec: execer},
 			InPathCheck{executable: "iptables", mandatory: true, exec: execer},
 			InPathCheck{executable: "mount", mandatory: true, exec: execer},
