@@ -1269,9 +1269,10 @@ func printCSIVolumeSource(csi *corev1.CSIVolumeSource, w PrefixWriter) {
 func printCSIPersistentVolumeSource(csi *corev1.CSIPersistentVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tCSI (a Container Storage Interface (CSI) volume source)\n"+
 		"    Driver:\t%v\n"+
+		"    FSType:\t%v\n"+
 		"    VolumeHandle:\t%v\n"+
 		"    ReadOnly:\t%v\n",
-		csi.Driver, csi.VolumeHandle, csi.ReadOnly)
+		csi.Driver, csi.FSType, csi.VolumeHandle, csi.ReadOnly)
 	printCSIPersistentVolumeAttributesMultiline(w, "VolumeAttributes", csi.VolumeAttributes)
 }
 
