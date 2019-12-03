@@ -38,6 +38,9 @@ type StableCollector interface {
 	// Create will initialize all Desc and it intends to be called by registry.
 	Create(version *semver.Version, self StableCollector) bool
 
+	// ClearState will clear all the states marked by Create.
+	ClearState()
+
 	// HiddenMetrics tells the list of hidden metrics with fqName.
 	HiddenMetrics() []string
 }
@@ -160,6 +163,18 @@ func (bsc *BaseStableCollector) Create(version *semver.Version, self StableColle
 	}
 
 	return false
+}
+
+// ClearState will clear all the states marked by Create.
+// It intends to be used for re-register a hidden metric.
+func (bsc *BaseStableCollector) ClearState() {
+	for _, d := range bsc.descriptors {
+		d.ClearState()
+	}
+
+	bsc.descriptors = nil
+	bsc.registrable = nil
+	bsc.hidden = nil
 }
 
 // HiddenMetrics tells the list of hidden metrics with fqName.
