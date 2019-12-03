@@ -317,6 +317,8 @@ func removeTerminatedContainerInfo(containerInfo map[string]cadvisorapiv2.Contai
 			podRef:        buildPodRef(cinfo.Spec.Labels),
 			containerName: kubetypes.GetContainerName(cinfo.Spec.Labels),
 		}
+		// Clear the UID since the container can be created in a new namespace.
+		cinfoID.podRef.UID = ""
 		cinfoMap[cinfoID] = append(cinfoMap[cinfoID], containerInfoWithCgroup{
 			cinfo:  cinfo,
 			cgroup: key,
