@@ -1148,7 +1148,7 @@ function Verify-WorkerServices {
 
 function DownloadAndInstall-Crictl {
   $CRICTL_VERSION = "v1.16.1"
-  $CRICTL_SHA256 = "7d092dcb3b1af2edf75477d5d049a70e8c0d1ac8242b1dff2de7e6aa084e3615"
+  $CRICTL_SHA256 = "69a53602f9a8469d4a86284e318fe19b33e97577f7836f48e6f4fb2ed1822baa"
 
   # Assume that presence of crictl.exe indicates that the crictl binaries
   # were already previously downloaded to this node.
@@ -1158,18 +1158,15 @@ function DownloadAndInstall-Crictl {
   $tmp_dir = 'C:\crictl_tmp'
   New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
 
-  $url = ('https://github.com/kubernetes-sigs/cri-tools/releases/' +
-      'download/' + $CRICTL_VERSION + '/crictl-' +
-      $CRICTL_VERSION + '-windows-amd64.tar.gz')
+  $url = ('https://storage.googleapis.com/kubernetes-release/crictl/' +
+      'crictl-' + $CRICTL_VERSION + '-windows-amd64.exe')
   MustDownload-File `
       -URLs $url `
-      -OutFile $tmp_dir\crictl.tgz `
+      -OutFile $tmp_dir\crictl.exe `
       -Hash $CRICTL_SHA256 `
       -Algorithm SHA256
 
   Push-Location $tmp_dir
-  # tar can only extract in the current directory.
-  tar -xvf $tmp_dir\crictl.tgz
   Move-Item -Force crictl.exe ${env:NODE_DIR}\
   if (${env:CONTAINER_RUNTIME_ENDPOINT}) {
     crictl.exe config runtime-endpoint ${env:CONTAINER_RUNTIME_ENDPOINT}
