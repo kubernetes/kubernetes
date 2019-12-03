@@ -53,7 +53,6 @@ go_test(
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus/testutil:go_default_library",
-        "//vendor/github.com/prometheus/client_model/go:go_default_library",
         "//vendor/github.com/prometheus/common/expfmt:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
