@@ -80,8 +80,8 @@ func (t *SysctlUpgradeTest) verifySafeSysctlWork(f *framework.Framework) *v1.Pod
 	ginkgo.By("Creating a pod with safe sysctls")
 	safeSysctl := "net.ipv4.ip_local_port_range"
 	safeSysctlValue := "1024 1042"
-	validPod := sysctlTestPod("valid-sysctls", map[string]string{safeSysctl: safeSysctlValue})
-	validPod = f.PodClient().Create(t.validPod)
+	sysctlTestPod("valid-sysctls", map[string]string{safeSysctl: safeSysctlValue})
+	validPod := f.PodClient().Create(t.validPod)
 
 	ginkgo.By("Making sure the valid pod launches")
 	ev, err := f.PodClient().WaitForErrorEventOrSuccess(t.validPod)

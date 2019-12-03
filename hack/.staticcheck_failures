@@ -77,8 +77,6 @@ test/e2e/storage/drivers
 test/e2e/storage/testsuites
 test/e2e/storage/utils
 test/e2e/storage/vsphere
-test/e2e/upgrades
-test/e2e/upgrades/storage
 test/images/agnhost/dns
 test/images/agnhost/inclusterclient
 test/images/agnhost/net/nat
