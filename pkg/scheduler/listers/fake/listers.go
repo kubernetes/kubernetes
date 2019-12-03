@@ -63,7 +63,16 @@ type ServiceLister []*v1.Service
 
 // Services returns nil.
 func (f ServiceLister) Services(namespace string) corelisters.ServiceNamespaceLister {
-	return nil
+	var services []*v1.Service
+	for i := range f {
+		if f[i].Namespace == namespace {
+			services = append(services, f[i])
+		}
+	}
+	return &serviceNamespaceLister{
+		services:  services,
+		namespace: namespace,
+	}
 }
 
 // List returns v1.ServiceList, the list of all services.
@@ -71,22 +80,18 @@ func (f ServiceLister) List(labels.Selector) ([]*v1.Service, error) {
 	return f, nil
 }
 
-// GetPodServices gets the services that have the selector that match the labels on the given pod.
-func (f ServiceLister) GetPodServices(pod *v1.Pod) (services []*v1.Service, err error) {
-	var selector labels.Selector
+// serviceNamespaceLister is implementation of ServiceNamespaceLister returned by Services() above.
+type serviceNamespaceLister struct {
+	services  []*v1.Service
+	namespace string
+}
 
-	for i := range f {
-		service := f[i]
-		// consider only services that are in the same namespace as the pod
-		if service.Namespace != pod.Namespace {
-			continue
-		}
-		selector = labels.Set(service.Spec.Selector).AsSelectorPreValidated()
-		if selector.Matches(labels.Set(pod.Labels)) {
-			services = append(services, service)
-		}
-	}
-	return
+func (f *serviceNamespaceLister) Get(name string) (*v1.Service, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (f *serviceNamespaceLister) List(selector labels.Selector) ([]*v1.Service, error) {
+	return f.services, nil
 }
 
 var _ corelisters.ReplicationControllerLister = &ControllerLister{}

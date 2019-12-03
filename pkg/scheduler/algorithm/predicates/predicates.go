@@ -1003,7 +1003,7 @@ func (s *ServiceAffinity) serviceAffinityMetadataProducer(pm *predicateMetadata)
 		return
 	}
 	// Store services which match the pod.
-	matchingPodServices, err := s.serviceLister.GetPodServices(pm.pod)
+	matchingPodServices, err := schedulerlisters.GetPodServices(s.serviceLister, pm.pod)
 	if err != nil {
 		klog.Errorf("Error precomputing service affinity: could not list services: %v", err)
 	}
