@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
 )
 
+// REST implements a RESTStorage for endpoints.
 type REST struct {
 	*genericregistry.Store
 }

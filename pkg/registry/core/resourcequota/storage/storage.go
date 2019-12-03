@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/resourcequota"
 )
 
+// REST implements a RESTStorage for resource quotas.
 type REST struct {
 	*genericregistry.Store
 }
@@ -73,6 +74,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new ResourceQuota object.
 func (r *StatusREST) New() runtime.Object {
 	return &api.ResourceQuota{}
 }
