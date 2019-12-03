@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package git_repo contains the internal representation of git repo volumes.
-package git_repo // import "k8s.io/kubernetes/pkg/volume/git_repo"
+// Package gitrepo contains the internal representation of git repo volumes.
+package gitrepo // import "k8s.io/kubernetes/pkg/volume/gitrepo"

@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/fc"
 	"k8s.io/kubernetes/pkg/volume/flexvolume"
 	"k8s.io/kubernetes/pkg/volume/flocker"
-	"k8s.io/kubernetes/pkg/volume/git_repo"
+	"k8s.io/kubernetes/pkg/volume/gitrepo"
 	"k8s.io/kubernetes/pkg/volume/glusterfs"
 	"k8s.io/kubernetes/pkg/volume/hostpath"
 	"k8s.io/kubernetes/pkg/volume/iscsi"
@@ -70,7 +70,7 @@ func ProbeVolumePlugins(featureGate featuregate.FeatureGate) ([]volume.VolumePlu
 		return allPlugins, err
 	}
 	allPlugins = append(allPlugins, emptydir.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, git_repo.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, gitrepo.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, hostpath.ProbeVolumePlugins(volume.VolumeConfig{})...)
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(volume.VolumeConfig{})...)
 	allPlugins = append(allPlugins, secret.ProbeVolumePlugins()...)

@@ -39,7 +39,7 @@ go_library(
         "//pkg/volume/emptydir:go_default_library",
         "//pkg/volume/fc:go_default_library",
         "//pkg/volume/flocker:go_default_library",
-        "//pkg/volume/git_repo:go_default_library",
+        "//pkg/volume/gitrepo:go_default_library",
         "//pkg/volume/glusterfs:go_default_library",
         "//pkg/volume/hostpath:go_default_library",
         "//pkg/volume/iscsi:go_default_library",

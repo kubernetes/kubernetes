@@ -12,7 +12,7 @@ go_library(
         "doc.go",
         "git_repo.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/volume/git_repo",
+    importpath = "k8s.io/kubernetes/pkg/volume/gitrepo",
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
