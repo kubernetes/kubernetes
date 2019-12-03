@@ -74,12 +74,8 @@ type ServiceNodePort struct {
 }
 
 type ServiceStorage interface {
+	rest.StandardStorage
 	rest.Scoper
-	rest.Getter
-	rest.Lister
-	rest.CreaterUpdater
-	rest.GracefulDeleter
-	rest.Watcher
 	rest.Exporter
 	rest.StorageVersionProvider
 }
@@ -363,6 +359,10 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, node
 		}
 	}
 	return true, nil
+}
+
+func (rs *REST) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
+	return rs.services.DeleteCollection(ctx, deleteValidation, options, listOptions)
 }
 
 func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
