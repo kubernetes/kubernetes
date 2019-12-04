@@ -182,7 +182,8 @@ func (w *mergingWalker) visitListItems(t *schema.List, lhs, rhs value.List) (err
 	// First, collect all RHS children.
 	observedRHS := fieldpath.MakePathElementValueMap(rLen)
 	if rhs != nil {
-		rhs.Iterate(func(i int, child value.Value) {
+		for i := 0; i < rhs.Length(); i++ {
+			child := rhs.At(i)
 			pe, err := listItemToPathElement(t, i, child)
 			if err != nil {
 				errs = append(errs, errorf("rhs: element %v: %v", i, err.Error())...)
@@ -196,13 +197,14 @@ func (w *mergingWalker) visitListItems(t *schema.List, lhs, rhs value.List) (err
 			}
 			observedRHS.Insert(pe, child)
 			rhsOrder = append(rhsOrder, pe)
-		})
+		}
 	}
 
 	// Then merge with LHS children.
 	observedLHS := fieldpath.MakePathElementSet(lLen)
 	if lhs != nil {
-		lhs.Iterate(func(i int, child value.Value) {
+		for i := 0; i < lhs.Length(); i++ {
+			child := lhs.At(i)
 			pe, err := listItemToPathElement(t, i, child)
 			if err != nil {
 				errs = append(errs, errorf("lhs: element %v: %v", i, err.Error())...)
@@ -228,7 +230,7 @@ func (w *mergingWalker) visitListItems(t *schema.List, lhs, rhs value.List) (err
 				out = append(out, *w2.out)
 			}
 			w.finishDescent(w2)
-		})
+		}
 	}
 
 	for _, pe := range rhsOrder {
@@ -314,65 +316,32 @@ func (w *mergingWalker) visitMapItems(t *schema.Map, lhs, rhs value.Map) (errs V
 	out := map[string]interface{}{}
 
 	if lhs != nil {
-		// Avoiding the closure on m.Iterate here significantly improves
-		// performance, so we have to switch on each type of maps.
-		switch mt := lhs.(type) {
-		case value.MapString:
-			for key, val := range mt {
-				var rval *value.Value
-				if rhs != nil {
-					if item, ok := rhs.Get(key); ok {
-						rval = &item
-					}
-				}
-				lval := value.Value(value.ValueInterface{Value: val})
-				errs = append(errs, w.visitMapItem(t, out, key, &lval, rval)...)
-			}
-		case value.MapInterface:
-			for key, val := range mt {
-				if key, ok := key.(string); !ok {
-					continue
-				} else {
-					var rval *value.Value
-					if rhs != nil {
-						if item, ok := rhs.Get(key); ok {
-							rval = &item
-						}
-					}
-					lval := value.Value(value.ValueInterface{Value: val})
-					errs = append(errs, w.visitMapItem(t, out, key, &lval, rval)...)
+		lhs.Iterate(func(key string, val value.Value) bool {
+			var rval *value.Value
+			if rhs != nil {
+				if item, ok := rhs.Get(key); ok {
+					rval = &item
 				}
 			}
-		}
+			errs = append(errs, w.visitMapItem(t, out, key, &val, rval)...)
+			if rval != nil {
+				(*rval).Recycle()
+			}
+			return true
+		})
 	}
 
 	if rhs != nil {
-		switch mt := rhs.(type) {
-		case value.MapString:
-			for key, val := range mt {
-				if lhs != nil {
-					if _, ok := lhs.Get(key); ok {
-						continue
-					}
-				}
-				rval := value.Value(value.ValueInterface{Value: val})
-				errs = append(errs, w.visitMapItem(t, out, key, nil, &rval)...)
-			}
-		case value.MapInterface:
-			for key, val := range mt {
-				if key, ok := key.(string); !ok {
-					continue
-				} else {
-					if lhs != nil {
-						if _, ok := lhs.Get(key); ok {
-							continue
-						}
-					}
-					rval := value.Value(value.ValueInterface{Value: val})
-					errs = append(errs, w.visitMapItem(t, out, key, nil, &rval)...)
+		rhs.Iterate(func(key string, val value.Value) bool {
+			if lhs != nil {
+				if v, ok := lhs.Get(key); ok {
+					v.Recycle()
+					return true
 				}
 			}
-		}
+			errs = append(errs, w.visitMapItem(t, out, key, nil, &val)...)
+			return true
+		})
 	}
 	if len(out) > 0 {
 		i := interface{}(out)

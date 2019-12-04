@@ -208,6 +208,7 @@ func (s *Updater) prune(merged *typed.TypedValue, managers fieldpath.ManagedFiel
 		}
 		return nil, fmt.Errorf("failed to convert merged object to last applied version: %v", err)
 	}
+
 	pruned := convertedMerged.RemoveItems(lastSet.Set())
 	pruned, err = s.addBackOwnedItems(convertedMerged, pruned, managers, applyingManager)
 	if err != nil {

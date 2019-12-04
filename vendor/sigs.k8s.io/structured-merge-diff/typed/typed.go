@@ -140,8 +140,7 @@ func (tv TypedValue) Compare(rhs *TypedValue) (c *Comparison, err error) {
 
 // RemoveItems removes each provided list or map item from the value.
 func (tv TypedValue) RemoveItems(items *fieldpath.Set) *TypedValue {
-	tv.value = value.Copy(tv.value)
-	removeItemsWithSchema(&tv.value, items, tv.schema, tv.typeRef)
+	tv.value = removeItemsWithSchema(tv.value, items, tv.schema, tv.typeRef)
 	return &tv
 }
 
@@ -250,7 +249,7 @@ func merge(lhs, rhs *TypedValue, rule, postRule mergeRule) (*TypedValue, error) 
 		typeRef: lhs.typeRef,
 	}
 	if mw.out != nil {
-		out.value = value.ValueInterface{Value: *mw.out}
+		out.value = value.NewValueInterface(*mw.out)
 	}
 	return out, nil
 }

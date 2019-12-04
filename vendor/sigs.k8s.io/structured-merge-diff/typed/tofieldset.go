@@ -92,7 +92,8 @@ func (v *tosetObjectWalker) doScalar(t *schema.Scalar) ValidationErrors {
 }
 
 func (v *tosetObjectWalker) visitListItems(t *schema.List, list value.List) (errs ValidationErrors) {
-	list.Iterate(func(i int, child value.Value) {
+	for i := 0; i < list.Length(); i++ {
+		child := list.At(i)
 		pe, _ := listItemToPathElement(t, i, child)
 		v2 := v.prepareDescent(pe, t.ElementType)
 		v2.value = child
@@ -100,7 +101,7 @@ func (v *tosetObjectWalker) visitListItems(t *schema.List, list value.List) (err
 
 		v2.set.Insert(v2.path)
 		v.finishDescent(v2)
-	})
+	}
 	return errs
 }
 
@@ -121,40 +122,23 @@ func (v *tosetObjectWalker) doList(t *schema.List) (errs ValidationErrors) {
 	return errs
 }
 
-func (v *tosetObjectWalker) visitMapItem(t *schema.Map, key string, val interface{}) (errs ValidationErrors) {
-	pe := fieldpath.PathElement{FieldName: &key}
-
-	tr := t.ElementType
-	if sf, ok := t.FindField(key); ok {
-		tr = sf.Type
-	}
-	v2 := v.prepareDescent(pe, tr)
-	v2.value = value.ValueInterface{Value: val}
-	errs = append(errs, v2.toFieldSet()...)
-	if _, ok := t.FindField(key); !ok {
-		v2.set.Insert(v2.path)
-	}
-	v.finishDescent(v2)
-	return errs
-}
-
 func (v *tosetObjectWalker) visitMapItems(t *schema.Map, m value.Map) (errs ValidationErrors) {
-	// Avoiding the closure on m.Iterate here significantly improves
-	// performance, so we have to switch on each type of maps.
-	switch mt := m.(type) {
-	case value.MapString:
-		for key, val := range mt {
-			errs = append(errs, v.visitMapItem(t, key, val)...)
+	m.Iterate(func(key string, val value.Value) bool {
+		pe := fieldpath.PathElement{FieldName: &key}
+
+		tr := t.ElementType
+		if sf, ok := t.FindField(key); ok {
+			tr = sf.Type
 		}
-	case value.MapInterface:
-		for key, val := range mt {
-			if k, ok := key.(string); !ok {
-				continue
-			} else {
-				errs = append(errs, v.visitMapItem(t, k, val)...)
-			}
+		v2 := v.prepareDescent(pe, tr)
+		v2.value = val
+		errs = append(errs, v2.toFieldSet()...)
+		if _, ok := t.FindField(key); !ok {
+			v2.set.Insert(v2.path)
 		}
-	}
+		v.finishDescent(v2)
+		return true
+	})
 	return errs
 }
 

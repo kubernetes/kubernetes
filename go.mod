@@ -567,3 +567,5 @@ replace (
 	sourcegraph.com/sqs/pbtypes => sourcegraph.com/sqs/pbtypes v0.0.0-20180604144634-d3ebe8f20ae4
 	vbom.ml/util => vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc
 )
+
+replace sigs.k8s.io/structured-merge-diff => /usr/local/google/home/jpbetz/projects/structured-merge-diff
