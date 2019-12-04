@@ -95,9 +95,7 @@ func AddMetaToScheme(scheme *runtime.Scheme) error {
 		&PartialObjectMetadataList{},
 	)
 
-	return scheme.AddConversionFuncs(
-		Convert_Slice_string_To_v1_IncludeObjectPolicy,
-	)
+	return nil
 }
 
 func init() {
