@@ -47,7 +47,15 @@ var kubeletMarshalCases = []struct {
 	{
 		name: "Empty config",
 		obj: &kubeletConfig{
-			config: kubeletconfig.KubeletConfiguration{},
+			configBase: configBase{
+				GroupVersion: kubeletconfig.SchemeGroupVersion,
+			},
+			config: kubeletconfig.KubeletConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: kubeletconfig.SchemeGroupVersion.String(),
+					Kind:       "KubeletConfiguration",
+				},
+			},
 		},
 		yaml: dedent.Dedent(`
 			apiVersion: kubelet.config.k8s.io/v1beta1
@@ -77,7 +85,14 @@ var kubeletMarshalCases = []struct {
 	{
 		name: "Non empty config",
 		obj: &kubeletConfig{
+			configBase: configBase{
+				GroupVersion: kubeletconfig.SchemeGroupVersion,
+			},
 			config: kubeletconfig.KubeletConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: kubeletconfig.SchemeGroupVersion.String(),
+					Kind:       "KubeletConfiguration",
+				},
 				Address:            "1.2.3.4",
 				Port:               12345,
 				RotateCertificates: true,
@@ -111,6 +126,23 @@ var kubeletMarshalCases = []struct {
 			volumeStatsAggPeriod: 0s
 		`),
 	},
+	{
+		name: "New config",
+		obj: &kubeletConfig{
+			configBase: configBase{
+				GroupVersion: kubeletconfig.SchemeGroupVersion,
+				newerConfigVersion: []byte(dedent.Dedent(`
+					apiVersion: kubelet.config.k8s.io/v1
+					kind: KubeletConfiguration
+				`)),
+			},
+			config: kubeletconfig.KubeletConfiguration{},
+		},
+		yaml: dedent.Dedent(`
+			apiVersion: kubelet.config.k8s.io/v1
+			kind: KubeletConfiguration
+		`),
+	},
 }
 
 func TestKubeletMarshal(t *testing.T) {
@@ -138,17 +170,17 @@ func TestKubeletUnmarshal(t *testing.T) {
 				t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
 			}
 
-			got := &kubeletConfig{}
+			got := &kubeletConfig{
+				configBase: configBase{
+					GroupVersion: kubeletconfig.SchemeGroupVersion,
+				},
+			}
 			if err = got.Unmarshal(gvkmap); err != nil {
 				t.Fatalf("unexpected failure of Unmarshal: %v", err)
 			}
 
-			expected := test.obj.DeepCopy().(*kubeletConfig)
-			expected.config.APIVersion = kubeletHandler.GroupVersion.String()
-			expected.config.Kind = "KubeletConfiguration"
-
-			if !reflect.DeepEqual(got, expected) {
-				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", expected, got)
+			if !reflect.DeepEqual(got, test.obj) {
+				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.obj, got)
 			}
 		})
 	}
@@ -164,6 +196,9 @@ func TestKubeletDefault(t *testing.T) {
 			name:       "No specific defaulting works",
 			clusterCfg: kubeadmapi.ClusterConfiguration{},
 			expected: kubeletConfig{
+				configBase: configBase{
+					GroupVersion: kubeletconfig.SchemeGroupVersion,
+				},
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
 					StaticPodPath: kubeadmapiv1beta2.DefaultManifestsDir,
@@ -196,6 +231,9 @@ func TestKubeletDefault(t *testing.T) {
 				},
 			},
 			expected: kubeletConfig{
+				configBase: configBase{
+					GroupVersion: kubeletconfig.SchemeGroupVersion,
+				},
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
 					StaticPodPath: kubeadmapiv1beta2.DefaultManifestsDir,
@@ -231,6 +269,9 @@ func TestKubeletDefault(t *testing.T) {
 				},
 			},
 			expected: kubeletConfig{
+				configBase: configBase{
+					GroupVersion: kubeletconfig.SchemeGroupVersion,
+				},
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
 					StaticPodPath: kubeadmapiv1beta2.DefaultManifestsDir,
@@ -263,6 +304,9 @@ func TestKubeletDefault(t *testing.T) {
 				},
 			},
 			expected: kubeletConfig{
+				configBase: configBase{
+					GroupVersion: kubeletconfig.SchemeGroupVersion,
+				},
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
 					StaticPodPath: kubeadmapiv1beta2.DefaultManifestsDir,
@@ -294,6 +338,9 @@ func TestKubeletDefault(t *testing.T) {
 				CertificatesDir: "/path/to/certs",
 			},
 			expected: kubeletConfig{
+				configBase: configBase{
+					GroupVersion: kubeletconfig.SchemeGroupVersion,
+				},
 				config: kubeletconfig.KubeletConfiguration{
 					FeatureGates:  map[string]bool{},
 					StaticPodPath: kubeadmapiv1beta2.DefaultManifestsDir,
@@ -322,7 +369,11 @@ func TestKubeletDefault(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := &kubeletConfig{}
+			got := &kubeletConfig{
+				configBase: configBase{
+					GroupVersion: kubeletconfig.SchemeGroupVersion,
+				},
+			}
 			got.Default(&test.clusterCfg, &kubeadmapi.APIEndpoint{})
 			if !reflect.DeepEqual(got, &test.expected) {
 				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.expected, got)
@@ -358,12 +409,20 @@ func runKubeletFromTest(t *testing.T, perform func(t *testing.T, in string) (kub
 			expectErr: true,
 		},
 		{
-			name: "New kubelet version returns an error",
+			name: "New kubelet version is used",
 			in: dedent.Dedent(`
 				apiVersion: kubelet.config.k8s.io/v1
 				kind: KubeletConfiguration
 			`),
-			expectErr: true,
+			out: &kubeletConfig{
+				configBase: configBase{
+					GroupVersion: kubeletHandler.GroupVersion,
+					newerConfigVersion: []byte(dedent.Dedent(`
+						apiVersion: kubelet.config.k8s.io/v1
+						kind: KubeletConfiguration
+					`)),
+				},
+			},
 		},
 		{
 			name: "Wrong kubelet kind returns an error",
@@ -383,6 +442,9 @@ func runKubeletFromTest(t *testing.T, perform func(t *testing.T, in string) (kub
 				rotateCertificates: true
 			`),
 			out: &kubeletConfig{
+				configBase: configBase{
+					GroupVersion: kubeletHandler.GroupVersion,
+				},
 				config: kubeletconfig.KubeletConfiguration{
 					TypeMeta: metav1.TypeMeta{
 						APIVersion: kubeletHandler.GroupVersion.String(),
@@ -407,6 +469,9 @@ func runKubeletFromTest(t *testing.T, perform func(t *testing.T, in string) (kub
 				rotateCertificates: true
 			`),
 			out: &kubeletConfig{
+				configBase: configBase{
+					GroupVersion: kubeletHandler.GroupVersion,
+				},
 				config: kubeletconfig.KubeletConfiguration{
 					TypeMeta: metav1.TypeMeta{
 						APIVersion: kubeletHandler.GroupVersion.String(),

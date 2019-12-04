@@ -26,6 +26,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/kube-proxy/config/v1alpha1:go_default_library",
         "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",

@@ -45,7 +45,15 @@ var kubeProxyMarshalCases = []struct {
 	{
 		name: "Empty config",
 		obj: &kubeProxyConfig{
-			config: kubeproxyconfig.KubeProxyConfiguration{},
+			configBase: configBase{
+				GroupVersion: kubeproxyconfig.SchemeGroupVersion,
+			},
+			config: kubeproxyconfig.KubeProxyConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: kubeproxyconfig.SchemeGroupVersion.String(),
+					Kind:       "KubeProxyConfiguration",
+				},
+			},
 		},
 		yaml: dedent.Dedent(`
 			apiVersion: kubeproxy.config.k8s.io/v1alpha1
@@ -97,7 +105,14 @@ var kubeProxyMarshalCases = []struct {
 	{
 		name: "Non empty config",
 		obj: &kubeProxyConfig{
+			configBase: configBase{
+				GroupVersion: kubeproxyconfig.SchemeGroupVersion,
+			},
 			config: kubeproxyconfig.KubeProxyConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: kubeproxyconfig.SchemeGroupVersion.String(),
+					Kind:       "KubeProxyConfiguration",
+				},
 				BindAddress:     "1.2.3.4",
 				EnableProfiling: true,
 			},
@@ -149,6 +164,23 @@ var kubeProxyMarshalCases = []struct {
 			  sourceVip: ""
 		`),
 	},
+	{
+		name: "New config",
+		obj: &kubeProxyConfig{
+			configBase: configBase{
+				GroupVersion: kubeproxyconfig.SchemeGroupVersion,
+				newerConfigVersion: []byte(dedent.Dedent(`
+					apiVersion: kubeproxy.config.k8s.io/v1
+					kind: KubeProxyConfiguration
+				`)),
+			},
+			config: kubeproxyconfig.KubeProxyConfiguration{},
+		},
+		yaml: dedent.Dedent(`
+			apiVersion: kubeproxy.config.k8s.io/v1
+			kind: KubeProxyConfiguration
+		`),
+	},
 }
 
 func TestKubeProxyMarshal(t *testing.T) {
@@ -176,17 +208,17 @@ func TestKubeProxyUnmarshal(t *testing.T) {
 				t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
 			}
 
-			got := &kubeProxyConfig{}
+			got := &kubeProxyConfig{
+				configBase: configBase{
+					GroupVersion: kubeproxyconfig.SchemeGroupVersion,
+				},
+			}
 			if err = got.Unmarshal(gvkmap); err != nil {
 				t.Fatalf("unexpected failure of Unmarshal: %v", err)
 			}
 
-			expected := test.obj.DeepCopy().(*kubeProxyConfig)
-			expected.config.APIVersion = kubeProxyHandler.GroupVersion.String()
-			expected.config.Kind = "KubeProxyConfiguration"
-
-			if !reflect.DeepEqual(got, expected) {
-				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", expected, got)
+			if !reflect.DeepEqual(got, test.obj) {
+				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.obj, got)
 			}
 		})
 	}
@@ -204,6 +236,9 @@ func TestKubeProxyDefault(t *testing.T) {
 			clusterCfg: kubeadmapi.ClusterConfiguration{},
 			endpoint:   kubeadmapi.APIEndpoint{},
 			expected: kubeProxyConfig{
+				configBase: configBase{
+					GroupVersion: kubeproxyconfig.SchemeGroupVersion,
+				},
 				config: kubeproxyconfig.KubeProxyConfiguration{
 					FeatureGates: map[string]bool{},
 					BindAddress:  kubeadmapiv1beta2.DefaultProxyBindAddressv6,
@@ -220,6 +255,9 @@ func TestKubeProxyDefault(t *testing.T) {
 				AdvertiseAddress: "1.2.3.4",
 			},
 			expected: kubeProxyConfig{
+				configBase: configBase{
+					GroupVersion: kubeproxyconfig.SchemeGroupVersion,
+				},
 				config: kubeproxyconfig.KubeProxyConfiguration{
 					FeatureGates: map[string]bool{},
 					BindAddress:  kubeadmapiv1beta2.DefaultProxyBindAddressv4,
@@ -238,6 +276,9 @@ func TestKubeProxyDefault(t *testing.T) {
 			},
 			endpoint: kubeadmapi.APIEndpoint{},
 			expected: kubeProxyConfig{
+				configBase: configBase{
+					GroupVersion: kubeproxyconfig.SchemeGroupVersion,
+				},
 				config: kubeproxyconfig.KubeProxyConfiguration{
 					FeatureGates: map[string]bool{},
 					BindAddress:  kubeadmapiv1beta2.DefaultProxyBindAddressv6,
@@ -257,6 +298,9 @@ func TestKubeProxyDefault(t *testing.T) {
 			},
 			endpoint: kubeadmapi.APIEndpoint{},
 			expected: kubeProxyConfig{
+				configBase: configBase{
+					GroupVersion: kubeproxyconfig.SchemeGroupVersion,
+				},
 				config: kubeproxyconfig.KubeProxyConfiguration{
 					FeatureGates: map[string]bool{
 						features.IPv6DualStack: true,
@@ -277,6 +321,9 @@ func TestKubeProxyDefault(t *testing.T) {
 			},
 			endpoint: kubeadmapi.APIEndpoint{},
 			expected: kubeProxyConfig{
+				configBase: configBase{
+					GroupVersion: kubeproxyconfig.SchemeGroupVersion,
+				},
 				config: kubeproxyconfig.KubeProxyConfiguration{
 					FeatureGates: map[string]bool{
 						features.IPv6DualStack: false,
@@ -292,7 +339,11 @@ func TestKubeProxyDefault(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := &kubeProxyConfig{}
+			got := &kubeProxyConfig{
+				configBase: configBase{
+					GroupVersion: kubeproxyconfig.SchemeGroupVersion,
+				},
+			}
 			got.Default(&test.clusterCfg, &test.endpoint)
 			if !reflect.DeepEqual(got, &test.expected) {
 				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.expected, got)
@@ -328,12 +379,21 @@ func runKubeProxyFromTest(t *testing.T, perform func(t *testing.T, in string) (k
 			expectErr: true,
 		},
 		{
-			name: "New kube-proxy version returns an error",
+			name: "New kube-proxy version is used",
 			in: dedent.Dedent(`
 				apiVersion: kubeproxy.config.k8s.io/v1beta1
 				kind: KubeProxyConfiguration
 			`),
-			expectErr: true,
+			out: &kubeProxyConfig{
+				configBase: configBase{
+					GroupVersion: kubeProxyHandler.GroupVersion,
+					newerConfigVersion: []byte(dedent.Dedent(`
+						apiVersion: kubeproxy.config.k8s.io/v1beta1
+						kind: KubeProxyConfiguration
+					`)),
+				},
+				config: kubeproxyconfig.KubeProxyConfiguration{},
+			},
 		},
 		{
 			name: "Wrong kube-proxy kind returns an error",
@@ -352,6 +412,9 @@ func runKubeProxyFromTest(t *testing.T, perform func(t *testing.T, in string) (k
 				enableProfiling: true
 			`),
 			out: &kubeProxyConfig{
+				configBase: configBase{
+					GroupVersion: kubeProxyHandler.GroupVersion,
+				},
 				config: kubeproxyconfig.KubeProxyConfiguration{
 					TypeMeta: metav1.TypeMeta{
 						APIVersion: kubeProxyHandler.GroupVersion.String(),
@@ -374,6 +437,9 @@ func runKubeProxyFromTest(t *testing.T, perform func(t *testing.T, in string) (k
 				enableProfiling: true
 			`),
 			out: &kubeProxyConfig{
+				configBase: configBase{
+					GroupVersion: kubeProxyHandler.GroupVersion,
+				},
 				config: kubeproxyconfig.KubeProxyConfiguration{
 					TypeMeta: metav1.TypeMeta{
 						APIVersion: kubeProxyHandler.GroupVersion.String(),

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/version"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 
@@ -97,38 +98,75 @@ func (h *handler) FromCluster(clientset clientset.Interface, clusterCfg *kubeadm
 	return h.fromCluster(h, clientset, clusterCfg)
 }
 
-// Marshal is an utility function, used by the component config support implementations to marshal a runtime.Object to YAML with the
-// correct group and version
-func (h *handler) Marshal(object runtime.Object) ([]byte, error) {
-	return kubeadmutil.MarshalToYamlForCodecs(object, h.GroupVersion, Codecs)
-}
-
-// Unmarshal attempts to unmarshal a runtime.Object from a document map. If no object is found, no error is returned.
-// If a matching group is found, but no matching version an error is returned indicating that users should do manual conversion.
-func (h *handler) Unmarshal(from kubeadmapi.DocumentMap, into runtime.Object) error {
-	for gvk, yaml := range from {
-		// If this is a different group, we ignore it
-		if gvk.Group != h.GroupVersion.Group {
-			continue
-		}
-
-		// If this is the correct group, but different version, we return an error
-		if gvk.Version != h.GroupVersion.Version {
-			// TODO: Replace this with a special error type and make UX better around it
-			return errors.Errorf("unexpected apiVersion %q, you may have to do manual conversion to %q and execute kubeadm again", gvk.GroupVersion(), h.GroupVersion)
-		}
-
-		// As long as we support only component configs with a single kind, this is allowed
-		return runtime.DecodeInto(Codecs.UniversalDecoder(), yaml, into)
-	}
-
-	return nil
-}
-
 // known holds the known component config handlers. Add new component configs here.
 var known = []*handler{
 	&kubeProxyHandler,
 	&kubeletHandler,
+}
+
+// configBase is the base type for all component config implementations
+type configBase struct {
+	// GroupVersion holds the supported GroupVersion for the inheriting config
+	GroupVersion schema.GroupVersion
+
+	// newerConfigVersion holds a complete config document that is of newer version than the one in GroupVersion.
+	// Thus the version of newerConfigVersion is always newer than GroupVersion.
+	// If newerConfigVersion is not empty it is returned when Marshal() is called.
+	// It's itself filled in by Unmarshal() whenever a newer config is unmarshalled.
+	newerConfigVersion []byte
+}
+
+// DeepCopyInto copies the current configBase object into another one
+func (cb *configBase) DeepCopyInto(other *configBase) {
+	*other = *cb
+}
+
+// cloneBytes creates a clone of the input byte slice and returns it
+func cloneBytes(in []byte) []byte {
+	out := make([]byte, len(in))
+	copy(out, in)
+	return out
+}
+
+// Marshal is an utility function, used by the component config support implementations to marshal a runtime.Object to YAML with the
+// correct group and version
+func (cb *configBase) Marshal(object runtime.Object) ([]byte, error) {
+	// If a newer version is stored, return that instead
+	if len(cb.newerConfigVersion) > 0 {
+		return cloneBytes(cb.newerConfigVersion), nil
+	}
+
+	return kubeadmutil.MarshalToYamlForCodecs(object, cb.GroupVersion, Codecs)
+}
+
+// Unmarshal attempts to unmarshal a runtime.Object from a document map. If no object is found, no error is returned.
+// If a matching group is found, but no matching version an error is returned indicating that users should do manual conversion.
+func (cb *configBase) Unmarshal(from kubeadmapi.DocumentMap, into runtime.Object) error {
+	for gvk, yaml := range from {
+		// If this is a different group, we ignore it
+		if gvk.Group != cb.GroupVersion.Group {
+			continue
+		}
+
+		// The group matches, let's examine the version
+		switch res := version.CompareKubeAwareVersionStrings(gvk.Version, cb.GroupVersion.Version); {
+		case res < 0: // The version is older than the one we support
+			// TODO: Replace this with a special error type and make UX better around it
+			return errors.Errorf("unexpected apiVersion %q, you may have to do manual conversion to %q and execute kubeadm again", gvk.GroupVersion(), cb.GroupVersion)
+
+		case res == 0: // The version matches the one we support
+			// As long as we support only component configs with a single kind, this is allowed
+			return runtime.DecodeInto(Codecs.UniversalDecoder(), yaml, into)
+
+		case res > 0: // The version is newer than the one we support
+			// We can't unmarshal it. Instead, we use it as is and warn the user about it.
+			klog.Warningf("WARNING: Newer apiVersion %q detected. kubeadm won't patch that config but will use it as is", gvk.GroupVersion())
+			cb.newerConfigVersion = cloneBytes(yaml)
+			return nil
+		}
+	}
+
+	return nil
 }
 
 // ensureInitializedComponentConfigs is an utility func to initialize the ComponentConfigMap in ClusterConfiguration prior to possible writes to it
