@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
+	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
@@ -201,6 +202,32 @@ func TestSchedulerCreation(t *testing.T) {
 
 	if err != nil {
 		t.Fatalf("Failed to create scheduler: %v", err)
+	}
+
+	// Test case for when a plugin name in frameworkOutOfTreeRegistry already exist in defaultRegistry.
+	fakeFrameworkPluginName := ""
+	for name := range frameworkplugins.NewDefaultRegistry(&frameworkplugins.RegistryArgs{}) {
+		fakeFrameworkPluginName = name
+		break
+	}
+	registryFake := map[string]framework.PluginFactory{
+		fakeFrameworkPluginName: func(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
+			return nil, nil
+		},
+	}
+	_, err = New(client,
+		informerFactory,
+		NewPodInformer(client, 0),
+		eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
+		stopCh,
+		WithAlgorithmSource(schedulerapi.SchedulerAlgorithmSource{Provider: &testSource}),
+		WithPodInitialBackoffSeconds(1),
+		WithPodMaxBackoffSeconds(10),
+		WithFrameworkOutOfTreeRegistry(registryFake),
+	)
+
+	if err == nil {
+		t.Fatalf("Create scheduler should fail")
 	}
 }
 
