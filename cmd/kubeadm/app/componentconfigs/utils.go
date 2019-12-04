@@ -17,15 +17,12 @@ limitations under the License.
 package componentconfigs
 
 import (
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-// NoValidator returns a dummy validator function when no validation method is available for the component
-func NoValidator(component string) func(*kubeadmapi.ClusterConfiguration, *field.Path) field.ErrorList {
-	return func(_ *kubeadmapi.ClusterConfiguration, _ *field.Path) field.ErrorList {
-		klog.Warningf("Cannot validate %s config - no validator is available", component)
-		return field.ErrorList{}
-	}
+// warnDefaultComponentConfigValue prints a warning if the user modified a field in a certain
+// CompomentConfig from the default recommended value in kubeadm.
+func warnDefaultComponentConfigValue(componentConfigKind, paramName string, defaultValue, userValue interface{}) {
+	klog.Warningf("The recommended value for %q in %q is: %v; the provided value is: %v",
+		paramName, componentConfigKind, defaultValue, userValue)
 }
