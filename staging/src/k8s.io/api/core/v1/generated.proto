@@ -644,11 +644,10 @@ message Container {
   // accessible from the network.
   // Cannot be updated.
   // +optional
-  // +patchMergeKey=containerPort
+  // +patchMergeKey=name
   // +patchStrategy=merge
   // +listType=map
-  // +listMapKey=containerPort
-  // +listMapKey=protocol
+  // +listMapKey=name
   repeated ContainerPort ports = 6;
 
   // List of sources to populate environment variables in the container.
@@ -4619,11 +4618,10 @@ message ServiceProxyOptions {
 message ServiceSpec {
   // The list of ports that are exposed by this service.
   // More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
-  // +patchMergeKey=port
+  // +patchMergeKey=name
   // +patchStrategy=merge
   // +listType=map
-  // +listMapKey=port
-  // +listMapKey=protocol
+  // +listMapKey=name
   repeated ServicePort ports = 1;
 
   // Route service traffic to pods with label keys and values matching this
