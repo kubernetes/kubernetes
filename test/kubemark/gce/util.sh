@@ -44,9 +44,6 @@ function create-kubemark-master {
     export KUBE_CREATE_NODES=false
     export KUBE_GCE_INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX}-kubemark"
 
-    # Even if the "real cluster" is private, we shouldn't manage cloud nat.
-    export KUBE_GCE_PRIVATE_CLUSTER=false
-
     # Quite tricky cidr setup: we set KUBE_GCE_ENABLE_IP_ALIASES=true to avoid creating
     # cloud routes and RangeAllocator to assign cidrs by kube-controller-manager.
     export KUBE_GCE_ENABLE_IP_ALIASES=true
@@ -94,8 +91,6 @@ function delete-kubemark-master {
     export KUBE_GCE_INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX}-kubemark"
 
     export KUBE_DELETE_NETWORK=false
-    # Even if the "real cluster" is private, we shouldn't manage cloud nat.
-    export KUBE_GCE_PRIVATE_CLUSTER=false
 
     if [[ "${KUBEMARK_HA_MASTER:-}" == "true" && -n "${KUBEMARK_MASTER_ADDITIONAL_ZONES:-}" ]]; then
       for KUBE_GCE_ZONE in ${KUBEMARK_MASTER_ADDITIONAL_ZONES}; do
