@@ -23,12 +23,12 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"time"
 
-	compute "google.golang.org/api/compute/v1"
+	"google.golang.org/api/compute/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 
-	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/filter"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	cloudprovider "k8s.io/cloud-provider"
@@ -40,7 +40,7 @@ func newRoutesMetricContext(request string) *metricContext {
 
 // ListRoutes in the cloud environment.
 func (g *Cloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
-	timeoutCtx, cancel := cloud.ContextWithCallTimeout()
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Hour)
 	defer cancel()
 
 	mc := newRoutesMetricContext("list")
@@ -66,7 +66,7 @@ func (g *Cloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpro
 
 // CreateRoute in the cloud environment.
 func (g *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint string, route *cloudprovider.Route) error {
-	timeoutCtx, cancel := cloud.ContextWithCallTimeout()
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Hour)
 	defer cancel()
 
 	mc := newRoutesMetricContext("create")
@@ -94,7 +94,7 @@ func (g *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint st
 
 // DeleteRoute from the cloud environment.
 func (g *Cloud) DeleteRoute(ctx context.Context, clusterName string, route *cloudprovider.Route) error {
-	timeoutCtx, cancel := cloud.ContextWithCallTimeout()
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Hour)
 	defer cancel()
 
 	mc := newRoutesMetricContext("delete")
