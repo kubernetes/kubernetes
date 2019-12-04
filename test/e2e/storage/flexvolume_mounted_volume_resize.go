@@ -139,7 +139,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 			VolumeMode:       pvc.Spec.VolumeMode,
 		})
 
-		pv, err = e2epv.CreatePV(c, pv)
+		_, err = e2epv.CreatePV(c, pv)
 		framework.ExpectNoError(err, "Error creating pv %v", err)
 
 		ginkgo.By("Waiting for PVC to be in bound phase")
@@ -173,6 +173,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 
 		ginkgo.By("Getting a pod from deployment")
 		podList, err := e2edeploy.GetPodsForDeployment(c, deployment)
+		framework.ExpectNoError(err, "While getting pods from deployment")
 		gomega.Expect(podList.Items).NotTo(gomega.BeEmpty())
 		pod := podList.Items[0]
 

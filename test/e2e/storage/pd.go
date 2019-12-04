@@ -489,13 +489,17 @@ func detachPD(nodeName types.NodeName, pdName string) error {
 		return err
 
 	} else if framework.TestContext.Provider == "aws" {
-		client := ec2.New(session.New())
+		awsSession, err := session.NewSession()
+		if err != nil {
+			return fmt.Errorf("error creating session: %v", err)
+		}
+		client := ec2.New(awsSession)
 		tokens := strings.Split(pdName, "/")
 		awsVolumeID := tokens[len(tokens)-1]
 		request := ec2.DetachVolumeInput{
 			VolumeId: aws.String(awsVolumeID),
 		}
-		_, err := client.DetachVolume(&request)
+		_, err = client.DetachVolume(&request)
 		if err != nil {
 			return fmt.Errorf("error detaching EBS volume: %v", err)
 		}

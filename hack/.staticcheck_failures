@@ -67,7 +67,6 @@ test/e2e/autoscaling
 test/e2e/instrumentation/logging/stackdriver
 test/e2e/instrumentation/monitoring
 test/e2e/manifest
-test/e2e/storage
 test/e2e/storage/drivers
 test/e2e/storage/testsuites
 test/e2e/storage/utils
