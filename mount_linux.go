@@ -256,6 +256,54 @@ func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	return SearchMountPoints(realpath, procMountInfoPath)
 }
 
+// checkAndRepairFileSystem checks and repairs filesystems using command fsck.
+func (mounter *SafeFormatAndMount) checkAndRepairFilesystem(source string) error {
+	klog.V(4).Infof("Checking for issues with fsck on disk: %s", source)
+	args := []string{"-a", source}
+	out, err := mounter.Exec.Command("fsck", args...).CombinedOutput()
+	if err != nil {
+		ee, isExitError := err.(utilexec.ExitError)
+		switch {
+		case err == utilexec.ErrExecutableNotFound:
+			klog.Warningf("'fsck' not found on system; continuing mount without running 'fsck'.")
+		case isExitError && ee.ExitStatus() == fsckErrorsCorrected:
+			klog.Infof("Device %s has errors which were corrected by fsck.", source)
+		case isExitError && ee.ExitStatus() == fsckErrorsUncorrected:
+			return NewMountError(HasFilesystemErrors, "'fsck' found errors on device %s but could not correct them: %s", source, string(out))
+		case isExitError && ee.ExitStatus() > fsckErrorsUncorrected:
+			klog.Infof("`fsck` error %s", string(out))
+		}
+	}
+	return nil
+}
+
+// checkAndRepairXfsFilesystem checks and repairs xfs filesystem using command xfs_repair.
+func (mounter *SafeFormatAndMount) checkAndRepairXfsFilesystem(source string) error {
+	klog.V(4).Infof("Checking for issues with xfs_repair on disk: %s", source)
+
+	args := []string{source}
+	checkArgs := []string{"-n", source}
+
+	// check-only using "xfs_repair -n", if the exit status is not 0, perform a "xfs_repair"
+	_, err := mounter.Exec.Command("xfs_repair", checkArgs...).CombinedOutput()
+	if err != nil {
+		if err == utilexec.ErrExecutableNotFound {
+			klog.Warningf("'xfs_repair' not found on system; continuing mount without running 'xfs_repair'.")
+			return nil
+		} else {
+			klog.Warningf("Filesystem corruption was detected for %s, running xfs_repair to repair", source)
+			out, err := mounter.Exec.Command("xfs_repair", args...).CombinedOutput()
+			if err != nil {
+				return fmt.Errorf("'xfs_repair' found errors on device %s but could not correct them: %s\n", source, out)
+			} else {
+				klog.Infof("Device %s has errors which were corrected by xfs_repair.", source)
+				return nil
+			}
+		}
+	}
+	return nil
+}
+
 // formatAndMount uses unix utils to format and mount the given disk
 func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
 	readOnly := false
@@ -268,26 +316,6 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 
 	options = append(options, "defaults")
 	var mountErrorValue MountErrorType
-
-	if !readOnly {
-		// Run fsck on the disk to fix repairable issues, only do this for volumes requested as rw.
-		klog.V(4).Infof("Checking for issues with fsck on disk: %s", source)
-		args := []string{"-a", source}
-		out, err := mounter.Exec.Command("fsck", args...).CombinedOutput()
-		if err != nil {
-			ee, isExitError := err.(utilexec.ExitError)
-			switch {
-			case err == utilexec.ErrExecutableNotFound:
-				klog.Warningf("'fsck' not found on system; continuing mount without running 'fsck'.")
-			case isExitError && ee.ExitStatus() == fsckErrorsCorrected:
-				klog.Infof("Device %s has errors which were corrected by fsck.", source)
-			case isExitError && ee.ExitStatus() == fsckErrorsUncorrected:
-				return NewMountError(HasFilesystemErrors, "'fsck' found errors on device %s but could not correct them: %s", source, string(out))
-			case isExitError && ee.ExitStatus() > fsckErrorsUncorrected:
-				klog.Infof("`fsck` error %s", string(out))
-			}
-		}
-	}
 
 	// Check if the disk is already formatted
 	existingFormat, err := mounter.GetDiskFormat(source)
@@ -324,10 +352,27 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 		}
 
 		klog.Infof("Disk successfully formatted (mkfs): %s - %s %s", fstype, source, target)
-	} else if fstype != existingFormat {
-		// Verify that the disk is formatted with filesystem type we are expecting
-		mountErrorValue = FilesystemMismatch
-		klog.Warningf("Configured to mount disk %s as %s but current format is %s, things might break", source, existingFormat, fstype)
+	} else {
+		if fstype != existingFormat {
+			// Verify that the disk is formatted with filesystem type we are expecting
+			mountErrorValue = FilesystemMismatch
+			klog.Warningf("Configured to mount disk %s as %s but current format is %s, things might break", source, existingFormat, fstype)
+		}
+
+		if !readOnly {
+			// Run check tools on the disk to fix repairable issues, only do this for formatted volumes requested as rw.
+			var err error
+			switch existingFormat {
+			case "xfs":
+				err = mounter.checkAndRepairXfsFilesystem(source)
+			default:
+				err = mounter.checkAndRepairFilesystem(source)
+			}
+
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	// Mount the disk
