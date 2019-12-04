@@ -262,7 +262,6 @@ func (a *Authenticator) cert() (*tls.Certificate, error) {
 func (a *Authenticator) getCreds() (*credentials, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	defer expirationMetrics.report(time.Now)
 
 	if a.cachedCreds != nil && !a.credsExpired() {
 		return a.cachedCreds, nil

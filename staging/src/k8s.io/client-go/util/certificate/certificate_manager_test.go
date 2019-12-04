@@ -200,7 +200,6 @@ func TestSetRotationDeadline(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			g := metricMock{}
 			m := manager{
 				cert: &tls.Certificate{
 					Leaf: &x509.Certificate{
@@ -208,10 +207,9 @@ func TestSetRotationDeadline(t *testing.T) {
 						NotAfter:  tc.notAfter,
 					},
 				},
-				getTemplate:           func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
-				usages:                []certificates.KeyUsage{},
-				certificateExpiration: &g,
-				now:                   func() time.Time { return now },
+				getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
+				usages:      []certificates.KeyUsage{},
+				now:         func() time.Time { return now },
 			}
 			jitteryDuration = func(float64) time.Duration { return time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.7) }
 			lowerBound := tc.notBefore.Add(time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.7))
@@ -224,12 +222,6 @@ func TestSetRotationDeadline(t *testing.T) {
 					tc.notAfter,
 					deadline,
 					lowerBound)
-			}
-			if g.calls != 1 {
-				t.Errorf("%d metrics were recorded, wanted %d", g.calls, 1)
-			}
-			if g.lastValue != float64(tc.notAfter.Unix()) {
-				t.Errorf("%f value for metric was recorded, wanted %d", g.lastValue, tc.notAfter.Unix())
 			}
 		})
 	}
