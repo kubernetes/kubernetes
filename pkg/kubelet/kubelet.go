@@ -93,6 +93,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
+	fakeremote "k8s.io/kubernetes/pkg/kubelet/remote/fake"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/server"
@@ -318,6 +319,11 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 }
 
 func getRuntimeAndImageServices(remoteRuntimeEndpoint string, remoteImageEndpoint string, runtimeRequestTimeout metav1.Duration) (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
+	if remoteRuntimeEndpoint == fakeremote.FakeRemoteRuntimeEndpoint && remoteImageEndpoint == fakeremote.FakeRemoteImageEndpoint {
+		fakeRuntime := fakeremote.NewFakeRemoteRuntime()
+		return fakeRuntime.RuntimeService, fakeRuntime.ImageService, nil
+	}
+
 	rs, err := remote.NewRemoteRuntimeService(remoteRuntimeEndpoint, runtimeRequestTimeout.Duration)
 	if err != nil {
 		return nil, nil, err

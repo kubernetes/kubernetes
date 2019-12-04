@@ -43,8 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubemark"
 	"k8s.io/kubernetes/pkg/master/ports"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
@@ -195,18 +193,11 @@ func run(config *hollowNodeConfig) {
 		}
 		containerManager := cm.NewStubContainerManager()
 
-		fakeDockerClientConfig := &dockershim.ClientConfig{
-			DockerEndpoint:    libdocker.FakeDockerEndpoint,
-			EnableSleep:       true,
-			WithTraceDisabled: true,
-		}
-
 		hollowKubelet := kubemark.NewHollowKubelet(
 			f, c,
 			client,
 			heartbeatClient,
 			cadvisorInterface,
-			fakeDockerClientConfig,
 			containerManager,
 		)
 		hollowKubelet.Run()

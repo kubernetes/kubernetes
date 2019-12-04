@@ -77,6 +77,7 @@ go_library(
         "//pkg/kubelet/prober:go_default_library",
         "//pkg/kubelet/prober/results:go_default_library",
         "//pkg/kubelet/remote:go_default_library",
+        "//pkg/kubelet/remote/fake:go_default_library",
         "//pkg/kubelet/runtimeclass:go_default_library",
         "//pkg/kubelet/secret:go_default_library",
         "//pkg/kubelet/server:go_default_library",
