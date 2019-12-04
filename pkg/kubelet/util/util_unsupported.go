@@ -52,3 +52,9 @@ func LocalEndpoint(path, file string) (string, error) {
 func GetBootTime() (time.Time, error) {
 	return time.Time{}, fmt.Errorf("GetBootTime is unsupported in this build")
 }
+
+// Umask empty implementation
+func Umask(mask int) (int, error) {
+	return 0, fmt.Errorf("platform and architecture is not supported")
+}
+

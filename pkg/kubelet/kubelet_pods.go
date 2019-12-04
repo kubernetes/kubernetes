@@ -58,6 +58,7 @@ import (
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -327,7 +328,10 @@ func ensureHostsFile(fileName string, hostIPs []string, hostName, hostDomainName
 		hostsFileContent = managedHostsFileContent(hostIPs, hostName, hostDomainName, hostAliases)
 	}
 
-	return ioutil.WriteFile(fileName, hostsFileContent, 0644)
+	oldMask, _ := util.Umask(0)
+	err = ioutil.WriteFile(fileName, hostsFileContent, 0644)
+	util.Umask(oldMask)
+	return err
 }
 
 // nodeHostsFileContent reads the content of node's hosts file.
