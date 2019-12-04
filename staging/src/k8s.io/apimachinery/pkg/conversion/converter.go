@@ -160,14 +160,11 @@ type FieldMappingFunc func(key string, sourceTag, destTag reflect.StructTag) (so
 
 func NewConversionFuncs() ConversionFuncs {
 	return ConversionFuncs{
-		fns:     make(map[typePair]reflect.Value),
 		untyped: make(map[typePair]ConversionFunc),
 	}
 }
 
 type ConversionFuncs struct {
-	// FIXME: Remove.
-	fns     map[typePair]reflect.Value
 	untyped map[typePair]ConversionFunc
 }
 
@@ -190,12 +187,6 @@ func (c ConversionFuncs) AddUntyped(a, b interface{}, fn ConversionFunc) error {
 // both other and c, with other conversions taking precedence.
 func (c ConversionFuncs) Merge(other ConversionFuncs) ConversionFuncs {
 	merged := NewConversionFuncs()
-	for k, v := range c.fns {
-		merged.fns[k] = v
-	}
-	for k, v := range other.fns {
-		merged.fns[k] = v
-	}
 	for k, v := range c.untyped {
 		merged.untyped[k] = v
 	}
@@ -493,35 +484,6 @@ func (c *Converter) doConversion(src, dest interface{}, flags FieldMatchingFlags
 	return f(sv, dv, scope)
 }
 
-// callCustom calls 'custom' with sv & dv. custom must be a conversion function.
-func (c *Converter) callCustom(sv, dv, custom reflect.Value, scope *scope) error {
-	if !sv.CanAddr() {
-		sv2 := reflect.New(sv.Type())
-		sv2.Elem().Set(sv)
-		sv = sv2
-	} else {
-		sv = sv.Addr()
-	}
-	if !dv.CanAddr() {
-		if !dv.CanSet() {
-			return scope.errorf("can't addr or set dest.")
-		}
-		dvOrig := dv
-		dv := reflect.New(dvOrig.Type())
-		defer func() { dvOrig.Set(dv) }()
-	} else {
-		dv = dv.Addr()
-	}
-	args := []reflect.Value{sv, dv, reflect.ValueOf(scope)}
-	ret := custom.Call(args)[0].Interface()
-	// This convolution is necessary because nil interfaces won't convert
-	// to errors.
-	if ret == nil {
-		return nil
-	}
-	return ret.(error)
-}
-
 // callUntyped calls predefined conversion func.
 func (c *Converter) callUntyped(sv, dv reflect.Value, f ConversionFunc, scope *scope) error {
 	if !dv.CanAddr() {
@@ -553,19 +515,6 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 	}
 
 	// Convert sv to dv.
-	if fv, ok := c.conversionFuncs.fns[pair]; ok {
-		if c.Debug != nil {
-			c.Debug.Logf("Calling custom conversion of '%v' to '%v'", st, dt)
-		}
-		return c.callCustom(sv, dv, fv, scope)
-	}
-	if fv, ok := c.generatedConversionFuncs.fns[pair]; ok {
-		if c.Debug != nil {
-			c.Debug.Logf("Calling generated conversion of '%v' to '%v'", st, dt)
-		}
-		return c.callCustom(sv, dv, fv, scope)
-	}
-
 	pair = typePair{reflect.PtrTo(sv.Type()), reflect.PtrTo(dv.Type())}
 	if f, ok := c.conversionFuncs.untyped[pair]; ok {
 		return c.callUntyped(sv, dv, f, scope)
