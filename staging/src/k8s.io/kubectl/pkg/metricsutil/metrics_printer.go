@@ -23,8 +23,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/kubectl/pkg/util/printers"
+	"k8s.io/cli-runtime/pkg/printers"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
 )
 
@@ -86,9 +85,7 @@ func NewNodeMetricsSorter(metrics []metricsapi.NodeMetrics, sortBy string) (*Nod
 	var usages = make([]v1.ResourceList, len(metrics))
 	if len(sortBy) > 0 {
 		for i, v := range metrics {
-			if err := scheme.Scheme.Convert(&v.Usage, &usages[i], nil); err != nil {
-				return nil, err
-			}
+			v.Usage.DeepCopyInto(&usages[i])
 		}
 	}
 
@@ -166,10 +163,7 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics,
 	}
 	var usage v1.ResourceList
 	for _, m := range metrics {
-		err := scheme.Scheme.Convert(&m.Usage, &usage, nil)
-		if err != nil {
-			return err
-		}
+		m.Usage.DeepCopyInto(&usage)
 		printMetricsLine(w, &ResourceMetricsInfo{
 			Name:      m.Name,
 			Metrics:   usage,
@@ -260,11 +254,9 @@ func getPodMetrics(m *metricsapi.PodMetrics, printContainersOnly bool) (v1.Resou
 		podMetrics[res], _ = resource.ParseQuantity("0")
 	}
 
+	var usage v1.ResourceList
 	for _, c := range m.Containers {
-		var usage v1.ResourceList
-		if err := scheme.Scheme.Convert(&c.Usage, &usage, nil); err != nil {
-			return nil, nil, err
-		}
+		c.Usage.DeepCopyInto(&usage)
 		containers[c.Name] = usage
 		if !printContainersOnly {
 			for _, res := range MeasuredResources {

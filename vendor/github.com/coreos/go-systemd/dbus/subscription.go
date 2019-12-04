@@ -94,7 +94,7 @@ func (c *Conn) dispatch() {
 	}()
 }
 
-// Returns two unbuffered channels which will receive all changed units every
+// SubscribeUnits returns two unbuffered channels which will receive all changed units every
 // interval.  Deleted units are sent as nil.
 func (c *Conn) SubscribeUnits(interval time.Duration) (<-chan map[string]*UnitStatus, <-chan error) {
 	return c.SubscribeUnitsCustom(interval, 0, func(u1, u2 *UnitStatus) bool { return *u1 != *u2 }, nil)

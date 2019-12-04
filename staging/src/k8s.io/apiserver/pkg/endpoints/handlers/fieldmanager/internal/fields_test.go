@@ -29,7 +29,7 @@ import (
 
 // TestFieldsRoundTrip tests that a fields trie can be round tripped as a path set
 func TestFieldsRoundTrip(t *testing.T) {
-	tests := []metav1.Fields{
+	tests := []metav1.FieldsV1{
 		{
 			Raw: []byte(`{"f:metadata":{"f:name":{},".":{}}}`),
 		},
@@ -54,11 +54,11 @@ func TestFieldsRoundTrip(t *testing.T) {
 // TestFieldsToSetError tests that errors are picked up by FieldsToSet
 func TestFieldsToSetError(t *testing.T) {
 	tests := []struct {
-		fields    metav1.Fields
+		fields    metav1.FieldsV1
 		errString string
 	}{
 		{
-			fields: metav1.Fields{
+			fields: metav1.FieldsV1{
 				Raw: []byte(`{"k:{invalid json}":{"f:name":{},".":{}}}`),
 			},
 			errString: "ReadObjectCB",

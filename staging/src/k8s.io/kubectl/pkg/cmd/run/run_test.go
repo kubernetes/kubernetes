@@ -168,14 +168,14 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			defer tf.Cleanup()
 
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := scheme.Codecs
+			ns := scheme.Codecs.WithoutConversion()
 
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         corev1.SchemeGroupVersion,
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					if req.URL.Path == "/namespaces/test/replicationcontrollers" {
-						return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, rc)}, nil
+						return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, rc)}, nil
 					}
 					return &http.Response{
 						StatusCode: http.StatusOK,
@@ -327,7 +327,7 @@ func TestGenerateService(t *testing.T) {
 			defer tf.Cleanup()
 
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := scheme.Codecs
+			ns := scheme.Codecs.WithoutConversion()
 
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 			tf.Client = &fake.RESTClient{
@@ -353,7 +353,7 @@ func TestGenerateService(t *testing.T) {
 						if !apiequality.Semantic.DeepEqual(&test.service, svc) {
 							t.Errorf("expected:\n%v\nsaw:\n%v\n", &test.service, svc)
 						}
-						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL, req)
 						return nil, fmt.Errorf("unexpected request")
@@ -505,9 +505,10 @@ func TestRunValidations(t *testing.T) {
 			defer tf.Cleanup()
 
 			_, _, codec := cmdtesting.NewExternalScheme()
+			ns := scheme.Codecs.WithoutConversion()
 			tf.Client = &fake.RESTClient{
-				NegotiatedSerializer: scheme.Codecs,
-				Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalType("", "", ""))},
+				NegotiatedSerializer: ns,
+				Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalType("", "", ""))},
 			}
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 

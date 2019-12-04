@@ -32,7 +32,7 @@ import (
 
 // Config has all the context to run a Scheduler
 type Config struct {
-	// config is the scheduler server's configuration object.
+	// ComponentConfig is the scheduler server's configuration object.
 	ComponentConfig kubeschedulerconfig.KubeSchedulerConfiguration
 
 	// LoopbackClientConfig is a config for a privileged loopback connection
@@ -47,12 +47,12 @@ type Config struct {
 	Client          clientset.Interface
 	InformerFactory informers.SharedInformerFactory
 	PodInformer     coreinformers.PodInformer
-	EventClient     v1beta1.EventsGetter
 
 	// TODO: Remove the following after fully migrating to the new events api.
-	CoreEventClient           v1core.EventsGetter
-	LeaderElectionBroadcaster record.EventBroadcaster
+	CoreEventClient v1core.EventsGetter
+	CoreBroadcaster record.EventBroadcaster
 
+	EventClient v1beta1.EventsGetter
 	Recorder    events.EventRecorder
 	Broadcaster events.EventBroadcaster
 

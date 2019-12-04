@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -33,6 +35,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -99,18 +102,38 @@ const (
 	clusterNameKey = "kubernetes-cluster-name"
 )
 
-// GetLoadBalancer returns whether the specified load balancer exists, and
+// GetLoadBalancer returns whether the specified load balancer and its components exist, and
 // if so, what its status is.
 func (az *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
-	_, status, exists, err = az.getServiceLoadBalancer(service, clusterName, nil, false)
+	// Since public IP is not a part of the load balancer on Azure,
+	// there is a chance that we could orphan public IP resources while we delete the load blanacer (kubernetes/kubernetes#80571).
+	// We need to make sure the existence of the load balancer depends on the load balancer resource and public IP resource on Azure.
+	existsPip := func() bool {
+		pipName, _, err := az.determinePublicIPName(clusterName, service)
+		if err != nil {
+			return false
+		}
+		pipResourceGroup := az.getPublicIPAddressResourceGroup(service)
+		_, existsPip, err := az.getPublicIPAddress(pipResourceGroup, pipName)
+		if err != nil {
+			return false
+		}
+		return existsPip
+	}()
+
+	_, status, existsLb, err := az.getServiceLoadBalancer(service, clusterName, nil, false)
 	if err != nil {
-		return nil, false, err
+		return nil, existsPip, err
 	}
-	if !exists {
+
+	// Return exists = false only if the load balancer and the public IP are not found on Azure
+	if !existsLb && !existsPip {
 		serviceName := getServiceName(service)
 		klog.V(5).Infof("getloadbalancer (cluster:%s) (service:%s) - doesn't exist", clusterName, serviceName)
 		return nil, false, nil
 	}
+
+	// Return exists = true if either the load balancer or the public IP (or both) exists
 	return status, true, nil
 }
 
@@ -164,6 +187,10 @@ func (az *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, ser
 
 // UpdateLoadBalancer updates hosts under the specified load balancer.
 func (az *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
+	if !az.shouldUpdateLoadBalancer(clusterName, service) {
+		klog.V(2).Infof("UpdateLoadBalancer: skipping service %s because it is either being deleted or does not exist anymore", service.Name)
+		return nil
+	}
 	_, err := az.EnsureLoadBalancer(ctx, clusterName, service, nodes)
 	return err
 }
@@ -470,7 +497,7 @@ func (az *Cloud) findServiceIPAddress(ctx context.Context, clusterName string, s
 		return service.Spec.LoadBalancerIP, nil
 	}
 
-	lbStatus, existsLb, err := az.GetLoadBalancer(ctx, clusterName, service)
+	_, lbStatus, existsLb, err := az.getServiceLoadBalancer(service, clusterName, nil, false)
 	if err != nil {
 		return "", err
 	}
@@ -533,6 +560,27 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 			DomainNameLabel: &domainNameLabel,
 		}
 	}
+
+	if az.ipv6DualStackEnabled {
+		// TODO: (khenidak) if we ever enable IPv6 single stack, then we should
+		// not wrap the following in a feature gate
+		ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
+		if ipv6 {
+			pip.PublicIPAddressVersion = network.IPv6
+			klog.V(2).Infof("service(%s): pip(%s) - creating as ipv6 for clusterIP:%v", serviceName, *pip.Name, service.Spec.ClusterIP)
+
+			pip.PublicIPAddressPropertiesFormat.PublicIPAllocationMethod = network.Dynamic
+			if az.useStandardLoadBalancer() {
+				// standard sku must have static allocation method for ipv6
+				pip.PublicIPAddressPropertiesFormat.PublicIPAllocationMethod = network.Static
+			}
+		} else {
+			pip.PublicIPAddressVersion = network.IPv4
+			klog.V(2).Infof("service(%s): pip(%s) - creating as ipv4 for clusterIP:%v", serviceName, *pip.Name, service.Spec.ClusterIP)
+		}
+	}
+
+	klog.V(2).Infof("ensurePublicIPExists for service(%s): pip(%s) - creating", serviceName, *pip.Name)
 
 	klog.V(10).Infof("CreateOrUpdatePIP(%s, %q): start", pipResourceGroup, *pip.Name)
 	err = az.CreateOrUpdatePIP(service, pipResourceGroup, pip)
@@ -647,7 +695,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 	klog.V(2).Infof("reconcileLoadBalancer for service(%s): lb(%s) wantLb(%t) resolved load balancer name", serviceName, lbName, wantLb)
 	lbFrontendIPConfigName := az.getFrontendIPConfigName(service, subnet(service))
 	lbFrontendIPConfigID := az.getFrontendIPConfigID(lbName, lbFrontendIPConfigName)
-	lbBackendPoolName := getBackendPoolName(clusterName)
+	lbBackendPoolName := getBackendPoolName(az.ipv6DualStackEnabled, clusterName, service)
 	lbBackendPoolID := az.getBackendPoolID(lbName, lbBackendPoolName)
 
 	lbIdleTimeout, err := getIdleTimeout(service)
@@ -725,6 +773,13 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 			// construct FrontendIPConfigurationPropertiesFormat
 			var fipConfigurationProperties *network.FrontendIPConfigurationPropertiesFormat
 			if isInternal {
+				// azure does not support ILB for IPv6 yet.
+				// TODO: remove this check when ILB supports IPv6 *and* the SDK
+				// have been rev'ed to 2019* version
+				if utilnet.IsIPv6String(service.Spec.ClusterIP) {
+					return nil, fmt.Errorf("ensure(%s): lb(%s) - internal load balancers does not support IPv6", serviceName, lbName)
+				}
+
 				subnetName := subnet(service)
 				if subnetName == nil {
 					subnetName = &az.SubnetName
@@ -905,7 +960,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 
 			if isInternal {
 				// Refresh updated lb which will be used later in other places.
-				newLB, exist, err := az.getAzureLoadBalancer(lbName)
+				newLB, exist, err := az.getAzureLoadBalancer(lbName, cacheReadTypeDefault)
 				if err != nil {
 					klog.V(2).Infof("reconcileLoadBalancer for service(%s): getAzureLoadBalancer(%s) failed: %v", serviceName, lbName, err)
 					return nil, err
@@ -1023,17 +1078,25 @@ func (az *Cloud) reconcileLoadBalancerRule(
 					LoadDistribution:    loadDistribution,
 					FrontendPort:        to.Int32Ptr(port.Port),
 					BackendPort:         to.Int32Ptr(port.Port),
-					EnableFloatingIP:    to.BoolPtr(true),
 					DisableOutboundSnat: to.BoolPtr(az.disableLoadBalancerOutboundSNAT()),
 					EnableTCPReset:      enableTCPReset,
 				},
 			}
+			// LB does not support floating IPs for IPV6 rules
+			if utilnet.IsIPv6String(service.Spec.ClusterIP) {
+				expectedRule.BackendPort = to.Int32Ptr(port.NodePort)
+				expectedRule.EnableFloatingIP = to.BoolPtr(false)
+			} else {
+				expectedRule.EnableFloatingIP = to.BoolPtr(true)
+			}
+
 			if protocol == v1.ProtocolTCP {
 				expectedRule.LoadBalancingRulePropertiesFormat.IdleTimeoutInMinutes = lbIdleTimeout
 			}
 
-			// we didn't construct the probe objects for UDP or SCTP because they're not used/needed/allowed
-			if protocol != v1.ProtocolUDP && protocol != v1.ProtocolSCTP {
+			// we didn't construct the probe objects for UDP or SCTP because they're not allowed on Azure.
+			// However, when externalTrafficPolicy is Local, Kubernetes HTTP health check would be used for probing.
+			if servicehelpers.NeedsHealthCheck(service) || (protocol != v1.ProtocolUDP && protocol != v1.ProtocolSCTP) {
 				expectedRule.Probe = &network.SubResource{
 					ID: to.StringPtr(az.getLoadBalancerProbeID(lbName, lbRuleName)),
 				}
@@ -1061,7 +1124,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		ports = []v1.ServicePort{}
 	}
 
-	sg, err := az.getSecurityGroup()
+	sg, err := az.getSecurityGroup(cacheReadTypeDefault)
 	if err != nil {
 		return nil, err
 	}
@@ -1243,6 +1306,11 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 	return &sg, nil
 }
 
+func (az *Cloud) shouldUpdateLoadBalancer(clusterName string, service *v1.Service) bool {
+	_, _, existsLb, _ := az.getServiceLoadBalancer(service, clusterName, nil, false)
+	return existsLb && service.ObjectMeta.DeletionTimestamp == nil
+}
+
 func logSafe(s *string) string {
 	if s == nil {
 		return "(nil)"
@@ -1397,7 +1465,7 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lbNa
 	}
 
 	if lbName != "" {
-		loadBalancer, _, err := az.getAzureLoadBalancer(lbName)
+		loadBalancer, _, err := az.getAzureLoadBalancer(lbName, cacheReadTypeDefault)
 		if err != nil {
 			return nil, err
 		}

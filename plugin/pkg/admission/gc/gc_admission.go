@@ -112,7 +112,7 @@ func (a *gcPermissionsEnforcement) Validate(ctx context.Context, attributes admi
 			ResourceRequest: true,
 			Path:            "",
 		}
-		decision, reason, err := a.authorizer.Authorize(deleteAttributes)
+		decision, reason, err := a.authorizer.Authorize(ctx, deleteAttributes)
 		if decision != authorizer.DecisionAllow {
 			return admission.NewForbidden(attributes, fmt.Errorf("cannot set an ownerRef on a resource you can't delete: %v, %v", reason, err))
 		}
@@ -131,7 +131,7 @@ func (a *gcPermissionsEnforcement) Validate(ctx context.Context, attributes admi
 		// resources. User needs to have delete permission on all the
 		// matched Resources.
 		for _, record := range records {
-			decision, reason, err := a.authorizer.Authorize(record)
+			decision, reason, err := a.authorizer.Authorize(ctx, record)
 			if decision != authorizer.DecisionAllow {
 				return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't set finalizers on: %v, %v", reason, err))
 			}

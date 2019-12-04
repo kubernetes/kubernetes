@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -28,7 +28,7 @@ const (
 
 // Define container for all the test specification aimed at verifying
 // that kubeadm creates the bootstrap signer
-var _ = KubeadmDescribe("bootstrap signer", func() {
+var _ = Describe("bootstrap signer", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("bootstrap token")

@@ -52,8 +52,12 @@ func TestCreateMasterAuditPolicy(t *testing.T) {
 	defer c.tearDown()
 
 	// Initialize required environment variables.
-	const kubeEnvTmpl = `readonly KUBE_HOME={{.KubeHome}}`
-	c.mustInvokeFunc(kubeEnvTmpl, kubeAPIServerEnv{KubeHome: c.kubeHome})
+	c.mustInvokeFunc(
+		kubeAPIServerEnv{KubeHome: c.kubeHome},
+		"configure-helper.sh",
+		"base.template",
+		"testdata/kube-apiserver/base.template",
+	)
 
 	policy, err := auditpolicy.LoadPolicyFromFile(policyFile)
 	require.NoError(t, err, "Failed to load generated policy.")

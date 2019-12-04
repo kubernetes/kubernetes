@@ -23,8 +23,9 @@ import (
 	"path"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/pkg/transport"
+	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/pkg/transport"
+	"google.golang.org/grpc"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -101,9 +102,9 @@ func (s *EtcdObjectReader) SetStoredCustomResource(ns, name string, obj *unstruc
 // GetEtcdClients returns an initialized  clientv3.Client and clientv3.KV.
 func GetEtcdClients(config storagebackend.TransportConfig) (*clientv3.Client, clientv3.KV, error) {
 	tlsInfo := transport.TLSInfo{
-		CertFile: config.CertFile,
-		KeyFile:  config.KeyFile,
-		CAFile:   config.CAFile,
+		CertFile:      config.CertFile,
+		KeyFile:       config.KeyFile,
+		TrustedCAFile: config.TrustedCAFile,
 	}
 
 	tlsConfig, err := tlsInfo.ClientConfig()
@@ -112,8 +113,12 @@ func GetEtcdClients(config storagebackend.TransportConfig) (*clientv3.Client, cl
 	}
 
 	cfg := clientv3.Config{
-		Endpoints: config.ServerList,
-		TLS:       tlsConfig,
+		Endpoints:   config.ServerList,
+		DialTimeout: 20 * time.Second,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+		TLS: tlsConfig,
 	}
 
 	c, err := clientv3.New(cfg)

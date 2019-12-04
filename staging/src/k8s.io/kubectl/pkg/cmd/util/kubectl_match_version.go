@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubectl/pkg/version"
+	"k8s.io/component-base/version"
 )
 
 const (

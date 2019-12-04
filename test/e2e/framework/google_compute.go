@@ -23,8 +23,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 // TODO: These should really just use the GCE API client library or at least use
@@ -48,9 +46,9 @@ func lookupClusterImageSources() (string, string, error) {
 		str = strings.Replace(str, ";", "\n", -1)
 		lines := strings.Split(str, "\n")
 		if err != nil {
-			e2elog.Logf("lookupDiskImageSources: gcloud error with [%#v]; err:%v", argv, err)
+			Logf("lookupDiskImageSources: gcloud error with [%#v]; err:%v", argv, err)
 			for _, l := range lines {
-				e2elog.Logf(" > %s", l)
+				Logf(" > %s", l)
 			}
 		}
 		return lines, err
@@ -114,11 +112,11 @@ func lookupClusterImageSources() (string, string, error) {
 func LogClusterImageSources() {
 	masterImg, nodeImg, err := lookupClusterImageSources()
 	if err != nil {
-		e2elog.Logf("Cluster image sources lookup failed: %v\n", err)
+		Logf("Cluster image sources lookup failed: %v\n", err)
 		return
 	}
-	e2elog.Logf("cluster-master-image: %s", masterImg)
-	e2elog.Logf("cluster-node-image: %s", nodeImg)
+	Logf("cluster-master-image: %s", masterImg)
+	Logf("cluster-node-image: %s", nodeImg)
 
 	images := map[string]string{
 		"master_os_image": masterImg,
@@ -128,7 +126,7 @@ func LogClusterImageSources() {
 	outputBytes, _ := json.MarshalIndent(images, "", "  ")
 	filePath := filepath.Join(TestContext.ReportDir, "images.json")
 	if err := ioutil.WriteFile(filePath, outputBytes, 0644); err != nil {
-		e2elog.Logf("cluster images sources, could not write to %q: %v", filePath, err)
+		Logf("cluster images sources, could not write to %q: %v", filePath, err)
 	}
 }
 

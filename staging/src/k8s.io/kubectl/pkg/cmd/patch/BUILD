@@ -31,7 +31,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["patch_test.go"],
-    data = ["//staging/src/k8s.io/kubectl/test/data"],
+    data = ["//staging/src/k8s.io/kubectl/testdata"],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",

@@ -18,14 +18,91 @@ package filters
 
 import (
 	"errors"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"net/http"
+	"net/http/httptest"
+	"testing"
 )
+
+func TestAuthenticateRequestWithAud(t *testing.T) {
+	success, failed := 0, 0
+	testcases := []struct {
+		name          string
+		apiAuds       []string
+		respAuds      []string
+		expectSuccess bool
+	}{
+		{
+			name:          "no api audience and no audience in response",
+			apiAuds:       nil,
+			respAuds:      nil,
+			expectSuccess: true,
+		},
+		{
+			name:          "audience in response",
+			apiAuds:       nil,
+			respAuds:      []string{"other"},
+			expectSuccess: true,
+		},
+		{
+			name:          "with api audience",
+			apiAuds:       authenticator.Audiences([]string{"other"}),
+			respAuds:      nil,
+			expectSuccess: true,
+		},
+		{
+			name:          "api audience matching response audience",
+			apiAuds:       authenticator.Audiences([]string{"other"}),
+			respAuds:      []string{"other"},
+			expectSuccess: true,
+		},
+		{
+			name:          "api audience non-matching response audience",
+			apiAuds:       authenticator.Audiences([]string{"other"}),
+			respAuds:      []string{"some"},
+			expectSuccess: false,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			success, failed = 0, 0
+			auth := WithAuthentication(
+				http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+					if tc.expectSuccess {
+						success = 1
+					} else {
+						t.Errorf("unexpected call to handler")
+					}
+				}),
+				authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+					if req.Header.Get("Authorization") == "Something" {
+						return &authenticator.Response{User: &user.DefaultInfo{Name: "user"}, Audiences: authenticator.Audiences(tc.respAuds)}, true, nil
+					}
+					return nil, false, errors.New("Authorization header is missing.")
+				}),
+				http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+					if tc.expectSuccess {
+						t.Errorf("unexpected call to failed")
+					} else {
+						failed = 1
+					}
+				}),
+				tc.apiAuds,
+			)
+			auth.ServeHTTP(httptest.NewRecorder(), &http.Request{Header: map[string][]string{"Authorization": {"Something"}}})
+			if tc.expectSuccess {
+				assert.Equal(t, 1, success)
+				assert.Equal(t, 0, failed)
+			} else {
+				assert.Equal(t, 0, success)
+				assert.Equal(t, 1, failed)
+			}
+		})
+	}
+}
 
 func TestAuthenticateRequest(t *testing.T) {
 	success := make(chan struct{})

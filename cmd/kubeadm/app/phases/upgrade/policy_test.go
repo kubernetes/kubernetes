@@ -191,6 +191,15 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			newK8sVersion:         constants.MinimumControlPlaneVersion.WithPatch(6).String(),
 			expectedSkippableErrs: 1, // can't upgrade old k8s with newer kubeadm
 		},
+		{
+			name: "build release supported at MinimumControlPlaneVersion",
+			vg: &fakeVersionGetter{
+				clusterVersion: constants.MinimumControlPlaneVersion.String(),
+				kubeletVersion: constants.MinimumControlPlaneVersion.String(),
+				kubeadmVersion: constants.MinimumControlPlaneVersion.WithBuildMetadata("build").String(),
+			},
+			newK8sVersion: constants.MinimumControlPlaneVersion.WithBuildMetadata("build").String(),
+		},
 	}
 
 	for _, rt := range tests {

@@ -84,7 +84,7 @@ type TestAuthorizer struct {
 	allowedAPIGroupName string
 }
 
-func (t *TestAuthorizer) Authorize(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+func (t *TestAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	if t.usernameToNamespaceToAllowedPSPs == nil {
 		return authorizer.DecisionAllow, "", nil
 	}
@@ -2249,7 +2249,7 @@ func TestPolicyAuthorizationErrors(t *testing.T) {
 			plugin := NewTestAdmission(tc.inPolicies, authz)
 			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), ns, "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &metav1.CreateOptions{}, false, &user.DefaultInfo{Name: userName})
 
-			allowedPod, _, validationErrs, err := plugin.computeSecurityContext(attrs, pod, true, "")
+			allowedPod, _, validationErrs, err := plugin.computeSecurityContext(context.Background(), attrs, pod, true, "")
 			assert.Nil(t, allowedPod)
 			assert.NoError(t, err)
 			assert.Len(t, validationErrs, tc.expectValidationErrs)
@@ -2342,7 +2342,7 @@ func TestPreferValidatedPSP(t *testing.T) {
 			plugin := NewTestAdmission(tc.inPolicies, authz)
 			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), "ns", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Update, &metav1.UpdateOptions{}, false, &user.DefaultInfo{Name: "test"})
 
-			_, pspName, validationErrs, err := plugin.computeSecurityContext(attrs, pod, false, tc.validatedPSPHint)
+			_, pspName, validationErrs, err := plugin.computeSecurityContext(context.Background(), attrs, pod, false, tc.validatedPSPHint)
 			assert.NoError(t, err)
 			assert.Len(t, validationErrs, tc.expectValidationErrs)
 			assert.Equal(t, tc.expectedPSP, pspName)

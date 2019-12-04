@@ -45,6 +45,8 @@ type Route struct {
 	MPLSDst    *int
 	NewDst     Destination
 	Encap      Encap
+	MTU        int
+	AdvMSS     int
 }
 
 func (r Route) String() string {

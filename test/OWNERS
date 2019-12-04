@@ -1,17 +1,15 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-  - xichengliudui
   - neolit123
-  - stevesloka
   - johnSchnake
   - SataQiu
   - draveness
+  - alejandrox1
 approvers:
   - andrewsykim
   - bowei # for test/e2e/{dns*,network}.go
   - cblecker
-  - rramkumar1
   - MrHohn
   - deads2k
   - enisoc
@@ -19,17 +17,14 @@ approvers:
   - liggitt
   - mikedanese
   - msau42
-  - ncdc
   - oomichi
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
-  - shyamjvs
   - sig-testing-approvers
   - smarterclayton
   - soltysh
   - sttts
   - timothysc
-  - vishh
 emeritus_approvers:
   - enj
   - eparis
@@ -42,6 +37,10 @@ emeritus_approvers:
   - marun
   - zmerlynn
   - MaciekPytel
+  - rramkumar1
+  - ncdc
+  - vishh
+  - shyamjvs
 
 labels:
 - area/test

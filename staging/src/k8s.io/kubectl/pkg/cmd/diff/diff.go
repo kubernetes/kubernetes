@@ -56,7 +56,7 @@ var (
 
 		KUBECTL_EXTERNAL_DIFF environment variable can be used to select your own
 		diff command. By default, the "diff" command available in your path will be
-		run with "-u" (unicode) and "-N" (treat new files as empty) options.`))
+		run with "-u" (unified diff) and "-N" (treat absent files as empty) options.`))
 	diffExample = templates.Examples(i18n.T(`
 		# Diff resources included in pod.json.
 		kubectl diff -f pod.json
@@ -257,6 +257,7 @@ type InfoObject struct {
 	Force           bool
 	ServerSideApply bool
 	ForceConflicts  bool
+	genericclioptions.IOStreams
 }
 
 var _ Object = &InfoObject{}
@@ -325,7 +326,7 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 		ResourceVersion: resourceVersion,
 	}
 
-	_, result, err := patcher.Patch(obj.Info.Object, modified, obj.Info.Source, obj.Info.Namespace, obj.Info.Name, nil)
+	_, result, err := patcher.Patch(obj.Info.Object, modified, obj.Info.Source, obj.Info.Namespace, obj.Info.Name, obj.ErrOut)
 	return result, err
 }
 
@@ -402,7 +403,7 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
 	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
 	if o.ForceConflicts && !o.ServerSideApply {
-		return fmt.Errorf("--experimental-force-conflicts only works with --experimental-server-side")
+		return fmt.Errorf("--force-conflicts only works with --server-side")
 	}
 
 	if !o.ServerSideApply {
@@ -492,6 +493,7 @@ func (o *DiffOptions) Run() error {
 				Force:           force,
 				ServerSideApply: o.ServerSideApply,
 				ForceConflicts:  o.ForceConflicts,
+				IOStreams:       o.Diff.IOStreams,
 			}
 
 			err = differ.Diff(obj, printer)

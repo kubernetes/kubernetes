@@ -39,7 +39,9 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
@@ -169,6 +171,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]describe.Desc
 		{Group: corev1.GroupName, Kind: "Endpoints"}:                              &EndpointsDescriber{c},
 		{Group: corev1.GroupName, Kind: "ConfigMap"}:                              &ConfigMapDescriber{c},
 		{Group: corev1.GroupName, Kind: "PriorityClass"}:                          &PriorityClassDescriber{c},
+		{Group: discoveryv1beta1.GroupName, Kind: "EndpointSlice"}:                &EndpointSliceDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "ReplicaSet"}:                  &ReplicaSetDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "NetworkPolicy"}:               &NetworkPolicyDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "PodSecurityPolicy"}:           &PodSecurityPolicyDescriber{c},
@@ -472,7 +475,7 @@ func describeLimitRangeSpec(spec corev1.LimitRangeSpec, prefix string, w PrefixW
 // DescribeLimitRanges merges a set of limit range items into a single tabular description
 func DescribeLimitRanges(limitRanges *corev1.LimitRangeList, w PrefixWriter) {
 	if len(limitRanges.Items) == 0 {
-		w.Write(LEVEL_0, "No resource limits.\n")
+		w.Write(LEVEL_0, "No LimitRange resource.\n")
 		return
 	}
 	w.Write(LEVEL_0, "Resource Limits\n Type\tResource\tMin\tMax\tDefault Request\tDefault Limit\tMax Limit/Request Ratio\n")
@@ -710,6 +713,13 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), w, "")
 		}
 		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(pod), w, "")
+		if len(pod.Spec.EphemeralContainers) > 0 {
+			var ec []corev1.Container
+			for i := range pod.Spec.EphemeralContainers {
+				ec = append(ec, corev1.Container(pod.Spec.EphemeralContainers[i].EphemeralContainerCommon))
+			}
+			describeContainers("Ephemeral Containers", ec, pod.Status.EphemeralContainerStatuses, EnvValueRetriever(pod), w, "")
+		}
 		if len(pod.Spec.ReadinessGates) > 0 {
 			w.Write(LEVEL_0, "Readiness Gates:\n  Type\tStatus\n")
 			for _, g := range pod.Spec.ReadinessGates {
@@ -767,10 +777,11 @@ func describePodIPs(pod *corev1.Pod, w PrefixWriter, space string) {
 }
 
 func describeVolumes(volumes []corev1.Volume, w PrefixWriter, space string) {
-	if volumes == nil || len(volumes) == 0 {
+	if len(volumes) == 0 {
 		w.Write(LEVEL_0, "%sVolumes:\t<none>\n", space)
 		return
 	}
+
 	w.Write(LEVEL_0, "%sVolumes:\n", space)
 	for _, volume := range volumes {
 		nameIndent := ""
@@ -1258,9 +1269,10 @@ func printCSIVolumeSource(csi *corev1.CSIVolumeSource, w PrefixWriter) {
 func printCSIPersistentVolumeSource(csi *corev1.CSIPersistentVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tCSI (a Container Storage Interface (CSI) volume source)\n"+
 		"    Driver:\t%v\n"+
+		"    FSType:\t%v\n"+
 		"    VolumeHandle:\t%v\n"+
 		"    ReadOnly:\t%v\n",
-		csi.Driver, csi.VolumeHandle, csi.ReadOnly)
+		csi.Driver, csi.FSType, csi.VolumeHandle, csi.ReadOnly)
 	printCSIPersistentVolumeAttributesMultiline(w, "VolumeAttributes", csi.VolumeAttributes)
 }
 
@@ -1540,8 +1552,11 @@ func describePersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, events *co
 		}
 		if pvc.Spec.DataSource != nil {
 			w.Write(LEVEL_0, "DataSource:\n")
-			w.Write(LEVEL_1, "Name:\t%v\n", pvc.Spec.DataSource.Name)
+			if pvc.Spec.DataSource.APIGroup != nil {
+				w.Write(LEVEL_1, "APIGroup:\t%v\n", *pvc.Spec.DataSource.APIGroup)
+			}
 			w.Write(LEVEL_1, "Kind:\t%v\n", pvc.Spec.DataSource.Kind)
+			w.Write(LEVEL_1, "Name:\t%v\n", pvc.Spec.DataSource.Name)
 		}
 		printPodsMultiline(w, "Mounted By", mountPods)
 
@@ -1699,6 +1714,10 @@ func describeContainerProbe(container corev1.Container, w PrefixWriter) {
 	if container.ReadinessProbe != nil {
 		probe := DescribeProbe(container.ReadinessProbe)
 		w.Write(LEVEL_2, "Readiness:\t%s\n", probe)
+	}
+	if container.StartupProbe != nil {
+		probe := DescribeProbe(container.StartupProbe)
+		w.Write(LEVEL_2, "Startup:\t%s\n", probe)
 	}
 }
 
@@ -2409,7 +2428,6 @@ func describeIngressTLS(w PrefixWriter, ingTLS []networkingv1beta1.IngressTLS) {
 			w.Write(LEVEL_1, "%v terminates %v\n", t.SecretName, strings.Join(t.Hosts, ","))
 		}
 	}
-	return
 }
 
 // TODO: Move from annotations into Ingress status.
@@ -2418,7 +2436,6 @@ func describeIngressAnnotations(w PrefixWriter, annotations map[string]string) {
 	for k, v := range annotations {
 		w.Write(LEVEL_1, "%v:\t%s\n", k, v)
 	}
-	return
 }
 
 // ServiceDescriber generates information about a service.
@@ -2471,6 +2488,11 @@ func describeService(service *corev1.Service, endpoints *corev1.Endpoints, event
 		w.Write(LEVEL_0, "Selector:\t%s\n", labels.FormatLabels(service.Spec.Selector))
 		w.Write(LEVEL_0, "Type:\t%s\n", service.Spec.Type)
 		w.Write(LEVEL_0, "IP:\t%s\n", service.Spec.ClusterIP)
+
+		if service.Spec.IPFamily != nil {
+			w.Write(LEVEL_0, "IPFamily:\t%s\n", *(service.Spec.IPFamily))
+		}
+
 		if len(service.Spec.ExternalIPs) > 0 {
 			w.Write(LEVEL_0, "External IPs:\t%v\n", strings.Join(service.Spec.ExternalIPs, ","))
 		}
@@ -2594,6 +2616,99 @@ func describeEndpoints(ep *corev1.Endpoints, events *corev1.EventList) (string, 
 	})
 }
 
+// EndpointSliceDescriber generates information about an EndpointSlice.
+type EndpointSliceDescriber struct {
+	clientset.Interface
+}
+
+func (d *EndpointSliceDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+	c := d.DiscoveryV1beta1().EndpointSlices(namespace)
+
+	eps, err := c.Get(name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	var events *corev1.EventList
+	if describerSettings.ShowEvents {
+		events, _ = d.CoreV1().Events(namespace).Search(scheme.Scheme, eps)
+	}
+
+	return describeEndpointSlice(eps, events)
+}
+
+func describeEndpointSlice(eps *discoveryv1beta1.EndpointSlice, events *corev1.EventList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%s\n", eps.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", eps.Namespace)
+		printLabelsMultiline(w, "Labels", eps.Labels)
+		printAnnotationsMultiline(w, "Annotations", eps.Annotations)
+
+		w.Write(LEVEL_0, "AddressType:\t%s\n", string(eps.AddressType))
+
+		if len(eps.Ports) == 0 {
+			w.Write(LEVEL_0, "Ports: <unset>\n")
+		} else {
+			w.Write(LEVEL_0, "Ports:\n")
+			w.Write(LEVEL_1, "Name\tPort\tProtocol\n")
+			w.Write(LEVEL_1, "----\t----\t--------\n")
+			for _, port := range eps.Ports {
+				portName := "<unset>"
+				if port.Name != nil && len(*port.Name) > 0 {
+					portName = *port.Name
+				}
+
+				portNum := "<unset>"
+				if port.Port != nil {
+					portNum = strconv.Itoa(int(*port.Port))
+				}
+
+				w.Write(LEVEL_1, "%s\t%s\t%s\n", portName, portNum, *port.Protocol)
+			}
+		}
+
+		if len(eps.Endpoints) == 0 {
+			w.Write(LEVEL_0, "Endpoints: <none>\n")
+		} else {
+			w.Write(LEVEL_0, "Endpoints:\n")
+			for i := range eps.Endpoints {
+				endpoint := &eps.Endpoints[i]
+
+				addressesString := strings.Join(endpoint.Addresses, ",")
+				if len(addressesString) == 0 {
+					addressesString = "<none>"
+				}
+				w.Write(LEVEL_1, "- Addresses:\t%s\n", addressesString)
+
+				w.Write(LEVEL_2, "Conditions:\n")
+				readyText := "<unset>"
+				if endpoint.Conditions.Ready != nil {
+					readyText = strconv.FormatBool(*endpoint.Conditions.Ready)
+				}
+				w.Write(LEVEL_3, "Ready:\t%s\n", readyText)
+
+				hostnameText := "<unset>"
+				if endpoint.Hostname != nil {
+					hostnameText = *endpoint.Hostname
+				}
+				w.Write(LEVEL_2, "Hostname:\t%s\n", hostnameText)
+
+				if endpoint.TargetRef != nil {
+					w.Write(LEVEL_2, "TargetRef:\t%s/%s\n", endpoint.TargetRef.Kind, endpoint.TargetRef.Name)
+				}
+
+				printLabelsMultilineWithIndent(w, "    ", "Topology", "\t", endpoint.Topology, sets.NewString())
+			}
+		}
+
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+		return nil
+	})
+}
+
 // ServiceAccountDescriber generates information about a service.
 type ServiceAccountDescriber struct {
 	clientset.Interface
@@ -2623,8 +2738,8 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 
 		for _, s := range secrets.Items {
 			if s.Type == corev1.SecretTypeServiceAccountToken {
-				name, _ := s.Annotations[corev1.ServiceAccountNameKey]
-				uid, _ := s.Annotations[corev1.ServiceAccountUIDKey]
+				name := s.Annotations[corev1.ServiceAccountNameKey]
+				uid := s.Annotations[corev1.ServiceAccountUIDKey]
 				if name == serviceAccount.Name && uid == string(serviceAccount.UID) {
 					tokens = append(tokens, s)
 				}
@@ -2882,6 +2997,15 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings descr
 		return "", err
 	}
 
+	lease, err := d.CoordinationV1().Leases(corev1.NamespaceNodeLease).Get(name, metav1.GetOptions{})
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return "", err
+		}
+		// Corresponding Lease object doesn't exist - print it accordingly.
+		lease = nil
+	}
+
 	fieldSelector, err := fields.ParseSelector("spec.nodeName=" + name + ",status.phase!=" + string(corev1.PodSucceeded) + ",status.phase!=" + string(corev1.PodFailed))
 	if err != nil {
 		return "", err
@@ -2908,10 +3032,10 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings descr
 		}
 	}
 
-	return describeNode(node, nodeNonTerminatedPodsList, events, canViewPods)
+	return describeNode(node, lease, nodeNonTerminatedPodsList, events, canViewPods)
 }
 
-func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, events *corev1.EventList, canViewPods bool) (string, error) {
+func describeNode(node *corev1.Node, lease *coordinationv1.Lease, nodeNonTerminatedPodsList *corev1.PodList, events *corev1.EventList, canViewPods bool) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", node.Name)
@@ -2925,6 +3049,24 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
 		printNodeTaintsMultiline(w, "Taints", node.Spec.Taints)
 		w.Write(LEVEL_0, "Unschedulable:\t%v\n", node.Spec.Unschedulable)
+
+		w.Write(LEVEL_0, "Lease:\n")
+		holderIdentity := "<unset>"
+		if lease != nil && lease.Spec.HolderIdentity != nil {
+			holderIdentity = *lease.Spec.HolderIdentity
+		}
+		w.Write(LEVEL_1, "HolderIdentity:\t%s\n", holderIdentity)
+		acquireTime := "<unset>"
+		if lease != nil && lease.Spec.AcquireTime != nil {
+			acquireTime = lease.Spec.AcquireTime.Time.Format(time.RFC1123Z)
+		}
+		w.Write(LEVEL_1, "AcquireTime:\t%s\n", acquireTime)
+		renewTime := "<unset>"
+		if lease != nil && lease.Spec.RenewTime != nil {
+			renewTime = lease.Spec.RenewTime.Time.Format(time.RFC1123Z)
+		}
+		w.Write(LEVEL_1, "RenewTime:\t%s\n", renewTime)
+
 		if len(node.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tLastHeartbeatTime\tLastTransitionTime\tReason\tMessage\n")
 			w.Write(LEVEL_1, "----\t------\t-----------------\t------------------\t------\t-------\n")
@@ -2952,7 +3094,7 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 			sort.Sort(SortableResourceNames(resources))
 			for _, resource := range resources {
 				value := resourceList[resource]
-				w.Write(LEVEL_0, " %s:\t%s\n", resource, value.String())
+				w.Write(LEVEL_0, "  %s:\t%s\n", resource, value.String())
 			}
 		}
 
@@ -2966,16 +3108,16 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 		}
 
 		w.Write(LEVEL_0, "System Info:\n")
-		w.Write(LEVEL_0, " Machine ID:\t%s\n", node.Status.NodeInfo.MachineID)
-		w.Write(LEVEL_0, " System UUID:\t%s\n", node.Status.NodeInfo.SystemUUID)
-		w.Write(LEVEL_0, " Boot ID:\t%s\n", node.Status.NodeInfo.BootID)
-		w.Write(LEVEL_0, " Kernel Version:\t%s\n", node.Status.NodeInfo.KernelVersion)
-		w.Write(LEVEL_0, " OS Image:\t%s\n", node.Status.NodeInfo.OSImage)
-		w.Write(LEVEL_0, " Operating System:\t%s\n", node.Status.NodeInfo.OperatingSystem)
-		w.Write(LEVEL_0, " Architecture:\t%s\n", node.Status.NodeInfo.Architecture)
-		w.Write(LEVEL_0, " Container Runtime Version:\t%s\n", node.Status.NodeInfo.ContainerRuntimeVersion)
-		w.Write(LEVEL_0, " Kubelet Version:\t%s\n", node.Status.NodeInfo.KubeletVersion)
-		w.Write(LEVEL_0, " Kube-Proxy Version:\t%s\n", node.Status.NodeInfo.KubeProxyVersion)
+		w.Write(LEVEL_0, "  Machine ID:\t%s\n", node.Status.NodeInfo.MachineID)
+		w.Write(LEVEL_0, "  System UUID:\t%s\n", node.Status.NodeInfo.SystemUUID)
+		w.Write(LEVEL_0, "  Boot ID:\t%s\n", node.Status.NodeInfo.BootID)
+		w.Write(LEVEL_0, "  Kernel Version:\t%s\n", node.Status.NodeInfo.KernelVersion)
+		w.Write(LEVEL_0, "  OS Image:\t%s\n", node.Status.NodeInfo.OSImage)
+		w.Write(LEVEL_0, "  Operating System:\t%s\n", node.Status.NodeInfo.OperatingSystem)
+		w.Write(LEVEL_0, "  Architecture:\t%s\n", node.Status.NodeInfo.Architecture)
+		w.Write(LEVEL_0, "  Container Runtime Version:\t%s\n", node.Status.NodeInfo.ContainerRuntimeVersion)
+		w.Write(LEVEL_0, "  Kubelet Version:\t%s\n", node.Status.NodeInfo.KubeletVersion)
+		w.Write(LEVEL_0, "  Kube-Proxy Version:\t%s\n", node.Status.NodeInfo.KubeProxyVersion)
 
 		// remove when .PodCIDR is depreciated
 		if len(node.Spec.PodCIDR) > 0 {
@@ -3115,10 +3257,15 @@ func describeCertificateSigningRequest(csr *certificatesv1beta1.CertificateSigni
 		printListHelper(w, "\t", "StreetAddress", cr.Subject.StreetAddress)
 		printListHelper(w, "\t", "PostalCode", cr.Subject.PostalCode)
 
-		if len(cr.DNSNames)+len(cr.EmailAddresses)+len(cr.IPAddresses) > 0 {
+		if len(cr.DNSNames)+len(cr.EmailAddresses)+len(cr.IPAddresses)+len(cr.URIs) > 0 {
 			w.Write(LEVEL_0, "Subject Alternative Names:\n")
 			printListHelper(w, "\t", "DNS Names", cr.DNSNames)
 			printListHelper(w, "\t", "Email Addresses", cr.EmailAddresses)
+			var uris []string
+			for _, uri := range cr.URIs {
+				uris = append(uris, uri.String())
+			}
+			printListHelper(w, "\t", "URIs", uris)
 			var ipaddrs []string
 			for _, ipaddr := range cr.IPAddresses {
 				ipaddrs = append(ipaddrs, ipaddr.String())
@@ -3595,11 +3742,36 @@ func describeNetworkPolicySpec(nps networkingv1.NetworkPolicySpec, w PrefixWrite
 	} else {
 		w.Write(LEVEL_2, "%s\n", metav1.FormatLabelSelector(&nps.PodSelector))
 	}
-	w.Write(LEVEL_1, "Allowing ingress traffic:\n")
-	printNetworkPolicySpecIngressFrom(nps.Ingress, "    ", w)
-	w.Write(LEVEL_1, "Allowing egress traffic:\n")
-	printNetworkPolicySpecEgressTo(nps.Egress, "    ", w)
+
+	ingressEnabled, egressEnabled := getPolicyType(nps)
+	if ingressEnabled {
+		w.Write(LEVEL_1, "Allowing ingress traffic:\n")
+		printNetworkPolicySpecIngressFrom(nps.Ingress, "    ", w)
+	} else {
+		w.Write(LEVEL_1, "Not affecting ingress traffic\n")
+	}
+	if egressEnabled {
+		w.Write(LEVEL_1, "Allowing egress traffic:\n")
+		printNetworkPolicySpecEgressTo(nps.Egress, "    ", w)
+	} else {
+		w.Write(LEVEL_1, "Not affecting egress traffic\n")
+
+	}
 	w.Write(LEVEL_1, "Policy Types: %v\n", policyTypesToString(nps.PolicyTypes))
+}
+
+func getPolicyType(nps networkingv1.NetworkPolicySpec) (bool, bool) {
+	var ingress, egress bool
+	for _, pt := range nps.PolicyTypes {
+		switch pt {
+		case networkingv1.PolicyTypeIngress:
+			ingress = true
+		case networkingv1.PolicyTypeEgress:
+			egress = true
+		}
+	}
+
+	return ingress, egress
 }
 
 func printNetworkPolicySpecIngressFrom(npirs []networkingv1.NetworkPolicyIngressRule, initialIndent string, w PrefixWriter) {
@@ -4173,7 +4345,7 @@ func printLabelsMultiline(w PrefixWriter, title string, labels map[string]string
 func printLabelsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, labels map[string]string, skip sets.String) {
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
-	if labels == nil || len(labels) == 0 {
+	if len(labels) == 0 {
 		w.WriteLine("<none>")
 		return
 	}
@@ -4211,7 +4383,7 @@ func printNodeTaintsMultiline(w PrefixWriter, title string, taints []corev1.Tain
 func printTaintsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, taints []corev1.Taint) {
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
-	if taints == nil || len(taints) == 0 {
+	if len(taints) == 0 {
 		w.WriteLine("<none>")
 		return
 	}
@@ -4242,7 +4414,7 @@ func printPodsMultiline(w PrefixWriter, title string, pods []corev1.Pod) {
 func printPodsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, pods []corev1.Pod) {
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
-	if pods == nil || len(pods) == 0 {
+	if len(pods) == 0 {
 		w.WriteLine("<none>")
 		return
 	}
@@ -4273,7 +4445,7 @@ func printPodTolerationsMultiline(w PrefixWriter, title string, tolerations []co
 func printTolerationsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, tolerations []corev1.Toleration) {
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
-	if tolerations == nil || len(tolerations) == 0 {
+	if len(tolerations) == 0 {
 		w.WriteLine("<none>")
 		return
 	}

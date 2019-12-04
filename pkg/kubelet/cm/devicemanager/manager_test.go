@@ -34,9 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
-	watcherapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
+	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+	watcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
@@ -60,9 +61,10 @@ func tmpSocketDir() (socketDir, socketName, pluginSocketName string, err error) 
 
 func TestNewManagerImpl(t *testing.T) {
 	socketDir, socketName, _, err := tmpSocketDir()
+	topologyStore := topologymanager.NewFakeManager()
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
-	_, err = newManagerImpl(socketName)
+	_, err = newManagerImpl(socketName, nil, topologyStore)
 	require.NoError(t, err)
 	os.RemoveAll(socketDir)
 }
@@ -221,7 +223,8 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 }
 
 func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string) (Manager, <-chan interface{}) {
-	m, err := newManagerImpl(socketName)
+	topologyStore := topologymanager.NewFakeManager()
+	m, err := newManagerImpl(socketName, nil, topologyStore)
 	require.NoError(t, err)
 	updateChan := make(chan interface{})
 
@@ -254,7 +257,6 @@ func setupDevicePlugin(t *testing.T, devs []*pluginapi.Device, pluginSocketName 
 func setupPluginManager(t *testing.T, pluginSocketName string, m Manager) pluginmanager.PluginManager {
 	pluginManager := pluginmanager.NewPluginManager(
 		filepath.Dir(pluginSocketName), /* sockDir */
-		"",                             /* deprecatedSockDir */
 		&record.FakeRecorder{},
 	)
 
@@ -288,9 +290,10 @@ func cleanup(t *testing.T, m Manager, p *Stub) {
 
 func TestUpdateCapacityAllocatable(t *testing.T) {
 	socketDir, socketName, _, err := tmpSocketDir()
+	topologyStore := topologymanager.NewFakeManager()
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
-	testManager, err := newManagerImpl(socketName)
+	testManager, err := newManagerImpl(socketName, nil, topologyStore)
 	as := assert.New(t)
 	as.NotNil(testManager)
 	as.Nil(err)
@@ -594,16 +597,17 @@ func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestReso
 		return nil, err
 	}
 	testManager := &ManagerImpl{
-		socketdir:         tmpDir,
-		callback:          monitorCallback,
-		healthyDevices:    make(map[string]sets.String),
-		unhealthyDevices:  make(map[string]sets.String),
-		allocatedDevices:  make(map[string]sets.String),
-		endpoints:         make(map[string]endpointInfo),
-		podDevices:        make(podDevices),
-		activePods:        activePods,
-		sourcesReady:      &sourcesReadyStub{},
-		checkpointManager: ckm,
+		socketdir:             tmpDir,
+		callback:              monitorCallback,
+		healthyDevices:        make(map[string]sets.String),
+		unhealthyDevices:      make(map[string]sets.String),
+		allocatedDevices:      make(map[string]sets.String),
+		endpoints:             make(map[string]endpointInfo),
+		podDevices:            make(podDevices),
+		topologyAffinityStore: topologymanager.NewFakeManager(),
+		activePods:            activePods,
+		sourcesReady:          &sourcesReadyStub{},
+		checkpointManager:     ckm,
 	}
 
 	for _, res := range testRes {
@@ -740,7 +744,9 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 				testCase.description, testCase.expErr, err)
 		}
 		runContainerOpts, err := testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
-		as.Nil(err)
+		if testCase.expErr == nil {
+			as.Nil(err)
+		}
 		if testCase.expectedContainerOptsLen == nil {
 			as.Nil(runContainerOpts)
 		} else {

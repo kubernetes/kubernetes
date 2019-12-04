@@ -19,22 +19,34 @@ package predicates
 import (
 	"os"
 	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
-	"k8s.io/kubernetes/pkg/features"
+	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	utilpointer "k8s.io/utils/pointer"
 )
+
+func getVolumeLimitKey(filterType string) v1.ResourceName {
+	switch filterType {
+	case EBSVolumeFilterType:
+		return v1.ResourceName(volumeutil.EBSVolumeLimitKey)
+	case GCEPDVolumeFilterType:
+		return v1.ResourceName(volumeutil.GCEVolumeLimitKey)
+	case AzureDiskVolumeFilterType:
+		return v1.ResourceName(volumeutil.AzureVolumeLimitKey)
+	case CinderVolumeFilterType:
+		return v1.ResourceName(volumeutil.CinderVolumeLimitKey)
+	default:
+		return v1.ResourceName(volumeutil.GetCSIAttachLimitKey(filterType))
+	}
+}
 
 func onePVCPod(filterName string) *v1.Pod {
 	return &v1.Pod{
@@ -832,39 +844,16 @@ func TestVolumeCountConflicts(t *testing.T) {
 
 	expectedFailureReasons := []PredicateFailureReason{ErrMaxVolumeCountExceeded}
 
-	// running attachable predicate tests without feature gate and no limit present on nodes
-	for _, test := range tests {
-		os.Setenv(KubeMaxPDVols, strconv.Itoa(test.maxVols))
-		node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
-		pred := NewMaxPDVolumeCountPredicate(test.filterName,
-			getFakeCSINodeInfo(csiNode),
-			getFakeStorageClassInfo(test.filterName),
-			getFakePVInfo(test.filterName),
-			getFakePVCInfo(test.filterName))
-
-		fits, reasons, err := pred(test.newPod, GetPredicateMetadata(test.newPod, nil), node)
-		if err != nil {
-			t.Errorf("[%s]%s: unexpected error: %v", test.filterName, test.test, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("[%s]%s: unexpected failure reasons: %v, want: %v", test.filterName, test.test, reasons, expectedFailureReasons)
-		}
-		if fits != test.fits {
-			t.Errorf("[%s]%s: expected %v, got %v", test.filterName, test.test, test.fits, fits)
-		}
-	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()
-
 	// running attachable predicate tests with feature gate and limit present on nodes
 	for _, test := range tests {
 		node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
 		pred := NewMaxPDVolumeCountPredicate(test.filterName,
-			getFakeCSINodeInfo(csiNode),
-			getFakeStorageClassInfo(test.filterName),
-			getFakePVInfo(test.filterName),
-			getFakePVCInfo(test.filterName))
-		fits, reasons, err := pred(test.newPod, GetPredicateMetadata(test.newPod, nil), node)
+			getFakeCSINodeLister(csiNode),
+			getFakeStorageClassLister(test.filterName),
+			getFakePVLister(test.filterName),
+			getFakePVCLister(test.filterName))
+		factory := &MetadataProducerFactory{}
+		fits, reasons, err := pred(test.newPod, factory.GetPredicateMetadata(test.newPod, nil), node)
 		if err != nil {
 			t.Errorf("Using allocatable [%s]%s: unexpected error: %v", test.filterName, test.test, err)
 		}
@@ -877,7 +866,7 @@ func TestVolumeCountConflicts(t *testing.T) {
 	}
 }
 
-func getFakeStorageClassInfo(sc string) FakeStorageClassInfo {
+func getFakeStorageClassLister(sc string) fakelisters.StorageClassLister {
 	var provisioner string
 	switch sc {
 	case EBSVolumeFilterType:
@@ -889,9 +878,9 @@ func getFakeStorageClassInfo(sc string) FakeStorageClassInfo {
 	case CinderVolumeFilterType:
 		provisioner = csilibplugins.CinderInTreePluginName
 	default:
-		return FakeStorageClassInfo{}
+		return fakelisters.StorageClassLister{}
 	}
-	return FakeStorageClassInfo{
+	return fakelisters.StorageClassLister{
 		{
 			ObjectMeta:  metav1.ObjectMeta{Name: sc},
 			Provisioner: provisioner,
@@ -903,8 +892,8 @@ func getFakeStorageClassInfo(sc string) FakeStorageClassInfo {
 	}
 }
 
-func getFakePVInfo(filterName string) FakePersistentVolumeInfo {
-	return FakePersistentVolumeInfo{
+func getFakePVLister(filterName string) fakelisters.PersistentVolumeLister {
+	return fakelisters.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
 			Spec: v1.PersistentVolumeSpec{
@@ -922,8 +911,8 @@ func getFakePVInfo(filterName string) FakePersistentVolumeInfo {
 	}
 }
 
-func getFakePVCInfo(filterName string) FakePersistentVolumeClaimInfo {
-	return FakePersistentVolumeClaimInfo{
+func getFakePVCLister(filterName string) fakelisters.PersistentVolumeClaimLister {
+	return fakelisters.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
 			Spec: v1.PersistentVolumeClaimSpec{
@@ -1051,7 +1040,42 @@ func TestMaxVolumeFuncM4(t *testing.T) {
 	}
 }
 
-func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int64, driverNames ...string) (*schedulernodeinfo.NodeInfo, *v1beta1.CSINode) {
+func TestMaxVolumeFuncM4WithOnlyStableLabels(t *testing.T) {
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-for-m4-instance",
+			Labels: map[string]string{
+				v1.LabelInstanceTypeStable: "m4.2xlarge",
+			},
+		},
+	}
+	os.Unsetenv(KubeMaxPDVols)
+	maxVolumeFunc := getMaxVolumeFunc(EBSVolumeFilterType)
+	maxVolume := maxVolumeFunc(node)
+	if maxVolume != volumeutil.DefaultMaxEBSVolumes {
+		t.Errorf("Expected max volume to be %d got %d", volumeutil.DefaultMaxEBSVolumes, maxVolume)
+	}
+}
+
+func TestMaxVolumeFuncM4WithBothBetaAndStableLabels(t *testing.T) {
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-for-m4-instance",
+			Labels: map[string]string{
+				v1.LabelInstanceType:       "m4.2xlarge",
+				v1.LabelInstanceTypeStable: "m4.2xlarge",
+			},
+		},
+	}
+	os.Unsetenv(KubeMaxPDVols)
+	maxVolumeFunc := getMaxVolumeFunc(EBSVolumeFilterType)
+	maxVolume := maxVolumeFunc(node)
+	if maxVolume != volumeutil.DefaultMaxEBSVolumes {
+		t.Errorf("Expected max volume to be %d got %d", volumeutil.DefaultMaxEBSVolumes, maxVolume)
+	}
+}
+
+func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int64, driverNames ...string) (*schedulernodeinfo.NodeInfo, *storagev1.CSINode) {
 	nodeInfo := schedulernodeinfo.NewNodeInfo(pods...)
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "node-for-max-pd-test-1"},
@@ -1059,7 +1083,7 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 			Allocatable: v1.ResourceList{},
 		},
 	}
-	var csiNode *v1beta1.CSINode
+	var csiNode *storagev1.CSINode
 
 	addLimitToNode := func() {
 		for _, driver := range driverNames {
@@ -1068,10 +1092,10 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 	}
 
 	initCSINode := func() {
-		csiNode = &v1beta1.CSINode{
+		csiNode = &storagev1.CSINode{
 			ObjectMeta: metav1.ObjectMeta{Name: "csi-node-for-max-pd-test-1"},
-			Spec: v1beta1.CSINodeSpec{
-				Drivers: []v1beta1.CSINodeDriver{},
+			Spec: storagev1.CSINodeSpec{
+				Drivers: []storagev1.CSINodeDriver{},
 			},
 		}
 	}
@@ -1079,12 +1103,12 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 	addDriversCSINode := func(addLimits bool) {
 		initCSINode()
 		for _, driver := range driverNames {
-			driver := v1beta1.CSINodeDriver{
+			driver := storagev1.CSINodeDriver{
 				Name:   driver,
 				NodeID: "node-for-max-pd-test-1",
 			}
 			if addLimits {
-				driver.Allocatable = &v1beta1.VolumeNodeResources{
+				driver.Allocatable = &storagev1.VolumeNodeResources{
 					Count: utilpointer.Int32Ptr(int32(limit)),
 				}
 			}
@@ -1110,19 +1134,4 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 
 	nodeInfo.SetNode(node)
 	return nodeInfo, csiNode
-}
-
-func getVolumeLimitKey(filterType string) v1.ResourceName {
-	switch filterType {
-	case EBSVolumeFilterType:
-		return v1.ResourceName(volumeutil.EBSVolumeLimitKey)
-	case GCEPDVolumeFilterType:
-		return v1.ResourceName(volumeutil.GCEVolumeLimitKey)
-	case AzureDiskVolumeFilterType:
-		return v1.ResourceName(volumeutil.AzureVolumeLimitKey)
-	case CinderVolumeFilterType:
-		return v1.ResourceName(volumeutil.CinderVolumeLimitKey)
-	default:
-		return v1.ResourceName(volumeutil.GetCSIAttachLimitKey(filterType))
-	}
 }

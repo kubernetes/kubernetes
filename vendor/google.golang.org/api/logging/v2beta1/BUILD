@@ -9,6 +9,8 @@ go_library(
     deps = [
         "//vendor/google.golang.org/api/gensupport:go_default_library",
         "//vendor/google.golang.org/api/googleapi:go_default_library",
+        "//vendor/google.golang.org/api/option:go_default_library",
+        "//vendor/google.golang.org/api/transport/http:go_default_library",
     ],
 )
 

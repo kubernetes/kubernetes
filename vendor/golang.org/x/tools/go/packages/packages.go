@@ -103,6 +103,12 @@ type Config struct {
 	// If Context is nil, the load cannot be cancelled.
 	Context context.Context
 
+	// Logf is the logger for the config.
+	// If the user provides a logger, debug logging is enabled.
+	// If the GOPACKAGESDEBUG environment variable is set to true,
+	// but the logger is nil, default to log.Printf.
+	Logf func(format string, args ...interface{})
+
 	// Dir is the directory in which to run the build system's query tool
 	// that provides information about the packages.
 	// If Dir is empty, the tool is run in the current directory.
@@ -429,6 +435,17 @@ func newLoader(cfg *Config) *loader {
 	}
 	if cfg != nil {
 		ld.Config = *cfg
+		// If the user has provided a logger, use it.
+		ld.Config.Logf = cfg.Logf
+	}
+	if ld.Config.Logf == nil {
+		// If the GOPACKAGESDEBUG environment variable is set to true,
+		// but the user has not provided a logger, default to log.Printf.
+		if debug {
+			ld.Config.Logf = log.Printf
+		} else {
+			ld.Config.Logf = func(format string, args ...interface{}) {}
+		}
 	}
 	if ld.Config.Mode == 0 {
 		ld.Config.Mode = NeedName | NeedFiles | NeedCompiledGoFiles // Preserve zero behavior of Mode for backwards compatibility.
@@ -527,28 +544,32 @@ func (ld *loader) refine(roots []string, list ...*Package) ([]*Package, error) {
 		lpkg.color = grey
 		stack = append(stack, lpkg) // push
 		stubs := lpkg.Imports       // the structure form has only stubs with the ID in the Imports
-		lpkg.Imports = make(map[string]*Package, len(stubs))
-		for importPath, ipkg := range stubs {
-			var importErr error
-			imp := ld.pkgs[ipkg.ID]
-			if imp == nil {
-				// (includes package "C" when DisableCgo)
-				importErr = fmt.Errorf("missing package: %q", ipkg.ID)
-			} else if imp.color == grey {
-				importErr = fmt.Errorf("import cycle: %s", stack)
-			}
-			if importErr != nil {
-				if lpkg.importErrors == nil {
-					lpkg.importErrors = make(map[string]error)
+		// If NeedImports isn't set, the imports fields will all be zeroed out.
+		// If NeedDeps isn't also set we want to keep the stubs.
+		if ld.Mode&NeedImports != 0 && ld.Mode&NeedDeps != 0 {
+			lpkg.Imports = make(map[string]*Package, len(stubs))
+			for importPath, ipkg := range stubs {
+				var importErr error
+				imp := ld.pkgs[ipkg.ID]
+				if imp == nil {
+					// (includes package "C" when DisableCgo)
+					importErr = fmt.Errorf("missing package: %q", ipkg.ID)
+				} else if imp.color == grey {
+					importErr = fmt.Errorf("import cycle: %s", stack)
 				}
-				lpkg.importErrors[importPath] = importErr
-				continue
-			}
+				if importErr != nil {
+					if lpkg.importErrors == nil {
+						lpkg.importErrors = make(map[string]error)
+					}
+					lpkg.importErrors[importPath] = importErr
+					continue
+				}
 
-			if visit(imp) {
-				lpkg.needsrc = true
+				if visit(imp) {
+					lpkg.needsrc = true
+				}
+				lpkg.Imports[importPath] = imp.Package
 			}
-			lpkg.Imports[importPath] = imp.Package
 		}
 		if lpkg.needsrc {
 			srcPkgs = append(srcPkgs, lpkg)

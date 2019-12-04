@@ -40,7 +40,7 @@ import (
 
 type fakeAuthorizer struct{}
 
-func (fakeAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
+func (fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 	username := a.GetUser().GetName()
 
 	if username == "non-deleter" {
@@ -101,7 +101,7 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 		whiteList: whiteList,
 	}
 
-	genericPluginInitializer := initializer.New(nil, nil, fakeAuthorizer{})
+	genericPluginInitializer := initializer.New(nil, nil, fakeAuthorizer{}, nil)
 	fakeDiscoveryClient := &fakediscovery.FakeDiscovery{Fake: &coretesting.Fake{}}
 	fakeDiscoveryClient.Resources = []*metav1.APIResourceList{
 		{

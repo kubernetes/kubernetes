@@ -16,6 +16,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/apis/admission/v1",
     deps = [
         "//pkg/apis/admission:go_default_library",
+        "//pkg/apis/authentication/v1:go_default_library",
         "//staging/src/k8s.io/api/admission/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",

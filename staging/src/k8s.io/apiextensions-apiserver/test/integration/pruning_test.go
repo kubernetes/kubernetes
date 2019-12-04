@@ -21,9 +21,11 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/pkg/transport"
+	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/pkg/transport"
+	"google.golang.org/grpc"
 
 	"sigs.k8s.io/yaml"
 
@@ -137,7 +139,7 @@ properties:
             type: string
 `
 
-	fooSchemaEmbeddedResourceInstance = fooInstance + `
+	fooSchemaEmbeddedResourceInstance = pruningFooInstance + `
 embeddedPruning:
   apiVersion: foo/v1
   kind: Foo
@@ -170,7 +172,7 @@ embeddedNested:
     specified: bar
 `
 
-	fooInstance = `
+	pruningFooInstance = `
 kind: Foo
 apiVersion: tests.example.com/v1beta1
 metadata:
@@ -199,7 +201,7 @@ func TestPruningCreate(t *testing.T) {
 	t.Logf("Creating CR and expect 'unspecified' fields to be pruned")
 	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(fooInstance), &foo.Object); err != nil {
+	if err := yaml.Unmarshal([]byte(pruningFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
 	}
 	unstructured.SetNestedField(foo.Object, "bar", "unspecified")
@@ -251,7 +253,7 @@ func TestPruningStatus(t *testing.T) {
 	t.Logf("Creating CR and expect 'unspecified' fields to be pruned")
 	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(fooInstance), &foo.Object); err != nil {
+	if err := yaml.Unmarshal([]byte(pruningFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
 	}
 	foo, err = fooClient.Create(foo, metav1.CreateOptions{})
@@ -322,17 +324,21 @@ func TestPruningFromStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 	tlsInfo := transport.TLSInfo{
-		CertFile: restOptions.StorageConfig.Transport.CertFile,
-		KeyFile:  restOptions.StorageConfig.Transport.KeyFile,
-		CAFile:   restOptions.StorageConfig.Transport.CAFile,
+		CertFile:      restOptions.StorageConfig.Transport.CertFile,
+		KeyFile:       restOptions.StorageConfig.Transport.KeyFile,
+		TrustedCAFile: restOptions.StorageConfig.Transport.TrustedCAFile,
 	}
 	tlsConfig, err := tlsInfo.ClientConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
 	etcdConfig := clientv3.Config{
-		Endpoints: restOptions.StorageConfig.Transport.ServerList,
-		TLS:       tlsConfig,
+		Endpoints:   restOptions.StorageConfig.Transport.ServerList,
+		DialTimeout: 20 * time.Second,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+		TLS: tlsConfig,
 	}
 	etcdclient, err := clientv3.New(etcdConfig)
 	if err != nil {
@@ -342,7 +348,7 @@ func TestPruningFromStorage(t *testing.T) {
 	t.Logf("Creating object with unknown field manually in etcd")
 
 	original := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(fooInstance), &original.Object); err != nil {
+	if err := yaml.Unmarshal([]byte(pruningFooInstance), &original.Object); err != nil {
 		t.Fatal(err)
 	}
 	unstructured.SetNestedField(original.Object, "bar", "unspecified")
@@ -404,7 +410,7 @@ func TestPruningPatch(t *testing.T) {
 
 	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(fooInstance), &foo.Object); err != nil {
+	if err := yaml.Unmarshal([]byte(pruningFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
 	}
 	foo, err = fooClient.Create(foo, metav1.CreateOptions{})
@@ -457,7 +463,7 @@ func TestPruningCreatePreservingUnknownFields(t *testing.T) {
 	t.Logf("Creating CR and expect 'unspecified' field to be pruned")
 	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Version, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(fooInstance), &foo.Object); err != nil {
+	if err := yaml.Unmarshal([]byte(pruningFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
 	}
 	unstructured.SetNestedField(foo.Object, "bar", "unspecified")

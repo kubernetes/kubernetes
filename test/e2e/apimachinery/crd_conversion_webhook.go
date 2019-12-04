@@ -30,12 +30,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
@@ -53,8 +52,6 @@ const (
 	serviceCRDName     = "e2e-test-crd-conversion-webhook"
 	roleBindingCRDName = "crd-conversion-webhook-auth-reader"
 )
-
-var serverCRDConversionWebhookVersion = utilversion.MustParseSemantic("v1.13.0-alpha")
 
 var apiVersions = []apiextensionsv1.CustomResourceDefinitionVersion{
 	{
@@ -116,7 +113,7 @@ var alternativeAPIVersions = []apiextensionsv1.CustomResourceDefinitionVersion{
 	},
 }
 
-var _ = SIGDescribe("CustomResourceConversionWebhook", func() {
+var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]", func() {
 	var context *certContext
 	f := framework.NewDefaultFramework("crd-webhook")
 	servicePort := int32(9443)
@@ -129,9 +126,6 @@ var _ = SIGDescribe("CustomResourceConversionWebhook", func() {
 		client = f.ClientSet
 		namespaceName = f.Namespace.Name
 
-		// Make sure the relevant provider supports conversion webhook
-		framework.SkipUnlessServerVersionGTE(serverCRDConversionWebhookVersion, f.ClientSet.Discovery())
-
 		ginkgo.By("Setting up server cert")
 		context = setupServerCert(f.Namespace.Name, serviceCRDName)
 		createAuthReaderRoleBindingForCRDConversion(f, f.Namespace.Name)
@@ -143,7 +137,13 @@ var _ = SIGDescribe("CustomResourceConversionWebhook", func() {
 		cleanCRDWebhookTest(client, namespaceName)
 	})
 
-	ginkgo.It("Should be able to convert from CR v1 to CR v2", func() {
+	/*
+		Release : v1.16
+		Testname: Custom Resource Definition Conversion Webhook, conversion custom resource
+		Description: Register a conversion webhook and a custom resource definition. Create a v1 custom
+		resource. Attempts to read it at v2 MUST succeed.
+	*/
+	framework.ConformanceIt("should be able to convert from CR v1 to CR v2", func() {
 		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *apiextensionsv1.CustomResourceDefinition) {
 			crd.Spec.Versions = apiVersions
 			crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
@@ -167,10 +167,18 @@ var _ = SIGDescribe("CustomResourceConversionWebhook", func() {
 			return
 		}
 		defer testcrd.CleanUp()
+		waitWebhookConversionReady(f, testcrd.Crd, testcrd.DynamicClients, "v2")
 		testCustomResourceConversionWebhook(f, testcrd.Crd, testcrd.DynamicClients)
 	})
 
-	ginkgo.It("Should be able to convert a non homogeneous list of CRs", func() {
+	/*
+		Release : v1.16
+		Testname: Custom Resource Definition Conversion Webhook, convert mixed version list
+		Description: Register a conversion webhook and a custom resource definition. Create a custom resource stored at
+		v1. Change the custom resource definition storage to v2. Create a custom resource stored at v2. Attempt to list
+		the custom resources at v2; the list result MUST contain both custom resources at v2.
+	*/
+	framework.ConformanceIt("should be able to convert a non homogeneous list of CRs", func() {
 		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *apiextensionsv1.CustomResourceDefinition) {
 			crd.Spec.Versions = apiVersions
 			crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
@@ -194,6 +202,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook", func() {
 			return
 		}
 		defer testcrd.CleanUp()
+		waitWebhookConversionReady(f, testcrd.Crd, testcrd.DynamicClients, "v2")
 		testCRListConversion(f, testcrd)
 	})
 })
@@ -228,7 +237,7 @@ func createAuthReaderRoleBindingForCRDConversion(f *framework.Framework, namespa
 		},
 	})
 	if err != nil && errors.IsAlreadyExists(err) {
-		e2elog.Logf("role binding %s already exists", roleBindingCRDName)
+		framework.Logf("role binding %s already exists", roleBindingCRDName)
 	} else {
 		framework.ExpectNoError(err, "creating role binding %s:webhook to access configMap", namespace)
 	}
@@ -284,6 +293,18 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 				"-v=4",
 				// Use a non-default port for containers.
 				fmt.Sprintf("--port=%d", containerPort),
+			},
+			ReadinessProbe: &v1.Probe{
+				Handler: v1.Handler{
+					HTTPGet: &v1.HTTPGetAction{
+						Scheme: v1.URISchemeHTTPS,
+						Port:   intstr.FromInt(int(containerPort)),
+						Path:   "/readyz",
+					},
+				},
+				PeriodSeconds:    1,
+				SuccessThreshold: 1,
+				FailureThreshold: 30,
 			},
 			Image: image,
 			Ports: []v1.ContainerPort{{ContainerPort: containerPort}},
@@ -465,4 +486,30 @@ func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
 		(list.Items[0].GetName() == name2 && list.Items[1].GetName() == name1)).To(gomega.BeTrue())
 	verifyV2Object(f, crd, &list.Items[0])
 	verifyV2Object(f, crd, &list.Items[1])
+}
+
+// waitWebhookConversionReady sends stub custom resource creation requests requiring conversion until one succeeds.
+func waitWebhookConversionReady(f *framework.Framework, crd *apiextensionsv1.CustomResourceDefinition, customResourceClients map[string]dynamic.ResourceInterface, version string) {
+	framework.ExpectNoError(wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		crInstance := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"kind":       crd.Spec.Names.Kind,
+				"apiVersion": crd.Spec.Group + "/" + version,
+				"metadata": map[string]interface{}{
+					"name":      f.UniqueName,
+					"namespace": f.Namespace.Name,
+				},
+			},
+		}
+		_, err := customResourceClients[version].Create(crInstance, metav1.CreateOptions{})
+		if err != nil {
+			// tolerate clusters that do not set --enable-aggregator-routing and have to wait for kube-proxy
+			// to program the service network, during which conversion requests return errors
+			framework.Logf("error waiting for conversion to succeed during setup: %v", err)
+			return false, nil
+		}
+
+		framework.ExpectNoError(customResourceClients[version].Delete(crInstance.GetName(), nil), "cleaning up stub object")
+		return true, nil
+	}))
 }

@@ -83,7 +83,7 @@ func TestMetricCollection(t *testing.T) {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	metricCollector := &totalVolumesCollector{asw, dsw, volumePluginMgr}
+	metricCollector := &totalVolumesCollector{asw: asw, dsw: dsw, pluginMgr: volumePluginMgr}
 
 	// Check if getVolumeCount returns correct data
 	count := metricCollector.getVolumeCount()

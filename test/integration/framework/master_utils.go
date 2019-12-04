@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"flag"
 	"net"
 	"net/http"
@@ -26,7 +27,7 @@ import (
 	"time"
 
 	"github.com/go-openapi/spec"
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	authauthenticator "k8s.io/apiserver/pkg/authentication/authenticator"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/component-base/version"
 	"k8s.io/klog"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -51,7 +53,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 // Config is a struct of configuration directives for NewMasterComponents.
@@ -69,7 +70,7 @@ type Config struct {
 // alwaysAllow always allows an action
 type alwaysAllow struct{}
 
-func (alwaysAllow) Authorize(requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
+func (alwaysAllow) Authorize(ctx context.Context, requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	return authorizer.DecisionAllow, "always allow", nil
 }
 
@@ -140,7 +141,9 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 	stopCh := make(chan struct{})
 	closeFn := func() {
-		m.GenericAPIServer.RunPreShutdownHooks()
+		if m != nil {
+			m.GenericAPIServer.RunPreShutdownHooks()
+		}
 		close(stopCh)
 		s.Close()
 	}
@@ -156,12 +159,12 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	}
 	masterConfig.GenericConfig.LoopbackClientConfig.Host = s.URL
 
-	privilegedLoopbackToken := uuid.NewRandom().String()
+	privilegedLoopbackToken := uuid.New().String()
 	// wrap any available authorizer
 	tokens := make(map[string]*user.DefaultInfo)
 	tokens[privilegedLoopbackToken] = &user.DefaultInfo{
 		Name:   user.APIServerUser,
-		UID:    uuid.NewRandom().String(),
+		UID:    uuid.New().String(),
 		Groups: []string{user.SystemPrivilegedGroup},
 	}
 
@@ -189,6 +192,8 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	masterConfig.ExtraConfig.VersionedInformers = informers.NewSharedInformerFactory(clientset, masterConfig.GenericConfig.LoopbackClientConfig.Timeout)
 	m, err = masterConfig.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
+		// We log the error first so that even if closeFn crashes, the error is shown
+		klog.Errorf("error in bringing up the master: %v", err)
 		closeFn()
 		klog.Fatalf("error in bringing up the master: %v", err)
 	}
@@ -257,7 +262,7 @@ func DefaultEtcdOptions() *options.EtcdOptions {
 	// This causes the integration tests to exercise the etcd
 	// prefix code, so please don't change without ensuring
 	// sufficient coverage in other ways.
-	etcdOptions := options.NewEtcdOptions(storagebackend.NewDefaultConfig(uuid.New(), nil))
+	etcdOptions := options.NewEtcdOptions(storagebackend.NewDefaultConfig(uuid.New().String(), nil))
 	etcdOptions.StorageConfig.Transport.ServerList = []string{GetEtcdURL()}
 	return etcdOptions
 }
@@ -275,7 +280,7 @@ func NewMasterConfigWithOptions(opts *MasterConfigOptions) *master.Config {
 	}
 
 	storageConfig := kubeapiserver.NewStorageFactoryConfig()
-	storageConfig.ApiResourceConfig = serverstorage.NewResourceConfig()
+	storageConfig.APIResourceConfig = serverstorage.NewResourceConfig()
 	completedStorageConfig, err := storageConfig.Complete(etcdOptions)
 	if err != nil {
 		panic(err)
@@ -329,7 +334,7 @@ func RunAMasterUsingServer(masterConfig *master.Config, s *httptest.Server, mast
 
 // SharedEtcd creates a storage config for a shared etcd instance, with a unique prefix.
 func SharedEtcd() *storagebackend.Config {
-	cfg := storagebackend.NewDefaultConfig(path.Join(uuid.New(), "registry"), nil)
+	cfg := storagebackend.NewDefaultConfig(path.Join(uuid.New().String(), "registry"), nil)
 	cfg.Transport.ServerList = []string{GetEtcdURL()}
 	return cfg
 }

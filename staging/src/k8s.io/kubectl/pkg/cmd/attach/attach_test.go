@@ -103,6 +103,14 @@ func TestPodAndContainerAttach(t *testing.T) {
 			obj:                   attachPod(),
 		},
 		{
+			name:                  "ephemeral container in flag",
+			options:               &AttachOptions{StreamOptions: exec.StreamOptions{ContainerName: "debugger"}, GetPodTimeout: 30},
+			args:                  []string{"foo"},
+			expectedPodName:       "foo",
+			expectedContainerName: "debugger",
+			obj:                   attachPod(),
+		},
+		{
 			name:            "non-existing container",
 			options:         &AttachOptions{StreamOptions: exec.StreamOptions{ContainerName: "wrong"}, GetPodTimeout: 10},
 			args:            []string{"foo"},
@@ -136,7 +144,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			test.options.Resources = test.args
 
 			if err := test.options.Validate(); err != nil {
-				if !strings.Contains(err.Error(), test.expectError) {
+				if test.expectError == "" || !strings.Contains(err.Error(), test.expectError) {
 					t.Errorf("unexpected error: expected %q, got %q", test.expectError, err)
 				}
 				return
@@ -153,7 +161,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 				},
 			})
 			if err != nil {
-				if !strings.Contains(err.Error(), test.expectError) {
+				if test.expectError == "" || !strings.Contains(err.Error(), test.expectError) {
 					t.Errorf("unexpected error: expected %q, got %q", err, test.expectError)
 				}
 				return
@@ -165,7 +173,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 
 			container, err := test.options.containerToAttachTo(attachPod())
 			if err != nil {
-				if !strings.Contains(err.Error(), test.expectError) {
+				if test.expectError == "" || !strings.Contains(err.Error(), test.expectError) {
 					t.Errorf("unexpected error: expected %q, got %q", err, test.expectError)
 				}
 				return
@@ -231,7 +239,7 @@ func TestAttach(t *testing.T) {
 			defer tf.Cleanup()
 
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := scheme.Codecs
+			ns := scheme.Codecs.WithoutConversion()
 
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
@@ -240,10 +248,10 @@ func TestAttach(t *testing.T) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == test.podPath && m == "GET":
 						body := cmdtesting.ObjBody(codec, test.pod)
-						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					case p == test.fetchPodPath && m == "GET":
 						body := cmdtesting.ObjBody(codec, test.pod)
-						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", p, req.Method, req.URL, req)
 						return nil, fmt.Errorf("unexpected request")
@@ -333,7 +341,7 @@ func TestAttachWarnings(t *testing.T) {
 			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()
 
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := scheme.Codecs
+			ns := scheme.Codecs.WithoutConversion()
 
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
@@ -342,10 +350,10 @@ func TestAttachWarnings(t *testing.T) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == test.podPath && m == "GET":
 						body := cmdtesting.ObjBody(codec, test.pod)
-						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					case p == test.fetchPodPath && m == "GET":
 						body := cmdtesting.ObjBody(codec, test.pod)
-						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", p, req.Method, req.URL, req)
 						return nil, fmt.Errorf("unexpected request")
@@ -412,6 +420,13 @@ func attachPod() *corev1.Pod {
 			InitContainers: []corev1.Container{
 				{
 					Name: "initfoo",
+				},
+			},
+			EphemeralContainers: []corev1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+						Name: "debugger",
+					},
 				},
 			},
 		},

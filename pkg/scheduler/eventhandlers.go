@@ -24,14 +24,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
-	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 )
 
 func (sched *Scheduler) onPvAdd(obj interface{}) {
@@ -41,7 +40,7 @@ func (sched *Scheduler) onPvAdd(obj interface{}) {
 	// provisioning and binding process, will not trigger events to schedule pod
 	// again. So we need to move pods to active queue on PV add for this
 	// scenario.
-	sched.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.PvAdd)
 }
 
 func (sched *Scheduler) onPvUpdate(old, new interface{}) {
@@ -49,15 +48,15 @@ func (sched *Scheduler) onPvUpdate(old, new interface{}) {
 	// bindings due to conflicts if PVs are updated by PV controller or other
 	// parties, then scheduler will add pod back to unschedulable queue. We
 	// need to move pods to active queue on PV update for this scenario.
-	sched.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.PvUpdate)
 }
 
 func (sched *Scheduler) onPvcAdd(obj interface{}) {
-	sched.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.PvcAdd)
 }
 
 func (sched *Scheduler) onPvcUpdate(old, new interface{}) {
-	sched.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.PvcUpdate)
 }
 
 func (sched *Scheduler) onStorageClassAdd(obj interface{}) {
@@ -74,20 +73,20 @@ func (sched *Scheduler) onStorageClassAdd(obj interface{}) {
 	// We don't need to invalidate cached results because results will not be
 	// cached for pod that has unbound immediate PVCs.
 	if sc.VolumeBindingMode != nil && *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
-		sched.SchedulingQueue.MoveAllToActiveQueue()
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.StorageClassAdd)
 	}
 }
 
 func (sched *Scheduler) onServiceAdd(obj interface{}) {
-	sched.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.ServiceAdd)
 }
 
 func (sched *Scheduler) onServiceUpdate(oldObj interface{}, newObj interface{}) {
-	sched.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.ServiceUpdate)
 }
 
 func (sched *Scheduler) onServiceDelete(obj interface{}) {
-	sched.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.ServiceDelete)
 }
 
 func (sched *Scheduler) addNodeToCache(obj interface{}) {
@@ -101,7 +100,7 @@ func (sched *Scheduler) addNodeToCache(obj interface{}) {
 		klog.Errorf("scheduler cache AddNode failed: %v", err)
 	}
 
-	sched.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.NodeAdd)
 }
 
 func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
@@ -125,8 +124,10 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 	// to save processing cycles. We still trigger a move to active queue to cover the case
 	// that a pod being processed by the scheduler is determined unschedulable. We want this
 	// pod to be reevaluated when a change in the cluster happens.
-	if sched.SchedulingQueue.NumUnschedulablePods() == 0 || nodeSchedulingPropertiesChanged(newNode, oldNode) {
-		sched.SchedulingQueue.MoveAllToActiveQueue()
+	if sched.SchedulingQueue.NumUnschedulablePods() == 0 {
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.Unknown)
+	} else if event := nodeSchedulingPropertiesChange(newNode, oldNode); event != "" {
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(event)
 	}
 }
 
@@ -157,59 +158,11 @@ func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 }
 
 func (sched *Scheduler) onCSINodeAdd(obj interface{}) {
-	csiNode, ok := obj.(*storagev1beta1.CSINode)
-	if !ok {
-		klog.Errorf("cannot convert to *storagev1beta1.CSINode: %v", obj)
-		return
-	}
-
-	if err := sched.SchedulerCache.AddCSINode(csiNode); err != nil {
-		klog.Errorf("scheduler cache AddCSINode failed: %v", err)
-	}
-
-	sched.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.CSINodeAdd)
 }
 
 func (sched *Scheduler) onCSINodeUpdate(oldObj, newObj interface{}) {
-	oldCSINode, ok := oldObj.(*storagev1beta1.CSINode)
-	if !ok {
-		klog.Errorf("cannot convert oldObj to *storagev1beta1.CSINode: %v", oldObj)
-		return
-	}
-
-	newCSINode, ok := newObj.(*storagev1beta1.CSINode)
-	if !ok {
-		klog.Errorf("cannot convert newObj to *storagev1beta1.CSINode: %v", newObj)
-		return
-	}
-
-	if err := sched.SchedulerCache.UpdateCSINode(oldCSINode, newCSINode); err != nil {
-		klog.Errorf("scheduler cache UpdateCSINode failed: %v", err)
-	}
-
-	sched.SchedulingQueue.MoveAllToActiveQueue()
-}
-
-func (sched *Scheduler) onCSINodeDelete(obj interface{}) {
-	var csiNode *storagev1beta1.CSINode
-	switch t := obj.(type) {
-	case *storagev1beta1.CSINode:
-		csiNode = t
-	case cache.DeletedFinalStateUnknown:
-		var ok bool
-		csiNode, ok = t.Obj.(*storagev1beta1.CSINode)
-		if !ok {
-			klog.Errorf("cannot convert to *storagev1beta1.CSINode: %v", t.Obj)
-			return
-		}
-	default:
-		klog.Errorf("cannot convert to *storagev1beta1.CSINode: %v", t)
-		return
-	}
-
-	if err := sched.SchedulerCache.RemoveCSINode(csiNode); err != nil {
-		klog.Errorf("scheduler cache RemoveCSINode failed: %v", err)
-	}
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.CSINodeUpdate)
 }
 
 func (sched *Scheduler) addPodToSchedulingQueue(obj interface{}) {
@@ -251,6 +204,7 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 		// Volume binder only wants to keep unassigned pods
 		sched.VolumeBinder.DeletePodBindings(pod)
 	}
+	sched.Framework.RejectWaitingPod(pod.UID)
 }
 
 func (sched *Scheduler) addPodToCache(obj interface{}) {
@@ -316,7 +270,7 @@ func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 		klog.Errorf("scheduler cache RemovePod failed: %v", err)
 	}
 
-	sched.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.AssignedPodDelete)
 }
 
 // assignedPod selects pods that are assigned (scheduled and running).
@@ -381,13 +335,8 @@ func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 func AddAllEventHandlers(
 	sched *Scheduler,
 	schedulerName string,
-	nodeInformer coreinformers.NodeInformer,
+	informerFactory informers.SharedInformerFactory,
 	podInformer coreinformers.PodInformer,
-	pvInformer coreinformers.PersistentVolumeInformer,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer,
-	serviceInformer coreinformers.ServiceInformer,
-	storageClassInformer storageinformersv1.StorageClassInformer,
-	csiNodeInformer storageinformersv1beta1.CSINodeInformer,
 ) {
 	// scheduled pod cache
 	podInformer.Informer().AddEventHandler(
@@ -440,7 +389,7 @@ func AddAllEventHandlers(
 		},
 	)
 
-	nodeInformer.Informer().AddEventHandler(
+	informerFactory.Core().V1().Nodes().Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    sched.addNodeToCache,
 			UpdateFunc: sched.updateNodeInCache,
@@ -449,18 +398,17 @@ func AddAllEventHandlers(
 	)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		csiNodeInformer.Informer().AddEventHandler(
+		informerFactory.Storage().V1().CSINodes().Informer().AddEventHandler(
 			cache.ResourceEventHandlerFuncs{
 				AddFunc:    sched.onCSINodeAdd,
 				UpdateFunc: sched.onCSINodeUpdate,
-				DeleteFunc: sched.onCSINodeDelete,
 			},
 		)
 	}
 
 	// On add and delete of PVs, it will affect equivalence cache items
 	// related to persistent volume
-	pvInformer.Informer().AddEventHandler(
+	informerFactory.Core().V1().PersistentVolumes().Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			// MaxPDVolumeCountPredicate: since it relies on the counts of PV.
 			AddFunc:    sched.onPvAdd,
@@ -469,7 +417,7 @@ func AddAllEventHandlers(
 	)
 
 	// This is for MaxPDVolumeCountPredicate: add/delete PVC will affect counts of PV when it is bound.
-	pvcInformer.Informer().AddEventHandler(
+	informerFactory.Core().V1().PersistentVolumeClaims().Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    sched.onPvcAdd,
 			UpdateFunc: sched.onPvcUpdate,
@@ -479,7 +427,7 @@ func AddAllEventHandlers(
 	// This is for ServiceAffinity: affected by the selector of the service is updated.
 	// Also, if new service is added, equivalence cache will also become invalid since
 	// existing pods may be "captured" by this service and change this predicate result.
-	serviceInformer.Informer().AddEventHandler(
+	informerFactory.Core().V1().Services().Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    sched.onServiceAdd,
 			UpdateFunc: sched.onServiceUpdate,
@@ -487,31 +435,31 @@ func AddAllEventHandlers(
 		},
 	)
 
-	storageClassInformer.Informer().AddEventHandler(
+	informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: sched.onStorageClassAdd,
 		},
 	)
 }
 
-func nodeSchedulingPropertiesChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+func nodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) string {
 	if nodeSpecUnschedulableChanged(newNode, oldNode) {
-		return true
+		return queue.NodeSpecUnschedulableChange
 	}
 	if nodeAllocatableChanged(newNode, oldNode) {
-		return true
+		return queue.NodeAllocatableChange
 	}
 	if nodeLabelsChanged(newNode, oldNode) {
-		return true
+		return queue.NodeLabelChange
 	}
 	if nodeTaintsChanged(newNode, oldNode) {
-		return true
+		return queue.NodeTaintChange
 	}
 	if nodeConditionsChanged(newNode, oldNode) {
-		return true
+		return queue.NodeConditionChange
 	}
 
-	return false
+	return ""
 }
 
 func nodeAllocatableChanged(newNode *v1.Node, oldNode *v1.Node) bool {

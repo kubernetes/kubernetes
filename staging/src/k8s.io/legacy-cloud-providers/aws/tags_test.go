@@ -1,3 +1,5 @@
+// +build !nolegacyroviders
+
 /*
 Copyright 2014 The Kubernetes Authors.
 

@@ -65,7 +65,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 					SideEffects:  &unknownSideEffect,
 				},
 			}, false),
-			expectedError: `webhooks[0].admissionReviewVersions: Required value: must specify one of v1beta1`,
+			expectedError: `webhooks[0].admissionReviewVersions: Required value: must specify one of v1, v1beta1`,
 		}, {
 			name: "should fail on bad AdmissionReviewVersion value",
 			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
@@ -415,7 +415,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 					SideEffects:  &unknownSideEffect,
 				},
 			}, false),
-			expectedError: `webhooks[0].admissionReviewVersions: Required value: must specify one of v1beta1`,
+			expectedError: `webhooks[0].admissionReviewVersions: Required value: must specify one of v1, v1beta1`,
 		},
 		{
 			name: "SideEffects are required",
@@ -1034,7 +1034,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 					SideEffects:  &unknownSideEffect,
 				},
 			}, false),
-			expectedError: `webhooks[0].admissionReviewVersions: Required value: must specify one of v1beta1`,
+			expectedError: `webhooks[0].admissionReviewVersions: Required value: must specify one of v1, v1beta1`,
 		}, {
 			name: "should fail on bad AdmissionReviewVersion value",
 			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
@@ -1384,7 +1384,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 					SideEffects:  &unknownSideEffect,
 				},
 			}, false),
-			expectedError: `webhooks[0].admissionReviewVersions: Required value: must specify one of v1beta1`,
+			expectedError: `webhooks[0].admissionReviewVersions: Required value: must specify one of v1, v1beta1`,
 		},
 		{
 			name: "SideEffects are required",
@@ -1795,13 +1795,32 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 		expectedError string
 	}{
 		{
-			name: "should pass on valid new AdmissionReviewVersion",
+			name: "should pass on valid new AdmissionReviewVersion (v1beta1)",
 			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
 					SideEffects:             &unknownSideEffect,
 					AdmissionReviewVersions: []string{"v1beta1"},
+				},
+			}, true),
+			oldconfig: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  &unknownSideEffect,
+				},
+			}, true),
+			expectedError: ``,
+		},
+		{
+			name: "should pass on valid new AdmissionReviewVersion (v1)",
+			config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{
+				{
+					Name:                    "webhook.k8s.io",
+					ClientConfig:            validClientConfig,
+					SideEffects:             &unknownSideEffect,
+					AdmissionReviewVersions: []string{"v1"},
 				},
 			}, true),
 			oldconfig: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{

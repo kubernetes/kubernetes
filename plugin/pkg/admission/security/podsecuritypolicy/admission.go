@@ -118,7 +118,6 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	}
 
 	// only mutate if this is a CREATE request. On updates we only validate.
-	// TODO(liggitt): allow spec mutation during initializing updates?
 	if a.GetOperation() != admission.Create {
 		return nil
 	}
@@ -126,7 +125,7 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	pod := a.GetObject().(*api.Pod)
 
 	// compute the context. Mutation is allowed. ValidatedPSPAnnotation is not taken into account.
-	allowedPod, pspName, validationErrs, err := p.computeSecurityContext(a, pod, true, "")
+	allowedPod, pspName, validationErrs, err := p.computeSecurityContext(ctx, a, pod, true, "")
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
@@ -161,7 +160,7 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 	pod := a.GetObject().(*api.Pod)
 
 	// compute the context. Mutation is not allowed. ValidatedPSPAnnotation is used as a hint to gain same speed-up.
-	allowedPod, pspName, validationErrs, err := p.computeSecurityContext(a, pod, false, pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation])
+	allowedPod, pspName, validationErrs, err := p.computeSecurityContext(ctx, a, pod, false, pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation])
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
@@ -207,7 +206,7 @@ func shouldIgnore(a admission.Attributes) (bool, error) {
 // if there is a matching policy with the same security context as given, it will be reused. If there is no
 // matching policy the returned pod will be nil and the pspName empty. validatedPSPHint is the validated psp name
 // saved in kubernetes.io/psp annotation. This psp is usually the one we are looking for.
-func (p *Plugin) computeSecurityContext(a admission.Attributes, pod *api.Pod, specMutationAllowed bool, validatedPSPHint string) (*api.Pod, string, field.ErrorList, error) {
+func (p *Plugin) computeSecurityContext(ctx context.Context, a admission.Attributes, pod *api.Pod, specMutationAllowed bool, validatedPSPHint string) (*api.Pod, string, field.ErrorList, error) {
 	// get all constraints that are usable by the user
 	klog.V(4).Infof("getting pod security policies for pod %s (generate: %s)", pod.Name, pod.GenerateName)
 	var saInfo user.Info
@@ -228,7 +227,6 @@ func (p *Plugin) computeSecurityContext(a admission.Attributes, pod *api.Pod, sp
 
 	// sort policies by name to make order deterministic
 	// If mutation is not allowed and validatedPSPHint is provided, check the validated policy first.
-	// TODO(liggitt): add priority field to allow admins to bucket differently
 	sort.SliceStable(policies, func(i, j int) bool {
 		if !specMutationAllowed {
 			if policies[i].Name == validatedPSPHint {
@@ -271,7 +269,7 @@ func (p *Plugin) computeSecurityContext(a admission.Attributes, pod *api.Pod, sp
 			continue
 		}
 
-		if !isAuthorizedForPolicy(a.GetUserInfo(), saInfo, a.GetNamespace(), provider.GetPSPName(), p.authz) {
+		if !isAuthorizedForPolicy(ctx, a.GetUserInfo(), saInfo, a.GetNamespace(), provider.GetPSPName(), p.authz) {
 			continue
 		}
 
@@ -295,7 +293,7 @@ func (p *Plugin) computeSecurityContext(a admission.Attributes, pod *api.Pod, sp
 	// Pod is rejected. Filter the validation errors to only include errors from authorized PSPs.
 	aggregate := field.ErrorList{}
 	for psp, errs := range validationErrs {
-		if isAuthorizedForPolicy(a.GetUserInfo(), saInfo, a.GetNamespace(), psp, p.authz) {
+		if isAuthorizedForPolicy(ctx, a.GetUserInfo(), saInfo, a.GetNamespace(), psp, p.authz) {
 			aggregate = append(aggregate, errs...)
 		}
 	}
@@ -338,27 +336,27 @@ func (p *Plugin) createProvidersFromPolicies(psps []*policyv1beta1.PodSecurityPo
 	return providers, errs
 }
 
-func isAuthorizedForPolicy(user, sa user.Info, namespace, policyName string, authz authorizer.Authorizer) bool {
+func isAuthorizedForPolicy(ctx context.Context, user, sa user.Info, namespace, policyName string, authz authorizer.Authorizer) bool {
 	// Check the service account first, as that is the more common use case.
-	return authorizedForPolicy(sa, namespace, policyName, authz) ||
-		authorizedForPolicy(user, namespace, policyName, authz)
+	return authorizedForPolicy(ctx, sa, namespace, policyName, authz) ||
+		authorizedForPolicy(ctx, user, namespace, policyName, authz)
 }
 
 // authorizedForPolicy returns true if info is authorized to perform the "use" verb on the policy resource.
 // TODO: check against only the policy group when PSP will be completely moved out of the extensions
-func authorizedForPolicy(info user.Info, namespace string, policyName string, authz authorizer.Authorizer) bool {
+func authorizedForPolicy(ctx context.Context, info user.Info, namespace string, policyName string, authz authorizer.Authorizer) bool {
 	// Check against extensions API group for backward compatibility
-	return authorizedForPolicyInAPIGroup(info, namespace, policyName, policy.GroupName, authz) ||
-		authorizedForPolicyInAPIGroup(info, namespace, policyName, extensions.GroupName, authz)
+	return authorizedForPolicyInAPIGroup(ctx, info, namespace, policyName, policy.GroupName, authz) ||
+		authorizedForPolicyInAPIGroup(ctx, info, namespace, policyName, extensions.GroupName, authz)
 }
 
 // authorizedForPolicyInAPIGroup returns true if info is authorized to perform the "use" verb on the policy resource in the specified API group.
-func authorizedForPolicyInAPIGroup(info user.Info, namespace, policyName, apiGroupName string, authz authorizer.Authorizer) bool {
+func authorizedForPolicyInAPIGroup(ctx context.Context, info user.Info, namespace, policyName, apiGroupName string, authz authorizer.Authorizer) bool {
 	if info == nil {
 		return false
 	}
 	attr := buildAttributes(info, namespace, policyName, apiGroupName)
-	decision, reason, err := authz.Authorize(attr)
+	decision, reason, err := authz.Authorize(ctx, attr)
 	if err != nil {
 		klog.V(5).Infof("cannot authorize for policy: %v,%v", reason, err)
 	}

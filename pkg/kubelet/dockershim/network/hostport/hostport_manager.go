@@ -21,11 +21,12 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog"
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
@@ -82,10 +83,16 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 		return nil
 	}
 
-	if podPortMapping.IP.To4() == nil {
+	// IP.To16() returns nil if IP is not a valid IPv4 or IPv6 address
+	if podPortMapping.IP.To16() == nil {
 		return fmt.Errorf("invalid or missing IP of pod %s", podFullName)
 	}
 	podIP := podPortMapping.IP.String()
+	isIpv6 := utilnet.IsIPv6(podPortMapping.IP)
+
+	if isIpv6 != hm.iptables.IsIpv6() {
+		return fmt.Errorf("HostPortManager IP family mismatch: %v, isIPv6 - %v", podIP, isIpv6)
+	}
 
 	if err = ensureKubeHostportChains(hm.iptables, natInterfaceName); err != nil {
 		return err
@@ -142,10 +149,11 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 			"-j", string(iptablesproxy.KubeMarkMasqChain))
 
 		// DNAT to the podIP:containerPort
+		hostPortBinding := net.JoinHostPort(podIP, strconv.Itoa(int(pm.ContainerPort)))
 		writeLine(natRules, "-A", string(chain),
 			"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, podFullName, pm.HostPort),
 			"-m", protocol, "-p", protocol,
-			"-j", "DNAT", fmt.Sprintf("--to-destination=%s:%d", podIP, pm.ContainerPort))
+			"-j", "DNAT", fmt.Sprintf("--to-destination=%s", hostPortBinding))
 	}
 
 	// getHostportChain should be able to provide unique hostport chain name using hash
@@ -166,7 +174,6 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 		// clean up opened host port if encounter any error
 		return utilerrors.NewAggregate([]error{err, hm.closeHostports(hostportMappings)})
 	}
-	isIpv6 := utilnet.IsIPv6(podPortMapping.IP)
 
 	// Remove conntrack entries just after adding the new iptables rules. If the conntrack entry is removed along with
 	// the IP tables rule, it can be the case that the packets received by the node after iptables rule removal will

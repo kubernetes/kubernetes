@@ -32,7 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // ServiceStartTimeout is how long to wait for a service endpoint to be resolvable.
@@ -103,7 +103,7 @@ func ValidateEndpointsPorts(c clientset.Interface, namespace, serviceName string
 	for start := time.Now(); time.Since(start) < ServiceStartTimeout; time.Sleep(1 * time.Second) {
 		ep, err := c.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
 		if err != nil {
-			e2elog.Logf("Get endpoints failed (%v elapsed, ignoring for 5s): %v", time.Since(start), err)
+			framework.Logf("Get endpoints failed (%v elapsed, ignoring for 5s): %v", time.Since(start), err)
 			continue
 		}
 		portsByPodUID := GetContainerPortsByPodUID(ep)
@@ -116,21 +116,21 @@ func ValidateEndpointsPorts(c clientset.Interface, namespace, serviceName string
 			if err != nil {
 				return err
 			}
-			e2elog.Logf("successfully validated that service %s in namespace %s exposes endpoints %v (%v elapsed)",
+			framework.Logf("successfully validated that service %s in namespace %s exposes endpoints %v (%v elapsed)",
 				serviceName, namespace, expectedEndpoints, time.Since(start))
 			return nil
 		}
 		if i%5 == 0 {
-			e2elog.Logf("Unexpected endpoints: found %v, expected %v (%v elapsed, will retry)", portsByPodUID, expectedEndpoints, time.Since(start))
+			framework.Logf("Unexpected endpoints: found %v, expected %v (%v elapsed, will retry)", portsByPodUID, expectedEndpoints, time.Since(start))
 		}
 		i++
 	}
 	if pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{}); err == nil {
 		for _, pod := range pods.Items {
-			e2elog.Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
+			framework.Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
 		}
 	} else {
-		e2elog.Logf("Can't list pod debug info: %v", err)
+		framework.Logf("Can't list pod debug info: %v", err)
 	}
 	return fmt.Errorf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, ServiceStartTimeout)
 }

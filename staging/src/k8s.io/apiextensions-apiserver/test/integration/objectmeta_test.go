@@ -21,9 +21,11 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/pkg/transport"
+	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/pkg/transport"
+	"google.golang.org/grpc"
 	"sigs.k8s.io/yaml"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -62,6 +64,7 @@ func TestPostInvalidObjectMeta(t *testing.T) {
 
 	obj := fixtures.NewNoxuInstance("default", "foo")
 	unstructured.SetNestedField(obj.UnstructuredContent(), int64(42), "metadata", "unknown")
+	unstructured.SetNestedField(obj.UnstructuredContent(), nil, "metadata", "generation")
 	unstructured.SetNestedField(obj.UnstructuredContent(), map[string]interface{}{"foo": int64(42), "bar": "abc"}, "metadata", "labels")
 	_, err = instantiateCustomResource(t, obj, noxuResourceClient, noxuDefinition)
 	if err == nil {
@@ -85,6 +88,14 @@ func TestPostInvalidObjectMeta(t *testing.T) {
 		t.Errorf("unexpected error getting metadata.unknown: %v", err)
 	} else if found {
 		t.Errorf("unexpected metadata.unknown=%#v: expected this to be pruned", unknown)
+	}
+
+	if generation, found, err := unstructured.NestedInt64(obj.UnstructuredContent(), "metadata", "generation"); err != nil {
+		t.Errorf("unexpected error getting metadata.generation: %v", err)
+	} else if !found {
+		t.Errorf("expected metadata.generation=1: got: %d", generation)
+	} else if generation != 1 {
+		t.Errorf("unexpected metadata.generation=%d: expected this to be set to 1", generation)
 	}
 }
 
@@ -129,17 +140,21 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 	tlsInfo := transport.TLSInfo{
-		CertFile: restOptions.StorageConfig.Transport.CertFile,
-		KeyFile:  restOptions.StorageConfig.Transport.KeyFile,
-		CAFile:   restOptions.StorageConfig.Transport.CAFile,
+		CertFile:      restOptions.StorageConfig.Transport.CertFile,
+		KeyFile:       restOptions.StorageConfig.Transport.KeyFile,
+		TrustedCAFile: restOptions.StorageConfig.Transport.TrustedCAFile,
 	}
 	tlsConfig, err := tlsInfo.ClientConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
 	etcdConfig := clientv3.Config{
-		Endpoints: restOptions.StorageConfig.Transport.ServerList,
-		TLS:       tlsConfig,
+		Endpoints:   restOptions.StorageConfig.Transport.ServerList,
+		DialTimeout: 20 * time.Second,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+		TLS: tlsConfig,
 	}
 	etcdclient, err := clientv3.New(etcdConfig)
 	if err != nil {
@@ -150,6 +165,8 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 
 	original := fixtures.NewNoxuInstance("default", "foo")
 	unstructured.SetNestedField(original.UnstructuredContent(), int64(42), "metadata", "unknown")
+	unstructured.SetNestedField(original.UnstructuredContent(), nil, "metadata", "generation")
+
 	unstructured.SetNestedField(original.UnstructuredContent(), map[string]interface{}{"foo": int64(42), "bar": "abc"}, "metadata", "annotations")
 	unstructured.SetNestedField(original.UnstructuredContent(), map[string]interface{}{"invalid": "x y"}, "metadata", "labels")
 	unstructured.SetNestedField(original.UnstructuredContent(), int64(42), "embedded", "metadata", "unknown")
@@ -191,6 +208,16 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	} else if found {
 		t.Errorf("Unexpected to find embedded.metadata.unknown=%#v", unknown)
+	}
+
+	t.Logf("Checking that metadata.generation=1")
+
+	if generation, found, err := unstructured.NestedInt64(obj.UnstructuredContent(), "metadata", "generation"); err != nil {
+		t.Errorf("unexpected error getting metadata.generation: %v", err)
+	} else if !found {
+		t.Errorf("expected metadata.generation=1: got: %d", generation)
+	} else if generation != 1 {
+		t.Errorf("unexpected metadata.generation=%d: expected this to be set to 1", generation)
 	}
 
 	t.Logf("Checking that ObjectMeta is pruned from wrongly-typed annotations")
@@ -308,20 +335,6 @@ properties:
       kind: Pod
       labels:
         foo: bar
-  invalidDefaults:
-    type: object
-    properties:
-      embedded:
-        type: object
-        x-kubernetes-embedded-resource: true
-        x-kubernetes-preserve-unknown-fields: true
-        default:
-          apiVersion: "foo/v1"
-          kind: "%"
-          metadata:
-            labels:
-              foo: bar
-              abc: "x y"
 `
 
 	embeddedResourceInstance = `
@@ -501,8 +514,6 @@ func TestEmbeddedResources(t *testing.T) {
 		` embeddedNested.metadata.name: Invalid value: ".."`,
 		` embeddedNested.embedded.kind: Invalid value: "%"`,
 		` embeddedNested.embedded.metadata.name: Invalid value: ".."`,
-		` invalidDefaults.embedded.kind: Invalid value: "%"`,
-		` invalidDefaults.embedded.metadata.labels: Invalid value: "x y"`,
 	}
 	for _, s := range invalidErrors {
 		if !strings.Contains(err.Error(), s) {

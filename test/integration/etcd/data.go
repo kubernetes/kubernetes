@@ -237,6 +237,13 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/discovery/v1beta1
+		gvr("discovery.k8s.io", "v1beta1", "endpointslices"): {
+			Stub:             `{"metadata": {"name": "slicev1beta1"}, "addressType": "IPv4", "protocol": "TCP", "ports": [], "endpoints": []}`,
+			ExpectedEtcdPath: "/registry/endpointslices/" + namespace + "/slicev1beta1",
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/events/v1beta1
 		gvr("events.k8s.io", "v1beta1", "events"): {
 			Stub:             `{"metadata": {"name": "event2"}, "regarding": {"namespace": "` + namespace + `"}, "note": "some data here", "eventTime": "2017-08-09T15:04:05.000000Z", "reportingInstance": "node-xyz", "reportingController": "k8s.io/my-controller", "action": "DidNothing", "reason": "Laziness"}`,
@@ -537,12 +544,19 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		// --
 	}
 
-	// k8s.io/kubernetes/pkg/apis/storage/v1beta1
 	// add csinodes if CSINodeInfo feature gate is enabled
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		// k8s.io/kubernetes/pkg/apis/storage/v1beta1
 		etcdStorageData[gvr("storage.k8s.io", "v1beta1", "csinodes")] = StorageData{
 			Stub:             `{"metadata": {"name": "csini1"}, "spec": {"drivers": [{"name": "test-driver", "nodeID": "localhost", "topologyKeys": ["company.com/zone1", "company.com/zone2"]}]}}`,
 			ExpectedEtcdPath: "/registry/csinodes/csini1",
+			ExpectedGVK:      gvkP("storage.k8s.io", "v1", "CSINode"),
+		}
+
+		// k8s.io/kubernetes/pkg/apis/storage/v1
+		etcdStorageData[gvr("storage.k8s.io", "v1", "csinodes")] = StorageData{
+			Stub:             `{"metadata": {"name": "csini2"}, "spec": {"drivers": [{"name": "test-driver", "nodeID": "localhost", "topologyKeys": ["company.com/zone1", "company.com/zone2"]}]}}`,
+			ExpectedEtcdPath: "/registry/csinodes/csini2",
 		}
 	}
 

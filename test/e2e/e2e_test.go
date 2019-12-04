@@ -50,7 +50,6 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/lifecycle/bootstrap"
 	_ "k8s.io/kubernetes/test/e2e/network"
 	_ "k8s.io/kubernetes/test/e2e/node"
-	_ "k8s.io/kubernetes/test/e2e/scalability"
 	_ "k8s.io/kubernetes/test/e2e/scheduling"
 	_ "k8s.io/kubernetes/test/e2e/servicecatalog"
 	_ "k8s.io/kubernetes/test/e2e/storage"
@@ -69,7 +68,7 @@ func handleFlags() {
 	flag.Parse()
 }
 
-func init() {
+func TestMain(m *testing.M) {
 	// Register test flags, then parse flags.
 	handleFlags()
 
@@ -105,9 +104,6 @@ func init() {
 		AssetNames: generated.AssetNames,
 	})
 
-}
-
-func TestMain(m *testing.M) {
 	rand.Seed(time.Now().UnixNano())
 	os.Exit(m.Run())
 }

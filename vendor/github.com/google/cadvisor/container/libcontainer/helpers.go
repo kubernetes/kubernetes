@@ -47,6 +47,7 @@ func GetCgroupSubsystems(includedMetrics container.MetricSet) (CgroupSubsystems,
 	//currently we only support disable blkio subsystem
 	if !includedMetrics.Has(container.DiskIOMetrics) {
 		disableCgroups["blkio"] = struct{}{}
+		disableCgroups["io"] = struct{}{}
 	}
 	return getCgroupSubsystemsHelper(allCgroups, disableCgroups)
 }
@@ -109,6 +110,7 @@ var supportedSubsystems map[string]struct{} = map[string]struct{}{
 	"pids":    {},
 	"cpuset":  {},
 	"blkio":   {},
+	"io":      {},
 	"devices": {},
 }
 

@@ -20,7 +20,6 @@ import (
 	"net"
 	"strconv"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	kubeschedulerconfigv1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
@@ -28,11 +27,8 @@ import (
 	// this package shouldn't really depend on other k8s.io/kubernetes code
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
-
-// When the --failure-domains scheduler flag is not specified,
-// DefaultFailureDomains defines the set of label keys used when TopologyKey is empty in PreferredDuringScheduling anti-affinity.
-var defaultFailureDomains string = v1.LabelHostname + "," + v1.LabelZoneFailureDomain + "," + v1.LabelZoneRegion
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
@@ -40,12 +36,14 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 
 // SetDefaults_KubeSchedulerConfiguration sets additional defaults
 func SetDefaults_KubeSchedulerConfiguration(obj *kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration) {
-	if len(obj.SchedulerName) == 0 {
-		obj.SchedulerName = api.DefaultSchedulerName
+	if obj.SchedulerName == nil {
+		val := api.DefaultSchedulerName
+		obj.SchedulerName = &val
 	}
 
-	if obj.HardPodAffinitySymmetricWeight == 0 {
-		obj.HardPodAffinitySymmetricWeight = api.DefaultHardPodAffinitySymmetricWeight
+	if obj.HardPodAffinitySymmetricWeight == nil {
+		val := api.DefaultHardPodAffinitySymmetricWeight
+		obj.HardPodAffinitySymmetricWeight = &val
 	}
 
 	if obj.AlgorithmSource.Policy == nil &&
@@ -60,24 +58,69 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubeschedulerconfigv1alpha1.Kub
 		}
 	}
 
-	if host, port, err := net.SplitHostPort(obj.HealthzBindAddress); err == nil {
-		if len(host) == 0 {
-			host = "0.0.0.0"
-		}
-		obj.HealthzBindAddress = net.JoinHostPort(host, port)
+	// For Healthz and Metrics bind addresses, we want to check:
+	// 1. If the value is nil, default to 0.0.0.0 and default scheduler port
+	// 2. If there is a value set, attempt to split it. If it's just a port (ie, ":1234"), default to 0.0.0.0 with that port
+	// 3. If splitting the value fails, check if the value is even a valid IP. If so, use that with the default port.
+	// Otherwise use the default bind address
+	defaultBindAddress := net.JoinHostPort("0.0.0.0", strconv.Itoa(ports.InsecureSchedulerPort))
+	if obj.HealthzBindAddress == nil {
+		obj.HealthzBindAddress = &defaultBindAddress
 	} else {
-		obj.HealthzBindAddress = net.JoinHostPort("0.0.0.0", strconv.Itoa(ports.InsecureSchedulerPort))
+		if host, port, err := net.SplitHostPort(*obj.HealthzBindAddress); err == nil {
+			if len(host) == 0 {
+				host = "0.0.0.0"
+			}
+			hostPort := net.JoinHostPort(host, port)
+			obj.HealthzBindAddress = &hostPort
+		} else {
+			// Something went wrong splitting the host/port, could just be a missing port so check if the
+			// existing value is a valid IP address. If so, use that with the default scheduler port
+			if host := net.ParseIP(*obj.HealthzBindAddress); host != nil {
+				hostPort := net.JoinHostPort(*obj.HealthzBindAddress, strconv.Itoa(ports.InsecureSchedulerPort))
+				obj.HealthzBindAddress = &hostPort
+			} else {
+				// TODO: in v1beta1 we should let this error instead of stomping with a default value
+				obj.HealthzBindAddress = &defaultBindAddress
+			}
+		}
 	}
 
-	if host, port, err := net.SplitHostPort(obj.MetricsBindAddress); err == nil {
-		if len(host) == 0 {
-			host = "0.0.0.0"
-		}
-		obj.MetricsBindAddress = net.JoinHostPort(host, port)
+	if obj.MetricsBindAddress == nil {
+		obj.MetricsBindAddress = &defaultBindAddress
 	} else {
-		obj.MetricsBindAddress = net.JoinHostPort("0.0.0.0", strconv.Itoa(ports.InsecureSchedulerPort))
+		if host, port, err := net.SplitHostPort(*obj.MetricsBindAddress); err == nil {
+			if len(host) == 0 {
+				host = "0.0.0.0"
+			}
+			hostPort := net.JoinHostPort(host, port)
+			obj.MetricsBindAddress = &hostPort
+		} else {
+			// Something went wrong splitting the host/port, could just be a missing port so check if the
+			// existing value is a valid IP address. If so, use that with the default scheduler port
+			if host := net.ParseIP(*obj.MetricsBindAddress); host != nil {
+				hostPort := net.JoinHostPort(*obj.MetricsBindAddress, strconv.Itoa(ports.InsecureSchedulerPort))
+				obj.MetricsBindAddress = &hostPort
+			} else {
+				// TODO: in v1beta1 we should let this error instead of stomping with a default value
+				obj.MetricsBindAddress = &defaultBindAddress
+			}
+		}
 	}
 
+	if obj.DisablePreemption == nil {
+		disablePreemption := false
+		obj.DisablePreemption = &disablePreemption
+	}
+
+	if obj.PercentageOfNodesToScore == nil {
+		percentageOfNodesToScore := int32(config.DefaultPercentageOfNodesToScore)
+		obj.PercentageOfNodesToScore = &percentageOfNodesToScore
+	}
+
+	if len(obj.LeaderElection.ResourceLock) == 0 {
+		obj.LeaderElection.ResourceLock = "endpointsleases"
+	}
 	if len(obj.LeaderElection.LockObjectNamespace) == 0 && len(obj.LeaderElection.ResourceNamespace) == 0 {
 		obj.LeaderElection.LockObjectNamespace = kubeschedulerconfigv1alpha1.SchedulerDefaultLockObjectNamespace
 	}
@@ -100,7 +143,29 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubeschedulerconfigv1alpha1.Kub
 	componentbaseconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection.LeaderElectionConfiguration)
 
 	if obj.BindTimeoutSeconds == nil {
-		defaultBindTimeoutSeconds := int64(600)
-		obj.BindTimeoutSeconds = &defaultBindTimeoutSeconds
+		val := int64(600)
+		obj.BindTimeoutSeconds = &val
+	}
+
+	if obj.PodInitialBackoffSeconds == nil {
+		val := int64(1)
+		obj.PodInitialBackoffSeconds = &val
+	}
+
+	if obj.PodMaxBackoffSeconds == nil {
+		val := int64(10)
+		obj.PodMaxBackoffSeconds = &val
+	}
+
+	// Enable profiling by default in the scheduler
+	if obj.EnableProfiling == nil {
+		enableProfiling := true
+		obj.EnableProfiling = &enableProfiling
+	}
+
+	// Enable contention profiling by default if profiling is enabled
+	if *obj.EnableProfiling && obj.EnableContentionProfiling == nil {
+		enableContentionProfiling := true
+		obj.EnableContentionProfiling = &enableContentionProfiling
 	}
 }

@@ -22,8 +22,8 @@ import (
 	"strings"
 	"testing"
 
-	_ "github.com/coreos/etcd/etcdserver/api/v3rpc" // Force package logger init.
 	"github.com/coreos/pkg/capnslog"
+	_ "go.etcd.io/etcd/etcdserver/api/v3rpc" // Force package logger init.
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -231,7 +231,7 @@ func setupWithOptions(t *testing.T, instanceOptions *apitesting.TestServerInstan
 	// StartTestServerOrDie to work with the etcd instance already started by the
 	// integration test scripts.
 	// See https://github.com/kubernetes/kubernetes/issues/49489.
-	repo, err := capnslog.GetRepoLogger("github.com/coreos/etcd")
+	repo, err := capnslog.GetRepoLogger("go.etcd.io/etcd")
 	if err != nil {
 		t.Fatalf("couldn't configure logging: %v", err)
 	}

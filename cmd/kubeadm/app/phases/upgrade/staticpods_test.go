@@ -28,15 +28,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/pkg/transport"
 	"github.com/pkg/errors"
+	"go.etcd.io/etcd/pkg/transport"
 
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
@@ -179,11 +177,8 @@ func NewFakeStaticPodPathManager(moveFileFunc func(string, string) error) (Stati
 		return nil, err
 	}
 
-	kustomizeDir := ""
-
 	return &fakeStaticPodPathManager{
 		kubernetesDir:     kubernetesDir,
-		kustomizeDir:      kustomizeDir,
 		realManifestDir:   realManifestDir,
 		tempManifestDir:   upgradedManifestDir,
 		backupManifestDir: backupManifestDir,
@@ -241,17 +236,12 @@ func (spm *fakeStaticPodPathManager) CleanupDirs() error {
 
 type fakeTLSEtcdClient struct{ TLS bool }
 
-func (c fakeTLSEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
-
 func (c fakeTLSEtcdClient) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
 	return true, nil
 }
 
-func (c fakeTLSEtcdClient) GetClusterStatus() (map[string]*clientv3.StatusResponse, error) {
-	return map[string]*clientv3.StatusResponse{
-		"https://1.2.3.4:2379": {
-			Version: "3.1.12",
-		}}, nil
+func (c fakeTLSEtcdClient) CheckClusterHealth() error {
+	return nil
 }
 
 func (c fakeTLSEtcdClient) GetClusterVersions() (map[string]string, error) {
@@ -280,13 +270,11 @@ func (c fakeTLSEtcdClient) RemoveMember(id uint64) ([]etcdutil.Member, error) {
 
 type fakePodManifestEtcdClient struct{ ManifestDir, CertificatesDir string }
 
-func (c fakePodManifestEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
-
 func (c fakePodManifestEtcdClient) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
 	return true, nil
 }
 
-func (c fakePodManifestEtcdClient) GetClusterStatus() (map[string]*clientv3.StatusResponse, error) {
+func (c fakePodManifestEtcdClient) CheckClusterHealth() error {
 	// Make sure the certificates generated from the upgrade are readable from disk
 	tlsInfo := transport.TLSInfo{
 		CertFile:      filepath.Join(c.CertificatesDir, constants.EtcdCACertName),
@@ -294,13 +282,7 @@ func (c fakePodManifestEtcdClient) GetClusterStatus() (map[string]*clientv3.Stat
 		TrustedCAFile: filepath.Join(c.CertificatesDir, constants.EtcdHealthcheckClientKeyName),
 	}
 	_, err := tlsInfo.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	return map[string]*clientv3.StatusResponse{
-		"https://1.2.3.4:2379": {Version: "3.1.12"},
-	}, nil
+	return err
 }
 
 func (c fakePodManifestEtcdClient) GetClusterVersions() (map[string]string, error) {
@@ -449,7 +431,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			moveFileFunc: func(oldPath, newPath string) error {
 				return os.Rename(oldPath, newPath)
 			},
-			skipKubeConfig:       kubeadmconstants.SchedulerKubeConfigFileName,
+			skipKubeConfig:       constants.SchedulerKubeConfigFileName,
 			expectedErr:          true,
 			manifestShouldChange: false,
 		},
@@ -463,7 +445,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			moveFileFunc: func(oldPath, newPath string) error {
 				return os.Rename(oldPath, newPath)
 			},
-			skipKubeConfig:       kubeadmconstants.AdminKubeConfigFileName,
+			skipKubeConfig:       constants.AdminKubeConfigFileName,
 			expectedErr:          true,
 			manifestShouldChange: false,
 		},
@@ -505,9 +487,9 @@ func TestStaticPodControlPlane(t *testing.T) {
 			}
 
 			for _, kubeConfig := range []string{
-				kubeadmconstants.AdminKubeConfigFileName,
-				kubeadmconstants.SchedulerKubeConfigFileName,
-				kubeadmconstants.ControllerManagerKubeConfigFileName,
+				constants.AdminKubeConfigFileName,
+				constants.SchedulerKubeConfigFileName,
+				constants.ControllerManagerKubeConfigFileName,
 			} {
 				if rt.skipKubeConfig == kubeConfig {
 					continue
@@ -760,14 +742,14 @@ func TestRenewCertsByComponent(t *testing.T) {
 			name:      "all CA exist, should be rotated for scheduler",
 			component: constants.KubeScheduler,
 			kubeConfigShouldExist: []string{
-				kubeadmconstants.SchedulerKubeConfigFileName,
+				constants.SchedulerKubeConfigFileName,
 			},
 		},
 		{
 			name:      "all CA exist, should be rotated for controller manager",
 			component: constants.KubeControllerManager,
 			kubeConfigShouldExist: []string{
-				kubeadmconstants.ControllerManagerKubeConfigFileName,
+				constants.ControllerManagerKubeConfigFileName,
 			},
 		},
 		{
@@ -867,7 +849,7 @@ func TestRenewCertsByComponent(t *testing.T) {
 					t.Errorf("couldn't load new certificate %q: %v", kubeCert.Name, err)
 					continue
 				}
-				oldSerial, _ := certMaps[kubeCert.Name]
+				oldSerial := certMaps[kubeCert.Name]
 
 				shouldBeRenewed := true
 				if test.certsShouldBeRenewed != nil {
@@ -893,7 +875,7 @@ func TestRenewCertsByComponent(t *testing.T) {
 				if err != nil {
 					t.Fatalf("error reading embedded certs from %s: %v", kubeConfig, err)
 				}
-				oldSerial, _ := certMaps[kubeConfig]
+				oldSerial := certMaps[kubeConfig]
 				if oldSerial.Cmp(newCerts[0].SerialNumber) == 0 {
 					t.Errorf("certifitate %v was not reissued", kubeConfig)
 				}

@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -21,7 +23,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
@@ -29,13 +31,14 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
+	"strings"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
-	"strings"
 )
 
 func TestGetDeviceName_Volume(t *testing.T) {
-	plugin := newPlugin()
+	plugin := newPlugin(t)
 	name := "my-pd-volume"
 	spec := createVolSpec(name, false)
 
@@ -49,7 +52,7 @@ func TestGetDeviceName_Volume(t *testing.T) {
 }
 
 func TestGetDeviceName_PersistentVolume(t *testing.T) {
-	plugin := newPlugin()
+	plugin := newPlugin(t)
 	name := "my-pd-pv"
 	spec := createPVSpec(name, true, nil)
 
@@ -399,8 +402,8 @@ func TestVerifyVolumesAttached(t *testing.T) {
 
 // newPlugin creates a new gcePersistentDiskPlugin with fake cloud, NewAttacher
 // and NewDetacher won't work.
-func newPlugin() *gcePersistentDiskPlugin {
-	host := volumetest.NewFakeVolumeHost(
+func newPlugin(t *testing.T) *gcePersistentDiskPlugin {
+	host := volumetest.NewFakeVolumeHost(t,
 		"/tmp", /* rootDir */
 		nil,    /* kubeClient */
 		nil,    /* plugins */

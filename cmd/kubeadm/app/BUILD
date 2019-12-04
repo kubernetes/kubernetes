@@ -29,6 +29,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//cmd/kubeadm/app/apis/kubeadm:all-srcs",
+        "//cmd/kubeadm/app/apis/output:all-srcs",
         "//cmd/kubeadm/app/cmd:all-srcs",
         "//cmd/kubeadm/app/componentconfigs:all-srcs",
         "//cmd/kubeadm/app/constants:all-srcs",
@@ -52,7 +53,6 @@ filegroup(
         "//cmd/kubeadm/app/phases/uploadconfig:all-srcs",
         "//cmd/kubeadm/app/preflight:all-srcs",
         "//cmd/kubeadm/app/util:all-srcs",
-        "//cmd/kubeadm/app/version:all-srcs",
     ],
     tags = ["automanaged"],
 )

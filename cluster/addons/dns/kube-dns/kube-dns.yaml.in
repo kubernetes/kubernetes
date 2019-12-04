@@ -82,7 +82,7 @@ spec:
       labels:
         k8s-app: kube-dns
       annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+        seccomp.security.alpha.kubernetes.io/pod: 'runtime/default'
         prometheus.io/port: "10054"
         prometheus.io/scrape: "true"
     spec:
@@ -93,6 +93,8 @@ spec:
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
+      nodeSelector:
+        beta.kubernetes.io/os: linux
       volumes:
       - name: kube-dns-config
         configMap:
@@ -150,6 +152,11 @@ spec:
         volumeMounts:
         - name: kube-dns-config
           mountPath: /kube-dns-config
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsUser: 1001
+          runAsGroup: 1001
       - name: dnsmasq
         image: k8s.gcr.io/k8s-dns-dnsmasq-nanny:1.14.13
         livenessProbe:
@@ -190,6 +197,13 @@ spec:
         volumeMounts:
         - name: kube-dns-config
           mountPath: /etc/k8s/dns/dnsmasq-nanny
+        securityContext:
+          capabilities:
+            drop:
+              - all
+            add:
+              - NET_BIND_SERVICE
+              - SETGID
       - name: sidecar
         image: k8s.gcr.io/k8s-dns-sidecar:1.14.13
         livenessProbe:
@@ -214,5 +228,10 @@ spec:
           requests:
             memory: 20Mi
             cpu: 10m
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsUser: 1001
+          runAsGroup: 1001
       dnsPolicy: Default  # Don't use cluster DNS.
       serviceAccountName: kube-dns

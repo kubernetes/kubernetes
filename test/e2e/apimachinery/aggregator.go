@@ -32,7 +32,6 @@ import (
 	unstructuredv1 "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
@@ -41,7 +40,6 @@ import (
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
@@ -49,8 +47,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 )
-
-var serverAggregatorVersion = utilversion.MustParseSemantic("v1.10.0")
 
 const (
 	aggregatorServicePort = 7443
@@ -81,11 +77,11 @@ var _ = SIGDescribe("Aggregator", func() {
 		if aggrclient == nil {
 			config, err := framework.LoadConfig()
 			if err != nil {
-				e2elog.Failf("could not load config: %v", err)
+				framework.Failf("could not load config: %v", err)
 			}
 			aggrclient, err = aggregatorclient.NewForConfig(config)
 			if err != nil {
-				e2elog.Failf("could not create aggregator client: %v", err)
+				framework.Failf("could not create aggregator client: %v", err)
 			}
 		}
 	})
@@ -375,16 +371,16 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	}, "Waited %s for the sample-apiserver to be ready to handle requests.")
 	if err != nil {
 		currentAPIServiceJSON, _ := json.Marshal(currentAPIService)
-		e2elog.Logf("current APIService: %s", string(currentAPIServiceJSON))
+		framework.Logf("current APIService: %s", string(currentAPIServiceJSON))
 
 		currentPodsJSON, _ := json.Marshal(currentPods)
-		e2elog.Logf("current pods: %s", string(currentPodsJSON))
+		framework.Logf("current pods: %s", string(currentPodsJSON))
 
 		if currentPods != nil {
 			for _, pod := range currentPods.Items {
 				for _, container := range pod.Spec.Containers {
 					logs, err := e2epod.GetPodLogs(client, namespace, pod.Name, container.Name)
-					e2elog.Logf("logs of %s/%s (error: %v): %s", pod.Name, container.Name, err, logs)
+					framework.Logf("logs of %s/%s (error: %v): %s", pod.Name, container.Name, err, logs)
 				}
 			}
 		}
@@ -402,11 +398,11 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	var statusCode int
 	result.StatusCode(&statusCode)
 	if statusCode != 201 {
-		e2elog.Failf("Flunders client creation response was status %d, not 201", statusCode)
+		framework.Failf("Flunders client creation response was status %d, not 201", statusCode)
 	}
 
 	pods, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
-	framework.ExpectNoError(result.Error(), "getting pods for flunders service")
+	framework.ExpectNoError(err, "getting pods for flunders service")
 
 	// kubectl get flunders -v 9
 	// curl -k -v -XGET https://localhost/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
@@ -416,7 +412,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	err = json.Unmarshal(contents, &flundersList)
 	validateErrorWithDebugInfo(f, err, pods, "Error in unmarshalling %T response from server %s", contents, "/apis/wardle.k8s.io/v1alpha1")
 	if len(flundersList.Items) != 1 {
-		e2elog.Failf("failed to get back the correct flunders list %v", flundersList)
+		framework.Failf("failed to get back the correct flunders list %v", flundersList)
 	}
 
 	// kubectl delete flunder test-flunder -v 9
@@ -431,7 +427,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	err = json.Unmarshal(contents, &flundersList)
 	validateErrorWithDebugInfo(f, err, pods, "Error in unmarshalling %T response from server %s", contents, "/apis/wardle.k8s.io/v1alpha1")
 	if len(flundersList.Items) != 0 {
-		e2elog.Failf("failed to get back the correct deleted flunders list %v", flundersList)
+		framework.Failf("failed to get back the correct deleted flunders list %v", flundersList)
 	}
 
 	flunderName = generateFlunderName("dynamic-flunder")
@@ -443,7 +439,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	gvr := schema.GroupVersionResource{Group: "wardle.k8s.io", Version: "v1alpha1", Resource: "flunders"}
 	_, ok := groupVersionResources[gvr]
 	if !ok {
-		e2elog.Failf("could not find group version resource for dynamic client and wardle/flunders (discovery error: %v, discovery results: %#v)", discoveryErr, groupVersionResources)
+		framework.Failf("could not find group version resource for dynamic client and wardle/flunders (discovery error: %v, discovery results: %#v)", discoveryErr, groupVersionResources)
 	}
 	dynamicClient := f.DynamicClient.Resource(gvr).Namespace(namespace)
 
@@ -462,14 +458,14 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	unstruct := &unstructuredv1.Unstructured{}
 	err = unstruct.UnmarshalJSON(jsonFlunder)
 	framework.ExpectNoError(err, "unmarshalling test-flunder as unstructured for create using dynamic client")
-	unstruct, err = dynamicClient.Create(unstruct, metav1.CreateOptions{})
+	_, err = dynamicClient.Create(unstruct, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 
 	// kubectl get flunders
 	unstructuredList, err := dynamicClient.List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 	if len(unstructuredList.Items) != 1 {
-		e2elog.Failf("failed to get back the correct flunders list %v from the dynamic client", unstructuredList)
+		framework.Failf("failed to get back the correct flunders list %v from the dynamic client", unstructuredList)
 	}
 
 	// kubectl delete flunder test-flunder
@@ -480,19 +476,19 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	unstructuredList, err = dynamicClient.List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 	if len(unstructuredList.Items) != 0 {
-		e2elog.Failf("failed to get back the correct deleted flunders list %v from the dynamic client", unstructuredList)
+		framework.Failf("failed to get back the correct deleted flunders list %v from the dynamic client", unstructuredList)
 	}
 
 	cleanTest(client, aggrclient, namespace)
 }
 
 // pollTimed will call Poll but time how long Poll actually took.
-// It will then e2elog.Logf the msg with the duration of the Poll.
+// It will then framework.Logf the msg with the duration of the Poll.
 // It is assumed that msg will contain one %s for the elapsed time.
 func pollTimed(interval, timeout time.Duration, condition wait.ConditionFunc, msg string) error {
 	defer func(start time.Time, msg string) {
 		elapsed := time.Since(start)
-		e2elog.Logf(msg, elapsed)
+		framework.Logf(msg, elapsed)
 	}(time.Now(), msg)
 	return wait.Poll(interval, timeout, condition)
 }
@@ -513,7 +509,7 @@ func validateErrorWithDebugInfo(f *framework.Framework, err error, pods *v1.PodL
 			msg += fmt.Sprintf("\nOriginal pods in %s:\n%v", namespace, pods)
 		}
 
-		e2elog.Failf(msg)
+		framework.Failf(msg)
 	}
 }
 

@@ -36,14 +36,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/workqueue"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
-	persistentvolumeoptions "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/options"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -99,7 +95,6 @@ type testPVC struct {
 }
 
 func TestVolumeBinding(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentLocalVolumes, true)()
 	config := setupCluster(t, "volume-scheduling-", 2, 0, 0)
 	defer config.teardown()
 
@@ -220,6 +215,20 @@ func TestVolumeBinding(t *testing.T) {
 			}
 		}
 
+		// Wait for PVs to become available to avoid race condition in PV controller
+		// https://github.com/kubernetes/kubernetes/issues/85320
+		for _, pvConfig := range test.pvs {
+			if err := waitForPVPhase(config.client, pvConfig.name, v1.VolumeAvailable); err != nil {
+				t.Fatalf("PersistentVolume %q failed to become available: %v", pvConfig.name, err)
+			}
+		}
+
+		for _, pvConfig := range test.unboundPvs {
+			if err := waitForPVPhase(config.client, pvConfig.name, v1.VolumeAvailable); err != nil {
+				t.Fatalf("PersistentVolume %q failed to become available: %v", pvConfig.name, err)
+			}
+		}
+
 		// Create PVCs
 		for _, pvcConfig := range test.pvcs {
 			pvc := makePVC(pvcConfig.name, config.ns, &classes[pvcConfig.scName].Name, pvcConfig.preboundPV)
@@ -269,7 +278,6 @@ func TestVolumeBinding(t *testing.T) {
 
 // TestVolumeBindingRescheduling tests scheduler will retry scheduling when needed.
 func TestVolumeBindingRescheduling(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentLocalVolumes, true)()
 	config := setupCluster(t, "volume-scheduling-", 2, 0, 0)
 	defer config.teardown()
 
@@ -412,7 +420,6 @@ func TestVolumeBindingDynamicStressSlow(t *testing.T) {
 }
 
 func testVolumeBindingStress(t *testing.T, schedulerResyncPeriod time.Duration, dynamic bool, provisionDelaySeconds int) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentLocalVolumes, true)()
 	config := setupCluster(t, "volume-binding-stress-", 1, schedulerResyncPeriod, provisionDelaySeconds)
 	defer config.teardown()
 
@@ -512,13 +519,11 @@ func testVolumeBindingStress(t *testing.T, schedulerResyncPeriod time.Duration, 
 }
 
 func testVolumeBindingWithAffinity(t *testing.T, anti bool, numNodes, numPods, numPVsFirstNode int) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentLocalVolumes, true)()
 	config := setupCluster(t, "volume-pod-affinity-", numNodes, 0, 0)
 	defer config.teardown()
 
 	pods := []*v1.Pod{}
 	pvcs := []*v1.PersistentVolumeClaim{}
-	pvs := []*v1.PersistentVolume{}
 
 	// Create PVs for the first node
 	for i := 0; i < numPVsFirstNode; i++ {
@@ -526,7 +531,6 @@ func testVolumeBindingWithAffinity(t *testing.T, anti bool, numNodes, numPods, n
 		if pv, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
 			t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
 		}
-		pvs = append(pvs, pv)
 	}
 
 	// Create 1 PV per Node for the remaining nodes
@@ -535,7 +539,6 @@ func testVolumeBindingWithAffinity(t *testing.T, anti bool, numNodes, numPods, n
 		if pv, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
 			t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
 		}
-		pvs = append(pvs, pv)
 	}
 
 	// Create pods
@@ -638,7 +641,6 @@ func TestVolumeBindingWithAffinity(t *testing.T) {
 }
 
 func TestPVAffinityConflict(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentLocalVolumes, true)()
 	config := setupCluster(t, "volume-scheduling-", 3, 0, 0)
 	defer config.teardown()
 
@@ -698,7 +700,6 @@ func TestPVAffinityConflict(t *testing.T) {
 }
 
 func TestVolumeProvision(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentLocalVolumes, true)()
 	config := setupCluster(t, "volume-scheduling", 1, 0, 0)
 	defer config.teardown()
 
@@ -851,7 +852,7 @@ func TestRescheduleProvisioning(t *testing.T) {
 		context.closeFn()
 	}()
 
-	ctrl, informerFactory, err := initPVController(context, 0)
+	ctrl, informerFactory, err := initPVController(t, context, 0)
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
@@ -899,14 +900,14 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 	clientset := context.clientSet
 	ns := context.ns.Name
 
-	ctrl, informerFactory, err := initPVController(context, provisionDelaySeconds)
+	ctrl, informerFactory, err := initPVController(t, context, provisionDelaySeconds)
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
-	go ctrl.Run(context.stopCh)
+	go ctrl.Run(context.ctx.Done())
 	// Start informer factory after all controllers are configured and running.
-	informerFactory.Start(context.stopCh)
-	informerFactory.WaitForCacheSync(context.stopCh)
+	informerFactory.Start(context.ctx.Done())
+	informerFactory.WaitForCacheSync(context.ctx.Done())
 
 	// Create shared objects
 	// Create nodes
@@ -927,7 +928,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 	return &testConfig{
 		client: clientset,
 		ns:     ns,
-		stop:   context.stopCh,
+		stop:   context.ctx.Done(),
 		teardown: func() {
 			klog.Infof("test cluster %q start to tear down", ns)
 			deleteTestObjects(clientset, ns, nil)
@@ -936,13 +937,13 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 	}
 }
 
-func initPVController(context *testContext, provisionDelaySeconds int) (*persistentvolume.PersistentVolumeController, informers.SharedInformerFactory, error) {
+func initPVController(t *testing.T, context *testContext, provisionDelaySeconds int) (*persistentvolume.PersistentVolumeController, informers.SharedInformerFactory, error) {
 	clientset := context.clientSet
-	// Informers factory for controllers, we disable resync period for testing.
+	// Informers factory for controllers
 	informerFactory := informers.NewSharedInformerFactory(clientset, 0)
 
 	// Start PV controller for volume binding.
-	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil)
+	host := volumetest.NewFakeVolumeHost(t, "/tmp/fake", nil, nil)
 	plugin := &volumetest.FakeVolumePlugin{
 		PluginName:             provisionerPluginName,
 		Host:                   host,
@@ -958,10 +959,11 @@ func initPVController(context *testContext, provisionDelaySeconds int) (*persist
 	}
 	plugins := []volume.VolumePlugin{plugin}
 
-	controllerOptions := persistentvolumeoptions.NewPersistentVolumeControllerOptions()
 	params := persistentvolume.ControllerParameters{
-		KubeClient:                clientset,
-		SyncPeriod:                controllerOptions.PVClaimBinderSyncPeriod,
+		KubeClient: clientset,
+		// Use a frequent resync period to retry API update conflicts due to
+		// https://github.com/kubernetes/kubernetes/issues/85320
+		SyncPeriod:                5 * time.Second,
 		VolumePlugins:             plugins,
 		Cloud:                     nil,
 		ClusterName:               "volume-test-cluster",
@@ -1190,6 +1192,20 @@ func validatePVPhase(t *testing.T, client clientset.Interface, pvName string, ph
 	if pv.Status.Phase != phase {
 		t.Errorf("PV %v phase not %v, got %v", pvName, phase, pv.Status.Phase)
 	}
+}
+
+func waitForPVPhase(client clientset.Interface, pvName string, phase v1.PersistentVolumePhase) error {
+	return wait.PollImmediate(time.Second, 30*time.Second, func() (bool, error) {
+		pv, err := client.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		if pv.Status.Phase == phase {
+			return true, nil
+		}
+		return false, nil
+	})
 }
 
 func waitForPVCBound(client clientset.Interface, pvc *v1.PersistentVolumeClaim) error {

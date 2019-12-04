@@ -30,7 +30,6 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -161,11 +160,14 @@ func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	defaultInternalConfig := &kubeadmapi.InitConfiguration{}
 
 	kubeadmscheme.Scheme.Default(defaultConfig)
-	err := kubeadmscheme.Scheme.Convert(defaultConfig, defaultInternalConfig, nil)
-	kubeadmutil.CheckErr(err)
+	if err := kubeadmscheme.Scheme.Convert(defaultConfig, defaultInternalConfig, nil); err != nil {
+		return ""
+	}
 
 	certConfig, err := certSpec.GetConfig(defaultInternalConfig)
-	kubeadmutil.CheckErr(err)
+	if err != nil {
+		return ""
+	}
 
 	if len(certConfig.AltNames.DNSNames) == 0 && len(certConfig.AltNames.IPs) == 0 {
 		return ""

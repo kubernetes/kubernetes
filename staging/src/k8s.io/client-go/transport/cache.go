@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,6 +46,7 @@ type tlsCacheKey struct {
 	keyData            string
 	getCert            string
 	serverName         string
+	nextProtos         string
 	dial               string
 	disableCompression bool
 }
@@ -114,6 +116,7 @@ func tlsConfigKey(c *Config) (tlsCacheKey, error) {
 		keyData:            string(c.TLS.KeyData),
 		getCert:            fmt.Sprintf("%p", c.TLS.GetCert),
 		serverName:         c.TLS.ServerName,
+		nextProtos:         strings.Join(c.TLS.NextProtos, ","),
 		dial:               fmt.Sprintf("%p", c.Dial),
 		disableCompression: c.DisableCompression,
 	}, nil

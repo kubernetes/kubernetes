@@ -17,6 +17,7 @@ limitations under the License.
 package subjectaccessreview
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -39,7 +40,7 @@ type fakeAuthorizer struct {
 	err      error
 }
 
-func (f *fakeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+func (f *fakeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	f.attrs = attrs
 	return f.decision, f.reason, f.err
 }

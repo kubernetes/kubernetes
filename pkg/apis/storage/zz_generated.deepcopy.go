@@ -98,6 +98,11 @@ func (in *CSIDriverSpec) DeepCopyInto(out *CSIDriverSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.VolumeLifecycleModes != nil {
+		in, out := &in.VolumeLifecycleModes, &out.VolumeLifecycleModes
+		*out = make([]VolumeLifecycleMode, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

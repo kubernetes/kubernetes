@@ -28,7 +28,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -91,6 +93,51 @@ func TestDescribePod(t *testing.T) {
 		t.Errorf("unexpected out: %s", out)
 	}
 	if !strings.Contains(out, "Terminating (lasts 10y)") || !strings.Contains(out, "1234s") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribePodEphemeralContainers(t *testing.T) {
+	fake := fake.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: corev1.PodSpec{
+			EphemeralContainers: []corev1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+						Name:  "debugger",
+						Image: "busybox",
+					},
+				},
+			},
+		},
+		Status: corev1.PodStatus{
+			EphemeralContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: "debugger",
+					State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+					Ready:        false,
+					RestartCount: 0,
+				},
+			},
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := PodDescriber{c}
+	out, err := d.Describe("foo", "bar", describe.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "debugger:") {
+		t.Errorf("unexpected out: %s", out)
+	}
+	if !strings.Contains(out, "busybox") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
@@ -306,6 +353,8 @@ func getResourceList(cpu, memory string) corev1.ResourceList {
 }
 
 func TestDescribeService(t *testing.T) {
+	defaultServiceIPFamily := corev1.IPv4Protocol
+
 	testCases := []struct {
 		name    string
 		service *corev1.Service
@@ -319,7 +368,8 @@ func TestDescribeService(t *testing.T) {
 					Namespace: "foo",
 				},
 				Spec: corev1.ServiceSpec{
-					Type: corev1.ServiceTypeLoadBalancer,
+					Type:     corev1.ServiceTypeLoadBalancer,
+					IPFamily: &defaultServiceIPFamily,
 					Ports: []corev1.ServicePort{{
 						Name:       "port-tcp",
 						Port:       8080,
@@ -357,7 +407,8 @@ func TestDescribeService(t *testing.T) {
 					Namespace: "foo",
 				},
 				Spec: corev1.ServiceSpec{
-					Type: corev1.ServiceTypeLoadBalancer,
+					Type:     corev1.ServiceTypeLoadBalancer,
+					IPFamily: &defaultServiceIPFamily,
 					Ports: []corev1.ServicePort{{
 						Name:       "port-tcp",
 						Port:       8080,
@@ -379,6 +430,46 @@ func TestDescribeService(t *testing.T) {
 				"Selector", "blah=heh",
 				"Type", "LoadBalancer",
 				"IP", "1.2.3.4",
+				"Port", "port-tcp", "8080/TCP",
+				"TargetPort", "targetPort/TCP",
+				"NodePort", "port-tcp", "31111/TCP",
+				"Session Affinity", "None",
+				"External Traffic Policy", "Local",
+				"HealthCheck NodePort", "32222",
+			},
+		},
+		{
+			name: "test-ServiceIPFamily",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: corev1.ServiceSpec{
+					Type:     corev1.ServiceTypeLoadBalancer,
+					IPFamily: &defaultServiceIPFamily,
+					Ports: []corev1.ServicePort{{
+						Name:       "port-tcp",
+						Port:       8080,
+						Protocol:   corev1.ProtocolTCP,
+						TargetPort: intstr.FromString("targetPort"),
+						NodePort:   31111,
+					}},
+					Selector:              map[string]string{"blah": "heh"},
+					ClusterIP:             "1.2.3.4",
+					LoadBalancerIP:        "5.6.7.8",
+					SessionAffinity:       "None",
+					ExternalTrafficPolicy: "Local",
+					HealthCheckNodePort:   32222,
+				},
+			},
+			expect: []string{
+				"Name", "bar",
+				"Namespace", "foo",
+				"Selector", "blah=heh",
+				"Type", "LoadBalancer",
+				"IP", "1.2.3.4",
+				"IPFamily", "IPv4",
 				"Port", "port-tcp", "8080/TCP",
 				"TargetPort", "targetPort/TCP",
 				"NodePort", "port-tcp", "31111/TCP",
@@ -1505,7 +1596,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 				},
 				Status: corev1.PersistentVolumeClaimStatus{},
 			},
-			expectedElements: []string{"\nDataSource:\n  Name:      srcpvc\n  Kind:      PersistentVolumeClaim"},
+			expectedElements: []string{"\nDataSource:\n  Kind:      PersistentVolumeClaim\n  Name:      srcpvc"},
 		},
 		{
 			name: "snapshot-datasource",
@@ -1525,7 +1616,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 				},
 				Status: corev1.PersistentVolumeClaimStatus{},
 			},
-			expectedElements: []string{"DataSource:\n  Name:      src-snapshot\n  Kind:      VolumeSnapshot\n"},
+			expectedElements: []string{"DataSource:\n  APIGroup:  snapshot.storage.k8s.io\n  Kind:      VolumeSnapshot\n  Name:      src-snapshot\n"},
 		},
 	}
 
@@ -2490,6 +2581,14 @@ func TestDescribeEvents(t *testing.T) {
 				},
 			}, events),
 		},
+		"EndpointSliceDescriber": &EndpointSliceDescriber{
+			fake.NewSimpleClientset(&discoveryv1beta1.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+			}, events),
+		},
 		// TODO(jchaloup): add tests for:
 		// - IngressDescriber
 		// - JobDescriber
@@ -3034,7 +3133,262 @@ Spec:
 		},
 	})
 	d := NetworkPolicyDescriber{versionedFake}
-	out, err := d.Describe("", "network-policy-1", describe.DescriberSettings{})
+	out, err := d.Describe("default", "network-policy-1", describe.DescriberSettings{})
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+	if out != expectedOut {
+		t.Errorf("want:\n%s\ngot:\n%s", expectedOut, out)
+	}
+}
+
+func TestDescribeIngressNetworkPolicies(t *testing.T) {
+	expectedTime, err := time.Parse("2006-01-02 15:04:05 Z0700 MST", "2017-06-04 21:45:56 -0700 PDT")
+	if err != nil {
+		t.Errorf("unable to parse time %q error: %s", "2017-06-04 21:45:56 -0700 PDT", err)
+	}
+	expectedOut := `Name:         network-policy-1
+Namespace:    default
+Created on:   2017-06-04 21:45:56 -0700 PDT
+Labels:       <none>
+Annotations:  <none>
+Spec:
+  PodSelector:     foo in (bar1,bar2),foo2 notin (bar1,bar2),id1=app1,id2=app2
+  Allowing ingress traffic:
+    To Port: 80/TCP
+    To Port: 82/TCP
+    From:
+      NamespaceSelector: id=ns1,id2=ns2
+      PodSelector: id=pod1,id2=pod2
+    From:
+      PodSelector: id=app2,id2=app3
+    From:
+      NamespaceSelector: id=app2,id2=app3
+    From:
+      NamespaceSelector: foo in (bar1,bar2),id=app2,id2=app3
+    From:
+      IPBlock:
+        CIDR: 192.168.0.0/16
+        Except: 192.168.3.0/24, 192.168.4.0/24
+    ----------
+    To Port: <any> (traffic allowed to all ports)
+    From: <any> (traffic not restricted by source)
+  Not affecting egress traffic
+  Policy Types: Ingress
+`
+
+	port80 := intstr.FromInt(80)
+	port82 := intstr.FromInt(82)
+	protoTCP := corev1.ProtocolTCP
+
+	versionedFake := fake.NewSimpleClientset(&networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "network-policy-1",
+			Namespace:         "default",
+			CreationTimestamp: metav1.NewTime(expectedTime),
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"id1": "app1",
+					"id2": "app2",
+				},
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{Key: "foo", Operator: "In", Values: []string{"bar1", "bar2"}},
+					{Key: "foo2", Operator: "NotIn", Values: []string{"bar1", "bar2"}},
+				},
+			},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{
+				{
+					Ports: []networkingv1.NetworkPolicyPort{
+						{Port: &port80},
+						{Port: &port82, Protocol: &protoTCP},
+					},
+					From: []networkingv1.NetworkPolicyPeer{
+						{
+							PodSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "pod1",
+									"id2": "pod2",
+								},
+							},
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "ns1",
+									"id2": "ns2",
+								},
+							},
+						},
+						{
+							PodSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+							},
+						},
+						{
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+							},
+						},
+						{
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{Key: "foo", Operator: "In", Values: []string{"bar1", "bar2"}},
+								},
+							},
+						},
+						{
+							IPBlock: &networkingv1.IPBlock{
+								CIDR:   "192.168.0.0/16",
+								Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
+							},
+						},
+					},
+				},
+				{},
+			},
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
+		},
+	})
+	d := NetworkPolicyDescriber{versionedFake}
+	out, err := d.Describe("default", "network-policy-1", describe.DescriberSettings{})
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+	if out != expectedOut {
+		t.Errorf("want:\n%s\ngot:\n%s", expectedOut, out)
+	}
+}
+
+func TestDescribeIsolatedEgressNetworkPolicies(t *testing.T) {
+	expectedTime, err := time.Parse("2006-01-02 15:04:05 Z0700 MST", "2017-06-04 21:45:56 -0700 PDT")
+	if err != nil {
+		t.Errorf("unable to parse time %q error: %s", "2017-06-04 21:45:56 -0700 PDT", err)
+	}
+	expectedOut := `Name:         network-policy-1
+Namespace:    default
+Created on:   2017-06-04 21:45:56 -0700 PDT
+Labels:       <none>
+Annotations:  <none>
+Spec:
+  PodSelector:     foo in (bar1,bar2),foo2 notin (bar1,bar2),id1=app1,id2=app2
+  Allowing ingress traffic:
+    To Port: 80/TCP
+    To Port: 82/TCP
+    From:
+      NamespaceSelector: id=ns1,id2=ns2
+      PodSelector: id=pod1,id2=pod2
+    From:
+      PodSelector: id=app2,id2=app3
+    From:
+      NamespaceSelector: id=app2,id2=app3
+    From:
+      NamespaceSelector: foo in (bar1,bar2),id=app2,id2=app3
+    From:
+      IPBlock:
+        CIDR: 192.168.0.0/16
+        Except: 192.168.3.0/24, 192.168.4.0/24
+    ----------
+    To Port: <any> (traffic allowed to all ports)
+    From: <any> (traffic not restricted by source)
+  Allowing egress traffic:
+    <none> (Selected pods are isolated for egress connectivity)
+  Policy Types: Ingress, Egress
+`
+
+	port80 := intstr.FromInt(80)
+	port82 := intstr.FromInt(82)
+	protoTCP := corev1.ProtocolTCP
+
+	versionedFake := fake.NewSimpleClientset(&networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "network-policy-1",
+			Namespace:         "default",
+			CreationTimestamp: metav1.NewTime(expectedTime),
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"id1": "app1",
+					"id2": "app2",
+				},
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{Key: "foo", Operator: "In", Values: []string{"bar1", "bar2"}},
+					{Key: "foo2", Operator: "NotIn", Values: []string{"bar1", "bar2"}},
+				},
+			},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{
+				{
+					Ports: []networkingv1.NetworkPolicyPort{
+						{Port: &port80},
+						{Port: &port82, Protocol: &protoTCP},
+					},
+					From: []networkingv1.NetworkPolicyPeer{
+						{
+							PodSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "pod1",
+									"id2": "pod2",
+								},
+							},
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "ns1",
+									"id2": "ns2",
+								},
+							},
+						},
+						{
+							PodSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+							},
+						},
+						{
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+							},
+						},
+						{
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{Key: "foo", Operator: "In", Values: []string{"bar1", "bar2"}},
+								},
+							},
+						},
+						{
+							IPBlock: &networkingv1.IPBlock{
+								CIDR:   "192.168.0.0/16",
+								Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
+							},
+						},
+					},
+				},
+				{},
+			},
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress, networkingv1.PolicyTypeEgress},
+		},
+	})
+	d := NetworkPolicyDescriber{versionedFake}
+	out, err := d.Describe("default", "network-policy-1", describe.DescriberSettings{})
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
 	}
@@ -3081,15 +3435,29 @@ Events:              <none>` + "\n"
 }
 
 func TestDescribeNode(t *testing.T) {
-	fake := fake.NewSimpleClientset(&corev1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "bar",
-			Namespace: "foo",
+	holderIdentity := "holder"
+
+	fake := fake.NewSimpleClientset(
+		&corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "bar",
+			},
+			Spec: corev1.NodeSpec{
+				Unschedulable: true,
+			},
 		},
-		Spec: corev1.NodeSpec{
-			Unschedulable: true,
+		&coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "bar",
+				Namespace: corev1.NamespaceNodeLease,
+			},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity: &holderIdentity,
+				AcquireTime:    &metav1.MicroTime{Time: time.Now().Add(-time.Hour)},
+				RenewTime:      &metav1.MicroTime{Time: time.Now()},
+			},
 		},
-	})
+	)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := NodeDescriber{c}
 	out, err := d.Describe("foo", "bar", describe.DescriberSettings{ShowEvents: true})
@@ -3097,13 +3465,12 @@ func TestDescribeNode(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	expectedOut := []string{"Unschedulable", "true"}
+	expectedOut := []string{"Unschedulable", "true", "holder"}
 	for _, expected := range expectedOut {
 		if !strings.Contains(out, expected) {
 			t.Errorf("expected to find %q in output: %q", expected, out)
 		}
 	}
-
 }
 
 func TestDescribeStatefulSet(t *testing.T) {
@@ -3145,6 +3512,82 @@ func TestDescribeStatefulSet(t *testing.T) {
 			t.Errorf("unexpected out: %s", out)
 			break
 		}
+	}
+}
+
+func TestDescribeEndpointSlice(t *testing.T) {
+	protocolTCP := corev1.ProtocolTCP
+	port80 := int32(80)
+
+	fake := fake.NewSimpleClientset(&discoveryv1beta1.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo.123",
+			Namespace: "bar",
+		},
+		AddressType: discoveryv1beta1.AddressTypeIPv4,
+		Endpoints: []discoveryv1beta1.Endpoint{
+			{
+				Addresses:  []string{"1.2.3.4", "1.2.3.5"},
+				Conditions: discoveryv1beta1.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-123"},
+				Topology: map[string]string{
+					"topology.kubernetes.io/zone":   "us-central1-a",
+					"topology.kubernetes.io/region": "us-central1",
+				},
+			}, {
+				Addresses:  []string{"1.2.3.6", "1.2.3.7"},
+				Conditions: discoveryv1beta1.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-124"},
+				Topology: map[string]string{
+					"topology.kubernetes.io/zone":   "us-central1-b",
+					"topology.kubernetes.io/region": "us-central1",
+				},
+			},
+		},
+		Ports: []discoveryv1beta1.EndpointPort{
+			{
+				Protocol: &protocolTCP,
+				Port:     &port80,
+			},
+		},
+	})
+
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := EndpointSliceDescriber{c}
+	out, err := d.Describe("bar", "foo.123", describe.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	expectedOut := `Name:         foo.123
+Namespace:    bar
+Labels:       <none>
+Annotations:  <none>
+AddressType:  IPv4
+Ports:
+  Name     Port  Protocol
+  ----     ----  --------
+  <unset>  80    TCP
+Endpoints:
+  - Addresses:  1.2.3.4,1.2.3.5
+    Conditions:
+      Ready:    true
+    Hostname:   <unset>
+    TargetRef:  Pod/test-123
+    Topology:   topology.kubernetes.io/region=us-central1
+                topology.kubernetes.io/zone=us-central1-a
+  - Addresses:  1.2.3.6,1.2.3.7
+    Conditions:
+      Ready:    true
+    Hostname:   <unset>
+    TargetRef:  Pod/test-124
+    Topology:   topology.kubernetes.io/region=us-central1
+                topology.kubernetes.io/zone=us-central1-b
+Events:         <none>` + "\n"
+
+	if out != expectedOut {
+		t.Logf(out)
+		t.Errorf("expected : %q\n but got output:\n %q", expectedOut, out)
 	}
 }
 

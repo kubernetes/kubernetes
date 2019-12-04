@@ -17,6 +17,8 @@ limitations under the License.
 package config
 
 import (
+	"math"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfig "k8s.io/component-base/config"
@@ -50,7 +52,7 @@ type KubeSchedulerConfiguration struct {
 	AlgorithmSource SchedulerAlgorithmSource
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.
-	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
+	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range [0-100].
 	HardPodAffinitySymmetricWeight int32
 
 	// LeaderElection defines the configuration of leader election client.
@@ -86,7 +88,17 @@ type KubeSchedulerConfiguration struct {
 	// Duration to wait for a binding operation to complete before timing out
 	// Value must be non-negative integer. The value zero indicates no waiting.
 	// If this value is nil, the default value will be used.
-	BindTimeoutSeconds *int64
+	BindTimeoutSeconds int64
+
+	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
+	// If specified, it must be greater than 0. If this value is null, the default value (1s)
+	// will be used.
+	PodInitialBackoffSeconds int64
+
+	// PodMaxBackoffSeconds is the max backoff for unschedulable pods.
+	// If specified, it must be greater than or equal to podInitialBackoffSeconds. If this value is null,
+	// the default value (10s) will be used.
+	PodMaxBackoffSeconds int64
 
 	// Plugins specify the set of plugins that should be enabled or disabled. Enabled plugins are the
 	// ones that should be enabled in addition to the default plugins. Disabled plugins are any of the
@@ -130,7 +142,7 @@ type SchedulerPolicyFileSource struct {
 type SchedulerPolicyConfigMapSource struct {
 	// Namespace is the namespace of the policy config map.
 	Namespace string
-	// Name is the name of hte policy config map.
+	// Name is the name of the policy config map.
 	Name string
 }
 
@@ -208,4 +220,53 @@ type PluginConfig struct {
 	Name string
 	// Args defines the arguments passed to the plugins at the time of initialization. Args can have arbitrary structure.
 	Args runtime.Unknown
+}
+
+/*
+ * NOTE: The following variables and methods are intentionally left out of the staging mirror.
+ */
+const (
+	// DefaultPercentageOfNodesToScore defines the percentage of nodes of all nodes
+	// that once found feasible, the scheduler stops looking for more nodes.
+	// A value of 0 means adaptive, meaning the scheduler figures out a proper default.
+	DefaultPercentageOfNodesToScore = 0
+
+	// MaxCustomPriorityScore is the max score UtilizationShapePoint expects.
+	MaxCustomPriorityScore int64 = 10
+
+	// MaxTotalScore is the maximum total score.
+	MaxTotalScore int64 = math.MaxInt64
+
+	// MaxWeight defines the max weight value allowed for custom PriorityPolicy
+	MaxWeight = MaxTotalScore / MaxCustomPriorityScore
+)
+
+func appendPluginSet(dst *PluginSet, src *PluginSet) *PluginSet {
+	if dst == nil {
+		dst = &PluginSet{}
+	}
+	if src != nil {
+		dst.Enabled = append(dst.Enabled, src.Enabled...)
+		dst.Disabled = append(dst.Disabled, src.Disabled...)
+	}
+	return dst
+}
+
+// Append appends src Plugins to current Plugins. If a PluginSet is nil, it will
+// be created.
+func (p *Plugins) Append(src *Plugins) {
+	if p == nil || src == nil {
+		return
+	}
+	p.QueueSort = appendPluginSet(p.QueueSort, src.QueueSort)
+	p.PreFilter = appendPluginSet(p.PreFilter, src.PreFilter)
+	p.Filter = appendPluginSet(p.Filter, src.Filter)
+	p.PostFilter = appendPluginSet(p.PostFilter, src.PostFilter)
+	p.Score = appendPluginSet(p.Score, src.Score)
+	p.Reserve = appendPluginSet(p.Reserve, src.Reserve)
+	p.Permit = appendPluginSet(p.Permit, src.Permit)
+	p.PreBind = appendPluginSet(p.PreBind, src.PreBind)
+	p.Bind = appendPluginSet(p.Bind, src.Bind)
+	p.PostBind = appendPluginSet(p.PostBind, src.PostBind)
+	p.Unreserve = appendPluginSet(p.Unreserve, src.Unreserve)
 }

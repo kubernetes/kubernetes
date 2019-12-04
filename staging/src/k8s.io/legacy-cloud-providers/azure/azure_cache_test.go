@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -97,7 +99,7 @@ func TestCacheGet(t *testing.T) {
 	for _, c := range cases {
 		dataSource, cache := newFakeCache(t)
 		dataSource.set(c.data)
-		val, err := cache.Get(c.key)
+		val, err := cache.Get(c.key, cacheReadTypeDefault)
 		assert.NoError(t, err, c.name)
 		assert.Equal(t, c.expected, val, c.name)
 	}
@@ -111,7 +113,7 @@ func TestCacheGetError(t *testing.T) {
 	cache, err := newTimedcache(fakeCacheTTL, getter)
 	assert.NoError(t, err)
 
-	val, err := cache.Get("key")
+	val, err := cache.Get("key", cacheReadTypeDefault)
 	assert.Error(t, err)
 	assert.Equal(t, getError, err)
 	assert.Nil(t, val)
@@ -126,13 +128,13 @@ func TestCacheDelete(t *testing.T) {
 	dataSource, cache := newFakeCache(t)
 	dataSource.set(data)
 
-	v, err := cache.Get(key)
+	v, err := cache.Get(key, cacheReadTypeDefault)
 	assert.NoError(t, err)
 	assert.Equal(t, val, v, "cache should get correct data")
 
 	dataSource.set(nil)
 	cache.Delete(key)
-	v, err = cache.Get(key)
+	v, err = cache.Get(key, cacheReadTypeDefault)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, dataSource.called)
 	assert.Equal(t, nil, v, "cache should get nil after data is removed")
@@ -147,14 +149,58 @@ func TestCacheExpired(t *testing.T) {
 	dataSource, cache := newFakeCache(t)
 	dataSource.set(data)
 
-	v, err := cache.Get(key)
+	v, err := cache.Get(key, cacheReadTypeDefault)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, dataSource.called)
 	assert.Equal(t, val, v, "cache should get correct data")
 
 	time.Sleep(fakeCacheTTL)
-	v, err = cache.Get(key)
+	v, err = cache.Get(key, cacheReadTypeDefault)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, dataSource.called)
 	assert.Equal(t, val, v, "cache should get correct data even after expired")
+}
+
+func TestCacheAllowUnsafeRead(t *testing.T) {
+	key := "key1"
+	val := &fakeDataObj{}
+	data := map[string]*fakeDataObj{
+		key: val,
+	}
+	dataSource, cache := newFakeCache(t)
+	dataSource.set(data)
+
+	v, err := cache.Get(key, cacheReadTypeDefault)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, dataSource.called)
+	assert.Equal(t, val, v, "cache should get correct data")
+
+	time.Sleep(fakeCacheTTL)
+	v, err = cache.Get(key, cacheReadTypeUnsafe)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, dataSource.called)
+	assert.Equal(t, val, v, "cache should return expired as allow unsafe read is allowed")
+}
+
+func TestCacheNoConcurrentGet(t *testing.T) {
+	key := "key1"
+	val := &fakeDataObj{}
+	data := map[string]*fakeDataObj{
+		key: val,
+	}
+	dataSource, cache := newFakeCache(t)
+	dataSource.set(data)
+
+	time.Sleep(fakeCacheTTL)
+	var wg sync.WaitGroup
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go cache.Get(key, cacheReadTypeDefault)
+		wg.Done()
+	}
+	v, err := cache.Get(key, cacheReadTypeDefault)
+	wg.Wait()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, dataSource.called)
+	assert.Equal(t, val, v, "cache should get correct data")
 }

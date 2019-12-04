@@ -1,0 +1,10 @@
+apiVersion: storage.k8s.io/v1beta1
+kind: CSIDriver
+metadata:
+  name: hostpath.csi.k8s.io
+spec:
+  # Supports both modes, but needs pod info for that to determine the actual mode.
+  podInfoOnMount: true
+  volumeLifecycleModes:
+  - Persistent
+  - Ephemeral

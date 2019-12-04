@@ -4,24 +4,21 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "isatty_android.go",
         "isatty_bsd.go",
-        "isatty_linux.go",
-        "isatty_linux_ppc64x.go",
         "isatty_others.go",
         "isatty_solaris.go",
+        "isatty_tcgets.go",
         "isatty_windows.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/mattn/go-isatty",
     importpath = "github.com/mattn/go-isatty",
     visibility = ["//visibility:public"],
     deps = select({
-        "@io_bazel_rules_go//go/platform:linux_ppc64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
-        "@io_bazel_rules_go//go/platform:linux_ppc64le": [
-            "//vendor/golang.org/x/sys/unix:go_default_library",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris_amd64": [
+        "@io_bazel_rules_go//go/platform:solaris": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],

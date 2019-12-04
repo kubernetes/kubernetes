@@ -51,7 +51,6 @@ type analyzer struct {
 	ctx       build.Context
 	failed    bool
 	donePaths map[string]interface{}
-	errors    []string
 }
 
 func newAnalyzer() *analyzer {

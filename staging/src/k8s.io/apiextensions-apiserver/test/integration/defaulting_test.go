@@ -18,6 +18,7 @@ package integration
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -32,11 +33,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/dynamic"
 	utilfeaturetesting "k8s.io/component-base/featuregate/testing"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	"k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	"k8s.io/apiextensions-apiserver/test/integration/storage"
 )
 
 var defaultingFixture = &apiextensionsv1.CustomResourceDefinition{
@@ -146,6 +151,13 @@ properties:
         default: "v1beta2"
 `
 
+const defaultingFooInstance = `
+kind: Foo
+apiVersion: tests.example.com/v1beta1
+metadata:
+  name: foo
+`
+
 func TestCustomResourceDefaultingWithWatchCache(t *testing.T) {
 	testDefaulting(t, true)
 }
@@ -252,7 +264,7 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	t.Logf("Creating CR and expecting defaulted fields in spec, but status does not exist at all")
 	fooClient := dynamicClient.Resource(schema.GroupVersionResource{crd.Spec.Group, crd.Spec.Versions[0].Name, crd.Spec.Names.Plural})
 	foo := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(fooInstance), &foo.Object); err != nil {
+	if err := yaml.Unmarshal([]byte(defaultingFooInstance), &foo.Object); err != nil {
 		t.Fatal(err)
 	}
 	unstructured.SetNestedField(foo.Object, "a", "spec", "a")
@@ -398,6 +410,275 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	}
 	mustExist(foo.Object, [][]string{{"spec", "a"}, {"spec", "b"}, {"status", "a"}, {"status", "b"}, {"status", "c"}})
 	mustNotExist(foo.Object, [][]string{{"spec", "c"}})
+}
+
+var metaDefaultingFixture = &apiextensionsv1.CustomResourceDefinition{
+	ObjectMeta: metav1.ObjectMeta{Name: "foos.tests.example.com"},
+	Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+		Group: "tests.example.com",
+		Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+			{
+				Name:    "v1beta1",
+				Storage: true,
+				Served:  true,
+				Subresources: &apiextensionsv1.CustomResourceSubresources{
+					Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+				},
+			},
+		},
+		Names: apiextensionsv1.CustomResourceDefinitionNames{
+			Plural:   "foos",
+			Singular: "foo",
+			Kind:     "Foo",
+			ListKind: "FooList",
+		},
+		Scope:                 apiextensionsv1.ClusterScoped,
+		PreserveUnknownFields: false,
+	},
+}
+
+const metaDefaultingFooV1beta1Schema = `
+type: object
+properties:
+  fields:
+    type: object
+    x-kubernetes-embedded-resource: true
+    properties:
+      apiVersion:
+        type: string
+        default: foos/v1
+      kind:
+        type: string
+        default: Foo
+      metadata:
+        type: object
+        properties:
+          name:
+            type: string
+            default: Bar
+          unknown:
+            type: string
+            default: unknown
+  fullMetadata:
+    type: object
+    x-kubernetes-embedded-resource: true
+    properties:
+      apiVersion:
+        type: string
+        default: foos/v1
+      kind:
+        type: string
+        default: Foo
+      metadata:
+        type: object
+        default:
+          name: Bar
+          unknown: unknown
+  fullObject:
+    type: object
+    x-kubernetes-embedded-resource: true
+    properties:
+      foo:
+        type: string
+    default:
+      apiVersion: foos/v1
+      kind: Foo
+      metadata:
+        name: Bar
+        unknown: unknown
+  spanning:
+    type: object
+    properties:
+      embedded:
+        type: object
+        properties:
+          foo:
+            type: string
+        x-kubernetes-embedded-resource: true
+    default:
+      embedded:
+        apiVersion: foos/v1
+        kind: Foo
+        metadata:
+          name: Bar
+          unknown: unknown
+  preserve-fields:
+    type: object
+    x-kubernetes-embedded-resource: true
+    x-kubernetes-preserve-unknown-fields: true
+    properties:
+      apiVersion:
+        type: string
+        default: foos/v1
+      kind:
+        type: string
+        default: Foo
+      metadata:
+        type: object
+        properties:
+          name:
+            type: string
+            default: Bar
+          unknown:
+            type: string
+            default: unknown
+  preserve-fullMetadata:
+    type: object
+    x-kubernetes-embedded-resource: true
+    x-kubernetes-preserve-unknown-fields: true
+    properties:
+      apiVersion:
+        type: string
+        default: foos/v1
+      kind:
+        type: string
+        default: Foo
+      metadata:
+        type: object
+        default:
+          name: Bar
+          unknown: unknown
+  preserve-fullObject:
+    type: object
+    x-kubernetes-embedded-resource: true
+    x-kubernetes-preserve-unknown-fields: true
+    default:
+      apiVersion: foos/v1
+      kind: Foo
+      metadata:
+        name: Bar
+        unknown: unknown
+  preserve-spanning:
+    type: object
+    properties:
+      embedded:
+        type: object
+        x-kubernetes-embedded-resource: true
+        x-kubernetes-preserve-unknown-fields: true
+    default:
+      embedded:
+        apiVersion: foos/v1
+        kind: Foo
+        metadata:
+          name: Bar
+          unknown: unknown
+`
+
+const metaDefaultingFooInstance = `
+kind: Foo
+apiVersion: tests.example.com/v1beta1
+metadata:
+  name: foo
+`
+
+func TestCustomResourceDefaultingOfMetaFields(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceDefaulting, true)()
+
+	tearDown, config, options, err := fixtures.StartDefaultServer(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	apiExtensionClient, err := clientset.NewForConfig(config)
+	if err != nil {
+		tearDown()
+		t.Fatal(err)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		tearDown()
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	crd := metaDefaultingFixture.DeepCopy()
+	crd.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{}
+	if err := yaml.Unmarshal([]byte(metaDefaultingFooV1beta1Schema), &crd.Spec.Versions[0].Schema.OpenAPIV3Schema); err != nil {
+		t.Fatal(err)
+	}
+	crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("Creating CR and expecting defaulted, embedded objects, with the unknown ObjectMeta fields pruned")
+	fooClient := dynamicClient.Resource(schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Versions[0].Name, Resource: crd.Spec.Names.Plural})
+
+	tests := []struct {
+		path  []string
+		value interface{}
+	}{
+		{[]string{"fields"}, map[string]interface{}{"metadata": map[string]interface{}{}}},
+		{[]string{"fullMetadata"}, map[string]interface{}{}},
+		{[]string{"fullObject"}, nil},
+		{[]string{"spanning", "embedded"}, nil},
+		{[]string{"preserve-fields"}, map[string]interface{}{"metadata": map[string]interface{}{}}},
+		{[]string{"preserve-fullMetadata"}, map[string]interface{}{}},
+		{[]string{"preserve-fullObject"}, nil},
+		{[]string{"preserve-spanning", "embedded"}, nil},
+	}
+
+	returnedFoo := &unstructured.Unstructured{}
+	if err := yaml.Unmarshal([]byte(metaDefaultingFooInstance), &returnedFoo.Object); err != nil {
+		t.Fatal(err)
+	}
+	for _, tst := range tests {
+		if tst.value != nil {
+			if err := unstructured.SetNestedField(returnedFoo.Object, tst.value, tst.path...); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	returnedFoo, err = fooClient.Create(returnedFoo, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Unable to create CR: %v", err)
+	}
+	t.Logf("CR created: %#v", returnedFoo.UnstructuredContent())
+
+	// get persisted object
+	RESTOptionsGetter := serveroptions.NewCRDRESTOptionsGetter(*options.RecommendedOptions.Etcd)
+	restOptions, err := RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural})
+	if err != nil {
+		t.Fatal(err)
+	}
+	etcdClient, _, err := storage.GetEtcdClients(restOptions.StorageConfig.Transport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer etcdClient.Close()
+	etcdObjectReader := storage.NewEtcdObjectReader(etcdClient, &restOptions, crd)
+
+	persistedFoo, err := etcdObjectReader.GetStoredCustomResource("", returnedFoo.GetName())
+	if err != nil {
+		t.Fatalf("Unable read CR from stored: %v", err)
+	}
+
+	// check that the returned and persisted object is pruned
+	for _, tst := range tests {
+		for _, foo := range []*unstructured.Unstructured{returnedFoo, persistedFoo} {
+			source := "request"
+			if foo == persistedFoo {
+				source = "persisted"
+			}
+			t.Run(fmt.Sprintf("%s of %s object", strings.Join(tst.path, "."), source), func(t *testing.T) {
+				obj, found, err := unstructured.NestedMap(foo.Object, tst.path...)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !found {
+					t.Errorf("expected defaulted objected, didn't find any")
+				} else if expected := map[string]interface{}{
+					"apiVersion": "foos/v1",
+					"kind":       "Foo",
+					"metadata": map[string]interface{}{
+						"name": "Bar",
+					},
+				}; !reflect.DeepEqual(obj, expected) {
+					t.Errorf("unexpected defaulted object\n  expected: %v\n  got: %v", expected, obj)
+				}
+			})
+		}
+	}
 }
 
 func jsonPtr(x interface{}) *apiextensionsv1.JSON {

@@ -17,6 +17,6 @@ const (
 	OpConcatN
 	// OpCapture pops an item and binds it to the variable
 	OpCapture
-	// OpEnd is the least postive invalid opcode.
+	// OpEnd is the least positive invalid opcode.
 	OpEnd
 )

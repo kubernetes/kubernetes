@@ -258,7 +258,7 @@ func ResetObjectMetaForStatus(meta, existingMeta Object) {
 // MarshalJSON implements json.Marshaler
 // MarshalJSON may get called on pointers or values, so implement MarshalJSON on value.
 // http://stackoverflow.com/questions/21390979/custom-marshaljson-never-gets-called-in-go
-func (f Fields) MarshalJSON() ([]byte, error) {
+func (f FieldsV1) MarshalJSON() ([]byte, error) {
 	if f.Raw == nil {
 		return []byte("null"), nil
 	}
@@ -266,7 +266,7 @@ func (f Fields) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON implements json.Unmarshaler
-func (f *Fields) UnmarshalJSON(b []byte) error {
+func (f *FieldsV1) UnmarshalJSON(b []byte) error {
 	if f == nil {
 		return errors.New("metav1.Fields: UnmarshalJSON on nil pointer")
 	}
@@ -276,5 +276,5 @@ func (f *Fields) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-var _ json.Marshaler = Fields{}
-var _ json.Unmarshaler = &Fields{}
+var _ json.Marshaler = FieldsV1{}
+var _ json.Unmarshaler = &FieldsV1{}

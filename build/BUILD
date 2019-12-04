@@ -135,7 +135,6 @@ release_filegroup(
     name = "server-targets",
     conditioned_srcs = for_platforms(for_server = [
         "//cluster/gce/gci/mounter",
-        "//cmd/hyperkube",
         "//cmd/kube-apiserver",
         "//cmd/kube-controller-manager",
         "//cmd/kube-scheduler",
@@ -168,7 +167,6 @@ filegroup(
 filegroup(
     name = "test-portable-targets",
     srcs = [
-        "//hack:e2e.go",
         "//hack:get-build.sh",
         "//hack:ginkgo-e2e.sh",
         "//hack/e2e-internal:all-srcs",

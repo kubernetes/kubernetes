@@ -296,7 +296,7 @@ run_deployment_tests() {
   sleep 1
   kube::test::get_object_assert deployment "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Rollback to revision 1000000 - should be no-op
-  ! kubectl rollout undo deployment nginx --to-revision=1000000 "${kube_flags[@]:?}"
+  ! kubectl rollout undo deployment nginx --to-revision=1000000 "${kube_flags[@]:?}" || exit 1
   kube::test::get_object_assert deployment "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Rollback to last revision
   kubectl rollout undo deployment nginx "${kube_flags[@]:?}"
@@ -305,9 +305,9 @@ run_deployment_tests() {
   # Pause the deployment
   kubectl-with-retry rollout pause deployment nginx "${kube_flags[@]:?}"
   # A paused deployment cannot be rolled back
-  ! kubectl rollout undo deployment nginx "${kube_flags[@]:?}"
+  ! kubectl rollout undo deployment nginx "${kube_flags[@]:?}" || exit 1
   # A paused deployment cannot be restarted
-  ! kubectl rollout restart deployment nginx "${kube_flags[@]:?}"
+  ! kubectl rollout restart deployment nginx "${kube_flags[@]:?}" || exit 1
   # Resume the deployment
   kubectl-with-retry rollout resume deployment nginx "${kube_flags[@]:?}"
   # The resumed deployment can now be rolled back
@@ -316,7 +316,7 @@ run_deployment_tests() {
   newrs="$(kubectl describe deployment nginx | grep NewReplicaSet | awk '{print $2}')"
   kubectl get rs "${newrs}" -o yaml | grep "deployment.kubernetes.io/revision-history: 1,3"
   # Check that trying to watch the status of a superseded revision returns an error
-  ! kubectl rollout status deployment/nginx --revision=3
+  ! kubectl rollout status deployment/nginx --revision=3 || exit 1
   # Restarting the deployment creates a new replicaset
   kubectl rollout restart deployment/nginx
   sleep 1
@@ -342,7 +342,7 @@ run_deployment_tests() {
   kube::test::get_object_assert deployment "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   kube::test::get_object_assert deployment "{{range.items}}{{${image_field1:?}}}:{{end}}" "${IMAGE_PERL}:"
   # Set non-existing container should fail
-  ! kubectl set image deployment nginx-deployment redis=redis "${kube_flags[@]:?}"
+  ! kubectl set image deployment nginx-deployment redis=redis "${kube_flags[@]:?}" || exit 1
   # Set image of deployments without specifying name
   kubectl set image deployments --all nginx="${IMAGE_DEPLOYMENT_R1}" "${kube_flags[@]:?}"
   kube::test::get_object_assert deployment "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
@@ -359,7 +359,7 @@ run_deployment_tests() {
   kubectl set image deployment nginx-deployment "*=${IMAGE_DEPLOYMENT_R1}" "${kube_flags[@]:?}"
   kube::test::get_object_assert deployment "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   kube::test::get_object_assert deployment "{{range.items}}{{${image_field1:?}}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
-  # Set image of all containners of the deployment again when image not change
+  # Set image of all containers of the deployment again when image not change
   kubectl set image deployment nginx-deployment "*=${IMAGE_DEPLOYMENT_R1}" "${kube_flags[@]:?}"
   kube::test::get_object_assert deployment "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   kube::test::get_object_assert deployment "{{range.items}}{{${image_field1:?}}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
@@ -656,7 +656,7 @@ run_rs_tests() {
     kube::test::get_object_assert 'hpa frontend' "{{${hpa_min_field:?}}} {{${hpa_max_field:?}}} {{${hpa_cpu_field:?}}}" '2 3 80'
     kubectl delete hpa frontend "${kube_flags[@]:?}"
     # autoscale without specifying --max should fail
-    ! kubectl autoscale rs frontend "${kube_flags[@]:?}"
+    ! kubectl autoscale rs frontend "${kube_flags[@]:?}" || exit 1
     # Clean up
     kubectl delete rs frontend "${kube_flags[@]:?}"
   fi

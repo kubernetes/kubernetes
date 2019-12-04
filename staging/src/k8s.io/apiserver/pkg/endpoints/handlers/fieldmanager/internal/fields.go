@@ -26,7 +26,7 @@ import (
 
 // EmptyFields represents a set with no paths
 // It looks like metav1.Fields{Raw: []byte("{}")}
-var EmptyFields metav1.Fields = func() metav1.Fields {
+var EmptyFields metav1.FieldsV1 = func() metav1.FieldsV1 {
 	f, err := SetToFields(*fieldpath.NewSet())
 	if err != nil {
 		panic("should never happen")
@@ -35,13 +35,13 @@ var EmptyFields metav1.Fields = func() metav1.Fields {
 }()
 
 // FieldsToSet creates a set paths from an input trie of fields
-func FieldsToSet(f metav1.Fields) (s fieldpath.Set, err error) {
+func FieldsToSet(f metav1.FieldsV1) (s fieldpath.Set, err error) {
 	err = s.FromJSON(bytes.NewReader(f.Raw))
 	return s, err
 }
 
 // SetToFields creates a trie of fields from an input set of paths
-func SetToFields(s fieldpath.Set) (f metav1.Fields, err error) {
+func SetToFields(s fieldpath.Set) (f metav1.FieldsV1, err error) {
 	f.Raw, err = s.ToJSON()
 	return f, err
 }

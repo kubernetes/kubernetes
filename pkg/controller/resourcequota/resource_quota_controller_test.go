@@ -1066,7 +1066,7 @@ func TestDiscoverySync(t *testing.T) {
 	//    wait.Until() loops with `period` until the `stopCh` is closed :
 	//       GetQuotableResources()
 	//       resyncMonitors()
-	//       controller.WaitForCacheSync() loops with `syncedPollPeriod` (hardcoded to 100ms), until either its stop channel is closed after `period`, or all caches synced.
+	//       cache.WaitForNamedCacheSync() loops with `syncedPollPeriod` (hardcoded to 100ms), until either its stop channel is closed after `period`, or all caches synced.
 	//
 	// Setting the period to 200ms allows the WaitForCacheSync() to check
 	// for cache sync ~2 times in every wait.Until() loop.

@@ -77,8 +77,10 @@ type LegacyRESTStorageProvider struct {
 	EventTTL            time.Duration
 
 	// ServiceIPRange is used to build cluster IPs for discovery.
-	ServiceIPRange       net.IPNet
-	ServiceNodePortRange utilnet.PortRange
+	ServiceIPRange net.IPNet
+	// allocates ips for secondary service cidr in dual  stack clusters
+	SecondaryServiceIPRange net.IPNet
+	ServiceNodePortRange    utilnet.PortRange
 
 	ServiceAccountIssuer        serviceaccount.TokenGenerator
 	ServiceAccountMaxExpiration time.Duration
@@ -92,8 +94,9 @@ type LegacyRESTStorageProvider struct {
 // master.go for wiring controllers.
 // TODO remove this by running the controller as a poststarthook
 type LegacyRESTStorage struct {
-	ServiceClusterIPAllocator rangeallocation.RangeRegistry
-	ServiceNodePortAllocator  rangeallocation.RangeRegistry
+	ServiceClusterIPAllocator          rangeallocation.RangeRegistry
+	SecondaryServiceClusterIPAllocator rangeallocation.RangeRegistry
+	ServiceNodePortAllocator           rangeallocation.RangeRegistry
 }
 
 func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generic.RESTOptionsGetter) (LegacyRESTStorage, genericapiserver.APIGroupInfo, error) {
@@ -216,6 +219,26 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	}
 	restStorage.ServiceClusterIPAllocator = serviceClusterIPRegistry
 
+	// allocator for secondary service ip range
+	var secondaryServiceClusterIPAllocator ipallocator.Interface
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && c.SecondaryServiceIPRange.IP != nil {
+		var secondaryServiceClusterIPRegistry rangeallocation.RangeRegistry
+		secondaryServiceClusterIPAllocator, err = ipallocator.NewAllocatorCIDRRange(&c.SecondaryServiceIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
+			mem := allocator.NewAllocationMap(max, rangeSpec)
+			// TODO etcdallocator package to return a storage interface via the storageFactory
+			etcd, err := serviceallocator.NewEtcd(mem, "/ranges/secondaryserviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
+			if err != nil {
+				return nil, err
+			}
+			secondaryServiceClusterIPRegistry = etcd
+			return etcd, nil
+		})
+		if err != nil {
+			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
+		}
+		restStorage.SecondaryServiceClusterIPAllocator = secondaryServiceClusterIPRegistry
+	}
+
 	var serviceNodePortRegistry rangeallocation.RangeRegistry
 	serviceNodePortAllocator, err := portallocator.NewPortAllocatorCustom(c.ServiceNodePortRange, func(max int, rangeSpec string) (allocator.Interface, error) {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
@@ -237,7 +260,13 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
 
-	serviceRest, serviceRestProxy := servicestore.NewREST(serviceRESTStorage, endpointsStorage, podStorage.Pod, serviceClusterIPAllocator, serviceNodePortAllocator, c.ProxyTransport)
+	serviceRest, serviceRestProxy := servicestore.NewREST(serviceRESTStorage,
+		endpointsStorage,
+		podStorage.Pod,
+		serviceClusterIPAllocator,
+		secondaryServiceClusterIPAllocator,
+		serviceNodePortAllocator,
+		c.ProxyTransport)
 
 	restStorageMap := map[string]rest.Storage{
 		"pods":             podStorage.Pod,

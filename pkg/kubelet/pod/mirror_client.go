@@ -17,8 +17,10 @@ limitations under the License.
 package pod
 
 import (
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	"fmt"
+
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
@@ -39,16 +41,28 @@ type MirrorClient interface {
 	DeleteMirrorPod(podFullName string, uid *types.UID) (bool, error)
 }
 
+// nodeGetter is a subset a NodeLister, simplified for testing.
+type nodeGetter interface {
+	// Get retrieves the Node for a given name.
+	Get(name string) (*v1.Node, error)
+}
+
 // basicMirrorClient is a functional MirrorClient.  Mirror pods are stored in
 // the kubelet directly because they need to be in sync with the internal
 // pods.
 type basicMirrorClient struct {
 	apiserverClient clientset.Interface
+	nodeGetter      nodeGetter
+	nodeName        string
 }
 
 // NewBasicMirrorClient returns a new MirrorClient.
-func NewBasicMirrorClient(apiserverClient clientset.Interface) MirrorClient {
-	return &basicMirrorClient{apiserverClient: apiserverClient}
+func NewBasicMirrorClient(apiserverClient clientset.Interface, nodeName string, nodeGetter nodeGetter) MirrorClient {
+	return &basicMirrorClient{
+		apiserverClient: apiserverClient,
+		nodeName:        nodeName,
+		nodeGetter:      nodeGetter,
+	}
 }
 
 func (mc *basicMirrorClient) CreateMirrorPod(pod *v1.Pod) error {
@@ -64,8 +78,25 @@ func (mc *basicMirrorClient) CreateMirrorPod(pod *v1.Pod) error {
 	}
 	hash := getPodHash(pod)
 	copyPod.Annotations[kubetypes.ConfigMirrorAnnotationKey] = hash
+
+	// With the MirrorPodNodeRestriction feature, mirror pods are required to have an owner reference
+	// to the owning node.
+	// See http://git.k8s.io/enhancements/keps/sig-auth/20190916-noderestriction-pods.md
+	nodeUID, err := mc.getNodeUID()
+	if err != nil {
+		return fmt.Errorf("failed to get node UID: %v", err)
+	}
+	controller := true
+	copyPod.OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: v1.SchemeGroupVersion.String(),
+		Kind:       "Node",
+		Name:       mc.nodeName,
+		UID:        nodeUID,
+		Controller: &controller,
+	}}
+
 	apiPod, err := mc.apiserverClient.CoreV1().Pods(copyPod.Namespace).Create(&copyPod)
-	if err != nil && errors.IsAlreadyExists(err) {
+	if err != nil && apierrors.IsAlreadyExists(err) {
 		// Check if the existing pod is the same as the pod we want to create.
 		if h, ok := apiPod.Annotations[kubetypes.ConfigMirrorAnnotationKey]; ok && h == hash {
 			return nil
@@ -94,7 +125,7 @@ func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string, uid *types.UID)
 	var GracePeriodSeconds int64
 	if err := mc.apiserverClient.CoreV1().Pods(namespace).Delete(name, &metav1.DeleteOptions{GracePeriodSeconds: &GracePeriodSeconds, Preconditions: &metav1.Preconditions{UID: uid}}); err != nil {
 		// Unfortunately, there's no generic error for failing a precondition
-		if !(errors.IsNotFound(err) || errors.IsConflict(err)) {
+		if !(apierrors.IsNotFound(err) || apierrors.IsConflict(err)) {
 			// We should return the error here, but historically this routine does
 			// not return an error unless it can't parse the pod name
 			klog.Errorf("Failed deleting a mirror pod %q: %v", podFullName, err)
@@ -104,16 +135,21 @@ func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string, uid *types.UID)
 	return true, nil
 }
 
+func (mc *basicMirrorClient) getNodeUID() (types.UID, error) {
+	node, err := mc.nodeGetter.Get(mc.nodeName)
+	if err != nil {
+		return "", err
+	}
+	if node.UID == "" {
+		return "", fmt.Errorf("UID unset for node %s", mc.nodeName)
+	}
+	return node.UID, nil
+}
+
 // IsStaticPod returns true if the passed Pod is static.
 func IsStaticPod(pod *v1.Pod) bool {
 	source, err := kubetypes.GetPodSource(pod)
 	return err == nil && source != kubetypes.ApiserverSource
-}
-
-// IsMirrorPod returns true if the passed Pod is a Mirror Pod.
-func IsMirrorPod(pod *v1.Pod) bool {
-	_, ok := pod.Annotations[kubetypes.ConfigMirrorAnnotationKey]
-	return ok
 }
 
 func getHashFromMirrorPod(pod *v1.Pod) (string, bool) {

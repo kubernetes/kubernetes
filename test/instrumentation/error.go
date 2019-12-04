@@ -30,9 +30,9 @@ const (
 	errInvalidNewMetricCall = "Invalid new metric call, please ensure code compiles"
 	errNonStringAttribute   = "Non string attribute it not supported"
 	errFieldNotSupported    = "Field %s is not supported"
-	errBuckets              = "Buckets were not set to list of floats"
+	errBuckets              = "Buckets should be set to list of floats, result from function call of prometheus.LinearBuckets or prometheus.ExponentialBuckets"
 	errLabels               = "Labels were not set to list of strings"
-	errImport               = `Importing through "." metrics framework is not supported`
+	errImport               = `Importing using "." is not supported`
 )
 
 type decodeError struct {

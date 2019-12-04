@@ -61,15 +61,12 @@ const (
 	seedContainer2 = 5000
 	seedSandbox2   = 6000
 	seedContainer3 = 7000
-	seedSandbox3   = 8000
-	seedContainer5 = 9000
 )
 
 const (
 	pName0 = "pod0"
 	pName1 = "pod1"
 	pName2 = "pod2"
-	pName3 = "pod3"
 )
 
 const (
@@ -758,6 +755,9 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 	var value0 uint64
 	var value1 uint64 = 10000000000
 
+	// Test with a large container of 100+ CPUs
+	var value2 uint64 = 188427786383
+
 	tests := []struct {
 		desc          string
 		cpuUsageCache map[string]*cpuUsageRecord
@@ -855,6 +855,31 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 				},
 			},
 			expected: &value1,
+		},
+		{
+			desc: "should return correct value if elapsed UsageCoreNanoSeconds exceeds 18446744073",
+			stats: &runtimeapi.ContainerStats{
+				Attributes: &runtimeapi.ContainerAttributes{
+					Id: "1",
+				},
+				Cpu: &runtimeapi.CpuUsage{
+					Timestamp: int64(time.Second / time.Nanosecond),
+					UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+						Value: 68172016162105,
+					},
+				},
+			},
+			cpuUsageCache: map[string]*cpuUsageRecord{
+				"1": {
+					stats: &runtimeapi.CpuUsage{
+						Timestamp: 0,
+						UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+							Value: 67983588375722,
+						},
+					},
+				},
+			},
+			expected: &value2,
 		},
 	}
 

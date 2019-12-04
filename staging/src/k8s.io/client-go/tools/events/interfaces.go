@@ -33,6 +33,9 @@ type EventRecorder interface {
 	// should be in UpperCamelCase format (starting with a capital letter). "reason" will be used
 	// to automate handling of events, so imagine people writing switch statements to handle them.
 	// You want to make that easy.
+	// 'action' explains what happened with regarding/what action did the ReportingController
+	// (ReportingController is a type of a Controller reporting an Event, e.g. k8s.io/node-controller, k8s.io/kubelet.)
+	// take in regarding's name; it should be in UpperCamelCase format (starting with a capital letter).
 	// 'note' is intended to be human readable.
 	Eventf(regarding runtime.Object, related runtime.Object, eventtype, reason, action, note string, args ...interface{})
 }
@@ -51,6 +54,9 @@ type EventBroadcaster interface {
 	// NOTE: events received on your eventHandler should be copied before being used.
 	// TODO: figure out if this can be removed.
 	StartEventWatcher(eventHandler func(event runtime.Object)) func()
+
+	// Shutdown shuts down the broadcaster
+	Shutdown()
 }
 
 // EventSink knows how to store events (client-go implements it.)

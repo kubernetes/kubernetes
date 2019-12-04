@@ -147,10 +147,6 @@ var provision2Success = provisionCall{
 	expectedParameters: class2Parameters,
 }
 
-var provisionAlphaSuccess = provisionCall{
-	ret: nil,
-}
-
 // Test single call to syncVolume, expecting provisioning to happen.
 // 1. Fill in the controller with initial data
 // 2. Call the syncVolume *once*.

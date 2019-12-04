@@ -104,17 +104,17 @@ func (e *events) Search(scheme *runtime.Scheme, objOrRef runtime.Object) (*v1.Ev
 	if err != nil {
 		return nil, err
 	}
-	if e.ns != "" && ref.Namespace != e.ns {
+	if len(e.ns) > 0 && ref.Namespace != e.ns {
 		return nil, fmt.Errorf("won't be able to find any events of namespace '%v' in namespace '%v'", ref.Namespace, e.ns)
 	}
 	stringRefKind := string(ref.Kind)
 	var refKind *string
-	if stringRefKind != "" {
+	if len(stringRefKind) > 0 {
 		refKind = &stringRefKind
 	}
 	stringRefUID := string(ref.UID)
 	var refUID *string
-	if stringRefUID != "" {
+	if len(stringRefUID) > 0 {
 		refUID = &stringRefUID
 	}
 	fieldSelector := e.GetFieldSelector(&ref.Name, &ref.Namespace, refKind, refUID)
@@ -124,10 +124,9 @@ func (e *events) Search(scheme *runtime.Scheme, objOrRef runtime.Object) (*v1.Ev
 // Returns the appropriate field selector based on the API version being used to communicate with the server.
 // The returned field selector can be used with List and Watch to filter desired events.
 func (e *events) GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector {
-	apiVersion := e.client.APIVersion().String()
 	field := fields.Set{}
 	if involvedObjectName != nil {
-		field[GetInvolvedObjectNameFieldLabel(apiVersion)] = *involvedObjectName
+		field["involvedObject.name"] = *involvedObjectName
 	}
 	if involvedObjectNamespace != nil {
 		field["involvedObject.namespace"] = *involvedObjectNamespace
@@ -142,6 +141,7 @@ func (e *events) GetFieldSelector(involvedObjectName, involvedObjectNamespace, i
 }
 
 // Returns the appropriate field label to use for name of the involved object as per the given API version.
+// DEPRECATED: please use "involvedObject.name" inline.
 func GetInvolvedObjectNameFieldLabel(version string) string {
 	return "involvedObject.name"
 }

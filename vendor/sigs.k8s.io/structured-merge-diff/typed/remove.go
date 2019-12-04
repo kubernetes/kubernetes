@@ -38,9 +38,9 @@ func removeItemsWithSchema(value *value.Value, toRemove *fieldpath.Set, schema *
 // will be a descent. It modifies w.inLeaf.
 func (w *removingWalker) doLeaf() ValidationErrors { return nil }
 
-func (w *removingWalker) doScalar(t schema.Scalar) ValidationErrors { return nil }
+func (w *removingWalker) doScalar(t *schema.Scalar) ValidationErrors { return nil }
 
-func (w *removingWalker) doList(t schema.List) (errs ValidationErrors) {
+func (w *removingWalker) doList(t *schema.List) (errs ValidationErrors) {
 	l := w.value.ListValue
 
 	// If list is null, empty, or atomic just return
@@ -70,7 +70,7 @@ func (w *removingWalker) doList(t schema.List) (errs ValidationErrors) {
 	return nil
 }
 
-func (w *removingWalker) doMap(t schema.Map) ValidationErrors {
+func (w *removingWalker) doMap(t *schema.Map) ValidationErrors {
 	m := w.value.MapValue
 
 	// If map is null, empty, or atomic just return

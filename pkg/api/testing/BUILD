@@ -26,6 +26,7 @@ go_library(
         "//pkg/apis/certificates/fuzzer:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/fuzzer:go_default_library",
+        "//pkg/apis/discovery/fuzzer:go_default_library",
         "//pkg/apis/extensions/fuzzer:go_default_library",
         "//pkg/apis/networking/fuzzer:go_default_library",
         "//pkg/apis/policy/fuzzer:go_default_library",
@@ -111,5 +112,6 @@ go_test(
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/github.com/json-iterator/go:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )

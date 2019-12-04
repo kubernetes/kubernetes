@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"bytes"
@@ -87,16 +87,24 @@ func checkIPTables() (err error) {
 func checkPublicGCR() error {
 	const image = "k8s.gcr.io/busybox"
 	output, err := runCommand("docker", "images", "-q", image)
+	if err != nil {
+		return err
+	}
+
 	if len(output) != 0 {
 		if _, err := runCommand("docker", "rmi", "-f", image); err != nil {
 			return err
 		}
 	}
 	output, err = runCommand("docker", "pull", image)
+	if err != nil {
+		return err
+	}
+
 	if len(output) == 0 {
 		return fmt.Errorf("failed to pull %s", image)
 	}
-	if _, err = runCommand("docker", "rmi", "-f", image); err != nil {
+	if _, err := runCommand("docker", "rmi", "-f", image); err != nil {
 		return err
 	}
 	return nil

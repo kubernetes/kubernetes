@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2014 The Kubernetes Authors.
 
@@ -36,6 +38,7 @@ import (
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	container "google.golang.org/api/container/v1"
+	"google.golang.org/api/option"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 
@@ -393,31 +396,19 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 		config.NetworkProjectID = config.ProjectID
 	}
 
-	client, err := newOauthClient(config.TokenSource)
-	if err != nil {
-		return nil, err
-	}
-	service, err := compute.New(client)
+	service, err := compute.NewService(context.Background(), option.WithTokenSource(config.TokenSource))
 	if err != nil {
 		return nil, err
 	}
 	service.UserAgent = userAgent
 
-	client, err = newOauthClient(config.TokenSource)
-	if err != nil {
-		return nil, err
-	}
-	serviceBeta, err := computebeta.New(client)
+	serviceBeta, err := computebeta.NewService(context.Background(), option.WithTokenSource(config.TokenSource))
 	if err != nil {
 		return nil, err
 	}
 	serviceBeta.UserAgent = userAgent
 
-	client, err = newOauthClient(config.TokenSource)
-	if err != nil {
-		return nil, err
-	}
-	serviceAlpha, err := computealpha.New(client)
+	serviceAlpha, err := computealpha.NewService(context.Background(), option.WithTokenSource(config.TokenSource))
 	if err != nil {
 		return nil, err
 	}
@@ -433,7 +424,7 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 		serviceAlpha.BasePath = fmt.Sprintf("%sprojects/", strings.Replace(config.APIEndpoint, "v1", "alpha", -1))
 	}
 
-	containerService, err := container.New(client)
+	containerService, err := container.NewService(context.Background(), option.WithTokenSource(config.TokenSource))
 	if err != nil {
 		return nil, err
 	}
@@ -442,6 +433,10 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 		containerService.BasePath = config.ContainerAPIEndpoint
 	}
 
+	client, err := newOauthClient(config.TokenSource)
+	if err != nil {
+		return nil, err
+	}
 	tpuService, err := newTPUService(client)
 	if err != nil {
 		return nil, err
@@ -612,11 +607,9 @@ func (g *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, 
 	g.clientBuilder = clientBuilder
 	g.client = clientBuilder.ClientOrDie("cloud-provider")
 
-	if g.OnXPN() {
-		g.eventBroadcaster = record.NewBroadcaster()
-		g.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: g.client.CoreV1().Events("")})
-		g.eventRecorder = g.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "g-cloudprovider"})
-	}
+	g.eventBroadcaster = record.NewBroadcaster()
+	g.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: g.client.CoreV1().Events("")})
+	g.eventRecorder = g.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "g-cloudprovider"})
 
 	go g.watchClusterID(stop)
 }
@@ -861,7 +854,7 @@ func newOauthClient(tokenSource oauth2.TokenSource) (*http.Client, error) {
 	if tokenSource == nil {
 		var err error
 		tokenSource, err = google.DefaultTokenSource(
-			oauth2.NoContext,
+			context.Background(),
 			compute.CloudPlatformScope,
 			compute.ComputeScope)
 		klog.Infof("Using DefaultTokenSource %#v", tokenSource)
@@ -888,22 +881,13 @@ func newOauthClient(tokenSource oauth2.TokenSource) (*http.Client, error) {
 		return nil, err
 	}
 
-	return oauth2.NewClient(oauth2.NoContext, tokenSource), nil
+	return oauth2.NewClient(context.Background(), tokenSource), nil
 }
 
 func (manager *gceServiceManager) getProjectsAPIEndpoint() string {
 	projectsAPIEndpoint := gceComputeAPIEndpoint + "projects/"
 	if manager.gce.service != nil {
 		projectsAPIEndpoint = manager.gce.service.BasePath
-	}
-
-	return projectsAPIEndpoint
-}
-
-func (manager *gceServiceManager) getProjectsAPIEndpointBeta() string {
-	projectsAPIEndpoint := gceComputeAPIEndpointBeta + "projects/"
-	if manager.gce.service != nil {
-		projectsAPIEndpoint = manager.gce.serviceBeta.BasePath
 	}
 
 	return projectsAPIEndpoint

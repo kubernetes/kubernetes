@@ -17,8 +17,6 @@ limitations under the License.
 package workqueue
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-
 	"k8s.io/client-go/util/workqueue"
 	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -56,14 +54,14 @@ var (
 		Subsystem: WorkQueueSubsystem,
 		Name:      QueueLatencyKey,
 		Help:      "How long in seconds an item stays in workqueue before being requested.",
-		Buckets:   prometheus.ExponentialBuckets(10e-9, 10, 10),
+		Buckets:   k8smetrics.ExponentialBuckets(10e-9, 10, 10),
 	}, []string{"name"})
 
 	workDuration = k8smetrics.NewHistogramVec(&k8smetrics.HistogramOpts{
 		Subsystem: WorkQueueSubsystem,
 		Name:      WorkDurationKey,
 		Help:      "How long in seconds processing an item from workqueue takes.",
-		Buckets:   prometheus.ExponentialBuckets(10e-9, 10, 10),
+		Buckets:   k8smetrics.ExponentialBuckets(10e-9, 10, 10),
 	}, []string{"name"})
 
 	unfinished = k8smetrics.NewGaugeVec(&k8smetrics.GaugeOpts{

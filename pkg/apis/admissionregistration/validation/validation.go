@@ -28,7 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
+	admissionregistrationv1beta1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1"
 )
 
 func hasWildcard(slice []string) bool {
@@ -155,8 +156,8 @@ func validateRule(rule *admissionregistration.Rule, fldPath *field.Path, allowSu
 // AcceptedAdmissionReviewVersions contains the list of AdmissionReview versions the *prior* version of the API server understands.
 // 1.15: server understands v1beta1; accepted versions are ["v1beta1"]
 // 1.16: server understands v1, v1beta1; accepted versions are ["v1beta1"]
-// 1.17: server understands v1, v1beta1; accepted versions are ["v1","v1beta1"]
-var AcceptedAdmissionReviewVersions = []string{v1beta1.SchemeGroupVersion.Version}
+// 1.17+: server understands v1, v1beta1; accepted versions are ["v1","v1beta1"]
+var AcceptedAdmissionReviewVersions = []string{admissionregistrationv1.SchemeGroupVersion.Version, admissionregistrationv1beta1.SchemeGroupVersion.Version}
 
 func isAcceptedAdmissionReviewVersion(v string) bool {
 	for _, version := range AcceptedAdmissionReviewVersions {

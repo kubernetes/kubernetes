@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -132,6 +131,8 @@ while true; do sleep 1; done
 		ginkgo.Context("on terminated container", func() {
 			rootUser := int64(0)
 			nonRootUser := int64(10000)
+			adminUserName := "ContainerAdministrator"
+			nonAdminUserName := "ContainerUser"
 
 			// Create and then terminate the container under defined PodPhase to verify if termination message matches the expected output. Lastly delete the created container.
 			matchTerminationMessage := func(container v1.Container, expectedPhase v1.PodPhase, expectedMsg gomegatypes.GomegaMatcher) {
@@ -157,7 +158,7 @@ while true; do sleep 1; done
 				framework.ExpectEqual(GetContainerState(status.State), ContainerStateTerminated)
 
 				ginkgo.By("the termination message should be set")
-				e2elog.Logf("Expected: %v to match Container's Termination Message: %v --", expectedMsg, status.State.Terminated.Message)
+				framework.Logf("Expected: %v to match Container's Termination Message: %v --", expectedMsg, status.State.Terminated.Message)
 				gomega.Expect(status.State.Terminated.Message).Should(expectedMsg)
 
 				ginkgo.By("delete the container")
@@ -166,14 +167,19 @@ while true; do sleep 1; done
 
 			ginkgo.It("should report termination message [LinuxOnly] if TerminationMessagePath is set [NodeConformance]", func() {
 				// Cannot mount files in Windows Containers.
+				// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default
+				// container runtime on Windows, and when the WindowsRunAsUserName feature becomes available by default.
 				container := v1.Container{
 					Image:                  framework.BusyBoxImage,
 					Command:                []string{"/bin/sh", "-c"},
 					Args:                   []string{"/bin/echo -n DONE > /dev/termination-log"},
 					TerminationMessagePath: "/dev/termination-log",
-					SecurityContext: &v1.SecurityContext{
-						RunAsUser: &rootUser,
-					},
+					SecurityContext:        &v1.SecurityContext{},
+				}
+				if framework.NodeOSDistroIs("windows") {
+					container.SecurityContext.WindowsOptions = &v1.WindowsSecurityContextOptions{RunAsUserName: &adminUserName}
+				} else {
+					container.SecurityContext.RunAsUser = &rootUser
 				}
 				matchTerminationMessage(container, v1.PodSucceeded, gomega.Equal("DONE"))
 			})
@@ -185,14 +191,19 @@ while true; do sleep 1; done
 				[LinuxOnly]: Tagged LinuxOnly due to use of 'uid' and unable to mount files in Windows Containers.
 			*/
 			framework.ConformanceIt("should report termination message [LinuxOnly] if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance]", func() {
+				// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default
+				// container runtime on Windows, and when the WindowsRunAsUserName feature becomes available by default.
 				container := v1.Container{
 					Image:                  framework.BusyBoxImage,
 					Command:                []string{"/bin/sh", "-c"},
 					Args:                   []string{"/bin/echo -n DONE > /dev/termination-custom-log"},
 					TerminationMessagePath: "/dev/termination-custom-log",
-					SecurityContext: &v1.SecurityContext{
-						RunAsUser: &nonRootUser,
-					},
+					SecurityContext:        &v1.SecurityContext{},
+				}
+				if framework.NodeOSDistroIs("windows") {
+					container.SecurityContext.WindowsOptions = &v1.WindowsSecurityContextOptions{RunAsUserName: &nonAdminUserName}
+				} else {
+					container.SecurityContext.RunAsUser = &nonRootUser
 				}
 				matchTerminationMessage(container, v1.PodSucceeded, gomega.Equal("DONE"))
 			})
@@ -348,9 +359,9 @@ while true; do sleep 1; done
 						break
 					}
 					if i < flakeRetry {
-						e2elog.Logf("No.%d attempt failed: %v, retrying...", i, err)
+						framework.Logf("No.%d attempt failed: %v, retrying...", i, err)
 					} else {
-						e2elog.Failf("All %d attempts failed: %v", flakeRetry, err)
+						framework.Failf("All %d attempts failed: %v", flakeRetry, err)
 					}
 				}
 			}
@@ -360,30 +371,10 @@ while true; do sleep 1; done
 				imagePullTest(image, false, v1.PodPending, true, false)
 			})
 
-			ginkgo.It("should not be able to pull non-existing image from gcr.io [NodeConformance]", func() {
-				image := imageutils.GetE2EImage(imageutils.Invalid)
-				imagePullTest(image, false, v1.PodPending, true, false)
-			})
-
-			ginkgo.It("should be able to pull image from gcr.io [NodeConformance]", func() {
-				image := imageutils.GetE2EImage(imageutils.DebianBase)
-				isWindows := false
-				if framework.NodeOSDistroIs("windows") {
-					image = imageutils.GetE2EImage(imageutils.WindowsNanoServer)
-					isWindows = true
-				}
-				imagePullTest(image, false, v1.PodRunning, false, isWindows)
-			})
-
-			ginkgo.It("should be able to pull image from docker hub [NodeConformance]", func() {
-				image := imageutils.GetE2EImage(imageutils.Alpine)
-				isWindows := false
-				if framework.NodeOSDistroIs("windows") {
-					// TODO(claudiub): Switch to nanoserver image manifest list.
-					image = "e2eteam/busybox:1.29"
-					isWindows = true
-				}
-				imagePullTest(image, false, v1.PodRunning, false, isWindows)
+			ginkgo.It("should be able to pull image [NodeConformance]", func() {
+				// NOTE(claudiub): The agnhost image is supposed to work on both Linux and Windows.
+				image := imageutils.GetE2EImage(imageutils.Agnhost)
+				imagePullTest(image, false, v1.PodRunning, false, false)
 			})
 
 			ginkgo.It("should not be able to pull from private registry without secret [NodeConformance]", func() {

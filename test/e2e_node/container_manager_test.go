@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"fmt"
@@ -33,11 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 func getOOMScoreForPid(pid int) (int, error) {
@@ -80,7 +79,7 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 		ginkgo.Context("once the node is setup", func() {
 			ginkgo.It("container runtime's oom-score-adj should be -999", func() {
 				runtimePids, err := getPidsForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
-				gomega.Expect(err).To(gomega.BeNil(), "failed to get list of container runtime pids")
+				framework.ExpectEqual(err, nil, "failed to get list of container runtime pids")
 				for _, pid := range runtimePids {
 					gomega.Eventually(func() error {
 						return validateOOMScoreAdjSetting(pid, -999)
@@ -89,7 +88,7 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 			})
 			ginkgo.It("Kubelet's oom-score-adj should be -999", func() {
 				kubeletPids, err := getPidsForProcess(kubeletProcessName, "")
-				gomega.Expect(err).To(gomega.BeNil(), "failed to get list of kubelet pids")
+				framework.ExpectEqual(err, nil, "failed to get list of kubelet pids")
 				framework.ExpectEqual(len(kubeletPids), 1, "expected only one kubelet process; found %d", len(kubeletPids))
 				gomega.Eventually(func() error {
 					return validateOOMScoreAdjSetting(kubeletPids[0], -999)
@@ -101,7 +100,7 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 					// created before this test, and may not be infra
 					// containers. They should be excluded from the test.
 					existingPausePIDs, err := getPidsForProcess("pause", "")
-					gomega.Expect(err).To(gomega.BeNil(), "failed to list all pause processes on the node")
+					framework.ExpectEqual(err, nil, "failed to list all pause processes on the node")
 					existingPausePIDSet := sets.NewInt(existingPausePIDs...)
 
 					podClient := f.PodClient()
@@ -119,6 +118,7 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 							},
 						},
 					})
+
 					var pausePids []int
 					ginkgo.By("checking infra container's oom-score-adj")
 					gomega.Eventually(func() error {
@@ -140,12 +140,12 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 					var shPids []int
 					ginkgo.By("checking besteffort container's oom-score-adj")
 					gomega.Eventually(func() error {
-						shPids, err = getPidsForProcess("serve_hostname", "")
+						shPids, err = getPidsForProcess("agnhost", "")
 						if err != nil {
 							return fmt.Errorf("failed to get list of serve hostname process pids: %v", err)
 						}
 						if len(shPids) != 1 {
-							return fmt.Errorf("expected only one serve_hostname process; found %d", len(shPids))
+							return fmt.Errorf("expected only one agnhost process; found %d", len(shPids))
 						}
 						return validateOOMScoreAdjSetting(shPids[0], 1000)
 					}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
@@ -162,9 +162,9 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 							},
 						})
 						framework.ExpectNoError(err)
-						e2elog.Logf("Running containers:")
+						framework.Logf("Running containers:")
 						for _, c := range containers {
-							e2elog.Logf("%+v", c)
+							framework.Logf("%+v", c)
 						}
 					}
 				})

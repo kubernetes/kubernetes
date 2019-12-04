@@ -45,17 +45,17 @@ func RetryErrorCondition(condition wait.ConditionFunc) wait.ConditionFunc {
 	}
 }
 
-func ScaleResourceWithRetries(scalesGetter scaleclient.ScalesGetter, namespace, name string, size uint, gr schema.GroupResource) error {
+func ScaleResourceWithRetries(scalesGetter scaleclient.ScalesGetter, namespace, name string, size uint, gvr schema.GroupVersionResource) error {
 	scaler := scale.NewScaler(scalesGetter)
 	preconditions := &scale.ScalePrecondition{
 		Size:            -1,
 		ResourceVersion: "",
 	}
 	waitForReplicas := scale.NewRetryParams(waitRetryInterval, waitRetryTimeout)
-	cond := RetryErrorCondition(scale.ScaleCondition(scaler, preconditions, namespace, name, size, nil, gr))
+	cond := RetryErrorCondition(scale.ScaleCondition(scaler, preconditions, namespace, name, size, nil, gvr))
 	err := wait.PollImmediate(updateRetryInterval, updateRetryTimeout, cond)
 	if err == nil {
-		err = scale.WaitForScaleHasDesiredReplicas(scalesGetter, gr, name, namespace, size, waitForReplicas)
+		err = scale.WaitForScaleHasDesiredReplicas(scalesGetter, gvr.GroupResource(), name, namespace, size, waitForReplicas)
 	}
 	if err != nil {
 		return fmt.Errorf("Error while scaling %s to %d replicas: %v", name, size, err)

@@ -28,7 +28,7 @@ run_kubectl_run_tests() {
   # Pre-Condition: no Job exists
   kube::test::get_object_assert jobs "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # Command
-  kubectl run pi --generator=job/v1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]:?}"
+  kubectl run pi --generator=job/v1 "--image=${IMAGE_PERL}" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]:?}"
   # Post-Condition: Job "pi" is created
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
   # Describe command (resource only) should print detailed information
@@ -41,7 +41,7 @@ run_kubectl_run_tests() {
   # Pre-Condition: no Deployment exists
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl run nginx-extensions "--image=$IMAGE_NGINX" "${kube_flags[@]}"
+  kubectl run nginx-extensions "--image=${IMAGE_NGINX}" "${kube_flags[@]}"
   # Post-Condition: Deployment "nginx" is created
   kube::test::get_object_assert deployment.apps "{{range.items}}{{$id_field}}:{{end}}" 'nginx-extensions:'
   # new generator was used
@@ -50,7 +50,7 @@ run_kubectl_run_tests() {
   # Clean up
   kubectl delete deployment nginx-extensions "${kube_flags[@]}"
   # Command
-  kubectl run nginx-apps "--image=$IMAGE_NGINX" --generator=deployment/apps.v1 "${kube_flags[@]}"
+  kubectl run nginx-apps "--image=${IMAGE_NGINX}" --generator=deployment/apps.v1 "${kube_flags[@]}"
   # Post-Condition: Deployment "nginx" is created
   kube::test::get_object_assert deployment.apps "{{range.items}}{{$id_field}}:{{end}}" 'nginx-apps:'
   # and new generator was used, iow. new defaults are applied
@@ -62,7 +62,7 @@ run_kubectl_run_tests() {
   # Pre-Condition: no Job exists
   kube::test::get_object_assert cronjobs "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl run pi --schedule="*/5 * * * *" --generator=cronjob/v1beta1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
+  kubectl run pi --schedule="*/5 * * * *" --generator=cronjob/v1beta1 "--image=${IMAGE_PERL}" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
   # Post-Condition: CronJob "pi" is created
   kube::test::get_object_assert cronjobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
 

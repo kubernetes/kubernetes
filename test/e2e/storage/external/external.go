@@ -31,11 +31,12 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 // List of testSuites to be executed for each external driver.
@@ -50,6 +51,7 @@ var csiTestSuites = []func() testsuites.TestSuite{
 	testsuites.InitVolumesTestSuite,
 	testsuites.InitVolumeExpandTestSuite,
 	testsuites.InitDisruptiveTestSuite,
+	testsuites.InitVolumeLimitsTestSuite,
 }
 
 func init() {
@@ -110,7 +112,9 @@ func loadDriverDefinition(filename string) (*driverDefinition, error) {
 				"", // Default fsType
 			),
 		},
-		ClaimSize: "5Gi",
+		SupportedSizeRange: volume.SizeRange{
+			Min: "5Gi",
+		},
 	}
 	// TODO: strict checking of the file content once https://github.com/kubernetes/kubernetes/pull/71589
 	// or something similar is merged.
@@ -179,18 +183,29 @@ type driverDefinition struct {
 		// TODO (?): load from file
 	}
 
-	// InlineVolumeAttributes defines one or more set of attributes for
-	// use as inline ephemeral volumes. At least one set of attributes
-	// has to be defined to enable testing of inline ephemeral volumes.
-	// If a test needs more volumes than defined, some of the defined
+	// InlineVolumes defines one or more volumes for use as inline
+	// ephemeral volumes. At least one such volume has to be
+	// defined to enable testing of inline ephemeral volumes.  If
+	// a test needs more volumes than defined, some of the defined
 	// volumes will be used multiple times.
 	//
 	// DriverInfo.Name is used as name of the driver in the inline volume.
-	InlineVolumeAttributes []map[string]string
+	InlineVolumes []struct {
+		// Attributes are passed as NodePublishVolumeReq.volume_context.
+		// Can be empty.
+		Attributes map[string]string
+		// Shared defines whether the resulting volume is
+		// shared between different pods (i.e.  changes made
+		// in one pod are visible in another)
+		Shared bool
+		// ReadOnly must be set to true if the driver does not
+		// support mounting as read/write.
+		ReadOnly bool
+	}
 
-	// ClaimSize defines the desired size of dynamically
-	// provisioned volumes. Default is "5GiB".
-	ClaimSize string
+	// SupportedSizeRange defines the desired size of dynamically
+	// provisioned volumes.
+	SupportedSizeRange volume.SizeRange
 
 	// ClientNodeName selects a specific node for scheduling test pods.
 	// Can be left empty. Most drivers should not need this and instead
@@ -221,7 +236,7 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern testpatterns.TestPattern)
 			supported = true
 		}
 	case testpatterns.CSIInlineVolume:
-		supported = len(d.InlineVolumeAttributes) != 0
+		supported = len(d.InlineVolumes) != 0
 	}
 	if !supported {
 		framework.Skipf("Driver %q does not support volume type %q - skipping", d.DriverInfo.Name, pattern.VolType)
@@ -256,15 +271,15 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(config *testsuites.Pe
 		return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 	}
 
-	items, err := f.LoadFromManifests(d.StorageClass.FromFile)
+	items, err := utils.LoadFromManifests(d.StorageClass.FromFile)
 	framework.ExpectNoError(err, "load storage class from %s", d.StorageClass.FromFile)
 	framework.ExpectEqual(len(items), 1, "exactly one item from %s", d.StorageClass.FromFile)
 
-	err = f.PatchItems(items...)
+	err = utils.PatchItems(f, items...)
 	framework.ExpectNoError(err, "patch items")
 
 	sc, ok := items[0].(*storagev1.StorageClass)
-	gomega.Expect(ok).To(gomega.BeTrue(), "storage class from %s", d.StorageClass.FromFile)
+	framework.ExpectEqual(ok, true, "storage class from %s", d.StorageClass.FromFile)
 	// Ensure that we can load more than once as required for
 	// GetDynamicProvisionStorageClass by adding a random suffix.
 	sc.Name = names.SimpleNameGenerator.GenerateName(sc.Name + "-")
@@ -290,15 +305,12 @@ func (d *driverDefinition) GetSnapshotClass(config *testsuites.PerTestConfig) *u
 	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
 }
 
-func (d *driverDefinition) GetClaimSize() string {
-	return d.ClaimSize
-}
-
-func (d *driverDefinition) GetVolumeAttributes(config *testsuites.PerTestConfig, volumeNumber int) map[string]string {
-	if len(d.InlineVolumeAttributes) == 0 {
+func (d *driverDefinition) GetVolume(config *testsuites.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {
+	if len(d.InlineVolumes) == 0 {
 		framework.Skipf("%s does not have any InlineVolumeAttributes defined", d.DriverInfo.Name)
 	}
-	return d.InlineVolumeAttributes[volumeNumber%len(d.InlineVolumeAttributes)]
+	volume := d.InlineVolumes[volumeNumber%len(d.InlineVolumes)]
+	return volume.Attributes, volume.Shared, volume.ReadOnly
 }
 
 func (d *driverDefinition) GetCSIDriverName(config *testsuites.PerTestConfig) string {

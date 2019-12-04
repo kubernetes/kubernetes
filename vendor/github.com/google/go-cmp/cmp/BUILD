@@ -36,6 +36,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//vendor/github.com/google/go-cmp/cmp/cmpopts:all-srcs",
         "//vendor/github.com/google/go-cmp/cmp/internal/diff:all-srcs",
         "//vendor/github.com/google/go-cmp/cmp/internal/flags:all-srcs",
         "//vendor/github.com/google/go-cmp/cmp/internal/function:all-srcs",

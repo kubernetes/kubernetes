@@ -21,6 +21,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	authnv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
@@ -67,7 +68,7 @@ func TestEnforced(t *testing.T) {
 				Level:      auditinternal.LevelRequestResponse,
 				Stage:      auditinternal.StageResponseComplete,
 				RequestURI: "/apis/extensions/v1beta1",
-				User: auditinternal.UserInfo{
+				User: authnv1.UserInfo{
 					Username: user.Anonymous,
 				},
 				RequestObject:  &runtime.Unknown{Raw: []byte(`test`)},

@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -40,14 +39,14 @@ func NewDefaultTableConvertor(resource schema.GroupResource) TableConvertor {
 
 var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
 
-func (c defaultTableConvertor) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
-	var table metav1beta1.Table
+func (c defaultTableConvertor) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
+	var table metav1.Table
 	fn := func(obj runtime.Object) error {
 		m, err := meta.Accessor(obj)
 		if err != nil {
 			return errNotAcceptable{resource: c.qualifiedResource}
 		}
-		table.Rows = append(table.Rows, metav1beta1.TableRow{
+		table.Rows = append(table.Rows, metav1.TableRow{
 			Cells:  []interface{}{m.GetName(), m.GetCreationTimestamp().Time.UTC().Format(time.RFC3339)},
 			Object: runtime.RawExtension{Object: obj},
 		})
@@ -74,8 +73,8 @@ func (c defaultTableConvertor) ConvertToTable(ctx context.Context, object runtim
 			table.SelfLink = m.GetSelfLink()
 		}
 	}
-	if opt, ok := tableOptions.(*metav1beta1.TableOptions); !ok || !opt.NoHeaders {
-		table.ColumnDefinitions = []metav1beta1.TableColumnDefinition{
+	if opt, ok := tableOptions.(*metav1.TableOptions); !ok || !opt.NoHeaders {
+		table.ColumnDefinitions = []metav1.TableColumnDefinition{
 			{Name: "Name", Type: "string", Format: "name", Description: swaggerMetadataDescriptions["name"]},
 			{Name: "Created At", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"]},
 		}

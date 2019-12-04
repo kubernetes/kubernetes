@@ -42,6 +42,8 @@ type streamingRuntime struct {
 
 var _ streaming.Runtime = &streamingRuntime{}
 
+const maxMsgSize = 1024 * 1024 * 16
+
 func (r *streamingRuntime) Exec(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	return r.exec(containerID, cmd, in, out, err, tty, resize, 0)
 }
@@ -78,8 +80,8 @@ func (ds *dockerService) ExecSync(_ context.Context, req *runtimeapi.ExecSyncReq
 	var stdoutBuffer, stderrBuffer bytes.Buffer
 	err := ds.streamingRuntime.exec(req.ContainerId, req.Cmd,
 		nil, // in
-		ioutils.WriteCloserWrapper(&stdoutBuffer),
-		ioutils.WriteCloserWrapper(&stderrBuffer),
+		ioutils.WriteCloserWrapper(ioutils.LimitWriter(&stdoutBuffer, maxMsgSize)),
+		ioutils.WriteCloserWrapper(ioutils.LimitWriter(&stderrBuffer, maxMsgSize)),
 		false, // tty
 		nil,   // resize
 		timeout)

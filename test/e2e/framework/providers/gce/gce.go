@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 )
@@ -43,7 +43,7 @@ func init() {
 }
 
 func factory() (framework.ProviderInterface, error) {
-	e2elog.Logf("Fetching cloud provider for %q\r", framework.TestContext.Provider)
+	framework.Logf("Fetching cloud provider for %q\r", framework.TestContext.Provider)
 	zone := framework.TestContext.CloudConfig.Zone
 	region := framework.TestContext.CloudConfig.Region
 
@@ -177,7 +177,7 @@ func (p *Provider) EnsureLoadBalancerResourcesDeleted(ip, portRange string) erro
 		}
 		for _, item := range list.Items {
 			if item.PortRange == portRange && item.IPAddress == ip {
-				e2elog.Logf("found a load balancer: %v", item)
+				framework.Logf("found a load balancer: %v", item)
 				return false, nil
 			}
 		}
@@ -231,7 +231,7 @@ func (p *Provider) DeletePD(pdName string) error {
 			return nil
 		}
 
-		e2elog.Logf("error deleting PD %q: %v", pdName, err)
+		framework.Logf("error deleting PD %q: %v", pdName, err)
 	}
 	return err
 }
@@ -249,7 +249,7 @@ func (p *Provider) CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSo
 
 // DeletePVSource deletes a persistent volume source
 func (p *Provider) DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
-	return framework.DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName)
+	return e2epv.DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName)
 }
 
 // CleanupServiceResources cleans up GCE Service Type=LoadBalancer resources with
@@ -258,12 +258,12 @@ func (p *Provider) DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
 func (p *Provider) CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zone string) {
 	if pollErr := wait.Poll(5*time.Second, e2eservice.LoadBalancerCleanupTimeout, func() (bool, error) {
 		if err := p.cleanupGCEResources(c, loadBalancerName, region, zone); err != nil {
-			e2elog.Logf("Still waiting for glbc to cleanup: %v", err)
+			framework.Logf("Still waiting for glbc to cleanup: %v", err)
 			return false, nil
 		}
 		return true, nil
 	}); pollErr != nil {
-		e2elog.Failf("Failed to cleanup service GCE resources.")
+		framework.Failf("Failed to cleanup service GCE resources.")
 	}
 }
 
@@ -310,10 +310,10 @@ func (p *Provider) cleanupGCEResources(c clientset.Interface, loadBalancerName, 
 	return
 }
 
-// LoadBalancerSrcRanges contains the ranges of ips used by the GCE load balancers (l4 & L7)
-// for proxying client requests and performing health checks.
-func (p *Provider) LoadBalancerSrcRanges() []string {
-	return gcecloud.LoadBalancerSrcRanges()
+// L4LoadBalancerSrcRanges contains the ranges of ips used by the GCE L4 load
+// balancers for proxying client requests and performing health checks.
+func (p *Provider) L4LoadBalancerSrcRanges() []string {
+	return gcecloud.L4LoadBalancerSrcRanges()
 }
 
 // EnableAndDisableInternalLB returns functions for both enabling and disabling internal Load Balancer
@@ -333,7 +333,7 @@ func GetInstanceTags(cloudConfig framework.CloudConfig, instanceName string) *co
 	res, err := gceCloud.ComputeServices().GA.Instances.Get(cloudConfig.ProjectID, cloudConfig.Zone,
 		instanceName).Do()
 	if err != nil {
-		e2elog.Failf("Failed to get instance tags for %v: %v", instanceName, err)
+		framework.Failf("Failed to get instance tags for %v: %v", instanceName, err)
 	}
 	return res.Tags
 }
@@ -347,20 +347,10 @@ func SetInstanceTags(cloudConfig framework.CloudConfig, instanceName, zone strin
 		cloudConfig.ProjectID, zone, instanceName,
 		&compute.Tags{Fingerprint: resTags.Fingerprint, Items: tags}).Do()
 	if err != nil {
-		e2elog.Failf("failed to set instance tags: %v", err)
+		framework.Failf("failed to set instance tags: %v", err)
 	}
-	e2elog.Logf("Sent request to set tags %v on instance: %v", tags, instanceName)
+	framework.Logf("Sent request to set tags %v on instance: %v", tags, instanceName)
 	return resTags.Items
-}
-
-// GetNodeTags gets k8s node tag from one of the nodes
-func GetNodeTags(c clientset.Interface, cloudConfig framework.CloudConfig) []string {
-	nodes := framework.GetReadySchedulableNodesOrDie(c)
-	if len(nodes.Items) == 0 {
-		e2elog.Logf("GetNodeTags: Found 0 node.")
-		return []string{}
-	}
-	return GetInstanceTags(cloudConfig, nodes.Items[0].Name).Items
 }
 
 // IsGoogleAPIHTTPErrorCode returns true if the error is a google api

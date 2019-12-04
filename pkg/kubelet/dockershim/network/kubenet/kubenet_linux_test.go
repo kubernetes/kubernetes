@@ -18,17 +18,20 @@ package kubenet
 
 import (
 	"fmt"
+	"net"
+	"strings"
+	"testing"
+
+	"github.com/containernetworking/cni/libcni"
+	"github.com/containernetworking/cni/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"strings"
-
-	"testing"
 
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/cni/testing"
+	mockcni "k8s.io/kubernetes/pkg/kubelet/dockershim/network/cni/testing"
 	hostporttest "k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport/testing"
 	nettest "k8s.io/kubernetes/pkg/kubelet/dockershim/network/testing"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
@@ -55,6 +58,7 @@ func TestGetPodNetworkStatus(t *testing.T) {
 	podIPMap[kubecontainer.ContainerID{ID: "1"}] = utilsets.NewString("10.245.0.2")
 	podIPMap[kubecontainer.ContainerID{ID: "2"}] = utilsets.NewString("10.245.0.3")
 	podIPMap[kubecontainer.ContainerID{ID: "3"}] = utilsets.NewString("10.245.0.4", "2000::")
+	podIPMap[kubecontainer.ContainerID{ID: "4"}] = utilsets.NewString("2000::2")
 
 	testCases := []struct {
 		id          string
@@ -76,6 +80,11 @@ func TestGetPodNetworkStatus(t *testing.T) {
 			id:          "3",
 			expectError: false,
 			expectIP:    utilsets.NewString("10.245.0.4", "2000::"),
+		},
+		{
+			id:          "4",
+			expectError: false,
+			expectIP:    utilsets.NewString("2000::2"),
 		},
 
 		//not in podIP map
@@ -156,15 +165,21 @@ func TestTeardownCallsShaper(t *testing.T) {
 	}
 	fhost := nettest.NewFakeHost(nil)
 	fshaper := &bandwidth.FakeShaper{}
-	mockcni := &mock_cni.MockCNI{}
+	mockcni := &mockcni.MockCNI{}
 	ips := make(map[kubecontainer.ContainerID]utilsets.String)
 	kubenet := newFakeKubenetPlugin(ips, fexec, fhost)
+	kubenet.loConfig = &libcni.NetworkConfig{
+		Network: &types.NetConf{
+			Name: "loopback-fake",
+			Type: "loopback",
+		},
+	}
 	kubenet.cniConfig = mockcni
 	kubenet.iptables = ipttest.NewFake()
 	kubenet.bandwidthShaper = fshaper
 	kubenet.hostportSyncer = hostporttest.NewFakeHostportSyncer()
 
-	mockcni.On("DelNetwork", mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
+	mockcni.On("DelNetwork", mock.AnythingOfType("*context.timerCtx"), mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
 
 	details := make(map[string]interface{})
 	details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = "10.0.0.1/24"
@@ -244,7 +259,7 @@ func TestTearDownWithoutRuntime(t *testing.T) {
 
 		fhost := nettest.NewFakeHost(nil)
 		fhost.Legacy = false
-		mockcni := &mock_cni.MockCNI{}
+		mockcni := &mockcni.MockCNI{}
 
 		fexec := &fakeexec.FakeExec{
 			CommandScript: []fakeexec.FakeCommandAction{},
@@ -255,6 +270,12 @@ func TestTearDownWithoutRuntime(t *testing.T) {
 
 		ips := make(map[kubecontainer.ContainerID]utilsets.String)
 		kubenet := newFakeKubenetPlugin(ips, fexec, fhost)
+		kubenet.loConfig = &libcni.NetworkConfig{
+			Network: &types.NetConf{
+				Name: "loopback-fake",
+				Type: "loopback",
+			},
+		}
 		kubenet.cniConfig = mockcni
 		kubenet.iptables = ipttest.NewFake()
 
@@ -287,7 +308,7 @@ func TestTearDownWithoutRuntime(t *testing.T) {
 		existingContainerID := kubecontainer.BuildContainerID("docker", "123")
 		kubenet.podIPs[existingContainerID] = utilsets.NewString(tc.ip)
 
-		mockcni.On("DelNetwork", mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
+		mockcni.On("DelNetwork", mock.AnythingOfType("*context.timerCtx"), mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
 
 		if err := kubenet.TearDownPod("namespace", "name", existingContainerID); err != nil {
 			t.Fatalf("Unexpected error in TearDownPod: %v", err)
@@ -295,6 +316,35 @@ func TestTearDownWithoutRuntime(t *testing.T) {
 		// Assert that the CNI DelNetwork made it through and we didn't crash
 		// without a runtime.
 		mockcni.AssertExpectations(t)
+	}
+}
+
+func TestGetRoutesConifg(t *testing.T) {
+	for _, test := range []struct {
+		cidrs  []string
+		routes string
+	}{
+		{
+			cidrs:  []string{"10.0.0.1/24"},
+			routes: `{"dst": "0.0.0.0/0"}`,
+		},
+		{
+			cidrs:  []string{"2001:4860:4860::8888/32"},
+			routes: `{"dst": "::/0"}`,
+		},
+		{
+			cidrs:  []string{"2001:4860:4860::8888/32", "10.0.0.1/24"},
+			routes: `{"dst": "0.0.0.0/0"},{"dst": "::/0"}`,
+		},
+	} {
+		var cidrs []*net.IPNet
+		for _, c := range test.cidrs {
+			_, cidr, err := net.ParseCIDR(c)
+			assert.NoError(t, err)
+			cidrs = append(cidrs, cidr)
+		}
+		fakeKubenet := &kubenetNetworkPlugin{podCIDRs: cidrs}
+		assert.Equal(t, test.routes, fakeKubenet.getRoutesConfig())
 	}
 }
 

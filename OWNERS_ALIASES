@@ -17,10 +17,8 @@ aliases:
   sig-auth-authenticators-reviewers:
     - deads2k
     - enj
-    - jianhuiz
     - lavalamp
     - liggitt
-    - mbohlool
     - mikedanese
     - sttts
     - wojtek-t
@@ -30,16 +28,13 @@ aliases:
     - liggitt
     - mikedanese
   sig-auth-authorizers-reviewers:
-    - david-mcmahon
     - deads2k
     - dims
     - enj
     - erictune
     - jianhuiz
-    - krousey
     - lavalamp
     - liggitt
-    - mbohlool
     - mikedanese
     - mml
     - ncdc
@@ -56,16 +51,13 @@ aliases:
   sig-auth-certificates-reviewers:
     - awly
     - caesarxuchao
-    - david-mcmahon
     - deads2k
     - dims
     - enj
     - errordeveloper
-    - hongchaodeng
     - jianhuiz
     - lavalamp
     - liggitt
-    - mbohlool
     - mikedanese
     - smarterclayton
     - sttts
@@ -81,7 +73,6 @@ aliases:
     - immutableT
     - lavalamp
     - liggitt
-    - sakshamsharma
     - smarterclayton
     - wojtek-t
 
@@ -102,11 +93,9 @@ aliases:
     - tallclair
   sig-auth-policy-reviewers:
     - deads2k
-    - hongchaodeng
     - jianhuiz
     - liggitt
     - mbohlool
-    - pweil-
     - tallclair
     - krmayankk
 
@@ -159,6 +148,8 @@ aliases:
     - wgliang
     - ahg-g
     - draveness
+    - hex108
+    - alculquicondor
 
   sig-cli-maintainers:
     - adohe
@@ -179,9 +170,7 @@ aliases:
     - derekwaynecarr
     - dixudx
     - dims
-    - dshulyak
     - eparis
-    - ghodss
     - juanvallejo
     - mengqiy
     - rootfs
@@ -203,6 +192,13 @@ aliases:
     - krzyzacy
     - ixdy
     - spiffxp
+  sig-node-approvers:
+    - Random-Liu
+    - dchen1107
+    - derekwaynecarr
+    - tallclair
+    - vishh
+    - yujuhong
   sig-node-reviewers:
     - Random-Liu
     - dashpole
@@ -214,9 +210,7 @@ aliases:
     - pmorie
     - resouer
     - sjenning
-    - sjpotter
     - tallclair
-    - tmrts
     - vishh
     - yifan-gu
     - yujuhong
@@ -227,7 +221,6 @@ aliases:
     - caseydavenport
     - danwinship
     - dcbw
-    - dnardo
     - freehan
     - johnbelamaric
     - mrhohn
@@ -238,7 +231,6 @@ aliases:
     - caseydavenport
     - danwinship
     - dcbw
-    - dnardo
     - freehan
     - johnbelamaric
     - mrhohn
@@ -271,6 +263,22 @@ aliases:
     - bskiba
     - MaciekPytel
     - mwielgus
+  sig-instrumentation-approvers:
+    - piosz
+    - brancz
+  sig-instrumentation-reviewers:
+    - kawych
+    - s-urbaniak
+    - DirectXMan12
+    - x13n
+    - loburm
+    - huangyuqi
+    - andyxning
+    - coffeepac
+    - monotek
+    - logicalhan
+    - RainbowMango
+    - serathius
 
   api-approvers:
     - erictune
@@ -362,7 +370,6 @@ aliases:
     - janetkuo
     - justinsb
     - pwittrock
-    - roberthbailey
     - ncdc
     - tallclair
     - yifan-gu
@@ -372,7 +379,6 @@ aliases:
     - soltysh
     - piosz
     - jsafrane
-    - jbeda
 
   # api-reviewers targeted by sig area
   # see https://git.k8s.io/community/sig-architecture/api-review-process.md#training-reviews
@@ -408,6 +414,14 @@ aliases:
     - derekwaynecarr
     - tallclair
     - yujuhong
+
+  sig-scalability-approvers:
+    - mm4tt
+    - wojtek-t
+
+  sig-scalability-reviewers:
+    - mm4tt
+    - wojtek-t
   
   sig-scheduling-api-reviewers:
       - bsalamat
@@ -450,7 +464,6 @@ aliases:
     - kow3ns          # Apps
     - lavalamp        # API Machinery
     - liggitt         # Auth
-    - lukemarsden     # Cluster Lifecycle
     - luxas           # Cluster Lifecycle
     - marcoceppi      # On Premise
     - mattfarina      # Apps
@@ -460,7 +473,7 @@ aliases:
     - prydonius       # Apps
     - pwittrock       # CLI
     - quinton-hoole   # Multicluster
-    - roberthbailey   # Cluster Lifecycle
+    - justinsb        # Cluster Lifecycle
     - saad-ali        # Storage
     - seans3          # CLI
     - soltysh         # CLI
@@ -469,3 +482,9 @@ aliases:
     - timothysc       # Cluster Lifecycle, Scheduling
     - wojtek-t        # Scalability
     - zehicle         # Cluster Ops
+
+  # conformance aliases https://git.k8s.io/enhancements/keps/sig-architecture/20190412-conformance-behaviors.md
+  conformance-behavior-approvers:
+    - bgrant0607
+    - smarterclayton
+    - johnbelamaric

@@ -26,7 +26,9 @@ import (
 	"github.com/go-openapi/spec"
 
 	v1 "k8s.io/api/autoscaling/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	openapiv2 "k8s.io/apiextensions-apiserver/pkg/controller/openapi/v2"
@@ -75,30 +77,45 @@ type Options struct {
 
 	// Strip value validation.
 	StripValueValidation bool
+
+	// Strip nullable.
+	StripNullable bool
+
+	// AllowNonStructural indicates swagger should be built for a schema that fits into the structural type but does not meet all structural invariants
+	AllowNonStructural bool
 }
 
 // BuildSwagger builds swagger for the given crd in the given version
-func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string, opts Options) (*spec.Swagger, error) {
+func BuildSwagger(crd *apiextensionsv1.CustomResourceDefinition, version string, opts Options) (*spec.Swagger, error) {
 	var schema *structuralschema.Structural
-	s, err := apiextensions.GetSchemaForVersion(crd, version)
+	s, err := apiextensionshelpers.GetSchemaForVersion(crd, version)
 	if err != nil {
 		return nil, err
 	}
 
 	if s != nil && s.OpenAPIV3Schema != nil {
-		if !validation.SchemaHasInvalidTypes(s.OpenAPIV3Schema) {
-			if ss, err := structuralschema.NewStructural(s.OpenAPIV3Schema); err == nil {
-				// skip non-structural schemas
-				schema = ss
+		internalCRDSchema := &apiextensionsinternal.CustomResourceValidation{}
+		if err := apiextensionsv1.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(s, internalCRDSchema, nil); err != nil {
+			return nil, fmt.Errorf("failed converting CRD validation to internal version: %v", err)
+		}
+		if !validation.SchemaHasInvalidTypes(internalCRDSchema.OpenAPIV3Schema) {
+			if ss, err := structuralschema.NewStructural(internalCRDSchema.OpenAPIV3Schema); err == nil {
+				// skip non-structural schemas unless explicitly asked to produce swagger from them
+				if opts.AllowNonStructural || len(structuralschema.ValidateStructural(nil, ss)) == 0 {
+					schema = ss
 
-				if opts.StripDefaults {
-					schema = schema.StripDefaults()
-				}
-				if opts.StripValueValidation {
-					schema = schema.StripValueValidations()
-				}
+					if opts.StripDefaults {
+						schema = schema.StripDefaults()
+					}
+					if opts.StripValueValidation {
+						schema = schema.StripValueValidations()
+					}
+					if opts.StripNullable {
+						schema = schema.StripNullable()
+					}
 
-				schema = schema.Unfold()
+					schema = schema.Unfold()
+				}
 			}
 		}
 	}
@@ -140,7 +157,7 @@ func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string, o
 	routes = append(routes, b.buildRoute(root, "/{name}", "DELETE", "delete", "delete", status))
 	routes = append(routes, b.buildRoute(root, "/{name}", "PATCH", "patch", "patch", sample).Reads(patch))
 
-	subresources, err := apiextensions.GetSubresourcesForVersion(crd, version)
+	subresources, err := apiextensionshelpers.GetSubresourcesForVersion(crd, version)
 	if err != nil {
 		return nil, err
 	}
@@ -334,12 +351,12 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 
 // buildKubeNative builds input schema with Kubernetes' native object meta, type meta and
 // extensions
-func (b *builder) buildKubeNative(schema *structuralschema.Structural, v2 bool) (ret *spec.Schema) {
+func (b *builder) buildKubeNative(schema *structuralschema.Structural, v2 bool, crdPreserveUnknownFields bool) (ret *spec.Schema) {
 	// only add properties if we have a schema. Otherwise, kubectl would (wrongly) assume additionalProperties=false
 	// and forbid anything outside of apiVersion, kind and metadata. We have to fix kubectl to stop doing this, e.g. by
 	// adding additionalProperties=true support to explicitly allow additional fields.
 	// TODO: fix kubectl to understand additionalProperties=true
-	if schema == nil || (v2 && schema.XPreserveUnknownFields) {
+	if schema == nil || (v2 && (schema.XPreserveUnknownFields || crdPreserveUnknownFields)) {
 		ret = &spec.Schema{
 			SchemaProps: spec.SchemaProps{Type: []string{"object"}},
 		}
@@ -390,10 +407,10 @@ func addEmbeddedProperties(s *spec.Schema, v2 bool) {
 	}
 	if isTrue, ok := s.VendorExtensible.Extensions.GetBool("x-kubernetes-embedded-resource"); ok && isTrue {
 		s.SetProperty("apiVersion", withDescription(getDefinition(typeMetaType).SchemaProps.Properties["apiVersion"],
-			"apiVersion defines the versioned schema of this representation of an object. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+			"apiVersion defines the versioned schema of this representation of an object. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
 		))
 		s.SetProperty("kind", withDescription(getDefinition(typeMetaType).SchemaProps.Properties["kind"],
-			"kind is a string value representing the type of this object. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+			"kind is a string value representing the type of this object. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
 		))
 		s.SetProperty("metadata", *spec.RefSchema(objectMetaSchemaRef).WithDescription(swaggerPartialObjectMetadataDescriptions["metadata"]))
 
@@ -436,7 +453,7 @@ func addTypeMetaProperties(s *spec.Schema) {
 // buildListSchema builds the list kind schema for the CRD
 func (b *builder) buildListSchema() *spec.Schema {
 	name := definitionPrefix + util.ToRESTFriendlyName(fmt.Sprintf("%s/%s/%s", b.group, b.version, b.kind))
-	doc := fmt.Sprintf("List of %s. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md", b.plural)
+	doc := fmt.Sprintf("List of %s. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md", b.plural)
 	s := new(spec.Schema).WithDescription(fmt.Sprintf("%s is a list of %s", b.listKind, b.kind)).
 		WithRequired("items").
 		SetProperty("items", *spec.ArrayProperty(spec.RefSchema(name)).WithDescription(doc)).
@@ -487,7 +504,7 @@ func (b *builder) getOpenAPIConfig() *common.Config {
 	}
 }
 
-func newBuilder(crd *apiextensions.CustomResourceDefinition, version string, schema *structuralschema.Structural, v2 bool) *builder {
+func newBuilder(crd *apiextensionsv1.CustomResourceDefinition, version string, schema *structuralschema.Structural, v2 bool) *builder {
 	b := &builder{
 		schema: &spec.Schema{
 			SchemaProps: spec.SchemaProps{Type: []string{"object"}},
@@ -501,12 +518,12 @@ func newBuilder(crd *apiextensions.CustomResourceDefinition, version string, sch
 		listKind: crd.Spec.Names.ListKind,
 		plural:   crd.Spec.Names.Plural,
 	}
-	if crd.Spec.Scope == apiextensions.NamespaceScoped {
+	if crd.Spec.Scope == apiextensionsv1.NamespaceScoped {
 		b.namespaced = true
 	}
 
 	// Pre-build schema with Kubernetes native properties
-	b.schema = b.buildKubeNative(schema, v2)
+	b.schema = b.buildKubeNative(schema, v2, crd.Spec.PreserveUnknownFields)
 	b.listSchema = b.buildListSchema()
 
 	return b

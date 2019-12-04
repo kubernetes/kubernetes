@@ -58,6 +58,8 @@ var testSuites = []func() testsuites.TestSuite{
 	testsuites.InitMultiVolumeTestSuite,
 	testsuites.InitVolumeExpandTestSuite,
 	testsuites.InitDisruptiveTestSuite,
+	testsuites.InitVolumeLimitsTestSuite,
+	testsuites.InitTopologyTestSuite,
 }
 
 // This executes testSuites for in-tree volumes.

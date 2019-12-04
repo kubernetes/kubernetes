@@ -34,16 +34,14 @@ type Counter struct {
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
 func NewCounter(opts *CounterOpts) *Counter {
-	// todo: handle defaulting better
-	if opts.StabilityLevel == "" {
-		opts.StabilityLevel = ALPHA
-	}
+	opts.StabilityLevel.setDefaults()
+
 	kc := &Counter{
 		CounterOpts: opts,
 		lazyMetric:  lazyMetric{},
 	}
 	kc.setPrometheusCounter(noop)
-	kc.lazyInit(kc)
+	kc.lazyInit(kc, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return kc
 }
 
@@ -86,17 +84,15 @@ type CounterVec struct {
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
 func NewCounterVec(opts *CounterOpts, labels []string) *CounterVec {
-	// todo: handle defaulting better
-	if opts.StabilityLevel == "" {
-		opts.StabilityLevel = ALPHA
-	}
+	opts.StabilityLevel.setDefaults()
+
 	cv := &CounterVec{
 		CounterVec:     noopCounterVec,
 		CounterOpts:    opts,
 		originalLabels: labels,
 		lazyMetric:     lazyMetric{},
 	}
-	cv.lazyInit(cv)
+	cv.lazyInit(cv, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return cv
 }
 
@@ -143,7 +139,7 @@ func (v *CounterVec) WithLabelValues(lvs ...string) CounterMetric {
 // must match those of the VariableLabels in Desc). If that label map is
 // accessed for the first time, a new Counter is created IFF the counterVec has
 // been registered to a metrics registry.
-func (v *CounterVec) With(labels prometheus.Labels) CounterMetric {
+func (v *CounterVec) With(labels map[string]string) CounterMetric {
 	if !v.IsCreated() {
 		return noop // return no-op counter
 	}
@@ -157,9 +153,18 @@ func (v *CounterVec) With(labels prometheus.Labels) CounterMetric {
 // with those of the VariableLabels in Desc. However, such inconsistent Labels
 // can never match an actual metric, so the method will always return false in
 // that case.
-func (v *CounterVec) Delete(labels prometheus.Labels) bool {
+func (v *CounterVec) Delete(labels map[string]string) bool {
 	if !v.IsCreated() {
 		return false // since we haven't created the metric, we haven't deleted a metric with the passed in values
 	}
 	return v.CounterVec.Delete(labels)
+}
+
+// Reset deletes all metrics in this vector.
+func (v *CounterVec) Reset() {
+	if !v.IsCreated() {
+		return
+	}
+
+	v.CounterVec.Reset()
 }

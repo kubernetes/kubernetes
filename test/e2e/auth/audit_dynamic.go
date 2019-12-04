@@ -36,7 +36,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -116,14 +115,14 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 		err = wait.Poll(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
 			p, err := f.ClientSet.CoreV1().Pods(namespace).Get("audit-proxy", metav1.GetOptions{})
 			if errors.IsNotFound(err) {
-				e2elog.Logf("waiting for audit-proxy pod to be present")
+				framework.Logf("waiting for audit-proxy pod to be present")
 				return false, nil
 			} else if err != nil {
 				return false, err
 			}
 			podIP = p.Status.PodIP
 			if podIP == "" {
-				e2elog.Logf("waiting for audit-proxy pod IP to be ready")
+				framework.Logf("waiting for audit-proxy pod IP to be ready")
 				return false, nil
 			}
 			return true, nil
@@ -156,17 +155,17 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 
 		_, err = f.ClientSet.AuditregistrationV1alpha1().AuditSinks().Create(&sink)
 		framework.ExpectNoError(err, "failed to create audit sink")
-		e2elog.Logf("created audit sink")
+		framework.Logf("created audit sink")
 
 		// check that we are receiving logs in the proxy
 		err = wait.Poll(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
 			logs, err := e2epod.GetPodLogs(f.ClientSet, namespace, "audit-proxy", "proxy")
 			if err != nil {
-				e2elog.Logf("waiting for audit-proxy pod logs to be available")
+				framework.Logf("waiting for audit-proxy pod logs to be available")
 				return false, nil
 			}
 			if logs == "" {
-				e2elog.Logf("waiting for audit-proxy pod logs to be non-empty")
+				framework.Logf("waiting for audit-proxy pod logs to be non-empty")
 				return false, nil
 			}
 			return true, nil
@@ -372,9 +371,9 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 			reader := strings.NewReader(logs)
 			missingReport, err := utils.CheckAuditLines(reader, expectedEvents, auditv1.SchemeGroupVersion)
 			if err != nil {
-				e2elog.Logf("Failed to observe audit events: %v", err)
+				framework.Logf("Failed to observe audit events: %v", err)
 			} else if len(missingReport.MissingEvents) > 0 {
-				e2elog.Logf(missingReport.String())
+				framework.Logf(missingReport.String())
 			}
 			return len(missingReport.MissingEvents) == 0, nil
 		})

@@ -29,6 +29,7 @@ import (
 	"k8s.io/klog"
 
 	api "k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -46,32 +47,33 @@ var (
 		driverName,
 		nodeName,
 		attachmentID,
-		csiVolumeMode string
+		volumeLifecycleMode string
 	}{
 		"specVolID",
 		"volumeHandle",
 		"driverName",
 		"nodeName",
 		"attachmentID",
-		"csiVolumeMode",
+		"volumeLifecycleMode",
 	}
 )
 
 type csiMountMgr struct {
 	csiClientGetter
-	k8s            kubernetes.Interface
-	plugin         *csiPlugin
-	driverName     csiDriverName
-	csiVolumeMode  csiVolumeMode
-	volumeID       string
-	specVolumeID   string
-	readOnly       bool
-	spec           *volume.Spec
-	pod            *api.Pod
-	podUID         types.UID
-	options        volume.VolumeOptions
-	publishContext map[string]string
-	kubeVolHost    volume.KubeletVolumeHost
+	k8s                 kubernetes.Interface
+	plugin              *csiPlugin
+	driverName          csiDriverName
+	volumeLifecycleMode storage.VolumeLifecycleMode
+	volumeID            string
+	specVolumeID        string
+	readOnly            bool
+	supportsSELinux     bool
+	spec                *volume.Spec
+	pod                 *api.Pod
+	podUID              types.UID
+	options             volume.VolumeOptions
+	publishContext      map[string]string
+	kubeVolHost         volume.KubeletVolumeHost
 	volume.MetricsProvider
 }
 
@@ -145,8 +147,8 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
 			return fmt.Errorf("CSIInlineVolume feature required")
 		}
-		if c.csiVolumeMode != ephemeralVolumeMode {
-			return fmt.Errorf("unexpected volume mode: %s", c.csiVolumeMode)
+		if c.volumeLifecycleMode != storage.VolumeLifecycleEphemeral {
+			return fmt.Errorf("unexpected volume mode: %s", c.volumeLifecycleMode)
 		}
 		if volSrc.FSType != nil {
 			fsType = *volSrc.FSType
@@ -160,8 +162,8 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 			secretRef = &api.SecretReference{Name: secretName, Namespace: ns}
 		}
 	case pvSrc != nil:
-		if c.csiVolumeMode != persistentVolumeMode {
-			return fmt.Errorf("unexpected driver mode: %s", c.csiVolumeMode)
+		if c.volumeLifecycleMode != storage.VolumeLifecyclePersistent {
+			return fmt.Errorf("unexpected driver mode: %s", c.volumeLifecycleMode)
 		}
 
 		fsType = pvSrc.FSType
@@ -258,6 +260,11 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		return errors.New(log("mounter.SetupAt failed: %v", err))
 	}
 
+	c.supportsSELinux, err = c.kubeVolHost.GetHostUtil().GetSELinuxSupport(dir)
+	if err != nil {
+		klog.V(2).Info(log("error checking for SELinux support: %s", err))
+	}
+
 	// apply volume ownership
 	// The following logic is derived from https://github.com/kubernetes/kubernetes/issues/66323
 	// if fstype is "", then skip fsgroup (could be indication of non-block filesystem)
@@ -319,7 +326,7 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 		"csi.storage.k8s.io/serviceAccount.name": c.pod.Spec.ServiceAccountName,
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-		attrs["csi.storage.k8s.io/ephemeral"] = strconv.FormatBool(c.csiVolumeMode == ephemeralVolumeMode)
+		attrs["csi.storage.k8s.io/ephemeral"] = strconv.FormatBool(c.volumeLifecycleMode == storage.VolumeLifecycleEphemeral)
 	}
 
 	klog.V(4).Infof(log("CSIDriver %q requires pod information", c.driverName))
@@ -327,18 +334,10 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 }
 
 func (c *csiMountMgr) GetAttributes() volume.Attributes {
-	path := c.GetPath()
-	hu := c.kubeVolHost.GetHostUtil()
-	supportSelinux, err := hu.GetSELinuxSupport(path)
-	if err != nil {
-		klog.V(2).Info(log("error checking for SELinux support: %s", err))
-		// Best guess
-		supportSelinux = false
-	}
 	return volume.Attributes{
 		ReadOnly:        c.readOnly,
 		Managed:         !c.readOnly,
-		SupportsSELinux: supportSelinux,
+		SupportsSELinux: c.supportsSELinux,
 	}
 }
 

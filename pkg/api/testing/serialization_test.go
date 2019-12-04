@@ -47,6 +47,7 @@ import (
 	k8s_apps_v1 "k8s.io/kubernetes/pkg/apis/apps/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"sigs.k8s.io/yaml"
 )
 
 // fuzzInternalObject fuzzes an arbitrary runtime object using the appropriate
@@ -79,7 +80,10 @@ func ConvertV1ReplicaSetToAPIReplicationController(in *appsv1.ReplicaSet, out *a
 }
 
 func TestSetControllerConversion(t *testing.T) {
-	if err := legacyscheme.Scheme.AddConversionFuncs(ConvertV1ReplicaSetToAPIReplicationController); err != nil {
+	s := legacyscheme.Scheme
+	if err := s.AddConversionFunc((*appsv1.ReplicaSet)(nil), (*api.ReplicationController)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return ConvertV1ReplicaSetToAPIReplicationController(a.(*appsv1.ReplicaSet), b.(*api.ReplicationController), scope)
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -629,6 +633,43 @@ func BenchmarkDecodeIntoJSONCodecGenConfigCompatibleWithStandardLibrary(b *testi
 	for i := 0; i < b.N; i++ {
 		obj := v1.Pod{}
 		if err := iter.Unmarshal(encoded[i%width], &obj); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+// BenchmarkEncodeYAMLMarshal provides a baseline for regular YAML encode performance
+func BenchmarkEncodeYAMLMarshal(b *testing.B) {
+	items := benchmarkItems(b)
+	width := len(items)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := yaml.Marshal(&items[i%width]); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+// BenchmarkDecodeYAML provides a baseline for regular YAML decode performance
+func BenchmarkDecodeIntoYAML(b *testing.B) {
+	codec := testapi.Default.Codec()
+	items := benchmarkItems(b)
+	width := len(items)
+	encoded := make([][]byte, width)
+	for i := range items {
+		data, err := runtime.Encode(codec, &items[i])
+		if err != nil {
+			b.Fatal(err)
+		}
+		encoded[i] = data
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		obj := v1.Pod{}
+		if err := yaml.Unmarshal(encoded[i%width], &obj); err != nil {
 			b.Fatal(err)
 		}
 	}

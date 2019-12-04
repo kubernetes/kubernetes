@@ -100,6 +100,5 @@ func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra
 		"Defaults to the line ending native to your platform.")
 
 	cmdutil.AddApplyAnnotationVarFlags(cmd, &o.ApplyAnnotation)
-	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }

@@ -340,12 +340,6 @@ func dropDisabledFields(
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodShareProcessNamespace) && !shareProcessNamespaceInUse(oldPodSpec) {
-		if podSpec.SecurityContext != nil {
-			podSpec.SecurityContext.ShareProcessNamespace = nil
-		}
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) && !sysctlsInUse(oldPodSpec) {
 		if podSpec.SecurityContext != nil {
 			podSpec.SecurityContext.Sysctls = nil
@@ -379,6 +373,14 @@ func dropDisabledFields(
 			for i := range c.VolumeMounts {
 				c.VolumeMounts[i].SubPathExpr = ""
 			}
+			return true
+		})
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.StartupProbe) && !startupProbeInUse(oldPodSpec) {
+		// drop startupProbe from all containers if the feature is disabled
+		VisitContainers(podSpec, func(c *api.Container) bool {
+			c.StartupProbe = nil
 			return true
 		})
 	}
@@ -625,16 +627,6 @@ func appArmorInUse(podAnnotations map[string]string) bool {
 	return false
 }
 
-func shareProcessNamespaceInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.SecurityContext != nil && podSpec.SecurityContext.ShareProcessNamespace != nil {
-		return true
-	}
-	return false
-}
-
 func tokenRequestProjectionInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
@@ -673,7 +665,7 @@ func sysctlsInUse(podSpec *api.PodSpec) bool {
 	return false
 }
 
-// emptyDirSizeLimitInUse returns true if any pod's EptyDir volumes use SizeLimit.
+// emptyDirSizeLimitInUse returns true if any pod's EmptyDir volumes use SizeLimit.
 func emptyDirSizeLimitInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
@@ -812,6 +804,24 @@ func subpathExprInUse(podSpec *api.PodSpec) bool {
 				inUse = true
 				return false
 			}
+		}
+		return true
+	})
+
+	return inUse
+}
+
+// startupProbeInUse returns true if the pod spec is non-nil and has a container that has a startupProbe defined
+func startupProbeInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	var inUse bool
+	VisitContainers(podSpec, func(c *api.Container) bool {
+		if c.StartupProbe != nil {
+			inUse = true
+			return false
 		}
 		return true
 	})

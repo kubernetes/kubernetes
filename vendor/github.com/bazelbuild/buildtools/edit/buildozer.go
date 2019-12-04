@@ -10,7 +10,8 @@ distributed under the License is distributed on an "AS IS" BASIS,
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-// Buildozer is a tool for programatically editing BUILD files.
+
+// Buildozer is a tool for programmatically editing BUILD files.
 
 package edit
 
@@ -58,7 +59,7 @@ func NewOpts() *Options {
 	return &Options{NumIO: 200, PreferEOLComments: true}
 }
 
-// Usage is a user-overriden func to print the program usage.
+// Usage is a user-overridden func to print the program usage.
 var Usage = func() {}
 
 var fileModified = false // set to true when a file has been fixed
@@ -69,7 +70,7 @@ const stdinPackageName = "-" // the special package name to represent stdin
 type CmdEnvironment struct {
 	File   *build.File                  // the AST
 	Rule   *build.Rule                  // the rule to modify
-	Vars   map[string]*build.BinaryExpr // global variables set in the build file
+	Vars   map[string]*build.AssignExpr // global variables set in the build file
 	Pkg    string                       // the full package name
 	Args   []string                     // the command-line arguments
 	output *apipb.Output_Record         // output proto, stores whatever a command wants to print
@@ -84,9 +85,10 @@ func cmdAdd(opts *Options, env CmdEnvironment) (*build.File, error) {
 			AddValueToListAttribute(env.Rule, attr, env.Pkg, &build.LiteralExpr{Token: val}, &env.Vars)
 			continue
 		}
-		strVal := &build.StringExpr{Value: ShortenLabel(val, env.Pkg)}
+		strVal := getStringExpr(val, env.Pkg)
 		AddValueToListAttribute(env.Rule, attr, env.Pkg, strVal, &env.Vars)
 	}
+	ResolveAttr(env.Rule, attr, env.Pkg)
 	return env.File, nil
 }
 
@@ -96,8 +98,10 @@ func cmdComment(opts *Options, env CmdEnvironment) (*build.File, error) {
 	str = strings.Replace(str, "\\n", "\n", -1)
 	// Multiline comments should go on a separate line.
 	fullLine := !opts.PreferEOLComments || strings.Contains(str, "\n")
-	str = strings.Replace("# "+str, "\n", "\n# ", -1)
-	comment := []build.Comment{{Token: str}}
+	comment := []build.Comment{}
+	for _, line := range strings.Split(str, "\n") {
+		comment = append(comment, build.Comment{Token: "# " + line})
+	}
 
 	// The comment might be attached to a rule, an attribute, or a value in a list,
 	// depending on how many arguments are passed.
@@ -107,9 +111,9 @@ func cmdComment(opts *Options, env CmdEnvironment) (*build.File, error) {
 	case 2: // Attach to an attribute
 		if attr := env.Rule.AttrDefn(env.Args[0]); attr != nil {
 			if fullLine {
-				attr.X.Comment().Before = comment
+				attr.LHS.Comment().Before = comment
 			} else {
-				attr.Y.Comment().Suffix = comment
+				attr.RHS.Comment().Suffix = comment
 			}
 		}
 	case 3: // Attach to a specific value in a list
@@ -218,7 +222,7 @@ func cmdNew(opts *Options, env CmdEnvironment) (*build.File, error) {
 		return nil, fmt.Errorf("rule '%s' already exists", name)
 	}
 
-	call := &build.CallExpr{X: &build.LiteralExpr{Token: kind}}
+	call := &build.CallExpr{X: &build.Ident{Name: kind}}
 	rule := &build.Rule{call, ""}
 	rule.SetAttr("name", &build.StringExpr{Value: name})
 
@@ -253,7 +257,16 @@ func findInsertionIndex(env CmdEnvironment) (bool, int, error) {
 }
 
 func cmdNewLoad(opts *Options, env CmdEnvironment) (*build.File, error) {
-	env.File.Stmt = InsertLoad(env.File.Stmt, env.Args)
+	from := env.Args[1:]
+	to := append([]string{}, from...)
+	for i := range from {
+		if s := strings.SplitN(from[i], "=", 2); len(s) == 2 {
+			to[i] = s[0]
+			from[i] = s[1]
+		}
+	}
+
+	env.File.Stmt = InsertLoad(env.File.Stmt, env.Args[0], from, to)
 	return env.File, nil
 }
 
@@ -290,6 +303,8 @@ func cmdPrint(opts *Options, env CmdEnvironment) (*build.File, error) {
 			fields[i] = &apipb.Output_Record_Field{Value: &apipb.Output_Record_Field_Error{Error: apipb.Output_Record_Field_MISSING}}
 		} else if lit, ok := value.(*build.LiteralExpr); ok {
 			fields[i] = &apipb.Output_Record_Field{Value: &apipb.Output_Record_Field_Text{lit.Token}}
+		} else if lit, ok := value.(*build.Ident); ok {
+			fields[i] = &apipb.Output_Record_Field{Value: &apipb.Output_Record_Field_Text{lit.Name}}
 		} else if string, ok := value.(*build.StringExpr); ok {
 			fields[i] = &apipb.Output_Record_Field{
 				Value:             &apipb.Output_Record_Field_Text{string.Value},
@@ -326,12 +341,45 @@ func cmdRemove(opts *Options, env CmdEnvironment) (*build.File, error) {
 				ListAttributeDelete(env.Rule, key, val, env.Pkg)
 				fixed = true
 			}
+			ResolveAttr(env.Rule, key, env.Pkg)
 		}
 		if fixed {
 			return env.File, nil
 		}
 	}
 	return nil, nil
+}
+
+func cmdRemoveComment(opts *Options, env CmdEnvironment) (*build.File, error) {
+	switch len(env.Args) {
+	case 0: // Remove comment attached to rule
+		env.Rule.Call.Comments.Before = nil
+		env.Rule.Call.Comments.Suffix = nil
+		env.Rule.Call.Comments.After = nil
+	case 1: // Remove comment attached to attr
+		if attr := env.Rule.AttrDefn(env.Args[0]); attr != nil {
+			attr.Comments.Before = nil
+			attr.Comments.Suffix = nil
+			attr.Comments.After = nil
+			attr.LHS.Comment().Before = nil
+			attr.LHS.Comment().Suffix = nil
+			attr.LHS.Comment().After = nil
+			attr.RHS.Comment().Before = nil
+			attr.RHS.Comment().Suffix = nil
+			attr.RHS.Comment().After = nil
+		}
+	case 2: // Remove comment attached to value
+		if attr := env.Rule.Attr(env.Args[0]); attr != nil {
+			if expr := ListFind(attr, env.Args[1], env.Pkg); expr != nil {
+				expr.Comments.Before = nil
+				expr.Comments.Suffix = nil
+				expr.Comments.After = nil
+			}
+		}
+	default:
+		panic("cmdRemoveComment")
+	}
+	return env.File, nil
 }
 
 func cmdRename(opts *Options, env CmdEnvironment) (*build.File, error) {
@@ -350,7 +398,7 @@ func cmdReplace(opts *Options, env CmdEnvironment) (*build.File, error) {
 		attr := env.Rule.Attr(key)
 		if e, ok := attr.(*build.StringExpr); ok {
 			if LabelsEqual(e.Value, oldV, env.Pkg) {
-				env.Rule.SetAttr(key, getAttrValueExpr(key, []string{newV}))
+				env.Rule.SetAttr(key, getAttrValueExpr(key, []string{newV}, env))
 			}
 		} else {
 			ListReplace(attr, oldV, newV, env.Pkg)
@@ -373,7 +421,7 @@ func cmdSubstitute(opts *Options, env CmdEnvironment) (*build.File, error) {
 			continue
 		}
 		if newValue, ok := stringSubstitute(e.Value, oldRegexp, newTemplate); ok {
-			env.Rule.SetAttr(key, getAttrValueExpr(key, []string{newValue}))
+			env.Rule.SetAttr(key, getAttrValueExpr(key, []string{newValue}, env))
 		}
 	}
 	return env.File, nil
@@ -385,7 +433,7 @@ func cmdSet(opts *Options, env CmdEnvironment) (*build.File, error) {
 	if attr == "kind" {
 		env.Rule.SetKind(args[0])
 	} else {
-		env.Rule.SetAttr(attr, getAttrValueExpr(attr, args))
+		env.Rule.SetAttr(attr, getAttrValueExpr(attr, args, env))
 	}
 	return env.File, nil
 }
@@ -397,12 +445,12 @@ func cmdSetIfAbsent(opts *Options, env CmdEnvironment) (*build.File, error) {
 		return nil, fmt.Errorf("setting 'kind' is not allowed for set_if_absent. Got %s", env.Args)
 	}
 	if env.Rule.Attr(attr) == nil {
-		env.Rule.SetAttr(attr, getAttrValueExpr(attr, args))
+		env.Rule.SetAttr(attr, getAttrValueExpr(attr, args, env))
 	}
 	return env.File, nil
 }
 
-func getAttrValueExpr(attr string, args []string) build.Expr {
+func getAttrValueExpr(attr string, args []string, env CmdEnvironment) build.Expr {
 	switch {
 	case attr == "kind":
 		return nil
@@ -414,15 +462,26 @@ func getAttrValueExpr(attr string, args []string) build.Expr {
 		return &build.ListExpr{List: list}
 	case IsList(attr) && !(len(args) == 1 && strings.HasPrefix(args[0], "glob(")):
 		var list []build.Expr
-		for _, i := range args {
-			list = append(list, &build.StringExpr{Value: i})
+		for _, arg := range args {
+			list = append(list, getStringExpr(arg, env.Pkg))
 		}
 		return &build.ListExpr{List: list}
+	case len(args) == 0:
+		// Expected a non-list argument, nothing provided
+		return &build.Ident{Name: "None"}
 	case IsString(attr):
-		return &build.StringExpr{Value: args[0]}
+		return getStringExpr(args[0], env.Pkg)
 	default:
-		return &build.LiteralExpr{Token: args[0]}
+		return &build.Ident{Name: args[0]}
 	}
+}
+
+func getStringExpr(value, pkg string) build.Expr {
+	unquoted, triple, err := build.Unquote(value)
+	if err == nil {
+		return &build.StringExpr{Value: ShortenLabel(unquoted, pkg), TripleQuote: triple}
+	}
+	return &build.StringExpr{Value: ShortenLabel(value, pkg)}
 }
 
 func cmdCopy(opts *Options, env CmdEnvironment) (*build.File, error) {
@@ -443,6 +502,77 @@ func cmdCopyNoOverwrite(opts *Options, env CmdEnvironment) (*build.File, error) 
 	return copyAttributeBetweenRules(env, attrName, from)
 }
 
+// cmdDictAdd adds a key to a dict, if that key does _not_ exit already.
+func cmdDictAdd(opts *Options, env CmdEnvironment) (*build.File, error) {
+	attr := env.Args[0]
+	args := env.Args[1:]
+
+	dict := &build.DictExpr{}
+	currDict, ok := env.Rule.Attr(attr).(*build.DictExpr)
+	if ok {
+		dict = currDict
+	}
+
+	for _, x := range args {
+		kv := strings.Split(x, ":")
+		expr := getStringExpr(kv[1], env.Pkg)
+
+		prev := DictionaryGet(dict, kv[0])
+		if prev == nil {
+			// Only set the value if the value is currently unset.
+			DictionarySet(dict, kv[0], expr)
+		}
+	}
+	env.Rule.SetAttr(attr, dict)
+	return env.File, nil
+}
+
+// cmdDictSet adds a key to a dict, overwriting any previous values.
+func cmdDictSet(opts *Options, env CmdEnvironment) (*build.File, error) {
+	attr := env.Args[0]
+	args := env.Args[1:]
+
+	dict := &build.DictExpr{}
+	currDict, ok := env.Rule.Attr(attr).(*build.DictExpr)
+	if ok {
+		dict = currDict
+	}
+
+	for _, x := range args {
+		kv := strings.Split(x, ":")
+		expr := getStringExpr(kv[1], env.Pkg)
+		// Set overwrites previous values.
+		DictionarySet(dict, kv[0], expr)
+	}
+	env.Rule.SetAttr(attr, dict)
+	return env.File, nil
+}
+
+// cmdDictRemove removes a key from a dict.
+func cmdDictRemove(opts *Options, env CmdEnvironment) (*build.File, error) {
+	attr := env.Args[0]
+	args := env.Args[1:]
+
+	thing := env.Rule.Attr(attr)
+	dictAttr, ok := thing.(*build.DictExpr)
+	if !ok {
+		return env.File, nil
+	}
+
+	for _, x := range args {
+		// should errors here be flagged?
+		DictionaryDelete(dictAttr, x)
+		env.Rule.SetAttr(attr, dictAttr)
+	}
+
+	// If the removal results in the dict having no contents, delete the attribute (stay clean!)
+	if dictAttr == nil || len(dictAttr.List) == 0 {
+		env.Rule.DelAttr(attr)
+	}
+
+	return env.File, nil
+}
+
 func copyAttributeBetweenRules(env CmdEnvironment, attrName string, from string) (*build.File, error) {
 	fromRule := FindRuleByName(env.File, from)
 	if fromRule == nil {
@@ -453,7 +583,7 @@ func copyAttributeBetweenRules(env CmdEnvironment, attrName string, from string)
 		return nil, fmt.Errorf("rule '%s' does not have attribute '%s'", from, attrName)
 	}
 
-	ast, err := build.Parse("" /* filename */, []byte(build.FormatString(attr)))
+	ast, err := build.ParseBuild("" /* filename */, []byte(build.FormatString(attr)))
 	if err != nil {
 		return nil, fmt.Errorf("could not parse attribute value %v", build.FormatString(attr))
 	}
@@ -474,6 +604,7 @@ func cmdFix(opts *Options, env CmdEnvironment) (*build.File, error) {
 // CommandInfo provides a command function and info on incoming arguments.
 type CommandInfo struct {
 	Fn       func(*Options, CmdEnvironment) (*build.File, error)
+	PerRule  bool
 	MinArg   int
 	MaxArg   int
 	Template string
@@ -482,23 +613,27 @@ type CommandInfo struct {
 // AllCommands associates the command names with their function and number
 // of arguments.
 var AllCommands = map[string]CommandInfo{
-	"add":               {cmdAdd, 2, -1, "<attr> <value(s)>"},
-	"new_load":          {cmdNewLoad, 1, -1, "<path> <symbol(s)>"},
-	"comment":           {cmdComment, 1, 3, "<attr>? <value>? <comment>"},
-	"print_comment":     {cmdPrintComment, 0, 2, "<attr>? <value>?"},
-	"delete":            {cmdDelete, 0, 0, ""},
-	"fix":               {cmdFix, 0, -1, "<fix(es)>?"},
-	"move":              {cmdMove, 3, -1, "<old_attr> <new_attr> <value(s)>"},
-	"new":               {cmdNew, 2, 4, "<rule_kind> <rule_name> [(before|after) <relative_rule_name>]"},
-	"print":             {cmdPrint, 0, -1, "<attribute(s)>"},
-	"remove":            {cmdRemove, 1, -1, "<attr> <value(s)>"},
-	"rename":            {cmdRename, 2, 2, "<old_attr> <new_attr>"},
-	"replace":           {cmdReplace, 3, 3, "<attr> <old_value> <new_value>"},
-	"substitute":        {cmdSubstitute, 3, 3, "<attr> <old_regexp> <new_template>"},
-	"set":               {cmdSet, 2, -1, "<attr> <value(s)>"},
-	"set_if_absent":     {cmdSetIfAbsent, 2, -1, "<attr> <value(s)>"},
-	"copy":              {cmdCopy, 2, 2, "<attr> <from_rule>"},
-	"copy_no_overwrite": {cmdCopyNoOverwrite, 2, 2, "<attr> <from_rule>"},
+	"add":               {cmdAdd, true, 2, -1, "<attr> <value(s)>"},
+	"new_load":          {cmdNewLoad, false, 1, -1, "<path> <[to=]from(s)>"},
+	"comment":           {cmdComment, true, 1, 3, "<attr>? <value>? <comment>"},
+	"print_comment":     {cmdPrintComment, true, 0, 2, "<attr>? <value>?"},
+	"delete":            {cmdDelete, true, 0, 0, ""},
+	"fix":               {cmdFix, true, 0, -1, "<fix(es)>?"},
+	"move":              {cmdMove, true, 3, -1, "<old_attr> <new_attr> <value(s)>"},
+	"new":               {cmdNew, false, 2, 4, "<rule_kind> <rule_name> [(before|after) <relative_rule_name>]"},
+	"print":             {cmdPrint, true, 0, -1, "<attribute(s)>"},
+	"remove":            {cmdRemove, true, 1, -1, "<attr> <value(s)>"},
+	"remove_comment":    {cmdRemoveComment, true, 0, 2, "<attr>? <value>?"},
+	"rename":            {cmdRename, true, 2, 2, "<old_attr> <new_attr>"},
+	"replace":           {cmdReplace, true, 3, 3, "<attr> <old_value> <new_value>"},
+	"substitute":        {cmdSubstitute, true, 3, 3, "<attr> <old_regexp> <new_template>"},
+	"set":               {cmdSet, true, 1, -1, "<attr> <value(s)>"},
+	"set_if_absent":     {cmdSetIfAbsent, true, 1, -1, "<attr> <value(s)>"},
+	"copy":              {cmdCopy, true, 2, 2, "<attr> <from_rule>"},
+	"copy_no_overwrite": {cmdCopyNoOverwrite, true, 2, 2, "<attr> <from_rule>"},
+	"dict_add":          {cmdDictAdd, true, 2, -1, "<attr> <(key:value)(s)>"},
+	"dict_set":          {cmdDictSet, true, 2, -1, "<attr> <(key:value)(s)>"},
+	"dict_remove":       {cmdDictRemove, true, 2, -1, "<attr> <key(s)>"},
 }
 
 func expandTargets(f *build.File, rule string) ([]*build.Rule, error) {
@@ -530,15 +665,11 @@ func filterRules(opts *Options, rules []*build.Rule) (result []*build.Rule) {
 		return rules
 	}
 	for _, rule := range rules {
-		acceptableType := false
 		for _, filterType := range opts.FilterRuleTypes {
 			if rule.Kind() == filterType {
-				acceptableType = true
+				result = append(result, rule)
 				break
 			}
-		}
-		if acceptableType || rule.Kind() == "package" {
-			result = append(result, rule)
 		}
 	}
 	return
@@ -564,6 +695,7 @@ func checkCommandUsage(name string, cmd CommandInfo, count int) {
 			name, cmd.MaxArg)
 	}
 	Usage()
+	os.Exit(1)
 }
 
 // Match text that only contains spaces if they're escaped with '\'.
@@ -630,16 +762,13 @@ type rewriteResult struct {
 // getGlobalVariables returns the global variable assignments in the provided list of expressions.
 // That is, for each variable assignment of the form
 //   a = v
-// vars["a"] will contain the BinaryExpr whose Y value is the assignment "a = v".
-func getGlobalVariables(exprs []build.Expr) (vars map[string]*build.BinaryExpr) {
-	vars = make(map[string]*build.BinaryExpr)
+// vars["a"] will contain the AssignExpr whose RHS value is the assignment "a = v".
+func getGlobalVariables(exprs []build.Expr) (vars map[string]*build.AssignExpr) {
+	vars = make(map[string]*build.AssignExpr)
 	for _, expr := range exprs {
-		if binExpr, ok := expr.(*build.BinaryExpr); ok {
-			if binExpr.Op != "=" {
-				continue
-			}
-			if lhs, ok := binExpr.X.(*build.LiteralExpr); ok {
-				vars[lhs.Token] = binExpr
+		if as, ok := expr.(*build.AssignExpr); ok {
+			if lhs, ok := as.LHS.(*build.Ident); ok {
+				vars[lhs.Name] = as
 			}
 		}
 	}
@@ -695,12 +824,12 @@ func rewrite(opts *Options, commandsForFile commandsForFile) *rewriteResult {
 		}
 	}
 
-	f, err := build.Parse(name, data)
+	f, err := build.ParseBuild(name, data)
 	if err != nil {
 		return &rewriteResult{file: name, errs: []error{err}}
 	}
 
-	vars := map[string]*build.BinaryExpr{}
+	vars := map[string]*build.AssignExpr{}
 	if opts.EditVariables {
 		vars = getGlobalVariables(f.Stmt)
 	}
@@ -726,8 +855,14 @@ func rewrite(opts *Options, commandsForFile commandsForFile) *rewriteResult {
 		}
 		targets = filterRules(opts, targets)
 		for _, cmd := range commands {
-			for _, r := range targets {
-				cmdInfo := AllCommands[cmd.tokens[0]]
+			cmdInfo := AllCommands[cmd.tokens[0]]
+			// Depending on whether a transformation is rule-specific or not, it should be applied to
+			// every rule that satisfies the filter or just once to the file.
+			cmdTargets := targets
+			if !cmdInfo.PerRule {
+				cmdTargets = []*build.Rule{nil}
+			}
+			for _, r := range cmdTargets {
 				record := &apipb.Output_Record{}
 				newf, err := cmdInfo.Fn(opts, CmdEnvironment{f, r, vars, absPkg, cmd.tokens[1:], record})
 				if len(record.Fields) != 0 {
@@ -793,7 +928,7 @@ func runBuildifier(opts *Options, f *build.File) ([]byte, error) {
 		return build.Format(f), nil
 	}
 
-	cmd := exec.Command(opts.Buildifier)
+	cmd := exec.Command(opts.Buildifier, "--type=build")
 	data := build.Format(f)
 	cmd.Stdin = bytes.NewBuffer(data)
 	stdout := bytes.NewBuffer(nil)
@@ -881,17 +1016,28 @@ func appendCommandsFromFile(opts *Options, commandsByFile map[string][]commandsF
 		reader = rc
 		defer rc.Close()
 	}
-	scanner := bufio.NewScanner(reader)
-	for scanner.Scan() {
-		line := scanner.Text()
+	appendCommandsFromReader(opts, reader, commandsByFile)
+}
+
+func appendCommandsFromReader(opts *Options, reader io.Reader, commandsByFile map[string][]commandsForTarget) {
+	r := bufio.NewReader(reader)
+	atEof := false
+	for !atEof {
+		line, err := r.ReadString('\n')
+		if err == io.EOF {
+			atEof = true
+			err = nil
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error while reading commands file: %v", err)
+			return
+		}
+		line = strings.TrimSuffix(line, "\n")
 		if line == "" {
 			continue
 		}
 		args := strings.Split(line, "|")
 		appendCommands(opts, commandsByFile, args)
-	}
-	if err := scanner.Err(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error while reading commands file: %v", scanner.Err())
 	}
 }
 

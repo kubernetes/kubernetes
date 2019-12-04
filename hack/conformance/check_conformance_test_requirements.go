@@ -32,9 +32,9 @@ import (
 
 const (
 	//e.g. framework.ConformanceIt("should provide secure master service ", func() {
-	patternStartConformance = "framework.ConformanceIt\\(.*, func\\(\\) {$"
-	patternEndConformance   = "}\\)$"
-	patternSkip             = "framework.Skip.*\\("
+	patternStartConformance = `framework.ConformanceIt\(.*, func\(\) {$`
+	patternEndConformance   = `}\)$`
+	patternSkip             = `framework.Skip.*\(`
 )
 
 // This function checks the requirement: it works for all providers (e.g., no SkipIfProviderIs/SkipUnlessProviderIs calls)
@@ -82,7 +82,7 @@ func checkAllProviders(e2eFile string) error {
 }
 
 func processFile(e2ePath string) error {
-	regGoFile := regexp.MustCompile(".*.go")
+	regGoFile := regexp.MustCompile(`.*\.go`)
 
 	files, err := ioutil.ReadDir(e2ePath)
 	if err != nil {

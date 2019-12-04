@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -1699,13 +1701,9 @@ func validateConfig(t *testing.T, config string) {
 
 func getCloudFromConfig(t *testing.T, config string) *Cloud {
 	configReader := strings.NewReader(config)
-	cloud, err := NewCloud(configReader)
+	azureCloud, err := NewCloudWithoutFeatureGates(configReader)
 	if err != nil {
 		t.Error(err)
-	}
-	azureCloud, ok := cloud.(*Cloud)
-	if !ok {
-		t.Error("NewCloud returned incorrect type")
 	}
 	return azureCloud
 }

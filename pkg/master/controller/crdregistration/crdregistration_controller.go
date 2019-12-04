@@ -22,9 +22,9 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	crdinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
-	crdlisters "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	crdinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
+	crdlisters "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -33,7 +33,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	"k8s.io/kubernetes/pkg/controller"
 )
 
 // AutoAPIServiceRegistration is an interface which callers can re-declare locally and properly cast to for
@@ -74,24 +73,24 @@ func NewCRDRegistrationController(crdinformer crdinformers.CustomResourceDefinit
 
 	crdinformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			cast := obj.(*apiextensions.CustomResourceDefinition)
+			cast := obj.(*apiextensionsv1.CustomResourceDefinition)
 			c.enqueueCRD(cast)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			// Enqueue both old and new object to make sure we remove and add appropriate API services.
 			// The working queue will resolve any duplicates and only changes will stay in the queue.
-			c.enqueueCRD(oldObj.(*apiextensions.CustomResourceDefinition))
-			c.enqueueCRD(newObj.(*apiextensions.CustomResourceDefinition))
+			c.enqueueCRD(oldObj.(*apiextensionsv1.CustomResourceDefinition))
+			c.enqueueCRD(newObj.(*apiextensionsv1.CustomResourceDefinition))
 		},
 		DeleteFunc: func(obj interface{}) {
-			cast, ok := obj.(*apiextensions.CustomResourceDefinition)
+			cast, ok := obj.(*apiextensionsv1.CustomResourceDefinition)
 			if !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
 					klog.V(2).Infof("Couldn't get object from tombstone %#v", obj)
 					return
 				}
-				cast, ok = tombstone.Obj.(*apiextensions.CustomResourceDefinition)
+				cast, ok = tombstone.Obj.(*apiextensionsv1.CustomResourceDefinition)
 				if !ok {
 					klog.V(2).Infof("Tombstone contained unexpected object: %#v", obj)
 					return
@@ -113,7 +112,7 @@ func (c *crdRegistrationController) Run(threadiness int, stopCh <-chan struct{})
 	defer klog.Infof("Shutting down crd-autoregister controller")
 
 	// wait for your secondary caches to fill before starting your work
-	if !controller.WaitForCacheSync("crd-autoregister", stopCh, c.crdSynced) {
+	if !cache.WaitForNamedCacheSync("crd-autoregister", stopCh, c.crdSynced) {
 		return
 	}
 
@@ -185,7 +184,7 @@ func (c *crdRegistrationController) processNextWorkItem() bool {
 	return true
 }
 
-func (c *crdRegistrationController) enqueueCRD(crd *apiextensions.CustomResourceDefinition) {
+func (c *crdRegistrationController) enqueueCRD(crd *apiextensionsv1.CustomResourceDefinition) {
 	for _, version := range crd.Spec.Versions {
 		c.queue.Add(schema.GroupVersion{Group: crd.Spec.Group, Version: version.Name})
 	}

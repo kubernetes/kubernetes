@@ -69,9 +69,9 @@ type CertificateOptions struct {
 }
 
 // NewCertificateOptions creates the options for certificate
-func NewCertificateOptions(ioStreams genericclioptions.IOStreams) *CertificateOptions {
+func NewCertificateOptions(ioStreams genericclioptions.IOStreams, operation string) *CertificateOptions {
 	return &CertificateOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("approved").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags(operation).WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
 	}
 }
@@ -111,7 +111,7 @@ func (o *CertificateOptions) Validate() error {
 }
 
 func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewCertificateOptions(ioStreams)
+	o := NewCertificateOptions(ioStreams, "approved")
 
 	cmd := &cobra.Command{
 		Use:                   "approve (-f FILENAME | NAME)",
@@ -166,7 +166,7 @@ func (o *CertificateOptions) RunCertificateApprove(force bool) error {
 }
 
 func NewCmdCertificateDeny(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewCertificateOptions(ioStreams)
+	o := NewCertificateOptions(ioStreams, "denied")
 
 	cmd := &cobra.Command{
 		Use:                   "deny (-f FILENAME | NAME)",

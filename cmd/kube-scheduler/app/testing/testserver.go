@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -62,9 +63,9 @@ type Logger interface {
 // 		 files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // 		 enough time to remove temporary files.
 func StartTestServer(t Logger, customFlags []string) (result TestServer, err error) {
-	stopCh := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
 	tearDown := func() {
-		close(stopCh)
+		cancel()
 		if len(result.TmpDir) != 0 {
 			os.RemoveAll(result.TmpDir)
 		}
@@ -119,11 +120,11 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 	}
 
 	errCh := make(chan error)
-	go func(stopCh <-chan struct{}) {
-		if err := app.Run(config.Complete(), stopCh); err != nil {
+	go func(ctx context.Context) {
+		if err := app.Run(ctx, config.Complete()); err != nil {
 			errCh <- err
 		}
-	}(stopCh)
+	}(ctx)
 
 	t.Logf("Waiting for /healthz to be ok...")
 	client, err := kubernetes.NewForConfig(config.LoopbackClientConfig)

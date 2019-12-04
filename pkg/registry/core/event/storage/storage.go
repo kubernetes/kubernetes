@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/event"
 )
 
+// REST implements a RESTStorage for events.
 type REST struct {
 	*genericregistry.Store
 }

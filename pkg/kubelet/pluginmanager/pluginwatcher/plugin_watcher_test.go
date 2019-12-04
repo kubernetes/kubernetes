@@ -28,13 +28,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
-	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
+	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
 
 var (
-	socketDir           string
-	deprecatedSocketDir string
+	socketDir string
 
 	supportedVersions = []string{"v1beta1", "v1beta2"}
 )
@@ -52,20 +51,12 @@ func init() {
 		panic(fmt.Sprintf("Could not create a temp directory: %s", d))
 	}
 
-	d2, err := ioutil.TempDir("", "deprecated_plugin_test")
-	if err != nil {
-		panic(fmt.Sprintf("Could not create a temp directory: %s", d))
-	}
-
 	socketDir = d
-	deprecatedSocketDir = d2
 }
 
 func cleanup(t *testing.T) {
 	require.NoError(t, os.RemoveAll(socketDir))
-	require.NoError(t, os.RemoveAll(deprecatedSocketDir))
 	os.MkdirAll(socketDir, 0755)
-	os.MkdirAll(deprecatedSocketDir, 0755)
 }
 
 func waitForRegistration(
@@ -119,7 +110,7 @@ func TestPluginRegistration(t *testing.T) {
 	defer cleanup(t)
 
 	dsw := cache.NewDesiredStateOfWorld()
-	newWatcher(t, false /* testDeprecatedDir */, dsw, wait.NeverStop)
+	newWatcher(t, dsw, wait.NeverStop)
 
 	for i := 0; i < 10; i++ {
 		socketPath := fmt.Sprintf("%s/plugin-%d.sock", socketDir, i)
@@ -128,7 +119,7 @@ func TestPluginRegistration(t *testing.T) {
 		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 
-		pluginInfo := GetPluginInfo(p, false /* testDeprecatedDir */)
+		pluginInfo := GetPluginInfo(p)
 		waitForRegistration(t, pluginInfo.SocketPath, dsw)
 
 		// Check the desired state for plugins
@@ -148,36 +139,11 @@ func TestPluginRegistration(t *testing.T) {
 	}
 }
 
-func TestPluginRegistrationDeprecated(t *testing.T) {
-	defer cleanup(t)
-
-	dsw := cache.NewDesiredStateOfWorld()
-	newWatcher(t, true /* testDeprecatedDir */, dsw, wait.NeverStop)
-
-	// Test plugins in deprecated dir
-	for i := 0; i < 10; i++ {
-		endpoint := fmt.Sprintf("%s/dep-plugin-%d.sock", deprecatedSocketDir, i)
-		pluginName := fmt.Sprintf("dep-example-plugin-%d", i)
-
-		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, endpoint, supportedVersions...)
-		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
-
-		pluginInfo := GetPluginInfo(p, true /* testDeprecatedDir */)
-		waitForRegistration(t, pluginInfo.SocketPath, dsw)
-
-		// Check the desired state for plugins
-		dswPlugins := dsw.GetPluginsToRegister()
-		if len(dswPlugins) != i+1 {
-			t.Fatalf("TestPluginRegistrationDeprecated: desired state of world length should be %d but it's %d", i+1, len(dswPlugins))
-		}
-	}
-}
-
 func TestPluginRegistrationSameName(t *testing.T) {
 	defer cleanup(t)
 
 	dsw := cache.NewDesiredStateOfWorld()
-	newWatcher(t, false /* testDeprecatedDir */, dsw, wait.NeverStop)
+	newWatcher(t, dsw, wait.NeverStop)
 
 	// Make 10 plugins with the same name and same type but different socket path;
 	// all 10 should be in desired state of world cache
@@ -187,7 +153,7 @@ func TestPluginRegistrationSameName(t *testing.T) {
 		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 
-		pluginInfo := GetPluginInfo(p, false /* testDeprecatedDir */)
+		pluginInfo := GetPluginInfo(p)
 		waitForRegistration(t, pluginInfo.SocketPath, dsw)
 
 		// Check the desired state for plugins
@@ -202,7 +168,7 @@ func TestPluginReRegistration(t *testing.T) {
 	defer cleanup(t)
 
 	dsw := cache.NewDesiredStateOfWorld()
-	newWatcher(t, false /* testDeprecatedDir */, dsw, wait.NeverStop)
+	newWatcher(t, dsw, wait.NeverStop)
 
 	// Create a plugin first, we are then going to remove the plugin, update the plugin with a different name
 	// and recreate it.
@@ -210,7 +176,7 @@ func TestPluginReRegistration(t *testing.T) {
 	pluginName := "reregister-plugin"
 	p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
-	pluginInfo := GetPluginInfo(p, false /* testDeprecatedDir */)
+	pluginInfo := GetPluginInfo(p)
 	lastTimestamp := time.Now()
 	waitForRegistration(t, pluginInfo.SocketPath, dsw)
 
@@ -259,7 +225,7 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 	}
 
 	dsw := cache.NewDesiredStateOfWorld()
-	newWatcher(t, false /* testDeprecatedDir */, dsw, wait.NeverStop)
+	newWatcher(t, dsw, wait.NeverStop)
 
 	var wg sync.WaitGroup
 	for i := 0; i < len(plugins); i++ {
@@ -267,7 +233,7 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 		go func(p *examplePlugin) {
 			defer wg.Done()
 
-			pluginInfo := GetPluginInfo(p, false /* testDeprecatedDir */)
+			pluginInfo := GetPluginInfo(p)
 			// Validate that the plugin is in the desired state cache
 			waitForRegistration(t, pluginInfo.SocketPath, dsw)
 		}(plugins[i])
@@ -287,213 +253,9 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 	}
 }
 
-func newWatcher(t *testing.T, testDeprecatedDir bool, desiredStateOfWorldCache cache.DesiredStateOfWorld, stopCh <-chan struct{}) *Watcher {
-	depSocketDir := ""
-	if testDeprecatedDir {
-		depSocketDir = deprecatedSocketDir
-	}
-	w := NewWatcher(socketDir, depSocketDir, desiredStateOfWorldCache)
+func newWatcher(t *testing.T, desiredStateOfWorldCache cache.DesiredStateOfWorld, stopCh <-chan struct{}) *Watcher {
+	w := NewWatcher(socketDir, desiredStateOfWorldCache)
 	require.NoError(t, w.Start(stopCh))
 
 	return w
-}
-
-func TestFoundInDeprecatedDir(t *testing.T) {
-	testCases := []struct {
-		sockDir                    string
-		deprecatedSockDir          string
-		socketPath                 string
-		expectFoundInDeprecatedDir bool
-	}{
-		{
-			sockDir:                    "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir:          "/var/lib/kubelet/plugins",
-			socketPath:                 "/var/lib/kubelet/plugins_registry/mydriver.foo/csi.sock",
-			expectFoundInDeprecatedDir: false,
-		},
-		{
-			sockDir:                    "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir:          "/var/lib/kubelet/plugins",
-			socketPath:                 "/var/lib/kubelet/plugins/mydriver.foo/csi.sock",
-			expectFoundInDeprecatedDir: true,
-		},
-		{
-			sockDir:                    "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir:          "/var/lib/kubelet/plugins",
-			socketPath:                 "/var/lib/kubelet/plugins_registry",
-			expectFoundInDeprecatedDir: false,
-		},
-		{
-			sockDir:                    "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir:          "/var/lib/kubelet/plugins",
-			socketPath:                 "/var/lib/kubelet/plugins",
-			expectFoundInDeprecatedDir: true,
-		},
-		{
-			sockDir:                    "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir:          "/var/lib/kubelet/plugins",
-			socketPath:                 "/var/lib/kubelet/plugins/kubernetes.io",
-			expectFoundInDeprecatedDir: true,
-		},
-		{
-			sockDir:                    "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir:          "/var/lib/kubelet/plugins",
-			socketPath:                 "/var/lib/kubelet/plugins/my.driver.com",
-			expectFoundInDeprecatedDir: true,
-		},
-		{
-			sockDir:                    "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir:          "/var/lib/kubelet/plugins",
-			socketPath:                 "/var/lib/kubelet/plugins_registry",
-			expectFoundInDeprecatedDir: false,
-		},
-		{
-			sockDir:                    "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir:          "/var/lib/kubelet/plugins",
-			socketPath:                 "/var/lib/kubelet/plugins_registry/kubernetes.io",
-			expectFoundInDeprecatedDir: false,
-		},
-		{
-			sockDir:                    "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir:          "/var/lib/kubelet/plugins",
-			socketPath:                 "/var/lib/kubelet/plugins_registry/my.driver.com",
-			expectFoundInDeprecatedDir: false,
-		},
-	}
-
-	for _, tc := range testCases {
-		// Arrange & Act
-		watcher := NewWatcher(tc.sockDir, tc.deprecatedSockDir, cache.NewDesiredStateOfWorld())
-
-		actualFoundInDeprecatedDir := watcher.foundInDeprecatedDir(tc.socketPath)
-
-		// Assert
-		if tc.expectFoundInDeprecatedDir != actualFoundInDeprecatedDir {
-			t.Fatalf("expecting actualFoundInDeprecatedDir=%v, but got %v for testcase: %#v", tc.expectFoundInDeprecatedDir, actualFoundInDeprecatedDir, tc)
-		}
-	}
-}
-
-func TestContainsBlacklistedDir(t *testing.T) {
-	testCases := []struct {
-		sockDir           string
-		deprecatedSockDir string
-		path              string
-		expected          bool
-	}{
-		{
-			sockDir:           "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir: "/var/lib/kubelet/plugins",
-			path:              "/var/lib/kubelet/plugins_registry/mydriver.foo/csi.sock",
-			expected:          false,
-		},
-		{
-			sockDir:           "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir: "/var/lib/kubelet/plugins",
-			path:              "/var/lib/kubelet/plugins/mydriver.foo/csi.sock",
-			expected:          false,
-		},
-		{
-			sockDir:           "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir: "/var/lib/kubelet/plugins",
-			path:              "/var/lib/kubelet/plugins_registry",
-			expected:          false,
-		},
-		{
-			sockDir:           "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir: "/var/lib/kubelet/plugins",
-			path:              "/var/lib/kubelet/plugins",
-			expected:          false,
-		},
-		{
-			sockDir:           "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir: "/var/lib/kubelet/plugins",
-			path:              "/var/lib/kubelet/plugins/kubernetes.io",
-			expected:          true,
-		},
-		{
-			sockDir:           "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir: "/var/lib/kubelet/plugins",
-			path:              "/var/lib/kubelet/plugins/kubernetes.io/csi.sock",
-			expected:          true,
-		},
-		{
-			sockDir:           "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir: "/var/lib/kubelet/plugins",
-			path:              "/var/lib/kubelet/plugins/kubernetes.io/my.plugin/csi.sock",
-			expected:          true,
-		},
-		{
-			sockDir:           "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir: "/var/lib/kubelet/plugins",
-			path:              "/var/lib/kubelet/plugins/kubernetes.io/",
-			expected:          true,
-		},
-		{
-			sockDir:           "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir: "/var/lib/kubelet/plugins",
-			path:              "/var/lib/kubelet/plugins/my.driver.com",
-			expected:          false,
-		},
-		{
-			sockDir:           "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir: "/var/lib/kubelet/plugins",
-			path:              "/var/lib/kubelet/plugins_registry",
-			expected:          false,
-		},
-		{
-			sockDir:           "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir: "/var/lib/kubelet/plugins",
-			path:              "/var/lib/kubelet/plugins_registry/kubernetes.io",
-			expected:          false, // New (non-deprecated dir) has no blacklist
-		},
-		{
-			sockDir:           "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir: "/var/lib/kubelet/plugins",
-			path:              "/var/lib/kubelet/plugins_registry/my.driver.com",
-			expected:          false,
-		},
-		{
-			sockDir:           "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir: "/var/lib/kubelet/plugins",
-			path:              "/var/lib/kubelet/plugins/my-kubernetes.io-plugin",
-			expected:          false,
-		},
-		{
-			sockDir:           "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir: "/var/lib/kubelet/plugins",
-			path:              "/var/lib/kubelet/plugins/my-kubernetes.io-plugin/csi.sock",
-			expected:          false,
-		},
-		{
-			sockDir:           "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir: "/var/lib/kubelet/plugins",
-			path:              "/var/lib/kubelet/plugins/kubernetes.io-plugin",
-			expected:          false,
-		},
-		{
-			sockDir:           "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir: "/var/lib/kubelet/plugins",
-			path:              "/var/lib/kubelet/plugins/kubernetes.io-plugin/csi.sock",
-			expected:          false,
-		},
-		{
-			sockDir:           "/var/lib/kubelet/plugins_registry",
-			deprecatedSockDir: "/var/lib/kubelet/plugins",
-			path:              "/var/lib/kubelet/plugins/kubernetes.io-plugin/",
-			expected:          false,
-		},
-	}
-
-	for _, tc := range testCases {
-		// Arrange & Act
-		watcher := NewWatcher(tc.sockDir, tc.deprecatedSockDir, cache.NewDesiredStateOfWorld())
-
-		actual := watcher.containsBlacklistedDir(tc.path)
-
-		// Assert
-		if tc.expected != actual {
-			t.Fatalf("expecting %v but got %v for testcase: %#v", tc.expected, actual, tc)
-		}
-	}
 }

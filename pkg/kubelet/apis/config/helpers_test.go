@@ -212,6 +212,7 @@ var (
 		"ReadOnlyPort",
 		"RegistryBurst",
 		"RegistryPullQPS",
+		"ReservedSystemCPUs",
 		"RuntimeRequestTimeout.Duration",
 		"SerializeImagePulls",
 		"StreamingConnectionIdleTimeout.Duration",

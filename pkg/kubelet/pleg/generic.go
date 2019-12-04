@@ -209,6 +209,8 @@ func (g *GenericPLEG) relist() {
 	g.updateRelistTime(timestamp)
 
 	pods := kubecontainer.Pods(podList)
+	// update running pod and container count
+	updateRunningPodAndContainerMetrics(pods)
 	g.podRecords.setCurrent(pods)
 
 	// Compare the old and the current pods, and generate events.
@@ -429,6 +431,24 @@ func getContainerState(pod *kubecontainer.Pod, cid *kubecontainer.ContainerID) p
 	}
 
 	return state
+}
+
+func updateRunningPodAndContainerMetrics(pods []*kubecontainer.Pod) {
+	// Set the number of running pods in the parameter
+	metrics.RunningPodCount.Set(float64(len(pods)))
+	// intermediate map to store the count of each "container_state"
+	containerStateCount := make(map[string]int)
+
+	for _, pod := range pods {
+		containers := pod.Containers
+		for _, container := range containers {
+			// update the corresponding "container_state" in map to set value for the gaugeVec metrics
+			containerStateCount[string(container.State)]++
+		}
+	}
+	for key, value := range containerStateCount {
+		metrics.RunningContainerCount.WithLabelValues(key).Set(float64(value))
+	}
 }
 
 func (pr podRecords) getOld(id types.UID) *kubecontainer.Pod {

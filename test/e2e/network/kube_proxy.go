@@ -28,8 +28,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/images/agnhost/net/nat"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -51,14 +51,15 @@ var _ = SIGDescribe("Network", func() {
 	fr := framework.NewDefaultFramework("network")
 
 	ginkgo.It("should set TCP CLOSE_WAIT timeout", func() {
-		nodes := framework.GetReadySchedulableNodesOrDie(fr.ClientSet)
-		ips := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
-
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(fr.ClientSet, 2)
+		framework.ExpectNoError(err)
 		if len(nodes.Items) < 2 {
 			framework.Skipf(
 				"Test requires >= 2 Ready nodes, but there are only %v nodes",
 				len(nodes.Items))
 		}
+
+		ips := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
 
 		type NodeInfo struct {
 			node   *v1.Node
@@ -81,7 +82,7 @@ var _ = SIGDescribe("Network", func() {
 		zero := int64(0)
 
 		// Some distributions (Ubuntu 16.04 etc.) don't support the proc file.
-		_, err := e2essh.IssueSSHCommandWithResult(
+		_, err = e2essh.IssueSSHCommandWithResult(
 			"ls /proc/net/nf_conntrack",
 			framework.TestContext.Provider,
 			clientNodeInfo.node)
@@ -212,7 +213,7 @@ var _ = SIGDescribe("Network", func() {
 		const epsilonSeconds = 60
 		const expectedTimeoutSeconds = 60 * 60
 
-		e2elog.Logf("conntrack entry timeout was: %v, expected: %v",
+		framework.Logf("conntrack entry timeout was: %v, expected: %v",
 			timeoutSeconds, expectedTimeoutSeconds)
 
 		gomega.Expect(math.Abs(float64(timeoutSeconds - expectedTimeoutSeconds))).Should(
@@ -241,7 +242,7 @@ var _ = SIGDescribe("Network", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "boom-server",
-						Image: "gcr.io/kubernetes-e2e-test-images/regression-issue-74839-amd64:1.0",
+						Image: imageutils.GetE2EImage(imageutils.RegressionIssue74839),
 						Ports: []v1.ContainerPort{
 							{
 								ContainerPort: 9000, // Default port exposed by boom-server
@@ -264,6 +265,9 @@ var _ = SIGDescribe("Network", func() {
 			},
 		}
 		_, err := fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Create(serverPod)
+		framework.ExpectNoError(err)
+
+		err = e2epod.WaitForPodsRunningReady(fr.ClientSet, fr.Namespace.Name, 1, 0, framework.PodReadyBeforeTimeout, map[string]string{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Server pod created")

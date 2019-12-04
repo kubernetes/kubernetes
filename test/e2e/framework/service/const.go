@@ -56,6 +56,10 @@ const (
 	// LoadBalancerCreateTimeoutLarge is the maximum time to wait for a load balancer to be created/modified.
 	LoadBalancerCreateTimeoutLarge = 2 * time.Hour
 
+	// LoadBalancerPropagationTimeoutDefault is the default time to wait for pods to
+	// be targeted by load balancers.
+	LoadBalancerPropagationTimeoutDefault = 10 * time.Minute
+
 	// LoadBalancerCleanupTimeout is the time required by the loadbalancer to cleanup, proportional to numApps/Ing.
 	// Bring the cleanup timeout back down to 5m once b/33588344 is resolved.
 	LoadBalancerCleanupTimeout = 15 * time.Minute
@@ -71,6 +75,12 @@ const (
 
 	// TestTimeout is used for most polling/waiting activities
 	TestTimeout = 60 * time.Second
+
+	// AffinityTimeout is the maximum time that CheckAffinity is allowed to take; this
+	// needs to be more than long enough for AffinityConfirmCount HTTP requests to
+	// complete in a busy CI cluster, but shouldn't be too long since we will end up
+	// waiting the entire time in the tests where affinity is not expected.
+	AffinityTimeout = 2 * time.Minute
 
 	// AffinityConfirmCount is the number of needed continuous requests to confirm that
 	// affinity is enabled.

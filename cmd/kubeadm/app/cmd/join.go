@@ -28,7 +28,7 @@ import (
 	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	clientcmd "k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -41,7 +41,6 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
@@ -159,15 +158,18 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 		Use:   "join [api-server-endpoint]",
 		Short: "Run this on any machine you wish to join an existing cluster",
 		Long:  joinLongDescription,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 
 			c, err := joinRunner.InitData(args)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
 			data := c.(*joinData)
 
-			err = joinRunner.Run(args)
-			kubeadmutil.CheckErr(err)
+			if err := joinRunner.Run(args); err != nil {
+				return err
+			}
 
 			// if the node is hosting a new control plane instance
 			if data.cfg.ControlPlane != nil {
@@ -181,14 +183,17 @@ func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 					"KubeConfigPath": kubeadmconstants.GetAdminKubeConfigPath(),
 					"etcdMessage":    etcdMessage,
 				}
-				err = joinControPlaneDoneTemp.Execute(data.outputWriter, ctx)
-				kubeadmutil.CheckErr(err)
+				if err := joinControPlaneDoneTemp.Execute(data.outputWriter, ctx); err != nil {
+					return err
+				}
 
 			} else {
 				// otherwise, if the node joined as a worker node;
 				// outputs the join done message and exit
 				fmt.Fprint(data.outputWriter, joinWorkerNodeDoneMsg)
 			}
+
+			return nil
 		},
 		// We accept the control-plane location as an optional positional argument
 		Args: cobra.MaximumNArgs(1),
@@ -337,6 +342,9 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 
 	// if not joining a control plane, unset the ControlPlane object
 	if !opt.controlPlane {
+		if opt.externalcfg.ControlPlane != nil {
+			klog.Warningf("[preflight] WARNING: JoinControlPane.controlPlane settings will be ignored when %s flag is not set.", options.ControlPlane)
+		}
 		opt.externalcfg.ControlPlane = nil
 	}
 

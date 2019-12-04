@@ -30,8 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/utils/pointer"
-
-	"github.com/onsi/ginkgo"
 )
 
 func getPatchBytes(oldLease, newLease *coordinationv1.Lease) ([]byte, error) {
@@ -53,8 +51,20 @@ func getPatchBytes(oldLease, newLease *coordinationv1.Lease) ([]byte, error) {
 var _ = framework.KubeDescribe("Lease", func() {
 	f := framework.NewDefaultFramework("lease-test")
 
-	// TODO(wojtek-t): Promote to Conformance once proved to be stable.
-	ginkgo.It("API should be available", func() {
+	/*
+		Release : v1.17
+		Testname: lease API should be available
+		Description: Create Lease object, and get it; create and get MUST be successful and Spec of the
+		read Lease MUST match Spec of original Lease. Update the Lease and get it; update and get MUST
+		be successful	and Spec of the read Lease MUST match Spec of updated Lease. Patch the Lease and
+		get it; patch and get MUST be successful and Spec of the read Lease MUST match Spec of patched
+		Lease. Create a second Lease with labels and list Leases; create and list MUST be successful and
+		list MUST return both leases. Delete the labels lease via delete collection; the delete MUST be
+		successful and MUST delete only the labels lease. List leases; list MUST be successful and MUST
+		return just the remaining lease. Delete the lease; delete MUST be successful. Get the lease; get
+		MUST return not found error.
+	*/
+	framework.ConformanceIt("lease API should be available", func() {
 		leaseClient := f.ClientSet.CoordinationV1().Leases(f.Namespace.Name)
 
 		name := "lease"

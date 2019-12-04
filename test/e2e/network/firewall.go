@@ -18,22 +18,23 @@ package network
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -71,27 +72,30 @@ var _ = SIGDescribe("Firewall rule", func() {
 		ginkgo.By("Getting cluster ID")
 		clusterID, err := gce.GetClusterID(cs)
 		framework.ExpectNoError(err)
-		e2elog.Logf("Got cluster ID: %v", clusterID)
+		framework.Logf("Got cluster ID: %v", clusterID)
 
-		jig := e2eservice.NewTestJig(cs, serviceName)
-		nodeList := jig.GetNodes(e2eservice.MaxNodesForEndpointsTests)
-		gomega.Expect(nodeList).NotTo(gomega.BeNil())
-		nodesNames := jig.GetNodesNames(e2eservice.MaxNodesForEndpointsTests)
-		if len(nodesNames) <= 0 {
-			e2elog.Failf("Expect at least 1 node, got: %v", nodesNames)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+		nodeList, err := e2enode.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
+		framework.ExpectNoError(err)
+
+		nodesNames := []string{}
+		for _, node := range nodeList.Items {
+			nodesNames = append(nodesNames, node.Name)
 		}
 		nodesSet := sets.NewString(nodesNames...)
 
 		ginkgo.By("Creating a LoadBalancer type service with ExternalTrafficPolicy=Global")
-		svc := jig.CreateLoadBalancerService(ns, serviceName, e2eservice.LoadBalancerCreateTimeoutDefault, func(svc *v1.Service) {
+		svc, err := jig.CreateLoadBalancerService(e2eservice.GetServiceLoadBalancerCreationTimeout(cs), func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: firewallTestHTTPPort}}
 			svc.Spec.LoadBalancerSourceRanges = firewallTestSourceRanges
 		})
+		framework.ExpectNoError(err)
 		defer func() {
-			jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+			_, err = jig.UpdateService(func(svc *v1.Service) {
 				svc.Spec.Type = v1.ServiceTypeNodePort
 				svc.Spec.LoadBalancerSourceRanges = nil
 			})
+			framework.ExpectNoError(err)
 			err = cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
 			framework.ExpectNoError(err)
 			ginkgo.By("Waiting for the local traffic health check firewall rule to be deleted")
@@ -117,9 +121,10 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		// OnlyLocal service is needed to examine which exact nodes the requests are being forwarded to by the Load Balancer on GCE
 		ginkgo.By("Updating LoadBalancer service to ExternalTrafficPolicy=Local")
-		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+		svc, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 		})
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for the nodes health check firewall rule to be deleted")
 		_, err = gce.WaitForFirewallRule(gceCloud, nodesHCFw.Name, false, e2eservice.LoadBalancerCleanupTimeout)
@@ -127,7 +132,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		ginkgo.By("Waiting for the correct local traffic health check firewall rule to be created")
 		localHCFw := gce.ConstructHealthCheckFirewallForLBService(clusterID, svc, cloudConfig.NodeTag, false)
-		fw, err = gce.WaitForFirewallRule(gceCloud, localHCFw.Name, true, e2eservice.LoadBalancerCreateTimeoutDefault)
+		fw, err = gce.WaitForFirewallRule(gceCloud, localHCFw.Name, true, e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
 		framework.ExpectNoError(err)
 		err = gce.VerifyFirewallRule(fw, localHCFw, cloudConfig.Network, false)
 		framework.ExpectNoError(err)
@@ -136,7 +141,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		for i, nodeName := range nodesNames {
 			podName := fmt.Sprintf("netexec%v", i)
 
-			e2elog.Logf("Creating netexec pod %q on node %v in namespace %q", podName, nodeName, ns)
+			framework.Logf("Creating netexec pod %q on node %v in namespace %q", podName, nodeName, ns)
 			pod := f.NewAgnhostPod(podName,
 				"netexec",
 				fmt.Sprintf("--http-port=%d", firewallTestHTTPPort),
@@ -146,11 +151,11 @@ var _ = SIGDescribe("Firewall rule", func() {
 			pod.Spec.HostNetwork = true
 			_, err := cs.CoreV1().Pods(ns).Create(pod)
 			framework.ExpectNoError(err)
-			framework.ExpectNoError(f.WaitForPodRunning(podName))
-			e2elog.Logf("Netexec pod %q in namespace %q running", podName, ns)
+			framework.ExpectNoError(f.WaitForPodReady(podName))
+			framework.Logf("Netexec pod %q in namespace %q running", podName, ns)
 
 			defer func() {
-				e2elog.Logf("Cleaning up the netexec pod: %v", podName)
+				framework.Logf("Cleaning up the netexec pod: %v", podName)
 				err = cs.CoreV1().Pods(ns).Delete(podName, nil)
 				framework.ExpectNoError(err)
 			}()
@@ -158,7 +163,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		// Send requests from outside of the cluster because internal traffic is whitelisted
 		ginkgo.By("Accessing the external service ip from outside, all non-master nodes should be reached")
-		err = framework.TestHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerCreateTimeoutDefault, nodesSet)
+		err = testHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerPropagationTimeoutDefault, nodesSet)
 		framework.ExpectNoError(err)
 
 		// Check if there are overlapping tags on the firewall that extend beyond just the vms in our cluster
@@ -179,20 +184,18 @@ var _ = SIGDescribe("Firewall rule", func() {
 			nodesSet.Insert(nodesNames[0])
 			gce.SetInstanceTags(cloudConfig, nodesNames[0], zone, removedTags)
 			// Make sure traffic is recovered before exit
-			err = framework.TestHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerCreateTimeoutDefault, nodesSet)
+			err = testHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerPropagationTimeoutDefault, nodesSet)
 			framework.ExpectNoError(err)
 		}()
 
 		ginkgo.By("Accessing serivce through the external ip and examine got no response from the node without tags")
-		err = framework.TestHitNodesFromOutsideWithCount(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerCreateTimeoutDefault, nodesSet, 15)
+		err = testHitNodesFromOutsideWithCount(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerPropagationTimeoutDefault, nodesSet, 15)
 		framework.ExpectNoError(err)
 	})
 
 	ginkgo.It("should have correct firewall rules for e2e cluster", func() {
-		nodes := framework.GetReadySchedulableNodesOrDie(cs)
-		if len(nodes.Items) <= 0 {
-			e2elog.Failf("Expect at least 1 node, got: %v", len(nodes.Items))
-		}
+		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Checking if e2e firewall rules are correct")
 		for _, expFw := range gce.GetE2eFirewalls(cloudConfig.MasterName, cloudConfig.MasterTag, cloudConfig.NodeTag, cloudConfig.Network, cloudConfig.ClusterIPRange) {
@@ -205,7 +208,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		ginkgo.By("Checking well known ports on master and nodes are not exposed externally")
 		nodeAddrs := e2enode.FirstAddress(nodes, v1.NodeExternalIP)
 		if len(nodeAddrs) == 0 {
-			e2elog.Failf("did not find any node addresses")
+			framework.Failf("did not find any node addresses")
 		}
 
 		masterAddresses := framework.GetAllMasterAddresses(cs)
@@ -220,11 +223,54 @@ var _ = SIGDescribe("Firewall rule", func() {
 })
 
 func assertNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) {
-	result := framework.PokeHTTP(ip, port, "/", &framework.HTTPPokeParams{Timeout: timeout})
-	if result.Status == framework.HTTPError {
-		e2elog.Failf("Unexpected error checking for reachability of %s:%d: %v", ip, port, result.Error)
+	result := e2enetwork.PokeHTTP(ip, port, "/", &e2enetwork.HTTPPokeParams{Timeout: timeout})
+	if result.Status == e2enetwork.HTTPError {
+		framework.Failf("Unexpected error checking for reachability of %s:%d: %v", ip, port, result.Error)
 	}
 	if result.Code != 0 {
-		e2elog.Failf("Was unexpectedly able to reach %s:%d", ip, port)
+		framework.Failf("Was unexpectedly able to reach %s:%d", ip, port)
 	}
+}
+
+// testHitNodesFromOutside checkes HTTP connectivity from outside.
+func testHitNodesFromOutside(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String) error {
+	return testHitNodesFromOutsideWithCount(externalIP, httpPort, timeout, expectedHosts, 1)
+}
+
+// testHitNodesFromOutsideWithCount checkes HTTP connectivity from outside with count.
+func testHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String,
+	countToSucceed int) error {
+	framework.Logf("Waiting up to %v for satisfying expectedHosts for %v times", timeout, countToSucceed)
+	hittedHosts := sets.NewString()
+	count := 0
+	condition := func() (bool, error) {
+		result := e2enetwork.PokeHTTP(externalIP, int(httpPort), "/hostname", &e2enetwork.HTTPPokeParams{Timeout: 1 * time.Second})
+		if result.Status != e2enetwork.HTTPSuccess {
+			return false, nil
+		}
+
+		hittedHost := strings.TrimSpace(string(result.Body))
+		if !expectedHosts.Has(hittedHost) {
+			framework.Logf("Error hitting unexpected host: %v, reset counter: %v", hittedHost, count)
+			count = 0
+			return false, nil
+		}
+		if !hittedHosts.Has(hittedHost) {
+			hittedHosts.Insert(hittedHost)
+			framework.Logf("Missing %+v, got %+v", expectedHosts.Difference(hittedHosts), hittedHosts)
+		}
+		if hittedHosts.Equal(expectedHosts) {
+			count++
+			if count >= countToSucceed {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+
+	if err := wait.Poll(time.Second, timeout, condition); err != nil {
+		return fmt.Errorf("error waiting for expectedHosts: %v, hittedHosts: %v, count: %v, expected count: %v",
+			expectedHosts, hittedHosts, count, countToSucceed)
+	}
+	return nil
 }

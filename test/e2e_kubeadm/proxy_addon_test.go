@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
 	authv1 "k8s.io/api/authorization/v1"
@@ -29,6 +29,7 @@ const (
 	kubeProxyServiceAccountName     = "kube-proxy"
 	kubeProxyConfigMap              = "kube-proxy"
 	kubeProxyConfigMapKey           = "config.conf"
+	kubeProxyConfigMapKeyKubeconfig = "kubeconfig.conf"
 	kubeProxyClusterRoleName        = "system:node-proxier"
 	kubeProxyClusterRoleBindingName = "kubeadm:node-proxier"
 	kubeProxyRoleName               = "kube-proxy"
@@ -47,7 +48,7 @@ var (
 
 // Define container for all the test specification aimed at verifying
 // that kubeadm configures the proxy addon as expected
-var _ = KubeadmDescribe("proxy addon", func() {
+var _ = Describe("proxy addon", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("proxy")
@@ -61,7 +62,7 @@ var _ = KubeadmDescribe("proxy addon", func() {
 			ExpectServiceAccount(f.ClientSet, kubeSystemNamespace, kubeProxyServiceAccountName)
 		})
 
-		ginkgo.It("should be binded to the system:node-proxier cluster role", func() {
+		ginkgo.It("should be bound to the system:node-proxier cluster role", func() {
 			ExpectClusterRoleBindingWithSubjectAndRole(f.ClientSet,
 				kubeProxyClusterRoleBindingName,
 				rbacv1.ServiceAccountKind, kubeProxyServiceAccountName,
@@ -75,6 +76,7 @@ var _ = KubeadmDescribe("proxy addon", func() {
 			cm := GetConfigMap(f.ClientSet, kubeSystemNamespace, kubeProxyConfigMap)
 
 			gomega.Expect(cm.Data).To(gomega.HaveKey(kubeProxyConfigMapKey))
+			gomega.Expect(cm.Data).To(gomega.HaveKey(kubeProxyConfigMapKeyKubeconfig))
 		})
 
 		ginkgo.It("should have related Role and RoleBinding", func() {

@@ -24,8 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -33,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestNewBuilder(t *testing.T) {
@@ -327,15 +328,15 @@ func TestNewBuilder(t *testing.T) {
       "required":["kind","apiVersion"],
       "properties":{
         "apiVersion":{
-          "description":"apiVersion defines the versioned schema of this representation of an object. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+          "description":"apiVersion defines the versioned schema of this representation of an object. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
           "type":"string"
         },
         "kind":{
-          "description":"kind is a string value representing the type of this object. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+          "description":"kind is a string value representing the type of this object. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
           "type":"string"
         },
         "metadata":{
-          "description":"Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+          "description":"Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
           "$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
         }
       }
@@ -351,34 +352,38 @@ func TestNewBuilder(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var schema *structuralschema.Structural
 			if len(tt.schema) > 0 {
-				v1beta1Schema := &v1beta1.JSONSchemaProps{}
+				v1beta1Schema := &apiextensionsv1.JSONSchemaProps{}
 				if err := json.Unmarshal([]byte(tt.schema), &v1beta1Schema); err != nil {
 					t.Fatal(err)
 				}
-				internalSchema := &apiextensions.JSONSchemaProps{}
-				v1beta1.Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v1beta1Schema, internalSchema, nil)
+				internalSchema := &apiextensionsinternal.JSONSchemaProps{}
+				apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v1beta1Schema, internalSchema, nil)
 				var err error
 				schema, err = structuralschema.NewStructural(internalSchema)
 				if err != nil {
 					t.Fatalf("structural schema error: %v", err)
 				}
-				if errs := structuralschema.ValidateStructural(schema, nil); len(errs) > 0 {
+				if errs := structuralschema.ValidateStructural(nil, schema); len(errs) > 0 {
 					t.Fatalf("structural schema validation error: %v", errs.ToAggregate())
 				}
 				schema = schema.Unfold()
 			}
 
-			got := newBuilder(&apiextensions.CustomResourceDefinition{
-				Spec: apiextensions.CustomResourceDefinitionSpec{
-					Group:   "bar.k8s.io",
-					Version: "v1",
-					Names: apiextensions.CustomResourceDefinitionNames{
+			got := newBuilder(&apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Group: "bar.k8s.io",
+					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+						{
+							Name: "v1",
+						},
+					},
+					Names: apiextensionsv1.CustomResourceDefinitionNames{
 						Plural:   "foos",
 						Singular: "foo",
 						Kind:     "Foo",
 						ListKind: "FooList",
 					},
-					Scope: apiextensions.NamespaceScoped,
+					Scope: apiextensionsv1.NamespaceScoped,
 				},
 			}, "v1", schema, tt.v2)
 
@@ -429,7 +434,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 	testCRDResourceName := "foos"
 
 	testCases := []struct {
-		scope apiextensions.ResourceScope
+		scope apiextensionsv1.ResourceScope
 		paths map[string]struct {
 			expectNamespaceParam bool
 			expectNameParam      bool
@@ -437,7 +442,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 		}
 	}{
 		{
-			scope: apiextensions.NamespaceScoped,
+			scope: apiextensionsv1.NamespaceScoped,
 			paths: map[string]struct {
 				expectNamespaceParam bool
 				expectNameParam      bool
@@ -451,7 +456,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 			},
 		},
 		{
-			scope: apiextensions.ClusterScoped,
+			scope: apiextensionsv1.ClusterScoped,
 			paths: map[string]struct {
 				expectNamespaceParam bool
 				expectNameParam      bool
@@ -466,22 +471,22 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		testNamespacedCRD := &apiextensions.CustomResourceDefinition{
-			Spec: apiextensions.CustomResourceDefinitionSpec{
+		testNamespacedCRD := &apiextensionsv1.CustomResourceDefinition{
+			Spec: apiextensionsv1.CustomResourceDefinitionSpec{
 				Scope: testCase.scope,
 				Group: testCRDGroup,
-				Names: apiextensions.CustomResourceDefinitionNames{
+				Names: apiextensionsv1.CustomResourceDefinitionNames{
 					Kind:   testCRDKind,
 					Plural: testCRDResourceName,
 				},
-				Versions: []apiextensions.CustomResourceDefinitionVersion{
+				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 					{
 						Name: testCRDVersion,
+						Subresources: &apiextensionsv1.CustomResourceSubresources{
+							Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+							Scale:  &apiextensionsv1.CustomResourceSubresourceScale{},
+						},
 					},
-				},
-				Subresources: &apiextensions.CustomResourceSubresources{
-					Status: &apiextensions.CustomResourceSubresourceStatus{},
-					Scale:  &apiextensions.CustomResourceSubresourceScale{},
 				},
 			},
 		}
@@ -554,82 +559,109 @@ func schemaDiff(a, b *spec.Schema) string {
 
 func TestBuildSwagger(t *testing.T) {
 	tests := []struct {
-		name         string
-		schema       string
-		wantedSchema string
-		opts         Options
+		name                  string
+		schema                string
+		preserveUnknownFields *bool
+		wantedSchema          string
+		opts                  Options
 	}{
 		{
 			"nil",
 			"",
+			nil,
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{V2: true, StripDefaults: true},
 		},
 		{
 			"with properties",
 			`{"type":"object","properties":{"spec":{"type":"object"},"status":{"type":"object"}}}`,
+			nil,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object"},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{V2: true, StripDefaults: true},
 		},
 		{
 			"with invalid-typed properties",
 			`{"type":"object","properties":{"spec":{"type":"bug"},"status":{"type":"object"}}}`,
+			nil,
+			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			Options{V2: true, StripDefaults: true},
+		},
+		{
+			"with non-structural schema",
+			`{"type":"object","properties":{"foo":{"type":"array"}}}`,
+			nil,
+			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			Options{V2: true, StripDefaults: true},
+		},
+		{
+			"with spec.preseveUnknownFields=true",
+			`{"type":"object","properties":{"foo":{"type":"string"}}}`,
+			utilpointer.BoolPtr(true),
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{V2: true, StripDefaults: true},
 		},
 		{
 			"with stripped defaults",
 			`{"type":"object","properties":{"foo":{"type":"string","default":"bar"}}}`,
+			nil,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{V2: true, StripDefaults: true},
 		},
 		{
 			"with stripped defaults",
 			`{"type":"object","properties":{"foo":{"type":"string","default":"bar"}}}`,
+			nil,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{V2: true, StripDefaults: true},
 		},
 		{
 			"v2",
 			`{"type":"object","properties":{"foo":{"type":"string","oneOf":[{"pattern":"a"},{"pattern":"b"}]}}}`,
+			nil,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{V2: true, StripDefaults: true},
 		},
 		{
 			"v3",
 			`{"type":"object","properties":{"foo":{"type":"string","oneOf":[{"pattern":"a"},{"pattern":"b"}]}}}`,
+			nil,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string","oneOf":[{"pattern":"a"},{"pattern":"b"}]}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{V2: false, StripDefaults: true},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var validation *apiextensions.CustomResourceValidation
+			var validation *apiextensionsv1.CustomResourceValidation
 			if len(tt.schema) > 0 {
-				v1beta1Schema := &v1beta1.JSONSchemaProps{}
-				if err := json.Unmarshal([]byte(tt.schema), &v1beta1Schema); err != nil {
+				v1Schema := &apiextensionsv1.JSONSchemaProps{}
+				if err := json.Unmarshal([]byte(tt.schema), &v1Schema); err != nil {
 					t.Fatal(err)
 				}
-				internalSchema := &apiextensions.JSONSchemaProps{}
-				v1beta1.Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v1beta1Schema, internalSchema, nil)
-				validation = &apiextensions.CustomResourceValidation{
-					OpenAPIV3Schema: internalSchema,
+				validation = &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: v1Schema,
 				}
+			}
+			if tt.preserveUnknownFields != nil && *tt.preserveUnknownFields {
+				validation.OpenAPIV3Schema.XPreserveUnknownFields = utilpointer.BoolPtr(true)
 			}
 
 			// TODO: mostly copied from the test above. reuse code to cleanup
-			got, err := BuildSwagger(&apiextensions.CustomResourceDefinition{
-				Spec: apiextensions.CustomResourceDefinitionSpec{
-					Group:   "bar.k8s.io",
-					Version: "v1",
-					Names: apiextensions.CustomResourceDefinitionNames{
+			got, err := BuildSwagger(&apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Group: "bar.k8s.io",
+					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+						{
+							Name:   "v1",
+							Schema: validation,
+						},
+					},
+					Names: apiextensionsv1.CustomResourceDefinitionNames{
 						Plural:   "foos",
 						Singular: "foo",
 						Kind:     "Foo",
 						ListKind: "FooList",
 					},
-					Scope:      apiextensions.NamespaceScoped,
-					Validation: validation,
+					Scope: apiextensionsv1.NamespaceScoped,
 				},
 			}, "v1", tt.opts)
 			if err != nil {

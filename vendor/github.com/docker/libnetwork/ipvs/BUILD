@@ -11,10 +11,17 @@ go_library(
     importpath = "github.com/docker/libnetwork/ipvs",
     visibility = ["//visibility:public"],
     deps = select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/sirupsen/logrus:go_default_library",
+            "//vendor/github.com/vishvananda/netlink/nl:go_default_library",
+            "//vendor/github.com/vishvananda/netns:go_default_library",
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/sirupsen/logrus:go_default_library",
             "//vendor/github.com/vishvananda/netlink/nl:go_default_library",
             "//vendor/github.com/vishvananda/netns:go_default_library",
+            "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],
     }),

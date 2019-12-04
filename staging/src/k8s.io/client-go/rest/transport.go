@@ -74,6 +74,7 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 			CertData:   c.CertData,
 			KeyFile:    c.KeyFile,
 			KeyData:    c.KeyData,
+			NextProtos: c.NextProtos,
 		},
 		Username:        c.Username,
 		Password:        c.Password,

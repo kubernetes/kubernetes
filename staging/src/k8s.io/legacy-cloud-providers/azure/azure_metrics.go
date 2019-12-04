@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -20,12 +22,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 type apiCallMetrics struct {
-	latency *prometheus.HistogramVec
-	errors  *prometheus.CounterVec
+	latency          *metrics.HistogramVec
+	errors           *metrics.CounterVec
+	rateLimitedCount *metrics.CounterVec
 }
 
 var (
@@ -50,6 +54,9 @@ func newMetricContext(prefix, request, resourceGroup, subscriptionID, source str
 		attributes: []string{prefix + "_" + request, strings.ToLower(resourceGroup), subscriptionID, source},
 	}
 }
+func (mc *metricContext) RateLimitedCount() {
+	apiMetrics.rateLimitedCount.WithLabelValues(mc.attributes...).Inc()
+}
 
 func (mc *metricContext) Observe(err error) error {
 	apiMetrics.latency.WithLabelValues(mc.attributes...).Observe(
@@ -63,24 +70,35 @@ func (mc *metricContext) Observe(err error) error {
 
 func registerAPIMetrics(attributes ...string) *apiCallMetrics {
 	metrics := &apiCallMetrics{
-		latency: prometheus.NewHistogramVec(
-			prometheus.HistogramOpts{
-				Name: "cloudprovider_azure_api_request_duration_seconds",
-				Help: "Latency of an Azure API call",
+		latency: metrics.NewHistogramVec(
+			&metrics.HistogramOpts{
+				Name:           "cloudprovider_azure_api_request_duration_seconds",
+				Help:           "Latency of an Azure API call",
+				StabilityLevel: metrics.ALPHA,
 			},
 			attributes,
 		),
-		errors: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "cloudprovider_azure_api_request_errors",
-				Help: "Number of errors for an Azure API call",
+		errors: metrics.NewCounterVec(
+			&metrics.CounterOpts{
+				Name:           "cloudprovider_azure_api_request_errors",
+				Help:           "Number of errors for an Azure API call",
+				StabilityLevel: metrics.ALPHA,
+			},
+			attributes,
+		),
+		rateLimitedCount: metrics.NewCounterVec(
+			&metrics.CounterOpts{
+				Name:           "cloudprovider_azure_api_request_ratelimited_count",
+				Help:           "Number of rate limited Azure API calls",
+				StabilityLevel: metrics.ALPHA,
 			},
 			attributes,
 		),
 	}
 
-	prometheus.MustRegister(metrics.latency)
-	prometheus.MustRegister(metrics.errors)
+	legacyregistry.MustRegister(metrics.latency)
+	legacyregistry.MustRegister(metrics.errors)
+	legacyregistry.MustRegister(metrics.rateLimitedCount)
 
 	return metrics
 }

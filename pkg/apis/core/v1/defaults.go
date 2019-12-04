@@ -24,6 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/parsers"
 	utilpointer "k8s.io/utils/pointer"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
+	utilnet "k8s.io/utils/net"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -128,6 +132,33 @@ func SetDefaults_Service(obj *v1.Service) {
 		obj.Spec.ExternalTrafficPolicy == "" {
 		obj.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
 	}
+
+	// if dualstack feature gate is on then we need to default
+	// Spec.IPFamily correctly. This is to cover the case
+	// when an existing cluster have been converted to dualstack
+	// i.e. it already contain services with Spec.IPFamily==nil
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) &&
+		obj.Spec.Type != v1.ServiceTypeExternalName &&
+		obj.Spec.ClusterIP != "" && /*has an ip already set*/
+		obj.Spec.ClusterIP != "None" && /* not converting from ExternalName to other */
+		obj.Spec.IPFamily == nil /* family was not previously set */ {
+
+		// there is a change that the ClusterIP (set by user) is unparsable.
+		// in this case, the family will be set mistakenly to ipv4 (because
+		// the util function does not parse errors *sigh*). The error
+		// will be caught in validation which asserts the validity of the
+		// IP and the service object will not be persisted with the wrong IP
+		// family
+
+		ipv6 := v1.IPv6Protocol
+		ipv4 := v1.IPv4Protocol
+		if utilnet.IsIPv6String(obj.Spec.ClusterIP) {
+			obj.Spec.IPFamily = &ipv6
+		} else {
+			obj.Spec.IPFamily = &ipv4
+		}
+	}
+
 }
 func SetDefaults_Pod(obj *v1.Pod) {
 	// If limits are specified, but requests are not, default requests to limits

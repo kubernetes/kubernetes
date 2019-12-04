@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -39,6 +40,7 @@ type fakeTable struct {
 type fakeIPTables struct {
 	tables        map[string]*fakeTable
 	builtinChains map[string]sets.String
+	ipv6          bool
 }
 
 func NewFakeIPTables() *fakeIPTables {
@@ -49,6 +51,7 @@ func NewFakeIPTables() *fakeIPTables {
 			string(utiliptables.TableNAT):    sets.NewString("PREROUTING", "INPUT", "OUTPUT", "POSTROUTING"),
 			string(utiliptables.TableMangle): sets.NewString("PREROUTING", "INPUT", "FORWARD", "OUTPUT", "POSTROUTING"),
 		},
+		ipv6: false,
 	}
 }
 
@@ -221,7 +224,7 @@ func (f *fakeIPTables) DeleteRule(tableName utiliptables.Table, chainName utilip
 }
 
 func (f *fakeIPTables) IsIpv6() bool {
-	return false
+	return f.ipv6
 }
 
 func saveChain(chain *fakeChain, data *bytes.Buffer) {
@@ -335,15 +338,16 @@ func (f *fakeIPTables) RestoreAll(data []byte, flush utiliptables.FlushFlag, cou
 	return f.restore("", data, flush)
 }
 
-func (f *fakeIPTables) AddReloadFunc(reloadFunc func()) {
-}
-
-func (f *fakeIPTables) Destroy() {
+func (f *fakeIPTables) Monitor(canary utiliptables.Chain, tables []utiliptables.Table, reloadFunc func(), interval time.Duration, stopCh <-chan struct{}) {
 }
 
 func (f *fakeIPTables) isBuiltinChain(tableName utiliptables.Table, chainName utiliptables.Chain) bool {
 	if builtinChains, ok := f.builtinChains[string(tableName)]; ok && builtinChains.Has(string(chainName)) {
 		return true
 	}
+	return false
+}
+
+func (f *fakeIPTables) HasRandomFully() bool {
 	return false
 }

@@ -270,19 +270,22 @@ func PossibleDiffDiskOptionsValues() []DiffDiskOptions {
 type DiskCreateOption string
 
 const (
-	// Attach ...
+	// Attach Disk will be attached to a VM.
 	Attach DiskCreateOption = "Attach"
-	// Copy ...
+	// Copy Create a new disk or snapshot by copying from a disk or snapshot specified by the given
+	// sourceResourceId.
 	Copy DiskCreateOption = "Copy"
-	// Empty ...
+	// Empty Create an empty data disk of a size given by diskSizeGB.
 	Empty DiskCreateOption = "Empty"
-	// FromImage ...
+	// FromImage Create a new disk from a platform image specified by the given imageReference.
 	FromImage DiskCreateOption = "FromImage"
-	// Import ...
+	// Import Create a disk by importing from a blob specified by a sourceUri in a storage account specified by
+	// storageAccountId.
 	Import DiskCreateOption = "Import"
-	// Restore ...
+	// Restore Create a new disk by copying from a backup recovery point.
 	Restore DiskCreateOption = "Restore"
-	// Upload ...
+	// Upload Create a new disk by obtaining a write token and using it to directly upload the contents of the
+	// disk.
 	Upload DiskCreateOption = "Upload"
 )
 
@@ -308,21 +311,34 @@ func PossibleDiskCreateOptionTypesValues() []DiskCreateOptionTypes {
 	return []DiskCreateOptionTypes{DiskCreateOptionTypesAttach, DiskCreateOptionTypesEmpty, DiskCreateOptionTypesFromImage}
 }
 
+// DiskEncryptionSetIdentityType enumerates the values for disk encryption set identity type.
+type DiskEncryptionSetIdentityType string
+
+const (
+	// SystemAssigned ...
+	SystemAssigned DiskEncryptionSetIdentityType = "SystemAssigned"
+)
+
+// PossibleDiskEncryptionSetIdentityTypeValues returns an array of possible values for the DiskEncryptionSetIdentityType const type.
+func PossibleDiskEncryptionSetIdentityTypeValues() []DiskEncryptionSetIdentityType {
+	return []DiskEncryptionSetIdentityType{SystemAssigned}
+}
+
 // DiskState enumerates the values for disk state.
 type DiskState string
 
 const (
-	// ActiveSAS ...
+	// ActiveSAS The disk currently has an Active SAS Uri associated with it.
 	ActiveSAS DiskState = "ActiveSAS"
-	// ActiveUpload ...
+	// ActiveUpload A disk is created for upload and a write token has been issued for uploading to it.
 	ActiveUpload DiskState = "ActiveUpload"
-	// Attached ...
+	// Attached The disk is currently mounted to a running VM.
 	Attached DiskState = "Attached"
-	// ReadyToUpload ...
+	// ReadyToUpload A disk is ready to be created by upload by requesting a write token.
 	ReadyToUpload DiskState = "ReadyToUpload"
-	// Reserved ...
+	// Reserved The disk is mounted to a stopped-deallocated VM
 	Reserved DiskState = "Reserved"
-	// Unattached ...
+	// Unattached The disk is not being used and can be attached to a VM.
 	Unattached DiskState = "Unattached"
 )
 
@@ -335,19 +351,39 @@ func PossibleDiskStateValues() []DiskState {
 type DiskStorageAccountTypes string
 
 const (
-	// PremiumLRS ...
+	// PremiumLRS Premium SSD locally redundant storage. Best for production and performance sensitive
+	// workloads.
 	PremiumLRS DiskStorageAccountTypes = "Premium_LRS"
-	// StandardLRS ...
+	// StandardLRS Standard HDD locally redundant storage. Best for backup, non-critical, and infrequent
+	// access.
 	StandardLRS DiskStorageAccountTypes = "Standard_LRS"
-	// StandardSSDLRS ...
+	// StandardSSDLRS Standard SSD locally redundant storage. Best for web servers, lightly used enterprise
+	// applications and dev/test.
 	StandardSSDLRS DiskStorageAccountTypes = "StandardSSD_LRS"
-	// UltraSSDLRS ...
+	// UltraSSDLRS Ultra SSD locally redundant storage. Best for IO-intensive workloads such as SAP HANA, top
+	// tier databases (for example, SQL, Oracle), and other transaction-heavy workloads.
 	UltraSSDLRS DiskStorageAccountTypes = "UltraSSD_LRS"
 )
 
 // PossibleDiskStorageAccountTypesValues returns an array of possible values for the DiskStorageAccountTypes const type.
 func PossibleDiskStorageAccountTypesValues() []DiskStorageAccountTypes {
 	return []DiskStorageAccountTypes{PremiumLRS, StandardLRS, StandardSSDLRS, UltraSSDLRS}
+}
+
+// EncryptionType enumerates the values for encryption type.
+type EncryptionType string
+
+const (
+	// EncryptionAtRestWithCustomerKey Disk is encrypted with Customer managed key at rest.
+	EncryptionAtRestWithCustomerKey EncryptionType = "EncryptionAtRestWithCustomerKey"
+	// EncryptionAtRestWithPlatformKey Disk is encrypted with XStore managed key at rest. It is the default
+	// encryption type.
+	EncryptionAtRestWithPlatformKey EncryptionType = "EncryptionAtRestWithPlatformKey"
+)
+
+// PossibleEncryptionTypeValues returns an array of possible values for the EncryptionType const type.
+func PossibleEncryptionTypeValues() []EncryptionType {
+	return []EncryptionType{EncryptionAtRestWithCustomerKey, EncryptionAtRestWithPlatformKey}
 }
 
 // HostCaching enumerates the values for host caching.
@@ -605,6 +641,29 @@ func PossibleProvisioningState2Values() []ProvisioningState2 {
 	return []ProvisioningState2{ProvisioningState2Creating, ProvisioningState2Deleting, ProvisioningState2Failed, ProvisioningState2Migrating, ProvisioningState2Succeeded, ProvisioningState2Updating}
 }
 
+// ProvisioningState3 enumerates the values for provisioning state 3.
+type ProvisioningState3 string
+
+const (
+	// ProvisioningState3Creating ...
+	ProvisioningState3Creating ProvisioningState3 = "Creating"
+	// ProvisioningState3Deleting ...
+	ProvisioningState3Deleting ProvisioningState3 = "Deleting"
+	// ProvisioningState3Failed ...
+	ProvisioningState3Failed ProvisioningState3 = "Failed"
+	// ProvisioningState3Migrating ...
+	ProvisioningState3Migrating ProvisioningState3 = "Migrating"
+	// ProvisioningState3Succeeded ...
+	ProvisioningState3Succeeded ProvisioningState3 = "Succeeded"
+	// ProvisioningState3Updating ...
+	ProvisioningState3Updating ProvisioningState3 = "Updating"
+)
+
+// PossibleProvisioningState3Values returns an array of possible values for the ProvisioningState3 const type.
+func PossibleProvisioningState3Values() []ProvisioningState3 {
+	return []ProvisioningState3{ProvisioningState3Creating, ProvisioningState3Deleting, ProvisioningState3Failed, ProvisioningState3Migrating, ProvisioningState3Succeeded, ProvisioningState3Updating}
+}
+
 // ProximityPlacementGroupType enumerates the values for proximity placement group type.
 type ProximityPlacementGroupType string
 
@@ -771,11 +830,11 @@ func PossibleSettingNamesValues() []SettingNames {
 type SnapshotStorageAccountTypes string
 
 const (
-	// SnapshotStorageAccountTypesPremiumLRS ...
+	// SnapshotStorageAccountTypesPremiumLRS Premium SSD locally redundant storage
 	SnapshotStorageAccountTypesPremiumLRS SnapshotStorageAccountTypes = "Premium_LRS"
-	// SnapshotStorageAccountTypesStandardLRS ...
+	// SnapshotStorageAccountTypesStandardLRS Standard HDD locally redundant storage
 	SnapshotStorageAccountTypesStandardLRS SnapshotStorageAccountTypes = "Standard_LRS"
-	// SnapshotStorageAccountTypesStandardZRS ...
+	// SnapshotStorageAccountTypesStandardZRS Standard zone redundant storage
 	SnapshotStorageAccountTypesStandardZRS SnapshotStorageAccountTypes = "Standard_ZRS"
 )
 
@@ -916,6 +975,23 @@ const (
 // PossibleVirtualMachinePriorityTypesValues returns an array of possible values for the VirtualMachinePriorityTypes const type.
 func PossibleVirtualMachinePriorityTypesValues() []VirtualMachinePriorityTypes {
 	return []VirtualMachinePriorityTypes{Low, Regular}
+}
+
+// VirtualMachineScaleSetScaleInRules enumerates the values for virtual machine scale set scale in rules.
+type VirtualMachineScaleSetScaleInRules string
+
+const (
+	// Default ...
+	Default VirtualMachineScaleSetScaleInRules = "Default"
+	// NewestVM ...
+	NewestVM VirtualMachineScaleSetScaleInRules = "NewestVM"
+	// OldestVM ...
+	OldestVM VirtualMachineScaleSetScaleInRules = "OldestVM"
+)
+
+// PossibleVirtualMachineScaleSetScaleInRulesValues returns an array of possible values for the VirtualMachineScaleSetScaleInRules const type.
+func PossibleVirtualMachineScaleSetScaleInRulesValues() []VirtualMachineScaleSetScaleInRules {
+	return []VirtualMachineScaleSetScaleInRules{Default, NewestVM, OldestVM}
 }
 
 // VirtualMachineScaleSetSkuScaleType enumerates the values for virtual machine scale set sku scale type.
@@ -1348,6 +1424,17 @@ type AutomaticOSUpgradeProperties struct {
 	AutomaticOSUpgradeSupported *bool `json:"automaticOSUpgradeSupported,omitempty"`
 }
 
+// AutomaticRepairsPolicy specifies the configuration parameters for automatic repairs on the virtual
+// machine scale set.
+type AutomaticRepairsPolicy struct {
+	// Enabled - Specifies whether automatic repairs should be enabled on the virtual machine scale set. The default value is false.
+	Enabled *bool `json:"enabled,omitempty"`
+	// GracePeriod - The amount of time for which automatic repairs are suspended due to a state change on VM. The grace time starts after the state change has completed. This helps avoid premature or accidental repairs. The time duration should be specified in ISO 8601 format. The default value is 5 minutes (PT5M).
+	GracePeriod *string `json:"gracePeriod,omitempty"`
+	// MaxInstanceRepairsPercent - The percentage (capacity of scaleset) of virtual machines that will be simultaneously repaired. The default value is 20%.
+	MaxInstanceRepairsPercent *int32 `json:"maxInstanceRepairsPercent,omitempty"`
+}
+
 // AvailabilitySet specifies information about the availability set that the virtual machine should be
 // assigned to. Virtual machines specified in the same availability set are allocated to different nodes to
 // maximize availability. For more information about availability sets, see [Manage the availability of
@@ -1698,6 +1785,13 @@ func (asu *AvailabilitySetUpdate) UnmarshalJSON(body []byte) error {
 	return nil
 }
 
+// BillingProfile specifies the billing related details of a low priority VM or VMSS. <br><br>Minimum
+// api-version: 2019-03-01.
+type BillingProfile struct {
+	// MaxPrice - Specifies the maximum price you are willing to pay for a low priority VM/VMSS. This price is in US Dollars. <br><br> This price will be compared with the current low priority price for the VM size. Also, the prices are compared at the time of create/update of low priority VM/VMSS and the operation will only succeed if  the maxPrice is greater than the current low priority price. <br><br> The maxPrice will also be used for evicting a low priority VM/VMSS if the current low priority price goes beyond the maxPrice after creation of VM/VMSS. <br><br> Possible values are: <br><br> - Any decimal value greater than zero. Example: $0.01538 <br><br> -1 – indicates default price to be up-to on-demand. <br><br> You can set the maxPrice to -1 to indicate that the low priority VM/VMSS should not be evicted for price reasons. Also, the default max price is -1 if it is not provided by you. <br><br>Minimum api-version: 2019-03-01.
+	MaxPrice *float64 `json:"maxPrice,omitempty"`
+}
+
 // BootDiagnostics boot Diagnostics is a debugging feature which allows you to view Console Output and
 // Screenshot to diagnose VM status. <br><br> You can easily view the output of your console log. <br><br>
 // Azure also enables you to see a screenshot of the VM from the hypervisor.
@@ -1718,7 +1812,7 @@ type BootDiagnosticsInstanceView struct {
 	Status *InstanceViewStatus `json:"status,omitempty"`
 }
 
-// CloudError an error response from the Gallery service.
+// CloudError an error response from the Compute service.
 type CloudError struct {
 	Error *APIError `json:"error,omitempty"`
 }
@@ -2142,6 +2236,10 @@ type CreationData struct {
 	SourceURI *string `json:"sourceUri,omitempty"`
 	// SourceResourceID - If createOption is Copy, this is the ARM id of the source snapshot or disk.
 	SourceResourceID *string `json:"sourceResourceId,omitempty"`
+	// SourceUniqueID - READ-ONLY; If this field is set, this is the unique id identifying the source of this resource.
+	SourceUniqueID *string `json:"sourceUniqueId,omitempty"`
+	// UploadSizeBytes - If createOption is Upload, this is the size of the contents of the upload including the VHD footer. This value should be between 20972032 (20 MiB + 512 bytes for the VHD footer) and 35183298347520 bytes (32 TiB + 512 bytes for the VHD footer).
+	UploadSizeBytes *int64 `json:"uploadSizeBytes,omitempty"`
 }
 
 // DataDisk describes a data disk.
@@ -2166,6 +2264,10 @@ type DataDisk struct {
 	ManagedDisk *ManagedDiskParameters `json:"managedDisk,omitempty"`
 	// ToBeDetached - Specifies whether the data disk is in process of detachment from the VirtualMachine/VirtualMachineScaleset
 	ToBeDetached *bool `json:"toBeDetached,omitempty"`
+	// DiskIOPSReadWrite - READ-ONLY; Specifies the Read-Write IOPS for the managed disk when StorageAccountType is UltraSSD_LRS. Returned only for VirtualMachine ScaleSet VM disks. Can be updated only via updates to the VirtualMachine Scale Set.
+	DiskIOPSReadWrite *int64 `json:"diskIOPSReadWrite,omitempty"`
+	// DiskMBpsReadWrite - READ-ONLY; Specifies the bandwidth in MB per second for the managed disk when StorageAccountType is UltraSSD_LRS. Returned only for VirtualMachine ScaleSet VM disks. Can be updated only via updates to the VirtualMachine Scale Set.
+	DiskMBpsReadWrite *int64 `json:"diskMBpsReadWrite,omitempty"`
 }
 
 // DataDiskImage contains the data disk images information.
@@ -3108,6 +3210,354 @@ func (d *Disk) UnmarshalJSON(body []byte) error {
 	return nil
 }
 
+// DiskEncryptionSet disk encryption set resource.
+type DiskEncryptionSet struct {
+	autorest.Response        `json:"-"`
+	Identity                 *EncryptionSetIdentity `json:"identity,omitempty"`
+	*EncryptionSetProperties `json:"properties,omitempty"`
+	// ID - READ-ONLY; Resource Id
+	ID *string `json:"id,omitempty"`
+	// Name - READ-ONLY; Resource name
+	Name *string `json:"name,omitempty"`
+	// Type - READ-ONLY; Resource type
+	Type *string `json:"type,omitempty"`
+	// Location - Resource location
+	Location *string `json:"location,omitempty"`
+	// Tags - Resource tags
+	Tags map[string]*string `json:"tags"`
+}
+
+// MarshalJSON is the custom marshaler for DiskEncryptionSet.
+func (desVar DiskEncryptionSet) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if desVar.Identity != nil {
+		objectMap["identity"] = desVar.Identity
+	}
+	if desVar.EncryptionSetProperties != nil {
+		objectMap["properties"] = desVar.EncryptionSetProperties
+	}
+	if desVar.Location != nil {
+		objectMap["location"] = desVar.Location
+	}
+	if desVar.Tags != nil {
+		objectMap["tags"] = desVar.Tags
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for DiskEncryptionSet struct.
+func (desVar *DiskEncryptionSet) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "identity":
+			if v != nil {
+				var identity EncryptionSetIdentity
+				err = json.Unmarshal(*v, &identity)
+				if err != nil {
+					return err
+				}
+				desVar.Identity = &identity
+			}
+		case "properties":
+			if v != nil {
+				var encryptionSetProperties EncryptionSetProperties
+				err = json.Unmarshal(*v, &encryptionSetProperties)
+				if err != nil {
+					return err
+				}
+				desVar.EncryptionSetProperties = &encryptionSetProperties
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				desVar.ID = &ID
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				desVar.Name = &name
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				desVar.Type = &typeVar
+			}
+		case "location":
+			if v != nil {
+				var location string
+				err = json.Unmarshal(*v, &location)
+				if err != nil {
+					return err
+				}
+				desVar.Location = &location
+			}
+		case "tags":
+			if v != nil {
+				var tags map[string]*string
+				err = json.Unmarshal(*v, &tags)
+				if err != nil {
+					return err
+				}
+				desVar.Tags = tags
+			}
+		}
+	}
+
+	return nil
+}
+
+// DiskEncryptionSetList the List disk encryption set operation response.
+type DiskEncryptionSetList struct {
+	autorest.Response `json:"-"`
+	// Value - A list of disk encryption sets.
+	Value *[]DiskEncryptionSet `json:"value,omitempty"`
+	// NextLink - The uri to fetch the next page of disk encryption sets. Call ListNext() with this to fetch the next page of disk encryption sets.
+	NextLink *string `json:"nextLink,omitempty"`
+}
+
+// DiskEncryptionSetListIterator provides access to a complete listing of DiskEncryptionSet values.
+type DiskEncryptionSetListIterator struct {
+	i    int
+	page DiskEncryptionSetListPage
+}
+
+// NextWithContext advances to the next value.  If there was an error making
+// the request the iterator does not advance and the error is returned.
+func (iter *DiskEncryptionSetListIterator) NextWithContext(ctx context.Context) (err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/DiskEncryptionSetListIterator.NextWithContext")
+		defer func() {
+			sc := -1
+			if iter.Response().Response.Response != nil {
+				sc = iter.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	iter.i++
+	if iter.i < len(iter.page.Values()) {
+		return nil
+	}
+	err = iter.page.NextWithContext(ctx)
+	if err != nil {
+		iter.i--
+		return err
+	}
+	iter.i = 0
+	return nil
+}
+
+// Next advances to the next value.  If there was an error making
+// the request the iterator does not advance and the error is returned.
+// Deprecated: Use NextWithContext() instead.
+func (iter *DiskEncryptionSetListIterator) Next() error {
+	return iter.NextWithContext(context.Background())
+}
+
+// NotDone returns true if the enumeration should be started or is not yet complete.
+func (iter DiskEncryptionSetListIterator) NotDone() bool {
+	return iter.page.NotDone() && iter.i < len(iter.page.Values())
+}
+
+// Response returns the raw server response from the last page request.
+func (iter DiskEncryptionSetListIterator) Response() DiskEncryptionSetList {
+	return iter.page.Response()
+}
+
+// Value returns the current value or a zero-initialized value if the
+// iterator has advanced beyond the end of the collection.
+func (iter DiskEncryptionSetListIterator) Value() DiskEncryptionSet {
+	if !iter.page.NotDone() {
+		return DiskEncryptionSet{}
+	}
+	return iter.page.Values()[iter.i]
+}
+
+// Creates a new instance of the DiskEncryptionSetListIterator type.
+func NewDiskEncryptionSetListIterator(page DiskEncryptionSetListPage) DiskEncryptionSetListIterator {
+	return DiskEncryptionSetListIterator{page: page}
+}
+
+// IsEmpty returns true if the ListResult contains no values.
+func (desl DiskEncryptionSetList) IsEmpty() bool {
+	return desl.Value == nil || len(*desl.Value) == 0
+}
+
+// diskEncryptionSetListPreparer prepares a request to retrieve the next set of results.
+// It returns nil if no more results exist.
+func (desl DiskEncryptionSetList) diskEncryptionSetListPreparer(ctx context.Context) (*http.Request, error) {
+	if desl.NextLink == nil || len(to.String(desl.NextLink)) < 1 {
+		return nil, nil
+	}
+	return autorest.Prepare((&http.Request{}).WithContext(ctx),
+		autorest.AsJSON(),
+		autorest.AsGet(),
+		autorest.WithBaseURL(to.String(desl.NextLink)))
+}
+
+// DiskEncryptionSetListPage contains a page of DiskEncryptionSet values.
+type DiskEncryptionSetListPage struct {
+	fn   func(context.Context, DiskEncryptionSetList) (DiskEncryptionSetList, error)
+	desl DiskEncryptionSetList
+}
+
+// NextWithContext advances to the next page of values.  If there was an error making
+// the request the page does not advance and the error is returned.
+func (page *DiskEncryptionSetListPage) NextWithContext(ctx context.Context) (err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/DiskEncryptionSetListPage.NextWithContext")
+		defer func() {
+			sc := -1
+			if page.Response().Response.Response != nil {
+				sc = page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	next, err := page.fn(ctx, page.desl)
+	if err != nil {
+		return err
+	}
+	page.desl = next
+	return nil
+}
+
+// Next advances to the next page of values.  If there was an error making
+// the request the page does not advance and the error is returned.
+// Deprecated: Use NextWithContext() instead.
+func (page *DiskEncryptionSetListPage) Next() error {
+	return page.NextWithContext(context.Background())
+}
+
+// NotDone returns true if the page enumeration should be started or is not yet complete.
+func (page DiskEncryptionSetListPage) NotDone() bool {
+	return !page.desl.IsEmpty()
+}
+
+// Response returns the raw server response from the last page request.
+func (page DiskEncryptionSetListPage) Response() DiskEncryptionSetList {
+	return page.desl
+}
+
+// Values returns the slice of values for the current page or nil if there are no values.
+func (page DiskEncryptionSetListPage) Values() []DiskEncryptionSet {
+	if page.desl.IsEmpty() {
+		return nil
+	}
+	return *page.desl.Value
+}
+
+// Creates a new instance of the DiskEncryptionSetListPage type.
+func NewDiskEncryptionSetListPage(getNextPage func(context.Context, DiskEncryptionSetList) (DiskEncryptionSetList, error)) DiskEncryptionSetListPage {
+	return DiskEncryptionSetListPage{fn: getNextPage}
+}
+
+// DiskEncryptionSetParameters describes the parameter of customer managed disk encryption set resource id
+// that can be specified for disk. <br><br> NOTE: The disk encryption set resource id can only be specified
+// for managed disk. Please refer https://aka.ms/mdssewithcmkoverview for more details.
+type DiskEncryptionSetParameters struct {
+	// ID - Resource Id
+	ID *string `json:"id,omitempty"`
+}
+
+// DiskEncryptionSetsCreateOrUpdateFuture an abstraction for monitoring and retrieving the results of a
+// long-running operation.
+type DiskEncryptionSetsCreateOrUpdateFuture struct {
+	azure.Future
+}
+
+// Result returns the result of the asynchronous operation.
+// If the operation has not completed it will return an error.
+func (future *DiskEncryptionSetsCreateOrUpdateFuture) Result(client DiskEncryptionSetsClient) (desVar DiskEncryptionSet, err error) {
+	var done bool
+	done, err = future.DoneWithContext(context.Background(), client)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "compute.DiskEncryptionSetsCreateOrUpdateFuture", "Result", future.Response(), "Polling failure")
+		return
+	}
+	if !done {
+		err = azure.NewAsyncOpIncompleteError("compute.DiskEncryptionSetsCreateOrUpdateFuture")
+		return
+	}
+	sender := autorest.DecorateSender(client, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	if desVar.Response.Response, err = future.GetResult(sender); err == nil && desVar.Response.Response.StatusCode != http.StatusNoContent {
+		desVar, err = client.CreateOrUpdateResponder(desVar.Response.Response)
+		if err != nil {
+			err = autorest.NewErrorWithError(err, "compute.DiskEncryptionSetsCreateOrUpdateFuture", "Result", desVar.Response.Response, "Failure responding to request")
+		}
+	}
+	return
+}
+
+// DiskEncryptionSetsDeleteFuture an abstraction for monitoring and retrieving the results of a
+// long-running operation.
+type DiskEncryptionSetsDeleteFuture struct {
+	azure.Future
+}
+
+// Result returns the result of the asynchronous operation.
+// If the operation has not completed it will return an error.
+func (future *DiskEncryptionSetsDeleteFuture) Result(client DiskEncryptionSetsClient) (ar autorest.Response, err error) {
+	var done bool
+	done, err = future.DoneWithContext(context.Background(), client)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "compute.DiskEncryptionSetsDeleteFuture", "Result", future.Response(), "Polling failure")
+		return
+	}
+	if !done {
+		err = azure.NewAsyncOpIncompleteError("compute.DiskEncryptionSetsDeleteFuture")
+		return
+	}
+	ar.Response = future.Response()
+	return
+}
+
+// DiskEncryptionSetsUpdateFuture an abstraction for monitoring and retrieving the results of a
+// long-running operation.
+type DiskEncryptionSetsUpdateFuture struct {
+	azure.Future
+}
+
+// Result returns the result of the asynchronous operation.
+// If the operation has not completed it will return an error.
+func (future *DiskEncryptionSetsUpdateFuture) Result(client DiskEncryptionSetsClient) (desVar DiskEncryptionSet, err error) {
+	var done bool
+	done, err = future.DoneWithContext(context.Background(), client)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "compute.DiskEncryptionSetsUpdateFuture", "Result", future.Response(), "Polling failure")
+		return
+	}
+	if !done {
+		err = azure.NewAsyncOpIncompleteError("compute.DiskEncryptionSetsUpdateFuture")
+		return
+	}
+	sender := autorest.DecorateSender(client, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	if desVar.Response.Response, err = future.GetResult(sender); err == nil && desVar.Response.Response.StatusCode != http.StatusNoContent {
+		desVar, err = client.UpdateResponder(desVar.Response.Response)
+		if err != nil {
+			err = autorest.NewErrorWithError(err, "compute.DiskEncryptionSetsUpdateFuture", "Result", desVar.Response.Response, "Failure responding to request")
+		}
+	}
+	return
+}
+
 // DiskEncryptionSettings describes a Encryption Settings for a Disk
 type DiskEncryptionSettings struct {
 	// DiskEncryptionKey - Specifies the location of the disk encryption key, which is a Key Vault Secret.
@@ -3116,6 +3566,63 @@ type DiskEncryptionSettings struct {
 	KeyEncryptionKey *KeyVaultKeyReference `json:"keyEncryptionKey,omitempty"`
 	// Enabled - Specifies whether disk encryption should be enabled on the virtual machine.
 	Enabled *bool `json:"enabled,omitempty"`
+}
+
+// DiskEncryptionSetUpdate disk encryption set update resource.
+type DiskEncryptionSetUpdate struct {
+	*DiskEncryptionSetUpdateProperties `json:"properties,omitempty"`
+	// Tags - Resource tags
+	Tags map[string]*string `json:"tags"`
+}
+
+// MarshalJSON is the custom marshaler for DiskEncryptionSetUpdate.
+func (desu DiskEncryptionSetUpdate) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if desu.DiskEncryptionSetUpdateProperties != nil {
+		objectMap["properties"] = desu.DiskEncryptionSetUpdateProperties
+	}
+	if desu.Tags != nil {
+		objectMap["tags"] = desu.Tags
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for DiskEncryptionSetUpdate struct.
+func (desu *DiskEncryptionSetUpdate) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var diskEncryptionSetUpdateProperties DiskEncryptionSetUpdateProperties
+				err = json.Unmarshal(*v, &diskEncryptionSetUpdateProperties)
+				if err != nil {
+					return err
+				}
+				desu.DiskEncryptionSetUpdateProperties = &diskEncryptionSetUpdateProperties
+			}
+		case "tags":
+			if v != nil {
+				var tags map[string]*string
+				err = json.Unmarshal(*v, &tags)
+				if err != nil {
+					return err
+				}
+				desu.Tags = tags
+			}
+		}
+	}
+
+	return nil
+}
+
+// DiskEncryptionSetUpdateProperties disk encryption set resource update properties.
+type DiskEncryptionSetUpdateProperties struct {
+	ActiveKey *KeyVaultAndKeyReference `json:"activeKey,omitempty"`
 }
 
 // DiskInstanceView the instance view of the disk.
@@ -3284,8 +3791,12 @@ type DiskProperties struct {
 	HyperVGeneration HyperVGeneration `json:"hyperVGeneration,omitempty"`
 	// CreationData - Disk source information. CreationData information cannot be changed after the disk has been created.
 	CreationData *CreationData `json:"creationData,omitempty"`
-	// DiskSizeGB - If creationData.createOption is Empty, this field is mandatory and it indicates the size of the VHD to create. If this field is present for updates or creation with other options, it indicates a resize. Resizes are only allowed if the disk is not attached to a running VM, and can only increase the disk's size.
+	// DiskSizeGB - If creationData.createOption is Empty, this field is mandatory and it indicates the size of the disk to create. If this field is present for updates or creation with other options, it indicates a resize. Resizes are only allowed if the disk is not attached to a running VM, and can only increase the disk's size.
 	DiskSizeGB *int32 `json:"diskSizeGB,omitempty"`
+	// DiskSizeBytes - READ-ONLY; The size of the disk in bytes. This field is read only.
+	DiskSizeBytes *int64 `json:"diskSizeBytes,omitempty"`
+	// UniqueID - READ-ONLY; Unique Guid identifying the resource.
+	UniqueID *string `json:"uniqueId,omitempty"`
 	// EncryptionSettingsCollection - Encryption settings collection used for Azure Disk Encryption, can contain multiple encryption settings per disk or snapshot.
 	EncryptionSettingsCollection *EncryptionSettingsCollection `json:"encryptionSettingsCollection,omitempty"`
 	// ProvisioningState - READ-ONLY; The disk provisioning state.
@@ -3296,6 +3807,8 @@ type DiskProperties struct {
 	DiskMBpsReadWrite *int32 `json:"diskMBpsReadWrite,omitempty"`
 	// DiskState - READ-ONLY; The state of the disk. Possible values include: 'Unattached', 'Attached', 'Reserved', 'ActiveSAS', 'ReadyToUpload', 'ActiveUpload'
 	DiskState DiskState `json:"diskState,omitempty"`
+	// Encryption - Encryption property can be used to encrypt data at rest with customer managed keys or platform managed keys.
+	Encryption *Encryption `json:"encryption,omitempty"`
 }
 
 // DisksCreateOrUpdateFuture an abstraction for monitoring and retrieving the results of a long-running
@@ -3506,7 +4019,7 @@ func (du *DiskUpdate) UnmarshalJSON(body []byte) error {
 type DiskUpdateProperties struct {
 	// OsType - the Operating System type. Possible values include: 'Windows', 'Linux'
 	OsType OperatingSystemTypes `json:"osType,omitempty"`
-	// DiskSizeGB - If creationData.createOption is Empty, this field is mandatory and it indicates the size of the VHD to create. If this field is present for updates or creation with other options, it indicates a resize. Resizes are only allowed if the disk is not attached to a running VM, and can only increase the disk's size.
+	// DiskSizeGB - If creationData.createOption is Empty, this field is mandatory and it indicates the size of the disk to create. If this field is present for updates or creation with other options, it indicates a resize. Resizes are only allowed if the disk is not attached to a running VM, and can only increase the disk's size.
 	DiskSizeGB *int32 `json:"diskSizeGB,omitempty"`
 	// EncryptionSettingsCollection - Encryption settings collection used be Azure Disk Encryption, can contain multiple encryption settings per disk or snapshot.
 	EncryptionSettingsCollection *EncryptionSettingsCollection `json:"encryptionSettingsCollection,omitempty"`
@@ -3516,12 +4029,43 @@ type DiskUpdateProperties struct {
 	DiskMBpsReadWrite *int32 `json:"diskMBpsReadWrite,omitempty"`
 }
 
+// Encryption encryption at rest settings for disk or snapshot
+type Encryption struct {
+	// DiskEncryptionSetID - ResourceId of the disk encryption set to use for enabling encryption at rest.
+	DiskEncryptionSetID *string `json:"diskEncryptionSetId,omitempty"`
+	// Type - The type of key used to encrypt the data of the disk. Possible values include: 'EncryptionAtRestWithPlatformKey', 'EncryptionAtRestWithCustomerKey'
+	Type EncryptionType `json:"type,omitempty"`
+}
+
+// EncryptionSetIdentity the managed identity for the disk encryption set. It should be given permission on
+// the key vault before it can be used to encrypt disks.
+type EncryptionSetIdentity struct {
+	// Type - The type of Managed Identity used by the DiskEncryptionSet. Only SystemAssigned is supported. Possible values include: 'SystemAssigned'
+	Type DiskEncryptionSetIdentityType `json:"type,omitempty"`
+	// PrincipalID - READ-ONLY; The object id of the Managed Identity Resource. This will be sent to the RP from ARM via the x-ms-identity-principal-id header in the PUT request if the resource has a systemAssigned(implicit) identity
+	PrincipalID *string `json:"principalId,omitempty"`
+	// TenantID - READ-ONLY; The tenant id of the Managed Identity Resource. This will be sent to the RP from ARM via the x-ms-client-tenant-id header in the PUT request if the resource has a systemAssigned(implicit) identity
+	TenantID *string `json:"tenantId,omitempty"`
+}
+
+// EncryptionSetProperties ...
+type EncryptionSetProperties struct {
+	// ActiveKey - The key vault key which is currently used by this disk encryption set.
+	ActiveKey *KeyVaultAndKeyReference `json:"activeKey,omitempty"`
+	// PreviousKeys - READ-ONLY; A readonly collection of key vault keys previously used by this disk encryption set while a key rotation is in progress. It will be empty if there is no ongoing key rotation.
+	PreviousKeys *[]KeyVaultAndKeyReference `json:"previousKeys,omitempty"`
+	// ProvisioningState - READ-ONLY; The disk encryption set provisioning state.
+	ProvisioningState *string `json:"provisioningState,omitempty"`
+}
+
 // EncryptionSettingsCollection encryption settings for disk or snapshot
 type EncryptionSettingsCollection struct {
 	// Enabled - Set this flag to true and provide DiskEncryptionKey and optional KeyEncryptionKey to enable encryption. Set this flag to false and remove DiskEncryptionKey and KeyEncryptionKey to disable encryption. If EncryptionSettings is null in the request object, the existing settings remain unchanged.
 	Enabled *bool `json:"enabled,omitempty"`
 	// EncryptionSettings - A collection of encryption settings, one for each disk volume.
 	EncryptionSettings *[]EncryptionSettingsElement `json:"encryptionSettings,omitempty"`
+	// EncryptionSettingsVersion - Describes what type of encryption is used for the disks. Once this field is set, it cannot be overwritten. '1.0' corresponds to Azure Disk Encryption with AAD app.'1.1' corresponds to Azure Disk Encryption.
+	EncryptionSettingsVersion *string `json:"encryptionSettingsVersion,omitempty"`
 }
 
 // EncryptionSettingsElement encryption settings for one disk volume.
@@ -3684,10 +4228,670 @@ func (g *Gallery) UnmarshalJSON(body []byte) error {
 	return nil
 }
 
+// GalleryApplication specifies information about the gallery Application Definition that you want to
+// create or update.
+type GalleryApplication struct {
+	autorest.Response             `json:"-"`
+	*GalleryApplicationProperties `json:"properties,omitempty"`
+	// ID - READ-ONLY; Resource Id
+	ID *string `json:"id,omitempty"`
+	// Name - READ-ONLY; Resource name
+	Name *string `json:"name,omitempty"`
+	// Type - READ-ONLY; Resource type
+	Type *string `json:"type,omitempty"`
+	// Location - Resource location
+	Location *string `json:"location,omitempty"`
+	// Tags - Resource tags
+	Tags map[string]*string `json:"tags"`
+}
+
+// MarshalJSON is the custom marshaler for GalleryApplication.
+func (ga GalleryApplication) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if ga.GalleryApplicationProperties != nil {
+		objectMap["properties"] = ga.GalleryApplicationProperties
+	}
+	if ga.Location != nil {
+		objectMap["location"] = ga.Location
+	}
+	if ga.Tags != nil {
+		objectMap["tags"] = ga.Tags
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for GalleryApplication struct.
+func (ga *GalleryApplication) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var galleryApplicationProperties GalleryApplicationProperties
+				err = json.Unmarshal(*v, &galleryApplicationProperties)
+				if err != nil {
+					return err
+				}
+				ga.GalleryApplicationProperties = &galleryApplicationProperties
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				ga.ID = &ID
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				ga.Name = &name
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				ga.Type = &typeVar
+			}
+		case "location":
+			if v != nil {
+				var location string
+				err = json.Unmarshal(*v, &location)
+				if err != nil {
+					return err
+				}
+				ga.Location = &location
+			}
+		case "tags":
+			if v != nil {
+				var tags map[string]*string
+				err = json.Unmarshal(*v, &tags)
+				if err != nil {
+					return err
+				}
+				ga.Tags = tags
+			}
+		}
+	}
+
+	return nil
+}
+
+// GalleryApplicationList the List Gallery Applications operation response.
+type GalleryApplicationList struct {
+	autorest.Response `json:"-"`
+	// Value - A list of Gallery Applications.
+	Value *[]GalleryApplication `json:"value,omitempty"`
+	// NextLink - The uri to fetch the next page of Application Definitions in the Application Gallery. Call ListNext() with this to fetch the next page of gallery Application Definitions.
+	NextLink *string `json:"nextLink,omitempty"`
+}
+
+// GalleryApplicationListIterator provides access to a complete listing of GalleryApplication values.
+type GalleryApplicationListIterator struct {
+	i    int
+	page GalleryApplicationListPage
+}
+
+// NextWithContext advances to the next value.  If there was an error making
+// the request the iterator does not advance and the error is returned.
+func (iter *GalleryApplicationListIterator) NextWithContext(ctx context.Context) (err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/GalleryApplicationListIterator.NextWithContext")
+		defer func() {
+			sc := -1
+			if iter.Response().Response.Response != nil {
+				sc = iter.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	iter.i++
+	if iter.i < len(iter.page.Values()) {
+		return nil
+	}
+	err = iter.page.NextWithContext(ctx)
+	if err != nil {
+		iter.i--
+		return err
+	}
+	iter.i = 0
+	return nil
+}
+
+// Next advances to the next value.  If there was an error making
+// the request the iterator does not advance and the error is returned.
+// Deprecated: Use NextWithContext() instead.
+func (iter *GalleryApplicationListIterator) Next() error {
+	return iter.NextWithContext(context.Background())
+}
+
+// NotDone returns true if the enumeration should be started or is not yet complete.
+func (iter GalleryApplicationListIterator) NotDone() bool {
+	return iter.page.NotDone() && iter.i < len(iter.page.Values())
+}
+
+// Response returns the raw server response from the last page request.
+func (iter GalleryApplicationListIterator) Response() GalleryApplicationList {
+	return iter.page.Response()
+}
+
+// Value returns the current value or a zero-initialized value if the
+// iterator has advanced beyond the end of the collection.
+func (iter GalleryApplicationListIterator) Value() GalleryApplication {
+	if !iter.page.NotDone() {
+		return GalleryApplication{}
+	}
+	return iter.page.Values()[iter.i]
+}
+
+// Creates a new instance of the GalleryApplicationListIterator type.
+func NewGalleryApplicationListIterator(page GalleryApplicationListPage) GalleryApplicationListIterator {
+	return GalleryApplicationListIterator{page: page}
+}
+
+// IsEmpty returns true if the ListResult contains no values.
+func (gal GalleryApplicationList) IsEmpty() bool {
+	return gal.Value == nil || len(*gal.Value) == 0
+}
+
+// galleryApplicationListPreparer prepares a request to retrieve the next set of results.
+// It returns nil if no more results exist.
+func (gal GalleryApplicationList) galleryApplicationListPreparer(ctx context.Context) (*http.Request, error) {
+	if gal.NextLink == nil || len(to.String(gal.NextLink)) < 1 {
+		return nil, nil
+	}
+	return autorest.Prepare((&http.Request{}).WithContext(ctx),
+		autorest.AsJSON(),
+		autorest.AsGet(),
+		autorest.WithBaseURL(to.String(gal.NextLink)))
+}
+
+// GalleryApplicationListPage contains a page of GalleryApplication values.
+type GalleryApplicationListPage struct {
+	fn  func(context.Context, GalleryApplicationList) (GalleryApplicationList, error)
+	gal GalleryApplicationList
+}
+
+// NextWithContext advances to the next page of values.  If there was an error making
+// the request the page does not advance and the error is returned.
+func (page *GalleryApplicationListPage) NextWithContext(ctx context.Context) (err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/GalleryApplicationListPage.NextWithContext")
+		defer func() {
+			sc := -1
+			if page.Response().Response.Response != nil {
+				sc = page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	next, err := page.fn(ctx, page.gal)
+	if err != nil {
+		return err
+	}
+	page.gal = next
+	return nil
+}
+
+// Next advances to the next page of values.  If there was an error making
+// the request the page does not advance and the error is returned.
+// Deprecated: Use NextWithContext() instead.
+func (page *GalleryApplicationListPage) Next() error {
+	return page.NextWithContext(context.Background())
+}
+
+// NotDone returns true if the page enumeration should be started or is not yet complete.
+func (page GalleryApplicationListPage) NotDone() bool {
+	return !page.gal.IsEmpty()
+}
+
+// Response returns the raw server response from the last page request.
+func (page GalleryApplicationListPage) Response() GalleryApplicationList {
+	return page.gal
+}
+
+// Values returns the slice of values for the current page or nil if there are no values.
+func (page GalleryApplicationListPage) Values() []GalleryApplication {
+	if page.gal.IsEmpty() {
+		return nil
+	}
+	return *page.gal.Value
+}
+
+// Creates a new instance of the GalleryApplicationListPage type.
+func NewGalleryApplicationListPage(getNextPage func(context.Context, GalleryApplicationList) (GalleryApplicationList, error)) GalleryApplicationListPage {
+	return GalleryApplicationListPage{fn: getNextPage}
+}
+
+// GalleryApplicationProperties describes the properties of a gallery Application Definition.
+type GalleryApplicationProperties struct {
+	// Description - The description of this gallery Application Definition resource. This property is updatable.
+	Description *string `json:"description,omitempty"`
+	// Eula - The Eula agreement for the gallery Application Definition.
+	Eula *string `json:"eula,omitempty"`
+	// PrivacyStatementURI - The privacy statement uri.
+	PrivacyStatementURI *string `json:"privacyStatementUri,omitempty"`
+	// ReleaseNoteURI - The release note uri.
+	ReleaseNoteURI *string `json:"releaseNoteUri,omitempty"`
+	// EndOfLifeDate - The end of life date of the gallery Application Definition. This property can be used for decommissioning purposes. This property is updatable.
+	EndOfLifeDate *date.Time `json:"endOfLifeDate,omitempty"`
+	// SupportedOSType - This property allows you to specify the supported type of the OS that application is built for. <br><br> Possible values are: <br><br> **Windows** <br><br> **Linux**. Possible values include: 'Windows', 'Linux'
+	SupportedOSType OperatingSystemTypes `json:"supportedOSType,omitempty"`
+}
+
+// GalleryApplicationsCreateOrUpdateFuture an abstraction for monitoring and retrieving the results of a
+// long-running operation.
+type GalleryApplicationsCreateOrUpdateFuture struct {
+	azure.Future
+}
+
+// Result returns the result of the asynchronous operation.
+// If the operation has not completed it will return an error.
+func (future *GalleryApplicationsCreateOrUpdateFuture) Result(client GalleryApplicationsClient) (ga GalleryApplication, err error) {
+	var done bool
+	done, err = future.DoneWithContext(context.Background(), client)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "compute.GalleryApplicationsCreateOrUpdateFuture", "Result", future.Response(), "Polling failure")
+		return
+	}
+	if !done {
+		err = azure.NewAsyncOpIncompleteError("compute.GalleryApplicationsCreateOrUpdateFuture")
+		return
+	}
+	sender := autorest.DecorateSender(client, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	if ga.Response.Response, err = future.GetResult(sender); err == nil && ga.Response.Response.StatusCode != http.StatusNoContent {
+		ga, err = client.CreateOrUpdateResponder(ga.Response.Response)
+		if err != nil {
+			err = autorest.NewErrorWithError(err, "compute.GalleryApplicationsCreateOrUpdateFuture", "Result", ga.Response.Response, "Failure responding to request")
+		}
+	}
+	return
+}
+
+// GalleryApplicationsDeleteFuture an abstraction for monitoring and retrieving the results of a
+// long-running operation.
+type GalleryApplicationsDeleteFuture struct {
+	azure.Future
+}
+
+// Result returns the result of the asynchronous operation.
+// If the operation has not completed it will return an error.
+func (future *GalleryApplicationsDeleteFuture) Result(client GalleryApplicationsClient) (ar autorest.Response, err error) {
+	var done bool
+	done, err = future.DoneWithContext(context.Background(), client)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "compute.GalleryApplicationsDeleteFuture", "Result", future.Response(), "Polling failure")
+		return
+	}
+	if !done {
+		err = azure.NewAsyncOpIncompleteError("compute.GalleryApplicationsDeleteFuture")
+		return
+	}
+	ar.Response = future.Response()
+	return
+}
+
+// GalleryApplicationVersion specifies information about the gallery Application Version that you want to
+// create or update.
+type GalleryApplicationVersion struct {
+	autorest.Response                    `json:"-"`
+	*GalleryApplicationVersionProperties `json:"properties,omitempty"`
+	// ID - READ-ONLY; Resource Id
+	ID *string `json:"id,omitempty"`
+	// Name - READ-ONLY; Resource name
+	Name *string `json:"name,omitempty"`
+	// Type - READ-ONLY; Resource type
+	Type *string `json:"type,omitempty"`
+	// Location - Resource location
+	Location *string `json:"location,omitempty"`
+	// Tags - Resource tags
+	Tags map[string]*string `json:"tags"`
+}
+
+// MarshalJSON is the custom marshaler for GalleryApplicationVersion.
+func (gav GalleryApplicationVersion) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if gav.GalleryApplicationVersionProperties != nil {
+		objectMap["properties"] = gav.GalleryApplicationVersionProperties
+	}
+	if gav.Location != nil {
+		objectMap["location"] = gav.Location
+	}
+	if gav.Tags != nil {
+		objectMap["tags"] = gav.Tags
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for GalleryApplicationVersion struct.
+func (gav *GalleryApplicationVersion) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var galleryApplicationVersionProperties GalleryApplicationVersionProperties
+				err = json.Unmarshal(*v, &galleryApplicationVersionProperties)
+				if err != nil {
+					return err
+				}
+				gav.GalleryApplicationVersionProperties = &galleryApplicationVersionProperties
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				gav.ID = &ID
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				gav.Name = &name
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				gav.Type = &typeVar
+			}
+		case "location":
+			if v != nil {
+				var location string
+				err = json.Unmarshal(*v, &location)
+				if err != nil {
+					return err
+				}
+				gav.Location = &location
+			}
+		case "tags":
+			if v != nil {
+				var tags map[string]*string
+				err = json.Unmarshal(*v, &tags)
+				if err != nil {
+					return err
+				}
+				gav.Tags = tags
+			}
+		}
+	}
+
+	return nil
+}
+
+// GalleryApplicationVersionList the List Gallery Application version operation response.
+type GalleryApplicationVersionList struct {
+	autorest.Response `json:"-"`
+	// Value - A list of gallery Application Versions.
+	Value *[]GalleryApplicationVersion `json:"value,omitempty"`
+	// NextLink - The uri to fetch the next page of gallery Application Versions. Call ListNext() with this to fetch the next page of gallery Application Versions.
+	NextLink *string `json:"nextLink,omitempty"`
+}
+
+// GalleryApplicationVersionListIterator provides access to a complete listing of GalleryApplicationVersion
+// values.
+type GalleryApplicationVersionListIterator struct {
+	i    int
+	page GalleryApplicationVersionListPage
+}
+
+// NextWithContext advances to the next value.  If there was an error making
+// the request the iterator does not advance and the error is returned.
+func (iter *GalleryApplicationVersionListIterator) NextWithContext(ctx context.Context) (err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/GalleryApplicationVersionListIterator.NextWithContext")
+		defer func() {
+			sc := -1
+			if iter.Response().Response.Response != nil {
+				sc = iter.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	iter.i++
+	if iter.i < len(iter.page.Values()) {
+		return nil
+	}
+	err = iter.page.NextWithContext(ctx)
+	if err != nil {
+		iter.i--
+		return err
+	}
+	iter.i = 0
+	return nil
+}
+
+// Next advances to the next value.  If there was an error making
+// the request the iterator does not advance and the error is returned.
+// Deprecated: Use NextWithContext() instead.
+func (iter *GalleryApplicationVersionListIterator) Next() error {
+	return iter.NextWithContext(context.Background())
+}
+
+// NotDone returns true if the enumeration should be started or is not yet complete.
+func (iter GalleryApplicationVersionListIterator) NotDone() bool {
+	return iter.page.NotDone() && iter.i < len(iter.page.Values())
+}
+
+// Response returns the raw server response from the last page request.
+func (iter GalleryApplicationVersionListIterator) Response() GalleryApplicationVersionList {
+	return iter.page.Response()
+}
+
+// Value returns the current value or a zero-initialized value if the
+// iterator has advanced beyond the end of the collection.
+func (iter GalleryApplicationVersionListIterator) Value() GalleryApplicationVersion {
+	if !iter.page.NotDone() {
+		return GalleryApplicationVersion{}
+	}
+	return iter.page.Values()[iter.i]
+}
+
+// Creates a new instance of the GalleryApplicationVersionListIterator type.
+func NewGalleryApplicationVersionListIterator(page GalleryApplicationVersionListPage) GalleryApplicationVersionListIterator {
+	return GalleryApplicationVersionListIterator{page: page}
+}
+
+// IsEmpty returns true if the ListResult contains no values.
+func (gavl GalleryApplicationVersionList) IsEmpty() bool {
+	return gavl.Value == nil || len(*gavl.Value) == 0
+}
+
+// galleryApplicationVersionListPreparer prepares a request to retrieve the next set of results.
+// It returns nil if no more results exist.
+func (gavl GalleryApplicationVersionList) galleryApplicationVersionListPreparer(ctx context.Context) (*http.Request, error) {
+	if gavl.NextLink == nil || len(to.String(gavl.NextLink)) < 1 {
+		return nil, nil
+	}
+	return autorest.Prepare((&http.Request{}).WithContext(ctx),
+		autorest.AsJSON(),
+		autorest.AsGet(),
+		autorest.WithBaseURL(to.String(gavl.NextLink)))
+}
+
+// GalleryApplicationVersionListPage contains a page of GalleryApplicationVersion values.
+type GalleryApplicationVersionListPage struct {
+	fn   func(context.Context, GalleryApplicationVersionList) (GalleryApplicationVersionList, error)
+	gavl GalleryApplicationVersionList
+}
+
+// NextWithContext advances to the next page of values.  If there was an error making
+// the request the page does not advance and the error is returned.
+func (page *GalleryApplicationVersionListPage) NextWithContext(ctx context.Context) (err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/GalleryApplicationVersionListPage.NextWithContext")
+		defer func() {
+			sc := -1
+			if page.Response().Response.Response != nil {
+				sc = page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	next, err := page.fn(ctx, page.gavl)
+	if err != nil {
+		return err
+	}
+	page.gavl = next
+	return nil
+}
+
+// Next advances to the next page of values.  If there was an error making
+// the request the page does not advance and the error is returned.
+// Deprecated: Use NextWithContext() instead.
+func (page *GalleryApplicationVersionListPage) Next() error {
+	return page.NextWithContext(context.Background())
+}
+
+// NotDone returns true if the page enumeration should be started or is not yet complete.
+func (page GalleryApplicationVersionListPage) NotDone() bool {
+	return !page.gavl.IsEmpty()
+}
+
+// Response returns the raw server response from the last page request.
+func (page GalleryApplicationVersionListPage) Response() GalleryApplicationVersionList {
+	return page.gavl
+}
+
+// Values returns the slice of values for the current page or nil if there are no values.
+func (page GalleryApplicationVersionListPage) Values() []GalleryApplicationVersion {
+	if page.gavl.IsEmpty() {
+		return nil
+	}
+	return *page.gavl.Value
+}
+
+// Creates a new instance of the GalleryApplicationVersionListPage type.
+func NewGalleryApplicationVersionListPage(getNextPage func(context.Context, GalleryApplicationVersionList) (GalleryApplicationVersionList, error)) GalleryApplicationVersionListPage {
+	return GalleryApplicationVersionListPage{fn: getNextPage}
+}
+
+// GalleryApplicationVersionProperties describes the properties of a gallery Image Version.
+type GalleryApplicationVersionProperties struct {
+	PublishingProfile *GalleryApplicationVersionPublishingProfile `json:"publishingProfile,omitempty"`
+	// ProvisioningState - READ-ONLY; The provisioning state, which only appears in the response. Possible values include: 'ProvisioningState1Creating', 'ProvisioningState1Updating', 'ProvisioningState1Failed', 'ProvisioningState1Succeeded', 'ProvisioningState1Deleting', 'ProvisioningState1Migrating'
+	ProvisioningState ProvisioningState1 `json:"provisioningState,omitempty"`
+	// ReplicationStatus - READ-ONLY
+	ReplicationStatus *ReplicationStatus `json:"replicationStatus,omitempty"`
+}
+
+// GalleryApplicationVersionPublishingProfile the publishing profile of a gallery Image Version.
+type GalleryApplicationVersionPublishingProfile struct {
+	Source *UserArtifactSource `json:"source,omitempty"`
+	// ContentType - Optional. May be used to help process this file. The type of file contained in the source, e.g. zip, json, etc.
+	ContentType *string `json:"contentType,omitempty"`
+	// EnableHealthCheck - Optional. Whether or not this application reports health.
+	EnableHealthCheck *bool `json:"enableHealthCheck,omitempty"`
+	// TargetRegions - The target regions where the Image Version is going to be replicated to. This property is updatable.
+	TargetRegions *[]TargetRegion `json:"targetRegions,omitempty"`
+	// ReplicaCount - The number of replicas of the Image Version to be created per region. This property would take effect for a region when regionalReplicaCount is not specified. This property is updatable.
+	ReplicaCount *int32 `json:"replicaCount,omitempty"`
+	// ExcludeFromLatest - If set to true, Virtual Machines deployed from the latest version of the Image Definition won't use this Image Version.
+	ExcludeFromLatest *bool `json:"excludeFromLatest,omitempty"`
+	// PublishedDate - READ-ONLY; The timestamp for when the gallery Image Version is published.
+	PublishedDate *date.Time `json:"publishedDate,omitempty"`
+	// EndOfLifeDate - The end of life date of the gallery Image Version. This property can be used for decommissioning purposes. This property is updatable.
+	EndOfLifeDate *date.Time `json:"endOfLifeDate,omitempty"`
+	// StorageAccountType - Specifies the storage account type to be used to store the image. This property is not updatable. Possible values include: 'StorageAccountTypeStandardLRS', 'StorageAccountTypeStandardZRS'
+	StorageAccountType StorageAccountType `json:"storageAccountType,omitempty"`
+}
+
+// GalleryApplicationVersionsCreateOrUpdateFuture an abstraction for monitoring and retrieving the results
+// of a long-running operation.
+type GalleryApplicationVersionsCreateOrUpdateFuture struct {
+	azure.Future
+}
+
+// Result returns the result of the asynchronous operation.
+// If the operation has not completed it will return an error.
+func (future *GalleryApplicationVersionsCreateOrUpdateFuture) Result(client GalleryApplicationVersionsClient) (gav GalleryApplicationVersion, err error) {
+	var done bool
+	done, err = future.DoneWithContext(context.Background(), client)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "compute.GalleryApplicationVersionsCreateOrUpdateFuture", "Result", future.Response(), "Polling failure")
+		return
+	}
+	if !done {
+		err = azure.NewAsyncOpIncompleteError("compute.GalleryApplicationVersionsCreateOrUpdateFuture")
+		return
+	}
+	sender := autorest.DecorateSender(client, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	if gav.Response.Response, err = future.GetResult(sender); err == nil && gav.Response.Response.StatusCode != http.StatusNoContent {
+		gav, err = client.CreateOrUpdateResponder(gav.Response.Response)
+		if err != nil {
+			err = autorest.NewErrorWithError(err, "compute.GalleryApplicationVersionsCreateOrUpdateFuture", "Result", gav.Response.Response, "Failure responding to request")
+		}
+	}
+	return
+}
+
+// GalleryApplicationVersionsDeleteFuture an abstraction for monitoring and retrieving the results of a
+// long-running operation.
+type GalleryApplicationVersionsDeleteFuture struct {
+	azure.Future
+}
+
+// Result returns the result of the asynchronous operation.
+// If the operation has not completed it will return an error.
+func (future *GalleryApplicationVersionsDeleteFuture) Result(client GalleryApplicationVersionsClient) (ar autorest.Response, err error) {
+	var done bool
+	done, err = future.DoneWithContext(context.Background(), client)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "compute.GalleryApplicationVersionsDeleteFuture", "Result", future.Response(), "Polling failure")
+		return
+	}
+	if !done {
+		err = azure.NewAsyncOpIncompleteError("compute.GalleryApplicationVersionsDeleteFuture")
+		return
+	}
+	ar.Response = future.Response()
+	return
+}
+
 // GalleryArtifactPublishingProfileBase describes the basic gallery artifact publishing profile.
 type GalleryArtifactPublishingProfileBase struct {
 	// TargetRegions - The target regions where the Image Version is going to be replicated to. This property is updatable.
 	TargetRegions *[]TargetRegion `json:"targetRegions,omitempty"`
+	// ReplicaCount - The number of replicas of the Image Version to be created per region. This property would take effect for a region when regionalReplicaCount is not specified. This property is updatable.
+	ReplicaCount *int32 `json:"replicaCount,omitempty"`
+	// ExcludeFromLatest - If set to true, Virtual Machines deployed from the latest version of the Image Definition won't use this Image Version.
+	ExcludeFromLatest *bool `json:"excludeFromLatest,omitempty"`
+	// PublishedDate - READ-ONLY; The timestamp for when the gallery Image Version is published.
+	PublishedDate *date.Time `json:"publishedDate,omitempty"`
+	// EndOfLifeDate - The end of life date of the gallery Image Version. This property can be used for decommissioning purposes. This property is updatable.
+	EndOfLifeDate *date.Time `json:"endOfLifeDate,omitempty"`
+	// StorageAccountType - Specifies the storage account type to be used to store the image. This property is not updatable. Possible values include: 'StorageAccountTypeStandardLRS', 'StorageAccountTypeStandardZRS'
+	StorageAccountType StorageAccountType `json:"storageAccountType,omitempty"`
+}
+
+// GalleryArtifactSource the source image from which the Image Version is going to be created.
+type GalleryArtifactSource struct {
+	ManagedImage *ManagedArtifact `json:"managedImage,omitempty"`
 }
 
 // GalleryArtifactVersionSource the gallery artifact version source.
@@ -4000,8 +5204,8 @@ type GalleryImageProperties struct {
 	Recommended   *RecommendedMachineConfiguration `json:"recommended,omitempty"`
 	Disallowed    *Disallowed                      `json:"disallowed,omitempty"`
 	PurchasePlan  *ImagePurchasePlan               `json:"purchasePlan,omitempty"`
-	// ProvisioningState - READ-ONLY; The provisioning state, which only appears in the response. Possible values include: 'ProvisioningState1Creating', 'ProvisioningState1Updating', 'ProvisioningState1Failed', 'ProvisioningState1Succeeded', 'ProvisioningState1Deleting', 'ProvisioningState1Migrating'
-	ProvisioningState ProvisioningState1 `json:"provisioningState,omitempty"`
+	// ProvisioningState - READ-ONLY; The provisioning state, which only appears in the response. Possible values include: 'ProvisioningState2Creating', 'ProvisioningState2Updating', 'ProvisioningState2Failed', 'ProvisioningState2Succeeded', 'ProvisioningState2Deleting', 'ProvisioningState2Migrating'
+	ProvisioningState ProvisioningState2 `json:"provisioningState,omitempty"`
 }
 
 // GalleryImagesCreateOrUpdateFuture an abstraction for monitoring and retrieving the results of a
@@ -4306,8 +5510,8 @@ func NewGalleryImageVersionListPage(getNextPage func(context.Context, GalleryIma
 // GalleryImageVersionProperties describes the properties of a gallery Image Version.
 type GalleryImageVersionProperties struct {
 	PublishingProfile *GalleryImageVersionPublishingProfile `json:"publishingProfile,omitempty"`
-	// ProvisioningState - READ-ONLY; The provisioning state, which only appears in the response. Possible values include: 'ProvisioningState2Creating', 'ProvisioningState2Updating', 'ProvisioningState2Failed', 'ProvisioningState2Succeeded', 'ProvisioningState2Deleting', 'ProvisioningState2Migrating'
-	ProvisioningState ProvisioningState2                 `json:"provisioningState,omitempty"`
+	// ProvisioningState - READ-ONLY; The provisioning state, which only appears in the response. Possible values include: 'ProvisioningState3Creating', 'ProvisioningState3Updating', 'ProvisioningState3Failed', 'ProvisioningState3Succeeded', 'ProvisioningState3Deleting', 'ProvisioningState3Migrating'
+	ProvisioningState ProvisioningState3                 `json:"provisioningState,omitempty"`
 	StorageProfile    *GalleryImageVersionStorageProfile `json:"storageProfile,omitempty"`
 	// ReplicationStatus - READ-ONLY
 	ReplicationStatus *ReplicationStatus `json:"replicationStatus,omitempty"`
@@ -4315,6 +5519,8 @@ type GalleryImageVersionProperties struct {
 
 // GalleryImageVersionPublishingProfile the publishing profile of a gallery Image Version.
 type GalleryImageVersionPublishingProfile struct {
+	// TargetRegions - The target regions where the Image Version is going to be replicated to. This property is updatable.
+	TargetRegions *[]TargetRegion `json:"targetRegions,omitempty"`
 	// ReplicaCount - The number of replicas of the Image Version to be created per region. This property would take effect for a region when regionalReplicaCount is not specified. This property is updatable.
 	ReplicaCount *int32 `json:"replicaCount,omitempty"`
 	// ExcludeFromLatest - If set to true, Virtual Machines deployed from the latest version of the Image Definition won't use this Image Version.
@@ -4325,8 +5531,6 @@ type GalleryImageVersionPublishingProfile struct {
 	EndOfLifeDate *date.Time `json:"endOfLifeDate,omitempty"`
 	// StorageAccountType - Specifies the storage account type to be used to store the image. This property is not updatable. Possible values include: 'StorageAccountTypeStandardLRS', 'StorageAccountTypeStandardZRS'
 	StorageAccountType StorageAccountType `json:"storageAccountType,omitempty"`
-	// TargetRegions - The target regions where the Image Version is going to be replicated to. This property is updatable.
-	TargetRegions *[]TargetRegion `json:"targetRegions,omitempty"`
 }
 
 // GalleryImageVersionsCreateOrUpdateFuture an abstraction for monitoring and retrieving the results of a
@@ -4685,6 +5889,26 @@ type ImageDataDisk struct {
 	DiskSizeGB *int32 `json:"diskSizeGB,omitempty"`
 	// StorageAccountType - Specifies the storage account type for the managed disk. NOTE: UltraSSD_LRS can only be used with data disks, it cannot be used with OS Disk. Possible values include: 'StorageAccountTypesStandardLRS', 'StorageAccountTypesPremiumLRS', 'StorageAccountTypesStandardSSDLRS', 'StorageAccountTypesUltraSSDLRS'
 	StorageAccountType StorageAccountTypes `json:"storageAccountType,omitempty"`
+	// DiskEncryptionSet - Specifies the customer managed disk encryption set resource id for the managed image disk.
+	DiskEncryptionSet *DiskEncryptionSetParameters `json:"diskEncryptionSet,omitempty"`
+}
+
+// ImageDisk describes a image disk.
+type ImageDisk struct {
+	// Snapshot - The snapshot.
+	Snapshot *SubResource `json:"snapshot,omitempty"`
+	// ManagedDisk - The managedDisk.
+	ManagedDisk *SubResource `json:"managedDisk,omitempty"`
+	// BlobURI - The Virtual Hard Disk.
+	BlobURI *string `json:"blobUri,omitempty"`
+	// Caching - Specifies the caching requirements. <br><br> Possible values are: <br><br> **None** <br><br> **ReadOnly** <br><br> **ReadWrite** <br><br> Default: **None for Standard storage. ReadOnly for Premium storage**. Possible values include: 'CachingTypesNone', 'CachingTypesReadOnly', 'CachingTypesReadWrite'
+	Caching CachingTypes `json:"caching,omitempty"`
+	// DiskSizeGB - Specifies the size of empty data disks in gigabytes. This element can be used to overwrite the name of the disk in a virtual machine image. <br><br> This value cannot be larger than 1023 GB
+	DiskSizeGB *int32 `json:"diskSizeGB,omitempty"`
+	// StorageAccountType - Specifies the storage account type for the managed disk. NOTE: UltraSSD_LRS can only be used with data disks, it cannot be used with OS Disk. Possible values include: 'StorageAccountTypesStandardLRS', 'StorageAccountTypesPremiumLRS', 'StorageAccountTypesStandardSSDLRS', 'StorageAccountTypesUltraSSDLRS'
+	StorageAccountType StorageAccountTypes `json:"storageAccountType,omitempty"`
+	// DiskEncryptionSet - Specifies the customer managed disk encryption set resource id for the managed image disk.
+	DiskEncryptionSet *DiskEncryptionSetParameters `json:"diskEncryptionSet,omitempty"`
 }
 
 // ImageDiskReference the source image used for creating the disk.
@@ -4857,8 +6081,10 @@ type ImageOSDisk struct {
 	Caching CachingTypes `json:"caching,omitempty"`
 	// DiskSizeGB - Specifies the size of empty data disks in gigabytes. This element can be used to overwrite the name of the disk in a virtual machine image. <br><br> This value cannot be larger than 1023 GB
 	DiskSizeGB *int32 `json:"diskSizeGB,omitempty"`
-	// StorageAccountType - Specifies the storage account type for the managed disk. UltraSSD_LRS cannot be used with OS Disk. Possible values include: 'StorageAccountTypesStandardLRS', 'StorageAccountTypesPremiumLRS', 'StorageAccountTypesStandardSSDLRS', 'StorageAccountTypesUltraSSDLRS'
+	// StorageAccountType - Specifies the storage account type for the managed disk. NOTE: UltraSSD_LRS can only be used with data disks, it cannot be used with OS Disk. Possible values include: 'StorageAccountTypesStandardLRS', 'StorageAccountTypesPremiumLRS', 'StorageAccountTypesStandardSSDLRS', 'StorageAccountTypesUltraSSDLRS'
 	StorageAccountType StorageAccountTypes `json:"storageAccountType,omitempty"`
+	// DiskEncryptionSet - Specifies the customer managed disk encryption set resource id for the managed image disk.
+	DiskEncryptionSet *DiskEncryptionSetParameters `json:"diskEncryptionSet,omitempty"`
 }
 
 // ImageProperties describes the properties of an Image.
@@ -5374,10 +6600,18 @@ type MaintenanceRedeployStatus struct {
 	LastOperationMessage *string `json:"lastOperationMessage,omitempty"`
 }
 
+// ManagedArtifact the managed artifact.
+type ManagedArtifact struct {
+	// ID - The managed artifact id.
+	ID *string `json:"id,omitempty"`
+}
+
 // ManagedDiskParameters the parameters of a managed disk.
 type ManagedDiskParameters struct {
 	// StorageAccountType - Specifies the storage account type for the managed disk. NOTE: UltraSSD_LRS can only be used with data disks, it cannot be used with OS Disk. Possible values include: 'StorageAccountTypesStandardLRS', 'StorageAccountTypesPremiumLRS', 'StorageAccountTypesStandardSSDLRS', 'StorageAccountTypesUltraSSDLRS'
 	StorageAccountType StorageAccountTypes `json:"storageAccountType,omitempty"`
+	// DiskEncryptionSet - Specifies the customer managed disk encryption set resource id for the managed disk.
+	DiskEncryptionSet *DiskEncryptionSetParameters `json:"diskEncryptionSet,omitempty"`
 	// ID - Resource Id
 	ID *string `json:"id,omitempty"`
 }
@@ -5577,6 +6811,8 @@ type OSProfile struct {
 	Secrets *[]VaultSecretGroup `json:"secrets,omitempty"`
 	// AllowExtensionOperations - Specifies whether extension operations should be allowed on the virtual machine. <br><br>This may only be set to False when no extensions are present on the virtual machine.
 	AllowExtensionOperations *bool `json:"allowExtensionOperations,omitempty"`
+	// RequireGuestProvisionSignal - Specifies whether the guest provision signal is required from the virtual machine.
+	RequireGuestProvisionSignal *bool `json:"requireGuestProvisionSignal,omitempty"`
 }
 
 // Plan specifies information about the marketplace image used to create the virtual machine. This element
@@ -6587,6 +7823,18 @@ type RunCommandResult struct {
 	Value *[]InstanceViewStatus `json:"value,omitempty"`
 }
 
+// ScaleInPolicy describes a scale-in policy for a virtual machine scale set.
+type ScaleInPolicy struct {
+	// Rules - The rules to be followed when scaling-in a virtual machine scale set. <br><br> Possible values are: <br><br> **Default** When a virtual machine scale set is scaled in, the scale set will first be balanced across zones if it is a zonal scale set. Then, it will be balanced across Fault Domains as far as possible. Within each Fault Domain, the virtual machines chosen for removal will be the newest ones that are not protected from scale-in. <br><br> **OldestVM** When a virtual machine scale set is being scaled-in, the oldest virtual machines that are not protected from scale-in will be chosen for removal. For zonal virtual machine scale sets, the scale set will first be balanced across zones. Within each zone, the oldest virtual machines that are not protected will be chosen for removal. <br><br> **NewestVM** When a virtual machine scale set is being scaled-in, the newest virtual machines that are not protected from scale-in will be chosen for removal. For zonal virtual machine scale sets, the scale set will first be balanced across zones. Within each zone, the newest virtual machines that are not protected will be chosen for removal. <br><br>
+	Rules *[]VirtualMachineScaleSetScaleInRules `json:"rules,omitempty"`
+}
+
+// ScheduledEventsProfile ...
+type ScheduledEventsProfile struct {
+	// TerminateNotificationProfile - Specifies Terminate Scheduled Event related configurations.
+	TerminateNotificationProfile *TerminateNotificationProfile `json:"terminateNotificationProfile,omitempty"`
+}
+
 // Sku describes a virtual machine scale set sku.
 type Sku struct {
 	// Name - The sku name.
@@ -6877,12 +8125,20 @@ type SnapshotProperties struct {
 	HyperVGeneration HyperVGeneration `json:"hyperVGeneration,omitempty"`
 	// CreationData - Disk source information. CreationData information cannot be changed after the disk has been created.
 	CreationData *CreationData `json:"creationData,omitempty"`
-	// DiskSizeGB - If creationData.createOption is Empty, this field is mandatory and it indicates the size of the VHD to create. If this field is present for updates or creation with other options, it indicates a resize. Resizes are only allowed if the disk is not attached to a running VM, and can only increase the disk's size.
+	// DiskSizeGB - If creationData.createOption is Empty, this field is mandatory and it indicates the size of the disk to create. If this field is present for updates or creation with other options, it indicates a resize. Resizes are only allowed if the disk is not attached to a running VM, and can only increase the disk's size.
 	DiskSizeGB *int32 `json:"diskSizeGB,omitempty"`
+	// DiskSizeBytes - READ-ONLY; The size of the disk in bytes. This field is read only.
+	DiskSizeBytes *int64 `json:"diskSizeBytes,omitempty"`
+	// UniqueID - READ-ONLY; Unique Guid identifying the resource.
+	UniqueID *string `json:"uniqueId,omitempty"`
 	// EncryptionSettingsCollection - Encryption settings collection used be Azure Disk Encryption, can contain multiple encryption settings per disk or snapshot.
 	EncryptionSettingsCollection *EncryptionSettingsCollection `json:"encryptionSettingsCollection,omitempty"`
 	// ProvisioningState - READ-ONLY; The disk provisioning state.
 	ProvisioningState *string `json:"provisioningState,omitempty"`
+	// Incremental - Whether a snapshot is incremental. Incremental snapshots on the same disk occupy less space than full snapshots and can be diffed.
+	Incremental *bool `json:"incremental,omitempty"`
+	// Encryption - Encryption property can be used to encrypt data at rest with customer managed keys or platform managed keys.
+	Encryption *Encryption `json:"encryption,omitempty"`
 }
 
 // SnapshotsCreateOrUpdateFuture an abstraction for monitoring and retrieving the results of a long-running
@@ -7095,7 +8351,7 @@ func (su *SnapshotUpdate) UnmarshalJSON(body []byte) error {
 type SnapshotUpdateProperties struct {
 	// OsType - the Operating System type. Possible values include: 'Windows', 'Linux'
 	OsType OperatingSystemTypes `json:"osType,omitempty"`
-	// DiskSizeGB - If creationData.createOption is Empty, this field is mandatory and it indicates the size of the VHD to create. If this field is present for updates or creation with other options, it indicates a resize. Resizes are only allowed if the disk is not attached to a running VM, and can only increase the disk's size.
+	// DiskSizeGB - If creationData.createOption is Empty, this field is mandatory and it indicates the size of the disk to create. If this field is present for updates or creation with other options, it indicates a resize. Resizes are only allowed if the disk is not attached to a running VM, and can only increase the disk's size.
 	DiskSizeGB *int32 `json:"diskSizeGB,omitempty"`
 	// EncryptionSettingsCollection - Encryption settings collection used be Azure Disk Encryption, can contain multiple encryption settings per disk or snapshot.
 	EncryptionSettingsCollection *EncryptionSettingsCollection `json:"encryptionSettingsCollection,omitempty"`
@@ -7153,6 +8409,14 @@ type TargetRegion struct {
 	RegionalReplicaCount *int32 `json:"regionalReplicaCount,omitempty"`
 	// StorageAccountType - Specifies the storage account type to be used to store the image. This property is not updatable. Possible values include: 'StorageAccountTypeStandardLRS', 'StorageAccountTypeStandardZRS'
 	StorageAccountType StorageAccountType `json:"storageAccountType,omitempty"`
+}
+
+// TerminateNotificationProfile ...
+type TerminateNotificationProfile struct {
+	// NotBeforeTimeout - Configurable length of time a Virtual Machine being deleted will have to potentially approve the Terminate Scheduled Event before the event is auto approved (timed out). The configuration must be specified in ISO 8601 format, the default value is 5 minutes (PT5M)
+	NotBeforeTimeout *string `json:"notBeforeTimeout,omitempty"`
+	// Enable - Specifies whether the Terminate Scheduled event is enabled or disabled.
+	Enable *bool `json:"enable,omitempty"`
 }
 
 // ThrottledRequestsInput api request input for LogAnalytics getThrottledRequests Api.
@@ -7251,6 +8515,14 @@ type UsageName struct {
 	Value *string `json:"value,omitempty"`
 	// LocalizedValue - The localized name of the resource.
 	LocalizedValue *string `json:"localizedValue,omitempty"`
+}
+
+// UserArtifactSource the source image from which the Image Version is going to be created.
+type UserArtifactSource struct {
+	// FileName - Required. The fileName of the artifact.
+	FileName *string `json:"fileName,omitempty"`
+	// MediaLink - Required. The mediaLink of the artifact, must be a readable storage blob.
+	MediaLink *string `json:"mediaLink,omitempty"`
 }
 
 // VaultCertificate describes a single certificate reference in a Key Vault, and where the certificate
@@ -8021,6 +9293,8 @@ type VirtualMachineImageProperties struct {
 	OsDiskImage                  *OSDiskImage                  `json:"osDiskImage,omitempty"`
 	DataDiskImages               *[]DataDiskImage              `json:"dataDiskImages,omitempty"`
 	AutomaticOSUpgradeProperties *AutomaticOSUpgradeProperties `json:"automaticOSUpgradeProperties,omitempty"`
+	// HyperVGeneration - Possible values include: 'HyperVGenerationTypesV1', 'HyperVGenerationTypesV2'
+	HyperVGeneration HyperVGenerationTypes `json:"hyperVGeneration,omitempty"`
 }
 
 // VirtualMachineImageResource virtual machine image resource information.
@@ -8244,10 +9518,18 @@ type VirtualMachineProperties struct {
 	NetworkProfile *NetworkProfile `json:"networkProfile,omitempty"`
 	// DiagnosticsProfile - Specifies the boot diagnostic settings state. <br><br>Minimum api-version: 2015-06-15.
 	DiagnosticsProfile *DiagnosticsProfile `json:"diagnosticsProfile,omitempty"`
-	// AvailabilitySet - Specifies information about the availability set that the virtual machine should be assigned to. Virtual machines specified in the same availability set are allocated to different nodes to maximize availability. For more information about availability sets, see [Manage the availability of virtual machines](https://docs.microsoft.com/azure/virtual-machines/virtual-machines-windows-manage-availability?toc=%2fazure%2fvirtual-machines%2fwindows%2ftoc.json). <br><br> For more information on Azure planned maintenance, see [Planned maintenance for virtual machines in Azure](https://docs.microsoft.com/azure/virtual-machines/virtual-machines-windows-planned-maintenance?toc=%2fazure%2fvirtual-machines%2fwindows%2ftoc.json) <br><br> Currently, a VM can only be added to availability set at creation time. An existing VM cannot be added to an availability set.
+	// AvailabilitySet - Specifies information about the availability set that the virtual machine should be assigned to. Virtual machines specified in the same availability set are allocated to different nodes to maximize availability. For more information about availability sets, see [Manage the availability of virtual machines](https://docs.microsoft.com/azure/virtual-machines/virtual-machines-windows-manage-availability?toc=%2fazure%2fvirtual-machines%2fwindows%2ftoc.json). <br><br> For more information on Azure planned maintenance, see [Planned maintenance for virtual machines in Azure](https://docs.microsoft.com/azure/virtual-machines/virtual-machines-windows-planned-maintenance?toc=%2fazure%2fvirtual-machines%2fwindows%2ftoc.json) <br><br> Currently, a VM can only be added to availability set at creation time. An existing VM cannot be added to an availability set. <br><br>This property cannot exist along with a non-null properties.virtualMachineScaleSet reference.
 	AvailabilitySet *SubResource `json:"availabilitySet,omitempty"`
+	// VirtualMachineScaleSet - Specifies information about the virtual machine scale set that the virtual machine should be assigned to. Virtual machines specified in the same virtual machine scale set are allocated to different nodes to maximize availability. Currently, a VM can only be added to virtual machine scale set at creation time. An existing VM cannot be added to a virtual machine scale set. <br><br>This property cannot exist along with a non-null properties.availabilitySet reference. <br><br>Minimum api‐version: 2019‐03‐01
+	VirtualMachineScaleSet *SubResource `json:"virtualMachineScaleSet,omitempty"`
 	// ProximityPlacementGroup - Specifies information about the proximity placement group that the virtual machine should be assigned to. <br><br>Minimum api-version: 2018-04-01.
 	ProximityPlacementGroup *SubResource `json:"proximityPlacementGroup,omitempty"`
+	// Priority - Specifies the priority for the virtual machine. <br><br>Minimum api-version: 2019-03-01. Possible values include: 'Regular', 'Low'
+	Priority VirtualMachinePriorityTypes `json:"priority,omitempty"`
+	// EvictionPolicy - Specifies the eviction policy for the low priority virtual machine. Only supported value is 'Deallocate'. <br><br>Minimum api-version: 2019-03-01. Possible values include: 'Deallocate', 'Delete'
+	EvictionPolicy VirtualMachineEvictionPolicyTypes `json:"evictionPolicy,omitempty"`
+	// BillingProfile - Specifies the billing related details of a low priority virtual machine. <br><br>Minimum api-version: 2019-03-01.
+	BillingProfile *BillingProfile `json:"billingProfile,omitempty"`
 	// Host - Specifies information about the dedicated host that the virtual machine resides in. <br><br>Minimum api-version: 2018-10-01.
 	Host *SubResource `json:"host,omitempty"`
 	// ProvisioningState - READ-ONLY; The provisioning state, which only appears in the response.
@@ -8439,6 +9721,10 @@ type VirtualMachineScaleSetDataDisk struct {
 	DiskSizeGB *int32 `json:"diskSizeGB,omitempty"`
 	// ManagedDisk - The managed disk parameters.
 	ManagedDisk *VirtualMachineScaleSetManagedDiskParameters `json:"managedDisk,omitempty"`
+	// DiskIOPSReadWrite - Specifies the Read-Write IOPS for the managed disk. Should be used only when StorageAccountType is UltraSSD_LRS. If not specified, a default value would be assigned based on diskSizeGB.
+	DiskIOPSReadWrite *int64 `json:"diskIOPSReadWrite,omitempty"`
+	// DiskMBpsReadWrite - Specifies the bandwidth in MB per second for the managed disk. Should be used only when StorageAccountType is UltraSSD_LRS. If not specified, a default value would be assigned based on diskSizeGB.
+	DiskMBpsReadWrite *int64 `json:"diskMBpsReadWrite,omitempty"`
 }
 
 // VirtualMachineScaleSetExtension describes a Virtual Machine Scale Set Extension.
@@ -9473,6 +10759,8 @@ func NewVirtualMachineScaleSetListWithLinkResultPage(getNextPage func(context.Co
 type VirtualMachineScaleSetManagedDiskParameters struct {
 	// StorageAccountType - Specifies the storage account type for the managed disk. NOTE: UltraSSD_LRS can only be used with data disks, it cannot be used with OS Disk. Possible values include: 'StorageAccountTypesStandardLRS', 'StorageAccountTypesPremiumLRS', 'StorageAccountTypesStandardSSDLRS', 'StorageAccountTypesUltraSSDLRS'
 	StorageAccountType StorageAccountTypes `json:"storageAccountType,omitempty"`
+	// DiskEncryptionSet - Specifies the customer managed disk encryption set resource id for the managed disk.
+	DiskEncryptionSet *DiskEncryptionSetParameters `json:"diskEncryptionSet,omitempty"`
 }
 
 // VirtualMachineScaleSetNetworkConfiguration describes a virtual machine scale set network profile's
@@ -9620,6 +10908,8 @@ type VirtualMachineScaleSetOSProfile struct {
 type VirtualMachineScaleSetProperties struct {
 	// UpgradePolicy - The upgrade policy.
 	UpgradePolicy *UpgradePolicy `json:"upgradePolicy,omitempty"`
+	// AutomaticRepairsPolicy - Policy for automatic repairs.
+	AutomaticRepairsPolicy *AutomaticRepairsPolicy `json:"automaticRepairsPolicy,omitempty"`
 	// VirtualMachineProfile - The virtual machine profile.
 	VirtualMachineProfile *VirtualMachineScaleSetVMProfile `json:"virtualMachineProfile,omitempty"`
 	// ProvisioningState - READ-ONLY; The provisioning state, which only appears in the response.
@@ -9640,6 +10930,8 @@ type VirtualMachineScaleSetProperties struct {
 	ProximityPlacementGroup *SubResource `json:"proximityPlacementGroup,omitempty"`
 	// AdditionalCapabilities - Specifies additional capabilities enabled or disabled on the Virtual Machines in the Virtual Machine Scale Set. For instance: whether the Virtual Machines have the capability to support attaching managed data disks with UltraSSD_LRS storage account type.
 	AdditionalCapabilities *AdditionalCapabilities `json:"additionalCapabilities,omitempty"`
+	// ScaleInPolicy - Specifies the scale-in policy that decides which virtual machines are chosen for removal when a Virtual Machine Scale Set is scaled-in.
+	ScaleInPolicy *ScaleInPolicy `json:"scaleInPolicy,omitempty"`
 }
 
 // VirtualMachineScaleSetPublicIPAddressConfiguration describes a virtual machines scale set IP
@@ -9713,6 +11005,8 @@ type VirtualMachineScaleSetPublicIPAddressConfigurationProperties struct {
 	IPTags *[]VirtualMachineScaleSetIPTag `json:"ipTags,omitempty"`
 	// PublicIPPrefix - The PublicIPPrefix from which to allocate publicIP addresses.
 	PublicIPPrefix *SubResource `json:"publicIPPrefix,omitempty"`
+	// PublicIPAddressVersion - Available from Api-Version 2019-07-01 onwards, it represents whether the specific ipconfiguration is IPv4 or IPv6. Default is taken as IPv4. Possible values are: 'IPv4' and 'IPv6'. Possible values include: 'IPv4', 'IPv6'
+	PublicIPAddressVersion IPVersion `json:"publicIPAddressVersion,omitempty"`
 }
 
 // VirtualMachineScaleSetReimageParameters describes a Virtual Machine Scale Set VM Reimage Parameters.
@@ -10404,6 +11698,8 @@ type VirtualMachineScaleSetUpdateNetworkConfigurationProperties struct {
 
 // VirtualMachineScaleSetUpdateNetworkProfile describes a virtual machine scale set network profile.
 type VirtualMachineScaleSetUpdateNetworkProfile struct {
+	// HealthProbe - A reference to a load balancer probe used to determine the health of an instance in the virtual machine scale set. The reference will be in the form: '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/loadBalancers/{loadBalancerName}/probes/{probeName}'.
+	HealthProbe *APIEntityReference `json:"healthProbe,omitempty"`
 	// NetworkInterfaceConfigurations - The list of network configurations.
 	NetworkInterfaceConfigurations *[]VirtualMachineScaleSetUpdateNetworkConfiguration `json:"networkInterfaceConfigurations,omitempty"`
 }
@@ -10441,14 +11737,20 @@ type VirtualMachineScaleSetUpdateOSProfile struct {
 type VirtualMachineScaleSetUpdateProperties struct {
 	// UpgradePolicy - The upgrade policy.
 	UpgradePolicy *UpgradePolicy `json:"upgradePolicy,omitempty"`
+	// AutomaticRepairsPolicy - Policy for automatic repairs.
+	AutomaticRepairsPolicy *AutomaticRepairsPolicy `json:"automaticRepairsPolicy,omitempty"`
 	// VirtualMachineProfile - The virtual machine profile.
 	VirtualMachineProfile *VirtualMachineScaleSetUpdateVMProfile `json:"virtualMachineProfile,omitempty"`
 	// Overprovision - Specifies whether the Virtual Machine Scale Set should be overprovisioned.
 	Overprovision *bool `json:"overprovision,omitempty"`
+	// DoNotRunExtensionsOnOverprovisionedVMs - When Overprovision is enabled, extensions are launched only on the requested number of VMs which are finally kept. This property will hence ensure that the extensions do not run on the extra overprovisioned VMs.
+	DoNotRunExtensionsOnOverprovisionedVMs *bool `json:"doNotRunExtensionsOnOverprovisionedVMs,omitempty"`
 	// SinglePlacementGroup - When true this limits the scale set to a single placement group, of max size 100 virtual machines.
 	SinglePlacementGroup *bool `json:"singlePlacementGroup,omitempty"`
 	// AdditionalCapabilities - Specifies additional capabilities enabled or disabled on the Virtual Machines in the Virtual Machine Scale Set. For instance: whether the Virtual Machines have the capability to support attaching managed data disks with UltraSSD_LRS storage account type.
 	AdditionalCapabilities *AdditionalCapabilities `json:"additionalCapabilities,omitempty"`
+	// ScaleInPolicy - Specifies the scale-in policy that decides which virtual machines are chosen for removal when a Virtual Machine Scale Set is scaled-in.
+	ScaleInPolicy *ScaleInPolicy `json:"scaleInPolicy,omitempty"`
 }
 
 // VirtualMachineScaleSetUpdatePublicIPAddressConfiguration describes a virtual machines scale set IP
@@ -10537,6 +11839,10 @@ type VirtualMachineScaleSetUpdateVMProfile struct {
 	ExtensionProfile *VirtualMachineScaleSetExtensionProfile `json:"extensionProfile,omitempty"`
 	// LicenseType - The license type, which is for bring your own license scenario.
 	LicenseType *string `json:"licenseType,omitempty"`
+	// BillingProfile - Specifies the billing related details of a low priority VMSS. <br><br>Minimum api-version: 2019-03-01.
+	BillingProfile *BillingProfile `json:"billingProfile,omitempty"`
+	// ScheduledEventsProfile - Specifies Scheduled Event related configurations.
+	ScheduledEventsProfile *ScheduledEventsProfile `json:"scheduledEventsProfile,omitempty"`
 }
 
 // VirtualMachineScaleSetVM describes a virtual machine scale set virtual machine.
@@ -10697,6 +12003,58 @@ func (vmssv *VirtualMachineScaleSetVM) UnmarshalJSON(body []byte) error {
 	return nil
 }
 
+// VirtualMachineScaleSetVMExtensionsCreateOrUpdateFuture an abstraction for monitoring and retrieving the
+// results of a long-running operation.
+type VirtualMachineScaleSetVMExtensionsCreateOrUpdateFuture struct {
+	azure.Future
+}
+
+// Result returns the result of the asynchronous operation.
+// If the operation has not completed it will return an error.
+func (future *VirtualMachineScaleSetVMExtensionsCreateOrUpdateFuture) Result(client VirtualMachineScaleSetVMExtensionsClient) (vme VirtualMachineExtension, err error) {
+	var done bool
+	done, err = future.DoneWithContext(context.Background(), client)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "compute.VirtualMachineScaleSetVMExtensionsCreateOrUpdateFuture", "Result", future.Response(), "Polling failure")
+		return
+	}
+	if !done {
+		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetVMExtensionsCreateOrUpdateFuture")
+		return
+	}
+	sender := autorest.DecorateSender(client, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	if vme.Response.Response, err = future.GetResult(sender); err == nil && vme.Response.Response.StatusCode != http.StatusNoContent {
+		vme, err = client.CreateOrUpdateResponder(vme.Response.Response)
+		if err != nil {
+			err = autorest.NewErrorWithError(err, "compute.VirtualMachineScaleSetVMExtensionsCreateOrUpdateFuture", "Result", vme.Response.Response, "Failure responding to request")
+		}
+	}
+	return
+}
+
+// VirtualMachineScaleSetVMExtensionsDeleteFuture an abstraction for monitoring and retrieving the results
+// of a long-running operation.
+type VirtualMachineScaleSetVMExtensionsDeleteFuture struct {
+	azure.Future
+}
+
+// Result returns the result of the asynchronous operation.
+// If the operation has not completed it will return an error.
+func (future *VirtualMachineScaleSetVMExtensionsDeleteFuture) Result(client VirtualMachineScaleSetVMExtensionsClient) (ar autorest.Response, err error) {
+	var done bool
+	done, err = future.DoneWithContext(context.Background(), client)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "compute.VirtualMachineScaleSetVMExtensionsDeleteFuture", "Result", future.Response(), "Polling failure")
+		return
+	}
+	if !done {
+		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetVMExtensionsDeleteFuture")
+		return
+	}
+	ar.Response = future.Response()
+	return
+}
+
 // VirtualMachineScaleSetVMExtensionsSummary extensions summary for virtual machines of a virtual machine
 // scale set.
 type VirtualMachineScaleSetVMExtensionsSummary struct {
@@ -10704,6 +12062,35 @@ type VirtualMachineScaleSetVMExtensionsSummary struct {
 	Name *string `json:"name,omitempty"`
 	// StatusesSummary - READ-ONLY; The extensions information.
 	StatusesSummary *[]VirtualMachineStatusCodeCount `json:"statusesSummary,omitempty"`
+}
+
+// VirtualMachineScaleSetVMExtensionsUpdateFuture an abstraction for monitoring and retrieving the results
+// of a long-running operation.
+type VirtualMachineScaleSetVMExtensionsUpdateFuture struct {
+	azure.Future
+}
+
+// Result returns the result of the asynchronous operation.
+// If the operation has not completed it will return an error.
+func (future *VirtualMachineScaleSetVMExtensionsUpdateFuture) Result(client VirtualMachineScaleSetVMExtensionsClient) (vme VirtualMachineExtension, err error) {
+	var done bool
+	done, err = future.DoneWithContext(context.Background(), client)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "compute.VirtualMachineScaleSetVMExtensionsUpdateFuture", "Result", future.Response(), "Polling failure")
+		return
+	}
+	if !done {
+		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetVMExtensionsUpdateFuture")
+		return
+	}
+	sender := autorest.DecorateSender(client, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	if vme.Response.Response, err = future.GetResult(sender); err == nil && vme.Response.Response.StatusCode != http.StatusNoContent {
+		vme, err = client.UpdateResponder(vme.Response.Response)
+		if err != nil {
+			err = autorest.NewErrorWithError(err, "compute.VirtualMachineScaleSetVMExtensionsUpdateFuture", "Result", vme.Response.Response, "Failure responding to request")
+		}
+	}
+	return
 }
 
 // VirtualMachineScaleSetVMInstanceIDs specifies a list of virtual machine instance IDs from the VM scale
@@ -10919,6 +12306,10 @@ type VirtualMachineScaleSetVMProfile struct {
 	Priority VirtualMachinePriorityTypes `json:"priority,omitempty"`
 	// EvictionPolicy - Specifies the eviction policy for virtual machines in a low priority scale set. <br><br>Minimum api-version: 2017-10-30-preview. Possible values include: 'Deallocate', 'Delete'
 	EvictionPolicy VirtualMachineEvictionPolicyTypes `json:"evictionPolicy,omitempty"`
+	// BillingProfile - Specifies the billing related details of a low priority VMSS. <br><br>Minimum api-version: 2019-03-01.
+	BillingProfile *BillingProfile `json:"billingProfile,omitempty"`
+	// ScheduledEventsProfile - Specifies Scheduled Event related configurations.
+	ScheduledEventsProfile *ScheduledEventsProfile `json:"scheduledEventsProfile,omitempty"`
 }
 
 // VirtualMachineScaleSetVMProperties describes the properties of a virtual machine scale set virtual
@@ -11425,6 +12816,29 @@ func (future *VirtualMachinesPowerOffFuture) Result(client VirtualMachinesClient
 	}
 	if !done {
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachinesPowerOffFuture")
+		return
+	}
+	ar.Response = future.Response()
+	return
+}
+
+// VirtualMachinesReapplyFuture an abstraction for monitoring and retrieving the results of a long-running
+// operation.
+type VirtualMachinesReapplyFuture struct {
+	azure.Future
+}
+
+// Result returns the result of the asynchronous operation.
+// If the operation has not completed it will return an error.
+func (future *VirtualMachinesReapplyFuture) Result(client VirtualMachinesClient) (ar autorest.Response, err error) {
+	var done bool
+	done, err = future.DoneWithContext(context.Background(), client)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "compute.VirtualMachinesReapplyFuture", "Result", future.Response(), "Polling failure")
+		return
+	}
+	if !done {
+		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachinesReapplyFuture")
 		return
 	}
 	ar.Response = future.Response()

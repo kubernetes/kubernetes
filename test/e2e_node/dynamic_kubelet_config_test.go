@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"fmt"
@@ -1189,9 +1189,4 @@ func (tc *nodeConfigTestCase) checkConfigMetrics(f *framework.Framework) {
 		}
 		return nil
 	}, timeout, interval).Should(gomega.BeNil())
-}
-
-// constructs the expected SelfLink for a config map
-func configMapAPIPath(cm *v1.ConfigMap) string {
-	return fmt.Sprintf("/api/v1/namespaces/%s/configmaps/%s", cm.Namespace, cm.Name)
 }

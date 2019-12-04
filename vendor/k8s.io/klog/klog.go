@@ -142,7 +142,7 @@ func (s *severity) Set(value string) error {
 	if v, ok := severityByName(value); ok {
 		threshold = v
 	} else {
-		v, err := strconv.Atoi(value)
+		v, err := strconv.ParseInt(value, 10, 32)
 		if err != nil {
 			return err
 		}
@@ -226,7 +226,7 @@ func (l *Level) Get() interface{} {
 
 // Set is part of the flag.Value interface.
 func (l *Level) Set(value string) error {
-	v, err := strconv.Atoi(value)
+	v, err := strconv.ParseInt(value, 10, 32)
 	if err != nil {
 		return err
 	}
@@ -294,7 +294,7 @@ func (m *moduleSpec) Set(value string) error {
 			return errVmoduleSyntax
 		}
 		pattern := patLev[0]
-		v, err := strconv.Atoi(patLev[1])
+		v, err := strconv.ParseInt(patLev[1], 10, 32)
 		if err != nil {
 			return errors.New("syntax error: expect comma-separated list of filename=N")
 		}
@@ -396,31 +396,23 @@ type flushSyncWriter interface {
 	io.Writer
 }
 
+// init sets up the defaults and runs flushDaemon.
 func init() {
-	// Default stderrThreshold is ERROR.
-	logging.stderrThreshold = errorLog
-
+	logging.stderrThreshold = errorLog // Default stderrThreshold is ERROR.
 	logging.setVState(0, nil, false)
+	logging.logDir = ""
+	logging.logFile = ""
+	logging.logFileMaxSizeMB = 1800
+	logging.toStderr = true
+	logging.alsoToStderr = false
+	logging.skipHeaders = false
+	logging.addDirHeader = false
+	logging.skipLogHeaders = false
 	go logging.flushDaemon()
 }
 
-var initDefaultsOnce sync.Once
-
 // InitFlags is for explicitly initializing the flags.
 func InitFlags(flagset *flag.FlagSet) {
-
-	// Initialize defaults.
-	initDefaultsOnce.Do(func() {
-		logging.logDir = ""
-		logging.logFile = ""
-		logging.logFileMaxSizeMB = 1800
-		logging.toStderr = true
-		logging.alsoToStderr = false
-		logging.skipHeaders = false
-		logging.addDirHeader = false
-		logging.skipLogHeaders = false
-	})
-
 	if flagset == nil {
 		flagset = flag.CommandLine
 	}

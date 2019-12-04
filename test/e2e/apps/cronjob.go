@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -270,8 +269,11 @@ var _ = SIGDescribe("CronJob", func() {
 			ginkgo.By("Ensuring a finished job exists by listing jobs explicitly")
 			jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
 			framework.ExpectNoError(err, "Failed to ensure a finished cronjob exists by listing jobs explicitly in namespace %s", f.Namespace.Name)
-			_, finishedJobs := filterActiveJobs(jobs)
-			framework.ExpectEqual(len(finishedJobs), 1)
+			activeJobs, finishedJobs := filterActiveJobs(jobs)
+			if len(finishedJobs) != 1 {
+				framework.Logf("Expected one finished job in namespace %s; activeJobs=%v; finishedJobs=%v", f.Namespace.Name, activeJobs, finishedJobs)
+				framework.ExpectEqual(len(finishedJobs), 1)
+			}
 
 			// Job should get deleted when the next job finishes the next minute
 			ginkgo.By("Ensuring this job and its pods does not exist anymore")
@@ -451,7 +453,7 @@ func waitForJobReplaced(c clientset.Interface, ns, previousJobName string) error
 		if len(aliveJobs) > 1 {
 			return false, fmt.Errorf("More than one job is running %+v", jobs.Items)
 		} else if len(aliveJobs) == 0 {
-			e2elog.Logf("Warning: Found 0 jobs in namespace %v", ns)
+			framework.Logf("Warning: Found 0 jobs in namespace %v", ns)
 			return false, nil
 		}
 		return aliveJobs[0].Name != previousJobName, nil

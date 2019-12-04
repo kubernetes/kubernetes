@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
 	"flag"
@@ -33,15 +33,12 @@ import (
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 )
 
-func init() {
+func TestMain(m *testing.M) {
+	// Copy go flags in TestMain, to ensure go test flags are registered (no longer available in init() as of go1.13)
 	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
 	framework.RegisterCommonFlags(flag.CommandLine)
 	framework.RegisterClusterFlags(flag.CommandLine)
-
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
-}
-
-func TestMain(m *testing.M) {
 	pflag.Parse()
 	framework.AfterReadingAllFlags(&framework.TestContext)
 	os.Exit(m.Run())

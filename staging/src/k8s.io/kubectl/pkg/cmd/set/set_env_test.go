@@ -60,7 +60,7 @@ func TestSetEnvLocal(t *testing.T) {
 	opts := NewEnvOptions(streams)
 	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
 	opts.FilenameOptions = resource.FilenameOptions{
-		Filenames: []string{"../../../test/data/controller.yaml"},
+		Filenames: []string{"../../../testdata/controller.yaml"},
 	}
 	opts.Local = true
 
@@ -97,7 +97,7 @@ func TestSetEnvLocalNamespace(t *testing.T) {
 	opts := NewEnvOptions(streams)
 	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
 	opts.FilenameOptions = resource.FilenameOptions{
-		Filenames: []string{"../../../test/data/set/namespaced-resource.yaml"},
+		Filenames: []string{"../../../testdata/set/namespaced-resource.yaml"},
 	}
 	opts.Local = true
 
@@ -134,7 +134,7 @@ func TestSetMultiResourcesEnvLocal(t *testing.T) {
 	opts := NewEnvOptions(streams)
 	opts.PrintFlags = genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme)
 	opts.FilenameOptions = resource.FilenameOptions{
-		Filenames: []string{"../../../test/data/set/multi-resource-yaml.yaml"},
+		Filenames: []string{"../../../testdata/set/multi-resource-yaml.yaml"},
 	}
 	opts.Local = true
 

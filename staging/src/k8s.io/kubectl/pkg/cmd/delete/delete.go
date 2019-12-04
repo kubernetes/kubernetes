@@ -54,6 +54,7 @@ var (
 		hosting a pod is down or cannot reach the API server, termination may take significantly longer
 		than the grace period. To force delete a resource, you must pass a grace period of 0 and specify
 		the --force flag.
+		Note: only a subset of resources support graceful deletion. In absence of the support, --grace-period is ignored.
 
 		IMPORTANT: Force deleting pods does not wait for confirmation that the pod's processes have been
 		terminated, which can leave those processes running until the node detects the deletion and
@@ -143,7 +144,6 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
 	deleteFlags.AddFlags(cmd)
 
-	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }
 

@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -31,12 +32,13 @@ metadata:
 spec:
   egress:
   - ports:
-    - protocol: ɗ
+    - port: 3
+      protocol: ɗ
     to:
     - ipBlock:
-        cidr: "50"
+        cidr: "51"
         except:
-        - "51"
+        - "52"
       namespaceSelector:
         matchExpressions:
         - key: 4a--0o8m3-d0w7p8vl-1z---883d-v3j4-7y-5.9-q390/niTl.1-.VT--5mj_9.M.134-5-.q6H5
@@ -57,9 +59,9 @@ spec:
   ingress:
   - from:
     - ipBlock:
-        cidr: "36"
+        cidr: "37"
         except:
-        - "37"
+        - "38"
       namespaceSelector:
         matchExpressions:
         - key: 2_28.-.7_8B.HF-U-_ik_--DSXr.n-A9..9__Y-H-Mqpt._.-_..051
@@ -73,7 +75,8 @@ spec:
         matchLabels:
           yg--79-e-a74bc-v--0jjy45-17-053.zyyms7-tk1po6c-m61733-x-2v4r--5-xgc3-yz-7-x--c0-w5-6r/78A6.6O: 17_.8CnT
     ports:
-    - protocol: Ǐ2啗塧ȱ蓿彭聡A3fƻfʣ
+    - port: 2
+      protocol: Ǐ2啗塧ȱ蓿彭聡A3fƻfʣ
   podSelector:
     matchExpressions:
     - key: p503---477-49p---o61---4fy--9---7--9-9s-0-u5lj2--10pq-0-7-9-2-0/fP81.-.9Vdx.TB_M-H_5_.t..bG0

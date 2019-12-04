@@ -19,22 +19,38 @@ package scheduling
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/etcd3"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
+	csitrans "k8s.io/csi-translation-lib"
+	csiplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
+	"k8s.io/kubernetes/pkg/controller/volume/scheduling/metrics"
+	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
+
+// InTreeToCSITranslator contains methods required to check migratable status
+// and perform translations from InTree PV's to CSI
+type InTreeToCSITranslator interface {
+	IsPVMigratable(pv *v1.PersistentVolume) bool
+	GetInTreePluginNameFromSpec(pv *v1.PersistentVolume, vol *v1.Volume) (string, error)
+	TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error)
+}
 
 // SchedulerVolumeBinder is used by the scheduler to handle PVC/PV binding
 // and dynamic provisioning.  The binding decisions are integrated into the pod scheduling
@@ -102,9 +118,10 @@ type volumeBinder struct {
 	kubeClient  clientset.Interface
 	classLister storagelisters.StorageClassLister
 
-	nodeInformer coreinformers.NodeInformer
-	pvcCache     PVCAssumeCache
-	pvCache      PVAssumeCache
+	nodeInformer    coreinformers.NodeInformer
+	csiNodeInformer storageinformers.CSINodeInformer
+	pvcCache        PVCAssumeCache
+	pvCache         PVAssumeCache
 
 	// Stores binding decisions that were made in FindPodVolumes for use in AssumePodVolumes.
 	// AssumePodVolumes modifies the bindings again for use in BindPodVolumes.
@@ -112,12 +129,15 @@ type volumeBinder struct {
 
 	// Amount of time to wait for the bind operation to succeed
 	bindTimeout time.Duration
+
+	translator InTreeToCSITranslator
 }
 
 // NewVolumeBinder sets up all the caches needed for the scheduler to make volume binding decisions.
 func NewVolumeBinder(
 	kubeClient clientset.Interface,
 	nodeInformer coreinformers.NodeInformer,
+	csiNodeInformer storageinformers.CSINodeInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
@@ -127,10 +147,12 @@ func NewVolumeBinder(
 		kubeClient:      kubeClient,
 		classLister:     storageClassInformer.Lister(),
 		nodeInformer:    nodeInformer,
+		csiNodeInformer: csiNodeInformer,
 		pvcCache:        NewPVCAssumeCache(pvcInformer.Informer()),
 		pvCache:         NewPVAssumeCache(pvInformer.Informer()),
 		podBindingCache: NewPodBindingCache(),
 		bindTimeout:     bindTimeout,
+		translator:      csitrans.New(),
 	}
 
 	return b
@@ -154,9 +176,9 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolume
 	boundVolumesSatisfied = true
 	start := time.Now()
 	defer func() {
-		VolumeSchedulingStageLatency.WithLabelValues("predicate").Observe(time.Since(start).Seconds())
+		metrics.VolumeSchedulingStageLatency.WithLabelValues("predicate").Observe(time.Since(start).Seconds())
 		if err != nil {
-			VolumeSchedulingStageFailed.WithLabelValues("predicate").Inc()
+			metrics.VolumeSchedulingStageFailed.WithLabelValues("predicate").Inc()
 		}
 	}()
 
@@ -256,9 +278,9 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 	klog.V(4).Infof("AssumePodVolumes for pod %q, node %q", podName, nodeName)
 	start := time.Now()
 	defer func() {
-		VolumeSchedulingStageLatency.WithLabelValues("assume").Observe(time.Since(start).Seconds())
+		metrics.VolumeSchedulingStageLatency.WithLabelValues("assume").Observe(time.Since(start).Seconds())
 		if err != nil {
-			VolumeSchedulingStageFailed.WithLabelValues("assume").Inc()
+			metrics.VolumeSchedulingStageFailed.WithLabelValues("assume").Inc()
 		}
 	}()
 
@@ -332,9 +354,9 @@ func (b *volumeBinder) BindPodVolumes(assumedPod *v1.Pod) (err error) {
 
 	start := time.Now()
 	defer func() {
-		VolumeSchedulingStageLatency.WithLabelValues("bind").Observe(time.Since(start).Seconds())
+		metrics.VolumeSchedulingStageLatency.WithLabelValues("bind").Observe(time.Since(start).Seconds())
 		if err != nil {
-			VolumeSchedulingStageFailed.WithLabelValues("bind").Inc()
+			metrics.VolumeSchedulingStageFailed.WithLabelValues("bind").Inc()
 		}
 	}()
 
@@ -347,10 +369,14 @@ func (b *volumeBinder) BindPodVolumes(assumedPod *v1.Pod) (err error) {
 		return err
 	}
 
-	return wait.Poll(time.Second, b.bindTimeout, func() (bool, error) {
+	err = wait.Poll(time.Second, b.bindTimeout, func() (bool, error) {
 		b, err := b.checkBindings(assumedPod, bindings, claimsToProvision)
 		return b, err
 	})
+	if err != nil {
+		return fmt.Errorf("Failed to bind volumes: %v", err)
+	}
+	return nil
 }
 
 func getPodName(pod *v1.Pod) string {
@@ -452,6 +478,12 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*bindingInfo, claim
 		return false, fmt.Errorf("failed to get node %q: %v", pod.Spec.NodeName, err)
 	}
 
+	csiNode, err := b.csiNodeInformer.Lister().Get(node.Name)
+	if err != nil {
+		// TODO: return the error once CSINode is created by default
+		klog.V(4).Infof("Could not get a CSINode object for the node %q: %v", node.Name, err)
+	}
+
 	// Check for any conditions that might require scheduling retry
 
 	// When pod is removed from scheduling queue because of deletion or any
@@ -478,6 +510,11 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*bindingInfo, claim
 		// and wait for new API object propagated from apiserver.
 		if versioner.CompareResourceVersion(binding.pv, pv) > 0 {
 			return false, nil
+		}
+
+		pv, err = b.tryTranslatePVToCSI(pv, csiNode)
+		if err != nil {
+			return false, fmt.Errorf("failed to translate pv to csi: %v", err)
 		}
 
 		// Check PV's node affinity (the node might not have the proper label)
@@ -514,7 +551,10 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*bindingInfo, claim
 		}
 		selectedNode := pvc.Annotations[pvutil.AnnSelectedNode]
 		if selectedNode != pod.Spec.NodeName {
-			return false, fmt.Errorf("selectedNode annotation value %q not set to scheduled node %q", selectedNode, pod.Spec.NodeName)
+			// If provisioner fails to provision a volume, selectedNode
+			// annotation will be removed to signal back to the scheduler to
+			// retry.
+			return false, fmt.Errorf("provisioning failed for PVC %q", pvc.Name)
 		}
 
 		// If the PVC is bound to a PV, check its node affinity
@@ -530,6 +570,12 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*bindingInfo, claim
 				}
 				return false, fmt.Errorf("failed to get pv %q from cache: %v", pvc.Spec.VolumeName, err)
 			}
+
+			pv, err = b.tryTranslatePVToCSI(pv, csiNode)
+			if err != nil {
+				return false, err
+			}
+
 			if err := volumeutil.CheckNodeAffinity(pv, node.Labels); err != nil {
 				return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %v", pv.Name, node.Name, err)
 			}
@@ -633,9 +679,20 @@ func (b *volumeBinder) getPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentV
 }
 
 func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node *v1.Node, podName string) (bool, error) {
+	csiNode, err := b.csiNodeInformer.Lister().Get(node.Name)
+	if err != nil {
+		// TODO: return the error once CSINode is created by default
+		klog.V(4).Infof("Could not get a CSINode object for the node %q: %v", node.Name, err)
+	}
+
 	for _, pvc := range claims {
 		pvName := pvc.Spec.VolumeName
 		pv, err := b.pvCache.GetPV(pvName)
+		if err != nil {
+			return false, err
+		}
+
+		pv, err = b.tryTranslatePVToCSI(pv, csiNode)
 		if err != nil {
 			return false, err
 		}
@@ -774,4 +831,73 @@ func (a byPVCSize) Less(i, j int) bool {
 
 func claimToClaimKey(claim *v1.PersistentVolumeClaim) string {
 	return fmt.Sprintf("%s/%s", claim.Namespace, claim.Name)
+}
+
+// isCSIMigrationOnForPlugin checks if CSI migrartion is enabled for a given plugin.
+func isCSIMigrationOnForPlugin(pluginName string) bool {
+	switch pluginName {
+	case csiplugins.AWSEBSInTreePluginName:
+		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
+	case csiplugins.GCEPDInTreePluginName:
+		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
+	case csiplugins.AzureDiskInTreePluginName:
+		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
+	case csiplugins.CinderInTreePluginName:
+		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationOpenStack)
+	}
+	return false
+}
+
+// isPluginMigratedToCSIOnNode checks if an in-tree plugin has been migrated to a CSI driver on the node.
+func isPluginMigratedToCSIOnNode(pluginName string, csiNode *storagev1.CSINode) bool {
+	if csiNode == nil {
+		return false
+	}
+
+	csiNodeAnn := csiNode.GetAnnotations()
+	if csiNodeAnn == nil {
+		return false
+	}
+
+	var mpaSet sets.String
+	mpa := csiNodeAnn[v1.MigratedPluginsAnnotationKey]
+	if len(mpa) == 0 {
+		mpaSet = sets.NewString()
+	} else {
+		tok := strings.Split(mpa, ",")
+		mpaSet = sets.NewString(tok...)
+	}
+
+	return mpaSet.Has(pluginName)
+}
+
+// tryTranslatePVToCSI will translate the in-tree PV to CSI if it meets the criteria. If not, it returns the unmodified in-tree PV.
+func (b *volumeBinder) tryTranslatePVToCSI(pv *v1.PersistentVolume, csiNode *storagev1.CSINode) (*v1.PersistentVolume, error) {
+	if !b.translator.IsPVMigratable(pv) {
+		return pv, nil
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+		return pv, nil
+	}
+
+	pluginName, err := b.translator.GetInTreePluginNameFromSpec(pv, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not get plugin name from pv: %v", err)
+	}
+
+	if !isCSIMigrationOnForPlugin(pluginName) {
+		return pv, nil
+	}
+
+	if !isPluginMigratedToCSIOnNode(pluginName, csiNode) {
+		return pv, nil
+	}
+
+	transPV, err := b.translator.TranslateInTreePVToCSI(pv)
+	if err != nil {
+		return nil, fmt.Errorf("could not translate pv: %v", err)
+	}
+
+	return transPV, nil
 }

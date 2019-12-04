@@ -22,8 +22,8 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 
 	"github.com/onsi/ginkgo"
@@ -62,7 +62,8 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				}
 
 				// Make sure all nodes are schedulable, otherwise we are in some kind of a problem state.
-				nodes = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+				nodes, err = e2enode.GetReadySchedulableNodes(f.ClientSet)
+				framework.ExpectNoError(err)
 				schedulableCount := len(nodes.Items)
 				framework.ExpectEqual(schedulableCount, nodeGroupSize, "not all nodes are schedulable")
 			})
@@ -93,15 +94,15 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				nodeMemoryMB := (&nodeMemoryBytes).Value() / 1024 / 1024
 				memRequestMB := nodeMemoryMB / 10 // Ensure each pod takes not more than 10% of node's allocatable memory.
 				replicas := 1
-				resourceConsumer := common.NewDynamicResourceConsumer("resource-consumer", f.Namespace.Name, common.KindDeployment, replicas, 0, 0, 0, cpuRequestMillis, memRequestMB, f.ClientSet, f.ScalesGetter)
+				resourceConsumer := e2eautoscaling.NewDynamicResourceConsumer("resource-consumer", f.Namespace.Name, e2eautoscaling.KindDeployment, replicas, 0, 0, 0, cpuRequestMillis, memRequestMB, f.ClientSet, f.ScalesGetter)
 				defer resourceConsumer.CleanUp()
 				resourceConsumer.WaitForReplicas(replicas, 1*time.Minute) // Should finish ~immediately, so 1 minute is more than enough.
 
 				// Enable Horizontal Pod Autoscaler with 50% target utilization and
 				// scale up the CPU usage to trigger autoscaling to 8 pods for target to be satisfied.
 				targetCPUUtilizationPercent := int32(50)
-				hpa := common.CreateCPUHorizontalPodAutoscaler(resourceConsumer, targetCPUUtilizationPercent, 1, 10)
-				defer common.DeleteHorizontalPodAutoscaler(resourceConsumer, hpa.Name)
+				hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscaler(resourceConsumer, targetCPUUtilizationPercent, 1, 10)
+				defer e2eautoscaling.DeleteHorizontalPodAutoscaler(resourceConsumer, hpa.Name)
 				cpuLoad := 8 * cpuRequestMillis * int64(targetCPUUtilizationPercent) / 100 // 8 pods utilized to the target level
 				resourceConsumer.ConsumeCPU(int(cpuLoad))
 

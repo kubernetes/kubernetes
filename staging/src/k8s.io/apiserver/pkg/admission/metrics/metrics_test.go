@@ -37,8 +37,12 @@ var (
 func TestObserveAdmissionStep(t *testing.T) {
 	Metrics.reset()
 	handler := WithStepMetrics(&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create), true, true})
-	handler.(admission.MutationInterface).Admit(context.TODO(), attr, nil)
-	handler.(admission.ValidationInterface).Validate(context.TODO(), attr, nil)
+	if err := handler.(admission.MutationInterface).Admit(context.TODO(), attr, nil); err != nil {
+		t.Errorf("Unexpected error in admit: %v", err)
+	}
+	if err := handler.(admission.ValidationInterface).Validate(context.TODO(), attr, nil); err != nil {
+		t.Errorf("Unexpected error in validate: %v", err)
+	}
 	wantLabels := map[string]string{
 		"operation": string(admission.Create),
 		"type":      "admit",
@@ -55,8 +59,12 @@ func TestObserveAdmissionStep(t *testing.T) {
 func TestObserveAdmissionController(t *testing.T) {
 	Metrics.reset()
 	handler := WithControllerMetrics(&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create), true, true}, "a")
-	handler.(admission.MutationInterface).Admit(context.TODO(), attr, nil)
-	handler.(admission.ValidationInterface).Validate(context.TODO(), attr, nil)
+	if err := handler.(admission.MutationInterface).Admit(context.TODO(), attr, nil); err != nil {
+		t.Errorf("Unexpected error in admit: %v", err)
+	}
+	if err := handler.(admission.ValidationInterface).Validate(context.TODO(), attr, nil); err != nil {
+		t.Errorf("Unexpected error in validate: %v", err)
+	}
 	wantLabels := map[string]string{
 		"name":      "a",
 		"operation": string(admission.Create),
@@ -79,6 +87,37 @@ func TestObserveWebhook(t *testing.T) {
 		"rejected":  "false",
 	}
 	expectHistogramCountTotal(t, "apiserver_admission_webhook_admission_duration_seconds", wantLabels, 1)
+}
+
+func TestObserveWebhookRejection(t *testing.T) {
+	Metrics.reset()
+	Metrics.ObserveWebhookRejection("x", stepAdmit, string(admission.Create), WebhookRejectionNoError, 500)
+	Metrics.ObserveWebhookRejection("x", stepAdmit, string(admission.Create), WebhookRejectionNoError, 654)
+	Metrics.ObserveWebhookRejection("x", stepValidate, string(admission.Update), WebhookRejectionCallingWebhookError, 0)
+	wantLabels := map[string]string{
+		"name":           "x",
+		"operation":      string(admission.Create),
+		"type":           "admit",
+		"error_type":     "no_error",
+		"rejection_code": "500",
+	}
+	wantLabels600 := map[string]string{
+		"name":           "x",
+		"operation":      string(admission.Create),
+		"type":           "admit",
+		"error_type":     "no_error",
+		"rejection_code": "600",
+	}
+	wantLabelsCallingWebhookError := map[string]string{
+		"name":           "x",
+		"operation":      string(admission.Update),
+		"type":           "validate",
+		"error_type":     "calling_webhook_error",
+		"rejection_code": "0",
+	}
+	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabels, 1)
+	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabels600, 1)
+	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabelsCallingWebhookError, 1)
 }
 
 func TestWithMetrics(t *testing.T) {

@@ -144,7 +144,7 @@ def _update_dict_for_platform_category(d, value, platforms, only_os = None):
 #
 # This macro produces a dictionary where each of the platform categories
 # (client, node, server, test, all) is enumerated and filled in
-# the the provided arguments as the values.
+# with the provided arguments as the values.
 #
 # For example, a filegroup might want to include one binary for all client
 # platforms and another binary for server platforms. The client and server

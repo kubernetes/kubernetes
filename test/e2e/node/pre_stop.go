@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -146,16 +145,16 @@ func testPreStop(c clientset.Interface, ns string) {
 
 		if err != nil {
 			if ctx.Err() != nil {
-				e2elog.Failf("Error validating prestop: %v", err)
+				framework.Failf("Error validating prestop: %v", err)
 				return true, err
 			}
 			ginkgo.By(fmt.Sprintf("Error validating prestop: %v", err))
 		} else {
-			e2elog.Logf("Saw: %s", string(body))
+			framework.Logf("Saw: %s", string(body))
 			state := State{}
 			err := json.Unmarshal(body, &state)
 			if err != nil {
-				e2elog.Logf("Error parsing: %v", err)
+				framework.Logf("Error parsing: %v", err)
 				return false, nil
 			}
 			if state.Received["prestop"] != 0 {
@@ -183,7 +182,7 @@ var _ = SIGDescribe("PreStop", func() {
 		testPreStop(f.ClientSet, f.Namespace.Name)
 	})
 
-	ginkgo.It("graceful pod terminated should wait until preStop hook completes the process", func() {
+	ginkgo.It("graceful pod terminated should wait until preStop hook completes the process [Flaky]", func() {
 		gracefulTerminationPeriodSeconds := int64(30)
 		ginkgo.By("creating the pod")
 		name := "pod-prestop-hook-" + string(uuid.NewUUID())
@@ -218,12 +217,14 @@ var _ = SIGDescribe("PreStop", func() {
 				if pod.Name != kubeletPod.Name {
 					continue
 				} else if kubeletPod.Status.Phase == v1.PodRunning {
-					e2elog.Logf("pod is running")
+					framework.Logf("pod is running")
 					return true, err
 				}
 			}
 			return false, err
 		})
+
+		framework.ExpectNoError(err, "validate-pod-is-running")
 	})
 })
 

@@ -20,9 +20,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-
-	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/klog"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,20 +28,59 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog"
+)
+
+/*
+ * By default, all the following metrics are defined as falling under
+ * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
+ *
+ * Promoting the stability level of the metric is a responsibility of the component owner, since it
+ * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
+ * the metric stability policy.
+ */
+const (
+	successLabel = "success"
+	failureLabel = "failure"
+	errorLabel   = "error"
 )
 
 var (
-	authenticatedUserCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "authenticated_user_requests",
-			Help: "Counter of authenticated requests broken out by username.",
+	authenticatedUserCounter = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "authenticated_user_requests",
+			Help:           "Counter of authenticated requests broken out by username.",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"username"},
+	)
+
+	authenticatedAttemptsCounter = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "authentication_attempts",
+			Help:           "Counter of authenticated attempts.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"result"},
+	)
+
+	authenticationLatency = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Name:           "authentication_duration_seconds",
+			Help:           "Authentication duration in seconds broken out by result.",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"result"},
 	)
 )
 
 func init() {
-	prometheus.MustRegister(authenticatedUserCounter)
+	legacyregistry.MustRegister(authenticatedUserCounter)
+	legacyregistry.MustRegister(authenticatedAttemptsCounter)
+	legacyregistry.MustRegister(authenticationLatency)
 }
 
 // WithAuthentication creates an http handler that tries to authenticate the given request as a user, and then
@@ -56,6 +93,8 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		authenticationStart := time.Now()
+
 		if len(apiAuds) > 0 {
 			req = req.WithContext(authenticator.WithAudiences(req.Context(), apiAuds))
 		}
@@ -63,13 +102,22 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 		if err != nil || !ok {
 			if err != nil {
 				klog.Errorf("Unable to authenticate the request due to an error: %v", err)
+				authenticatedAttemptsCounter.WithLabelValues(errorLabel).Inc()
+				authenticationLatency.WithLabelValues(errorLabel).Observe(time.Since(authenticationStart).Seconds())
+			} else if !ok {
+				authenticatedAttemptsCounter.WithLabelValues(failureLabel).Inc()
+				authenticationLatency.WithLabelValues(failureLabel).Observe(time.Since(authenticationStart).Seconds())
 			}
+
 			failed.ServeHTTP(w, req)
 			return
 		}
 
-		// TODO(mikedanese): verify the response audience matches one of apiAuds if
-		// non-empty
+		if len(apiAuds) > 0 && len(resp.Audiences) > 0 && len(authenticator.Audiences(apiAuds).Intersect(resp.Audiences)) == 0 {
+			klog.Errorf("Unable to match the audience: %v , accepted: %v", resp.Audiences, apiAuds)
+			failed.ServeHTTP(w, req)
+			return
+		}
 
 		// authorization header is not required anymore in case of a successful authentication.
 		req.Header.Del("Authorization")
@@ -77,6 +125,8 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 		req = req.WithContext(genericapirequest.WithUser(req.Context(), resp.User))
 
 		authenticatedUserCounter.WithLabelValues(compressUsername(resp.User.GetName())).Inc()
+		authenticatedAttemptsCounter.WithLabelValues(successLabel).Inc()
+		authenticationLatency.WithLabelValues(successLabel).Observe(time.Since(authenticationStart).Seconds())
 
 		handler.ServeHTTP(w, req)
 	})

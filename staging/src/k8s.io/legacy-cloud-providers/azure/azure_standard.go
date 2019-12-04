@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -37,9 +39,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
+
+	"k8s.io/component-base/featuregate"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
+	// IPv6DualStack is here to avoid having to import features pkg
+	// and violate import rules
+	IPv6DualStack featuregate.Feature = "IPv6DualStack"
+
 	loadBalancerMinimumPriority = 500
 	loadBalancerMaximumPriority = 4096
 
@@ -218,11 +227,50 @@ func getPrimaryIPConfig(nic network.Interface) (*network.InterfaceIPConfiguratio
 	return nil, fmt.Errorf("failed to determine the primary ipconfig. nicname=%q", *nic.Name)
 }
 
+// returns first ip configuration on a nic by family
+func getIPConfigByIPFamily(nic network.Interface, IPv6 bool) (*network.InterfaceIPConfiguration, error) {
+	if nic.IPConfigurations == nil {
+		return nil, fmt.Errorf("nic.IPConfigurations for nic (nicname=%q) is nil", *nic.Name)
+	}
+
+	var ipVersion network.IPVersion
+	if IPv6 {
+		ipVersion = network.IPv6
+	} else {
+		ipVersion = network.IPv4
+	}
+	for _, ref := range *nic.IPConfigurations {
+		if ref.PrivateIPAddress != nil && ref.PrivateIPAddressVersion == ipVersion {
+			return &ref, nil
+		}
+	}
+	return nil, fmt.Errorf("failed to determine the ipconfig(IPv6=%v). nicname=%q", IPv6, *nic.Name)
+}
+
 func isInternalLoadBalancer(lb *network.LoadBalancer) bool {
 	return strings.HasSuffix(*lb.Name, InternalLoadBalancerNameSuffix)
 }
 
-func getBackendPoolName(clusterName string) string {
+// getBackendPoolName the LB BackendPool name for a service.
+// to ensure backword and forward compat:
+// SingleStack -v4 (pre v1.16) => BackendPool name == clusterName
+// SingleStack -v6 => BackendPool name == clusterName (all cluster bootstrap uses this name)
+// DualStack
+//	=> IPv4 BackendPool name == clusterName
+//  => IPv6 BackendPool name == <clusterName>-IPv6
+// This means:
+// clusters moving from IPv4 to duakstack will require no changes
+// clusters moving from IPv6 (while not seen in the wild, we can not rule out their existence)
+// to dualstack will require deleting backend pools (the reconciler will take care of creating correct backendpools)
+func getBackendPoolName(ipv6DualStackEnabled bool, clusterName string, service *v1.Service) string {
+	if !ipv6DualStackEnabled {
+		return clusterName
+	}
+	IPv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
+	if IPv6 {
+		return fmt.Sprintf("%v-IPv6", clusterName)
+	}
+
 	return clusterName
 }
 
@@ -326,14 +374,14 @@ func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) 
 	var machine compute.VirtualMachine
 	var err error
 
-	machine, err = as.getVirtualMachine(types.NodeName(name))
+	machine, err = as.getVirtualMachine(types.NodeName(name), cacheReadTypeUnsafe)
 	if err == cloudprovider.InstanceNotFound {
 		return "", cloudprovider.InstanceNotFound
 	}
 	if err != nil {
 		if as.CloudProviderBackoff {
 			klog.V(2).Infof("GetInstanceIDByNodeName(%s) backing off", name)
-			machine, err = as.GetVirtualMachineWithRetry(types.NodeName(name))
+			machine, err = as.GetVirtualMachineWithRetry(types.NodeName(name), cacheReadTypeUnsafe)
 			if err != nil {
 				klog.V(2).Infof("GetInstanceIDByNodeName(%s) abort backoff", name)
 				return "", err
@@ -354,7 +402,7 @@ func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) 
 
 // GetPowerStatusByNodeName returns the power state of the specified node.
 func (as *availabilitySet) GetPowerStatusByNodeName(name string) (powerState string, err error) {
-	vm, err := as.getVirtualMachine(types.NodeName(name))
+	vm, err := as.getVirtualMachine(types.NodeName(name), cacheReadTypeDefault)
 	if err != nil {
 		return powerState, err
 	}
@@ -387,7 +435,7 @@ func (as *availabilitySet) GetNodeNameByProviderID(providerID string) (types.Nod
 
 // GetInstanceTypeByNodeName gets the instance type by node name.
 func (as *availabilitySet) GetInstanceTypeByNodeName(name string) (string, error) {
-	machine, err := as.getVirtualMachine(types.NodeName(name))
+	machine, err := as.getVirtualMachine(types.NodeName(name), cacheReadTypeUnsafe)
 	if err != nil {
 		klog.Errorf("as.GetInstanceTypeByNodeName(%s) failed: as.getVirtualMachine(%s) err=%v", name, name, err)
 		return "", err
@@ -399,7 +447,7 @@ func (as *availabilitySet) GetInstanceTypeByNodeName(name string) (string, error
 // GetZoneByNodeName gets availability zone for the specified node. If the node is not running
 // with availability zone, then it returns fault domain.
 func (as *availabilitySet) GetZoneByNodeName(name string) (cloudprovider.Zone, error) {
-	vm, err := as.getVirtualMachine(types.NodeName(name))
+	vm, err := as.getVirtualMachine(types.NodeName(name), cacheReadTypeUnsafe)
 	if err != nil {
 		return cloudprovider.Zone{}, err
 	}
@@ -600,7 +648,7 @@ func extractResourceGroupByNicID(nicID string) (string, error) {
 func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName string) (network.Interface, error) {
 	var machine compute.VirtualMachine
 
-	machine, err := as.GetVirtualMachineWithRetry(types.NodeName(nodeName))
+	machine, err := as.GetVirtualMachineWithRetry(types.NodeName(nodeName), cacheReadTypeDefault)
 	if err != nil {
 		klog.V(2).Infof("GetPrimaryInterface(%s, %s) abort backoff", nodeName, vmSetName)
 		return network.Interface{}, err
@@ -672,9 +720,17 @@ func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.
 	}
 
 	var primaryIPConfig *network.InterfaceIPConfiguration
-	primaryIPConfig, err = getPrimaryIPConfig(nic)
-	if err != nil {
-		return err
+	if !as.Cloud.ipv6DualStackEnabled {
+		primaryIPConfig, err = getPrimaryIPConfig(nic)
+		if err != nil {
+			return err
+		}
+	} else {
+		ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
+		primaryIPConfig, err = getIPConfigByIPFamily(nic, ipv6)
+		if err != nil {
+			return err
+		}
 	}
 
 	foundPool := false

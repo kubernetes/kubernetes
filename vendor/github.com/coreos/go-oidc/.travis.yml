@@ -1,8 +1,8 @@
 language: go
 
 go:
-  - 1.7.5
-  - 1.8
+  - "1.9"
+  - "1.10"
 
 install:
  - go get -v -t github.com/coreos/go-oidc/...

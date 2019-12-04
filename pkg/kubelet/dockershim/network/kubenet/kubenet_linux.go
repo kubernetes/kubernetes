@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
-	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilebtables "k8s.io/kubernetes/pkg/util/ebtables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
@@ -80,10 +79,7 @@ const (
   "ipam": {
     "type": "host-local",
     "ranges": [%s],
-    "routes": [
-      { "dst": "%s" },
-      { "dst": "%s" }
-    ]
+    "routes": [%s]
   }
 }`
 )
@@ -108,12 +104,14 @@ type kubenetNetworkPlugin struct {
 	// kubenet can use either hostportSyncer and hostportManager to implement hostports
 	// Currently, if network host supports legacy features, hostportSyncer will be used,
 	// otherwise, hostportManager will be used.
-	hostportSyncer  hostport.HostportSyncer
-	hostportManager hostport.HostPortManager
-	iptables        utiliptables.Interface
-	iptablesv6      utiliptables.Interface
-	sysctl          utilsysctl.Interface
-	ebtables        utilebtables.Interface
+	hostportSyncer    hostport.HostportSyncer
+	hostportSyncerv6  hostport.HostportSyncer
+	hostportManager   hostport.HostPortManager
+	hostportManagerv6 hostport.HostPortManager
+	iptables          utiliptables.Interface
+	iptablesv6        utiliptables.Interface
+	sysctl            utilsysctl.Interface
+	ebtables          utilebtables.Interface
 	// binDirs is passed by kubelet cni-bin-dir parameter.
 	// kubenet will search for CNI binaries in DefaultCNIDir first, then continue to binDirs.
 	binDirs           []string
@@ -125,9 +123,8 @@ type kubenetNetworkPlugin struct {
 
 func NewPlugin(networkPluginDirs []string, cacheDir string) network.NetworkPlugin {
 	execer := utilexec.New()
-	dbus := utildbus.New()
-	iptInterface := utiliptables.New(execer, dbus, utiliptables.ProtocolIpv4)
-	iptInterfacev6 := utiliptables.New(execer, dbus, utiliptables.ProtocolIpv6)
+	iptInterface := utiliptables.New(execer, utiliptables.ProtocolIpv4)
+	iptInterfacev6 := utiliptables.New(execer, utiliptables.ProtocolIpv6)
 	return &kubenetNetworkPlugin{
 		podIPs:            make(map[kubecontainer.ContainerID]utilsets.String),
 		execer:            utilexec.New(),
@@ -136,7 +133,9 @@ func NewPlugin(networkPluginDirs []string, cacheDir string) network.NetworkPlugi
 		sysctl:            utilsysctl.New(),
 		binDirs:           append([]string{DefaultCNIDir}, networkPluginDirs...),
 		hostportSyncer:    hostport.NewHostportSyncer(iptInterface),
+		hostportSyncerv6:  hostport.NewHostportSyncer(iptInterfacev6),
 		hostportManager:   hostport.NewHostportManager(iptInterface),
+		hostportManagerv6: hostport.NewHostportManager(iptInterfacev6),
 		nonMasqueradeCIDR: "10.0.0.0/8",
 		cacheDir:          cacheDir,
 		podCIDRs:          make([]*net.IPNet, 0),
@@ -283,7 +282,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 	//setup hairpinMode
 	setHairpin := plugin.hairpinMode == kubeletconfig.HairpinVeth
 
-	json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.mtu, network.DefaultInterfaceName, setHairpin, plugin.getRangesConfig(), zeroCIDRv4, zeroCIDRv6)
+	json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.mtu, network.DefaultInterfaceName, setHairpin, plugin.getRangesConfig(), plugin.getRoutesConfig())
 	klog.V(4).Infof("CNI network config set to %v", json)
 	plugin.netConfig, err = libcni.ConfFromBytes([]byte(json))
 	if err != nil {
@@ -459,8 +458,14 @@ func (plugin *kubenetNetworkPlugin) addPortMapping(id kubecontainer.ContainerID,
 			IP:           net.ParseIP(ip),
 			HostNetwork:  false,
 		}
-		if err := plugin.hostportManager.Add(id.ID, pm, BridgeName); err != nil {
-			return err
+		if netutils.IsIPv6(pm.IP) {
+			if err := plugin.hostportManagerv6.Add(id.ID, pm, BridgeName); err != nil {
+				return err
+			}
+		} else {
+			if err := plugin.hostportManager.Add(id.ID, pm, BridgeName); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -499,35 +504,60 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id kubecontainer.ContainerID) error {
 	errList := []error{}
 
+	// Loopback network deletion failure should not be fatal on teardown
+	if err := plugin.delContainerFromNetwork(plugin.loConfig, "lo", namespace, name, id); err != nil {
+		klog.Warningf("Failed to delete loopback network: %v", err)
+		errList = append(errList, err)
+
+	}
+
 	// no ip dependent actions
 	if err := plugin.delContainerFromNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id); err != nil {
+		klog.Warningf("Failed to delete %q network: %v", network.DefaultInterfaceName, err)
 		errList = append(errList, err)
 	}
 
-	portMappings, err := plugin.host.GetPodPortMappings(id.ID)
-	if err != nil {
-		errList = append(errList, err)
-	} else if len(portMappings) > 0 {
-		if err = plugin.hostportManager.Remove(id.ID, &hostport.PodPortMapping{
-			Namespace:    namespace,
-			Name:         name,
-			PortMappings: portMappings,
-			HostNetwork:  false,
-		}); err != nil {
-			errList = append(errList, err)
-		}
-	}
-
+	// If there are no IPs registered we can't teardown pod's IP dependencies
 	iplist, exists := plugin.getCachedPodIPs(id)
 	if !exists || len(iplist) == 0 {
 		klog.V(5).Infof("container %s (%s/%s) does not have recorded. ignoring teardown call", id, name, namespace)
 		return nil
 	}
 
+	// get the list of port mappings
+	portMappings, err := plugin.host.GetPodPortMappings(id.ID)
+	if err != nil {
+		errList = append(errList, err)
+	}
+
+	// process each pod IP
 	for _, ip := range iplist {
+		isV6 := netutils.IsIPv6String(ip)
+		klog.V(5).Infof("Removing pod port mappings from IP %s", ip)
+		if portMappings != nil && len(portMappings) > 0 {
+			if isV6 {
+				if err = plugin.hostportManagerv6.Remove(id.ID, &hostport.PodPortMapping{
+					Namespace:    namespace,
+					Name:         name,
+					PortMappings: portMappings,
+					HostNetwork:  false,
+				}); err != nil {
+					errList = append(errList, err)
+				}
+			} else {
+				if err = plugin.hostportManager.Remove(id.ID, &hostport.PodPortMapping{
+					Namespace:    namespace,
+					Name:         name,
+					PortMappings: portMappings,
+					HostNetwork:  false,
+				}); err != nil {
+					errList = append(errList, err)
+				}
+			}
+		}
+
 		klog.V(5).Infof("Removing pod IP %s from shaper for (%s/%s)", ip, name, namespace)
 		// shaper uses a cidr, but we are using a single IP.
-		isV6 := netutils.IsIPv6String(ip)
 		mask := "32"
 		if isV6 {
 			mask = "128"
@@ -687,8 +717,11 @@ func (plugin *kubenetNetworkPlugin) addContainerToNetwork(config *libcni.Network
 	}
 
 	klog.V(3).Infof("Adding %s/%s to '%s' with CNI '%s' plugin and runtime: %+v", namespace, name, config.Network.Name, config.Network.Type, rt)
-
-	res, err := plugin.cniConfig.AddNetwork(context.TODO(), config, rt)
+	// Because the default remote runtime request timeout is 4 min,so set slightly less than 240 seconds
+	// Todo get the timeout from parent ctx
+	cniTimeoutCtx, cancelFunc := context.WithTimeout(context.Background(), network.CNITimeoutSec*time.Second)
+	defer cancelFunc()
+	res, err := plugin.cniConfig.AddNetwork(cniTimeoutCtx, config, rt)
 	if err != nil {
 		return nil, fmt.Errorf("error adding container to network: %v", err)
 	}
@@ -702,7 +735,11 @@ func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(config *libcni.Netwo
 	}
 
 	klog.V(3).Infof("Removing %s/%s from '%s' with CNI '%s' plugin and runtime: %+v", namespace, name, config.Network.Name, config.Network.Type, rt)
-	err = plugin.cniConfig.DelNetwork(context.TODO(), config, rt)
+	// Because the default remote runtime request timeout is 4 min,so set slightly less than 240 seconds
+	// Todo get the timeout from parent ctx
+	cniTimeoutCtx, cancelFunc := context.WithTimeout(context.Background(), network.CNITimeoutSec*time.Second)
+	defer cancelFunc()
+	err = plugin.cniConfig.DelNetwork(cniTimeoutCtx, config, rt)
 	// The pod may not get deleted successfully at the first time.
 	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
 	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
@@ -837,6 +874,29 @@ func (plugin *kubenetNetworkPlugin) getRangesConfig() string {
 	//[{range}], [{range}]
 	// each range is a subnet and a gateway
 	return strings.Join(ranges[:], ",")
+}
+
+// given a n cidrs assigned to nodes,
+// create bridge routes configuration that conforms to them
+func (plugin *kubenetNetworkPlugin) getRoutesConfig() string {
+	var (
+		routes       []string
+		hasV4, hasV6 bool
+	)
+	for _, thisCIDR := range plugin.podCIDRs {
+		if thisCIDR.IP.To4() != nil {
+			hasV4 = true
+		} else {
+			hasV6 = true
+		}
+	}
+	if hasV4 {
+		routes = append(routes, fmt.Sprintf(`{"dst": "%s"}`, zeroCIDRv4))
+	}
+	if hasV6 {
+		routes = append(routes, fmt.Sprintf(`{"dst": "%s"}`, zeroCIDRv6))
+	}
+	return strings.Join(routes, ",")
 }
 
 func (plugin *kubenetNetworkPlugin) addPodIP(id kubecontainer.ContainerID, ip string) {

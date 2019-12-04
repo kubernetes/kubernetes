@@ -27,7 +27,6 @@ import (
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
-	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
@@ -49,7 +48,6 @@ type applyFlags struct {
 	dryRun             bool
 	etcdUpgrade        bool
 	renewCerts         bool
-	criSocket          string
 	imagePullTimeout   time.Duration
 	kustomizeDir       string
 }
@@ -66,19 +64,19 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 		imagePullTimeout: defaultImagePullTimeout,
 		etcdUpgrade:      true,
 		renewCerts:       true,
-		// Don't set criSocket to a default value here, as this will override the setting in the stored config in RunApply below.
 	}
 
 	cmd := &cobra.Command{
 		Use:                   "apply [version]",
 		DisableFlagsInUseLine: true,
 		Short:                 "Upgrade your Kubernetes cluster to the specified version",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			userVersion, err := getK8sVersionFromUserInput(flags.applyPlanFlags, args, true)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
-			err = runApply(flags, userVersion)
-			kubeadmutil.CheckErr(err)
+			return runApply(flags, userVersion)
 		},
 	}
 
@@ -89,14 +87,10 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 	cmd.Flags().BoolVarP(&flags.force, "force", "f", flags.force, "Force upgrading although some requirements might not be met. This also implies non-interactive mode.")
 	cmd.Flags().BoolVar(&flags.dryRun, options.DryRun, flags.dryRun, "Do not change any state, just output what actions would be performed.")
 	cmd.Flags().BoolVar(&flags.etcdUpgrade, "etcd-upgrade", flags.etcdUpgrade, "Perform the upgrade of etcd.")
-	cmd.Flags().BoolVar(&flags.renewCerts, "certificate-renewal", flags.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
+	cmd.Flags().BoolVar(&flags.renewCerts, options.CertificateRenewal, flags.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
 	cmd.Flags().DurationVar(&flags.imagePullTimeout, "image-pull-timeout", flags.imagePullTimeout, "The maximum amount of time to wait for the control plane pods to be downloaded.")
 	options.AddKustomizePodsFlag(cmd.Flags(), &flags.kustomizeDir)
 
-	// The CRI socket flag is deprecated here, since it should be taken from the NodeRegistrationOptions for the current
-	// node instead of the command line. This prevents errors by the users (such as attempts to use wrong CRI during upgrade).
-	cmdutil.AddCRISocketFlag(cmd.Flags(), &flags.criSocket)
-	cmd.Flags().MarkDeprecated(options.NodeCRISocket, "This flag is deprecated. Please, avoid using it.")
 	return cmd
 }
 
@@ -120,11 +114,6 @@ func runApply(flags *applyFlags, userVersion string) error {
 	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, flags.dryRun, userVersion)
 	if err != nil {
 		return err
-	}
-
-	if len(flags.criSocket) != 0 {
-		fmt.Println("[upgrade/apply] Respecting the --cri-socket flag that is set with higher priority than the config file.")
-		cfg.NodeRegistration.CRISocket = flags.criSocket
 	}
 
 	// Validate requested and validate actual version

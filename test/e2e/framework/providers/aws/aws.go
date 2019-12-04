@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	awscloud "k8s.io/legacy-cloud-providers/aws"
 )
 
@@ -100,6 +100,29 @@ func (p *Provider) CreatePD(zone string) (string, error) {
 	request.AvailabilityZone = aws.String(zone)
 	request.Size = aws.Int64(10)
 	request.VolumeType = aws.String(awscloud.DefaultVolumeType)
+
+	// We need to tag the volume so that locked-down IAM configurations can still mount it
+	if framework.TestContext.CloudConfig.ClusterTag != "" {
+		clusterID := framework.TestContext.CloudConfig.ClusterTag
+
+		legacyTag := &ec2.Tag{
+			Key:   aws.String(awscloud.TagNameKubernetesClusterLegacy),
+			Value: aws.String(clusterID),
+		}
+
+		newTag := &ec2.Tag{
+			Key:   aws.String(awscloud.TagNameKubernetesClusterPrefix + clusterID),
+			Value: aws.String(awscloud.ResourceLifecycleOwned),
+		}
+
+		tagSpecification := &ec2.TagSpecification{
+			ResourceType: aws.String(ec2.ResourceTypeVolume),
+			Tags:         []*ec2.Tag{legacyTag, newTag},
+		}
+
+		request.TagSpecifications = append(request.TagSpecifications, tagSpecification)
+	}
+
 	response, err := client.CreateVolume(request)
 	if err != nil {
 		return "", err
@@ -123,7 +146,7 @@ func (p *Provider) DeletePD(pdName string) error {
 	_, err := client.DeleteVolume(request)
 	if err != nil {
 		if awsError, ok := err.(awserr.Error); ok && awsError.Code() == "InvalidVolume.NotFound" {
-			e2elog.Logf("volume deletion implicitly succeeded because volume %q does not exist.", pdName)
+			framework.Logf("volume deletion implicitly succeeded because volume %q does not exist.", pdName)
 		} else {
 			return fmt.Errorf("error deleting EBS volumes: %v", err)
 		}
@@ -143,7 +166,7 @@ func (p *Provider) CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSo
 
 // DeletePVSource deletes a persistent volume source
 func (p *Provider) DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
-	return framework.DeletePDWithRetry(pvSource.AWSElasticBlockStore.VolumeID)
+	return e2epv.DeletePDWithRetry(pvSource.AWSElasticBlockStore.VolumeID)
 }
 
 func newAWSClient(zone string) *ec2.EC2 {
@@ -153,7 +176,7 @@ func newAWSClient(zone string) *ec2.EC2 {
 		zone = framework.TestContext.CloudConfig.Zone
 	}
 	if zone == "" {
-		e2elog.Logf("Warning: No AWS zone configured!")
+		framework.Logf("Warning: No AWS zone configured!")
 		cfg = nil
 	} else {
 		region := zone[:len(zone)-1]
@@ -161,7 +184,7 @@ func newAWSClient(zone string) *ec2.EC2 {
 	}
 	session, err := session.NewSession()
 	if err != nil {
-		e2elog.Logf("Warning: failed to create aws session")
+		framework.Logf("Warning: failed to create aws session")
 	}
 	return ec2.New(session, cfg)
 }

@@ -35,11 +35,11 @@ func NewSchemaValidator(customResourceValidation *apiextensions.CustomResourceVa
 	openapiSchema := &spec.Schema{}
 	if customResourceValidation != nil {
 		// TODO: replace with NewStructural(...).ToGoOpenAPI
-		if err := ConvertJSONSchemaProps(customResourceValidation.OpenAPIV3Schema, openapiSchema); err != nil {
+		if err := ConvertJSONSchemaPropsWithPostProcess(customResourceValidation.OpenAPIV3Schema, openapiSchema, StripUnsupportedFormatsPostProcess); err != nil {
 			return nil, nil, err
 		}
 	}
-	return validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default, validate.DisableObjectArrayTypeCheck(true)), openapiSchema, nil
+	return validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default), openapiSchema, nil
 }
 
 // ValidateCustomResource validates the Custom Resource against the schema in the CustomResourceDefinition.
@@ -58,10 +58,14 @@ func ValidateCustomResource(fldPath *field.Path, customResource interface{}, val
 		switch err := err.(type) {
 
 		case *openapierrors.Validation:
-			switch err.Code() {
+			errPath := fldPath
+			if len(err.Name) > 0 && err.Name != "." {
+				errPath = errPath.Child(strings.TrimPrefix(err.Name, "."))
+			}
 
+			switch err.Code() {
 			case openapierrors.RequiredFailCode:
-				allErrs = append(allErrs, field.Required(fldPath.Child(strings.TrimPrefix(err.Name, ".")), ""))
+				allErrs = append(allErrs, field.Required(errPath, ""))
 
 			case openapierrors.EnumFailCode:
 				values := []string{}
@@ -73,14 +77,14 @@ func ValidateCustomResource(fldPath *field.Path, customResource interface{}, val
 						values = append(values, string(allowedJSON))
 					}
 				}
-				allErrs = append(allErrs, field.NotSupported(fldPath.Child(strings.TrimPrefix(err.Name, ".")), err.Value, values))
+				allErrs = append(allErrs, field.NotSupported(errPath, err.Value, values))
 
 			default:
 				value := interface{}("")
 				if err.Value != nil {
 					value = err.Value
 				}
-				allErrs = append(allErrs, field.Invalid(fldPath.Child(strings.TrimPrefix(err.Name, ".")), value, err.Error()))
+				allErrs = append(allErrs, field.Invalid(errPath, value, err.Error()))
 			}
 
 		default:
@@ -99,7 +103,7 @@ func ConvertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema)
 type PostProcessFunc func(*spec.Schema) error
 
 // ConvertJSONSchemaPropsWithPostProcess converts the schema from apiextensions.JSONSchemaPropos to go-openapi/spec.Schema
-// and run a post process step on each JSONSchemaProps node.
+// and run a post process step on each JSONSchemaProps node. postProcess is never called for nil schemas.
 func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, out *spec.Schema, postProcess PostProcessFunc) error {
 	if in == nil {
 		return nil
@@ -242,7 +246,15 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 	if in.XEmbeddedResource {
 		out.VendorExtensible.AddExtension("x-kubernetes-embedded-resource", true)
 	}
-
+	if len(in.XListMapKeys) != 0 {
+		out.VendorExtensible.AddExtension("x-kubernetes-list-map-keys", in.XListMapKeys)
+	}
+	if in.XListType != nil {
+		out.VendorExtensible.AddExtension("x-kubernetes-list-type", *in.XListType)
+	}
+	if in.XMapType != nil {
+		out.VendorExtensible.AddExtension("x-kubernetes-map-type", *in.XMapType)
+	}
 	return nil
 }
 

@@ -5,7 +5,7 @@ load(
     go_binary = "go_binary_conditional_pure",
 )
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
-load("//pkg/version:def.bzl", "version_x_defs")
+load("//staging/src/k8s.io/component-base/version:def.bzl", "version_x_defs")
 
 go_binary(
     name = "kubelet",
@@ -19,9 +19,9 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubelet",
     deps = [
         "//cmd/kubelet/app:go_default_library",
-        "//pkg/client/metrics/prometheus:go_default_library",
-        "//pkg/version/prometheus:go_default_library",
         "//staging/src/k8s.io/component-base/logs:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/prometheus/restclient:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/prometheus/version:go_default_library",
     ],
 )
 

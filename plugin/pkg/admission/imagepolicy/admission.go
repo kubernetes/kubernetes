@@ -84,7 +84,6 @@ type Plugin struct {
 	responseCache *cache.LRUExpireCache
 	allowTTL      time.Duration
 	denyTTL       time.Duration
-	retryBackoff  time.Duration
 	defaultAllow  bool
 }
 
@@ -160,13 +159,13 @@ func (a *Plugin) Validate(ctx context.Context, attributes admission.Attributes, 
 			Namespace:   attributes.GetNamespace(),
 		},
 	}
-	if err := a.admitPod(pod, attributes, &imageReview); err != nil {
+	if err := a.admitPod(ctx, pod, attributes, &imageReview); err != nil {
 		return admission.NewForbidden(attributes, err)
 	}
 	return nil
 }
 
-func (a *Plugin) admitPod(pod *api.Pod, attributes admission.Attributes, review *v1alpha1.ImageReview) error {
+func (a *Plugin) admitPod(ctx context.Context, pod *api.Pod, attributes admission.Attributes, review *v1alpha1.ImageReview) error {
 	cacheKey, err := json.Marshal(review.Spec)
 	if err != nil {
 		return err
@@ -174,8 +173,8 @@ func (a *Plugin) admitPod(pod *api.Pod, attributes admission.Attributes, review 
 	if entry, ok := a.responseCache.Get(string(cacheKey)); ok {
 		review.Status = entry.(v1alpha1.ImageReviewStatus)
 	} else {
-		result := a.webhook.WithExponentialBackoff(func() rest.Result {
-			return a.webhook.RestClient.Post().Body(review).Do()
+		result := a.webhook.WithExponentialBackoff(ctx, func() rest.Result {
+			return a.webhook.RestClient.Post().Context(ctx).Body(review).Do()
 		})
 
 		if err := result.Error(); err != nil {

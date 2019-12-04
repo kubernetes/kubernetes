@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/instrumentation/logging/utils"
 
 	"golang.org/x/oauth2/google"
@@ -118,7 +117,7 @@ func ensureProjectHasSinkCapacity(sinksService *sd.ProjectsSinksService, project
 		return err
 	}
 	if len(listResponse.Sinks) >= stackdriverSinkCountLimit {
-		e2elog.Logf("Reached Stackdriver sink limit. Deleting all sinks")
+		framework.Logf("Reached Stackdriver sink limit. Deleting all sinks")
 		deleteSinks(sinksService, projectID, listResponse.Sinks)
 	}
 	return nil
@@ -137,7 +136,7 @@ func deleteSinks(sinksService *sd.ProjectsSinksService, projectID string, sinks 
 	for _, sink := range sinks {
 		sinkNameID := fmt.Sprintf("projects/%s/sinks/%s", projectID, sink.Name)
 		if _, err := sinksService.Delete(sinkNameID).Do(); err != nil {
-			e2elog.Logf("Failed to delete LogSink: %v", err)
+			framework.Logf("Failed to delete LogSink: %v", err)
 		}
 	}
 }
@@ -186,21 +185,21 @@ func (p *sdLogProvider) Cleanup() {
 		sinkNameID := fmt.Sprintf("projects/%s/sinks/%s", projectID, p.logSink.Name)
 		sinksService := p.sdService.Projects.Sinks
 		if _, err := sinksService.Delete(sinkNameID).Do(); err != nil {
-			e2elog.Logf("Failed to delete LogSink: %v", err)
+			framework.Logf("Failed to delete LogSink: %v", err)
 		}
 	}
 
 	if p.subscription != nil {
 		subsService := p.pubsubService.Projects.Subscriptions
 		if _, err := subsService.Delete(p.subscription.Name).Do(); err != nil {
-			e2elog.Logf("Failed to delete PubSub subscription: %v", err)
+			framework.Logf("Failed to delete PubSub subscription: %v", err)
 		}
 	}
 
 	if p.topic != nil {
 		topicsService := p.pubsubService.Projects.Topics
 		if _, err := topicsService.Delete(p.topic.Name).Do(); err != nil {
-			e2elog.Logf("Failed to delete PubSub topic: %v", err)
+			framework.Logf("Failed to delete PubSub topic: %v", err)
 		}
 	}
 }
@@ -235,7 +234,7 @@ func (p *sdLogProvider) createSink(projectID, sinkName, topicName string) (*sd.L
 	if err != nil {
 		return nil, err
 	}
-	e2elog.Logf("Using the following filter for log entries: %s", filter)
+	framework.Logf("Using the following filter for log entries: %s", filter)
 	sink := &sd.LogSink{
 		Name:        sinkName,
 		Destination: fmt.Sprintf("pubsub.googleapis.com/%s", topicName),
@@ -281,20 +280,20 @@ func (p *sdLogProvider) authorizeSink() error {
 }
 
 func (p *sdLogProvider) waitSinkInit() error {
-	e2elog.Logf("Waiting for log sink to become operational")
+	framework.Logf("Waiting for log sink to become operational")
 	return wait.Poll(1*time.Second, sinkStartupTimeout, func() (bool, error) {
 		err := publish(p.pubsubService, p.topic, "embrace eternity")
 		if err != nil {
-			e2elog.Logf("Failed to push message to PubSub due to %v", err)
+			framework.Logf("Failed to push message to PubSub due to %v", err)
 		}
 
 		messages, err := pullAndAck(p.pubsubService, p.subscription)
 		if err != nil {
-			e2elog.Logf("Failed to pull messages from PubSub due to %v", err)
+			framework.Logf("Failed to pull messages from PubSub due to %v", err)
 			return false, nil
 		}
 		if len(messages) > 0 {
-			e2elog.Logf("Sink %s is operational", p.logSink.Name)
+			framework.Logf("Sink %s is operational", p.logSink.Name)
 			return true, nil
 		}
 
@@ -319,32 +318,32 @@ func (p *sdLogProvider) startPollingLogs() {
 func (p *sdLogProvider) pollLogsOnce() {
 	messages, err := pullAndAck(p.pubsubService, p.subscription)
 	if err != nil {
-		e2elog.Logf("Failed to pull messages from PubSub due to %v", err)
+		framework.Logf("Failed to pull messages from PubSub due to %v", err)
 		return
 	}
 
 	for _, msg := range messages {
 		logEntryEncoded, err := base64.StdEncoding.DecodeString(msg.Message.Data)
 		if err != nil {
-			e2elog.Logf("Got a message from pubsub that is not base64-encoded: %s", msg.Message.Data)
+			framework.Logf("Got a message from pubsub that is not base64-encoded: %s", msg.Message.Data)
 			continue
 		}
 
 		var sdLogEntry sd.LogEntry
 		if err := json.Unmarshal(logEntryEncoded, &sdLogEntry); err != nil {
-			e2elog.Logf("Failed to decode a pubsub message '%s': %v", logEntryEncoded, err)
+			framework.Logf("Failed to decode a pubsub message '%s': %v", logEntryEncoded, err)
 			continue
 		}
 
 		name, ok := p.tryGetName(sdLogEntry)
 		if !ok {
-			e2elog.Logf("Received LogEntry with unexpected resource type: %s", sdLogEntry.Resource.Type)
+			framework.Logf("Received LogEntry with unexpected resource type: %s", sdLogEntry.Resource.Type)
 			continue
 		}
 
 		logEntry, err := convertLogEntry(sdLogEntry)
 		if err != nil {
-			e2elog.Logf("Failed to parse Stackdriver LogEntry: %v", err)
+			framework.Logf("Failed to parse Stackdriver LogEntry: %v", err)
 			continue
 		}
 
@@ -408,7 +407,7 @@ func pullAndAck(service *pubsub.Service, subs *pubsub.Subscription) ([]*pubsub.R
 	if len(ids) > 0 {
 		ackReq := &pubsub.AcknowledgeRequest{AckIds: ids}
 		if _, err = subsService.Acknowledge(subs.Name, ackReq).Do(); err != nil {
-			e2elog.Logf("Failed to ack poll: %v", err)
+			framework.Logf("Failed to ack poll: %v", err)
 		}
 	}
 

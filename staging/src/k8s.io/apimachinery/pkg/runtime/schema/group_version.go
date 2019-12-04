@@ -191,6 +191,11 @@ func (gv GroupVersion) String() string {
 	return gv.Version
 }
 
+// Identifier implements runtime.GroupVersioner interface.
+func (gv GroupVersion) Identifier() string {
+	return gv.String()
+}
+
 // KindForGroupVersionKinds identifies the preferred GroupVersionKind out of a list. It returns ok false
 // if none of the options match the group. It prefers a match to group and version over just group.
 // TODO: Move GroupVersion to a package under pkg/runtime, since it's used by scheme.
@@ -245,6 +250,15 @@ func (gv GroupVersion) WithResource(resource string) GroupVersionResource {
 // TODO: Introduce an adapter type between GroupVersions and runtime.GroupVersioner, and use LegacyCodec(GroupVersion)
 //   in fewer places.
 type GroupVersions []GroupVersion
+
+// Identifier implements runtime.GroupVersioner interface.
+func (gv GroupVersions) Identifier() string {
+	groupVersions := make([]string, 0, len(gv))
+	for i := range gv {
+		groupVersions = append(groupVersions, gv[i].String())
+	}
+	return fmt.Sprintf("[%s]", strings.Join(groupVersions, ","))
+}
 
 // KindForGroupVersionKinds identifies the preferred GroupVersionKind out of a list. It returns ok false
 // if none of the options match the group.

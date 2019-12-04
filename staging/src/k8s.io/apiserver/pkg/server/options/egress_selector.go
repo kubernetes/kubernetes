@@ -68,7 +68,7 @@ func (o *EgressSelectorOptions) ApplyTo(c *server.Config) error {
 		return fmt.Errorf("failed to validate egress selector configuration: %v", errs.ToAggregate())
 	}
 
-	cs, err := server.NewEgressSelector(npConfig)
+	cs, err := egressselector.NewEgressSelector(npConfig)
 	if err != nil {
 		return fmt.Errorf("failed to setup egress selector with config %#v: %v", npConfig, err)
 	}

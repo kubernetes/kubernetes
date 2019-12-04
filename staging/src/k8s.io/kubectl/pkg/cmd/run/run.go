@@ -339,6 +339,12 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		}
 	}
 
+	generators := generateversioned.GeneratorFn("run")
+	generator, found := generators[generatorName]
+	if !found {
+		return cmdutil.UsageErrorf(cmd, "generator %q not found", generatorName)
+	}
+
 	// start deprecating all generators except for 'run-pod/v1' which will be
 	// the only supported on a route to simple kubectl run which should mimic
 	// docker run
@@ -346,11 +352,6 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		fmt.Fprintf(o.ErrOut, "kubectl run --generator=%s is DEPRECATED and will be removed in a future version. Use kubectl run --generator=%s or kubectl create instead.\n", generatorName, generateversioned.RunPodV1GeneratorName)
 	}
 
-	generators := generateversioned.GeneratorFn("run")
-	generator, found := generators[generatorName]
-	if !found {
-		return cmdutil.UsageErrorf(cmd, "generator %q not found", generatorName)
-	}
 	names := generator.ParamNames()
 	params := generate.MakeParams(cmd, names)
 	params["name"] = args[0]

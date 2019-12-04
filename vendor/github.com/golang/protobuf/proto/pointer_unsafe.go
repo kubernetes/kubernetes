@@ -85,16 +85,21 @@ func toPointer(i *Message) pointer {
 
 // toAddrPointer converts an interface to a pointer that points to
 // the interface data.
-func toAddrPointer(i *interface{}, isptr bool) pointer {
+func toAddrPointer(i *interface{}, isptr, deref bool) (p pointer) {
 	// Super-tricky - read or get the address of data word of interface value.
 	if isptr {
 		// The interface is of pointer type, thus it is a direct interface.
 		// The data word is the pointer data itself. We take its address.
-		return pointer{p: unsafe.Pointer(uintptr(unsafe.Pointer(i)) + ptrSize)}
+		p = pointer{p: unsafe.Pointer(uintptr(unsafe.Pointer(i)) + ptrSize)}
+	} else {
+		// The interface is not of pointer type. The data word is the pointer
+		// to the data.
+		p = pointer{p: (*[2]unsafe.Pointer)(unsafe.Pointer(i))[1]}
 	}
-	// The interface is not of pointer type. The data word is the pointer
-	// to the data.
-	return pointer{p: (*[2]unsafe.Pointer)(unsafe.Pointer(i))[1]}
+	if deref {
+		p.p = *(*unsafe.Pointer)(p.p)
+	}
+	return p
 }
 
 // valToPointer converts v to a pointer. v must be of pointer type.

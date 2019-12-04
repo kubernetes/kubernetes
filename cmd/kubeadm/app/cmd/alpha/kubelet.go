@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	utilsexec "k8s.io/utils/exec"
 )
@@ -101,15 +100,18 @@ func newCmdKubeletConfigDownload() *cobra.Command {
 		Short:   "Download the kubelet configuration from the cluster ConfigMap kubelet-config-1.X, where X is the minor version of the kubelet",
 		Long:    kubeletConfigDownloadLongDesc,
 		Example: kubeletConfigDownloadExample,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			kubeletVersion, err := getKubeletVersion(kubeletVersionStr)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
-			err = kubeletphase.DownloadConfig(client, kubeletVersion, constants.KubeletRunDirectory)
-			kubeadmutil.CheckErr(err)
+			return kubeletphase.DownloadConfig(client, kubeletVersion, constants.KubeletRunDirectory)
 		},
 	}
 
@@ -136,23 +138,26 @@ func newCmdKubeletConfigEnableDynamic() *cobra.Command {
 		Short:   "EXPERIMENTAL: Enable or update dynamic kubelet configuration for a Node",
 		Long:    kubeletConfigEnableDynamicLongDesc,
 		Example: kubeletConfigEnableDynamicExample,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(nodeName) == 0 {
-				kubeadmutil.CheckErr(errors.New("the --node-name argument is required"))
+				return errors.New("the --node-name argument is required")
 			}
 			if len(kubeletVersionStr) == 0 {
-				kubeadmutil.CheckErr(errors.New("the --kubelet-version argument is required"))
+				return errors.New("the --kubelet-version argument is required")
 			}
 
 			kubeletVersion, err := version.ParseSemantic(kubeletVersionStr)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
-			err = kubeletphase.EnableDynamicConfigForNode(client, nodeName, kubeletVersion)
-			kubeadmutil.CheckErr(err)
+			return kubeletphase.EnableDynamicConfigForNode(client, nodeName, kubeletVersion)
 		},
 	}
 

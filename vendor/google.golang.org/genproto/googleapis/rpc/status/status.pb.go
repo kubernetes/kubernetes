@@ -19,24 +19,25 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
-// The `Status` type defines a logical error model that is suitable for different
-// programming environments, including REST APIs and RPC APIs. It is used by
-// [gRPC](https://github.com/grpc). The error model is designed to be:
+// The `Status` type defines a logical error model that is suitable for
+// different programming environments, including REST APIs and RPC APIs. It is
+// used by [gRPC](https://github.com/grpc). The error model is designed to be:
 //
 // - Simple to use and understand for most users
 // - Flexible enough to meet unexpected needs
 //
 // # Overview
 //
-// The `Status` message contains three pieces of data: error code, error message,
-// and error details. The error code should be an enum value of
-// [google.rpc.Code][google.rpc.Code], but it may accept additional error codes if needed.  The
-// error message should be a developer-facing English message that helps
-// developers *understand* and *resolve* the error. If a localized user-facing
-// error message is needed, put the localized message in the error details or
-// localize it in the client. The optional error details may contain arbitrary
-// information about the error. There is a predefined set of error detail types
-// in the package `google.rpc` that can be used for common error conditions.
+// The `Status` message contains three pieces of data: error code, error
+// message, and error details. The error code should be an enum value of
+// [google.rpc.Code][google.rpc.Code], but it may accept additional error codes
+// if needed.  The error message should be a developer-facing English message
+// that helps developers *understand* and *resolve* the error. If a localized
+// user-facing error message is needed, put the localized message in the error
+// details or localize it in the client. The optional error details may contain
+// arbitrary information about the error. There is a predefined set of error
+// detail types in the package `google.rpc` that can be used for common error
+// conditions.
 //
 // # Language mapping
 //
@@ -72,11 +73,13 @@ const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 // - Logging. If some API errors are stored in logs, the message `Status` could
 //     be used directly after any stripping needed for security/privacy reasons.
 type Status struct {
-	// The status code, which should be an enum value of [google.rpc.Code][google.rpc.Code].
+	// The status code, which should be an enum value of
+	// [google.rpc.Code][google.rpc.Code].
 	Code int32 `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	// A developer-facing error message, which should be in English. Any
 	// user-facing error message should be localized and sent in the
-	// [google.rpc.Status.details][google.rpc.Status.details] field, or localized by the client.
+	// [google.rpc.Status.details][google.rpc.Status.details] field, or localized
+	// by the client.
 	Message string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	// A list of messages that carry the error details.  There is a common set of
 	// message types for APIs to use.
@@ -90,7 +93,7 @@ func (m *Status) Reset()         { *m = Status{} }
 func (m *Status) String() string { return proto.CompactTextString(m) }
 func (*Status) ProtoMessage()    {}
 func (*Status) Descriptor() ([]byte, []int) {
-	return fileDescriptor_status_c6e4de62dcdf2edf, []int{0}
+	return fileDescriptor_status_ced6ddf76350620b, []int{0}
 }
 func (m *Status) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Status.Unmarshal(m, b)
@@ -135,9 +138,9 @@ func init() {
 	proto.RegisterType((*Status)(nil), "google.rpc.Status")
 }
 
-func init() { proto.RegisterFile("google/rpc/status.proto", fileDescriptor_status_c6e4de62dcdf2edf) }
+func init() { proto.RegisterFile("google/rpc/status.proto", fileDescriptor_status_ced6ddf76350620b) }
 
-var fileDescriptor_status_c6e4de62dcdf2edf = []byte{
+var fileDescriptor_status_ced6ddf76350620b = []byte{
 	// 209 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x12, 0x4f, 0xcf, 0xcf, 0x4f,
 	0xcf, 0x49, 0xd5, 0x2f, 0x2a, 0x48, 0xd6, 0x2f, 0x2e, 0x49, 0x2c, 0x29, 0x2d, 0xd6, 0x2b, 0x28,

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"bytes"
@@ -27,7 +27,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -35,7 +35,6 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/davecgh/go-spew/spew"
@@ -60,23 +59,22 @@ var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor
 			ginkgo.It("should enforce a profile blocking writes", func() {
 				status := runAppArmorTest(f, true, apparmor.ProfileNamePrefix+apparmorProfilePrefix+"deny-write")
 				if len(status.ContainerStatuses) == 0 {
-					e2elog.Failf("Unexpected pod status: %s", spew.Sdump(status))
+					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
 					return
 				}
 				state := status.ContainerStatuses[0].State.Terminated
-				gomega.Expect(state).ToNot(gomega.BeNil(), "ContainerState: %+v", status.ContainerStatuses[0].State)
-				gomega.Expect(state.ExitCode).To(gomega.Not(gomega.BeZero()), "ContainerStateTerminated: %+v", state)
-
+				framework.ExpectNotEqual(state, nil, "ContainerState: %+v", status.ContainerStatuses[0].State)
+				framework.ExpectEqual(state.ExitCode, 0, "ContainerStateTerminated: %+v", state)
 			})
 			ginkgo.It("should enforce a permissive profile", func() {
 				status := runAppArmorTest(f, true, apparmor.ProfileNamePrefix+apparmorProfilePrefix+"audit-write")
 				if len(status.ContainerStatuses) == 0 {
-					e2elog.Failf("Unexpected pod status: %s", spew.Sdump(status))
+					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
 					return
 				}
 				state := status.ContainerStatuses[0].State.Terminated
-				gomega.Expect(state).ToNot(gomega.BeNil(), "ContainerState: %+v", status.ContainerStatuses[0].State)
-				gomega.Expect(state.ExitCode).To(gomega.BeZero(), "ContainerStateTerminated: %+v", state)
+				framework.ExpectNotEqual(state, nil, "ContainerState: %+v", status.ContainerStatuses[0].State)
+				framework.ExpectEqual(state.ExitCode, 0, "ContainerStateTerminated: %+v", state)
 			})
 		})
 	} else {

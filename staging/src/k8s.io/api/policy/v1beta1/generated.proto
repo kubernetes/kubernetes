@@ -151,7 +151,7 @@ message PodDisruptionBudgetSpec {
 // PodDisruptionBudget. Status may trail the actual state of a system.
 message PodDisruptionBudgetStatus {
   // Most recent generation observed when updating this PDB status. PodDisruptionsAllowed and other
-  // status informatio is valid only if observedGeneration equals to PDB's object generation.
+  // status information is valid only if observedGeneration equals to PDB's object generation.
   // +optional
   optional int64 observedGeneration = 1;
 
@@ -186,7 +186,7 @@ message PodDisruptionBudgetStatus {
 // that will be applied to a pod and container.
 message PodSecurityPolicy {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -198,7 +198,7 @@ message PodSecurityPolicy {
 // PodSecurityPolicyList is a list of PodSecurityPolicy objects.
 message PodSecurityPolicyList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 

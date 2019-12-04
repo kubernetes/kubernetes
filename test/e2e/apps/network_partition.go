@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -64,14 +64,14 @@ func expectNodeReadiness(isReady bool, newNode chan *v1.Node) {
 			if e2enode.IsConditionSetAsExpected(n, v1.NodeReady, isReady) {
 				expected = true
 			} else {
-				e2elog.Logf("Observed node ready status is NOT %v as expected", isReady)
+				framework.Logf("Observed node ready status is NOT %v as expected", isReady)
 			}
 		case <-timer:
 			timeout = true
 		}
 	}
 	if !expected {
-		e2elog.Failf("Failed to observe node ready status change to %v", isReady)
+		framework.Failf("Failed to observe node ready status change to %v", isReady)
 	}
 }
 
@@ -101,9 +101,9 @@ func podOnNode(podName, nodeName string, image string) *v1.Pod {
 func newPodOnNode(c clientset.Interface, namespace, podName, nodeName string) error {
 	pod, err := c.CoreV1().Pods(namespace).Create(podOnNode(podName, nodeName, framework.ServeHostnameImage))
 	if err == nil {
-		e2elog.Logf("Created pod %s on node %s", pod.ObjectMeta.Name, nodeName)
+		framework.Logf("Created pod %s on node %s", pod.ObjectMeta.Name, nodeName)
 	} else {
-		e2elog.Logf("Failed to create pod %s on node %s: %v", podName, nodeName, err)
+		framework.Logf("Failed to create pod %s on node %s: %v", podName, nodeName, err)
 	}
 	return err
 }
@@ -122,7 +122,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 		// TODO(foxish): Re-enable testing on gce after kubernetes#56787 is fixed.
 		framework.SkipUnlessProviderIs("gke", "aws")
 		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
-			e2elog.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
+			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
 		}
 	})
 
@@ -158,12 +158,12 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					return true
 				})
 				if len(nodes.Items) <= 0 {
-					e2elog.Failf("No eligible node were found: %d", len(nodes.Items))
+					framework.Failf("No eligible node were found: %d", len(nodes.Items))
 				}
 				node := nodes.Items[0]
 				podOpts = metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
 				if err = e2epod.WaitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, testutils.PodRunningReady); err != nil {
-					e2elog.Failf("Pods on node %s are not ready and running within %v: %v", node.Name, podReadyTimeout, err)
+					framework.Failf("Pods on node %s are not ready and running within %v: %v", node.Name, podReadyTimeout, err)
 				}
 
 				ginkgo.By("Set up watch on node status")
@@ -219,7 +219,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					ginkgo.By("Expect to observe node and pod status change from NotReady to Ready after network connectivity recovers")
 					expectNodeReadiness(true, newNode)
 					if err = e2epod.WaitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, testutils.PodRunningReady); err != nil {
-						e2elog.Failf("Pods on node %s did not become ready and running within %v: %v", node.Name, podReadyTimeout, err)
+						framework.Failf("Pods on node %s did not become ready and running within %v: %v", node.Name, podReadyTimeout, err)
 					}
 				}()
 
@@ -230,7 +230,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				ginkgo.By("Expect to observe node and pod status change from Ready to NotReady after network partition")
 				expectNodeReadiness(false, newNode)
 				if err = e2epod.WaitForMatchPodsCondition(c, podOpts, "NotReady", podNotReadyTimeout, testutils.PodNotReady); err != nil {
-					e2elog.Failf("Pods on node %s did not become NotReady within %v: %v", node.Name, podNotReadyTimeout, err)
+					framework.Failf("Pods on node %s did not become NotReady within %v: %v", node.Name, podNotReadyTimeout, err)
 				}
 			})
 		})
@@ -268,9 +268,9 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// Finally, it checks that the replication controller recreates the
 			// pods on another node and that now the number of replicas is equal 'replicas'.
 			ginkgo.By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
-			framework.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
-				e2elog.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
-				err := framework.WaitForRCPodToDisappear(c, ns, name, pods.Items[0].Name)
+			e2enetwork.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
+				framework.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
+				err := waitForRCPodToDisappear(c, ns, name, pods.Items[0].Name)
 				framework.ExpectNoError(err)
 
 				ginkgo.By("verifying whether the pod from the unreachable node is recreated")
@@ -278,9 +278,9 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				framework.ExpectNoError(err)
 			})
 
-			e2elog.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
+			framework.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
 			if !e2enode.WaitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
-				e2elog.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
+				framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 			}
 
 			// sleep a bit, to allow Watch in NodeController to catch up.
@@ -300,7 +300,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				pod, err := c.CoreV1().Pods(ns).Get(additionalPod, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				if pod.Spec.NodeName != node.Name {
-					e2elog.Logf("Pod %s found on invalid node: %s instead of %s", pod.Name, pod.Spec.NodeName, node.Name)
+					framework.Logf("Pod %s found on invalid node: %s instead of %s", pod.Name, pod.Spec.NodeName, node.Name)
 				}
 			}
 		})
@@ -337,9 +337,9 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// Finally, it checks that the replication controller recreates the
 			// pods on another node and that now the number of replicas is equal 'replicas + 1'.
 			ginkgo.By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
-			framework.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
-				e2elog.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
-				err := framework.WaitForRCPodToDisappear(c, ns, name, pods.Items[0].Name)
+			e2enetwork.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
+				framework.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
+				err := waitForRCPodToDisappear(c, ns, name, pods.Items[0].Name)
 				framework.ExpectEqual(err, wait.ErrWaitTimeout, "Pod was not deleted during network partition.")
 
 				ginkgo.By(fmt.Sprintf("verifying that there are %v running pods during partition", replicas))
@@ -347,9 +347,9 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				framework.ExpectNoError(err)
 			})
 
-			e2elog.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
+			framework.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
 			if !e2enode.WaitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
-				e2elog.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
+				framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 			}
 		})
 	})
@@ -376,7 +376,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
 				framework.DumpDebugInfo(c, ns)
 			}
-			e2elog.Logf("Deleting all stateful set in ns %v", ns)
+			framework.Logf("Deleting all stateful set in ns %v", ns)
 			e2esset.DeleteAllStatefulSets(c, ns)
 		})
 
@@ -413,15 +413,15 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// Blocks outgoing network traffic on 'node'. Then verifies that 'podNameToDisappear',
 			// that belongs to StatefulSet 'statefulSetName', **does not** disappear due to forced deletion from the apiserver.
 			// The grace period on the stateful pods is set to a value > 0.
-			framework.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
-				e2elog.Logf("Checking that the NodeController does not force delete stateful pods %v", pod.Name)
+			e2enetwork.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
+				framework.Logf("Checking that the NodeController does not force delete stateful pods %v", pod.Name)
 				err := e2epod.WaitTimeoutForPodNoLongerRunningInNamespace(c, pod.Name, ns, 10*time.Minute)
 				framework.ExpectEqual(err, wait.ErrWaitTimeout, "Pod was not deleted during network partition.")
 			})
 
-			e2elog.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
+			framework.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
 			if !e2enode.WaitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
-				e2elog.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
+				framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 			}
 
 			ginkgo.By("waiting for pods to be running again")
@@ -459,8 +459,8 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// This creates a temporary network partition, verifies that the job has 'parallelism' number of
 			// running pods after the node-controller detects node unreachable.
 			ginkgo.By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
-			framework.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
-				e2elog.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
+			e2enetwork.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
+				framework.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
 				err := e2epod.WaitForPodToDisappear(c, ns, pods.Items[0].Name, label, 20*time.Second, 10*time.Minute)
 				framework.ExpectEqual(err, wait.ErrWaitTimeout, "Pod was not deleted during network partition.")
 
@@ -469,9 +469,9 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				framework.ExpectNoError(err)
 			})
 
-			e2elog.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
+			framework.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
 			if !e2enode.WaitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
-				e2elog.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
+				framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 			}
 		})
 	})
@@ -493,7 +493,8 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				framework.SkipUnlessSSHKeyPresent()
 				ginkgo.By("choose a node - we will block all network traffic on this node")
 				var podOpts metav1.ListOptions
-				nodes := framework.GetReadySchedulableNodesOrDie(c)
+				nodes, err := e2enode.GetReadySchedulableNodes(c)
+				framework.ExpectNoError(err)
 				e2enode.Filter(nodes, func(node v1.Node) bool {
 					if !e2enode.IsConditionSetAsExpected(&node, v1.NodeReady, true) {
 						return false
@@ -506,12 +507,12 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					return true
 				})
 				if len(nodes.Items) <= 0 {
-					e2elog.Failf("No eligible node were found: %d", len(nodes.Items))
+					framework.Failf("No eligible node were found: %d", len(nodes.Items))
 				}
 				node := nodes.Items[0]
 				podOpts = metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
 				if err := e2epod.WaitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, testutils.PodRunningReadyOrSucceeded); err != nil {
-					e2elog.Failf("Pods on node %s are not ready and running within %v: %v", node.Name, podReadyTimeout, err)
+					framework.Failf("Pods on node %s are not ready and running within %v: %v", node.Name, podReadyTimeout, err)
 				}
 				pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(podOpts)
 				framework.ExpectNoError(err)
@@ -547,7 +548,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 						}
 					}
 				}
-				e2elog.Logf(
+				framework.Logf(
 					"Only %v should be running after partition. Maximum TolerationSeconds among other Pods is %v",
 					neverEvictedPods,
 					maxTolerationTime,
@@ -617,7 +618,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					return framework.NodeHasTaint(c, node.Name, nodepkg.UnreachableTaintTemplate)
 				}))
 				if err = e2epod.WaitForMatchPodsCondition(c, podOpts, "NotReady", podNotReadyTimeout, testutils.PodNotReady); err != nil {
-					e2elog.Failf("Pods on node %s did not become NotReady within %v: %v", node.Name, podNotReadyTimeout, err)
+					framework.Failf("Pods on node %s did not become NotReady within %v: %v", node.Name, podNotReadyTimeout, err)
 				}
 
 				sleepTime := maxTolerationTime + 20*time.Second
@@ -637,7 +638,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					if pod.DeletionTimestamp == nil {
 						seenRunning = append(seenRunning, namespacedName)
 						if shouldBeTerminating {
-							e2elog.Failf("Pod %v should have been deleted but was seen running", namespacedName)
+							framework.Failf("Pod %v should have been deleted but was seen running", namespacedName)
 						}
 					}
 				}
@@ -651,10 +652,20 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 						}
 					}
 					if !running {
-						e2elog.Failf("Pod %v was evicted even though it shouldn't", neverEvictedPod)
+						framework.Failf("Pod %v was evicted even though it shouldn't", neverEvictedPod)
 					}
 				}
 			})
 		})
 	})
 })
+
+// waitForRCPodToDisappear returns nil if the pod from the given replication controller (described by rcName) no longer exists.
+// In case of failure or too long waiting time, an error is returned.
+func waitForRCPodToDisappear(c clientset.Interface, ns, rcName, podName string) error {
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
+	// NodeController evicts pod after 5 minutes, so we need timeout greater than that to observe effects.
+	// The grace period must be set to 0 on the pod for it to be deleted during the partition.
+	// Otherwise, it goes to the 'Terminating' state till the kubelet confirms deletion.
+	return e2epod.WaitForPodToDisappear(c, ns, podName, label, 20*time.Second, 10*time.Minute)
+}

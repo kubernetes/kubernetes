@@ -10,6 +10,14 @@ go_library(
     importpath = "github.com/google/cadvisor/fs",
     visibility = ["//visibility:public"],
     deps = select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/docker/docker/pkg/mount:go_default_library",
+            "//vendor/github.com/google/cadvisor/devicemapper:go_default_library",
+            "//vendor/github.com/google/cadvisor/utils:go_default_library",
+            "//vendor/github.com/google/cadvisor/utils/docker:go_default_library",
+            "//vendor/github.com/mistifyio/go-zfs:go_default_library",
+            "//vendor/k8s.io/klog:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/docker/docker/pkg/mount:go_default_library",
             "//vendor/github.com/google/cadvisor/devicemapper:go_default_library",

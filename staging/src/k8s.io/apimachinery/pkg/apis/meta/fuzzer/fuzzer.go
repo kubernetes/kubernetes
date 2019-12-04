@@ -272,7 +272,7 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 		},
 		func(j *metav1.ManagedFieldsEntry, c fuzz.Continue) {
 			c.FuzzNoCustom(j)
-			j.Fields = nil
+			j.FieldsV1 = nil
 		},
 	}
 }

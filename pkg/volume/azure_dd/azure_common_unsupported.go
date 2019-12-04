@@ -1,3 +1,4 @@
+// +build !providerless
 // +build !linux,!windows
 
 /*
@@ -18,11 +19,11 @@ limitations under the License.
 
 package azure_dd
 
-import "k8s.io/kubernetes/pkg/util/mount"
+import "k8s.io/utils/exec"
 
-func scsiHostRescan(io ioHandler, exec mount.Exec) {
+func scsiHostRescan(io ioHandler, exec exec.Interface) {
 }
 
-func findDiskByLun(lun int, io ioHandler, exec mount.Exec) (string, error) {
+func findDiskByLun(lun int, io ioHandler, exec exec.Interface) (string, error) {
 	return "", nil
 }
