@@ -137,7 +137,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 			VolumeMode:       pvc.Spec.VolumeMode,
 		})
 
-		pv, err = e2epv.CreatePV(c, pv)
+		_, err = e2epv.CreatePV(c, pv)
 		framework.ExpectNoError(err, "Error creating pv %v", err)
 
 		ginkgo.By("Waiting for PVC to be in bound phase")

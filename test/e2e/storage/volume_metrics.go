@@ -126,7 +126,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.ExpectNoError(err)
 
 		err = e2epod.WaitForPodRunningInNamespace(c, pod)
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(c, pod), "Error starting pod %s", pod.Name)
+		framework.ExpectNoError(err, "Error starting pod %s", pod.Name)
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
 		framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
@@ -212,7 +212,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.ExpectNoError(err)
 
 		err = e2epod.WaitForPodRunningInNamespace(c, pod)
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(c, pod), "Error starting pod ", pod.Name)
+		framework.ExpectNoError(err, "Error starting pod ", pod.Name)
 
 		pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
@@ -269,7 +269,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.ExpectNoError(err)
 
 		err = e2epod.WaitForPodRunningInNamespace(c, pod)
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(c, pod), "Error starting pod ", pod.Name)
+		framework.ExpectNoError(err, "Error starting pod ", pod.Name)
 
 		pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
@@ -300,7 +300,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.ExpectNoError(err)
 
 		err = e2epod.WaitForPodRunningInNamespace(c, pod)
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(c, pod), "Error starting pod ", pod.Name)
+		framework.ExpectNoError(err, "Error starting pod ", pod.Name)
 
 		pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
@@ -337,7 +337,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		pod, err = c.CoreV1().Pods(ns).Create(pod)
 		framework.ExpectNoError(err)
 		err = e2epod.WaitForPodRunningInNamespace(c, pod)
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(c, pod), "Error starting pod ", pod.Name)
+		framework.ExpectNoError(err, "Error starting pod ", pod.Name)
 		pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
