@@ -17,11 +17,17 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
 	v1beta1 "k8s.io/api/events/v1beta1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 	k8s_api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
+
+func addConversionFuncs(scheme *runtime.Scheme) error {
+	return AddFieldLabelConversionsForEvent(scheme)
+}
 
 func Convert_v1beta1_Event_To_core_Event(in *v1beta1.Event, out *k8s_api.Event, s conversion.Scope) error {
 	if err := autoConvert_v1beta1_Event_To_core_Event(in, out, s); err != nil {
@@ -55,4 +61,32 @@ func Convert_core_Event_To_v1beta1_Event(in *k8s_api.Event, out *v1beta1.Event, 
 	out.DeprecatedLastTimestamp = in.LastTimestamp
 	out.DeprecatedCount = in.Count
 	return nil
+}
+
+func AddFieldLabelConversionsForEvent(scheme *runtime.Scheme) error {
+	return scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("Event"),
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "regarding.kind":
+				return "involvedObject.kind", value, nil
+			case "regarding.namespace":
+				return "involvedObject.namespace", value, nil
+			case "regarding.name":
+				return "involvedObject.name", value, nil
+			case "regarding.uid":
+				return "involvedObject.uid", value, nil
+			case "regarding.apiVersion":
+				return "involvedObject.apiVersion", value, nil
+			case "regarding.resourceVersion":
+				return "involvedObject.resourceVersion", value, nil
+			case "regarding.fieldPath":
+				return "involvedObject.fieldPath", value, nil
+			case "reportingController":
+				return "source.component", value, nil
+			case "reportingInstance", "reason", "type", "metadata.namespace", "metadata.name":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		})
 }
