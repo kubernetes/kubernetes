@@ -106,10 +106,6 @@ var kindWhiteList = sets.NewString(
 	"JobTemplate",
 	// --
 
-	// k8s.io/api/extensions
-	"ReplicationControllerDummy",
-	// --
-
 	// k8s.io/api/imagepolicy
 	"ImageReview",
 	// --
