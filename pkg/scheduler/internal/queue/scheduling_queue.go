@@ -259,16 +259,16 @@ func (p *PriorityQueue) Add(pod *v1.Pod) error {
 	defer p.lock.Unlock()
 	pInfo := p.newPodInfo(pod)
 	if err := p.activeQ.Add(pInfo); err != nil {
-		klog.Errorf("Error adding pod %v/%v to the scheduling queue: %v", pod.Namespace, pod.Name, err)
+		klog.Errorf("Error adding pod %v to the scheduling queue: %v", nsNameForPod(pod), err)
 		return err
 	}
 	if p.unschedulableQ.get(pod) != nil {
-		klog.Errorf("Error: pod %v/%v is already in the unschedulable queue.", pod.Namespace, pod.Name)
+		klog.Errorf("Error: pod %v is already in the unschedulable queue.", nsNameForPod(pod))
 		p.unschedulableQ.delete(pod)
 	}
 	// Delete pod from backoffQ if it is backing off
 	if err := p.podBackoffQ.Delete(pInfo); err == nil {
-		klog.Errorf("Error: pod %v/%v is already in the podBackoff queue.", pod.Namespace, pod.Name)
+		klog.Errorf("Error: pod %v is already in the podBackoff queue.", nsNameForPod(pod))
 	}
 	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", PodAdd).Inc()
 	p.nominatedPods.add(pod, "")
@@ -328,16 +328,16 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.PodInfo, p
 	defer p.lock.Unlock()
 	pod := pInfo.Pod
 	if p.unschedulableQ.get(pod) != nil {
-		return fmt.Errorf("pod is already present in unschedulableQ")
+		return fmt.Errorf("pod: %v is already present in unschedulable queue", nsNameForPod(pod))
 	}
 
 	// Refresh the timestamp since the pod is re-added.
 	pInfo.Timestamp = p.clock.Now()
 	if _, exists, _ := p.activeQ.Get(pInfo); exists {
-		return fmt.Errorf("pod is already present in the activeQ")
+		return fmt.Errorf("pod: %v is already present in the active queue", nsNameForPod(pod))
 	}
 	if _, exists, _ := p.podBackoffQ.Get(pInfo); exists {
-		return fmt.Errorf("pod is already present in the backoffQ")
+		return fmt.Errorf("pod %v is already present in the backoff queue", nsNameForPod(pod))
 	}
 
 	// Every unschedulable pod is subject to backoff timers.
@@ -372,7 +372,7 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 		pod := rawPodInfo.(*framework.PodInfo).Pod
 		boTime, found := p.podBackoff.GetBackoffTime(nsNameForPod(pod))
 		if !found {
-			klog.Errorf("Unable to find backoff value for pod %v in backoffQ", nsNameForPod(pod))
+			klog.Errorf("Unable to find backoff value for pod %v in backoff queue", nsNameForPod(pod))
 			p.podBackoffQ.Pop()
 			p.activeQ.Add(rawPodInfo)
 			metrics.SchedulerQueueIncomingPods.WithLabelValues("active", BackoffComplete).Inc()
@@ -385,7 +385,7 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 		}
 		_, err := p.podBackoffQ.Pop()
 		if err != nil {
-			klog.Errorf("Unable to pop pod %v from backoffQ despite backoff completion.", nsNameForPod(pod))
+			klog.Errorf("Unable to pop pod %v from backoff queue despite backoff completion.", nsNameForPod(pod))
 			return
 		}
 		p.activeQ.Add(rawPodInfo)
