@@ -27,7 +27,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -63,9 +63,8 @@ var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor
 					return
 				}
 				state := status.ContainerStatuses[0].State.Terminated
-				gomega.Expect(state).ToNot(gomega.BeNil(), "ContainerState: %+v", status.ContainerStatuses[0].State)
-				gomega.Expect(state.ExitCode).To(gomega.Not(gomega.BeZero()), "ContainerStateTerminated: %+v", state)
-
+				framework.ExpectNotEqual(state, nil, "ContainerState: %+v", status.ContainerStatuses[0].State)
+				framework.ExpectEqual(state.ExitCode, 0, "ContainerStateTerminated: %+v", state)
 			})
 			ginkgo.It("should enforce a permissive profile", func() {
 				status := runAppArmorTest(f, true, apparmor.ProfileNamePrefix+apparmorProfilePrefix+"audit-write")
@@ -74,8 +73,8 @@ var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor
 					return
 				}
 				state := status.ContainerStatuses[0].State.Terminated
-				gomega.Expect(state).ToNot(gomega.BeNil(), "ContainerState: %+v", status.ContainerStatuses[0].State)
-				gomega.Expect(state.ExitCode).To(gomega.BeZero(), "ContainerStateTerminated: %+v", state)
+				framework.ExpectNotEqual(state, nil, "ContainerState: %+v", status.ContainerStatuses[0].State)
+				framework.ExpectEqual(state.ExitCode, 0, "ContainerStateTerminated: %+v", state)
 			})
 		})
 	} else {

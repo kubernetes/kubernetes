@@ -32,7 +32,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -86,7 +85,7 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 			})
 
 			_, err = f.ClientSet.SchedulingV1().PriorityClasses().Create(systemCriticalPriority)
-			gomega.Expect(err == nil || errors.IsAlreadyExists(err)).To(gomega.BeTrue(), "failed to create PriorityClasses with an error: %v", err)
+			framework.ExpectEqual(err == nil || errors.IsAlreadyExists(err), true, "failed to create PriorityClasses with an error: %v", err)
 
 			// Create pods, starting with non-critical so that the critical preempts the other pods.
 			f.PodClient().CreateBatch([]*v1.Pod{nonCriticalBestEffort, nonCriticalBurstable, nonCriticalGuaranteed})
@@ -157,9 +156,9 @@ func getTestPod(critical bool, name string, resources v1.ResourceRequirements) *
 		pod.Spec.PriorityClassName = systemCriticalPriorityName
 		pod.Spec.Priority = &value
 
-		gomega.Expect(kubelettypes.IsCriticalPod(pod)).To(gomega.BeTrue(), "pod should be a critical pod")
+		framework.ExpectEqual(kubelettypes.IsCriticalPod(pod), true, "pod should be a critical pod")
 	} else {
-		gomega.Expect(kubelettypes.IsCriticalPod(pod)).To(gomega.BeFalse(), "pod should not be a critical pod")
+		framework.ExpectEqual(kubelettypes.IsCriticalPod(pod), false, "pod should not be a critical pod")
 	}
 	return pod
 }
