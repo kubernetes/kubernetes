@@ -54,7 +54,8 @@ type Converter struct {
 	generatedConversionFuncs ConversionFuncs
 
 	// Set of conversions that should be treated as a no-op
-	ignoredConversions map[typePair]struct{}
+	ignoredConversions        map[typePair]struct{}
+	ignoredUntypedConversions map[typePair]struct{}
 
 	// This is a map from a source field type and name, to a list of destination
 	// field type and name.
@@ -83,12 +84,13 @@ type Converter struct {
 // NewConverter creates a new Converter object.
 func NewConverter(nameFn NameFunc) *Converter {
 	c := &Converter{
-		conversionFuncs:          NewConversionFuncs(),
-		generatedConversionFuncs: NewConversionFuncs(),
-		ignoredConversions:       make(map[typePair]struct{}),
-		nameFunc:                 nameFn,
-		structFieldDests:         make(map[typeNamePair][]typeNamePair),
-		structFieldSources:       make(map[typeNamePair][]typeNamePair),
+		conversionFuncs:           NewConversionFuncs(),
+		generatedConversionFuncs:  NewConversionFuncs(),
+		ignoredConversions:        make(map[typePair]struct{}),
+		ignoredUntypedConversions: make(map[typePair]struct{}),
+		nameFunc:                  nameFn,
+		structFieldDests:          make(map[typeNamePair][]typeNamePair),
+		structFieldSources:        make(map[typeNamePair][]typeNamePair),
 
 		inputFieldMappingFuncs: make(map[reflect.Type]FieldMappingFunc),
 		inputDefaultFlags:      make(map[reflect.Type]FieldMatchingFlags),
@@ -377,6 +379,7 @@ func (c *Converter) RegisterIgnoredConversion(from, to interface{}) error {
 		return fmt.Errorf("expected pointer arg for 'to' param 1, got: %v", typeTo)
 	}
 	c.ignoredConversions[typePair{typeFrom.Elem(), typeTo.Elem()}] = struct{}{}
+	c.ignoredUntypedConversions[typePair{typeFrom, typeTo}] = struct{}{}
 	return nil
 }
 
@@ -458,6 +461,11 @@ func (c *Converter) doConversion(src, dest interface{}, flags FieldMatchingFlags
 		converter: c,
 		flags:     flags,
 		meta:      meta,
+	}
+
+	// ignore conversions of this type
+	if _, ok := c.ignoredUntypedConversions[pair]; ok {
+		return nil
 	}
 	if fn, ok := c.conversionFuncs.untyped[pair]; ok {
 		return fn(src, dest, scope)
