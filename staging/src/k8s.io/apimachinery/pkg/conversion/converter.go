@@ -93,7 +93,12 @@ func NewConverter(nameFn NameFunc) *Converter {
 		inputFieldMappingFuncs: make(map[reflect.Type]FieldMappingFunc),
 		inputDefaultFlags:      make(map[reflect.Type]FieldMatchingFlags),
 	}
-	c.RegisterConversionFunc(Convert_Slice_byte_To_Slice_byte)
+	c.RegisterUntypedConversionFunc(
+		(*[]byte)(nil), (*[]byte)(nil),
+		func(a, b interface{}, s Scope) error {
+			return Convert_Slice_byte_To_Slice_byte(a.(*[]byte), b.(*[]byte), s)
+		},
+	)
 	return c
 }
 
@@ -159,23 +164,9 @@ func NewConversionFuncs() ConversionFuncs {
 }
 
 type ConversionFuncs struct {
+	// FIXME: Remove.
 	fns     map[typePair]reflect.Value
 	untyped map[typePair]ConversionFunc
-}
-
-// Add adds the provided conversion functions to the lookup table - they must have the signature
-// `func(type1, type2, Scope) error`. Functions are added in the order passed and will override
-// previously registered pairs.
-func (c ConversionFuncs) Add(fns ...interface{}) error {
-	for _, fn := range fns {
-		fv := reflect.ValueOf(fn)
-		ft := fv.Type()
-		if err := verifyConversionFunctionSignature(ft); err != nil {
-			return err
-		}
-		c.fns[typePair{ft.In(0).Elem(), ft.In(1).Elem()}] = fv
-	}
-	return nil
 }
 
 // AddUntyped adds the provided conversion function to the lookup table for the types that are
@@ -358,29 +349,6 @@ func verifyConversionFunctionSignature(ft reflect.Type) error {
 		return fmt.Errorf("expected error return, got: %v", ft)
 	}
 	return nil
-}
-
-// RegisterConversionFunc registers a conversion func with the
-// Converter. conversionFunc must take three parameters: a pointer to the input
-// type, a pointer to the output type, and a conversion.Scope (which should be
-// used if recursive conversion calls are desired).  It must return an error.
-//
-// Example:
-// c.RegisterConversionFunc(
-//         func(in *Pod, out *v1.Pod, s Scope) error {
-//                 // conversion logic...
-//                 return nil
-//          })
-// DEPRECATED: Will be removed in favor of RegisterUntypedConversionFunc
-func (c *Converter) RegisterConversionFunc(conversionFunc interface{}) error {
-	return c.conversionFuncs.Add(conversionFunc)
-}
-
-// Similar to RegisterConversionFunc, but registers conversion function that were
-// automatically generated.
-// DEPRECATED: Will be removed in favor of RegisterGeneratedUntypedConversionFunc
-func (c *Converter) RegisterGeneratedConversionFunc(conversionFunc interface{}) error {
-	return c.generatedConversionFuncs.Add(conversionFunc)
 }
 
 // RegisterUntypedConversionFunc registers a function that converts between a and b by passing objects of those

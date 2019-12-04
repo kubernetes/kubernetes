@@ -308,45 +308,6 @@ func (s *Scheme) AddIgnoredConversionType(from, to interface{}) error {
 	return s.converter.RegisterIgnoredConversion(from, to)
 }
 
-// AddConversionFuncs adds functions to the list of conversion functions. The given
-// functions should know how to convert between two of your API objects, or their
-// sub-objects. We deduce how to call these functions from the types of their two
-// parameters; see the comment for Converter.Register.
-//
-// Note that, if you need to copy sub-objects that didn't change, you can use the
-// conversion.Scope object that will be passed to your conversion function.
-// Additionally, all conversions started by Scheme will set the SrcVersion and
-// DestVersion fields on the Meta object. Example:
-//
-// s.AddConversionFuncs(
-//	func(in *InternalObject, out *ExternalObject, scope conversion.Scope) error {
-//		// You can depend on Meta() being non-nil, and this being set to
-//		// the source version, e.g., ""
-//		s.Meta().SrcVersion
-//		// You can depend on this being set to the destination version,
-//		// e.g., "v1".
-//		s.Meta().DestVersion
-//		// Call scope.Convert to copy sub-fields.
-//		s.Convert(&in.SubFieldThatMoved, &out.NewLocation.NewName, 0)
-//		return nil
-//	},
-// )
-//
-// (For more detail about conversion functions, see Converter.Register's comment.)
-//
-// Also note that the default behavior, if you don't add a conversion function, is to
-// sanely copy fields that have the same names and same type names. It's OK if the
-// destination type has extra fields, but it must not remove any. So you only need to
-// add conversion functions for things with changed/removed fields.
-func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
-	for _, f := range conversionFuncs {
-		if err := s.converter.RegisterConversionFunc(f); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // AddConversionFunc registers a function that converts between a and b by passing objects of those
 // types to the provided function. The function *must* accept objects of a and b - this machinery will not enforce
 // any other guarantee.
