@@ -52,8 +52,12 @@ type Helper struct {
 	DeleteLocalData     bool
 	Selector            string
 	PodSelector         string
-	Out                 io.Writer
-	ErrOut              io.Writer
+
+	// DisableEviction forces drain to use delete rather than evict
+	DisableEviction bool
+
+	Out    io.Writer
+	ErrOut io.Writer
 
 	// TODO(justinsb): unnecessary?
 	DryRun bool
@@ -179,17 +183,20 @@ func (d *Helper) DeleteOrEvictPods(pods []corev1.Pod) error {
 		return nil
 	}
 
-	policyGroupVersion, err := CheckEvictionSupport(d.Client)
-	if err != nil {
-		return err
-	}
-
 	// TODO(justinsb): unnecessary?
 	getPodFn := func(namespace, name string) (*corev1.Pod, error) {
 		return d.Client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 	}
-	if len(policyGroupVersion) > 0 {
-		return d.evictPods(pods, policyGroupVersion, getPodFn)
+
+	if !d.DisableEviction {
+		policyGroupVersion, err := CheckEvictionSupport(d.Client)
+		if err != nil {
+			return err
+		}
+
+		if len(policyGroupVersion) > 0 {
+			return d.evictPods(pods, policyGroupVersion, getPodFn)
+		}
 	}
 
 	return d.deletePods(pods, getPodFn)
