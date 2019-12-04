@@ -46,13 +46,16 @@ func newTokenSecret(tokenID, tokenSecret string) *v1.Secret {
 	}
 }
 
-func GenerateTokenId() (string, error) {
+// GenerateTokenID creates tokenID for e2e test.
+func GenerateTokenID() (string, error) {
 	tokenID, err := randBytes(TokenIDBytes)
 	if err != nil {
 		return "", err
 	}
 	return tokenID, nil
 }
+
+// GenerateTokenSecret creates tokenSecret for e2e test.
 func GenerateTokenSecret() (string, error) {
 	tokenSecret, err := randBytes(TokenSecretBytes)
 	if err != nil {
@@ -74,10 +77,12 @@ func addSecretExpiration(s *v1.Secret, expiration string) {
 	s.Data[bootstrapapi.BootstrapTokenExpirationKey] = []byte(expiration)
 }
 
+// TimeStringFromNow return the current time with format RFC3339.
 func TimeStringFromNow(delta time.Duration) string {
 	return time.Now().Add(delta).Format(time.RFC3339)
 }
 
+// WaitforSignedClusterInfoByBootStrapToken wait for the bootstrap token secret be signed.
 func WaitforSignedClusterInfoByBootStrapToken(c clientset.Interface, tokenID string) error {
 
 	return wait.Poll(framework.Poll, 2*time.Minute, func() (bool, error) {
@@ -94,6 +99,7 @@ func WaitforSignedClusterInfoByBootStrapToken(c clientset.Interface, tokenID str
 	})
 }
 
+// WaitForSignedClusterInfoGetUpdatedByBootstrapToken wait for signed bootstrap token updated.
 func WaitForSignedClusterInfoGetUpdatedByBootstrapToken(c clientset.Interface, tokenID string, signedToken string) error {
 
 	return wait.Poll(framework.Poll, 2*time.Minute, func() (bool, error) {
@@ -110,6 +116,7 @@ func WaitForSignedClusterInfoGetUpdatedByBootstrapToken(c clientset.Interface, t
 	})
 }
 
+// WaitForSignedClusterInfoByBootstrapTokenToDisappear wait for the bootstrap token removed from cluster-info ConfigMap.
 func WaitForSignedClusterInfoByBootstrapTokenToDisappear(c clientset.Interface, tokenID string) error {
 
 	return wait.Poll(framework.Poll, 2*time.Minute, func() (bool, error) {
@@ -126,6 +133,7 @@ func WaitForSignedClusterInfoByBootstrapTokenToDisappear(c clientset.Interface, 
 	})
 }
 
+// WaitForBootstrapTokenSecretToDisappear wait for the bootstrap token secret be deleted.
 func WaitForBootstrapTokenSecretToDisappear(c clientset.Interface, tokenID string) error {
 
 	return wait.Poll(framework.Poll, 1*time.Minute, func() (bool, error) {
@@ -137,6 +145,7 @@ func WaitForBootstrapTokenSecretToDisappear(c clientset.Interface, tokenID strin
 	})
 }
 
+// WaitForBootstrapTokenSecretNotDisappear wait for the bootstrap token secret not be deleted.
 func WaitForBootstrapTokenSecretNotDisappear(c clientset.Interface, tokenID string, t time.Duration) error {
 	err := wait.Poll(framework.Poll, t, func() (bool, error) {
 		secret, err := c.CoreV1().Secrets(metav1.NamespaceSystem).Get(bootstrapapi.BootstrapTokenSecretPrefix+tokenID, metav1.GetOptions{})
