@@ -40,10 +40,10 @@ var (
 
 	kubeletConfigDownloadExample = cmdutil.Examples(fmt.Sprintf(`
 		# Download the kubelet configuration from the ConfigMap in the cluster. Autodetect the kubelet version.
-		kubeadm alpha phase kubelet config download
+		kubeadm alpha kubelet config download
 
 		# Download the kubelet configuration from the ConfigMap in the cluster. Use a specific desired kubelet version.
-		kubeadm alpha phase kubelet config download --kubelet-version %s
+		kubeadm alpha kubelet config download --kubelet-version %s
 		`, constants.CurrentKubernetesVersion))
 
 	kubeletConfigEnableDynamicLongDesc = cmdutil.LongDesc(`
