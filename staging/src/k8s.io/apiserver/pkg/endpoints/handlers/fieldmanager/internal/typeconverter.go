@@ -49,7 +49,12 @@ var _ TypeConverter = DeducedTypeConverter{}
 
 // ObjectToTyped converts an object into a TypedValue with a "deduced type".
 func (DeducedTypeConverter) ObjectToTyped(obj runtime.Object) (*typed.TypedValue, error) {
-	return typed.DeducedParseableType.FromInterface(obj)
+	switch o := obj.(type) {
+	case *unstructured.Unstructured:
+		return typed.DeducedParseableType.FromUnstructured(o.UnstructuredContent())
+	default:
+		return typed.DeducedParseableType.FromInterface(obj)
+	}
 }
 
 // TypedToObject transforms the typed value into a runtime.Object. That
@@ -82,7 +87,12 @@ func (c *typeConverter) ObjectToTyped(obj runtime.Object) (*typed.TypedValue, er
 	if t == nil {
 		return nil, newNoCorrespondingTypeError(gvk)
 	}
-	return t.FromInterface(obj)
+	switch o := obj.(type) {
+	case *unstructured.Unstructured:
+		return t.FromUnstructured(o.UnstructuredContent())
+	default:
+		return t.FromInterface(obj)
+	}
 }
 
 func (c *typeConverter) TypedToObject(value *typed.TypedValue) (runtime.Object, error) {

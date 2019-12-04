@@ -111,7 +111,8 @@ func (v *validatingObjectWalker) doScalar(t *schema.Scalar) ValidationErrors {
 
 func (v *validatingObjectWalker) visitListItems(t *schema.List, list value.List) (errs ValidationErrors) {
 	observedKeys := fieldpath.MakePathElementSet(list.Length())
-	list.Iterate(func(i int, child value.Value) {
+	for i := 0; i < list.Length(); i++ {
+		child := list.At(i)
 		var pe fieldpath.PathElement
 		if t.ElementRelationship != schema.Associative {
 			pe.Index = &i
@@ -136,7 +137,7 @@ func (v *validatingObjectWalker) visitListItems(t *schema.List, list value.List)
 			errs = append(errs, newErrs.WithPrefix(pe.String())...)
 		}
 		v.finishDescent(v2)
-	})
+	}
 	return errs
 }
 
@@ -155,37 +156,18 @@ func (v *validatingObjectWalker) doList(t *schema.List) (errs ValidationErrors) 
 	return errs
 }
 
-func (v *validatingObjectWalker) visitMapItem(t *schema.Map, key string, val value.Value) (errs ValidationErrors) {
-	tr := t.ElementType
-	if sf, ok := t.FindField(key); ok {
-		tr = sf.Type
-	}
-	v2 := v.prepareDescent(tr)
-	v2.value = val
-	if newErrs := v2.validate(); len(newErrs) != 0 {
-		errs = append(errs, newErrs.WithPrefix(fieldpath.PathElement{FieldName: &key}.String())...)
-	}
-	v.finishDescent(v2)
-	return errs
-}
-
 func (v *validatingObjectWalker) visitMapItems(t *schema.Map, m value.Map) (errs ValidationErrors) {
-	// Avoiding the closure on m.Iterate here significantly improves
-	// performance, so we have to switch on each type of maps.
-	switch mt := m.(type) {
-	case value.MapString:
-		for key, val := range mt {
-			errs = append(errs, v.visitMapItem(t, key, value.ValueInterface{Value: val})...)
+	m.Iterate(func(key string, val value.Value) bool {
+		tr := t.ElementType
+		if sf, ok := t.FindField(key); ok {
+			tr = sf.Type
 		}
-	case value.MapInterface:
-		for key, val := range mt {
-			if k, ok := key.(string); !ok {
-				continue
-			} else {
-				errs = append(errs, v.visitMapItem(t, k, value.ValueInterface{Value: val})...)
-			}
-		}
-	}
+		v2 := v.prepareDescent(tr)
+		v2.value = val
+		errs = append(errs, v2.validate()...)
+		v.finishDescent(v2)
+		return true
+	})
 	return errs
 }
 

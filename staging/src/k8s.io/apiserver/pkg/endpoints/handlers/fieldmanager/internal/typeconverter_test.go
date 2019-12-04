@@ -27,7 +27,13 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	corev1 "k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+
 	"k8s.io/kube-openapi/pkg/util/proto"
 	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
 )
@@ -57,10 +63,12 @@ func TestTypeConverter(t *testing.T) {
 
 	testCases := []struct {
 		name string
+		gvk schema.GroupVersionKind
 		yaml string
 	}{
 		{
 			name: "apps/v1.Deployment",
+			gvk: appsv1.SchemeGroupVersion.WithKind("Deployment"),
 			yaml: `
 apiVersion: apps/v1
 kind: Deployment
@@ -83,6 +91,7 @@ spec:
 `,
 		}, {
 			name: "extensions/v1beta1.Deployment",
+			gvk: extensionsv1beta1.SchemeGroupVersion.WithKind("Deployment"),
 			yaml: `
 apiVersion: extensions/v1beta1
 kind: Deployment
@@ -105,6 +114,7 @@ spec:
 `,
 		}, {
 			name: "v1.Pod",
+			gvk: corev1.SchemeGroupVersion.WithKind("Pod"),
 			yaml: `
 apiVersion: v1
 kind: Pod
@@ -126,6 +136,9 @@ spec:
 		})
 		t.Run(fmt.Sprintf("%v ObjectToTyped with DeducedTypeConverter", testCase.name), func(t *testing.T) {
 			testObjectToTyped(t, dtc, testCase.yaml)
+		})
+		t.Run(fmt.Sprintf("%v ObjectToTypedReflect with DeducedTypeConverter", testCase.name), func(t *testing.T) {
+			testObjectToTypedReflect(t, dtc, testCase.yaml, testCase.gvk)
 		})
 	}
 }
@@ -149,6 +162,57 @@ Original object:
 %#v
 Final object:
 %#v`, obj, newObj)
+	}
+}
+
+func testObjectToTypedReflect(t *testing.T, tc internal.TypeConverter, y string, gvk schema.GroupVersionKind) {
+	scheme := runtime.NewScheme()
+	if err :=corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add to scheme: %v", err)
+	}
+	if err :=appsv1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add to scheme: %v", err)
+	}
+	if err :=extensionsv1beta1.AddToScheme(scheme); err != nil {
+		t.Fatalf("Failed to add to scheme: %v", err)
+	}
+
+	obj, err := scheme.New(gvk)
+	if err != nil {
+		t.Fatalf("Failed to construct object: %v", err)
+	}
+	if err := yaml.Unmarshal([]byte(y), &obj); err != nil {
+		t.Fatalf("Failed to parse yaml object: %v", err)
+	}
+	typed, err := tc.ObjectToTyped(obj)
+	if err != nil {
+		t.Fatalf("Failed to convert object to typed: %v", err)
+	}
+
+	newObj, err := tc.TypedToObject(typed)
+	if err != nil {
+		t.Fatalf("Failed to convert typed to object: %v", err)
+	}
+
+	// convert back to typed object before comparing
+	newBytes, err := yaml.Marshal(newObj)
+	if err != nil {
+		t.Fatalf("Failed to marshal object: %v", err)
+	}
+	newTyped, err:= scheme.New(gvk)
+	if err != nil {
+		t.Fatalf("Failed to construct object: %v", err)
+	}
+	if err := yaml.Unmarshal([]byte(newBytes), &newTyped); err != nil {
+		t.Fatalf("Failed to parse yaml object: %v", err)
+	}
+
+	if !reflect.DeepEqual(obj, newTyped) {
+		t.Errorf(`Round-trip failed:
+Original object:
+%#v
+Final object:
+%#v`, obj, newTyped)
 	}
 }
 

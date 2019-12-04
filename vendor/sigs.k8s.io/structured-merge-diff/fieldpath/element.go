@@ -127,7 +127,7 @@ func KeyByFields(nameValues ...interface{}) *value.FieldList {
 	}
 	out := value.FieldList{}
 	for i := 0; i < len(nameValues)-1; i += 2 {
-		out = append(out, value.Field{Name: nameValues[i].(string), Value: value.ValueInterface{Value: nameValues[i+1]}})
+		out = append(out, value.Field{Name: nameValues[i].(string), Value: value.NewValueInterface(nameValues[i+1])})
 	}
 	out.Sort()
 	return &out

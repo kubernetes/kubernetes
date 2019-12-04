@@ -55,21 +55,21 @@ func (w *objectWalker) walk() {
 		// If the list were atomic, we'd break here, but we don't have
 		// a schema, so we can't tell.
 
-		w.value.List().Iterate(func(i int, child value.Value) {
+		for i := 0; i < w.value.List().Length(); i++ {
 			w2 := *w
-			w2.path = append(w.path, GuessBestListPathElement(i, child))
-			w2.value = child
+			w2.path = append(w.path, GuessBestListPathElement(i, w.value.List().At(i)))
+			w2.value = w.value.List().At(i)
 			w2.walk()
-		})
+		}
 		return
 	case w.value.IsMap():
 		// If the map/struct were atomic, we'd break here, but we don't
 		// have a schema, so we can't tell.
 
-		w.value.Map().Iterate(func(key string, value value.Value) bool {
+		w.value.Map().Iterate(func(k string, val value.Value) bool {
 			w2 := *w
-			w2.path = append(w.path, PathElement{FieldName: &key})
-			w2.value = value
+			w2.path = append(w.path, PathElement{FieldName: &k})
+			w2.value = val
 			w2.walk()
 			return true
 		})
