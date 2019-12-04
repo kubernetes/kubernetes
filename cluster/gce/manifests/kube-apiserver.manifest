@@ -45,7 +45,7 @@
         "scheme": "HTTPS",
         "host": "127.0.0.1",
         "port": {{secure_port}},
-        "path": "/healthz"
+        "path": "/healthz?exclude=kms-provider-0&exclude=kms-provider-1"
       },
       "periodSeconds": 1,
       "timeoutSeconds": 15
