@@ -64,7 +64,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/pvcprotection"
 	"k8s.io/kubernetes/pkg/controller/volume/pvprotection"
 	"k8s.io/kubernetes/pkg/features"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/generic"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -111,7 +110,7 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 	}
 
 	// failure: more than one cidr and dual stack is not enabled
-	if len(clusterCIDRs) > 1 && !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack) {
+	if len(clusterCIDRs) > 1 && !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
 		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and dualstack feature is not enabled", len(clusterCIDRs))
 	}
 
@@ -143,7 +142,7 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 	// the following checks are triggered if both serviceCIDR and secondaryServiceCIDR are provided
 	if serviceCIDR != nil && secondaryServiceCIDR != nil {
 		// should have dual stack flag enabled
-		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
 			return nil, false, fmt.Errorf("secondary service cidr is provided and IPv6DualStack feature is not enabled")
 		}
 
@@ -158,7 +157,7 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 	}
 
 	var nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6 int
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
 		// only --node-cidr-mask-size-ipv4 and --node-cidr-mask-size-ipv6 supported with dual stack clusters.
 		// --node-cidr-mask-size flag is incompatible with dual stack clusters.
 		nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6, err = setNodeCIDRMaskSizesDualStack(ctx.ComponentConfig.NodeIPAMController)
@@ -259,7 +258,7 @@ func startRouteController(ctx ControllerContext) (http.Handler, bool, error) {
 	}
 
 	// failure: more than one cidr and dual stack is not enabled
-	if len(clusterCIDRs) > 1 && !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack) {
+	if len(clusterCIDRs) > 1 && !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
 		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and dualstack feature is not enabled", len(clusterCIDRs))
 	}
 
