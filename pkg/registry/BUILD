@@ -73,7 +73,6 @@ filegroup(
         "//pkg/registry/discovery/rest:all-srcs",
         "//pkg/registry/events/event:all-srcs",
         "//pkg/registry/events/rest:all-srcs",
-        "//pkg/registry/extensions/controller/storage:all-srcs",
         "//pkg/registry/extensions/rest:all-srcs",
         "//pkg/registry/flowcontrol/flowschema:all-srcs",
         "//pkg/registry/flowcontrol/prioritylevelconfiguration:all-srcs",
