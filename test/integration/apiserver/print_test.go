@@ -124,16 +124,11 @@ var kindWhiteList = sets.NewString(
 var missingHanlders = sets.NewString(
 	"ClusterRole",
 	"LimitRange",
-	"MutatingWebhookConfiguration",
 	"ResourceQuota",
 	"Role",
-	"ValidatingWebhookConfiguration",
-	"VolumeAttachment",
 	"PriorityClass",
 	"PodPreset",
 	"AuditSink",
-	"CSINode",
-	"CSIDriver",
 	"FlowSchema",                 // TODO(yue9944882): remove this comment by merging print-handler for flow-control API
 	"PriorityLevelConfiguration", // TODO(yue9944882): remove this comment by merging print-handler for flow-control API
 )
