@@ -90,6 +90,7 @@ type TokenFileAuthenticationOptions struct {
 
 type WebHookAuthenticationOptions struct {
 	ConfigFile string
+	Version    string
 	CacheTTL   time.Duration
 }
 
@@ -155,6 +156,7 @@ func (s *BuiltInAuthenticationOptions) WithTokenFile() *BuiltInAuthenticationOpt
 
 func (s *BuiltInAuthenticationOptions) WithWebHook() *BuiltInAuthenticationOptions {
 	s.WebHook = &WebHookAuthenticationOptions{
+		Version:  "v1beta1",
 		CacheTTL: 2 * time.Minute,
 	}
 	return s
@@ -175,7 +177,7 @@ func (s *BuiltInAuthenticationOptions) Validate() []error {
 	}
 	if s.ServiceAccounts != nil && utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) || !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
-			allErrors = append(allErrors, errors.New("If the BoundServiceAccountTokenVolume feature is enabled,"+
+			allErrors = append(allErrors, errors.New("if the BoundServiceAccountTokenVolume feature is enabled,"+
 				" the TokenRequest and TokenRequestProjection features must also be enabled"))
 		}
 		if len(s.ServiceAccounts.Issuer) == 0 {
@@ -303,6 +305,9 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"File with webhook configuration for token authentication in kubeconfig format. "+
 			"The API server will query the remote service to determine authentication for bearer tokens.")
 
+		fs.StringVar(&s.WebHook.Version, "authentication-token-webhook-version", s.WebHook.Version, ""+
+			"The API version of the authentication.k8s.io TokenReview to send to and expect from the webhook.")
+
 		fs.DurationVar(&s.WebHook.CacheTTL, "authentication-token-webhook-cache-ttl", s.WebHook.CacheTTL,
 			"The duration to cache responses from the webhook token authenticator.")
 	}
@@ -370,6 +375,7 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 
 	if s.WebHook != nil {
 		ret.WebhookTokenAuthnConfigFile = s.WebHook.ConfigFile
+		ret.WebhookTokenAuthnVersion = s.WebHook.Version
 		ret.WebhookTokenAuthnCacheTTL = s.WebHook.CacheTTL
 
 		if len(s.WebHook.ConfigFile) > 0 && s.WebHook.CacheTTL > 0 {

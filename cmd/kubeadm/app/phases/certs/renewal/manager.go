@@ -315,6 +315,16 @@ func (rm *Manager) CreateRenewCSR(name, outdir string) error {
 	return nil
 }
 
+// CertificateExists returns true if a certificate exists.
+func (rm *Manager) CertificateExists(name string) (bool, error) {
+	handler, ok := rm.certificates[name]
+	if !ok {
+		return false, errors.Errorf("%s is not a known certificate", name)
+	}
+
+	return handler.readwriter.Exists(), nil
+}
+
 // GetCertificateExpirationInfo returns certificate expiration info.
 // For PKI certificates, use the name defined in the certsphase package, while for certificates
 // embedded in the kubeConfig files, use the kubeConfig file name defined in the kubeadm constants package.
@@ -339,6 +349,16 @@ func (rm *Manager) GetCertificateExpirationInfo(name string) (*ExpirationInfo, e
 
 	// returns the certificate expiration info
 	return newExpirationInfo(name, cert, externallyManaged), nil
+}
+
+// CAExists returns true if a certificate authority exists.
+func (rm *Manager) CAExists(name string) (bool, error) {
+	handler, ok := rm.cas[name]
+	if !ok {
+		return false, errors.Errorf("%s is not a known certificate", name)
+	}
+
+	return handler.readwriter.Exists(), nil
 }
 
 // GetCAExpirationInfo returns CA expiration info.

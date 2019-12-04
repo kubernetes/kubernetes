@@ -23,12 +23,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	"k8s.io/utils/mount"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -37,7 +38,7 @@ import (
 // Construct an instance of a plugin, by name.
 func makePluginUnderTest(t *testing.T, plugName, basePath string) volume.VolumePlugin {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(basePath, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, basePath, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName(plugName)
 	if err != nil {

@@ -28,6 +28,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+
+	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
@@ -269,7 +271,7 @@ func nodePoolsGKE() ([]string, error) {
 		locationParamGKE(),
 		"list",
 		fmt.Sprintf("--cluster=%s", TestContext.CloudConfig.Cluster),
-		`--format="get(name)"`,
+		"--format=get(name)",
 	}
 	stdout, _, err := RunCmd("gcloud", appendContainerCommandGroupIfNeeded(args)...)
 	if err != nil {

@@ -141,8 +141,8 @@ func TestNodePreferAvoidPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(nil, test.nodes)
-			list, err := priorityFunction(CalculateNodePreferAvoidPodsPriorityMap, nil, nil)(test.pod, snapshot, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(nil, test.nodes))
+			list, err := runMapReducePriority(CalculateNodePreferAvoidPodsPriorityMap, nil, nil, test.pod, snapshot, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

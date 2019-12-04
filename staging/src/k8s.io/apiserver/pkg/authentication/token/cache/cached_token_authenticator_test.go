@@ -21,10 +21,12 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	mathrand "math/rand"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -173,21 +175,33 @@ func BenchmarkKeyFunc(b *testing.B) {
 
 func BenchmarkCachedTokenAuthenticator(b *testing.B) {
 	tokenCount := []int{100, 500, 2500, 12500, 62500}
-	for _, tc := range tokenCount {
-		b.Run(fmt.Sprintf("toks-%v", tc), newSingleBenchmark(tc).bench)
+	threadCount := []int{1, 16, 256}
+	for _, tokens := range tokenCount {
+		for _, threads := range threadCount {
+			newSingleBenchmark(tokens, threads).run(b)
+		}
 	}
 }
 
-func newSingleBenchmark(tokenCount int) *singleBenchmark {
-	s := &singleBenchmark{}
-	s.makeTokens(tokenCount)
+func newSingleBenchmark(tokens, threads int) *singleBenchmark {
+	s := &singleBenchmark{
+		threadCount: threads,
+		tokenCount:  tokens,
+	}
+	s.makeTokens()
 	return s
 }
 
 // singleBenchmark collects all the state needed to run a benchmark. The
 // question this benchmark answers is, "what's the average latency added by the
 // cache for N concurrent tokens?"
+//
+// Given the size of the key range constructed by this test, the default go
+// benchtime of 1 second is often inadequate to test caching and expiration
+// behavior. A benchtime of 10 to 30 seconds is adequate to stress these
+// code paths.
 type singleBenchmark struct {
+	threadCount int
 	// These token.* variables are set by makeTokens()
 	tokenCount int
 	// pre-computed response for a token
@@ -196,16 +210,9 @@ type singleBenchmark struct {
 	tokenToAuds map[string]authenticator.Audiences
 	// a list makes it easy to select a random one
 	tokens []string
-
-	// Simulate slowness, qps limit, external service limitation, etc
-	chokepoint chan struct{}
-
-	b  *testing.B
-	wg sync.WaitGroup
 }
 
-func (s *singleBenchmark) makeTokens(count int) {
-	s.tokenCount = count
+func (s *singleBenchmark) makeTokens() {
 	s.tokenToResponse = map[string]*cacheRecord{}
 	s.tokenToAuds = map[string]authenticator.Audiences{}
 	s.tokens = []string{}
@@ -222,17 +229,17 @@ func (s *singleBenchmark) makeTokens(count int) {
 		for i := 0; i < mathrand.Intn(4); i++ {
 			auds = append(auds, string(uuid.NewUUID()))
 		}
-		choice := mathrand.Intn(1000)
+		choice := mathrand.Float64()
 		switch {
-		case choice < 900:
+		case choice < 0.9:
 			r.ok = true
 			r.err = nil
-		case choice < 990:
+		case choice < 0.99:
 			r.ok = false
 			r.err = nil
 		default:
 			r.ok = false
-			r.err = fmt.Errorf("I can't think of a clever error name right now")
+			r.err = errors.New("I can't think of a clever error name right now")
 		}
 		s.tokens = append(s.tokens, tok)
 		s.tokenToResponse[tok] = &r
@@ -243,49 +250,11 @@ func (s *singleBenchmark) makeTokens(count int) {
 }
 
 func (s *singleBenchmark) lookup(ctx context.Context, token string) (*authenticator.Response, bool, error) {
-	<-s.chokepoint
-	defer func() { s.chokepoint <- struct{}{} }()
-	time.Sleep(1 * time.Millisecond)
 	r, ok := s.tokenToResponse[token]
 	if !ok {
 		panic("test setup problem")
 	}
 	return r.resp, r.ok, r.err
-}
-
-// To prevent contention over a channel, and to minimize the case where some
-// goroutines finish before others, vary the number of goroutines and batch
-// size based on the benchmark size.
-func (s *singleBenchmark) queueBatches() (<-chan int, int) {
-	batchSize := 1
-	threads := 1
-
-	switch {
-	case s.b.N < 5000:
-		threads = s.b.N
-		batchSize = 1
-	default:
-		threads = 5000
-		batchSize = s.b.N / (threads * 10)
-		if batchSize < 1 {
-			batchSize = 1
-		}
-	}
-
-	batches := make(chan int, threads*2)
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		defer close(batches)
-		remaining := s.b.N
-		for remaining > batchSize {
-			batches <- batchSize
-			remaining -= batchSize
-		}
-		batches <- remaining
-	}()
-
-	return batches, threads
 }
 
 func (s *singleBenchmark) doAuthForTokenN(n int, a authenticator.Token) {
@@ -296,42 +265,46 @@ func (s *singleBenchmark) doAuthForTokenN(n int, a authenticator.Token) {
 	a.AuthenticateToken(ctx, tok)
 }
 
+func (s *singleBenchmark) run(b *testing.B) {
+	b.Run(fmt.Sprintf("tokens=%d threads=%d", s.tokenCount, s.threadCount), s.bench)
+}
+
 func (s *singleBenchmark) bench(b *testing.B) {
-	s.b = b
+	// Simulate slowness, qps limit, external service limitation, etc
+	const maxInFlight = 40
+	chokepoint := make(chan struct{}, maxInFlight)
+	// lookup count
+	var lookups uint64
+
 	a := newWithClock(
-		authenticator.TokenFunc(s.lookup),
+		authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+			atomic.AddUint64(&lookups, 1)
+
+			chokepoint <- struct{}{}
+			defer func() { <-chokepoint }()
+
+			time.Sleep(1 * time.Millisecond)
+
+			return s.lookup(ctx, token)
+		}),
 		true,
 		4*time.Second,
 		500*time.Millisecond,
 		utilclock.RealClock{},
 	)
-	const maxInFlight = 40
-	s.chokepoint = make(chan struct{}, maxInFlight)
-	for i := 0; i < maxInFlight; i++ {
-		s.chokepoint <- struct{}{}
-	}
 
-	batches, threadCount := s.queueBatches()
-	s.b.ResetTimer()
+	b.ResetTimer()
+	b.SetParallelism(s.threadCount)
+	b.RunParallel(func(pb *testing.PB) {
+		r := mathrand.New(mathrand.NewSource(mathrand.Int63()))
+		for pb.Next() {
+			// some problems appear with random access, some appear with many
+			// requests for a single entry, so we do both.
+			s.doAuthForTokenN(r.Intn(s.tokenCount), a)
+			s.doAuthForTokenN(0, a)
+		}
+	})
+	b.StopTimer()
 
-	for i := 0; i < threadCount; i++ {
-		s.wg.Add(1)
-		go func() {
-			defer s.wg.Done()
-			// don't contend over the lock for the global rand.Rand
-			r := mathrand.New(mathrand.NewSource(mathrand.Int63()))
-			for count := range batches {
-				for i := 0; i < count; i++ {
-					// some problems appear with random
-					// access, some appear with many
-					// requests for a single entry, so we
-					// do both.
-					s.doAuthForTokenN(r.Intn(len(s.tokens)), a)
-					s.doAuthForTokenN(0, a)
-				}
-			}
-		}()
-	}
-
-	s.wg.Wait()
+	b.ReportMetric(float64(lookups)/float64(b.N), "lookups/op")
 }

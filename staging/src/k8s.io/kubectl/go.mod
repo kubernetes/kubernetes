@@ -15,7 +15,7 @@ require (
 	github.com/evanphx/json-patch v4.2.0+incompatible
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
 	github.com/fatih/camelcase v1.0.0
-	github.com/go-openapi/spec v0.19.2
+	github.com/go-openapi/spec v0.19.3
 	github.com/golangplus/bytes v0.0.0-20160111154220-45c989fe5450 // indirect
 	github.com/golangplus/fmt v0.0.0-20150411045040-2a5d6d7d2995 // indirect
 	github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e // indirect
@@ -31,7 +31,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
 	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
 	golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456
 	gopkg.in/yaml.v2 v2.2.4
@@ -44,15 +44,15 @@ require (
 	k8s.io/klog v1.0.0
 	k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a
 	k8s.io/metrics v0.0.0
-	k8s.io/utils v0.0.0-20191030222137-2b95a09bc58d
+	k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
 	sigs.k8s.io/kustomize v2.0.3+incompatible
 	sigs.k8s.io/yaml v1.1.0
 	vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc
 )
 
 replace (
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a
-	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
+	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cli-runtime => ../cli-runtime

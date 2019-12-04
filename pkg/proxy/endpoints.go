@@ -26,13 +26,19 @@ import (
 	"k8s.io/klog"
 
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	utilnet "k8s.io/utils/net"
+)
+
+var supportedEndpointSliceAddressTypes = sets.NewString(
+	string(discovery.AddressTypeIP), // IP is a deprecated address type
+	string(discovery.AddressTypeIPv4),
+	string(discovery.AddressTypeIPv6),
 )
 
 // BaseEndpointInfo contains base information that defines an endpoint.
@@ -42,7 +48,8 @@ import (
 type BaseEndpointInfo struct {
 	Endpoint string // TODO: should be an endpointString type
 	// IsLocal indicates whether the endpoint is running in same host as kube-proxy.
-	IsLocal bool
+	IsLocal  bool
+	Topology map[string]string
 }
 
 var _ Endpoint = &BaseEndpointInfo{}
@@ -55,6 +62,11 @@ func (info *BaseEndpointInfo) String() string {
 // GetIsLocal is part of proxy.Endpoint interface.
 func (info *BaseEndpointInfo) GetIsLocal() bool {
 	return info.IsLocal
+}
+
+// GetTopology returns the topology information of the endpoint.
+func (info *BaseEndpointInfo) GetTopology() map[string]string {
+	return info.Topology
 }
 
 // IP returns just the IP part of the endpoint, it's a part of proxy.Endpoint interface.
@@ -72,10 +84,11 @@ func (info *BaseEndpointInfo) Equal(other Endpoint) bool {
 	return info.String() == other.String() && info.GetIsLocal() == other.GetIsLocal()
 }
 
-func newBaseEndpointInfo(IP string, port int, isLocal bool) *BaseEndpointInfo {
+func newBaseEndpointInfo(IP string, port int, isLocal bool, topology map[string]string) *BaseEndpointInfo {
 	return &BaseEndpointInfo{
 		Endpoint: net.JoinHostPort(IP, strconv.Itoa(port)),
 		IsLocal:  isLocal,
+		Topology: topology,
 	}
 }
 
@@ -173,6 +186,11 @@ func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 // It returns true if items changed, otherwise return false. Will add/update/delete items of EndpointsChangeMap.
 // If removeSlice is true, slice will be removed, otherwise it will be added or updated.
 func (ect *EndpointChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.EndpointSlice, removeSlice bool) bool {
+	if !supportedEndpointSliceAddressTypes.Has(string(endpointSlice.AddressType)) {
+		klog.V(4).Infof("EndpointSlice address type not supported by kube-proxy: %s", endpointSlice.AddressType)
+		return false
+	}
+
 	// This should never happen
 	if endpointSlice == nil {
 		klog.Error("Nil endpointSlice passed to EndpointSliceUpdate")
@@ -347,7 +365,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 					continue
 				}
 				isLocal := addr.NodeName != nil && *addr.NodeName == ect.hostname
-				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal)
+				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal, nil)
 				if ect.makeEndpointInfo != nil {
 					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], ect.makeEndpointInfo(baseEndpointInfo))
 				} else {

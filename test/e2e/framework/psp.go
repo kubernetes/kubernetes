@@ -29,9 +29,11 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
-	"k8s.io/kubernetes/test/e2e/framework/auth"
 
 	"github.com/onsi/ginkgo"
+
+	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
+	"k8s.io/kubernetes/test/e2e/framework/auth"
 )
 
 const (

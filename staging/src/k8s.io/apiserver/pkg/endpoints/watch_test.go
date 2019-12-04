@@ -34,7 +34,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -210,6 +209,48 @@ func TestWatchWebsocketClientClose(t *testing.T) {
 	err = websocket.JSON.Receive(ws, &got)
 	if err == nil {
 		t.Errorf("Unexpected non-error")
+	}
+}
+
+func TestWatchClientClose(t *testing.T) {
+	simpleStorage := &SimpleRESTStorage{}
+	_ = rest.Watcher(simpleStorage) // Give compile error if this doesn't work.
+	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	dest, _ := url.Parse(server.URL)
+	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simples"
+	dest.RawQuery = "watch=1"
+
+	request, err := http.NewRequest("GET", dest.String(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	request.Header.Add("Accept", "application/json")
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if response.StatusCode != http.StatusOK {
+		b, _ := ioutil.ReadAll(response.Body)
+		t.Fatalf("Unexpected response: %#v\n%s", response, string(b))
+	}
+
+	// Close response to cause a cancel on the server
+	if err := response.Body.Close(); err != nil {
+		t.Fatalf("Unexpected close client err: %v", err)
+	}
+
+	select {
+	case data, ok := <-simpleStorage.fakeWatch.ResultChan():
+		if ok {
+			t.Errorf("expected a closed result channel, but got watch result %#v", data)
+		}
+	case <-time.After(5 * time.Second):
+		t.Errorf("watcher did not close when client closed")
 	}
 }
 
@@ -659,38 +700,20 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 		watchServer.ServeHTTP(w, req)
 	}))
 	defer s.Close()
+	defer s.CloseClientConnections()
 
 	client := dynamic.NewForConfigOrDie(&restclient.Config{
 		Host:    s.URL,
 		APIPath: "/" + prefix,
 	}).Resource(newGroupVersion.WithResource("simple"))
 
-	w, err := client.Watch(metav1.ListOptions{})
-	if err != nil {
+	_, err := client.Watch(metav1.ListOptions{})
+	if err == nil {
 		t.Fatal(err)
 	}
-
-	errStatus := errors.NewInternalError(fmt.Errorf("we got an error")).Status()
-	watcher.Error(&errStatus)
-	watcher.Stop()
-
-	got := <-w.ResultChan()
-	if got.Type != watch.Error {
-		t.Fatalf("unexpected watch type: %#v", got)
+	if err.Error() != "no stream serializers registered for testcase/json" {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	obj, ok := got.Object.(*unstructured.Unstructured)
-	if !ok {
-		t.Fatalf("not the correct object type: %#v", got)
-	}
-
-	status := &metav1.Status{}
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), status); err != nil {
-		t.Fatal(err)
-	}
-	if status.Kind != "Status" || status.APIVersion != "v1" || status.Code != 500 || status.Status != "Failure" || !strings.Contains(status.Message, "we got an error") {
-		t.Fatalf("error: %#v", status)
-	}
-	t.Logf("status: %#v", status)
 }
 
 func TestWatchHTTPTimeout(t *testing.T) {

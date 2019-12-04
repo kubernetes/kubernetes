@@ -735,8 +735,9 @@ func TestSingleNode(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, []*v1.Node{test.node})
-			meta := predicates.GetPredicateMetadata(test.pod, snapshot)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, []*v1.Node{test.node}))
+			factory := &predicates.MetadataProducerFactory{}
+			meta := factory.GetPredicateMetadata(test.pod, snapshot)
 			state := framework.NewCycleState()
 			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 
@@ -1435,9 +1436,10 @@ func TestMultipleNodes(t *testing.T) {
 
 	for indexTest, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 			for indexNode, node := range test.nodes {
-				meta := predicates.GetPredicateMetadata(test.pod, snapshot)
+				factory := &predicates.MetadataProducerFactory{}
+				meta := factory.GetPredicateMetadata(test.pod, snapshot)
 				state := framework.NewCycleState()
 				state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 
@@ -1941,13 +1943,13 @@ func TestInterPodAffinityPriority(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			metaDataProducer := priorities.NewPriorityMetadataFactory(
+			metaDataProducer := priorities.NewMetadataFactory(
 				informerFactory.Core().V1().Services().Lister(),
 				informerFactory.Core().V1().ReplicationControllers().Lister(),
 				informerFactory.Apps().V1().ReplicaSets().Lister(),
@@ -2056,13 +2058,13 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			metaDataProducer := priorities.NewPriorityMetadataFactory(
+			metaDataProducer := priorities.NewMetadataFactory(
 				informerFactory.Core().V1().Services().Lister(),
 				informerFactory.Core().V1().ReplicationControllers().Lister(),
 				informerFactory.Apps().V1().ReplicaSets().Lister(),

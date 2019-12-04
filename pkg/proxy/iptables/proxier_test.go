@@ -30,7 +30,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -2350,7 +2350,6 @@ COMMIT
 :KUBE-NODEPORTS - [0:0]
 :KUBE-POSTROUTING - [0:0]
 :KUBE-MARK-MASQ - [0:0]
-:KUBE-MARK-DROP - [0:0]
 :KUBE-SVC-AHZNAGK3SCETOS2T - [0:0]
 :KUBE-SEP-PXD6POUVGD2I37UY - [0:0]
 :KUBE-SEP-SOKZUIT7SCEVIP33 - [0:0]
@@ -2390,7 +2389,6 @@ COMMIT
 		},
 	})
 
-	ipAddressType := discovery.AddressTypeIP
 	tcpProtocol := v1.ProtocolTCP
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2403,7 +2401,7 @@ COMMIT
 			Port:     utilpointer.Int32Ptr(80),
 			Protocol: &tcpProtocol,
 		}},
-		AddressType: &ipAddressType,
+		AddressType: discovery.AddressTypeIPv4,
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"10.0.1.1"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},

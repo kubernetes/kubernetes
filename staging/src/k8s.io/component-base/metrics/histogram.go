@@ -53,7 +53,7 @@ func NewHistogram(opts *HistogramOpts) *Histogram {
 		lazyMetric:    lazyMetric{},
 	}
 	h.setPrometheusHistogram(noopMetric{})
-	h.lazyInit(h)
+	h.lazyInit(h, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return h
 }
 
@@ -104,7 +104,7 @@ func NewHistogramVec(opts *HistogramOpts, labels []string) *HistogramVec {
 		originalLabels: labels,
 		lazyMetric:     lazyMetric{},
 	}
-	v.lazyInit(v)
+	v.lazyInit(v, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return v
 }
 
@@ -165,4 +165,13 @@ func (v *HistogramVec) Delete(labels map[string]string) bool {
 		return false // since we haven't created the metric, we haven't deleted a metric with the passed in values
 	}
 	return v.HistogramVec.Delete(labels)
+}
+
+// Reset deletes all metrics in this vector.
+func (v *HistogramVec) Reset() {
+	if !v.IsCreated() {
+		return
+	}
+
+	v.HistogramVec.Reset()
 }

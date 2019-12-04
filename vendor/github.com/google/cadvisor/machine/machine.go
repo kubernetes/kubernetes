@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
 	// s390/s390x changes
 	"runtime"
 
@@ -49,6 +50,7 @@ var (
 
 const maxFreqFile = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
 const cpuBusPath = "/sys/bus/cpu/devices/"
+const nodePath = "/sys/devices/system/node"
 
 // GetClockSpeed returns the CPU clock speed, given a []byte formatted as the /proc/cpuinfo file.
 func GetClockSpeed(procInfo []byte) (uint64, error) {
@@ -189,6 +191,47 @@ func getNodeIdFromCpuBus(cpuBusPath string, threadId int) (int, error) {
 	}
 
 	return nodeId, nil
+}
+
+// GetHugePagesInfo returns information about pre-allocated huge pages
+// hugepagesDirectory should be top directory of hugepages
+// Such as: /sys/kernel/mm/hugepages/
+func GetHugePagesInfo(hugepagesDirectory string) ([]info.HugePagesInfo, error) {
+	var hugePagesInfo []info.HugePagesInfo
+	files, err := ioutil.ReadDir(hugepagesDirectory)
+	if err != nil {
+		// treat as non-fatal since kernels and machine can be
+		// configured to disable hugepage support
+		return hugePagesInfo, nil
+	}
+	for _, st := range files {
+		nameArray := strings.Split(st.Name(), "-")
+		pageSizeArray := strings.Split(nameArray[1], "kB")
+		pageSize, err := strconv.ParseUint(string(pageSizeArray[0]), 10, 64)
+		if err != nil {
+			return hugePagesInfo, err
+		}
+
+		numFile := hugepagesDirectory + st.Name() + "/nr_hugepages"
+		val, err := ioutil.ReadFile(numFile)
+		if err != nil {
+			return hugePagesInfo, err
+		}
+		var numPages uint64
+		// we use sscanf as the file as a new-line that trips up ParseUint
+		// it returns the number of tokens successfully parsed, so if
+		// n != 1, it means we were unable to parse a number from the file
+		n, err := fmt.Sscanf(string(val), "%d", &numPages)
+		if err != nil || n != 1 {
+			return hugePagesInfo, fmt.Errorf("could not parse file %v contents %q", numFile, string(val))
+		}
+
+		hugePagesInfo = append(hugePagesInfo, info.HugePagesInfo{
+			NumPages: numPages,
+			PageSize: pageSize,
+		})
+	}
+	return hugePagesInfo, nil
 }
 
 func GetTopology(sysFs sysfs.SysFs, cpuinfo string) ([]info.Node, int, error) {
@@ -352,6 +395,15 @@ func addNode(nodes *[]info.Node, id int) (int, error) {
 			}
 			node.Memory = uint64(m)
 		}
+		// Look for per-node hugepages info using node id
+		// Such as: /sys/devices/system/node/node%d/hugepages
+		hugepagesDirectory := fmt.Sprintf("%s/node%d/hugepages/", nodePath, id)
+		hugePagesInfo, err := GetHugePagesInfo(hugepagesDirectory)
+		if err != nil {
+			return -1, err
+		}
+		node.HugePages = hugePagesInfo
+
 		*nodes = append(*nodes, node)
 		idx = len(*nodes) - 1
 	}

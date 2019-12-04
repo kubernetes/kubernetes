@@ -1376,7 +1376,8 @@
     "strategy": {
       "type": "荥ơ'禧ǵŊ)TiD¢ƿ媴h5",
       "rollingUpdate": {
-        
+        "maxUnavailable": 2,
+        "maxSurge": 3
       }
     },
     "minReadySeconds": 212061711,

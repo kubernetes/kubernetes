@@ -33,6 +33,11 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	utilexec "k8s.io/utils/exec"
+	"k8s.io/utils/integer"
+	"k8s.io/utils/mount"
+	utilnet "k8s.io/utils/net"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -108,7 +113,6 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	sysctlwhitelist "k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
 	utilipt "k8s.io/kubernetes/pkg/util/iptables"
-	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/selinux"
@@ -117,9 +121,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
-	utilexec "k8s.io/utils/exec"
-	"k8s.io/utils/integer"
-	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -582,6 +583,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	imageBackOff := flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
 
 	klet.livenessManager = proberesults.NewManager()
+	klet.startupManager = proberesults.NewManager()
 
 	klet.podCache = kubecontainer.NewCache()
 	var checkpointManager checkpointmanager.CheckpointManager
@@ -671,6 +673,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 		klet.livenessManager,
+		klet.startupManager,
 		seccompProfileRoot,
 		containerRefManager,
 		machineInfo,
@@ -777,6 +780,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.probeManager = prober.NewManager(
 		klet.statusManager,
 		klet.livenessManager,
+		klet.startupManager,
 		klet.runner,
 		containerRefManager,
 		kubeDeps.Recorder)
@@ -793,7 +797,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	klet.pluginManager = pluginmanager.NewPluginManager(
 		klet.getPluginsRegistrationDir(), /* sockDir */
-		klet.getPluginsDir(),             /* deprecatedSockDir */
 		kubeDeps.Recorder,
 	)
 
@@ -973,6 +976,7 @@ type Kubelet struct {
 	probeManager prober.Manager
 	// Manages container health check results.
 	livenessManager proberesults.Manager
+	startupManager  proberesults.Manager
 
 	// How long to keep idle streaming command execution/port forwarding
 	// connections open before terminating them

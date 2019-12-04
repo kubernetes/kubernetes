@@ -17,13 +17,11 @@ limitations under the License.
 package v1_test
 
 import (
-	"net/url"
 	"testing"
 	"time"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestMapToLabelSelectorRoundTrip(t *testing.T) {
@@ -75,60 +73,53 @@ func TestConvertSliceStringToDeletionPropagation(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		var dp v1.DeletionPropagation
-		if err := v1.Convert_Slice_string_To_v1_DeletionPropagation(&tc.Input, &dp, nil); err != nil {
-			t.Errorf("Convert_Slice_string_To_v1_DeletionPropagation(%#v): %v", tc.Input, err)
+		var dpPtr *v1.DeletionPropagation
+		if err := v1.Convert_Slice_string_To_Pointer_v1_DeletionPropagation(&tc.Input, &dpPtr, nil); err != nil {
+			t.Errorf("Convert_Slice_string_To_Pointer_v1_DeletionPropagation(%#v): %v", tc.Input, err)
 			continue
 		}
-		if !apiequality.Semantic.DeepEqual(dp, tc.Output) {
-			t.Errorf("slice string to DeletionPropagation conversion failed: got %v; want %v", dp, tc.Output)
+		if !apiequality.Semantic.DeepEqual(dpPtr, &tc.Output) {
+			t.Errorf("slice string to DeletionPropagation conversion failed: got %v; want %v", *dpPtr, tc.Output)
 		}
 	}
 }
 
-func TestUrlValuesToPointerTime(t *testing.T) {
-	scheme := runtime.NewScheme()
-	v1.AddConversionFuncs(scheme)
-
-	type testType struct {
-		Time *v1.Time `json:"time"`
-	}
-
+func TestConvertSliceStringToPointerTime(t *testing.T) {
 	t1 := v1.Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC)
 	t1String := t1.Format(time.RFC3339)
 	t2 := v1.Date(2000, time.June, 6, 6, 6, 6, 0, time.UTC)
 	t2String := t2.Format(time.RFC3339)
 
 	tcs := []struct {
-		Input  url.Values
+		Input  []string
 		Output *v1.Time
 	}{
 		{
-			Input:  url.Values{},
-			Output: nil,
-		},
-		{
-			Input:  url.Values{"time": []string{}},
+			Input:  []string{},
 			Output: &v1.Time{},
 		},
 		{
-			Input:  url.Values{"time": []string{""}},
+			Input:  []string{""},
 			Output: &v1.Time{},
 		},
 		{
-			Input:  url.Values{"time": []string{t1String, t2String}},
+			Input:  []string{t1String},
+			Output: &t1,
+		},
+		{
+			Input:  []string{t1String, t2String},
 			Output: &t1,
 		},
 	}
 
 	for _, tc := range tcs {
-		result := &testType{}
-		if err := scheme.Convert(&tc.Input, &result, nil); err != nil {
-			t.Errorf("Failed to convert []string to *metav1.Time %#v: %v", tc.Input, err)
+		var timePtr *v1.Time
+		if err := v1.Convert_Slice_string_To_Pointer_v1_Time(&tc.Input, &timePtr, nil); err != nil {
+			t.Errorf("Convert_Slice_string_To_Pointer_v1_Time(%#v): %v", tc.Input, err)
 			continue
 		}
-		if !apiequality.Semantic.DeepEqual(result.Time, tc.Output) {
-			t.Errorf("Unexpected output: %v, expected: %v", result.Time, tc.Output)
+		if !apiequality.Semantic.DeepEqual(timePtr, tc.Output) {
+			t.Errorf("slice string to *v1.Time conversion failed: got %#v; want %#v", timePtr, tc.Output)
 		}
 	}
 }

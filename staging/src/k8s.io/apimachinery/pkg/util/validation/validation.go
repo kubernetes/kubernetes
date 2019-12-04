@@ -309,6 +309,26 @@ func IsValidIP(value string) []string {
 	return nil
 }
 
+// IsValidIPv4Address tests that the argument is a valid IPv4 address.
+func IsValidIPv4Address(fldPath *field.Path, value string) field.ErrorList {
+	var allErrors field.ErrorList
+	ip := net.ParseIP(value)
+	if ip == nil || ip.To4() == nil {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv4 address"))
+	}
+	return allErrors
+}
+
+// IsValidIPv6Address tests that the argument is a valid IPv6 address.
+func IsValidIPv6Address(fldPath *field.Path, value string) field.ErrorList {
+	var allErrors field.ErrorList
+	ip := net.ParseIP(value)
+	if ip == nil || ip.To4() != nil {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv6 address"))
+	}
+	return allErrors
+}
+
 const percentFmt string = "[0-9]+%"
 const percentErrMsg string = "a valid percent string must be a numeric string followed by an ending '%'"
 

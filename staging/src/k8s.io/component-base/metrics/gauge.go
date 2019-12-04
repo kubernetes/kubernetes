@@ -43,7 +43,7 @@ func NewGauge(opts *GaugeOpts) *Gauge {
 		lazyMetric: lazyMetric{},
 	}
 	kc.setPrometheusGauge(noop)
-	kc.lazyInit(kc)
+	kc.lazyInit(kc, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return kc
 }
 
@@ -94,7 +94,7 @@ func NewGaugeVec(opts *GaugeOpts, labels []string) *GaugeVec {
 		originalLabels: labels,
 		lazyMetric:     lazyMetric{},
 	}
-	cv.lazyInit(cv)
+	cv.lazyInit(cv, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return cv
 }
 
@@ -159,6 +159,15 @@ func (v *GaugeVec) Delete(labels map[string]string) bool {
 		return false // since we haven't created the metric, we haven't deleted a metric with the passed in values
 	}
 	return v.GaugeVec.Delete(labels)
+}
+
+// Reset deletes all metrics in this vector.
+func (v *GaugeVec) Reset() {
+	if !v.IsCreated() {
+		return
+	}
+
+	v.GaugeVec.Reset()
 }
 
 func newGaugeFunc(opts GaugeOpts, function func() float64, v semver.Version) GaugeFunc {

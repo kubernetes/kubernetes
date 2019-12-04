@@ -22,7 +22,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
@@ -38,10 +37,10 @@ type Result struct {
 // LogResult records result log
 func LogResult(result Result) {
 	remote := result.Host
-	e2elog.Logf("exec %s: command:   %s", remote, result.Cmd)
-	e2elog.Logf("exec %s: stdout:    %q", remote, result.Stdout)
-	e2elog.Logf("exec %s: stderr:    %q", remote, result.Stderr)
-	e2elog.Logf("exec %s: exit code: %d", remote, result.Code)
+	framework.Logf("exec %s: command:   %s", remote, result.Cmd)
+	framework.Logf("exec %s: stdout:    %q", remote, result.Stdout)
+	framework.Logf("exec %s: stderr:    %q", remote, result.Stderr)
+	framework.Logf("exec %s: exit code: %d", remote, result.Code)
 }
 
 // HostExec represents interface we require to execute commands on remote host.

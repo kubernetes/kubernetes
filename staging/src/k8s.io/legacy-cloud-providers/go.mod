@@ -18,11 +18,10 @@ require (
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c
 	github.com/satori/go.uuid v1.2.0 // indirect
-	github.com/stretchr/testify v1.3.0
-	github.com/vmware/govmomi v0.20.1
+	github.com/stretchr/testify v1.4.0
+	github.com/vmware/govmomi v0.20.3
 	golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
-	golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456
 	google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/warnings.v0 v0.1.1 // indirect
@@ -34,13 +33,13 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/csi-translation-lib v0.0.0
 	k8s.io/klog v1.0.0
-	k8s.io/utils v0.0.0-20191030222137-2b95a09bc58d
+	k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
 	sigs.k8s.io/yaml v1.1.0
 )
 
 replace (
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a
-	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
+	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

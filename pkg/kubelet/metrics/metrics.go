@@ -499,7 +499,7 @@ var (
 var registerMetrics sync.Once
 
 // Register registers all metrics.
-func Register(containerCache kubecontainer.RuntimeCache, collectors ...metrics.Collector) {
+func Register(containerCache kubecontainer.RuntimeCache, collectors ...metrics.StableCollector) {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(NodeName)
@@ -540,9 +540,14 @@ func Register(containerCache kubecontainer.RuntimeCache, collectors ...metrics.C
 			legacyregistry.MustRegister(ConfigError)
 		}
 		for _, collector := range collectors {
-			legacyregistry.RawMustRegister(collector)
+			legacyregistry.CustomMustRegister(collector)
 		}
 	})
+}
+
+// GetGather returns the gatherer. It used by test case outside current package.
+func GetGather() metrics.Gatherer {
+	return legacyregistry.DefaultGatherer
 }
 
 // SinceInMicroseconds gets the time since the specified start in microseconds.

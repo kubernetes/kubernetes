@@ -105,13 +105,12 @@ func TestSkipPodUpdate(t *testing.T) {
 	}
 	for _, test := range table {
 		t.Run(test.name, func(t *testing.T) {
-			c := NewFromConfig(&Config{
+			c := &Scheduler{
 				SchedulerCache: &fakecache.Cache{
 					IsAssumedPodFunc: test.isAssumedPodFunc,
 					GetPodFunc:       test.getPodFunc,
 				},
-			},
-			)
+			}
 			got := c.skipPodUpdate(test.pod)
 			if got != test.expected {
 				t.Errorf("skipPodUpdate() = %t, expected = %t", got, test.expected)

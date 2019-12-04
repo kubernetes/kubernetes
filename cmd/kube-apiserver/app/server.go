@@ -48,6 +48,7 @@ import (
 	serveroptions "k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
+	"k8s.io/apiserver/pkg/util/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/term"
 	"k8s.io/apiserver/pkg/util/webhook"
@@ -57,6 +58,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
+	"k8s.io/component-base/metrics"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue" // for workqueue metric registration
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
@@ -298,6 +300,10 @@ func CreateKubeAPIServerConfig(
 		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
 	})
 
+	if len(s.ShowHiddenMetricsForVersion) > 0 {
+		metrics.SetShowHidden()
+	}
+
 	serviceIPRange, apiServerServiceIP, err := master.ServiceIPRange(s.PrimaryServiceClusterIPRange)
 	if err != nil {
 		return nil, nil, nil, nil, err
@@ -511,6 +517,7 @@ func buildGenericConfig(
 		genericConfig,
 		versionedInformers,
 		kubeClientConfig,
+		feature.DefaultFeatureGate,
 		pluginInitializers...)
 	if err != nil {
 		lastErr = fmt.Errorf("failed to initialize admission: %v", err)

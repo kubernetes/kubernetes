@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/mount"
 )
 
 // FileType enumerates the known set of possible file types.

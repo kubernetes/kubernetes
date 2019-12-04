@@ -40,7 +40,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	   Description: A Pod is created with projected volume source ‘ConfigMap’ to store a configMap with default permission mode. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -rw-r—-r—-.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func() {
-		doProjectedConfigMapE2EWithoutMappings(f, 0, 0, nil)
+		doProjectedConfigMapE2EWithoutMappings(f, false, 0, nil)
 	})
 
 	/*
@@ -51,30 +51,29 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func() {
 		defaultMode := int32(0400)
-		doProjectedConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
+		doProjectedConfigMapE2EWithoutMappings(f, false, 0, &defaultMode)
 	})
 
 	ginkgo.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeFeature:FSGroup]", func() {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
 		framework.SkipIfNodeOSDistroIs("windows")
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
-		doProjectedConfigMapE2EWithoutMappings(f, 1000, 1001, &defaultMode)
+		doProjectedConfigMapE2EWithoutMappings(f, true, 1001, &defaultMode)
 	})
 
 	/*
 	   Release : v1.9
 	   Testname: Projected Volume, ConfigMap, non-root user
 	   Description: A Pod is created with projected volume source ‘ConfigMap’ to store a configMap as non-root user with uid 1000. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -rw—r——r—-.
-	   This test is marked LinuxOnly since Windows does not support running as UID / GID.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume as non-root [LinuxOnly] [NodeConformance]", func() {
-		doProjectedConfigMapE2EWithoutMappings(f, 1000, 0, nil)
+	framework.ConformanceIt("should be consumable from pods in volume as non-root [NodeConformance]", func() {
+		doProjectedConfigMapE2EWithoutMappings(f, true, 0, nil)
 	})
 
 	ginkgo.It("should be consumable from pods in volume as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]", func() {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		framework.SkipIfNodeOSDistroIs("windows")
-		doProjectedConfigMapE2EWithoutMappings(f, 1000, 1001, nil)
+		doProjectedConfigMapE2EWithoutMappings(f, true, 1001, nil)
 	})
 
 	/*
@@ -83,7 +82,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	   Description: A Pod is created with projected volume source ‘ConfigMap’ to store a configMap with default permission mode. The ConfigMap is also mapped to a custom path. Pod MUST be able to read the content of the ConfigMap from the custom location successfully and the mode on the volume MUST be -rw—r——r—-.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func() {
-		doProjectedConfigMapE2EWithMappings(f, 0, 0, nil)
+		doProjectedConfigMapE2EWithMappings(f, false, 0, nil)
 	})
 
 	/*
@@ -94,23 +93,22 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [LinuxOnly] [NodeConformance]", func() {
 		mode := int32(0400)
-		doProjectedConfigMapE2EWithMappings(f, 0, 0, &mode)
+		doProjectedConfigMapE2EWithMappings(f, false, 0, &mode)
 	})
 
 	/*
 	   Release : v1.9
 	   Testname: Projected Volume, ConfigMap, mapped, non-root user
 	   Description: A Pod is created with projected volume source ‘ConfigMap’ to store a configMap as non-root user with uid 1000. The ConfigMap is also mapped to a custom path. Pod MUST be able to read the content of the ConfigMap from the custom location successfully and the mode on the volume MUST be -r-—r——r—-.
-	   This test is marked LinuxOnly since Windows does not support running as UID / GID.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [LinuxOnly] [NodeConformance]", func() {
-		doProjectedConfigMapE2EWithMappings(f, 1000, 0, nil)
+	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [NodeConformance]", func() {
+		doProjectedConfigMapE2EWithMappings(f, true, 0, nil)
 	})
 
 	ginkgo.It("should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]", func() {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		framework.SkipIfNodeOSDistroIs("windows")
-		doProjectedConfigMapE2EWithMappings(f, 1000, 1001, nil)
+		doProjectedConfigMapE2EWithMappings(f, true, 1001, nil)
 	})
 
 	/*
@@ -513,8 +511,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	})
 })
 
-func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, defaultMode *int32) {
-	userID := int64(uid)
+func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, asUser bool, fsGroup int64, defaultMode *int32) {
 	groupID := int64(fsGroup)
 
 	var (
@@ -573,8 +570,8 @@ func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup
 		},
 	}
 
-	if userID != 0 {
-		pod.Spec.SecurityContext.RunAsUser = &userID
+	if asUser {
+		setPodNonRootUser(pod)
 	}
 
 	if groupID != 0 {
@@ -594,8 +591,7 @@ func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup
 	f.TestContainerOutputRegexp("consume configMaps", pod, 0, output)
 }
 
-func doProjectedConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, itemMode *int32) {
-	userID := int64(uid)
+func doProjectedConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fsGroup int64, itemMode *int32) {
 	groupID := int64(fsGroup)
 
 	var (
@@ -661,8 +657,8 @@ func doProjectedConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup in
 		},
 	}
 
-	if userID != 0 {
-		pod.Spec.SecurityContext.RunAsUser = &userID
+	if asUser {
+		setPodNonRootUser(pod)
 	}
 
 	if groupID != 0 {

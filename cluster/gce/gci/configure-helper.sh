@@ -1245,6 +1245,12 @@ current-context: service-account-context
 EOF
 }
 
+function create-node-problem-detector-kubeconfig-from-kubelet {
+  echo "Creating node-problem-detector kubeconfig from /var/lib/kubelet/kubeconfig"
+  mkdir -p /var/lib/node-problem-detector
+  cp /var/lib/kubelet/kubeconfig /var/lib/node-problem-detector/kubeconfig
+}
+
 function create-master-etcd-auth {
   if [[ -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
     local -r auth_dir="/etc/srv/kubernetes"
@@ -2076,6 +2082,45 @@ function start-fluentd-resource-update {
   wait-for-apiserver-and-update-fluentd &
 }
 
+# VolumeSnapshot CRDs and controller are installed by cluster addon manager,
+# which may not be available at this point. Run this as a background process.
+function wait-for-volumesnapshot-crd-and-controller {
+  # Wait until volumesnapshot CRDs and controller are in place.
+  echo "Wait until volume snapshot CRDs are installed"
+  until kubectl get volumesnapshotclasses.snapshot.storage.k8s.io
+  do
+    sleep 10
+  done
+
+  until kubectl get volumesnapshotcontents.snapshot.storage.k8s.io
+  do
+    sleep 10
+  done
+
+  until kubectl get volumesnapshots.snapshot.storage.k8s.io
+  do
+    sleep 10
+  done
+
+  echo "Wait until volume snapshot RBAC rules are installed"
+  until kubectl get clusterrolebinding volume-snapshot-controller-role
+  do
+    sleep 10
+  done
+
+  echo "Wait until volume snapshot controller is installed"
+  until kubectl get statefulset volume-snapshot-controller | grep volume-snapshot-controller | grep "1/1"
+  do
+    sleep 10
+  done
+}
+
+# Trigger background process that will wait for volumesnapshot CRDs
+# and snapshot-controller to be installed
+function start-volumesnapshot-crd-and-controller {
+  wait-for-volumesnapshot-crd-and-controller &
+}
+
 # Update {{ fluentd_container_runtime_service }} with actual container runtime name,
 # and {{ container_runtime_endpoint }} with actual container runtime
 # endpoint.
@@ -2425,8 +2470,11 @@ EOF
     setup-addon-manifests "addons" "node-problem-detector"
   fi
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-    # Setup role binding for standalone node problem detector.
-    setup-addon-manifests "addons" "node-problem-detector/standalone" "node-problem-detector"
+    # Setup role binding(s) for standalone node problem detector.
+    if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
+      setup-addon-manifests "addons" "node-problem-detector/standalone"
+    fi
+    setup-addon-manifests "addons" "node-problem-detector/kubelet-user-standalone" "node-problem-detector"
   fi
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
     setup-addon-manifests "admission-controls" "limit-range" "gce"
@@ -2443,6 +2491,11 @@ EOF
   fi
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
+  fi
+  if [[ "${ENABLE_VOLUME_SNAPSHOTS:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "volumesnapshots/crd"
+    setup-addon-manifests "addons" "volumesnapshots/volume-snapshot-controller"
+    start-volumesnapshot-crd-and-controller
   fi
   if [[ "${ENABLE_IP_MASQ_AGENT:-}" == "true" ]]; then
     setup-addon-manifests "addons" "ip-masq-agent"
@@ -2781,7 +2834,14 @@ function main() {
       create-kubeproxy-user-kubeconfig
     fi
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-      create-node-problem-detector-kubeconfig ${KUBERNETES_MASTER_NAME}
+      if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
+        create-node-problem-detector-kubeconfig ${KUBERNETES_MASTER_NAME}
+      elif [[ -f "/var/lib/kubelet/kubeconfig" ]]; then
+        create-node-problem-detector-kubeconfig-from-kubelet
+      else
+        echo "Either NODE_PROBLEM_DETECTOR_TOKEN or /var/lib/kubelet/kubeconfig must be set"
+        exit 1
+      fi
     fi
   fi
 

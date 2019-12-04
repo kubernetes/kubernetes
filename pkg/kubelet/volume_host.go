@@ -22,6 +22,8 @@ import (
 	"runtime"
 
 	"k8s.io/klog"
+	utilexec "k8s.io/utils/exec"
+	"k8s.io/utils/mount"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -38,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/token"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -86,7 +87,7 @@ func NewInitializedVolumePluginMgr(
 		informerFactory:  informerFactory,
 		csiDriverLister:  csiDriverLister,
 		csiDriversSynced: csiDriversSynced,
-		exec:             mount.NewOSExec(),
+		exec:             utilexec.New(),
 	}
 
 	if err := kvh.volumePluginMgr.InitPlugins(plugins, prober, kvh); err != nil {
@@ -115,7 +116,7 @@ type kubeletVolumeHost struct {
 	informerFactory  informers.SharedInformerFactory
 	csiDriverLister  storagelisters.CSIDriverLister
 	csiDriversSynced cache.InformerSynced
-	exec             mount.Exec
+	exec             utilexec.Interface
 }
 
 func (kvh *kubeletVolumeHost) SetKubeletError(err error) {
@@ -271,6 +272,6 @@ func (kvh *kubeletVolumeHost) GetEventRecorder() record.EventRecorder {
 	return kvh.kubelet.recorder
 }
 
-func (kvh *kubeletVolumeHost) GetExec(pluginName string) mount.Exec {
+func (kvh *kubeletVolumeHost) GetExec(pluginName string) utilexec.Interface {
 	return kvh.exec
 }

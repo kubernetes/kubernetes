@@ -18,6 +18,7 @@ package v1
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -25,67 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
-
-func AddConversionFuncs(scheme *runtime.Scheme) error {
-	return scheme.AddConversionFuncs(
-		Convert_v1_TypeMeta_To_v1_TypeMeta,
-
-		Convert_v1_ListMeta_To_v1_ListMeta,
-
-		Convert_v1_DeleteOptions_To_v1_DeleteOptions,
-
-		Convert_intstr_IntOrString_To_intstr_IntOrString,
-		Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString,
-		Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString,
-
-		Convert_Pointer_v1_Duration_To_v1_Duration,
-		Convert_v1_Duration_To_Pointer_v1_Duration,
-
-		Convert_Slice_string_To_v1_Time,
-		Convert_Slice_string_To_Pointer_v1_Time,
-
-		Convert_v1_Time_To_v1_Time,
-		Convert_v1_MicroTime_To_v1_MicroTime,
-
-		Convert_resource_Quantity_To_resource_Quantity,
-
-		Convert_string_To_labels_Selector,
-		Convert_labels_Selector_To_string,
-
-		Convert_string_To_fields_Selector,
-		Convert_fields_Selector_To_string,
-
-		Convert_Pointer_bool_To_bool,
-		Convert_bool_To_Pointer_bool,
-
-		Convert_Pointer_string_To_string,
-		Convert_string_To_Pointer_string,
-
-		Convert_Pointer_int64_To_int,
-		Convert_int_To_Pointer_int64,
-
-		Convert_Pointer_int32_To_int32,
-		Convert_int32_To_Pointer_int32,
-
-		Convert_Pointer_int64_To_int64,
-		Convert_int64_To_Pointer_int64,
-
-		Convert_Pointer_float64_To_float64,
-		Convert_float64_To_Pointer_float64,
-
-		Convert_Map_string_To_string_To_v1_LabelSelector,
-		Convert_v1_LabelSelector_To_Map_string_To_string,
-
-		Convert_Slice_string_To_Slice_int32,
-
-		Convert_Slice_string_To_v1_DeletionPropagation,
-
-		Convert_Slice_string_To_v1_IncludeObjectPolicy,
-	)
-}
 
 func Convert_Pointer_float64_To_float64(in **float64, out *float64, s conversion.Scope) error {
 	if *in == nil {
@@ -352,13 +295,16 @@ func Convert_Slice_string_To_Slice_int32(in *[]string, out *[]int32, s conversio
 	return nil
 }
 
-// Convert_Slice_string_To_v1_DeletionPropagation allows converting a URL query parameter propagationPolicy
-func Convert_Slice_string_To_v1_DeletionPropagation(in *[]string, out *DeletionPropagation, s conversion.Scope) error {
+// Convert_Slice_string_To_Pointer_v1_DeletionPropagation allows converting a URL query parameter propagationPolicy
+func Convert_Slice_string_To_Pointer_v1_DeletionPropagation(in *[]string, out **DeletionPropagation, s conversion.Scope) error {
+	var str string
 	if len(*in) > 0 {
-		*out = DeletionPropagation((*in)[0])
+		str = (*in)[0]
 	} else {
-		*out = ""
+		str = ""
 	}
+	temp := DeletionPropagation(str)
+	*out = &temp
 	return nil
 }
 
@@ -366,6 +312,36 @@ func Convert_Slice_string_To_v1_DeletionPropagation(in *[]string, out *DeletionP
 func Convert_Slice_string_To_v1_IncludeObjectPolicy(in *[]string, out *IncludeObjectPolicy, s conversion.Scope) error {
 	if len(*in) > 0 {
 		*out = IncludeObjectPolicy((*in)[0])
+	}
+	return nil
+}
+
+// Convert_url_Values_To_v1_DeleteOptions allows converting a URL to DeleteOptions.
+func Convert_url_Values_To_v1_DeleteOptions(in *url.Values, out *DeleteOptions, s conversion.Scope) error {
+	if err := autoConvert_url_Values_To_v1_DeleteOptions(in, out, s); err != nil {
+		return err
+	}
+
+	uid := types.UID("")
+	if values, ok := (*in)["uid"]; ok && len(values) > 0 {
+		uid = types.UID(values[0])
+	}
+
+	resourceVersion := ""
+	if values, ok := (*in)["resourceVersion"]; ok && len(values) > 0 {
+		resourceVersion = values[0]
+	}
+
+	if len(uid) > 0 || len(resourceVersion) > 0 {
+		if out.Preconditions == nil {
+			out.Preconditions = &Preconditions{}
+		}
+		if len(uid) > 0 {
+			out.Preconditions.UID = &uid
+		}
+		if len(resourceVersion) > 0 {
+			out.Preconditions.ResourceVersion = &resourceVersion
+		}
 	}
 	return nil
 }

@@ -57,15 +57,15 @@ var (
 	order         = []string{"false", "true", "matches", "nopods", algorithmpredicates.MatchInterPodAffinityPred}
 )
 
-func falsePredicate(pod *v1.Pod, meta algorithmpredicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithmpredicates.PredicateFailureReason, error) {
+func falsePredicate(pod *v1.Pod, meta algorithmpredicates.Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithmpredicates.PredicateFailureReason, error) {
 	return false, []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
 }
 
-func truePredicate(pod *v1.Pod, meta algorithmpredicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithmpredicates.PredicateFailureReason, error) {
+func truePredicate(pod *v1.Pod, meta algorithmpredicates.Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithmpredicates.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
-func matchesPredicate(pod *v1.Pod, meta algorithmpredicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithmpredicates.PredicateFailureReason, error) {
+func matchesPredicate(pod *v1.Pod, meta algorithmpredicates.Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithmpredicates.PredicateFailureReason, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
@@ -76,7 +76,7 @@ func matchesPredicate(pod *v1.Pod, meta algorithmpredicates.PredicateMetadata, n
 	return false, []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
 }
 
-func hasNoPodsPredicate(pod *v1.Pod, meta algorithmpredicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithmpredicates.PredicateFailureReason, error) {
+func hasNoPodsPredicate(pod *v1.Pod, meta algorithmpredicates.Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithmpredicates.PredicateFailureReason, error) {
 	if len(nodeInfo.Pods()) == 0 {
 		return true, nil, nil
 	}
@@ -655,17 +655,18 @@ func TestGenericScheduler(t *testing.T) {
 
 			pvcLister := fakelisters.PersistentVolumeClaimLister(pvcs)
 
-			predMetaProducer := algorithmpredicates.EmptyPredicateMetadataProducer
+			predMetaProducer := algorithmpredicates.EmptyMetadataProducer
 			if test.buildPredMeta {
-				predMetaProducer = algorithmpredicates.GetPredicateMetadata
+				f := &algorithmpredicates.MetadataProducerFactory{}
+				predMetaProducer = f.GetPredicateMetadata
 			}
 			scheduler := NewGenericScheduler(
 				cache,
-				internalqueue.NewSchedulingQueue(nil, nil),
+				internalqueue.NewSchedulingQueue(nil),
 				test.predicates,
 				predMetaProducer,
 				test.prioritizers,
-				priorities.EmptyPriorityMetadataProducer,
+				priorities.EmptyMetadataProducer,
 				emptySnapshot,
 				filterFramework,
 				[]algorithm.SchedulerExtender{},
@@ -701,11 +702,11 @@ func makeScheduler(predicates map[string]algorithmpredicates.FitPredicate, nodes
 
 	s := NewGenericScheduler(
 		cache,
-		internalqueue.NewSchedulingQueue(nil, nil),
+		internalqueue.NewSchedulingQueue(nil),
 		predicates,
-		algorithmpredicates.EmptyPredicateMetadataProducer,
+		algorithmpredicates.EmptyMetadataProducer,
 		nil,
-		priorities.EmptyPriorityMetadataProducer,
+		priorities.EmptyMetadataProducer,
 		emptySnapshot,
 		emptyFramework,
 		nil, nil, nil, nil, false, false,
@@ -782,7 +783,7 @@ type predicateCallCounter struct {
 }
 
 func (c *predicateCallCounter) truePredicate() algorithmpredicates.FitPredicate {
-	return func(pod *v1.Pod, meta algorithmpredicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithmpredicates.PredicateFailureReason, error) {
+	return func(pod *v1.Pod, meta algorithmpredicates.Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []algorithmpredicates.PredicateFailureReason, error) {
 		c.count++
 		return truePredicate(pod, meta, nodeInfo)
 	}
@@ -818,14 +819,14 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			cache.AddNode(n)
 		}
 
-		queue := internalqueue.NewSchedulingQueue(nil, nil)
+		queue := internalqueue.NewSchedulingQueue(nil)
 		scheduler := NewGenericScheduler(
 			cache,
 			queue,
 			predicates,
-			algorithmpredicates.EmptyPredicateMetadataProducer,
+			algorithmpredicates.EmptyMetadataProducer,
 			nil,
-			priorities.EmptyPriorityMetadataProducer,
+			priorities.EmptyMetadataProducer,
 			emptySnapshot,
 			emptyFramework,
 			nil, nil, nil, nil, false, false,
@@ -995,9 +996,9 @@ func TestZeroRequest(t *testing.T) {
 			pc := priorities.PriorityConfig{Map: selectorSpreadPriorityMap, Reduce: selectorSpreadPriorityReduce, Weight: 1}
 			priorityConfigs = append(priorityConfigs, pc)
 
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 
-			metaDataProducer := priorities.NewPriorityMetadataFactory(
+			metaDataProducer := priorities.NewMetadataFactory(
 				informerFactory.Core().V1().Services().Lister(),
 				informerFactory.Core().V1().ReplicationControllers().Lister(),
 				informerFactory.Apps().V1().ReplicaSets().Lister(),
@@ -1407,14 +1408,15 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				cache.AddNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"hostname": name}}})
 			}
 
+			factory := &algorithmpredicates.MetadataProducerFactory{}
 			filterPlugin.failedNodeReturnCodeMap = filterFailedNodeReturnCodeMap
 			scheduler := NewGenericScheduler(
 				nil,
-				internalqueue.NewSchedulingQueue(nil, nil),
+				internalqueue.NewSchedulingQueue(nil),
 				test.predicates,
-				algorithmpredicates.GetPredicateMetadata,
+				factory.GetPredicateMetadata,
 				nil,
-				priorities.EmptyPriorityMetadataProducer,
+				priorities.EmptyMetadataProducer,
 				emptySnapshot,
 				filterFramework,
 				[]algorithm.SchedulerExtender{},
@@ -1447,7 +1449,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				test.predicates[algorithmpredicates.MatchInterPodAffinityPred] = algorithmpredicates.NewPodAffinityPredicate(n, p)
 			}
 
-			g.nodeInfoSnapshot = nodeinfosnapshot.NewSnapshot(test.pods, nodes)
+			g.nodeInfoSnapshot = nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
 			// newnode simulate a case that a new node is added to the cluster, but nodeNameToInfo
 			// doesn't have it yet.
 			newnode := makeNode("newnode", 1000*5, priorityutil.DefaultMemoryRequest*5)
@@ -1667,18 +1669,19 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodes := []*v1.Node{}
+			var nodes []*v1.Node
 			for _, n := range test.nodes {
 				nodes = append(nodes, makeNode(n, priorityutil.DefaultMilliCPURequest*5, priorityutil.DefaultMemoryRequest*5))
 			}
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
 			fwk, _ := framework.NewFramework(emptyPluginRegistry, nil, []schedulerapi.PluginConfig{}, framework.WithSnapshotSharedLister(snapshot))
 
+			factory := algorithmpredicates.MetadataProducerFactory{}
 			g := &genericScheduler{
 				framework:             fwk,
 				nodeInfoSnapshot:      snapshot,
 				predicates:            test.predicates,
-				predicateMetaProducer: algorithmpredicates.GetPredicateMetadata,
+				predicateMetaProducer: factory.GetPredicateMetadata,
 			}
 			assignDefaultStartTime(test.pods)
 
@@ -1827,7 +1830,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				FailedPredicates:      test.failedPredMap,
 				FilteredNodesStatuses: test.nodesStatuses,
 			}
-			nodes := nodesWherePreemptionMightHelp(schedulernodeinfo.CreateNodeNameToInfoMap(nil, makeNodeList(nodeNames)), &fitErr)
+			nodes := nodesWherePreemptionMightHelp(nodeinfosnapshot.CreateNodeInfoMap(nil, makeNodeList(nodeNames)), &fitErr)
 			if len(test.expected) != len(nodes) {
 				t.Errorf("number of nodes is not the same as expected. exptectd: %d, got: %d. Nodes: %v", len(test.expected), len(nodes), nodes)
 			}
@@ -2150,17 +2153,18 @@ func TestPreempt(t *testing.T) {
 			if test.predicate != nil {
 				predicate = test.predicate
 			}
-			predMetaProducer := algorithmpredicates.EmptyPredicateMetadataProducer
+			predMetaProducer := algorithmpredicates.EmptyMetadataProducer
 			if test.buildPredMeta {
-				predMetaProducer = algorithmpredicates.GetPredicateMetadata
+				f := &algorithmpredicates.MetadataProducerFactory{}
+				predMetaProducer = f.GetPredicateMetadata
 			}
 			scheduler := NewGenericScheduler(
 				cache,
-				internalqueue.NewSchedulingQueue(nil, nil),
+				internalqueue.NewSchedulingQueue(nil),
 				map[string]algorithmpredicates.FitPredicate{"matches": predicate},
 				predMetaProducer,
 				[]priorities.PriorityConfig{{Map: numericMapPriority, Weight: 1}},
-				priorities.EmptyPriorityMetadataProducer,
+				priorities.EmptyMetadataProducer,
 				emptySnapshot,
 				emptyFramework,
 				extenders,
@@ -2172,7 +2176,7 @@ func TestPreempt(t *testing.T) {
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				true)
 			state := framework.NewCycleState()
-			scheduler.(*genericScheduler).snapshot()
+			scheduler.Snapshot()
 			// Call Preempt and check the expected results.
 			failedPredMap := defaultFailedPredMap
 			if test.failedPredMap != nil {
@@ -2279,6 +2283,35 @@ func assignDefaultStartTime(pods []*v1.Pod) {
 		pod := pods[i]
 		if pod.Status.StartTime == nil {
 			pod.Status.StartTime = &now
+		}
+	}
+}
+
+func TestFairEvaluationForNodes(t *testing.T) {
+	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
+	predicates := map[string]algorithmpredicates.FitPredicate{"true": truePredicate}
+	numAllNodes := 500
+	nodeNames := make([]string, 0, numAllNodes)
+	for i := 0; i < numAllNodes; i++ {
+		nodeNames = append(nodeNames, strconv.Itoa(i))
+	}
+	nodes := makeNodeList(nodeNames)
+	g := makeScheduler(predicates, nodes)
+	// To make numAllNodes % nodesToFind != 0
+	g.percentageOfNodesToScore = 30
+	nodesToFind := int(g.numFeasibleNodesToFind(int32(numAllNodes)))
+
+	// Iterating over all nodes more than twice
+	for i := 0; i < 2*(numAllNodes/nodesToFind+1); i++ {
+		nodesThatFit, _, _, err := g.findNodesThatFit(context.Background(), framework.NewCycleState(), &v1.Pod{})
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if len(nodesThatFit) != nodesToFind {
+			t.Errorf("got %d nodes filtered, want %d", len(nodesThatFit), nodesToFind)
+		}
+		if g.nextStartNodeIndex != (i+1)*nodesToFind%numAllNodes {
+			t.Errorf("got %d lastProcessedNodeIndex, want %d", g.nextStartNodeIndex, (i+1)*nodesToFind%numAllNodes)
 		}
 	}
 }

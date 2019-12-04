@@ -8,20 +8,30 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["lruexpirecache_test.go"],
+    srcs = [
+        "expiring_test.go",
+        "lruexpirecache_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//vendor/github.com/golang/groupcache/lru:go_default_library",
+        "//vendor/github.com/google/uuid:go_default_library",
     ],
 )
 
 go_library(
     name = "go_default_library",
-    srcs = ["lruexpirecache.go"],
+    srcs = [
+        "expiring.go",
+        "lruexpirecache.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/cache",
     importpath = "k8s.io/apimachinery/pkg/util/cache",
-    deps = ["//vendor/github.com/hashicorp/golang-lru:go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
+        "//vendor/github.com/hashicorp/golang-lru:go_default_library",
+    ],
 )
 
 filegroup(

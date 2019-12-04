@@ -97,8 +97,9 @@ func GetSnapshotClass(
 				// Name must be unique, so let's base it on namespace name
 				"name": ns + "-" + suffix,
 			},
-			"snapshotter": snapshotter,
-			"parameters":  parameters,
+			"driver":         snapshotter,
+			"parameters":     parameters,
+			"deletionPolicy": "Delete",
 		},
 	}
 

@@ -25,13 +25,12 @@ import (
 	"time"
 
 	"k8s.io/klog"
+	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
@@ -640,45 +639,25 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 				continue
 			}
 
-			// Migration: Must also check the Node since Attach would have been done with in-tree if node is not using Migration
-			nu, err := nodeUsingCSIPlugin(oe.operationGenerator.GetCSITranslator(), oe.operationGenerator.GetVolumePluginMgr(), volumeAttached.VolumeSpec, node)
+			volumePlugin, err :=
+				oe.operationGenerator.GetVolumePluginMgr().FindPluginBySpec(volumeAttached.VolumeSpec)
 			if err != nil {
-				klog.Errorf(volumeAttached.GenerateErrorDetailed("VolumesAreAttached.NodeUsingCSIPlugin failed", err).Error())
+				klog.Errorf(
+					"VolumesAreAttached.FindPluginBySpec failed for volume %q (spec.Name: %q) on node %q with error: %v",
+					volumeAttached.VolumeName,
+					volumeAttached.VolumeSpec.Name(),
+					volumeAttached.NodeName,
+					err)
 				continue
 			}
-
-			var volumePlugin volume.VolumePlugin
-			if useCSIPlugin(oe.operationGenerator.GetCSITranslator(), oe.operationGenerator.GetVolumePluginMgr(), volumeAttached.VolumeSpec) && nu {
-				// The volume represented by this spec is CSI and thus should be migrated
-				volumePlugin, err = oe.operationGenerator.GetVolumePluginMgr().FindPluginByName(csi.CSIPluginName)
-				if err != nil || volumePlugin == nil {
-					klog.Errorf(
-						"VolumesAreAttached.Name failed for volume %q (spec.Name: %q) on node %q with error: %v",
-						volumeAttached.VolumeName,
-						volumeAttached.VolumeSpec.Name(),
-						volumeAttached.NodeName,
-						err)
-					continue
-				}
-
-				csiSpec, err := translateSpec(oe.operationGenerator.GetCSITranslator(), volumeAttached.VolumeSpec)
-				if err != nil {
-					klog.Errorf(volumeAttached.GenerateErrorDetailed("VolumesAreAttached.TranslateSpec failed", err).Error())
-					continue
-				}
-				volumeAttached.VolumeSpec = csiSpec
-			} else {
-				volumePlugin, err =
-					oe.operationGenerator.GetVolumePluginMgr().FindPluginBySpec(volumeAttached.VolumeSpec)
-				if err != nil || volumePlugin == nil {
-					klog.Errorf(
-						"VolumesAreAttached.FindPluginBySpec failed for volume %q (spec.Name: %q) on node %q with error: %v",
-						volumeAttached.VolumeName,
-						volumeAttached.VolumeSpec.Name(),
-						volumeAttached.NodeName,
-						err)
-					continue
-				}
+			if volumePlugin == nil {
+				// should never happen since FindPluginBySpec always returns error if volumePlugin = nil
+				klog.Errorf(
+					"Failed to find volume plugin for volume %q (spec.Name: %q) on node %q",
+					volumeAttached.VolumeName,
+					volumeAttached.VolumeSpec.Name(),
+					volumeAttached.NodeName)
+				continue
 			}
 
 			pluginName := volumePlugin.GetPluginName()

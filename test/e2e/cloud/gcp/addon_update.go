@@ -31,10 +31,10 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 // TODO: it would probably be slightly better to build up the objects
@@ -246,7 +246,7 @@ var _ = SIGDescribe("Addon update", func() {
 		framework.SkipUnlessProviderIs("gce")
 
 		//these tests are long, so I squeezed several cases in one scenario
-		gomega.Expect(sshClient).NotTo(gomega.BeNil())
+		framework.ExpectNotEqual(sshClient, nil)
 		dir = f.Namespace.Name // we use it only to give a unique string for each test execution
 
 		temporaryRemotePathPrefix := "addon-test-dir"
@@ -350,7 +350,7 @@ func waitForReplicationControllerInAddonTest(c clientset.Interface, addonNamespa
 }
 
 func waitForServicewithSelectorInAddonTest(c clientset.Interface, addonNamespace string, exist bool, selector labels.Selector) {
-	framework.ExpectNoError(framework.WaitForServiceWithSelector(c, addonNamespace, selector, exist, addonTestPollInterval, addonTestPollTimeout))
+	framework.ExpectNoError(waitForServiceWithSelector(c, addonNamespace, selector, exist, addonTestPollInterval, addonTestPollTimeout))
 }
 
 func waitForReplicationControllerwithSelectorInAddonTest(c clientset.Interface, addonNamespace string, exist bool, selector labels.Selector) {
@@ -372,6 +372,33 @@ func waitForReplicationController(c clientset.Interface, namespace, name string,
 	if err != nil {
 		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
 		return fmt.Errorf("error waiting for ReplicationController %s/%s %s: %v", namespace, name, stateMsg[exist], err)
+	}
+	return nil
+}
+
+// waitForServiceWithSelector waits until any service with given selector appears (exist == true), or disappears (exist == false)
+func waitForServiceWithSelector(c clientset.Interface, namespace string, selector labels.Selector, exist bool, interval,
+	timeout time.Duration) error {
+	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+		services, err := c.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+		switch {
+		case len(services.Items) != 0:
+			framework.Logf("Service with %s in namespace %s found.", selector.String(), namespace)
+			return exist, nil
+		case len(services.Items) == 0:
+			framework.Logf("Service with %s in namespace %s disappeared.", selector.String(), namespace)
+			return !exist, nil
+		case !testutils.IsRetryableAPIError(err):
+			framework.Logf("Non-retryable failure while listing service.")
+			return false, err
+		default:
+			framework.Logf("List service with %s in namespace %s failed: %v", selector.String(), namespace, err)
+			return false, nil
+		}
+	})
+	if err != nil {
+		stateMsg := map[bool]string{true: "to appear", false: "to disappear"}
+		return fmt.Errorf("error waiting for service with %s in namespace %s %s: %v", selector.String(), namespace, stateMsg[exist], err)
 	}
 	return nil
 }

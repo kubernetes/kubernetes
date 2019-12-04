@@ -166,6 +166,9 @@ type TestContextType struct {
 
 	// NonblockingTaints is the comma-delimeted string given by the user to specify taints which should not stop the test framework from running tests.
 	NonblockingTaints string
+
+	// ProgressReportURL is the URL which progress updates will be posted to as tests complete. If empty, no updates are sent.
+	ProgressReportURL string
 }
 
 // NodeKillerConfig describes configuration of NodeKiller -- a utility to
@@ -292,6 +295,8 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 
 	flags.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for runnning tests.")
 	flags.StringVar(&TestContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")
+
+	flags.StringVar(&TestContext.ProgressReportURL, "progress-report-url", "", "The URL to POST progress updates to as the suite runs to assist in aiding integrations. If empty, no messages sent.")
 }
 
 // RegisterClusterFlags registers flags specific to the cluster e2e test suite.
@@ -347,24 +352,6 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.DurationVar(&nodeKiller.Interval, "node-killer-interval", 1*time.Minute, "Time between node failures.")
 	flags.Float64Var(&nodeKiller.JitterFactor, "node-killer-jitter-factor", 60, "Factor used to jitter node failures.")
 	flags.DurationVar(&nodeKiller.SimulatedDowntime, "node-killer-simulated-downtime", 10*time.Minute, "A delay between node death and recreation")
-}
-
-// RegisterNodeFlags registers flags specific to the node e2e test suite.
-func RegisterNodeFlags(flags *flag.FlagSet) {
-	// Mark the test as node e2e when node flags are api.Registry.
-	TestContext.NodeE2E = true
-	flags.StringVar(&TestContext.NodeName, "node-name", "", "Name of the node to run tests on.")
-	// TODO(random-liu): Move kubelet start logic out of the test.
-	// TODO(random-liu): Move log fetch logic out of the test.
-	// There are different ways to start kubelet (systemd, initd, docker, manually started etc.)
-	// and manage logs (journald, upstart etc.).
-	// For different situation we need to mount different things into the container, run different commands.
-	// It is hard and unnecessary to deal with the complexity inside the test suite.
-	flags.BoolVar(&TestContext.NodeConformance, "conformance", false, "If true, the test suite will not start kubelet, and fetch system log (kernel, docker, kubelet log etc.) to the report directory.")
-	flags.BoolVar(&TestContext.PrepullImages, "prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
-	flags.StringVar(&TestContext.ImageDescription, "image-description", "", "The description of the image which the test will be running on.")
-	flags.StringVar(&TestContext.SystemSpecName, "system-spec-name", "", "The name of the system spec (e.g., gke) that's used in the node e2e test. The system specs are in test/e2e_node/system/specs/. This is used by the test framework to determine which tests to run for validating the system requirements.")
-	flags.Var(cliflag.NewMapStringString(&TestContext.ExtraEnvs), "extra-envs", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
 }
 
 func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {

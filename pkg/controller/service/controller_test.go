@@ -93,7 +93,6 @@ func newController() (*Controller, *fakecloud.Cloud, *fake.Clientset) {
 func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 	testCases := []struct {
 		desc                 string
-		enableFeatureGate    bool
 		service              *v1.Service
 		lbExists             bool
 		expectOp             loadBalancerOperation
@@ -155,9 +154,10 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 					Type: v1.ServiceTypeLoadBalancer,
 				},
 			},
-			expectOp:            ensureLoadBalancer,
-			expectCreateAttempt: true,
-			expectPatchStatus:   true,
+			expectOp:             ensureLoadBalancer,
+			expectCreateAttempt:  true,
+			expectPatchStatus:    true,
+			expectPatchFinalizer: true,
 		},
 		{
 			desc: "tcp service that wants LB",
@@ -175,9 +175,10 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 					Type: v1.ServiceTypeLoadBalancer,
 				},
 			},
-			expectOp:            ensureLoadBalancer,
-			expectCreateAttempt: true,
-			expectPatchStatus:   true,
+			expectOp:             ensureLoadBalancer,
+			expectCreateAttempt:  true,
+			expectPatchStatus:    true,
+			expectPatchFinalizer: true,
 		},
 		{
 			desc: "sctp service that wants LB",
@@ -195,9 +196,10 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 					Type: v1.ServiceTypeLoadBalancer,
 				},
 			},
-			expectOp:            ensureLoadBalancer,
-			expectCreateAttempt: true,
-			expectPatchStatus:   true,
+			expectOp:             ensureLoadBalancer,
+			expectCreateAttempt:  true,
+			expectPatchStatus:    true,
+			expectPatchFinalizer: true,
 		},
 		// Finalizer test cases below.
 		{
@@ -259,8 +261,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 			expectPatchFinalizer: true,
 		},
 		{
-			desc:              "service without finalizer that wants LB",
-			enableFeatureGate: true,
+			desc: "service without finalizer that wants LB",
 			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "basic-service1",
@@ -281,8 +282,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 			expectPatchFinalizer: true,
 		},
 		{
-			desc:              "service with finalizer that wants LB",
-			enableFeatureGate: true,
+			desc: "service with finalizer that wants LB",
 			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:       "basic-service1",
@@ -307,8 +307,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, serviceLoadBalancerFinalizerFeature, tc.enableFeatureGate)()
-
 			controller, cloud, client := newController()
 			cloud.Exists = tc.lbExists
 			key := fmt.Sprintf("%s/%s", tc.service.Namespace, tc.service.Name)
@@ -392,7 +390,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				}
 			}
 			if numPatches != expectNumPatches {
-				t.Errorf("Expected %d patches, got %d instead. Actions: %v", numPatches, expectNumPatches, actions)
+				t.Errorf("Got %d patches, expect %d instead. Actions: %v", numPatches, expectNumPatches, actions)
 			}
 		})
 	}

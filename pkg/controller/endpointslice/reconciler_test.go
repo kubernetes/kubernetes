@@ -18,6 +18,8 @@ package endpointslice
 
 import (
 	"fmt"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,7 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -65,11 +67,16 @@ func TestReconcileEmpty(t *testing.T) {
 // Given a single pod matching a service selector and no existing endpoint slices,
 // a slice should be created
 func TestReconcile1Pod(t *testing.T) {
-	client := newClientset()
-	setupMetrics()
 	namespace := "test"
-	svc, _ := newServiceAndEndpointMeta("foo", namespace)
+	ipv6Family := corev1.IPv6Protocol
+	svcv4, _ := newServiceAndEndpointMeta("foo", namespace)
+	svcv6, _ := newServiceAndEndpointMeta("foo", namespace)
+	svcv6.Spec.IPFamily = &ipv6Family
+	svcv6ClusterIP, _ := newServiceAndEndpointMeta("foo", namespace)
+	svcv6ClusterIP.Spec.ClusterIP = "1234::5678:0000:0000:9abc:def1"
+
 	pod1 := newPod(1, namespace, true, 1)
+	pod1.Status.PodIPs = []corev1.PodIP{{IP: "1.2.3.4"}, {IP: "1234::5678:0000:0000:9abc:def0"}}
 	pod1.Spec.Hostname = "example-hostname"
 	node1 := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -81,33 +88,110 @@ func TestReconcile1Pod(t *testing.T) {
 		},
 	}
 
-	triggerTime := time.Now()
-	r := newReconciler(client, []*corev1.Node{node1}, defaultMaxEndpointsPerSlice)
-	reconcileHelper(t, r, &svc, []*corev1.Pod{pod1}, []*discovery.EndpointSlice{}, triggerTime)
-	assert.Len(t, client.Actions(), 1, "Expected 1 additional clientset action")
+	testCases := map[string]struct {
+		service             corev1.Service
+		expectedAddressType discovery.AddressType
+		expectedEndpoint    discovery.Endpoint
+	}{
+		"ipv4": {
+			service:             svcv4,
+			expectedAddressType: discovery.AddressTypeIPv4,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses:  []string{"1.2.3.4"},
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Topology: map[string]string{
+					"kubernetes.io/hostname":        "node-1",
+					"topology.kubernetes.io/zone":   "us-central1-a",
+					"topology.kubernetes.io/region": "us-central1",
+				},
+				TargetRef: &corev1.ObjectReference{
+					Kind:      "Pod",
+					Namespace: namespace,
+					Name:      "pod1",
+				},
+			},
+		},
+		"ipv6": {
+			service:             svcv6,
+			expectedAddressType: discovery.AddressTypeIPv6,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses:  []string{"1234::5678:0000:0000:9abc:def0"},
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Topology: map[string]string{
+					"kubernetes.io/hostname":        "node-1",
+					"topology.kubernetes.io/zone":   "us-central1-a",
+					"topology.kubernetes.io/region": "us-central1",
+				},
+				TargetRef: &corev1.ObjectReference{
+					Kind:      "Pod",
+					Namespace: namespace,
+					Name:      "pod1",
+				},
+			},
+		},
+		"ipv6-clusterip": {
+			service:             svcv6ClusterIP,
+			expectedAddressType: discovery.AddressTypeIPv6,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses:  []string{"1234::5678:0000:0000:9abc:def0"},
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Topology: map[string]string{
+					"kubernetes.io/hostname":        "node-1",
+					"topology.kubernetes.io/zone":   "us-central1-a",
+					"topology.kubernetes.io/region": "us-central1",
+				},
+				TargetRef: &corev1.ObjectReference{
+					Kind:      "Pod",
+					Namespace: namespace,
+					Name:      "pod1",
+				},
+			},
+		},
+	}
 
-	slices := fetchEndpointSlices(t, client, namespace)
-	assert.Len(t, slices, 1, "Expected 1 endpoint slices")
-	assert.Regexp(t, "^"+svc.Name, slices[0].Name)
-	assert.Equal(t, svc.Name, slices[0].Labels[discovery.LabelServiceName])
-	assert.Equal(t, slices[0].Annotations, map[string]string{
-		"endpoints.kubernetes.io/last-change-trigger-time": triggerTime.Format(time.RFC3339Nano),
-	})
-	assert.EqualValues(t, []discovery.Endpoint{{
-		Addresses:  []string{"1.2.3.5"},
-		Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-		Topology: map[string]string{
-			"kubernetes.io/hostname":        "node-1",
-			"topology.kubernetes.io/zone":   "us-central1-a",
-			"topology.kubernetes.io/region": "us-central1",
-		},
-		TargetRef: &corev1.ObjectReference{
-			Kind:      "Pod",
-			Namespace: namespace,
-			Name:      "pod1",
-		},
-	}}, slices[0].Endpoints)
-	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 1, addedPerSync: 1, removedPerSync: 0, numCreated: 1, numUpdated: 0, numDeleted: 0})
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			client := newClientset()
+			setupMetrics()
+			triggerTime := time.Now()
+			r := newReconciler(client, []*corev1.Node{node1}, defaultMaxEndpointsPerSlice)
+			reconcileHelper(t, r, &testCase.service, []*corev1.Pod{pod1}, []*discovery.EndpointSlice{}, triggerTime)
+
+			if len(client.Actions()) != 1 {
+				t.Errorf("Expected 1 clientset action, got %d", len(client.Actions()))
+			}
+
+			slices := fetchEndpointSlices(t, client, namespace)
+
+			if len(slices) != 1 {
+				t.Fatalf("Expected 1 EndpointSlice, got %d", len(slices))
+			}
+
+			slice := slices[0]
+			if !strings.HasPrefix(slice.Name, testCase.service.Name) {
+				t.Errorf("Expected EndpointSlice name to start with %s, got %s", testCase.service.Name, slice.Name)
+			}
+
+			if slice.Labels[discovery.LabelServiceName] != testCase.service.Name {
+				t.Errorf("Expected EndpointSlice to have label set with %s value, got %s", testCase.service.Name, slice.Labels[discovery.LabelServiceName])
+			}
+
+			if slice.Annotations[corev1.EndpointsLastChangeTriggerTime] != triggerTime.Format(time.RFC3339Nano) {
+				t.Errorf("Expected EndpointSlice trigger time annotation to be %s, got %s", triggerTime.Format(time.RFC3339Nano), slice.Annotations[corev1.EndpointsLastChangeTriggerTime])
+			}
+
+			if len(slice.Endpoints) != 1 {
+				t.Fatalf("Expected 1 Endpoint, got %d", len(slice.Endpoints))
+			}
+
+			endpoint := slice.Endpoints[0]
+			if !reflect.DeepEqual(endpoint, testCase.expectedEndpoint) {
+				t.Errorf("Expected endpoint: %+v, got: %+v", testCase.expectedEndpoint, endpoint)
+			}
+
+			expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 1, addedPerSync: 1, removedPerSync: 0, numCreated: 1, numUpdated: 0, numDeleted: 0})
+		})
+	}
 }
 
 // given an existing endpoint slice and no pods matching the service, the existing
@@ -119,7 +203,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
 	endpointSlice1 := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
 
-	_, createErr := client.DiscoveryV1alpha1().EndpointSlices(namespace).Create(endpointSlice1)
+	_, createErr := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(endpointSlice1)
 	assert.Nil(t, createErr, "Expected no error creating endpoint slice")
 
 	numActionsBefore := len(client.Actions())
@@ -234,6 +318,7 @@ func TestReconcileEndpointSlicesSomePreexisting(t *testing.T) {
 	}
 
 	existingSlices := []*discovery.EndpointSlice{endpointSlice1, endpointSlice2}
+	cmc := newCacheMutationCheck(existingSlices)
 	createEndpointSlices(t, client, namespace, existingSlices)
 
 	numActionsBefore := len(client.Actions())
@@ -248,6 +333,9 @@ func TestReconcileEndpointSlicesSomePreexisting(t *testing.T) {
 	// 1 new slice (0->100) + 1 updated slice (62->89)
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{89, 61, 100})
 	expectMetrics(t, expectedMetrics{desiredSlices: 3, actualSlices: 3, desiredEndpoints: 250, addedPerSync: 127, removedPerSync: 0, numCreated: 1, numUpdated: 1, numDeleted: 0})
+
+	// ensure cache mutation has not occurred
+	cmc.Check(t)
 }
 
 // now with preexisting slices, we have 300 pods matching a service
@@ -286,6 +374,7 @@ func TestReconcileEndpointSlicesSomePreexistingWorseAllocation(t *testing.T) {
 	}
 
 	existingSlices := []*discovery.EndpointSlice{endpointSlice1, endpointSlice2}
+	cmc := newCacheMutationCheck(existingSlices)
 	createEndpointSlices(t, client, namespace, existingSlices)
 
 	numActionsBefore := len(client.Actions())
@@ -299,6 +388,9 @@ func TestReconcileEndpointSlicesSomePreexistingWorseAllocation(t *testing.T) {
 	// 2 new slices (100, 52) in addition to existing slices (74, 74)
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{74, 74, 100, 52})
 	expectMetrics(t, expectedMetrics{desiredSlices: 3, actualSlices: 4, desiredEndpoints: 300, addedPerSync: 152, removedPerSync: 0, numCreated: 2, numUpdated: 0, numDeleted: 0})
+
+	// ensure cache mutation has not occurred
+	cmc.Check(t)
 }
 
 // In some cases, such as a service port change, all slices for that service will require a change
@@ -361,6 +453,7 @@ func TestReconcileEndpointSlicesRecycling(t *testing.T) {
 		existingSlices[sliceNum].Endpoints = append(existingSlices[sliceNum].Endpoints, podToEndpoint(pod, &corev1.Node{}, &svc))
 	}
 
+	cmc := newCacheMutationCheck(existingSlices)
 	createEndpointSlices(t, client, namespace, existingSlices)
 
 	numActionsBefore := len(client.Actions())
@@ -379,6 +472,9 @@ func TestReconcileEndpointSlicesRecycling(t *testing.T) {
 	// thanks to recycling, we get a free repack of endpoints, resulting in 3 full slices instead of 10 mostly empty slices
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{100, 100, 100})
 	expectMetrics(t, expectedMetrics{desiredSlices: 3, actualSlices: 3, desiredEndpoints: 300, addedPerSync: 300, removedPerSync: 0, numCreated: 0, numUpdated: 3, numDeleted: 7})
+
+	// ensure cache mutation has not occurred
+	cmc.Check(t)
 }
 
 // In this test, we want to verify that endpoints are added to a slice that will
@@ -409,6 +505,7 @@ func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 	}
 	existingSlices = append(existingSlices, slice2)
 
+	cmc := newCacheMutationCheck(existingSlices)
 	createEndpointSlices(t, client, namespace, existingSlices)
 
 	// ensure that endpoints in each slice will be marked for update.
@@ -435,6 +532,63 @@ func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 
 	// additional pods should get added to fuller slice
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{95, 20})
+
+	// ensure cache mutation has not occurred
+	cmc.Check(t)
+}
+
+// In this test, we want to verify that old EndpointSlices with a deprecated IP
+// address type will be replaced with a newer IPv4 type.
+func TestReconcileEndpointSlicesReplaceDeprecated(t *testing.T) {
+	client := newClientset()
+	setupMetrics()
+	namespace := "test"
+
+	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
+	endpointMeta.AddressType = discovery.AddressTypeIP
+
+	existingSlices := []*discovery.EndpointSlice{}
+	pods := []*corev1.Pod{}
+
+	slice1 := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
+	for i := 0; i < 80; i++ {
+		pod := newPod(i, namespace, true, 1)
+		slice1.Endpoints = append(slice1.Endpoints, podToEndpoint(pod, &corev1.Node{}, &corev1.Service{Spec: corev1.ServiceSpec{}}))
+		pods = append(pods, pod)
+	}
+	existingSlices = append(existingSlices, slice1)
+
+	slice2 := newEmptyEndpointSlice(2, namespace, endpointMeta, svc)
+	for i := 100; i < 150; i++ {
+		pod := newPod(i, namespace, true, 1)
+		slice2.Endpoints = append(slice2.Endpoints, podToEndpoint(pod, &corev1.Node{}, &corev1.Service{Spec: corev1.ServiceSpec{}}))
+		pods = append(pods, pod)
+	}
+	existingSlices = append(existingSlices, slice2)
+
+	createEndpointSlices(t, client, namespace, existingSlices)
+
+	cmc := newCacheMutationCheck(existingSlices)
+	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	reconcileHelper(t, r, &svc, pods, existingSlices, time.Now())
+
+	// ensure that both original endpoint slices have been deleted
+	expectActions(t, client.Actions(), 2, "delete", "endpointslices")
+
+	endpointSlices := fetchEndpointSlices(t, client, namespace)
+
+	// since this involved replacing both EndpointSlices, the result should be
+	// perfectly packed.
+	expectUnorderedSlicesWithLengths(t, endpointSlices, []int{100, 30})
+
+	for _, endpointSlice := range endpointSlices {
+		if endpointSlice.AddressType != discovery.AddressTypeIPv4 {
+			t.Errorf("Expected address type to be IPv4, got %s", endpointSlice.AddressType)
+		}
+	}
+
+	// ensure cache mutation has not occurred
+	cmc.Check(t)
 }
 
 // Named ports can map to different port numbers on different pods.
@@ -489,7 +643,6 @@ func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 
 	// generate data structures for expected slice ports and address types
 	protoTCP := corev1.ProtocolTCP
-	ipAddressType := discovery.AddressTypeIP
 	expectedSlices := []discovery.EndpointSlice{}
 	for i := range fetchedSlices {
 		expectedSlices = append(expectedSlices, discovery.EndpointSlice{
@@ -498,7 +651,7 @@ func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 				Protocol: &protoTCP,
 				Port:     utilpointer.Int32Ptr(int32(8080 + i)),
 			}},
-			AddressType: &ipAddressType,
+			AddressType: discovery.AddressTypeIPv4,
 		})
 	}
 
@@ -673,7 +826,7 @@ func portsAndAddressTypeEqual(slice1, slice2 discovery.EndpointSlice) bool {
 func createEndpointSlices(t *testing.T, client *fake.Clientset, namespace string, endpointSlices []*discovery.EndpointSlice) {
 	t.Helper()
 	for _, endpointSlice := range endpointSlices {
-		_, err := client.DiscoveryV1alpha1().EndpointSlices(namespace).Create(endpointSlice)
+		_, err := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(endpointSlice)
 		if err != nil {
 			t.Fatalf("Expected no error creating Endpoint Slice, got: %v", err)
 		}
@@ -682,7 +835,7 @@ func createEndpointSlices(t *testing.T, client *fake.Clientset, namespace string
 
 func fetchEndpointSlices(t *testing.T, client *fake.Clientset, namespace string) []discovery.EndpointSlice {
 	t.Helper()
-	fetchedSlices, err := client.DiscoveryV1alpha1().EndpointSlices(namespace).List(metav1.ListOptions{})
+	fetchedSlices, err := client.DiscoveryV1beta1().EndpointSlices(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error fetching Endpoint Slices, got: %v", err)
 		return []discovery.EndpointSlice{}

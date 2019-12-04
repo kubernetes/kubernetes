@@ -22,13 +22,11 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
-	v1beta1storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -280,19 +278,19 @@ func NewNodeInfoLister(nodes []*v1.Node) schedulerlisters.NodeInfoLister {
 	return NodeInfoLister(nodeInfoList)
 }
 
-var _ v1beta1storagelisters.CSINodeLister = CSINodeLister{}
+var _ storagelisters.CSINodeLister = CSINodeLister{}
 
-// CSINodeLister declares a storagev1beta1.CSINode type for testing.
-type CSINodeLister storagev1beta1.CSINode
+// CSINodeLister declares a storagev1.CSINode type for testing.
+type CSINodeLister storagev1.CSINode
 
 // Get returns a fake CSINode object.
-func (n CSINodeLister) Get(name string) (*storagev1beta1.CSINode, error) {
-	csiNode := storagev1beta1.CSINode(n)
+func (n CSINodeLister) Get(name string) (*storagev1.CSINode, error) {
+	csiNode := storagev1.CSINode(n)
 	return &csiNode, nil
 }
 
 // List lists all CSINodes in the indexer.
-func (n CSINodeLister) List(selector labels.Selector) (ret []*storagev1beta1.CSINode, err error) {
+func (n CSINodeLister) List(selector labels.Selector) (ret []*storagev1.CSINode, err error) {
 	return nil, fmt.Errorf("not implemented")
 }
 

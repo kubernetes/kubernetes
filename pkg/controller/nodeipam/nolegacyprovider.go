@@ -34,7 +34,7 @@ func startLegacyIPAM(
 	kubeClient clientset.Interface,
 	clusterCIDRs []*net.IPNet,
 	serviceCIDR *net.IPNet,
-	nodeCIDRMaskSize int,
+	nodeCIDRMaskSizes []int,
 ) {
 	klog.Fatal("Error trying to Init(): legacy cloud provider support disabled at build time")
 }

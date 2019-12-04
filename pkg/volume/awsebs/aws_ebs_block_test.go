@@ -52,7 +52,7 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 	expectedGlobalPath := filepath.Join(tmpVDir, testGlobalPath)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpVDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpVDir, nil, nil))
 	plug, err := plugMgr.FindMapperPluginByName(awsElasticBlockStorePluginName)
 	if err != nil {
 		os.RemoveAll(tmpVDir)
@@ -120,7 +120,7 @@ func TestGetPodAndPluginMapPaths(t *testing.T) {
 
 	spec := getTestVolume(false, true /*isBlock*/)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpVDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpVDir, nil, nil))
 	plug, err := plugMgr.FindMapperPluginByName(awsElasticBlockStorePluginName)
 	if err != nil {
 		os.RemoveAll(tmpVDir)

@@ -9,7 +9,6 @@ pkg/apis/admission
 pkg/apis/admissionregistration/v1
 pkg/apis/admissionregistration/v1beta1
 pkg/apis/admissionregistration/validation
-pkg/apis/apps
 pkg/apis/apps/v1
 pkg/apis/apps/v1beta1
 pkg/apis/apps/v1beta2
@@ -21,7 +20,6 @@ pkg/apis/autoscaling/v2beta2
 pkg/apis/batch/v1
 pkg/apis/batch/v1beta1
 pkg/apis/batch/v2alpha1
-pkg/apis/batch/validation
 pkg/apis/certificates
 pkg/apis/certificates/v1beta1
 pkg/apis/certificates/validation
@@ -32,8 +30,8 @@ pkg/apis/core/v1/helper/qos
 pkg/apis/core/v1/validation
 pkg/apis/core/validation
 pkg/apis/discovery/v1alpha1
+pkg/apis/discovery/v1beta1
 pkg/apis/events/v1beta1
-pkg/apis/extensions
 pkg/apis/extensions/v1beta1
 pkg/apis/flowcontrol/v1alpha1
 pkg/apis/networking/v1
@@ -119,7 +117,6 @@ pkg/kubelet/dockershim/network/hostport
 pkg/kubelet/dockershim/network/hostport/testing
 pkg/kubelet/dockershim/network/kubenet
 pkg/kubelet/dockershim/network/testing
-pkg/kubelet/events
 pkg/kubelet/lifecycle
 pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/pod/testing
@@ -138,7 +135,6 @@ pkg/proxy/winkernel
 pkg/proxy/winuserspace
 pkg/registry/admissionregistration/rest
 pkg/registry/apps/deployment/storage
-pkg/registry/apps/replicaset
 pkg/registry/apps/replicaset/storage
 pkg/registry/apps/rest
 pkg/registry/apps/statefulset/storage
@@ -153,30 +149,20 @@ pkg/registry/autoscaling/rest
 pkg/registry/batch/job
 pkg/registry/batch/rest
 pkg/registry/certificates/certificates
-pkg/registry/certificates/certificates/storage
 pkg/registry/certificates/rest
 pkg/registry/coordination/rest
 pkg/registry/core/componentstatus
-pkg/registry/core/endpoint/storage
-pkg/registry/core/event/storage
-pkg/registry/core/limitrange/storage
 pkg/registry/core/namespace
 pkg/registry/core/namespace/storage
 pkg/registry/core/node
-pkg/registry/core/node/storage
 pkg/registry/core/persistentvolume
-pkg/registry/core/persistentvolume/storage
 pkg/registry/core/persistentvolumeclaim
-pkg/registry/core/persistentvolumeclaim/storage
 pkg/registry/core/pod
 pkg/registry/core/pod/rest
-pkg/registry/core/podtemplate/storage
 pkg/registry/core/replicationcontroller
 pkg/registry/core/replicationcontroller/storage
-pkg/registry/core/resourcequota/storage
 pkg/registry/core/rest
 pkg/registry/core/secret
-pkg/registry/core/secret/storage
 pkg/registry/core/service
 pkg/registry/core/service/allocator
 pkg/registry/core/service/allocator/storage
@@ -189,10 +175,8 @@ pkg/registry/events/rest
 pkg/registry/extensions/controller/storage
 pkg/registry/extensions/rest
 pkg/registry/flowcontrol/rest
-pkg/registry/networking/networkpolicy/storage
 pkg/registry/networking/rest
 pkg/registry/node/rest
-pkg/registry/policy/poddisruptionbudget/storage
 pkg/registry/policy/rest
 pkg/registry/rbac/clusterrole/policybased
 pkg/registry/rbac/clusterrolebinding
@@ -205,11 +189,9 @@ pkg/registry/rbac/rolebinding/policybased
 pkg/registry/rbac/validation
 pkg/registry/registrytest
 pkg/registry/scheduling/rest
-pkg/registry/settings/podpreset/storage
 pkg/registry/settings/rest
 pkg/registry/storage/rest
 pkg/registry/storage/storageclass
-pkg/registry/storage/storageclass/storage
 pkg/scheduler/apis/config/v1alpha1
 pkg/security/podsecuritypolicy
 pkg/security/podsecuritypolicy/group
@@ -221,10 +203,7 @@ pkg/ssh
 pkg/util/config
 pkg/util/ebtables
 pkg/util/goroutinemap/exponentialbackoff
-pkg/util/iptables
-pkg/util/iptables/testing
 pkg/util/labels # See previous effort in PR #80685
-pkg/util/mount
 pkg/util/oom
 pkg/util/procfs
 pkg/util/removeall
@@ -235,7 +214,6 @@ pkg/util/taints
 pkg/volume
 pkg/volume/azure_dd
 pkg/volume/azure_file
-pkg/volume/csi/csiv0
 pkg/volume/csi/fake
 pkg/volume/git_repo
 pkg/volume/iscsi
@@ -246,6 +224,7 @@ pkg/volume/util/volumepathhandler
 pkg/volume/vsphere_volume
 plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1
 plugin/pkg/admission/limitranger
+plugin/pkg/admission/resourcequota/apis/resourcequota/v1
 plugin/pkg/admission/resourcequota/apis/resourcequota/v1alpha1
 plugin/pkg/admission/resourcequota/apis/resourcequota/v1beta1
 plugin/pkg/auth/authorizer/node
@@ -327,7 +306,6 @@ staging/src/k8s.io/apimachinery/pkg/runtime/testing
 staging/src/k8s.io/apimachinery/pkg/selection
 staging/src/k8s.io/apimachinery/pkg/test
 staging/src/k8s.io/apimachinery/pkg/types
-staging/src/k8s.io/apimachinery/pkg/util/clock
 staging/src/k8s.io/apimachinery/pkg/util/errors
 staging/src/k8s.io/apimachinery/pkg/util/framer
 staging/src/k8s.io/apimachinery/pkg/util/httpstream
@@ -351,14 +329,17 @@ staging/src/k8s.io/apiserver/pkg/admission/configuration
 staging/src/k8s.io/apiserver/pkg/admission/initializer
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission
+staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts
 staging/src/k8s.io/apiserver/pkg/apis/apiserver
+staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1
 staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1
 staging/src/k8s.io/apiserver/pkg/apis/audit
 staging/src/k8s.io/apiserver/pkg/apis/audit/v1
 staging/src/k8s.io/apiserver/pkg/apis/audit/v1alpha1
 staging/src/k8s.io/apiserver/pkg/apis/audit/v1beta1
+staging/src/k8s.io/apiserver/pkg/apis/config/v1
 staging/src/k8s.io/apiserver/pkg/apis/example
 staging/src/k8s.io/apiserver/pkg/apis/example/v1
 staging/src/k8s.io/apiserver/pkg/apis/example2
@@ -414,7 +395,6 @@ staging/src/k8s.io/apiserver/plugin/pkg/authorizer/webhook
 staging/src/k8s.io/cli-runtime/pkg/genericclioptions
 staging/src/k8s.io/cli-runtime/pkg/printers
 staging/src/k8s.io/cli-runtime/pkg/resource
-staging/src/k8s.io/client-go/deprecated-dynamic
 staging/src/k8s.io/client-go/discovery
 staging/src/k8s.io/client-go/discovery/fake
 staging/src/k8s.io/client-go/dynamic
@@ -539,9 +519,6 @@ staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 test/e2e/common
-test/e2e/lifecycle/bootstrap
 test/e2e/storage/vsphere
-test/e2e_node
-test/e2e_node/remote
 test/e2e_node/runner/remote
 test/utils

@@ -18,6 +18,7 @@ package get
 
 import (
 	"bytes"
+	"encoding/json"
 	encjson "encoding/json"
 	"fmt"
 	"io"
@@ -252,6 +253,31 @@ func TestGetTableObjects(t *testing.T) {
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, pods.Items[0])},
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+	cmd.Run(cmd, []string{"pods", "foo"})
+
+	expected := `NAME   READY   STATUS   RESTARTS   AGE
+foo    0/0              0          <unknown>
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestGetV1TableObjects(t *testing.T) {
+	pods, _, _ := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: podV1TableObjBody(codec, pods.Items[0])},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -1176,7 +1202,7 @@ func TestGetListComponentStatus(t *testing.T) {
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, statuses)},
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: componentStatusTableObjBody(codec, (*statuses).Items...)},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -1184,10 +1210,10 @@ func TestGetListComponentStatus(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"componentstatuses"})
 
-	expected := `NAME            AGE
-servergood      <unknown>
-serverbad       <unknown>
-serverunknown   <unknown>
+	expected := `NAME            STATUS      MESSAGE   ERROR
+servergood      Healthy     ok        
+serverbad       Unhealthy             bad status: 500
+serverunknown   Unhealthy             fizzbuzz error
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
@@ -2706,7 +2732,32 @@ var podColumns = []metav1.TableColumnDefinition{
 
 // build a meta table response from a pod list
 func podTableObjBody(codec runtime.Codec, pods ...corev1.Pod) io.ReadCloser {
+	table := &metav1beta1.Table{
+		TypeMeta:          metav1.TypeMeta{APIVersion: "meta.k8s.io/v1beta1", Kind: "Table"},
+		ColumnDefinitions: podColumns,
+	}
+	for i := range pods {
+		b := bytes.NewBuffer(nil)
+		codec.Encode(&pods[i], b)
+		table.Rows = append(table.Rows, metav1beta1.TableRow{
+			Object: runtime.RawExtension{Raw: b.Bytes()},
+			Cells:  []interface{}{pods[i].Name, "0/0", "", int64(0), "<unknown>", "<none>", "<none>", "<none>", "<none>"},
+		})
+	}
+	data, err := json.Marshal(table)
+	if err != nil {
+		panic(err)
+	}
+	if !strings.Contains(string(data), `"meta.k8s.io/v1beta1"`) {
+		panic("expected v1beta1, got " + string(data))
+	}
+	return cmdtesting.BytesBody(data)
+}
+
+// build a meta table response from a pod list
+func podV1TableObjBody(codec runtime.Codec, pods ...corev1.Pod) io.ReadCloser {
 	table := &metav1.Table{
+		TypeMeta:          metav1.TypeMeta{APIVersion: "meta.k8s.io/v1", Kind: "Table"},
 		ColumnDefinitions: podColumns,
 	}
 	for i := range pods {
@@ -2717,7 +2768,14 @@ func podTableObjBody(codec runtime.Codec, pods ...corev1.Pod) io.ReadCloser {
 			Cells:  []interface{}{pods[i].Name, "0/0", "", int64(0), "<unknown>", "<none>", "<none>", "<none>", "<none>"},
 		})
 	}
-	return cmdtesting.ObjBody(codec, table)
+	data, err := json.Marshal(table)
+	if err != nil {
+		panic(err)
+	}
+	if !strings.Contains(string(data), `"meta.k8s.io/v1"`) {
+		panic("expected v1, got " + string(data))
+	}
+	return cmdtesting.BytesBody(data)
 }
 
 // build meta table watch events from pod watch events
@@ -2783,6 +2841,33 @@ func nodeTableObjBody(codec runtime.Codec, nodes ...corev1.Node) io.ReadCloser {
 		table.Rows = append(table.Rows, metav1.TableRow{
 			Object: runtime.RawExtension{Raw: b.Bytes()},
 			Cells:  []interface{}{nodes[i].Name, "Unknown", "<none>", "<unknown>", ""},
+		})
+	}
+	return cmdtesting.ObjBody(codec, table)
+}
+
+// build a meta table response from a componentStatus list
+func componentStatusTableObjBody(codec runtime.Codec, componentStatuses ...corev1.ComponentStatus) io.ReadCloser {
+	table := &metav1.Table{
+		ColumnDefinitions: []metav1.TableColumnDefinition{
+			{Name: "Name", Type: "string", Format: "name"},
+			{Name: "Status", Type: "string", Format: ""},
+			{Name: "Message", Type: "string", Format: ""},
+			{Name: "Error", Type: "string", Format: ""},
+		},
+	}
+	for _, v := range componentStatuses {
+		b := bytes.NewBuffer(nil)
+		codec.Encode(&v, b)
+		var status string
+		if v.Conditions[0].Status == corev1.ConditionTrue {
+			status = "Healthy"
+		} else {
+			status = "Unhealthy"
+		}
+		table.Rows = append(table.Rows, metav1.TableRow{
+			Object: runtime.RawExtension{Raw: b.Bytes()},
+			Cells:  []interface{}{v.Name, status, v.Conditions[0].Message, v.Conditions[0].Error},
 		})
 	}
 	return cmdtesting.ObjBody(codec, table)

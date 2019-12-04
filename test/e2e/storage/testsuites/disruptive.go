@@ -18,7 +18,9 @@ package testsuites
 
 import (
 	"github.com/onsi/ginkgo"
+
 	v1 "k8s.io/api/core/v1"
+	errors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -97,22 +99,23 @@ func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpattern
 	}
 
 	cleanup := func() {
+		var errs []error
 		if l.pod != nil {
 			ginkgo.By("Deleting pod")
 			err := e2epod.DeletePodWithWait(f.ClientSet, l.pod)
-			framework.ExpectNoError(err, "while deleting pod")
+			errs = append(errs, err)
 			l.pod = nil
 		}
 
 		if l.resource != nil {
-			l.resource.cleanupResource()
+			err := l.resource.cleanupResource()
+			errs = append(errs, err)
 			l.resource = nil
 		}
 
-		if l.driverCleanup != nil {
-			l.driverCleanup()
-			l.driverCleanup = nil
-		}
+		errs = append(errs, tryFunc(l.driverCleanup))
+		l.driverCleanup = nil
+		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 	}
 
 	type testBody func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod)

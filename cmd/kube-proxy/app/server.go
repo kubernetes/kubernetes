@@ -35,6 +35,7 @@ import (
 	gerrors "github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -663,6 +664,7 @@ func (s *ProxyServer) Run() error {
 	labelSelector := labels.NewSelector()
 	labelSelector = labelSelector.Add(*noProxyName, *noHeadlessEndpoints)
 
+	// Make informers that filter out objects that want a non-default service proxy.
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.LabelSelector = labelSelector.String()
@@ -677,7 +679,7 @@ func (s *ProxyServer) Run() error {
 	go serviceConfig.Run(wait.NeverStop)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
-		endpointSliceConfig := config.NewEndpointSliceConfig(informerFactory.Discovery().V1alpha1().EndpointSlices(), s.ConfigSyncPeriod)
+		endpointSliceConfig := config.NewEndpointSliceConfig(informerFactory.Discovery().V1beta1().EndpointSlices(), s.ConfigSyncPeriod)
 		endpointSliceConfig.RegisterEventHandler(s.Proxier)
 		go endpointSliceConfig.Run(wait.NeverStop)
 	} else {
@@ -689,6 +691,21 @@ func (s *ProxyServer) Run() error {
 	// This has to start after the calls to NewServiceConfig and NewEndpointsConfig because those
 	// functions must configure their shared informer event handlers first.
 	informerFactory.Start(wait.NeverStop)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) {
+		// Make an informer that selects for our nodename.
+		currentNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
+			informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+				options.FieldSelector = fields.OneTermEqualSelector("metadata.name", s.NodeRef.Name).String()
+			}))
+		nodeConfig := config.NewNodeConfig(currentNodeInformerFactory.Core().V1().Nodes(), s.ConfigSyncPeriod)
+		nodeConfig.RegisterEventHandler(s.Proxier)
+		go nodeConfig.Run(wait.NeverStop)
+
+		// This has to start after the calls to NewNodeConfig because that must
+		// configure the shared informer event handler first.
+		currentNodeInformerFactory.Start(wait.NeverStop)
+	}
 
 	// Birth Cry after the birth is successful
 	s.birthCry()

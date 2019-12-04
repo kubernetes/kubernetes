@@ -461,7 +461,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 	// node-proxier role is used by kube-proxy.
 	nodeProxierRules := []rbacv1.PolicyRule{
 		rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
-		rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+		rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 
 		eventsRule(),
 	}
@@ -498,10 +498,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		// Needed to check API access. These creates are non-mutating
 		rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
 		rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
-		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csinodes").RuleOrDie())
+		// Needed for volume limits
+		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csinodes").RuleOrDie(),
 	}
 	roles = append(roles, rbacv1.ClusterRole{
 		// a role to use for the kube-scheduler

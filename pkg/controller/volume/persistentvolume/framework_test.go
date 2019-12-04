@@ -527,16 +527,21 @@ func (t fakeCSINameTranslator) GetCSINameFromInTreeName(pluginName string) (stri
 	return "vendor.com/MockCSIPlugin", nil
 }
 
+type fakeCSIMigratedPluginManager struct{}
+
+func (t fakeCSIMigratedPluginManager) IsMigrationEnabledForPlugin(pluginName string) bool {
+	return true
+}
+
 // wrapTestWithCSIMigrationProvisionCalls returns a testCall that:
 // - configures controller with a volume plugin that emulates CSI migration
 // - calls given testCall
 func wrapTestWithCSIMigrationProvisionCalls(toWrap testCall) testCall {
+	plugin := &mockVolumePlugin{}
 	return func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
-		plugin := &mockVolumePlugin{
-			isMigratedToCSI: true,
-		}
 		ctrl.volumePluginMgr.InitPlugins([]vol.VolumePlugin{plugin}, nil /* prober */, ctrl)
 		ctrl.translator = fakeCSINameTranslator{}
+		ctrl.csiMigratedPluginManager = fakeCSIMigratedPluginManager{}
 		return toWrap(ctrl, reactor, test)
 	}
 }
@@ -782,7 +787,6 @@ type mockVolumePlugin struct {
 	deleteCallCounter    int
 	recycleCalls         []error
 	recycleCallCounter   int
-	isMigratedToCSI      bool
 	provisionOptions     vol.VolumeOptions
 }
 
@@ -810,10 +814,6 @@ func (plugin *mockVolumePlugin) GetVolumeName(spec *vol.Spec) (string, error) {
 
 func (plugin *mockVolumePlugin) CanSupport(spec *vol.Spec) bool {
 	return true
-}
-
-func (plugin *mockVolumePlugin) IsMigratedToCSI() bool {
-	return plugin.isMigratedToCSI
 }
 
 func (plugin *mockVolumePlugin) RequiresRemount() bool {

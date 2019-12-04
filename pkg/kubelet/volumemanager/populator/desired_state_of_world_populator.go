@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -87,7 +88,9 @@ func NewDesiredStateOfWorldPopulator(
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	kubeContainerRuntime kubecontainer.Runtime,
-	keepTerminatedPodVolumes bool) DesiredStateOfWorldPopulator {
+	keepTerminatedPodVolumes bool,
+	csiMigratedPluginManager csimigration.PluginManager,
+	intreeToCSITranslator csimigration.InTreeToCSITranslator) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
 		kubeClient:                kubeClient,
 		loopSleepDuration:         loopSleepDuration,
@@ -102,6 +105,8 @@ func NewDesiredStateOfWorldPopulator(
 		keepTerminatedPodVolumes: keepTerminatedPodVolumes,
 		hasAddedPods:             false,
 		hasAddedPodsLock:         sync.RWMutex{},
+		csiMigratedPluginManager: csiMigratedPluginManager,
+		intreeToCSITranslator:    intreeToCSITranslator,
 	}
 }
 
@@ -119,6 +124,8 @@ type desiredStateOfWorldPopulator struct {
 	keepTerminatedPodVolumes  bool
 	hasAddedPods              bool
 	hasAddedPodsLock          sync.RWMutex
+	csiMigratedPluginManager  csimigration.PluginManager
+	intreeToCSITranslator     csimigration.InTreeToCSITranslator
 }
 
 type processedPods struct {
@@ -505,6 +512,17 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 			pvcSource.ClaimName,
 			pvcUID)
 
+		migratable, err := dswp.csiMigratedPluginManager.IsMigratable(volumeSpec)
+		if err != nil {
+			return nil, nil, "", err
+		}
+		if migratable {
+			volumeSpec, err = csimigration.TranslateInTreeSpecToCSI(volumeSpec, dswp.intreeToCSITranslator)
+			if err != nil {
+				return nil, nil, "", err
+			}
+		}
+
 		// TODO: replace this with util.GetVolumeMode() when features.BlockVolume is removed.
 		// The function will return the right value then.
 		volumeMode := v1.PersistentVolumeFilesystem
@@ -537,7 +555,18 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 	// Do not return the original volume object, since the source could mutate it
 	clonedPodVolume := podVolume.DeepCopy()
 
-	return nil, volume.NewSpecFromVolume(clonedPodVolume), "", nil
+	spec := volume.NewSpecFromVolume(clonedPodVolume)
+	migratable, err := dswp.csiMigratedPluginManager.IsMigratable(spec)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	if migratable {
+		spec, err = csimigration.TranslateInTreeSpecToCSI(spec, dswp.intreeToCSITranslator)
+		if err != nil {
+			return nil, nil, "", err
+		}
+	}
+	return nil, spec, "", nil
 }
 
 // getPVCExtractPV fetches the PVC object with the given namespace and name from

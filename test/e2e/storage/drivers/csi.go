@@ -106,6 +106,7 @@ func InitHostPathCSIDriver() testsuites.TestDriver {
 		testsuites.CapPVCDataSource:       true,
 		testsuites.CapControllerExpansion: true,
 		testsuites.CapSingleNodeVolume:    true,
+		testsuites.CapVolumeLimits:        true,
 	}
 	return initHostPathCSIDriver("csi-hostpath",
 		capabilities,
@@ -344,23 +345,6 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 	}
 }
 
-// InitHostPathV0CSIDriver returns a variant of hostpathCSIDriver with different manifests.
-func InitHostPathV0CSIDriver() testsuites.TestDriver {
-	return initHostPathCSIDriver("csi-hostpath-v0",
-		map[testsuites.Capability]bool{testsuites.CapPersistence: true, testsuites.CapMultiPODs: true, testsuites.CapSingleNodeVolume: true},
-		nil, /* no volume attributes -> no ephemeral volume testing */
-		// Using the current set of rbac.yaml files is problematic here because they don't
-		// match the version of the rules that were written for the releases of external-attacher
-		// and external-provisioner that we are using here. It happens to work in practice...
-		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/csi-hostpath-attacher.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/csi-hostpath-provisioner.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/csi-hostpathplugin.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/e2e-test-rbac.yaml",
-	)
-}
-
 // gce-pd
 type gcePDCSIDriver struct {
 	driverInfo testsuites.DriverInfo
@@ -368,6 +352,7 @@ type gcePDCSIDriver struct {
 
 var _ testsuites.TestDriver = &gcePDCSIDriver{}
 var _ testsuites.DynamicPVTestDriver = &gcePDCSIDriver{}
+var _ testsuites.SnapshottableTestDriver = &gcePDCSIDriver{}
 
 // InitGcePDCSIDriver returns gcePDCSIDriver that implements TestDriver interface
 func InitGcePDCSIDriver() testsuites.TestDriver {
@@ -399,6 +384,7 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 				testsuites.CapTopology:            true,
 				testsuites.CapControllerExpansion: true,
 				testsuites.CapNodeExpansion:       true,
+				testsuites.CapSnapshotDataSource:  true,
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			TopologyKeys:        []string{GCEPDCSIZoneTopologyKey},
@@ -432,6 +418,15 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.PerT
 	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 
 	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
+}
+
+func (g *gcePDCSIDriver) GetSnapshotClass(config *testsuites.PerTestConfig) *unstructured.Unstructured {
+	parameters := map[string]string{}
+	snapshotter := g.driverInfo.Name
+	ns := config.Framework.Namespace.Name
+	suffix := fmt.Sprintf("%s-vsc", snapshotter)
+
+	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
 }
 
 func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {

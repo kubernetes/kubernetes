@@ -21,11 +21,12 @@ import (
 	"os"
 	"regexp"
 
+	"k8s.io/utils/mount"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -82,10 +83,6 @@ func (plugin *hostPathPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 func (plugin *hostPathPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.HostPath != nil) ||
 		(spec.Volume != nil && spec.Volume.HostPath != nil)
-}
-
-func (plugin *hostPathPlugin) IsMigratedToCSI() bool {
-	return false
 }
 
 func (plugin *hostPathPlugin) RequiresRemount() bool {

@@ -34,7 +34,7 @@ func TestFlowSchemaValidation(t *testing.T) {
 		expectedErrors field.ErrorList
 	}{
 		{
-			name: "missing neither resource and non-resource policy-rule should fail",
+			name: "missing both resource and non-resource policy-rule should fail",
 			flowSchema: &flowcontrol.FlowSchema{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "system-foo",
@@ -81,9 +81,10 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:     []string{flowcontrol.VerbAll},
-									APIGroups: []string{flowcontrol.APIGroupAll},
-									Resources: []string{flowcontrol.ResourceAll},
+									Verbs:      []string{flowcontrol.VerbAll},
+									APIGroups:  []string{flowcontrol.APIGroupAll},
+									Resources:  []string{flowcontrol.ResourceAll},
+									Namespaces: []string{flowcontrol.NamespaceEvery},
 								},
 							},
 						},
@@ -113,9 +114,10 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:     []string{flowcontrol.VerbAll, "create"},
-									APIGroups: []string{flowcontrol.APIGroupAll, "tak"},
-									Resources: []string{flowcontrol.ResourceAll, "tok"},
+									Verbs:      []string{flowcontrol.VerbAll, "create"},
+									APIGroups:  []string{flowcontrol.APIGroupAll, "tak"},
+									Resources:  []string{flowcontrol.ResourceAll, "tok"},
+									Namespaces: []string{flowcontrol.NamespaceEvery},
 								},
 							},
 						},
@@ -149,9 +151,10 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:     []string{flowcontrol.VerbAll},
-									APIGroups: []string{flowcontrol.APIGroupAll},
-									Resources: []string{flowcontrol.ResourceAll},
+									Verbs:      []string{flowcontrol.VerbAll},
+									APIGroups:  []string{flowcontrol.APIGroupAll},
+									Resources:  []string{flowcontrol.ResourceAll},
+									Namespaces: []string{flowcontrol.NamespaceEvery},
 								},
 							},
 							NonResourceRules: []flowcontrol.NonResourcePolicyRule{
@@ -252,9 +255,10 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:     []string{"feed"},
-									APIGroups: []string{flowcontrol.APIGroupAll},
-									Resources: []string{flowcontrol.ResourceAll},
+									Verbs:      []string{"feed"},
+									APIGroups:  []string{flowcontrol.APIGroupAll},
+									Resources:  []string{flowcontrol.ResourceAll},
+									Namespaces: []string{flowcontrol.NamespaceEvery},
 								},
 							},
 						},
@@ -286,9 +290,10 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:     []string{flowcontrol.VerbAll},
-									APIGroups: []string{flowcontrol.APIGroupAll},
-									Resources: []string{flowcontrol.ResourceAll},
+									Verbs:      []string{flowcontrol.VerbAll},
+									APIGroups:  []string{flowcontrol.APIGroupAll},
+									Resources:  []string{flowcontrol.ResourceAll},
+									Namespaces: []string{flowcontrol.NamespaceEvery},
 								},
 							},
 						},
@@ -322,9 +327,10 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:     []string{flowcontrol.VerbAll},
-									APIGroups: []string{flowcontrol.APIGroupAll},
-									Resources: []string{flowcontrol.ResourceAll},
+									Verbs:      []string{flowcontrol.VerbAll},
+									APIGroups:  []string{flowcontrol.APIGroupAll},
+									Resources:  []string{flowcontrol.ResourceAll},
+									Namespaces: []string{flowcontrol.NamespaceEvery},
 								},
 							},
 						},
@@ -355,9 +361,10 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:     []string{flowcontrol.VerbAll},
-									APIGroups: []string{flowcontrol.APIGroupAll},
-									Resources: []string{flowcontrol.ResourceAll},
+									Verbs:      []string{flowcontrol.VerbAll},
+									APIGroups:  []string{flowcontrol.APIGroupAll},
+									Resources:  []string{flowcontrol.ResourceAll},
+									Namespaces: []string{flowcontrol.NamespaceEvery},
 								},
 							},
 						},
@@ -366,6 +373,178 @@ func TestFlowSchemaValidation(t *testing.T) {
 			},
 			expectedErrors: field.ErrorList{
 				field.NotSupported(field.NewPath("spec").Child("rules").Index(0).Child("subjects").Index(0).Child("kind"), flowcontrol.SubjectKind(""), supportedSubjectKinds.List()),
+			},
+		},
+		{
+			name: "Omitted ResourceRule.Namespaces should fail",
+			flowSchema: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo",
+				},
+				Spec: flowcontrol.FlowSchemaSpec{
+					MatchingPrecedence: 50,
+					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+						Name: "system-bar",
+					},
+					Rules: []flowcontrol.PolicyRulesWithSubjects{
+						{
+							Subjects: []flowcontrol.Subject{
+								{
+									Kind: flowcontrol.SubjectKindUser,
+									User: &flowcontrol.UserSubject{Name: "noxu"},
+								},
+							},
+							ResourceRules: []flowcontrol.ResourcePolicyRule{
+								{
+									Verbs:      []string{flowcontrol.VerbAll},
+									APIGroups:  []string{flowcontrol.APIGroupAll},
+									Resources:  []string{flowcontrol.ResourceAll},
+									Namespaces: nil,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{
+				field.Required(field.NewPath("spec").Child("rules").Index(0).Child("resourceRules").Index(0).Child("namespaces"), "resource rules that are not cluster scoped must supply at least one namespace"),
+			},
+		},
+		{
+			name: "ClusterScope is allowed, with no Namespaces",
+			flowSchema: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo",
+				},
+				Spec: flowcontrol.FlowSchemaSpec{
+					MatchingPrecedence: 50,
+					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+						Name: "system-bar",
+					},
+					Rules: []flowcontrol.PolicyRulesWithSubjects{
+						{
+							Subjects: []flowcontrol.Subject{
+								{
+									Kind: flowcontrol.SubjectKindUser,
+									User: &flowcontrol.UserSubject{Name: "noxu"},
+								},
+							},
+							ResourceRules: []flowcontrol.ResourcePolicyRule{
+								{
+									Verbs:        []string{flowcontrol.VerbAll},
+									APIGroups:    []string{flowcontrol.APIGroupAll},
+									Resources:    []string{flowcontrol.ResourceAll},
+									ClusterScope: true,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "ClusterScope is allowed with NamespaceEvery",
+			flowSchema: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo",
+				},
+				Spec: flowcontrol.FlowSchemaSpec{
+					MatchingPrecedence: 50,
+					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+						Name: "system-bar",
+					},
+					Rules: []flowcontrol.PolicyRulesWithSubjects{
+						{
+							Subjects: []flowcontrol.Subject{
+								{
+									Kind: flowcontrol.SubjectKindUser,
+									User: &flowcontrol.UserSubject{Name: "noxu"},
+								},
+							},
+							ResourceRules: []flowcontrol.ResourcePolicyRule{
+								{
+									Verbs:        []string{flowcontrol.VerbAll},
+									APIGroups:    []string{flowcontrol.APIGroupAll},
+									Resources:    []string{flowcontrol.ResourceAll},
+									ClusterScope: true,
+									Namespaces:   []string{flowcontrol.NamespaceEvery},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "NamespaceEvery may not be combined with particulars",
+			flowSchema: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo",
+				},
+				Spec: flowcontrol.FlowSchemaSpec{
+					MatchingPrecedence: 50,
+					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+						Name: "system-bar",
+					},
+					Rules: []flowcontrol.PolicyRulesWithSubjects{
+						{
+							Subjects: []flowcontrol.Subject{
+								{
+									Kind: flowcontrol.SubjectKindUser,
+									User: &flowcontrol.UserSubject{Name: "noxu"},
+								},
+							},
+							ResourceRules: []flowcontrol.ResourcePolicyRule{
+								{
+									Verbs:      []string{flowcontrol.VerbAll},
+									APIGroups:  []string{flowcontrol.APIGroupAll},
+									Resources:  []string{flowcontrol.ResourceAll},
+									Namespaces: []string{"foo", flowcontrol.NamespaceEvery},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("rules").Index(0).Child("resourceRules").Index(0).Child("namespaces"), []string{"foo", flowcontrol.NamespaceEvery}, "if '*' is present, must not specify other namespaces"),
+			},
+		},
+		{
+			name: "ResourceRule.Namespaces must be well formed",
+			flowSchema: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo",
+				},
+				Spec: flowcontrol.FlowSchemaSpec{
+					MatchingPrecedence: 50,
+					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+						Name: "system-bar",
+					},
+					Rules: []flowcontrol.PolicyRulesWithSubjects{
+						{
+							Subjects: []flowcontrol.Subject{
+								{
+									Kind: flowcontrol.SubjectKindUser,
+									User: &flowcontrol.UserSubject{Name: "noxu"},
+								},
+							},
+							ResourceRules: []flowcontrol.ResourcePolicyRule{
+								{
+									Verbs:      []string{flowcontrol.VerbAll},
+									APIGroups:  []string{flowcontrol.APIGroupAll},
+									Resources:  []string{flowcontrol.ResourceAll},
+									Namespaces: []string{"-foo"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("rules").Index(0).Child("resourceRules").Index(0).Child("namespaces").Index(0), "-foo", nsErrIntro+`a DNS-1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')`),
 			},
 		},
 	}
@@ -392,14 +571,16 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 					Name: "system-foo",
 				},
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelQueuingTypeQueueing,
-					Queuing: &flowcontrol.QueuingConfiguration{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 						AssuredConcurrencyShares: 100,
-						Queues:                   512,
-						HandSize:                 4,
-						QueueLengthLimit:         100,
-					},
-				},
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeQueue,
+							Queuing: &flowcontrol.QueuingConfiguration{
+								Queues:           512,
+								HandSize:         4,
+								QueueLengthLimit: 100,
+							}}}},
 			},
 			expectedErrors: field.ErrorList{},
 		},
@@ -410,7 +591,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 					Name: flowcontrol.PriorityLevelConfigurationNameExempt,
 				},
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelQueuingTypeExempt,
+					Type: flowcontrol.PriorityLevelEnablementExempt,
 				},
 			},
 			expectedErrors: field.ErrorList{},
@@ -422,17 +603,19 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 					Name: "system-foo",
 				},
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelQueuingTypeQueueing,
-					Queuing: &flowcontrol.QueuingConfiguration{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 						AssuredConcurrencyShares: 100,
-						QueueLengthLimit:         100,
-						Queues:                   512,
-						HandSize:                 8,
-					},
-				},
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeQueue,
+							Queuing: &flowcontrol.QueuingConfiguration{
+								QueueLengthLimit: 100,
+								Queues:           512,
+								HandSize:         8,
+							}}}},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("queuing").Child("handSize"), int32(8), "required entropy bits of deckSize 512 and handSize 8 should not be greater than 60"),
+				field.Invalid(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing").Child("handSize"), int32(8), "required entropy bits of deckSize 512 and handSize 8 should not be greater than 60"),
 			},
 		},
 		{
@@ -442,17 +625,19 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 					Name: "system-foo",
 				},
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelQueuingTypeQueueing,
-					Queuing: &flowcontrol.QueuingConfiguration{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 						AssuredConcurrencyShares: 100,
-						QueueLengthLimit:         100,
-						Queues:                   128,
-						HandSize:                 10,
-					},
-				},
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeQueue,
+							Queuing: &flowcontrol.QueuingConfiguration{
+								QueueLengthLimit: 100,
+								Queues:           128,
+								HandSize:         10,
+							}}}},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("queuing").Child("handSize"), int32(10), "required entropy bits of deckSize 128 and handSize 10 should not be greater than 60"),
+				field.Invalid(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing").Child("handSize"), int32(10), "required entropy bits of deckSize 128 and handSize 10 should not be greater than 60"),
 			},
 		},
 		{
@@ -462,18 +647,20 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 					Name: "system-foo",
 				},
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelQueuingTypeQueueing,
-					Queuing: &flowcontrol.QueuingConfiguration{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 						AssuredConcurrencyShares: 100,
-						QueueLengthLimit:         100,
-						Queues:                   math.MaxInt32,
-						HandSize:                 3,
-					},
-				},
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeQueue,
+							Queuing: &flowcontrol.QueuingConfiguration{
+								QueueLengthLimit: 100,
+								Queues:           math.MaxInt32,
+								HandSize:         3,
+							}}}},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("queuing").Child("handSize"), int32(3), "required entropy bits of deckSize 2147483647 and handSize 3 should not be greater than 60"),
-				field.Invalid(field.NewPath("spec").Child("queuing").Child("queues"), int32(math.MaxInt32), "must not be greater than 10000000"),
+				field.Invalid(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing").Child("handSize"), int32(3), "required entropy bits of deckSize 2147483647 and handSize 3 should not be greater than 60"),
+				field.Invalid(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing").Child("queues"), int32(math.MaxInt32), "must not be greater than 10000000"),
 			},
 		},
 		{
@@ -483,14 +670,16 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 					Name: "system-foo",
 				},
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelQueuingTypeQueueing,
-					Queuing: &flowcontrol.QueuingConfiguration{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 						AssuredConcurrencyShares: 100,
-						QueueLengthLimit:         100,
-						Queues:                   10 * 1000 * 1000, // 10^7
-						HandSize:                 2,
-					},
-				},
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeQueue,
+							Queuing: &flowcontrol.QueuingConfiguration{
+								QueueLengthLimit: 100,
+								Queues:           10 * 1000 * 1000, // 10^7
+								HandSize:         2,
+							}}}},
 			},
 			expectedErrors: field.ErrorList{},
 		},
@@ -501,17 +690,19 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 					Name: "system-foo",
 				},
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelQueuingTypeQueueing,
-					Queuing: &flowcontrol.QueuingConfiguration{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 						AssuredConcurrencyShares: 100,
-						QueueLengthLimit:         100,
-						Queues:                   7,
-						HandSize:                 8,
-					},
-				},
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeQueue,
+							Queuing: &flowcontrol.QueuingConfiguration{
+								QueueLengthLimit: 100,
+								Queues:           7,
+								HandSize:         8,
+							}}}},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("queuing").Child("handSize"), int32(8), "should not be greater than queues (7)"),
+				field.Invalid(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing").Child("handSize"), int32(8), "should not be greater than queues (7)"),
 			},
 		},
 	}

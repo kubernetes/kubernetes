@@ -18,6 +18,8 @@ go_library(
         "kubelet_network_linux.go",
         "kubelet_network_others.go",
         "kubelet_node_status.go",
+        "kubelet_node_status_others.go",
+        "kubelet_node_status_windows.go",
         "kubelet_pods.go",
         "kubelet_resources.go",
         "kubelet_volumes.go",
@@ -98,7 +100,6 @@ go_library(
         "//pkg/security/apparmor:go_default_library",
         "//pkg/security/podsecuritypolicy/sysctl:go_default_library",
         "//pkg/util/iptables:go_default_library",
-        "//pkg/util/mount:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/oom:go_default_library",
         "//pkg/util/removeall:go_default_library",
@@ -147,9 +148,15 @@ go_library(
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/integer:go_default_library",
+        "//vendor/k8s.io/utils/mount:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
         "//vendor/k8s.io/utils/path:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//pkg/kubelet/winstats:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 go_test(
@@ -207,7 +214,6 @@ go_test(
         "//pkg/kubelet/util/sliceutils:go_default_library",
         "//pkg/kubelet/volumemanager:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
-        "//pkg/util/mount:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/awsebs:go_default_library",
@@ -249,6 +255,7 @@ go_test(
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
+        "//vendor/k8s.io/utils/mount:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",

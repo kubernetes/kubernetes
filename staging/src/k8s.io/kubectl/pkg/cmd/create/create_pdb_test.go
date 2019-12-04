@@ -35,7 +35,7 @@ func TestCreatePdb(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	ns := scheme.Codecs
+	ns := scheme.Codecs.WithoutConversion()
 
 	tf.Client = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "policy", Version: "v1beta1"},

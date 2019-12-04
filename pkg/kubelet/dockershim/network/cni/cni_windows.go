@@ -45,6 +45,10 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 		return nil, fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
 	}
 
+	if plugin.getDefaultNetwork() == nil {
+		return nil, fmt.Errorf("CNI network not yet initialized, skipping pod network status for container %q", id)
+	}
+
 	// Because the default remote runtime request timeout is 4 min,so set slightly less than 240 seconds
 	// Todo get the timeout from parent ctx
 	cniTimeoutCtx, cancelFunc := context.WithTimeout(context.Background(), network.CNITimeoutSec*time.Second)

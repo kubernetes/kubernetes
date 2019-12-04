@@ -132,14 +132,14 @@ type EventBroadcaster interface {
 	Shutdown()
 }
 
-// EventRecorderAdapter is a wrapper around EventRecorder implementing the
-// new EventRecorder interface.
+// EventRecorderAdapter is a wrapper around a "k8s.io/client-go/tools/record".EventRecorder
+// implementing the new "k8s.io/client-go/tools/events".EventRecorder interface.
 type EventRecorderAdapter struct {
 	recorder EventRecorder
 }
 
-// NewEventRecorderAdapter returns an adapter implementing new EventRecorder
-// interface.
+// NewEventRecorderAdapter returns an adapter implementing the new
+// "k8s.io/client-go/tools/events".EventRecorder interface.
 func NewEventRecorderAdapter(recorder EventRecorder) *EventRecorderAdapter {
 	return &EventRecorderAdapter{
 		recorder: recorder,

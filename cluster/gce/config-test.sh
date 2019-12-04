@@ -104,9 +104,7 @@ LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-}
 GCI_DOCKER_VERSION=${KUBE_GCI_DOCKER_VERSION:-}
 if [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
   CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-containerd}
-  CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
   LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
-  KUBELET_TEST_ARGS="${KUBELET_TEST_ARGS:-} --runtime-cgroups=/system.slice/containerd.service"
 fi
 
 # MASTER_EXTRA_METADATA is the extra instance metadata on master instance separated by commas.
@@ -443,6 +441,9 @@ SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"
 
 # Optional: install a default StorageClass
 ENABLE_DEFAULT_STORAGE_CLASS="${ENABLE_DEFAULT_STORAGE_CLASS:-true}"
+
+# Optional: install volume snapshot CRDs
+ENABLE_VOLUME_SNAPSHOTS="${ENABLE_VOLUME_SNAPSHOTS:-true}"
 
 # Optional: Enable legacy ABAC policy that makes all service accounts superusers.
 # Disabling this by default in tests ensures default RBAC policies are sufficient from 1.6+

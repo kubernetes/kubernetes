@@ -21,9 +21,14 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
+
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -34,11 +39,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-
-	"time"
-
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var (
@@ -162,22 +162,22 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 	}
 
 	cleanup := func() {
+		var errs []error
 		if l.pod != nil {
 			ginkgo.By("Deleting pod")
 			err := e2epod.DeletePodWithWait(f.ClientSet, l.pod)
-			framework.ExpectNoError(err, "while deleting pod")
+			errs = append(errs, err)
 			l.pod = nil
 		}
 
 		if l.resource != nil {
-			l.resource.cleanupResource()
+			errs = append(errs, l.resource.cleanupResource())
 			l.resource = nil
 		}
 
-		if l.driverCleanup != nil {
-			l.driverCleanup()
-			l.driverCleanup = nil
-		}
+		errs = append(errs, tryFunc(l.driverCleanup))
+		l.driverCleanup = nil
+		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 
 		if l.hostExec != nil {
 			l.hostExec.Cleanup()

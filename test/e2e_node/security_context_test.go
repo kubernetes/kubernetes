@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"fmt"
@@ -26,8 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -78,10 +76,6 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			framework.ExpectNoError(err)
 			if !isEnabled {
 				framework.Skipf("Skipped because shared PID namespace is not supported by this docker version.")
-			}
-			// It's not enough to set this flag in the kubelet because the apiserver needs it too
-			if !utilfeature.DefaultFeatureGate.Enabled(features.PodShareProcessNamespace) {
-				framework.Skipf("run test with --feature-gates=PodShareProcessNamespace=true to test PID namespace sharing")
 			}
 
 			ginkgo.By("Create a pod with shared PID namespace.")

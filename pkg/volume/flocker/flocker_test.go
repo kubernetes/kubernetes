@@ -21,15 +21,15 @@ import (
 	"os"
 	"testing"
 
+	flockerapi "github.com/clusterhq/flocker-go"
+	"github.com/stretchr/testify/assert"
+	"k8s.io/utils/mount"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-
-	flockerapi "github.com/clusterhq/flocker-go"
-	"github.com/stretchr/testify/assert"
 )
 
 const pluginName = "kubernetes.io/flocker"
@@ -127,7 +127,7 @@ func newInitializedVolumePlugMgr(t *testing.T) (*volume.VolumePluginMgr, string)
 	plugMgr := &volume.VolumePluginMgr{}
 	dir, err := utiltesting.MkTmpdir("flocker")
 	assert.NoError(t, err)
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(dir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, dir, nil, nil))
 	return plugMgr, dir
 }
 
@@ -138,7 +138,7 @@ func TestPlugin(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/flocker")
 	if err != nil {

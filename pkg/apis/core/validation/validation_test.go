@@ -18,6 +18,7 @@ package validation
 
 import (
 	"bytes"
+	"fmt"
 	"math"
 	"reflect"
 	"strings"
@@ -4432,6 +4433,15 @@ func TestValidateEnv(t *testing.T) {
 			},
 		},
 		{
+			Name: "abc",
+			ValueFrom: &core.EnvVarSource{
+				FieldRef: &core.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "status.podIPs",
+				},
+			},
+		},
+		{
 			Name: "secret_value",
 			ValueFrom: &core.EnvVarSource{
 				SecretKeyRef: &core.SecretKeySelector{
@@ -4662,7 +4672,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP", "status.podIPs"`,
 		},
 		{
 			name: "metadata.annotations without subscript",
@@ -4675,7 +4685,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP", "status.podIPs"`,
 		},
 		{
 			name: "metadata.annotations with invalid key",
@@ -4714,7 +4724,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP"`,
+			expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.podIP", "status.podIPs"`,
 		},
 	}
 	for _, tc := range errorCases {
@@ -9380,6 +9390,7 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 
 func TestValidateService(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceTopology, true)()
 
 	testCases := []struct {
 		name     string
@@ -10055,6 +10066,66 @@ func TestValidateService(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				invalidServiceIPFamily := core.IPFamily("not-a-valid-ip-family")
 				s.Spec.IPFamily = &invalidServiceIPFamily
+			},
+			numErrs: 1,
+		},
+		{
+			name: "valid topology keys",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.TopologyKeys = []string{
+					"kubernetes.io/hostname",
+					"failure-domain.beta.kubernetes.io/zone",
+					"failure-domain.beta.kubernetes.io/region",
+					v1.TopologyKeyAny,
+				}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid topology key",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.TopologyKeys = []string{"NoUppercaseOrSpecialCharsLike=Equals"}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "too many topology keys",
+			tweakSvc: func(s *core.Service) {
+				for i := 0; i < core.MaxServiceTopologyKeys+1; i++ {
+					s.Spec.TopologyKeys = append(s.Spec.TopologyKeys, fmt.Sprintf("topologykey-%d", i))
+				}
+			},
+			numErrs: 1,
+		},
+		{
+			name: `"Any" was not the last key`,
+			tweakSvc: func(s *core.Service) {
+				s.Spec.TopologyKeys = []string{
+					"kubernetes.io/hostname",
+					v1.TopologyKeyAny,
+					"failure-domain.beta.kubernetes.io/zone",
+				}
+			},
+			numErrs: 1,
+		},
+		{
+			name: `duplicate topology key`,
+			tweakSvc: func(s *core.Service) {
+				s.Spec.TopologyKeys = []string{
+					"kubernetes.io/hostname",
+					"kubernetes.io/hostname",
+					"failure-domain.beta.kubernetes.io/zone",
+				}
+			},
+			numErrs: 1,
+		},
+		{
+			name: `use topology keys with externalTrafficPolicy=Local`,
+			tweakSvc: func(s *core.Service) {
+				s.Spec.ExternalTrafficPolicy = "Local"
+				s.Spec.TopologyKeys = []string{
+					"kubernetes.io/hostname",
+				}
 			},
 			numErrs: 1,
 		},

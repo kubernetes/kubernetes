@@ -247,7 +247,6 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 
 		//no changes
 		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
-			allErrs = append(allErrs, fmt.Errorf("info: %s was not changed\n", name))
 			continue
 		}
 

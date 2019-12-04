@@ -40,6 +40,7 @@ go_test(
     srcs = [
         "collector_test.go",
         "counter_test.go",
+        "desc_test.go",
         "gauge_test.go",
         "histogram_test.go",
         "opts_test.go",
@@ -53,7 +54,6 @@ go_test(
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus/testutil:go_default_library",
-        "//vendor/github.com/prometheus/client_model/go:go_default_library",
         "//vendor/github.com/prometheus/common/expfmt:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
@@ -100,6 +100,7 @@ package_group(
         "//pkg/scheduler/framework/v1alpha1",
         "//pkg/volume/util/operationexecutor",
         "//staging/src/k8s.io/apiserver/pkg/admission/metrics",
+        "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/metrics",
         "//staging/src/k8s.io/component-base/metrics/...",
         "//test/e2e",
         "//test/e2e/storage",

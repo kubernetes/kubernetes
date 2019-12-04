@@ -62,7 +62,6 @@ var (
 	// emptyFramework is an empty framework used in tests.
 	// Note: If the test runs in goroutine, please don't use this variable to avoid a race condition.
 	emptyFramework, _ = framework.NewFramework(emptyPluginRegistry, nil, nil)
-	emptySnapshot     = nodeinfosnapshot.NewEmptySnapshot()
 )
 
 type fakeBinder struct {
@@ -139,7 +138,7 @@ func podWithResources(id, desiredHost string, limits v1.ResourceList, requests v
 	return pod
 }
 
-func PredicateOne(pod *v1.Pod, meta predicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
+func PredicateOne(pod *v1.Pod, meta predicates.Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
@@ -152,11 +151,10 @@ type mockScheduler struct {
 	err    error
 }
 
-func (es mockScheduler) PredicateMetadataProducer() predicates.PredicateMetadataProducer {
+func (es mockScheduler) PredicateMetadataProducer() predicates.MetadataProducer {
 	return nil
 
 }
-
 func (es mockScheduler) Schedule(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (core.ScheduleResult, error) {
 	return es.result, es.err
 }
@@ -170,9 +168,12 @@ func (es mockScheduler) Prioritizers() []priorities.PriorityConfig {
 func (es mockScheduler) Extenders() []algorithm.SchedulerExtender {
 	return nil
 }
-
 func (es mockScheduler) Preempt(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
 	return nil, nil, nil, nil
+}
+func (es mockScheduler) Snapshot() error {
+	return nil
+
 }
 
 func TestSchedulerCreation(t *testing.T) {
@@ -192,8 +193,8 @@ func TestSchedulerCreation(t *testing.T) {
 		informerFactory,
 		NewPodInformer(client, 0),
 		eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
-		schedulerapi.SchedulerAlgorithmSource{Provider: &testSource},
 		stopCh,
+		WithAlgorithmSource(schedulerapi.SchedulerAlgorithmSource{Provider: &testSource}),
 		WithPodInitialBackoffSeconds(1),
 		WithPodMaxBackoffSeconds(10),
 	)
@@ -645,12 +646,12 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, recorder events.EventRecorder) (*Scheduler, chan *v1.Binding, chan error) {
 	algo := core.NewGenericScheduler(
 		scache,
-		internalqueue.NewSchedulingQueue(nil, nil),
+		internalqueue.NewSchedulingQueue(nil),
 		predicateMap,
-		predicates.EmptyPredicateMetadataProducer,
+		predicates.EmptyMetadataProducer,
 		[]priorities.PriorityConfig{},
-		priorities.EmptyPriorityMetadataProducer,
-		emptySnapshot,
+		priorities.EmptyMetadataProducer,
+		nodeinfosnapshot.NewEmptySnapshot(),
 		emptyFramework,
 		[]algorithm.SchedulerExtender{},
 		nil,
@@ -694,14 +695,15 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 }
 
 func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
+	queue := internalqueue.NewSchedulingQueue(nil)
 	algo := core.NewGenericScheduler(
 		scache,
-		internalqueue.NewSchedulingQueue(nil, nil),
+		queue,
 		predicateMap,
-		predicates.EmptyPredicateMetadataProducer,
+		predicates.EmptyMetadataProducer,
 		[]priorities.PriorityConfig{},
-		priorities.EmptyPriorityMetadataProducer,
-		emptySnapshot,
+		priorities.EmptyMetadataProducer,
+		nodeinfosnapshot.NewEmptySnapshot(),
 		emptyFramework,
 		[]algorithm.SchedulerExtender{},
 		nil,
@@ -739,6 +741,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		StopEverything:      stop,
 		Framework:           emptyFramework,
 		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
+		SchedulingQueue:     queue,
 	}
 
 	return sched, bindingChan

@@ -24,12 +24,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	"k8s.io/utils/mount"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/fake"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/legacy-cloud-providers/vsphere"
@@ -42,7 +43,7 @@ func TestCanSupport(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/vsphere-volume")
 	if err != nil {
@@ -91,7 +92,7 @@ func TestPlugin(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/vsphere-volume")
 	if err != nil {
@@ -213,7 +214,7 @@ func TestUnsupportedCloudProvider(t *testing.T) {
 
 		plugMgr := volume.VolumePluginMgr{}
 		plugMgr.InitPlugins(ProbeVolumePlugins(), nil, /* prober */
-			volumetest.NewFakeVolumeHostWithCloudProvider(tmpDir, nil, nil, tc.cloudProvider))
+			volumetest.NewFakeVolumeHostWithCloudProvider(t, tmpDir, nil, nil, tc.cloudProvider))
 
 		plug, err := plugMgr.FindAttachablePluginByName("kubernetes.io/vsphere-volume")
 		if err != nil {

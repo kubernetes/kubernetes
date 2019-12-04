@@ -162,10 +162,9 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 	}
 
 	cleanup := func() {
-		if l.driverCleanup != nil {
-			l.driverCleanup()
-			l.driverCleanup = nil
-		}
+		err := tryFunc(l.driverCleanup)
+		l.driverCleanup = nil
+		framework.ExpectNoError(err, "while cleaning up driver")
 
 		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
@@ -325,7 +324,7 @@ func (t StorageClassTest) checkProvisioning(client clientset.Interface, claim *v
 				break
 			}
 		}
-		gomega.Expect(found).To(gomega.BeTrue())
+		framework.ExpectEqual(found, true)
 	}
 
 	framework.ExpectEqual(pv.Spec.ClaimRef.Name, claim.ObjectMeta.Name)
@@ -454,7 +453,10 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 	ginkgo.By("creating a storage class " + t.Class.Name)
 	class, err := t.Client.StorageV1().StorageClasses().Create(t.Class)
 	framework.ExpectNoError(err)
-	defer deleteStorageClass(t.Client, class.Name)
+	defer func() {
+		err = deleteStorageClass(t.Client, class.Name)
+		framework.ExpectNoError(err, "While deleting storage class")
+	}()
 
 	ginkgo.By("creating claims")
 	var claimNames []string
@@ -629,6 +631,12 @@ func prepareSnapshotDataSourceForProvisioning(
 	ginkgo.By("[Initialize dataSource]creating a initClaim")
 	updatedClaim, err := client.CoreV1().PersistentVolumeClaims(initClaim.Namespace).Create(initClaim)
 	framework.ExpectNoError(err)
+
+	// write namespace to the /mnt/test (= the volume).
+	ginkgo.By("[Initialize dataSource]write data to volume")
+	command := fmt.Sprintf("echo '%s' > /mnt/test/initialData", updatedClaim.GetNamespace())
+	RunInPodWithVolume(client, updatedClaim.Namespace, updatedClaim.Name, "pvc-snapshot-writer", command, node)
+
 	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, updatedClaim.Namespace, updatedClaim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 	framework.ExpectNoError(err)
 
@@ -636,11 +644,6 @@ func prepareSnapshotDataSourceForProvisioning(
 	// Get new copy of the initClaim
 	_, err = client.CoreV1().PersistentVolumeClaims(updatedClaim.Namespace).Get(updatedClaim.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-
-	// write namespace to the /mnt/test (= the volume).
-	ginkgo.By("[Initialize dataSource]write data to volume")
-	command := fmt.Sprintf("echo '%s' > /mnt/test/initialData", updatedClaim.GetNamespace())
-	RunInPodWithVolume(client, updatedClaim.Namespace, updatedClaim.Name, "pvc-snapshot-writer", command, node)
 
 	ginkgo.By("[Initialize dataSource]creating a SnapshotClass")
 	snapshotClass, err = dynamicClient.Resource(snapshotClassGVR).Create(snapshotClass, metav1.CreateOptions{})

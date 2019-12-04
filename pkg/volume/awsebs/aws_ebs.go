@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	"k8s.io/klog"
+	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -36,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/legacy-cloud-providers/aws"
@@ -87,11 +87,6 @@ func (plugin *awsElasticBlockStorePlugin) GetVolumeName(spec *volume.Spec) (stri
 func (plugin *awsElasticBlockStorePlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.AWSElasticBlockStore != nil) ||
 		(spec.Volume != nil && spec.Volume.AWSElasticBlockStore != nil)
-}
-
-func (plugin *awsElasticBlockStorePlugin) IsMigratedToCSI() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
 }
 
 func (plugin *awsElasticBlockStorePlugin) RequiresRemount() bool {

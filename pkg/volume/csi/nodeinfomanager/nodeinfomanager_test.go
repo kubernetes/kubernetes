@@ -962,7 +962,7 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("can't create temp dir: %v", err)
 		}
-		host := volumetest.NewFakeVolumeHostWithCSINodeName(
+		host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
 			tmpDir,
 			client,
 			nil,
@@ -1011,7 +1011,6 @@ func getClientSet(existingNode *v1.Node, existingCSINode *storage.CSINode) *fake
 
 func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []testcase) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, csiNodeInfoEnabled)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()
 
 	for _, tc := range testcases {
 		t.Logf("test case: %q", tc.name)
@@ -1024,7 +1023,7 @@ func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []t
 		if err != nil {
 			t.Fatalf("can't create temp dir: %v", err)
 		}
-		host := volumetest.NewFakeVolumeHostWithCSINodeName(
+		host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
 			tmpDir,
 			client,
 			nil,

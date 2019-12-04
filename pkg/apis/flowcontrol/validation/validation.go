@@ -60,9 +60,14 @@ var supportedSubjectKinds = sets.NewString(
 	string(flowcontrol.SubjectKindUser),
 )
 
-var supportedQueuingType = sets.NewString(
-	string(flowcontrol.PriorityLevelQueuingTypeQueueing),
-	string(flowcontrol.PriorityLevelQueuingTypeExempt),
+var supportedPriorityLevelEnablement = sets.NewString(
+	string(flowcontrol.PriorityLevelEnablementExempt),
+	string(flowcontrol.PriorityLevelEnablementLimited),
+)
+
+var supportedLimitResponseType = sets.NewString(
+	string(flowcontrol.LimitResponseTypeQueue),
+	string(flowcontrol.LimitResponseTypeReject),
 )
 
 // ValidateFlowSchema validates the content of flow-schema
@@ -240,8 +245,24 @@ func ValidateFlowSchemaResourcePolicyRule(rule *flowcontrol.ResourcePolicyRule, 
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("resources"), rule.Resources, "if '*' is present, must not specify other resources"))
 	}
 
+	if len(rule.Namespaces) == 0 && !rule.ClusterScope {
+		allErrs = append(allErrs, field.Required(fldPath.Child("namespaces"), "resource rules that are not cluster scoped must supply at least one namespace"))
+	} else if hasWildcard(rule.Namespaces) {
+		if len(rule.Namespaces) > 1 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespaces"), rule.Namespaces, "if '*' is present, must not specify other namespaces"))
+		}
+	} else {
+		for idx, tgtNS := range rule.Namespaces {
+			for _, msg := range apimachineryvalidation.ValidateNamespaceName(tgtNS, false) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("namespaces").Index(idx), tgtNS, nsErrIntro+msg))
+			}
+		}
+	}
+
 	return allErrs
 }
+
+const nsErrIntro = "each member of this list must be '*' or a DNS-1123 label; "
 
 // ValidateFlowSchemaStatus validates status for the flow-schema.
 func ValidateFlowSchemaStatus(status *flowcontrol.FlowSchemaStatus, fldPath *field.Path) field.ErrorList {
@@ -288,18 +309,48 @@ func ValidatePriorityLevelConfigurationUpdate(old, pl *flowcontrol.PriorityLevel
 func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfigurationSpec, name string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	switch spec.Type {
-	case flowcontrol.PriorityLevelQueuingTypeExempt:
-		if spec.Queuing != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("queuing"), "must be nil if the type is not Queuing"))
+	case flowcontrol.PriorityLevelEnablementExempt:
+		if spec.Limited != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("limited"), "must be nil if the type is not Limited"))
 		}
-	case flowcontrol.PriorityLevelQueuingTypeQueueing:
-		if spec.Queuing == nil {
-			allErrs = append(allErrs, field.Required(fldPath.Child("queuing"), "must not be empty"))
+	case flowcontrol.PriorityLevelEnablementLimited:
+		if spec.Limited == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("limited"), "must not be empty"))
 		} else {
-			allErrs = append(allErrs, ValidatePriorityLevelQueuingConfiguration(spec.Queuing, fldPath.Child("queuing"))...)
+			allErrs = append(allErrs, ValidateLimitedPriorityLevelConfiguration(spec.Limited, fldPath.Child("limited"))...)
 		}
 	default:
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), spec.Type, supportedQueuingType.List()))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), spec.Type, supportedPriorityLevelEnablement.List()))
+	}
+	return allErrs
+}
+
+// ValidateLimitedPriorityLevelConfiguration validates the configuration for an exeuction-limited priority level
+func ValidateLimitedPriorityLevelConfiguration(lplc *flowcontrol.LimitedPriorityLevelConfiguration, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if lplc.AssuredConcurrencyShares <= 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("assuredConcurrencyShares"), lplc.AssuredConcurrencyShares, "must be positive"))
+	}
+	allErrs = append(allErrs, ValidateLimitResponse(lplc.LimitResponse, fldPath.Child("limitResponse"))...)
+	return allErrs
+}
+
+// ValidateLimitResponse validates a LimitResponse
+func ValidateLimitResponse(lr flowcontrol.LimitResponse, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	switch lr.Type {
+	case flowcontrol.LimitResponseTypeReject:
+		if lr.Queuing != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("queuing"), "must be nil if the type is not Limited"))
+		}
+	case flowcontrol.LimitResponseTypeQueue:
+		if lr.Queuing == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("queuing"), "must not be empty"))
+		} else {
+			allErrs = append(allErrs, ValidatePriorityLevelQueuingConfiguration(lr.Queuing, fldPath.Child("queuing"))...)
+		}
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), lr.Type, supportedLimitResponseType.List()))
 	}
 	return allErrs
 }
@@ -307,9 +358,6 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 // ValidatePriorityLevelQueuingConfiguration validates queuing-configuration for a priority-level
 func ValidatePriorityLevelQueuingConfiguration(queuing *flowcontrol.QueuingConfiguration, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	if queuing.AssuredConcurrencyShares <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("assuredConcurrencyShares"), queuing.AssuredConcurrencyShares, "must be positive"))
-	}
 	if queuing.QueueLengthLimit <= 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("queueLengthLimit"), queuing.QueueLengthLimit, "must be positive"))
 	}
@@ -392,8 +440,12 @@ func ValidateNonResourceURLPath(path string, fldPath *field.Path) *field.Error {
 }
 
 func hasWildcard(operations []string) bool {
-	for _, o := range operations {
-		if o == "*" {
+	return memberInList("*", operations...)
+}
+
+func memberInList(seek string, a ...string) bool {
+	for _, ai := range a {
+		if ai == seek {
 			return true
 		}
 	}

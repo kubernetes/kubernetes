@@ -154,9 +154,9 @@ func (t *topologyTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 
 	cleanup := func(l topologyTest) {
 		t.cleanupResources(cs, &l)
-		if l.driverCleanup != nil {
-			l.driverCleanup()
-		}
+		err := tryFunc(l.driverCleanup)
+		l.driverCleanup = nil
+		framework.ExpectNoError(err, "while cleaning up driver")
 
 		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
@@ -353,5 +353,7 @@ func (t *topologyTestSuite) cleanupResources(cs clientset.Interface, l *topology
 		err := e2epod.DeletePodWithWait(cs, l.pod)
 		framework.ExpectNoError(err, "while deleting pod")
 	}
-	l.resource.cleanupResource()
+
+	err := l.resource.cleanupResource()
+	framework.ExpectNoError(err, "while clean up resource")
 }

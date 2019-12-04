@@ -193,7 +193,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			metaDataProducer := priorities.NewPriorityMetadataFactory(
+			metaDataProducer := priorities.NewMetadataFactory(
 				informerFactory.Core().V1().Services().Lister(),
 				informerFactory.Core().V1().ReplicationControllers().Lister(),
 				informerFactory.Apps().V1().ReplicaSets().Lister(),
@@ -201,7 +201,7 @@ func TestImageLocalityPriority(t *testing.T) {
 				1,
 			)
 
-			snapshot := nodeinfosnapshot.NewSnapshot(nil, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(nil, test.nodes))
 			meta := metaDataProducer(test.pod, test.nodes, snapshot)
 
 			state := framework.NewCycleState()

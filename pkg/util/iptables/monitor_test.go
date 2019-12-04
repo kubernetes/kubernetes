@@ -130,9 +130,8 @@ func (mfc *monitorFakeCmd) CombinedOutput() ([]byte, error) {
 	case opListChain:
 		if table.Has(chainName) {
 			return []byte{}, nil
-		} else {
-			return []byte{}, fmt.Errorf("no such chain %q", chainName)
 		}
+		return []byte{}, fmt.Errorf("no such chain %q", chainName)
 	case opDeleteChain:
 		table.Delete(chainName)
 		return []byte{}, nil

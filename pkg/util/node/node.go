@@ -112,7 +112,7 @@ func GetNodeHostIP(node *v1.Node) (net.IP, error) {
 func GetNodeIP(client clientset.Interface, hostname string) net.IP {
 	var nodeIP net.IP
 	backoff := wait.Backoff{
-		Steps:    5,
+		Steps:    6,
 		Duration: 1 * time.Second,
 		Factor:   2.0,
 		Jitter:   0.2,

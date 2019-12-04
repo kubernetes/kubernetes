@@ -21,6 +21,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/validatingwebhookconfiguration"
 )
 
@@ -42,6 +45,8 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 		CreateStrategy: validatingwebhookconfiguration.Strategy,
 		UpdateStrategy: validatingwebhookconfiguration.Strategy,
 		DeleteStrategy: validatingwebhookconfiguration.Strategy,
+
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {

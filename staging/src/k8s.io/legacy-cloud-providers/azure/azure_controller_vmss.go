@@ -44,8 +44,7 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 
 	disks := []compute.DataDisk{}
 	if vm.StorageProfile != nil && vm.StorageProfile.DataDisks != nil {
-		disks = make([]compute.DataDisk, len(*vm.StorageProfile.DataDisks))
-		copy(disks, *vm.StorageProfile.DataDisks)
+		disks = filterDetachingDisks(*vm.StorageProfile.DataDisks)
 	}
 	if isManagedDisk {
 		managedDisk := &compute.ManagedDiskParameters{ID: &diskURI}
@@ -88,9 +87,7 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 	defer cancel()
 
 	// Invalidate the cache right after updating
-	if err = ss.deleteCacheForNode(vmName); err != nil {
-		return err
-	}
+	defer ss.deleteCacheForNode(vmName)
 
 	klog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk(%s, %s) with DiskEncryptionSetID(%s)", nodeResourceGroup, nodeName, diskName, diskURI, diskEncryptionSetID)
 	_, err = ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM, "attach_disk")
@@ -123,8 +120,7 @@ func (ss *scaleSet) DetachDisk(diskName, diskURI string, nodeName types.NodeName
 
 	disks := []compute.DataDisk{}
 	if vm.StorageProfile != nil && vm.StorageProfile.DataDisks != nil {
-		disks = make([]compute.DataDisk, len(*vm.StorageProfile.DataDisks))
-		copy(disks, *vm.StorageProfile.DataDisks)
+		disks = filterDetachingDisks(*vm.StorageProfile.DataDisks)
 	}
 	bFoundDisk := false
 	for i, disk := range disks {
@@ -160,9 +156,7 @@ func (ss *scaleSet) DetachDisk(diskName, diskURI string, nodeName types.NodeName
 	defer cancel()
 
 	// Invalidate the cache right after updating
-	if err = ss.deleteCacheForNode(vmName); err != nil {
-		return nil, err
-	}
+	defer ss.deleteCacheForNode(vmName)
 
 	klog.V(2).Infof("azureDisk - update(%s): vm(%s) - detach disk(%s, %s)", nodeResourceGroup, nodeName, diskName, diskURI)
 	return ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM, "detach_disk")

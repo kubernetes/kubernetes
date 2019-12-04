@@ -18,11 +18,13 @@ package options
 
 import (
 	"github.com/spf13/pflag"
+	"k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/component-base/featuregate"
 )
 
 // RecommendedOptions contains the recommended options for running an API server.
@@ -37,6 +39,8 @@ type RecommendedOptions struct {
 	Features       *FeatureOptions
 	CoreAPI        *CoreAPIOptions
 
+	// FeatureGate is a way to plumb feature gate through if you have them.
+	FeatureGate featuregate.FeatureGate
 	// ExtraAdmissionInitializers is called once after all ApplyTo from the options above, to pass the returned
 	// admission plugin initializers to Admission.ApplyTo.
 	ExtraAdmissionInitializers func(c *server.RecommendedConfig) ([]admission.PluginInitializer, error)
@@ -58,13 +62,17 @@ func NewRecommendedOptions(prefix string, codec runtime.Codec, processInfo *Proc
 	sso.HTTP2MaxStreamsPerConnection = 1000
 
 	return &RecommendedOptions{
-		Etcd:                       NewEtcdOptions(storagebackend.NewDefaultConfig(prefix, codec)),
-		SecureServing:              sso.WithLoopback(),
-		Authentication:             NewDelegatingAuthenticationOptions(),
-		Authorization:              NewDelegatingAuthorizationOptions(),
-		Audit:                      NewAuditOptions(),
-		Features:                   NewFeatureOptions(),
-		CoreAPI:                    NewCoreAPIOptions(),
+		Etcd:           NewEtcdOptions(storagebackend.NewDefaultConfig(prefix, codec)),
+		SecureServing:  sso.WithLoopback(),
+		Authentication: NewDelegatingAuthenticationOptions(),
+		Authorization:  NewDelegatingAuthorizationOptions(),
+		Audit:          NewAuditOptions(),
+		Features:       NewFeatureOptions(),
+		CoreAPI:        NewCoreAPIOptions(),
+		// Wired a global by default that sadly people will abuse to have different meanings in different repos.
+		// Please consider creating your own FeatureGate so you can have a consistent meaning for what a variable contains
+		// across different repos.  Future you will thank you.
+		FeatureGate:                feature.DefaultFeatureGate,
 		ExtraAdmissionInitializers: func(c *server.RecommendedConfig) ([]admission.PluginInitializer, error) { return nil, nil },
 		Admission:                  NewAdmissionOptions(),
 		ProcessInfo:                processInfo,
@@ -111,7 +119,7 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	}
 	if initializers, err := o.ExtraAdmissionInitializers(config); err != nil {
 		return err
-	} else if err := o.Admission.ApplyTo(&config.Config, config.SharedInformerFactory, config.ClientConfig, initializers...); err != nil {
+	} else if err := o.Admission.ApplyTo(&config.Config, config.SharedInformerFactory, config.ClientConfig, o.FeatureGate, initializers...); err != nil {
 		return err
 	}
 	if err := o.EgressSelector.ApplyTo(&config.Config); err != nil {

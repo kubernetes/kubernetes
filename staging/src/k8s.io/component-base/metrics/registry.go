@@ -32,6 +32,8 @@ import (
 var (
 	showHiddenOnce sync.Once
 	showHidden     atomic.Value
+	registries     []*kubeRegistry // stores all registries created by NewKubeRegistry()
+	registriesLock sync.RWMutex
 )
 
 // shouldHide be used to check if a specific metric with deprecated version should be hidden
@@ -49,11 +51,39 @@ func shouldHide(currentVersion *semver.Version, deprecatedVersion *semver.Versio
 	return false
 }
 
+func validateShowHiddenMetricsVersion(currentVersion semver.Version, targetVersionStr string) error {
+	if targetVersionStr == "" {
+		return nil
+	}
+
+	validVersionStr := fmt.Sprintf("%d.%d", currentVersion.Major, currentVersion.Minor-1)
+	if targetVersionStr != validVersionStr {
+		return fmt.Errorf("--show-hidden-metrics-for-version must be omitted or have the value '%v'. Only the previous minor version is allowed", validVersionStr)
+	}
+
+	return nil
+}
+
+// ValidateShowHiddenMetricsVersion checks invalid version for which show hidden metrics.
+func ValidateShowHiddenMetricsVersion(v string) []error {
+	err := validateShowHiddenMetricsVersion(parseVersion(version.Get()), v)
+	if err != nil {
+		return []error{err}
+	}
+
+	return nil
+}
+
 // SetShowHidden will enable showing hidden metrics. This will no-opt
 // after the initial call
 func SetShowHidden() {
 	showHiddenOnce.Do(func() {
 		showHidden.Store(true)
+
+		// re-register collectors that has been hidden in phase of last registry.
+		for _, r := range registries {
+			r.enableHiddenCollectors()
+		}
 	})
 }
 
@@ -68,7 +98,15 @@ func ShouldShowHidden() bool {
 // will register with KubeRegistry.
 type Registerable interface {
 	prometheus.Collector
+
+	// Create will mark deprecated state for the collector
 	Create(version *semver.Version) bool
+
+	// ClearState will clear all the states marked by Create.
+	ClearState()
+
+	// FQName returns the fully-qualified metric name of the collector.
+	FQName() string
 }
 
 // KubeRegistry is an interface which implements a subset of prometheus.Registerer and
@@ -91,7 +129,9 @@ type KubeRegistry interface {
 // automatic behavior can be configured for metric versioning.
 type kubeRegistry struct {
 	PromRegistry
-	version semver.Version
+	version              semver.Version
+	hiddenCollectors     map[string]Registerable // stores all collectors that has been hidden
+	hiddenCollectorsLock sync.RWMutex
 }
 
 // Register registers a new Collector to be included in metrics
@@ -103,6 +143,9 @@ func (kr *kubeRegistry) Register(c Registerable) error {
 	if c.Create(&kr.version) {
 		return kr.PromRegistry.Register(c)
 	}
+
+	kr.trackHiddenCollector(c)
+
 	return nil
 }
 
@@ -114,6 +157,8 @@ func (kr *kubeRegistry) MustRegister(cs ...Registerable) {
 	for _, c := range cs {
 		if c.Create(&kr.version) {
 			metrics = append(metrics, c)
+		} else {
+			kr.trackHiddenCollector(c)
 		}
 	}
 	kr.PromRegistry.MustRegister(metrics...)
@@ -181,11 +226,37 @@ func (kr *kubeRegistry) Gather() ([]*dto.MetricFamily, error) {
 	return kr.PromRegistry.Gather()
 }
 
+// trackHiddenCollector stores all hidden collectors.
+func (kr *kubeRegistry) trackHiddenCollector(c Registerable) {
+	kr.hiddenCollectorsLock.Lock()
+	defer kr.hiddenCollectorsLock.Unlock()
+
+	kr.hiddenCollectors[c.FQName()] = c
+}
+
+// enableHiddenCollectors will re-register all of the hidden collectors.
+func (kr *kubeRegistry) enableHiddenCollectors() {
+	kr.hiddenCollectorsLock.Lock()
+	defer kr.hiddenCollectorsLock.Unlock()
+
+	for _, c := range kr.hiddenCollectors {
+		c.ClearState()
+		kr.MustRegister(c)
+	}
+	kr.hiddenCollectors = nil
+}
+
 func newKubeRegistry(v apimachineryversion.Info) *kubeRegistry {
 	r := &kubeRegistry{
-		PromRegistry: prometheus.NewRegistry(),
-		version:      parseVersion(v),
+		PromRegistry:     prometheus.NewRegistry(),
+		version:          parseVersion(v),
+		hiddenCollectors: make(map[string]Registerable),
 	}
+
+	registriesLock.Lock()
+	defer registriesLock.Unlock()
+	registries = append(registries, r)
+
 	return r
 }
 
@@ -193,5 +264,6 @@ func newKubeRegistry(v apimachineryversion.Info) *kubeRegistry {
 // pre-registered.
 func NewKubeRegistry() KubeRegistry {
 	r := newKubeRegistry(version.Get())
+
 	return r
 }

@@ -384,7 +384,7 @@ func verifyVSphereVolumesAccessible(c clientset.Interface, pod *v1.Pod, persiste
 		// Verify disks are attached to the node
 		isAttached, err := diskIsAttached(pv.Spec.VsphereVolume.VolumePath, nodeName)
 		framework.ExpectNoError(err)
-		gomega.Expect(isAttached).To(gomega.BeTrue(), fmt.Sprintf("disk %v is not attached with the node", pv.Spec.VsphereVolume.VolumePath))
+		framework.ExpectEqual(isAttached, true, fmt.Sprintf("disk %v is not attached with the node", pv.Spec.VsphereVolume.VolumePath))
 		// Verify Volumes are accessible
 		filepath := filepath.Join("/mnt/", fmt.Sprintf("volume%v", index+1), "/emptyFile.txt")
 		_, err = framework.LookForStringInPodExec(namespace, pod.Name, []string{"/bin/touch", filepath}, "", time.Minute)
@@ -795,7 +795,7 @@ func invokeVCenterServiceControl(command, service, host string) error {
 func expectVolumeToBeAttached(nodeName, volumePath string) {
 	isAttached, err := diskIsAttached(volumePath, nodeName)
 	framework.ExpectNoError(err)
-	gomega.Expect(isAttached).To(gomega.BeTrue(), fmt.Sprintf("disk: %s is not attached with the node", volumePath))
+	framework.ExpectEqual(isAttached, true, fmt.Sprintf("disk: %s is not attached with the node", volumePath))
 }
 
 // expectVolumesToBeAttached checks if the given Volumes are attached to the

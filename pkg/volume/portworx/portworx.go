@@ -21,15 +21,16 @@ import (
 	"os"
 
 	volumeclient "github.com/libopenstorage/openstorage/api/client/volume"
-	"k8s.io/api/core/v1"
+	"k8s.io/klog"
+	"k8s.io/utils/mount"
+	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -93,10 +94,6 @@ func (plugin *portworxVolumePlugin) GetVolumeName(spec *volume.Spec) (string, er
 func (plugin *portworxVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.PortworxVolume != nil) ||
 		(spec.Volume != nil && spec.Volume.PortworxVolume != nil)
-}
-
-func (plugin *portworxVolumePlugin) IsMigratedToCSI() bool {
-	return false
 }
 
 func (plugin *portworxVolumePlugin) RequiresRemount() bool {

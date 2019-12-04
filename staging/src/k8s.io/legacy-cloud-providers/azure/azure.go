@@ -325,7 +325,7 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 		}
 	}
 
-	env, err := auth.ParseAzureEnvironment(config.Cloud)
+	env, err := auth.ParseAzureEnvironment(config.Cloud, config.ResourceManagerEndpoint, config.IdentitySystem)
 	if err != nil {
 		return err
 	}
@@ -614,6 +614,7 @@ func initDiskControllers(az *Cloud) error {
 		resourceGroup:         az.ResourceGroup,
 		subscriptionID:        az.SubscriptionID,
 		cloud:                 az,
+		vmLockMap:             newLockMap(),
 	}
 
 	az.BlobDiskController = &BlobDiskController{common: common}

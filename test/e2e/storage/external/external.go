@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 // List of testSuites to be executed for each external driver.
@@ -280,7 +279,7 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(config *testsuites.Pe
 	framework.ExpectNoError(err, "patch items")
 
 	sc, ok := items[0].(*storagev1.StorageClass)
-	gomega.Expect(ok).To(gomega.BeTrue(), "storage class from %s", d.StorageClass.FromFile)
+	framework.ExpectEqual(ok, true, "storage class from %s", d.StorageClass.FromFile)
 	// Ensure that we can load more than once as required for
 	// GetDynamicProvisionStorageClass by adding a random suffix.
 	sc.Name = names.SimpleNameGenerator.GenerateName(sc.Name + "-")

@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -962,6 +964,7 @@ func createDswpWithVolume(t *testing.T, pv *v1.PersistentVolume, pvc *v1.Persist
 
 	fakeStatusManager := status.NewManager(fakeClient, fakePodManager, &statustest.FakePodDeletionSafetyProvider{})
 
+	csiTranslator := csitrans.New()
 	dswp := &desiredStateOfWorldPopulator{
 		kubeClient:                fakeClient,
 		loopSleepDuration:         100 * time.Millisecond,
@@ -974,6 +977,8 @@ func createDswpWithVolume(t *testing.T, pv *v1.PersistentVolume, pvc *v1.Persist
 			processedPods: make(map[types.UniquePodName]bool)},
 		kubeContainerRuntime:     fakeRuntime,
 		keepTerminatedPodVolumes: false,
+		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator),
+		intreeToCSITranslator:    csiTranslator,
 	}
 	return dswp, fakePodManager, fakesDSW
 }

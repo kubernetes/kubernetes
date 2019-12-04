@@ -209,6 +209,14 @@ func (cache *schedulerCache) UpdateNodeInfoSnapshot(nodeSnapshot *nodeinfosnapsh
 	// Get the last generation of the snapshot.
 	snapshotGeneration := nodeSnapshot.Generation
 
+	// NodeInfoList and HavePodsWithAffinityNodeInfoList must be re-created if a node was added
+	// or removed from the cache.
+	updateAllLists := false
+	// HavePodsWithAffinityNodeInfoList must be re-created if a node changed its
+	// status from having pods with affinity to NOT having pods with affinity or the other
+	// way around.
+	updateNodesHavePodsWithAffinity := false
+
 	// Start from the head of the NodeInfo doubly linked list and update snapshot
 	// of NodeInfos updated after the last snapshot.
 	for node := cache.headNode; node != nil; node = node.next {
@@ -221,7 +229,22 @@ func (cache *schedulerCache) UpdateNodeInfoSnapshot(nodeSnapshot *nodeinfosnapsh
 			node.info.TransientInfo.ResetTransientSchedulerInfo()
 		}
 		if np := node.info.Node(); np != nil {
-			nodeSnapshot.NodeInfoMap[np.Name] = node.info.Clone()
+			existing, ok := nodeSnapshot.NodeInfoMap[np.Name]
+			if !ok {
+				updateAllLists = true
+				existing = &schedulernodeinfo.NodeInfo{}
+				nodeSnapshot.NodeInfoMap[np.Name] = existing
+			}
+			clone := node.info.Clone()
+			// We track nodes that have pods with affinity, here we check if this node changed its
+			// status from having pods with affinity to NOT having pods with affinity or the other
+			// way around.
+			if (len(existing.PodsWithAffinity()) > 0) != (len(clone.PodsWithAffinity()) > 0) {
+				updateNodesHavePodsWithAffinity = true
+			}
+			// We need to preserve the original pointer of the NodeInfo struct since it
+			// is used in the NodeInfoList, which we may not update.
+			*existing = *clone
 		}
 	}
 	// Update the snapshot generation with the latest NodeInfo generation.
@@ -230,28 +253,67 @@ func (cache *schedulerCache) UpdateNodeInfoSnapshot(nodeSnapshot *nodeinfosnapsh
 	}
 
 	if len(nodeSnapshot.NodeInfoMap) > len(cache.nodes) {
-		for name := range nodeSnapshot.NodeInfoMap {
-			if _, ok := cache.nodes[name]; !ok {
-				delete(nodeSnapshot.NodeInfoMap, name)
-			}
-		}
+		cache.removeDeletedNodesFromSnapshot(nodeSnapshot)
+		updateAllLists = true
 	}
 
-	// Take a snapshot of the nodes order in the tree
-	nodeSnapshot.NodeInfoList = make([]*schedulernodeinfo.NodeInfo, 0, cache.nodeTree.numNodes)
+	if updateAllLists || updateNodesHavePodsWithAffinity {
+		cache.updateNodeInfoSnapshotList(nodeSnapshot, updateAllLists)
+	}
+
+	if len(nodeSnapshot.NodeInfoList) != len(nodeSnapshot.NodeInfoMap) {
+		errMsg := fmt.Sprintf("snapshot state is not consistent, length of NodeInfoList=%v not equal to length of NodeInfoMap=%v "+
+			"length of nodes in cache=%v, length of nodes in tree=%v"+
+			", trying to recover",
+			len(nodeSnapshot.NodeInfoList), len(nodeSnapshot.NodeInfoMap),
+			len(cache.nodes), cache.nodeTree.numNodes)
+		klog.Error(errMsg)
+		// We will try to recover by re-creating the lists for the next scheduling cycle, but still return an
+		// error to surface the problem, the error will likely cause a failure to the current scheduling cycle.
+		cache.updateNodeInfoSnapshotList(nodeSnapshot, true)
+		return fmt.Errorf(errMsg)
+	}
+
+	return nil
+}
+
+func (cache *schedulerCache) updateNodeInfoSnapshotList(nodeSnapshot *nodeinfosnapshot.Snapshot, updateAll bool) {
 	nodeSnapshot.HavePodsWithAffinityNodeInfoList = make([]*schedulernodeinfo.NodeInfo, 0, cache.nodeTree.numNodes)
-	for i := 0; i < cache.nodeTree.numNodes; i++ {
-		nodeName := cache.nodeTree.next()
-		if n := nodeSnapshot.NodeInfoMap[nodeName]; n != nil {
-			nodeSnapshot.NodeInfoList = append(nodeSnapshot.NodeInfoList, n)
+	if updateAll {
+		// Take a snapshot of the nodes order in the tree
+		nodeSnapshot.NodeInfoList = make([]*schedulernodeinfo.NodeInfo, 0, cache.nodeTree.numNodes)
+		for i := 0; i < cache.nodeTree.numNodes; i++ {
+			nodeName := cache.nodeTree.next()
+			if n := nodeSnapshot.NodeInfoMap[nodeName]; n != nil {
+				nodeSnapshot.NodeInfoList = append(nodeSnapshot.NodeInfoList, n)
+				if len(n.PodsWithAffinity()) > 0 {
+					nodeSnapshot.HavePodsWithAffinityNodeInfoList = append(nodeSnapshot.HavePodsWithAffinityNodeInfoList, n)
+				}
+			} else {
+				klog.Errorf("node %q exist in nodeTree but not in NodeInfoMap, this should not happen.", nodeName)
+			}
+		}
+	} else {
+		for _, n := range nodeSnapshot.NodeInfoList {
 			if len(n.PodsWithAffinity()) > 0 {
 				nodeSnapshot.HavePodsWithAffinityNodeInfoList = append(nodeSnapshot.HavePodsWithAffinityNodeInfoList, n)
 			}
-		} else {
-			klog.Errorf("node %q exist in nodeTree but not in NodeInfoMap, this should not happen.", nodeName)
 		}
 	}
-	return nil
+}
+
+// If certain nodes were deleted after the last snapshot was taken, we should remove them from the snapshot.
+func (cache *schedulerCache) removeDeletedNodesFromSnapshot(nodeSnapshot *nodeinfosnapshot.Snapshot) {
+	toDelete := len(nodeSnapshot.NodeInfoMap) - len(cache.nodes)
+	for name := range nodeSnapshot.NodeInfoMap {
+		if toDelete <= 0 {
+			break
+		}
+		if _, ok := cache.nodes[name]; !ok {
+			delete(nodeSnapshot.NodeInfoMap, name)
+			toDelete--
+		}
+	}
 }
 
 func (cache *schedulerCache) List(selector labels.Selector) ([]*v1.Pod, error) {
@@ -542,6 +604,7 @@ func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) error {
 	if !ok {
 		n = newNodeInfoListItem(schedulernodeinfo.NewNodeInfo())
 		cache.nodes[newNode.Name] = n
+		cache.nodeTree.addNode(newNode)
 	} else {
 		cache.removeNodeImageStates(n.info.Node())
 	}

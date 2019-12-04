@@ -18,12 +18,13 @@ package reconcilers
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1"
+	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
+	utilnet "k8s.io/utils/net"
 )
 
 // EndpointsAdapter provides a simple interface for reading and writing both
@@ -95,6 +96,16 @@ func (adapter *EndpointsAdapter) EnsureEndpointSliceFromEndpoints(namespace stri
 		return err
 	}
 
+	// required for transition from IP to IPv4 address type.
+	if currentEndpointSlice.AddressType != endpointSlice.AddressType {
+		err = adapter.endpointSliceClient.EndpointSlices(namespace).Delete(endpointSlice.Name, &metav1.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+		_, err = adapter.endpointSliceClient.EndpointSlices(namespace).Create(endpointSlice)
+		return err
+	}
+
 	if apiequality.Semantic.DeepEqual(currentEndpointSlice.Endpoints, endpointSlice.Endpoints) &&
 		apiequality.Semantic.DeepEqual(currentEndpointSlice.Ports, endpointSlice.Ports) &&
 		apiequality.Semantic.DeepEqual(currentEndpointSlice.Labels, endpointSlice.Labels) {
@@ -112,8 +123,9 @@ func endpointSliceFromEndpoints(endpoints *corev1.Endpoints) *discovery.Endpoint
 	endpointSlice.Name = endpoints.Name
 	endpointSlice.Labels = map[string]string{discovery.LabelServiceName: endpoints.Name}
 
-	ipAddressType := discovery.AddressTypeIP
-	endpointSlice.AddressType = &ipAddressType
+	// TODO: Add support for dual stack here (and in the rest of
+	// EndpointsAdapter).
+	endpointSlice.AddressType = discovery.AddressTypeIPv4
 
 	if len(endpoints.Subsets) > 0 {
 		subset := endpoints.Subsets[0]
@@ -124,15 +136,31 @@ func endpointSliceFromEndpoints(endpoints *corev1.Endpoints) *discovery.Endpoint
 				Protocol: &subset.Ports[i].Protocol,
 			})
 		}
-		for _, address := range subset.Addresses {
-			endpointSlice.Endpoints = append(endpointSlice.Endpoints, endpointFromAddress(address, true))
+
+		if allAddressesIPv6(append(subset.Addresses, subset.NotReadyAddresses...)) {
+			endpointSlice.AddressType = discovery.AddressTypeIPv6
 		}
-		for _, address := range subset.NotReadyAddresses {
-			endpointSlice.Endpoints = append(endpointSlice.Endpoints, endpointFromAddress(address, false))
-		}
+
+		endpointSlice.Endpoints = append(endpointSlice.Endpoints, getEndpointsFromAddresses(subset.Addresses, endpointSlice.AddressType, true)...)
+		endpointSlice.Endpoints = append(endpointSlice.Endpoints, getEndpointsFromAddresses(subset.NotReadyAddresses, endpointSlice.AddressType, false)...)
 	}
 
 	return endpointSlice
+}
+
+// getEndpointsFromAddresses returns a list of Endpoints from addresses that
+// match the provided address type.
+func getEndpointsFromAddresses(addresses []corev1.EndpointAddress, addressType discovery.AddressType, ready bool) []discovery.Endpoint {
+	endpoints := []discovery.Endpoint{}
+	isIPv6AddressType := addressType == discovery.AddressTypeIPv6
+
+	for _, address := range addresses {
+		if utilnet.IsIPv6String(address.IP) == isIPv6AddressType {
+			endpoints = append(endpoints, endpointFromAddress(address, ready))
+		}
+	}
+
+	return endpoints
 }
 
 // endpointFromAddress generates an Endpoint from an EndpointAddress resource.
@@ -148,4 +176,19 @@ func endpointFromAddress(address corev1.EndpointAddress, ready bool) discovery.E
 		TargetRef:  address.TargetRef,
 		Topology:   topology,
 	}
+}
+
+// allAddressesIPv6 returns true if all provided addresses are IPv6.
+func allAddressesIPv6(addresses []corev1.EndpointAddress) bool {
+	if len(addresses) == 0 {
+		return false
+	}
+
+	for _, address := range addresses {
+		if !utilnet.IsIPv6String(address.IP) {
+			return false
+		}
+	}
+
+	return true
 }

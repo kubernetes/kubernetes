@@ -45,6 +45,7 @@ type HollowProxy struct {
 
 type FakeProxier struct {
 	proxyconfig.NoopEndpointSliceHandler
+	proxyconfig.NoopNodeHandler
 }
 
 func (*FakeProxier) Sync() {}

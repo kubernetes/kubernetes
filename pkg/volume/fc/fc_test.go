@@ -24,12 +24,14 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/utils/exec/testing"
+	"k8s.io/utils/mount"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -42,7 +44,7 @@ func TestCanSupport(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/fc")
 	if err != nil {
@@ -79,7 +81,7 @@ func TestGetAccessModes(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/fc")
 	if err != nil {
@@ -155,7 +157,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	defer os.RemoveAll(tmpDir)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/fc")
 	if err != nil {
@@ -164,7 +166,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	fakeManager := newFakeDiskManager()
 	defer fakeManager.Cleanup()
 	fakeMounter := mount.NewFakeMounter(nil)
-	fakeExec := mount.NewFakeExec(nil)
+	fakeExec := &testingexec.FakeExec{}
 	mounter, err := plug.(*fcPlugin).newMounterInternal(spec, types.UID("poduid"), fakeManager, fakeMounter, fakeExec)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
@@ -218,7 +220,7 @@ func doTestPluginNilMounter(t *testing.T, spec *volume.Spec) {
 	defer os.RemoveAll(tmpDir)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/fc")
 	if err != nil {
@@ -227,7 +229,7 @@ func doTestPluginNilMounter(t *testing.T, spec *volume.Spec) {
 	fakeManager := newFakeDiskManager()
 	defer fakeManager.Cleanup()
 	fakeMounter := mount.NewFakeMounter(nil)
-	fakeExec := mount.NewFakeExec(nil)
+	fakeExec := &testingexec.FakeExec{}
 	mounter, err := plug.(*fcPlugin).newMounterInternal(spec, types.UID("poduid"), fakeManager, fakeMounter, fakeExec)
 	if err == nil {
 		t.Errorf("Error failed to make a new Mounter is expected: %v", err)
@@ -380,7 +382,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	client := fake.NewSimpleClientset(pv, claim)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, client, nil))
 	plug, _ := plugMgr.FindPluginByName(fcPluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes

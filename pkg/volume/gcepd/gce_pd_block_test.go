@@ -112,7 +112,7 @@ func TestGetPodAndPluginMapPaths(t *testing.T) {
 
 	spec := getTestVolume(false, tmpVDir, true /*isBlock*/)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpVDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpVDir, nil, nil))
 	plug, err := plugMgr.FindMapperPluginByName(gcePersistentDiskPluginName)
 	if err != nil {
 		os.RemoveAll(tmpVDir)

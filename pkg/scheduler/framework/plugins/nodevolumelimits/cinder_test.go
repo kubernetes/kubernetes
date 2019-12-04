@@ -22,9 +22,6 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
@@ -83,8 +80,6 @@ func TestCinderLimits(t *testing.T) {
 			wantStatus:   framework.NewStatus(framework.Unschedulable, predicates.ErrMaxVolumeCountExceeded.GetReason()),
 		},
 	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()
 
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {

@@ -86,7 +86,7 @@ func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL,
 		// used. Currently we advertise support 5k nodes and 10k
 		// namespaces; a 32k entry cache is therefore a 2x safety
 		// margin.
-		cache: newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(1024, clock) }),
+		cache: newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(clock) }),
 
 		hashPool: &sync.Pool{
 			New: func() interface{} {

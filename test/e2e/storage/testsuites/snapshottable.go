@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -37,12 +38,12 @@ import (
 const snapshotGroup = "snapshot.storage.k8s.io"
 
 // snapshot CRD api version
-const snapshotAPIVersion = "snapshot.storage.k8s.io/v1alpha1"
+const snapshotAPIVersion = "snapshot.storage.k8s.io/v1beta1"
 
 var (
-	snapshotGVR        = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1alpha1", Resource: "volumesnapshots"}
-	snapshotClassGVR   = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1alpha1", Resource: "volumesnapshotclasses"}
-	snapshotContentGVR = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1alpha1", Resource: "volumesnapshotcontents"}
+	snapshotGVR        = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1beta1", Resource: "volumesnapshots"}
+	snapshotClassGVR   = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1beta1", Resource: "volumesnapshotclasses"}
+	snapshotContentGVR = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1beta1", Resource: "volumesnapshotcontents"}
 )
 
 type snapshottableTestSuite struct {
@@ -106,7 +107,10 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 
 		// Now do the more expensive test initialization.
 		config, driverCleanup := driver.PrepareTest(f)
-		defer driverCleanup()
+		defer func() {
+			err := tryFunc(driverCleanup)
+			framework.ExpectNoError(err, "while cleaning up driver")
+		}()
 
 		vsc := sDriver.GetSnapshotClass(config)
 		class := dDriver.GetDynamicProvisionStorageClass(config, "")
@@ -143,6 +147,12 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
 			}
 		}()
+
+		ginkgo.By("starting a pod to use the claim")
+		command := "echo 'hello world' > /mnt/test/data"
+		pod := StartInPodWithVolume(cs, pvc.Namespace, pvc.Name, "pvc-snapshottable-tester", command, e2epod.NodeSelection{Name: config.ClientNodeName})
+		defer StopPod(cs, pod)
+
 		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 
@@ -152,7 +162,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		framework.ExpectNoError(err)
 
 		// Get the bound PV
-		pv, err := cs.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
+		_, err = cs.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("creating a SnapshotClass")
@@ -185,21 +195,19 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		framework.ExpectNoError(err)
 
 		// Get the bound snapshotContent
-		snapshotSpec := snapshot.Object["spec"].(map[string]interface{})
-		snapshotContentName := snapshotSpec["snapshotContentName"].(string)
+		snapshotStatus := snapshot.Object["status"].(map[string]interface{})
+		snapshotContentName := snapshotStatus["boundVolumeSnapshotContentName"].(string)
 		snapshotContent, err := dc.Resource(snapshotContentGVR).Get(snapshotContentName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		snapshotContentSpec := snapshotContent.Object["spec"].(map[string]interface{})
 		volumeSnapshotRef := snapshotContentSpec["volumeSnapshotRef"].(map[string]interface{})
-		persistentVolumeRef := snapshotContentSpec["persistentVolumeRef"].(map[string]interface{})
 
 		// Check SnapshotContent properties
 		ginkgo.By("checking the SnapshotContent")
-		framework.ExpectEqual(snapshotContentSpec["snapshotClassName"], vsc.GetName())
+		framework.ExpectEqual(snapshotContentSpec["volumeSnapshotClassName"], vsc.GetName())
 		framework.ExpectEqual(volumeSnapshotRef["name"], snapshot.GetName())
 		framework.ExpectEqual(volumeSnapshotRef["namespace"], snapshot.GetNamespace())
-		framework.ExpectEqual(persistentVolumeRef["name"], pv.Name)
 	})
 }
 

@@ -566,6 +566,9 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 	// Allow the webhook to establish
 	time.Sleep(time.Second)
 
+	start := time.Now()
+	count := 0
+
 	// Test admission on all resources, subresources, and verbs
 	for _, gvr := range gvrsToTest {
 		resource := resourcesByGVR[gvr]
@@ -573,6 +576,7 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 			for _, verb := range []string{"create", "update", "patch", "connect", "delete", "deletecollection"} {
 				if shouldTestResourceVerb(gvr, resource, verb) {
 					t.Run(verb, func(t *testing.T) {
+						count++
 						holder.reset(t)
 						testFunc := getTestFunc(gvr, verb)
 						testFunc(&testContext{
@@ -590,6 +594,12 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 				}
 			}
 		})
+	}
+
+	duration := time.Now().Sub(start)
+	perResourceDuration := time.Duration(int(duration) / count)
+	if perResourceDuration >= 150*time.Millisecond {
+		t.Errorf("expected resources to process in < 150ms, average was %v", perResourceDuration)
 	}
 }
 
@@ -1390,9 +1400,6 @@ func getStubObj(gvr schema.GroupVersionResource, resource metav1.APIResource) (*
 
 func createOrGetResource(client dynamic.Interface, gvr schema.GroupVersionResource, resource metav1.APIResource) (*unstructured.Unstructured, error) {
 	stubObj, err := getStubObj(gvr, resource)
-	if gvr.Group == "discovery.k8s.io" {
-		fmt.Printf("stubObj =====> %v\n", stubObj)
-	}
 	if err != nil {
 		return nil, err
 	}

@@ -3,6 +3,7 @@
 approvers:
 - sig-instrumentation-approvers
 - logicalhan
+- RainbowMango
 reviewers:
 - sig-instrumentation-reviewers
 labels:

@@ -43,6 +43,7 @@ const (
 
 // Helper contains the parameters to control the behaviour of drainer
 type Helper struct {
+	Ctx                 context.Context
 	Client              kubernetes.Interface
 	Force               bool
 	GracePeriodSeconds  int
@@ -203,7 +204,7 @@ func (d *Helper) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodF
 	} else {
 		globalTimeout = d.Timeout
 	}
-	ctx, cancel := context.WithTimeout(context.TODO(), globalTimeout)
+	ctx, cancel := context.WithTimeout(d.getContext(), globalTimeout)
 	defer cancel()
 	for _, pod := range pods {
 		go func(pod corev1.Pod, returnCh chan error) {
@@ -271,7 +272,7 @@ func (d *Helper) deletePods(pods []corev1.Pod, getPodFn func(namespace, name str
 			return err
 		}
 	}
-	ctx := context.TODO()
+	ctx := d.getContext()
 	_, err := waitForDelete(ctx, pods, 1*time.Second, globalTimeout, false, getPodFn, d.OnPodDeletedOrEvicted, globalTimeout)
 	return err
 }
@@ -305,4 +306,14 @@ func waitForDelete(ctx context.Context, pods []corev1.Pod, interval, timeout tim
 		return true, nil
 	})
 	return pods, err
+}
+
+// Since Helper does not have a constructor, we can't enforce Helper.Ctx != nil
+// Multiple public methods prevent us from initializing the context in a single
+// place as well.
+func (d *Helper) getContext() context.Context {
+	if d.Ctx != nil {
+		return d.Ctx
+	}
+	return context.Background()
 }

@@ -184,8 +184,8 @@ func TestImageLocalityPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
-			list, err := priorityFunction(ImageLocalityPriorityMap, nil, &priorityMetadata{totalNumNodes: len(test.nodes)})(test.pod, snapshot, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
+			list, err := runMapReducePriority(ImageLocalityPriorityMap, nil, &priorityMetadata{totalNumNodes: len(test.nodes)}, test.pod, snapshot, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

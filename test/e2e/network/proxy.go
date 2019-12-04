@@ -34,6 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -160,9 +161,9 @@ var _ = SIGDescribe("Proxy", func() {
 				Labels:      labels,
 				CreatedPods: &pods,
 			}
-			err = framework.RunRC(cfg)
+			err = e2erc.RunRC(cfg)
 			framework.ExpectNoError(err)
-			defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, cfg.Name)
+			defer e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, cfg.Name)
 
 			err = waitForEndpoint(f.ClientSet, f.Namespace.Name, service.Name)
 			framework.ExpectNoError(err)

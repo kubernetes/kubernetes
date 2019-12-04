@@ -33,14 +33,16 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/version"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/manifest"
+	e2ereporters "k8s.io/kubernetes/test/e2e/reporters"
 	testutils "k8s.io/kubernetes/test/utils"
 	utilnet "k8s.io/utils/net"
 
@@ -68,9 +70,9 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 })
 
 var _ = ginkgo.SynchronizedAfterSuite(func() {
-	framework.CleanupSuite()
+	CleanupSuite()
 }, func() {
-	framework.AfterSuiteActions()
+	AfterSuiteActions()
 })
 
 // RunE2ETests checks configuration parameters (specified through flags) and then runs
@@ -83,7 +85,7 @@ func RunE2ETests(t *testing.T) {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	gomega.RegisterFailHandler(e2elog.Fail)
+	gomega.RegisterFailHandler(framework.Fail)
 	// Disable skipped tests unless they are explicitly requested.
 	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
 		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Feature:.+\]`
@@ -100,8 +102,11 @@ func RunE2ETests(t *testing.T) {
 			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
 		}
 	}
-	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
 
+	// Stream the progress to stdout and optionally a URL accepting progress updates.
+	r = append(r, e2ereporters.NewProgressReporter(framework.TestContext.ProgressReportURL))
+
+	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }
 
@@ -154,6 +159,40 @@ func getDefaultClusterIPFamily(c clientset.Interface) string {
 		return "ipv6"
 	}
 	return "ipv4"
+}
+
+// waitForDaemonSets for all daemonsets in the given namespace to be ready
+// (defined as all but 'allowedNotReadyNodes' pods associated with that
+// daemonset are ready).
+func waitForDaemonSets(c clientset.Interface, ns string, allowedNotReadyNodes int32, timeout time.Duration) error {
+	start := time.Now()
+	framework.Logf("Waiting up to %v for all daemonsets in namespace '%s' to start",
+		timeout, ns)
+
+	return wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+		dsList, err := c.AppsV1().DaemonSets(ns).List(metav1.ListOptions{})
+		if err != nil {
+			framework.Logf("Error getting daemonsets in namespace: '%s': %v", ns, err)
+			if testutils.IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		var notReadyDaemonSets []string
+		for _, ds := range dsList.Items {
+			framework.Logf("%d / %d pods ready in namespace '%s' in daemonset '%s' (%d seconds elapsed)", ds.Status.NumberReady, ds.Status.DesiredNumberScheduled, ns, ds.ObjectMeta.Name, int(time.Since(start).Seconds()))
+			if ds.Status.DesiredNumberScheduled-ds.Status.NumberReady > allowedNotReadyNodes {
+				notReadyDaemonSets = append(notReadyDaemonSets, ds.ObjectMeta.Name)
+			}
+		}
+
+		if len(notReadyDaemonSets) > 0 {
+			framework.Logf("there are not ready daemonsets: %v", notReadyDaemonSets)
+			return false, nil
+		}
+
+		return true, nil
+	})
 }
 
 // setupSuite is the boilerplate that can be used to setup ginkgo test suites, on the SynchronizedBeforeSuite step.
@@ -220,12 +259,12 @@ func setupSuite() {
 	// number equal to the number of allowed not-ready nodes).
 	if err := e2epod.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, map[string]string{}); err != nil {
 		framework.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
-		framework.LogFailedContainers(c, metav1.NamespaceSystem, framework.Logf)
+		e2ekubectl.LogFailedContainers(c, metav1.NamespaceSystem, framework.Logf)
 		runKubernetesServiceTestContainer(c, metav1.NamespaceDefault)
 		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 
-	if err := framework.WaitForDaemonSets(c, metav1.NamespaceSystem, int32(framework.TestContext.AllowedNotReadyNodes), framework.TestContext.SystemDaemonsetStartupTimeout); err != nil {
+	if err := waitForDaemonSets(c, metav1.NamespaceSystem, int32(framework.TestContext.AllowedNotReadyNodes), framework.TestContext.SystemDaemonsetStartupTimeout); err != nil {
 		framework.Logf("WARNING: Waiting for all daemonsets to be ready failed: %v", err)
 	}
 

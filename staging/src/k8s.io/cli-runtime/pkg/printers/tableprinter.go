@@ -26,7 +26,6 @@ import (
 	"github.com/liggitt/tabwriter"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/duration"
@@ -36,7 +35,7 @@ import (
 var _ ResourcePrinter = &HumanReadablePrinter{}
 
 type printHandler struct {
-	columnDefinitions []metav1beta1.TableColumnDefinition
+	columnDefinitions []metav1.TableColumnDefinition
 	printFunc         reflect.Value
 }
 
@@ -46,7 +45,7 @@ var (
 		printFunc:         reflect.ValueOf(printStatus),
 	}
 
-	statusColumnDefinitions = []metav1beta1.TableColumnDefinition{
+	statusColumnDefinitions = []metav1.TableColumnDefinition{
 		{Name: "Status", Type: "string"},
 		{Name: "Reason", Type: "string"},
 		{Name: "Message", Type: "string"},
@@ -57,7 +56,7 @@ var (
 		printFunc:         reflect.ValueOf(printObjectMeta),
 	}
 
-	objectMetaColumnDefinitions = []metav1beta1.TableColumnDefinition{
+	objectMetaColumnDefinitions = []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
@@ -73,7 +72,7 @@ var (
 type HumanReadablePrinter struct {
 	options        PrintOptions
 	lastType       interface{}
-	lastColumns    []metav1beta1.TableColumnDefinition
+	lastColumns    []metav1.TableColumnDefinition
 	printedHeaders bool
 }
 
@@ -110,7 +109,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 
 	// Parameter "obj" is a table from server; print it.
 	// display tables following the rules of options
-	if table, ok := obj.(*metav1beta1.Table); ok {
+	if table, ok := obj.(*metav1.Table); ok {
 		// Do not print headers if this table has no column definitions, or they are the same as the last ones we printed
 		localOptions := h.options
 		if h.printedHeaders && (len(table.ColumnDefinitions) == 0 || reflect.DeepEqual(table.ColumnDefinitions, h.lastColumns)) {
@@ -136,8 +135,8 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 		}
 		if len(eventType) > 0 {
 			if err := addColumns(beginning, table,
-				[]metav1beta1.TableColumnDefinition{{Name: "Event", Type: "string"}},
-				[]cellValueFunc{func(metav1beta1.TableRow) (interface{}, error) { return formatEventType(eventType), nil }},
+				[]metav1.TableColumnDefinition{{Name: "Event", Type: "string"}},
+				[]cellValueFunc{func(metav1.TableRow) (interface{}, error) { return formatEventType(eventType), nil }},
 			); err != nil {
 				return err
 			}
@@ -171,7 +170,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 // printTable prints a table to the provided output respecting the filtering rules for options
 // for wide columns and filtered rows. It filters out rows that are Completed. You should call
 // decorateTable if you receive a table from a remote server before calling printTable.
-func printTable(table *metav1beta1.Table, output io.Writer, options PrintOptions) error {
+func printTable(table *metav1.Table, output io.Writer, options PrintOptions) error {
 	if !options.NoHeaders {
 		// avoid printing headers if we have no rows to display
 		if len(table.Rows) == 0 {
@@ -218,7 +217,7 @@ func printTable(table *metav1beta1.Table, output io.Writer, options PrintOptions
 	return nil
 }
 
-type cellValueFunc func(metav1beta1.TableRow) (interface{}, error)
+type cellValueFunc func(metav1.TableRow) (interface{}, error)
 
 type columnAddPosition int
 
@@ -227,7 +226,7 @@ const (
 	end       columnAddPosition = 2
 )
 
-func addColumns(pos columnAddPosition, table *metav1beta1.Table, columns []metav1beta1.TableColumnDefinition, valueFuncs []cellValueFunc) error {
+func addColumns(pos columnAddPosition, table *metav1.Table, columns []metav1.TableColumnDefinition, valueFuncs []cellValueFunc) error {
 	if len(columns) != len(valueFuncs) {
 		return fmt.Errorf("cannot prepend columns, unmatched value functions")
 	}
@@ -268,7 +267,7 @@ func addColumns(pos columnAddPosition, table *metav1beta1.Table, columns []metav
 	}
 
 	// All cells successfully computed, now replace columns and rows
-	newColumns := make([]metav1beta1.TableColumnDefinition, 0, len(columns)+len(table.ColumnDefinitions))
+	newColumns := make([]metav1.TableColumnDefinition, 0, len(columns)+len(table.ColumnDefinitions))
 	switch pos {
 	case beginning:
 		newColumns = append(newColumns, columns...)
@@ -291,7 +290,7 @@ func addColumns(pos columnAddPosition, table *metav1beta1.Table, columns []metav
 // namespace column. It will fill empty columns with nil (if the object
 // does not expose metadata). It returns an error if the table cannot
 // be decorated.
-func decorateTable(table *metav1beta1.Table, options PrintOptions) error {
+func decorateTable(table *metav1.Table, options PrintOptions) error {
 	width := len(table.ColumnDefinitions) + len(options.ColumnLabels)
 	if options.WithNamespace {
 		width++
@@ -313,22 +312,22 @@ func decorateTable(table *metav1beta1.Table, options PrintOptions) error {
 	}
 
 	if width != len(table.ColumnDefinitions) {
-		columns = make([]metav1beta1.TableColumnDefinition, 0, width)
+		columns = make([]metav1.TableColumnDefinition, 0, width)
 		if options.WithNamespace {
-			columns = append(columns, metav1beta1.TableColumnDefinition{
+			columns = append(columns, metav1.TableColumnDefinition{
 				Name: "Namespace",
 				Type: "string",
 			})
 		}
 		columns = append(columns, table.ColumnDefinitions...)
 		for _, label := range formatLabelHeaders(options.ColumnLabels) {
-			columns = append(columns, metav1beta1.TableColumnDefinition{
+			columns = append(columns, metav1.TableColumnDefinition{
 				Name: label,
 				Type: "string",
 			})
 		}
 		if options.ShowLabels {
-			columns = append(columns, metav1beta1.TableColumnDefinition{
+			columns = append(columns, metav1.TableColumnDefinition{
 				Name: "Labels",
 				Type: "string",
 			})
@@ -417,7 +416,7 @@ func printRowsForHandlerEntry(output io.Writer, handler *printHandler, eventType
 	}
 
 	if results[1].IsNil() {
-		rows := results[0].Interface().([]metav1beta1.TableRow)
+		rows := results[0].Interface().([]metav1.TableRow)
 		printRows(output, eventType, rows, options)
 		return nil
 	}
@@ -439,7 +438,7 @@ func formatEventType(eventType string) string {
 }
 
 // printRows writes the provided rows to output.
-func printRows(output io.Writer, eventType string, rows []metav1beta1.TableRow, options PrintOptions) {
+func printRows(output io.Writer, eventType string, rows []metav1.TableRow, options PrintOptions) {
 	for _, row := range rows {
 		if len(eventType) > 0 {
 			fmt.Fprint(output, formatEventType(eventType))
@@ -522,20 +521,20 @@ func appendLabelCells(values []interface{}, itemLabels map[string]string, opts P
 	return values
 }
 
-func printStatus(obj runtime.Object, options PrintOptions) ([]metav1beta1.TableRow, error) {
+func printStatus(obj runtime.Object, options PrintOptions) ([]metav1.TableRow, error) {
 	status, ok := obj.(*metav1.Status)
 	if !ok {
 		return nil, fmt.Errorf("expected *v1.Status, got %T", obj)
 	}
-	return []metav1beta1.TableRow{{
+	return []metav1.TableRow{{
 		Object: runtime.RawExtension{Object: obj},
 		Cells:  []interface{}{status.Status, status.Reason, status.Message},
 	}}, nil
 }
 
-func printObjectMeta(obj runtime.Object, options PrintOptions) ([]metav1beta1.TableRow, error) {
+func printObjectMeta(obj runtime.Object, options PrintOptions) ([]metav1.TableRow, error) {
 	if meta.IsListType(obj) {
-		rows := make([]metav1beta1.TableRow, 0, 16)
+		rows := make([]metav1.TableRow, 0, 16)
 		err := meta.EachListItem(obj, func(obj runtime.Object) error {
 			nestedRows, err := printObjectMeta(obj, options)
 			if err != nil {
@@ -550,12 +549,12 @@ func printObjectMeta(obj runtime.Object, options PrintOptions) ([]metav1beta1.Ta
 		return rows, nil
 	}
 
-	rows := make([]metav1beta1.TableRow, 0, 1)
+	rows := make([]metav1.TableRow, 0, 1)
 	m, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
 	}
-	row := metav1beta1.TableRow{
+	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
 	row.Cells = append(row.Cells, m.GetName(), translateTimestampSince(m.GetCreationTimestamp()))

@@ -120,11 +120,20 @@ func (f *NodeClient) GetNodePublishedVolumes() map[string]CSIVolume {
 	return f.nodePublishedVolumes
 }
 
+// AddNodePublishedVolume adds specified volume to nodePublishedVolumes
+func (f *NodeClient) AddNodePublishedVolume(volID, deviceMountPath string, volumeContext map[string]string) {
+	f.nodePublishedVolumes[volID] = CSIVolume{
+		Path:          deviceMountPath,
+		VolumeContext: volumeContext,
+	}
+}
+
 // GetNodeStagedVolumes returns node staged volumes
 func (f *NodeClient) GetNodeStagedVolumes() map[string]CSIVolume {
 	return f.nodeStagedVolumes
 }
 
+// AddNodeStagedVolume adds specified volume to nodeStagedVolumes
 func (f *NodeClient) AddNodeStagedVolume(volID, deviceMountPath string, volumeContext map[string]string) {
 	f.nodeStagedVolumes[volID] = CSIVolume{
 		Path:          deviceMountPath,

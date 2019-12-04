@@ -796,7 +796,12 @@ function construct-linux-kubelet-flags {
   fi
   if [[ "${CONTAINER_RUNTIME:-}" != "docker" ]]; then
     flags+=" --container-runtime=remote"
+    if [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
+      CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
+      flags+=" --runtime-cgroups=/system.slice/containerd.service"
+    fi
   fi
+
   if [[ -n "${CONTAINER_RUNTIME_ENDPOINT:-}" ]]; then
     flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
   fi
@@ -873,7 +878,7 @@ function construct-windows-kubelet-flags {
   flags+=" --logtostderr=false"
 
   # Configure the file path for host dns configuration
-  flags+=" --resolv-conf=${WINDOWS_CNI_CONFIG_DIR}\hostdns.conf"
+  flags+=" --resolv-conf=${WINDOWS_CNI_DIR}\hostdns.conf"
 
   # Both --cgroups-per-qos and --enforce-node-allocatable should be disabled on
   # windows; the latter requires the former to be enabled to work.
@@ -885,6 +890,14 @@ function construct-windows-kubelet-flags {
   # TODO(#78628): Re-enable KubeletPodResources when the issue is fixed.
   # Force disable KubeletPodResources feature on Windows until #78628 is fixed.
   flags+=" --feature-gates=KubeletPodResources=false"
+
+  if [[ "${CONTAINER_RUNTIME:-}" != "docker" ]]; then
+    flags+=" --container-runtime=remote"
+    if [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
+      CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-npipe:////./pipe/containerd-containerd}
+      flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
+    fi
+  fi
 
   KUBELET_ARGS="${flags}"
 }
@@ -1171,6 +1184,7 @@ MULTIZONE: $(yaml-quote ${MULTIZONE:-})
 MULTIMASTER: $(yaml-quote ${MULTIMASTER:-})
 NON_MASQUERADE_CIDR: $(yaml-quote ${NON_MASQUERADE_CIDR:-})
 ENABLE_DEFAULT_STORAGE_CLASS: $(yaml-quote ${ENABLE_DEFAULT_STORAGE_CLASS:-})
+ENABLE_VOLUME_SNAPSHOTS: $(yaml-quote ${ENABLE_VOLUME_SNAPSHOTS:-})
 ENABLE_APISERVER_ADVANCED_AUDIT: $(yaml-quote ${ENABLE_APISERVER_ADVANCED_AUDIT:-})
 ENABLE_APISERVER_DYNAMIC_AUDIT: $(yaml-quote ${ENABLE_APISERVER_DYNAMIC_AUDIT:-})
 ENABLE_CACHE_MUTATION_DETECTOR: $(yaml-quote ${ENABLE_CACHE_MUTATION_DETECTOR:-false})

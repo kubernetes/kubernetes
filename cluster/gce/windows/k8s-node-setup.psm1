@@ -209,7 +209,7 @@ function Fetch-KubeEnv {
 function Set_MachineEnvironmentVar {
   param (
     [parameter(Mandatory=$true)] [string]$Key,
-    [parameter(Mandatory=$true)] [string]$Value
+    [parameter(Mandatory=$true)] [AllowEmptyString()] [string]$Value
   )
   [Environment]::SetEnvironmentVariable($Key, $Value, "Machine")
 }
@@ -218,7 +218,7 @@ function Set_MachineEnvironmentVar {
 function Set_CurrentShellEnvironmentVar {
   param (
     [parameter(Mandatory=$true)] [string]$Key,
-    [parameter(Mandatory=$true)] [string]$Value
+    [parameter(Mandatory=$true)] [AllowEmptyString()] [string]$Value
   )
   $expression = '$env:' + $Key + ' = "' + $Value + '"'
   Invoke-Expression ${expression}
@@ -246,6 +246,9 @@ function Set-EnvironmentVars {
     "CA_CERT_BUNDLE_PATH" = ${kube_env}['PKI_DIR'] + '\ca-certificates.crt'
     "KUBELET_CERT_PATH" = ${kube_env}['PKI_DIR'] + '\kubelet.crt'
     "KUBELET_KEY_PATH" = ${kube_env}['PKI_DIR'] + '\kubelet.key'
+
+    "CONTAINER_RUNTIME" = ${kube_env}['CONTAINER_RUNTIME']
+    "CONTAINER_RUNTIME_ENDPOINT" = ${kube_env}['CONTAINER_RUNTIME_ENDPOINT']
 
     # TODO(pjh): these are only in flags, can be removed from env once flags are
     # moved to util.sh:
@@ -298,7 +301,7 @@ function Download-HelperScripts {
     return
   }
   MustDownload-File -OutFile ${env:K8S_DIR}\hns.psm1 `
-    -URLs "https://github.com/Microsoft/SDN/raw/master/Kubernetes/windows/hns.psm1"
+    -URLs "https://www.googleapis.com/storage/v1/b/gke-release/o/winnode%2fconfig%2fsdn%2fmaster%2fhns.psm1?alt=media"
 }
 
 # Takes the Windows version string from the cluster bash scripts (e.g.
@@ -344,6 +347,7 @@ function DownloadAndInstall-KubernetesBinaries {
 
   # Change the directory to the parent directory of ${env:K8S_DIR} and untar.
   # This (over-)writes ${dest_dir}/kubernetes/node/bin/*.exe files.
+  # TODO(pjh): clean this up, files not guaranteed to end up in NODE_DIR
   $dest_dir = (Get-Item ${env:K8S_DIR}).Parent.Fullname
   tar xzf ${tmp_dir}\${filename} -C ${dest_dir}
 
@@ -780,7 +784,9 @@ function Configure-HostNetworkingService {
     netsh interface ipv4 set interface "${vnic_name}" forwarding=enabled
   }
 
-  Get-HNSPolicyList | Remove-HnsPolicyList
+  Try {
+    Get-HNSPolicyList | Remove-HnsPolicyList
+  } Catch { }
 
   # Add a route from the management NIC to the pod CIDR.
   #
@@ -824,7 +830,7 @@ function Configure-HostNetworkingService {
 function Configure-GcePdTools {
   if (ShouldWrite-File ${env:K8S_DIR}\GetGcePdName.dll) {
     MustDownload-File -OutFile ${env:K8S_DIR}\GetGcePdName.dll `
-      -URLs "https://github.com/pjh/gce-tools/raw/master/GceTools/GetGcePdName/GetGcePdName.dll"
+      -URLs "https://www.googleapis.com/storage/v1/b/gke-release/o/winnode%2fconfig%2fgce-tools%2fmaster%2fGetGcePdName%2fGetGcePdName.dll?alt=media"
   }
   if (-not (Test-Path $PsHome\profile.ps1)) {
     New-Item -path $PsHome\profile.ps1 -type file
@@ -834,6 +840,16 @@ function Configure-GcePdTools {
 '$modulePath = "K8S_DIR\GetGcePdName.dll"
 Unblock-File $modulePath
 Import-Module -Name $modulePath'.replace('K8S_DIR', ${env:K8S_DIR})
+}
+
+# Setup cni network. This function supports both Docker
+# and containerd.
+function Configure-CniNetworking {
+  if (${env:CONTAINER_RUNTIME} -eq "containerd") {
+    Configure_Containerd_CniNetworking
+  } else {
+    Configure_Dockerd_CniNetworking
+  }
 }
 
 # Downloads the Windows CNI binaries and writes a CNI config file under
@@ -850,7 +866,7 @@ Import-Module -Name $modulePath'.replace('K8S_DIR', ${env:K8S_DIR})
 #   DNS_DOMAIN
 #   CLUSTER_IP_RANGE
 #   SERVICE_CLUSTER_IP_RANGE
-function Configure-CniNetworking {
+function Configure_Dockerd_CniNetworking {
   $CNI_RELEASE_VERSION = 'v0.8.2-gke.0'
   if ((ShouldWrite-File ${env:CNI_DIR}\win-bridge.exe) -or
       (ShouldWrite-File ${env:CNI_DIR}\host-local.exe)) {
@@ -990,7 +1006,9 @@ function Configure-HostDnsConf {
 	$conf = $conf + "nameserver $ip`r`n"
   }
   $conf = $conf + "search $search_list"
-  $hostdns_conf = "${env:CNI_CONFIG_DIR}\hostdns.conf"
+  # Do not put hostdns.conf into the CNI config directory so as to
+  # avoid the container runtime treating it as CNI config.
+  $hostdns_conf = "${env:CNI_DIR}\hostdns.conf"
   New-Item -Force -ItemType file ${hostdns_conf} | Out-Null
   Set-Content ${hostdns_conf} $conf
   Log-Output "HOST dns conf:`n$(Get-Content -Raw ${hostdns_conf})"
@@ -1098,12 +1116,25 @@ function Start-WorkerServices {
   # TODO(pjh): still getting errors like these in kube-proxy log:
   # E1023 04:03:58.143449    4840 reflector.go:205] k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/factory.go:129: Failed to list *core.Endpoints: Get https://35.239.84.171/api/v1/endpoints?limit=500&resourceVersion=0: dial tcp 35.239.84.171:443: connectex: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond.
   # E1023 04:03:58.150266    4840 reflector.go:205] k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/factory.go:129: Failed to list *core.Service: Get https://35.239.84.171/api/v1/services?limit=500&resourceVersion=0: dial tcp 35.239.84.171:443: connectex: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond.
-
-  Log_Todo ("verify that jobs are still running; print more details about " +
-            "the background jobs.")
-  Log-Output "$(Get-Service kube* | Out-String)"
+  WaitFor_KubeletAndKubeProxyReady
   Verify_GceMetadataServerRouteIsPresent
   Log-Output "Kubernetes components started successfully"
+}
+
+# Wait for kubelet & kube-proxy to be ready within 10s.
+function WaitFor_KubeletAndKubeProxyReady {
+  $waited = 0
+  $timeout = 10
+  while (((Get-Service kube-proxy).Status -ne 'Running' -or (Get-Service kubelet).Status -ne 'Running') -and $waited -lt $timeout) {
+    Start-Sleep 1
+    $waited++
+  }
+
+  # Timeout occurred
+  if ($waited -ge $timeout) {
+    Log-Output "$(Get-Service kube* | Out-String)"
+    Throw ("Timeout while waiting ${timeout} seconds for kubelet & kube-proxy services to start")
+  }
 }
 
 # Runs 'kubectl get nodes'.
@@ -1115,28 +1146,71 @@ function Verify-WorkerServices {
   Log_Todo "run more verification commands."
 }
 
+function DownloadAndInstall-Crictl {
+  $CRICTL_VERSION = "v1.16.1"
+  $CRICTL_SHA256 = "69a53602f9a8469d4a86284e318fe19b33e97577f7836f48e6f4fb2ed1822baa"
+
+  # Assume that presence of crictl.exe indicates that the crictl binaries
+  # were already previously downloaded to this node.
+  if (-not (ShouldWrite-File ${env:NODE_DIR}\crictl.exe)) {
+    return
+  }
+  $tmp_dir = 'C:\crictl_tmp'
+  New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
+
+  $url = ('https://storage.googleapis.com/kubernetes-release/crictl/' +
+      'crictl-' + $CRICTL_VERSION + '-windows-amd64.exe')
+  MustDownload-File `
+      -URLs $url `
+      -OutFile $tmp_dir\crictl.exe `
+      -Hash $CRICTL_SHA256 `
+      -Algorithm SHA256
+
+  Push-Location $tmp_dir
+  Move-Item -Force crictl.exe ${env:NODE_DIR}\
+  if (${env:CONTAINER_RUNTIME_ENDPOINT}) {
+    crictl.exe config runtime-endpoint ${env:CONTAINER_RUNTIME_ENDPOINT}
+  }
+  Pop-Location
+  Remove-Item -Force -Recurse $tmp_dir
+}
+
 # Pulls the infra/pause container image onto the node so that it will be
 # immediately available when the kubelet tries to run pods.
 # TODO(pjh): downloading the container container image may take a few minutes;
 # figure out how to run this in the background while perform the rest of the
 # node startup steps!
+# Pull-InfraContainer must be called AFTER Verify-WorkerServices.
 function Pull-InfraContainer {
   $name, $label = $INFRA_CONTAINER -split ':',2
-  if (-not ("$(& docker image list)" -match "$name.*$label")) {
-    & docker pull $INFRA_CONTAINER
+  if (-not ("$(& crictl images)" -match "$name.*$label")) {
+    & crictl pull $INFRA_CONTAINER
     if (!$?) {
-      throw "Error running 'docker pull $INFRA_CONTAINER'"
+      throw "Error running 'crictl pull $INFRA_CONTAINER'"
     }
   }
-  $inspect = "$(& docker inspect $INFRA_CONTAINER | Out-String)"
+  $inspect = "$(& crictl inspecti $INFRA_CONTAINER | Out-String)"
   Log-Output "Infra/pause container:`n$inspect"
+}
+
+# Setup the container runtime on the node. It supports both
+# Docker and containerd.
+function Setup-ContainerRuntime {
+  if (${env:CONTAINER_RUNTIME} -eq "containerd") {
+    Install_Containerd
+    Start_Containerd
+  } else {
+    Create_DockerRegistryKey
+    Configure_Dockerd
+  }
 }
 
 # Add a registry key for docker in EventLog so that log messages are mapped
 # correctly. This is a workaround since the key is missing in the base image.
 # https://github.com/MicrosoftDocs/Virtualization-Documentation/pull/503
 # TODO: Fix this in the base image.
-function Create-DockerRegistryKey {
+# TODO(random-liu): Figure out whether we need this for containerd.
+function Create_DockerRegistryKey {
   $tmp_dir = 'C:\tmp_docker_reg'
   New-Item -Force -ItemType 'directory' ${tmp_dir} | Out-Null
   $reg_file = 'docker.reg'
@@ -1153,7 +1227,7 @@ function Create-DockerRegistryKey {
 }
 
 # Configure Docker daemon and restart the service.
-function Configure-Dockerd {
+function Configure_Dockerd {
   Set-Content "C:\ProgramData\docker\config\daemon.json" @'
 {
   "log-driver": "json-file",
@@ -1165,6 +1239,180 @@ function Configure-Dockerd {
 '@
 
  Restart-Service Docker
+}
+
+# Writes a CNI config file under $env:CNI_CONFIG_DIR for containerd.
+#
+# Prerequisites:
+#   $env:POD_CIDR is set (by Set-PodCidr).
+#   The "management" interface exists (Configure-HostNetworkingService).
+#   The HNS network for pod networking has been configured
+#     (Configure-HostNetworkingService).
+#   Containerd is installed (Install_Containerd).
+#
+# Required ${kube_env} keys:
+#   DNS_SERVER_IP
+#   DNS_DOMAIN
+#   CLUSTER_IP_RANGE
+#   SERVICE_CLUSTER_IP_RANGE
+function Configure_Containerd_CniNetworking {
+  $l2bridge_conf = "${env:CNI_CONFIG_DIR}\l2bridge.conf"
+  if (-not (ShouldWrite-File ${l2bridge_conf})) {
+    return
+  }
+
+  $mgmt_ip = (Get_MgmtNetAdapter |
+              Get-NetIPAddress -AddressFamily IPv4).IPAddress
+  $mgmt_subnet = Get_MgmtSubnet
+  Log-Output ("using mgmt IP ${mgmt_ip} and mgmt subnet ${mgmt_subnet} for " +
+              "CNI config")
+
+  $pod_gateway = Get_Endpoint_Gateway_From_CIDR(${env:POD_CIDR})
+
+  # Explanation of the CNI config values:
+  #   CLUSTER_CIDR: the cluster CIDR from which pod CIDRs are allocated.
+  #   POD_CIDR: the pod CIDR assigned to this node.
+  #   POD_GATEWAY: the gateway IP.
+  #   MGMT_SUBNET: the subnet on which the Windows pods + kubelet will
+  #     communicate with the rest of the cluster without NAT (i.e. the subnet
+  #     that VM internal IPs are allocated from).
+  #   MGMT_IP: the IP address assigned to the node's primary network interface
+  #     (i.e. the internal IP of the GCE VM).
+  #   SERVICE_CIDR: the CIDR used for kubernetes services.
+  #   DNS_SERVER_IP: the cluster's DNS server IP address.
+  #   DNS_DOMAIN: the cluster's DNS domain, e.g. "cluster.local".
+  New-Item -Force -ItemType file ${l2bridge_conf} | Out-Null
+  Set-Content ${l2bridge_conf} `
+'{
+  "cniVersion":  "0.2.0",
+  "name":  "l2bridge",
+  "type":  "sdnbridge",
+  "master": "Ethernet",
+  "capabilities":  {
+    "portMappings":  true,
+    "dns": true
+  },
+  "ipam":  {
+    "subnet": "POD_CIDR",
+    "routes": [
+      {
+        "GW": "POD_GATEWAY"
+      }
+    ]
+  },
+  "dns":  {
+    "Nameservers":  [
+      "DNS_SERVER_IP"
+    ],
+    "Search": [
+      "DNS_DOMAIN"
+    ]
+  },
+  "AdditionalArgs": [
+    {
+      "Name":  "EndpointPolicy",
+      "Value":  {
+        "Type":  "OutBoundNAT",
+	"Settings": {
+          "Exceptions":  [
+            "CLUSTER_CIDR",
+            "SERVICE_CIDR",
+            "MGMT_SUBNET"
+          ]
+        }
+      }
+    },
+    {
+      "Name":  "EndpointPolicy",
+      "Value":  {
+        "Type":  "SDNRoute",
+	"Settings": {
+          "DestinationPrefix":  "SERVICE_CIDR",
+          "NeedEncap":  true
+	}
+      }
+    },
+    {
+      "Name":  "EndpointPolicy",
+      "Value":  {
+        "Type":  "SDNRoute",
+	"Settings": {
+          "DestinationPrefix":  "MGMT_IP/32",
+          "NeedEncap":  true
+	}
+      }
+    }
+  ]
+}'.replace('POD_CIDR', ${env:POD_CIDR}).`
+  replace('POD_GATEWAY', ${pod_gateway}).`
+  replace('DNS_SERVER_IP', ${kube_env}['DNS_SERVER_IP']).`
+  replace('DNS_DOMAIN', ${kube_env}['DNS_DOMAIN']).`
+  replace('MGMT_IP', ${mgmt_ip}).`
+  replace('CLUSTER_CIDR', ${kube_env}['CLUSTER_IP_RANGE']).`
+  replace('SERVICE_CIDR', ${kube_env}['SERVICE_CLUSTER_IP_RANGE']).`
+  replace('MGMT_SUBNET', ${mgmt_subnet})
+
+  Log-Output "CNI config:`n$(Get-Content -Raw ${l2bridge_conf})"
+}
+
+# Download and install containerd and CNI binaries.
+function Install_Containerd {
+  # Assume that presence of containerd.exe indicates that all containerd binaries
+  # were already previously downloaded to this node.
+  if (-not (ShouldWrite-File ${env:NODE_DIR}\containerd.exe)) {
+    return
+  }
+
+  # https://storage.googleapis.com/cri-containerd-staging/cri-containerd-9f79be1b.windows-amd64.tar.gz
+  # TODO(random-liu): Change this to official release path after testing.
+  $CONTAINERD_GCS_BUCKET = "cri-containerd-staging/windows"
+
+  $tmp_dir = 'C:\containerd_tmp'
+  New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
+
+  $version_url = "https://storage.googleapis.com/$CONTAINERD_GCS_BUCKET/latest"
+  MustDownload-File -URLs $version_url -OutFile $tmp_dir\version
+  $version = $(Get-Content $tmp_dir\version)
+
+  $tar_url = "https://storage.googleapis.com/$CONTAINERD_GCS_BUCKET/cri-containerd-cni-$version.windows-amd64.tar.gz"
+  $sha_url = $tar_url + ".sha256"
+  MustDownload-File -URLs $sha_url -OutFile $tmp_dir\sha256
+  $sha = $(Get-Content $tmp_dir\sha256)
+
+  MustDownload-File `
+      -URLs $tar_url `
+      -OutFile $tmp_dir\containerd.tar.gz `
+      -Hash $sha `
+      -Algorithm SHA256
+
+  Push-Location $tmp_dir
+  # tar can only extract in the current directory.
+  tar -xvf $tmp_dir\containerd.tar.gz
+  Move-Item -Force cni\*.exe ${env:CNI_DIR}\
+  Move-Item -Force *.exe ${env:NODE_DIR}\
+  Pop-Location
+  Remove-Item -Force -Recurse $tmp_dir
+
+  # Generate containerd config
+  $config_dir = 'C:\Program Files\containerd'
+  New-Item $config_dir -ItemType 'directory' -Force | Out-Null
+  Set-Content "$config_dir\config.toml" @"
+[plugins.cri]
+  sandbox_image = 'INFRA_CONTAINER_IMAGE'
+[plugins.cri.cni]
+  bin_dir = 'CNI_BIN_DIR'
+  conf_dir = 'CNI_CONF_DIR'
+"@.replace('INFRA_CONTAINER_IMAGE', $INFRA_CONTAINER).`
+    replace('CNI_BIN_DIR', ${env:CNI_DIR}).`
+    replace('CNI_CONF_DIR', ${env:CNI_CONFIG_DIR})
+}
+
+# Register and start containerd service.
+function Start_Containerd {
+  Log-Output "Creating containerd service"
+  containerd.exe --register-service
+  Log-Output "Starting containerd service"
+  Start-Service containerd
 }
 
 # TODO(pjh): move the Stackdriver logging agent code below into a separate
@@ -1244,8 +1492,8 @@ function Install-LoggingAgent {
     return
   }
 
-  $url = ("https://dl.google.com/cloudagents/windows/" +
-          "StackdriverLogging-${STACKDRIVER_VERSION}.exe")
+  $url = ("https://www.googleapis.com/storage/v1/b/gke-release/o/winnode%2fstackdriver%2f" +
+          "StackdriverLogging-${STACKDRIVER_VERSION}.exe?alt=media")
   $tmp_dir = 'C:\stackdriver_tmp'
   New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
   $installer_file = "${tmp_dir}\StackdriverLogging-${STACKDRIVER_VERSION}.exe"
@@ -1259,6 +1507,11 @@ function Install-LoggingAgent {
   # Install the record-reformer plugin.
   Start-Process "$STACKDRIVER_ROOT\LoggingAgent\Main\bin\fluent-gem" `
       -ArgumentList "install","fluent-plugin-record-reformer" `
+      -Wait
+
+  # Install the multi-format-parser plugin.
+  Start-Process "$STACKDRIVER_ROOT\LoggingAgent\Main\bin\fluent-gem" `
+      -ArgumentList "install","fluent-plugin-multi-format-parser" `
       -Wait
 
   Remove-Item -Force -Recurse $tmp_dir
@@ -1329,7 +1582,8 @@ $FLUENTD_CONFIG = @'
 
 # Json Log Example:
 # {"log":"[info:2016-02-16T16:04:05.930-08:00] Some log text here\n","stream":"stdout","time":"2016-02-17T00:04:05.931087621Z"}
-# TODO: Support CRI log format, which requires the multi_format plugin.
+# CRI Log Example:
+# 2016-02-17T00:04:05.931087621Z stdout F [info:2016-02-16T16:04:05.930-08:00] Some log text here
 <source>
   @type tail
   path /var/log/containers/*.log
@@ -1337,10 +1591,19 @@ $FLUENTD_CONFIG = @'
   # Tags at this point are in the format of:
   # reform.var.log.containers.<POD_NAME>_<NAMESPACE_NAME>_<CONTAINER_NAME>-<CONTAINER_ID>.log
   tag reform.*
-  format json
-  time_key time
-  time_format %Y-%m-%dT%H:%M:%S.%NZ
   read_from_head true
+  <parse>
+    @type multi_format
+    <pattern>
+      format json
+      time_key time
+      time_format %Y-%m-%dT%H:%M:%S.%NZ
+    </pattern>
+    <pattern>
+      format /^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$/
+      time_format %Y-%m-%dT%H:%M:%S.%N%:z
+    </pattern>
+  </parse>
 </source>
 
 # Example:

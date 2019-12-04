@@ -71,7 +71,7 @@ func NewServicePortCache() *ServicePortCache {
 	}
 }
 
-// Set updates the the ServicePortCache to contain the provided EfficiencyInfo
+// Set updates the ServicePortCache to contain the provided EfficiencyInfo
 // for the provided PortMapKey.
 func (spc *ServicePortCache) Set(pmKey endpointutil.PortMapKey, eInfo EfficiencyInfo) {
 	spc.items[pmKey] = eInfo

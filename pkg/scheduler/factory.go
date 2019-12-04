@@ -27,24 +27,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
-	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
-	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
-	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
-	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
-	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
-	storagelistersv1beta1 "k8s.io/client-go/listers/storage/v1beta1"
+	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/events"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
@@ -70,46 +62,6 @@ type Binder interface {
 	Bind(binding *v1.Binding) error
 }
 
-// Config is an implementation of the Scheduler's configured input data.
-// TODO over time we should make this struct a hidden implementation detail of the scheduler.
-type Config struct {
-	SchedulerCache internalcache.Cache
-
-	Algorithm core.ScheduleAlgorithm
-	GetBinder func(pod *v1.Pod) Binder
-	// Framework runs scheduler plugins at configured extension points.
-	Framework framework.Framework
-
-	// NextPod should be a function that blocks until the next pod
-	// is available. We don't use a channel for this, because scheduling
-	// a pod may take some amount of time and we don't want pods to get
-	// stale while they sit in a channel.
-	NextPod func() *framework.PodInfo
-
-	// Error is called if there is an error. It is passed the pod in
-	// question, and the error
-	Error func(*framework.PodInfo, error)
-
-	// Recorder is the EventRecorder to use
-	Recorder events.EventRecorder
-
-	// Close this to shut down the scheduler.
-	StopEverything <-chan struct{}
-
-	// VolumeBinder handles PVC/PV binding for the pod.
-	VolumeBinder *volumebinder.VolumeBinder
-
-	// Disable pod preemption or not.
-	DisablePreemption bool
-
-	// SchedulingQueue holds pods to be scheduled
-	SchedulingQueue internalqueue.SchedulingQueue
-
-	// The final configuration of the framework.
-	Plugins      schedulerapi.Plugins
-	PluginConfig []schedulerapi.PluginConfig
-}
-
 // Configurator defines I/O, caching, and other functionality needed to
 // construct a new scheduler.
 type Configurator struct {
@@ -117,28 +69,7 @@ type Configurator struct {
 
 	informerFactory informers.SharedInformerFactory
 
-	// a means to list all PersistentVolumes
-	pVLister corelisters.PersistentVolumeLister
-	// a means to list all PersistentVolumeClaims
-	pVCLister corelisters.PersistentVolumeClaimLister
-	// a means to list all services
-	serviceLister corelisters.ServiceLister
-	// a means to list all controllers
-	controllerLister corelisters.ReplicationControllerLister
-	// a means to list all replicasets
-	replicaSetLister appslisters.ReplicaSetLister
-	// a means to list all statefulsets
-	statefulSetLister appslisters.StatefulSetLister
-	// a means to list all PodDisruptionBudgets
-	pdbLister policylisters.PodDisruptionBudgetLister
-	// a means to list all StorageClasses
-	storageClassLister storagelistersv1.StorageClassLister
-	// a means to list all CSINodes
-	csiNodeLister storagelistersv1beta1.CSINodeLister
-	// a means to list all Nodes
-	nodeLister corelisters.NodeLister
-	// a means to list all Pods
-	podLister corelisters.PodLister
+	podInformer coreinformers.PodInformer
 
 	// Close this to stop all reflectors
 	StopEverything <-chan struct{}
@@ -147,7 +78,7 @@ type Configurator struct {
 
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.
-	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
+	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range [0-100].
 	hardPodAffinitySymmetricWeight int32
 
 	// Handles volume binding decisions
@@ -177,112 +108,8 @@ type Configurator struct {
 	pluginConfigProducerRegistry *plugins.ConfigProducerRegistry
 	nodeInfoSnapshot             *nodeinfosnapshot.Snapshot
 
-	factoryArgs        *PluginFactoryArgs
-	configProducerArgs *plugins.ConfigProducerArgs
-}
-
-// ConfigFactoryArgs is a set arguments passed to NewConfigFactory.
-type ConfigFactoryArgs struct {
-	Client                         clientset.Interface
-	InformerFactory                informers.SharedInformerFactory
-	NodeInformer                   coreinformers.NodeInformer
-	PodInformer                    coreinformers.PodInformer
-	PvInformer                     coreinformers.PersistentVolumeInformer
-	PvcInformer                    coreinformers.PersistentVolumeClaimInformer
-	ReplicationControllerInformer  coreinformers.ReplicationControllerInformer
-	ReplicaSetInformer             appsinformers.ReplicaSetInformer
-	StatefulSetInformer            appsinformers.StatefulSetInformer
-	ServiceInformer                coreinformers.ServiceInformer
-	PdbInformer                    policyinformers.PodDisruptionBudgetInformer
-	StorageClassInformer           storageinformersv1.StorageClassInformer
-	CSINodeInformer                storageinformersv1beta1.CSINodeInformer
-	VolumeBinder                   *volumebinder.VolumeBinder
-	SchedulerCache                 internalcache.Cache
-	HardPodAffinitySymmetricWeight int32
-	DisablePreemption              bool
-	PercentageOfNodesToScore       int32
-	BindTimeoutSeconds             int64
-	PodInitialBackoffSeconds       int64
-	PodMaxBackoffSeconds           int64
-	StopCh                         <-chan struct{}
-	Registry                       framework.Registry
-	Plugins                        *schedulerapi.Plugins
-	PluginConfig                   []schedulerapi.PluginConfig
-	PluginConfigProducerRegistry   *plugins.ConfigProducerRegistry
-}
-
-// NewConfigFactory initializes the default implementation of a Configurator. To encourage eventual privatization of the struct type, we only
-// return the interface.
-func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
-	stopEverything := args.StopCh
-	if stopEverything == nil {
-		stopEverything = wait.NeverStop
-	}
-
-	// storageClassInformer is only enabled through VolumeScheduling feature gate
-	var storageClassLister storagelistersv1.StorageClassLister
-	if args.StorageClassInformer != nil {
-		storageClassLister = args.StorageClassInformer.Lister()
-	}
-
-	var csiNodeLister storagelistersv1beta1.CSINodeLister
-	if args.CSINodeInformer != nil {
-		csiNodeLister = args.CSINodeInformer.Lister()
-	}
-
-	var pdbLister policylisters.PodDisruptionBudgetLister
-	if args.PdbInformer != nil {
-		pdbLister = args.PdbInformer.Lister()
-	}
-
-	c := &Configurator{
-		client:                         args.Client,
-		informerFactory:                args.InformerFactory,
-		pVLister:                       args.PvInformer.Lister(),
-		pVCLister:                      args.PvcInformer.Lister(),
-		serviceLister:                  args.ServiceInformer.Lister(),
-		controllerLister:               args.ReplicationControllerInformer.Lister(),
-		replicaSetLister:               args.ReplicaSetInformer.Lister(),
-		statefulSetLister:              args.StatefulSetInformer.Lister(),
-		pdbLister:                      pdbLister,
-		nodeLister:                     args.NodeInformer.Lister(),
-		podLister:                      args.PodInformer.Lister(),
-		storageClassLister:             storageClassLister,
-		csiNodeLister:                  csiNodeLister,
-		volumeBinder:                   args.VolumeBinder,
-		schedulerCache:                 args.SchedulerCache,
-		StopEverything:                 stopEverything,
-		hardPodAffinitySymmetricWeight: args.HardPodAffinitySymmetricWeight,
-		disablePreemption:              args.DisablePreemption,
-		percentageOfNodesToScore:       args.PercentageOfNodesToScore,
-		bindTimeoutSeconds:             args.BindTimeoutSeconds,
-		podInitialBackoffSeconds:       args.PodInitialBackoffSeconds,
-		podMaxBackoffSeconds:           args.PodMaxBackoffSeconds,
-		enableNonPreempting:            utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority),
-		registry:                       args.Registry,
-		plugins:                        args.Plugins,
-		pluginConfig:                   args.PluginConfig,
-		pluginConfigProducerRegistry:   args.PluginConfigProducerRegistry,
-		nodeInfoSnapshot:               nodeinfosnapshot.NewEmptySnapshot(),
-	}
-	c.factoryArgs = &PluginFactoryArgs{
-		NodeInfoLister:                 c.nodeInfoSnapshot.NodeInfos(),
-		PodLister:                      c.nodeInfoSnapshot.Pods(),
-		ServiceLister:                  c.serviceLister,
-		ControllerLister:               c.controllerLister,
-		ReplicaSetLister:               c.replicaSetLister,
-		StatefulSetLister:              c.statefulSetLister,
-		PDBLister:                      c.pdbLister,
-		CSINodeLister:                  c.csiNodeLister,
-		PVLister:                       c.pVLister,
-		PVCLister:                      c.pVCLister,
-		StorageClassLister:             c.storageClassLister,
-		VolumeBinder:                   c.volumeBinder,
-		HardPodAffinitySymmetricWeight: c.hardPodAffinitySymmetricWeight,
-	}
-	c.configProducerArgs = &plugins.ConfigProducerArgs{}
-
-	return c
+	algorithmFactoryArgs AlgorithmFactoryArgs
+	configProducerArgs   *plugins.ConfigProducerArgs
 }
 
 // GetHardPodAffinitySymmetricWeight is exposed for testing.
@@ -291,12 +118,12 @@ func (c *Configurator) GetHardPodAffinitySymmetricWeight() int32 {
 }
 
 // Create creates a scheduler with the default algorithm provider.
-func (c *Configurator) Create() (*Config, error) {
-	return c.CreateFromProvider(DefaultProvider)
+func (c *Configurator) Create() (*Scheduler, error) {
+	return c.CreateFromProvider(schedulerapi.SchedulerDefaultProviderName)
 }
 
 // CreateFromProvider creates a scheduler from the name of a registered algorithm provider.
-func (c *Configurator) CreateFromProvider(providerName string) (*Config, error) {
+func (c *Configurator) CreateFromProvider(providerName string) (*Scheduler, error) {
 	klog.V(2).Infof("Creating scheduler from algorithm provider '%v'", providerName)
 	provider, err := GetAlgorithmProvider(providerName)
 	if err != nil {
@@ -306,7 +133,7 @@ func (c *Configurator) CreateFromProvider(providerName string) (*Config, error) 
 }
 
 // CreateFromConfig creates a scheduler from the configuration file
-func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Config, error) {
+func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Scheduler, error) {
 	klog.V(2).Infof("Creating scheduler from configuration: %v", policy)
 
 	// validate the policy configuration
@@ -316,8 +143,8 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Config, er
 
 	predicateKeys := sets.NewString()
 	if policy.Predicates == nil {
-		klog.V(2).Infof("Using predicates from algorithm provider '%v'", DefaultProvider)
-		provider, err := GetAlgorithmProvider(DefaultProvider)
+		klog.V(2).Infof("Using predicates from algorithm provider '%v'", schedulerapi.SchedulerDefaultProviderName)
+		provider, err := GetAlgorithmProvider(schedulerapi.SchedulerDefaultProviderName)
 		if err != nil {
 			return nil, err
 		}
@@ -331,8 +158,8 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Config, er
 
 	priorityKeys := sets.NewString()
 	if policy.Priorities == nil {
-		klog.V(2).Infof("Using priorities from algorithm provider '%v'", DefaultProvider)
-		provider, err := GetAlgorithmProvider(DefaultProvider)
+		klog.V(2).Infof("Using priorities from algorithm provider '%v'", schedulerapi.SchedulerDefaultProviderName)
+		provider, err := GetAlgorithmProvider(schedulerapi.SchedulerDefaultProviderName)
 		if err != nil {
 			return nil, err
 		}
@@ -388,7 +215,7 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Config, er
 }
 
 // CreateFromKeys creates a scheduler from a set of registered fit predicate keys and priority keys.
-func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*Config, error) {
+func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*Scheduler, error) {
 	klog.V(2).Infof("Creating scheduler with fit predicates '%v' and priority functions '%v'", predicateKeys, priorityKeys)
 
 	if c.GetHardPodAffinitySymmetricWeight() < 1 || c.GetHardPodAffinitySymmetricWeight() > 100 {
@@ -405,12 +232,12 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		return nil, err
 	}
 
-	priorityMetaProducer, err := getPriorityMetadataProducer(*c.factoryArgs)
+	priorityMetaProducer, err := getPriorityMetadataProducer(c.algorithmFactoryArgs)
 	if err != nil {
 		return nil, err
 	}
 
-	predicateMetaProducer, err := c.GetPredicateMetadataProducer()
+	predicateMetaProducer, err := getPredicateMetadataProducer(c.algorithmFactoryArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -439,7 +266,6 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 	}
 
 	podQueue := internalqueue.NewSchedulingQueue(
-		c.StopEverything,
 		framework,
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(c.podInitialBackoffSeconds)*time.Second),
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(c.podMaxBackoffSeconds)*time.Second),
@@ -447,17 +273,12 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 
 	// Setup cache debugger.
 	debugger := cachedebugger.New(
-		c.nodeLister,
-		c.podLister,
+		c.informerFactory.Core().V1().Nodes().Lister(),
+		c.podInformer.Lister(),
 		c.schedulerCache,
 		podQueue,
 	)
 	debugger.ListenForSignal(c.StopEverything)
-
-	go func() {
-		<-c.StopEverything
-		podQueue.Close()
-	}()
 
 	algo := core.NewGenericScheduler(
 		c.schedulerCache,
@@ -470,15 +291,15 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		framework,
 		extenders,
 		c.volumeBinder,
-		c.pVCLister,
-		c.pdbLister,
+		c.informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
+		GetPodDisruptionBudgetLister(c.informerFactory),
 		c.alwaysCheckAllPredicates,
 		c.disablePreemption,
 		c.percentageOfNodesToScore,
 		c.enableNonPreempting,
 	)
 
-	return &Config{
+	return &Scheduler{
 		SchedulerCache:  c.schedulerCache,
 		Algorithm:       algo,
 		GetBinder:       getBinderFunc(c.client, extenders),
@@ -510,7 +331,7 @@ func getBinderFunc(client clientset.Interface, extenders []algorithm.SchedulerEx
 // as framework plugins. Specifically, a priority will run as a framework plugin if a plugin config producer was
 // registered for that priority.
 func (c *Configurator) getPriorityConfigs(priorityKeys sets.String) ([]priorities.PriorityConfig, *schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
-	allPriorityConfigs, err := getPriorityFunctionConfigs(priorityKeys, *c.factoryArgs)
+	allPriorityConfigs, err := getPriorityFunctionConfigs(priorityKeys, c.algorithmFactoryArgs)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -537,19 +358,13 @@ func (c *Configurator) getPriorityConfigs(priorityKeys sets.String) ([]prioritie
 	return priorityConfigs, &plugins, pluginConfig, nil
 }
 
-// GetPredicateMetadataProducer returns a function to build Predicate Metadata.
-// It is used by the scheduler and other components, such as k8s.io/autoscaler/cluster-autoscaler.
-func (c *Configurator) GetPredicateMetadataProducer() (predicates.PredicateMetadataProducer, error) {
-	return getPredicateMetadataProducer()
-}
-
 // getPredicateConfigs returns predicates configuration: ones that will run as fitPredicates and ones that will run
 // as framework plugins. Specifically, a predicate will run as a framework plugin if a plugin config producer was
 // registered for that predicate.
 // Note that the framework executes plugins according to their order in the Plugins list, and so predicates run as plugins
 // are added to the Plugins list according to the order specified in predicates.Ordering().
 func (c *Configurator) getPredicateConfigs(predicateKeys sets.String) (map[string]predicates.FitPredicate, *schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
-	allFitPredicates, err := getFitPredicateFunctions(predicateKeys, *c.factoryArgs)
+	allFitPredicates, err := getFitPredicateFunctions(predicateKeys, c.algorithmFactoryArgs)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -697,4 +512,20 @@ type binder struct {
 func (b *binder) Bind(binding *v1.Binding) error {
 	klog.V(3).Infof("Attempting to bind %v to %v", binding.Name, binding.Target.Name)
 	return b.Client.CoreV1().Pods(binding.Namespace).Bind(binding)
+}
+
+// GetPodDisruptionBudgetLister returns pdb lister from the given informer factory. Returns nil if PodDisruptionBudget feature is disabled.
+func GetPodDisruptionBudgetLister(informerFactory informers.SharedInformerFactory) policylisters.PodDisruptionBudgetLister {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodDisruptionBudget) {
+		return informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister()
+	}
+	return nil
+}
+
+// GetCSINodeLister returns CSINode lister from the given informer factory. Returns nil if CSINodeInfo feature is disabled.
+func GetCSINodeLister(informerFactory informers.SharedInformerFactory) storagelisters.CSINodeLister {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CSINodeInfo) {
+		return informerFactory.Storage().V1().CSINodes().Lister()
+	}
+	return nil
 }

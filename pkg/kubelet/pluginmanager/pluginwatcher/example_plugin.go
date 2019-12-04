@@ -88,10 +88,9 @@ func NewTestExamplePlugin(pluginName string, pluginType string, endpoint string,
 }
 
 // GetPluginInfo returns a PluginInfo object
-func GetPluginInfo(plugin *examplePlugin, foundInDeprecatedDir bool) cache.PluginInfo {
+func GetPluginInfo(plugin *examplePlugin) cache.PluginInfo {
 	return cache.PluginInfo{
-		SocketPath:           plugin.endpoint,
-		FoundInDeprecatedDir: foundInDeprecatedDir,
+		SocketPath: plugin.endpoint,
 	}
 }
 

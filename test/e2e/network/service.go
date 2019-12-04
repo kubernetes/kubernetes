@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
@@ -44,6 +43,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -1405,9 +1405,8 @@ var _ = SIGDescribe("Services", func() {
 
 		service := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:        t.ServiceName,
-				Namespace:   t.Namespace,
-				Annotations: map[string]string{endpoint.TolerateUnreadyEndpointsAnnotation: "true"},
+				Name:      t.ServiceName,
+				Namespace: t.Namespace,
 			},
 			Spec: v1.ServiceSpec{
 				Selector: t.Labels,
@@ -1416,9 +1415,10 @@ var _ = SIGDescribe("Services", func() {
 					Port:       int32(port),
 					TargetPort: intstr.FromInt(port),
 				}},
+				PublishNotReadyAddresses: true,
 			},
 		}
-		rcSpec := framework.RcByNameContainer(t.Name, 1, t.Image, t.Labels, v1.Container{
+		rcSpec := e2erc.ByNameContainer(t.Name, 1, t.Image, t.Labels, v1.Container{
 			Args:  []string{"netexec", fmt.Sprintf("--http-port=%d", port)},
 			Name:  t.Name,
 			Image: t.Image,
@@ -1471,11 +1471,11 @@ var _ = SIGDescribe("Services", func() {
 		}
 
 		ginkgo.By("Scaling down replication controller to zero")
-		framework.ScaleRC(f.ClientSet, f.ScalesGetter, t.Namespace, rcSpec.Name, 0, false)
+		e2erc.ScaleRC(f.ClientSet, f.ScalesGetter, t.Namespace, rcSpec.Name, 0, false)
 
 		ginkgo.By("Update service to not tolerate unready services")
 		_, err = e2eservice.UpdateService(f.ClientSet, t.Namespace, t.ServiceName, func(s *v1.Service) {
-			s.ObjectMeta.Annotations[endpoint.TolerateUnreadyEndpointsAnnotation] = "false"
+			s.Spec.PublishNotReadyAddresses = false
 		})
 		framework.ExpectNoError(err)
 
@@ -1495,7 +1495,7 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("Update service to tolerate unready services again")
 		_, err = e2eservice.UpdateService(f.ClientSet, t.Namespace, t.ServiceName, func(s *v1.Service) {
-			s.ObjectMeta.Annotations[endpoint.TolerateUnreadyEndpointsAnnotation] = "true"
+			s.Spec.PublishNotReadyAddresses = true
 		})
 		framework.ExpectNoError(err)
 
@@ -2255,7 +2255,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 				err := e2eservice.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, path, e2eservice.KubeProxyEndpointLagTimeout, expectedSuccess, threshold)
 				framework.ExpectNoError(err)
 			}
-			framework.ExpectNoError(framework.DeleteRCAndWaitForGC(f.ClientSet, namespace, serviceName))
+			framework.ExpectNoError(e2erc.DeleteRCAndWaitForGC(f.ClientSet, namespace, serviceName))
 		}
 	})
 

@@ -107,10 +107,9 @@ func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns
 	}
 
 	cleanup := func() {
-		if l.driverCleanup != nil {
-			l.driverCleanup()
-			l.driverCleanup = nil
-		}
+		err := tryFunc(l.driverCleanup)
+		framework.ExpectNoError(err, "while cleaning up driver")
+		l.driverCleanup = nil
 	}
 
 	ginkgo.It("should create read-only inline ephemeral volume", func() {
@@ -119,7 +118,7 @@ func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns
 
 		l.testCase.ReadOnly = true
 		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
-			storageutils.VerifyExecInPodSucceed(pod, "mount | grep /mnt/test | grep ro,")
+			storageutils.VerifyExecInPodSucceed(f, pod, "mount | grep /mnt/test | grep ro,")
 			return nil
 		}
 		l.testCase.TestEphemeral()
@@ -131,7 +130,7 @@ func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns
 
 		l.testCase.ReadOnly = false
 		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
-			storageutils.VerifyExecInPodSucceed(pod, "mount | grep /mnt/test | grep rw,")
+			storageutils.VerifyExecInPodSucceed(f, pod, "mount | grep /mnt/test | grep rw,")
 			return nil
 		}
 		l.testCase.TestEphemeral()
@@ -160,8 +159,8 @@ func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns
 			// visible in the other.
 			if !readOnly && !shared {
 				ginkgo.By("writing data in one pod and checking for it in the second")
-				storageutils.VerifyExecInPodSucceed(pod, "touch /mnt/test-0/hello-world")
-				storageutils.VerifyExecInPodSucceed(pod2, "[ ! -f /mnt/test-0/hello-world ]")
+				storageutils.VerifyExecInPodSucceed(f, pod, "touch /mnt/test-0/hello-world")
+				storageutils.VerifyExecInPodSucceed(f, pod2, "[ ! -f /mnt/test-0/hello-world ]")
 			}
 
 			defer StopPod(f.ClientSet, pod2)

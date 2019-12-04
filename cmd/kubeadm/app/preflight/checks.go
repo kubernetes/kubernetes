@@ -46,7 +46,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/system"
+	system "k8s.io/system-validators/validators"
 	utilsexec "k8s.io/utils/exec"
 	utilsnet "k8s.io/utils/net"
 )
@@ -833,14 +833,6 @@ func (ImagePullCheck) Name() string {
 // Check pulls images required by kubeadm. This is a mutating check
 func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 	for _, image := range ipc.imageList {
-		ret, err := ipc.runtime.ImageExists(image)
-		if ret && err == nil {
-			klog.V(1).Infof("image exists: %s", image)
-			continue
-		}
-		if err != nil {
-			errorList = append(errorList, errors.Wrapf(err, "failed to check if image %s exists", image))
-		}
 		klog.V(1).Infof("pulling %s", image)
 		if err := ipc.runtime.PullImage(image); err != nil {
 			errorList = append(errorList, errors.Wrapf(err, "failed to pull image %s", image))
@@ -886,8 +878,8 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
 		FirewalldCheck{ports: []int{int(cfg.LocalAPIEndpoint.BindPort), kubeadmconstants.KubeletPort}},
 		PortOpenCheck{port: int(cfg.LocalAPIEndpoint.BindPort)},
-		PortOpenCheck{port: kubeadmconstants.InsecureSchedulerPort},
-		PortOpenCheck{port: kubeadmconstants.InsecureKubeControllerManagerPort},
+		PortOpenCheck{port: kubeadmconstants.KubeSchedulerPort},
+		PortOpenCheck{port: kubeadmconstants.KubeControllerManagerPort},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeControllerManager, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeScheduler, manifestsDir)},
