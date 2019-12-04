@@ -70,7 +70,6 @@ type pausePodConfig struct {
 var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
-	var totalPodCapacity int64
 	var RCName string
 	var ns string
 	f := framework.NewDefaultFramework("sched-pred")
@@ -113,46 +112,6 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			e2ekubelet.PrintAllKubeletPods(cs, node.Name)
 		}
 
-	})
-
-	// This test verifies that max-pods flag works as advertised. It assumes that cluster add-on pods stay stable
-	// and cannot be run in parallel with any other test that touches Nodes or Pods. It is so because to check
-	// if max-pods is working we need to fully saturate the cluster and keep it in this state for few seconds.
-	//
-	// Slow PR #13315 (8 min)
-	ginkgo.It("validates MaxPods limit number of pods that are allowed to run [Slow]", func() {
-		totalPodCapacity = 0
-
-		for _, node := range nodeList.Items {
-			framework.Logf("Node: %v", node)
-			podCapacity, found := node.Status.Capacity[v1.ResourcePods]
-			framework.ExpectEqual(found, true)
-			totalPodCapacity += podCapacity.Value()
-		}
-
-		WaitForPodsToBeDeleted(cs)
-		currentlyScheduledPods := WaitForStableCluster(cs, masterNodes)
-		podsNeededForSaturation := int(totalPodCapacity) - currentlyScheduledPods
-
-		ginkgo.By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster max pods and trying to start another one", podsNeededForSaturation))
-
-		// As the pods are distributed randomly among nodes,
-		// it can easily happen that all nodes are satured
-		// and there is no need to create additional pods.
-		// StartPods requires at least one pod to replicate.
-		if podsNeededForSaturation > 0 {
-			framework.ExpectNoError(testutils.StartPods(cs, podsNeededForSaturation, ns, "maxp",
-				*initPausePod(f, pausePodConfig{
-					Name:   "",
-					Labels: map[string]string{"name": ""},
-				}), true, framework.Logf))
-		}
-		podName := "additional-pod"
-		WaitForSchedulerAfterAction(f, createPausePodAction(f, pausePodConfig{
-			Name:   podName,
-			Labels: map[string]string{"name": "additional"},
-		}), ns, podName, false)
-		verifyResult(cs, podsNeededForSaturation, 1, ns)
 	})
 
 	// This test verifies we don't allow scheduling of pods in a way that sum of local ephemeral storage limits of pods is greater than machines capacity.
