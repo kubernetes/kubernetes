@@ -200,6 +200,8 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 	if m.policy.Name() == string(PolicyNone) {
 		return nil
 	}
+	// Periodically call m.reconcileState() to continue to keep the CPU sets of
+	// all pods in sync with and guaranteed CPUs handed out among them.
 	go wait.Until(func() { m.reconcileState() }, m.reconcilePeriod, wait.NeverStop)
 	return nil
 }
@@ -217,19 +219,24 @@ func (m *manager) AddContainer(p *v1.Pod, c *v1.Container, containerID string) e
 			}
 		}
 	}
+
+	// Call down into the policy to assign this container CPUs if required.
 	err := m.policyAddContainer(p, c, containerID)
 	if err != nil {
 		klog.Errorf("[cpumanager] AddContainer error: %v", err)
 		m.Unlock()
 		return err
 	}
+
+	// Get the CPUs just assigned to the container (or fall back to the default
+	// CPUSet if none were assigned).
 	cpus := m.state.GetCPUSetOrDefault(string(p.UID), c.Name)
 	m.Unlock()
 
 	if !cpus.IsEmpty() {
 		err = m.updateContainerCPUSet(containerID, cpus)
 		if err != nil {
-			klog.Errorf("[cpumanager] AddContainer error: %v", err)
+			klog.Errorf("[cpumanager] AddContainer error: error updating CPUSet for container (pod: %s, container: %s, container id: %s, err: %v)", p.Name, c.Name, containerID, err)
 			m.Lock()
 			err := m.policyRemoveContainerByID(containerID)
 			if err != nil {
@@ -379,7 +386,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 
 			if cstatus.State.Waiting != nil ||
 				(cstatus.State.Waiting == nil && cstatus.State.Running == nil && cstatus.State.Terminated == nil) {
-				klog.Warningf("[cpumanager] reconcileState: skipping container; container still in the waiting state (pod: %s, container: %s)", pod.Name, container.Name)
+				klog.Warningf("[cpumanager] reconcileState: skipping container; container still in the waiting state (pod: %s, container: %s, error: %v)", pod.Name, container.Name, err)
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
 				continue
 			}
@@ -401,6 +408,9 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 				continue
 			}
 
+			// Once we make it here we know we have a running container.
+			// Idempotently add it to the containerMap incase it is missing.
+			// This can happen after a kubelet restart, for example.
 			m.containerMap.Add(string(pod.UID), container.Name, containerID)
 
 			cset := m.state.GetCPUSetOrDefault(string(pod.UID), container.Name)
