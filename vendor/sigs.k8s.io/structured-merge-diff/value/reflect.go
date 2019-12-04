@@ -30,7 +30,7 @@ func Reflect(value interface{}) (Value, error) {
 	if value != nil {
 		rv := reflect.ValueOf(value)
 		if isCustomConvertable(rv) {
-			return customConvert(rv)
+			return toUnstructured(rv)
 		}
 	}
 	return reflectValue{value}, nil
@@ -45,10 +45,16 @@ func MustReflect(value interface{}) Value {
 }
 
 func isCustomConvertable(rv reflect.Value) bool{
-	return reflect.PtrTo(rv.Type()).Implements(unmarshalerType)
+	// TODO: consider corner cases (typerefs with unmarshaller interface, etc...)
+	switch rv.Kind() {
+	case reflect.Ptr:
+		return rv.Type().Implements(unmarshalerType)
+	default:
+		return reflect.PtrTo(rv.Type()).Implements(unmarshalerType)
+	}
 }
-func customConvert(rv reflect.Value) (Value, error) {
-	// TODO: find cleaner way to apply custom conversion
+func toUnstructured(rv reflect.Value) (Value, error) {
+	// TODO: round tripping through unstructured is expensive, can we avoid for both custom conversion and merging structured with unstructured?
 	data, err := json.Marshal(rv.Interface())
 	if err != nil {
 		return nil, fmt.Errorf("error encoding %v to json: %v", rv, err)
@@ -145,7 +151,12 @@ func (r reflectValue) String() string {
 	panic("value is not a string")
 }
 func (r reflectValue) Interface() interface{} {
-	return r.Value
+	// In order to be mergable with unstructured, must return unstructured here
+	v, err := toUnstructured(deref(r.Value))
+	if err != nil {
+		panic("unable to convert to unstructured via json round-trip")
+	}
+	return v.Interface()
 }
 
 type reflectMap struct {
