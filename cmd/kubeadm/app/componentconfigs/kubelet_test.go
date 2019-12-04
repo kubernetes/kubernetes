@@ -17,6 +17,8 @@ limitations under the License.
 package componentconfigs
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -47,7 +49,15 @@ var kubeletMarshalCases = []struct {
 	{
 		name: "Empty config",
 		obj: &kubeletConfig{
-			config: kubeletconfig.KubeletConfiguration{},
+			configBase: configBase{
+				GroupVersion: kubeletconfig.SchemeGroupVersion,
+			},
+			config: kubeletconfig.KubeletConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: kubeletconfig.SchemeGroupVersion.String(),
+					Kind:       "KubeletConfiguration",
+				},
+			},
 		},
 		yaml: dedent.Dedent(`
 			apiVersion: kubelet.config.k8s.io/v1beta1
@@ -77,7 +87,14 @@ var kubeletMarshalCases = []struct {
 	{
 		name: "Non empty config",
 		obj: &kubeletConfig{
+			configBase: configBase{
+				GroupVersion: kubeletconfig.SchemeGroupVersion,
+			},
 			config: kubeletconfig.KubeletConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: kubeletconfig.SchemeGroupVersion.String(),
+					Kind:       "KubeletConfiguration",
+				},
 				Address:            "1.2.3.4",
 				Port:               12345,
 				RotateCertificates: true,
@@ -138,17 +155,17 @@ func TestKubeletUnmarshal(t *testing.T) {
 				t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
 			}
 
-			got := &kubeletConfig{}
+			got := &kubeletConfig{
+				configBase: configBase{
+					GroupVersion: kubeletconfig.SchemeGroupVersion,
+				},
+			}
 			if err = got.Unmarshal(gvkmap); err != nil {
 				t.Fatalf("unexpected failure of Unmarshal: %v", err)
 			}
 
-			expected := test.obj.DeepCopy().(*kubeletConfig)
-			expected.config.APIVersion = kubeletHandler.GroupVersion.String()
-			expected.config.Kind = "KubeletConfiguration"
-
-			if !reflect.DeepEqual(got, expected) {
-				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", expected, got)
+			if !reflect.DeepEqual(got, test.obj) {
+				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.obj, got)
 			}
 		})
 	}
@@ -373,10 +390,19 @@ func TestKubeletDefault(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := &kubeletConfig{}
+			// This is the same for all test cases so we set it here
+			expected := test.expected
+			expected.configBase.GroupVersion = kubeletconfig.SchemeGroupVersion
+
+			got := &kubeletConfig{
+				configBase: configBase{
+					GroupVersion: kubeletconfig.SchemeGroupVersion,
+				},
+			}
 			got.Default(&test.clusterCfg, &kubeadmapi.APIEndpoint{}, &kubeadmapi.NodeRegistrationOptions{})
-			if !reflect.DeepEqual(got, &test.expected) {
-				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.expected, *got)
+
+			if !reflect.DeepEqual(got, &expected) {
+				t.Fatalf("Missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", expected, *got)
 			}
 		})
 	}
@@ -409,14 +435,6 @@ func runKubeletFromTest(t *testing.T, perform func(t *testing.T, in string) (kub
 			expectErr: true,
 		},
 		{
-			name: "New kubelet version returns an error",
-			in: dedent.Dedent(`
-				apiVersion: kubelet.config.k8s.io/v1
-				kind: KubeletConfiguration
-			`),
-			expectErr: true,
-		},
-		{
 			name: "Wrong kubelet kind returns an error",
 			in: dedent.Dedent(`
 				apiVersion: kubelet.config.k8s.io/v1beta1
@@ -434,6 +452,10 @@ func runKubeletFromTest(t *testing.T, perform func(t *testing.T, in string) (kub
 				rotateCertificates: true
 			`),
 			out: &kubeletConfig{
+				configBase: configBase{
+					GroupVersion: kubeletHandler.GroupVersion,
+					userSupplied: true,
+				},
 				config: kubeletconfig.KubeletConfiguration{
 					TypeMeta: metav1.TypeMeta{
 						APIVersion: kubeletHandler.GroupVersion.String(),
@@ -458,6 +480,10 @@ func runKubeletFromTest(t *testing.T, perform func(t *testing.T, in string) (kub
 				rotateCertificates: true
 			`),
 			out: &kubeletConfig{
+				configBase: configBase{
+					GroupVersion: kubeletHandler.GroupVersion,
+					userSupplied: true,
+				},
 				config: kubeletconfig.KubeletConfiguration{
 					TypeMeta: metav1.TypeMeta{
 						APIVersion: kubeletHandler.GroupVersion.String(),
@@ -492,8 +518,10 @@ func runKubeletFromTest(t *testing.T, perform func(t *testing.T, in string) (kub
 						} else {
 							if test.out == nil {
 								t.Errorf("unexpected result: %v", got)
-							} else if !reflect.DeepEqual(test.out, got) {
-								t.Errorf("missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.out, got)
+							} else {
+								if !reflect.DeepEqual(test.out, got) {
+									t.Errorf("missmatch between expected and got:\nExpected:\n%v\n---\nGot:\n%v", test.out, got)
+								}
 							}
 						}
 					}
@@ -536,4 +564,72 @@ func TestKubeletFromCluster(t *testing.T) {
 
 		return kubeletHandler.FromCluster(client, clusterCfg)
 	})
+}
+
+func TestGeneratedKubeletFromCluster(t *testing.T) {
+	testYAML := dedent.Dedent(`
+		apiVersion: kubelet.config.k8s.io/v1beta1
+		kind: KubeletConfiguration
+		address: 1.2.3.4
+		port: 12345
+		rotateCertificates: true
+	`)
+	testYAMLHash := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(testYAML)))
+	// The SHA256 sum of "The quick brown fox jumps over the lazy dog"
+	const mismatchHash = "sha256:d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592"
+	tests := []struct {
+		name         string
+		hash         string
+		userSupplied bool
+	}{
+		{
+			name: "Matching hash means generated config",
+			hash: testYAMLHash,
+		},
+		{
+			name:         "Missmatching hash means user supplied config",
+			hash:         mismatchHash,
+			userSupplied: true,
+		},
+		{
+			name:         "No hash means user supplied config",
+			userSupplied: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			clusterCfg := &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: constants.CurrentKubernetesVersion.String(),
+			}
+
+			k8sVersion := version.MustParseGeneric(clusterCfg.KubernetesVersion)
+
+			configMap := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      constants.GetKubeletConfigMapName(k8sVersion),
+					Namespace: metav1.NamespaceSystem,
+				},
+				Data: map[string]string{
+					constants.KubeletBaseConfigurationConfigMapKey: testYAML,
+				},
+			}
+
+			if test.hash != "" {
+				configMap.Annotations = map[string]string{
+					constants.ComponentConfigHashAnnotationKey: test.hash,
+				}
+			}
+
+			client := clientsetfake.NewSimpleClientset(configMap)
+			cfg, err := kubeletHandler.FromCluster(client, clusterCfg)
+			if err != nil {
+				t.Fatalf("unexpected failure of FromCluster: %v", err)
+			}
+
+			got := cfg.IsUserSupplied()
+			if got != test.userSupplied {
+				t.Fatalf("mismatch between expected and got:\n\tExpected: %t\n\tGot: %t", test.userSupplied, got)
+			}
+		})
+	}
 }

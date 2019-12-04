@@ -40,7 +40,7 @@ import (
 func WriteConfigToDisk(cfg *kubeadmapi.ClusterConfiguration, kubeletDir string) error {
 	kubeletCfg, ok := cfg.ComponentConfigs[componentconfigs.KubeletGroup]
 	if !ok {
-		return errors.New("no kubelet component config found in the active component config set")
+		return errors.New("no kubelet component config found")
 	}
 
 	kubeletBytes, err := kubeletCfg.Marshal()
@@ -73,7 +73,7 @@ func CreateConfigMap(cfg *kubeadmapi.ClusterConfiguration, client clientset.Inte
 		return err
 	}
 
-	if err := apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
+	configMap := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      configMapName,
 			Namespace: metav1.NamespaceSystem,
@@ -81,7 +81,13 @@ func CreateConfigMap(cfg *kubeadmapi.ClusterConfiguration, client clientset.Inte
 		Data: map[string]string{
 			kubeadmconstants.KubeletBaseConfigurationConfigMapKey: string(kubeletBytes),
 		},
-	}); err != nil {
+	}
+
+	if !kubeletCfg.IsUserSupplied() {
+		componentconfigs.SignConfigMap(configMap)
+	}
+
+	if err := apiclient.CreateOrUpdateConfigMap(client, configMap); err != nil {
 		return err
 	}
 

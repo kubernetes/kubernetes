@@ -17,8 +17,28 @@ limitations under the License.
 package componentconfigs
 
 import (
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 )
+
+// UnsupportedConfigVersionError is a special error type returned whenever we encounter too old config version
+type UnsupportedConfigVersionError struct {
+	// OldVersion is the config version that is causing the problem
+	OldVersion schema.GroupVersion
+
+	// CurrentVersion describes the natively supported config version
+	CurrentVersion schema.GroupVersion
+
+	// Document points to the YAML/JSON document that caused the problem
+	Document []byte
+}
+
+// Error implements the standard Golang error interface for UnsupportedConfigVersionError
+func (err *UnsupportedConfigVersionError) Error() string {
+	return fmt.Sprintf("unsupported apiVersion %q, you may have to do manual conversion to %q and run kubeadm again", err.OldVersion, err.CurrentVersion)
+}
 
 // warnDefaultComponentConfigValue prints a warning if the user modified a field in a certain
 // CompomentConfig from the default recommended value in kubeadm.

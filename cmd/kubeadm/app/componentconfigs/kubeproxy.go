@@ -41,7 +41,11 @@ var kubeProxyHandler = handler{
 	GroupVersion: kubeproxyconfig.SchemeGroupVersion,
 	AddToScheme:  kubeproxyconfig.AddToScheme,
 	CreateEmpty: func() kubeadmapi.ComponentConfig {
-		return &kubeProxyConfig{}
+		return &kubeProxyConfig{
+			configBase: configBase{
+				GroupVersion: kubeproxyconfig.SchemeGroupVersion,
+			},
+		}
 	},
 	fromCluster: kubeProxyConfigFromCluster,
 }
@@ -52,21 +56,23 @@ func kubeProxyConfigFromCluster(h *handler, clientset clientset.Interface, _ *ku
 
 // kubeProxyConfig implements the kubeadmapi.ComponentConfig interface for kube-proxy
 type kubeProxyConfig struct {
+	configBase
 	config kubeproxyconfig.KubeProxyConfiguration
 }
 
 func (kp *kubeProxyConfig) DeepCopy() kubeadmapi.ComponentConfig {
 	result := &kubeProxyConfig{}
+	kp.configBase.DeepCopyInto(&result.configBase)
 	kp.config.DeepCopyInto(&result.config)
 	return result
 }
 
 func (kp *kubeProxyConfig) Marshal() ([]byte, error) {
-	return kubeProxyHandler.Marshal(&kp.config)
+	return kp.configBase.Marshal(&kp.config)
 }
 
 func (kp *kubeProxyConfig) Unmarshal(docmap kubeadmapi.DocumentMap) error {
-	return kubeProxyHandler.Unmarshal(docmap, &kp.config)
+	return kp.configBase.Unmarshal(docmap, &kp.config)
 }
 
 func kubeProxyDefaultBindAddress(localAdvertiseAddress string) string {

@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "checksums.go",
         "configset.go",
         "kubelet.go",
         "kubeproxy.go",
@@ -19,6 +20,7 @@ go_library(
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//cmd/kubeadm/app/util/initsystem:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -40,6 +42,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "checksums_test.go",
         "configset_test.go",
         "kubelet_test.go",
         "kubeproxy_test.go",
