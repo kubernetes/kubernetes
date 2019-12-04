@@ -240,9 +240,9 @@ func makeFakeCmd(fakeCmd *testingexec.FakeCmd, cmd string, args ...string) testi
 	}
 }
 
-func makeFakeOutput(output string, err error) testingexec.FakeCombinedOutputAction {
+func makeFakeOutput(output string, err error) testingexec.FakeAction {
 	o := output
-	return func() ([]byte, error) {
-		return []byte(o), err
+	return func() ([]byte, []byte, error) {
+		return []byte(o), nil, err
 	}
 }
