@@ -8,6 +8,6 @@ rules:
   - apiGroups: [""]
     resources: ["nodes"]
     verbs: ["list"]
-  - apiGroups: ["apps", "extensions"]
+  - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["patch"]
