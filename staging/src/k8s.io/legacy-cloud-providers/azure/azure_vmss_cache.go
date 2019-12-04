@@ -19,6 +19,7 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -33,10 +34,12 @@ import (
 var (
 	vmssNameSeparator = "_"
 
+	vmssKey                 = "k8svmssKey"
 	vmssVirtualMachinesKey  = "k8svmssVirtualMachinesKey"
 	availabilitySetNodesKey = "k8sAvailabilitySetNodesKey"
 
 	availabilitySetNodesCacheTTL = 15 * time.Minute
+	vmssTTL                      = 10 * time.Minute
 	vmssVirtualMachinesTTL       = 10 * time.Minute
 )
 
@@ -46,6 +49,45 @@ type vmssVirtualMachinesEntry struct {
 	instanceID     string
 	virtualMachine *compute.VirtualMachineScaleSetVM
 	lastUpdate     time.Time
+}
+
+type vmssEntry struct {
+	vmss       *compute.VirtualMachineScaleSet
+	lastUpdate time.Time
+}
+
+func (ss *scaleSet) newVMSSCache() (*timedCache, error) {
+	getter := func(key string) (interface{}, error) {
+		localCache := &sync.Map{} // [vmssName]*vmssEntry
+
+		allResourceGroups, err := ss.GetResourceGroups()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, resourceGroup := range allResourceGroups.List() {
+			allScaleSets, err := ss.VirtualMachineScaleSetsClient.List(context.Background(), resourceGroup)
+			if err != nil {
+				klog.Errorf("VirtualMachineScaleSetsClient.List failed: %v", err)
+				return nil, err
+			}
+
+			for _, scaleSet := range allScaleSets {
+				if scaleSet.Name == nil || *scaleSet.Name == "" {
+					klog.Warning("failed to get the name of VMSS")
+					continue
+				}
+				localCache.Store(*scaleSet.Name, &vmssEntry{
+					vmss:       &scaleSet,
+					lastUpdate: time.Now().UTC(),
+				})
+			}
+		}
+
+		return localCache, nil
+	}
+
+	return newTimedcache(vmssTTL, getter)
 }
 
 func extractVmssVMName(name string) (string, string, error) {
