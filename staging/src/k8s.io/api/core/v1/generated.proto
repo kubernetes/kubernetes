@@ -644,10 +644,11 @@ message Container {
   // accessible from the network.
   // Cannot be updated.
   // +optional
-  // +patchMergeKey=name
+  // +patchMergeKey=containerPort
   // +patchStrategy=merge
   // +listType=map
-  // +listMapKey=name
+  // +listMapKey=containerPort
+  // +listMapKey=protocol
   repeated ContainerPort ports = 6;
 
   // List of sources to populate environment variables in the container.
