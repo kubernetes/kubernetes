@@ -21,8 +21,10 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
+	"math"
 	"net"
 	"sort"
+	"time"
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/api/core/v1"
@@ -52,15 +54,6 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize server certificate store: %v", err)
 	}
-	certificateExpiration := compbasemetrics.NewGauge(
-		&compbasemetrics.GaugeOpts{
-			Subsystem:      metrics.KubeletSubsystem,
-			Name:           "certificate_manager_server_expiration_seconds",
-			Help:           "Gauge of the lifetime of a certificate. The value is the date the certificate will expire in seconds since January 1, 1970 UTC.",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-	)
-	legacyregistry.MustRegister(certificateExpiration)
 	var certificateRenewFailure = compbasemetrics.NewCounter(
 		&compbasemetrics.CounterOpts{
 			Subsystem:      metrics.KubeletSubsystem,
@@ -129,13 +122,30 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 			certificates.UsageServerAuth,
 		},
 		CertificateStore:        certificateStore,
-		CertificateExpiration:   certificateExpiration,
 		CertificateRotation:     certificateRotationAge,
 		CertificateRenewFailure: certificateRenewFailure,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize server certificate manager: %v", err)
 	}
+	legacyregistry.RawMustRegister(compbasemetrics.NewGaugeFunc(
+		compbasemetrics.GaugeOpts{
+			Subsystem: metrics.KubeletSubsystem,
+			Name:      "certificate_manager_server_ttl_seconds",
+			Help: "Gauge of the shortest TTL (time-to-live) of " +
+				"the Kubelet's serving certificate. The value is in seconds " +
+				"until certificate expiry (negative if already expired). If " +
+				"serving certificate is invalid or unused, the value will " +
+				"be +INF.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		func() float64 {
+			if c := m.Current(); c != nil && c.Leaf != nil {
+				return c.Leaf.NotAfter.Sub(time.Now()).Seconds()
+			}
+			return math.Inf(1)
+		},
+	))
 	return m, nil
 }
 
@@ -252,7 +262,6 @@ func NewKubeletClientCertificateManager(
 		BootstrapKeyPEM:         bootstrapKeyData,
 
 		CertificateStore:        certificateStore,
-		CertificateExpiration:   certificateExpiration,
 		CertificateRenewFailure: certificateRenewFailure,
 	})
 	if err != nil {

@@ -112,12 +112,6 @@ type Config struct {
 	// initialized using a generic, multi-use cert/key pair which will be
 	// quickly replaced with a unique cert/key pair.
 	BootstrapKeyPEM []byte
-	// CertificateExpiration will record a metric that shows the remaining
-	// lifetime of the certificate. This metric is a gauge because only the
-	// current cert expiry time is really useful. Reading this metric at any
-	// time simply gives the next expiration date, no need to keep some
-	// history (histogram) of all previous expiry dates.
-	CertificateExpiration Gauge
 	// CertificateRotation will record a metric showing the time in seconds
 	// that certificates lived before being rotated. This metric is a histogram
 	// because there is value in keeping a history of rotation cadences. It
@@ -185,7 +179,6 @@ type manager struct {
 
 	certStore Store
 
-	certificateExpiration   Gauge
 	certificateRotation     Histogram
 	certificateRenewFailure Counter
 
@@ -230,7 +223,6 @@ func NewManager(config *Config) (Manager, error) {
 		certStore:               config.CertificateStore,
 		cert:                    cert,
 		forceRotation:           forceRotation,
-		certificateExpiration:   config.CertificateExpiration,
 		certificateRotation:     config.CertificateRotation,
 		certificateRenewFailure: config.CertificateRenewFailure,
 		now:                     time.Now,
@@ -554,9 +546,6 @@ func (m *manager) nextRotationDeadline() time.Time {
 	deadline := m.cert.Leaf.NotBefore.Add(jitteryDuration(totalDuration))
 
 	klog.V(2).Infof("Certificate expiration is %v, rotation deadline is %v", notAfter, deadline)
-	if m.certificateExpiration != nil {
-		m.certificateExpiration.Set(float64(notAfter.Unix()))
-	}
 	return deadline
 }
 

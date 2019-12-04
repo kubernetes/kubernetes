@@ -19,36 +19,27 @@ package exec
 import (
 	"testing"
 	"time"
-
-	"k8s.io/client-go/tools/metrics"
 )
 
-type mockTTLGauge struct {
-	v *time.Duration
+type mockExpiryGauge struct {
+	v *time.Time
 }
 
-func (m *mockTTLGauge) Set(d *time.Duration) {
-	m.v = d
+func (m *mockExpiryGauge) Set(t *time.Time) {
+	m.v = t
 }
 
-func ptr(d time.Duration) *time.Duration {
-	return &d
+func ptr(t time.Time) *time.Time {
+	return &t
 }
 
 func TestCertificateExpirationTracker(t *testing.T) {
 	now := time.Now()
-	nowFn := func() time.Time { return now }
-	mockMetric := &mockTTLGauge{}
-	realMetric := metrics.ClientCertTTL
-	metrics.ClientCertTTL = mockMetric
-	defer func() {
-		metrics.ClientCertTTL = realMetric
-	}()
+	mockMetric := &mockExpiryGauge{}
 
-	tracker := &certificateExpirationTracker{m: map[*Authenticator]time.Time{}}
-	tracker.report(nowFn)
-	if mockMetric.v != nil {
-		t.Error("empty tracker should record nil value")
+	tracker := &certificateExpirationTracker{
+		m:         map[*Authenticator]time.Time{},
+		metricSet: mockMetric.Set,
 	}
 
 	firstAuthenticator := &Authenticator{}
@@ -57,31 +48,31 @@ func TestCertificateExpirationTracker(t *testing.T) {
 		desc string
 		auth *Authenticator
 		time time.Time
-		want *time.Duration
+		want *time.Time
 	}{
 		{
 			desc: "ttl for one authenticator",
 			auth: firstAuthenticator,
 			time: now.Add(time.Minute * 10),
-			want: ptr(time.Minute * 10),
+			want: ptr(now.Add(time.Minute * 10)),
 		},
 		{
 			desc: "second authenticator shorter ttl",
 			auth: secondAuthenticator,
 			time: now.Add(time.Minute * 5),
-			want: ptr(time.Minute * 5),
+			want: ptr(now.Add(time.Minute * 5)),
 		},
 		{
 			desc: "update shorter to be longer",
 			auth: secondAuthenticator,
 			time: now.Add(time.Minute * 15),
-			want: ptr(time.Minute * 10),
+			want: ptr(now.Add(time.Minute * 10)),
 		},
 		{
 			desc: "update shorter to be zero time",
 			auth: firstAuthenticator,
 			time: time.Time{},
-			want: ptr(time.Minute * 15),
+			want: ptr(now.Add(time.Minute * 15)),
 		},
 		{
 			desc: "update last to be zero time records nil",
@@ -93,13 +84,12 @@ func TestCertificateExpirationTracker(t *testing.T) {
 		// Must run in series as the tests build off each other.
 		t.Run(tc.desc, func(t *testing.T) {
 			tracker.set(tc.auth, tc.time)
-			tracker.report(nowFn)
 			if mockMetric.v != nil && tc.want != nil {
-				if mockMetric.v.Seconds() != tc.want.Seconds() {
-					t.Errorf("got: %v; want: %v", mockMetric.v, tc.want)
+				if !mockMetric.v.Equal(*tc.want) {
+					t.Errorf("got: %s; want: %s", mockMetric.v, tc.want)
 				}
 			} else if mockMetric.v != tc.want {
-				t.Errorf("got: %v; want: %v", mockMetric.v, tc.want)
+				t.Errorf("got: %s; want: %s", mockMetric.v, tc.want)
 			}
 		})
 	}
