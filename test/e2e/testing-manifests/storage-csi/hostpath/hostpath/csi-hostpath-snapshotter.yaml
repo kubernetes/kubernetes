@@ -38,6 +38,11 @@ spec:
         env:
         - name: ADDRESS
           value: /csi/csi.sock
+        securityContext:
+          # This is necessary only for systems with SELinux, where
+          # non-privileged sidecar containers cannot access unix domain socket
+          # created by privileged CSI driver container.
+          privileged: true
         imagePullPolicy: Always
         volumeMounts:
         - name: socket-dir
