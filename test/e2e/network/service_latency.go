@@ -258,11 +258,10 @@ func (eq *endpointQueries) join() {
 					delete(eq.requests, got.Name)
 					req.endpoints = got
 					close(req.result)
-				} else {
-					// We've already recorded a result, but
-					// haven't gotten the request yet. Only
-					// keep the first result.
 				}
+				// We've already recorded a result, but
+				// haven't gotten the request yet. Only
+				// keep the first result.
 			} else {
 				// We haven't gotten the corresponding request
 				// yet, save this result.
@@ -352,7 +351,7 @@ func singleServiceLatency(f *framework.Framework, name string, q *endpointQuerie
 	framework.Logf("Created: %v", gotSvc.Name)
 
 	if e := q.request(gotSvc.Name); e == nil {
-		return 0, fmt.Errorf("Never got a result for endpoint %v", gotSvc.Name)
+		return 0, fmt.Errorf("never got a result for endpoint %v", gotSvc.Name)
 	}
 	stopTime := time.Now()
 	d := stopTime.Sub(startTime)
