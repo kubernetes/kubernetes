@@ -310,7 +310,7 @@ EOF
     mkdir -p "${containerd_opt_path}/bin"
     mkdir -p "${containerd_opt_path}/lib"
 
-    local -r containerd_sandbox_pod_annotations=${CONTAINERD_SANDBOX_POD_ANNOTATIONS:-'"gvisor.dev/spec/mount/*/*"'}
+    local -r containerd_sandbox_pod_annotations=${CONTAINERD_SANDBOX_POD_ANNOTATIONS:-'"dev.gvisor.*"'}
     cat >> "${config_path}" <<EOF
 [plugins.cri.containerd.runtimes.${CONTAINERD_SANDBOX_RUNTIME_HANDLER}]
   runtime_type = "${CONTAINERD_SANDBOX_RUNTIME_TYPE:-}"
