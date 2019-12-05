@@ -34,8 +34,8 @@ const (
 	mandatoryFieldErrFmt     = "%s is a mandatory field for a %s"
 	base64EncodingErr        = "secrets must be base64 encoded"
 	zeroOrNegativeErrFmt     = "%s should be a positive value"
-	negativeValueErrFmt      = "%s can't be negative"
 	encryptionConfigNilErr   = "EncryptionConfiguration can't be nil"
+	unsupportedAlgorithm     = "%q is not a supported cryptographic algorithm, only AESCBC and AESGCM are supported"
 )
 
 var (
@@ -179,6 +179,15 @@ func validateKMSConfiguration(c *config.KMSConfiguration, fieldPath *field.Path)
 	allErrs = append(allErrs, validateKMSTimeout(c, fieldPath.Child("timeout"))...)
 	allErrs = append(allErrs, validateKMSEndpoint(c, fieldPath.Child("endpoint"))...)
 	allErrs = append(allErrs, validateKMSCacheSize(c, fieldPath.Child("cachesize"))...)
+	allErrs = append(allErrs, validateKMSDataEncryptionAlgorithm(c, fieldPath.Child("dataEncryptionAlgorithm"))...)
+	return allErrs
+}
+
+func validateKMSDataEncryptionAlgorithm(c *config.KMSConfiguration, fieldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if c.DataEncryptionAlgorithm != config.AESCBC && c.DataEncryptionAlgorithm != config.AESGCM {
+		allErrs = append(allErrs, field.Invalid(fieldPath, c.DataEncryptionAlgorithm, fmt.Sprintf(unsupportedAlgorithm, c.DataEncryptionAlgorithm)))
+	}
 	return allErrs
 }
 

@@ -97,10 +97,11 @@ func TestLegacyConfig(t *testing.T) {
 						},
 					}},
 					{KMS: &apiserverconfig.KMSConfiguration{
-						Name:      "testprovider",
-						Endpoint:  "unix:///tmp/testprovider.sock",
-						CacheSize: &cacheSize,
-						Timeout:   &metav1.Duration{Duration: 3 * time.Second},
+						Name:                    "testprovider",
+						Endpoint:                "unix:///tmp/testprovider.sock",
+						CacheSize:               &cacheSize,
+						Timeout:                 &metav1.Duration{Duration: 3 * time.Second},
+						DataEncryptionAlgorithm: "AESCBC",
 					}},
 					{AESCBC: &apiserverconfig.AESConfiguration{
 						Keys: []apiserverconfig.Key{

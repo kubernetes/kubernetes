@@ -367,12 +367,25 @@ func GetSecretboxPrefixTransformer(config *apiserverconfig.SecretboxConfiguratio
 // getEnvelopePrefixTransformer returns a prefix transformer from the provided config.
 // envelopeService is used as the root of trust.
 func getEnvelopePrefixTransformer(config *apiserverconfig.KMSConfiguration, envelopeService envelope.Service, prefix string) (value.PrefixTransformer, error) {
-	envelopeTransformer, err := envelope.NewEnvelopeTransformer(envelopeService, int(*config.CacheSize), aestransformer.NewCBCTransformer)
+	var (
+		dataTransformer value.Transformer
+		err             error
+	)
+
+	switch config.DataEncryptionAlgorithm {
+	case apiserverconfig.AESCBC:
+		dataTransformer, err = envelope.NewEnvelopeTransformer(envelopeService, int(*config.CacheSize), aestransformer.NewCBCTransformer)
+	case apiserverconfig.AESGCM:
+		dataTransformer, err = envelope.NewEnvelopeTransformer(envelopeService, int(*config.CacheSize), aestransformer.NewGCMTransformer)
+	default:
+		return value.PrefixTransformer{}, fmt.Errorf("unexpected dataEncryptionAlgorithm %q", config.DataEncryptionAlgorithm)
+	}
+
 	if err != nil {
 		return value.PrefixTransformer{}, err
 	}
 	return value.PrefixTransformer{
-		Transformer: envelopeTransformer,
+		Transformer: dataTransformer,
 		Prefix:      []byte(prefix + config.Name + ":"),
 	}, nil
 }

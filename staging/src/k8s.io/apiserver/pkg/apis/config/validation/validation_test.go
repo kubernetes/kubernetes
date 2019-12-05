@@ -352,3 +352,38 @@ func TestKMSProviderCacheSize(t *testing.T) {
 		})
 	}
 }
+
+func TestKMSProviderDataEncryptionAlgorithm(t *testing.T) {
+	var (
+		invalidAlg config.EnvelopeDataEncryptionTransformer = "foo"
+		algField                                            = root.Index(0).Child("kms").Child("dataEncryptionAlgorithm")
+	)
+
+	testCases := []struct {
+		desc string
+		in   *config.KMSConfiguration
+		want field.ErrorList
+	}{
+		{
+			desc: "valid positive cache size",
+			in:   &config.KMSConfiguration{DataEncryptionAlgorithm: config.AESCBC},
+			want: field.ErrorList{},
+		},
+		{
+			desc: "unsupported algorithm",
+			in:   &config.KMSConfiguration{DataEncryptionAlgorithm: invalidAlg},
+			want: field.ErrorList{
+				field.Invalid(algField, invalidAlg, fmt.Sprintf(unsupportedAlgorithm, invalidAlg)),
+			},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			got := validateKMSDataEncryptionAlgorithm(tt.in, algField)
+			if d := cmp.Diff(tt.want, got); d != "" {
+				t.Fatalf("KMS Provider validation mismatch (-want +got):\n%s", d)
+			}
+		})
+	}
+}

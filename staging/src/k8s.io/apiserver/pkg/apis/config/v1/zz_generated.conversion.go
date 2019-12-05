@@ -182,6 +182,7 @@ func autoConvert_v1_KMSConfiguration_To_config_KMSConfiguration(in *KMSConfigura
 	out.CacheSize = (*int32)(unsafe.Pointer(in.CacheSize))
 	out.Endpoint = in.Endpoint
 	out.Timeout = (*metav1.Duration)(unsafe.Pointer(in.Timeout))
+	out.DataEncryptionAlgorithm = config.EnvelopeDataEncryptionTransformer(in.DataEncryptionAlgorithm)
 	return nil
 }
 
@@ -195,6 +196,7 @@ func autoConvert_config_KMSConfiguration_To_v1_KMSConfiguration(in *config.KMSCo
 	out.CacheSize = (*int32)(unsafe.Pointer(in.CacheSize))
 	out.Endpoint = in.Endpoint
 	out.Timeout = (*metav1.Duration)(unsafe.Pointer(in.Timeout))
+	out.DataEncryptionAlgorithm = EnvelopeDataEncryptionTransformer(in.DataEncryptionAlgorithm)
 	return nil
 }
 

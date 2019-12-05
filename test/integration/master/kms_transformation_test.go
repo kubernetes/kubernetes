@@ -22,11 +22,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/aes"
+	"crypto/cipher"
 	"encoding/binary"
+	"strings"
 
 	"fmt"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 
@@ -76,17 +77,17 @@ func (r envelope) cipherTextPayload() []byte {
 	return r.rawEnvelope[r.startOfPayload(r.providerName):]
 }
 
-func (r envelope) plainTextPayload(secretETCDPath string) ([]byte, error) {
+func (r envelope) plainTextPayload(secretETCDPath string, transformerFunc func(block cipher.Block) value.Transformer) ([]byte, error) {
 	block, err := aes.NewCipher(r.plainTextDEK)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize AES Cipher: %v", err)
 	}
 	// etcd path of the key is used as the authenticated context - need to pass it to decrypt
 	ctx := value.DefaultContext([]byte(secretETCDPath))
-	aescbcTransformer := aestransformer.NewCBCTransformer(block)
-	plainSecret, _, err := aescbcTransformer.TransformFromStorage(r.cipherTextPayload(), ctx)
+	dataTransformer := transformerFunc(block)
+	plainSecret, _, err := dataTransformer.TransformFromStorage(r.cipherTextPayload(), ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to transform from storage via AESCBC, err: %v", err)
+		return nil, fmt.Errorf("failed to transform from storage via data transformer, err: %v", err)
 	}
 
 	return plainSecret, nil
@@ -100,7 +101,14 @@ func (r envelope) plainTextPayload(secretETCDPath string) ([]byte, error) {
 // 4. The cipherTextPayload (ex. Secret) should be encrypted via AES CBC transform
 // 5. Prefix-EncryptedDEK-EncryptedPayload structure should be deposited to ETCD
 func TestKMSProvider(t *testing.T) {
-	encryptionConfig := `
+	testCases := []struct {
+		desc            string
+		config          string
+		transformerFunc func(block cipher.Block) value.Transformer
+	}{
+		{
+			desc: "default dataEncryptionAlgorithm AESCBC",
+			config: `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
@@ -111,74 +119,115 @@ resources:
        name: kms-provider
        cachesize: 1000
        endpoint: unix:///@kms-provider.sock
-`
-
-	providerName := "kms-provider"
-	pluginMock, err := mock.NewBase64Plugin("@kms-provider.sock")
-	if err != nil {
-		t.Fatalf("failed to create mock of KMS Plugin: %v", err)
+`,
+			transformerFunc: aestransformer.NewCBCTransformer,
+		},
+		{
+			desc: "dataEncryptionAlgorithm explicitly provided as AESCBC",
+			config: `
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+       name: kms-provider
+       cachesize: 1000
+       endpoint: unix:///@kms-provider.sock
+       dataEncryptionAlgorithm: AESCBC
+`,
+			transformerFunc: aestransformer.NewCBCTransformer,
+		},
+		{
+			desc: "dataEncryptionAlgorithm explicitly provided as AESGCM",
+			config: `
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+       name: kms-provider
+       cachesize: 1000
+       endpoint: unix:///@kms-provider.sock
+       dataEncryptionAlgorithm: AESGCM
+`,
+			transformerFunc: aestransformer.NewGCMTransformer,
+		},
 	}
 
-	go pluginMock.Start()
-	if err := mock.WaitForBase64PluginToBeUp(pluginMock); err != nil {
-		t.Fatalf("Failed start plugin, err: %v", err)
-	}
-	defer pluginMock.CleanUp()
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			providerName := "kms-provider"
+			pluginMock, err := mock.NewBase64Plugin("@kms-provider.sock")
+			if err != nil {
+				t.Fatalf("failed to create mock of KMS Plugin: %v", err)
+			}
 
-	test, err := newTransformTest(t, encryptionConfig)
-	if err != nil {
-		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
-	}
-	defer test.cleanUp()
+			go pluginMock.Start()
+			if err := mock.WaitForBase64PluginToBeUp(pluginMock); err != nil {
+				t.Fatalf("Failed start plugin, err: %v", err)
+			}
+			defer pluginMock.CleanUp()
 
-	test.secret, err = test.createSecret(testSecret, testNamespace)
-	if err != nil {
-		t.Fatalf("Failed to create test secret, error: %v", err)
-	}
+			test, err := newTransformTest(t, tt.config)
+			if err != nil {
+				t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", tt.config, err)
+			}
+			defer test.cleanUp()
 
-	// Since Data Encryption Key (DEK) is randomly generated (per encryption operation), we need to ask KMS Mock for it.
-	plainTextDEK := pluginMock.LastEncryptRequest()
+			test.secret, err = test.createSecret(testSecret, testNamespace)
+			if err != nil {
+				t.Fatalf("Failed to create test secret, error: %v", err)
+			}
 
-	secretETCDPath := test.getETCDPath()
-	rawEnvelope, err := test.getRawSecretFromETCD()
-	if err != nil {
-		t.Fatalf("failed to read %s from etcd: %v", secretETCDPath, err)
-	}
-	envelope := envelope{
-		providerName: providerName,
-		rawEnvelope:  rawEnvelope,
-		plainTextDEK: plainTextDEK,
-	}
+			// Since Data Encryption Key (DEK) is randomly generated (per encryption operation), we need to ask KMS Mock for it.
+			plainTextDEK := pluginMock.LastEncryptRequest()
 
-	wantPrefix := "k8s:enc:kms:v1:kms-provider:"
-	if !bytes.HasPrefix(rawEnvelope, []byte(wantPrefix)) {
-		t.Fatalf("expected secret to be prefixed with %s, but got %s", wantPrefix, rawEnvelope)
-	}
+			secretETCDPath := test.getETCDPath()
+			rawEnvelope, err := test.getRawSecretFromETCD()
+			if err != nil {
+				t.Fatalf("failed to read %s from etcd: %v", secretETCDPath, err)
+			}
+			envelope := envelope{
+				providerName: providerName,
+				rawEnvelope:  rawEnvelope,
+				plainTextDEK: plainTextDEK,
+			}
 
-	decryptResponse, err := pluginMock.Decrypt(context.Background(), &kmsapi.DecryptRequest{Version: kmsAPIVersion, Cipher: envelope.cipherTextDEK()})
-	if err != nil {
-		t.Fatalf("failed to decrypt DEK, %v", err)
-	}
-	dekPlainAsWouldBeSeenByETCD := decryptResponse.Plain
+			wantPrefix := "k8s:enc:kms:v1:kms-provider:"
+			if !bytes.HasPrefix(rawEnvelope, []byte(wantPrefix)) {
+				t.Fatalf("expected secret to be prefixed with %s, but got %s", wantPrefix, rawEnvelope)
+			}
 
-	if !bytes.Equal(plainTextDEK, dekPlainAsWouldBeSeenByETCD) {
-		t.Fatalf("expected plainTextDEK %v to be passed to KMS Plugin, but got %s",
-			plainTextDEK, dekPlainAsWouldBeSeenByETCD)
-	}
+			decryptResponse, err := pluginMock.Decrypt(context.Background(), &kmsapi.DecryptRequest{Version: kmsAPIVersion, Cipher: envelope.cipherTextDEK()})
+			if err != nil {
+				t.Fatalf("failed to decrypt DEK, %v", err)
+			}
+			dekPlainAsWouldBeSeenByETCD := decryptResponse.Plain
 
-	plainSecret, err := envelope.plainTextPayload(secretETCDPath)
-	if err != nil {
-		t.Fatalf("failed to transform from storage via AESCBC, err: %v", err)
-	}
+			if !bytes.Equal(plainTextDEK, dekPlainAsWouldBeSeenByETCD) {
+				t.Fatalf("expected plainTextDEK %v to be passed to KMS Plugin, but got %s",
+					plainTextDEK, dekPlainAsWouldBeSeenByETCD)
+			}
 
-	if !strings.Contains(string(plainSecret), secretVal) {
-		t.Fatalf("expected %q after decryption, but got %q", secretVal, string(plainSecret))
-	}
+			plainSecret, err := envelope.plainTextPayload(secretETCDPath, tt.transformerFunc)
+			if err != nil {
+				t.Fatalf("failed to transform from storage, err: %v", err)
+			}
 
-	// Secrets should be un-enveloped on direct reads from Kube API Server.
-	s, err := test.restClient.CoreV1().Secrets(testNamespace).Get(testSecret, metav1.GetOptions{})
-	if secretVal != string(s.Data[secretKey]) {
-		t.Fatalf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
+			if !strings.Contains(string(plainSecret), secretVal) {
+				t.Fatalf("expected %q after decryption, but got %q", secretVal, string(plainSecret))
+			}
+
+			// Secrets should be un-enveloped on direct reads from Kube API Server.
+			s, err := test.restClient.CoreV1().Secrets(testNamespace).Get(testSecret, metav1.GetOptions{})
+			if secretVal != string(s.Data[secretKey]) {
+				t.Fatalf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
+			}
+		})
 	}
 }
 

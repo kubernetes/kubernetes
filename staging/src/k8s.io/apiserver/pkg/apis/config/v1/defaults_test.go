@@ -25,6 +25,34 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+func TestKMSProviderAlgorithmDefaults(t *testing.T) {
+	testCases := []struct {
+		desc string
+		in   *KMSConfiguration
+		want *KMSConfiguration
+	}{
+		{
+			desc: "algorithm not supplied",
+			in:   &KMSConfiguration{},
+			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &defaultCacheSize, DataEncryptionAlgorithm: defaultDataEncryptionAlgorithm},
+		},
+		{
+			desc: "algorithm supplied",
+			in:   &KMSConfiguration{DataEncryptionAlgorithm: AESGCM},
+			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &defaultCacheSize, DataEncryptionAlgorithm: AESGCM},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			SetDefaults_KMSConfiguration(tt.in)
+			if d := cmp.Diff(tt.want, tt.in); d != "" {
+				t.Fatalf("KMS Provider mismatch (-want +got):\n%s", d)
+			}
+		})
+	}
+}
+
 func TestKMSProviderTimeoutDefaults(t *testing.T) {
 	testCases := []struct {
 		desc string
@@ -34,12 +62,22 @@ func TestKMSProviderTimeoutDefaults(t *testing.T) {
 		{
 			desc: "timeout not supplied",
 			in:   &KMSConfiguration{},
-			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &defaultCacheSize},
+			want: &KMSConfiguration{
+				Timeout:                 defaultTimeout,
+				CacheSize:               &defaultCacheSize,
+				DataEncryptionAlgorithm: defaultDataEncryptionAlgorithm,
+			},
 		},
 		{
 			desc: "timeout supplied",
-			in:   &KMSConfiguration{Timeout: &v1.Duration{Duration: 1 * time.Minute}},
-			want: &KMSConfiguration{Timeout: &v1.Duration{Duration: 1 * time.Minute}, CacheSize: &defaultCacheSize},
+			in: &KMSConfiguration{
+				Timeout: &v1.Duration{Duration: 1 * time.Minute},
+			},
+			want: &KMSConfiguration{
+				Timeout:                 &v1.Duration{Duration: 1 * time.Minute},
+				CacheSize:               &defaultCacheSize,
+				DataEncryptionAlgorithm: defaultDataEncryptionAlgorithm,
+			},
 		},
 	}
 
@@ -67,17 +105,33 @@ func TestKMSProviderCacheDefaults(t *testing.T) {
 		{
 			desc: "cache size not supplied",
 			in:   &KMSConfiguration{},
-			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &defaultCacheSize},
+			want: &KMSConfiguration{
+				Timeout:                 defaultTimeout,
+				CacheSize:               &defaultCacheSize,
+				DataEncryptionAlgorithm: defaultDataEncryptionAlgorithm,
+			},
 		},
 		{
 			desc: "cache of zero size supplied",
-			in:   &KMSConfiguration{CacheSize: &zero},
-			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &zero},
+			in: &KMSConfiguration{
+				CacheSize: &zero,
+			},
+			want: &KMSConfiguration{
+				Timeout:                 defaultTimeout,
+				CacheSize:               &zero,
+				DataEncryptionAlgorithm: defaultDataEncryptionAlgorithm,
+			},
 		},
 		{
 			desc: "positive cache size supplied",
-			in:   &KMSConfiguration{CacheSize: &ten},
-			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &ten},
+			in: &KMSConfiguration{
+				CacheSize: &ten,
+			},
+			want: &KMSConfiguration{
+				Timeout:                 defaultTimeout,
+				CacheSize:               &ten,
+				DataEncryptionAlgorithm: defaultDataEncryptionAlgorithm,
+			},
 		},
 	}
 

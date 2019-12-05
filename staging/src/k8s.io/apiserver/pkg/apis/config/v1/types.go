@@ -84,6 +84,17 @@ func (k Key) String() string {
 // IdentityConfiguration is an empty struct to allow identity transformer in provider configuration.
 type IdentityConfiguration struct{}
 
+// EnvelopeDataEncryptionTransformer defines supported transformers used for encrypting the data section of an envelope.
+type EnvelopeDataEncryptionTransformer string
+
+// Supported data encryption algorithms.
+const (
+	// AESCBC, see  https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/aes/aes.go#L93 for details.
+	AESCBC EnvelopeDataEncryptionTransformer = "AESCBC"
+	// AESGCM, see https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/aes/aes.go#L51 for details.
+	AESGCM EnvelopeDataEncryptionTransformer = "AESGCM"
+)
+
 // KMSConfiguration contains the name, cache size and path to configuration file for a KMS based envelope transformer.
 type KMSConfiguration struct {
 	// name is the name of the KMS plugin to be used.
@@ -96,4 +107,7 @@ type KMSConfiguration struct {
 	// Timeout for gRPC calls to kms-plugin (ex. 5s). The default is 3 seconds.
 	// +optional
 	Timeout *metav1.Duration `json:"timeout,omitempty"`
+	// DataEncryptionAlgorithm specifies the crypto algorithm to use for encrypting the data section of the envelope.
+	// +optional
+	DataEncryptionAlgorithm EnvelopeDataEncryptionTransformer `json:"dataEncryptionAlgorithm,omitempty"`
 }
