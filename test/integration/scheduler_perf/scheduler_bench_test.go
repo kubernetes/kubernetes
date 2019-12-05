@@ -191,6 +191,44 @@ func BenchmarkSchedulingPodAffinity(b *testing.B) {
 	}
 }
 
+// BenchmarkSchedulingPreferredPodAffinity benchmarks the scheduling rate of pods with
+// preferred PodAffinity rules when the cluster has various quantities of nodes and
+// scheduled pods.
+func BenchmarkSchedulingPreferredPodAffinity(b *testing.B) {
+	testBasePod := makeBasePodWithPreferredPodAffinity(
+		map[string]string{"foo": ""},
+		map[string]string{"foo": ""},
+	)
+	// The test strategy creates pods with affinity for each other.
+	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
+	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelZoneFailureDomain, "zone1")
+	for _, test := range tests {
+		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
+		b.Run(name, func(b *testing.B) {
+			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, nodeStrategy, testStrategy, b)
+		})
+	}
+}
+
+// BenchmarkSchedulingPreferredPodAntiAffinity benchmarks the scheduling rate of pods with
+// preferred PodAntiAffinity rules when the cluster has various quantities of nodes and
+// scheduled pods.
+func BenchmarkSchedulingPreferredPodAntiAffinity(b *testing.B) {
+	testBasePod := makeBasePodWithPreferredPodAntiAffinity(
+		map[string]string{"foo": ""},
+		map[string]string{"foo": ""},
+	)
+	// The test strategy creates pods with affinity for each other.
+	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
+	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelZoneFailureDomain, "zone1")
+	for _, test := range tests {
+		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
+		b.Run(name, func(b *testing.B) {
+			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, nodeStrategy, testStrategy, b)
+		})
+	}
+}
+
 // BenchmarkSchedulingNodeAffinity benchmarks the scheduling rate of pods with
 // NodeAffinity rules when the cluster has various quantities of nodes and
 // scheduled pods.
@@ -225,6 +263,62 @@ func makeBasePodWithPodAntiAffinity(podLabels, affinityLabels map[string]string)
 						MatchLabels: affinityLabels,
 					},
 					TopologyKey: v1.LabelHostname,
+				},
+			},
+		},
+	}
+	return basePod
+}
+
+// makeBasePodWithPreferredPodAntiAffinity creates a Pod object to be used as a template.
+// The Pod has a preferred PodAntiAffinity with pods with the given labels.
+func makeBasePodWithPreferredPodAntiAffinity(podLabels, affinityLabels map[string]string) *v1.Pod {
+	basePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "preferred-affinity-pod-",
+			Labels:       podLabels,
+		},
+		Spec: testutils.MakePodSpec(),
+	}
+	basePod.Spec.Affinity = &v1.Affinity{
+		PodAntiAffinity: &v1.PodAntiAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+				{
+					PodAffinityTerm: v1.PodAffinityTerm{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: affinityLabels,
+						},
+						TopologyKey: v1.LabelHostname,
+					},
+					Weight: 1,
+				},
+			},
+		},
+	}
+	return basePod
+}
+
+// makeBasePodWithPreferredPodAffinity creates a Pod object to be used as a template.
+// The Pod has a preferred PodAffinity with pods with the given labels.
+func makeBasePodWithPreferredPodAffinity(podLabels, affinityLabels map[string]string) *v1.Pod {
+	basePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "preferred-affinity-pod-",
+			Labels:       podLabels,
+		},
+		Spec: testutils.MakePodSpec(),
+	}
+	basePod.Spec.Affinity = &v1.Affinity{
+		PodAffinity: &v1.PodAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+				{
+					PodAffinityTerm: v1.PodAffinityTerm{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: affinityLabels,
+						},
+						TopologyKey: v1.LabelHostname,
+					},
+					Weight: 1,
 				},
 			},
 		},
