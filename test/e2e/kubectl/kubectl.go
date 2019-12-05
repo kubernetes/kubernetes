@@ -60,6 +60,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
@@ -450,7 +451,26 @@ var _ = SIGDescribe("Kubectl client", func() {
 			}
 
 			apiGroups, err := c.Discovery().ServerPreferredResources()
-			framework.ExpectNoError(err)
+
+			if discovery.IsGroupDiscoveryFailedError(err) {
+				discoveryErr := err.(*discovery.ErrGroupDiscoveryFailed)
+				for gv := range discoveryErr.Groups {
+					if strings.Contains(gv.Group, ".") && !strings.HasSuffix(gv.Group, ".k8s.io") {
+						// tolerate discovery errors for non-k8s.io groups (like aggregated/crd groups)
+						continue
+					}
+					if gv.Group == "wardle.k8s.io" || gv.Group == "metrics.k8s.io" {
+						// tolerate discovery errors for known test k8s.io groups like aggregated/metrics groups
+						continue
+					}
+					// otherwise, fail
+					framework.ExpectNoError(err)
+				}
+			} else {
+				// fail immediately if this isn't a discovery error
+				framework.ExpectNoError(err)
+
+			}
 
 			testableResources := etcd.GetEtcdStorageDataForNamespace(f.Namespace.Name)
 
