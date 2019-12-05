@@ -35,29 +35,29 @@ import (
 )
 
 type kubeletFlagsOpts struct {
-	nodeRegOpts              *kubeadmapi.NodeRegistrationOptions
-	featureGates             map[string]bool
-	pauseImage               string
-	registerTaintsUsingFlags bool
-	execer                   utilsexec.Interface
-	isServiceActiveFunc      func(string) (bool, error)
-	defaultHostname          string
+	nodeRegOpts          *kubeadmapi.NodeRegistrationOptions
+	featureGates         map[string]bool
+	pauseImage           string
+	addControlPlaneTaint bool
+	execer               utilsexec.Interface
+	isServiceActiveFunc  func(string) (bool, error)
+	defaultHostname      string
 }
 
 // WriteKubeletDynamicEnvFile writes an environment file with dynamic flags to the kubelet.
 // Used at "kubeadm init" and "kubeadm join" time.
-func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *kubeadmapi.NodeRegistrationOptions, registerTaintsUsingFlags bool, kubeletDir string) error {
+func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *kubeadmapi.NodeRegistrationOptions, addControlPlaneTaint bool, kubeletDir string) error {
 	hostName, err := kubeadmutil.GetHostname("")
 	if err != nil {
 		return err
 	}
 
 	flagOpts := kubeletFlagsOpts{
-		nodeRegOpts:              nodeReg,
-		featureGates:             cfg.FeatureGates,
-		pauseImage:               images.GetPauseImage(cfg),
-		registerTaintsUsingFlags: registerTaintsUsingFlags,
-		execer:                   utilsexec.New(),
+		nodeRegOpts:          nodeReg,
+		featureGates:         cfg.FeatureGates,
+		pauseImage:           images.GetPauseImage(cfg),
+		addControlPlaneTaint: addControlPlaneTaint,
+		execer:               utilsexec.New(),
 		isServiceActiveFunc: func(name string) (bool, error) {
 			initSystem, err := initsystem.GetInitSystem()
 			if err != nil {
@@ -96,13 +96,20 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 		kubeletFlags["container-runtime-endpoint"] = opts.nodeRegOpts.CRISocket
 	}
 
-	if opts.registerTaintsUsingFlags && opts.nodeRegOpts.Taints != nil && len(opts.nodeRegOpts.Taints) > 0 {
-		taintStrs := []string{}
+	// Taint the Node using the kubelet flag --register-with-taints
+	taintStrs := []string{}
+	if opts.addControlPlaneTaint {
+		taintStrs = append(taintStrs, constants.ControlPlaneTaint.ToString())
+	}
+	if opts.nodeRegOpts.Taints != nil && len(opts.nodeRegOpts.Taints) > 0 {
 		for _, taint := range opts.nodeRegOpts.Taints {
 			taintStrs = append(taintStrs, taint.ToString())
 		}
-
-		kubeletFlags["register-with-taints"] = strings.Join(taintStrs, ",")
+	}
+	if len(taintStrs) > 0 {
+		taintsJoined := strings.Join(taintStrs, ",")
+		klog.V(1).Infof("passing the following taints to the kubelet %q", taintsJoined)
+		kubeletFlags["register-with-taints"] = taintsJoined
 	}
 
 	ok, err := opts.isServiceActiveFunc("systemd-resolved")

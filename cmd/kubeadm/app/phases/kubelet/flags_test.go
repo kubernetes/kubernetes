@@ -110,13 +110,6 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "/var/run/dockershim.sock",
 					Name:      "foo",
-					Taints: []v1.Taint{ // This should be ignored as registerTaintsUsingFlags is false
-						{
-							Key:    "foo",
-							Value:  "bar",
-							Effect: "baz",
-						},
-					},
 				},
 				execer:              errCgroupExecer,
 				isServiceActiveFunc: serviceIsNotActiveFunc,
@@ -209,15 +202,44 @@ func TestBuildKubeletArgMap(t *testing.T) {
 						},
 					},
 				},
-				registerTaintsUsingFlags: true,
-				execer:                   cgroupfsCgroupExecer,
-				isServiceActiveFunc:      serviceIsNotActiveFunc,
-				defaultHostname:          "foo",
+				execer:              cgroupfsCgroupExecer,
+				isServiceActiveFunc: serviceIsNotActiveFunc,
+				defaultHostname:     "foo",
 			},
 			expected: map[string]string{
 				"container-runtime":          "remote",
 				"container-runtime-endpoint": "/var/run/containerd.sock",
 				"register-with-taints":       "foo=bar:baz,key=val:eff",
+			},
+		},
+		{
+			name: "register with user taints and control-plane taint",
+			opts: kubeletFlagsOpts{
+				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
+					CRISocket: "/var/run/containerd.sock",
+					Name:      "foo",
+					Taints: []v1.Taint{
+						{
+							Key:    "foo",
+							Value:  "bar",
+							Effect: "baz",
+						},
+						{
+							Key:    "key",
+							Value:  "val",
+							Effect: "eff",
+						},
+					},
+				},
+				addControlPlaneTaint: true,
+				execer:               cgroupfsCgroupExecer,
+				isServiceActiveFunc:  serviceIsNotActiveFunc,
+				defaultHostname:      "foo",
+			},
+			expected: map[string]string{
+				"container-runtime":          "remote",
+				"container-runtime-endpoint": "/var/run/containerd.sock",
+				"register-with-taints":       "node-role.kubernetes.io/master:NoSchedule,foo=bar:baz,key=val:eff",
 			},
 		},
 		{

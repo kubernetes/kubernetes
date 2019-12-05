@@ -26,41 +26,15 @@ import (
 )
 
 // MarkControlPlane taints the control-plane and sets the control-plane label
-func MarkControlPlane(client clientset.Interface, controlPlaneName string, taints []v1.Taint) error {
+func MarkControlPlane(client clientset.Interface, controlPlaneName string) error {
 
 	fmt.Printf("[mark-control-plane] Marking the node %s as control-plane by adding the label \"%s=''\"\n", controlPlaneName, constants.LabelNodeRoleMaster)
 
-	if len(taints) > 0 {
-		taintStrs := []string{}
-		for _, taint := range taints {
-			taintStrs = append(taintStrs, taint.ToString())
-		}
-		fmt.Printf("[mark-control-plane] Marking the node %s as control-plane by adding the taints %v\n", controlPlaneName, taintStrs)
-	}
-
 	return apiclient.PatchNode(client, controlPlaneName, func(n *v1.Node) {
-		markControlPlaneNode(n, taints)
+		markControlPlaneNode(n)
 	})
 }
 
-func taintExists(taint v1.Taint, taints []v1.Taint) bool {
-	for _, t := range taints {
-		if t == taint {
-			return true
-		}
-	}
-
-	return false
-}
-
-func markControlPlaneNode(n *v1.Node, taints []v1.Taint) {
+func markControlPlaneNode(n *v1.Node) {
 	n.ObjectMeta.Labels[constants.LabelNodeRoleMaster] = ""
-
-	for _, nt := range n.Spec.Taints {
-		if !taintExists(nt, taints) {
-			taints = append(taints, nt)
-		}
-	}
-
-	n.Spec.Taints = taints
 }

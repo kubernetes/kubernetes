@@ -194,8 +194,8 @@ func runMarkControlPlanePhase(c workflow.RunData) error {
 		return err
 	}
 
-	if err := markcontrolplanephase.MarkControlPlane(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.Taints); err != nil {
-		return errors.Wrap(err, "error applying control-plane label and taints")
+	if err := markcontrolplanephase.MarkControlPlane(client, cfg.NodeRegistration.Name); err != nil {
+		return errors.Wrap(err, "error applying control-plane label")
 	}
 
 	return nil

@@ -61,5 +61,5 @@ func runMarkControlPlane(c workflow.RunData) error {
 	}
 
 	nodeRegistration := data.Cfg().NodeRegistration
-	return markcontrolplanephase.MarkControlPlane(client, nodeRegistration.Name, nodeRegistration.Taints)
+	return markcontrolplanephase.MarkControlPlane(client, nodeRegistration.Name)
 }

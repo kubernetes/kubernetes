@@ -33,11 +33,7 @@ import (
 
 // SetJoinDynamicDefaults checks and sets configuration values for the JoinConfiguration object
 func SetJoinDynamicDefaults(cfg *kubeadmapi.JoinConfiguration) error {
-	addControlPlaneTaint := false
-	if cfg.ControlPlane != nil {
-		addControlPlaneTaint = true
-	}
-	if err := SetNodeRegistrationDynamicDefaults(&cfg.NodeRegistration, addControlPlaneTaint); err != nil {
+	if err := SetNodeRegistrationDynamicDefaults(&cfg.NodeRegistration); err != nil {
 		return err
 	}
 

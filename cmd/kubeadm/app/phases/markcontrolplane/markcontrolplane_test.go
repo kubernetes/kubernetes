@@ -39,70 +39,19 @@ func TestMarkControlPlane(t *testing.T) {
 	// will need to change if strategicpatch's behavior changes in the
 	// future.
 	tests := []struct {
-		name           string
-		existingLabel  string
-		existingTaints []v1.Taint
-		newTaints      []v1.Taint
-		expectedPatch  string
+		name          string
+		existingLabel string
+		expectedPatch string
 	}{
-		{
-			"control-plane label and taint missing",
-			"",
-			nil,
-			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
-			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}},\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\"}]}}",
-		},
-		{
-			"control-plane label and taint missing but taint not wanted",
-			"",
-			nil,
-			nil,
-			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}}}",
-		},
 		{
 			"control-plane label missing",
 			"",
-			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
-			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
 			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}}}",
-		},
-		{
-			"control-plane taint missing",
-			kubeadmconstants.LabelNodeRoleMaster,
-			nil,
-			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
-			"{\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\"}]}}",
 		},
 		{
 			"nothing missing",
 			kubeadmconstants.LabelNodeRoleMaster,
-			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
-			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
 			"{}",
-		},
-		{
-			"has taint and no new taints wanted",
-			kubeadmconstants.LabelNodeRoleMaster,
-			[]v1.Taint{
-				{
-					Key:    "node.cloudprovider.kubernetes.io/uninitialized",
-					Effect: v1.TaintEffectNoSchedule,
-				},
-			},
-			nil,
-			"{}",
-		},
-		{
-			"has taint and should merge with wanted taint",
-			kubeadmconstants.LabelNodeRoleMaster,
-			[]v1.Taint{
-				{
-					Key:    "node.cloudprovider.kubernetes.io/uninitialized",
-					Effect: v1.TaintEffectNoSchedule,
-				},
-			},
-			[]v1.Taint{kubeadmconstants.ControlPlaneTaint},
-			"{\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\"},{\"effect\":\"NoSchedule\",\"key\":\"node.cloudprovider.kubernetes.io/uninitialized\"}]}}",
 		},
 	}
 
@@ -123,10 +72,6 @@ func TestMarkControlPlane(t *testing.T) {
 
 			if tc.existingLabel != "" {
 				controlPlaneNode.ObjectMeta.Labels[tc.existingLabel] = ""
-			}
-
-			if tc.existingTaints != nil {
-				controlPlaneNode.Spec.Taints = tc.existingTaints
 			}
 
 			jsonNode, err := json.Marshal(controlPlaneNode)
@@ -164,7 +109,7 @@ func TestMarkControlPlane(t *testing.T) {
 				t.Fatalf("MarkControlPlane(%s): unexpected error building clientset: %v", tc.name, err)
 			}
 
-			if err := MarkControlPlane(cs, hostname, tc.newTaints); err != nil {
+			if err := MarkControlPlane(cs, hostname); err != nil {
 				t.Errorf("MarkControlPlane(%s) returned unexpected error: %v", tc.name, err)
 			}
 
