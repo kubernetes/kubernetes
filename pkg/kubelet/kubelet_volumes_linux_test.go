@@ -27,6 +27,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
@@ -137,7 +139,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 				}
 			}
 
-			err := kubelet.cleanupOrphanedPodDirs(tc.pods, nil)
+			err := kubelet.cleanupOrphanedPodDirs(tc.pods, nil, map[types.UID]sets.Empty{})
 			if tc.expectErr && err == nil {
 				t.Errorf("%s failed: expected error, got success", name)
 			}
