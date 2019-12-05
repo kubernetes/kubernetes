@@ -97,16 +97,9 @@ func createRuntimeClass(f *framework.Framework, name, handler string) string {
 }
 
 func expectPodRejection(f *framework.Framework, pod *v1.Pod) {
-	// The Node E2E doesn't run the RuntimeClass admission controller, so we expect the rejection to
-	// happen by the Kubelet.
-	if framework.TestContext.NodeE2E {
-		pod = f.PodClient().Create(pod)
-		expectSandboxFailureEvent(f, pod, fmt.Sprintf("\"%s\" not found", *pod.Spec.RuntimeClassName))
-	} else {
-		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-		framework.ExpectError(err, "should be forbidden")
-		framework.ExpectEqual(apierrors.IsForbidden(err), true, "should be forbidden error")
-	}
+	_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+	framework.ExpectError(err, "should be forbidden")
+	framework.ExpectEqual(apierrors.IsForbidden(err), true, "should be forbidden error")
 }
 
 // expectPodSuccess waits for the given pod to terminate successfully.
