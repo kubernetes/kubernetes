@@ -28,8 +28,6 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
-	fakediscovery "k8s.io/client-go/discovery/fake"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -38,11 +36,9 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
-	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
-	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
 func getK8sVersionFromUserInput(flags *applyPlanFlags, args []string, versionIsMandatory bool) (string, error) {
@@ -76,7 +72,7 @@ func getK8sVersionFromUserInput(flags *applyPlanFlags, args []string, versionIsM
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
 func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion string) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, error) {
-	client, err := getClient(flags.kubeConfigPath, dryRun)
+	client, err := upgrade.GetClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
 		return nil, nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 	}
@@ -121,7 +117,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 
 	// Ensure the user is root
 	klog.V(1).Info("running preflight checks")
-	if err := runPreflightChecks(client, ignorePreflightErrorsSet, &cfg.ClusterConfiguration); err != nil {
+	if err := upgrade.RunPreflightChecks(client, ignorePreflightErrorsSet, &cfg.ClusterConfiguration); err != nil {
 		return nil, nil, nil, err
 	}
 
@@ -176,55 +172,6 @@ func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer
 			fmt.Fprintf(w, "\t%s\n", scanner.Text())
 		}
 	}
-}
-
-// runPreflightChecks runs the root preflight check
-func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.String, cfg *kubeadmapi.ClusterConfiguration) error {
-	fmt.Println("[preflight] Running pre-flight checks.")
-	err := preflight.RunRootCheckOnly(ignorePreflightErrors)
-	if err != nil {
-		return err
-	}
-	err = upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors, cfg.DNS.Type)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// getClient gets a real or fake client depending on whether the user is dry-running or not
-func getClient(file string, dryRun bool) (clientset.Interface, error) {
-	if dryRun {
-		dryRunGetter, err := apiclient.NewClientBackedDryRunGetterFromKubeconfig(file)
-		if err != nil {
-			return nil, err
-		}
-
-		// In order for fakeclient.Discovery().ServerVersion() to return the backing API Server's
-		// real version; we have to do some clever API machinery tricks. First, we get the real
-		// API Server's version
-		realServerVersion, err := dryRunGetter.Client().Discovery().ServerVersion()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get server version")
-		}
-
-		// Get the fake clientset
-		dryRunOpts := apiclient.GetDefaultDryRunClientOptions(dryRunGetter, os.Stdout)
-		// Print GET and LIST requests
-		dryRunOpts.PrintGETAndLIST = true
-		fakeclient := apiclient.NewDryRunClientWithOpts(dryRunOpts)
-		// As we know the return of Discovery() of the fake clientset is of type *fakediscovery.FakeDiscovery
-		// we can convert it to that struct.
-		fakeclientDiscovery, ok := fakeclient.Discovery().(*fakediscovery.FakeDiscovery)
-		if !ok {
-			return nil, errors.New("couldn't set fake discovery's server version")
-		}
-		// Lastly, set the right server version to be used
-		fakeclientDiscovery.FakedServerVersion = realServerVersion
-		// return the fake clientset used for dry-running
-		return fakeclient, nil
-	}
-	return kubeconfigutil.ClientSetFromFile(file)
 }
 
 // getWaiter gets the right waiter implementation

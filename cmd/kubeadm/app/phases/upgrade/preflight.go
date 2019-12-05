@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/coredns/corefile-migration/migration"
@@ -94,6 +95,20 @@ func checkUnsupportedPlugins(client clientset.Interface) error {
 		if UnsupportedPlugins != "" || UnsupportedVersion != "" {
 			return errors.New("there are unsupported plugins in the CoreDNS Corefile")
 		}
+	}
+	return nil
+}
+
+// RunPreflightChecks runs preflight checks
+func RunPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.String, cfg *kubeadmapi.ClusterConfiguration) error {
+	fmt.Println("[preflight] Running pre-flight checks.")
+	err := preflight.RunRootCheckOnly(ignorePreflightErrors)
+	if err != nil {
+		return err
+	}
+	err = RunCoreDNSMigrationCheck(client, ignorePreflightErrors, cfg.DNS.Type)
+	if err != nil {
+		return err
 	}
 	return nil
 }
