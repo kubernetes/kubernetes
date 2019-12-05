@@ -17,6 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
@@ -52,8 +53,17 @@ func (p *singleNumaNodePolicy) canAdmitPodResult(hint *TopologyHint) lifecycle.P
 	}
 }
 
+func (p *singleNumaNodePolicy) mergeProvidersHints(providersHints []map[string][]TopologyHint) TopologyHint {
+	// Set the default hint to return from this function as an any-NUMANode
+	// affinity with an unpreferred allocation. This will only be returned if
+	// no better hint can be found when merging hints from each hint provider.
+	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
+	defaultHint := TopologyHint{defaultAffinity, false}
+	return defaultHint
+}
+
 func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
-	hint := mergeProvidersHints(p, p.numaNodes, providersHints)
+	hint := p.mergeProvidersHints(providersHints)
 	admit := p.canAdmitPodResult(&hint)
 	return hint, admit
 }
