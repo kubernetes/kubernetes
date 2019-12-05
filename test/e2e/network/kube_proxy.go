@@ -172,6 +172,8 @@ var _ = SIGDescribe("Network", func() {
 		}
 
 		jsonBytes, err := json.Marshal(options)
+		framework.ExpectNoError(err, "could not marshal")
+
 		cmd := fmt.Sprintf(
 			`curl -X POST http://localhost:%v/run/nat-closewait-client -d `+
 				`'%v' 2>/dev/null`,

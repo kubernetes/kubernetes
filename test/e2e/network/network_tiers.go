@@ -134,7 +134,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		framework.ExpectEqual(svcTier, cloud.NetworkTierStandard)
 
 		// Wait until the ingress IP changes and verifies the LB.
-		ingressIP = waitAndVerifyLBWithTier(jig, ingressIP, createTimeout, lagTimeout)
+		waitAndVerifyLBWithTier(jig, ingressIP, createTimeout, lagTimeout)
 	})
 })
 
