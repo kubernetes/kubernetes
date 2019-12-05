@@ -237,24 +237,23 @@ function Set-EnvironmentVars {
     "CNI_DIR" = ${kube_env}['CNI_DIR']
     "CNI_CONFIG_DIR" = ${kube_env}['CNI_CONFIG_DIR']
     "PKI_DIR" = ${kube_env}['PKI_DIR']
+    "CA_FILE_PATH" = ${kube_env}['CA_FILE_PATH']
     "KUBELET_CONFIG" = ${kube_env}['KUBELET_CONFIG_FILE']
     "BOOTSTRAP_KUBECONFIG" = ${kube_env}['BOOTSTRAP_KUBECONFIG_FILE']
+    "KUBECONFIG" = ${kube_env}['KUBECONFIG_FILE']
     "KUBEPROXY_KUBECONFIG" = ${kube_env}['KUBEPROXY_KUBECONFIG_FILE']
+    "LOGS_DIR" = ${kube_env}['LOGS_DIR']
+    "MANIFESTS_DIR" = ${kube_env}['MANIFESTS_DIR']
 
     "Path" = ${env:Path} + ";" + ${kube_env}['NODE_DIR']
     "KUBE_NETWORK" = "l2bridge".ToLower()
-    "CA_CERT_BUNDLE_PATH" = ${kube_env}['PKI_DIR'] + '\ca-certificates.crt'
     "KUBELET_CERT_PATH" = ${kube_env}['PKI_DIR'] + '\kubelet.crt'
     "KUBELET_KEY_PATH" = ${kube_env}['PKI_DIR'] + '\kubelet.key'
 
     "CONTAINER_RUNTIME" = ${kube_env}['CONTAINER_RUNTIME']
     "CONTAINER_RUNTIME_ENDPOINT" = ${kube_env}['CONTAINER_RUNTIME_ENDPOINT']
 
-    # TODO(pjh): these are only in flags, can be removed from env once flags are
-    # moved to util.sh:
-    "LOGS_DIR" = ${kube_env}['LOGS_DIR']
-    "MANIFESTS_DIR" = ${kube_env}['MANIFESTS_DIR']
-    "KUBECONFIG" = ${kube_env}['KUBECONFIG_FILE']
+    'LICENSE_DIR' = 'C:\Program Files\Google\Compute Engine\THIRD_PARTY_NOTICES'
   }
 
   # Set the environment variables in two ways: permanently on the machine (only
@@ -289,7 +288,7 @@ function Create-Directories {
   Log-Output "Creating ${env:K8S_DIR} and its subdirectories."
   ForEach ($dir in ("${env:K8S_DIR}", "${env:NODE_DIR}", "${env:LOGS_DIR}",
     "${env:CNI_DIR}", "${env:CNI_CONFIG_DIR}", "${env:MANIFESTS_DIR}",
-    "${env:PKI_DIR}"), "C:\tmp", "C:\var\log") {
+    "${env:PKI_DIR}", "${env:LICENSE_DIR}"), "C:\tmp", "C:\var\log") {
     mkdir -Force $dir
   }
 }
@@ -320,6 +319,39 @@ function Get_ContainerVersionLabel {
   }
   Throw ("Unknown Windows version $WinVersion, don't know its container " +
          "version label")
+}
+
+# Downloads the gke-exec-auth-plugin for TPM-based authentication to the
+# master, if auth plugin support has been requested for this node (see
+# Test-NodeUsesAuthPlugin).
+# https://github.com/kubernetes/cloud-provider-gcp/tree/master/cmd/gke-exec-auth-plugin
+#
+# Required ${kube_env} keys:
+#   EXEC_AUTH_PLUGIN_LICENSE_URL
+#   EXEC_AUTH_PLUGIN_SHA1
+#   EXEC_AUTH_PLUGIN_URL
+function DownloadAndInstall-AuthPlugin {
+  if (-not (Test-NodeUsesAuthPlugin ${kube_env})) {
+    Log-Output 'Skipping download of auth plugin'
+    return
+  }
+  if (-not (ShouldWrite-File "${env:NODE_DIR}\gke-exec-auth-plugin.exe")) {
+    return
+  }
+
+  if (-not ($kube_env.ContainsKey('EXEC_AUTH_PLUGIN_LICENSE_URL') -and
+            $kube_env.ContainsKey('EXEC_AUTH_PLUGIN_SHA1') -and
+            $kube_env.ContainsKey('EXEC_AUTH_PLUGIN_URL'))) {
+    Log-Output -Fatal ("Missing one or more kube-env keys needed for " +
+                       "downloading auth plugin: $(Out-String $kube_env)")
+  }
+  MustDownload-File `
+      -URLs ${kube_env}['EXEC_AUTH_PLUGIN_URL'] `
+      -Hash ${kube_env}['EXEC_AUTH_PLUGIN_SHA1'] `
+      -OutFile "${env:NODE_DIR}\gke-exec-auth-plugin.exe"
+  MustDownload-File `
+      -URLs ${kube_env}['EXEC_AUTH_PLUGIN_LICENSE_URL'] `
+      -OutFile "${env:LICENSE_DIR}\LICENSE_gke-exec-auth-plugin.txt"
 }
 
 # Downloads the Kubernetes binaries from kube-env's NODE_BINARY_TAR_URL and
@@ -477,44 +509,66 @@ function Write_PkiData {
 #
 # Required ${kube_env} keys:
 #   CA_CERT
+# ${kube_env} keys that can be omitted for nodes that do not use an
+# authentication plugin:
 #   KUBELET_CERT
 #   KUBELET_KEY
 function Create-NodePki {
-  Log-Output "Creating node pki files"
+  Log-Output 'Creating node pki files'
 
-  $CA_CERT_BUNDLE = ${kube_env}['CA_CERT']
-  $KUBELET_CERT = ${kube_env}['KUBELET_CERT']
-  $KUBELET_KEY = ${kube_env}['KUBELET_KEY']
+  if ($kube_env.ContainsKey('CA_CERT')) {
+    $CA_CERT_BUNDLE = ${kube_env}['CA_CERT']
+    Write_PkiData "${CA_CERT_BUNDLE}" ${env:CA_FILE_PATH}
+  }
+  else {
+    Log-Output -Fatal 'CA_CERT not present in kube-env'
+  }
 
-  Write_PkiData "${CA_CERT_BUNDLE}" ${env:CA_CERT_BUNDLE_PATH}
-  Write_PkiData "${KUBELET_CERT}" ${env:KUBELET_CERT_PATH}
-  Write_PkiData "${KUBELET_KEY}" ${env:KUBELET_KEY_PATH}
+  # On nodes that use a plugin to support authentication, KUBELET_CERT and
+  # KUBELET_KEY will not be present - TPM_BOOTSTRAP_CERT and TPM_BOOTSTRAP_KEY
+  # should be set instead.
+  if (Test-NodeUsesAuthPlugin ${kube_env}) {
+    Log-Output ('Skipping KUBELET_CERT and KUBELET_KEY, plugin will be used ' +
+                'for authentication')
+    return
+  }
+
+  if ($kube_env.ContainsKey('KUBELET_CERT')) {
+    $KUBELET_CERT = ${kube_env}['KUBELET_CERT']
+    Write_PkiData "${KUBELET_CERT}" ${env:KUBELET_CERT_PATH}
+  }
+  else {
+    Log-Output -Fatal 'KUBELET_CERT not present in kube-env'
+  }
+  if ($kube_env.ContainsKey('KUBELET_KEY')) {
+    $KUBELET_KEY = ${kube_env}['KUBELET_KEY']
+    Write_PkiData "${KUBELET_KEY}" ${env:KUBELET_KEY_PATH}
+  }
+  else {
+    Log-Output -Fatal 'KUBELET_KEY not present in kube-env'
+  }
+
   Get-ChildItem ${env:PKI_DIR}
 }
 
-# Creates the kubelet kubeconfig at $env:BOOTSTRAP_KUBECONFIG.
+# Creates the bootstrap kubelet kubeconfig at $env:BOOTSTRAP_KUBECONFIG.
+# https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet-tls-bootstrapping/
 #
 # Create-NodePki() must be called first.
 #
 # Required ${kube_env} keys:
 #   KUBERNETES_MASTER_NAME: the apiserver IP address.
-function Create-KubeletKubeconfig {
-  # The API server IP address comes from KUBERNETES_MASTER_NAME in kube-env, I
-  # think. cluster/gce/gci/configure-helper.sh?l=2801
+function Write_BootstrapKubeconfig {
+  if (-not (ShouldWrite-File ${env:BOOTSTRAP_KUBECONFIG})) {
+    return
+  }
+
+  # TODO(mtaufen): is user "kubelet" correct? Other examples use e.g.
+  # "system:node:$(hostname)".
+
   $apiserverAddress = ${kube_env}['KUBERNETES_MASTER_NAME']
-
-  # TODO(pjh): set these using kube-env values.
-  $createBootstrapConfig = $true
-  $fetchBootstrapConfig = $false
-
-  if (${createBootstrapConfig}) {
-    if (-not (ShouldWrite-File ${env:BOOTSTRAP_KUBECONFIG})) {
-      return
-    }
-    New-Item -Force -ItemType file ${env:BOOTSTRAP_KUBECONFIG} | Out-Null
-    # TODO(mtaufen): is user "kubelet" correct? Other examples use e.g.
-    #   "system:node:$(hostname)".
-    Set-Content ${env:BOOTSTRAP_KUBECONFIG} `
+  New-Item -Force -ItemType file ${env:BOOTSTRAP_KUBECONFIG} | Out-Null
+  Set-Content ${env:BOOTSTRAP_KUBECONFIG} `
 'apiVersion: v1
 kind: Config
 users:
@@ -526,30 +580,53 @@ clusters:
 - name: local
   cluster:
     server: https://APISERVER_ADDRESS
-    certificate-authority: CA_CERT_BUNDLE_PATH
+    certificate-authority: CA_FILE_PATH
 contexts:
 - context:
     cluster: local
     user: kubelet
   name: service-account-context
 current-context: service-account-context'.`
-      replace('KUBELET_CERT_PATH', ${env:KUBELET_CERT_PATH}).`
-      replace('KUBELET_KEY_PATH', ${env:KUBELET_KEY_PATH}).`
-      replace('APISERVER_ADDRESS', ${apiserverAddress}).`
-      replace('CA_CERT_BUNDLE_PATH', ${env:CA_CERT_BUNDLE_PATH})
-    Log-Output ("kubelet bootstrap kubeconfig:`n" +
-                "$(Get-Content -Raw ${env:BOOTSTRAP_KUBECONFIG})")
+    replace('KUBELET_CERT_PATH', ${env:KUBELET_CERT_PATH}).`
+    replace('KUBELET_KEY_PATH', ${env:KUBELET_KEY_PATH}).`
+    replace('APISERVER_ADDRESS', ${apiserverAddress}).`
+    replace('CA_FILE_PATH', ${env:CA_FILE_PATH})
+  Log-Output ("kubelet bootstrap kubeconfig:`n" +
+              "$(Get-Content -Raw ${env:BOOTSTRAP_KUBECONFIG})")
+}
+
+# Fetches the kubelet kubeconfig from the metadata server and writes it to
+# $env:KUBECONFIG.
+#
+# Create-NodePki() must be called first.
+function Write_KubeconfigFromMetadata {
+  if (-not (ShouldWrite-File ${env:KUBECONFIG})) {
+    return
   }
-  elseif (${fetchBootstrapConfig}) {
-    Log_NotImplemented `
-        "fetching kubelet bootstrap-kubeconfig file from metadata"
-    # get-metadata-value "instance/attributes/bootstrap-kubeconfig" >
-    #   /var/lib/kubelet/bootstrap-kubeconfig
-    Log-Output ("kubelet bootstrap kubeconfig:`n" +
-                "$(Get-Content -Raw ${env:BOOTSTRAP_KUBECONFIG})")
+
+  $kubeconfig = Get-InstanceMetadataAttribute 'kubeconfig'
+  if ($kubeconfig -eq $null) {
+    Log-Output `
+        "kubeconfig metadata key not found, can't write ${env:KUBECONFIG}" `
+        -Fatal
   }
-  else {
-    Log_NotImplemented "fetching kubelet kubeconfig file from metadata"
+  Set-Content ${env:KUBECONFIG} $kubeconfig
+  Log-Output ("kubelet kubeconfig from metadata (non-bootstrap):`n" +
+              "$(Get-Content -Raw ${env:KUBECONFIG})")
+}
+
+# Creates the kubelet kubeconfig at $env:KUBECONFIG for nodes that use an
+# authentication plugin, or at $env:BOOTSTRAP_KUBECONFIG for nodes that do not.
+#
+# Create-NodePki() must be called first.
+#
+# Required ${kube_env} keys:
+#   KUBERNETES_MASTER_NAME: the apiserver IP address.
+function Create-KubeletKubeconfig {
+  if (Test-NodeUsesAuthPlugin ${kube_env}) {
+    Write_KubeconfigFromMetadata
+  } else {
+    Write_BootstrapKubeconfig
   }
 }
 
@@ -1045,6 +1122,11 @@ function Start-WorkerServices {
       "--pod-infra-container-image=${INFRA_CONTAINER}"
   )
   $kubelet_args = ${default_kubelet_args} + ${kubelet_args}
+  if (-not (Test-NodeUsesAuthPlugin ${kube_env})) {
+    Log-Output 'Using bootstrap kubeconfig for authentication'
+    $kubelet_args = (${kubelet_args} +
+                     "--bootstrap-kubeconfig=${env:BOOTSTRAP_KUBECONFIG}")
+  }
   Log-Output "Final kubelet_args: ${kubelet_args}"
 
   # Compute kube-proxy args
