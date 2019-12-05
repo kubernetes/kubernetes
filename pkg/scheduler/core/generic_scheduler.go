@@ -199,7 +199,7 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 	if err := g.Snapshot(); err != nil {
 		return result, err
 	}
-	trace.Step("Snapshoting scheduler cache and node infos done")
+	trace.Step("Snapshotting scheduler cache and node infos done")
 
 	if len(g.nodeInfoSnapshot.NodeInfoList) == 0 {
 		return result, ErrNoNodesAvailable
