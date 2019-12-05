@@ -319,7 +319,6 @@ func TestSubnet(t *testing.T) {
 func TestEnsureLoadBalancerDeleted(t *testing.T) {
 	const vmCount = 8
 	const availabilitySetCount = 4
-	const serviceCount = 9
 
 	tests := []struct {
 		desc              string

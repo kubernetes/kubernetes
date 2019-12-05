@@ -19,7 +19,6 @@ limitations under the License.
 package azure
 
 import (
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -32,8 +31,7 @@ import (
 )
 
 var (
-	vmssNameSeparator  = "_"
-	vmssCacheSeparator = "#"
+	vmssNameSeparator = "_"
 
 	vmssVirtualMachinesKey  = "k8svmssVirtualMachinesKey"
 	availabilitySetNodesKey = "k8sAvailabilitySetNodesKey"
@@ -48,10 +46,6 @@ type vmssVirtualMachinesEntry struct {
 	instanceID     string
 	virtualMachine *compute.VirtualMachineScaleSetVM
 	lastUpdate     time.Time
-}
-
-func (ss *scaleSet) makeVmssVMName(scaleSetName, instanceID string) string {
-	return fmt.Sprintf("%s%s%s", scaleSetName, vmssNameSeparator, instanceID)
 }
 
 func extractVmssVMName(name string) (string, string, error) {
