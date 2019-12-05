@@ -20,6 +20,24 @@ import (
 	"testing"
 )
 
+func TestPolicyRestrictedName(t *testing.T) {
+	tcases := []struct {
+		name     string
+		expected string
+	}{
+		{
+			name:     "New Restricted Policy",
+			expected: "restricted",
+		},
+	}
+	for _, tc := range tcases {
+		policy := NewRestrictedPolicy([]int{0, 1})
+		if policy.Name() != tc.expected {
+			t.Errorf("Expected Policy Name to be %s, got %s", tc.expected, policy.Name())
+		}
+	}
+}
+
 func TestPolicyRestrictedCanAdmitPodResult(t *testing.T) {
 	tcases := []struct {
 		name     string
@@ -58,7 +76,7 @@ func TestPolicyRestrictedCanAdmitPodResult(t *testing.T) {
 	}
 }
 
-func TestRestrictedPolicyMerge(t *testing.T) {
+func TestPolicyRestrictedMerge(t *testing.T) {
 	numaNodes := []int{0, 1}
 	policy := NewRestrictedPolicy(numaNodes)
 

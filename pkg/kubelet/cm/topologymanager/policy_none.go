@@ -36,12 +36,6 @@ func (p *nonePolicy) Name() string {
 	return PolicyNone
 }
 
-func (p *nonePolicy) canAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
-	return lifecycle.PodAdmitResult{
-		Admit: true,
-	}
-}
-
 func (p *nonePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
-	return TopologyHint{}, p.canAdmitPodResult(nil)
+	return TopologyHint{}, lifecycle.PodAdmitResult{Admit: true}
 }
