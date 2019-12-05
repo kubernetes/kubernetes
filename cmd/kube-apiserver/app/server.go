@@ -572,8 +572,10 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 
 	// process s.ServiceClusterIPRange from list to Primary and Secondary
 	// we process secondary only if provided by user
-
-	serviceClusterIPRangeList := strings.Split(s.ServiceClusterIPRanges, ",")
+	serviceClusterIPRangeList := []string{}
+	if s.ServiceClusterIPRanges != "" {
+		serviceClusterIPRangeList = strings.Split(s.ServiceClusterIPRanges, ",")
+	}
 
 	var apiServerServiceIP net.IP
 	var serviceIPRange net.IPNet
