@@ -639,7 +639,10 @@ var _ = SIGDescribe("Kubectl client", func() {
 			}
 		})
 
-		ginkgo.It("should handle in-cluster config", func() {
+		// Temporarily turning off this test to give a better signal, since this
+		// test is continuously failing. The long-term effort to fix this test
+		// is being coordinated through the bug: https://b/122439474
+		ginkgo.It("should handle in-cluster config [Flaky]", func() {
 			// TODO: Find a way to download and copy the appropriate kubectl binary, or maybe a multi-arch kubectl image
 			// for now this only works on amd64
 			e2eskipper.SkipUnlessNodeOSArchIs("amd64")
