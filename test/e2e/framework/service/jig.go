@@ -702,7 +702,7 @@ func (j *TestJig) waitForPdbReady() error {
 		if err != nil {
 			return err
 		}
-		if pdb.Status.PodDisruptionsAllowed > 0 {
+		if pdb.Status.DisruptionsAllowed > 0 {
 			return nil
 		}
 	}
