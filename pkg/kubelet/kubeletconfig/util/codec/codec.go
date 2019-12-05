@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/component-base/codec"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
@@ -80,20 +81,6 @@ func NewYAMLEncoder(groupName string) (runtime.Encoder, error) {
 	return legacyscheme.Codecs.EncoderForVersion(info.Serializer, versions[0]), nil
 }
 
-// newLenientSchemeAndCodecs returns a scheme that has only v1beta1 registered into
-// it and a CodecFactory with strict decoding disabled.
-func newLenientSchemeAndCodecs() (*runtime.Scheme, *serializer.CodecFactory, error) {
-	lenientScheme := runtime.NewScheme()
-	if err := kubeletconfig.AddToScheme(lenientScheme); err != nil {
-		return nil, nil, fmt.Errorf("failed to add internal kubelet config API to lenient scheme: %v", err)
-	}
-	if err := kubeletconfigv1beta1.AddToScheme(lenientScheme); err != nil {
-		return nil, nil, fmt.Errorf("failed to add kubelet config v1beta1 API to lenient scheme: %v", err)
-	}
-	lenientCodecs := serializer.NewCodecFactory(lenientScheme, serializer.DisableStrict)
-	return lenientScheme, &lenientCodecs, nil
-}
-
 // DecodeKubeletConfiguration decodes a serialized KubeletConfiguration to the internal type.
 func DecodeKubeletConfiguration(kubeletCodecs *serializer.CodecFactory, data []byte) (*kubeletconfig.KubeletConfiguration, error) {
 	var (
@@ -112,7 +99,11 @@ func DecodeKubeletConfiguration(kubeletCodecs *serializer.CodecFactory, data []b
 		}
 
 		var lenientErr error
-		_, lenientCodecs, lenientErr := newLenientSchemeAndCodecs()
+		_, lenientCodecs, lenientErr := codec.NewLenientSchemeAndCodecs(
+			kubeletconfig.AddToScheme,
+			kubeletconfigv1beta1.AddToScheme,
+		)
+
 		if lenientErr != nil {
 			return nil, lenientErr
 		}
