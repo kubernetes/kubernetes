@@ -821,8 +821,6 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 		params.ExpectCode = http.StatusOK
 	}
 
-	framework.Logf("Poking %q", url)
-
 	resp, err := httpGetNoConnectionPoolTimeout(url, params.Timeout)
 	if err != nil {
 		ret.Error = err
