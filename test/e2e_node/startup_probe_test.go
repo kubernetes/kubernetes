@@ -30,6 +30,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -178,7 +179,7 @@ var _ = framework.KubeDescribe("StartupProbe [Serial] [Disruptive] [NodeAlphaFea
 
 			isReady, err := testutils.PodRunningReady(p)
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(isReady, true, "pod should be ready")
+			gomega.Expect(isReady).To(gomega.BeTrue(), "pod should be ready")
 
 			// We assume the pod became ready when the container became ready. This
 			// is true for a single container pod.

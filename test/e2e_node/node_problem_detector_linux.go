@@ -24,7 +24,7 @@ import (
 	"path"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -104,7 +104,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 
 			nodeTime = time.Now()
 			bootTime, err = util.GetBootTime()
-			framework.ExpectEqual(err, nil)
+			gomega.Expect(err).To(gomega.BeNil())
 
 			// Set lookback duration longer than node up time.
 			// Assume the test won't take more than 1 hour, in fact it usually only takes 90 seconds.
