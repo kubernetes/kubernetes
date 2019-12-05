@@ -18,6 +18,7 @@ package upgrade
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/pkg/errors"
@@ -26,6 +27,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -109,11 +111,30 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 func runApply(flags *applyFlags, userVersion string) error {
 
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
-	klog.V(1).Infoln("[upgrade/apply] verifying health of cluster")
+
 	klog.V(1).Infoln("[upgrade/apply] retrieving configuration from cluster")
-	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, flags.dryRun, userVersion)
+	client, cfg, versionGetter, err := upgrade.GetUpgradeVariables(flags.applyPlanFlags.kubeConfigPath, flags.applyPlanFlags.cfgPath, flags.dryRun, userVersion)
 	if err != nil {
 		return err
+	}
+
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(flags.applyPlanFlags.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
+	if err != nil {
+		return err
+	}
+
+	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
+	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
+
+	klog.V(1).Infoln("[upgrade/apply] verifying health of cluster")
+	err = upgrade.EnforceRequirements(client, cfg, ignorePreflightErrorsSet, flags.featureGatesString, flags.dryRun)
+	if err != nil {
+		return err
+	}
+
+	// If the user told us to print this information out; do it!
+	if flags.printConfig {
+		printConfiguration(&cfg.ClusterConfiguration, os.Stdout)
 	}
 
 	// Validate requested and validate actual version
