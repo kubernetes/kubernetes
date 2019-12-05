@@ -744,7 +744,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			}
 		})
 
-		ginkgo.It("should handle in-cluster config", func() {
+		ginkgo.It("should handle in-cluster config [Flaky]", func() {
 			ginkgo.By("adding rbac permissions")
 			// grant the view permission widely to allow inspection of the `invalid` namespace and the default namespace
 			err := auth.BindClusterRole(f.ClientSet.RbacV1(), "view", f.Namespace.Name,
