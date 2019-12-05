@@ -46,6 +46,11 @@ spec:
             - -v=5
             - --csi-address=/csi/csi.sock
             - --connection-timeout=15s
+          securityContext:
+            # This is necessary only for systems with SELinux, where
+            # non-privileged sidecar containers cannot access unix domain socket
+            # created by privileged CSI driver container.
+            privileged: true
           volumeMounts:
             - mountPath: /csi
               name: socket-dir
