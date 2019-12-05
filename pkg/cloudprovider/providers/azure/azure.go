@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -51,10 +51,13 @@ const (
 	CloudProviderName      = "azure"
 	rateLimitQPSDefault    = 1.0
 	rateLimitBucketDefault = 5
-	backoffRetriesDefault  = 6
-	backoffExponentDefault = 1.5
-	backoffDurationDefault = 5 // in seconds
-	backoffJitterDefault   = 1.0
+	// VMSS API limits are 180 per 3 minutes & 900 per 30 minutes per subscription
+	vmssRateLimitQPSDefault    = 1.0
+	vmssRateLimitBucketDefault = 5
+	backoffRetriesDefault      = 6
+	backoffExponentDefault     = 1.5
+	backoffDurationDefault     = 5 // in seconds
+	backoffJitterDefault       = 1.0
 	// According to https://docs.microsoft.com/en-us/azure/azure-subscription-service-limits#load-balancer.
 	maximumLoadBalancerRuleCount = 250
 
@@ -128,6 +131,10 @@ type Config struct {
 	CloudProviderRateLimitQPS float32 `json:"cloudProviderRateLimitQPS" yaml:"cloudProviderRateLimitQPS"`
 	// Rate limit Bucket Size
 	CloudProviderRateLimitBucket int `json:"cloudProviderRateLimitBucket" yaml:"cloudProviderRateLimitBucket"`
+	// VMSS Rate limit QPS
+	CloudProviderVMSSRateLimitQPS float32 `json:"cloudProviderVMSSRateLimitQPS" yaml:"cloudProviderVMSSRateLimitQPS"`
+	// VMSS Rate limit Bucket Size
+	CloudProviderVMSSRateLimitBucket int `json:"cloudProviderVMSSRateLimitBucket" yaml:"cloudProviderVMSSRateLimitBucket"`
 	// Rate limit QPS (Write)
 	CloudProviderRateLimitQPSWrite float32 `json:"cloudProviderRateLimitQPSWrite" yaml:"cloudProviderRateLimitQPSWrite"`
 	// Rate limit Bucket Size
@@ -250,6 +257,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	// operationPollRateLimiter.Accept() is a no-op if rate limits are configured off.
 	operationPollRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
 	operationPollRateLimiterWrite := flowcontrol.NewFakeAlwaysRateLimiter()
+	operationPollVMSSRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
 
 	// If reader is provided (and no writer) we will
 	// use the same value for both.
@@ -260,6 +268,12 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		}
 		if config.CloudProviderRateLimitBucket == 0 {
 			config.CloudProviderRateLimitBucket = rateLimitBucketDefault
+		}
+		if config.CloudProviderVMSSRateLimitQPS == 0 {
+			config.CloudProviderVMSSRateLimitQPS = vmssRateLimitQPSDefault
+		}
+		if config.CloudProviderVMSSRateLimitBucket == 0 {
+			config.CloudProviderRateLimitBucket = vmssRateLimitBucketDefault
 		}
 		if config.CloudProviderRateLimitQPSWrite == 0 {
 			config.CloudProviderRateLimitQPSWrite = rateLimitQPSDefault
@@ -272,13 +286,21 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 			config.CloudProviderRateLimitQPS,
 			config.CloudProviderRateLimitBucket)
 
-		operationPollRateLimiterWrite = flowcontrol.NewTokenBucketRateLimiter(
+		operationPollVMSSRateLimiter = flowcontrol.NewTokenBucketRateLimiter(
+			config.CloudProviderVMSSRateLimitQPS,
+			config.CloudProviderVMSSRateLimitBucket)
+
+		operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(
 			config.CloudProviderRateLimitQPSWrite,
 			config.CloudProviderRateLimitBucketWrite)
 
 		klog.V(2).Infof("Azure cloudprovider (read ops) using rate limit config: QPS=%g, bucket=%d",
 			config.CloudProviderRateLimitQPS,
 			config.CloudProviderRateLimitBucket)
+
+		klog.V(2).Infof("Azure cloudprovider (VMSS ops) using rate limit config: QPS=%g, bucket=%d",
+			config.CloudProviderVMSSRateLimitQPS,
+			config.CloudProviderVMSSRateLimitBucket)
 
 		klog.V(2).Infof("Azure cloudprovider (write ops) using rate limit config: QPS=%g, bucket=%d",
 			config.CloudProviderRateLimitQPSWrite,
@@ -301,13 +323,22 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		}
 	}
 
-	azClientConfig := &azClientConfig{
+	clientConfig := &azClientConfig{
 		subscriptionID:          config.SubscriptionID,
 		resourceManagerEndpoint: env.ResourceManagerEndpoint,
 		servicePrincipalToken:   servicePrincipalToken,
 		rateLimiterReader:       operationPollRateLimiter,
 		rateLimiterWriter:       operationPollRateLimiterWrite,
 	}
+
+	vmssClientConfig := &azClientConfig{
+		subscriptionID:          config.SubscriptionID,
+		resourceManagerEndpoint: env.ResourceManagerEndpoint,
+		servicePrincipalToken:   servicePrincipalToken,
+		rateLimiterReader:       operationPollVMSSRateLimiter,
+		rateLimiterWriter:       operationPollVMSSRateLimiter,
+	}
+
 	az := Cloud{
 		Config:             *config,
 		Environment:        *env,
@@ -316,19 +347,19 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		unmanagedNodes:     sets.NewString(),
 		routeCIDRs:         map[string]string{},
 
-		DisksClient:                     newAzDisksClient(azClientConfig),
-		RoutesClient:                    newAzRoutesClient(azClientConfig),
-		SubnetsClient:                   newAzSubnetsClient(azClientConfig),
-		InterfacesClient:                newAzInterfacesClient(azClientConfig),
-		RouteTablesClient:               newAzRouteTablesClient(azClientConfig),
-		LoadBalancerClient:              newAzLoadBalancersClient(azClientConfig),
-		SecurityGroupsClient:            newAzSecurityGroupsClient(azClientConfig),
-		StorageAccountClient:            newAzStorageAccountClient(azClientConfig),
-		VirtualMachinesClient:           newAzVirtualMachinesClient(azClientConfig),
-		PublicIPAddressesClient:         newAzPublicIPAddressesClient(azClientConfig),
-		VirtualMachineSizesClient:       newAzVirtualMachineSizesClient(azClientConfig),
-		VirtualMachineScaleSetsClient:   newAzVirtualMachineScaleSetsClient(azClientConfig),
-		VirtualMachineScaleSetVMsClient: newAzVirtualMachineScaleSetVMsClient(azClientConfig),
+		DisksClient:                     newAzDisksClient(clientConfig),
+		RoutesClient:                    newAzRoutesClient(clientConfig),
+		SubnetsClient:                   newAzSubnetsClient(clientConfig),
+		InterfacesClient:                newAzInterfacesClient(clientConfig),
+		RouteTablesClient:               newAzRouteTablesClient(clientConfig),
+		LoadBalancerClient:              newAzLoadBalancersClient(clientConfig),
+		SecurityGroupsClient:            newAzSecurityGroupsClient(clientConfig),
+		StorageAccountClient:            newAzStorageAccountClient(clientConfig),
+		VirtualMachinesClient:           newAzVirtualMachinesClient(clientConfig),
+		PublicIPAddressesClient:         newAzPublicIPAddressesClient(clientConfig),
+		VirtualMachineSizesClient:       newAzVirtualMachineSizesClient(clientConfig),
+		VirtualMachineScaleSetsClient:   newAzVirtualMachineScaleSetsClient(vmssClientConfig),
+		VirtualMachineScaleSetVMsClient: newAzVirtualMachineScaleSetVMsClient(vmssClientConfig),
 		FileClient:                      &azureFileClient{env: *env},
 	}
 
