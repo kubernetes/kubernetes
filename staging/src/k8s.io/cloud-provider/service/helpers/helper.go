@@ -140,5 +140,8 @@ func ingressEqual(lhs, rhs *v1.LoadBalancerIngress) bool {
 	if lhs.Hostname != rhs.Hostname {
 		return false
 	}
+	if lhs.DisableBindOptimization != rhs.DisableBindOptimization {
+		return false
+	}
 	return true
 }

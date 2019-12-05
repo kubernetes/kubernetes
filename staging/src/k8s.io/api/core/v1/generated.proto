@@ -1978,6 +1978,12 @@ message LoadBalancerIngress {
   // (typically AWS load-balancers)
   // +optional
   optional string hostname = 2;
+
+  // DisableBindOptimization is set for a load-balancer ingress that does not want its IP
+  // to bind locally bind to nodes
+  // (typically to ensure that PROXY protocol is always set or TLS offload is always made)
+  // +optional
+  optional bool disableBindOptimization = 3;
 }
 
 // LoadBalancerStatus represents the status of a load-balancer.

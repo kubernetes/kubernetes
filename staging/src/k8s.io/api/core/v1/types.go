@@ -3817,6 +3817,12 @@ type LoadBalancerIngress struct {
 	// (typically AWS load-balancers)
 	// +optional
 	Hostname string `json:"hostname,omitempty" protobuf:"bytes,2,opt,name=hostname"`
+
+	// DisableBindOptimization is set for a load-balancer ingress that does not want its IP
+	// to bind locally bind to nodes
+	// (typically to ensure that PROXY protocol is always set or TLS offload is always made)
+	// +optional
+	DisableBindOptimization bool `json:"disableBindOptimization,omitempty" protobuf:"bytes,3,opt,name=disableBindOptimization"`
 }
 
 // IPFamily represents the IP Family (IPv4 or IPv6). This type is used

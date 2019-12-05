@@ -48,5 +48,6 @@ spec:
 status:
   loadBalancer:
     ingress:
-    - hostname: "28"
+    - disableBindOptimization: true
+      hostname: "28"
       ip: "27"

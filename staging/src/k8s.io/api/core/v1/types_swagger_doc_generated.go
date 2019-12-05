@@ -939,9 +939,10 @@ func (LimitRangeSpec) SwaggerDoc() map[string]string {
 }
 
 var map_LoadBalancerIngress = map[string]string{
-	"":         "LoadBalancerIngress represents the status of a load-balancer ingress point: traffic intended for the service should be sent to an ingress point.",
-	"ip":       "IP is set for load-balancer ingress points that are IP based (typically GCE or OpenStack load-balancers)",
-	"hostname": "Hostname is set for load-balancer ingress points that are DNS based (typically AWS load-balancers)",
+	"":                        "LoadBalancerIngress represents the status of a load-balancer ingress point: traffic intended for the service should be sent to an ingress point.",
+	"ip":                      "IP is set for load-balancer ingress points that are IP based (typically GCE or OpenStack load-balancers)",
+	"hostname":                "Hostname is set for load-balancer ingress points that are DNS based (typically AWS load-balancers)",
+	"disableBindOptimization": "DisableBindOptimization is set for a load-balancer ingress that does not want its IP to bind locally bind to nodes (typically to ensure that PROXY protocol is always set or TLS offload is always made)",
 }
 
 func (LoadBalancerIngress) SwaggerDoc() map[string]string {

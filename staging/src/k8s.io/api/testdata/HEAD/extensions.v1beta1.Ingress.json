@@ -75,7 +75,8 @@
       "ingress": [
         {
           "ip": "27",
-          "hostname": "28"
+          "hostname": "28",
+          "disableBindOptimization": true
         }
       ]
     }

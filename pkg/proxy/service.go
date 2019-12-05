@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
@@ -110,7 +110,10 @@ func (info *BaseServiceInfo) ExternalIPStrings() []string {
 func (info *BaseServiceInfo) LoadBalancerIPStrings() []string {
 	var ips []string
 	for _, ing := range info.loadBalancerStatus.Ingress {
-		ips = append(ips, ing.IP)
+		// bypass the LB bypass mechanism if set
+		if !ing.DisableBindOptimization {
+			ips = append(ips, ing.IP)
+		}
 	}
 	return ips
 }
