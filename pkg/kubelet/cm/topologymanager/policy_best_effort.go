@@ -91,6 +91,43 @@ func iterateAllProviderTopologyHints(allProviderHints [][]TopologyHint, callback
 	iterate(0, []TopologyHint{})
 }
 
+// Merge a TopologyHints permutation to a single hint by performing a bitwise-AND
+// of their affinity masks. The hint shall be preferred if all hits in the permutation
+// are preferred.
+func mergePermutation(policy Policy, numaNodes []int, permutation []TopologyHint) TopologyHint {
+	// Get the NUMANodeAffinity from each hint in the permutation and see if any
+	// of them encode unpreferred allocations.
+	defaultAffinity, _ := bitmask.NewBitMask(numaNodes...)
+	preferred := true
+	var numaAffinities []bitmask.BitMask
+	for _, hint := range permutation {
+		// Only consider hints that have an actual NUMANodeAffinity set.
+		if hint.NUMANodeAffinity == nil {
+			numaAffinities = append(numaAffinities, defaultAffinity)
+		} else {
+			numaAffinities = append(numaAffinities, hint.NUMANodeAffinity)
+		}
+
+		if !hint.Preferred {
+			preferred = false
+		}
+
+		// Special case PolicySingleNumaNode to only prefer hints where
+		// all providers have a single NUMA affinity set.
+		if policy != nil && policy.Name() == PolicySingleNumaNode && hint.NUMANodeAffinity != nil && hint.NUMANodeAffinity.Count() > 1 {
+			preferred = false
+		}
+
+	}
+
+	// Merge the affinities using a bitwise-and operation.
+	mergedAffinity, _ := bitmask.NewBitMask(numaNodes...)
+	mergedAffinity.And(numaAffinities...)
+	// Build a mergedHint from the merged affinity mask, indicating if an
+	// preferred allocation was used to generate the affinity mask or not.
+	return TopologyHint{mergedAffinity, preferred}
+}
+
 // Merge the hints from all hint providers to find the best one.
 func mergeProvidersHints(policy Policy, numaNodes []int, providersHints []map[string][]TopologyHint) TopologyHint {
 	// Set the default affinity as an any-numa affinity containing the list
@@ -136,33 +173,7 @@ func mergeProvidersHints(policy Policy, numaNodes []int, providersHints []map[st
 	iterateAllProviderTopologyHints(allProviderHints, func(permutation []TopologyHint) {
 		// Get the NUMANodeAffinity from each hint in the permutation and see if any
 		// of them encode unpreferred allocations.
-		preferred := true
-		var numaAffinities []bitmask.BitMask
-		for _, hint := range permutation {
-			if hint.NUMANodeAffinity == nil {
-				numaAffinities = append(numaAffinities, defaultAffinity)
-			} else {
-				numaAffinities = append(numaAffinities, hint.NUMANodeAffinity)
-			}
-
-			if !hint.Preferred {
-				preferred = false
-			}
-
-			// Special case PolicySingleNumaNode to only prefer hints where
-			// all providers have a single NUMA affinity set.
-			if policy != nil && policy.Name() == PolicySingleNumaNode && hint.NUMANodeAffinity != nil && hint.NUMANodeAffinity.Count() > 1 {
-				preferred = false
-			}
-		}
-
-		// Merge the affinities using a bitwise-and operation.
-		mergedAffinity, _ := bitmask.NewBitMask(numaNodes...)
-		mergedAffinity.And(numaAffinities...)
-
-		// Build a mergedHintfrom the merged affinity mask, indicating if an
-		// preferred allocation was used to generate the affinity mask or not.
-		mergedHint := TopologyHint{mergedAffinity, preferred}
+		mergedHint := mergePermutation(policy, numaNodes, permutation)
 
 		// Only consider mergedHints that result in a NUMANodeAffinity > 0 to
 		// replace the current bestHint.
