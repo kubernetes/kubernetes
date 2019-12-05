@@ -100,6 +100,19 @@ func checkUnsupportedPlugins(client clientset.Interface) error {
 	return nil
 }
 
+func RunPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.String, cfg *kubeadmapi.ClusterConfiguration) error {
+	fmt.Println("[preflight] Running pre-flight checks.")
+	err := preflight.RunRootCheckOnly(ignorePreflightErrors)
+	if err != nil {
+		return err
+	}
+	err = RunCoreDNSMigrationCheck(client, ignorePreflightErrors, cfg.DNS.Type)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // checkMigration validates if migration of the current CoreDNS ConfigMap is possible.
 func checkMigration(client clientset.Interface) error {
 	klog.V(1).Infoln("validating if migration can be done for the current CoreDNS release.")
