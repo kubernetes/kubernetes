@@ -572,47 +572,12 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 
 	// process s.ServiceClusterIPRange from list to Primary and Secondary
 	// we process secondary only if provided by user
-	serviceClusterIPRangeList := []string{}
-	if s.ServiceClusterIPRanges != "" {
-		serviceClusterIPRangeList = strings.Split(s.ServiceClusterIPRanges, ",")
+	apiServerServiceIP, primaryServiceIPRange, secondaryServiceIPRange, err := getServiceIPAndRanges(s.ServiceClusterIPRanges)
+	if err != nil {
+		return options, err
 	}
-
-	var apiServerServiceIP net.IP
-	var serviceIPRange net.IPNet
-	var err error
-	// nothing provided by user, use default range (only applies to the Primary)
-	if len(serviceClusterIPRangeList) == 0 {
-		var primaryServiceClusterCIDR net.IPNet
-		serviceIPRange, apiServerServiceIP, err = master.ServiceIPRange(primaryServiceClusterCIDR)
-		if err != nil {
-			return options, fmt.Errorf("error determining service IP ranges: %v", err)
-		}
-		s.PrimaryServiceClusterIPRange = serviceIPRange
-	}
-
-	if len(serviceClusterIPRangeList) > 0 {
-		_, primaryServiceClusterCIDR, err := net.ParseCIDR(serviceClusterIPRangeList[0])
-		if err != nil {
-			return options, fmt.Errorf("service-cluster-ip-range[0] is not a valid cidr")
-		}
-
-		serviceIPRange, apiServerServiceIP, err = master.ServiceIPRange(*(primaryServiceClusterCIDR))
-		if err != nil {
-			return options, fmt.Errorf("error determining service IP ranges for primary service cidr: %v", err)
-		}
-		s.PrimaryServiceClusterIPRange = serviceIPRange
-	}
-
-	// user provided at least two entries
-	if len(serviceClusterIPRangeList) > 1 {
-		_, secondaryServiceClusterCIDR, err := net.ParseCIDR(serviceClusterIPRangeList[1])
-		if err != nil {
-			return options, fmt.Errorf("service-cluster-ip-range[1] is not an ip net")
-		}
-
-		s.SecondaryServiceClusterIPRange = *(secondaryServiceClusterCIDR)
-	}
-	//note: validation asserts that the list is max of two dual stack entries
+	s.PrimaryServiceClusterIPRange = primaryServiceIPRange
+	s.SecondaryServiceClusterIPRange = secondaryServiceIPRange
 
 	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{apiServerServiceIP}); err != nil {
 		return options, fmt.Errorf("error creating self-signed certificates: %v", err)
@@ -717,4 +682,48 @@ func buildServiceResolver(enabledAggregatorRouting bool, hostname string, inform
 		serviceResolver = aggregatorapiserver.NewLoopbackServiceResolver(serviceResolver, localHost)
 	}
 	return serviceResolver
+}
+
+func getServiceIPAndRanges(serviceClusterIPRanges string) (net.IP, net.IPNet, net.IPNet, error) {
+	serviceClusterIPRangeList := []string{}
+	if serviceClusterIPRanges != "" {
+		serviceClusterIPRangeList = strings.Split(serviceClusterIPRanges, ",")
+	}
+
+	var apiServerServiceIP net.IP
+	var primaryServiceIPRange net.IPNet
+	var secondaryServiceIPRange net.IPNet
+	var err error
+	// nothing provided by user, use default range (only applies to the Primary)
+	if len(serviceClusterIPRangeList) == 0 {
+		var primaryServiceClusterCIDR net.IPNet
+		primaryServiceIPRange, apiServerServiceIP, err = master.ServiceIPRange(primaryServiceClusterCIDR)
+		if err != nil {
+			return net.IP{}, net.IPNet{}, net.IPNet{}, fmt.Errorf("error determining service IP ranges: %v", err)
+		}
+		return apiServerServiceIP, primaryServiceIPRange, net.IPNet{}, nil
+	}
+
+	if len(serviceClusterIPRangeList) > 0 {
+		_, primaryServiceClusterCIDR, err := net.ParseCIDR(serviceClusterIPRangeList[0])
+		if err != nil {
+			return net.IP{}, net.IPNet{}, net.IPNet{}, fmt.Errorf("service-cluster-ip-range[0] is not a valid cidr")
+		}
+
+		primaryServiceIPRange, apiServerServiceIP, err = master.ServiceIPRange(*(primaryServiceClusterCIDR))
+		if err != nil {
+			return net.IP{}, net.IPNet{}, net.IPNet{}, fmt.Errorf("error determining service IP ranges for primary service cidr: %v", err)
+		}
+	}
+
+	// user provided at least two entries
+	// note: validation asserts that the list is max of two dual stack entries
+	if len(serviceClusterIPRangeList) > 1 {
+		_, secondaryServiceClusterCIDR, err := net.ParseCIDR(serviceClusterIPRangeList[1])
+		if err != nil {
+			return net.IP{}, net.IPNet{}, net.IPNet{}, fmt.Errorf("service-cluster-ip-range[1] is not an ip net")
+		}
+		secondaryServiceIPRange = *secondaryServiceClusterCIDR
+	}
+	return apiServerServiceIP, primaryServiceIPRange, secondaryServiceIPRange, nil
 }
