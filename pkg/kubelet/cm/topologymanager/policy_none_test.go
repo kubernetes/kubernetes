@@ -17,10 +17,11 @@ limitations under the License.
 package topologymanager
 
 import (
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"testing"
 )
 
-func TestName(t *testing.T) {
+func TestPolicyNoneName(t *testing.T) {
 	tcases := []struct {
 		name     string
 		expected string
@@ -38,30 +39,46 @@ func TestName(t *testing.T) {
 	}
 }
 
-func TestPolicyNoneCanAdmitPodResult(t *testing.T) {
+func TestPolicyNoneMerge(t *testing.T) {
 	tcases := []struct {
-		name     string
-		hint     TopologyHint
-		expected bool
+		name           string
+		providersHints []map[string][]TopologyHint
+		expectedHint   TopologyHint
+		expectedAdmit  lifecycle.PodAdmitResult
 	}{
 		{
-			name:     "Preferred is set to false in topology hints",
-			hint:     TopologyHint{nil, false},
-			expected: true,
+			name:           "merged empty providers hints",
+			providersHints: []map[string][]TopologyHint{},
+			expectedHint:   TopologyHint{},
+			expectedAdmit:  lifecycle.PodAdmitResult{Admit: true},
 		},
 		{
-			name:     "Preferred is set to true in topology hints",
-			hint:     TopologyHint{nil, true},
-			expected: true,
+			name: "merge with a single provider with a single preferred resource",
+			providersHints: []map[string][]TopologyHint{
+				{
+					"resource": {{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: true}},
+				},
+			},
+			expectedHint:  TopologyHint{},
+			expectedAdmit: lifecycle.PodAdmitResult{Admit: true},
+		},
+		{
+			name: "merge with a single provider with a single non-preferred resource",
+			providersHints: []map[string][]TopologyHint{
+				{
+					"resource": {{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: false}},
+				},
+			},
+			expectedHint:  TopologyHint{},
+			expectedAdmit: lifecycle.PodAdmitResult{Admit: true},
 		},
 	}
 
 	for _, tc := range tcases {
 		policy := NewNonePolicy()
-		result := policy.(*nonePolicy).canAdmitPodResult(&tc.hint)
-
-		if result.Admit != tc.expected {
-			t.Errorf("Expected Admit field in result to be %t, got %t", tc.expected, result.Admit)
+		result, admit := policy.Merge(tc.providersHints)
+		if !result.IsEqual(tc.expectedHint) || admit.Admit != tc.expectedAdmit.Admit {
+			t.Errorf("Test Case: %s: Expected merge hint to be %v, got %v", tc.name, tc.expectedHint, result)
 		}
 	}
 }
