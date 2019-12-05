@@ -48,7 +48,7 @@ func (p *bestEffortPolicy) canAdmitPodResult(hint *TopologyHint) lifecycle.PodAd
 }
 
 func (p *bestEffortPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
-	hint := mergeProvidersHints(p, p.numaNodes, providersHints)
+	hint := p.mergeProvidersHints(providersHints)
 	admit := p.canAdmitPodResult(&hint)
 	return hint, admit
 }
@@ -72,7 +72,7 @@ func (p *bestEffortPolicy) Merge(providersHints []map[string][]TopologyHint) (To
 //                     providerHints[-1][z]
 //                 }
 //                 callback(permutation)
-func iterateAllProviderTopologyHints(allProviderHints [][]TopologyHint, callback func([]TopologyHint)) {
+func (p *bestEffortPolicy) iterateAllProviderTopologyHints(allProviderHints [][]TopologyHint, callback func([]TopologyHint)) {
 	// Internal helper function to accumulate the permutation before calling the callback.
 	var iterate func(i int, accum []TopologyHint)
 	iterate = func(i int, accum []TopologyHint) {
@@ -94,10 +94,10 @@ func iterateAllProviderTopologyHints(allProviderHints [][]TopologyHint, callback
 // Merge a TopologyHints permutation to a single hint by performing a bitwise-AND
 // of their affinity masks. The hint shall be preferred if all hits in the permutation
 // are preferred.
-func mergePermutation(policy Policy, numaNodes []int, permutation []TopologyHint) TopologyHint {
+func (p *bestEffortPolicy) mergePermutation(permutation []TopologyHint) TopologyHint {
 	// Get the NUMANodeAffinity from each hint in the permutation and see if any
 	// of them encode unpreferred allocations.
-	defaultAffinity, _ := bitmask.NewBitMask(numaNodes...)
+	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
 	preferred := true
 	var numaAffinities []bitmask.BitMask
 	for _, hint := range permutation {
@@ -111,17 +111,10 @@ func mergePermutation(policy Policy, numaNodes []int, permutation []TopologyHint
 		if !hint.Preferred {
 			preferred = false
 		}
-
-		// Special case PolicySingleNumaNode to only prefer hints where
-		// all providers have a single NUMA affinity set.
-		if policy != nil && policy.Name() == PolicySingleNumaNode && hint.NUMANodeAffinity != nil && hint.NUMANodeAffinity.Count() > 1 {
-			preferred = false
-		}
-
 	}
 
 	// Merge the affinities using a bitwise-and operation.
-	mergedAffinity, _ := bitmask.NewBitMask(numaNodes...)
+	mergedAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
 	mergedAffinity.And(numaAffinities...)
 	// Build a mergedHint from the merged affinity mask, indicating if an
 	// preferred allocation was used to generate the affinity mask or not.
@@ -129,10 +122,10 @@ func mergePermutation(policy Policy, numaNodes []int, permutation []TopologyHint
 }
 
 // Merge the hints from all hint providers to find the best one.
-func mergeProvidersHints(policy Policy, numaNodes []int, providersHints []map[string][]TopologyHint) TopologyHint {
+func (p *bestEffortPolicy) mergeProvidersHints(providersHints []map[string][]TopologyHint) TopologyHint {
 	// Set the default affinity as an any-numa affinity containing the list
 	// of NUMA Nodes available on this machine.
-	defaultAffinity, _ := bitmask.NewBitMask(numaNodes...)
+	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
 
 	// Loop through all hint providers and save an accumulated list of the
 	// hints returned by each hint provider. If no hints are provided, assume
@@ -170,10 +163,10 @@ func mergeProvidersHints(policy Policy, numaNodes []int, providersHints []map[st
 	// permutations that have at least one NUMA ID set. If no merged mask can be
 	// found that has at least one NUMA ID set, return the 'defaultAffinity'.
 	bestHint := TopologyHint{defaultAffinity, false}
-	iterateAllProviderTopologyHints(allProviderHints, func(permutation []TopologyHint) {
+	p.iterateAllProviderTopologyHints(allProviderHints, func(permutation []TopologyHint) {
 		// Get the NUMANodeAffinity from each hint in the permutation and see if any
 		// of them encode unpreferred allocations.
-		mergedHint := mergePermutation(policy, numaNodes, permutation)
+		mergedHint := p.mergePermutation(permutation)
 
 		// Only consider mergedHints that result in a NUMANodeAffinity > 0 to
 		// replace the current bestHint.
