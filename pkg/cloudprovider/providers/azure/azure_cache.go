@@ -141,7 +141,6 @@ func (t *timedCache) Get(key string, crt cacheReadType) (interface{}, error) {
 	// to now as the data was recently fetched
 	entry.data = data
 	entry.createdOn = time.Now().UTC()
-
 	return entry.data, nil
 }
 
