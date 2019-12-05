@@ -5,4 +5,4 @@ reviewers:
 approvers:
 - mrhohn
 labels:
-- sig/gcp
+- area/provider/gcp
