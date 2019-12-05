@@ -321,10 +321,12 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 			disruptOp int    // disruptive operation performed on target node
 		}
 		tests := []testT{
-			{
-				descr:     "node is deleted",
-				disruptOp: deleteNode,
-			},
+			// https://github.com/kubernetes/kubernetes/issues/85972
+			// This test case is flawed. Disabling for now.
+			// {
+			//		descr:     "node is deleted",
+			//		disruptOp: deleteNode,
+			// },
 			{
 				descr:     "node's API object is deleted",
 				disruptOp: deleteNodeObj,
