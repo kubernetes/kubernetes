@@ -61,7 +61,7 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 		}
 
 		newNodes, err := e2enode.CheckReady(c, len(origNodes.Items)-1, 5*time.Minute)
-		framework.ExpectEqual(err, nil)
+		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(newNodes), len(origNodes.Items)-1)
 
 		_, err = c.CoreV1().Nodes().Get(nodeToDelete.Name, metav1.GetOptions{})
