@@ -102,7 +102,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			podResources, err := getNodeDevices()
 			var resourcesForOurPod *kubeletpodresourcesv1alpha1.PodResources
 			framework.Logf("pod resources %v", podResources)
-			gomega.Expect(err).To(gomega.BeNil())
+			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(podResources.PodResources), 2)
 			for _, res := range podResources.GetPodResources() {
 				if res.Name == pod1.Name {
