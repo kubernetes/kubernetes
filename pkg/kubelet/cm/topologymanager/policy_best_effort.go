@@ -135,7 +135,7 @@ func (p *bestEffortPolicy) mergeProvidersHints(providersHints []map[string][]Top
 		// If hints is nil, insert a single, preferred any-numa hint into allProviderHints.
 		if len(hints) == 0 {
 			klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with any resource")
-			allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
+			allProviderHints = append(allProviderHints, []TopologyHint{{defaultAffinity, true}})
 			continue
 		}
 
@@ -143,13 +143,13 @@ func (p *bestEffortPolicy) mergeProvidersHints(providersHints []map[string][]Top
 		for resource := range hints {
 			if hints[resource] == nil {
 				klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with resource '%s'", resource)
-				allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
+				allProviderHints = append(allProviderHints, []TopologyHint{{defaultAffinity, true}})
 				continue
 			}
 
 			if len(hints[resource]) == 0 {
 				klog.Infof("[topologymanager] Hint Provider has no possible NUMA affinities for resource '%s'", resource)
-				allProviderHints = append(allProviderHints, []TopologyHint{{nil, false}})
+				allProviderHints = append(allProviderHints, []TopologyHint{{defaultAffinity, false}})
 				continue
 			}
 
