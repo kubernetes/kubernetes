@@ -1604,15 +1604,12 @@ function Install-LoggingAgent {
 function Configure-LoggingAgent {
   $fluentd_config_dir = "$STACKDRIVER_ROOT\LoggingAgent\config.d"
   $fluentd_config_file = "$fluentd_config_dir\k8s_containers.conf"
-  if (-not (ShouldWrite-File $fluentd_config_file)) {
-    Log-Output ("Skip: fluentd logging config $fluentd_config_file already " +
-                "exists")
-  } else {
-     # Create a configuration file for kubernetes containers.
-     # The config.d directory should have already been created automatically, but
-     # try creating again just in case.
-     New-Item $fluentd_config_dir -ItemType 'directory' -Force | Out-Null
-  }
+  
+  # Create a configuration file for kubernetes containers.
+  # The config.d directory should have already been created automatically, but
+  # try creating again just in case.
+  New-Item $fluentd_config_dir -ItemType 'directory' -Force | Out-Null
+  
   $config = $FLUENTD_CONFIG.replace('NODE_NAME', (hostname))
   $config | Out-File -FilePath $fluentd_config_file -Encoding ASCII
   Log-Output "Wrote fluentd logging config to $fluentd_config_file"
