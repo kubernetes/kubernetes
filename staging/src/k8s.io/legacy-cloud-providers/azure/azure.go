@@ -377,7 +377,7 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 			config.CloudProviderVMSSRateLimitQPS = vmssRateLimitQPSDefault
 		}
 		if config.CloudProviderVMSSRateLimitBucket == 0 {
-			config.CloudProviderRateLimitBucket = vmssRateLimitBucketDefault
+			config.CloudProviderVMSSRateLimitBucket = vmssRateLimitBucketDefault
 		}
 		if config.CloudProviderRateLimitQPSWrite == 0 {
 			config.CloudProviderRateLimitQPSWrite = rateLimitQPSDefault
