@@ -394,7 +394,7 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 			config.CloudProviderVMSSRateLimitQPS,
 			config.CloudProviderVMSSRateLimitBucket)
 
-		operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(
+		operationPollRateLimiterWrite = flowcontrol.NewTokenBucketRateLimiter(
 			config.CloudProviderRateLimitQPSWrite,
 			config.CloudProviderRateLimitBucketWrite)
 
