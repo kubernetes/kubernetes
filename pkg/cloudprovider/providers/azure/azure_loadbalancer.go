@@ -1528,14 +1528,20 @@ func equalLoadBalancingRulePropertiesFormat(s, t *network.LoadBalancingRulePrope
 		return false
 	}
 
-	return reflect.DeepEqual(s.Protocol, t.Protocol) &&
+	properties := reflect.DeepEqual(s.Protocol, t.Protocol) &&
 		reflect.DeepEqual(s.FrontendIPConfiguration, t.FrontendIPConfiguration) &&
 		reflect.DeepEqual(s.BackendAddressPool, t.BackendAddressPool) &&
 		reflect.DeepEqual(s.LoadDistribution, t.LoadDistribution) &&
 		reflect.DeepEqual(s.FrontendPort, t.FrontendPort) &&
 		reflect.DeepEqual(s.BackendPort, t.BackendPort) &&
 		reflect.DeepEqual(s.EnableFloatingIP, t.EnableFloatingIP) &&
-		reflect.DeepEqual(s.IdleTimeoutInMinutes, t.IdleTimeoutInMinutes)
+		reflect.DeepEqual(s.EnableTCPReset, t.EnableTCPReset) &&
+		reflect.DeepEqual(s.DisableOutboundSnat, t.DisableOutboundSnat)
+
+	if s.IdleTimeoutInMinutes != nil && t.IdleTimeoutInMinutes != nil {
+		return properties && reflect.DeepEqual(s.IdleTimeoutInMinutes, t.IdleTimeoutInMinutes)
+	}
+	return properties
 }
 
 // This compares rule's Name, Protocol, SourcePortRange, DestinationPortRange, SourceAddressPrefix, Access, and Direction.
