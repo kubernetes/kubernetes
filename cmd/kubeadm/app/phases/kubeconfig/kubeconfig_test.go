@@ -217,6 +217,8 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1", "myOrg2")
 	configWithAnotherClusterCa := setupdKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1", "myOrg2")
 	configWithAnotherClusterAddress := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://3.4.5.6:3456", "myOrg1", "test-cluster", "myOrg2")
+	invalidConfig := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1", "myOrg2")
+	invalidConfig.CurrentContext = "invalid context"
 
 	var tests = []struct {
 		name               string
@@ -227,6 +229,12 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 		{ // if there is no existing KubeConfig, creates the kubeconfig
 			name:       "KubeConfig doesn't exist",
 			kubeConfig: config,
+		},
+		{ // if KubeConfig is invalid raise error
+			name:               "KubeConfig is invalid",
+			existingKubeConfig: invalidConfig,
+			kubeConfig:         invalidConfig,
+			expectedError:      true,
 		},
 		{ // if KubeConfig is equal to the existingKubeConfig - refers to the same cluster -, use the existing (Test idempotency)
 			name:               "KubeConfig refers to the same cluster",
