@@ -55,8 +55,8 @@ const (
 	rateLimitQPSDefault    = 1.0
 	rateLimitBucketDefault = 5
 	// VMSS API limits are 180 queries per 3 minutes & 900 queries per 30 minutes per subscription
-	vmssRateLimitQPSDefault    = 6.0
-	vmssRateLimitBucketDefault = 20
+	vmssRateLimitQPSDefault    = 1.0
+	vmssRateLimitBucketDefault = 5
 	backoffRetriesDefault      = 6
 	backoffExponentDefault     = 1.5
 	backoffDurationDefault     = 5 // in seconds
