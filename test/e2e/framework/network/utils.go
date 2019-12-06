@@ -185,7 +185,7 @@ func (config *NetworkingTestConfig) diagnoseMissingEndpoints(foundEndpoints sets
 		}
 		framework.Logf("\nOutput of kubectl describe pod %v/%v:\n", e.Namespace, e.Name)
 		desc, _ := framework.RunKubectl(
-			"describe", "pod", e.Name, fmt.Sprintf("--namespace=%v", e.Namespace))
+			e.Namespace, "describe", "pod", e.Name, fmt.Sprintf("--namespace=%v", e.Namespace))
 		framework.Logf(desc)
 	}
 }
@@ -423,7 +423,7 @@ func (config *NetworkingTestConfig) executeCurlCmd(cmd string, expected string) 
 	}); pollErr != nil {
 		framework.Logf("\nOutput of kubectl describe pod %v/%v:\n", config.Namespace, podName)
 		desc, _ := framework.RunKubectl(
-			"describe", "pod", podName, fmt.Sprintf("--namespace=%v", config.Namespace))
+			config.Namespace, "describe", "pod", podName, fmt.Sprintf("--namespace=%v", config.Namespace))
 		framework.Logf("%s", desc)
 		framework.Failf("Timed out in %v: %v", retryTimeout, msg)
 	}

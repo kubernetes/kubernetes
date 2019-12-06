@@ -549,7 +549,7 @@ var _ = SIGDescribe("Services", func() {
 
 		// Restart apiserver
 		ginkgo.By("Restarting apiserver")
-		if err := framework.RestartApiserver(cs); err != nil {
+		if err := framework.RestartApiserver(ns, cs); err != nil {
 			framework.Failf("error restarting apiserver: %v", err)
 		}
 		ginkgo.By("Waiting for apiserver to come up by polling /healthz")

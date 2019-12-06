@@ -962,5 +962,5 @@ func podContainerExec(pod *v1.Pod, containerIndex int, command string) (string, 
 		shell = "/bin/sh"
 		option = "-c"
 	}
-	return framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", pod.Namespace), pod.Name, "--container", pod.Spec.Containers[containerIndex].Name, "--", shell, option, command)
+	return framework.RunKubectl(pod.Namespace, "exec", fmt.Sprintf("--namespace=%s", pod.Namespace), pod.Name, "--container", pod.Spec.Containers[containerIndex].Name, "--", shell, option, command)
 }
