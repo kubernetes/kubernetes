@@ -756,14 +756,14 @@ filename | sha256 hash
 
 ## Known Issues for v1.6.5
 
-* If you use the [GLBC Ingress Controller](https://github.com/kubernetes/ingress/tree/master/controllers/gce),
+* If you use the [GLBC Ingress Controller](https://github.com/kubernetes/ingress-nginx/tree/0.9.0-beta.1/controllers/gce),
   upgrading an existing pre-v1.6.4 cluster to Kubernetes v1.6.5 will cause an unintentional
   [overwrite of manual edits to GCP Health Checks](https://github.com/kubernetes/ingress/issues/842)
   managed by the GLBC Ingress Controller. This can cause the health checks to start failing,
   requiring you to reapply the manual edits.
   * This issue does not affect clusters that were already running Kubernetes v1.6.4 or higher.
   * This issue does not affect Health Checks that were left in the configuration
-    [originally set by the GLBC Ingress Controller](https://github.com/kubernetes/ingress/tree/master/controllers/gce#health-checks).
+    [originally set by the GLBC Ingress Controller](https://github.com/kubernetes/ingress-nginx/tree/0.9.0-beta.1/controllers/gce#health-checks).
 
 ## Downloads for v1.6.5
 
@@ -852,14 +852,14 @@ filename | sha256 hash
 
 ## Known Issues for v1.6.4
 
-* If you use the [GLBC Ingress Controller](https://github.com/kubernetes/ingress/tree/master/controllers/gce),
+* If you use the [GLBC Ingress Controller](https://github.com/kubernetes/ingress-nginx/tree/0.9.0-beta.1/controllers/gce),
   upgrading an existing cluster to Kubernetes v1.6.4 will cause an unintentional
   [overwrite of manual edits to GCP Health Checks](https://github.com/kubernetes/ingress/issues/842)
   managed by the GLBC Ingress Controller. This can cause the health checks to start failing,
   requiring you to reapply the manual edits.
   * This issue does not affect clusters that start out with Kubernetes v1.6.4 or higher.
   * This issue does not affect Health Checks that were left in the configuration
-    [originally set by the GLBC Ingress Controller](https://github.com/kubernetes/ingress/tree/master/controllers/gce#health-checks).
+    [originally set by the GLBC Ingress Controller](https://github.com/kubernetes/ingress-nginx/tree/0.9.0-beta.1/controllers/gce#health-checks).
 
 ## Downloads for v1.6.4
 

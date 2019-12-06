@@ -88,7 +88,7 @@ for an example.
 
 2. Setup branch protection and enable access to the `stage-bots` team
 by adding the repo in
-[`prow/config.yaml`](https://github.com/kubernetes/test-infra/blob/master/prow/config.yaml).
+[`prow/config.yaml`](https://github.com/kubernetes/test-infra/blob/master/config/prow/config.yaml).
 See [#kubernetes/test-infra#9292](https://github.com/kubernetes/test-infra/pull/9292)
 for an example.
 
