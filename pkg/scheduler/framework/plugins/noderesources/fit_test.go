@@ -109,8 +109,12 @@ func TestNodeResourcesFit(t *testing.T) {
 			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
 			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 10, Memory: 20})),
-			name:       "too many resources fails",
-			wantStatus: framework.NewStatus(framework.Unschedulable, predicates.NewInsufficientResourceError(v1.ResourceCPU, 2, 10, 10).GetReason()),
+			name: "too many resources fails",
+			wantStatus: framework.NewStatus(
+				framework.Unschedulable,
+				predicates.NewInsufficientResourceError(v1.ResourceCPU, 2, 10, 10).GetReason(),
+				predicates.NewInsufficientResourceError(v1.ResourceMemory, 2, 10, 10).GetReason(),
+			),
 		},
 		{
 			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}), schedulernodeinfo.Resource{MilliCPU: 3, Memory: 1}),
