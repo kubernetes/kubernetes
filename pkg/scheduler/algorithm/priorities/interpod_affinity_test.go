@@ -532,7 +532,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 
 			CalculateInterPodAffinityPriorityReduce(test.pod, meta, snapshot, gotList)
 			if !reflect.DeepEqual(gotList, test.expectedList) {
-				t.Errorf("CalculateInterPodAffinityPriority() = %#v, want %#v", gotList, test.expectedList)
+				t.Errorf("CalculateInterPodAffinityPriorityReduce() = %#v, want %#v", gotList, test.expectedList)
 			}
 		})
 	}
@@ -628,7 +628,7 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 
 			CalculateInterPodAffinityPriorityReduce(test.pod, meta, snapshot, gotList)
 			if !reflect.DeepEqual(gotList, test.expectedList) {
-				t.Errorf("CalculateInterPodAffinityPriority() = %#v, want %#v", gotList, test.expectedList)
+				t.Errorf("CalculateInterPodAffinityPriorityReduce() = %#v, want %#v", gotList, test.expectedList)
 			}
 		})
 	}
