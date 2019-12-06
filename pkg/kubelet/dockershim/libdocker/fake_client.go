@@ -766,7 +766,7 @@ func (f *FakeDockerClient) Info() (*dockertypes.Info, error) {
 	return &f.Information, nil
 }
 
-// CreateExec is a fake implentation of the same call in the real client, the call is stored in the fake with the name "create_exec"
+// CreateExec is a fake implementation of the same call in the real client, the call is stored in the fake with the name "create_exec"
 func (f *FakeDockerClient) CreateExec(id string, opts dockertypes.ExecConfig) (*dockertypes.IDResponse, error) {
 	f.Lock()
 	defer f.Unlock()
