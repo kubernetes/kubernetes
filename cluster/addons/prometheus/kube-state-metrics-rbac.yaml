@@ -30,7 +30,7 @@ rules:
   - namespaces
   - endpoints
   verbs: ["list", "watch"]
-- apiGroups: ["extensions"]
+- apiGroups: ["extensions","apps"]
   resources:
   - daemonsets
   - deployments
@@ -63,7 +63,7 @@ rules:
   resources:
   - pods
   verbs: ["get"]
-- apiGroups: ["extensions"]
+- apiGroups: ["extensions","apps"]
   resources:
   - deployments
   resourceNames: ["kube-state-metrics"]
