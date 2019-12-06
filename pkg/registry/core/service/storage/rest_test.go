@@ -1750,7 +1750,7 @@ func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
 	}
 	if err == nil {
 		t.Errorf("Expected an error, but we didn't get one")
-	} else if strings.Index(err.Error(), "Service.Namespace does not match the provided context") == -1 {
+	} else if !strings.Contains(err.Error(), "Service.Namespace does not match the provided context") {
 		t.Errorf("Expected 'Service.Namespace does not match the provided context' error, got '%s'", err.Error())
 	}
 }
@@ -2626,17 +2626,17 @@ func TestAllocGetters(t *testing.T) {
 				return
 			}
 
-			if tc.enableDualStack && !tc.clusterIPExpectPrimary && !bytes.Equal(alloc.CIDR().IP, storage.secondaryServiceIPs.CIDR().IP) {
+			if tc.enableDualStack && !tc.clusterIPExpectPrimary && !alloc.CIDR().IP.Equal(storage.secondaryServiceIPs.CIDR().IP) {
 				t.Errorf("expected secondary allocator, but secondary allocator was not selected")
 			}
 
 			alloc = storage.getAllocatorBySpec(tc.svc)
-			if tc.specExpctPrimary && !bytes.Equal(alloc.CIDR().IP, storage.serviceIPs.CIDR().IP) {
+			if tc.specExpctPrimary && !alloc.CIDR().IP.Equal(storage.serviceIPs.CIDR().IP) {
 				t.Errorf("expected primary allocator, but primary allocator was not selected")
 				return
 			}
 
-			if tc.enableDualStack && !tc.specExpctPrimary && !bytes.Equal(alloc.CIDR().IP, storage.secondaryServiceIPs.CIDR().IP) {
+			if tc.enableDualStack && !tc.specExpctPrimary && !alloc.CIDR().IP.Equal(storage.secondaryServiceIPs.CIDR().IP) {
 				t.Errorf("expected secondary allocator, but secondary allocator was not selected")
 			}
 
