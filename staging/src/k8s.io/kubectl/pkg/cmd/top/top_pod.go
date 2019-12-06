@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/discovery"
@@ -39,7 +39,8 @@ import (
 	"k8s.io/klog"
 )
 
-type TopPodOptions struct {
+// PodOptions defines the structure for top pod command options
+type PodOptions struct {
 	ResourceName    string
 	Namespace       string
 	Selector        string
@@ -82,9 +83,10 @@ var (
 		kubectl top pod -l name=myLabel`))
 )
 
-func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions.IOStreams) *cobra.Command {
+// NewCmdTopPod creates 'top pod' command
+func NewCmdTopPod(f cmdutil.Factory, o *PodOptions, streams genericclioptions.IOStreams) *cobra.Command {
 	if o == nil {
-		o = &TopPodOptions{
+		o = &PodOptions{
 			IOStreams: streams,
 		}
 	}
@@ -111,7 +113,8 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions
 	return cmd
 }
 
-func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+// Complete adapts from the command line args and factory to the data required
+func (o *PodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 	if len(args) == 1 {
 		o.ResourceName = args[0]
@@ -145,7 +148,8 @@ func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	return nil
 }
 
-func (o *TopPodOptions) Validate() error {
+// Validate checks to see if there is sufficient information run the command.
+func (o *PodOptions) Validate() error {
 	if len(o.SortBy) > 0 {
 		if o.SortBy != sortByCPU && o.SortBy != sortByMemory {
 			return errors.New("--sort-by accepts only cpu or memory")
@@ -157,7 +161,8 @@ func (o *TopPodOptions) Validate() error {
 	return nil
 }
 
-func (o TopPodOptions) RunTopPod() error {
+// RunTopPod does the work
+func (o PodOptions) RunTopPod() error {
 	var err error
 	selector := labels.Everything()
 	if len(o.Selector) > 0 {
@@ -204,6 +209,7 @@ func (o TopPodOptions) RunTopPod() error {
 	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy)
 }
 
+// getMetricsFromMetricsAPI gets metrics from MetricsAPI
 func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespace, resourceName string, allNamespaces bool, selector labels.Selector) (*metricsapi.PodMetricsList, error) {
 	var err error
 	ns := metav1.NamespaceAll
@@ -231,7 +237,8 @@ func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespac
 	return metrics, nil
 }
 
-func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {
+// verifyEmptyMetrics verifies if metrics available
+func verifyEmptyMetrics(o PodOptions, selector labels.Selector) error {
 	if len(o.ResourceName) > 0 {
 		pod, err := o.PodClient.Pods(o.Namespace).Get(o.ResourceName, metav1.GetOptions{})
 		if err != nil {
@@ -259,14 +266,14 @@ func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {
 	return errors.New("metrics not available yet")
 }
 
+// checkPodAge calculates pod age
 func checkPodAge(pod *v1.Pod) error {
 	age := time.Since(pod.CreationTimestamp.Time)
 	if age > metricsCreationDelay {
 		message := fmt.Sprintf("Metrics not available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
 		klog.Warningf(message)
 		return errors.New(message)
-	} else {
-		klog.V(2).Infof("Metrics not yet available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
-		return nil
 	}
+	klog.V(2).Infof("Metrics not yet available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
+	return nil
 }
