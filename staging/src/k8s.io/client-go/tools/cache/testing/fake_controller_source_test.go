@@ -20,7 +20,7 @@ import (
 	"sync"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 )
@@ -90,6 +90,40 @@ func TestRCNumber(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	go consume(t, w3, []string{}, wg)
+	source.Shutdown()
+	wg.Wait()
+}
+
+func TestRCNumberDisruptive(t *testing.T) {
+	pod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+		}
+	}
+
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+
+	source := NewFakeControllerSource()
+	source.Add(pod("foo"))
+	source.Modify(pod("foo"))
+	source.Modify(pod("foo"))
+	source.ResetWatch() // resets change count
+
+	_, err := source.Watch(metav1.ListOptions{ResourceVersion: "1"})
+	if err == nil {
+		t.Fatalf("Unexpected non-error")
+	}
+
+	w, err := source.Watch(metav1.ListOptions{ResourceVersion: "3"})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	source.Modify(pod("foo"))
+
+	go consume(t, w, []string{"4"}, wg)
 	source.Shutdown()
 	wg.Wait()
 }
