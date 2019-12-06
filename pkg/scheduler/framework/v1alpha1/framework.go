@@ -231,7 +231,13 @@ func updatePluginList(pluginList interface{}, pluginSet *config.PluginSet, plugi
 
 	plugins := reflect.ValueOf(pluginList).Elem()
 	pluginType := plugins.Type().Elem()
-	set := sets.NewString()
+
+	disabledSet := sets.NewString()
+	for _, ep := range pluginSet.Disabled {
+		disabledSet.Insert(ep.Name)
+	}
+
+	enabledSet := sets.NewString()
 	for _, ep := range pluginSet.Enabled {
 		pg, ok := pluginsMap[ep.Name]
 		if !ok {
@@ -242,11 +248,15 @@ func updatePluginList(pluginList interface{}, pluginSet *config.PluginSet, plugi
 			return fmt.Errorf("plugin %q does not extend %s plugin", ep.Name, pluginType.Name())
 		}
 
-		if set.Has(ep.Name) {
+		if enabledSet.Has(ep.Name) {
 			return fmt.Errorf("plugin %q already registered as %q", ep.Name, pluginType.Name())
 		}
 
-		set.Insert(ep.Name)
+		if disabledSet.Has(ep.Name) {
+			continue
+		}
+
+		enabledSet.Insert(ep.Name)
 
 		newPlugins := reflect.Append(plugins, reflect.ValueOf(pg))
 		plugins.Set(newPlugins)

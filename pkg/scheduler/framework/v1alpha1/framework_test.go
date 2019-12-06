@@ -1036,6 +1036,30 @@ func TestRejectWaitingPod(t *testing.T) {
 	}
 }
 
+func TestNewFrameworkWithDisabledPlugin(t *testing.T) {
+	testPermitPlugin := &TestPermitPlugin{}
+	r := make(Registry)
+	r.Register(permitPlugin,
+		func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
+			return testPermitPlugin, nil
+		})
+	plugins := &config.Plugins{
+		Permit: &config.PluginSet{
+			Enabled:  []config.Plugin{{Name: permitPlugin, Weight: 1}},
+			Disabled: []config.Plugin{{Name: permitPlugin}},
+		},
+	}
+
+	f, err := NewFramework(r, plugins, emptyArgs)
+	if err != nil {
+		t.Fatalf("Failed to create framework for testing: %v", err)
+	}
+
+	if len(f.(*framework).permitPlugins) != 0 {
+		t.Fatalf("Failed to disable plugin for testing")
+	}
+}
+
 func buildScoreConfigDefaultWeights(ps ...string) *config.Plugins {
 	return buildScoreConfigWithWeights(defaultWeights, ps...)
 }
