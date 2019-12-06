@@ -435,7 +435,7 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 
 func createRecorder(kubeClient clientset.Interface, userAgent string) record.EventRecorder {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartLogging(klog.V(4).Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	return eventBroadcaster.NewRecorder(clientgokubescheme.Scheme, v1.EventSource{Component: userAgent})
 }

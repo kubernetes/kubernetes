@@ -61,7 +61,7 @@ func NewCertificateController(
 ) *CertificateController {
 	// Send events to the apiserver
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartLogging(klog.V(4).Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 
 	cc := &CertificateController{

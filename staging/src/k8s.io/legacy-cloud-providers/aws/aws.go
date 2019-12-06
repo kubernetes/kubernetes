@@ -1356,7 +1356,7 @@ func (c *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, 
 	c.clientBuilder = clientBuilder
 	c.kubeClient = clientBuilder.ClientOrDie("aws-cloud-provider")
 	c.eventBroadcaster = record.NewBroadcaster()
-	c.eventBroadcaster.StartLogging(klog.Infof)
+	c.eventBroadcaster.StartLogging(klog.V(4).Infof)
 	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.kubeClient.CoreV1().Events("")})
 	c.eventRecorder = c.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "aws-cloud-provider"})
 }

@@ -267,7 +267,7 @@ func (o *CloudControllerManagerOptions) Config(allControllers, disabledByDefault
 
 func createRecorder(kubeClient clientset.Interface, userAgent string) record.EventRecorder {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartLogging(klog.V(4).Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	// TODO: remove dependence on the legacyscheme
 	return eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: userAgent})

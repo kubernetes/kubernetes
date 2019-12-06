@@ -89,7 +89,7 @@ func (d *delegate) gracefulShutdown() {
 // based on a shared informer.
 func NewBackend(c *Config) (audit.Backend, error) {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartLogging(klog.V(4).Infof)
 	eventBroadcaster.StartRecordingToSink(c.EventConfig.Sink)
 
 	scheme := runtime.NewScheme()

@@ -383,7 +383,7 @@ func NewNodeLifecycleController(
 
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "node-controller"})
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartLogging(klog.V(4).Infof)
 
 	klog.Infof("Sending events to api server.")
 	eventBroadcaster.StartRecordingToSink(

@@ -77,7 +77,7 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartLogging(klog.V(4).Infof)
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
 
 	rc := &RouteController{
