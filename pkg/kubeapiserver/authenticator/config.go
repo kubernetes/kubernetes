@@ -21,6 +21,7 @@ import (
 
 	"github.com/go-openapi/spec"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authentication/group"
@@ -34,7 +35,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	tokenunion "k8s.io/apiserver/pkg/authentication/token/union"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
-	"k8s.io/apiserver/pkg/server/egressselector"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile"
 	"k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth"
@@ -85,8 +85,8 @@ type Config struct {
 	// If this value is nil, then mutual TLS is disabled.
 	ClientCAContentProvider dynamiccertificates.CAContentProvider
 
-	// Lookup will give us a dialer if the egress selector is configured for it
-	EgressLookup egressselector.Lookup
+	// Optional field, custom dial function used to connect to webhook
+	CustomDial utilnet.DialFunc
 }
 
 // New returns an authenticator.Request or an error that supports the standard
@@ -311,15 +311,10 @@ func newServiceAccountAuthenticator(iss string, keyfiles []string, apiAudiences 
 }
 
 func newWebhookTokenAuthenticator(config Config) (authenticator.Token, error) {
-	webhookConfigFile := config.WebhookTokenAuthnConfigFile
-	version := config.WebhookTokenAuthnVersion
-	ttl := config.WebhookTokenAuthnCacheTTL
-	implicitAuds := config.APIAudiences
-
-	webhookTokenAuthenticator, err := webhook.New(webhookConfigFile, version, implicitAuds, config.EgressLookup)
+	webhookTokenAuthenticator, err := webhook.New(config.WebhookTokenAuthnConfigFile, config.WebhookTokenAuthnVersion, config.APIAudiences, config.CustomDial)
 	if err != nil {
 		return nil, err
 	}
 
-	return tokencache.New(webhookTokenAuthenticator, false, ttl, ttl), nil
+	return tokencache.New(webhookTokenAuthenticator, false, config.WebhookTokenAuthnCacheTTL, config.WebhookTokenAuthnCacheTTL), nil
 }

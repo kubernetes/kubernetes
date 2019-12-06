@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -63,11 +62,11 @@ func DefaultShouldRetry(err error) bool {
 }
 
 // NewGenericWebhook creates a new GenericWebhook from the provided kubeconfig file.
-func NewGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff time.Duration, egressLookup egressselector.Lookup) (*GenericWebhook, error) {
-	return newGenericWebhook(scheme, codecFactory, kubeConfigFile, groupVersions, initialBackoff, defaultRequestTimeout, egressLookup)
+func NewGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff time.Duration, customDial utilnet.DialFunc) (*GenericWebhook, error) {
+	return newGenericWebhook(scheme, codecFactory, kubeConfigFile, groupVersions, initialBackoff, defaultRequestTimeout, customDial)
 }
 
-func newGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff, requestTimeout time.Duration, egressLookup egressselector.Lookup) (*GenericWebhook, error) {
+func newGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff, requestTimeout time.Duration, customDial utilnet.DialFunc) (*GenericWebhook, error) {
 	for _, groupVersion := range groupVersions {
 		if !scheme.IsVersionRegistered(groupVersion) {
 			return nil, fmt.Errorf("webhook plugin requires enabling extension resource: %s", groupVersion)
@@ -96,14 +95,9 @@ func newGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFact
 
 	codec := codecFactory.LegacyCodec(groupVersions...)
 	clientConfig.ContentConfig.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
-	if egressLookup != nil {
-		networkContext := egressselector.Master.AsNetworkContext()
-		var egressDialer utilnet.DialFunc
-		egressDialer, err = egressLookup(networkContext)
-		if err != nil {
-			return nil, err
-		}
-		clientConfig.Dial = egressDialer
+
+	if customDial != nil {
+		clientConfig.Dial = customDial
 	}
 
 	restClient, err := rest.UnversionedRESTClientFor(clientConfig)
