@@ -823,9 +823,9 @@ func (a *HorizontalController) updateStatus(hpa *autoscalingv2.HorizontalPodAuto
 	_, err = a.hpaNamespacer.HorizontalPodAutoscalers(hpav1.Namespace).UpdateStatus(hpav1)
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedUpdateStatus", err.Error())
-		return fmt.Errorf("failed to update status for %s: %v", hpa.Name, err)
+		return fmt.Errorf("failed to update status for HPA %s: %v", hpa.Name, err)
 	}
-	klog.V(2).Infof("Successfully updated status for %s", hpa.Name)
+	klog.V(4).Infof("Successfully updated status for HPA %s", hpa.Name)
 	return nil
 }
 
