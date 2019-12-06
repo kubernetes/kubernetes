@@ -3109,7 +3109,8 @@ func describeNode(node *corev1.Node, lease *coordinationv1.Lease, nodeNonTermina
 		w.Write(LEVEL_1, "RenewTime:\t%s\n", renewTime)
 
 		if len(node.Status.Conditions) > 0 {
-			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tLastHeartbeatTime\tLastTransitionTime\tReason\tMessage\n")
+			w.Write(LEVEL_0, "Conditions:\n")
+			w.Write(LEVEL_1, "Type\tStatus\tLastHeartbeatTime\tLastTransitionTime\tReason\tMessage\n")
 			w.Write(LEVEL_1, "----\t------\t-----------------\t------------------\t------\t-------\n")
 			for _, c := range node.Status.Conditions {
 				w.Write(LEVEL_1, "%v \t%v \t%s \t%s \t%v \t%v\n",
@@ -3135,7 +3136,7 @@ func describeNode(node *corev1.Node, lease *coordinationv1.Lease, nodeNonTermina
 			sort.Sort(SortableResourceNames(resources))
 			for _, resource := range resources {
 				value := resourceList[resource]
-				w.Write(LEVEL_0, "  %s:\t%s\n", resource, value.String())
+				w.Write(LEVEL_1, "%s:\t%s\n", resource, value.String())
 			}
 		}
 
@@ -3149,16 +3150,16 @@ func describeNode(node *corev1.Node, lease *coordinationv1.Lease, nodeNonTermina
 		}
 
 		w.Write(LEVEL_0, "System Info:\n")
-		w.Write(LEVEL_0, "  Machine ID:\t%s\n", node.Status.NodeInfo.MachineID)
-		w.Write(LEVEL_0, "  System UUID:\t%s\n", node.Status.NodeInfo.SystemUUID)
-		w.Write(LEVEL_0, "  Boot ID:\t%s\n", node.Status.NodeInfo.BootID)
-		w.Write(LEVEL_0, "  Kernel Version:\t%s\n", node.Status.NodeInfo.KernelVersion)
-		w.Write(LEVEL_0, "  OS Image:\t%s\n", node.Status.NodeInfo.OSImage)
-		w.Write(LEVEL_0, "  Operating System:\t%s\n", node.Status.NodeInfo.OperatingSystem)
-		w.Write(LEVEL_0, "  Architecture:\t%s\n", node.Status.NodeInfo.Architecture)
-		w.Write(LEVEL_0, "  Container Runtime Version:\t%s\n", node.Status.NodeInfo.ContainerRuntimeVersion)
-		w.Write(LEVEL_0, "  Kubelet Version:\t%s\n", node.Status.NodeInfo.KubeletVersion)
-		w.Write(LEVEL_0, "  Kube-Proxy Version:\t%s\n", node.Status.NodeInfo.KubeProxyVersion)
+		w.Write(LEVEL_1, "Machine ID:\t%s\n", node.Status.NodeInfo.MachineID)
+		w.Write(LEVEL_1, "System UUID:\t%s\n", node.Status.NodeInfo.SystemUUID)
+		w.Write(LEVEL_1, "Boot ID:\t%s\n", node.Status.NodeInfo.BootID)
+		w.Write(LEVEL_1, "Kernel Version:\t%s\n", node.Status.NodeInfo.KernelVersion)
+		w.Write(LEVEL_1, "OS Image:\t%s\n", node.Status.NodeInfo.OSImage)
+		w.Write(LEVEL_1, "Operating System:\t%s\n", node.Status.NodeInfo.OperatingSystem)
+		w.Write(LEVEL_1, "Architecture:\t%s\n", node.Status.NodeInfo.Architecture)
+		w.Write(LEVEL_1, "Container Runtime Version:\t%s\n", node.Status.NodeInfo.ContainerRuntimeVersion)
+		w.Write(LEVEL_1, "Kubelet Version:\t%s\n", node.Status.NodeInfo.KubeletVersion)
+		w.Write(LEVEL_1, "Kube-Proxy Version:\t%s\n", node.Status.NodeInfo.KubeProxyVersion)
 
 		// remove when .PodCIDR is depreciated
 		if len(node.Spec.PodCIDR) > 0 {
@@ -3541,7 +3542,8 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit), translateTimestampSince(pod.CreationTimestamp))
 	}
 
-	w.Write(LEVEL_0, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.)\n")
+	w.Write(LEVEL_0, "Allocated resources:\n")
+	w.Write(LEVEL_1, "(Total limits may be over 100 percent, i.e., overcommitted.)\n")
 	w.Write(LEVEL_1, "Resource\tRequests\tLimits\n")
 	w.Write(LEVEL_1, "--------\t--------\t------\n")
 	reqs, limits := getPodsTotalRequestsAndLimits(nodeNonTerminatedPodsList)
