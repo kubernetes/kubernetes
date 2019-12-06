@@ -93,7 +93,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
-	fakeremote "k8s.io/kubernetes/pkg/kubelet/remote/fake"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/server"
@@ -265,6 +264,8 @@ type Dependencies struct {
 	DynamicPluginProber     volume.DynamicPluginProber
 	TLSOptions              *server.TLSOptions
 	KubeletConfigController *kubeletconfig.Controller
+	RemoteRuntimeService    internalapi.RuntimeService
+	RemoteImageService      internalapi.ImageManagerService
 }
 
 // makePodSourceConfig creates a config.PodConfig from the given
@@ -316,23 +317,6 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 		config.NewSourceApiserver(kubeDeps.KubeClient, nodeName, updatechannel)
 	}
 	return cfg, nil
-}
-
-func getRuntimeAndImageServices(remoteRuntimeEndpoint string, remoteImageEndpoint string, runtimeRequestTimeout metav1.Duration) (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
-	if remoteRuntimeEndpoint == fakeremote.FakeRemoteRuntimeEndpoint && remoteImageEndpoint == fakeremote.FakeRemoteImageEndpoint {
-		fakeRuntime := fakeremote.NewFakeRemoteRuntime()
-		return fakeRuntime.RuntimeService, fakeRuntime.ImageService, nil
-	}
-
-	rs, err := remote.NewRemoteRuntimeService(remoteRuntimeEndpoint, runtimeRequestTimeout.Duration)
-	if err != nil {
-		return nil, nil, err
-	}
-	is, err := remote.NewRemoteImageService(remoteImageEndpoint, runtimeRequestTimeout.Duration)
-	if err != nil {
-		return nil, nil, err
-	}
-	return rs, is, err
 }
 
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
@@ -666,9 +650,19 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	default:
 		return nil, fmt.Errorf("unsupported CRI runtime: %q", containerRuntime)
 	}
-	runtimeService, imageService, err := getRuntimeAndImageServices(remoteRuntimeEndpoint, remoteImageEndpoint, kubeCfg.RuntimeRequestTimeout)
-	if err != nil {
-		return nil, err
+
+	runtimeService, imageService := kubeDeps.RemoteRuntimeService, kubeDeps.RemoteImageService
+	if runtimeService == nil {
+		runtimeService, err = remote.NewRemoteRuntimeService(remoteRuntimeEndpoint, kubeCfg.RuntimeRequestTimeout.Duration)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if imageService == nil {
+		imageService, err = remote.NewRemoteImageService(remoteImageEndpoint, kubeCfg.RuntimeRequestTimeout.Duration)
+		if err != nil {
+			return nil, err
+		}
 	}
 	klet.runtimeService = runtimeService
 

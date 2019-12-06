@@ -28,14 +28,6 @@ import (
 	utilexec "k8s.io/utils/exec"
 )
 
-const (
-	// FakeRemoteRuntimeEndpoint used by kubemark hollow-node
-	FakeRemoteRuntimeEndpoint = "fake://runtime"
-
-	// FakeRemoteImageEndpoint used by kubemark hollow-node
-	FakeRemoteImageEndpoint = "fake://image"
-)
-
 // RemoteRuntime represents a fake remote container runtime.
 type RemoteRuntime struct {
 	server *grpc.Server

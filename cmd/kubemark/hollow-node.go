@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	fakeremote "k8s.io/kubernetes/pkg/kubelet/remote/fake"
 	"k8s.io/kubernetes/pkg/kubemark"
 	"k8s.io/kubernetes/pkg/master/ports"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
@@ -192,12 +193,14 @@ func run(config *hollowNodeConfig) {
 			NodeName: config.NodeName,
 		}
 		containerManager := cm.NewStubContainerManager()
+		fakeRemoteRuntime := fakeremote.NewFakeRemoteRuntime()
 
 		hollowKubelet := kubemark.NewHollowKubelet(
 			f, c,
 			client,
 			heartbeatClient,
 			cadvisorInterface,
+			fakeRemoteRuntime,
 			containerManager,
 		)
 		hollowKubelet.Run()
