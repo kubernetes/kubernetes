@@ -266,10 +266,10 @@ func validateIngressRules(ingressRules []networking.IngressRule, fldPath *field.
 
 func validateIngressRuleValue(ingressRule *networking.IngressRuleValue, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if ingressRule.HTTP != nil {
-		allErrs = append(allErrs, validateHTTPIngressRuleValue(ingressRule.HTTP, fldPath.Child("http"))...)
+	if ingressRule.HTTP == nil {
+		return append(allErrs, field.Required(fldPath.Child("http"), ""))
 	}
-	return allErrs
+	return append(allErrs, validateHTTPIngressRuleValue(ingressRule.HTTP, fldPath.Child("http"))...)
 }
 
 func validateHTTPIngressRuleValue(httpIngressRuleValue *networking.HTTPIngressRuleValue, fldPath *field.Path) field.ErrorList {
