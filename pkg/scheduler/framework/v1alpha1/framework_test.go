@@ -1031,7 +1031,7 @@ func TestRejectWaitingPod(t *testing.T) {
 		f.RejectWaitingPod(pod.UID)
 	}()
 	permitStatus := f.RunPermitPlugins(context.Background(), nil, pod, "")
-	if permitStatus.message != "pod \"pod\" rejected while waiting at permit: removed" {
+	if permitStatus.Message() != "pod \"pod\" rejected while waiting at permit: removed" {
 		t.Fatalf("RejectWaitingPod failed, permitStatus: %v", permitStatus)
 	}
 }

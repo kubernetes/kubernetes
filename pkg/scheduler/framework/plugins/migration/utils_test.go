@@ -54,7 +54,7 @@ func TestPredicateResultToFrameworkStatus(t *testing.T) {
 		{
 			name:       "Unschedulable and Unresolvable",
 			reasons:    []predicates.PredicateFailureReason{predicates.ErrDiskConflict, predicates.ErrNodeSelectorNotMatch},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) didn't match node selector"),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) had no available disk", "node(s) didn't match node selector"),
 		},
 	}
 	for _, tt := range tests {

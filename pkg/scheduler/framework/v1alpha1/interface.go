@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -93,12 +94,11 @@ const (
 )
 
 // Status indicates the result of running a plugin. It consists of a code and a
-// message. When the status code is not `Success`, the status message should
-// explain why.
+// message. When the status code is not `Success`, the reasons should explain why.
 // NOTE: A nil Status is also considered as Success.
 type Status struct {
 	code    Code
-	message string
+	reasons []string
 }
 
 // Code returns code of the Status.
@@ -109,12 +109,17 @@ func (s *Status) Code() Code {
 	return s.code
 }
 
-// Message returns message of the Status.
+// Message returns a concatenated message on reasons of the Status.
 func (s *Status) Message() string {
 	if s == nil {
 		return ""
 	}
-	return s.message
+	return strings.Join(s.reasons, ", ")
+}
+
+// Reasons returns reasons of the Status.
+func (s *Status) Reasons() []string {
+	return s.reasons
 }
 
 // IsSuccess returns true if and only if "Status" is nil or Code is "Success".
@@ -128,19 +133,20 @@ func (s *Status) IsUnschedulable() bool {
 	return code == Unschedulable || code == UnschedulableAndUnresolvable
 }
 
-// AsError returns an "error" object with the same message as that of the Status.
+// AsError returns nil if the status is a success; otherwise returns an "error" object
+// with a concatenated message on reasons of the Status.
 func (s *Status) AsError() error {
 	if s.IsSuccess() {
 		return nil
 	}
-	return errors.New(s.message)
+	return errors.New(s.Message())
 }
 
 // NewStatus makes a Status out of the given arguments and returns its pointer.
-func NewStatus(code Code, msg string) *Status {
+func NewStatus(code Code, reasons ...string) *Status {
 	return &Status{
 		code:    code,
-		message: msg,
+		reasons: reasons,
 	}
 }
 

@@ -33,9 +33,7 @@ import (
 )
 
 var (
-	defaultNamespace             = ""
-	unschedulable                = framework.NewStatus(framework.Unschedulable, predicates.ErrPodAffinityNotMatch.GetReason())
-	unschedulableAndUnresolvable = framework.NewStatus(framework.UnschedulableAndUnresolvable, predicates.ErrPodAffinityRulesNotMatch.GetReason())
+	defaultNamespace = ""
 )
 
 func createPodWithAffinityTerms(namespace, nodeName string, labels map[string]string, affinity, antiAffinity []v1.PodAffinityTerm) *v1.Pod {
@@ -135,10 +133,14 @@ func TestSingleNode(t *testing.T) {
 						Namespaces: []string{"DiffNameSpace"},
 					},
 				}, nil),
-			pods:       []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel, Namespace: "ns"}}},
-			node:       &node1,
-			name:       "Does not satisfy the PodAffinity with labelSelector because of diff Namespace",
-			wantStatus: unschedulableAndUnresolvable,
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel, Namespace: "ns"}}},
+			node: &node1,
+			name: "Does not satisfy the PodAffinity with labelSelector because of diff Namespace",
+			wantStatus: framework.NewStatus(
+				framework.UnschedulableAndUnresolvable,
+				predicates.ErrPodAffinityNotMatch.GetReason(),
+				predicates.ErrPodAffinityRulesNotMatch.GetReason(),
+			),
 		},
 		{
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel,
@@ -155,10 +157,14 @@ func TestSingleNode(t *testing.T) {
 						},
 					},
 				}, nil),
-			pods:       []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
-			node:       &node1,
-			name:       "Doesn't satisfy the PodAffinity because of unmatching labelSelector with the existing pod",
-			wantStatus: unschedulableAndUnresolvable,
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
+			node: &node1,
+			name: "Doesn't satisfy the PodAffinity because of unmatching labelSelector with the existing pod",
+			wantStatus: framework.NewStatus(
+				framework.UnschedulableAndUnresolvable,
+				predicates.ErrPodAffinityNotMatch.GetReason(),
+				predicates.ErrPodAffinityRulesNotMatch.GetReason(),
+			),
 		},
 		{
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel2,
@@ -230,10 +236,14 @@ func TestSingleNode(t *testing.T) {
 						TopologyKey: "region",
 					},
 				}, nil),
-			pods:       []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
-			node:       &node1,
-			name:       "The labelSelector requirements(items of matchExpressions) are ANDed, the pod cannot schedule onto the node because one of the matchExpression item don't match.",
-			wantStatus: unschedulableAndUnresolvable,
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
+			node: &node1,
+			name: "The labelSelector requirements(items of matchExpressions) are ANDed, the pod cannot schedule onto the node because one of the matchExpression item don't match.",
+			wantStatus: framework.NewStatus(
+				framework.UnschedulableAndUnresolvable,
+				predicates.ErrPodAffinityNotMatch.GetReason(),
+				predicates.ErrPodAffinityRulesNotMatch.GetReason(),
+			),
 		},
 		{
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel2,
@@ -349,10 +359,14 @@ func TestSingleNode(t *testing.T) {
 						TopologyKey: "zone",
 					},
 				}),
-			pods:       []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
-			node:       &node1,
-			name:       "satisfies the PodAffinity but doesn't satisfy the PodAntiAffinity with the existing pod",
-			wantStatus: unschedulable,
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
+			node: &node1,
+			name: "satisfies the PodAffinity but doesn't satisfy the PodAntiAffinity with the existing pod",
+			wantStatus: framework.NewStatus(
+				framework.Unschedulable,
+				predicates.ErrPodAffinityNotMatch.GetReason(),
+				predicates.ErrPodAntiAffinityRulesNotMatch.GetReason(),
+			),
 		},
 		{
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel,
@@ -401,9 +415,13 @@ func TestSingleNode(t *testing.T) {
 						},
 					}),
 			},
-			node:       &node1,
-			name:       "satisfies the PodAffinity and PodAntiAffinity but doesn't satisfy PodAntiAffinity symmetry with the existing pod",
-			wantStatus: unschedulable,
+			node: &node1,
+			name: "satisfies the PodAffinity and PodAntiAffinity but doesn't satisfy PodAntiAffinity symmetry with the existing pod",
+			wantStatus: framework.NewStatus(
+				framework.Unschedulable,
+				predicates.ErrPodAffinityNotMatch.GetReason(),
+				predicates.ErrExistingPodsAntiAffinityRulesNotMatch.GetReason(),
+			),
 		},
 		{
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel,
@@ -421,10 +439,14 @@ func TestSingleNode(t *testing.T) {
 						TopologyKey: "region",
 					},
 				}, nil),
-			pods:       []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
-			node:       &node1,
-			name:       "pod matches its own Label in PodAffinity and that matches the existing pod Labels",
-			wantStatus: unschedulableAndUnresolvable,
+			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
+			node: &node1,
+			name: "pod matches its own Label in PodAffinity and that matches the existing pod Labels",
+			wantStatus: framework.NewStatus(
+				framework.UnschedulableAndUnresolvable,
+				predicates.ErrPodAffinityNotMatch.GetReason(),
+				predicates.ErrPodAffinityRulesNotMatch.GetReason(),
+			),
 		},
 		{
 			pod: &v1.Pod{
@@ -449,9 +471,13 @@ func TestSingleNode(t *testing.T) {
 						},
 					}),
 			},
-			node:       &node1,
-			name:       "verify that PodAntiAffinity from existing pod is respected when pod has no AntiAffinity constraints. doesn't satisfy PodAntiAffinity symmetry with the existing pod",
-			wantStatus: unschedulable,
+			node: &node1,
+			name: "verify that PodAntiAffinity from existing pod is respected when pod has no AntiAffinity constraints. doesn't satisfy PodAntiAffinity symmetry with the existing pod",
+			wantStatus: framework.NewStatus(
+				framework.Unschedulable,
+				predicates.ErrPodAffinityNotMatch.GetReason(),
+				predicates.ErrExistingPodsAntiAffinityRulesNotMatch.GetReason(),
+			),
 		},
 		{
 			pod: &v1.Pod{
@@ -521,9 +547,13 @@ func TestSingleNode(t *testing.T) {
 						},
 					}),
 			},
-			node:       &node1,
-			name:       "satisfies the PodAntiAffinity with existing pod but doesn't satisfy PodAntiAffinity symmetry with incoming pod",
-			wantStatus: unschedulable,
+			node: &node1,
+			name: "satisfies the PodAntiAffinity with existing pod but doesn't satisfy PodAntiAffinity symmetry with incoming pod",
+			wantStatus: framework.NewStatus(
+				framework.Unschedulable,
+				predicates.ErrPodAffinityNotMatch.GetReason(),
+				predicates.ErrPodAntiAffinityRulesNotMatch.GetReason(),
+			),
 		},
 		{
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel, nil,
@@ -567,9 +597,13 @@ func TestSingleNode(t *testing.T) {
 						},
 					}),
 			},
-			node:       &node1,
-			wantStatus: unschedulable,
-			name:       "PodAntiAffinity symmetry check a1: incoming pod and existing pod partially match each other on AffinityTerms",
+			node: &node1,
+			wantStatus: framework.NewStatus(
+				framework.Unschedulable,
+				predicates.ErrPodAffinityNotMatch.GetReason(),
+				predicates.ErrPodAntiAffinityRulesNotMatch.GetReason(),
+			),
+			name: "PodAntiAffinity symmetry check a1: incoming pod and existing pod partially match each other on AffinityTerms",
 		},
 		{
 			pod: createPodWithAffinityTerms(defaultNamespace, "", podLabel2, nil,
@@ -613,9 +647,13 @@ func TestSingleNode(t *testing.T) {
 						},
 					}),
 			},
-			node:       &node1,
-			wantStatus: unschedulable,
-			name:       "PodAntiAffinity symmetry check a2: incoming pod and existing pod partially match each other on AffinityTerms",
+			node: &node1,
+			wantStatus: framework.NewStatus(
+				framework.Unschedulable,
+				predicates.ErrPodAffinityNotMatch.GetReason(),
+				predicates.ErrExistingPodsAntiAffinityRulesNotMatch.GetReason(),
+			),
+			name: "PodAntiAffinity symmetry check a2: incoming pod and existing pod partially match each other on AffinityTerms",
 		},
 		{
 			pod: createPodWithAffinityTerms(defaultNamespace, "", map[string]string{"abc": "", "xyz": ""}, nil,
@@ -670,9 +708,13 @@ func TestSingleNode(t *testing.T) {
 						},
 					}),
 			},
-			node:       &node1,
-			wantStatus: unschedulable,
-			name:       "PodAntiAffinity symmetry check b1: incoming pod and existing pod partially match each other on AffinityTerms",
+			node: &node1,
+			wantStatus: framework.NewStatus(
+				framework.Unschedulable,
+				predicates.ErrPodAffinityNotMatch.GetReason(),
+				predicates.ErrExistingPodsAntiAffinityRulesNotMatch.GetReason(),
+			),
+			name: "PodAntiAffinity symmetry check b1: incoming pod and existing pod partially match each other on AffinityTerms",
 		},
 		{
 			pod: createPodWithAffinityTerms(defaultNamespace, "", map[string]string{"def": "", "xyz": ""}, nil,
@@ -727,9 +769,13 @@ func TestSingleNode(t *testing.T) {
 						},
 					}),
 			},
-			node:       &node1,
-			wantStatus: unschedulable,
-			name:       "PodAntiAffinity symmetry check b2: incoming pod and existing pod partially match each other on AffinityTerms",
+			node: &node1,
+			wantStatus: framework.NewStatus(
+				framework.Unschedulable,
+				predicates.ErrPodAffinityNotMatch.GetReason(),
+				predicates.ErrExistingPodsAntiAffinityRulesNotMatch.GetReason(),
+			),
+			name: "PodAntiAffinity symmetry check b2: incoming pod and existing pod partially match each other on AffinityTerms",
 		},
 	}
 
@@ -798,8 +844,16 @@ func TestMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChinaAzAz1}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelRgIndia}},
 			},
-			wantStatuses: []*framework.Status{nil, nil, unschedulableAndUnresolvable},
-			name:         "A pod can be scheduled onto all the nodes that have the same topology key & label value with one of them has an existing pod that matches the affinity rules",
+			wantStatuses: []*framework.Status{
+				nil,
+				nil,
+				framework.NewStatus(
+					framework.UnschedulableAndUnresolvable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrPodAffinityRulesNotMatch.GetReason(),
+				),
+			},
+			name: "A pod can be scheduled onto all the nodes that have the same topology key & label value with one of them has an existing pod that matches the affinity rules",
 		},
 		{
 			pod: createPodWithAffinityTerms(defaultNamespace, "", map[string]string{"foo": "bar", "service": "securityscan"},
@@ -861,8 +915,19 @@ func TestMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "hostname": "nodeB"}}},
 			},
-			wantStatuses: []*framework.Status{unschedulable, unschedulable},
-			name:         "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that matches the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB.",
+			wantStatuses: []*framework.Status{
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrPodAntiAffinityRulesNotMatch.GetReason(),
+				),
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrPodAntiAffinityRulesNotMatch.GetReason(),
+				),
+			},
+			name: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that matches the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB.",
 		},
 		{
 			pod: createPodWithAffinityTerms(defaultNamespace, "", nil, nil,
@@ -899,8 +964,19 @@ func TestMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
-			wantStatuses: []*framework.Status{unschedulable, unschedulable},
-			name:         "This test ensures that anti-affinity matches a pod when any term of the anti-affinity rule matches a pod.",
+			wantStatuses: []*framework.Status{
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrPodAntiAffinityRulesNotMatch.GetReason(),
+				),
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrPodAntiAffinityRulesNotMatch.GetReason(),
+				),
+			},
+			name: "This test ensures that anti-affinity matches a pod when any term of the anti-affinity rule matches a pod.",
 		},
 		{
 			pod: createPodWithAffinityTerms(defaultNamespace, "", nil, nil,
@@ -926,8 +1002,20 @@ func TestMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
 			},
-			wantStatuses: []*framework.Status{unschedulable, unschedulable, nil},
-			name:         "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that matches the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB but can be scheduled onto nodeC",
+			wantStatuses: []*framework.Status{
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrPodAntiAffinityRulesNotMatch.GetReason(),
+				),
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrPodAntiAffinityRulesNotMatch.GetReason(),
+				),
+				nil,
+			},
+			name: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that matches the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB but can be scheduled onto nodeC",
 		},
 		{
 			pod: createPodWithAffinityTerms("NS1", "", map[string]string{"foo": "123"}, nil,
@@ -974,8 +1062,20 @@ func TestMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
 			},
-			wantStatuses: []*framework.Status{unschedulable, unschedulable, nil},
-			name:         "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that matches the inter pod affinity rule. The pod can not be scheduled onto nodeA, nodeB, but can be scheduled onto nodeC (NodeC has an existing pod that match the inter pod affinity rule but in different namespace)",
+			wantStatuses: []*framework.Status{
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrPodAntiAffinityRulesNotMatch.GetReason(),
+				),
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrPodAntiAffinityRulesNotMatch.GetReason(),
+				),
+				nil,
+			},
+			name: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that matches the inter pod affinity rule. The pod can not be scheduled onto nodeA, nodeB, but can be scheduled onto nodeC (NodeC has an existing pod that match the inter pod affinity rule but in different namespace)",
 		},
 		{
 			pod: &v1.Pod{
@@ -1072,8 +1172,19 @@ func TestMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
-			wantStatuses: []*framework.Status{unschedulable, unschedulable},
-			name:         "Test existing pod's anti-affinity: incoming pod wouldn't considered as a fit as it violates each existingPod's terms on all nodes",
+			wantStatuses: []*framework.Status{
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrExistingPodsAntiAffinityRulesNotMatch.GetReason(),
+				),
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrExistingPodsAntiAffinityRulesNotMatch.GetReason(),
+				),
+			},
+			name: "Test existing pod's anti-affinity: incoming pod wouldn't considered as a fit as it violates each existingPod's terms on all nodes",
 		},
 		{
 			pod: createPodWithAffinityTerms(defaultNamespace, "", nil, nil,
@@ -1119,8 +1230,19 @@ func TestMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
-			wantStatuses: []*framework.Status{unschedulable, unschedulable},
-			name:         "Test incoming pod's anti-affinity: incoming pod wouldn't considered as a fit as it at least violates one anti-affinity rule of existingPod",
+			wantStatuses: []*framework.Status{
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrPodAntiAffinityRulesNotMatch.GetReason(),
+				),
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrPodAntiAffinityRulesNotMatch.GetReason(),
+				),
+			},
+			name: "Test incoming pod's anti-affinity: incoming pod wouldn't considered as a fit as it at least violates one anti-affinity rule of existingPod",
 		},
 		{
 			pod: &v1.Pod{
@@ -1157,8 +1279,15 @@ func TestMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
-			wantStatuses: []*framework.Status{unschedulable, nil},
-			name:         "Test existing pod's anti-affinity: only when labelSelector and topologyKey both match, it's counted as a single term match - case when one term has invalid topologyKey",
+			wantStatuses: []*framework.Status{
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrExistingPodsAntiAffinityRulesNotMatch.GetReason(),
+				),
+				nil,
+			},
+			name: "Test existing pod's anti-affinity: only when labelSelector and topologyKey both match, it's counted as a single term match - case when one term has invalid topologyKey",
 		},
 		{
 			pod: createPodWithAffinityTerms(defaultNamespace, "", nil, nil,
@@ -1198,8 +1327,15 @@ func TestMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
-			wantStatuses: []*framework.Status{unschedulable, nil},
-			name:         "Test incoming pod's anti-affinity: only when labelSelector and topologyKey both match, it's counted as a single term match - case when one term has invalid topologyKey",
+			wantStatuses: []*framework.Status{
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrPodAntiAffinityRulesNotMatch.GetReason(),
+				),
+				nil,
+			},
+			name: "Test incoming pod's anti-affinity: only when labelSelector and topologyKey both match, it's counted as a single term match - case when one term has invalid topologyKey",
 		},
 		{
 			pod: &v1.Pod{
@@ -1236,8 +1372,19 @@ func TestMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
-			wantStatuses: []*framework.Status{unschedulable, unschedulable},
-			name:         "Test existing pod's anti-affinity: only when labelSelector and topologyKey both match, it's counted as a single term match - case when all terms have valid topologyKey",
+			wantStatuses: []*framework.Status{
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrExistingPodsAntiAffinityRulesNotMatch.GetReason(),
+				),
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrExistingPodsAntiAffinityRulesNotMatch.GetReason(),
+				),
+			},
+			name: "Test existing pod's anti-affinity: only when labelSelector and topologyKey both match, it's counted as a single term match - case when all terms have valid topologyKey",
 		},
 		{
 			pod: createPodWithAffinityTerms(defaultNamespace, "", nil, nil,
@@ -1277,8 +1424,19 @@ func TestMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
-			wantStatuses: []*framework.Status{unschedulable, unschedulable},
-			name:         "Test incoming pod's anti-affinity: only when labelSelector and topologyKey both match, it's counted as a single term match - case when all terms have valid topologyKey",
+			wantStatuses: []*framework.Status{
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrPodAntiAffinityRulesNotMatch.GetReason(),
+				),
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrPodAntiAffinityRulesNotMatch.GetReason(),
+				),
+			},
+			name: "Test incoming pod's anti-affinity: only when labelSelector and topologyKey both match, it's counted as a single term match - case when all terms have valid topologyKey",
 		},
 		{
 			pod: &v1.Pod{
@@ -1341,8 +1499,20 @@ func TestMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: map[string]string{"region": "r1", "zone": "z3", "hostname": "nodeC"}}},
 			},
-			wantStatuses: []*framework.Status{unschedulable, unschedulable, nil},
-			name:         "Test existing pod's anti-affinity: existingPod on nodeA and nodeB has at least one anti-affinity term matches incoming pod, so incoming pod can only be scheduled to nodeC",
+			wantStatuses: []*framework.Status{
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrExistingPodsAntiAffinityRulesNotMatch.GetReason(),
+				),
+				framework.NewStatus(
+					framework.Unschedulable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrExistingPodsAntiAffinityRulesNotMatch.GetReason(),
+				),
+				nil,
+			},
+			name: "Test existing pod's anti-affinity: existingPod on nodeA and nodeB has at least one anti-affinity term matches incoming pod, so incoming pod can only be scheduled to nodeC",
 		},
 		{
 			pod: createPodWithAffinityTerms(defaultNamespace, "", nil,
@@ -1429,8 +1599,19 @@ func TestMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
-			wantStatuses: []*framework.Status{unschedulableAndUnresolvable, unschedulableAndUnresolvable},
-			name:         "Test incoming pod's affinity: firstly check if all affinityTerms match, and then check if all topologyKeys match, and the match logic should be satisfied on the same pod",
+			wantStatuses: []*framework.Status{
+				framework.NewStatus(
+					framework.UnschedulableAndUnresolvable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrPodAffinityRulesNotMatch.GetReason(),
+				),
+				framework.NewStatus(
+					framework.UnschedulableAndUnresolvable,
+					predicates.ErrPodAffinityNotMatch.GetReason(),
+					predicates.ErrPodAffinityRulesNotMatch.GetReason(),
+				),
+			},
+			name: "Test incoming pod's affinity: firstly check if all affinityTerms match, and then check if all topologyKeys match, and the match logic should be satisfied on the same pod",
 		},
 	}
 
