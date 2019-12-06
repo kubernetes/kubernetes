@@ -17,6 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -53,7 +54,276 @@ func TestPolicySingleNumaNodeCanAdmitPodResult(t *testing.T) {
 	}
 }
 
-func TestSingleNumaNodePolicyMerge(t *testing.T) {
+func TestPolicySingleNumaNodeFilterHints(t *testing.T) {
+	tcases := []struct {
+		name              string
+		allResources      [][]TopologyHint
+		expectedResources [][]TopologyHint
+	}{
+		{
+			name:              "filter empty resources",
+			allResources:      [][]TopologyHint{},
+			expectedResources: [][]TopologyHint(nil),
+		},
+		{
+			name: "filter hints with nil socket mask",
+			allResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: nil, Preferred: false},
+				},
+				{
+					{NUMANodeAffinity: nil, Preferred: true},
+				},
+			},
+			expectedResources: [][]TopologyHint{
+				[]TopologyHint(nil),
+				[]TopologyHint(nil),
+			},
+		},
+		{
+			name: "filter hints with nil socket mask",
+			allResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+					{NUMANodeAffinity: nil, Preferred: false},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+					{NUMANodeAffinity: nil, Preferred: true},
+				},
+			},
+			expectedResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+				},
+			},
+		},
+		{
+			name: "filter hints with empty resource socket mask",
+			allResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+					{NUMANodeAffinity: nil, Preferred: false},
+				},
+				{},
+			},
+			expectedResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+				},
+				[]TopologyHint(nil),
+			},
+		},
+		{
+			name: "filter hints with wide sockemask",
+			allResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(1, 2), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(0, 1, 2), Preferred: false},
+					{NUMANodeAffinity: nil, Preferred: false},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(1, 2), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(0, 1, 2), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(0, 2), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(3), Preferred: false},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(1, 2), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(0, 1, 2), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(0, 2), Preferred: false},
+				},
+			},
+			expectedResources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(3), Preferred: false},
+				},
+				[]TopologyHint(nil),
+			},
+		},
+	}
+
+	numaNodes := []int{0, 1, 2, 3}
+	for _, tc := range tcases {
+		policy := NewSingleNumaNodePolicy(numaNodes)
+		actual := policy.(*singleNumaNodePolicy).filterHints(tc.allResources)
+		if !reflect.DeepEqual(tc.expectedResources, actual) {
+			t.Errorf("Test Case: %s", tc.name)
+			t.Errorf("Expected result to be %v, got %v", tc.expectedResources, actual)
+		}
+	}
+}
+
+func TestPolicySingleNumaNodeGetHintMatch(t *testing.T) {
+	tcases := []struct {
+		name          string
+		resources     [][]TopologyHint
+		expectedFound bool
+		expectedMatch TopologyHint
+	}{
+		{
+			name: "match single resource single hint",
+			resources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(3), Preferred: true},
+				},
+			},
+			expectedFound: true,
+			expectedMatch: TopologyHint{
+				NUMANodeAffinity: NewTestBitMask(3),
+				Preferred:        true,
+			},
+		},
+		{
+			name: "match single resource multiple hints (Selected hint preferred is true) 1/2",
+			resources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(3), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(5), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(2), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+				},
+			},
+			expectedFound: true,
+			expectedMatch: TopologyHint{
+				NUMANodeAffinity: NewTestBitMask(1),
+				Preferred:        true,
+			},
+		},
+		{
+			name: "match single resource multiple hints (Selected hint preferred is false) 2/2",
+			resources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(3), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(5), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(2), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: false},
+				},
+			},
+			expectedFound: true,
+			expectedMatch: TopologyHint{
+				NUMANodeAffinity: NewTestBitMask(1),
+				Preferred:        true,
+			},
+		},
+		{
+			name: "match multiple resource single hint",
+			resources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(2), Preferred: true},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(2), Preferred: true},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(2), Preferred: false},
+				},
+			},
+			expectedFound: true,
+			expectedMatch: TopologyHint{
+				NUMANodeAffinity: NewTestBitMask(2),
+				Preferred:        true,
+			},
+		},
+		{
+			name: "match multiple resource single hint no match",
+			resources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(2), Preferred: false},
+				},
+			},
+			expectedFound: false,
+			expectedMatch: TopologyHint{},
+		},
+		{
+			name: "multiple resources no match",
+			resources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(3), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(4), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(2), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: false},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(3), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(5), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: false},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(5), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(4), Preferred: true},
+				},
+			},
+			expectedFound: false,
+			expectedMatch: TopologyHint{},
+		},
+		{
+			name: "multiple resources with match",
+			resources: [][]TopologyHint{
+				{
+					{NUMANodeAffinity: NewTestBitMask(3), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(4), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(2), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(3), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(5), Preferred: false},
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(1), Preferred: false},
+				},
+				{
+					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(5), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(4), Preferred: true},
+					{NUMANodeAffinity: NewTestBitMask(3), Preferred: true},
+				},
+			},
+			expectedFound: true,
+			expectedMatch: TopologyHint{
+				NUMANodeAffinity: NewTestBitMask(3),
+				Preferred:        true,
+			},
+		},
+	}
+
+	numaNodes := []int{0, 1, 2, 3, 4, 5}
+	for _, tc := range tcases {
+		policy := NewSingleNumaNodePolicy(numaNodes)
+		found, match := policy.(*singleNumaNodePolicy).getHintMatch(tc.resources)
+		if found != tc.expectedFound {
+			t.Errorf("Test Case: %s", tc.name)
+			t.Errorf("Expected found to be %v, got %v", tc.expectedFound, found)
+		}
+		if found {
+			if !match.IsEqual(tc.expectedMatch) {
+				t.Errorf("Test Case: %s", tc.name)
+				t.Errorf("Expected match to be %v, got %v", tc.expectedMatch, match)
+			}
+		}
+	}
+}
+
+func TestPolicySingleNumaNodeMerge(t *testing.T) {
 	numaNodes := []int{0, 1}
 	policy := NewSingleNumaNodePolicy(numaNodes)
 
