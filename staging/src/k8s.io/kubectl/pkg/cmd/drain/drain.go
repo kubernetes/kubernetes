@@ -289,11 +289,7 @@ func (o *DrainCmdOptions) RunDrain() error {
 	var fatal error
 
 	for _, info := range o.nodeInfos {
-		var err error
-		if !o.drainer.DryRun {
-			err = o.deleteOrEvictPodsSimple(info)
-		}
-		if err == nil || o.drainer.DryRun {
+		if err := o.deleteOrEvictPodsSimple(info); err == nil {
 			drainedNodes.Insert(info.Name)
 			printObj(info.Object, o.Out)
 		} else {
@@ -327,6 +323,12 @@ func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error
 	}
 	if warnings := list.Warnings(); warnings != "" {
 		fmt.Fprintf(o.ErrOut, "WARNING: %s\n", warnings)
+	}
+	if o.drainer.DryRun {
+		for _, pod := range list.Pods() {
+			fmt.Fprintf(o.Out, "evicting pod %s/%s (dry run)\n", pod.Namespace, pod.Name)
+		}
+		return nil
 	}
 
 	if err := o.drainer.DeleteOrEvictPods(list.Pods()); err != nil {
