@@ -265,7 +265,7 @@ func shouldHaveOrphanFinalizer(options *metav1.DeleteOptions, haveOrphanFinalize
 
 func shouldHaveDeleteDependentsFinalizer(options *metav1.DeleteOptions, haveDeleteDependentsFinalizer bool) bool {
 	if options.OrphanDependents != nil {
-		return *options.OrphanDependents == false
+		return !*options.OrphanDependents
 	}
 	if options.PropagationPolicy != nil {
 		return *options.PropagationPolicy == metav1.DeletePropagationForeground

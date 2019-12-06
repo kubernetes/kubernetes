@@ -228,7 +228,7 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 
 	pdb.Status.PodDisruptionsAllowed--
 	// If this is a dry-run, we don't need to go any further than that.
-	if dryRun == true {
+	if dryRun {
 		return nil
 	}
 
