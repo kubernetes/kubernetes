@@ -156,6 +156,9 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		defer cleanup()
 
 		// Check different-node test requirement
+		if l.driver.GetDriverInfo().Capabilities[CapSingleNodeVolume] {
+			framework.Skipf("Driver %s only supports %v -- skipping", l.driver.GetDriverInfo().Name, CapSingleNodeVolume)
+		}
 		nodes := framework.GetReadySchedulableNodesOrDie(l.cs)
 		if len(nodes.Items) < 2 {
 			framework.Skipf("Number of available nodes is less than 2 - skipping")
@@ -236,6 +239,9 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		defer cleanup()
 
 		// Check different-node test requirement
+		if l.driver.GetDriverInfo().Capabilities[CapSingleNodeVolume] {
+			framework.Skipf("Driver %s only supports %v -- skipping", l.driver.GetDriverInfo().Name, CapSingleNodeVolume)
+		}
 		nodes := framework.GetReadySchedulableNodesOrDie(l.cs)
 		if len(nodes.Items) < 2 {
 			framework.Skipf("Number of available nodes is less than 2 - skipping")

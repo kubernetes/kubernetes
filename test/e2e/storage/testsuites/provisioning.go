@@ -187,6 +187,10 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 			framework.Skipf("Driver %q only supports testing on one node - skipping", dInfo.Name)
 		}
 
+		if dInfo.Capabilities[CapSingleNodeVolume] {
+			framework.Skipf("Driver %q only supports testing on one node - skipping", dInfo.Name)
+		}
+
 		// Ensure that we actually have more than one node.
 		nodes := framework.GetReadySchedulableNodesOrDie(l.cs)
 		if len(nodes.Items) <= 1 {

@@ -17,7 +17,7 @@ limitations under the License.
 package testsuites
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -126,7 +126,8 @@ const (
 	// - NodeStageVolume in the spec
 	CapMultiPODs Capability = "multipods"
 
-	CapRWX Capability = "RWX" // support ReadWriteMany access modes
+	CapRWX              Capability = "RWX"              // support ReadWriteMany access modes
+	CapSingleNodeVolume Capability = "singleNodeVolume" // support volume that can run on single node (like hostpath)
 )
 
 // DriverInfo represents static information about a TestDriver.
