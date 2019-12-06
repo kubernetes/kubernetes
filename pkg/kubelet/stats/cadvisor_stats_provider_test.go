@@ -62,16 +62,10 @@ func TestRemoveTerminatedContainerInfo(t *testing.T) {
 		// The latest containers, which should be in the results.
 		"/pod0-i":  getTestContainerInfo(seedPod0Infra, pName0, namespace, leaky.PodInfraContainerName),
 		"/pod0-c0": getTestContainerInfo(seedPod0Container0, pName0, namespace, cName00),
-
-		// Duplicated containers with non-zero CPU and memory usage. This case
-		// shouldn't happen unless something goes wrong, but we want to test
-		// that the metrics reporting logic works in this scenario.
-		"/pod0-i-duplicated":  getTestContainerInfo(seedPod0Infra, pName0, namespace, leaky.PodInfraContainerName),
-		"/pod0-c0-duplicated": getTestContainerInfo(seedPod0Container0, pName0, namespace, cName00),
 	}
 	output := removeTerminatedContainerInfo(infos)
-	assert.Len(t, output, 4)
-	for _, c := range []string{"/pod0-i", "/pod0-c0", "/pod0-i-duplicated", "/pod0-c0-duplicated"} {
+	assert.Len(t, output, 2)
+	for _, c := range []string{"/pod0-i", "/pod0-c0"} {
 		if _, found := output[c]; !found {
 			t.Errorf("%q is expected to be in the output\n", c)
 		}
