@@ -75,6 +75,16 @@ func toPullableImageID(id string, image *dockertypes.ImageInspect) string {
 	return imageID
 }
 
+func toPullableImageName(name string, image *dockertypes.ImageInspect) string {
+	// Default to the image name, but if RepoTags is not empty, use
+	// the first digest instead.
+	imageName := name
+	if image != nil && len(image.RepoTags) > 0 {
+		imageName = image.RepoTags[0]
+	}
+	return imageName
+}
+
 func toRuntimeAPIContainer(c *dockertypes.Container) (*runtimeapi.Container, error) {
 	state := toRuntimeAPIContainerState(c.Status)
 	if len(c.Names) == 0 {

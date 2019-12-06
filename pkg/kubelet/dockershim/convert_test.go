@@ -69,3 +69,31 @@ func TestConvertToPullableImageID(t *testing.T) {
 		assert.Equal(t, test.expected, actual)
 	}
 }
+
+func TestConvertToPullableImageName(t *testing.T) {
+	testCases := []struct {
+		name     string
+		image    *dockertypes.ImageInspect
+		expected string
+	}{
+		{
+			name: "image-1",
+			image: &dockertypes.ImageInspect{
+				RepoTags: []string{"tag-1"},
+			},
+			expected: "tag-1",
+		},
+		{
+			name: "image-2",
+			image: &dockertypes.ImageInspect{
+				RepoTags: []string{},
+			},
+			expected: "image-2",
+		},
+	}
+
+	for _, test := range testCases {
+		actual := toPullableImageName(test.name, test.image)
+		assert.Equal(t, test.expected, actual)
+	}
+}

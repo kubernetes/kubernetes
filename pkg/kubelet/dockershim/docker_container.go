@@ -343,7 +343,6 @@ func (ds *dockerService) ContainerStatus(_ context.Context, req *runtimeapi.Cont
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse timestamp for container %q: %v", containerID, err)
 	}
-
 	// Convert the image id to a pullable id.
 	ir, err := ds.client.InspectImageByID(r.Image)
 	if err != nil {
@@ -414,10 +413,7 @@ func (ds *dockerService) ContainerStatus(_ context.Context, req *runtimeapi.Cont
 	}
 
 	labels, annotations := extractLabels(r.Config.Labels)
-	imageName := r.Config.Image
-	if len(ir.RepoTags) > 0 {
-		imageName = ir.RepoTags[0]
-	}
+	imageName := toPullableImageName(r.Config.Image, ir)
 	status := &runtimeapi.ContainerStatus{
 		Id:          r.ID,
 		Metadata:    metadata,

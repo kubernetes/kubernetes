@@ -194,6 +194,98 @@ func TestContainerStatus(t *testing.T) {
 	assert.Error(t, err, fmt.Sprintf("status of container: %+v", resp))
 }
 
+// TestContainerStatusWithNilImage tests the basic lifecycle operations and verify that
+// the status returned reflects the operations performed.
+func TestContainerStatusWithNilImage(t *testing.T) {
+	ds, fDocker, fClock := newTestDockerService()
+	sConfig := makeSandboxConfig("foo", "bar", "1", 0)
+	labels := map[string]string{"abc.xyz": "foo"}
+	annotations := map[string]string{"foo.bar.baz": "abc"}
+	imageName := "iamimage"
+	imageNil := "nilimage"
+	config := makeContainerConfig(sConfig, "pause", imageName, 0, labels, annotations)
+
+	var defaultTime time.Time
+	dt := defaultTime.UnixNano()
+	ct, st, ft := dt, dt, dt
+	state := runtimeapi.ContainerState_CONTAINER_CREATED
+	imageRef := DockerImageIDPrefix + imageName
+	// The following variables are not set in FakeDockerClient.
+	exitCode := int32(0)
+	var reason, message string
+
+	expected := &runtimeapi.ContainerStatus{
+		State:       state,
+		CreatedAt:   ct,
+		StartedAt:   st,
+		FinishedAt:  ft,
+		Metadata:    config.Metadata,
+		Image:       config.Image,
+		ImageRef:    imageRef,
+		ExitCode:    exitCode,
+		Reason:      reason,
+		Message:     message,
+		Mounts:      []*runtimeapi.Mount{},
+		Labels:      config.Labels,
+		Annotations: config.Annotations,
+	}
+
+	fDocker.InjectImages([]dockertypes.ImageSummary{{ID: imageNil}})
+
+	// Create the container.
+	fClock.SetTime(time.Now().Add(-1 * time.Hour))
+	expected.CreatedAt = fClock.Now().UnixNano()
+	const sandboxId = "sandboxid"
+
+	req := &runtimeapi.CreateContainerRequest{PodSandboxId: sandboxId, Config: config, SandboxConfig: sConfig}
+	createResp, err := ds.CreateContainer(getTestCTX(), req)
+	require.NoError(t, err)
+	id := createResp.ContainerId
+
+	// Check internal labels
+	c, err := fDocker.InspectContainer(id)
+	require.NoError(t, err)
+	assert.Equal(t, c.Config.Labels[containerTypeLabelKey], containerTypeLabelContainer)
+	assert.Equal(t, c.Config.Labels[sandboxIDLabelKey], sandboxId)
+
+	// Set the id manually since we don't know the id until it's created.
+	expected.Id = id
+	assert.NoError(t, err)
+	resp, err := ds.ContainerStatus(getTestCTX(), &runtimeapi.ContainerStatusRequest{ContainerId: id})
+	require.NoError(t, err)
+	assert.Equal(t, expected, resp.Status)
+
+	// Advance the clock and start the container.
+	fClock.SetTime(time.Now())
+	expected.StartedAt = fClock.Now().UnixNano()
+	expected.State = runtimeapi.ContainerState_CONTAINER_RUNNING
+
+	_, err = ds.StartContainer(getTestCTX(), &runtimeapi.StartContainerRequest{ContainerId: id})
+	require.NoError(t, err)
+
+	resp, err = ds.ContainerStatus(getTestCTX(), &runtimeapi.ContainerStatusRequest{ContainerId: id})
+	require.NoError(t, err)
+	assert.Equal(t, expected, resp.Status)
+
+	// Advance the clock and stop the container.
+	fClock.SetTime(time.Now().Add(1 * time.Hour))
+	expected.FinishedAt = fClock.Now().UnixNano()
+	expected.State = runtimeapi.ContainerState_CONTAINER_EXITED
+	expected.Reason = "Completed"
+
+	_, err = ds.StopContainer(getTestCTX(), &runtimeapi.StopContainerRequest{ContainerId: id, Timeout: int64(0)})
+	assert.NoError(t, err)
+	resp, err = ds.ContainerStatus(getTestCTX(), &runtimeapi.ContainerStatusRequest{ContainerId: id})
+	require.NoError(t, err)
+	assert.Equal(t, expected, resp.Status)
+
+	// Remove the container.
+	_, err = ds.RemoveContainer(getTestCTX(), &runtimeapi.RemoveContainerRequest{ContainerId: id})
+	require.NoError(t, err)
+	resp, err = ds.ContainerStatus(getTestCTX(), &runtimeapi.ContainerStatusRequest{ContainerId: id})
+	assert.Error(t, err, fmt.Sprintf("status of container: %+v", resp))
+}
+
 // TestContainerLogPath tests the container log creation logic.
 func TestContainerLogPath(t *testing.T) {
 	ds, fDocker, _ := newTestDockerService()
