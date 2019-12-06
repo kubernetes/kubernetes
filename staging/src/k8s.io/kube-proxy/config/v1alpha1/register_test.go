@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,24 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheme
+package v1alpha1
 
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	componentconfigtesting "k8s.io/component-base/config/testing"
-	"k8s.io/kubernetes/pkg/proxy/apis/config/fuzzer"
 )
 
-func TestRoundTripFuzzing(t *testing.T) {
-	roundtrip.RoundTripTestForScheme(t, Scheme, fuzzer.Funcs)
-}
+func TestComponentConfigSetup(t *testing.T) {
+	pkginfo := &componentconfigtesting.ComponentConfigPackage{
+		ComponentName:      "kube-proxy",
+		GroupName:          GroupName,
+		SchemeGroupVersion: SchemeGroupVersion,
+		AddToScheme:        AddToScheme,
+	}
 
-func TestRoundTripYAML(t *testing.T) {
-	componentconfigtesting.RoundTripTest(t, Scheme, Codecs)
-}
-
-func TestDefaults(t *testing.T) {
-	componentconfigtesting.DefaultingTest(t, Scheme, Codecs)
+	if err := componentconfigtesting.VerifyExternalTypePackage(pkginfo); err != nil {
+		t.Errorf("failed TestComponentConfigSetup: %v", err)
+	}
 }
