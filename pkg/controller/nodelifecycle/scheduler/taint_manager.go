@@ -365,8 +365,8 @@ func (tc *NoExecuteTaintManager) processPodOnNode(
 	triggerTime := startTime.Add(minTolerationTime)
 	scheduledEviction := tc.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String())
 	if scheduledEviction != nil {
-		startTime = scheduledEviction.CreatedAt
-		if startTime.Add(minTolerationTime).Before(triggerTime) {
+		fireAt := scheduledEviction.FireAt
+		if fireAt.Before(triggerTime) {
 			return
 		}
 		tc.cancelWorkWithEvent(podNamespacedName)
