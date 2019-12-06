@@ -148,7 +148,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		}
 
 		subPath := f.Namespace.Name
-		l.pod = SubpathTestPod(f, subPath, l.resource.VolType, l.resource.VolSource, true)
+		l.pod = SubpathTestPod(f, subPath, string(volType), l.resource.VolSource, true)
 		l.pod.Spec.NodeName = l.config.ClientNodeName
 		l.pod.Spec.NodeSelector = l.config.ClientNodeSelector
 
@@ -185,6 +185,8 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 
 		validateMigrationVolumeOpCounts(f.ClientSet, driver.GetDriverInfo().InTreePluginName, l.intreeOps, l.migratedOps)
 	}
+
+	driverName := driver.GetDriverInfo().Name
 
 	ginkgo.It("should support non-existent path", func() {
 		init()
@@ -348,9 +350,9 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		init()
 		defer cleanup()
 
-		if strings.HasPrefix(l.resource.VolType, "hostPath") || strings.HasPrefix(l.resource.VolType, "csi-hostpath") {
+		if strings.HasPrefix(driverName, "hostPath") {
 			// TODO: This skip should be removed once #61446 is fixed
-			framework.Skipf("%s volume type does not support reconstruction, skipping", l.resource.VolType)
+			framework.Skipf("Driver %s does not support reconstruction, skipping", driverName)
 		}
 
 		testSubpathReconstruction(f, l.hostExec, l.pod, true)
@@ -390,7 +392,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		init()
 		defer cleanup()
 		if l.roVolSource == nil {
-			framework.Skipf("Volume type %v doesn't support readOnly source", l.resource.VolType)
+			framework.Skipf("Driver %s on volume type %s doesn't support readOnly source", driverName, pattern.VolType)
 		}
 
 		origpod := l.pod.DeepCopy()
@@ -418,7 +420,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		init()
 		defer cleanup()
 		if l.roVolSource == nil {
-			framework.Skipf("Volume type %v doesn't support readOnly source", l.resource.VolType)
+			framework.Skipf("Driver %s on volume type %s doesn't support readOnly source", driverName, pattern.VolType)
 		}
 
 		// Format the volume while it's writable
