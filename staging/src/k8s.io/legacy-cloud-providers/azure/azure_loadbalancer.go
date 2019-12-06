@@ -1641,7 +1641,7 @@ func equalLoadBalancingRulePropertiesFormat(s *network.LoadBalancingRuleProperti
 		reflect.DeepEqual(s.EnableTCPReset, t.EnableTCPReset) &&
 		reflect.DeepEqual(s.DisableOutboundSnat, t.DisableOutboundSnat)
 
-	if wantLB {
+	if wantLB && s.IdleTimeoutInMinutes != nil && t.IdleTimeoutInMinutes != nil {
 		return properties && reflect.DeepEqual(s.IdleTimeoutInMinutes, t.IdleTimeoutInMinutes)
 	}
 	return properties

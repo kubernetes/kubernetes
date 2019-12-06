@@ -174,6 +174,40 @@ func TestFindRule(t *testing.T) {
 			expected: false,
 		},
 		{
+			msg: "rule names match while idletimeout unmatch should return false",
+			existingRule: []network.LoadBalancingRule{
+				{
+					Name: to.StringPtr("httpRule"),
+					LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
+						IdleTimeoutInMinutes: to.Int32Ptr(1),
+					},
+				},
+			},
+			curRule: network.LoadBalancingRule{
+				Name: to.StringPtr("httpRule"),
+				LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
+					IdleTimeoutInMinutes: to.Int32Ptr(2),
+				},
+			},
+			expected: false,
+		},
+		{
+			msg: "rule names match while idletimeout nil should return true",
+			existingRule: []network.LoadBalancingRule{
+				{
+					Name:                              to.StringPtr("httpRule"),
+					LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{},
+				},
+			},
+			curRule: network.LoadBalancingRule{
+				Name: to.StringPtr("httpRule"),
+				LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
+					IdleTimeoutInMinutes: to.Int32Ptr(2),
+				},
+			},
+			expected: true,
+		},
+		{
 			msg: "rule names match while LoadDistribution unmatch should return false",
 			existingRule: []network.LoadBalancingRule{
 				{
