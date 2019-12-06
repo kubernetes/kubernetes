@@ -77,7 +77,7 @@ func toPullableImageID(id string, image *dockertypes.ImageInspect) string {
 
 func toPullableImageName(name string, image *dockertypes.ImageInspect) string {
 	// Default to the image name, but if RepoTags is not empty, use
-	// the first digest instead.
+	// the first tag instead.
 	imageName := name
 	if image != nil && len(image.RepoTags) > 0 {
 		imageName = image.RepoTags[0]
