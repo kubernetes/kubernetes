@@ -83,6 +83,7 @@ func SetShowHidden() {
 		// re-register collectors that has been hidden in phase of last registry.
 		for _, r := range registries {
 			r.enableHiddenCollectors()
+			r.enableHiddenStableCollectors()
 		}
 	})
 }
@@ -120,7 +121,7 @@ type KubeRegistry interface {
 	CustomMustRegister(cs ...StableCollector)
 	Register(Registerable) error
 	MustRegister(...Registerable)
-	Unregister(Registerable) bool
+	Unregister(collector Collector) bool
 	Gather() ([]*dto.MetricFamily, error)
 }
 
@@ -131,7 +132,9 @@ type kubeRegistry struct {
 	PromRegistry
 	version              semver.Version
 	hiddenCollectors     map[string]Registerable // stores all collectors that has been hidden
+	stableCollectors     []StableCollector       // stores all stable collector
 	hiddenCollectorsLock sync.RWMutex
+	stableCollectorsLock sync.RWMutex
 }
 
 // Register registers a new Collector to be included in metrics
@@ -166,10 +169,11 @@ func (kr *kubeRegistry) MustRegister(cs ...Registerable) {
 
 // CustomRegister registers a new custom collector.
 func (kr *kubeRegistry) CustomRegister(c StableCollector) error {
+	kr.trackStableCollectors(c)
+
 	if c.Create(&kr.version, c) {
 		return kr.PromRegistry.Register(c)
 	}
-
 	return nil
 }
 
@@ -177,6 +181,8 @@ func (kr *kubeRegistry) CustomRegister(c StableCollector) error {
 // StableCollectors and panics upon the first registration that causes an
 // error.
 func (kr *kubeRegistry) CustomMustRegister(cs ...StableCollector) {
+	kr.trackStableCollectors(cs...)
+
 	collectors := make([]prometheus.Collector, 0, len(cs))
 	for _, c := range cs {
 		if c.Create(&kr.version, c) {
@@ -211,7 +217,7 @@ func (kr *kubeRegistry) RawMustRegister(cs ...prometheus.Collector) {
 // returns whether a Collector was unregistered. Note that an unchecked
 // Collector cannot be unregistered (as its Describe method does not
 // yield any descriptor).
-func (kr *kubeRegistry) Unregister(collector Registerable) bool {
+func (kr *kubeRegistry) Unregister(collector Collector) bool {
 	return kr.PromRegistry.Unregister(collector)
 }
 
@@ -234,16 +240,54 @@ func (kr *kubeRegistry) trackHiddenCollector(c Registerable) {
 	kr.hiddenCollectors[c.FQName()] = c
 }
 
+// trackStableCollectors stores all custom collectors.
+func (kr *kubeRegistry) trackStableCollectors(cs ...StableCollector) {
+	kr.stableCollectorsLock.Lock()
+	defer kr.stableCollectorsLock.Unlock()
+
+	kr.stableCollectors = append(kr.stableCollectors, cs...)
+}
+
 // enableHiddenCollectors will re-register all of the hidden collectors.
 func (kr *kubeRegistry) enableHiddenCollectors() {
+	if len(kr.hiddenCollectors) == 0 {
+		return
+	}
+
 	kr.hiddenCollectorsLock.Lock()
-	defer kr.hiddenCollectorsLock.Unlock()
+	cs := make([]Registerable, 0, len(kr.hiddenCollectors))
 
 	for _, c := range kr.hiddenCollectors {
 		c.ClearState()
-		kr.MustRegister(c)
+		cs = append(cs, c)
 	}
+
 	kr.hiddenCollectors = nil
+	kr.hiddenCollectorsLock.Unlock()
+	kr.MustRegister(cs...)
+}
+
+// enableHiddenStableCollectors will re-register the stable collectors if there is one or more hidden metrics in it.
+// Since we can not register a metrics twice, so we have to unregister first then register again.
+func (kr *kubeRegistry) enableHiddenStableCollectors() {
+	if len(kr.stableCollectors) == 0 {
+		return
+	}
+
+	kr.stableCollectorsLock.Lock()
+
+	cs := make([]StableCollector, 0, len(kr.stableCollectors))
+	for _, c := range kr.stableCollectors {
+		if len(c.HiddenMetrics()) > 0 {
+			kr.Unregister(c) // unregister must happens before clear state, otherwise no metrics would be unregister
+			c.ClearState()
+			cs = append(cs, c)
+		}
+	}
+
+	kr.stableCollectors = nil
+	kr.stableCollectorsLock.Unlock()
+	kr.CustomMustRegister(cs...)
 }
 
 func newKubeRegistry(v apimachineryversion.Info) *kubeRegistry {
