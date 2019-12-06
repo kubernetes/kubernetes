@@ -171,7 +171,6 @@ func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 type VolumeResource struct {
 	Config    *PerTestConfig
 	Pattern   testpatterns.TestPattern
-	VolType   string
 	VolSource *v1.VolumeSource
 	Pvc       *v1.PersistentVolumeClaim
 	Pv        *v1.PersistentVolume
@@ -199,7 +198,6 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern test
 		framework.Logf("Creating resource for inline volume")
 		if iDriver, ok := driver.(InlineVolumeTestDriver); ok {
 			r.VolSource = iDriver.GetVolumeSource(false, pattern.FsType, r.Volume)
-			r.VolType = dInfo.Name
 		}
 	case testpatterns.PreprovisionedPV:
 		framework.Logf("Creating resource for pre-provisioned PV")
@@ -209,7 +207,6 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern test
 				r.Pv, r.Pvc = createPVCPV(f, dInfo.Name, pvSource, volumeNodeAffinity, pattern.VolMode, dInfo.RequiredAccessModes)
 				r.VolSource = createVolumeSource(r.Pvc.Name, false /* readOnly */)
 			}
-			r.VolType = fmt.Sprintf("%s-preprovisionedPV", dInfo.Name)
 		}
 	case testpatterns.DynamicPV:
 		framework.Logf("Creating resource for dynamic PV")
@@ -238,12 +235,10 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern test
 					f, dInfo.Name, claimSize, r.Sc, pattern.VolMode, dInfo.RequiredAccessModes)
 				r.VolSource = createVolumeSource(r.Pvc.Name, false /* readOnly */)
 			}
-			r.VolType = fmt.Sprintf("%s-dynamicPV", dInfo.Name)
 		}
 	case testpatterns.CSIInlineVolume:
 		framework.Logf("Creating resource for CSI ephemeral inline volume")
 		if eDriver, ok := driver.(EphemeralTestDriver); ok {
-			r.VolType = fmt.Sprintf("%s-ephemeral", dInfo.Name)
 			attributes, _, _ := eDriver.GetVolume(config, 0)
 			r.VolSource = &v1.VolumeSource{
 				CSI: &v1.CSIVolumeSource{
