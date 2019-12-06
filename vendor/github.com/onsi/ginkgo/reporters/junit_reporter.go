@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/onsi/ginkgo/config"
@@ -141,17 +142,29 @@ func (reporter *JUnitReporter) SpecSuiteDidEnd(summary *types.SuiteSummary) {
 	reporter.suite.Time = math.Trunc(summary.RunTime.Seconds()*1000) / 1000
 	reporter.suite.Failures = summary.NumberOfFailedSpecs
 	reporter.suite.Errors = 0
-	file, err := os.Create(reporter.filename)
+	if reporter.ReporterConfig.ReportFile != "" {
+		reporter.filename = reporter.ReporterConfig.ReportFile
+		fmt.Printf("\nJUnit path was configured: %s\n", reporter.filename)
+	}
+	filePath, _ := filepath.Abs(reporter.filename)
+	dirPath := filepath.Dir(filePath)
+	err := os.MkdirAll(dirPath, os.ModePerm)
 	if err != nil {
-		fmt.Printf("Failed to create JUnit report file: %s\n\t%s", reporter.filename, err.Error())
+		fmt.Printf("\nFailed to create JUnit directory: %s\n\t%s", filePath, err.Error())
+	}
+	file, err := os.Create(filePath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create JUnit report file: %s\n\t%s", filePath, err.Error())
 	}
 	defer file.Close()
 	file.WriteString(xml.Header)
 	encoder := xml.NewEncoder(file)
 	encoder.Indent("  ", "    ")
 	err = encoder.Encode(reporter.suite)
-	if err != nil {
-		fmt.Printf("Failed to generate JUnit report\n\t%s", err.Error())
+	if err == nil {
+		fmt.Fprintf(os.Stdout, "\nJUnit report was created: %s\n", filePath)
+	} else {
+		fmt.Fprintf(os.Stderr,"\nFailed to generate JUnit report data:\n\t%s", err.Error())
 	}
 }
 
