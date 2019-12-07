@@ -428,6 +428,9 @@ func newTimeoutWebhookHandler(recorder *timeoutRecorder) http.Handler {
 		}
 
 		timeout, err := time.ParseDuration(r.URL.Query().Get("timeout"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
 		invocation := invocation{path: r.URL.Path, timeoutSeconds: int(timeout.Round(time.Second) / time.Second)}
 		recorder.RecordInvocation(invocation)
 
