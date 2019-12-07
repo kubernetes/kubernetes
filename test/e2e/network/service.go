@@ -933,24 +933,24 @@ var _ = SIGDescribe("Services", func() {
 		// Change the services back to ClusterIP.
 
 		ginkgo.By("changing TCP service back to type=ClusterIP")
-		tcpService, err = tcpJig.UpdateService(func(s *v1.Service) {
+		_, err = tcpJig.UpdateService(func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeClusterIP
 			s.Spec.Ports[0].NodePort = 0
 		})
 		framework.ExpectNoError(err)
 		// Wait for the load balancer to be destroyed asynchronously
-		tcpService, err = tcpJig.WaitForLoadBalancerDestroy(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
+		_, err = tcpJig.WaitForLoadBalancerDestroy(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("changing UDP service back to type=ClusterIP")
-		udpService, err = udpJig.UpdateService(func(s *v1.Service) {
+		_, err = udpJig.UpdateService(func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeClusterIP
 			s.Spec.Ports[0].NodePort = 0
 		})
 		framework.ExpectNoError(err)
 		if loadBalancerSupportsUDP {
 			// Wait for the load balancer to be destroyed asynchronously
-			udpService, err = udpJig.WaitForLoadBalancerDestroy(udpIngressIP, svcPort, loadBalancerCreateTimeout)
+			_, err = udpJig.WaitForLoadBalancerDestroy(udpIngressIP, svcPort, loadBalancerCreateTimeout)
 			framework.ExpectNoError(err)
 		}
 
@@ -1381,7 +1381,7 @@ var _ = SIGDescribe("Services", func() {
 		service = t.BuildServiceSpec()
 		service.Spec.Type = v1.ServiceTypeNodePort
 		service.Spec.Ports[0].NodePort = nodePort
-		service, err = t.CreateService(service)
+		_, err = t.CreateService(service)
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 	})
 
@@ -2516,12 +2516,12 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(f *framework.Framewor
 		gomega.Expect(e2eservice.CheckAffinity(execPod, svcIP, servicePort, true)).To(gomega.BeTrue())
 	}
 	if isTransitionTest {
-		svc, err = jig.UpdateService(func(svc *v1.Service) {
+		_, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityNone
 		})
 		framework.ExpectNoError(err)
 		gomega.Expect(e2eservice.CheckAffinity(execPod, svcIP, servicePort, false)).To(gomega.BeTrue())
-		svc, err = jig.UpdateService(func(svc *v1.Service) {
+		_, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		})
 		framework.ExpectNoError(err)

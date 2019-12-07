@@ -181,7 +181,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				return true, nil
 			})
 			if pollErr != nil {
-				framework.ExpectNoError(fmt.Errorf("Timed out waiting for ingress %s to get %s annotation", name, instanceGroupAnnotation))
+				framework.ExpectNoError(fmt.Errorf("timed out waiting for ingress %s to get %s annotation", name, instanceGroupAnnotation))
 			}
 
 			// Verify that the ingress does not get other annotations like url-map, target-proxy, backends, etc.
