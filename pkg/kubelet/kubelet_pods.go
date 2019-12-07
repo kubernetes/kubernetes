@@ -1457,6 +1457,26 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		defaultWaitingState = v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: "PodInitializing"}}
 	}
 
+	// Make the latest container status comes first.
+	sort.Sort(sort.Reverse(kubecontainer.SortContainerStatusesByCreationTime(podStatus.ContainerStatuses)))
+
+	// Init container statuses according to the statuses in pod status
+	containerSeen := map[string]int{}
+	kubeContainerStatuses := make(map[string]*v1.ContainerStatus, len(podStatus.ContainerStatuses))
+	for _, cStatus := range podStatus.ContainerStatuses {
+		cName := cStatus.Name
+		if containerSeen[cName] >= 2 {
+			continue
+		}
+		status := convertContainerStatus(cStatus)
+		if containerSeen[cName] == 0 {
+			kubeContainerStatuses[cName] = status
+		} else {
+			kubeContainerStatuses[cName].LastTerminationState = status.State
+		}
+		containerSeen[cName] = containerSeen[cName] + 1
+	}
+
 	genContainerStatuses := func(previousStatus []v1.ContainerStatus, containers []v1.Container, isInitContainer bool) map[string]*v1.ContainerStatus {
 
 		// Fetch old containers statuses from old pod status.
@@ -1486,30 +1506,13 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 				}
 			}
 			statuses[container.Name] = status
-		}
 
-		// Set container statuses according to the statuses seen in pod status
-		containerSeen := map[string]int{}
-		for _, cStatus := range podStatus.ContainerStatuses {
-			cName := cStatus.Name
-			if _, ok := statuses[cName]; !ok {
-				// This would also ignore the infra container.
-				continue
+			// Set container statuses according to the statuses seen in pod status
+			if _, ok := kubeContainerStatuses[container.Name]; ok {
+				statuses[container.Name] = kubeContainerStatuses[container.Name]
 			}
-			if containerSeen[cName] >= 2 {
-				continue
-			}
-			status := convertContainerStatus(cStatus)
-			if containerSeen[cName] == 0 {
-				statuses[cName] = status
-			} else {
-				statuses[cName].LastTerminationState = status.State
-			}
-			containerSeen[cName] = containerSeen[cName] + 1
-		}
 
-		// Handle the containers failed to be started, which should be in Waiting state.
-		for _, container := range containers {
+			// Handle the containers failed to be started, which should be in Waiting state.
 			if isInitContainer {
 				// If the init container is terminated with exit code 0, it won't be restarted.
 				// TODO(random-liu): Handle this in a cleaner way.
@@ -1522,7 +1525,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			if !kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
 				continue
 			}
-			status := statuses[container.Name]
+			status = statuses[container.Name]
 			reason, ok := kl.reasonCache.Get(pod.UID, container.Name)
 			if !ok {
 				// In fact, we could also apply Waiting state here, but it is less informative,
@@ -1546,9 +1549,6 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		}
 		return statuses
 	}
-
-	// Make the latest container status comes first.
-	sort.Sort(sort.Reverse(kubecontainer.SortContainerStatusesByCreationTime(podStatus.ContainerStatuses)))
 
 	// Sort the container statuses since clients of this interface expect the list
 	// of containers in a pod has a deterministic order.
