@@ -328,7 +328,7 @@ func validateAnnotations(removeAnnotations []string, newAnnotations map[string]s
 			if modifyRemoveBuf.Len() > 0 {
 				modifyRemoveBuf.WriteString(", ")
 			}
-			modifyRemoveBuf.WriteString(fmt.Sprintf(removeAnnotation))
+			modifyRemoveBuf.WriteString(fmt.Sprint(removeAnnotation))
 		}
 	}
 	if modifyRemoveBuf.Len() > 0 {
