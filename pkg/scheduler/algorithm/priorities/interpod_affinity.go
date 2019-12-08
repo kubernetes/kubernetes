@@ -26,13 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
-
-	"k8s.io/klog"
 )
 
 type topologyPairToScore map[string]map[string]int64
@@ -286,7 +284,8 @@ func buildTopologyPairToScore(
 		hardPodAffinityWeight: hardPodAffinityWeight,
 	}
 
-	errCh := schedutil.NewErrorChannel()
+	// start trial fix here
+	errCh := make(chan error, 1)
 	ctx, cancel := context.WithCancel(context.Background())
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]
@@ -301,17 +300,26 @@ func buildTopologyPairToScore(
 
 			for _, existingPod := range podsToProcess {
 				if err := pm.processExistingPod(existingPod, nodeInfo, pod); err != nil {
-					errCh.SendErrorWithCancel(err, cancel)
+					select {
+					case errCh <- err:
+					default:
+					}
+					cancel()
 					return
 				}
 			}
 		}
 	}
 	workqueue.ParallelizeUntil(ctx, 16, len(allNodes), processNode)
-	if err := errCh.ReceiveError(); err != nil {
-		klog.Error(err)
-		return nil
-	}
 
+	// receive from channel here in non blocking operation
+	select {
+	case err := <-errCh:
+		if err != nil {
+			klog.Error(err)
+			return nil
+		}
+	default:
+	}
 	return pm.topologyScore
 }

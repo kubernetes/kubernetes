@@ -38,7 +38,6 @@ go_library(
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/listers:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
-        "//pkg/scheduler/util:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/parsers:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
