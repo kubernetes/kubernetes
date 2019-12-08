@@ -23,7 +23,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -795,7 +794,7 @@ func TestPromptPodList(t *testing.T) {
 		in, _ := ioutil.TempFile("", "")
 		defer in.Close()
 		io.WriteString(in, "2")
-		in.Seek(0, os.SEEK_SET)
+		in.Seek(0, io.SeekStart)
 		selectedIndex, _ := promptPodList(4, in)
 		if selectedIndex != 2 {
 			t.Errorf("unexpected promp response")
@@ -806,7 +805,7 @@ func TestPromptPodList(t *testing.T) {
 		in, _ := ioutil.TempFile("", "")
 		defer in.Close()
 		io.WriteString(in, "foo")
-		in.Seek(0, os.SEEK_SET)
+		in.Seek(0, io.SeekStart)
 		_, err := promptPodList(4, in)
 		if err == nil {
 			t.Errorf("unexpected error promp response")

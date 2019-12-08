@@ -475,12 +475,7 @@ func getSelectedPod(builder resource.Builder, resourceLike string, io io.Writer)
 		return resourceLike
 	}
 
-	allErrs := []error{}
-	err := addContextHeaders(out)
-	if err != nil {
-		allErrs = append(allErrs, err)
-	}
-
+	addContextHeaders(out)
 	addPrintContext(filteredPods, out)
 	out.Flush()
 
