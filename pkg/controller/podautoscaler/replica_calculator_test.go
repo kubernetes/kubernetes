@@ -362,7 +362,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	}
 
 	if tc.resource != nil {
-		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, testNamespace, selector)
+		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, testNamespace, selector, nil)
 
 		if tc.expectedError != nil {
 			require.Error(t, err, "there should be an error calculating the replica count")

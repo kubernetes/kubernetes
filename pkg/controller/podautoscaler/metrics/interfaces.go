@@ -39,7 +39,7 @@ type PodMetricsInfo map[string]PodMetric
 type MetricsClient interface {
 	// GetResourceMetric gets the given resource metric (and an associated oldest timestamp)
 	// for all pods matching the specified selector in the given namespace
-	GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error)
+	GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector, ref *autoscaling.CrossVersionObjectReference) (PodMetricsInfo, time.Time, error)
 
 	// GetRawMetric gets the given metric (and an associated oldest timestamp)
 	// for all pods matching the specified selector in the given namespace

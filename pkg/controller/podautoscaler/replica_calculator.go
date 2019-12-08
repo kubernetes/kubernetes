@@ -59,8 +59,8 @@ func NewReplicaCalculator(metricsClient metricsclient.MetricsClient, podLister c
 
 // GetResourceReplicas calculates the desired replica count based on a target resource utilization percentage
 // of the given resource for pods matching the given selector in the given namespace, and the current replica count
-func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUtilization int32, resource v1.ResourceName, namespace string, selector labels.Selector) (replicaCount int32, utilization int32, rawUtilization int64, timestamp time.Time, err error) {
-	metrics, timestamp, err := c.metricsClient.GetResourceMetric(resource, namespace, selector)
+func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUtilization int32, resource v1.ResourceName, namespace string, selector labels.Selector, ref *autoscaling.CrossVersionObjectReference) (replicaCount int32, utilization int32, rawUtilization int64, timestamp time.Time, err error) {
+	metrics, timestamp, err := c.metricsClient.GetResourceMetric(resource, namespace, selector, ref)
 	if err != nil {
 		return 0, 0, 0, time.Time{}, fmt.Errorf("unable to get metrics for resource %s: %v", resource, err)
 	}
@@ -141,8 +141,8 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 
 // GetRawResourceReplicas calculates the desired replica count based on a target resource utilization (as a raw milli-value)
 // for pods matching the given selector in the given namespace, and the current replica count
-func (c *ReplicaCalculator) GetRawResourceReplicas(currentReplicas int32, targetUtilization int64, resource v1.ResourceName, namespace string, selector labels.Selector) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
-	metrics, timestamp, err := c.metricsClient.GetResourceMetric(resource, namespace, selector)
+func (c *ReplicaCalculator) GetRawResourceReplicas(currentReplicas int32, targetUtilization int64, resource v1.ResourceName, namespace string, selector labels.Selector, ref *autoscaling.CrossVersionObjectReference) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
+	metrics, timestamp, err := c.metricsClient.GetResourceMetric(resource, namespace, selector, ref)
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metrics for resource %s: %v", resource, err)
 	}

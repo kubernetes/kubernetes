@@ -62,7 +62,7 @@ func NewHeapsterMetricsClient(client clientset.Interface, namespace, scheme, ser
 	}
 }
 
-func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error) {
+func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector, objectRef *autoscaling.CrossVersionObjectReference) (PodMetricsInfo, time.Time, error) {
 	metricPath := fmt.Sprintf("/apis/metrics/v1alpha1/namespaces/%s/pods", namespace)
 	params := map[string]string{"labelSelector": selector.String()}
 

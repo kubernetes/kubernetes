@@ -230,7 +230,7 @@ func (tc *restClientTestCase) runTest(t *testing.T) {
 	isResource := len(tc.resourceName) > 0
 	isExternal := tc.metricSelector != nil
 	if isResource {
-		info, timestamp, err := metricsClient.GetResourceMetric(v1.ResourceName(tc.resourceName), tc.namespace, tc.selector)
+		info, timestamp, err := metricsClient.GetResourceMetric(v1.ResourceName(tc.resourceName), tc.namespace, tc.selector, nil)
 		tc.verifyResults(t, info, timestamp, err)
 	} else if isExternal {
 		tc.metricLabelSelector, err = metav1.LabelSelectorAsSelector(tc.metricSelector)

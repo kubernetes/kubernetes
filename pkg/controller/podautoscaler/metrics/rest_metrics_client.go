@@ -62,7 +62,7 @@ type resourceMetricsClient struct {
 
 // GetResourceMetric gets the given resource metric (and an associated oldest timestamp)
 // for all pods matching the specified selector in the given namespace
-func (c *resourceMetricsClient) GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error) {
+func (c *resourceMetricsClient) GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector, objectRef *autoscaling.CrossVersionObjectReference) (PodMetricsInfo, time.Time, error) {
 	metrics, err := c.client.PodMetricses(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("unable to fetch metrics from resource metrics API: %v", err)
@@ -74,7 +74,16 @@ func (c *resourceMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 
 	res := make(PodMetricsInfo, len(metrics.Items))
 
+	var gvk *schema.GroupVersionKind
+	if objectRef != nil {
+		gvkObj := schema.FromAPIVersionAndKind(objectRef.APIVersion, objectRef.Kind)
+		gvk = &gvkObj
+	}
 	for _, m := range metrics.Items {
+		mgvk := m.GroupVersionKind()
+		if gvk != nil && mgvk.Kind != "" && mgvk != *gvk {
+			continue
+		}
 		podSum := int64(0)
 		missing := len(m.Containers) == 0
 		for _, c := range m.Containers {

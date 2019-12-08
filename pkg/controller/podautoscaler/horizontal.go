@@ -421,7 +421,7 @@ func (a *HorizontalController) computeStatusForPodsMetric(currentReplicas int32,
 func (a *HorizontalController) computeStatusForResourceMetric(currentReplicas int32, metricSpec autoscalingv2.MetricSpec, hpa *autoscalingv2.HorizontalPodAutoscaler, selector labels.Selector, status *autoscalingv2.MetricStatus) (replicaCountProposal int32, timestampProposal time.Time, metricNameProposal string, condition autoscalingv2.HorizontalPodAutoscalerCondition, err error) {
 	if metricSpec.Resource.Target.AverageValue != nil {
 		var rawProposal int64
-		replicaCountProposal, rawProposal, timestampProposal, err := a.replicaCalc.GetRawResourceReplicas(currentReplicas, metricSpec.Resource.Target.AverageValue.MilliValue(), metricSpec.Resource.Name, hpa.Namespace, selector)
+		replicaCountProposal, rawProposal, timestampProposal, err := a.replicaCalc.GetRawResourceReplicas(currentReplicas, metricSpec.Resource.Target.AverageValue.MilliValue(), metricSpec.Resource.Name, hpa.Namespace, selector, &hpa.Spec.ScaleTargetRef)
 		if err != nil {
 			condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetResourceMetric", err)
 			return 0, time.Time{}, "", condition, fmt.Errorf("failed to get %s utilization: %v", metricSpec.Resource.Name, err)
@@ -447,7 +447,7 @@ func (a *HorizontalController) computeStatusForResourceMetric(currentReplicas in
 		targetUtilization := *metricSpec.Resource.Target.AverageUtilization
 		var percentageProposal int32
 		var rawProposal int64
-		replicaCountProposal, percentageProposal, rawProposal, timestampProposal, err := a.replicaCalc.GetResourceReplicas(currentReplicas, targetUtilization, metricSpec.Resource.Name, hpa.Namespace, selector)
+		replicaCountProposal, percentageProposal, rawProposal, timestampProposal, err := a.replicaCalc.GetResourceReplicas(currentReplicas, targetUtilization, metricSpec.Resource.Name, hpa.Namespace, selector, &hpa.Spec.ScaleTargetRef)
 		if err != nil {
 			condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetResourceMetric", err)
 			return 0, time.Time{}, "", condition, fmt.Errorf("failed to get %s utilization: %v", metricSpec.Resource.Name, err)
