@@ -85,12 +85,14 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 	if err != nil {
 		return upgrades, err
 	}
+	fmt.Printf("[upgrade/versions] Cluster version: %s\n", clusterVersionStr)
 
 	// Get current kubeadm CLI version
 	kubeadmVersionStr, kubeadmVersion, err := versionGetterImpl.KubeadmVersion()
 	if err != nil {
 		return upgrades, err
 	}
+	fmt.Printf("[upgrade/versions] kubeadm version: %s\n", kubeadmVersionStr)
 
 	// Get and output the current latest stable version
 	stableVersionStr, stableVersion, err := versionGetterImpl.VersionFromCILabel("stable", "stable version")
@@ -98,6 +100,8 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		fmt.Printf("[upgrade/versions] WARNING: %v\n", err)
 		fmt.Println("[upgrade/versions] WARNING: Falling back to current kubeadm version as latest stable version")
 		stableVersionStr, stableVersion = kubeadmVersionStr, kubeadmVersion
+	} else {
+		fmt.Printf("[upgrade/versions] Latest %s: %s\n", "stable version", stableVersionStr)
 	}
 
 	// Get the kubelet versions in the cluster
@@ -144,6 +148,8 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		if err != nil {
 			fmt.Printf("[upgrade/versions] WARNING: %v\n", err)
 		} else {
+			fmt.Printf("[upgrade/versions] Latest %s: %s\n", description, patchVersionStr)
+
 			// Check if a minor version upgrade is possible when a patch release exists
 			// It's only possible if the latest patch version is higher than the current patch version
 			// If that's the case, they must be on different branches => a newer minor version can be upgraded to
@@ -211,6 +217,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		if err != nil {
 			return upgrades, err
 		}
+		fmt.Printf("[upgrade/versions] Latest %s: %s\n", "experimental version", latestVersionStr)
 
 		minorUnstable := latestVersion.Components()[1]
 		// Get and output the current latest unstable version
@@ -219,6 +226,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		if err != nil {
 			return upgrades, err
 		}
+		fmt.Printf("[upgrade/versions] Latest %s: %s\n", "", previousBranchLatestVersionStr)
 
 		// If that previous latest version is an RC, RCs are allowed and the cluster version is lower than the RC version, show the upgrade
 		if rcUpgradesAllowed && rcUpgradePossible(clusterVersion, previousBranchLatestVersion) {
