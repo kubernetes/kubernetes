@@ -18,11 +18,16 @@ package scheduler
 
 import (
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
 )
@@ -259,5 +264,81 @@ func TestNodeConditionsChanged(t *testing.T) {
 		if changed != c.Changed {
 			t.Errorf("Test case %q failed: should be %t, got %t", c.Name, c.Changed, changed)
 		}
+	}
+}
+
+func TestUpdatePodInCache(t *testing.T) {
+	ttl := 10 * time.Second
+	nodeName := "node"
+
+	tests := []struct {
+		name   string
+		oldObj interface{}
+		newObj interface{}
+	}{
+		{
+			name:   "test update pod with same uid",
+			oldObj: makeBasePod(t, nodeName, "oldUID", "testName", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
+			newObj: makeBasePod(t, nodeName, "oldUID", "testName", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
+		},
+		{
+			name:   "test update pod with different uid",
+			oldObj: makeBasePod(t, nodeName, "oldUID", "testName", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
+			newObj: makeBasePod(t, nodeName, "newUID", "testName", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			schedulerCache := cache.New(ttl, stopCh)
+			schedulerQueue := queue.NewPriorityQueue(nil)
+			sched := &Scheduler{
+				SchedulerCache:  schedulerCache,
+				SchedulingQueue: schedulerQueue,
+			}
+			sched.addPodToCache(tt.oldObj)
+			sched.updatePodInCache(tt.oldObj, tt.newObj)
+			pod, err := sched.SchedulerCache.GetPod(tt.newObj.(*v1.Pod))
+			if err != nil {
+				t.Errorf("Failed to get pod from scheduler: %v", err)
+			}
+			if pod.UID != tt.newObj.(*v1.Pod).UID {
+				t.Errorf("Expected get pod UID %v, got %v", tt.newObj.(*v1.Pod).UID, pod.UID)
+			}
+		})
+	}
+}
+
+func makeBasePod(t *testing.T, nodeName, objUID, objName, cpu, mem, extended string, ports []v1.ContainerPort) *v1.Pod {
+	req := v1.ResourceList{}
+	if cpu != "" {
+		req = v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse(cpu),
+			v1.ResourceMemory: resource.MustParse(mem),
+		}
+		if extended != "" {
+			parts := strings.Split(extended, ":")
+			if len(parts) != 2 {
+				t.Fatalf("Invalid extended resource string: \"%s\"", extended)
+			}
+			req[v1.ResourceName(parts[0])] = resource.MustParse(parts[1])
+		}
+	}
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       types.UID(objUID),
+			Namespace: "node_info_cache_test",
+			Name:      objName,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Resources: v1.ResourceRequirements{
+					Requests: req,
+				},
+				Ports: ports,
+			}},
+			NodeName: nodeName,
+		},
 	}
 }

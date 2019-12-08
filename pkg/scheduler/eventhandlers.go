@@ -233,6 +233,15 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 		return
 	}
 
+	// A Pod delete event followed by an immediate Pod add event may be merged
+	// into a Pod update event. In this case, we should invalidate the old Pod, and
+	// then add the new Pod.
+	if oldPod.UID != newPod.UID {
+		sched.deletePodFromCache(oldObj)
+		sched.addPodToCache(newObj)
+		return
+	}
+
 	// NOTE: Updates must be written to scheduler cache before invalidating
 	// equivalence cache, because we could snapshot equivalence cache after the
 	// invalidation and then snapshot the cache itself. If the cache is
