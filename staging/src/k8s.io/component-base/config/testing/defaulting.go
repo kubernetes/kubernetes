@@ -48,7 +48,7 @@ func GetDefaultingTestCases(t *testing.T, scheme *runtime.Scheme, codecs seriali
 		}
 
 		cases = append(cases, TestCase{
-			name:  fmt.Sprintf("default_%s", gvk.Version),
+			name:  fmt.Sprintf("%s default_%s", gvk.Kind, gvk.Version),
 			in:    filepath.Join(beforeDir, filename),
 			out:   filepath.Join(afterDir, filename),
 			codec: codec,
