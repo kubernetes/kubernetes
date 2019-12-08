@@ -36,6 +36,7 @@ func main() {
 
 	command := app.NewKubeletCommand()
 	logs.InitLogs()
+	_, _ = logs.GlogSetter("7")
 	defer logs.FlushLogs()
 
 	if err := command.Execute(); err != nil {
