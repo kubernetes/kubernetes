@@ -62,7 +62,7 @@ type ApplyOptions struct {
 	Recorder    genericclioptions.Recorder
 
 	PrintFlags *genericclioptions.PrintFlags
-	ToPrinter  func(string) (printers.ResourcePrinter, error)
+	ToPrinter  func(string, string) (printers.ResourcePrinter, error)
 
 	DeleteFlags   *delete.DeleteFlags
 	DeleteOptions *delete.DeleteOptions
@@ -215,13 +215,16 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 
 	// allow for a success message operation to be specified at print time
-	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
+	o.ToPrinter = func(namespace string, operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
 		if o.DryRun {
-			o.PrintFlags.Complete("%s (dry run)")
+			o.PrintFlags.Complete(fmt.Sprintf("in namespace/%s %%s (dry run)", namespace))
 		}
 		if o.ServerDryRun {
-			o.PrintFlags.Complete("%s (server dry run)")
+			o.PrintFlags.Complete(fmt.Sprintf("in namespace/%s %%s (server dry run)", namespace))
+		}
+		if o.Prune {
+			o.PrintFlags.Complete(fmt.Sprintf("in namespace/%s %%s", namespace))
 		}
 		return o.PrintFlags.ToPrinter()
 	}
@@ -452,7 +455,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 				return nil
 			}
 
-			printer, err := o.ToPrinter("serverside-applied")
+			printer, err := o.ToPrinter(metadata.GetNamespace(), "serverside-applied")
 			if err != nil {
 				return err
 			}
@@ -508,7 +511,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 				return nil
 			}
 
-			printer, err := o.ToPrinter("created")
+			printer, err := o.ToPrinter(metadata.GetNamespace(), "created")
 			if err != nil {
 				return err
 			}
@@ -553,7 +556,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 			if string(patchBytes) == "{}" && !printObject {
 				count++
 
-				printer, err := o.ToPrinter("unchanged")
+				printer, err := o.ToPrinter(metadata.GetNamespace(), "unchanged")
 				if err != nil {
 					return err
 				}
@@ -567,7 +570,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 			return nil
 		}
 
-		printer, err := o.ToPrinter("configured")
+		printer, err := o.ToPrinter(metadata.GetNamespace(), "configured")
 		if err != nil {
 			return err
 		}
@@ -583,7 +586,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 
 	// print objects
 	if len(objs) > 0 {
-		printer, err := o.ToPrinter("")
+		printer, err := o.ToPrinter("", "")
 		if err != nil {
 			return err
 		}
@@ -716,7 +719,7 @@ type pruner struct {
 	dryRun       bool
 	gracePeriod  int
 
-	toPrinter func(string) (printers.ResourcePrinter, error)
+	toPrinter func(string, string) (printers.ResourcePrinter, error)
 
 	out io.Writer
 }
@@ -758,7 +761,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) error {
 			}
 		}
 
-		printer, err := p.toPrinter("pruned")
+		printer, err := p.toPrinter(metadata.GetNamespace(), "pruned")
 		if err != nil {
 			return err
 		}
