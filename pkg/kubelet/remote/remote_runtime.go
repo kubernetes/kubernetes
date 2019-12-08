@@ -126,7 +126,7 @@ func (r *RemoteRuntimeService) StopPodSandbox(podSandBoxID string) error {
 	})
 	if err != nil {
 		klog.Errorf("StopPodSandbox %q from runtime service failed: %v", podSandBoxID, err)
-		return err
+		// return err
 	}
 
 	return nil
