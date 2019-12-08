@@ -20,6 +20,16 @@ import (
 	"github.com/onsi/gomega"
 )
 
+// ExpectBeNil expects actual is equivalent to gomega.BeNil()
+func ExpectBeNil(actual interface{}, explain ...interface{}) {
+	gomega.Expect(actual).To(gomega.BeNil(), explain...)
+}
+
+// ExpectNotBeNil expects actual is not equivalent to gomega.BeNil()
+func ExpectNotBeNil(actual interface{}, explain ...interface{}) {
+	gomega.Expect(actual).NotTo(gomega.BeNil(), explain...)
+}
+
 // ExpectEqual expects the specified two are the same, otherwise an exception raises
 func ExpectEqual(actual interface{}, extra interface{}, explain ...interface{}) {
 	gomega.ExpectWithOffset(1, actual).To(gomega.Equal(extra), explain...)
