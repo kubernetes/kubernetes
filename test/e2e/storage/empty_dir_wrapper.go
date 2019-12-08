@@ -406,6 +406,7 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 	}()
 
 	pods, err := e2epod.PodsCreated(f.ClientSet, f.Namespace.Name, rcName, podCount)
+	framework.ExpectNoError(err, "error creating pods")
 
 	ginkgo.By("Ensuring each pod is running")
 
