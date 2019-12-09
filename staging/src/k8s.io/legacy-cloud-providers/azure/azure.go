@@ -169,42 +169,42 @@ type Config struct {
 }
 
 type cloudProviderRateLimiting struct {
-	Enabled bool
+	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 
 	// QPS are the number of queries per second authorized per client
 	// Once hit, the Rate Limiter will start to throttle queries unless
 	// its associated bucket is greater than 0.
-	RoutesClientQPS                  float32
-	SubnetsClientQPS                 float32
-	InterfacesClientQPS              float32
-	RouteTablesClientQPS             float32
-	LoadBalancerClientQPS            float32
-	PublicIPAddressesClientQPS       float32
-	SecurityGroupsClientQPS          float32
-	VirtualMachinesClientQPS         float32
-	StorageAccountClientQPS          float32
-	DisksClientQPS                   float32
-	SnapshotsClientQPS               float32
-	VirtualMachineScaleSetsClientQPS float32
-	VirtualMachineSizesClientQPS     float32
+	RoutesClientQPS                  float32 `json:"routesClientQPS,omitempty" yaml:"routesClientQPS,omitempty"`
+	SubnetsClientQPS                 float32 `json:"subnetsClientQPS,omitempty" yaml:"subnetsClientQPS,omitempty"`
+	InterfacesClientQPS              float32 `json:"interfacesClientQPS,omitempty" yaml:"interfacesClientQPS,omitempty"`
+	RouteTablesClientQPS             float32 `json:"routeTablesClientQPS,omitempty" yaml:"routeTablesClientQPS,omitempty"`
+	LoadBalancerClientQPS            float32 `json:"loadBalancerClientQPS,omitempty" yaml:"loadBalancerClientQPS,omitempty"`
+	PublicIPAddressesClientQPS       float32 `json:"publicIPAddressesClientQPS,omitempty" yaml:"publicIPAddressesClientQPS,omitempty"`
+	SecurityGroupsClientQPS          float32 `json:"securityGroupsClientQPS,omitempty" yaml:"securityGroupsClientQPS,omitempty"`
+	VirtualMachinesClientQPS         float32 `json:"virtualMachinesClientQPS,omitempty" yaml:"virtualMachinesClientQPS,omitempty"`
+	StorageAccountClientQPS          float32 `json:"storageAccountClientQPS,omitempty" yaml:"storageAccountClientQPS,omitempty"`
+	DisksClientQPS                   float32 `json:"disksClientQPS,omitempty" yaml:"disksClientQPS,omitempty"`
+	SnapshotsClientQPS               float32 `json:"snapshotsClientQPS,omitempty" yaml:"snapshotsClientQPS,omitempty"`
+	VirtualMachineScaleSetsClientQPS float32 `json:"virtualMachineScaleSetsClientQPS,omitempty" yaml:"virtualMachineScaleSetsClientQPS,omitempty"`
+	VirtualMachineSizesClientQPS     float32 `json:"virtualMachineSizesClientQPS,omitempty" yaml:"virtualMachineSizesClientQPS,omitempty"`
 
 	// Buckets (burst) are the number of queries above the QPS that the Rate Limiter
 	// will still allow. Each query made above QPS rate will decrease the bucket and
 	// the rate limiter will start throttle queries when the bucket is depleted. The
-	// buckets are refilled with the unused QPS until it reaches its orginal size.
-	RoutesClientBucket                  int
-	SubnetsClientBucket                 int
-	InterfacesClientBucket              int
-	RouteTablesClientBucket             int
-	LoadBalancerClientBucket            int
-	PublicIPAddressesClientBucket       int
-	SecurityGroupsClientBucket          int
-	VirtualMachinesClientBucket         int
-	StorageAccountClientBucket          int
-	DisksClientBucket                   int
-	SnapshotsClientBucket               int
-	VirtualMachineScaleSetsClientBucket int
-	VirtualMachineSizesClientBucket     int
+	// buckets are refilled with the unused QPS until it reaches its original size.
+	RoutesClientBucket                  int `json:"routesClientBucket,omitempty" yaml:"routesClientBucket,omitempty"`
+	SubnetsClientBucket                 int `json:"subnetsClientBucket,omitempty" yaml:"subnetsClientBucket,omitempty"`
+	InterfacesClientBucket              int `json:"interfacesClientBucket,omitempty" yaml:"interfacesClientBucket,omitempty"`
+	RouteTablesClientBucket             int `json:"routeTablesClientBucket,omitempty" yaml:"routeTablesClientBucket,omitempty"`
+	LoadBalancerClientBucket            int `json:"loadBalancerClientBucket,omitempty" yaml:"loadBalancerClientBucket,omitempty"`
+	PublicIPAddressesClientBucket       int `json:"publicIPAddressesClientBucket,omitempty" yaml:"publicIPAddressesClientBucket,omitempty"`
+	SecurityGroupsClientBucket          int `json:"securityGroupsClientBucket,omitempty" yaml:"securityGroupsClientBucket,omitempty"`
+	VirtualMachinesClientBucket         int `json:"virtualMachinesClientBucket,omitempty" yaml:"virtualMachinesClientBucket,omitempty"`
+	StorageAccountClientBucket          int `json:"storageAccountClientBucket,omitempty" yaml:"storageAccountClientBucket,omitempty"`
+	DisksClientBucket                   int `json:"disksClientBucket,omitempty" yaml:"disksClientBucket,omitempty"`
+	SnapshotsClientBucket               int `json:"snapshotsClientBucket,omitempty" yaml:"snapshotsClientBucket,omitempty"`
+	VirtualMachineScaleSetsClientBucket int `json:"virtualMachineScaleSetsClientBucket,omitempty" yaml:"virtualMachineScaleSetsClientBucket,omitempty"`
+	VirtualMachineSizesClientBucket     int `json:"virtualMachineSizesClientBucket,omitempty" yaml:"virtualMachineSizesClientBucket,omitempty"`
 }
 
 var _ cloudprovider.Interface = (*Cloud)(nil)

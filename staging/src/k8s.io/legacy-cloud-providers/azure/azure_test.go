@@ -54,11 +54,35 @@ func TestParseConfig(t *testing.T) {
 		"cloudProviderBackoffExponent": 1,
 		"cloudProviderBackoffJitter": 1,
 		"cloudProviderBackoffRetries": 1,
-		"cloudProviderRatelimit": true,
-		"cloudProviderRateLimitBucket": 1,
-		"CloudProviderRateLimitBucketWrite": 1,
-		"cloudProviderRateLimitQPS": 1,
-		"CloudProviderRateLimitQPSWrite": 1,
+		"cloudProviderRateLimiting": {
+			"enabled": true,
+			"routesClientQPS": 2,
+			"subnetsClientQPS": 2,
+			"interfacesClientQPS": 2,
+			"routeTablesClientQPS": 2,
+			"loadBalancerClientQPS": 2,
+			"publicIPAddressesClientQPS": 2,
+			"securityGroupsClientQPS": 2,
+			"virtualMachinesClientQPS": 2,
+			"storageAccountClientQPS": 2,
+			"disksClientQPS": 2,
+			"snapshotsClientQPS": 2,
+			"virtualMachineScaleSetsClientQPS": 2,
+			"virtualMachineSizesClientQPS": 2,
+			"routesClientBucket": 4,
+			"subnetsClientBucket": 4,
+			"interfacesClientBucket": 4,
+			"routeTablesClientBucket": 4,
+			"loadBalancerClientBucket": 4,
+			"publicIPAddressesClientBucket": 4,
+			"securityGroupsClientBucket": 4,
+			"virtualMachinesClientBucket": 4,
+			"storageAccountClientBucket": 4,
+			"disksClientBucket": 4,
+			"snapshotsClientBucket": 4,
+			"virtualMachineScaleSetsClientBucket": 4,
+			"virtualMachineSizesClientBucket": 4
+		},
 		"location": "location",
 		"maximumLoadBalancerRuleCount": 1,
 		"primaryAvailabilitySetName": "primaryAvailabilitySetName",
@@ -87,29 +111,53 @@ func TestParseConfig(t *testing.T) {
 			TenantID:                    "tenantId",
 			UseManagedIdentityExtension: true,
 		},
-		CloudProviderBackoff:              true,
-		CloudProviderBackoffDuration:      1,
-		CloudProviderBackoffExponent:      1,
-		CloudProviderBackoffJitter:        1,
-		CloudProviderBackoffRetries:       1,
-		CloudProviderRateLimit:            true,
-		CloudProviderRateLimitBucket:      1,
-		CloudProviderRateLimitBucketWrite: 1,
-		CloudProviderRateLimitQPS:         1,
-		CloudProviderRateLimitQPSWrite:    1,
-		Location:                          "location",
-		MaximumLoadBalancerRuleCount:      1,
-		PrimaryAvailabilitySetName:        "primaryAvailabilitySetName",
-		PrimaryScaleSetName:               "primaryScaleSetName",
-		ResourceGroup:                     "resourcegroup",
-		RouteTableName:                    "routeTableName",
-		RouteTableResourceGroup:           "routeTableResourceGroup",
-		SecurityGroupName:                 "securityGroupName",
-		SubnetName:                        "subnetName",
-		UseInstanceMetadata:               true,
-		VMType:                            "standard",
-		VnetName:                          "vnetName",
-		VnetResourceGroup:                 "vnetResourceGroup",
+		CloudProviderBackoff:         true,
+		CloudProviderBackoffDuration: 1,
+		CloudProviderBackoffExponent: 1,
+		CloudProviderBackoffJitter:   1,
+		CloudProviderBackoffRetries:  1,
+		CloudProviderRateLimiting: cloudProviderRateLimiting{
+			Enabled:                             true,
+			RoutesClientQPS:                     2,
+			SubnetsClientQPS:                    2,
+			InterfacesClientQPS:                 2,
+			RouteTablesClientQPS:                2,
+			LoadBalancerClientQPS:               2,
+			PublicIPAddressesClientQPS:          2,
+			SecurityGroupsClientQPS:             2,
+			VirtualMachinesClientQPS:            2,
+			StorageAccountClientQPS:             2,
+			DisksClientQPS:                      2,
+			SnapshotsClientQPS:                  2,
+			VirtualMachineScaleSetsClientQPS:    2,
+			VirtualMachineSizesClientQPS:        2,
+			RoutesClientBucket:                  4,
+			SubnetsClientBucket:                 4,
+			InterfacesClientBucket:              4,
+			RouteTablesClientBucket:             4,
+			LoadBalancerClientBucket:            4,
+			PublicIPAddressesClientBucket:       4,
+			SecurityGroupsClientBucket:          4,
+			VirtualMachinesClientBucket:         4,
+			StorageAccountClientBucket:          4,
+			DisksClientBucket:                   4,
+			SnapshotsClientBucket:               4,
+			VirtualMachineScaleSetsClientBucket: 4,
+			VirtualMachineSizesClientBucket:     4,
+		},
+		Location:                     "location",
+		MaximumLoadBalancerRuleCount: 1,
+		PrimaryAvailabilitySetName:   "primaryAvailabilitySetName",
+		PrimaryScaleSetName:          "primaryScaleSetName",
+		ResourceGroup:                "resourcegroup",
+		RouteTableName:               "routeTableName",
+		RouteTableResourceGroup:      "routeTableResourceGroup",
+		SecurityGroupName:            "securityGroupName",
+		SubnetName:                   "subnetName",
+		UseInstanceMetadata:          true,
+		VMType:                       "standard",
+		VnetName:                     "vnetName",
+		VnetResourceGroup:            "vnetResourceGroup",
 	}
 
 	buffer := bytes.NewBufferString(azureConfig)
@@ -1572,9 +1620,9 @@ func TestNewCloudFromJSON(t *testing.T) {
 		"routeTableName": "--route-table-name--",
 		"primaryAvailabilitySetName": "--primary-availability-set-name--",
 		"cloudProviderBackoff": true,
-		"cloudProviderRatelimit": true,
-		"cloudProviderRateLimitQPS": 0.5,
-		"cloudProviderRateLimitBucket": 5
+		"cloudProviderRateLimiting": {
+			"enabled": true
+		}
 	}`
 	validateConfig(t, config)
 }
@@ -1621,9 +1669,8 @@ cloudProviderBackoffRetries: 6
 cloudProviderBackoffExponent: 1.5
 cloudProviderBackoffDuration: 5
 cloudProviderBackoffJitter: 1.0
-cloudProviderRatelimit: true
-cloudProviderRateLimitQPS: 0.5
-cloudProviderRateLimitBucket: 5
+cloudProviderRateLimiting:
+  enabled: true
 `
 	validateConfig(t, config)
 }
@@ -1688,14 +1735,8 @@ func validateConfig(t *testing.T, config string) {
 	if azureCloud.CloudProviderBackoffJitter != 1.0 {
 		t.Errorf("got incorrect value for CloudProviderBackoffJitter")
 	}
-	if azureCloud.CloudProviderRateLimit != true {
-		t.Errorf("got incorrect value for CloudProviderRateLimit")
-	}
-	if azureCloud.CloudProviderRateLimitQPS != 0.5 {
-		t.Errorf("got incorrect value for CloudProviderRateLimitQPS")
-	}
-	if azureCloud.CloudProviderRateLimitBucket != 5 {
-		t.Errorf("got incorrect value for CloudProviderRateLimitBucket")
+	if azureCloud.CloudProviderRateLimiting.Enabled != true {
+		t.Errorf("got incorrect value for CloudProviderRateLimiting.Enabled")
 	}
 }
 
@@ -1717,8 +1758,8 @@ func validateEmptyConfig(t *testing.T, config string) {
 		t.Errorf("got incorrect value for CloudProviderBackoff")
 	}
 	// rate limits should be disabled by default if not explicitly enabled in config
-	if azureCloud.CloudProviderRateLimit != false {
-		t.Errorf("got incorrect value for CloudProviderRateLimit")
+	if azureCloud.CloudProviderRateLimiting.Enabled != false {
+		t.Errorf("got incorrect value for CloudProviderRateLimiting.Enabled")
 	}
 }
 
