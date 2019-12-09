@@ -91,10 +91,9 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	scheduler.RegisterPriorityMapReduceFunction("PriorityTwo", PriorityTwo, nil, 1)
 
 	for i, test := range []struct {
-		policy               string
-		expectedPredicates   sets.String
-		expectedPrioritizers sets.String
-		expectedPlugins      map[string][]kubeschedulerconfig.Plugin
+		policy             string
+		expectedPredicates sets.String
+		expectedPlugins    map[string][]kubeschedulerconfig.Plugin
 	}{
 		{
 			policy: `{
@@ -113,10 +112,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"PredicateOne",
 				"PredicateTwo",
 			),
-			expectedPrioritizers: sets.NewString(
-				"PriorityOne",
-				"PriorityTwo",
-			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -129,7 +124,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"kind" : "Policy",
 				"apiVersion" : "v1"
 			}`,
-			expectedPrioritizers: sets.NewString(),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"PreFilterPlugin": {
 					{Name: "InterPodAffinity"},
@@ -169,8 +163,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"predicates" : [],
 				"priorities" : []
 			}`,
-			expectedPredicates:   sets.NewString(),
-			expectedPrioritizers: sets.NewString(),
+			expectedPredicates: sets.NewString(),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -194,10 +187,6 @@ priorities:
 				"PredicateOne",
 				"PredicateTwo",
 			),
-			expectedPrioritizers: sets.NewString(
-				"PriorityOne",
-				"PriorityTwo",
-			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -209,7 +198,6 @@ priorities:
 			policy: `apiVersion: v1
 kind: Policy
 `,
-			expectedPrioritizers: sets.NewString(),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"PreFilterPlugin": {
 					{Name: "InterPodAffinity"},
@@ -248,8 +236,7 @@ kind: Policy
 predicates: []
 priorities: []
 `,
-			expectedPredicates:   sets.NewString(),
-			expectedPrioritizers: sets.NewString(),
+			expectedPredicates: sets.NewString(),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -300,15 +287,8 @@ priorities: []
 		for k := range sched.Algorithm.Predicates() {
 			schedPredicates.Insert(k)
 		}
-		schedPrioritizers := sets.NewString()
-		for _, p := range sched.Algorithm.Prioritizers() {
-			schedPrioritizers.Insert(p.Name)
-		}
 		if !schedPredicates.Equal(test.expectedPredicates) {
 			t.Errorf("Expected predicates %v, got %v", test.expectedPredicates, schedPredicates)
-		}
-		if !schedPrioritizers.Equal(test.expectedPrioritizers) {
-			t.Errorf("Expected priority functions %v, got %v", test.expectedPrioritizers, schedPrioritizers)
 		}
 		schedPlugins := sched.Framework.ListPlugins()
 		if diff := cmp.Diff(test.expectedPlugins, schedPlugins); diff != "" {

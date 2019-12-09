@@ -39,13 +39,12 @@ import (
 )
 
 type testCase struct {
-	name             string
-	JSON             string
-	featureGates     map[featuregate.Feature]bool
-	wantPredicates   sets.String
-	wantPrioritizers sets.String
-	wantPlugins      map[string][]config.Plugin
-	wantExtenders    []config.Extender
+	name           string
+	JSON           string
+	featureGates   map[featuregate.Feature]bool
+	wantPredicates sets.String
+	wantPlugins    map[string][]config.Plugin
+	wantExtenders  []config.Extender
 }
 
 func TestCompatibility_v1_Scheduler(t *testing.T) {
@@ -99,9 +98,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(
 				"PodFitsPorts",
 			),
-			wantPrioritizers: sets.NewString(
-				"ServiceSpreadingPriority",
-			),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -144,8 +140,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "TestLabelPreference",      "weight": 4, "argument": {"labelPreference": {"label": "bar", "presence":true}}}
 		  ]
 		}`,
-			wantPredicates:   sets.NewString(),
-			wantPrioritizers: sets.NewString(),
+			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -197,8 +192,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "TestLabelPreference",      "weight": 4, "argument": {"labelPreference": {"label": "bar", "presence":true}}}
 		  ]
 		}`,
-			wantPredicates:   sets.NewString(),
-			wantPrioritizers: sets.NewString(),
+			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -259,8 +253,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "InterPodAffinityPriority",   "weight": 2}
 		  ]
 		}`,
-			wantPredicates:   sets.NewString(),
-			wantPrioritizers: sets.NewString(),
+			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
 					{Name: "InterPodAffinity"},
@@ -327,8 +320,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "MostRequestedPriority",   "weight": 2}
 		  ]
 		}`,
-			wantPredicates:   sets.NewString(),
-			wantPrioritizers: sets.NewString(),
+			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
 					{Name: "InterPodAffinity"},
@@ -406,8 +398,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"nodeCacheCapable": true
 		  }]
 		}`,
-			wantPredicates:   sets.NewString(),
-			wantPrioritizers: sets.NewString(),
+			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
 					{Name: "InterPodAffinity"},
@@ -496,8 +487,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"nodeCacheCapable": true
 		  }]
 		}`,
-			wantPredicates:   sets.NewString(),
-			wantPrioritizers: sets.NewString(),
+			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
 					{Name: "InterPodAffinity"},
@@ -587,8 +577,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"nodeCacheCapable": true
 		  }]
 		}`,
-			wantPredicates:   sets.NewString(),
-			wantPrioritizers: sets.NewString(),
+			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
 					{Name: "InterPodAffinity"},
@@ -682,8 +671,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			wantPredicates:   sets.NewString(),
-			wantPrioritizers: sets.NewString(),
+			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
 					{Name: "InterPodAffinity"},
@@ -789,8 +777,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			wantPredicates:   sets.NewString(),
-			wantPrioritizers: sets.NewString(),
+			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
 					{Name: "InterPodAffinity"},
@@ -898,8 +885,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			wantPredicates:   sets.NewString(),
-			wantPrioritizers: sets.NewString(),
+			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
 					{Name: "InterPodAffinity"},
@@ -1007,8 +993,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			wantPredicates:   sets.NewString(),
-			wantPrioritizers: sets.NewString(),
+			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
 					{Name: "InterPodAffinity"},
@@ -1121,8 +1106,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			wantPredicates:   sets.NewString(),
-			wantPrioritizers: sets.NewString(),
+			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
 					{Name: "InterPodAffinity"},
@@ -1201,7 +1185,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		},
 	}
 	registeredPredicates := sets.NewString(scheduler.ListRegisteredFitPredicates()...)
-	registeredPriorities := sets.NewString(scheduler.ListRegisteredPriorityFunctions()...)
 	seenPredicates := sets.NewString()
 	seenPriorities := sets.NewString()
 	mandatoryPredicates := sets.NewString()
@@ -1285,14 +1268,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				t.Errorf("Got predicates %v, want %v", gotPredicates, wantPredicates)
 			}
 
-			gotPrioritizers := sets.NewString()
-			for _, p := range sched.Algorithm.Prioritizers() {
-				gotPrioritizers.Insert(p.Name)
-			}
-			if !gotPrioritizers.Equal(tc.wantPrioritizers) {
-				t.Errorf("Got prioritizers %v, want %v", gotPrioritizers, tc.wantPrioritizers)
-			}
-
 			gotPlugins := sched.Framework.ListPlugins()
 			for _, p := range gotPlugins["FilterPlugin"] {
 				seenPredicates.Insert(filterToPredicateMap[p.Name])
@@ -1326,15 +1301,11 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			}
 
 			seenPredicates = seenPredicates.Union(gotPredicates)
-			seenPriorities = seenPriorities.Union(gotPrioritizers)
 		})
 	}
 
 	if !seenPredicates.HasAll(registeredPredicates.List()...) {
 		t.Errorf("Registered predicates are missing from compatibility test (add to test stanza for version currently in development): %#v", registeredPredicates.Difference(seenPredicates).List())
-	}
-	if !seenPriorities.HasAll(registeredPriorities.List()...) {
-		t.Errorf("Registered priorities are missing from compatibility test (add to test stanza for version currently in development): %#v", registeredPriorities.Difference(seenPriorities).List())
 	}
 }
 
