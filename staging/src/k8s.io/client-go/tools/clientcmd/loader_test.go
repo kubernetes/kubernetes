@@ -18,6 +18,7 @@ package clientcmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -31,6 +32,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdlatest "k8s.io/client-go/tools/clientcmd/api/latest"
 )
@@ -143,6 +145,39 @@ func TestErrorReadingNonFile(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), tmpdir) {
 		t.Fatalf("Expected error about '%s', got %s", tmpdir, err.Error())
+	}
+}
+
+func TestErrorWrapping(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.RemoveAll(tmpdir)
+
+	loadingRules := ClientConfigLoadingRules{
+		ExplicitPath: tmpdir,
+	}
+
+	_, err = loadingRules.Load()
+	if err == nil {
+		t.Fatal("Expected error for non-file, got none")
+	}
+
+	aggErrors, ok := err.(utilerrors.Aggregate)
+	if !ok {
+		t.Fatal("Incorrect error type returned, was not an aggregate")
+	}
+
+	onlyError := utilerrors.Reduce(aggErrors)
+
+	finalError := errors.Unwrap(onlyError)
+	if err == nil {
+		t.Fatal("Expected unwrap to succeed")
+	}
+
+	if _, ok := finalError.(*os.PathError); !ok {
+		t.Fatal("Error type could not be validated")
 	}
 }
 

@@ -212,7 +212,7 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 		}
 
 		if err != nil {
-			errlist = append(errlist, fmt.Errorf("error loading config file \"%s\": %v", filename, err))
+			errlist = append(errlist, fmt.Errorf("error loading config file \"%s\": %w", filename, err))
 			continue
 		}
 
