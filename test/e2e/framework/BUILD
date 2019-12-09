@@ -119,7 +119,6 @@ filegroup(
         "//test/e2e/framework/autoscaling:all-srcs",
         "//test/e2e/framework/config:all-srcs",
         "//test/e2e/framework/deployment:all-srcs",
-        "//test/e2e/framework/deviceplugin:all-srcs",
         "//test/e2e/framework/endpoints:all-srcs",
         "//test/e2e/framework/ginkgowrapper:all-srcs",
         "//test/e2e/framework/gpu:all-srcs",
