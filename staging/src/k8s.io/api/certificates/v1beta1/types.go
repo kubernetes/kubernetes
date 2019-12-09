@@ -45,6 +45,17 @@ type CertificateSigningRequest struct {
 // and Usages fields can be set on creation, other fields are derived by
 // Kubernetes and cannot be modified by users.
 type CertificateSigningRequestSpec struct {
+	// requested signer for the request.  If empty, it will be defaulted for v1beta1:
+	//  1. If it's a kubelet client certificate, it is assigned "kubelet-client".
+	//  2. Otherwise, it is assign "unknown-legacy-signer".
+	// In v1 it will be required. We will have "kubelet-client", "kubelet-serving", and "unknown-legacy-signer" as out of the box signers
+	// that will be honored by the kube-controller-manager signer after approval.  Distribution of trust for signers happens out of band.
+	//  * kubelet-client signer must be honored by the kube-apiserver as valid client-certificate-ca.
+	//  * kubelet-serving signer must be accepted as a valid kubelet serving certificate by the kube-apiserver, but has no other guarantees.
+	//  * unknown-legacy-signer has no guarantees for trust at all.
+	// None of these usages are related to ServiceAccount token secrets `.data[ca.crt]` in any way.
+	Signer string `json:"signer" protobuf:"bytes,7,opt,name=signer"`
+
 	// Base64-encoded PKCS#10 CSR data
 	Request []byte `json:"request" protobuf:"bytes,1,opt,name=request"`
 
