@@ -172,6 +172,12 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// ensure the connection times out
+	timeoutCh, cleanup := s.TimeoutFactory.TimeoutCh()
+	defer cleanup()
+	// Ensure that underlying watch is stopped independently of any errors.
+	defer s.Watching.Stop()
+
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		err := fmt.Errorf("unable to start watch - can't get http.Flusher: %#v", w)
@@ -189,11 +195,6 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	e := streaming.NewEncoder(framer, s.Encoder)
-
-	// ensure the connection times out
-	timeoutCh, cleanup := s.TimeoutFactory.TimeoutCh()
-	defer cleanup()
-	defer s.Watching.Stop()
 
 	// begin the stream
 	w.Header().Set("Content-Type", s.MediaType)
