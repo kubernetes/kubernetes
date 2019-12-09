@@ -41,12 +41,17 @@ func PredicateResultToFrameworkStatus(reasons []predicates.PredicateFailureReaso
 		return nil
 	}
 
-	if r := predicates.UnresolvablePredicateExists(reasons); r != nil {
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, r.GetReason())
+	code := framework.Unschedulable
+	if predicates.UnresolvablePredicateExists(reasons) {
+		code = framework.UnschedulableAndUnresolvable
 	}
 
-	// We will just use the first reason.
-	return framework.NewStatus(framework.Unschedulable, reasons[0].GetReason())
+	// We will keep all failure reasons.
+	var failureReasons []string
+	for _, reason := range reasons {
+		failureReasons = append(failureReasons, reason.GetReason())
+	}
+	return framework.NewStatus(code, failureReasons...)
 }
 
 // ErrorToFrameworkStatus converts an error to a framework status.
