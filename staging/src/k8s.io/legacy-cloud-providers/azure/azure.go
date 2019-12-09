@@ -54,13 +54,10 @@ const (
 	CloudProviderName      = "azure"
 	rateLimitQPSDefault    = 1.0
 	rateLimitBucketDefault = 5
-	// VMSS API limits are 180 queries per 3 minutes & 900 queries per 30 minutes per subscription
-	vmssRateLimitQPSDefault    = 1.0
-	vmssRateLimitBucketDefault = 5
-	backoffRetriesDefault      = 6
-	backoffExponentDefault     = 1.5
-	backoffDurationDefault     = 5 // in seconds
-	backoffJitterDefault       = 1.0
+	backoffRetriesDefault  = 6
+	backoffExponentDefault = 1.5
+	backoffDurationDefault = 5 // in seconds
+	backoffJitterDefault   = 1.0
 	// According to https://docs.microsoft.com/en-us/azure/azure-subscription-service-limits#load-balancer.
 	maximumLoadBalancerRuleCount = 250
 
@@ -141,20 +138,8 @@ type Config struct {
 	//   CloudProviderBackoffJitter are omitted.
 	// "default" will be used if not specified.
 	CloudProviderBackoffMode string `json:"cloudProviderBackoffMode,omitempty" yaml:"cloudProviderBackoffMode,omitempty"`
-	// Enable rate limiting
-	CloudProviderRateLimit bool `json:"cloudProviderRateLimit,omitempty" yaml:"cloudProviderRateLimit,omitempty"`
-	// Rate limit QPS (Read)
-	CloudProviderRateLimitQPS float32 `json:"cloudProviderRateLimitQPS,omitempty" yaml:"cloudProviderRateLimitQPS,omitempty"`
-	// Rate limit Bucket Size
-	CloudProviderRateLimitBucket int `json:"cloudProviderRateLimitBucket,omitempty" yaml:"cloudProviderRateLimitBucket,omitempty"`
-	// VMSS Rate limit QPS
-	CloudProviderVMSSRateLimitQPS float32 `json:"cloudProviderVMSSRateLimitQPS,omitempty" yaml:"cloudProviderVMSSRateLimitQPS,omitempty"`
-	// VMSS Rate limit Bucket Size
-	CloudProviderVMSSRateLimitBucket int `json:"cloudProviderVMSSRateLimitBucket,omitempty" yaml:"cloudProviderVMSSRateLimitBucket,omitempty"`
-	// Rate limit QPS (Write)
-	CloudProviderRateLimitQPSWrite float32 `json:"cloudProviderRateLimitQPSWrite,omitempty" yaml:"cloudProviderRateLimitQPSWrite,omitempty"`
-	// Rate limit Bucket Size
-	CloudProviderRateLimitBucketWrite int `json:"cloudProviderRateLimitBucketWrite,omitempty" yaml:"cloudProviderRateLimitBucketWrite,omitempty"`
+	// Rate limiting configuration for azure clients
+	CloudProviderRateLimiting cloudProviderRateLimiting `json:"cloudProviderRateLimiting,omitempty" yaml:"cloudProviderRateLimiting,omitempty"`
 
 	// Use instance metadata service where possible
 	UseInstanceMetadata bool `json:"useInstanceMetadata,omitempty" yaml:"useInstanceMetadata,omitempty"`
@@ -183,6 +168,45 @@ type Config struct {
 	LoadBalancerResourceGroup string `json:"loadBalancerResourceGroup,omitempty" yaml:"loadBalancerResourceGroup,omitempty"`
 }
 
+type cloudProviderRateLimiting struct {
+	Enabled bool
+
+	// QPS are the number of queries per second authorized per client
+	// Once hit, the Rate Limiter will start to throttle queries unless
+	// its associated bucket is greater than 0.
+	RoutesClientQPS                  float32
+	SubnetsClientQPS                 float32
+	InterfacesClientQPS              float32
+	RouteTablesClientQPS             float32
+	LoadBalancerClientQPS            float32
+	PublicIPAddressesClientQPS       float32
+	SecurityGroupsClientQPS          float32
+	VirtualMachinesClientQPS         float32
+	StorageAccountClientQPS          float32
+	DisksClientQPS                   float32
+	SnapshotsClientQPS               float32
+	VirtualMachineScaleSetsClientQPS float32
+	VirtualMachineSizesClientQPS     float32
+
+	// Buckets (burst) are the number of queries above the QPS that the Rate Limiter
+	// will still allow. Each query made above QPS rate will decrease the bucket and
+	// the rate limiter will start throttle queries when the bucket is depleted. The
+	// buckets are refilled with the unused QPS until it reaches its orginal size.
+	RoutesClientBucket                  int
+	SubnetsClientBucket                 int
+	InterfacesClientBucket              int
+	RouteTablesClientBucket             int
+	LoadBalancerClientBucket            int
+	PublicIPAddressesClientBucket       int
+	SecurityGroupsClientBucket          int
+	VirtualMachinesClientBucket         int
+	StorageAccountClientBucket          int
+	DisksClientBucket                   int
+	SnapshotsClientBucket               int
+	VirtualMachineScaleSetsClientBucket int
+	VirtualMachineSizesClientBucket     int
+}
+
 var _ cloudprovider.Interface = (*Cloud)(nil)
 var _ cloudprovider.Instances = (*Cloud)(nil)
 var _ cloudprovider.LoadBalancer = (*Cloud)(nil)
@@ -193,22 +217,27 @@ var _ cloudprovider.PVLabeler = (*Cloud)(nil)
 // Cloud holds the config and clients
 type Cloud struct {
 	Config
-	Environment             azure.Environment
-	RoutesClient            RoutesClient
-	SubnetsClient           SubnetsClient
-	InterfacesClient        InterfacesClient
-	RouteTablesClient       RouteTablesClient
-	LoadBalancerClient      LoadBalancersClient
-	PublicIPAddressesClient PublicIPAddressesClient
-	SecurityGroupsClient    SecurityGroupsClient
-	VirtualMachinesClient   VirtualMachinesClient
-	StorageAccountClient    StorageAccountClient
-	DisksClient             DisksClient
-	SnapshotsClient         *compute.SnapshotsClient
-	FileClient              FileClient
-	ResourceRequestBackoff  wait.Backoff
-	metadata                *InstanceMetadataService
-	vmSet                   VMSet
+	Environment azure.Environment
+
+	RoutesClient                    RoutesClient
+	SubnetsClient                   SubnetsClient
+	InterfacesClient                InterfacesClient
+	RouteTablesClient               RouteTablesClient
+	LoadBalancerClient              LoadBalancersClient
+	PublicIPAddressesClient         PublicIPAddressesClient
+	SecurityGroupsClient            SecurityGroupsClient
+	VirtualMachinesClient           VirtualMachinesClient
+	StorageAccountClient            StorageAccountClient
+	DisksClient                     DisksClient
+	SnapshotsClient                 *compute.SnapshotsClient
+	FileClient                      FileClient
+	VirtualMachineScaleSetsClient   VirtualMachineScaleSetsClient
+	VirtualMachineScaleSetVMsClient VirtualMachineScaleSetVMsClient
+	VirtualMachineSizesClient       VirtualMachineSizesClient
+
+	ResourceRequestBackoff wait.Backoff
+	metadata               *InstanceMetadataService
+	vmSet                  VMSet
 
 	// ipv6DualStack allows overriding for unit testing.  It's normally initialized from featuregates
 	ipv6DualStackEnabled bool
@@ -230,11 +259,8 @@ type Cloud struct {
 	routeCIDRs map[string]string
 
 	// Clients for vmss.
-	VirtualMachineScaleSetsClient   VirtualMachineScaleSetsClient
-	VirtualMachineScaleSetVMsClient VirtualMachineScaleSetVMsClient
 
 	// client for vm sizes list
-	VirtualMachineSizesClient VirtualMachineSizesClient
 
 	kubeClient       clientset.Interface
 	eventBroadcaster record.EventBroadcaster
@@ -358,63 +384,138 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 		return err
 	}
 
-	// operationPollRateLimiter.Accept() is a no-op if rate limits are configured off.
-	operationPollRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
-	operationPollRateLimiterWrite := flowcontrol.NewFakeAlwaysRateLimiter()
-	operationPollVMSSRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	// Default fake rate limiters
+	routesClientRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	subnetsClientRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	interfacesClientRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	routeTablesClientRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	loadBalancerClientRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	publicIPAddressesClientRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	securityGroupsClientRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	virtualMachinesClientRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	storageAccountClientRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	disksClientRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	snapshotsClientRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	virtualMachineScaleSetsClientRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	virtualMachineSizesClientRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
 
 	// If reader is provided (and no writer) we will
 	// use the same value for both.
-	if config.CloudProviderRateLimit {
-		// Assign rate limit defaults if no configuration was passed in
-		if config.CloudProviderRateLimitQPS == 0 {
-			config.CloudProviderRateLimitQPS = rateLimitQPSDefault
+	if config.CloudProviderRateLimiting.Enabled {
+		if config.CloudProviderRateLimiting.RoutesClientQPS == 0 {
+			config.CloudProviderRateLimiting.RoutesClientQPS = rateLimitQPSDefault
 		}
-		if config.CloudProviderRateLimitBucket == 0 {
-			config.CloudProviderRateLimitBucket = rateLimitBucketDefault
+		if config.CloudProviderRateLimiting.SubnetsClientQPS == 0 {
+			config.CloudProviderRateLimiting.SubnetsClientQPS = rateLimitQPSDefault
 		}
-		if config.CloudProviderVMSSRateLimitQPS == 0 {
-			config.CloudProviderVMSSRateLimitQPS = vmssRateLimitQPSDefault
+		if config.CloudProviderRateLimiting.InterfacesClientQPS == 0 {
+			config.CloudProviderRateLimiting.InterfacesClientQPS = rateLimitQPSDefault
 		}
-		if config.CloudProviderVMSSRateLimitBucket == 0 {
-			config.CloudProviderVMSSRateLimitBucket = vmssRateLimitBucketDefault
+		if config.CloudProviderRateLimiting.RouteTablesClientQPS == 0 {
+			config.CloudProviderRateLimiting.RouteTablesClientQPS = rateLimitQPSDefault
 		}
-		if config.CloudProviderRateLimitQPSWrite == 0 {
-			config.CloudProviderRateLimitQPSWrite = rateLimitQPSDefault
+		if config.CloudProviderRateLimiting.LoadBalancerClientQPS == 0 {
+			config.CloudProviderRateLimiting.LoadBalancerClientQPS = rateLimitQPSDefault
 		}
-		if config.CloudProviderRateLimitBucketWrite == 0 {
-			config.CloudProviderRateLimitBucketWrite = rateLimitBucketDefault
+		if config.CloudProviderRateLimiting.PublicIPAddressesClientQPS == 0 {
+			config.CloudProviderRateLimiting.PublicIPAddressesClientQPS = rateLimitQPSDefault
+		}
+		if config.CloudProviderRateLimiting.SecurityGroupsClientQPS == 0 {
+			config.CloudProviderRateLimiting.SecurityGroupsClientQPS = rateLimitQPSDefault
+		}
+		if config.CloudProviderRateLimiting.VirtualMachinesClientQPS == 0 {
+			config.CloudProviderRateLimiting.VirtualMachinesClientQPS = rateLimitQPSDefault
+		}
+		if config.CloudProviderRateLimiting.StorageAccountClientQPS == 0 {
+			config.CloudProviderRateLimiting.VirtualMachinesClientQPS = rateLimitQPSDefault
+		}
+		if config.CloudProviderRateLimiting.DisksClientQPS == 0 {
+			config.CloudProviderRateLimiting.DisksClientQPS = rateLimitQPSDefault
+		}
+		if config.CloudProviderRateLimiting.SnapshotsClientQPS == 0 {
+			config.CloudProviderRateLimiting.SnapshotsClientQPS = rateLimitQPSDefault
+		}
+		if config.CloudProviderRateLimiting.VirtualMachineScaleSetsClientQPS == 0 {
+			config.CloudProviderRateLimiting.VirtualMachineScaleSetsClientQPS = rateLimitQPSDefault
+		}
+		if config.CloudProviderRateLimiting.VirtualMachineSizesClientQPS == 0 {
+			config.CloudProviderRateLimiting.VirtualMachineSizesClientQPS = rateLimitQPSDefault
 		}
 
-		operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(
-			config.CloudProviderRateLimitQPS,
-			config.CloudProviderRateLimitBucket)
+		if config.CloudProviderRateLimiting.RoutesClientBucket == 0 {
+			config.CloudProviderRateLimiting.RoutesClientBucket = rateLimitBucketDefault
+		}
+		if config.CloudProviderRateLimiting.SubnetsClientBucket == 0 {
+			config.CloudProviderRateLimiting.SubnetsClientBucket = rateLimitBucketDefault
+		}
+		if config.CloudProviderRateLimiting.InterfacesClientBucket == 0 {
+			config.CloudProviderRateLimiting.InterfacesClientBucket = rateLimitBucketDefault
+		}
+		if config.CloudProviderRateLimiting.RouteTablesClientBucket == 0 {
+			config.CloudProviderRateLimiting.RouteTablesClientBucket = rateLimitBucketDefault
+		}
+		if config.CloudProviderRateLimiting.LoadBalancerClientBucket == 0 {
+			config.CloudProviderRateLimiting.LoadBalancerClientBucket = rateLimitBucketDefault
+		}
+		if config.CloudProviderRateLimiting.PublicIPAddressesClientBucket == 0 {
+			config.CloudProviderRateLimiting.PublicIPAddressesClientBucket = rateLimitBucketDefault
+		}
+		if config.CloudProviderRateLimiting.SecurityGroupsClientBucket == 0 {
+			config.CloudProviderRateLimiting.SecurityGroupsClientBucket = rateLimitBucketDefault
+		}
+		if config.CloudProviderRateLimiting.VirtualMachinesClientBucket == 0 {
+			config.CloudProviderRateLimiting.VirtualMachinesClientBucket = rateLimitBucketDefault
+		}
+		if config.CloudProviderRateLimiting.StorageAccountClientBucket == 0 {
+			config.CloudProviderRateLimiting.VirtualMachinesClientBucket = rateLimitBucketDefault
+		}
+		if config.CloudProviderRateLimiting.DisksClientBucket == 0 {
+			config.CloudProviderRateLimiting.DisksClientBucket = rateLimitBucketDefault
+		}
+		if config.CloudProviderRateLimiting.SnapshotsClientBucket == 0 {
+			config.CloudProviderRateLimiting.SnapshotsClientBucket = rateLimitBucketDefault
+		}
+		if config.CloudProviderRateLimiting.VirtualMachineScaleSetsClientBucket == 0 {
+			config.CloudProviderRateLimiting.VirtualMachineScaleSetsClientBucket = rateLimitBucketDefault
+		}
+		if config.CloudProviderRateLimiting.VirtualMachineSizesClientBucket == 0 {
+			config.CloudProviderRateLimiting.VirtualMachineSizesClientBucket = rateLimitBucketDefault
+		}
 
-		operationPollVMSSRateLimiter = flowcontrol.NewTokenBucketRateLimiter(
-			config.CloudProviderVMSSRateLimitQPS,
-			config.CloudProviderVMSSRateLimitBucket)
+		routesClientRateLimiter = flowcontrol.NewTokenBucketRateLimiter(config.CloudProviderRateLimiting.RoutesClientQPS, config.CloudProviderRateLimiting.RoutesClientBucket)
+		subnetsClientRateLimiter = flowcontrol.NewTokenBucketRateLimiter(config.CloudProviderRateLimiting.SubnetsClientQPS, config.CloudProviderRateLimiting.SubnetsClientBucket)
+		interfacesClientRateLimiter = flowcontrol.NewTokenBucketRateLimiter(config.CloudProviderRateLimiting.InterfacesClientQPS, config.CloudProviderRateLimiting.InterfacesClientBucket)
+		routeTablesClientRateLimiter = flowcontrol.NewTokenBucketRateLimiter(config.CloudProviderRateLimiting.RouteTablesClientQPS, config.CloudProviderRateLimiting.RouteTablesClientBucket)
+		loadBalancerClientRateLimiter = flowcontrol.NewTokenBucketRateLimiter(config.CloudProviderRateLimiting.LoadBalancerClientQPS, config.CloudProviderRateLimiting.LoadBalancerClientBucket)
+		publicIPAddressesClientRateLimiter = flowcontrol.NewTokenBucketRateLimiter(config.CloudProviderRateLimiting.PublicIPAddressesClientQPS, config.CloudProviderRateLimiting.PublicIPAddressesClientBucket)
+		securityGroupsClientRateLimiter = flowcontrol.NewTokenBucketRateLimiter(config.CloudProviderRateLimiting.SecurityGroupsClientQPS, config.CloudProviderRateLimiting.SecurityGroupsClientBucket)
+		virtualMachinesClientRateLimiter = flowcontrol.NewTokenBucketRateLimiter(config.CloudProviderRateLimiting.VirtualMachinesClientQPS, config.CloudProviderRateLimiting.VirtualMachinesClientBucket)
+		storageAccountClientRateLimiter = flowcontrol.NewTokenBucketRateLimiter(config.CloudProviderRateLimiting.StorageAccountClientQPS, config.CloudProviderRateLimiting.StorageAccountClientBucket)
+		disksClientRateLimiter = flowcontrol.NewTokenBucketRateLimiter(config.CloudProviderRateLimiting.DisksClientQPS, config.CloudProviderRateLimiting.DisksClientBucket)
+		snapshotsClientRateLimiter = flowcontrol.NewTokenBucketRateLimiter(config.CloudProviderRateLimiting.SnapshotsClientQPS, config.CloudProviderRateLimiting.SnapshotsClientBucket)
+		virtualMachineScaleSetsClientRateLimiter = flowcontrol.NewTokenBucketRateLimiter(config.CloudProviderRateLimiting.VirtualMachineScaleSetsClientQPS, config.CloudProviderRateLimiting.VirtualMachineScaleSetsClientBucket)
+		virtualMachineSizesClientRateLimiter = flowcontrol.NewTokenBucketRateLimiter(config.CloudProviderRateLimiting.VirtualMachineSizesClientQPS, config.CloudProviderRateLimiting.VirtualMachineSizesClientBucket)
 
-		operationPollRateLimiterWrite = flowcontrol.NewTokenBucketRateLimiter(
-			config.CloudProviderRateLimitQPSWrite,
-			config.CloudProviderRateLimitBucketWrite)
-
-		klog.V(2).Infof("Azure cloudprovider (read ops) using rate limit config: QPS=%g, bucket=%d",
-			config.CloudProviderRateLimitQPS,
-			config.CloudProviderRateLimitBucket)
-
-		klog.V(2).Infof("Azure cloudprovider (VMSS ops) using rate limit config: QPS=%g, bucket=%d",
-			config.CloudProviderVMSSRateLimitQPS,
-			config.CloudProviderVMSSRateLimitBucket)
-
-		klog.V(2).Infof("Azure cloudprovider (write ops) using rate limit config: QPS=%g, bucket=%d",
-			config.CloudProviderRateLimitQPSWrite,
-			config.CloudProviderRateLimitBucketWrite)
+		klog.V(2).Infof("Azure cloudprovider Routes client using rate limit config: QPS=%g, bucket=%d", config.CloudProviderRateLimiting.RoutesClientQPS, config.CloudProviderRateLimiting.RoutesClientBucket)
+		klog.V(2).Infof("Azure cloudprovider Subnets client using rate limit config: QPS=%g, bucket=%d", config.CloudProviderRateLimiting.SubnetsClientQPS, config.CloudProviderRateLimiting.SubnetsClientBucket)
+		klog.V(2).Infof("Azure cloudprovider Interfaces client using rate limit config: QPS=%g, bucket=%d", config.CloudProviderRateLimiting.InterfacesClientQPS, config.CloudProviderRateLimiting.InterfacesClientBucket)
+		klog.V(2).Infof("Azure cloudprovider RouteTables client using rate limit config: QPS=%g, bucket=%d", config.CloudProviderRateLimiting.RouteTablesClientQPS, config.CloudProviderRateLimiting.RouteTablesClientBucket)
+		klog.V(2).Infof("Azure cloudprovider LoadBalancer client using rate limit config: QPS=%g, bucket=%d", config.CloudProviderRateLimiting.LoadBalancerClientQPS, config.CloudProviderRateLimiting.LoadBalancerClientBucket)
+		klog.V(2).Infof("Azure cloudprovider PublicIPAddresses client using rate limit config: QPS=%g, bucket=%d", config.CloudProviderRateLimiting.PublicIPAddressesClientQPS, config.CloudProviderRateLimiting.PublicIPAddressesClientBucket)
+		klog.V(2).Infof("Azure cloudprovider SecurityGroups client using rate limit config: QPS=%g, bucket=%d", config.CloudProviderRateLimiting.SecurityGroupsClientQPS, config.CloudProviderRateLimiting.SecurityGroupsClientBucket)
+		klog.V(2).Infof("Azure cloudprovider VirtualMachines client using rate limit config: QPS=%g, bucket=%d", config.CloudProviderRateLimiting.VirtualMachinesClientQPS, config.CloudProviderRateLimiting.VirtualMachinesClientBucket)
+		klog.V(2).Infof("Azure cloudprovider StorageAccount client using rate limit config: QPS=%g, bucket=%d", config.CloudProviderRateLimiting.StorageAccountClientQPS, config.CloudProviderRateLimiting.StorageAccountClientBucket)
+		klog.V(2).Infof("Azure cloudprovider Disks client using rate limit config: QPS=%g, bucket=%d", config.CloudProviderRateLimiting.DisksClientQPS, config.CloudProviderRateLimiting.DisksClientBucket)
+		klog.V(2).Infof("Azure cloudprovider Snapshots client using rate limit config: QPS=%g, bucket=%d", config.CloudProviderRateLimiting.SnapshotsClientQPS, config.CloudProviderRateLimiting.SnapshotsClientBucket)
+		klog.V(2).Infof("Azure cloudprovider VirtualMachineScaleSets client using rate limit config: QPS=%g, bucket=%d", config.CloudProviderRateLimiting.VirtualMachineScaleSetsClientQPS, config.CloudProviderRateLimiting.VirtualMachineScaleSetsClientBucket)
+		klog.V(2).Infof("Azure cloudprovider VirtualMachineSizes client using rate limit config: QPS=%g, bucket=%d", config.CloudProviderRateLimiting.VirtualMachineSizesClientQPS, config.CloudProviderRateLimiting.VirtualMachineSizesClientBucket)
 	}
 
 	// Conditionally configure resource request backoff
 	resourceRequestBackoff := wait.Backoff{
 		Steps: 1,
 	}
+
 	if config.CloudProviderBackoff {
 		// Assign backoff defaults if no configuration was passed in
 		if config.CloudProviderBackoffRetries == 0 {
@@ -484,42 +585,151 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 	}
 
 	// Initialize Azure clients.
-	clientConfig := &azClientConfig{
+	routesClientConfig := &azClientConfig{
 		subscriptionID:                 config.SubscriptionID,
 		resourceManagerEndpoint:        env.ResourceManagerEndpoint,
 		servicePrincipalToken:          servicePrincipalToken,
-		rateLimiterReader:              operationPollRateLimiter,
-		rateLimiterWriter:              operationPollRateLimiterWrite,
+		rateLimiterReader:              routesClientRateLimiter,
+		rateLimiterWriter:              routesClientRateLimiter,
+		CloudProviderBackoffRetries:    config.CloudProviderBackoffRetries,
+		CloudProviderBackoffDuration:   config.CloudProviderBackoffDuration,
+		ShouldOmitCloudProviderBackoff: config.shouldOmitCloudProviderBackoff(),
+	}
+	subnetsClientConfig := &azClientConfig{
+		subscriptionID:                 config.SubscriptionID,
+		resourceManagerEndpoint:        env.ResourceManagerEndpoint,
+		servicePrincipalToken:          servicePrincipalToken,
+		rateLimiterReader:              subnetsClientRateLimiter,
+		rateLimiterWriter:              subnetsClientRateLimiter,
+		CloudProviderBackoffRetries:    config.CloudProviderBackoffRetries,
+		CloudProviderBackoffDuration:   config.CloudProviderBackoffDuration,
+		ShouldOmitCloudProviderBackoff: config.shouldOmitCloudProviderBackoff(),
+	}
+	interfacesClientConfig := &azClientConfig{
+		subscriptionID:                 config.SubscriptionID,
+		resourceManagerEndpoint:        env.ResourceManagerEndpoint,
+		servicePrincipalToken:          servicePrincipalToken,
+		rateLimiterReader:              interfacesClientRateLimiter,
+		rateLimiterWriter:              interfacesClientRateLimiter,
+		CloudProviderBackoffRetries:    config.CloudProviderBackoffRetries,
+		CloudProviderBackoffDuration:   config.CloudProviderBackoffDuration,
+		ShouldOmitCloudProviderBackoff: config.shouldOmitCloudProviderBackoff(),
+	}
+	routeTablesClientConfig := &azClientConfig{
+		subscriptionID:                 config.SubscriptionID,
+		resourceManagerEndpoint:        env.ResourceManagerEndpoint,
+		servicePrincipalToken:          servicePrincipalToken,
+		rateLimiterReader:              routeTablesClientRateLimiter,
+		rateLimiterWriter:              routeTablesClientRateLimiter,
+		CloudProviderBackoffRetries:    config.CloudProviderBackoffRetries,
+		CloudProviderBackoffDuration:   config.CloudProviderBackoffDuration,
+		ShouldOmitCloudProviderBackoff: config.shouldOmitCloudProviderBackoff(),
+	}
+	loadBalancerClientConfig := &azClientConfig{
+		subscriptionID:                 config.SubscriptionID,
+		resourceManagerEndpoint:        env.ResourceManagerEndpoint,
+		servicePrincipalToken:          servicePrincipalToken,
+		rateLimiterReader:              loadBalancerClientRateLimiter,
+		rateLimiterWriter:              loadBalancerClientRateLimiter,
+		CloudProviderBackoffRetries:    config.CloudProviderBackoffRetries,
+		CloudProviderBackoffDuration:   config.CloudProviderBackoffDuration,
+		ShouldOmitCloudProviderBackoff: config.shouldOmitCloudProviderBackoff(),
+	}
+	publicIPAddressesClientConfig := &azClientConfig{
+		subscriptionID:                 config.SubscriptionID,
+		resourceManagerEndpoint:        env.ResourceManagerEndpoint,
+		servicePrincipalToken:          servicePrincipalToken,
+		rateLimiterReader:              publicIPAddressesClientRateLimiter,
+		rateLimiterWriter:              publicIPAddressesClientRateLimiter,
+		CloudProviderBackoffRetries:    config.CloudProviderBackoffRetries,
+		CloudProviderBackoffDuration:   config.CloudProviderBackoffDuration,
+		ShouldOmitCloudProviderBackoff: config.shouldOmitCloudProviderBackoff(),
+	}
+	securityGroupsClientConfig := &azClientConfig{
+		subscriptionID:                 config.SubscriptionID,
+		resourceManagerEndpoint:        env.ResourceManagerEndpoint,
+		servicePrincipalToken:          servicePrincipalToken,
+		rateLimiterReader:              securityGroupsClientRateLimiter,
+		rateLimiterWriter:              securityGroupsClientRateLimiter,
+		CloudProviderBackoffRetries:    config.CloudProviderBackoffRetries,
+		CloudProviderBackoffDuration:   config.CloudProviderBackoffDuration,
+		ShouldOmitCloudProviderBackoff: config.shouldOmitCloudProviderBackoff(),
+	}
+	virtualMachinesClientConfig := &azClientConfig{
+		subscriptionID:                 config.SubscriptionID,
+		resourceManagerEndpoint:        env.ResourceManagerEndpoint,
+		servicePrincipalToken:          servicePrincipalToken,
+		rateLimiterReader:              virtualMachinesClientRateLimiter,
+		rateLimiterWriter:              virtualMachinesClientRateLimiter,
+		CloudProviderBackoffRetries:    config.CloudProviderBackoffRetries,
+		CloudProviderBackoffDuration:   config.CloudProviderBackoffDuration,
+		ShouldOmitCloudProviderBackoff: config.shouldOmitCloudProviderBackoff(),
+	}
+	storageAccountClientConfig := &azClientConfig{
+		subscriptionID:                 config.SubscriptionID,
+		resourceManagerEndpoint:        env.ResourceManagerEndpoint,
+		servicePrincipalToken:          servicePrincipalToken,
+		rateLimiterReader:              storageAccountClientRateLimiter,
+		rateLimiterWriter:              storageAccountClientRateLimiter,
+		CloudProviderBackoffRetries:    config.CloudProviderBackoffRetries,
+		CloudProviderBackoffDuration:   config.CloudProviderBackoffDuration,
+		ShouldOmitCloudProviderBackoff: config.shouldOmitCloudProviderBackoff(),
+	}
+	disksClientConfig := &azClientConfig{
+		subscriptionID:                 config.SubscriptionID,
+		resourceManagerEndpoint:        env.ResourceManagerEndpoint,
+		servicePrincipalToken:          servicePrincipalToken,
+		rateLimiterReader:              disksClientRateLimiter,
+		rateLimiterWriter:              disksClientRateLimiter,
+		CloudProviderBackoffRetries:    config.CloudProviderBackoffRetries,
+		CloudProviderBackoffDuration:   config.CloudProviderBackoffDuration,
+		ShouldOmitCloudProviderBackoff: config.shouldOmitCloudProviderBackoff(),
+	}
+	snapshotsClientConfig := &azClientConfig{
+		subscriptionID:                 config.SubscriptionID,
+		resourceManagerEndpoint:        env.ResourceManagerEndpoint,
+		servicePrincipalToken:          servicePrincipalToken,
+		rateLimiterReader:              snapshotsClientRateLimiter,
+		rateLimiterWriter:              snapshotsClientRateLimiter,
+		CloudProviderBackoffRetries:    config.CloudProviderBackoffRetries,
+		CloudProviderBackoffDuration:   config.CloudProviderBackoffDuration,
+		ShouldOmitCloudProviderBackoff: config.shouldOmitCloudProviderBackoff(),
+	}
+	virtualMachineScaleSetsClientConfig := &azClientConfig{
+		subscriptionID:                 config.SubscriptionID,
+		resourceManagerEndpoint:        env.ResourceManagerEndpoint,
+		servicePrincipalToken:          servicePrincipalToken,
+		rateLimiterReader:              virtualMachineScaleSetsClientRateLimiter,
+		rateLimiterWriter:              virtualMachineScaleSetsClientRateLimiter,
+		CloudProviderBackoffRetries:    config.CloudProviderBackoffRetries,
+		CloudProviderBackoffDuration:   config.CloudProviderBackoffDuration,
+		ShouldOmitCloudProviderBackoff: config.shouldOmitCloudProviderBackoff(),
+	}
+	virtualMachineSizesClientConfig := &azClientConfig{
+		subscriptionID:                 config.SubscriptionID,
+		resourceManagerEndpoint:        env.ResourceManagerEndpoint,
+		servicePrincipalToken:          servicePrincipalToken,
+		rateLimiterReader:              virtualMachineSizesClientRateLimiter,
+		rateLimiterWriter:              virtualMachineSizesClientRateLimiter,
 		CloudProviderBackoffRetries:    config.CloudProviderBackoffRetries,
 		CloudProviderBackoffDuration:   config.CloudProviderBackoffDuration,
 		ShouldOmitCloudProviderBackoff: config.shouldOmitCloudProviderBackoff(),
 	}
 
-	vmssClientConfig := &azClientConfig{
-		subscriptionID:                 config.SubscriptionID,
-		resourceManagerEndpoint:        env.ResourceManagerEndpoint,
-		servicePrincipalToken:          servicePrincipalToken,
-		rateLimiterReader:              operationPollVMSSRateLimiter,
-		rateLimiterWriter:              operationPollVMSSRateLimiter,
-		CloudProviderBackoffRetries:    config.CloudProviderBackoffRetries,
-		CloudProviderBackoffDuration:   config.CloudProviderBackoffDuration,
-		ShouldOmitCloudProviderBackoff: config.shouldOmitCloudProviderBackoff(),
-	}
-
-	az.DisksClient = newAzDisksClient(clientConfig)
-	az.SnapshotsClient = newSnapshotsClient(clientConfig)
-	az.RoutesClient = newAzRoutesClient(clientConfig)
-	az.SubnetsClient = newAzSubnetsClient(clientConfig)
-	az.InterfacesClient = newAzInterfacesClient(clientConfig)
-	az.RouteTablesClient = newAzRouteTablesClient(clientConfig)
-	az.LoadBalancerClient = newAzLoadBalancersClient(clientConfig)
-	az.SecurityGroupsClient = newAzSecurityGroupsClient(clientConfig)
-	az.StorageAccountClient = newAzStorageAccountClient(clientConfig)
-	az.VirtualMachinesClient = newAzVirtualMachinesClient(clientConfig)
-	az.PublicIPAddressesClient = newAzPublicIPAddressesClient(clientConfig)
-	az.VirtualMachineSizesClient = newAzVirtualMachineSizesClient(clientConfig)
-	az.VirtualMachineScaleSetsClient = newAzVirtualMachineScaleSetsClient(vmssClientConfig)
-	az.VirtualMachineScaleSetVMsClient = newAzVirtualMachineScaleSetVMsClient(vmssClientConfig)
+	az.RoutesClient = newAzRoutesClient(routesClientConfig)
+	az.SubnetsClient = newAzSubnetsClient(subnetsClientConfig)
+	az.InterfacesClient = newAzInterfacesClient(interfacesClientConfig)
+	az.RouteTablesClient = newAzRouteTablesClient(routeTablesClientConfig)
+	az.LoadBalancerClient = newAzLoadBalancersClient(loadBalancerClientConfig)
+	az.PublicIPAddressesClient = newAzPublicIPAddressesClient(publicIPAddressesClientConfig)
+	az.SecurityGroupsClient = newAzSecurityGroupsClient(securityGroupsClientConfig)
+	az.VirtualMachinesClient = newAzVirtualMachinesClient(virtualMachinesClientConfig)
+	az.StorageAccountClient = newAzStorageAccountClient(storageAccountClientConfig)
+	az.DisksClient = newAzDisksClient(disksClientConfig)
+	az.SnapshotsClient = newSnapshotsClient(snapshotsClientConfig)
+	az.VirtualMachineScaleSetsClient = newAzVirtualMachineScaleSetsClient(virtualMachineScaleSetsClientConfig)
+	az.VirtualMachineScaleSetVMsClient = newAzVirtualMachineScaleSetVMsClient(virtualMachineScaleSetsClientConfig)
+	az.VirtualMachineSizesClient = newAzVirtualMachineSizesClient(virtualMachineSizesClientConfig)
 	az.FileClient = &azureFileClient{env: *env}
 
 	if az.MaximumLoadBalancerRuleCount == 0 {
