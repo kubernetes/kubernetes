@@ -17,10 +17,21 @@ limitations under the License.
 package kubelet
 
 import (
+	"fmt"
+
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/master/ports"
 )
+
+// GetKubeletPort find the kubelet port from the given nodeName.
+func GetKubeletPort(c clientset.Interface, nodeName string) (int, error) {
+	node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	if err != nil {
+		return -1, fmt.Errorf("Failed to get node %s: %v", nodeName, err)
+	}
+	return int(node.Status.DaemonEndpoints.KubeletEndpoint.Port), nil
+}
 
 // GetKubeletPods retrieves the list of pods on the kubelet.
 func GetKubeletPods(c clientset.Interface, node string) (*v1.PodList, error) {
@@ -34,9 +45,14 @@ func GetKubeletRunningPods(c clientset.Interface, node string) (*v1.PodList, err
 	return getKubeletPods(c, node, "runningpods")
 }
 
-func getKubeletPods(c clientset.Interface, node, resource string) (*v1.PodList, error) {
+func getKubeletPods(c clientset.Interface, nodeName, resource string) (*v1.PodList, error) {
+	kubeletPort, err := GetKubeletPort(c, nodeName)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get kubelet port, node %s:%v", nodeName, kubeletPort)
+	}
+
 	result := &v1.PodList{}
-	client, err := ProxyRequest(c, node, resource, ports.KubeletPort)
+	client, err := ProxyRequest(c, nodeName, resource, kubeletPort)
 	if err != nil {
 		return &v1.PodList{}, err
 	}

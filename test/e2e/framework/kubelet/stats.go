@@ -310,7 +310,12 @@ func formatResourceUsageStats(nodeName string, containerStats ResourceUsagePerCo
 
 // GetKubeletHeapStats returns stats of kubelet heap.
 func GetKubeletHeapStats(c clientset.Interface, nodeName string) (string, error) {
-	client, err := ProxyRequest(c, nodeName, "debug/pprof/heap", ports.KubeletPort)
+	kubeletPort, err := GetKubeletPort(c, nodeName)
+	if err != nil {
+		return "", fmt.Errorf("Failed to get kubelet port, node %s:%v", nodeName, kubeletPort)
+	}
+
+	client, err := ProxyRequest(c, nodeName, "debug/pprof/heap", kubeletPort)
 	if err != nil {
 		return "", err
 	}
