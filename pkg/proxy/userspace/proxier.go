@@ -363,8 +363,6 @@ func (proxier *Proxier) syncProxyRules() {
 	changes := proxier.serviceChanges
 	proxier.serviceChanges = make(map[types.NamespacedName]*serviceChange)
 	proxier.serviceChangesLock.Unlock()
-        
-	klog.V(2).Infof("userspace syncProxyRules service events: %d", len(changes))
 	
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
