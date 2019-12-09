@@ -106,11 +106,6 @@ type ResourceConsumer struct {
 	requestSizeCustomMetric  int
 }
 
-// GetResourceConsumerImage is a wrapper to get the fully qualified URI of the ResourceConsumer image
-func GetResourceConsumerImage() string {
-	return resourceConsumerImage
-}
-
 // NewDynamicResourceConsumer is a wrapper to create a new dynamic ResourceConsumer
 func NewDynamicResourceConsumer(name, nsName string, kind schema.GroupVersionKind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, scaleClient scaleclient.ScalesGetter) *ResourceConsumer {
 	return newResourceConsumer(name, nsName, kind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, dynamicConsumptionTimeInSeconds,
