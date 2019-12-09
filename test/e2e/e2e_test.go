@@ -70,6 +70,15 @@ func handleFlags() {
 }
 
 func init() {
+	// Enable bindata file lookup as fallback.
+	testfiles.AddFileSource(testfiles.BindataFileSource{
+		Asset:      generated.Asset,
+		AssetNames: generated.AssetNames,
+	})
+
+}
+
+func TestMain(m *testing.M) {
 	// Register test flags, then parse flags.
 	handleFlags()
 
@@ -99,15 +108,6 @@ func init() {
 		testfiles.AddFileSource(testfiles.RootFileSource{Root: framework.TestContext.RepoRoot})
 	}
 
-	// Enable bindata file lookup as fallback.
-	testfiles.AddFileSource(testfiles.BindataFileSource{
-		Asset:      generated.Asset,
-		AssetNames: generated.AssetNames,
-	})
-
-}
-
-func TestMain(m *testing.M) {
 	rand.Seed(time.Now().UnixNano())
 	os.Exit(m.Run())
 }
