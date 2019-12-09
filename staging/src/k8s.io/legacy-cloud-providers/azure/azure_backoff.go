@@ -747,13 +747,15 @@ func (az *Cloud) processHTTPRetryResponse(service *v1.Service, reason string, re
 	}
 
 	if shouldRetryHTTPRequest(resp, err) {
-		if err != nil {
-			az.Event(service, v1.EventTypeWarning, reason, err.Error())
-			klog.Errorf("processHTTPRetryResponse: backoff failure, will retry, err=%v", err)
-		} else {
-			az.Event(service, v1.EventTypeWarning, reason, fmt.Sprintf("Azure HTTP response %d", resp.StatusCode))
-			klog.Errorf("processHTTPRetryResponse: backoff failure, will retry, HTTP response=%d", resp.StatusCode)
+		message := "processHTTPRetryResponse: backoff failure, will retry"
+		if resp != nil {
+			message = fmt.Sprintf("%s, HTTP response: %d", message, resp.StatusCode)
 		}
+		if err != nil {
+			message = fmt.Sprintf("%s, error: %v", message, err)
+		}
+		az.Event(service, v1.EventTypeWarning, reason, message)
+		klog.Error(message)
 
 		// suppress the error object so that backoff process continues
 		return false, nil
@@ -769,15 +771,17 @@ func (az *Cloud) processHTTPResponse(service *v1.Service, reason string, resp *h
 		return nil
 	}
 
-	if err != nil {
-		az.Event(service, v1.EventTypeWarning, reason, err.Error())
-		klog.Errorf("processHTTPRetryResponse failure with err: %v", err)
-	} else if resp != nil {
-		az.Event(service, v1.EventTypeWarning, reason, fmt.Sprintf("Azure HTTP response %d", resp.StatusCode))
-		klog.Errorf("processHTTPRetryResponse failure with HTTP response %q", resp.Status)
+	message := "processHTTPResponse failed"
+	if resp != nil {
+		message = fmt.Sprintf("%s, HTTP response: %d", message, resp.StatusCode)
 	}
+	if err != nil {
+		message = fmt.Sprintf("%s, error: %v", message, err)
+	}
+	az.Event(service, v1.EventTypeWarning, reason, message)
+	klog.Error(message)
 
-	return err
+	return fmt.Errorf(message)
 }
 
 func (cfg *Config) shouldOmitCloudProviderBackoff() bool {
