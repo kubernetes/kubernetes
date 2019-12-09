@@ -3183,6 +3183,11 @@ type PodSecurityContext struct {
 	// sysctls (by the container runtime) might fail to launch.
 	// +optional
 	Sysctls []Sysctl `json:"sysctls,omitempty" protobuf:"bytes,7,rep,name=sysctls"`
+	// The seccomp options to apply to all containers in this pod.
+	// The per-container securityContext seccomp options override these
+	// podSecurityContext seccomp options.
+	// +optional
+	Seccomp *SeccompOptions `json:"seccomp,omitempty"`
 }
 
 // PodQOSClass defines the supported qos classes of Pods.
@@ -5758,6 +5763,11 @@ type SecurityContext struct {
 	// This requires the ProcMountType feature flag to be enabled.
 	// +optional
 	ProcMount *ProcMountType `json:"procMount,omitempty" protobuf:"bytes,9,opt,name=procMount"`
+	// The seccomp options to apply to this container.
+	// These per-container securityContext seccomp options override the
+	// podSecurityContext seccomp options.
+	// +optional
+	Seccomp *SeccompOptions `json:"seccomp,omitempty"`
 }
 
 type ProcMountType string
@@ -5789,6 +5799,52 @@ type SELinuxOptions struct {
 	// +optional
 	Level string `json:"level,omitempty" protobuf:"bytes,4,opt,name=level"`
 }
+
+// SeccompOptions configure the seccomp profile applied to containers.
+type SeccompOptions struct {
+	// The seccomp profile to run the container with.
+	SeccompProfile `json:",inline"`
+}
+
+// Seccomp profile selects the seccomp profile that is applied to containers.
+// +union
+type SeccompProfile struct {
+	// Type is the type of profile to apply. Additional options can specify
+	// what profile to apply for a given type.
+	// +unionDiscriminator
+	// +optional
+	Type *SeccompProfileType `json:"type,omitempty"`
+	// RuntimeProfile is the name of a predefined profile defined by the runtime.
+	// Most runtimes only support "default", which is the default value when
+	// using the Runtime profile type.
+	// If a runtimeProfile is specified, the profile type must be 'Runtime'.
+	// +optional
+	RuntimeProfile *string `json:"runtimeProfile,omitempty"`
+	// LocalhostProfile is the path to a profile defined in static file on the node.
+	// The profile must be preconfigured on the node to work.
+	// If a localhostProfile is specified, the profile type must be 'Localhost'.
+	// This is an alpha field and requires enabling the LocalhostSeccompProfiles
+	// feature gate.
+	// +optional
+	LocalhostProfile *string `json:"localhostProfile,omitempty"`
+}
+
+// SeccompProfileType defines the type of a SeccompProfile.
+type SeccompProfileType string
+
+const (
+	// SeccompProfileUnconfined is the unconfined type profile, which doesn't
+	// apply any seccomp profile.
+	SeccompProfileUnconfined SeccompProfileType = "Unconfined"
+	// SeccompProfileRuntime is the predefined runtime profile type, which defers
+	// the profile specification to the container runtime.
+	SeccompProfileRuntime SeccompProfileType = "Runtime"
+	// SeccompProfileLocalhost is the statically configured profile type, which
+	// uses a profile preconfigured on the node.
+	// This is an alpha feature and requires enabling the LocalhostSeccompProfiles
+	// feature gate.
+	SeccompProfileLocalhost SeccompProfileType = "Localhost"
+)
 
 // WindowsSecurityContextOptions contain Windows-specific options and credentials.
 type WindowsSecurityContextOptions struct {

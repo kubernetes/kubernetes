@@ -250,6 +250,10 @@ type PodSecurityPolicySpec struct {
 	// Enforcement of this field depends on the RuntimeClass feature gate being enabled.
 	// +optional
 	RuntimeClass *RuntimeClassStrategyOptions `json:"runtimeClass,omitempty" protobuf:"bytes,24,opt,name=runtimeClass"`
+	// seccomp is the strategy that will dictate allowable and default seccomp
+	// profiles for the pod. If omitted, only the default (unset) seccomp options are allowed.
+	// +optional
+	Seccomp *SeccompStrategyOptions `json:"seccompStrategyOptions,omitempty"`
 }
 
 // AllowedHostPath defines the host volume conditions that will be enabled by a policy
@@ -473,6 +477,37 @@ type RuntimeClassStrategyOptions struct {
 // RuntimeClassStrategyOptions.AllowedRuntimeClassNames field and means that any RuntimeClassName is
 // allowed.
 const AllowAllRuntimeClassNames = "*"
+
+// SeccompStrategyOptions define the strategy for applying seccomp profiles to containers.
+type SeccompStrategyOptions struct {
+	// The default profile to set on the pod. Set on the podSecurityContext if non
+	// has been set (even if all container securityContexts include a seccomp
+	// profile). The default MUST be allowed by the allowedProfiles.
+	// +optional
+	DefaultProfile *v1.SeccompProfile `json:"defaultProfile,omitempty"`
+	// The set of profiles that may be set on the pod or containers.
+	// If unspecified, seccomp profiles are unrestricted by this policy.
+	// +optional
+	AllowedProfiles *SeccompProfileSet `json:"allowedProfiles,omitempty"`
+}
+
+// A set of seccomp profiles. This struct should be a plural of v1.SeccompProfile.
+// All values are optional, and an unspecified field excludes all profiles of
+// that type from the set.
+type SeccompProfileSet struct {
+	// The allowed seccomp profile types.
+	// +optional
+	Types []v1.SeccompProfileType `json:"types,omitempty"`
+	// The allowed runtimeProfiles. A value of '*' allows all runtimeProfiles.
+	// +optional
+	RuntimeProfiles []string `json:"runtimeProfiles,omitempty"`
+	// The allowed localhostProfiles. Values may end in '*' to include all
+	// localhostProfiles with a prefix.
+	// This is an alpha field and requires enabling the LocalhostSeccompProfiles
+	// feature gate.
+	// +optional
+	LocalhostProfiles []string `json:"localhostProfiles,omitempty"`
+}
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
