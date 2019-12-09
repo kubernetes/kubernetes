@@ -100,23 +100,34 @@ func (p *singleNumaNodePolicy) getHintMatch(allResourcesHints [][]TopologyHint) 
 	return foundMatch, match
 }
 
-// Return hints that have valid bitmasks with exactly one bit set
-func (p *singleNumaNodePolicy) filterHints(allResourcesHints [][]TopologyHint) [][]TopologyHint {
+// Return hints that have valid bitmasks with exactly one bit set. Also return bool
+// which indicates whether allResourceHints only consists of {nil true} hints.
+func (p *singleNumaNodePolicy) filterHints(allResourcesHints [][]TopologyHint) ([][]TopologyHint, bool) {
 	var filteredResourcesHints [][]TopologyHint
+	var noAffinityPreferredHints int
+	var totalHints int
 	if len(allResourcesHints) > 0 {
 		for _, oneResourceHints := range allResourcesHints {
 			var filtered []TopologyHint
 			if len(oneResourceHints) > 0 {
 				for _, hint := range oneResourceHints {
-					if hint.NUMANodeAffinity != nil && hint.NUMANodeAffinity.Count() == 1 {
+					totalHints++
+					if hint.NUMANodeAffinity != nil && hint.NUMANodeAffinity.Count() == 1 && hint.Preferred == true {
 						filtered = append(filtered, hint)
+					}
+					if hint.NUMANodeAffinity == nil && hint.Preferred == true {
+						noAffinityPreferredHints++
 					}
 				}
 			}
 			filteredResourcesHints = append(filteredResourcesHints, filtered)
 		}
 	}
-	return filteredResourcesHints
+	// Check if all resource hints only consist of nil-affinity/preferred hint: {nil true}.
+	if noAffinityPreferredHints == totalHints {
+		return filteredResourcesHints, true
+	}
+	return filteredResourcesHints, false
 }
 
 func (p *singleNumaNodePolicy) mergeProvidersHints(providersHints []map[string][]TopologyHint) TopologyHint {
@@ -164,16 +175,25 @@ func (p *singleNumaNodePolicy) mergeProvidersHints(providersHints []map[string][
 		return defaultHint
 	}
 
-	allResourcesHints = p.filterHints(allResourcesHints)
-	// if no hints or there is a resource with empty hints after filtering, then policy cannot be satisfied
+	var noAffinityPreferredOnly bool
+	allResourcesHints, noAffinityPreferredOnly = p.filterHints(allResourcesHints)
+	// If no hints, then policy cannot be satisfied
 	if len(allResourcesHints) == 0 {
 		klog.Infof("[topologymanager] No hints that align to a single NUMA node.")
 		return defaultHint
 	}
+	// If there is a resource with empty hints after filtering, then policy cannot be satisfied.
+	// In the event that the only hints that exist are {nil true} update default hint preferred
+	// to allow scheduling.
 	for _, hints := range allResourcesHints {
 		if len(hints) == 0 {
 			klog.Infof("[topologymanager] No hints that align to a single NUMA node for resource.")
-			return defaultHint
+			if !noAffinityPreferredOnly {
+				return defaultHint
+			} else if noAffinityPreferredOnly {
+				defaultHint.Preferred = true
+				return defaultHint
+			}
 		}
 	}
 
