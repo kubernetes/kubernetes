@@ -363,7 +363,7 @@ func (proxier *Proxier) syncProxyRules() {
 	changes := proxier.serviceChanges
 	proxier.serviceChanges = make(map[types.NamespacedName]*serviceChange)
 	proxier.serviceChangesLock.Unlock()
-	
+
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 
