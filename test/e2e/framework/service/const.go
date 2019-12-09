@@ -66,7 +66,7 @@ const (
 
 	// LoadBalancerPollTimeout is the time required by the loadbalancer to poll.
 	// On average it takes ~6 minutes for a single backend to come online in GCE.
-	LoadBalancerPollTimeout = 15 * time.Minute
+	LoadBalancerPollTimeout = 22 * time.Minute
 	// LoadBalancerPollInterval is the interval value in which the loadbalancer polls.
 	LoadBalancerPollInterval = 30 * time.Second
 
