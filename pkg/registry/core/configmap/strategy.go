@@ -76,8 +76,6 @@ func (strategy) PrepareForUpdate(ctx context.Context, newObj, oldObj runtime.Obj
 	_ = newObj.(*api.ConfigMap)
 }
 
-func (strategy) ResetFields(new, old runtime.Object) {}
-
 func (strategy) AllowUnconditionalUpdate() bool {
 	return true
 }

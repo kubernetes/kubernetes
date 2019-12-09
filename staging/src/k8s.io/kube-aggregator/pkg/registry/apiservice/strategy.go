@@ -66,8 +66,6 @@ func (apiServerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	newAPIService.Status = oldAPIService.Status
 }
 
-func (apiServerStrategy) ResetFields(new, old runtime.Object) {}
-
 func (apiServerStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	return validation.ValidateAPIService(obj.(*apiregistration.APIService))
 }
@@ -110,8 +108,6 @@ func (apiServerStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old ru
 	newAPIService.Finalizers = oldAPIService.Finalizers
 	newAPIService.OwnerReferences = oldAPIService.OwnerReferences
 }
-
-func (apiServerStatusStrategy) ResetFields(new, old runtime.Object) {}
 
 func (apiServerStatusStrategy) AllowCreateOnUpdate() bool {
 	return false

@@ -79,8 +79,6 @@ func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	}
 }
 
-func (csiDriverStrategy) ResetFields(new, old runtime.Object) {}
-
 func (csiDriverStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newCSIDriverObj := obj.(*storage.CSIDriver)
 	oldCSIDriverObj := old.(*storage.CSIDriver)

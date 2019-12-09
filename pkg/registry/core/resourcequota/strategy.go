@@ -48,9 +48,6 @@ func (resourcequotaStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 	resourcequota.Status = api.ResourceQuotaStatus{}
 }
 
-// ResetFields .
-func (resourcequotaStrategy) ResetFields(new, old runtime.Object) {}
-
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (resourcequotaStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newResourcequota := obj.(*api.ResourceQuota)

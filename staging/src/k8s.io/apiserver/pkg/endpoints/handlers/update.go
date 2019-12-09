@@ -35,7 +35,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
-	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -127,13 +126,6 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 		transformers := []rest.TransformFunc{}
 		if scope.FieldManager != nil {
 			transformers = append(transformers, func(_ context.Context, newObj, liveObj runtime.Object) (runtime.Object, error) {
-
-				if store, isGenericStore := r.(registry.GenericStore); isGenericStore {
-					if strategy := store.GetUpdateStrategy(); strategy != nil {
-						strategy.ResetFields(obj, liveObj)
-					}
-				}
-
 				obj, err := scope.FieldManager.Update(liveObj, newObj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
 				if err != nil {
 					return nil, fmt.Errorf("failed to update object (Update for %v) managed fields: %v", scope.Kind, err)

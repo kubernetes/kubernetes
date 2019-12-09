@@ -51,9 +51,6 @@ func (podDisruptionBudgetStrategy) PrepareForCreate(ctx context.Context, obj run
 	podDisruptionBudget.Generation = 1
 }
 
-// ResetFields .
-func (podDisruptionBudgetStrategy) ResetFields(new, old runtime.Object) {}
-
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (podDisruptionBudgetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPodDisruptionBudget := obj.(*policy.PodDisruptionBudget)
@@ -101,9 +98,6 @@ type podDisruptionBudgetStatusStrategy struct {
 
 // StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = podDisruptionBudgetStatusStrategy{Strategy}
-
-// ResetFields .
-func (podDisruptionBudgetStatusStrategy) ResetFields(new, old runtime.Object) {}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
 func (podDisruptionBudgetStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

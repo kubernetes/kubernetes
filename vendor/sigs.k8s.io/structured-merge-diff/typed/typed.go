@@ -144,7 +144,14 @@ func (tv TypedValue) Compare(rhs *TypedValue) (c *Comparison, err error) {
 // RemoveItems removes each provided list or map item from the value.
 func (tv TypedValue) RemoveItems(items *fieldpath.Set) *TypedValue {
 	tv.value, _ = value.FromUnstructured(tv.value.ToUnstructured(true))
-	removeItemsWithSchema(&tv.value, items, tv.schema, tv.typeRef)
+	removeItemsWithSchema(&tv.value, items, tv.schema, tv.typeRef, false)
+	return &tv
+}
+
+// Remove removes each provided path from the value.
+func (tv TypedValue) Remove(paths *fieldpath.Set) *TypedValue {
+	tv.value, _ = value.FromUnstructured(tv.value.ToUnstructured(true))
+	removeItemsWithSchema(&tv.value, paths, tv.schema, tv.typeRef, true)
 	return &tv
 }
 

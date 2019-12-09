@@ -41,6 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"sigs.k8s.io/structured-merge-diff/fieldpath"
 )
 
 const (
@@ -247,6 +248,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	exporter, isExporter := storage.(rest.Exporter)
 	if !isExporter {
 		exporter = nil
+	}
+
+	var resetFields *fieldpath.Set
+	if resetFieldsProvider, isResetFieldsProvider := storage.(rest.ResetFieldsProvider); isResetFieldsProvider {
+		resetFields = resetFieldsProvider.ResetFieldsFor(a.group.GroupVersion.Version)
 	}
 
 	versionedExportOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("ExportOptions"))
@@ -557,6 +563,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			a.group.Creater,
 			fqKindToRegister,
 			reqScope.HubGroupVersion,
+			resetFields,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create field manager: %v", err)

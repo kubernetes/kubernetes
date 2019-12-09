@@ -56,8 +56,6 @@ func (eventStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 func (eventStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 }
 
-func (eventStrategy) ResetFields(new, old runtime.Object) {}
-
 func (eventStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	event := obj.(*api.Event)
 	return validation.ValidateEvent(event)

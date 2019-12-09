@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -44,11 +45,11 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
-	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/utils/trace"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -322,12 +323,6 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	}
 
 	if p.fieldManager != nil {
-		if store, isGenericStore := p.restPatcher.(registry.GenericStore); isGenericStore {
-			if strategy := store.GetUpdateStrategy(); strategy != nil {
-				strategy.ResetFields(objToUpdate, currentObject)
-			}
-		}
-
 		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, managerOrUserAgent(p.options.FieldManager, p.userAgent)); err != nil {
 			return nil, fmt.Errorf("failed to update object (json PATCH for %v) managed fields: %v", p.kind, err)
 		}
@@ -413,12 +408,6 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	}
 
 	if p.fieldManager != nil {
-		if store, isGenericStore := p.restPatcher.(registry.GenericStore); isGenericStore {
-			if strategy := store.GetUpdateStrategy(); strategy != nil {
-				strategy.ResetFields(newObj, currentObject)
-			}
-		}
-
 		if newObj, err = p.fieldManager.Update(currentObject, newObj, managerOrUserAgent(p.options.FieldManager, p.userAgent)); err != nil {
 			return nil, fmt.Errorf("failed to update object (smp PATCH for %v) managed fields: %v", p.kind, err)
 		}
@@ -436,7 +425,6 @@ type applyPatcher struct {
 	creater      runtime.ObjectCreater
 	kind         schema.GroupVersionKind
 	fieldManager *fieldmanager.FieldManager
-	resetter     rest.ObjectResetter
 	decoder      runtime.Decoder
 }
 
@@ -458,17 +446,10 @@ func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Ob
 	// 	return nil, errors.NewBadRequest(fmt.Sprintf("error decoding YAML: %v", err))
 	// }
 
-	defaultGVK := p.kind
-	original, err := p.creater.New(p.kind)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new object (Create for %v): %v", p.kind, err)
+	patchObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal(p.patch, &patchObj.Object); err != nil {
+		return nil, errors.NewBadRequest(fmt.Sprintf("error decoding YAML: %v", err))
 	}
-	patchObj, _, err := p.decoder.Decode(p.patch, &defaultGVK, original)
-	if err != nil {
-		return nil, errors.NewBadRequest(fmt.Sprintf("error decoding patch: %v", err))
-	}
-
-	p.resetter.ResetFields(patchObj, obj)
 
 	return p.fieldManager.Apply(obj, patchObj, p.options.FieldManager, force)
 }
@@ -596,20 +577,12 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 		}
 	// this case is unreachable if ServerSideApply is not enabled because we will have already rejected the content type
 	case types.ApplyPatchType:
-		var resetter rest.ObjectResetter
-		if store, isGenericStore := p.restPatcher.(registry.GenericStore); isGenericStore {
-			if strategy := store.GetUpdateStrategy(); strategy != nil {
-				resetter = strategy
-			}
-		}
-
 		p.mechanism = &applyPatcher{
 			fieldManager: scope.FieldManager,
 			patch:        p.patchBytes,
 			options:      p.options,
 			creater:      p.creater,
 			kind:         p.kind,
-			resetter:     resetter,
 			decoder:      p.codec,
 		}
 		p.forceAllowCreate = true

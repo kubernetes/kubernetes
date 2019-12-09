@@ -91,6 +91,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
+        "//vendor/sigs.k8s.io/structured-merge-diff/fieldpath:go_default_library",
     ],
 )
 

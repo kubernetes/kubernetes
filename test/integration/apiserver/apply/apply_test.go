@@ -1248,9 +1248,8 @@ func TestClearManagedFieldsWithUpdate(t *testing.T) {
 	}
 }
 
-// TestResetFieldsBeforeUpdate verifies that fields are being reset based on the resources strategy
-// before an Upate
-func TestResetFieldsBeforeUpdate(t *testing.T) {
+// TestApplyFailsOnResetFields verifies fields that would be reset before being persisted, cause the apply to fail
+func TestApplyFailsOnResetFields(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
 	_, client, closeFn := setup(t)
@@ -1279,8 +1278,34 @@ func TestResetFieldsBeforeUpdate(t *testing.T) {
 		}`)).
 		Do().
 		Get()
+
+	if err == nil {
+		t.Fatalf("Apply should error on fields that get reset")
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Resource("pods").
+		Name("test").
+		Param("fieldManager", "apply_test").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {
+				"name": "test",
+				"namespace": "default"
+			},
+			"spec": {
+				"containers": [
+					{"name": "foo", "image": "none"}
+				]
+			}
+		}`)).
+		Do().
+		Get()
+
 	if err != nil {
-		t.Fatalf("Failed to create object using Apply patch: %v", err)
+		t.Fatalf("Failed to apply valid object: %v", err)
 	}
 
 	object, err := client.CoreV1().RESTClient().Get().Namespace("default").Resource("pods").Name("test").Do().Get()
@@ -1293,13 +1318,102 @@ func TestResetFieldsBeforeUpdate(t *testing.T) {
 		t.Fatalf("Failed to get meta accessor: %v", err)
 	}
 
-	if managedFields := accessor.GetManagedFields(); len(managedFields) == 0 {
-		t.Fatalf("Failed to set managedFields, got: %v", managedFields)
+	managedFields := accessor.GetManagedFields()
+	if len(managedFields) == 0 {
+		t.Fatalf("Failed to get managedFields, got: %v", managedFields)
 	}
 
-	// fields, _ := accessor.GetManagedFields()[0].Marshal()
-	// t.Logf("obj: %v", object)
-	// t.Fatalf("managed fields: %v", string(fields))
+	for _, fields := range managedFields {
+		managed := make(map[string]interface{})
+		json.Unmarshal(fields.FieldsV1.Raw, &managed)
+
+		if _, ok := managed["f:status"]; ok {
+			t.Fatalf("Apply should not own status: %v - %v", fields, managed)
+		}
+	}
+}
+
+// TestUpdateDoesNotOwnResetFields verifies fields that would be reset before being persisted, do not get owned by update operations
+func TestUpdateDoesNotOwnResetFields(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Resource("pods").
+		Name("test").
+		Param("fieldManager", "apply_test").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {
+				"name": "test",
+				"namespace": "default"
+			},
+			"spec": {
+				"containers": [
+					{"name": "foo", "image": "none"}
+				]
+			},
+		}`)).
+		Do().
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using apply: %v", err)
+	}
+
+	_, err = client.CoreV1().RESTClient().Put().
+		Namespace("default").
+		Resource("pods").
+		Name("test").
+		Param("fieldManager", "update_test").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {
+				"name": "test",
+				"namespace": "default"
+			},
+			"spec": {
+				"containers": [
+					{"name": "foo", "image": "none"}
+				]
+			},
+			"status": {
+				"phase": "test"
+			}
+		}`)).
+		Do().
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to update object: %v", err)
+	}
+
+	object, err := client.CoreV1().RESTClient().Get().Namespace("default").Resource("pods").Name("test").Do().Get()
+	if err != nil {
+		t.Fatalf("Failed to retrieve object: %v", err)
+	}
+
+	accessor, err := meta.Accessor(object)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor: %v", err)
+	}
+
+	managedFields := accessor.GetManagedFields()
+	if len(managedFields) == 0 {
+		t.Fatalf("Failed to get managedFields, got: %v", managedFields)
+	}
+
+	for _, fields := range managedFields {
+		managed := make(map[string]interface{})
+		json.Unmarshal(fields.FieldsV1.Raw, &managed)
+
+		if _, ok := managed["f:status"]; ok {
+			t.Fatalf("Update should not own status: %v - %v", fields, managed)
+		}
+	}
 }
 
 var podBytes = []byte(`

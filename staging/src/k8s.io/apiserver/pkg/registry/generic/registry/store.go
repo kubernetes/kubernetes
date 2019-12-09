@@ -45,6 +45,7 @@ import (
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	"sigs.k8s.io/structured-merge-diff/fieldpath"
 
 	"k8s.io/klog"
 )
@@ -177,6 +178,10 @@ type Store struct {
 	// of items into tabular output. If unset, the default will be used.
 	TableConvertor rest.TableConvertor
 
+	// ResetFields is an optional interface providing details about the fields
+	// being reset by the strategy before the resource is persisted
+	ResetFieldsProvider rest.ResetFieldsProvider
+
 	// Storage is the interface for the underlying storage for the
 	// resource. It is wrapped into a "DryRunnableStorage" that will
 	// either pass-through or simply dry-run.
@@ -285,6 +290,14 @@ func (e *Store) GetDeleteStrategy() rest.RESTDeleteStrategy {
 // GetExportStrategy implements GenericStore.
 func (e *Store) GetExportStrategy() rest.RESTExportStrategy {
 	return e.ExportStrategy
+}
+
+// ResetFieldsFor implements rest.ResetFieldsProvider.
+func (e *Store) ResetFieldsFor(version string) *fieldpath.Set {
+	if e.ResetFieldsProvider != nil {
+		return e.ResetFieldsProvider.ResetFieldsFor(version)
+	}
+	return nil
 }
 
 // List returns a list of items matching labels and field according to the

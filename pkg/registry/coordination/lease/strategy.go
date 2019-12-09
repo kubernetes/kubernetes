@@ -45,9 +45,6 @@ func (leaseStrategy) NamespaceScoped() bool {
 func (leaseStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 }
 
-// ResetFields .
-func (leaseStrategy) ResetFields(new, old runtime.Object) {}
-
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (leaseStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 }

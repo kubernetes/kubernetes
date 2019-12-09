@@ -51,9 +51,6 @@ func (ingressStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object)
 	ingress.Generation = 1
 }
 
-// ResetFields .
-func (ingressStrategy) ResetFields(new, old runtime.Object) {}
-
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (ingressStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newIngress := obj.(*networking.Ingress)
@@ -104,9 +101,6 @@ type ingressStatusStrategy struct {
 
 // StatusStrategy implements logic used to validate and prepare for updates of the status subresource
 var StatusStrategy = ingressStatusStrategy{Strategy}
-
-// ResetFields .
-func (ingressStatusStrategy) ResetFields(new, old runtime.Object) {}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
 func (ingressStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

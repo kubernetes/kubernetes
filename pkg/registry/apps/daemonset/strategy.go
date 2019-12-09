@@ -79,9 +79,6 @@ func (daemonSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	pod.DropDisabledTemplateFields(&daemonSet.Spec.Template, nil)
 }
 
-// ResetFields .
-func (daemonSetStrategy) ResetFields(new, old runtime.Object) {}
-
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (daemonSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newDaemonSet := obj.(*apps.DaemonSet)

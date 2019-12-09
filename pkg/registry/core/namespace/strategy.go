@@ -72,9 +72,6 @@ func (namespaceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	}
 }
 
-// ResetFields .
-func (namespaceStrategy) ResetFields(new, old runtime.Object) {}
-
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (namespaceStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newNamespace := obj.(*api.Namespace)
@@ -133,9 +130,6 @@ var FinalizeStrategy = namespaceFinalizeStrategy{Strategy}
 func (namespaceFinalizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateNamespaceFinalizeUpdate(obj.(*api.Namespace), old.(*api.Namespace))
 }
-
-// ResetFields .
-func (namespaceFinalizeStrategy) ResetFields(new, old runtime.Object) {}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (namespaceFinalizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

@@ -23,13 +23,15 @@ type removingWalker struct {
 	value    *value.Value
 	schema   *schema.Schema
 	toRemove *fieldpath.Set
+	shallow  bool
 }
 
-func removeItemsWithSchema(value *value.Value, toRemove *fieldpath.Set, schema *schema.Schema, typeRef schema.TypeRef) {
+func removeItemsWithSchema(value *value.Value, toRemove *fieldpath.Set, schema *schema.Schema, typeRef schema.TypeRef, shallow bool) {
 	w := &removingWalker{
 		value:    value,
 		schema:   schema,
 		toRemove: toRemove,
+		shallow:  shallow,
 	}
 	resolveSchema(schema, typeRef, value, w)
 }
@@ -58,7 +60,7 @@ func (w *removingWalker) doList(t *schema.List) (errs ValidationErrors) {
 			continue
 		}
 		if subset := w.toRemove.WithPrefix(pe); !subset.Empty() {
-			removeItemsWithSchema(&l.Items[i], subset, w.schema, t.ElementType)
+			removeItemsWithSchema(&l.Items[i], subset, w.schema, t.ElementType, w.shallow)
 		}
 		newItems = append(newItems, l.Items[i])
 	}
@@ -88,6 +90,13 @@ func (w *removingWalker) doMap(t *schema.Map) ValidationErrors {
 		item := m.Items[i]
 		pe := fieldpath.PathElement{FieldName: &item.Name}
 		path, _ := fieldpath.MakePath(pe)
+
+		if w.shallow {
+			if w.toRemove.Has(path) {
+				continue
+			}
+		}
+
 		fieldType := t.ElementType
 		if ft, ok := fieldTypes[item.Name]; ok {
 			fieldType = ft
@@ -97,7 +106,7 @@ func (w *removingWalker) doMap(t *schema.Map) ValidationErrors {
 			}
 		}
 		if subset := w.toRemove.WithPrefix(pe); !subset.Empty() {
-			removeItemsWithSchema(&m.Items[i].Value, subset, w.schema, fieldType)
+			removeItemsWithSchema(&m.Items[i].Value, subset, w.schema, fieldType, w.shallow)
 		}
 		newMap.Set(item.Name, m.Items[i].Value)
 	}

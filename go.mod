@@ -164,6 +164,7 @@ require (
 	k8s.io/system-validators v1.0.4
 	k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
 	sigs.k8s.io/kustomize v2.0.3+incompatible
+	sigs.k8s.io/structured-merge-diff v0.0.0-20190817042607-6149e4549fca
 	sigs.k8s.io/yaml v1.1.0
 )
 

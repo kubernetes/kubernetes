@@ -1,0 +1,15 @@
+types:
+- name: list
+  map:
+    fields:
+    - name: elementType
+      type:
+        namedType: typeRef
+    - name: elementRelationship
+      type:
+        scalar: string
+    - name: keys
+      type:
+        list:
+          elementType:
+            scalar: string

@@ -38,7 +38,6 @@ import (
 // the call pattern in use.
 type RESTUpdateStrategy interface {
 	runtime.ObjectTyper
-	ObjectResetter
 	// NamespaceScoped returns true if the object must be within a namespace.
 	NamespaceScoped() bool
 	// AllowCreateOnUpdate returns true if the object can be created by a PUT.

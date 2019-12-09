@@ -1,0 +1,24 @@
+types:
+- name: struct
+  map:
+    fields:
+    - name: fields
+      type:
+        list:
+          elementType:
+            namedType: structField
+          elementRelationship: associative
+          keys: [ "name" ]
+    - name: elementRelationship
+      type:
+        scalar: string
+- name: structField
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+    - name: type
+      type:
+        namedType: typeRef
+

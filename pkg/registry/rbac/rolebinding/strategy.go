@@ -60,9 +60,6 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	_ = obj.(*rbac.RoleBinding)
 }
 
-// ResetFields .
-func (strategy) ResetFields(new, old runtime.Object) {}
-
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newRoleBinding := obj.(*rbac.RoleBinding)

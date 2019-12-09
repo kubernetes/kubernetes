@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	"sigs.k8s.io/structured-merge-diff/fieldpath"
 )
 
 //TODO:
@@ -345,10 +346,10 @@ type StorageVersionProvider interface {
 	StorageVersion() runtime.GroupVersioner
 }
 
-// ObjectResetter is an optional interface that a strategy can implement
-// to reset fields not meant to be changed by a user
-type ObjectResetter interface {
-	// ResetFields takes an Object (must be a pointer) and resets any fields that are not allowed to be changed by a user
-	// If old is not nil, fields in the new object will be reset based on old.
-	ResetFields(new, old runtime.Object)
+// ResetFieldsProvider is an optional interface that a strategy can implement
+// to expose a set of fields that get reset before persisting the object.
+type ResetFieldsProvider interface {
+	// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
+	// If no fieldset is defined for a version, nil is returned.
+	ResetFieldsFor(version string) *fieldpath.Set
 }

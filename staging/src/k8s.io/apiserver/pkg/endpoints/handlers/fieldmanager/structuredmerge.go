@@ -39,13 +39,14 @@ type structuredMergeManager struct {
 	groupVersion    schema.GroupVersion
 	hubVersion      schema.GroupVersion
 	updater         merge.Updater
+	resetFields     *fieldpath.Set
 }
 
 var _ Manager = &structuredMergeManager{}
 
 // NewStructuredMergeManager creates a new Manager that merges apply requests
 // and update managed fields for other types of requests.
-func NewStructuredMergeManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (Manager, error) {
+func NewStructuredMergeManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, resetFields *fieldpath.Set) (Manager, error) {
 	typeConverter, err := internal.NewTypeConverter(models, false)
 	if err != nil {
 		return nil, err
@@ -60,13 +61,14 @@ func NewStructuredMergeManager(models openapiproto.Models, objectConverter runti
 		updater: merge.Updater{
 			Converter: internal.NewVersionConverter(typeConverter, objectConverter, hub),
 		},
+		resetFields: resetFields,
 	}, nil
 }
 
 // NewCRDStructuredMergeManager creates a new Manager specifically for
 // CRDs. This allows for the possibility of fields which are not defined
 // in models, as well as having no models defined at all.
-func NewCRDStructuredMergeManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, preserveUnknownFields bool) (_ Manager, err error) {
+func NewCRDStructuredMergeManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, preserveUnknownFields bool, resetFields *fieldpath.Set) (_ Manager, err error) {
 	var typeConverter internal.TypeConverter = internal.DeducedTypeConverter{}
 	if models != nil {
 		typeConverter, err = internal.NewTypeConverter(models, preserveUnknownFields)
@@ -83,6 +85,7 @@ func NewCRDStructuredMergeManager(models openapiproto.Models, objectConverter ru
 		updater: merge.Updater{
 			Converter: internal.NewCRDVersionConverter(typeConverter, objectConverter, hub),
 		},
+		resetFields: resetFields,
 	}, nil
 }
 
@@ -109,6 +112,10 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 		return newObj, managed, nil
 	}
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
+
+	if f.resetFields != nil {
+		newObjTyped = newObjTyped.Remove(f.resetFields)
+	}
 
 	// TODO(apelisse) use the first return value when unions are implemented
 	self := "current-operation"
@@ -159,6 +166,19 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create typed patch object: %v", err)
 	}
+
+	if f.resetFields != nil {
+		resetObjTyped := patchObjTyped.Remove(f.resetFields)
+		diff, err := patchObjTyped.Compare(resetObjTyped)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to compare typed patch to its reset: %v", err)
+		}
+
+		if !diff.IsSame() {
+			return nil, nil, fmt.Errorf("apply contained fields a user should not change:\n%s", diff)
+		}
+	}
+
 	liveObjTyped, err := f.typeConverter.ObjectToTyped(liveObjVersioned)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create typed live object: %v", err)

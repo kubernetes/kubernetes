@@ -114,17 +114,27 @@ func resolveSchema(s *schema.Schema, tr schema.TypeRef, v *value.Value, ah atomH
 	return handleAtom(a, tr, ah)
 }
 
-func deduceAtom(a schema.Atom, v *value.Value) schema.Atom {
+// deduceAtom determines which of the possible types in atom 'atom' applies to value 'val'.
+// If val is of a type allowed by atom, return a copy of atom with all other types set to nil.
+// if val is nil, or is not of a type allowed by atom, just return the original atom,
+// and validation will fail at a later stage. (with a more useful error)
+func deduceAtom(atom schema.Atom, val *value.Value) schema.Atom {
 	switch {
-	case v == nil:
-	case v.FloatValue != nil, v.IntValue != nil, v.StringValue != nil, v.BooleanValue != nil:
-		return schema.Atom{Scalar: a.Scalar}
-	case v.ListValue != nil:
-		return schema.Atom{List: a.List}
-	case v.MapValue != nil:
-		return schema.Atom{Map: a.Map}
+	case val == nil:
+	case val.FloatValue != nil, val.IntValue != nil, val.StringValue != nil, val.BooleanValue != nil:
+		if atom.Scalar != nil {
+			return schema.Atom{Scalar: atom.Scalar}
+		}
+	case val.ListValue != nil:
+		if atom.List != nil {
+			return schema.Atom{List: atom.List}
+		}
+	case val.MapValue != nil:
+		if atom.Map != nil {
+			return schema.Atom{Map: atom.Map}
+		}
 	}
-	return a
+	return atom
 }
 
 func handleAtom(a schema.Atom, tr schema.TypeRef, ah atomHandler) ValidationErrors {

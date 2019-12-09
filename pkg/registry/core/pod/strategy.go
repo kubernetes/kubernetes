@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	"sigs.k8s.io/structured-merge-diff/fieldpath"
 )
 
 // podStrategy implements behavior for Pods
@@ -64,29 +65,40 @@ func (podStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (s podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	s.ResetFields(obj, nil)
+func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	pod := obj.(*api.Pod)
+	pod.Status = api.PodStatus{
+		Phase:    api.PodPending,
+		QOSClass: qos.GetPodQOS(pod),
+	}
+
+	podutil.DropDisabledPodFields(pod, nil)
 }
 
-// ResetFields .
-func (podStrategy) ResetFields(new, old runtime.Object) {
-	newPod := new.(*api.Pod)
-	if old != nil {
-		oldPod := old.(*api.Pod)
-		newPod.Status = oldPod.Status
-		podutil.DropDisabledPodFields(newPod, oldPod)
-	} else {
-		newPod.Status = api.PodStatus{
-			Phase:    api.PodPending,
-			QOSClass: qos.GetPodQOS(newPod),
-		}
-		podutil.DropDisabledPodFields(newPod, nil)
+// ResetFieldsFor returns a set of fields for the provided version that get reset before persisting the object.
+// If no fieldset is defined for a version, nil is returned.
+func (podStrategy) ResetFieldsFor(version string) *fieldpath.Set {
+	set, ok := resetFieldsByVersion[version]
+	if !ok {
+		return nil
 	}
+	return set
+}
+
+var resetFieldsByVersion = map[string]*fieldpath.Set{
+	"v1": fieldpath.NewSet(
+		fieldpath.MakePathOrDie("status"),
+		// TODO: add fields reset by podutil.DropDisabledPodFields
+	),
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (s podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	s.ResetFields(obj, old)
+func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	newPod.Status = oldPod.Status
+
+	podutil.DropDisabledPodFields(newPod, oldPod)
 }
 
 // Validate validates a new pod.

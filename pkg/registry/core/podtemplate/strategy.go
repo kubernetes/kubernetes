@@ -67,9 +67,6 @@ func (podTemplateStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-// ResetFields .
-func (podTemplateStrategy) ResetFields(new, old runtime.Object) {}
-
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (podTemplateStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newTemplate := obj.(*api.PodTemplate)

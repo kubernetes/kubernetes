@@ -1,0 +1,3 @@
+types:
+- name: scalar
+  scalar: string

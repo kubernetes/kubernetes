@@ -842,6 +842,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				reqScope.Kind,
 				reqScope.HubGroupVersion,
 				crd.Spec.PreserveUnknownFields,
+				nil,
 			)
 			if err != nil {
 				return nil, err

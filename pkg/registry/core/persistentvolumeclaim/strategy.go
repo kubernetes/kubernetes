@@ -70,9 +70,6 @@ func (persistentvolumeclaimStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-// ResetFields .
-func (persistentvolumeclaimStrategy) ResetFields(new, old runtime.Object) {}
-
 // PrepareForUpdate sets the Status field which is not allowed to be set by end users on update
 func (persistentvolumeclaimStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPvc := obj.(*api.PersistentVolumeClaim)
@@ -96,9 +93,6 @@ type persistentvolumeclaimStatusStrategy struct {
 }
 
 var StatusStrategy = persistentvolumeclaimStatusStrategy{Strategy}
-
-// ResetFields .
-func (persistentvolumeclaimStatusStrategy) ResetFields(new, old runtime.Object) {}
 
 // PrepareForUpdate sets the Spec field which is not allowed to be changed when updating a PV's Status
 func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

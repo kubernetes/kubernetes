@@ -37,7 +37,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
-	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -152,12 +151,6 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			if err != nil {
 				scope.err(fmt.Errorf("failed to create new object (Create for %v): %v", scope.Kind, err), w, req)
 				return
-			}
-
-			if store, isGenericStore := r.(registry.GenericStore); isGenericStore {
-				if strategy := store.GetCreateStrategy(); strategy != nil {
-					strategy.ResetFields(obj, liveObj)
-				}
 			}
 
 			obj, err = scope.FieldManager.Update(liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))

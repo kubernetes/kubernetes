@@ -83,9 +83,6 @@ func (rcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pod.DropDisabledTemplateFields(controller.Spec.Template, nil)
 }
 
-// ResetFields .
-func (rcStrategy) ResetFields(new, old runtime.Object) {}
-
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (rcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newController := obj.(*api.ReplicationController)

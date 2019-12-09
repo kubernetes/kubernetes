@@ -62,9 +62,6 @@ func (csiNodeStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-// ResetFields .
-func (csiNodeStrategy) ResetFields(new, old runtime.Object) {}
-
 // PrepareForUpdate sets the driver's Allocatable fields that are not allowed to be set by an end user updating a CSINode.
 func (csiNodeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 }

@@ -68,9 +68,6 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	}
 }
 
-// ResetFields .
-func (strategy) ResetFields(new, old runtime.Object) {}
-
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newCRD := obj.(*apiextensions.CustomResourceDefinition)
@@ -162,8 +159,6 @@ func (statusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Obj
 	newObj.Generation = oldObj.Generation
 	newObj.SelfLink = oldObj.SelfLink
 }
-
-func (statusStrategy) ResetFields(new, old runtime.Object) {}
 
 func (statusStrategy) AllowCreateOnUpdate() bool {
 	return false

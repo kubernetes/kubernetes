@@ -49,9 +49,6 @@ func (endpointSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 	endpointSlice.Generation = 1
 }
 
-// ResetFields .
-func (endpointSliceStrategy) ResetFields(new, old runtime.Object) {}
-
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (endpointSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newEPS := obj.(*discovery.EndpointSlice)
