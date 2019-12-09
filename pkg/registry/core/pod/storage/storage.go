@@ -81,7 +81,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		DeleteStrategy:      registrypod.Strategy,
 		ReturnDeletedObject: true,
 
-		ResetFieldsProvider: pod.Strategy,
+		ResetFieldsProvider: registrypod.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
