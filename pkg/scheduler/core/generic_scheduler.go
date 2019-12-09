@@ -96,7 +96,9 @@ func (f *FitError) Error() string {
 	}
 
 	for _, status := range f.FilteredNodesStatuses {
-		reasons[status.Message()]++
+		for _, reason := range status.Reasons() {
+			reasons[reason]++
+		}
 	}
 
 	sortReasonsHistogram := func() []string {
@@ -1207,7 +1209,7 @@ func nodesWherePreemptionMightHelp(nodeNameToInfo map[string]*schedulernodeinfo.
 		// to rely less on such assumptions in the code when checking does not impose
 		// significant overhead.
 		// Also, we currently assume all failures returned by extender as resolvable.
-		if predicates.UnresolvablePredicateExists(failedPredicates) == nil {
+		if !predicates.UnresolvablePredicateExists(failedPredicates) {
 			klog.V(3).Infof("Node %v is a potential node for preemption.", name)
 			potentialNodes = append(potentialNodes, node.Node())
 		}
