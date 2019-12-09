@@ -77,31 +77,6 @@ func WaitForDeploymentRollbackCleared(c clientset.Interface, ns, deploymentName 
 	return testutils.WaitForDeploymentRollbackCleared(c, ns, deploymentName, poll, pollShortTimeout)
 }
 
-// WaitForDeploymentOldRSsNum waits for the deployment to clean up old rcs.
-func WaitForDeploymentOldRSsNum(c clientset.Interface, ns, deploymentName string, desiredRSNum int) error {
-	var oldRSs []*appsv1.ReplicaSet
-	var d *appsv1.Deployment
-
-	pollErr := wait.PollImmediate(poll, 5*time.Minute, func() (bool, error) {
-		deployment, err := c.AppsV1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		d = deployment
-
-		_, oldRSs, err = deploymentutil.GetOldReplicaSets(deployment, c.AppsV1())
-		if err != nil {
-			return false, err
-		}
-		return len(oldRSs) == desiredRSNum, nil
-	})
-	if pollErr == wait.ErrWaitTimeout {
-		pollErr = fmt.Errorf("%d old replica sets were not cleaned up for deployment %q", len(oldRSs)-desiredRSNum, deploymentName)
-		logReplicaSetsOfDeployment(d, oldRSs, nil)
-	}
-	return pollErr
-}
-
 // WaitForDeploymentRevision waits for becoming the target revision of a delopyment.
 func WaitForDeploymentRevision(c clientset.Interface, d *appsv1.Deployment, targetRevision string) error {
 	err := wait.PollImmediate(poll, pollLongTimeout, func() (bool, error) {

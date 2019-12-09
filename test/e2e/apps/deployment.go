@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"time"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	watchtools "k8s.io/client-go/tools/watch"
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -48,6 +50,7 @@ import (
 )
 
 const (
+	poll          = 2 * time.Second
 	dRetryPeriod  = 2 * time.Second
 	dRetryTimeout = 5 * time.Minute
 )
@@ -333,7 +336,7 @@ func testRecreateDeployment(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	framework.Logf("Watching deployment %q to verify that new pods will not run with olds pods", deploymentName)
-	err = e2edeploy.WatchRecreateDeployment(c, deployment)
+	err = watchRecreateDeployment(c, deployment)
 	framework.ExpectNoError(err)
 }
 
@@ -403,7 +406,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting for deployment %s history to be cleaned up", deploymentName))
-	err = e2edeploy.WaitForDeploymentOldRSsNum(c, ns, deploymentName, int(*revisionHistoryLimit))
+	err = waitForDeploymentOldRSsNum(c, ns, deploymentName, int(*revisionHistoryLimit))
 	framework.ExpectNoError(err)
 }
 
@@ -1017,4 +1020,72 @@ func setAffinities(d *appsv1.Deployment, setAffinity bool) {
 		}
 	}
 	d.Spec.Template.Spec.Affinity = affinity
+}
+
+// watchRecreateDeployment watches Recreate deployments and ensures no new pods will run at the same time with
+// old pods.
+func watchRecreateDeployment(c clientset.Interface, d *appsv1.Deployment) error {
+	if d.Spec.Strategy.Type != appsv1.RecreateDeploymentStrategyType {
+		return fmt.Errorf("deployment %q does not use a Recreate strategy: %s", d.Name, d.Spec.Strategy.Type)
+	}
+
+	w, err := c.AppsV1().Deployments(d.Namespace).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: d.Name, ResourceVersion: d.ResourceVersion}))
+	if err != nil {
+		return err
+	}
+
+	status := d.Status
+
+	condition := func(event watch.Event) (bool, error) {
+		d := event.Object.(*appsv1.Deployment)
+		status = d.Status
+
+		if d.Status.UpdatedReplicas > 0 && d.Status.Replicas != d.Status.UpdatedReplicas {
+			_, allOldRSs, err := deploymentutil.GetOldReplicaSets(d, c.AppsV1())
+			newRS, nerr := deploymentutil.GetNewReplicaSet(d, c.AppsV1())
+			if err == nil && nerr == nil {
+				framework.Logf("%+v", d)
+				testutil.LogReplicaSetsOfDeployment(d, allOldRSs, newRS, framework.Logf)
+				testutil.LogPodsOfDeployment(c, d, append(allOldRSs, newRS), framework.Logf)
+			}
+			return false, fmt.Errorf("deployment %q is running new pods alongside old pods: %#v", d.Name, status)
+		}
+
+		return *(d.Spec.Replicas) == d.Status.Replicas &&
+			*(d.Spec.Replicas) == d.Status.UpdatedReplicas &&
+			d.Generation <= d.Status.ObservedGeneration, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	_, err = watchtools.UntilWithoutRetry(ctx, w, condition)
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("deployment %q never completed: %#v", d.Name, status)
+	}
+	return err
+}
+
+// waitForDeploymentOldRSsNum waits for the deployment to clean up old rcs.
+func waitForDeploymentOldRSsNum(c clientset.Interface, ns, deploymentName string, desiredRSNum int) error {
+	var oldRSs []*appsv1.ReplicaSet
+	var d *appsv1.Deployment
+
+	pollErr := wait.PollImmediate(poll, 5*time.Minute, func() (bool, error) {
+		deployment, err := c.AppsV1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		d = deployment
+
+		_, oldRSs, err = deploymentutil.GetOldReplicaSets(deployment, c.AppsV1())
+		if err != nil {
+			return false, err
+		}
+		return len(oldRSs) == desiredRSNum, nil
+	})
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("%d old replica sets were not cleaned up for deployment %q", len(oldRSs)-desiredRSNum, deploymentName)
+		testutil.LogReplicaSetsOfDeployment(d, oldRSs, nil, framework.Logf)
+	}
+	return pollErr
 }
