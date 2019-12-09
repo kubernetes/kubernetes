@@ -94,16 +94,10 @@ type TestFieldManager struct {
 }
 
 func NewTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
-	d, err := fakeSchema.OpenAPISchema()
-	if err != nil {
-		panic(err)
-	}
-	m, err := proto.NewOpenAPIData(d)
-	if err != nil {
-		panic(err)
-	}
+	m := NewFakeOpenAPIModels()
+	tc := NewFakeTypeConverter(m)
 
-	converter := internal.NewVersionConverter(internal.DeducedTypeConverter{}, &fakeObjectConvertor{}, gvk.GroupVersion())
+	converter := internal.NewVersionConverter(tc, &fakeObjectConvertor{}, gvk.GroupVersion())
 	apiVersion := fieldpath.APIVersion(gvk.GroupVersion().String())
 	f, err := NewStructuredMergeManager(
 		m,
@@ -125,6 +119,26 @@ func NewTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
 		emptyObj:     live,
 		liveObj:      live.DeepCopyObject(),
 	}
+}
+
+func NewFakeTypeConverter(m proto.Models) internal.TypeConverter {
+	tc, err := internal.NewTypeConverter(m, false)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to build TypeConverter: %v", err))
+	}
+	return tc
+}
+
+func NewFakeOpenAPIModels() proto.Models {
+	d, err := fakeSchema.OpenAPISchema()
+	if err != nil {
+		panic(err)
+	}
+	m, err := proto.NewOpenAPIData(d)
+	if err != nil {
+		panic(err)
+	}
+	return m
 }
 
 func (f *TestFieldManager) Reset() {
@@ -412,35 +426,136 @@ func BenchmarkNewObject(b *testing.B) {
 
 func BenchmarkRepeatedUpdate(b *testing.B) {
 	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
+
 	podBytes := getObjectBytes("pod.yaml")
 
-	var obj *corev1.Pod
-	if err := yaml.Unmarshal(podBytes, &obj); err != nil {
+	var obj1 *corev1.Pod
+	if err := yaml.Unmarshal(podBytes, &obj1); err != nil {
 		b.Fatalf("Failed to parse yaml object: %v", err)
 	}
-	obj.Spec.Containers[0].Image = "nginx:latest"
-	objs := []*corev1.Pod{obj}
-	obj = obj.DeepCopy()
-	obj.Spec.Containers[0].Image = "nginx:4.3"
-	objs = append(objs, obj)
+	obj1.Spec.Containers[0].Image = "nginx:latest"
+	obj2 := obj1.DeepCopy()
+	obj2.Spec.Containers[0].Image = "nginx:4.3"
 
-	err := f.Apply(podBytes, "fieldmanager_apply", false)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	if err := f.Update(objs[1], "fieldmanager_1"); err != nil {
-		b.Fatal(err)
-	}
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		err := f.Update(objs[n%len(objs)], fmt.Sprintf("fieldmanager_%d", n%len(objs)))
+	toUnstructured := func(o runtime.Object) *unstructured.Unstructured {
+		data, err := json.Marshal(o)
 		if err != nil {
-			b.Fatal(err)
+			b.Fatalf("Failed to marshal to json: %v", err)
 		}
-		f.Reset()
+		u := &unstructured.Unstructured{Object: map[string]interface{}{}}
+		err = json.Unmarshal(data, u)
+		if err != nil {
+			b.Fatalf("Failed to unmarshal to json: %v", err)
+		}
+		return u
+	}
+
+	tests := []struct{
+		name string
+		objs []runtime.Object
+	}{
+		{
+			name: "structured",
+			objs: []runtime.Object{obj1, obj2},
+		},
+		{
+			name: "unstructured",
+			objs: []runtime.Object{toUnstructured(obj1), toUnstructured(obj2)},
+		},
+	}
+
+	for _, tc := range tests {
+		b.Run(tc.name, func(b *testing.B) {
+			err := f.Apply(podBytes, "fieldmanager_apply", false)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			if err := f.Update(tc.objs[1], "fieldmanager_1"); err != nil {
+				b.Fatal(err)
+			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for n := 0; n < b.N; n++ {
+				err := f.Update(tc.objs[n%len(tc.objs)], fmt.Sprintf("fieldmanager_%d", n%len(tc.objs)))
+				if err != nil {
+					b.Fatal(err)
+				}
+				f.Reset()
+			}
+		})
+	}
+}
+
+func toUnstructured(b *testing.B, o runtime.Object) *unstructured.Unstructured {
+	data, err := json.Marshal(o)
+	if err != nil {
+		b.Fatalf("Failed to marshal to json: %v", err)
+	}
+	u := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	err = json.Unmarshal(data, u)
+	if err != nil {
+		b.Fatalf("Failed to unmarshal to json: %v", err)
+	}
+	return u
+}
+
+func BenchmarkConvertObjectToTyped(b *testing.B) {
+	tests := []struct {
+		gvk schema.GroupVersionKind
+		obj []byte
+	}{
+		{
+			gvk: schema.FromAPIVersionAndKind("v1", "Pod"),
+			obj: getObjectBytes("pod.yaml"),
+		},
+		{
+			gvk: schema.FromAPIVersionAndKind("v1", "Node"),
+			obj: getObjectBytes("node.yaml"),
+		},
+		{
+			gvk: schema.FromAPIVersionAndKind("v1", "Endpoints"),
+			obj: getObjectBytes("endpoints.yaml"),
+		},
+	}
+
+	scheme := runtime.NewScheme()
+	if err :=corev1.AddToScheme(scheme); err != nil {
+		b.Fatalf("Failed to add to scheme: %v", err)
+	}
+
+	for _, test := range tests {
+		b.Run(test.gvk.Kind, func(b *testing.B) {
+			decoder := serializer.NewCodecFactory(scheme).UniversalDecoder(test.gvk.GroupVersion())
+			obj, err := runtime.Decode(decoder, test.obj)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			m := NewFakeOpenAPIModels()
+			typeConverter := NewFakeTypeConverter(m)
+			//var typeConverter internal.TypeConverter = internal.DeducedTypeConverter{}
+
+			b.Run("structured", func(b *testing.B) {
+				b.ReportAllocs()
+				for n := 0; n < b.N; n++ {
+					_, err := typeConverter.ObjectToTyped(obj)
+					if err != nil {
+						b.Errorf("Error in ObjectToTyped: %v", err)
+					}
+				}
+			})
+			b.Run("unstructured", func(b *testing.B) {
+				b.ReportAllocs()
+				for n := 0; n < b.N; n++ {
+					_, err := typeConverter.ObjectToTyped(toUnstructured(b, obj))
+					if err != nil {
+						b.Errorf("Error in ObjectToTyped: %v", err)
+					}
+				}
+			})
+		})
 	}
 }
 
