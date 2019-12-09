@@ -18,11 +18,13 @@ package proxy
 
 import (
 	"net"
+	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -387,42 +389,29 @@ func TestServiceToServiceMap(t *testing.T) {
 type FakeProxier struct {
 	endpointsChanges *EndpointChangeTracker
 	serviceChanges   *ServiceChangeTracker
-	serviceMap       ServiceMap
 	endpointsMap     EndpointsMap
 	hostname         string
 }
 
 func newFakeProxier() *FakeProxier {
 	return &FakeProxier{
-		serviceMap:       make(ServiceMap),
 		serviceChanges:   NewServiceChangeTracker(nil, nil, nil),
 		endpointsMap:     make(EndpointsMap),
 		endpointsChanges: NewEndpointChangeTracker(testHostname, nil, nil, nil, false),
 	}
 }
 
-func makeServiceMap(fake *FakeProxier, allServices ...*v1.Service) {
-	for i := range allServices {
-		fake.addService(allServices[i])
+func addServices(sct *ServiceChangeTracker, services ...*v1.Service) {
+	for _, svc := range services {
+		sct.Update(nil, svc)
 	}
 }
 
-func (fake *FakeProxier) addService(service *v1.Service) {
-	fake.serviceChanges.Update(nil, service)
-}
-
-func (fake *FakeProxier) updateService(oldService *v1.Service, service *v1.Service) {
-	fake.serviceChanges.Update(oldService, service)
-}
-
-func (fake *FakeProxier) deleteService(service *v1.Service) {
-	fake.serviceChanges.Update(service, nil)
-}
-
 func TestUpdateServiceMapHeadless(t *testing.T) {
-	fp := newFakeProxier()
+	sct := NewServiceChangeTracker(nil, nil, nil)
 
-	makeServiceMap(fp,
+	addServices(
+		sct,
 		makeTestService("ns2", "headless", func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeClusterIP
 			svc.Spec.ClusterIP = v1.ClusterIPNone
@@ -435,25 +424,25 @@ func TestUpdateServiceMapHeadless(t *testing.T) {
 	)
 
 	// Headless service should be ignored
-	result := UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
-	if len(fp.serviceMap) != 0 {
-		t.Errorf("expected service map length 0, got %d", len(fp.serviceMap))
+	result := sct.Commit()
+	if len(result.ServiceMap) != 0 {
+		t.Errorf("expected service map length 0, got %d", len(result.ServiceMap))
 	}
 
 	// No proxied services, so no healthchecks
-	if len(result.HCServiceNodePorts) != 0 {
-		t.Errorf("expected healthcheck ports length 0, got %d", len(result.HCServiceNodePorts))
+	if len(result.ServiceMap.HCServiceNodePorts()) != 0 {
+		t.Errorf("expected healthcheck ports length 0, got %d", len(result.ServiceMap.HCServiceNodePorts()))
 	}
 
-	if len(result.UDPStaleClusterIP) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+	if len(result.UDPStaleClusterIPs()) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIPs()))
 	}
 }
 
 func TestUpdateServiceTypeExternalName(t *testing.T) {
-	fp := newFakeProxier()
+	sct := NewServiceChangeTracker(nil, nil, nil)
 
-	makeServiceMap(fp,
+	addServices(sct,
 		makeTestService("ns2", "external-name", func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeExternalName
 			svc.Spec.ClusterIP = "172.16.55.4" // Should be ignored
@@ -462,21 +451,21 @@ func TestUpdateServiceTypeExternalName(t *testing.T) {
 		}),
 	)
 
-	result := UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
-	if len(fp.serviceMap) != 0 {
-		t.Errorf("expected service map length 0, got %v", fp.serviceMap)
+	result := sct.Commit()
+	if len(result.ServiceMap) != 0 {
+		t.Errorf("expected service map length 0, got %v", result.ServiceMap)
 	}
 	// No proxied services, so no healthchecks
-	if len(result.HCServiceNodePorts) != 0 {
-		t.Errorf("expected healthcheck ports length 0, got %v", result.HCServiceNodePorts)
+	if len(result.ServiceMap.HCServiceNodePorts()) != 0 {
+		t.Errorf("expected healthcheck ports length 0, got %v", result.ServiceMap.HCServiceNodePorts())
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.UDPStaleClusterIP)
+	if len(result.UDPStaleClusterIPs()) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %v", result.UDPStaleClusterIPs())
 	}
 }
 
 func TestBuildServiceMapAddRemove(t *testing.T) {
-	fp := newFakeProxier()
+	sct := NewServiceChangeTracker(nil, nil, nil)
 
 	services := []*v1.Service{
 		makeTestService("ns2", "cluster-ip", func(svc *v1.Service) {
@@ -519,27 +508,30 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 		}),
 	}
 
-	for i := range services {
-		fp.addService(services[i])
+	for _, svc := range services {
+		sct.Update(nil, svc)
 	}
-	result := UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
-	if len(fp.serviceMap) != 8 {
-		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
+	if len(sct.pendingChanges) != 4 {
+		t.Errorf("expected pending changes length 4, got %v", sct.pendingChanges)
+	}
+	result := sct.Commit()
+	if len(result.ServiceMap) != 8 {
+		t.Errorf("expected service map length 8, got %#v", result)
 	}
 
 	// The only-local-loadbalancer ones get added
-	if len(result.HCServiceNodePorts) != 1 {
-		t.Errorf("expected 1 healthcheck port, got %v", result.HCServiceNodePorts)
+	if len(result.ServiceMap.HCServiceNodePorts()) != 1 {
+		t.Errorf("expected 1 healthcheck port, got %v", result.ServiceMap.HCServiceNodePorts())
 	} else {
 		nsn := makeNSN("ns1", "only-local-load-balancer")
-		if port, found := result.HCServiceNodePorts[nsn]; !found || port != 345 {
-			t.Errorf("expected healthcheck port [%q]=345: got %v", nsn, result.HCServiceNodePorts)
+		if port, found := result.ServiceMap.HCServiceNodePorts()[nsn]; !found || port != 345 {
+			t.Errorf("expected healthcheck port [%q]=345: got %v", nsn, result.ServiceMap.HCServiceNodePorts())
 		}
 	}
 
-	if len(result.UDPStaleClusterIP) != 0 {
+	if len(result.UDPStaleClusterIPs()) != 0 {
 		// Services only added, so nothing stale yet
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIPs()))
 	}
 
 	// Remove some stuff
@@ -550,36 +542,34 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "p2", "UDP", 1235, 5321, 0)
 	})
 
-	fp.updateService(services[0], oneService)
-	fp.deleteService(services[1])
-	fp.deleteService(services[2])
-	fp.deleteService(services[3])
-
-	result = UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
-	if len(fp.serviceMap) != 1 {
-		t.Errorf("expected service map length 1, got %v", fp.serviceMap)
+	sct.Update(services[0], oneService)
+	sct.Update(services[1], nil)
+	sct.Update(services[2], nil)
+	sct.Update(services[3], nil)
+	result = sct.Commit()
+	if len(result.ServiceMap) != 1 {
+		t.Errorf("expected service map length 1, got %v", result.ServiceMap)
 	}
 
-	if len(result.HCServiceNodePorts) != 0 {
-		t.Errorf("expected 0 healthcheck ports, got %v", result.HCServiceNodePorts)
+	if len(result.ServiceMap.HCServiceNodePorts()) != 0 {
+		t.Errorf("expected 0 healthcheck ports, got %v", result.ServiceMap.HCServiceNodePorts())
 	}
 
 	// All services but one were deleted. While you'd expect only the ClusterIPs
 	// from the three deleted services here, we still have the ClusterIP for
 	// the not-deleted service, because one of it's ServicePorts was deleted.
 	expectedStaleUDPServices := []string{"172.16.55.10", "172.16.55.4", "172.16.55.11", "172.16.55.12"}
-	if len(result.UDPStaleClusterIP) != len(expectedStaleUDPServices) {
-		t.Errorf("expected stale UDP services length %d, got %v", len(expectedStaleUDPServices), result.UDPStaleClusterIP.UnsortedList())
-	}
-	for _, ip := range expectedStaleUDPServices {
-		if !result.UDPStaleClusterIP.Has(ip) {
-			t.Errorf("expected stale UDP service service %s", ip)
-		}
+	actualStaleServices := result.UDPStaleClusterIPs().UnsortedList()
+	sort.Strings(actualStaleServices)
+	sort.Strings(expectedStaleUDPServices)
+
+	if !reflect.DeepEqual(expectedStaleUDPServices, actualStaleServices) {
+		t.Errorf("expected stale udp services %#v, got %#v", expectedStaleUDPServices, actualStaleServices)
 	}
 }
 
 func TestBuildServiceMapServiceUpdate(t *testing.T) {
-	fp := newFakeProxier()
+	sct := NewServiceChangeTracker(nil, nil, nil)
 
 	servicev1 := makeTestService("ns1", "svc1", func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeClusterIP
@@ -602,58 +592,73 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 		svc.Spec.HealthCheckNodePort = 345
 	})
 
-	fp.addService(servicev1)
+	sct.Update(nil, servicev1)
 
-	result := UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
-	if len(fp.serviceMap) != 2 {
-		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
+	result := sct.Commit()
+	if len(result.ServiceMap) != 2 {
+		t.Errorf("expected service map length 2, got %v", result.ServiceMap)
 	}
-	if len(result.HCServiceNodePorts) != 0 {
-		t.Errorf("expected healthcheck ports length 0, got %v", result.HCServiceNodePorts)
+	if len(result.ServiceMap.HCServiceNodePorts()) != 0 {
+		t.Errorf("expected healthcheck ports length 0, got %v", result.ServiceMap.HCServiceNodePorts())
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
+	if len(result.UDPStaleClusterIPs()) != 0 {
 		// Services only added, so nothing stale yet
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIPs()))
 	}
 
 	// Change service to load-balancer
-	fp.updateService(servicev1, servicev2)
-	result = UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
-	if len(fp.serviceMap) != 2 {
-		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
+	sct.Update(servicev1, servicev2)
+	result = sct.Commit()
+	if len(result.ServiceMap) != 2 {
+		t.Errorf("expected service map length 2, got %v", result.ServiceMap)
 	}
-	if len(result.HCServiceNodePorts) != 1 {
-		t.Errorf("expected healthcheck ports length 1, got %v", result.HCServiceNodePorts)
+	if len(result.ServiceMap.HCServiceNodePorts()) != 1 {
+		t.Errorf("expected healthcheck ports length 1, got %v", result.ServiceMap.HCServiceNodePorts())
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.UDPStaleClusterIP.UnsortedList())
+	if len(result.UDPStaleClusterIPs()) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %v", result.UDPStaleClusterIPs().UnsortedList())
 	}
 
 	// No change; make sure the service map stays the same and there are
 	// no health-check changes
-	fp.updateService(servicev2, servicev2)
-	result = UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
-	if len(fp.serviceMap) != 2 {
-		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
+	sct.Update(servicev2, servicev2)
+	result = sct.Commit()
+	if len(result.ServiceMap) != 2 {
+		t.Errorf("expected service map length 2, got %v", result.ServiceMap)
 	}
-	if len(result.HCServiceNodePorts) != 1 {
-		t.Errorf("expected healthcheck ports length 1, got %v", result.HCServiceNodePorts)
+	if len(result.ServiceMap.HCServiceNodePorts()) != 1 {
+		t.Errorf("expected healthcheck ports length 1, got %v", result.ServiceMap.HCServiceNodePorts())
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
-		t.Errorf("expected stale UDP services length 0, got %v", result.UDPStaleClusterIP.UnsortedList())
+	if len(result.UDPStaleClusterIPs()) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %v", result.UDPStaleClusterIPs().UnsortedList())
 	}
 
 	// And back to ClusterIP
-	fp.updateService(servicev2, servicev1)
-	result = UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
-	if len(fp.serviceMap) != 2 {
-		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
+	sct.Update(servicev2, servicev1)
+	result = sct.Commit()
+	if len(result.ServiceMap) != 2 {
+		t.Errorf("expected service map length 2, got %v", result.ServiceMap)
 	}
-	if len(result.HCServiceNodePorts) != 0 {
-		t.Errorf("expected healthcheck ports length 0, got %v", result.HCServiceNodePorts)
+	if len(result.ServiceMap.HCServiceNodePorts()) != 0 {
+		t.Errorf("expected healthcheck ports length 0, got %v", result.ServiceMap.HCServiceNodePorts())
 	}
-	if len(result.UDPStaleClusterIP) != 0 {
+	if len(result.UDPStaleClusterIPs()) != 0 {
 		// Services only added, so nothing stale yet
-		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIP))
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.UDPStaleClusterIPs()))
+	}
+
+	// check that shortcutting works
+	changed := sct.Update(servicev1, servicev1)
+	if changed {
+		t.Errorf("Expected no-op change to report no pending changes")
+	}
+
+	// Check that we elide ABA
+	if !sct.Update(servicev1, servicev2) {
+		t.Errorf("Change should report pending changes")
+	}
+
+	if sct.Update(servicev2, servicev1) {
+		t.Errorf("ABA change should be cancelled")
 	}
 }
