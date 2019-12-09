@@ -40,7 +40,7 @@ import (
 )
 
 // DriverDefinition needs to be filled in via a .yaml or .json
-// file. It's methods then implement the TestDriver interface, using
+// file. Its methods then implement the TestDriver interface, using
 // nothing but the information in this struct.
 type driverDefinition struct {
 	// DriverInfo is the static information that the storage testsuite
