@@ -82,8 +82,8 @@ const (
 var NetexecImageName = imageutils.GetE2EImage(imageutils.Agnhost)
 
 // NewNetworkingTestConfig creates and sets up a new test config helper.
-func NewNetworkingTestConfig(f *framework.Framework) *NetworkingTestConfig {
-	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: true}
+func NewNetworkingTestConfig(f *framework.Framework, hostNetwork bool) *NetworkingTestConfig {
+	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork}
 	ginkgo.By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
 	config.setup(getServiceSelector())
 	return config
@@ -232,7 +232,7 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, dialCommand, con
 	responses := sets.NewString()
 
 	for i := 0; i < maxTries; i++ {
-		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.HostTestContainerPod.Name, cmd)
+		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.TestContainerPod.Name, cmd)
 		if err != nil {
 			// A failure to kubectl exec counts as a try, not a hard fail.
 			// Also note that we will keep failing for maxTries in tests where
@@ -293,7 +293,7 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 	eps := sets.NewString()
 
 	for i := 0; i < tries; i++ {
-		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.HostTestContainerPod.Name, cmd)
+		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.TestContainerPod.Name, cmd)
 		if err != nil {
 			// A failure to kubectl exec counts as a try, not a hard fail.
 			// Also note that we will keep failing for maxTries in tests where
@@ -561,10 +561,11 @@ func (config *NetworkingTestConfig) createTestPods() {
 	hostTestContainerPod := e2epod.NewExecPodSpec(config.Namespace, hostTestPodName, config.HostNetwork)
 
 	config.createPod(testContainerPod)
-	config.createPod(hostTestContainerPod)
+	if config.HostNetwork {
+		config.createPod(hostTestContainerPod)
+	}
 
 	framework.ExpectNoError(config.f.WaitForPodRunning(testContainerPod.Name))
-	framework.ExpectNoError(config.f.WaitForPodRunning(hostTestContainerPod.Name))
 
 	var err error
 	config.TestContainerPod, err = config.getPodClient().Get(testContainerPod.Name, metav1.GetOptions{})
@@ -572,9 +573,12 @@ func (config *NetworkingTestConfig) createTestPods() {
 		framework.Failf("Failed to retrieve %s pod: %v", testContainerPod.Name, err)
 	}
 
-	config.HostTestContainerPod, err = config.getPodClient().Get(hostTestContainerPod.Name, metav1.GetOptions{})
-	if err != nil {
-		framework.Failf("Failed to retrieve %s pod: %v", hostTestContainerPod.Name, err)
+	if config.HostNetwork {
+		framework.ExpectNoError(config.f.WaitForPodRunning(hostTestContainerPod.Name))
+		config.HostTestContainerPod, err = config.getPodClient().Get(hostTestContainerPod.Name, metav1.GetOptions{})
+		if err != nil {
+			framework.Failf("Failed to retrieve %s pod: %v", hostTestContainerPod.Name, err)
+		}
 	}
 }
 
