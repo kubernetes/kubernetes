@@ -46,6 +46,25 @@ var (
 		Install addons from an AddonInstallerConfiguration via the API server.
 		This phase only runs when ClusterConfiguration.FeatureGates.AddonInstaller is true.
 		`)  // TODO: add documentation / link
+
+	addonInstallerExample = cmdutil.Examples(`
+		# To enable the addon installer feature gate and add Weave Net as a cluster addon
+		# and run everything in out single "kubeadm init" command, use the following:
+
+		cat << EOF > cluster-config.yaml
+		apiVersion: kubeadm.k8s.io/v1beta2
+		kind: ClusterConfiguration
+		featureGates:
+		AddonInstaller: true
+		---
+		apiVersion: addons.config.x-k8s.io/v1alpha1
+		kind: AddonInstallerConfiguration
+		addons:
+		- name: weave-net
+		  manifestRef: https://raw.githubusercontent.com/weaveworks/weave/v2.6.0/prog/weave-kube/weave-daemonset-k8s-1.11.yaml
+		EOF
+		kubeadm init --config=cluster-config.yaml
+		`)
 )
 
 // NewAddonPhase returns the addon Cobra command
@@ -79,6 +98,7 @@ func NewAddonPhase() workflow.Phase {
 				Name:         "installer",
 				Short:        "Install addons from an AddonInstallerConfiguration",
 				Long:         addonInstallerLongDesc,
+				Example:      addonInstallerExample,
 				InheritFlags: getAddonPhaseFlags("installer"),
 				Run:          runAddonInstaller,
 			},
