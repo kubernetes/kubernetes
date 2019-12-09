@@ -437,15 +437,6 @@ func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Ob
 		panic("FieldManager must be installed to run apply")
 	}
 
-	// patchObj, err := p.creater.New(p.kind)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to create new object (Create for %v): %v", p.kind, err)
-	// }
-
-	// if err := yaml.Unmarshal(p.patch, &patchObj); err != nil {
-	// 	return nil, errors.NewBadRequest(fmt.Sprintf("error decoding YAML: %v", err))
-	// }
-
 	patchObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal(p.patch, &patchObj.Object); err != nil {
 		return nil, errors.NewBadRequest(fmt.Sprintf("error decoding YAML: %v", err))
