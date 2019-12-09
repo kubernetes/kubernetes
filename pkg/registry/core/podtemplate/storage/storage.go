@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/podtemplate"
 )
 
+// REST implements a RESTStorage for pod templates.
 type REST struct {
 	*genericregistry.Store
 }

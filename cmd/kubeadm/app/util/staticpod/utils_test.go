@@ -65,6 +65,13 @@ func TestGetAPIServerProbeAddress(t *testing.T) {
 			},
 			expected: "10.10.10.10",
 		},
+		{
+			desc: "filled in ipv6 AdvertiseAddress endpoint returns it",
+			endpoint: &kubeadmapi.APIEndpoint{
+				AdvertiseAddress: "2001:abcd:bcda::1",
+			},
+			expected: "2001:abcd:bcda::1",
+		},
 	}
 
 	for _, test := range tests {
@@ -103,6 +110,17 @@ func TestGetControllerManagerProbeAddress(t *testing.T) {
 			},
 			expected: "10.10.10.10",
 		},
+		{
+			desc: "setting controller manager extra ipv6 address arg to something acknowledges it",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ControllerManager: kubeadmapi.ControlPlaneComponent{
+					ExtraArgs: map[string]string{
+						kubeControllerManagerAddressArg: "2001:abcd:bcda::1",
+					},
+				},
+			},
+			expected: "2001:abcd:bcda::1",
+		},
 	}
 
 	for _, test := range tests {
@@ -119,6 +137,7 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 	var tests = []struct {
 		name             string
 		cfg              *kubeadmapi.Etcd
+		isIPv6           bool
 		expectedHostname string
 		expectedPort     int
 		expectedScheme   v1.URIScheme
@@ -131,6 +150,7 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 						"listen-metrics-urls": "https://1.2.3.4:1234,https://4.3.2.1:2381"},
 				},
 			},
+			isIPv6:           false,
 			expectedHostname: "1.2.3.4",
 			expectedPort:     1234,
 			expectedScheme:   v1.URISchemeHTTPS,
@@ -143,6 +163,7 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 						"listen-metrics-urls": "http://1.2.3.4:1234"},
 				},
 			},
+			isIPv6:           false,
 			expectedHostname: "1.2.3.4",
 			expectedPort:     1234,
 			expectedScheme:   v1.URISchemeHTTP,
@@ -155,6 +176,7 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 						"listen-metrics-urls": "1.2.3.4"},
 				},
 			},
+			isIPv6:           false,
 			expectedHostname: "127.0.0.1",
 			expectedPort:     kubeadmconstants.EtcdMetricsPort,
 			expectedScheme:   v1.URISchemeHTTP,
@@ -167,7 +189,60 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 						"listen-metrics-urls": "https://1.2.3.4"},
 				},
 			},
+			isIPv6:           false,
 			expectedHostname: "1.2.3.4",
+			expectedPort:     kubeadmconstants.EtcdMetricsPort,
+			expectedScheme:   v1.URISchemeHTTPS,
+		},
+		{
+			name: "etcd probe URL from two IPv6 URLs",
+			cfg: &kubeadmapi.Etcd{
+				Local: &kubeadmapi.LocalEtcd{
+					ExtraArgs: map[string]string{
+						"listen-metrics-urls": "https://[2001:abcd:bcda::1]:1234,https://[2001:abcd:bcda::2]:2381"},
+				},
+			},
+			isIPv6:           true,
+			expectedHostname: "2001:abcd:bcda::1",
+			expectedPort:     1234,
+			expectedScheme:   v1.URISchemeHTTPS,
+		},
+		{
+			name: "etcd probe localhost IPv6 URL with HTTP scheme",
+			cfg: &kubeadmapi.Etcd{
+				Local: &kubeadmapi.LocalEtcd{
+					ExtraArgs: map[string]string{
+						"listen-metrics-urls": "http://[::1]:1234"},
+				},
+			},
+			isIPv6:           true,
+			expectedHostname: "::1",
+			expectedPort:     1234,
+			expectedScheme:   v1.URISchemeHTTP,
+		},
+		{
+			name: "etcd probe IPv6 URL with HTTP scheme",
+			cfg: &kubeadmapi.Etcd{
+				Local: &kubeadmapi.LocalEtcd{
+					ExtraArgs: map[string]string{
+						"listen-metrics-urls": "http://[2001:abcd:bcda::1]:1234"},
+				},
+			},
+			isIPv6:           true,
+			expectedHostname: "2001:abcd:bcda::1",
+			expectedPort:     1234,
+			expectedScheme:   v1.URISchemeHTTP,
+		},
+		{
+			name: "etcd probe IPv6 URL without port",
+			cfg: &kubeadmapi.Etcd{
+				Local: &kubeadmapi.LocalEtcd{
+					ExtraArgs: map[string]string{
+						"listen-metrics-urls": "https://[2001:abcd:bcda::1]"},
+				},
+			},
+			isIPv6:           true,
+			expectedHostname: "2001:abcd:bcda::1",
 			expectedPort:     kubeadmconstants.EtcdMetricsPort,
 			expectedScheme:   v1.URISchemeHTTPS,
 		},
@@ -176,14 +251,25 @@ func TestGetEtcdProbeEndpoint(t *testing.T) {
 			cfg: &kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{},
 			},
+			isIPv6:           false,
 			expectedHostname: "127.0.0.1",
+			expectedPort:     kubeadmconstants.EtcdMetricsPort,
+			expectedScheme:   v1.URISchemeHTTP,
+		},
+		{
+			name: "etcd probe URL from defaults if IPv6",
+			cfg: &kubeadmapi.Etcd{
+				Local: &kubeadmapi.LocalEtcd{},
+			},
+			isIPv6:           true,
+			expectedHostname: "::1",
 			expectedPort:     kubeadmconstants.EtcdMetricsPort,
 			expectedScheme:   v1.URISchemeHTTP,
 		},
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			hostname, port, scheme := GetEtcdProbeEndpoint(rt.cfg)
+			hostname, port, scheme := GetEtcdProbeEndpoint(rt.cfg, rt.isIPv6)
 			if hostname != rt.expectedHostname {
 				t.Errorf("%q test case failed:\n\texpected hostname: %s\n\tgot: %s",
 					rt.name, rt.expectedHostname, hostname)

@@ -38,10 +38,9 @@ const devicePath = "/mnt/volume1"
 // formatted and mounted like a nil/Filesystem PV after a downgrade to a version
 // where the BlockVolume feature is disabled
 type VolumeModeDowngradeTest struct {
-	pvSource *v1.PersistentVolumeSource
-	pv       *v1.PersistentVolume
-	pvc      *v1.PersistentVolumeClaim
-	pod      *v1.Pod
+	pv  *v1.PersistentVolume
+	pvc *v1.PersistentVolumeClaim
+	pod *v1.Pod
 }
 
 // Name returns the tracking name of the test.

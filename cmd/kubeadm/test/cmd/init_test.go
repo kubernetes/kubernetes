@@ -180,6 +180,16 @@ func TestCmdInitConfig(t *testing.T) {
 			args:     "--kubernetes-version=1.11.0 --config=testdata/init/v1beta2.yaml",
 			expected: false,
 		},
+		{
+			name:     "can load current component config",
+			args:     "--config=testdata/init/current-component-config.yaml",
+			expected: true,
+		},
+		{
+			name:     "can't load old component config",
+			args:     "--config=testdata/init/old-component-config.yaml",
+			expected: false,
+		},
 	}
 
 	for _, rt := range initTest {

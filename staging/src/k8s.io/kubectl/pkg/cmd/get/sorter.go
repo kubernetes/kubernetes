@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/util/jsonpath"
@@ -46,7 +45,7 @@ type SortingPrinter struct {
 }
 
 func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
-	if table, isTable := obj.(*metav1beta1.Table); isTable && len(table.Rows) > 1 {
+	if table, isTable := obj.(*metav1.Table); isTable && len(table.Rows) > 1 {
 		parsedField, err := RelaxedJSONPathExpression(s.SortField)
 		if err != nil {
 			parsedField = s.SortField
@@ -322,7 +321,7 @@ func (r *RuntimeSort) OriginalPosition(ix int) int {
 
 type TableSorter struct {
 	field      string
-	obj        *metav1beta1.Table
+	obj        *metav1.Table
 	parsedRows [][][]reflect.Value
 }
 
@@ -361,7 +360,7 @@ func (t *TableSorter) Sort() error {
 	return nil
 }
 
-func NewTableSorter(table *metav1beta1.Table, field string) (*TableSorter, error) {
+func NewTableSorter(table *metav1.Table, field string) (*TableSorter, error) {
 	var parsedRows [][][]reflect.Value
 
 	parser := jsonpath.New("sorting").AllowMissingKeys(true)

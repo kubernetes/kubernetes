@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
+	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
@@ -62,7 +63,6 @@ var (
 	// emptyFramework is an empty framework used in tests.
 	// Note: If the test runs in goroutine, please don't use this variable to avoid a race condition.
 	emptyFramework, _ = framework.NewFramework(emptyPluginRegistry, nil, nil)
-	emptySnapshot     = nodeinfosnapshot.NewEmptySnapshot()
 )
 
 type fakeBinder struct {
@@ -156,7 +156,6 @@ func (es mockScheduler) PredicateMetadataProducer() predicates.MetadataProducer 
 	return nil
 
 }
-
 func (es mockScheduler) Schedule(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (core.ScheduleResult, error) {
 	return es.result, es.err
 }
@@ -170,9 +169,12 @@ func (es mockScheduler) Prioritizers() []priorities.PriorityConfig {
 func (es mockScheduler) Extenders() []algorithm.SchedulerExtender {
 	return nil
 }
-
 func (es mockScheduler) Preempt(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
 	return nil, nil, nil, nil
+}
+func (es mockScheduler) Snapshot() error {
+	return nil
+
 }
 
 func TestSchedulerCreation(t *testing.T) {
@@ -200,6 +202,32 @@ func TestSchedulerCreation(t *testing.T) {
 
 	if err != nil {
 		t.Fatalf("Failed to create scheduler: %v", err)
+	}
+
+	// Test case for when a plugin name in frameworkOutOfTreeRegistry already exist in defaultRegistry.
+	fakeFrameworkPluginName := ""
+	for name := range frameworkplugins.NewDefaultRegistry(&frameworkplugins.RegistryArgs{}) {
+		fakeFrameworkPluginName = name
+		break
+	}
+	registryFake := map[string]framework.PluginFactory{
+		fakeFrameworkPluginName: func(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
+			return nil, nil
+		},
+	}
+	_, err = New(client,
+		informerFactory,
+		NewPodInformer(client, 0),
+		eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
+		stopCh,
+		WithAlgorithmSource(schedulerapi.SchedulerAlgorithmSource{Provider: &testSource}),
+		WithPodInitialBackoffSeconds(1),
+		WithPodMaxBackoffSeconds(10),
+		WithFrameworkOutOfTreeRegistry(registryFake),
+	)
+
+	if err == nil {
+		t.Fatalf("Create scheduler should fail")
 	}
 }
 
@@ -645,12 +673,12 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, recorder events.EventRecorder) (*Scheduler, chan *v1.Binding, chan error) {
 	algo := core.NewGenericScheduler(
 		scache,
-		internalqueue.NewSchedulingQueue(nil, nil),
+		internalqueue.NewSchedulingQueue(nil),
 		predicateMap,
 		predicates.EmptyMetadataProducer,
 		[]priorities.PriorityConfig{},
 		priorities.EmptyMetadataProducer,
-		emptySnapshot,
+		nodeinfosnapshot.NewEmptySnapshot(),
 		emptyFramework,
 		[]algorithm.SchedulerExtender{},
 		nil,
@@ -694,14 +722,15 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 }
 
 func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
+	queue := internalqueue.NewSchedulingQueue(nil)
 	algo := core.NewGenericScheduler(
 		scache,
-		internalqueue.NewSchedulingQueue(nil, nil),
+		queue,
 		predicateMap,
 		predicates.EmptyMetadataProducer,
 		[]priorities.PriorityConfig{},
 		priorities.EmptyMetadataProducer,
-		emptySnapshot,
+		nodeinfosnapshot.NewEmptySnapshot(),
 		emptyFramework,
 		[]algorithm.SchedulerExtender{},
 		nil,
@@ -739,6 +768,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		StopEverything:      stop,
 		Framework:           emptyFramework,
 		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
+		SchedulingQueue:     queue,
 	}
 
 	return sched, bindingChan

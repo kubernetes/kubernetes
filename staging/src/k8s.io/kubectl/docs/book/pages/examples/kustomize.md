@@ -17,7 +17,7 @@ values that should be copied from this file or that are recommended.
 In practice, fields with no value should simply be  omitted from kustomization.yaml
 to reduce the content visible in configuration reviews.
 
-Example copied from the [kustomize repo](https://github.com/kubernetes-sigs/kustomize/blob/master/docs/kustomization.yaml)
+Example copied from the [kustomize repo](https://github.com/kubernetes-sigs/kustomize/tree/master/examples)
  
  {% sample lang="yaml" %}
 ```yaml

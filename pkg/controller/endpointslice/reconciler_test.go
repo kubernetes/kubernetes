@@ -318,6 +318,7 @@ func TestReconcileEndpointSlicesSomePreexisting(t *testing.T) {
 	}
 
 	existingSlices := []*discovery.EndpointSlice{endpointSlice1, endpointSlice2}
+	cmc := newCacheMutationCheck(existingSlices)
 	createEndpointSlices(t, client, namespace, existingSlices)
 
 	numActionsBefore := len(client.Actions())
@@ -332,6 +333,9 @@ func TestReconcileEndpointSlicesSomePreexisting(t *testing.T) {
 	// 1 new slice (0->100) + 1 updated slice (62->89)
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{89, 61, 100})
 	expectMetrics(t, expectedMetrics{desiredSlices: 3, actualSlices: 3, desiredEndpoints: 250, addedPerSync: 127, removedPerSync: 0, numCreated: 1, numUpdated: 1, numDeleted: 0})
+
+	// ensure cache mutation has not occurred
+	cmc.Check(t)
 }
 
 // now with preexisting slices, we have 300 pods matching a service
@@ -370,6 +374,7 @@ func TestReconcileEndpointSlicesSomePreexistingWorseAllocation(t *testing.T) {
 	}
 
 	existingSlices := []*discovery.EndpointSlice{endpointSlice1, endpointSlice2}
+	cmc := newCacheMutationCheck(existingSlices)
 	createEndpointSlices(t, client, namespace, existingSlices)
 
 	numActionsBefore := len(client.Actions())
@@ -383,6 +388,9 @@ func TestReconcileEndpointSlicesSomePreexistingWorseAllocation(t *testing.T) {
 	// 2 new slices (100, 52) in addition to existing slices (74, 74)
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{74, 74, 100, 52})
 	expectMetrics(t, expectedMetrics{desiredSlices: 3, actualSlices: 4, desiredEndpoints: 300, addedPerSync: 152, removedPerSync: 0, numCreated: 2, numUpdated: 0, numDeleted: 0})
+
+	// ensure cache mutation has not occurred
+	cmc.Check(t)
 }
 
 // In some cases, such as a service port change, all slices for that service will require a change
@@ -445,6 +453,7 @@ func TestReconcileEndpointSlicesRecycling(t *testing.T) {
 		existingSlices[sliceNum].Endpoints = append(existingSlices[sliceNum].Endpoints, podToEndpoint(pod, &corev1.Node{}, &svc))
 	}
 
+	cmc := newCacheMutationCheck(existingSlices)
 	createEndpointSlices(t, client, namespace, existingSlices)
 
 	numActionsBefore := len(client.Actions())
@@ -463,6 +472,9 @@ func TestReconcileEndpointSlicesRecycling(t *testing.T) {
 	// thanks to recycling, we get a free repack of endpoints, resulting in 3 full slices instead of 10 mostly empty slices
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{100, 100, 100})
 	expectMetrics(t, expectedMetrics{desiredSlices: 3, actualSlices: 3, desiredEndpoints: 300, addedPerSync: 300, removedPerSync: 0, numCreated: 0, numUpdated: 3, numDeleted: 7})
+
+	// ensure cache mutation has not occurred
+	cmc.Check(t)
 }
 
 // In this test, we want to verify that endpoints are added to a slice that will
@@ -493,6 +505,7 @@ func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 	}
 	existingSlices = append(existingSlices, slice2)
 
+	cmc := newCacheMutationCheck(existingSlices)
 	createEndpointSlices(t, client, namespace, existingSlices)
 
 	// ensure that endpoints in each slice will be marked for update.
@@ -519,6 +532,9 @@ func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 
 	// additional pods should get added to fuller slice
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{95, 20})
+
+	// ensure cache mutation has not occurred
+	cmc.Check(t)
 }
 
 // In this test, we want to verify that old EndpointSlices with a deprecated IP
@@ -552,6 +568,7 @@ func TestReconcileEndpointSlicesReplaceDeprecated(t *testing.T) {
 
 	createEndpointSlices(t, client, namespace, existingSlices)
 
+	cmc := newCacheMutationCheck(existingSlices)
 	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
 	reconcileHelper(t, r, &svc, pods, existingSlices, time.Now())
 
@@ -569,6 +586,9 @@ func TestReconcileEndpointSlicesReplaceDeprecated(t *testing.T) {
 			t.Errorf("Expected address type to be IPv4, got %s", endpointSlice.AddressType)
 		}
 	}
+
+	// ensure cache mutation has not occurred
+	cmc.Check(t)
 }
 
 // Named ports can map to different port numbers on different pods.

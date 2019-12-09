@@ -47,6 +47,7 @@ go_library(
         "examples.go",
         "gke_local_ssd.go",
         "gke_node_pools.go",
+        "suites.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e",
     deps = [
@@ -66,7 +67,8 @@ go_library(
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/auth:go_default_library",
-        "//test/e2e/framework/log:go_default_library",
+        "//test/e2e/framework/kubectl:go_default_library",
+        "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/providers/aws:go_default_library",

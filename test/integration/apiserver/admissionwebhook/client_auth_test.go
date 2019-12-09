@@ -247,11 +247,11 @@ func newClientAuthWebhookHandler(t *testing.T, recorder *clientAuthRecorder) htt
 		defer r.Body.Close()
 		data, err := ioutil.ReadAll(r.Body)
 		if err != nil {
-			http.Error(w, err.Error(), 400)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
 		review := v1beta1.AdmissionReview{}
 		if err := json.Unmarshal(data, &review); err != nil {
-			http.Error(w, err.Error(), 400)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
 		if review.Request.UserInfo.Username != testClientAuthClientUsername {
 			// skip requests not originating from this integration test's client
@@ -261,17 +261,17 @@ func newClientAuthWebhookHandler(t *testing.T, recorder *clientAuthRecorder) htt
 
 		if authz := r.Header.Get("Authorization"); authz != "Bearer localhost-match-with-port" {
 			t.Errorf("unexpected authz header: %q", authz)
-			http.Error(w, "Invalid auth", 401)
+			http.Error(w, "Invalid auth", http.StatusUnauthorized)
 			return
 		}
 
 		if len(review.Request.Object.Raw) == 0 {
-			http.Error(w, err.Error(), 400)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		pod := &corev1.Pod{}
 		if err := json.Unmarshal(review.Request.Object.Raw, pod); err != nil {
-			http.Error(w, err.Error(), 400)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 

@@ -364,7 +364,7 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 
 func verifyFilesExistOnVSphereVolume(namespace string, podName string, filePaths ...string) {
 	for _, filePath := range filePaths {
-		_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/ls", filePath)
+		_, err := framework.RunKubectl(namespace, "exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/ls", filePath)
 		framework.ExpectNoError(err, fmt.Sprintf("failed to verify file: %q on the pod: %q", filePath, podName))
 	}
 }
@@ -384,7 +384,7 @@ func verifyVSphereVolumesAccessible(c clientset.Interface, pod *v1.Pod, persiste
 		// Verify disks are attached to the node
 		isAttached, err := diskIsAttached(pv.Spec.VsphereVolume.VolumePath, nodeName)
 		framework.ExpectNoError(err)
-		gomega.Expect(isAttached).To(gomega.BeTrue(), fmt.Sprintf("disk %v is not attached with the node", pv.Spec.VsphereVolume.VolumePath))
+		framework.ExpectEqual(isAttached, true, fmt.Sprintf("disk %v is not attached with the node", pv.Spec.VsphereVolume.VolumePath))
 		// Verify Volumes are accessible
 		filepath := filepath.Join("/mnt/", fmt.Sprintf("volume%v", index+1), "/emptyFile.txt")
 		_, err = framework.LookForStringInPodExec(namespace, pod.Name, []string{"/bin/touch", filepath}, "", time.Minute)
@@ -795,7 +795,7 @@ func invokeVCenterServiceControl(command, service, host string) error {
 func expectVolumeToBeAttached(nodeName, volumePath string) {
 	isAttached, err := diskIsAttached(volumePath, nodeName)
 	framework.ExpectNoError(err)
-	gomega.Expect(isAttached).To(gomega.BeTrue(), fmt.Sprintf("disk: %s is not attached with the node", volumePath))
+	framework.ExpectEqual(isAttached, true, fmt.Sprintf("disk: %s is not attached with the node", volumePath))
 }
 
 // expectVolumesToBeAttached checks if the given Volumes are attached to the
@@ -822,7 +822,7 @@ func expectFilesToBeAccessible(namespace string, pods []*v1.Pod, filePaths []str
 
 // writeContentToPodFile writes the given content to the specified file.
 func writeContentToPodFile(namespace, podName, filePath, content string) error {
-	_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName,
+	_, err := framework.RunKubectl(namespace, "exec", fmt.Sprintf("--namespace=%s", namespace), podName,
 		"--", "/bin/sh", "-c", fmt.Sprintf("echo '%s' > %s", content, filePath))
 	return err
 }
@@ -830,7 +830,7 @@ func writeContentToPodFile(namespace, podName, filePath, content string) error {
 // expectFileContentToMatch checks if a given file contains the specified
 // content, else fails.
 func expectFileContentToMatch(namespace, podName, filePath, content string) {
-	_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName,
+	_, err := framework.RunKubectl(namespace, "exec", fmt.Sprintf("--namespace=%s", namespace), podName,
 		"--", "/bin/sh", "-c", fmt.Sprintf("grep '%s' %s", content, filePath))
 	framework.ExpectNoError(err, fmt.Sprintf("failed to match content of file: %q on the pod: %q", filePath, podName))
 }

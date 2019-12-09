@@ -566,6 +566,9 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 	// Allow the webhook to establish
 	time.Sleep(time.Second)
 
+	start := time.Now()
+	count := 0
+
 	// Test admission on all resources, subresources, and verbs
 	for _, gvr := range gvrsToTest {
 		resource := resourcesByGVR[gvr]
@@ -573,6 +576,7 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 			for _, verb := range []string{"create", "update", "patch", "connect", "delete", "deletecollection"} {
 				if shouldTestResourceVerb(gvr, resource, verb) {
 					t.Run(verb, func(t *testing.T) {
+						count++
 						holder.reset(t)
 						testFunc := getTestFunc(gvr, verb)
 						testFunc(&testContext{
@@ -590,6 +594,12 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 				}
 			}
 		})
+	}
+
+	duration := time.Since(start)
+	perResourceDuration := time.Duration(int(duration) / count)
+	if perResourceDuration >= 150*time.Millisecond {
+		t.Errorf("expected resources to process in < 150ms, average was %v", perResourceDuration)
 	}
 }
 
@@ -726,6 +736,10 @@ func testResourceDelete(c *testContext) {
 		}
 		return true, nil
 	})
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
 
 	// remove the finalizer
 	_, err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Patch(
@@ -1421,17 +1435,11 @@ var (
 )
 
 func shouldTestResource(gvr schema.GroupVersionResource, resource metav1.APIResource) bool {
-	if !sets.NewString(resource.Verbs...).HasAny("create", "update", "patch", "connect", "delete", "deletecollection") {
-		return false
-	}
-	return true
+	return sets.NewString(resource.Verbs...).HasAny("create", "update", "patch", "connect", "delete", "deletecollection")
 }
 
 func shouldTestResourceVerb(gvr schema.GroupVersionResource, resource metav1.APIResource, verb string) bool {
-	if !sets.NewString(resource.Verbs...).Has(verb) {
-		return false
-	}
-	return true
+	return sets.NewString(resource.Verbs...).Has(verb)
 }
 
 //

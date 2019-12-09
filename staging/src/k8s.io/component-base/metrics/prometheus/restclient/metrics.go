@@ -17,6 +17,7 @@ limitations under the License.
 package restclient
 
 import (
+	"math"
 	"net/url"
 	"time"
 
@@ -55,13 +56,62 @@ var (
 		},
 		[]string{"code", "method", "host"},
 	)
+
+	execPluginCertTTL = k8smetrics.NewGauge(
+		&k8smetrics.GaugeOpts{
+			Name: "rest_client_exec_plugin_ttl_seconds",
+			Help: "Gauge of the shortest TTL (time-to-live) of the client " +
+				"certificate(s) managed by the auth exec plugin. The value " +
+				"is in seconds until certificate expiry. If auth exec " +
+				"plugins are unused or manage no TLS certificates, the " +
+				"value will be +INF.",
+		},
+	)
+
+	execPluginCertRotation = k8smetrics.NewHistogram(
+		&k8smetrics.HistogramOpts{
+			Name: "rest_client_exec_plugin_certificate_rotation_age",
+			Help: "Histogram of the number of seconds the last auth exec " +
+				"plugin client certificate lived before being rotated. " +
+				"If auth exec plugin client certificates are unused, " +
+				"histogram will contain no data.",
+			// There are three sets of ranges these buckets intend to capture:
+			//   - 10-60 minutes: captures a rotation cadence which is
+			//     happening too quickly.
+			//   - 4 hours - 1 month: captures an ideal rotation cadence.
+			//   - 3 months - 4 years: captures a rotation cadence which is
+			//     is probably too slow or much too slow.
+			Buckets: []float64{
+				600,       // 10 minutes
+				1800,      // 30 minutes
+				3600,      // 1  hour
+				14400,     // 4  hours
+				86400,     // 1  day
+				604800,    // 1  week
+				2592000,   // 1  month
+				7776000,   // 3  months
+				15552000,  // 6  months
+				31104000,  // 1  year
+				124416000, // 4  years
+			},
+		},
+	)
 )
 
 func init() {
+	execPluginCertTTL.Set(math.Inf(1)) // Initialize TTL to +INF
+
 	legacyregistry.MustRegister(requestLatency)
 	legacyregistry.MustRegister(deprecatedRequestLatency)
 	legacyregistry.MustRegister(requestResult)
-	metrics.Register(&latencyAdapter{m: requestLatency, dm: deprecatedRequestLatency}, &resultAdapter{requestResult})
+	legacyregistry.MustRegister(execPluginCertTTL)
+	legacyregistry.MustRegister(execPluginCertRotation)
+	metrics.Register(metrics.RegisterOpts{
+		ClientCertTTL:         &ttlAdapter{m: execPluginCertTTL},
+		ClientCertRotationAge: &rotationAdapter{m: execPluginCertRotation},
+		RequestLatency:        &latencyAdapter{m: requestLatency, dm: deprecatedRequestLatency},
+		RequestResult:         &resultAdapter{requestResult},
+	})
 }
 
 type latencyAdapter struct {
@@ -80,4 +130,24 @@ type resultAdapter struct {
 
 func (r *resultAdapter) Increment(code, method, host string) {
 	r.m.WithLabelValues(code, method, host).Inc()
+}
+
+type ttlAdapter struct {
+	m *k8smetrics.Gauge
+}
+
+func (e *ttlAdapter) Set(ttl *time.Duration) {
+	if ttl == nil {
+		e.m.Set(math.Inf(1))
+	} else {
+		e.m.Set(float64(ttl.Seconds()))
+	}
+}
+
+type rotationAdapter struct {
+	m *k8smetrics.Histogram
+}
+
+func (r *rotationAdapter) Observe(d time.Duration) {
+	r.m.Observe(d.Seconds())
 }

@@ -1269,9 +1269,10 @@ func printCSIVolumeSource(csi *corev1.CSIVolumeSource, w PrefixWriter) {
 func printCSIPersistentVolumeSource(csi *corev1.CSIPersistentVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tCSI (a Container Storage Interface (CSI) volume source)\n"+
 		"    Driver:\t%v\n"+
+		"    FSType:\t%v\n"+
 		"    VolumeHandle:\t%v\n"+
 		"    ReadOnly:\t%v\n",
-		csi.Driver, csi.VolumeHandle, csi.ReadOnly)
+		csi.Driver, csi.FSType, csi.VolumeHandle, csi.ReadOnly)
 	printCSIPersistentVolumeAttributesMultiline(w, "VolumeAttributes", csi.VolumeAttributes)
 }
 
@@ -3981,7 +3982,7 @@ func describePodDisruptionBudget(pdb *policyv1beta1.PodDisruptionBudget, events 
 			w.Write(LEVEL_0, "Selector:\t<unset>\n")
 		}
 		w.Write(LEVEL_0, "Status:\n")
-		w.Write(LEVEL_2, "Allowed disruptions:\t%d\n", pdb.Status.PodDisruptionsAllowed)
+		w.Write(LEVEL_2, "Allowed disruptions:\t%d\n", pdb.Status.DisruptionsAllowed)
 		w.Write(LEVEL_2, "Current:\t%d\n", pdb.Status.CurrentHealthy)
 		w.Write(LEVEL_2, "Desired:\t%d\n", pdb.Status.DesiredHealthy)
 		w.Write(LEVEL_2, "Total:\t%d\n", pdb.Status.ExpectedPods)

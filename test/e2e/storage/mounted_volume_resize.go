@@ -81,7 +81,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		}
 		resizableSc, err = c.StorageV1().StorageClasses().Create(newStorageClass(test, ns, "resizing"))
 		framework.ExpectNoError(err, "Error creating resizable storage class")
-		gomega.Expect(*resizableSc.AllowVolumeExpansion).To(gomega.BeTrue())
+		framework.ExpectEqual(*resizableSc.AllowVolumeExpansion, true)
 
 		pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			ClaimSize:        test.ClaimSize,
@@ -145,6 +145,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 
 		ginkgo.By("Getting a pod from deployment")
 		podList, err := e2edeploy.GetPodsForDeployment(c, deployment)
+		framework.ExpectNoError(err, "While getting pods from deployment")
 		gomega.Expect(podList.Items).NotTo(gomega.BeEmpty())
 		pod := podList.Items[0]
 
@@ -177,7 +178,6 @@ func waitForDeploymentToRecreatePod(client clientset.Interface, deployment *apps
 			case v1.PodFailed, v1.PodSucceeded:
 				return false, conditions.ErrPodCompleted
 			}
-			return false, nil
 		}
 		return false, err
 	})

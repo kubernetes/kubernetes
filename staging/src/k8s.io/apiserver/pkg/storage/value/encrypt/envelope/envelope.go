@@ -31,9 +31,6 @@ import (
 	"golang.org/x/crypto/cryptobyte"
 )
 
-// defaultCacheSize is the number of decrypted DEKs which would be cached by the transformer.
-const defaultCacheSize = 1000
-
 func init() {
 	value.RegisterMetrics()
 }
@@ -54,6 +51,8 @@ type envelopeTransformer struct {
 
 	// baseTransformerFunc creates a new transformer for encrypting the data with the DEK.
 	baseTransformerFunc func(cipher.Block) value.Transformer
+
+	cacheEnabled bool
 }
 
 // NewEnvelopeTransformer returns a transformer which implements a KEK-DEK based envelope encryption scheme.
@@ -61,17 +60,22 @@ type envelopeTransformer struct {
 // the data items they encrypt. A cache (of size cacheSize) is maintained to store the most recently
 // used decrypted DEKs in memory.
 func NewEnvelopeTransformer(envelopeService Service, cacheSize int, baseTransformerFunc func(cipher.Block) value.Transformer) (value.Transformer, error) {
-	if cacheSize == 0 {
-		cacheSize = defaultCacheSize
-	}
-	cache, err := lru.New(cacheSize)
-	if err != nil {
-		return nil, err
+	var (
+		cache *lru.Cache
+		err   error
+	)
+
+	if cacheSize > 0 {
+		cache, err = lru.New(cacheSize)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &envelopeTransformer{
 		envelopeService:     envelopeService,
 		transformers:        cache,
 		baseTransformerFunc: baseTransformerFunc,
+		cacheEnabled:        cacheSize > 0,
 	}, nil
 }
 
@@ -91,7 +95,9 @@ func (t *envelopeTransformer) TransformFromStorage(data []byte, context value.Co
 	// Look up the decrypted DEK from cache or Envelope.
 	transformer := t.getTransformer(encKey)
 	if transformer == nil {
-		value.RecordCacheMiss()
+		if t.cacheEnabled {
+			value.RecordCacheMiss()
+		}
 		key, err := t.envelopeService.Decrypt(encKey)
 		if err != nil {
 			// Do NOT wrap this err using fmt.Errorf() or similar functions
@@ -99,6 +105,7 @@ func (t *envelopeTransformer) TransformFromStorage(data []byte, context value.Co
 			// record the metric.
 			return nil, false, err
 		}
+
 		transformer, err = t.addTransformer(encKey, key)
 		if err != nil {
 			return nil, false, err
@@ -153,12 +160,18 @@ func (t *envelopeTransformer) addTransformer(encKey []byte, key []byte) (value.T
 	transformer := t.baseTransformerFunc(block)
 	// Use base64 of encKey as the key into the cache because hashicorp/golang-lru
 	// cannot hash []uint8.
-	t.transformers.Add(base64.StdEncoding.EncodeToString(encKey), transformer)
+	if t.cacheEnabled {
+		t.transformers.Add(base64.StdEncoding.EncodeToString(encKey), transformer)
+	}
 	return transformer, nil
 }
 
 // getTransformer fetches the transformer corresponding to encKey from cache, if it exists.
 func (t *envelopeTransformer) getTransformer(encKey []byte) value.Transformer {
+	if !t.cacheEnabled {
+		return nil
+	}
+
 	_transformer, found := t.transformers.Get(base64.StdEncoding.EncodeToString(encKey))
 	if found {
 		return _transformer.(value.Transformer)

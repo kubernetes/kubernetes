@@ -150,7 +150,7 @@ message PodDisruptionBudgetSpec {
 // PodDisruptionBudgetStatus represents information about the status of a
 // PodDisruptionBudget. Status may trail the actual state of a system.
 message PodDisruptionBudgetStatus {
-  // Most recent generation observed when updating this PDB status. PodDisruptionsAllowed and other
+  // Most recent generation observed when updating this PDB status. DisruptionsAllowed and other
   // status information is valid only if observedGeneration equals to PDB's object generation.
   // +optional
   optional int64 observedGeneration = 1;

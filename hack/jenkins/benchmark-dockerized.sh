@@ -22,7 +22,7 @@ set -o xtrace
 retry() {
   for i in {1..5}; do
     if "$@"
-    then      
+    then
       return 0
     else
       sleep "${i}"
@@ -59,7 +59,8 @@ cd "${GOPATH}/src/k8s.io/kubernetes"
 ./hack/install-etcd.sh
 
 # Run the benchmark tests and pretty-print the results into a separate file.
-make test-integration WHAT="$*" KUBE_TEST_ARGS="-run='XXX' -bench=. -benchmem" \
+make test-integration WHAT="$*" KUBE_TEST_ARGS="-run='XXX' -bench=${TEST_PREFIX:-.} -benchmem  -alsologtostderr=false -logtostderr=false" \
+  | (go run test/integration/benchmark/extractlog/main.go) \
   | tee \
    >(prettybench -no-passthrough > "${ARTIFACTS}/BenchmarkResults.txt") \
    >(go run test/integration/benchmark/jsonify/main.go "${ARTIFACTS}/BenchmarkResults_benchmark_$(date -u +%Y-%m-%dT%H:%M:%SZ).json" || cat > /dev/null)

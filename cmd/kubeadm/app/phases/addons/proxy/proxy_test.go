@@ -19,22 +19,18 @@ package proxy
 import (
 	"strings"
 	"testing"
-	"time"
 
 	apps "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
-	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	"k8s.io/utils/pointer"
 )
 
 func TestCreateServiceAccount(t *testing.T) {
@@ -206,22 +202,6 @@ func TestEnsureProxyAddon(t *testing.T) {
 				t.Errorf("test failed to convert external to internal version")
 				return
 			}
-			intControlPlane.ComponentConfigs.KubeProxy = &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
-				BindAddress:        "",
-				HealthzBindAddress: "0.0.0.0:10256",
-				MetricsBindAddress: "127.0.0.1:10249",
-				Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
-					MaxPerCore:            pointer.Int32Ptr(1),
-					Min:                   pointer.Int32Ptr(1),
-					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
-				},
-			}
-			// Run dynamic defaulting again as we changed the internal cfg
-			if err := configutil.SetInitDynamicDefaults(intControlPlane); err != nil {
-				t.Errorf("test failed to set dynamic defaults: %v", err)
-				return
-			}
 			err = EnsureProxyAddon(&intControlPlane.ClusterConfiguration, &intControlPlane.LocalAPIEndpoint, client)
 
 			// Compare actual to expected errors
@@ -239,18 +219,6 @@ func TestEnsureProxyAddon(t *testing.T) {
 					tc.name,
 					expErr,
 					actErr)
-			}
-			if intControlPlane.ComponentConfigs.KubeProxy.BindAddress != tc.expBindAddr {
-				t.Errorf("%s test failed, expected: %s, got: %s",
-					tc.name,
-					tc.expBindAddr,
-					intControlPlane.ComponentConfigs.KubeProxy.BindAddress)
-			}
-			if intControlPlane.ComponentConfigs.KubeProxy.ClusterCIDR != tc.expClusterCIDR {
-				t.Errorf("%s test failed, expected: %s, got: %s",
-					tc.name,
-					tc.expClusterCIDR,
-					intControlPlane.ComponentConfigs.KubeProxy.ClusterCIDR)
 			}
 		})
 	}

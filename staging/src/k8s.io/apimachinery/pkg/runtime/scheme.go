@@ -102,10 +102,10 @@ func NewScheme() *Scheme {
 	}
 	s.converter = conversion.NewConverter(s.nameFunc)
 
-	utilruntime.Must(s.AddConversionFuncs(DefaultEmbeddedConversions()...))
+	// Enable couple default conversions by default.
+	utilruntime.Must(RegisterEmbeddedConversions(s))
+	utilruntime.Must(RegisterStringConversions(s))
 
-	// Enable map[string][]string conversions by default
-	utilruntime.Must(s.AddConversionFuncs(DefaultStringConversions...))
 	utilruntime.Must(s.RegisterInputDefaults(&map[string][]string{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields))
 	utilruntime.Must(s.RegisterInputDefaults(&url.Values{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields))
 	return s

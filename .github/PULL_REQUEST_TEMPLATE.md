@@ -14,6 +14,7 @@ https://git.k8s.io/community/contributors/devel/sig-release/release.md#issuepr-k
 > /kind api-change
 > /kind bug
 > /kind cleanup
+> /kind deprecation
 > /kind design
 > /kind documentation
 > /kind failing-test

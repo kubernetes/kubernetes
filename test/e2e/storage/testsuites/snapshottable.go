@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -55,25 +56,25 @@ var _ TestSuite = &snapshottableTestSuite{}
 func InitSnapshottableTestSuite() TestSuite {
 	return &snapshottableTestSuite{
 		tsInfo: TestSuiteInfo{
-			name: "snapshottable",
-			testPatterns: []testpatterns.TestPattern{
+			Name: "snapshottable",
+			TestPatterns: []testpatterns.TestPattern{
 				testpatterns.DynamicSnapshot,
 			},
-			supportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: volume.SizeRange{
 				Min: "1Mi",
 			},
 		},
 	}
 }
 
-func (s *snapshottableTestSuite) getTestSuiteInfo() TestSuiteInfo {
+func (s *snapshottableTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *snapshottableTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *snapshottableTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
-func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	var (
 		sDriver SnapshottableTestDriver
 		dDriver DynamicPVTestDriver
@@ -116,7 +117,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		if class == nil {
 			framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
 		}
-		testVolumeSizeRange := s.getTestSuiteInfo().supportedSizeRange
+		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
 		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
 		claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
 		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
@@ -146,6 +147,12 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
 			}
 		}()
+
+		ginkgo.By("starting a pod to use the claim")
+		command := "echo 'hello world' > /mnt/test/data"
+		pod := StartInPodWithVolume(cs, pvc.Namespace, pvc.Name, "pvc-snapshottable-tester", command, e2epod.NodeSelection{Name: config.ClientNodeName})
+		defer StopPod(cs, pod)
+
 		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 

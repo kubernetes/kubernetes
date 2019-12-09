@@ -177,7 +177,9 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 		}
 	}
 	m.mutex.Unlock()
-	m.writeCheckpoint()
+	if err := m.writeCheckpoint(); err != nil {
+		klog.Errorf("writing checkpoint encountered %v", err)
+	}
 }
 
 func (m *ManagerImpl) removeContents(dir string) error {
@@ -541,7 +543,9 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 	}
 	m.mutex.Unlock()
 	if needsUpdateCheckpoint {
-		m.writeCheckpoint()
+		if err := m.writeCheckpoint(); err != nil {
+			klog.Errorf("writing checkpoint encountered %v", err)
+		}
 	}
 	return capacity, allocatable, deletedResources.UnsortedList()
 }
@@ -602,12 +606,10 @@ func (m *ManagerImpl) updateAllocatedDevices(activePods []*v1.Pod) {
 	}
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	activePodUids := sets.NewString()
+	podsToBeRemoved := m.podDevices.pods()
 	for _, pod := range activePods {
-		activePodUids.Insert(string(pod.UID))
+		podsToBeRemoved.Delete(string(pod.UID))
 	}
-	allocatedPodUids := m.podDevices.pods()
-	podsToBeRemoved := allocatedPodUids.Difference(activePodUids)
 	if len(podsToBeRemoved) <= 0 {
 		return
 	}
@@ -688,21 +690,21 @@ func (m *ManagerImpl) takeByTopology(resource string, available sets.String, aff
 	// available device does not have any NUMA Nodes associated with it, add it
 	// to a list of NUMA Nodes for the fake NUMANode -1.
 	perNodeDevices := make(map[int]sets.String)
+	nodeWithoutTopology := -1
 	for d := range available {
-		var nodes []int
-		if m.allDevices[resource][d].Topology != nil {
-			for _, node := range m.allDevices[resource][d].Topology.Nodes {
-				nodes = append(nodes, int(node.ID))
+		if m.allDevices[resource][d].Topology == nil || len(m.allDevices[resource][d].Topology.Nodes) == 0 {
+			if _, ok := perNodeDevices[nodeWithoutTopology]; !ok {
+				perNodeDevices[nodeWithoutTopology] = sets.NewString()
 			}
+			perNodeDevices[nodeWithoutTopology].Insert(d)
+			continue
 		}
-		if len(nodes) == 0 {
-			nodes = []int{-1}
-		}
-		for _, node := range nodes {
-			if _, ok := perNodeDevices[node]; !ok {
-				perNodeDevices[node] = sets.NewString()
+
+		for _, node := range m.allDevices[resource][d].Topology.Nodes {
+			if _, ok := perNodeDevices[int(node.ID)]; !ok {
+				perNodeDevices[int(node.ID)] = sets.NewString()
 			}
-			perNodeDevices[node].Insert(d)
+			perNodeDevices[int(node.ID)].Insert(d)
 		}
 	}
 
@@ -734,7 +736,7 @@ func (m *ManagerImpl) takeByTopology(resource string, available sets.String, aff
 		// has the device is encountered.
 		for _, n := range nodes {
 			if perNodeDevices[n].Has(d) {
-				if n == -1 {
+				if n == nodeWithoutTopology {
 					withoutTopology = append(withoutTopology, d)
 				} else if affinity.IsSet(n) {
 					fromAffinity = append(fromAffinity, d)

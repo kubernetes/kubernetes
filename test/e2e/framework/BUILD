@@ -15,14 +15,11 @@ go_library(
         "log_size_monitoring.go",
         "nodes_util.go",
         "pods.go",
-        "profile_gatherer.go",
         "provider.go",
         "psp.go",
-        "rc_util.go",
         "resource_usage_gatherer.go",
         "size.go",
         "skip.go",
-        "suites.go",
         "test_context.go",
         "util.go",
     ],
@@ -30,7 +27,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/client/conditions:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/features:go_default_library",
@@ -76,6 +72,7 @@ go_library(
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//test/e2e/framework/auth:go_default_library",
         "//test/e2e/framework/ginkgowrapper:go_default_library",
+        "//test/e2e/framework/kubectl:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
@@ -92,6 +89,18 @@ go_library(
         "//vendor/golang.org/x/net/websocket:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["log_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//vendor/github.com/onsi/ginkgo:go_default_library",
+        "//vendor/github.com/onsi/ginkgo/config:go_default_library",
+        "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
+        "//vendor/github.com/onsi/gomega:go_default_library",
     ],
 )
 
@@ -116,6 +125,7 @@ filegroup(
         "//test/e2e/framework/gpu:all-srcs",
         "//test/e2e/framework/ingress:all-srcs",
         "//test/e2e/framework/job:all-srcs",
+        "//test/e2e/framework/kubectl:all-srcs",
         "//test/e2e/framework/kubelet:all-srcs",
         "//test/e2e/framework/lifecycle:all-srcs",
         "//test/e2e/framework/log:all-srcs",
@@ -132,6 +142,7 @@ filegroup(
         "//test/e2e/framework/providers/openstack:all-srcs",
         "//test/e2e/framework/providers/vsphere:all-srcs",
         "//test/e2e/framework/pv:all-srcs",
+        "//test/e2e/framework/rc:all-srcs",
         "//test/e2e/framework/replicaset:all-srcs",
         "//test/e2e/framework/resource:all-srcs",
         "//test/e2e/framework/security:all-srcs",
@@ -145,16 +156,4 @@ filegroup(
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["log_test.go"],
-    embed = [":go_default_library"],
-    deps = [
-        "//vendor/github.com/onsi/ginkgo:go_default_library",
-        "//vendor/github.com/onsi/ginkgo/config:go_default_library",
-        "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
-        "//vendor/github.com/onsi/gomega:go_default_library",
-    ],
 )

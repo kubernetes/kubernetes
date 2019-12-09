@@ -150,7 +150,9 @@ func (c *ManifestTestCase) mustLoadPodFromManifest() {
 }
 
 func (c *ManifestTestCase) tearDown() {
-	os.RemoveAll(c.kubeHome)
+	if err := os.RemoveAll(c.kubeHome); err != nil {
+		c.t.Fatalf("Failed to teardown: %s", err)
+	}
 }
 
 func copyFile(src, dst string) (err error) {

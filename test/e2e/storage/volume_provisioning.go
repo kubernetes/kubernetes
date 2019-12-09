@@ -69,14 +69,20 @@ func checkAWSEBS(volume *v1.PersistentVolume, volumeType string, encrypted bool)
 	volumeID := tokens[len(tokens)-1]
 
 	zone := framework.TestContext.CloudConfig.Zone
+
+	awsSession, err := session.NewSession()
+	if err != nil {
+		return fmt.Errorf("error creating session: %v", err)
+	}
+
 	if len(zone) > 0 {
 		region := zone[:len(zone)-1]
 		cfg := aws.Config{Region: &region}
 		framework.Logf("using region %s", region)
-		client = ec2.New(session.New(), &cfg)
+		client = ec2.New(awsSession, &cfg)
 	} else {
 		framework.Logf("no region configured")
-		client = ec2.New(session.New())
+		client = ec2.New(awsSession)
 	}
 
 	request := &ec2.DescribeVolumesInput{
@@ -414,14 +420,13 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			var suffix string = "unmananged"
 
 			ginkgo.By("Discovering an unmanaged zone")
-			allZones := sets.NewString()     // all zones in the project
-			managedZones := sets.NewString() // subset of allZones
+			allZones := sets.NewString() // all zones in the project
 
 			gceCloud, err := gce.GetGCECloud()
 			framework.ExpectNoError(err)
 
 			// Get all k8s managed zones (same as zones with nodes in them for test)
-			managedZones, err = gceCloud.GetAllZonesFromCloudProvider()
+			managedZones, err := gceCloud.GetAllZonesFromCloudProvider()
 			framework.ExpectNoError(err)
 
 			// Get a list of all zones in the project
@@ -864,7 +869,7 @@ func updateDefaultStorageClass(c clientset.Interface, scName string, defaultStr 
 		sc.Annotations[storageutil.IsDefaultStorageClassAnnotation] = defaultStr
 	}
 
-	sc, err = c.StorageV1().StorageClasses().Update(sc)
+	_, err = c.StorageV1().StorageClasses().Update(sc)
 	framework.ExpectNoError(err)
 
 	expectedDefault := false
