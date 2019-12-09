@@ -144,8 +144,8 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 		// role for listing ValidatingWebhookConfiguration/MutatingWebhookConfiguration/Namespaces
 		ObjectMeta: metav1.ObjectMeta{Name: "sample-apiserver-reader"},
 		Rules: []rbacv1.PolicyRule{
-			rbacv1helpers.NewRule("list").Groups("").Resources("namespaces").RuleOrDie(),
-			rbacv1helpers.NewRule("list").Groups("admissionregistration.k8s.io").Resources("*").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch").Groups("").Resources("namespaces").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch").Groups("admissionregistration.k8s.io").Resources("*").RuleOrDie(),
 		},
 	})
 	framework.ExpectNoError(err, "creating cluster role %s", "sample-apiserver-reader")
