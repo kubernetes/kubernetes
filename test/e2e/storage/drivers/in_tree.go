@@ -576,10 +576,6 @@ func (v *rbdVolume) DeleteVolume() {
 
 // Ceph
 type cephFSDriver struct {
-	serverIP  string
-	serverPod *v1.Pod
-	secret    *v1.Secret
-
 	driverInfo testsuites.DriverInfo
 }
 
@@ -690,8 +686,6 @@ func (v *cephVolume) DeleteVolume() {
 
 // Hostpath
 type hostPathDriver struct {
-	node v1.Node
-
 	driverInfo testsuites.DriverInfo
 }
 
@@ -758,8 +752,6 @@ func (h *hostPathDriver) CreateVolume(config *testsuites.PerTestConfig, volType 
 
 // HostPathSymlink
 type hostPathSymlinkDriver struct {
-	node v1.Node
-
 	driverInfo testsuites.DriverInfo
 }
 

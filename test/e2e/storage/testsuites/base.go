@@ -649,14 +649,6 @@ func getMigrationVolumeOpCounts(cs clientset.Interface, pluginName string) (opCo
 	return opCounts{}, opCounts{}
 }
 
-func getTotOps(ops opCounts) int64 {
-	var tot = int64(0)
-	for _, count := range ops {
-		tot += count
-	}
-	return tot
-}
-
 func validateMigrationVolumeOpCounts(cs clientset.Interface, pluginName string, oldInTreeOps, oldMigratedOps opCounts) {
 	if len(pluginName) == 0 {
 		// This is a native CSI Driver and we don't check ops

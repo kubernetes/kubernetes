@@ -468,7 +468,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 		framework.ExpectNoError(err)
 	}
 	defer func() {
-		var errors map[string]error
+		errors := map[string]error{}
 		for _, claim := range createdClaims {
 			err := e2epv.DeletePersistentVolumeClaim(t.Client, claim.Name, claim.Namespace)
 			if err != nil {
