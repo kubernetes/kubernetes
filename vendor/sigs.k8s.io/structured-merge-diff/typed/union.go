@@ -38,8 +38,11 @@ func normalizeUnions(w *mergingWalker) error {
 	if w.lhs != nil {
 		old = (*w.lhs).Map()
 	}
+	newMap := (*w.rhs).Map()
+	outMap := value.NewValueInterface(*w.out).Map()
+
 	for _, union := range atom.Map.Unions {
-		if err := newUnion(&union).Normalize(old, (*w.rhs).Map(), value.NewValueInterface(*w.out).Map()); err != nil {
+		if err := newUnion(&union).Normalize(old, newMap, outMap); err != nil {
 			return err
 		}
 	}
@@ -60,10 +63,13 @@ func normalizeUnionsApply(w *mergingWalker) error {
 	if w.lhs != nil && *w.lhs != nil {
 		old = (*w.lhs).Map()
 	}
+	newMap := (*w.rhs).Map()
+
+	out := value.NewValueInterface(*w.out)
+	outMap := out.Map()
 
 	for _, union := range atom.Map.Unions {
-		out := value.NewValueInterface(*w.out)
-		if err := newUnion(&union).NormalizeApply(old, (*w.rhs).Map(), out.Map()); err != nil {
+		if err := newUnion(&union).NormalizeApply(old, newMap, outMap); err != nil {
 			return err
 		}
 		*w.out = out.Interface()
