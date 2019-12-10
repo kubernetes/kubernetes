@@ -467,14 +467,13 @@ func validateHashFamily(family string) bool {
 func IsNotFoundError(err error) bool {
 	es := err.Error()
 	if strings.Contains(es, "does not exist") {
-		// set with the same name already exists
-		// xref: https://github.com/Olipro/ipset/blob/master/lib/errcode.c#L32-L33
+		// set with the given name does not exist
+		// xref: https://github.com/Olipro/ipset/blob/c3ad11037681e46fb5f3096c5c824f3e3556522a/lib/errcode.c#L24-L25
 		return true
 	}
-	if strings.Contains(es, "element is missing") {
-		// entry is missing from the set
-		// xref: https://github.com/Olipro/ipset/blob/master/lib/parse.c#L1904
-		// https://github.com/Olipro/ipset/blob/master/lib/parse.c#L1925
+	if strings.Contains(es, "it's not added") {
+		// entry that does not exist in set cannot be deleted
+		// https://github.com/Olipro/ipset/blob/c3ad11037681e46fb5f3096c5c824f3e3556522a/lib/errcode.c#L84
 		return true
 	}
 	return false
