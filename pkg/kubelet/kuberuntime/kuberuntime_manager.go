@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	goruntime "runtime"
+	"sync"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
@@ -682,7 +684,8 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		}
 	} else {
 		// Step 3: kill any running containers in this pod which are not to keep.
-		for containerID, containerInfo := range podContainerChanges.ContainersToKill {
+		wg := sync.WaitGroup{}
+		kill := func(containerID kubecontainer.ContainerID, containerInfo containerToKillInfo) {
 			klog.V(3).Infof("Killing unwanted container %q(id=%q) for pod %q", containerInfo.name, containerID, format.Pod(pod))
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
 			result.AddSyncResult(killContainerResult)
@@ -692,6 +695,17 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 				return
 			}
 		}
+
+		wg.Add(len(podContainerChanges.ContainersToKill))
+		for containerID, containerInfo := range podContainerChanges.ContainersToKill {
+			go func() {
+				defer utilruntime.HandleCrash()
+				defer wg.Done()
+				kill(containerID, containerInfo)
+			}()
+		}
+
+		wg.Wait()
 	}
 
 	// Keep terminated init containers fairly aggressively controlled
@@ -831,9 +845,16 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	}
 
 	// Step 7: start containers in podContainerChanges.ContainersToStart.
+	wg := sync.WaitGroup{}
+	wg.Add(len(podContainerChanges.ContainersToStart))
 	for _, idx := range podContainerChanges.ContainersToStart {
-		start("container", &pod.Spec.Containers[idx])
+		go func(typeName string, container *v1.Container) {
+			defer utilruntime.HandleCrash()
+			defer wg.Done()
+			start(typeName, container)
+		}("container", &pod.Spec.Containers[idx])
 	}
+	wg.Wait()
 
 	return
 }
