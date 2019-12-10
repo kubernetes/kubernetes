@@ -20,7 +20,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // GetKubeletPods retrieves the list of pods on the kubelet.
@@ -45,20 +44,4 @@ func getKubeletPods(c clientset.Interface, node, resource string) (*v1.PodList, 
 		return &v1.PodList{}, err
 	}
 	return result, nil
-}
-
-// PrintAllKubeletPods outputs status of all kubelet pods into log.
-func PrintAllKubeletPods(c clientset.Interface, nodeName string) {
-	podList, err := GetKubeletPods(c, nodeName)
-	if err != nil {
-		framework.Logf("Unable to retrieve kubelet pods for node %v: %v", nodeName, err)
-		return
-	}
-	for _, p := range podList.Items {
-		framework.Logf("%v from %v started at %v (%d container statuses recorded)", p.Name, p.Namespace, p.Status.StartTime, len(p.Status.ContainerStatuses))
-		for _, c := range p.Status.ContainerStatuses {
-			framework.Logf("\tContainer %v ready: %v, restart count %v",
-				c.Name, c.Ready, c.RestartCount)
-		}
-	}
 }

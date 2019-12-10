@@ -109,7 +109,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 		for _, node := range nodeList.Items {
 			framework.Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
-			e2ekubelet.PrintAllKubeletPods(cs, node.Name)
+			printAllKubeletPods(cs, node.Name)
 		}
 
 	})
@@ -597,6 +597,22 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		createHostPortPodOnNode(f, "pod5", ns, "127.0.0.1", port, v1.ProtocolTCP, nodeSelector, false)
 	})
 })
+
+// printAllKubeletPods outputs status of all kubelet pods into log.
+func printAllKubeletPods(c clientset.Interface, nodeName string) {
+	podList, err := e2ekubelet.GetKubeletPods(c, nodeName)
+	if err != nil {
+		framework.Logf("Unable to retrieve kubelet pods for node %v: %v", nodeName, err)
+		return
+	}
+	for _, p := range podList.Items {
+		framework.Logf("%v from %v started at %v (%d container statuses recorded)", p.Name, p.Namespace, p.Status.StartTime, len(p.Status.ContainerStatuses))
+		for _, c := range p.Status.ContainerStatuses {
+			framework.Logf("\tContainer %v ready: %v, restart count %v",
+				c.Name, c.Ready, c.RestartCount)
+		}
+	}
+}
 
 func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	var gracePeriod = int64(1)
