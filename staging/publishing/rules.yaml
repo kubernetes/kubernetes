@@ -1,4 +1,3 @@
-skip-tags: true
 recursive-delete-patterns:
 - BUILD
 - "*/BUILD"
