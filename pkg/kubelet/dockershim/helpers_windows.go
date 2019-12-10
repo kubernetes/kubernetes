@@ -25,6 +25,7 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/pkg/sysinfo"
 	"k8s.io/klog"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -69,11 +70,12 @@ func (ds *dockerService) updateCreateConfig(
 	if wc := config.GetWindows(); wc != nil {
 		rOpts := wc.GetResources()
 		if rOpts != nil {
+			// Precedence and units for these are described at length in kuberuntime_container_windows.go - generateWindowsContainerConfig()
 			createConfig.HostConfig.Resources = dockercontainer.Resources{
-				Memory:     rOpts.MemoryLimitInBytes,
-				CPUShares:  rOpts.CpuShares,
-				CPUCount:   rOpts.CpuCount,
-				CPUPercent: rOpts.CpuMaximum,
+				Memory:    rOpts.MemoryLimitInBytes,
+				CPUShares: rOpts.CpuShares,
+				CPUCount:  rOpts.CpuCount,
+				NanoCPUs:  rOpts.CpuMaximum * int64(sysinfo.NumCPU()) * (1e9 / 10000),
 			}
 		}
 

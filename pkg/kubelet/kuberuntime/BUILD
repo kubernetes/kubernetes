@@ -14,7 +14,6 @@ go_library(
         "helpers.go",
         "helpers_linux.go",
         "helpers_unsupported.go",
-        "helpers_windows.go",
         "instrumented_services.go",
         "kuberuntime_container.go",
         "kuberuntime_container_linux.go",
