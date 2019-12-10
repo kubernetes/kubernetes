@@ -425,32 +425,32 @@ func TestStorageVersionHashEqualities(t *testing.T) {
 
 	server := httptest.NewServer(master.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
 
-	// Test 1: extensions/v1beta1/replicasets and apps/v1/replicasets have
+	// Test 1: extensions/v1beta1/ingresses and apps/v1/ingresses have
 	// the same storage version hash.
 	resp, err := http.Get(server.URL + "/apis/extensions/v1beta1")
 	assert.Empty(err)
 	extList := metav1.APIResourceList{}
 	assert.NoError(decodeResponse(resp, &extList))
-	var extReplicasetHash, appsReplicasetHash string
+	var extIngressHash, appsIngressHash string
 	for _, r := range extList.APIResources {
-		if r.Name == "replicasets" {
-			extReplicasetHash = r.StorageVersionHash
-			assert.NotEmpty(extReplicasetHash)
+		if r.Name == "ingresses" {
+			extIngressHash = r.StorageVersionHash
+			assert.NotEmpty(extIngressHash)
 		}
 	}
 
-	resp, err = http.Get(server.URL + "/apis/apps/v1")
+	resp, err = http.Get(server.URL + "/apis/networking.k8s.io/v1beta1")
 	assert.Empty(err)
 	appsList := metav1.APIResourceList{}
 	assert.NoError(decodeResponse(resp, &appsList))
 	for _, r := range appsList.APIResources {
-		if r.Name == "replicasets" {
-			appsReplicasetHash = r.StorageVersionHash
-			assert.NotEmpty(appsReplicasetHash)
+		if r.Name == "ingresses" {
+			appsIngressHash = r.StorageVersionHash
+			assert.NotEmpty(appsIngressHash)
 		}
 	}
-	if len(extReplicasetHash) > 0 && len(appsReplicasetHash) > 0 {
-		assert.Equal(extReplicasetHash, appsReplicasetHash)
+	if len(extIngressHash) > 0 && len(appsIngressHash) > 0 {
+		assert.Equal(extIngressHash, appsIngressHash)
 	}
 
 	// Test 2: batch/v1/jobs and batch/v1beta1/cronjobs have different
