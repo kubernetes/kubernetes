@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -63,10 +64,31 @@ func flattenSubsets(subsets []corev1.EndpointSubset) []string {
 	return ips
 }
 
+func getAdvertiseAddress() (string, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "", err
+	}
+
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			return ipnet.IP.String(), nil
+		}
+	}
+
+	return "", fmt.Errorf("no non-loopback address is available")
+}
+
 func main() {
 	flag.Parse()
 
 	klog.Info("Kubernetes Elasticsearch logging discovery")
+
+	advertiseAddress, err := getAdvertiseAddress()
+	if err != nil {
+		klog.Fatalf("Failed to get valid advertise address: %v", err)
+	}
+	fmt.Printf("network.host: \"%s\"\n\n", advertiseAddress)
 
 	cc, err := buildConfigFromEnvs(os.Getenv("APISERVER_HOST"), os.Getenv("KUBE_CONFIG_FILE"))
 	if err != nil {

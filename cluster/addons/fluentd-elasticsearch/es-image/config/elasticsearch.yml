@@ -9,4 +9,3 @@ http.port: ${HTTP_PORT}
 
 path.data: /data
 
-network.host: 0.0.0.0
