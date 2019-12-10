@@ -104,7 +104,6 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 	f := framework.NewDefaultFramework("topology")
 
 	init := func() topologyTest {
-		const numTestTopologies = 2
 
 		l := topologyTest{}
 
