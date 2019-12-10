@@ -20,7 +20,6 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"sort"
 )
 
 type singleNumaNodePolicy struct {
@@ -55,49 +54,59 @@ func (p *singleNumaNodePolicy) canAdmitPodResult(hint *TopologyHint) lifecycle.P
 	}
 }
 
-// Get the narrowest hint aligned to one NUMA node
-// assumption: allResourcesHints are not empty, all hints have NUMAAffinity != nil,
-// all hints have exactly one NUMA node set in NUMANodeAffinity
-func (p *singleNumaNodePolicy) getHintMatch(allResourcesHints [][]TopologyHint) (bool, TopologyHint) {
-	// Sort all resources hints
-	for _, resource := range allResourcesHints {
-		sort.Slice(resource, func(i, j int) bool {
-			if resource[i].NUMANodeAffinity.GetBits()[0] < resource[j].NUMANodeAffinity.GetBits()[0] {
-				return true
-			}
-			return false
-		})
-
-	}
-	// find a match by searching a hint of one resource in the rest
-	var match TopologyHint
-	var foundMatch bool
-
-	if len(allResourcesHints) == 1 {
-		match = allResourcesHints[0][0]
-		match.Preferred = true
-		return true, match
-	}
-	for _, candidate := range allResourcesHints[0] {
-		foundMatch = true
-		for _, hints := range allResourcesHints[1:] {
-			res := sort.Search(len(hints), func(i int) bool {
-				return hints[i].NUMANodeAffinity.GetBits()[0] >= candidate.NUMANodeAffinity.GetBits()[0]
-			})
-			if res >= len(hints) ||
-				!hints[res].NUMANodeAffinity.IsEqual(candidate.NUMANodeAffinity) {
-				// hint not found, move to next hint from allResourcesHints[0]
-				foundMatch = false
-				break
-			}
+// Iterate over all permutations of hints in 'allProviderHints [][]TopologyHint'.
+//
+// This procedure is implemented as a recursive function over the set of hints
+// in 'allproviderHints[i]'. It applies the function 'callback' to each
+// permutation as it is found. It is the equivalent of:
+//
+// for i := 0; i < len(providerHints[0]); i++
+//     for j := 0; j < len(providerHints[1]); j++
+//         for k := 0; k < len(providerHints[2]); k++
+//             ...
+//             for z := 0; z < len(providerHints[-1]); z++
+//                 permutation := []TopologyHint{
+//                     providerHints[0][i],
+//                     providerHints[1][j],
+//                     providerHints[2][k],
+//                     ...
+//                     providerHints[-1][z]
+//                 }
+//                 callback(permutation)
+func (p *singleNumaNodePolicy) iterateAllProviderTopologyHints(allProviderHints [][]TopologyHint, callback func([]TopologyHint)) {
+	// Internal helper function to accumulate the permutation before calling the callback.
+	var iterate func(i int, accum []TopologyHint)
+	iterate = func(i int, accum []TopologyHint) {
+		// Base case: we have looped through all providers and have a full permutation.
+		if i == len(allProviderHints) {
+			callback(accum)
+			return
 		}
-		if foundMatch {
-			match = candidate
-			match.Preferred = true
-			break
+
+		// Loop through all hints for provider 'i', and recurse to build the
+		// the permutation of this hint with all hints from providers 'i++'.
+		for j := range allProviderHints[i] {
+			iterate(i+1, append(accum, allProviderHints[i][j]))
 		}
 	}
-	return foundMatch, match
+	iterate(0, []TopologyHint{})
+}
+
+// Merge a TopologyHints permutation to a single hint by performing a bitwise-AND
+// of their affinity masks. At this point, all hints have single numa node affinity
+// and preferred-true.
+func (p *singleNumaNodePolicy) mergePermutation(permutation []TopologyHint) TopologyHint {
+	preferred := true
+	var numaAffinities []bitmask.BitMask
+	for _, hint := range permutation {
+		numaAffinities = append(numaAffinities, hint.NUMANodeAffinity)
+	}
+
+	// Merge the affinities using a bitwise-and operation.
+	mergedAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
+	mergedAffinity.And(numaAffinities...)
+	// Build a mergedHint from the merged affinity mask.
+	return TopologyHint{mergedAffinity, preferred}
 }
 
 // Return hints that have valid bitmasks with exactly one bit set. Also return bool
@@ -197,12 +206,22 @@ func (p *singleNumaNodePolicy) mergeProvidersHints(providersHints []map[string][
 		}
 	}
 
-	found, match := p.getHintMatch(allResourcesHints)
-	if found {
-		klog.Infof("[topologymanager] single-numa-node policy match: %v", match)
-		return match
-	}
-	klog.Infof("[topologymanager] single-numa-node no match: %v", defaultHint)
+	p.iterateAllProviderTopologyHints(allResourcesHints, func(permutation []TopologyHint) {
+		mergedHint := p.mergePermutation(permutation)
+		// Only consider mergedHints that result in a NUMANodeAffinity == 1 to
+		// replace the current defaultHint.
+		if mergedHint.NUMANodeAffinity.Count() != 1 {
+			return
+		}
+
+		// If the current defaultHint is the same size as the new mergedHint,
+		// do not update defaultHint
+		if mergedHint.NUMANodeAffinity.Count() == defaultHint.NUMANodeAffinity.Count() {
+			return
+		}
+		// In all other cases, update defaultHint to the current mergedHint
+		defaultHint = mergedHint
+	})
 	return defaultHint
 }
 
