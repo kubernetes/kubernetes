@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -453,18 +454,23 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 	for _, d := range obj.(Deltas) {
 		switch d.Type {
 		case Sync, Added, Updated:
-			isSync := d.Type == Sync
 			s.cacheMutationDetector.AddObject(d.Object)
 			if old, exists, err := s.indexer.Get(d.Object); err == nil && exists {
+				// The processor wants to know if this is a resync or a real
+				// object change; it's a resync if the Delta says so *and* our
+				// store is up-to-date. Sync is also emitted by DeltaFIFO on
+				// Relist, so it's not guaranteed to be a no-op change.
+				// Not all handlers get Resync updates, so this is important.
+				isResync := d.Type == Sync && isObjectSame(old, d.Object)
 				if err := s.indexer.Update(d.Object); err != nil {
 					return err
 				}
-				s.processor.distribute(updateNotification{oldObj: old, newObj: d.Object}, isSync)
+				s.processor.distribute(updateNotification{oldObj: old, newObj: d.Object}, isResync)
 			} else {
 				if err := s.indexer.Add(d.Object); err != nil {
 					return err
 				}
-				s.processor.distribute(addNotification{newObj: d.Object}, isSync)
+				s.processor.distribute(addNotification{newObj: d.Object}, false)
 			}
 		case Deleted:
 			if err := s.indexer.Delete(d.Object); err != nil {
@@ -698,4 +704,31 @@ func (p *processorListener) setResyncPeriod(resyncPeriod time.Duration) {
 	defer p.resyncLock.Unlock()
 
 	p.resyncPeriod = resyncPeriod
+}
+
+var metadataAccessor = meta.NewAccessor()
+
+// isObjectSame returns true if oldObj and newObj have same ResourceVersion.
+func isObjectSame(oldObj, newObj interface{}) bool {
+	oldRO, ok := oldObj.(runtime.Object)
+	if !ok {
+		return false
+	}
+
+	newRO, ok := newObj.(runtime.Object)
+	if !ok {
+		return false
+	}
+
+	oldRV, err := metadataAccessor.ResourceVersion(oldRO)
+	if err != nil {
+		return false
+	}
+
+	newRV, err := metadataAccessor.ResourceVersion(newRO)
+	if err != nil {
+		return false
+	}
+
+	return oldRV == newRV
 }
