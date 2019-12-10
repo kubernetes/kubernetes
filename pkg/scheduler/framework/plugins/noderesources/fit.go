@@ -43,7 +43,7 @@ func (f *Fit) Name() string {
 
 // Filter invoked at the filter extension point.
 func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
-	meta, ok := migration.PredicateMetadata(cycleState).(predicates.Metadata)
+	meta, ok := migration.CovertStateRefToPredMeta(migration.PredicateMetadata(cycleState))
 	if !ok {
 		return migration.ErrorToFrameworkStatus(fmt.Errorf("%+v convert to predicates.Metadata error", cycleState))
 	}

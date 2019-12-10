@@ -48,7 +48,7 @@ func (pl *InterPodAffinity) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
-	meta, ok := migration.PredicateMetadata(cycleState).(predicates.Metadata)
+	meta, ok := migration.CovertStateRefToPredMeta(migration.PredicateMetadata(cycleState))
 	if !ok {
 		return migration.ErrorToFrameworkStatus(fmt.Errorf("%+v convert to predicates.Metadata error", cycleState))
 	}

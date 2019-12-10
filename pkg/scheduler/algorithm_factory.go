@@ -71,6 +71,7 @@ var (
 	schedulerFactoryMutex sync.RWMutex
 
 	// maps that hold registered algorithm types
+	// TODO(Huang-Wei): remove this.
 	fitPredicateMap        = make(map[string]FitPredicateFactory)
 	mandatoryFitPredicates = sets.NewString()
 	priorityFunctionMap    = make(map[string]PriorityConfigFactory)
@@ -143,6 +144,7 @@ func ApplyPredicatesAndPriorities(s *Snapshot) {
 
 // RegisterFitPredicate registers a fit predicate with the algorithm
 // registry. Returns the name with which the predicate was registered.
+// TODO(Huang-Wei): remove this.
 func RegisterFitPredicate(name string, predicate predicates.FitPredicate) string {
 	return RegisterFitPredicateFactory(name, func(AlgorithmFactoryArgs) predicates.FitPredicate { return predicate })
 }

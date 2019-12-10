@@ -124,3 +124,13 @@ func PredicateMetadata(state *framework.CycleState) interface{} {
 	}
 	return meta
 }
+
+// CovertStateRefToPredMeta checks if 'stateRef' is nil, if it is, return nil;
+// otherwise covert it to predicates metadata and return.
+func CovertStateRefToPredMeta(stateRef interface{}) (predicates.Metadata, bool) {
+	if stateRef == nil {
+		return nil, true
+	}
+	meta, ok := stateRef.(predicates.Metadata)
+	return meta, ok
+}
