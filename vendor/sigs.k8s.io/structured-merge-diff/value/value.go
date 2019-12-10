@@ -205,7 +205,8 @@ func ToString(v Value) string {
 		return "[" + strings.Join(strs, ",") + "]"
 	case v.IsMap():
 		strs := []string{}
-		v.Map().Iterate(func(k string, v Value) bool {
+		m := v.Map()
+		m.Iterate(func(k string, v Value) bool {
 			strs = append(strs, fmt.Sprintf("%v=%v", k, ToString(v)))
 			return true
 		})

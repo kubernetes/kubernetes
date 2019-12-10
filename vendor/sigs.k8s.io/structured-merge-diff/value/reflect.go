@@ -24,16 +24,14 @@ import (
 	"sync"
 )
 
-var unmarshalerType = reflect.TypeOf(new(json.Unmarshaler)).Elem()
+var reflectPool = sync.Pool{
+	New: func() interface{} {
+		return &reflectValue{}
+	},
+}
 
 func Reflect(value interface{}) (Value, error) {
-	if value != nil {
-		rv := reflect.ValueOf(value)
-		if isCustomConvertable(rv) {
-			return toUnstructured(rv)
-		}
-	}
-	return reflectValue{value}, nil
+	return wrap(reflect.ValueOf(value))
 }
 
 func MustReflect(value interface{}) Value {
@@ -44,20 +42,106 @@ func MustReflect(value interface{}) Value {
 	return v
 }
 
-func isCustomConvertable(rv reflect.Value) bool{
-	// TODO: consider corner cases (typerefs with unmarshaller interface, etc...)
-	switch rv.Kind() {
-	case reflect.Ptr:
-		return rv.Type().Implements(unmarshalerType)
-	default:
-		return reflect.PtrTo(rv.Type()).Implements(unmarshalerType)
+func wrap(value reflect.Value) (Value, error) {
+	if hasJsonMarshaler(value) {
+		return toUnstructured(value)
+	}
+	value = deref(value)
+	val := reflectPool.Get().(*reflectValue)
+	val.Value = value
+	return Value(val), nil
+}
+
+func mustWrap(value reflect.Value) Value {
+	v, err := wrap(value)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
+// Keep track of json tag related data for structs and fields to speed up reflection.
+var (
+	reflectHints      = map[reflect.Type]structHints{}
+	reflectHintsMu sync.RWMutex
+)
+
+// structHints contains hints about each field, keyed by field json name.
+type structHints map[string]*fieldHints
+
+type fieldHints struct {
+	// isOmitEmpty is true if the field has the json 'omitempty' tag.
+	isOmitEmpty bool
+	// fieldPath is the field indices (see FieldByIndex) to lookup the value of
+	// a field in a reflect.Value struct. A path of field indices is used
+	// to support traversing to a field nested in struct fields that have the 'inline'
+	// json tag.
+	fieldPath [][]int
+}
+
+func (f *fieldHints) lookupField(structVal reflect.Value) reflect.Value {
+	// field might be nested within 'inline' structs
+	for _, elem := range f.fieldPath {
+		structVal = structVal.FieldByIndex(elem)
+	}
+	return structVal
+}
+
+func getStructHints(t reflect.Type) structHints {
+	var hints structHints
+	ok := false
+	func() {
+		reflectHintsMu.RLock()
+		defer reflectHintsMu.RUnlock()
+		hints, ok = reflectHints[t]
+	}()
+	if ok {
+		return hints
+	}
+
+	hints = map[string]*fieldHints{}
+	buildStructHints(t, hints, nil)
+
+	reflectHintsMu.Lock()
+	defer reflectHintsMu.Unlock()
+	reflectHints[t] = hints
+	return hints
+}
+
+func buildStructHints(t reflect.Type, infos map[string]*fieldHints, fieldPath [][]int) {
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		jsonName, isInline, isOmitempty := lookupJsonTags(field)
+		if isInline {
+			buildStructHints(field.Type, infos, append(fieldPath, field.Index))
+			continue
+		}
+		info := &fieldHints{isOmitEmpty: isOmitempty, fieldPath: append(fieldPath, field.Index)}
+		infos[jsonName] = info
+
 	}
 }
-func toUnstructured(rv reflect.Value) (Value, error) {
+
+var marshalerType = reflect.TypeOf(new(json.Marshaler)).Elem()
+
+func hasJsonMarshaler(val reflect.Value) bool{
+	if ! val.IsValid() {
+		return false
+	}
+	// TODO: consider corner cases (typerefs with unmarshaller interface, etc...)
+	switch val.Kind() {
+	case reflect.Ptr:
+		return val.Type().Implements(marshalerType)
+	default:
+		return reflect.PtrTo(val.Type()).Implements(marshalerType)
+	}
+}
+
+func toUnstructured(val reflect.Value) (Value, error) {
 	// TODO: round tripping through unstructured is expensive, can we avoid for both custom conversion and merging structured with unstructured?
-	data, err := json.Marshal(rv.Interface())
+	data, err := json.Marshal(val.Interface())
 	if err != nil {
-		return nil, fmt.Errorf("error encoding %v to json: %v", rv, err)
+		return nil, fmt.Errorf("error encoding %v to json: %v", val, err)
 	}
 	wrappedResult := struct{Value interface{}}{}
 	wrappedData := fmt.Sprintf("{\"Value\": %s}", data)
@@ -69,32 +153,48 @@ func toUnstructured(rv reflect.Value) (Value, error) {
 }
 
 type reflectValue struct {
-	Value interface{}
+	Value reflect.Value
 }
 
 func (r reflectValue) IsMap() bool {
-	return isKind(r.Value, reflect.Map, reflect.Struct)
+	return r.isKind(reflect.Map, reflect.Struct)
 }
 
 func (r reflectValue) IsList() bool {
-	return isKind(r.Value, reflect.Slice, reflect.Array)
+	return r.isKind(reflect.Slice, reflect.Array)
 }
+
 func (r reflectValue) IsBool() bool {
-	return isKind(r.Value, reflect.Bool)
+	return r.isKind(reflect.Bool)
 }
+
 func (r reflectValue) IsInt() bool {
 	// This feels wrong. Very wrong.
-	return isKind(r.Value, reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8, reflect.Uint64, reflect.Uint, reflect.Uint32, reflect.Uint16, reflect.Uint8)
+	return r.isKind(reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8, reflect.Uint64, reflect.Uint, reflect.Uint32, reflect.Uint16, reflect.Uint8)
 }
+
 func (r reflectValue) IsFloat() bool {
-	return isKind(r.Value, reflect.Float64, reflect.Float32)
+	return r.isKind(reflect.Float64, reflect.Float32)
 }
+
 func (r reflectValue) IsString() bool {
-	return isKind(r.Value, reflect.String)
+	return r.isKind(reflect.String)
 }
+
 func (r reflectValue) IsNull() bool {
-	return safeIsNil(reflect.ValueOf(r.Value))
+	return safeIsNil(r.Value)
 }
+
+func (r reflectValue) isKind(kinds ...reflect.Kind) bool {
+	kind := r.Value.Kind()
+	for _, k := range kinds {
+		if kind == k {
+			return true
+		}
+	}
+	return false
+}
+
 // TODO find a cleaner way to avoid panics from reflect.IsNil()
 func safeIsNil(v reflect.Value) bool {
 	k := v.Kind()
@@ -104,19 +204,21 @@ func safeIsNil(v reflect.Value) bool {
 	}
 	return false
 }
+
 func (r reflectValue) Map() Map {
-	rval := deref(r.Value)
-	switch rval.Kind() {
+	val := r.Value
+	switch val.Kind() {
 	case reflect.Struct:
 		return reflectStruct{Value: r.Value}
 	case reflect.Map:
-		return reflectMap{r.Value}
+		return reflectMap{Value: r.Value}
 	default:
 		panic("value is not a map or struct")
 	}
 }
-func (r reflectValue) Recycle() {
-	// TODO implement this
+
+func (r *reflectValue) Recycle() {
+	reflectPool.Put(r)
 }
 
 func (r reflectValue) List() List {
@@ -125,34 +227,39 @@ func (r reflectValue) List() List {
 	}
 	panic("value is not a list")
 }
+
 func (r reflectValue) Bool() bool {
 	if r.IsBool() {
-		return deref(r.Value).Bool()
+		return r.Value.Bool()
 	}
 	panic("value is not a bool")
 }
+
 func (r reflectValue) Int() int64 {
 	// TODO: What about reflect.Value.Uint?
 	if r.IsInt() {
-		return deref(r.Value).Int()
+		return r.Value.Int()
 	}
 	panic("value is not an int")
 }
+
 func (r reflectValue) Float() float64 {
 	if r.IsFloat() {
-		return deref(r.Value).Float()
+		return r.Value.Float()
 	}
 	panic("value is not a float")
 }
+
 func (r reflectValue) String() string {
 	if r.IsString() {
-		return deref(r.Value).String()
+		return r.Value.String()
 	}
 	panic("value is not a string")
 }
+
 func (r reflectValue) Interface() interface{} {
 	// In order to be mergable with unstructured, must return unstructured here
-	v, err := toUnstructured(deref(r.Value))
+	v, err := toUnstructured(r.Value)
 	if err != nil {
 		panic("unable to convert to unstructured via json round-trip")
 	}
@@ -160,86 +267,62 @@ func (r reflectValue) Interface() interface{} {
 }
 
 type reflectMap struct {
-	Value interface{}
+	Value reflect.Value
 }
 
 func (r reflectMap) Length() int {
-	rval := deref(r.Value)
-	return rval.Len()
+	val := r.Value
+	return val.Len()
 }
 
 func (r reflectMap) Get(key string) (Value, bool) {
 	var val reflect.Value
-	rval := deref(r.Value)
-	val = rval.MapIndex(reflect.ValueOf(key))
+	// TODO: this only works for strings and string alias key types
+	val = r.Value.MapIndex(r.toMapKey(key))
 	if !val.IsValid() {
 		return nil, false
 	}
-	return MustReflect(val.Interface()), val != zero
+	return mustWrap(val), val != reflect.Value{}
 }
 
 func (r reflectMap) Set(key string, val Value) {
-	rval := deref(r.Value)
-	rval.SetMapIndex(reflect.ValueOf(key), rval)
+	r.Value.SetMapIndex(r.toMapKey(key), reflect.ValueOf(val.Interface()))
 }
 
 func (r reflectMap) Delete(key string) {
-	rval := deref(r.Value)
-	rval.SetMapIndex(reflect.ValueOf(key), zero)
+	val := r.Value
+	val.SetMapIndex(r.toMapKey(key), reflect.Value{})
+}
+
+func (r reflectMap) toMapKey(key string) reflect.Value {
+	val := r.Value
+	return reflect.ValueOf(key).Convert(val.Type().Key())
 }
 
 func (r reflectMap) Iterate(fn func(string, Value) bool) bool {
-	rval := deref(r.Value)
-	iter := rval.MapRange()
+	val := r.Value
+	iter := val.MapRange()
 	for iter.Next() {
 		next := iter.Value()
 		if !next.IsValid() {
 			continue
 		}
-		if !fn(iter.Key().String(), MustReflect(next.Interface())) {
+		mapVal := mustWrap(next)
+		if !fn(iter.Key().String(), mapVal) {
+			mapVal.Recycle()
 			return false
 		}
 	}
 	return true
 }
+
 func (r reflectMap) Equals(m Map) bool {
 	// TODO use reflect.DeepEqual
 	return MapCompare(r, m) == 0
 }
-func (r reflectMap) Recycle() {
-	// TODO implement this
-}
 
 type reflectStruct struct {
-	Value interface{}
-	// TODO: is creating this lookup table worth the allocation?
-	sync.Once
-	fieldByJsonName map[string]reflect.Value
-}
-
-func (r reflectStruct) findJsonNameField(jsonName string) (reflect.Value, bool) {
-	rval := deref(r.Value)
-	r.Once.Do(func() {
-		r.fieldByJsonName = make(map[string]reflect.Value, rval.NumField())
-		r.accumulateFields(r.fieldByJsonName, rval)
-	})
-	field, ok := r.fieldByJsonName[jsonName]
-	return field, ok
-}
-
-func (r reflectStruct) accumulateFields(fields map[string]reflect.Value, rval reflect.Value) {
-	t := rval.Type()
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		fieldVal := rval.FieldByIndex(field.Index)
-		if isInline(field) {
-			r.accumulateFields(fields, rval.FieldByIndex(field.Index))
-		} else if isOmitempty(field) && (safeIsNil(fieldVal) || isEmptyValue(fieldVal)) {
-			// skip it
-		} else {
-			r.fieldByJsonName[lookupJsonName(field)] = fieldVal
-		}
-	}
+	Value reflect.Value
 }
 
 func (r reflectStruct) Length() int {
@@ -253,7 +336,7 @@ func (r reflectStruct) Length() int {
 
 func (r reflectStruct) Get(key string) (Value, bool) {
 	if val, ok := r.findJsonNameField(key); ok {
-		return MustReflect(val.Interface()), true
+		return mustWrap(val), true
 	}
 	// TODO: decide how to handle invalid keys
 	return MustReflect(nil), false
@@ -273,21 +356,33 @@ func (r reflectStruct) Delete(key string) {
 	// TODO: decide how to handle invalid keys
 }
 
-func (r reflectStruct) Iterate(fn func(string, Value) bool) bool {
-	return r.iterate(deref(r.Value), fn)
+func (r reflectStruct) findJsonNameField(jsonName string) (reflect.Value, bool) {
+	fieldHints, ok := getStructHints(r.Value.Type())[jsonName]
+	if !ok {
+		return reflect.Value{}, false
+	}
+	fieldVal := fieldHints.lookupField(r.Value)
+	omit := fieldHints.isOmitEmpty && (safeIsNil(fieldVal) || isEmptyValue(fieldVal))
+	return fieldVal, !omit
 }
 
-func (r reflectStruct) iterate(rval reflect.Value, fn func(string, Value) bool) bool {
-	for i := 0; i < rval.NumField(); i++ {
-		field := rval.Type().Field(i)
-		fieldVal := rval.FieldByIndex(field.Index)
-		if isInline(field) {
-			if ok := r.iterate(fieldVal, fn); !ok {
-				return false
-			}
-		} else if isOmitempty(field) && (safeIsNil(fieldVal) || isEmptyValue(fieldVal)) {
-			// skip it
-		} else if !fn(lookupJsonName(field), MustReflect(rval.Field(i).Interface())) {
+func (r reflectStruct) Iterate(fn func(string, Value) bool) bool {
+	return eachStructValue(r.Value, func(s string, value reflect.Value) bool {
+		v := mustWrap(value)
+		defer v.Recycle()
+		return fn(s, v)
+	})
+}
+
+func eachStructValue(structVal reflect.Value, fn func(string, reflect.Value) bool) bool {
+	for jsonName, hints := range getStructHints(structVal.Type()) {
+		fieldVal := hints.lookupField(structVal)
+		if hints.isOmitEmpty && (safeIsNil(fieldVal) || isEmptyValue(fieldVal)) {
+			// omit it
+			continue
+		}
+		ok := fn(jsonName, fieldVal)
+		if !ok {
 			return false
 		}
 	}
@@ -300,74 +395,42 @@ func (r reflectStruct) Equals(m Map) bool {
 }
 
 type ReflectList struct {
-	Value interface{}
+	Value reflect.Value
 }
 
 func (r ReflectList) Length() int {
-	rval := deref(r.Value)
-	return rval.Len()
+	val := r.Value
+	return val.Len()
 }
 
 func (r ReflectList) At(i int) Value {
-	rval := deref(r.Value)
-	return MustReflect(rval.Index(i).Interface())
+	val := r.Value
+	return mustWrap(val.Index(i))
 }
 
-var zero = reflect.Value{}
-
-func isKind(val interface{}, kinds ...reflect.Kind) bool {
-	rval := deref(val)
-	kind := rval.Kind()
-	for _, k := range kinds {
-		if kind == k {
-			return true
-		}
+func deref(val reflect.Value) reflect.Value {
+	kind := val.Kind()
+	if (kind == reflect.Interface || kind == reflect.Ptr) && !safeIsNil(val) {
+		return val.Elem()
 	}
-	return false
+	return val
 }
 
-func deref(val interface{}) reflect.Value {
-	rval := reflect.ValueOf(val)
-	kind := rval.Kind()
-	if kind == reflect.Interface || kind == reflect.Ptr {
-		return rval.Elem()
+func lookupJsonTags(f reflect.StructField) (string, bool, bool) {
+	var name string
+	tag := f.Tag.Get("json")
+	if tag == "-"  {
+		return f.Name, false, false
 	}
-	return rval
-}
-
-func lookupJsonName(f reflect.StructField) string {
-	if jsonTag, ok := f.Tag.Lookup("json"); ok {
-		parts := strings.Split(jsonTag, ",")
-		if len(parts) > 0 {
-			return strings.TrimSpace(parts[0])
-		}
+	name, opts := parseTag(tag)
+	if name == "" {
+		name = f.Name
 	}
-	return f.Name
-}
-
-func isInline(f reflect.StructField) bool {
-	return hasTag(f, "inline")
-}
-
-func isOmitempty(f reflect.StructField) bool {
-	return hasTag(f, "omitempty")
-}
-
-func hasTag(f reflect.StructField, tag string) bool {
-	if jsonTag, ok := f.Tag.Lookup("json"); ok {
-		parts := strings.Split(jsonTag, ",")
-		if len(parts) > 1 {
-			for i := 1; i < len(parts); i++ {
-				if parts[i] == tag {
-					return true
-				}
-			}
-		}
-	}
-	return false
+	return name, opts.Contains("inline"), opts.Contains("omitempty")
 }
 
 // Copied from https://golang.org/src/encoding/json/encode.go
+
 func isEmptyValue(v reflect.Value) bool {
 	switch v.Kind() {
 	case reflect.Array, reflect.Map, reflect.Slice, reflect.String:
@@ -382,6 +445,39 @@ func isEmptyValue(v reflect.Value) bool {
 		return v.Float() == 0
 	case reflect.Interface, reflect.Ptr:
 		return v.IsNil()
+	}
+	return false
+}
+
+type tagOptions string
+
+// parseTag splits a struct field's json tag into its name and
+// comma-separated options.
+func parseTag(tag string) (string, tagOptions) {
+	if idx := strings.Index(tag, ","); idx != -1 {
+		return tag[:idx], tagOptions(tag[idx+1:])
+	}
+	return tag, tagOptions("")
+}
+
+// Contains reports whether a comma-separated list of options
+// contains a particular substr flag. substr must be surrounded by a
+// string boundary or commas.
+func (o tagOptions) Contains(optionName string) bool {
+	if len(o) == 0 {
+		return false
+	}
+	s := string(o)
+	for s != "" {
+		var next string
+		i := strings.Index(s, ",")
+		if i >= 0 {
+			s, next = s[:i], s[i+1:]
+		}
+		if s == optionName {
+			return true
+		}
+		s = next
 	}
 	return false
 }
