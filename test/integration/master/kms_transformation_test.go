@@ -22,13 +22,15 @@ import (
 	"bytes"
 	"context"
 	"crypto/aes"
+	"encoding/base64"
 	"encoding/binary"
-
 	"fmt"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/cryptobyte"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -99,6 +101,7 @@ func (r envelope) plainTextPayload(secretETCDPath string) ([]byte, error) {
 // 3. KMS gRPC Plugin should encrypt the DEK with a Key Encryption Key (KEK) and pass it back to envelopeTransformer
 // 4. The cipherTextPayload (ex. Secret) should be encrypted via AES CBC transform
 // 5. Prefix-EncryptedDEK-EncryptedPayload structure should be deposited to ETCD
+// 6. "Future" data stored in etcd with AES GCM transform is still readable and is migrated to CBC on write
 func TestKMSProvider(t *testing.T) {
 	encryptionConfig := `
 kind: EncryptionConfiguration
@@ -144,7 +147,7 @@ resources:
 	if err != nil {
 		t.Fatalf("failed to read %s from etcd: %v", secretETCDPath, err)
 	}
-	envelope := envelope{
+	envelopeData := envelope{
 		providerName: providerName,
 		rawEnvelope:  rawEnvelope,
 		plainTextDEK: plainTextDEK,
@@ -155,7 +158,7 @@ resources:
 		t.Fatalf("expected secret to be prefixed with %s, but got %s", wantPrefix, rawEnvelope)
 	}
 
-	decryptResponse, err := pluginMock.Decrypt(context.Background(), &kmsapi.DecryptRequest{Version: kmsAPIVersion, Cipher: envelope.cipherTextDEK()})
+	decryptResponse, err := pluginMock.Decrypt(context.Background(), &kmsapi.DecryptRequest{Version: kmsAPIVersion, Cipher: envelopeData.cipherTextDEK()})
 	if err != nil {
 		t.Fatalf("failed to decrypt DEK, %v", err)
 	}
@@ -166,7 +169,7 @@ resources:
 			plainTextDEK, dekPlainAsWouldBeSeenByETCD)
 	}
 
-	plainSecret, err := envelope.plainTextPayload(secretETCDPath)
+	plainSecret, err := envelopeData.plainTextPayload(secretETCDPath)
 	if err != nil {
 		t.Fatalf("failed to transform from storage via AESCBC, err: %v", err)
 	}
@@ -175,10 +178,101 @@ resources:
 		t.Fatalf("expected %q after decryption, but got %q", secretVal, string(plainSecret))
 	}
 
+	secretClient := test.restClient.CoreV1().Secrets(testNamespace)
+
 	// Secrets should be un-enveloped on direct reads from Kube API Server.
-	s, err := test.restClient.CoreV1().Secrets(testNamespace).Get(testSecret, metav1.GetOptions{})
+	s, err := secretClient.Get(testSecret, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to read secret via Kube API, err: %v", err)
+	}
 	if secretVal != string(s.Data[secretKey]) {
 		t.Fatalf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
+	}
+
+	// write data using AES GCM to simulate a downgrade
+	futureSecretBytes, err := base64.StdEncoding.DecodeString(futureSecret)
+	if err != nil {
+		t.Fatalf("failed to base64 decode future secret, err: %v", err)
+	}
+	futureKeyBytes, err := base64.StdEncoding.DecodeString(futureAESGCMKey)
+	if err != nil {
+		t.Fatalf("failed to base64 decode future key, err: %v", err)
+	}
+	block, err := aes.NewCipher(futureKeyBytes)
+	if err != nil {
+		t.Fatalf("invalid key, err: %v", err)
+	}
+
+	// we cannot precompute this because the authenticated data changes per run
+	futureEncryptedSecretBytes, err := aestransformer.NewGCMTransformer(block).TransformToStorage(futureSecretBytes, value.DefaultContext(secretETCDPath))
+	if err != nil {
+		t.Fatalf("failed to encrypt future secret, err: %v", err)
+	}
+
+	futureEncryptedSecretBuf := cryptobyte.NewBuilder(nil)
+	futureEncryptedSecretBuf.AddBytes([]byte(wantPrefix))
+	futureEncryptedSecretBuf.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+		b.AddBytes([]byte(futureAESGCMKey))
+	})
+	futureEncryptedSecretBuf.AddBytes(futureEncryptedSecretBytes)
+
+	_, err = test.writeRawRecordToETCD(secretETCDPath, futureEncryptedSecretBuf.BytesOrPanic())
+	if err != nil {
+		t.Fatalf("failed to write future encrypted secret, err: %v", err)
+	}
+
+	// confirm that direct AES CBC decryption does not work
+	failingRawEnvelope, err := test.getRawSecretFromETCD()
+	if err != nil {
+		t.Fatalf("failed to read %s from etcd: %v", secretETCDPath, err)
+	}
+	failingFutureEnvelope := envelope{
+		providerName: providerName,
+		rawEnvelope:  failingRawEnvelope,
+		plainTextDEK: futureKeyBytes,
+	}
+	failingFuturePlainSecret, err := failingFutureEnvelope.plainTextPayload(secretETCDPath)
+	if err == nil || err.Error() != "failed to transform from storage via AESCBC, err: the stored data is not a multiple of the block size" {
+		t.Fatalf("AESCBC decryption failure not seen, err: %v, data: %s", err, string(failingFuturePlainSecret))
+	}
+
+	// AES GCM secrets should be un-enveloped on direct reads from Kube API Server.
+	futureSecretObj, err := secretClient.Get(testSecret, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to read future secret via Kube API, err: %v", err)
+	}
+	if futureSecretVal != string(futureSecretObj.Data[secretKey]) {
+		t.Fatalf("expected %s from KubeAPI, but got %s", futureSecretVal, string(futureSecretObj.Data[secretKey]))
+	}
+
+	// no-op update should cause new AES CBC key to be used
+	futureSecretUpdated, err := secretClient.Update(futureSecretObj)
+	if err != nil {
+		t.Fatalf("failed to update future secret via Kube API, err: %v", err)
+	}
+	if futureSecretObj.ResourceVersion == futureSecretUpdated.ResourceVersion {
+		t.Fatalf("future secret not updated on no-op write: %s", futureSecretObj.ResourceVersion)
+	}
+
+	// confirm that direct AES CBC decryption works
+	futureRawEnvelope, err := test.getRawSecretFromETCD()
+	if err != nil {
+		t.Fatalf("failed to read %s from etcd: %v", secretETCDPath, err)
+	}
+	futureEnvelope := envelope{
+		providerName: providerName,
+		rawEnvelope:  futureRawEnvelope,
+		plainTextDEK: pluginMock.LastEncryptRequest(),
+	}
+	if !bytes.HasPrefix(futureRawEnvelope, []byte(wantPrefix)) {
+		t.Fatalf("expected secret to be prefixed with %s, but got %s", wantPrefix, futureRawEnvelope)
+	}
+	futurePlainSecret, err := futureEnvelope.plainTextPayload(secretETCDPath)
+	if err != nil {
+		t.Fatalf("failed to transform from storage via AESCBC, err: %v", err)
+	}
+	if !strings.Contains(string(futurePlainSecret), futureSecretVal) {
+		t.Fatalf("expected %q after decryption, but got %q", futureSecretVal, string(futurePlainSecret))
 	}
 }
 
