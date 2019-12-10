@@ -19,4 +19,5 @@ replace (
 	k8s.io/cli-runtime => ../cli-runtime
 	k8s.io/client-go => ../client-go
 	k8s.io/sample-cli-plugin => ../sample-cli-plugin
+	sigs.k8s.io/structured-merge-diff => github.com/jpbetz/structured-merge-diff v0.0.0-20191210012355-aca71c7dbc90
 )
