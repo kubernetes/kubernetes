@@ -5,8 +5,8 @@ reviewers:
   - johnSchnake
   - SataQiu
   - draveness
-  - alejandrox1
 approvers:
+  - alejandrox1
   - andrewsykim
   - bowei # for test/e2e/{dns*,network}.go
   - cblecker
