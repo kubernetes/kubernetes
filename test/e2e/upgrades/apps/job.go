@@ -17,8 +17,14 @@ limitations under the License.
 package upgrades
 
 import (
+	"fmt"
+	"strings"
+
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
 	"k8s.io/kubernetes/test/e2e/upgrades"
@@ -54,11 +60,35 @@ func (t *JobUpgradeTest) Setup(f *framework.Framework) {
 func (t *JobUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	<-done
 	ginkgo.By("Ensuring active pods == parallelism")
-	err := jobutil.EnsureAllJobPodsRunning(f.ClientSet, t.namespace, t.job.Name, 2)
+	err := ensureAllJobPodsRunning(f.ClientSet, t.namespace, t.job.Name, 2)
 	framework.ExpectNoError(err)
 }
 
 // Teardown cleans up any remaining resources.
 func (t *JobUpgradeTest) Teardown(f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
+}
+
+// ensureAllJobPodsRunning uses c to check in the Job named jobName in ns
+// is running, returning an error if the expected parallelism is not
+// satisfied.
+func ensureAllJobPodsRunning(c clientset.Interface, ns, jobName string, parallelism int32) error {
+	label := labels.SelectorFromSet(labels.Set(map[string]string{jobutil.JobSelectorKey: jobName}))
+	options := metav1.ListOptions{LabelSelector: label.String()}
+	pods, err := c.CoreV1().Pods(ns).List(options)
+	if err != nil {
+		return err
+	}
+	podsSummary := make([]string, 0, parallelism)
+	count := int32(0)
+	for _, p := range pods.Items {
+		if p.Status.Phase == v1.PodRunning {
+			count++
+		}
+		podsSummary = append(podsSummary, fmt.Sprintf("%s (%s: %s)", p.ObjectMeta.Name, p.Status.Phase, p.Status.Message))
+	}
+	if count != parallelism {
+		return fmt.Errorf("job has %d of %d expected running pods: %s", count, parallelism, strings.Join(podsSummary, ", "))
+	}
+	return nil
 }
