@@ -91,7 +91,7 @@ func TestMain(m *testing.M) {
 
 	// TODO: Deprecating repo-root over time... instead just use gobindata_util.go , see #23987.
 	// Right now it is still needed, for example by
-	// test/e2e/framework/ingress/ingress_utils.go
+	// test/e2e/network/ingress_utils.go
 	// for providing the optional secret.yaml file and by
 	// test/e2e/framework/util.go for cluster/log-dump.
 	if framework.TestContext.RepoRoot != "" {

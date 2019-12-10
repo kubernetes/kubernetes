@@ -36,7 +36,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
-	"k8s.io/kubernetes/test/e2e/framework/ingress"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 
@@ -52,13 +51,13 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 	defer ginkgo.GinkgoRecover()
 	var (
 		ns               string
-		jig              *ingress.TestJig
-		conformanceTests []ingress.ConformanceTests
+		jig              *TestJig
+		conformanceTests []ConformanceTests
 	)
 	f := framework.NewDefaultFramework("ingress")
 
 	ginkgo.BeforeEach(func() {
-		jig = ingress.NewIngressTestJig(f.ClientSet)
+		jig = NewIngressTestJig(f.ClientSet)
 		ns = f.Namespace.Name
 
 		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
@@ -114,7 +113,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		})
 
 		ginkgo.It("should conform to Ingress spec", func() {
-			conformanceTests = ingress.CreateIngressComformanceTests(jig, ns, map[string]string{})
+			conformanceTests = CreateIngressComformanceTests(jig, ns, map[string]string{})
 			for _, t := range conformanceTests {
 				ginkgo.By(t.EntryLog)
 				t.Execute()
@@ -129,8 +128,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		ginkgo.It("should support multiple TLS certs", func() {
 			ginkgo.By("Creating an ingress with no certs.")
-			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "multiple-certs"), ns, map[string]string{
-				ingress.IngressStaticIPKey: ns,
+			jig.CreateIngress(filepath.Join(IngressManifestPath, "multiple-certs"), ns, map[string]string{
+				IngressStaticIPKey: ns,
 			}, map[string]string{})
 
 			ginkgo.By("Adding multiple certs to the ingress.")
@@ -165,8 +164,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		ginkgo.It("multicluster ingress should get instance group annotation", func() {
 			name := "echomap"
-			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "http"), ns, map[string]string{
-				ingress.IngressClassKey: ingress.MulticlusterIngressClassValue,
+			jig.CreateIngress(filepath.Join(IngressManifestPath, "http"), ns, map[string]string{
+				IngressClassKey: MulticlusterIngressClassValue,
 			}, map[string]string{})
 
 			ginkgo.By(fmt.Sprintf("waiting for Ingress %s to get instance group annotation", name))
@@ -186,13 +185,13 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 			// Verify that the ingress does not get other annotations like url-map, target-proxy, backends, etc.
 			// Note: All resources except the firewall rule have an annotation.
-			umKey := ingress.StatusPrefix + "/url-map"
-			fwKey := ingress.StatusPrefix + "/forwarding-rule"
-			tpKey := ingress.StatusPrefix + "/target-proxy"
-			fwsKey := ingress.StatusPrefix + "/https-forwarding-rule"
-			tpsKey := ingress.StatusPrefix + "/https-target-proxy"
-			scKey := ingress.StatusPrefix + "/ssl-cert"
-			beKey := ingress.StatusPrefix + "/backends"
+			umKey := StatusPrefix + "/url-map"
+			fwKey := StatusPrefix + "/forwarding-rule"
+			tpKey := StatusPrefix + "/target-proxy"
+			fwsKey := StatusPrefix + "/https-forwarding-rule"
+			tpsKey := StatusPrefix + "/https-target-proxy"
+			scKey := StatusPrefix + "/ssl-cert"
+			beKey := StatusPrefix + "/backends"
 			wait.Poll(2*time.Second, time.Minute, func() (bool, error) {
 				ing, err := f.ClientSet.NetworkingV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
@@ -272,8 +271,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		ginkgo.It("should conform to Ingress spec", func() {
 			jig.PollInterval = 5 * time.Second
-			conformanceTests = ingress.CreateIngressComformanceTests(jig, ns, map[string]string{
-				ingress.NEGAnnotation: `{"ingress": true}`,
+			conformanceTests = CreateIngressComformanceTests(jig, ns, map[string]string{
+				NEGAnnotation: `{"ingress": true}`,
 			})
 			for _, t := range conformanceTests {
 				ginkgo.By(t.EntryLog)
@@ -288,7 +287,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		ginkgo.It("should be able to switch between IG and NEG modes", func() {
 			var err error
 			ginkgo.By("Create a basic HTTP ingress using NEG")
-			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
+			jig.CreateIngress(filepath.Join(IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
 			err = gceController.WaitForNegBackendService(jig.GetServicePorts(false))
 			framework.ExpectNoError(err)
@@ -297,7 +296,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			svcList, err := f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			for _, svc := range svcList.Items {
-				svc.Annotations[ingress.NEGAnnotation] = `{"ingress": false}`
+				svc.Annotations[NEGAnnotation] = `{"ingress": false}`
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
 				framework.ExpectNoError(err)
 			}
@@ -315,7 +314,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			svcList, err = f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			for _, svc := range svcList.Items {
-				svc.Annotations[ingress.NEGAnnotation] = `{"ingress": true}`
+				svc.Annotations[NEGAnnotation] = `{"ingress": true}`
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
 				framework.ExpectNoError(err)
 			}
@@ -332,7 +331,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		ginkgo.It("should be able to create a ClusterIP service", func() {
 			ginkgo.By("Create a basic HTTP ingress using NEG")
-			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "neg-clusterip"), ns, map[string]string{}, map[string]string{})
+			jig.CreateIngress(filepath.Join(IngressManifestPath, "neg-clusterip"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
 			svcPorts := jig.GetServicePorts(false)
 			err := gceController.WaitForNegBackendService(svcPorts)
@@ -366,7 +365,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}
 
 			ginkgo.By("Create a basic HTTP ingress using NEG")
-			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
+			jig.CreateIngress(filepath.Join(IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
 			jig.WaitForIngressToStable()
 			err := gceController.WaitForNegBackendService(jig.GetServicePorts(false))
@@ -391,7 +390,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			name := "hostname"
 			replicas := 8
 			ginkgo.By("Create a basic HTTP ingress using NEG")
-			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
+			jig.CreateIngress(filepath.Join(IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
 			jig.WaitForIngressToStable()
 			err := gceController.WaitForNegBackendService(jig.GetServicePorts(false))
@@ -456,11 +455,11 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 					svc, err := f.ClientSet.CoreV1().Services(ns).Get(name, metav1.GetOptions{})
 					framework.ExpectNoError(err)
 
-					var status ingress.NegStatus
-					v, ok := svc.Annotations[ingress.NEGStatusAnnotation]
+					var status NegStatus
+					v, ok := svc.Annotations[NEGStatusAnnotation]
 					if !ok {
 						// Wait for NEG sync loop to find NEGs
-						framework.Logf("Waiting for %v, got: %+v", ingress.NEGStatusAnnotation, svc.Annotations)
+						framework.Logf("Waiting for %v, got: %+v", NEGStatusAnnotation, svc.Annotations)
 						return false, nil
 					}
 					err = json.Unmarshal([]byte(v), &status)
@@ -468,7 +467,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 						framework.Logf("Error in parsing Expose NEG annotation: %v", err)
 						return false, nil
 					}
-					framework.Logf("Got %v: %v", ingress.NEGStatusAnnotation, v)
+					framework.Logf("Got %v: %v", NEGStatusAnnotation, v)
 
 					// Expect 2 NEGs to be created based on the test setup (neg-exposed)
 					if len(status.NetworkEndpointGroups) != 2 {
@@ -503,7 +502,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}
 
 			ginkgo.By("Create a basic HTTP ingress using NEG")
-			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "neg-exposed"), ns, map[string]string{}, map[string]string{})
+			jig.CreateIngress(filepath.Join(IngressManifestPath, "neg-exposed"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
 			err := gceController.WaitForNegBackendService(jig.GetServicePorts(false))
 			framework.ExpectNoError(err)
@@ -525,7 +524,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		ginkgo.It("should create NEGs for all ports with the Ingress annotation, and NEGs for the standalone annotation otherwise", func() {
 			ginkgo.By("Create a basic HTTP ingress using standalone NEG")
-			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "neg-exposed"), ns, map[string]string{}, map[string]string{})
+			jig.CreateIngress(filepath.Join(IngressManifestPath, "neg-exposed"), ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(true)
 
 			name := "hostname"
@@ -536,7 +535,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			svcList, err := f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			for _, svc := range svcList.Items {
-				svc.Annotations[ingress.NEGAnnotation] = `{"ingress":true,"exposed_ports":{"80":{},"443":{}}}`
+				svc.Annotations[NEGAnnotation] = `{"ingress":true,"exposed_ports":{"80":{},"443":{}}}`
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
 				framework.ExpectNoError(err)
 			}
@@ -547,7 +546,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			svcList, err = f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			for _, svc := range svcList.Items {
-				svc.Annotations[ingress.NEGAnnotation] = `{"ingress":true,"exposed_ports":{"443":{}}}`
+				svc.Annotations[NEGAnnotation] = `{"ingress":true,"exposed_ports":{"443":{}}}`
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
 				framework.ExpectNoError(err)
 			}
@@ -558,7 +557,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			svcList, err = f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			for _, svc := range svcList.Items {
-				svc.Annotations[ingress.NEGAnnotation] = `{"ingress":false,"exposed_ports":{"443":{}}}`
+				svc.Annotations[NEGAnnotation] = `{"ingress":false,"exposed_ports":{"443":{}}}`
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
 				framework.ExpectNoError(err)
 			}
@@ -569,7 +568,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			svcList, err = f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			for _, svc := range svcList.Items {
-				delete(svc.Annotations, ingress.NEGAnnotation)
+				delete(svc.Annotations, NEGAnnotation)
 				// Service cannot be ClusterIP if it's using Instance Groups.
 				svc.Spec.Type = v1.ServiceTypeNodePort
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
@@ -586,7 +585,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		// Platform specific setup
 		ginkgo.BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
-			jig.Class = ingress.MulticlusterIngressClassValue
+			jig.Class = MulticlusterIngressClassValue
 			jig.PollInterval = 5 * time.Second
 			ginkgo.By("Initializing gce controller")
 			gceController = &gce.IngressController{
@@ -623,8 +622,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		})
 
 		ginkgo.It("should conform to Ingress spec", func() {
-			conformanceTests = ingress.CreateIngressComformanceTests(jig, ns, map[string]string{
-				ingress.IngressStaticIPKey: ipName,
+			conformanceTests = CreateIngressComformanceTests(jig, ns, map[string]string{
+				IngressStaticIPKey: ipName,
 			})
 			for _, t := range conformanceTests {
 				ginkgo.By(t.EntryLog)
@@ -648,9 +647,9 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		ginkgo.It("should remove clusters as expected", func() {
 			ingAnnotations := map[string]string{
-				ingress.IngressStaticIPKey: ipName,
+				IngressStaticIPKey: ipName,
 			}
-			ingFilePath := filepath.Join(ingress.IngressManifestPath, "http")
+			ingFilePath := filepath.Join(IngressManifestPath, "http")
 			jig.CreateIngress(ingFilePath, ns, ingAnnotations, map[string]string{})
 			jig.WaitForIngress(false /*waitForNodePort*/)
 			name := jig.Ingress.Name
@@ -678,7 +677,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		ginkgo.It("single and multi-cluster ingresses should be able to exist together", func() {
 			ginkgo.By("Creating a single cluster ingress first")
 			jig.Class = ""
-			singleIngFilePath := filepath.Join(ingress.GCEIngressManifestPath, "static-ip-2")
+			singleIngFilePath := filepath.Join(GCEIngressManifestPath, "static-ip-2")
 			jig.CreateIngress(singleIngFilePath, ns, map[string]string{}, map[string]string{})
 			jig.WaitForIngress(false /*waitForNodePort*/)
 			// jig.Ingress will be overwritten when we create MCI, so keep a reference.
@@ -686,11 +685,11 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 			// Create the multi-cluster ingress next.
 			ginkgo.By("Creating a multi-cluster ingress next")
-			jig.Class = ingress.MulticlusterIngressClassValue
+			jig.Class = MulticlusterIngressClassValue
 			ingAnnotations := map[string]string{
-				ingress.IngressStaticIPKey: ipName,
+				IngressStaticIPKey: ipName,
 			}
-			multiIngFilePath := filepath.Join(ingress.IngressManifestPath, "http")
+			multiIngFilePath := filepath.Join(IngressManifestPath, "http")
 			jig.CreateIngress(multiIngFilePath, ns, ingAnnotations, map[string]string{})
 			jig.WaitForIngress(false /*waitForNodePort*/)
 			mciIngress := jig.Ingress
@@ -700,7 +699,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			jig.Class = ""
 			jig.TryDeleteIngress()
 			jig.Ingress = mciIngress
-			jig.Class = ingress.MulticlusterIngressClassValue
+			jig.Class = MulticlusterIngressClassValue
 			jig.WaitForIngress(false /*waitForNodePort*/)
 
 			ginkgo.By("Cleanup: Deleting the multi-cluster ingress")
@@ -710,13 +709,13 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 	// Time: borderline 5m, slow by design
 	ginkgo.Describe("[Slow] Nginx", func() {
-		var nginxController *ingress.NginxIngressController
+		var nginxController *NginxIngressController
 
 		ginkgo.BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			ginkgo.By("Initializing nginx controller")
 			jig.Class = "nginx"
-			nginxController = &ingress.NginxIngressController{Ns: ns, Client: jig.Client}
+			nginxController = &NginxIngressController{Ns: ns, Client: jig.Client}
 
 			// TODO: This test may fail on other platforms. We can simply skip it
 			// but we want to allow easy testing where a user might've hand
@@ -750,7 +749,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			// Poll more frequently to reduce e2e completion time.
 			// This test runs in presubmit.
 			jig.PollInterval = 5 * time.Second
-			conformanceTests = ingress.CreateIngressComformanceTests(jig, ns, map[string]string{})
+			conformanceTests = CreateIngressComformanceTests(jig, ns, map[string]string{})
 			for _, t := range conformanceTests {
 				ginkgo.By(t.EntryLog)
 				t.Execute()
@@ -772,11 +771,11 @@ func verifyKubemciStatusHas(name, expectedSubStr string) {
 	}
 }
 
-func executePresharedCertTest(f *framework.Framework, jig *ingress.TestJig, staticIPName string) {
+func executePresharedCertTest(f *framework.Framework, jig *TestJig, staticIPName string) {
 	preSharedCertName := "test-pre-shared-cert"
 	ginkgo.By(fmt.Sprintf("Creating ssl certificate %q on GCE", preSharedCertName))
 	testHostname := "test.ingress.com"
-	cert, key, err := ingress.GenerateRSACerts(testHostname, true)
+	cert, key, err := GenerateRSACerts(testHostname, true)
 	framework.ExpectNoError(err)
 	gceCloud, err := gce.GetGCECloud()
 	framework.ExpectNoError(err)
@@ -808,36 +807,36 @@ func executePresharedCertTest(f *framework.Framework, jig *ingress.TestJig, stat
 	ginkgo.By("Creating an ingress referencing the pre-shared certificate")
 	// Create an ingress referencing this cert using pre-shared-cert annotation.
 	ingAnnotations := map[string]string{
-		ingress.IngressPreSharedCertKey: preSharedCertName,
+		IngressPreSharedCertKey: preSharedCertName,
 		// Disallow HTTP to save resources. This is irrelevant to the
 		// pre-shared cert test.
-		ingress.IngressAllowHTTPKey: "false",
+		IngressAllowHTTPKey: "false",
 	}
 	if staticIPName != "" {
-		ingAnnotations[ingress.IngressStaticIPKey] = staticIPName
+		ingAnnotations[IngressStaticIPKey] = staticIPName
 	}
-	jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "pre-shared-cert"), f.Namespace.Name, ingAnnotations, map[string]string{})
+	jig.CreateIngress(filepath.Join(IngressManifestPath, "pre-shared-cert"), f.Namespace.Name, ingAnnotations, map[string]string{})
 
 	ginkgo.By("Test that ingress works with the pre-shared certificate")
 	err = jig.WaitForIngressWithCert(true, []string{testHostname}, cert)
 	framework.ExpectNoError(err, fmt.Sprintf("Unexpected error while waiting for ingress: %v", err))
 }
 
-func executeStaticIPHttpsOnlyTest(f *framework.Framework, jig *ingress.TestJig, ipName, ip string) {
-	jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "static-ip"), f.Namespace.Name, map[string]string{
-		ingress.IngressStaticIPKey:  ipName,
-		ingress.IngressAllowHTTPKey: "false",
+func executeStaticIPHttpsOnlyTest(f *framework.Framework, jig *TestJig, ipName, ip string) {
+	jig.CreateIngress(filepath.Join(IngressManifestPath, "static-ip"), f.Namespace.Name, map[string]string{
+		IngressStaticIPKey:  ipName,
+		IngressAllowHTTPKey: "false",
 	}, map[string]string{})
 
 	ginkgo.By("waiting for Ingress to come up with ip: " + ip)
-	httpClient := ingress.BuildInsecureClient(ingress.IngressReqTimeout)
-	framework.ExpectNoError(ingress.PollURL(fmt.Sprintf("https://%s/", ip), "", e2eservice.LoadBalancerPollTimeout, jig.PollInterval, httpClient, false))
+	httpClient := BuildInsecureClient(IngressReqTimeout)
+	framework.ExpectNoError(PollURL(fmt.Sprintf("https://%s/", ip), "", e2eservice.LoadBalancerPollTimeout, jig.PollInterval, httpClient, false))
 
 	ginkgo.By("should reject HTTP traffic")
-	framework.ExpectNoError(ingress.PollURL(fmt.Sprintf("http://%s/", ip), "", e2eservice.LoadBalancerPollTimeout, jig.PollInterval, httpClient, true))
+	framework.ExpectNoError(PollURL(fmt.Sprintf("http://%s/", ip), "", e2eservice.LoadBalancerPollTimeout, jig.PollInterval, httpClient, true))
 }
 
-func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *ingress.TestJig, staticIPName string) {
+func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *TestJig, staticIPName string) {
 	ginkgo.By("Creating a set of ingress, service and deployment that have backside re-encryption configured")
 	deployCreated, svcCreated, ingCreated, err := jig.SetUpBacksideHTTPSIngress(f.ClientSet, f.Namespace.Name, staticIPName)
 	defer func() {
@@ -853,9 +852,9 @@ func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *ingress.TestJ
 	framework.ExpectNoError(err, "ginkgo.Failed to wait for ingress IP")
 
 	ginkgo.By(fmt.Sprintf("Polling on address %s and verify the backend is serving HTTPS", ingIP))
-	timeoutClient := &http.Client{Timeout: ingress.IngressReqTimeout}
+	timeoutClient := &http.Client{Timeout: IngressReqTimeout}
 	err = wait.PollImmediate(e2eservice.LoadBalancerPollInterval, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
-		resp, err := ingress.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", ingIP), "")
+		resp, err := SimpleGET(timeoutClient, fmt.Sprintf("http://%s", ingIP), "")
 		if err != nil {
 			framework.Logf("SimpleGET failed: %v", err)
 			return false, nil
@@ -869,7 +868,7 @@ func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *ingress.TestJ
 	framework.ExpectNoError(err, "ginkgo.Failed to verify backside re-encryption ingress")
 }
 
-func detectNegAnnotation(f *framework.Framework, jig *ingress.TestJig, gceController *gce.IngressController, ns, name string, negs int) {
+func detectNegAnnotation(f *framework.Framework, jig *TestJig, gceController *gce.IngressController, ns, name string, negs int) {
 	if err := wait.Poll(5*time.Second, negUpdateTimeout, func() (bool, error) {
 		svc, err := f.ClientSet.CoreV1().Services(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
@@ -886,10 +885,10 @@ func detectNegAnnotation(f *framework.Framework, jig *ingress.TestJig, gceContro
 			return true, nil
 		}
 
-		var status ingress.NegStatus
-		v, ok := svc.Annotations[ingress.NEGStatusAnnotation]
+		var status NegStatus
+		v, ok := svc.Annotations[NEGStatusAnnotation]
 		if !ok {
-			framework.Logf("Waiting for %v, got: %+v", ingress.NEGStatusAnnotation, svc.Annotations)
+			framework.Logf("Waiting for %v, got: %+v", NEGStatusAnnotation, svc.Annotations)
 			return false, nil
 		}
 
@@ -898,7 +897,7 @@ func detectNegAnnotation(f *framework.Framework, jig *ingress.TestJig, gceContro
 			framework.Logf("Error in parsing Expose NEG annotation: %v", err)
 			return false, nil
 		}
-		framework.Logf("Got %v: %v", ingress.NEGStatusAnnotation, v)
+		framework.Logf("Got %v: %v", NEGStatusAnnotation, v)
 
 		if len(status.NetworkEndpointGroups) != negs {
 			framework.Logf("Expected %d NEGs, got %d", negs, len(status.NetworkEndpointGroups))

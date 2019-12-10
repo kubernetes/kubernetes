@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"k8s.io/kubernetes/test/e2e/network"
 	"os"
 	"path/filepath"
 	"sort"
@@ -33,7 +34,6 @@ import (
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/ingress"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	"k8s.io/kubernetes/test/e2e/network/scale"
 )
@@ -152,7 +152,7 @@ func main() {
 
 	// Setting up a localized scale test framework.
 	f := scale.NewIngressScaleFramework(cs, ns.Name, cloudConfig)
-	f.Logger = &ingress.GLogger{}
+	f.Logger = &network.GLogger{}
 	// Customizing scale test.
 	f.EnableTLS = enableTLS
 	f.OutputFile = outputFile
