@@ -1,0 +1,74 @@
+substitutions:
+  ## mandatory
+  # one of: 'debian-base', 'debian-iptables', 'debian-hyperkube-base'
+  _IMAGE:
+  ## optional
+  _K8S_GIT_URL:    https://github.com/kubernetes/kubernetes
+  _K8S_GIT_BRANCH: master
+  _BUILDER_IMAGE:  gcr.io/k8s-staging-release-test/k8s-cloud-builder
+  _REGISTRY:       staging-k8s.gcr.io
+
+steps:
+- name:       gcr.io/cloud-builders/git
+  dir:        go/src/k8s.io
+  entrypoint: bash
+  waitFor:    [ '-' ]
+  id:         clone
+  args:
+  - -euc
+  - |
+    git clone "${_K8S_GIT_URL}" --depth=1 --branch="${_K8S_GIT_BRANCH}" --no-checkout
+    cd kubernetes
+    git checkout "${_K8S_GIT_BRANCH}" -- \
+      third_party/multiarch/qemu-user-static \
+      "build/${_IMAGE}"
+    rev="$( git describe --always )"
+    echo "checked out ${_K8S_GIT_URL}:${_K8S_GIT_BRANCH} @ ${rev}"
+
+- name:    gcr.io/cloud-builders/docker
+  args:    [ 'pull', "${_BUILDER_IMAGE}" ]
+  waitFor: [ '-' ]
+  id:      pull-builder
+
+- name:    "${_BUILDER_IMAGE}"
+  dir:     "go/src/k8s.io/kubernetes/build/${_IMAGE}"
+  args:    [ 'make', 'ARCH=not-amd64', 'register-multiarch' ]
+  id:      register-multiarch
+
+- &build
+  name:    "${_BUILDER_IMAGE}"
+  dir:     "go/src/k8s.io/kubernetes/build/${_IMAGE}"
+  args:    [ 'make', 'SKIP_REGISTER_MULTIARCH=1', "REGISTRY=${_REGISTRY}", 'build' ]
+  waitFor: [ 'register-multiarch' ]
+  env:     [ 'ARCH=amd64' ]
+  id:      amd64
+- <<: *build
+  env:     [ 'ARCH=arm' ]
+  id:      arm
+- <<: *build
+  env:     [ 'ARCH=arm64' ]
+  id:      arm64
+- <<: *build
+  env:     [ 'ARCH=ppc64le' ]
+  id:      ppc64le
+- <<: *build
+  env:     [ 'ARCH=s390x' ]
+  id:      s390x
+
+# - name:    gcr.io/cloud-builders/docker
+#   args:    [ 'image', 'ls', "${_REGISTRY}/*" ]
+#   id:      inspect
+#   # staging-k8s.gcr.io/debian-iptables-arm      v12.0.1  93ba97061d5f  1 second ago    64.4MB
+#   # staging-k8s.gcr.io/debian-iptables-ppc64le  v12.0.1  72bf7ec547ce  7 seconds ago   123MB
+#   # staging-k8s.gcr.io/debian-iptables-arm64    v12.0.1  1fee893156fc  35 seconds ago  78.4MB
+#   # staging-k8s.gcr.io/debian-iptables-amd64    v12.0.1  4564dfcef5ec  2 minutes ago   78.3MB
+#   # staging-k8s.gcr.io/debian-iptables-s390x    v12.0.1  fd5c1524099a  3 minutes ago   70.4MB
+
+images:
+- "${_REGISTRY}/${_IMAGE}-arm"
+- "${_REGISTRY}/${_IMAGE}-ppc64le"
+- "${_REGISTRY}/${_IMAGE}-arm64"
+- "${_REGISTRY}/${_IMAGE}-amd64"
+- "${_REGISTRY}/${_IMAGE}-s390x"
+
+timeout: 6000s
