@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -78,7 +79,7 @@ type staticPolicy struct {
 	// containerMap provides a mapping from
 	// (pod, container) -> containerID
 	// for all containers a pod
-	containerMap containerMap
+	containerMap containermap.ContainerMap
 	// topology manager reference to get container Topology affinity
 	affinity topologymanager.Store
 }
@@ -112,7 +113,7 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 	return &staticPolicy{
 		topology:     topology,
 		reserved:     reserved,
-		containerMap: newContainerMap(),
+		containerMap: containermap.NewContainerMap(),
 		affinity:     affinity,
 	}
 }

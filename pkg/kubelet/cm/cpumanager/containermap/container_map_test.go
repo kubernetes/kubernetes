@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cpumanager
+package containermap
 
 import (
 	"testing"
@@ -42,7 +42,7 @@ func TestContainerMap(t *testing.T) {
 
 		// Build a new containerMap from the testCases, checking proper
 		// addition, retrieval along the way.
-		cm := newContainerMap()
+		cm := NewContainerMap()
 		for i := range tc.containerNames {
 			container := v1.Container{Name: tc.containerNames[i]}
 

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cpumanager
+package containermap
 
 import (
 	"fmt"
@@ -22,14 +22,16 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-// containerMap maps (podUID, containerName) -> containerID
-type containerMap map[string]map[string]string
+// ContainerMap maps (containerID)->(podUID, containerName)
+type ContainerMap map[string]map[string]string
 
-func newContainerMap() containerMap {
-	return make(containerMap)
+// NewContainerMap creates a new ContainerMap struct
+func NewContainerMap() ContainerMap {
+	return make(ContainerMap)
 }
 
-func (cm containerMap) Add(p *v1.Pod, c *v1.Container, containerID string) {
+// Add adds a mapping of (containerID)->(podUID, containerName) to the ContainerMap
+func (cm ContainerMap) Add(p *v1.Pod, c *v1.Container, containerID string) {
 	podUID := string(p.UID)
 	if _, exists := cm[podUID]; !exists {
 		cm[podUID] = make(map[string]string)
@@ -37,7 +39,8 @@ func (cm containerMap) Add(p *v1.Pod, c *v1.Container, containerID string) {
 	cm[podUID][c.Name] = containerID
 }
 
-func (cm containerMap) Remove(containerID string) {
+// Remove removes a mapping of (containerID)->(podUID, containerName) from the ContainerMap
+func (cm ContainerMap) Remove(containerID string) {
 	found := false
 	for podUID := range cm {
 		for containerName := range cm[podUID] {
@@ -56,13 +59,14 @@ func (cm containerMap) Remove(containerID string) {
 	}
 }
 
-func (cm containerMap) Get(p *v1.Pod, c *v1.Container) (string, error) {
+// Get retrieves a ContainerID from the ContainerMap
+func (cm ContainerMap) Get(p *v1.Pod, c *v1.Container) (string, error) {
 	podUID := string(p.UID)
 	if _, exists := cm[podUID]; !exists {
-		return "", fmt.Errorf("pod %s not in containerMap", podUID)
+		return "", fmt.Errorf("pod %s not in ContainerMap", podUID)
 	}
 	if _, exists := cm[podUID][c.Name]; !exists {
-		return "", fmt.Errorf("container %s not in containerMap for pod %s", c.Name, podUID)
+		return "", fmt.Errorf("container %s not in ContainerMap for pod %s", c.Name, podUID)
 	}
 	return cm[podUID][c.Name], nil
 }
