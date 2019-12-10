@@ -30,6 +30,7 @@ const (
 	milliCPUToCPU    = 1000
 )
 
+// TODO: remove - may be dead code
 // milliCPUToShares converts milliCPU to CPU shares
 func milliCPUToShares(milliCPU int64, hyperv bool) int64 {
 	var minShares int64 = minSharesProcess
