@@ -108,6 +108,7 @@ go_test(
         "container_log_rotation_test.go",
         "container_manager_test.go",
         "cpu_manager_test.go",
+        "topology_manager_test.go",
         "critical_pod_test.go",
         "density_test.go",
         "device_plugin_test.go",
