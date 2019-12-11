@@ -1596,8 +1596,8 @@ metadata:
 
 		ginkgo.BeforeEach(func() {
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			name = "e2e-test-httpd-deployment"
-			cleanUp = func() { framework.RunKubectlOrDie(ns, "delete", "deployment", name, nsFlag) }
+			name = "e2e-test-httpd-pod"
+			cleanUp = func() { framework.RunKubectlOrDie(ns, "delete", "pod", name, nsFlag) }
 		})
 
 		ginkgo.AfterEach(func() {
@@ -1609,14 +1609,14 @@ metadata:
 			Testname: Kubectl, run default
 			Description: Command ‘kubectl run’ MUST create a running pod with possible replicas given a image using the option --image=’httpd’. The running Pod SHOULD have one container and the container SHOULD be running the image specified in the ‘run’ command.
 		*/
-		framework.ConformanceIt("should create an rc or deployment from an image ", func() {
+		framework.ConformanceIt("should create a pod from an image ", func() {
 			ginkgo.By("running the image " + httpdImage)
 			framework.RunKubectlOrDie(ns, "run", name, "--image="+httpdImage, nsFlag)
-			ginkgo.By("verifying the pod controlled by " + name + " gets created")
+			ginkgo.By("verifying the pod " + name + " gets created")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": name}))
 			podlist, err := e2epod.WaitForPodsWithLabel(c, ns, label)
 			if err != nil {
-				framework.Failf("Failed getting pod controlled by %s: %v", name, err)
+				framework.Failf("Failed getting pod %s: %v", name, err)
 			}
 			pods := podlist.Items
 			if pods == nil || len(pods) != 1 || len(pods[0].Spec.Containers) != 1 || pods[0].Spec.Containers[0].Image != httpdImage {
