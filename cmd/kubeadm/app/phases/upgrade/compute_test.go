@@ -121,6 +121,10 @@ func (f fakeEtcdClient) RemoveMember(id uint64) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
+func (f fakeEtcdClient) UpdateMember(name string, peerAddrs string) ([]etcdutil.Member, error) {
+	return []etcdutil.Member{}, nil
+}
+
 func getEtcdVersion(v *versionutil.Version) string {
 	return constants.SupportedEtcdVersion[uint8(v.Minor())]
 }

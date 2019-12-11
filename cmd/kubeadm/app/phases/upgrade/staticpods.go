@@ -397,6 +397,12 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 		return true, errors.Wrap(err, "fatal error upgrading local etcd cluster, rolled the state back to pre-upgrade state")
 	}
 
+	// Update the peer address of this etcd member (best-effort)
+	etcdPeerAddress := etcdutil.GetPeerURL(&cfg.LocalAPIEndpoint)
+	if _, err := newEtcdClient.UpdateMember(cfg.NodeRegistration.Name, etcdPeerAddress); err != nil {
+		return false, errors.Wrap(err, "failed to update the peer address of local etcd member")
+	}
+
 	return false, nil
 }
 

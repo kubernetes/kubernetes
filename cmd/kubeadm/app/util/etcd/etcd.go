@@ -58,6 +58,7 @@ type ClusterInterrogator interface {
 	AddMember(name string, peerAddrs string) ([]Member, error)
 	GetMemberID(peerURL string) (uint64, error)
 	RemoveMember(id uint64) ([]Member, error)
+	UpdateMember(name string, peerAddrs string) ([]Member, error)
 }
 
 // Client provides connection parameters for an etcd cluster
@@ -313,6 +314,85 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 
 	// Add the new member client address to the list of endpoints
 	c.Endpoints = append(c.Endpoints, GetClientURLByIP(parsedPeerAddrs.Hostname()))
+
+	return ret, nil
+}
+
+// UpdateMember updates the peer address of etcd member in the cluster after upgrade
+func (c *Client) UpdateMember(name string, peerAddrs string) ([]Member, error) {
+	cli, err := clientv3.New(clientv3.Config{
+		Endpoints:   c.Endpoints,
+		DialTimeout: dialTimeout,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+		TLS: c.TLS,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer cli.Close()
+
+	// Gets the member list
+	var lastError error
+	var listResp *clientv3.MemberListResponse
+	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+		listResp, err = cli.MemberList(ctx)
+		cancel()
+		if err == nil {
+			return true, nil
+		}
+		klog.V(5).Infof("Failed to get etcd member list: %v", err)
+		lastError = err
+		return false, nil
+	})
+	if err != nil {
+		return nil, lastError
+	}
+
+	// Gets the member id by name
+	var id uint64
+	var oldPeerAddrs string
+	for _, member := range listResp.Members {
+		if member.GetName() == name {
+			id = member.GetID()
+			oldPeerAddrs = member.PeerURLs[0]
+			break
+		}
+	}
+
+	if oldPeerAddrs == peerAddrs {
+		klog.V(5).Infof("Current and new peer address of %s are equal, skipping update", name)
+		ret := []Member{}
+		for _, m := range listResp.Members {
+			ret = append(ret, Member{Name: m.Name, PeerURL: m.PeerURLs[0]})
+		}
+		return ret, nil
+	}
+
+	// Updates the peer address of the etcd member
+	var updateResp *clientv3.MemberUpdateResponse
+	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+		updateResp, err = cli.MemberUpdate(ctx, id, []string{peerAddrs})
+		cancel()
+		if err == nil {
+			return true, nil
+		}
+		klog.V(5).Infof("Failed to update etcd member: %v", err)
+		lastError = err
+		return false, nil
+	})
+	if err != nil {
+		return nil, lastError
+	}
+
+	// Returns the updated list of etcd members
+	ret := []Member{}
+	for _, m := range updateResp.Members {
+		ret = append(ret, Member{Name: m.Name, PeerURL: m.PeerURLs[0]})
+	}
 
 	return ret, nil
 }
