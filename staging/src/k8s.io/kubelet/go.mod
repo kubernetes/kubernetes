@@ -19,5 +19,5 @@ replace (
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/kubelet => ../kubelet
-	sigs.k8s.io/structured-merge-diff => github.com/kwiesmueller/structured-merge-diff v0.0.0-20191211131859-28e231e1903d
+	sigs.k8s.io/structured-merge-diff => github.com/kwiesmueller/structured-merge-diff v0.0.0-20191211141020-83c7b28154fe
 )

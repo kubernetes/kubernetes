@@ -317,8 +317,8 @@ github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORN
 github.com/kr/pty v1.1.5/go.mod h1:9r2w37qlBe7rQ6e1fg1S/9xpWHSnaqNdHD3WcMdbPDA=
 github.com/kr/text v0.1.0 h1:45sCR5RtlFHMR4UwH9sdQ5TC8v0qDQCHnXt+kaKSTVE=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
-github.com/kwiesmueller/structured-merge-diff v0.0.0-20191211131859-28e231e1903d h1:AWl/Sg7j8LhmHeMW2KkqWRGQ/L0fQIDSwrgCxi849fI=
-github.com/kwiesmueller/structured-merge-diff v0.0.0-20191211131859-28e231e1903d/go.mod h1:lSZQXytRDQFWQpBh4omyCTwCdWEZ2GthGxfTZ4jRAPE=
+github.com/kwiesmueller/structured-merge-diff v0.0.0-20191211141020-83c7b28154fe h1:/KXkidNZKOSAsd5jVYectNtcJg9KlEDiXMQmOnnQgh8=
+github.com/kwiesmueller/structured-merge-diff v0.0.0-20191211141020-83c7b28154fe/go.mod h1:lSZQXytRDQFWQpBh4omyCTwCdWEZ2GthGxfTZ4jRAPE=
 github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348/go.mod h1:B69LEHPfb2qLo0BaaOLcbitczOKLWTsrBG9LczfCD4k=
 github.com/libopenstorage/openstorage v1.0.0 h1:GLPam7/0mpdP8ZZtKjbfcXJBTIA/T1O6CBErVEFEyIM=
 github.com/libopenstorage/openstorage v1.0.0/go.mod h1:Sp1sIObHjat1BeXhfMqLZ14wnOzEhNx2YQedreMcUyc=

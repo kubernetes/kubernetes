@@ -104,9 +104,9 @@ func BenchmarkSetToFields(b *testing.B) {
 		fieldpath.MakePathOrDie("foo", 0),
 		fieldpath.MakePathOrDie("foo", 1, "bar", "baz"),
 		fieldpath.MakePathOrDie("foo", 1, "bar"),
-		fieldpath.MakePathOrDie("qux", fieldpath.KeyByFields("name", value.StringValue("first"))),
-		fieldpath.MakePathOrDie("qux", fieldpath.KeyByFields("name", value.StringValue("first")), "bar"),
-		fieldpath.MakePathOrDie("qux", fieldpath.KeyByFields("name", value.StringValue("second")), "bar"),
+		fieldpath.MakePathOrDie("qux", fieldpath.KeyByFields("name", value.NewValueInterface("first"))),
+		fieldpath.MakePathOrDie("qux", fieldpath.KeyByFields("name", value.NewValueInterface("first")), "bar"),
+		fieldpath.MakePathOrDie("qux", fieldpath.KeyByFields("name", value.NewValueInterface("second")), "bar"),
 	)
 
 	b.ReportAllocs()
@@ -127,9 +127,9 @@ func BenchmarkFieldsToSet(b *testing.B) {
 		fieldpath.MakePathOrDie("foo", 0),
 		fieldpath.MakePathOrDie("foo", 1, "bar", "baz"),
 		fieldpath.MakePathOrDie("foo", 1, "bar"),
-		fieldpath.MakePathOrDie("qux", fieldpath.KeyByFields("name", value.StringValue("first"))),
-		fieldpath.MakePathOrDie("qux", fieldpath.KeyByFields("name", value.StringValue("first")), "bar"),
-		fieldpath.MakePathOrDie("qux", fieldpath.KeyByFields("name", value.StringValue("second")), "bar"),
+		fieldpath.MakePathOrDie("qux", fieldpath.KeyByFields("name", value.NewValueInterface("first"))),
+		fieldpath.MakePathOrDie("qux", fieldpath.KeyByFields("name", value.NewValueInterface("first")), "bar"),
+		fieldpath.MakePathOrDie("qux", fieldpath.KeyByFields("name", value.NewValueInterface("second")), "bar"),
 	)
 	fields, err := SetToFields(*set)
 	if err != nil {

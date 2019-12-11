@@ -168,15 +168,7 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 	}
 
 	if f.resetFields != nil {
-		resetObjTyped := patchObjTyped.Remove(f.resetFields)
-		diff, err := patchObjTyped.Compare(resetObjTyped)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to compare typed patch to its reset: %v", err)
-		}
-
-		if !diff.IsSame() {
-			return nil, nil, fmt.Errorf("apply contained fields a user should not change:\n%s", diff)
-		}
+		patchObjTyped = patchObjTyped.Remove(f.resetFields)
 	}
 
 	liveObjTyped, err := f.typeConverter.ObjectToTyped(liveObjVersioned)

@@ -96,8 +96,8 @@ func (c *typeConverter) TypedToObject(value *typed.TypedValue) (runtime.Object, 
 	return valueToObject(value.AsValue())
 }
 
-func valueToObject(value *value.Value) (runtime.Object, error) {
-	vu := value.ToUnstructured(false)
+func valueToObject(value value.Value) (runtime.Object, error) {
+	vu := value.Unstructured()
 	u, ok := vu.(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("failed to convert typed to unstructured: want map, got %T", vu)

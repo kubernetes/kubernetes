@@ -146,7 +146,7 @@ func (tv TypedValue) RemoveItems(items *fieldpath.Set) *TypedValue {
 
 // Remove removes each provided path from the value.
 func (tv TypedValue) Remove(paths *fieldpath.Set) *TypedValue {
-	tv.value = removeItemsWithSchema(tv.value, paths, tv.schema, tv.typeRef, false)
+	tv.value = removeItemsWithSchema(tv.value, paths, tv.schema, tv.typeRef, true)
 	return &tv
 }
 

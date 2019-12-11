@@ -1248,8 +1248,8 @@ func TestClearManagedFieldsWithUpdate(t *testing.T) {
 	}
 }
 
-// TestApplyFailsOnResetFields verifies fields that would be reset before being persisted, cause the apply to fail
-func TestApplyFailsOnResetFields(t *testing.T) {
+// TestApplyDoesNotOwnResetFields verifies fields that would be reset before being persisted, do not get owned by apply operations
+func TestApplyDoesNotOwnResetFields(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
 	_, client, closeFn := setup(t)
@@ -1279,8 +1279,8 @@ func TestApplyFailsOnResetFields(t *testing.T) {
 		Do().
 		Get()
 
-	if err == nil {
-		t.Fatalf("Apply should error on fields that get reset")
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
 	}
 
 	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
@@ -1305,7 +1305,7 @@ func TestApplyFailsOnResetFields(t *testing.T) {
 		Get()
 
 	if err != nil {
-		t.Fatalf("Failed to apply valid object: %v", err)
+		t.Fatalf("Failed to update object using Apply patch: %v", err)
 	}
 
 	object, err := client.CoreV1().RESTClient().Get().Namespace("default").Resource("pods").Name("test").Do().Get()
