@@ -51,6 +51,30 @@ do
     fi
 done
 
+errors_expect_be_bool=()
+for file in "${all_e2e_files[@]}"
+do
+    if grep -E "gomega\.Expect\(.*\)\.(To|NotTo)\(gomega\.(BeTrue|BeFalse)\(\)" "${file}" > /dev/null
+    then
+        errors_expect_be_bool+=( "${file}" )
+    fi
+done
+
+if [ ${#errors_expect_be_bool[@]} -ne 0 ]; then
+  {
+    echo "Errors:"
+    for err in "${errors_expect_be_bool[@]}"; do
+      echo "$err"
+    done
+    echo
+    echo 'The above files need to use framework.ExpectEqual(foo, true, explain) or '
+    echo 'framework.ExpectEqual(foo, false, explain) instead of '
+    echo 'gomega.Expect(foo).To(gomega.BeTrue(), explain) or gomega.Expect(foo).To(gomega.BeFalse(), explain)'
+    echo
+  } >&2
+  exit 1
+fi
+
 if [ ${#errors_expect_no_error[@]} -ne 0 ]; then
   {
     echo "Errors:"
