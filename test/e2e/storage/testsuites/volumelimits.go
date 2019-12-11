@@ -191,12 +191,17 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		e2epod.SetAffinity(&selection, nodeName)
 		pod.Spec.Affinity = selection.Affinity
 		l.unschedulablePod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(pod)
+		framework.ExpectNoError(err, "Failed to create an extra pod with one volume to exceed the limit")
 
 		ginkgo.By("Waiting for the pod to get unschedulable with the right message")
 		err = e2epod.WaitForPodCondition(l.cs, l.ns.Name, l.unschedulablePod.Name, "Unschedulable", framework.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
 			if pod.Status.Phase == v1.PodPending {
+				reg, err := regexp.Compile(`max.+volume.+count`)
+				if err != nil {
+					return false, err
+				}
 				for _, cond := range pod.Status.Conditions {
-					matched, _ := regexp.MatchString("max.+volume.+count", cond.Message)
+					matched := reg.MatchString(cond.Message)
 					if cond.Type == v1.PodScheduled && cond.Status == v1.ConditionFalse && cond.Reason == "Unschedulable" && matched {
 						return true, nil
 					}
