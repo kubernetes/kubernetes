@@ -227,10 +227,10 @@ func WaitForSnapshotReady(c dynamic.Interface, ns string, snapshotName string, P
 			}
 			value := status.(map[string]interface{})
 			if value["readyToUse"] == true {
-				framework.Logf("VolumeSnapshot %s found and is ready", snapshotName, time.Since(start))
+				framework.Logf("VolumeSnapshot %s found and is ready after %v", snapshotName, time.Since(start))
 				return nil
 			} else if value["ready"] == true {
-				framework.Logf("VolumeSnapshot %s found and is ready", snapshotName, time.Since(start))
+				framework.Logf("VolumeSnapshot %s found and is ready after %v", snapshotName, time.Since(start))
 				return nil
 			} else {
 				framework.Logf("VolumeSnapshot %s found but is not ready.", snapshotName)
