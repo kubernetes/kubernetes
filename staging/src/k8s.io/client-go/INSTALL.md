@@ -52,10 +52,26 @@ go mod init
 
 ### Add client-go as a dependency
 
-Indicate which version of `client-go` your project requires (replace `kubernetes-1.15.0` with the desired version):
+Indicate which version of `client-go` your project requires:
+
+- If you are using Kubernetes versions >= `v1.17.0`, use a corresponding
+`v0.x.y` tag. For example, `k8s.io/client-go@v0.17.0` corresponds to Kubernetes `v1.17.0`:
 
 ```sh
-go get k8s.io/client-go@kubernetes-1.15.0
+go get k8s.io/client-go@v0.17.0
+```
+
+You can also use a non-semver `kubernetes-1.x.y` tag to refer to a version
+of `client-go` corresponding to a given Kubernetes release. Prior to Kubernetes
+`v1.17.0` these were the only tags available for use with go modules.
+For example, `kubernetes-1.16.3` corresponds to Kubernetes `v1.16.3`.
+However, it is recommended to use semver-like `v0.x.y` tags over non-semver
+`kubernetes-1.x.y` tags to have a seamless experience with go modules.
+
+- If you are using Kubernetes versions < `v1.17.0` (replace `kubernetes-1.16.3` with the desired version):
+
+```sh
+go get k8s.io/client-go@kubernetes-1.16.3
 ```
 
 You can now import and use the `k8s.io/client-go` APIs in your project.
