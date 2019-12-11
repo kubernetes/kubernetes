@@ -4,7 +4,7 @@ metadata:
   name: aggregated-apiserver-clusterrole
 rules:
 - apiGroups: [""]
-  resources: ["namespaces"]
+  resources: ["namespaces", "configmaps"]
   verbs: ["get", "watch", "list"]
 - apiGroups: ["admissionregistration.k8s.io"]
   resources: ["mutatingwebhookconfigurations", "validatingwebhookconfigurations"]
