@@ -20,6 +20,7 @@ go_library(
         "replica_set.go",
         "statefulset.go",
         "types.go",
+        "wait.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/apps",
     deps = [
