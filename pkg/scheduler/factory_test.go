@@ -231,16 +231,28 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 // Test configures a scheduler from a policy that does not specify any
 // predicate/priority.
 // The predicate/priority from DefaultProvider will be used.
+// TODO(Huang-Wei): refactor (or remove) this test along with eliminating 'RegisterFitPredicate()'.
 func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
+	predicateOne := "PredicateOne"
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+	factory.registry.Register(predicateOne, func(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
+		return &TestPlugin{name: predicateOne}, nil
+	})
+	factory.pluginConfigProducerRegistry.RegisterPredicate(predicateOne, func(_ frameworkplugins.ConfigProducerArgs) (schedulerapi.Plugins, []schedulerapi.PluginConfig) {
+		return schedulerapi.Plugins{
+			Filter: &schedulerapi.PluginSet{
+				Enabled: []schedulerapi.Plugin{{Name: predicateOne}},
+			},
+		}, nil
+	})
 
-	RegisterFitPredicate("PredicateOne", PredicateFunc)
+	RegisterFitPredicate(predicateOne, PredicateFunc)
 	RegisterPriorityMapReduceFunction("PriorityOne", PriorityFunc, nil, 1)
 
-	RegisterAlgorithmProvider(schedulerapi.SchedulerDefaultProviderName, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
+	RegisterAlgorithmProvider(schedulerapi.SchedulerDefaultProviderName, sets.NewString(predicateOne), sets.NewString("PriorityOne"))
 
 	configData := []byte(`{
 		"kind" : "Policy",
@@ -255,12 +267,21 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create scheduler from configuration: %v", err)
 	}
-	if _, found := c.Algorithm.Predicates()["PredicateOne"]; !found {
+	if !foundPlugin(c.Plugins.Filter.Enabled, predicateOne) {
 		t.Errorf("Expected predicate PredicateOne from %q", schedulerapi.SchedulerDefaultProviderName)
 	}
 	if len(c.Algorithm.Prioritizers()) != 1 || c.Algorithm.Prioritizers()[0].Name != "PriorityOne" {
 		t.Errorf("Expected priority PriorityOne from %q", schedulerapi.SchedulerDefaultProviderName)
 	}
+}
+
+func foundPlugin(plugins []schedulerapi.Plugin, name string) bool {
+	for _, plugin := range plugins {
+		if plugin.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // Test configures a scheduler from a policy that contains empty

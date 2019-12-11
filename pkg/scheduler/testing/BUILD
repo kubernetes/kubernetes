@@ -5,11 +5,14 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "framework_helpers.go",
         "workload_prep.go",
         "wrappers.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/testing",
     deps = [
+        "//pkg/scheduler/apis/config:go_default_library",
+        "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ],
