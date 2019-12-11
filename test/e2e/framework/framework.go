@@ -162,7 +162,9 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 			return
 		}
 		if !f.SkipNamespaceCreation {
-			DumpAllNamespaceInfo(f.ClientSet, f.Namespace.Name)
+			for _, ns := range f.namespacesToDelete {
+				DumpAllNamespaceInfo(f.ClientSet, ns.Name)
+			}
 		}
 	})
 
