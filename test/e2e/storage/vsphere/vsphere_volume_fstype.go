@@ -130,6 +130,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 	framework.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(namespace).List(metav1.ListOptions{})
+	framework.ExpectNoError(err)
 
 	// Detach and delete volume
 	detachVolume(f, client, pod, persistentvolumes[0].Spec.VsphereVolume.VolumePath)
