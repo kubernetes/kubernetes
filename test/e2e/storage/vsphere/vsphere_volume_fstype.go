@@ -145,7 +145,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 			isFound = true
 		}
 	}
-	gomega.Expect(isFound).To(gomega.BeTrue(), "Unable to verify MountVolume.MountDevice failure")
+	framework.ExpectEqual(isFound, true, "Unable to verify MountVolume.MountDevice failure")
 }
 
 func createVolume(client clientset.Interface, namespace string, scParameters map[string]string) (*v1.PersistentVolumeClaim, []*v1.PersistentVolume) {

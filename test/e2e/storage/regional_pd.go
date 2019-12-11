@@ -217,8 +217,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	err = waitForStatefulSetReplicasReady(statefulSet.Name, ns, c, framework.Poll, statefulSetReadyTimeout)
 	if err != nil {
 		pod := getPod(c, ns, regionalPDLabels)
-		gomega.Expect(podutil.IsPodReadyConditionTrue(pod.Status)).To(gomega.BeTrue(),
-			"The statefulset pod has the following conditions: %s", pod.Status.Conditions)
+		framework.ExpectEqual(podutil.IsPodReadyConditionTrue(pod.Status), true, "The statefulset pod has the following conditions: %s", pod.Status.Conditions)
 		framework.ExpectNoError(err)
 	}
 
@@ -269,8 +268,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	err = waitForStatefulSetReplicasReady(statefulSet.Name, ns, c, 3*time.Second, framework.RestartPodReadyAgainTimeout)
 	if err != nil {
 		pod := getPod(c, ns, regionalPDLabels)
-		gomega.Expect(podutil.IsPodReadyConditionTrue(pod.Status)).To(gomega.BeTrue(),
-			"The statefulset pod has the following conditions: %s", pod.Status.Conditions)
+		framework.ExpectEqual(podutil.IsPodReadyConditionTrue(pod.Status), true, "The statefulset pod has the following conditions: %s", pod.Status.Conditions)
 		framework.ExpectNoError(err)
 	}
 

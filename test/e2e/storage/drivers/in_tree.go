@@ -43,7 +43,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -119,7 +118,7 @@ func (n *nfsDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 
 func (n *nfsDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	nv, ok := volume.(*nfsVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to NFS test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to NFS test volume")
 	return &v1.VolumeSource{
 		NFS: &v1.NFSVolumeSource{
 			Server:   nv.serverIP,
@@ -131,7 +130,7 @@ func (n *nfsDriver) GetVolumeSource(readOnly bool, fsType string, volume testsui
 
 func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	nv, ok := volume.(*nfsVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to NFS test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to NFS test volume")
 	return &v1.PersistentVolumeSource{
 		NFS: &v1.NFSVolumeSource{
 			Server:   nv.serverIP,
@@ -260,7 +259,7 @@ func (g *glusterFSDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) 
 
 func (g *glusterFSDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	gv, ok := volume.(*glusterVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Gluster test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to Gluster test volume")
 
 	name := gv.prefix + "-server"
 	return &v1.VolumeSource{
@@ -275,7 +274,7 @@ func (g *glusterFSDriver) GetVolumeSource(readOnly bool, fsType string, volume t
 
 func (g *glusterFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	gv, ok := volume.(*glusterVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Gluster test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to Gluster test volume")
 
 	name := gv.prefix + "-server"
 	return &v1.PersistentVolumeSource{
@@ -384,7 +383,7 @@ func (i *iSCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 
 func (i *iSCSIDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	iv, ok := volume.(*iSCSIVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to iSCSI test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to iSCSI test volume")
 
 	volSource := v1.VolumeSource{
 		ISCSI: &v1.ISCSIVolumeSource{
@@ -402,7 +401,7 @@ func (i *iSCSIDriver) GetVolumeSource(readOnly bool, fsType string, volume tests
 
 func (i *iSCSIDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	iv, ok := volume.(*iSCSIVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to iSCSI test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to iSCSI test volume")
 
 	pvSource := v1.PersistentVolumeSource{
 		ISCSI: &v1.ISCSIPersistentVolumeSource{
@@ -501,7 +500,7 @@ func (r *rbdDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 
 func (r *rbdDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	rv, ok := volume.(*rbdVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to RBD test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to RBD test volume")
 
 	volSource := v1.VolumeSource{
 		RBD: &v1.RBDVolumeSource{
@@ -523,7 +522,7 @@ func (r *rbdDriver) GetVolumeSource(readOnly bool, fsType string, volume testsui
 
 func (r *rbdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	rv, ok := volume.(*rbdVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to RBD test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to RBD test volume")
 
 	f := rv.f
 	ns := f.Namespace
@@ -624,7 +623,7 @@ func (c *cephFSDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 
 func (c *cephFSDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	cv, ok := volume.(*cephVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Ceph test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to Ceph test volume")
 
 	return &v1.VolumeSource{
 		CephFS: &v1.CephFSVolumeSource{
@@ -640,7 +639,7 @@ func (c *cephFSDriver) GetVolumeSource(readOnly bool, fsType string, volume test
 
 func (c *cephFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	cv, ok := volume.(*cephVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Ceph test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to Ceph test volume")
 
 	ns := cv.f.Namespace
 
@@ -794,7 +793,7 @@ func (h *hostPathSymlinkDriver) SkipUnsupportedTest(pattern testpatterns.TestPat
 
 func (h *hostPathSymlinkDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	hv, ok := volume.(*hostPathSymlinkVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Hostpath Symlink test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to Hostpath Symlink test volume")
 
 	// hostPathSymlink doesn't support readOnly volume
 	if readOnly {
@@ -1013,7 +1012,7 @@ func (c *cinderDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 
 func (c *cinderDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	cv, ok := volume.(*cinderVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Cinder test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to Cinder test volume")
 
 	volSource := v1.VolumeSource{
 		Cinder: &v1.CinderVolumeSource{
@@ -1029,7 +1028,7 @@ func (c *cinderDriver) GetVolumeSource(readOnly bool, fsType string, volume test
 
 func (c *cinderDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	cv, ok := volume.(*cinderVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Cinder test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to Cinder test volume")
 
 	pvSource := v1.PersistentVolumeSource{
 		Cinder: &v1.CinderPersistentVolumeSource{
@@ -1191,7 +1190,7 @@ func (g *gcePdDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 
 func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	gv, ok := volume.(*gcePdVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to GCE PD test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to GCE PD test volume")
 	volSource := v1.VolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 			PDName:   gv.volumeName,
@@ -1206,7 +1205,7 @@ func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string, volume tests
 
 func (g *gcePdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	gv, ok := volume.(*gcePdVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to GCE PD test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to GCE PD test volume")
 	pvSource := v1.PersistentVolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 			PDName:   gv.volumeName,
@@ -1316,7 +1315,7 @@ func (v *vSphereDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 
 func (v *vSphereDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	vsv, ok := volume.(*vSphereVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to vSphere test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to vSphere test volume")
 
 	// vSphere driver doesn't seem to support readOnly volume
 	// TODO: check if it is correct
@@ -1336,7 +1335,7 @@ func (v *vSphereDriver) GetVolumeSource(readOnly bool, fsType string, volume tes
 
 func (v *vSphereDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	vsv, ok := volume.(*vSphereVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to vSphere test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to vSphere test volume")
 
 	// vSphere driver doesn't seem to support readOnly volume
 	// TODO: check if it is correct
@@ -1445,8 +1444,7 @@ func (a *azureDiskDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) 
 
 func (a *azureDiskDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	av, ok := volume.(*azureDiskVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Azure test volume")
-
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
 	diskName := av.volumeName[(strings.LastIndex(av.volumeName, "/") + 1):]
 
 	kind := v1.AzureManagedDisk
@@ -1466,7 +1464,7 @@ func (a *azureDiskDriver) GetVolumeSource(readOnly bool, fsType string, volume t
 
 func (a *azureDiskDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	av, ok := volume.(*azureDiskVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Azure test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to Azure test volume")
 
 	diskName := av.volumeName[(strings.LastIndex(av.volumeName, "/") + 1):]
 
@@ -1579,7 +1577,7 @@ func (a *awsDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 
 func (a *awsDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	av, ok := volume.(*awsVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to AWS test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to AWS test volume")
 	volSource := v1.VolumeSource{
 		AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
 			VolumeID: av.volumeName,
@@ -1594,7 +1592,7 @@ func (a *awsDriver) GetVolumeSource(readOnly bool, fsType string, volume testsui
 
 func (a *awsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	av, ok := volume.(*awsVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to AWS test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to AWS test volume")
 	pvSource := v1.PersistentVolumeSource{
 		AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
 			VolumeID: av.volumeName,
@@ -1832,7 +1830,7 @@ func (l *localDriver) nodeAffinityForNode(node *v1.Node) *v1.VolumeNodeAffinity 
 
 func (l *localDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	lv, ok := volume.(*localVolume)
-	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to local test volume")
+	framework.ExpectEqual(ok, true, "Failed to cast test volume to local test volume")
 	return &v1.PersistentVolumeSource{
 		Local: &v1.LocalVolumeSource{
 			Path:   lv.ltr.Path,

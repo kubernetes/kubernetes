@@ -353,5 +353,6 @@ func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, masterN
 	dummyVMFullName := DummyVMPrefixName + "-" + fmt.Sprint(fnvHash.Sum32())
 	errorMsg := "Dummy VM - " + vmName + "is still present. Failing the test.."
 	nodeInfo := TestContext.NodeMapper.GetNodeInfo(masterNode)
-	gomega.Expect(nodeInfo.VSphere.IsVMPresent(dummyVMFullName, nodeInfo.DataCenterRef)).NotTo(gomega.BeTrue(), errorMsg)
+	isVMPresentFlag, _ := nodeInfo.VSphere.IsVMPresent(dummyVMFullName, nodeInfo.DataCenterRef)
+	framework.ExpectNotEqual(isVMPresentFlag, true, errorMsg)
 }
