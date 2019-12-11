@@ -592,7 +592,7 @@ function write-master-env {
     KUBERNETES_MASTER_NAME="${MASTER_NAME}"
   fi
 
-  construct-linux-kubelet-flags "master"
+  construct-linux-kubelet-flags true
   build-linux-kube-env true "${KUBE_TEMP}/master-kube-env.yaml"
   build-kubelet-config true "linux" "${KUBE_TEMP}/master-kubelet-config.yaml"
   build-kube-master-certs "${KUBE_TEMP}/kube-master-certs.yaml"
@@ -603,9 +603,7 @@ function write-linux-node-env {
     KUBERNETES_MASTER_NAME="${MASTER_NAME}"
   fi
 
-  construct-linux-kubelet-flags "heapster"
-  build-linux-kube-env false "${KUBE_TEMP}/heapster-kube-env.yaml"
-  construct-linux-kubelet-flags "node"
+  construct-linux-kubelet-flags false
   build-linux-kube-env false "${KUBE_TEMP}/node-kube-env.yaml"
   build-kubelet-config false "linux" "${KUBE_TEMP}/node-kubelet-config.yaml"
 }
@@ -618,7 +616,7 @@ function write-windows-node-env {
 }
 
 function build-linux-node-labels {
-  local node_type=$1
+  local master=$1
   local node_labels=""
   if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" && "${master}" != "true" ]]; then
     # Add kube-proxy daemonset label to node to avoid situation during cluster
@@ -628,10 +626,10 @@ function build-linux-node-labels {
   if [[ -n "${NODE_LABELS:-}" ]]; then
     node_labels="${node_labels:+${node_labels},}${NODE_LABELS}"
   fi
-  if [[ -n "${NON_MASTER_NODE_LABELS:-}" && "${node_type}" != "master" ]]; then
+  if [[ -n "${NON_MASTER_NODE_LABELS:-}" && "${master}" != "true" ]]; then
     node_labels="${node_labels:+${node_labels},}${NON_MASTER_NODE_LABELS}"
   fi
-  if [[ -n "${MASTER_NODE_LABELS:-}" && "${node_type}" == "master" ]]; then
+  if [[ -n "${MASTER_NODE_LABELS:-}" && "${master}" == "true" ]]; then
     node_labels="${node_labels:+${node_labels},}${MASTER_NODE_LABELS}"
   fi
   echo $node_labels
@@ -742,7 +740,7 @@ function construct-common-kubelet-flags {
 # Sets KUBELET_ARGS with the kubelet flags for Linux nodes.
 # $1: if 'true', we're rendering flags for a master, else a node
 function construct-linux-kubelet-flags {
-  local node_type="$1"
+  local master="$1"
   local flags="$(construct-common-kubelet-flags)"
   # Keep in sync with CONTAINERIZED_MOUNTER_HOME in configure-helper.sh
   flags+=" --experimental-mounter-path=/home/kubernetes/containerized_mounter/mounter"
@@ -753,7 +751,7 @@ function construct-linux-kubelet-flags {
   flags+=" --dynamic-config-dir=/var/lib/kubelet/dynamic-config"
 
 
-  if [[ "${node_type}" == "master" ]]; then
+  if [[ "${master}" == "true" ]]; then
     flags+=" ${MASTER_KUBELET_TEST_ARGS:-}"
     if [[ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]]; then
       #TODO(mikedanese): allow static pods to start before creating a client
@@ -767,9 +765,6 @@ function construct-linux-kubelet-flags {
     flags+=" ${NODE_KUBELET_TEST_ARGS:-}"
     flags+=" --bootstrap-kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
     flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
-    if [[ "${node_type}" == "heapster" ]]; then
-        flags+=" ${HEAPSTER_KUBELET_TEST_ARGS:-}"
-    fi
   fi
   # Network plugin
   if [[ -n "${NETWORK_PROVIDER:-}" || -n "${NETWORK_POLICY_PROVIDER:-}" ]]; then
@@ -777,7 +772,7 @@ function construct-linux-kubelet-flags {
     if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" || "${ENABLE_NETD:-}" == "true" ]]; then
       # Calico uses CNI always.
       # Note that network policy won't work for master node.
-      if [[ "${node_type}" == "master" ]]; then
+      if [[ "${master}" == "true" ]]; then
         flags+=" --network-plugin=${NETWORK_PROVIDER}"
       else
         flags+=" --network-plugin=cni"
@@ -792,7 +787,7 @@ function construct-linux-kubelet-flags {
     flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
   fi
   flags+=" --volume-plugin-dir=${VOLUME_PLUGIN_DIR}"
-  local node_labels="$(build-linux-node-labels ${node_type})"
+  local node_labels="$(build-linux-node-labels ${master})"
   if [[ -n "${node_labels:-}" ]]; then
     flags+=" --node-labels=${node_labels}"
   fi
@@ -1486,7 +1481,7 @@ EOF
           # TODO(kubernetes/autoscaler#718): AUTOSCALER_ENV_VARS is a hotfix for cluster autoscaler,
           # which reads the kube-env to determine the shape of a node and was broken by #60020.
           # This should be removed as soon as a more reliable source of information is available!
-          local node_labels="$(build-linux-node-labels node)"
+          local node_labels="$(build-linux-node-labels false)"
           local node_taints="${NODE_TAINTS:-}"
           local autoscaler_env_vars="node_labels=${node_labels};node_taints=${node_taints}"
           cat >>$file <<EOF
@@ -3261,7 +3256,7 @@ function create-heapster-node() {
       --tags "${NODE_TAG}" \
       ${network} \
       $(get-scope-flags) \
-      --metadata-from-file "$(get-node-instance-metadata-from-file "heapster-kube-env")"
+      --metadata-from-file "$(get-node-instance-metadata-from-file)"
 }
 
 # Assumes:
