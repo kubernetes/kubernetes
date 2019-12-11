@@ -153,7 +153,7 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Verify Disk Format")
-	gomega.Expect(verifyDiskFormat(client, nodeName, pv.Spec.VsphereVolume.VolumePath, diskFormat)).To(gomega.BeTrue(), "DiskFormat Verification Failed")
+	framework.ExpectEqual(verifyDiskFormat(client, nodeName, pv.Spec.VsphereVolume.VolumePath, diskFormat), true, "DiskFormat Verification Failed")
 
 	var volumePaths []string
 	volumePaths = append(volumePaths, pv.Spec.VsphereVolume.VolumePath)
