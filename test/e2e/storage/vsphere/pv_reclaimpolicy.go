@@ -245,7 +245,7 @@ func deletePVCAfterBind(c clientset.Interface, ns string, pvc *v1.PersistentVolu
 
 	ginkgo.By("delete pvc")
 	framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
-	pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
+	_, err = c.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
 	if !apierrs.IsNotFound(err) {
 		framework.ExpectNoError(err)
 	}
