@@ -26,8 +26,8 @@ import (
 
 // TODO: Reconcile custom types in kubelet/types and this subpackage
 
-// HttpDoer encapsulates http.Do functionality
-type HttpDoer interface {
+// HTTPDoer encapsulates http.Do functionality
+type HTTPDoer interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 

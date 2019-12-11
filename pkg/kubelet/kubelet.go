@@ -499,7 +499,16 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			clusterDNS = append(clusterDNS, ip)
 		}
 	}
-	httpClient := &http.Client{}
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	httpClient := &http.Client{Transport: tr}
+	parsedNodeIP := net.ParseIP(nodeIP)
+	protocol := utilipt.ProtocolIPv4
+	if utilnet.IsIPv6(parsedNodeIP) {
+		klog.V(0).Infof("IPv6 node IP (%s), assume IPv6 operation", nodeIP)
+		protocol = utilipt.ProtocolIPv6
+	}
 
 	klet := &Kubelet{
 		hostname:                                hostname,

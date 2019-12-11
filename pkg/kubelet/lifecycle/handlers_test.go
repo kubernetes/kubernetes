@@ -183,7 +183,7 @@ func TestRunHandlerHttpWithHeaders(t *testing.T) {
 					Port: intstr.FromInt(8080),
 					Path: "/bar",
 					HTTPHeaders: []v1.HTTPHeader{
-						{Name: "foo", Value: "bar"},
+						{Name: "Foo", Value: "bar"},
 					},
 				},
 			},
@@ -201,7 +201,7 @@ func TestRunHandlerHttpWithHeaders(t *testing.T) {
 	if fakeHttp.url != "http://foo:8080/bar" {
 		t.Errorf("unexpected url: %s", fakeHttp.url)
 	}
-	if fakeHttp.headers["foo"][0] != "bar" {
+	if fakeHttp.headers["Foo"][0] != "bar" {
 		t.Errorf("missing http header: %s", fakeHttp.headers)
 	}
 }
