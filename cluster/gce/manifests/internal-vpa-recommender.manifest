@@ -13,7 +13,7 @@
         "containers": [
             {
                 "name": "vpa-recommender",
-                "image":"gcr.io/gke-master-images/vpa-recommender:vpa-0.7.0-gke.1",
+                "image":"gcr.io/gke-master-images/vpa-recommender:vpa-0.7.0-gke.2",
                 "livenessProbe": {
                     "httpGet": {
                         "path": "/health-check",
