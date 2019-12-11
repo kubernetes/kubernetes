@@ -194,6 +194,14 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 
 		ginkgo.By("Run a critical pod that use 60% of a node resources.")
 		// Create a critical pod and make sure it is scheduled.
+		defer func() {
+			// Clean-up the critical pod
+			// Always run cleanup to make sure the pod is properly cleaned up.
+			err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete("critical-pod", metav1.NewDeleteOptions(0))
+			if err != nil && !errors.IsNotFound(err) {
+				framework.Failf("Error cleanup pod `%s/%s`: %v", metav1.NamespaceSystem, "critical-pod", err)
+			}
+		}()
 		runPausePod(f, pausePodConfig{
 			Name:              "critical-pod",
 			Namespace:         metav1.NamespaceSystem,
@@ -204,11 +212,6 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		})
 		// Make sure that the lowest priority pod is deleted.
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(pods[0].Name, metav1.GetOptions{})
-		defer func() {
-			// Clean-up the critical pod
-			err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete("critical-pod", metav1.NewDeleteOptions(0))
-			framework.ExpectNoError(err)
-		}()
 		podDeleted := (err != nil && errors.IsNotFound(err)) ||
 			(err == nil && preemptedPod.DeletionTimestamp != nil)
 		gomega.Expect(podDeleted).To(gomega.BeTrue())
