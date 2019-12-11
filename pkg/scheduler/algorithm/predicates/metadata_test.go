@@ -61,16 +61,6 @@ func predicateMetadataEquivalent(meta1, meta2 *predicateMetadata) error {
 	if !reflect.DeepEqual(meta1.pod, meta2.pod) {
 		return fmt.Errorf("pods are not the same")
 	}
-	if meta1.podBestEffort != meta2.podBestEffort {
-		return fmt.Errorf("podBestEfforts are not equal")
-	}
-	if len(meta1.podFitsHostPortsMetadata.podPorts) != len(meta2.podFitsHostPortsMetadata.podPorts) {
-		return fmt.Errorf("podPorts are not equal")
-	}
-	for !reflect.DeepEqual(meta1.podFitsHostPortsMetadata.podPorts, meta2.podFitsHostPortsMetadata.podPorts) {
-		return fmt.Errorf("podPorts are not equal")
-	}
-
 	if meta1.serviceAffinityMetadata != nil {
 		sortablePods1 := sortablePods(meta1.serviceAffinityMetadata.matchingPodList)
 		sort.Sort(sortablePods1)
@@ -238,23 +228,11 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 				Namespace: "testns",
 			},
 		},
-		podBestEffort: true,
 		podFitsResourcesMetadata: &podFitsResourcesMetadata{
 			podRequest: &schedulernodeinfo.Resource{
 				MilliCPU:         1000,
 				Memory:           300,
 				AllowedPodNumber: 4,
-			},
-		},
-		podFitsHostPortsMetadata: &podFitsHostPortsMetadata{
-			podPorts: []*v1.ContainerPort{
-				{
-					Name:          "name",
-					HostPort:      10,
-					ContainerPort: 20,
-					Protocol:      "TCP",
-					HostIP:        "1.2.3.4",
-				},
 			},
 		},
 		evenPodsSpreadMetadata: &evenPodsSpreadMetadata{

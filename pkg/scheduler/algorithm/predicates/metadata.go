@@ -304,26 +304,10 @@ func (m *podFitsResourcesMetadata) clone() *podFitsResourcesMetadata {
 	return &copy
 }
 
-type podFitsHostPortsMetadata struct {
-	podPorts []*v1.ContainerPort
-}
-
-func (m *podFitsHostPortsMetadata) clone() *podFitsHostPortsMetadata {
-	if m == nil {
-		return nil
-	}
-
-	copy := podFitsHostPortsMetadata{}
-	copy.podPorts = append([]*v1.ContainerPort(nil), m.podPorts...)
-
-	return &copy
-}
-
 // NOTE: When new fields are added/removed or logic is changed, please make sure that
 // RemovePod, AddPod, and ShallowCopy functions are updated to work with the new changes.
 type predicateMetadata struct {
-	pod           *v1.Pod
-	podBestEffort bool
+	pod *v1.Pod
 
 	// evenPodsSpreadMetadata holds info of the minimum match number on each topology spread constraint,
 	// and the match number of all valid topology pairs.
@@ -331,7 +315,6 @@ type predicateMetadata struct {
 
 	serviceAffinityMetadata  *serviceAffinityMetadata
 	podFitsResourcesMetadata *podFitsResourcesMetadata
-	podFitsHostPortsMetadata *podFitsHostPortsMetadata
 }
 
 // Ensure that predicateMetadata implements algorithm.Metadata.
@@ -396,19 +379,12 @@ func (f *MetadataProducerFactory) GetPredicateMetadata(pod *v1.Pod, sharedLister
 		pod:                      pod,
 		evenPodsSpreadMetadata:   evenPodsSpreadMetadata,
 		podFitsResourcesMetadata: getPodFitsResourcesMetedata(pod),
-		podFitsHostPortsMetadata: getPodFitsHostPortsMetadata(pod),
 	}
 	for predicateName, precomputeFunc := range predicateMetadataProducers {
 		klog.V(10).Infof("Precompute: %v", predicateName)
 		precomputeFunc(predicateMetadata)
 	}
 	return predicateMetadata
-}
-
-func getPodFitsHostPortsMetadata(pod *v1.Pod) *podFitsHostPortsMetadata {
-	return &podFitsHostPortsMetadata{
-		podPorts: schedutil.GetContainerPorts(pod),
-	}
 }
 
 func getPodFitsResourcesMetedata(pod *v1.Pod) *podFitsResourcesMetadata {
@@ -638,10 +614,8 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, node *v1.Node) error {
 // its maps and slices, but it does not copy the contents of pointer values.
 func (meta *predicateMetadata) ShallowCopy() Metadata {
 	newPredMeta := &predicateMetadata{
-		pod:           meta.pod,
-		podBestEffort: meta.podBestEffort,
+		pod: meta.pod,
 	}
-	newPredMeta.podFitsHostPortsMetadata = meta.podFitsHostPortsMetadata.clone()
 	newPredMeta.evenPodsSpreadMetadata = meta.evenPodsSpreadMetadata.clone()
 	newPredMeta.serviceAffinityMetadata = meta.serviceAffinityMetadata.clone()
 	newPredMeta.podFitsResourcesMetadata = meta.podFitsResourcesMetadata.clone()
