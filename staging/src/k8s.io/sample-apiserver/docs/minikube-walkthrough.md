@@ -48,7 +48,7 @@ docker push <YOUR_DOCKERHUB_USER>/kube-sample-apiserver
 
 ## Modify the replication controller
 
-You need to modify the [artifacts/example/rc.yaml](/artifacts/example/rc.yaml) file to change the ```imagePullPolicy``` to ```Always``` or ```IfNotPresent```.
+You need to modify the [artifacts/example/deployment.yaml](/artifacts/example/deployment.yaml) file to change the ```imagePullPolicy``` to ```Always``` or ```IfNotPresent```.
 
 You also need to change the image from ```kube-sample-apiserver:latest``` to ```<YOUR_DOCKERHUB_USER>/kube-sample-apiserver:latest```. For example:
 
@@ -83,7 +83,7 @@ kubectl create -f artifacts/example/rbac.yaml
 kubectl create -f artifacts/example/rbac-bind.yaml
 
 # create the service and replication controller
-kubectl create -f artifacts/example/rc.yaml -n wardle
+kubectl create -f artifacts/example/deployment.yaml -n wardle
 kubectl create -f artifacts/example/service.yaml -n wardle
 
 # create the apiservice object that tells kubernetes about your api extension and where in the cluster the server is located
