@@ -94,7 +94,7 @@ run_cmd_with_img_tests() {
   # Test that a valid image reference value is provided as the value of --image in `kubectl run <name> --image`
   output_message=$(kubectl run test1 --image=validname)
   kube::test::if_has_string "${output_message}" 'pod/test1 created'
-  kubectl delete deployments test1
+  kubectl delete pod test1
   # test invalid image name
   output_message=$(! kubectl run test2 --image=InvalidImageName 2>&1)
   kube::test::if_has_string "${output_message}" 'error: Invalid image name "InvalidImageName": invalid reference format'
