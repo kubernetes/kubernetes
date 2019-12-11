@@ -64,26 +64,26 @@ var (
 		Creates a deployment or job to manage the created container(s).`))
 
 	runExample = templates.Examples(i18n.T(`
-		# Start a single instance of nginx.
+		# Start a pod of nginx.
 		kubectl run nginx --image=nginx
 
-		# Start a single instance of hazelcast and let the container expose port 5701 .
+		# Start a pod of hazelcast and let the container expose port 5701 .
 		kubectl run hazelcast --image=hazelcast --port=5701
 
-		# Start a single instance of hazelcast and set environment variables "DNS_DOMAIN=cluster" and "POD_NAMESPACE=default" in the container.
+		# Start a pod of hazelcast and set environment variables "DNS_DOMAIN=cluster" and "POD_NAMESPACE=default" in the container.
 		kubectl run hazelcast --image=hazelcast --env="DNS_DOMAIN=cluster" --env="POD_NAMESPACE=default"
 
-		# Start a single instance of hazelcast and set labels "app=hazelcast" and "env=prod" in the container.
+		# Start a pod of hazelcast and set labels "app=hazelcast" and "env=prod" in the container.
 		kubectl run hazelcast --image=hazelcast --labels="app=hazelcast,env=prod"
-
-		# Start a replicated instance of nginx.
-		kubectl run nginx --image=nginx --replicas=5
 
 		# Dry run. Print the corresponding API objects without creating them.
 		kubectl run nginx --image=nginx --dry-run
 
+		# Start a replicated instance of nginx.
+		kubectl run nginx --image=nginx --restart=Always --replicas=5
+
 		# Start a single instance of nginx, but overload the spec of the deployment with a partial set of values parsed from JSON.
-		kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { ... } }'
+		kubectl run nginx --image=nginx --restart=Always --overrides='{ "apiVersion": "v1", "spec": { ... } }'
 
 		# Start a pod of busybox and keep it in the foreground, don't restart it if it exits.
 		kubectl run -i -t busybox --image=busybox --restart=Never
@@ -196,7 +196,7 @@ func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmd.Flags().BoolVarP(&opt.TTY, "tty", "t", opt.TTY, "Allocated a TTY for each container in the pod.")
 	cmd.Flags().BoolVar(&opt.Attach, "attach", opt.Attach, "If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true. With '--restart=Never' the exit code of the container process is returned.")
 	cmd.Flags().BoolVar(&opt.LeaveStdinOpen, "leave-stdin-open", opt.LeaveStdinOpen, "If the pod is started in interactive mode or with stdin, leave stdin open after the first attach completes. By default, stdin will be closed after the first attach completes.")
-	cmd.Flags().String("restart", "Always", i18n.T("The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs `Never`."))
+	cmd.Flags().String("restart", "Never", i18n.T("The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Never', for CronJobs `Never`."))
 	cmd.Flags().Bool("command", false, "If true and extra arguments are present, use them as the 'command' field in the container, rather than the 'args' field which is the default.")
 	cmd.Flags().String("requests", "", i18n.T("The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges."))
 	cmd.Flags().String("limits", "", i18n.T("The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."))
@@ -591,7 +591,7 @@ func getRestartPolicy(cmd *cobra.Command, interactive bool) (corev1.RestartPolic
 		if interactive {
 			return corev1.RestartPolicyOnFailure, nil
 		}
-		return corev1.RestartPolicyAlways, nil
+		return corev1.RestartPolicyNever, nil
 	}
 	switch corev1.RestartPolicy(restart) {
 	case corev1.RestartPolicyAlways:

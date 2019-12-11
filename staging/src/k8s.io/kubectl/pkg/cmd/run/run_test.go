@@ -52,7 +52,7 @@ func TestGetRestartPolicy(t *testing.T) {
 	}{
 		{
 			input:    "",
-			expected: corev1.RestartPolicyAlways,
+			expected: corev1.RestartPolicyNever,
 		},
 		{
 			input:       "",
