@@ -217,7 +217,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 			defaultIPFamily = v1.IPv6Protocol
 		}
 
-		t := e2eservice.NewServerTest(cs, ns, serviceName)
+		t := NewServerTest(cs, ns, serviceName)
 		defer func() {
 			defer ginkgo.GinkgoRecover()
 			if errs := t.Cleanup(); len(errs) != 0 {
@@ -254,7 +254,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 
-		t := e2eservice.NewServerTest(cs, ns, serviceName)
+		t := NewServerTest(cs, ns, serviceName)
 		defer func() {
 			defer ginkgo.GinkgoRecover()
 			if errs := t.Cleanup(); len(errs) != 0 {
@@ -291,7 +291,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 
-		t := e2eservice.NewServerTest(cs, ns, serviceName)
+		t := NewServerTest(cs, ns, serviceName)
 		defer func() {
 			defer ginkgo.GinkgoRecover()
 			if errs := t.Cleanup(); len(errs) != 0 {

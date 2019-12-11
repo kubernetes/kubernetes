@@ -17,7 +17,6 @@ limitations under the License.
 package service
 
 import (
-	"context"
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -29,43 +28,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 )
-
-// WaitForServiceResponding waits for the service to be responding.
-func WaitForServiceResponding(c clientset.Interface, ns, name string) error {
-	ginkgo.By(fmt.Sprintf("trying to dial the service %s.%s via the proxy", ns, name))
-
-	return wait.PollImmediate(framework.Poll, RespondingTimeout, func() (done bool, err error) {
-		proxyRequest, errProxy := GetServicesProxyRequest(c, c.CoreV1().RESTClient().Get())
-		if errProxy != nil {
-			framework.Logf("Failed to get services proxy request: %v:", errProxy)
-			return false, nil
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
-		defer cancel()
-
-		body, err := proxyRequest.Namespace(ns).
-			Context(ctx).
-			Name(name).
-			Do().
-			Raw()
-		if err != nil {
-			if ctx.Err() != nil {
-				framework.Failf("Failed to GET from service %s: %v", name, err)
-				return true, err
-			}
-			framework.Logf("Failed to GET from service %s: %v:", name, err)
-			return false, nil
-		}
-		got := string(body)
-		if len(got) == 0 {
-			framework.Logf("Service %s: expected non-empty response", name)
-			return false, err // stop polling
-		}
-		framework.Logf("Service %s: found nonempty answer: %s", name, got)
-		return true, nil
-	})
-}
 
 // WaitForServiceDeletedWithFinalizer waits for the service with finalizer to be deleted.
 func WaitForServiceDeletedWithFinalizer(cs clientset.Interface, namespace, name string) {

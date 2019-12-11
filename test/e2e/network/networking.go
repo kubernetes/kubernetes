@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
 	"github.com/onsi/ginkgo"
@@ -327,9 +326,9 @@ var _ = SIGDescribe("Networking", func() {
 		svc := "iptables-flush-test"
 
 		defer func() {
-			framework.ExpectNoError(e2eservice.StopServeHostnameService(f.ClientSet, ns, svc))
+			framework.ExpectNoError(StopServeHostnameService(f.ClientSet, ns, svc))
 		}()
-		podNames, svcIP, err := e2eservice.StartServeHostnameService(f.ClientSet, getServeHostnameService(svc), ns, numPods)
+		podNames, svcIP, err := StartServeHostnameService(f.ClientSet, getServeHostnameService(svc), ns, numPods)
 		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc, ns)
 
 		// Ideally we want to reload the system firewall, but we don't necessarily
@@ -377,7 +376,7 @@ var _ = SIGDescribe("Networking", func() {
 		}
 
 		ginkgo.By("verifying that kube-proxy rules are eventually recreated")
-		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceUp(f.ClientSet, ns, host, podNames, svcIP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(f.ClientSet, ns, host, podNames, svcIP, servicePort))
 
 		ginkgo.By("verifying that kubelet rules are eventually recreated")
 		err = utilwait.PollImmediate(framework.Poll, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
