@@ -92,5 +92,6 @@ func invokeInvalidDatastoreTestNeg(client clientset.Interface, namespace string,
 	framework.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
+	framework.ExpectNoError(err)
 	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
 }

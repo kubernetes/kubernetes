@@ -439,6 +439,8 @@ func verifyPodAndPvcCreationFailureOnWaitForFirstConsumerMode(client clientset.I
 	framework.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
+	framework.ExpectNoError(err)
+
 	// Look for PVC ProvisioningFailed event and return the message.
 	for _, event := range eventList.Items {
 		if event.Source.Component == "persistentvolume-controller" && event.Reason == volumeevents.ProvisioningFailed {
@@ -484,14 +486,13 @@ func verifyPVCCreationFails(client clientset.Interface, namespace string, scPara
 	framework.ExpectNoError(err)
 	defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
-	var pvclaims []*v1.PersistentVolumeClaim
-	pvclaims = append(pvclaims, pvclaim)
-
 	ginkgo.By("Waiting for claim to be in bound phase")
 	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
 	framework.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
+	framework.ExpectNoError(err)
+
 	framework.Logf("Failure message : %+q", eventList.Items[0].Message)
 	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
 }

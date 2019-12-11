@@ -67,8 +67,6 @@ test/e2e/autoscaling
 test/e2e/instrumentation/logging/stackdriver
 test/e2e/instrumentation/monitoring
 test/e2e/manifest
-test/e2e/storage/utils
-test/e2e/storage/vsphere
 test/images/agnhost/dns
 test/images/agnhost/inclusterclient
 test/images/agnhost/net/nat
