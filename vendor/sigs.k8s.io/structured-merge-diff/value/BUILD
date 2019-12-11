@@ -1,12 +1,17 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "fastjson.go",
-        "unstructured.go",
+        "fields.go",
+        "list.go",
+        "listunstructured.go",
+        "map.go",
+        "mapunstructured.go",
+        "scalar.go",
         "value.go",
+        "valueunstructured.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/structured-merge-diff/value",
     importpath = "sigs.k8s.io/structured-merge-diff/value",
@@ -29,15 +34,4 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = [
-        "less_test.go",
-        "unstructured_test.go",
-    ],
-    embed = [":go_default_library"],
-    tags = ["manual"],
-    deps = ["//vendor/gopkg.in/yaml.v2:go_default_library"],
 )

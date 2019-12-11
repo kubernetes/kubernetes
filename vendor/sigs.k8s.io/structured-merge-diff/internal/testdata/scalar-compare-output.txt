@@ -1,2 +1,0 @@
-- Modified Fields:
-.types[name="scalar"].scalar

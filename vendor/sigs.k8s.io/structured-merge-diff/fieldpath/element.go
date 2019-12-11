@@ -34,7 +34,7 @@ type PathElement struct {
 
 	// Key selects the list element which has fields matching those given.
 	// The containing object must be an associative list with map typed
-	// elements.
+	// elements. They are sorted alphabetically.
 	Key *value.FieldList
 
 	// Value selects the list element with the given value. The containing
@@ -71,7 +71,7 @@ func (e PathElement) Less(rhs PathElement) bool {
 		if rhs.Value == nil {
 			return true
 		}
-		return e.Value.Less(*rhs.Value)
+		return value.Less(*e.Value, *rhs.Value)
 	} else if rhs.Value != nil {
 		return false
 	}
@@ -103,12 +103,12 @@ func (e PathElement) String() string {
 	case e.Key != nil:
 		strs := make([]string, len(*e.Key))
 		for i, k := range *e.Key {
-			strs[i] = fmt.Sprintf("%v=%v", k.Name, k.Value)
+			strs[i] = fmt.Sprintf("%v=%v", k.Name, value.ToString(k.Value))
 		}
 		// Keys are supposed to be sorted.
 		return "[" + strings.Join(strs, ",") + "]"
 	case e.Value != nil:
-		return fmt.Sprintf("[=%v]", e.Value)
+		return fmt.Sprintf("[=%v]", value.ToString(*e.Value))
 	case e.Index != nil:
 		return fmt.Sprintf("[%v]", *e.Index)
 	default:
@@ -127,10 +127,7 @@ func KeyByFields(nameValues ...interface{}) *value.FieldList {
 	}
 	out := value.FieldList{}
 	for i := 0; i < len(nameValues)-1; i += 2 {
-		out = append(out, value.Field{
-			Name:  nameValues[i].(string),
-			Value: nameValues[i+1].(value.Value),
-		})
+		out = append(out, value.Field{Name: nameValues[i].(string), Value: value.NewValueInterface(nameValues[i+1])})
 	}
 	out.Sort()
 	return &out

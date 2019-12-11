@@ -61,4 +61,5 @@ replace (
 	k8s.io/component-base => ../component-base
 	k8s.io/kubectl => ../kubectl
 	k8s.io/metrics => ../metrics
+	sigs.k8s.io/structured-merge-diff => github.com/kwiesmueller/structured-merge-diff v0.0.0-20191211131859-28e231e1903d
 )

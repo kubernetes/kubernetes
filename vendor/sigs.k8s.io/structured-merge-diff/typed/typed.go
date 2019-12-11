@@ -62,15 +62,15 @@ type TypedValue struct {
 }
 
 // AsValue removes the type from the TypedValue and only keeps the value.
-func (tv TypedValue) AsValue() *value.Value {
-	return &tv.value
+func (tv TypedValue) AsValue() value.Value {
+	return tv.value
 }
 
 // Validate returns an error with a list of every spec violation.
 func (tv TypedValue) Validate() error {
 	w := tv.walker()
 	defer w.finished()
-	if errs := w.validate(); len(errs) != 0 {
+	if errs := w.validate(nil); len(errs) != 0 {
 		return errs
 	}
 	return nil
@@ -79,15 +79,12 @@ func (tv TypedValue) Validate() error {
 // ToFieldSet creates a set containing every leaf field and item mentioned, or
 // validation errors, if any were encountered.
 func (tv TypedValue) ToFieldSet() (*fieldpath.Set, error) {
-	s := fieldpath.NewSet()
-	w := tv.walker()
+	w := tv.toFieldSetWalker()
 	defer w.finished()
-	w.leafFieldCallback = func(p fieldpath.Path) { s.Insert(p) }
-	w.nodeFieldCallback = func(p fieldpath.Path) { s.Insert(p) }
-	if errs := w.validate(); len(errs) != 0 {
+	if errs := w.toFieldSet(); len(errs) != 0 {
 		return nil, errs
 	}
-	return s, nil
+	return w.set, nil
 }
 
 // Merge returns the result of merging tv and pso ("partially specified
@@ -122,7 +119,7 @@ func (tv TypedValue) Compare(rhs *TypedValue) (c *Comparison, err error) {
 			c.Added.Insert(w.path)
 		} else if w.rhs == nil {
 			c.Removed.Insert(w.path)
-		} else if !w.rhs.Equals(*w.lhs) {
+		} else if !value.Equals(w.rhs, w.lhs) {
 			// TODO: Equality is not sufficient for this.
 			// Need to implement equality check on the value type.
 			c.Modified.Insert(w.path)
@@ -143,15 +140,13 @@ func (tv TypedValue) Compare(rhs *TypedValue) (c *Comparison, err error) {
 
 // RemoveItems removes each provided list or map item from the value.
 func (tv TypedValue) RemoveItems(items *fieldpath.Set) *TypedValue {
-	tv.value, _ = value.FromUnstructured(tv.value.ToUnstructured(true))
-	removeItemsWithSchema(&tv.value, items, tv.schema, tv.typeRef, false)
+	tv.value = removeItemsWithSchema(tv.value, items, tv.schema, tv.typeRef, false)
 	return &tv
 }
 
 // Remove removes each provided path from the value.
 func (tv TypedValue) Remove(paths *fieldpath.Set) *TypedValue {
-	tv.value, _ = value.FromUnstructured(tv.value.ToUnstructured(true))
-	removeItemsWithSchema(&tv.value, paths, tv.schema, tv.typeRef, true)
+	tv.value = removeItemsWithSchema(tv.value, paths, tv.schema, tv.typeRef, false)
 	return &tv
 }
 
@@ -169,11 +164,11 @@ func (tv TypedValue) NormalizeUnions(new *TypedValue) (*TypedValue, error) {
 	var errs ValidationErrors
 	var normalizeFn = func(w *mergingWalker) {
 		if w.rhs != nil {
-			v := *w.rhs
+			v := w.rhs.Unstructured()
 			w.out = &v
 		}
 		if err := normalizeUnions(w); err != nil {
-			errs = append(errs, w.error(err)...)
+			errs = append(errs, errorf(err.Error())...)
 		}
 	}
 	out, mergeErrs := merge(&tv, new, func(w *mergingWalker) {}, normalizeFn)
@@ -195,11 +190,11 @@ func (tv TypedValue) NormalizeUnionsApply(new *TypedValue) (*TypedValue, error) 
 	var errs ValidationErrors
 	var normalizeFn = func(w *mergingWalker) {
 		if w.rhs != nil {
-			v := *w.rhs
+			v := w.rhs.Unstructured()
 			w.out = &v
 		}
 		if err := normalizeUnionsApply(w); err != nil {
-			errs = append(errs, w.error(err)...)
+			errs = append(errs, errorf(err.Error())...)
 		}
 	}
 	out, mergeErrs := merge(&tv, new, func(w *mergingWalker) {}, normalizeFn)
@@ -213,7 +208,7 @@ func (tv TypedValue) NormalizeUnionsApply(new *TypedValue) (*TypedValue, error) 
 }
 
 func (tv TypedValue) Empty() *TypedValue {
-	tv.value = value.Value{Null: true}
+	tv.value = value.NewValueInterface(nil)
 	return &tv
 }
 
@@ -223,12 +218,10 @@ var mwPool = sync.Pool{
 
 func merge(lhs, rhs *TypedValue, rule, postRule mergeRule) (*TypedValue, error) {
 	if lhs.schema != rhs.schema {
-		return nil, errorFormatter{}.
-			errorf("expected objects with types from the same schema")
+		return nil, errorf("expected objects with types from the same schema")
 	}
 	if !lhs.typeRef.Equals(rhs.typeRef) {
-		return nil, errorFormatter{}.
-			errorf("expected objects of the same type, but got %v and %v", lhs.typeRef, rhs.typeRef)
+		return nil, errorf("expected objects of the same type, but got %v and %v", lhs.typeRef, rhs.typeRef)
 	}
 
 	mw := mwPool.Get().(*mergingWalker)
@@ -245,14 +238,14 @@ func merge(lhs, rhs *TypedValue, rule, postRule mergeRule) (*TypedValue, error) 
 		mwPool.Put(mw)
 	}()
 
-	mw.lhs = &lhs.value
-	mw.rhs = &rhs.value
+	mw.lhs = lhs.value
+	mw.rhs = rhs.value
 	mw.schema = lhs.schema
 	mw.typeRef = lhs.typeRef
 	mw.rule = rule
 	mw.postItemHook = postRule
 
-	errs := mw.merge()
+	errs := mw.merge(nil)
 	if len(errs) > 0 {
 		return nil, errs
 	}
@@ -261,10 +254,8 @@ func merge(lhs, rhs *TypedValue, rule, postRule mergeRule) (*TypedValue, error) 
 		schema:  lhs.schema,
 		typeRef: lhs.typeRef,
 	}
-	if mw.out == nil {
-		out.value = value.Value{Null: true}
-	} else {
-		out.value = *mw.out
+	if mw.out != nil {
+		out.value = value.NewValueInterface(*mw.out)
 	}
 	return out, nil
 }

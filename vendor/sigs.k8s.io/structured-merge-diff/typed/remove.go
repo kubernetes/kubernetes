@@ -20,39 +20,40 @@ import (
 )
 
 type removingWalker struct {
-	value    *value.Value
+	value    value.Value
+	out      interface{}
 	schema   *schema.Schema
 	toRemove *fieldpath.Set
 	shallow  bool
 }
 
-func removeItemsWithSchema(value *value.Value, toRemove *fieldpath.Set, schema *schema.Schema, typeRef schema.TypeRef, shallow bool) {
+func removeItemsWithSchema(val value.Value, toRemove *fieldpath.Set, schema *schema.Schema, typeRef schema.TypeRef, shallow bool) value.Value {
 	w := &removingWalker{
-		value:    value,
+		value:    val,
 		schema:   schema,
 		toRemove: toRemove,
 		shallow:  shallow,
 	}
-	resolveSchema(schema, typeRef, value, w)
+	resolveSchema(schema, typeRef, val, w)
+	return value.NewValueInterface(w.out)
 }
 
-// doLeaf should be called on leaves before descending into children, if there
-// will be a descent. It modifies w.inLeaf.
-func (w *removingWalker) doLeaf() ValidationErrors { return nil }
-
-func (w *removingWalker) doScalar(t *schema.Scalar) ValidationErrors { return nil }
+func (w *removingWalker) doScalar(t *schema.Scalar) ValidationErrors {
+	w.out = w.value.Unstructured()
+	return nil
+}
 
 func (w *removingWalker) doList(t *schema.List) (errs ValidationErrors) {
-	l := w.value.ListValue
+	l := w.value.List()
 
 	// If list is null, empty, or atomic just return
-	if l == nil || len(l.Items) == 0 || t.ElementRelationship == schema.Atomic {
+	if l == nil || l.Length() == 0 || t.ElementRelationship == schema.Atomic {
 		return nil
 	}
 
-	newItems := []value.Value{}
-	for i := range l.Items {
-		item := l.Items[i]
+	var newItems []interface{}
+	for i := 0; i < l.Length(); i++ {
+		item := l.At(i)
 		// Ignore error because we have already validated this list
 		pe, _ := listItemToPathElement(t, i, item)
 		path, _ := fieldpath.MakePath(pe)
@@ -60,23 +61,21 @@ func (w *removingWalker) doList(t *schema.List) (errs ValidationErrors) {
 			continue
 		}
 		if subset := w.toRemove.WithPrefix(pe); !subset.Empty() {
-			removeItemsWithSchema(&l.Items[i], subset, w.schema, t.ElementType, w.shallow)
+			item = removeItemsWithSchema(item, subset, w.schema, t.ElementType, w.shallow)
 		}
-		newItems = append(newItems, l.Items[i])
+		newItems = append(newItems, item.Unstructured())
 	}
-	l.Items = newItems
-	if len(l.Items) == 0 {
-		w.value.ListValue = nil
-		w.value.Null = true
+	if len(newItems) > 0 {
+		w.out = newItems
 	}
 	return nil
 }
 
 func (w *removingWalker) doMap(t *schema.Map) ValidationErrors {
-	m := w.value.MapValue
+	m := w.value.Map()
 
 	// If map is null, empty, or atomic just return
-	if m == nil || len(m.Items) == 0 || t.ElementRelationship == schema.Atomic {
+	if m == nil || m.Length() == 0 || t.ElementRelationship == schema.Atomic {
 		return nil
 	}
 
@@ -85,37 +84,33 @@ func (w *removingWalker) doMap(t *schema.Map) ValidationErrors {
 		fieldTypes[structField.Name] = structField.Type
 	}
 
-	newMap := &value.Map{}
-	for i := range m.Items {
-		item := m.Items[i]
-		pe := fieldpath.PathElement{FieldName: &item.Name}
+	newMap := map[string]interface{}{}
+	m.Iterate(func(k string, val value.Value) bool {
+		pe := fieldpath.PathElement{FieldName: &k}
 		path, _ := fieldpath.MakePath(pe)
 
 		if w.shallow {
 			if w.toRemove.Has(path) {
-				continue
+				return true
 			}
 		}
 
 		fieldType := t.ElementType
-		if ft, ok := fieldTypes[item.Name]; ok {
+		if ft, ok := fieldTypes[k]; ok {
 			fieldType = ft
 		} else {
 			if w.toRemove.Has(path) {
-				continue
+				return true
 			}
 		}
 		if subset := w.toRemove.WithPrefix(pe); !subset.Empty() {
-			removeItemsWithSchema(&m.Items[i].Value, subset, w.schema, fieldType, w.shallow)
+			val = removeItemsWithSchema(val, subset, w.schema, fieldType, w.shallow)
 		}
-		newMap.Set(item.Name, m.Items[i].Value)
-	}
-	w.value.MapValue = newMap
-	if len(w.value.MapValue.Items) == 0 {
-		w.value.MapValue = nil
-		w.value.Null = true
+		newMap[k] = val.Unstructured()
+		return true
+	})
+	if len(newMap) > 0 {
+		w.out = newMap
 	}
 	return nil
 }
-
-func (*removingWalker) errorf(_ string, _ ...interface{}) ValidationErrors { return nil }

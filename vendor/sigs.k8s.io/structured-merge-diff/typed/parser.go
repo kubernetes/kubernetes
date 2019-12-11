@@ -94,21 +94,18 @@ func (p ParseableType) IsValid() bool {
 // FromYAML parses a yaml string into an object with the current schema
 // and the type "typename" or an error if validation fails.
 func (p ParseableType) FromYAML(object YAMLObject) (*TypedValue, error) {
-	v, err := value.FromYAML([]byte(object))
+	var v interface{}
+	err := yaml.Unmarshal([]byte(object), &v)
 	if err != nil {
 		return nil, err
 	}
-	return AsTyped(v, p.Schema, p.TypeRef)
+	return AsTyped(value.NewValueInterface(v), p.Schema, p.TypeRef)
 }
 
 // FromUnstructured converts a go interface to a TypedValue. It will return an
 // error if the resulting object fails schema validation.
 func (p ParseableType) FromUnstructured(in interface{}) (*TypedValue, error) {
-	v, err := value.FromUnstructured(in)
-	if err != nil {
-		return nil, err
-	}
-	return AsTyped(v, p.Schema, p.TypeRef)
+	return AsTyped(value.NewValueInterface(in), p.Schema, p.TypeRef)
 }
 
 // DeducedParseableType is a ParseableType that deduces the type from
