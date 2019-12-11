@@ -108,6 +108,9 @@ type manager struct {
 	// sourcesReady provides the readiness of kubelet configuration sources such as apiserver update readiness.
 	// We use it to determine when we can purge inactive pods from checkpointed state.
 	sourcesReady config.SourcesReady
+
+	// stateFileDirectory holds the directory where the state file for checkpoints is held.
+	stateFileDirectory string
 }
 
 var _ Manager = &manager{}
@@ -158,18 +161,13 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 		return nil, fmt.Errorf("unknown policy: \"%s\"", cpuPolicyName)
 	}
 
-	stateImpl, err := state.NewCheckpointState(stateFileDirectory, cpuManagerStateFileName, policy.Name(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize checkpoint manager: %v", err)
-	}
-
 	manager := &manager{
 		policy:                     policy,
 		reconcilePeriod:            reconcilePeriod,
-		state:                      stateImpl,
 		containerMap:               containermap.NewContainerMap(),
 		topology:                   topo,
 		nodeAllocatableReservation: nodeAllocatableReservation,
+		stateFileDirectory:         stateFileDirectory,
 	}
 	manager.sourcesReady = &sourcesReadyStub{}
 	return manager, nil
@@ -182,6 +180,13 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 	m.activePods = activePods
 	m.podStatusProvider = podStatusProvider
 	m.containerRuntime = containerRuntime
+
+	stateImpl, err := state.NewCheckpointState(m.stateFileDirectory, cpuManagerStateFileName, m.policy.Name(), nil)
+	if err != nil {
+		klog.Errorf("[cpumanager] could not initialize checkpoint manager: %v\n", err)
+		panic("[cpumanager] - please drain node and remove policy state file")
+	}
+	m.state = stateImpl
 
 	m.policy.Start(m.state)
 	if m.policy.Name() == string(PolicyNone) {
