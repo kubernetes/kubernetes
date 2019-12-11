@@ -1014,7 +1014,7 @@ __EOF__
   # Pre-condition: no deployment exists
   kube::test::wait_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl run testmetadata --image=nginx --replicas=2 --port=80 --expose --service-overrides='{ "metadata": { "annotations": { "zone-context": "home" } } } '
+  kubectl run testmetadata --restart=Always --image=nginx --replicas=2 --port=80 --expose --service-overrides='{ "metadata": { "annotations": { "zone-context": "home" } } } '
   # Check result
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'testmetadata:'
   kube::test::get_object_assert 'service testmetadata' "{{.metadata.annotations}}" "map\[zone-context:home\]"

@@ -41,7 +41,7 @@ run_kubectl_run_tests() {
   # Pre-Condition: no Deployment exists
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl run nginx-extensions "--image=${IMAGE_NGINX}" "${kube_flags[@]}"
+  kubectl run nginx-extensions --restart=Always "--image=${IMAGE_NGINX}" "${kube_flags[@]}"
   # Post-Condition: Deployment "nginx" is created
   kube::test::get_object_assert deployment.apps "{{range.items}}{{$id_field}}:{{end}}" 'nginx-extensions:'
   # new generator was used
@@ -93,7 +93,7 @@ run_cmd_with_img_tests() {
 
   # Test that a valid image reference value is provided as the value of --image in `kubectl run <name> --image`
   output_message=$(kubectl run test1 --image=validname)
-  kube::test::if_has_string "${output_message}" 'deployment.apps/test1 created'
+  kube::test::if_has_string "${output_message}" 'pod/test1 created'
   kubectl delete deployments test1
   # test invalid image name
   output_message=$(! kubectl run test2 --image=InvalidImageName 2>&1)
