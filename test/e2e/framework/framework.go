@@ -30,6 +30,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,6 +73,7 @@ type Framework struct {
 	// test multiple times in parallel.
 	UniqueName string
 
+	clientConfig                     *rest.Config
 	ClientSet                        clientset.Interface
 	KubemarkExternalClusterClientSet clientset.Interface
 
@@ -192,6 +195,7 @@ func (f *Framework) BeforeEach() {
 		if TestContext.KubeAPIContentType != "" {
 			config.ContentType = TestContext.KubeAPIContentType
 		}
+		f.clientConfig = rest.CopyConfig(config)
 		f.ClientSet, err = clientset.NewForConfig(config)
 		ExpectNoError(err)
 		f.DynamicClient, err = dynamic.NewForConfig(config)
@@ -387,6 +391,7 @@ func (f *Framework) AfterEach() {
 
 		// Paranoia-- prevent reuse!
 		f.Namespace = nil
+		f.clientConfig = nil
 		f.ClientSet = nil
 		f.namespacesToDelete = nil
 
@@ -520,6 +525,15 @@ func (f *Framework) WaitForPodRunningSlow(podName string) error {
 // success or failure.
 func (f *Framework) WaitForPodNoLongerRunning(podName string) error {
 	return e2epod.WaitForPodNoLongerRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
+}
+
+// ClientConfig an externally accessible method for reading the kube client config.
+func (f *Framework) ClientConfig() *rest.Config {
+	ret := rest.CopyConfig(f.clientConfig)
+	// json is least common denominator
+	ret.ContentType = runtime.ContentTypeJSON
+	ret.AcceptContentTypes = runtime.ContentTypeJSON
+	return ret
 }
 
 // TestContainerOutput runs the given pod in the given namespace and waits
