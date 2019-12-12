@@ -33,12 +33,10 @@ import (
 )
 
 func NewOOMAdjuster() *OOMAdjuster {
-	oomAdjuster := &OOMAdjuster{
+	return &OOMAdjuster{
 		pidLister:        getPids,
-		ApplyOOMScoreAdj: applyOOMScoreAdj,
+		applyOOMScoreAdj: applyOOMScoreAdj,
 	}
-	oomAdjuster.ApplyOOMScoreAdjContainer = oomAdjuster.applyOOMScoreAdjContainer
-	return oomAdjuster
 }
 
 func getPids(cgroupName string) ([]int, error) {
@@ -84,9 +82,15 @@ func applyOOMScoreAdj(pid int, oomScoreAdj int) error {
 	return err
 }
 
-// Writes 'value' to /proc/<pid>/oom_score_adj for all processes in cgroup cgroupName.
+// ApplyOOMScoreAdj writes 'value' to /proc/<pid>/oom_score_adj. PID = 0 means self
+// Returns os.ErrNotExist if the `pid` does not exist.
+func (oomAdjuster *OOMAdjuster) ApplyOOMScoreAdj(pid int, oomScoreAdj int) error {
+	return oomAdjuster.applyOOMScoreAdj(pid, oomScoreAdj)
+}
+
+// ApplyOOMScoreAdjContainer writes 'value' to /proc/<pid>/oom_score_adj for all processes in cgroup cgroupName.
 // Keeps trying to write until the process list of the cgroup stabilizes, or until maxTries tries.
-func (oomAdjuster *OOMAdjuster) applyOOMScoreAdjContainer(cgroupName string, oomScoreAdj, maxTries int) error {
+func (oomAdjuster *OOMAdjuster) ApplyOOMScoreAdjContainer(cgroupName string, oomScoreAdj, maxTries int) error {
 	adjustedProcessSet := make(map[int]bool)
 	for i := 0; i < maxTries; i++ {
 		continueAdjusting := false

@@ -19,9 +19,9 @@ limitations under the License.
 package oom
 
 import (
-	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"testing"
 
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -48,7 +48,7 @@ func applyOOMScoreAdjContainerTester(pidListSequence [][]int, maxTries int, appl
 
 	// Mock ApplyOOMScoreAdj and pidLister.
 	oomAdjuster := NewOOMAdjuster()
-	oomAdjuster.ApplyOOMScoreAdj = func(pid int, oomScoreAdj int) error {
+	oomAdjuster.applyOOMScoreAdj = func(pid int, oomScoreAdj int) error {
 		pidOOMs[pid] = true
 		return nil
 	}
