@@ -27,10 +27,7 @@ metadata:
   labels:
     k8s-app: kube-dns
 spec:
-  # replicas: not specified here:
-  # 1. In order to make Addon Manager do not reconcile this replicas parameter.
-  # 2. Default is 1.
-  # 3. Will be tuned in real time if DNS horizontal auto-scaling is turned on.
+  replicas: {{ .Replicas }}
   strategy:
     rollingUpdate:
       maxSurge: 10%
@@ -223,7 +220,7 @@ metadata:
   labels:
     k8s-app: kube-dns
 spec:
-  replicas: 2
+  replicas: {{ .Replicas }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
