@@ -30,6 +30,11 @@ func (m mapInterface) Get(key string) (Value, bool) {
 	}
 }
 
+func (m mapInterface) Has(key string) bool {
+	_, ok := m[key]
+	return ok
+}
+
 func (m mapInterface) Delete(key string) {
 	delete(m, key)
 }
@@ -91,6 +96,11 @@ func (m mapString) Get(key string) (Value, bool) {
 	} else {
 		return NewValueInterface(v), true
 	}
+}
+
+func (m mapString) Has(key string) bool {
+	_, ok := m[key]
+	return ok
 }
 
 func (m mapString) Delete(key string) {
