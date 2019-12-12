@@ -25,7 +25,7 @@ if [ "$#" -lt 5 ] || [ "${1}" == "--help" ]; then
   cat <<EOF
 Usage: $(basename "$0") <generators> <output-package> <internal-apis-package> <extensiona-apis-package> <groups-versions> ...
 
-  <generators>        the generators comma separated to run (deepcopy,defaulter,conversion,client,lister,informer,openapi) or "all".
+  <generators>        the generators comma separated to run (deepcopy,defaulter,conversion,openapi) or "all".
   <output-package>    the output package name (e.g. github.com/example/project/pkg/generated).
   <int-apis-package>  the internal types dir (e.g. github.com/example/project/pkg/apis).
   <ext-apis-package>  the external types dir (e.g. github.com/example/project/pkg/apis or githubcom/example/apis).
@@ -83,31 +83,6 @@ fi
 if [ "${GENS}" = "all" ] || grep -qw "conversion" <<<"${GENS}"; then
   echo "Generating conversions"
   "${GOPATH}/bin/conversion-gen" --input-dirs "$(codegen::join , "${ALL_FQ_APIS[@]}")" -O zz_generated.conversion "$@"
-fi
-
-if [ "${GENS}" = "all" ] || grep -qw "client" <<<"${GENS}"; then
-  echo "Generating clientset for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}"
-  if [ -n "${INT_APIS_PKG}" ]; then
-    IFS=" " read -r -a APIS <<< "$(printf '%s/ ' "${INT_FQ_APIS[@]}")"
-    "${GOPATH}/bin/client-gen" --clientset-name "${CLIENTSET_NAME_INTERNAL:-internalversion}" --input-base "" --input "$(codegen::join , "${APIS[@]}")" --output-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}" "$@"
-  fi
-  "${GOPATH}/bin/client-gen" --clientset-name "${CLIENTSET_NAME_VERSIONED:-versioned}" --input-base "" --input "$(codegen::join , "${EXT_FQ_APIS[@]}")" --output-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}" "$@"
-fi
-
-if [ "${GENS}" = "all" ] || grep -qw "lister" <<<"${GENS}"; then
-  echo "Generating listers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/listers"
-  "${GOPATH}/bin/lister-gen" --input-dirs "$(codegen::join , "${ALL_FQ_APIS[@]}")" --output-package "${OUTPUT_PKG}/listers" "$@"
-fi
-
-if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
-  echo "Generating informers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/informers"
-  "${GOPATH}/bin/informer-gen" \
-           --input-dirs "$(codegen::join , "${ALL_FQ_APIS[@]}")" \
-           --versioned-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_VERSIONED:-versioned}" \
-           --internal-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_INTERNAL:-internalversion}" \
-           --listers-package "${OUTPUT_PKG}/listers" \
-           --output-package "${OUTPUT_PKG}/informers" \
-           "$@"
 fi
 
 if [ "${GENS}" = "all" ] || grep -qw "openapi" <<<"${GENS}"; then
