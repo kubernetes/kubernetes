@@ -2209,8 +2209,18 @@ function setup-addon-manifests {
 # manifests directory.
 function download-extra-addons {
   local -r out_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/gce-extras"
+  local -r file="${out_dir}/extras.json"
 
   mkdir -p "${out_dir}"
+
+  local -r compressed=$(get-metadata-value "instance/attributes/extra-addons-compressed")
+  # Decompress metadata from 'extra-addons-compressed' if it's not empty.
+  if [[ ! -z "${compressed}" ]]
+  then
+    echo -e "Decompressing extra addons..."
+    echo "${compressed}" | base64 -d | gzip -d > "${file}"
+    return
+  fi
 
   local curl_cmd=(
     "curl"
@@ -2226,7 +2236,7 @@ function download-extra-addons {
   if [[ -n "${EXTRA_ADDONS_HEADER:-}" ]]; then
     curl_cmd+=("-H" "${EXTRA_ADDONS_HEADER}")
   fi
-  curl_cmd+=("-o" "${out_dir}/extras.json")
+  curl_cmd+=("-o" "${file}")
   curl_cmd+=("${EXTRA_ADDONS_URL}")
 
   "${curl_cmd[@]}"
