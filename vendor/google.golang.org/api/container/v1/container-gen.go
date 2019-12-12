@@ -2140,7 +2140,7 @@ type NodeConfig struct {
 	// LocalSsdCount: The number of local SSD disks to be attached to the
 	// node.
 	//
-	// The limit for this value is dependant upon the maximum number
+	// The limit for this value is dependent upon the maximum number
 	// of
 	// disks available on a machine per zone.
 	// See:
