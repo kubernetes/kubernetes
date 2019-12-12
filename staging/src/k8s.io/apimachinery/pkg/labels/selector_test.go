@@ -518,8 +518,10 @@ func TestSetSelectorParser(t *testing.T) {
 			t.Errorf("Parse(%s) => %v expected no error", ssp.In, err)
 		} else if err == nil && !ssp.Valid {
 			t.Errorf("Parse(%s) => %+v expected error", ssp.In, sel)
-		} else if ssp.Match && !reflect.DeepEqual(sel, ssp.Out) {
+		} else if ssp.Match && ssp.Out != nil && !reflect.DeepEqual(sel, ssp.Out) {
 			t.Errorf("Parse(%s) => parse output '%#v' doesn't match '%#v' expected match", ssp.In, sel, ssp.Out)
+		} else if ssp.Match && ssp.Out == nil && !reflect.ValueOf(sel).IsNil() {
+			t.Errorf("Parse(%s) => %v expected nil", ssp.In, sel)
 		}
 	}
 }

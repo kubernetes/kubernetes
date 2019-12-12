@@ -832,11 +832,7 @@ func (p *Parser) parseExactValue() (sets.String, error) {
 //  (5) A requirement with just !KEY requires that the KEY not exist.
 //
 func Parse(selector string) (Selector, error) {
-	parsedSelector, err := parse(selector)
-	if err == nil {
-		return parsedSelector, nil
-	}
-	return nil, err
+	return parse(selector)
 }
 
 // parse parses the string representation of the selector and returns the internalSelector struct.
@@ -850,7 +846,7 @@ func parse(selector string) (internalSelector, error) {
 		return nil, err
 	}
 	sort.Sort(ByKey(items)) // sort to grant determistic parsing
-	return internalSelector(items), err
+	return items, err
 }
 
 func validateLabelKey(k string) error {
