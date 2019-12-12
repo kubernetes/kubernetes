@@ -27,6 +27,8 @@ type Map interface {
 	Set(key string, val Value)
 	// Get returns the value for the given key, if present, or (nil, false) otherwise.
 	Get(key string) (Value, bool)
+	// Has returns true if the key is present, or false otherwise.
+	Has(key string) bool
 	// Delete removes the key from the map.
 	Delete(key string)
 	// Equals compares the two maps, and return true if they are the same, false otherwise.
