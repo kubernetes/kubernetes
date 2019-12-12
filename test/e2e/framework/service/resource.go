@@ -17,7 +17,6 @@ limitations under the License.
 package service
 
 import (
-	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -99,14 +98,6 @@ func GetIngressPoint(ing *v1.LoadBalancerIngress) string {
 // setting for the supported cloud providers (currently GCE/GKE and Azure) and empty functions for others.
 func EnableAndDisableInternalLB() (enable func(svc *v1.Service), disable func(svc *v1.Service)) {
 	return framework.TestContext.CloudConfig.Provider.EnableAndDisableInternalLB()
-}
-
-// DescribeSvc logs the output of kubectl describe svc for the given namespace
-func DescribeSvc(ns string) {
-	framework.Logf("\nOutput of kubectl describe svc:\n")
-	desc, _ := framework.RunKubectl(
-		ns, "describe", "svc", fmt.Sprintf("--namespace=%v", ns))
-	framework.Logf(desc)
 }
 
 // GetServiceLoadBalancerCreationTimeout returns a timeout value for creating a load balancer of a service.
