@@ -777,16 +777,6 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 							// this error since all subsequent creations will fail.
 							return
 						}
-						if errors.IsTimeout(err) {
-							// Pod is created but its initialization has timed out.
-							// If the initialization is successful eventually, the
-							// controller will observe the creation via the informer.
-							// If the initialization fails, or if the pod keeps
-							// uninitialized for a long time, the informer will not
-							// receive any update, and the controller will create a new
-							// pod when the expectation expires.
-							return
-						}
 					}
 					if err != nil {
 						defer utilruntime.HandleError(err)
