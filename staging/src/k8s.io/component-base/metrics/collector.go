@@ -175,6 +175,7 @@ func (bsc *BaseStableCollector) ClearState() {
 	bsc.descriptors = nil
 	bsc.registrable = nil
 	bsc.hidden = nil
+	bsc.self = nil
 }
 
 // HiddenMetrics tells the list of hidden metrics with fqName.
