@@ -70,16 +70,7 @@ func predicateMetadataEquivalent(meta1, meta2 *predicateMetadata) error {
 	for !reflect.DeepEqual(meta1.podFitsHostPortsMetadata.podPorts, meta2.podFitsHostPortsMetadata.podPorts) {
 		return fmt.Errorf("podPorts are not equal")
 	}
-	if !reflect.DeepEqual(meta1.podAffinityMetadata.topologyToMatchedAffinityTerms, meta2.podAffinityMetadata.topologyToMatchedAffinityTerms) {
-		return fmt.Errorf("topologyToMatchedAffinityTerms are not equal")
-	}
-	if !reflect.DeepEqual(meta1.podAffinityMetadata.topologyToMatchedAntiAffinityTerms, meta2.podAffinityMetadata.topologyToMatchedAntiAffinityTerms) {
-		return fmt.Errorf("topologyToMatchedAntiAffinityTerms are not equal")
-	}
-	if !reflect.DeepEqual(meta1.podAffinityMetadata.topologyToMatchedExistingAntiAffinityTerms,
-		meta2.podAffinityMetadata.topologyToMatchedExistingAntiAffinityTerms) {
-		return fmt.Errorf("topologyToMatchedExistingAntiAffinityTerms are not equal, got: %v, want: %v", meta1.podAffinityMetadata.topologyToMatchedExistingAntiAffinityTerms, meta2.podAffinityMetadata.topologyToMatchedExistingAntiAffinityTerms)
-	}
+
 	if meta1.serviceAffinityMetadata != nil {
 		sortablePods1 := sortablePods(meta1.serviceAffinityMetadata.matchingPodList)
 		sort.Sort(sortablePods1)
@@ -114,78 +105,6 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 		"zone":   "z21",
 	}
 	selector1 := map[string]string{"foo": "bar"}
-	antiAffinityFooBar := &v1.PodAntiAffinity{
-		RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-			{
-				LabelSelector: &metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
-						{
-							Key:      "foo",
-							Operator: metav1.LabelSelectorOpIn,
-							Values:   []string{"bar"},
-						},
-					},
-				},
-				TopologyKey: "region",
-			},
-		},
-	}
-	antiAffinityComplex := &v1.PodAntiAffinity{
-		RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-			{
-				LabelSelector: &metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
-						{
-							Key:      "foo",
-							Operator: metav1.LabelSelectorOpIn,
-							Values:   []string{"bar", "buzz"},
-						},
-					},
-				},
-				TopologyKey: "region",
-			},
-			{
-				LabelSelector: &metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
-						{
-							Key:      "service",
-							Operator: metav1.LabelSelectorOpNotIn,
-							Values:   []string{"bar", "security", "test"},
-						},
-					},
-				},
-				TopologyKey: "zone",
-			},
-		},
-	}
-	affinityComplex := &v1.PodAffinity{
-		RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-			{
-				LabelSelector: &metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
-						{
-							Key:      "foo",
-							Operator: metav1.LabelSelectorOpIn,
-							Values:   []string{"bar", "buzz"},
-						},
-					},
-				},
-				TopologyKey: "region",
-			},
-			{
-				LabelSelector: &metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
-						{
-							Key:      "service",
-							Operator: metav1.LabelSelectorOpNotIn,
-							Values:   []string{"bar", "security", "test"},
-						},
-					},
-				},
-				TopologyKey: "zone",
-			},
-		},
-	}
 
 	tests := []struct {
 		name         string
@@ -219,39 +138,6 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 			},
 		},
 		{
-			name: "metadata anti-affinity terms are updated correctly after adding and removing a pod",
-			pendingPod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pending", Labels: selector1},
-			},
-			existingPods: []*v1.Pod{
-				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
-					Spec: v1.PodSpec{NodeName: "nodeA"},
-				},
-				{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
-					Spec: v1.PodSpec{
-						NodeName: "nodeC",
-						Affinity: &v1.Affinity{
-							PodAntiAffinity: antiAffinityFooBar,
-						},
-					},
-				},
-			},
-			addedPod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "addedPod", Labels: selector1},
-				Spec: v1.PodSpec{
-					NodeName: "nodeB",
-					Affinity: &v1.Affinity{
-						PodAntiAffinity: antiAffinityFooBar,
-					},
-				},
-			},
-			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: label1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: label2}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: label3}},
-			},
-		},
-		{
 			name: "metadata service-affinity data are updated correctly after adding and removing a pod",
 			pendingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pending", Labels: selector1},
@@ -267,75 +153,6 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 			addedPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "addedPod", Labels: selector1},
 				Spec:       v1.PodSpec{NodeName: "nodeB"},
-			},
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector1}}},
-			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: label1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: label2}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: label3}},
-			},
-		},
-		{
-			name: "metadata anti-affinity terms and service affinity data are updated correctly after adding and removing a pod",
-			pendingPod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pending", Labels: selector1},
-			},
-			existingPods: []*v1.Pod{
-				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
-					Spec: v1.PodSpec{NodeName: "nodeA"},
-				},
-				{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
-					Spec: v1.PodSpec{
-						NodeName: "nodeC",
-						Affinity: &v1.Affinity{
-							PodAntiAffinity: antiAffinityFooBar,
-						},
-					},
-				},
-			},
-			addedPod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "addedPod", Labels: selector1},
-				Spec: v1.PodSpec{
-					NodeName: "nodeA",
-					Affinity: &v1.Affinity{
-						PodAntiAffinity: antiAffinityComplex,
-					},
-				},
-			},
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector1}}},
-			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: label1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: label2}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: label3}},
-			},
-		},
-		{
-			name: "metadata matching pod affinity and anti-affinity are updated correctly after adding and removing a pod",
-			pendingPod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pending", Labels: selector1},
-			},
-			existingPods: []*v1.Pod{
-				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
-					Spec: v1.PodSpec{NodeName: "nodeA"},
-				},
-				{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
-					Spec: v1.PodSpec{
-						NodeName: "nodeC",
-						Affinity: &v1.Affinity{
-							PodAntiAffinity: antiAffinityFooBar,
-							PodAffinity:     affinityComplex,
-						},
-					},
-				},
-			},
-			addedPod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "addedPod", Labels: selector1},
-				Spec: v1.PodSpec{
-					NodeName: "nodeA",
-					Affinity: &v1.Affinity{
-						PodAntiAffinity: antiAffinityComplex,
-					},
-				},
 			},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector1}}},
 			nodes: []*v1.Node{
@@ -385,6 +202,31 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 	}
 }
 
+func TestPodAffinityMetadata_Clone(t *testing.T) {
+	source := &PodAffinityMetadata{
+		topologyToMatchedExistingAntiAffinityTerms: topologyToMatchedTermCount{
+			{key: "name", value: "machine1"}: 1,
+			{key: "name", value: "machine2"}: 1,
+		},
+		topologyToMatchedAffinityTerms: topologyToMatchedTermCount{
+			{key: "name", value: "nodeA"}: 1,
+			{key: "name", value: "nodeC"}: 2,
+		},
+		topologyToMatchedAntiAffinityTerms: topologyToMatchedTermCount{
+			{key: "name", value: "nodeN"}: 3,
+			{key: "name", value: "nodeM"}: 1,
+		},
+	}
+
+	clone := source.Clone()
+	if clone == source {
+		t.Errorf("Clone returned the exact same object!")
+	}
+	if !reflect.DeepEqual(clone, source) {
+		t.Errorf("Copy is not equal to source!")
+	}
+}
+
 // TestPredicateMetadata_ShallowCopy tests the ShallowCopy function. It is based
 // on the idea that shallow-copy should produce an object that is deep-equal to the original
 // object.
@@ -413,20 +255,6 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 					Protocol:      "TCP",
 					HostIP:        "1.2.3.4",
 				},
-			},
-		},
-		podAffinityMetadata: &podAffinityMetadata{
-			topologyToMatchedExistingAntiAffinityTerms: topologyToMatchedTermCount{
-				{key: "name", value: "machine1"}: 1,
-				{key: "name", value: "machine2"}: 1,
-			},
-			topologyToMatchedAffinityTerms: topologyToMatchedTermCount{
-				{key: "name", value: "nodeA"}: 1,
-				{key: "name", value: "nodeC"}: 2,
-			},
-			topologyToMatchedAntiAffinityTerms: topologyToMatchedTermCount{
-				{key: "name", value: "nodeN"}: 3,
-				{key: "name", value: "nodeM"}: 1,
 			},
 		},
 		evenPodsSpreadMetadata: &evenPodsSpreadMetadata{

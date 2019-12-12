@@ -131,6 +131,9 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 			}`,
 			expectedPrioritizers: sets.NewString(),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"PreFilterPlugin": {
+					{Name: "InterPodAffinity"},
+				},
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeResourcesFit"},
@@ -208,6 +211,9 @@ kind: Policy
 `,
 			expectedPrioritizers: sets.NewString(),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"PreFilterPlugin": {
+					{Name: "InterPodAffinity"},
+				},
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeResourcesFit"},

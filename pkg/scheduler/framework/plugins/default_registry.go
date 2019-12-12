@@ -200,6 +200,7 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 	registry.RegisterPredicate(predicates.MatchInterPodAffinityPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, interpodaffinity.Name, nil)
+			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, interpodaffinity.Name, nil)
 			return
 		})
 	registry.RegisterPredicate(predicates.EvenPodsSpreadPred,

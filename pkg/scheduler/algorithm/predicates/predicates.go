@@ -1194,23 +1194,30 @@ type PodAffinityChecker struct {
 	podLister      schedulerlisters.PodLister
 }
 
+// NewPodAffinityChecker returns a PodAffinityChecker.
+func NewPodAffinityChecker(sharedLister schedulerlisters.SharedLister) *PodAffinityChecker {
+	return &PodAffinityChecker{
+		nodeInfoLister: sharedLister.NodeInfos(),
+		podLister:      sharedLister.Pods(),
+	}
+}
+
 // NewPodAffinityPredicate creates a PodAffinityChecker.
 func NewPodAffinityPredicate(nodeInfoLister schedulerlisters.NodeInfoLister, podLister schedulerlisters.PodLister) FitPredicate {
-	checker := &PodAffinityChecker{
-		nodeInfoLister: nodeInfoLister,
-		podLister:      podLister,
+	return func(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+		return false, nil, fmt.Errorf("This function should never be called")
 	}
-	return checker.InterPodAffinityMatches
 }
 
 // InterPodAffinityMatches checks if a pod can be scheduled on the specified node with pod affinity/anti-affinity configuration.
 // First return value indicates whether a pod can be scheduled on the specified node while the second return value indicates the
 // predicate failure reasons if the pod cannot be scheduled on the specified node.
-func (c *PodAffinityChecker) InterPodAffinityMatches(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+func (c *PodAffinityChecker) InterPodAffinityMatches(pod *v1.Pod, meta *PodAffinityMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
 	}
+
 	if failedPredicates, error := c.satisfiesExistingPodsAntiAffinity(pod, meta, nodeInfo); failedPredicates != nil {
 		failedPredicates := append([]PredicateFailureReason{ErrPodAffinityNotMatch}, failedPredicates)
 		return false, failedPredicates, error
@@ -1341,14 +1348,14 @@ func (c *PodAffinityChecker) getMatchingAntiAffinityTopologyPairsOfPods(pod *v1.
 
 // Checks if scheduling the pod onto this node would break any anti-affinity
 // terms indicated by the existing pods.
-func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (PredicateFailureReason, error) {
+func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta *PodAffinityMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (PredicateFailureReason, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return ErrExistingPodsAntiAffinityRulesNotMatch, fmt.Errorf("node not found")
 	}
 	var topologyMap topologyToMatchedTermCount
-	if predicateMeta, ok := meta.(*predicateMetadata); ok {
-		topologyMap = predicateMeta.podAffinityMetadata.topologyToMatchedExistingAntiAffinityTerms
+	if meta != nil {
+		topologyMap = meta.topologyToMatchedExistingAntiAffinityTerms
 	} else {
 		// Filter out pods whose nodeName is equal to nodeInfo.node.Name, but are not
 		// present in nodeInfo. Pods on other nodes pass the filter.
@@ -1416,15 +1423,15 @@ func (c *PodAffinityChecker) nodeMatchesAnyTopologyTerm(pod *v1.Pod, topologyPai
 
 // satisfiesPodsAffinityAntiAffinity checks if scheduling the pod onto this node would break any term of this pod.
 func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
-	meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo,
+	predicateMeta *PodAffinityMetadata, nodeInfo *schedulernodeinfo.NodeInfo,
 	affinity *v1.Affinity) (PredicateFailureReason, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return ErrPodAffinityRulesNotMatch, fmt.Errorf("node not found")
 	}
-	if predicateMeta, ok := meta.(*predicateMetadata); ok {
+	if predicateMeta != nil {
 		// Check all affinity terms.
-		topologyToMatchedAffinityTerms := predicateMeta.podAffinityMetadata.topologyToMatchedAffinityTerms
+		topologyToMatchedAffinityTerms := predicateMeta.topologyToMatchedAffinityTerms
 		if affinityTerms := GetPodAffinityTerms(affinity.PodAffinity); len(affinityTerms) > 0 {
 			matchExists := c.nodeMatchesAllTopologyTerms(pod, topologyToMatchedAffinityTerms, nodeInfo, affinityTerms)
 			if !matchExists {
@@ -1441,7 +1448,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 		}
 
 		// Check all anti-affinity terms.
-		topologyToMatchedAntiAffinityTerms := predicateMeta.podAffinityMetadata.topologyToMatchedAntiAffinityTerms
+		topologyToMatchedAntiAffinityTerms := predicateMeta.topologyToMatchedAntiAffinityTerms
 		if antiAffinityTerms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity); len(antiAffinityTerms) > 0 {
 			matchExists := c.nodeMatchesAnyTopologyTerm(pod, topologyToMatchedAntiAffinityTerms, nodeInfo, antiAffinityTerms)
 			if matchExists {
