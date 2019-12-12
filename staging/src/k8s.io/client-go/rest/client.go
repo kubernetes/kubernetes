@@ -44,6 +44,7 @@ type Interface interface {
 	Post() *Request
 	Put() *Request
 	Patch(pt types.PatchType) *Request
+	Apply() *Request
 	Get() *Request
 	Delete() *Request
 	APIVersion() schema.GroupVersion
@@ -179,6 +180,11 @@ func (c *RESTClient) Put() *Request {
 // Patch begins a PATCH request. Short for c.Verb("Patch").
 func (c *RESTClient) Patch(pt types.PatchType) *Request {
 	return c.Verb("PATCH").SetHeader("Content-Type", string(pt))
+}
+
+// Apply begins a PATCH request with the apply patch type.
+func (c *RESTClient) Apply() *Request {
+	return c.Patch(types.ApplyPatchType)
 }
 
 // Get begins a GET request. Short for c.Verb("GET").

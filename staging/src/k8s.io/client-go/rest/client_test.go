@@ -280,6 +280,11 @@ func TestHttpMethods(t *testing.T) {
 	if request == nil {
 		t.Errorf("Patch : Object returned should not be nil")
 	}
+
+	request = c.Apply()
+	if request == nil {
+		t.Errorf("Apply : Object returned should not be nil")
+	}
 }
 
 func TestCreateBackoffManager(t *testing.T) {
