@@ -133,7 +133,7 @@ func notImplemented(action core.Action) (bool, runtime.Object, error) {
 	return true, nil, fmt.Errorf("no reaction implemented for %s", action)
 }
 
-func addNotImplatedReaction(kubeClient *fake.Clientset) {
+func addNotImplementedReaction(kubeClient *fake.Clientset) {
 	if kubeClient == nil {
 		return
 	}
@@ -1140,7 +1140,7 @@ func TestRegisterWithApiServer(t *testing.T) {
 		}, nil
 	})
 
-	addNotImplatedReaction(kubeClient)
+	addNotImplementedReaction(kubeClient)
 
 	machineInfo := &cadvisorapi.MachineInfo{
 		MachineID:      "123",
@@ -1292,7 +1292,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		kubeClient.AddReactor("delete", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 			return true, nil, tc.deleteError
 		})
-		addNotImplatedReaction(kubeClient)
+		addNotImplementedReaction(kubeClient)
 
 		result := kubelet.tryRegisterWithAPIServer(tc.newNode)
 		require.Equal(t, tc.expectedResult, result, "test [%s]", tc.name)
@@ -1953,7 +1953,7 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 		return true, gotNode, nil
 	})
 
-	addNotImplatedReaction(kubeClient)
+	addNotImplementedReaction(kubeClient)
 
 	// Make node to be unschedulable.
 	kubelet.registerSchedulable = false
