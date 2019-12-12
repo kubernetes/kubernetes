@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -42,13 +41,11 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
@@ -1521,9 +1518,6 @@ func TestTaintPressureNodeDaemonLaunchesPod(t *testing.T) {
 			{Key: v1.TaintNodePIDPressure, Effect: v1.TaintEffectNoSchedule},
 		}
 		manager.nodeStore.Add(node)
-
-		// Enabling critical pod and taint nodes by condition feature gate should create critical pod
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintNodesByCondition, true)()
 		manager.dsStore.Add(ds)
 		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 	}
