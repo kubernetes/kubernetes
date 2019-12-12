@@ -7,6 +7,7 @@ approvers:
 - tallclair
 - vishh
 - yujuhong
+- dashpole
 reviewers:
 - sig-node-reviewers
 labels:
