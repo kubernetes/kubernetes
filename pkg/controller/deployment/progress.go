@@ -72,7 +72,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*apps.ReplicaSet, new
 			// everything but lastTransitionTime. SetDeploymentCondition already does that but
 			// it also is not updating conditions when the reason of the new condition is the
 			// same as the old. The Progressing condition is a special case because we want to
-			// update with the same reason and change just lastUpdateTime iff we notice any
+			// update with the same reason and change just lastUpdateTime if we notice any
 			// progress. That's why we handle it here.
 			if currentCond != nil {
 				if currentCond.Status == v1.ConditionTrue {

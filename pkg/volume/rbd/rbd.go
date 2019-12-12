@@ -760,7 +760,7 @@ func (r *rbdVolumeDeleter) Delete() error {
 	return r.manager.DeleteImage(r)
 }
 
-// rbd implmenets volume.Volume interface.
+// rbd implments volume.Volume interface.
 // It's embedded in Mounter/Unmounter/Deleter.
 type rbd struct {
 	volName  string

@@ -362,7 +362,7 @@ func TestReentrantRollback(t *testing.T) {
 }
 
 // TestPodDeletionEnqueuesRecreateDeployment ensures that the deletion of a pod
-// will requeue a Recreate deployment iff there is no other pod returned from the
+// will requeue a Recreate deployment if there is no other pod returned from the
 // client.
 func TestPodDeletionEnqueuesRecreateDeployment(t *testing.T) {
 	f := newFixture(t)
@@ -395,7 +395,7 @@ func TestPodDeletionEnqueuesRecreateDeployment(t *testing.T) {
 }
 
 // TestPodDeletionDoesntEnqueueRecreateDeployment ensures that the deletion of a pod
-// will not requeue a Recreate deployment iff there are other pods returned from the
+// will not requeue a Recreate deployment if there are other pods returned from the
 // client.
 func TestPodDeletionDoesntEnqueueRecreateDeployment(t *testing.T) {
 	f := newFixture(t)
@@ -431,7 +431,7 @@ func TestPodDeletionDoesntEnqueueRecreateDeployment(t *testing.T) {
 }
 
 // TestPodDeletionPartialReplicaSetOwnershipEnqueueRecreateDeployment ensures that
-// the deletion of a pod will requeue a Recreate deployment iff there is no other
+// the deletion of a pod will requeue a Recreate deployment if there is no other
 // pod returned from the client in the case where a deployment has multiple replica
 // sets, some of which have empty owner references.
 func TestPodDeletionPartialReplicaSetOwnershipEnqueueRecreateDeployment(t *testing.T) {
@@ -467,7 +467,7 @@ func TestPodDeletionPartialReplicaSetOwnershipEnqueueRecreateDeployment(t *testi
 }
 
 // TestPodDeletionPartialReplicaSetOwnershipDoesntEnqueueRecreateDeployment that the
-// deletion of a pod will not requeue a Recreate deployment iff there are other pods
+// deletion of a pod will not requeue a Recreate deployment if there are other pods
 // returned from the client in the case where a deployment has multiple replica sets,
 // some of which have empty owner references.
 func TestPodDeletionPartialReplicaSetOwnershipDoesntEnqueueRecreateDeployment(t *testing.T) {

@@ -399,7 +399,7 @@ func Test_v1_PodStatus_to_core_PodStatus(t *testing.T) {
 	// fail
 	v1FailTestInputs := []v1.PodStatus{
 		{
-			PodIP: "1.1.2.1", // fail becaue PodIP != PodIPs[0]
+			PodIP: "1.1.2.1", // fail because PodIP != PodIPs[0]
 			PodIPs: []v1.PodIP{
 				{IP: "1.1.1.1"},
 				{IP: "2.2.2.2"},

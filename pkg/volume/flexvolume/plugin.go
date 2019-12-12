@@ -292,7 +292,7 @@ func (plugin *flexVolumePlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
-// Returns true iff the given command is known to be unsupported.
+// Returns true if the given command is known to be unsupported.
 func (plugin *flexVolumePlugin) isUnsupported(command string) bool {
 	plugin.Lock()
 	defer plugin.Unlock()
