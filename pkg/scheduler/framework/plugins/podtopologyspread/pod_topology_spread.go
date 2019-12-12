@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
@@ -55,6 +56,8 @@ func (pl *PodTopologySpread) Name() string {
 
 // preFilterState computed at PreFilter and used at Filter.
 type preFilterState struct {
+	// `nil` represents the meta is not set at all (in PreFilter phase)
+	// An empty `PodTopologySpreadMetadata` object denotes it's a legit meta and is set in PreFilter phase.
 	meta *predicates.PodTopologySpreadMetadata
 }
 
@@ -118,11 +121,9 @@ func (pl *PodTopologySpread) RemovePod(ctx context.Context, cycleState *framewor
 func getPodTopologySpreadMetadata(cycleState *framework.CycleState) (*predicates.PodTopologySpreadMetadata, error) {
 	c, err := cycleState.Read(preFilterStateKey)
 	if err != nil {
-		return nil, err
-	}
-
-	// It's possible that meta is set to nil intentionally.
-	if c == nil {
+		// The metadata wasn't pre-computed in prefilter. We ignore the error for now since
+		// we are able to handle that by computing it again (e.g. in Filter()).
+		klog.Error(err)
 		return nil, nil
 	}
 
