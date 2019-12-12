@@ -18,10 +18,11 @@ package e2e_node
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -110,7 +111,7 @@ func configureTopologyManagerInKubelet(f *framework.Framework, policy string) {
 		newCfg.KubeReserved["cpu"] = "200m"
 	}
 	// Dump the config -- debug
-	framework.Logf( "New kublet config is %s", *newCfg)
+	framework.Logf("New kublet config is %s", *newCfg)
 
 	// Update the Kubelet configuration.
 	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
@@ -360,7 +361,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 		for _, policy := range policies {
 			// Configure Topology Manager
 			ginkgo.By("by configuring Topology Manager policy to xxx")
-			framework.Logf( "Configuring topology Manager policy to %s", policy)
+			framework.Logf("Configuring topology Manager policy to %s", policy)
 			configureTopologyManagerInKubelet(f, policy)
 			// Run the tests
 			runTopologyManagerSuiteTests(f)
@@ -372,7 +373,7 @@ func runTopologyManagerTests(f *framework.Framework) {
 		time.Sleep(5 * time.Minute)
 
 		// Delete state file to allow repeated runs
-	    deleteStateFile()
+		deleteStateFile()
 	})
 }
 
