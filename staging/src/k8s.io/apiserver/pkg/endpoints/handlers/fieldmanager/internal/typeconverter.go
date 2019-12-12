@@ -102,7 +102,7 @@ func (c *typeConverter) TypedToObject(value *typed.TypedValue) (runtime.Object, 
 
 func valueToObject(val *value.Value) (runtime.Object, error) {
 	v := *val
-	vu :=  v.Interface()
+	vu := v.Interface()
 	switch o := vu.(type) {
 	case map[string]interface{}:
 		return &unstructured.Unstructured{Object: o}, nil

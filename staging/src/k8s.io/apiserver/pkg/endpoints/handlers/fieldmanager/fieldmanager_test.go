@@ -57,7 +57,7 @@ var fakeSchema = prototesting.Fake{
 }
 
 // TODO(jpbetz): Is there a pre-existing converter for this sort of thing?
-type fakeObjectConvertor struct{
+type fakeObjectConvertor struct {
 	converter  merge.Converter
 	apiVersion fieldpath.APIVersion
 }
@@ -374,7 +374,7 @@ func BenchmarkNewObject(b *testing.B) {
 	}
 
 	scheme := runtime.NewScheme()
-	if err :=corev1.AddToScheme(scheme); err != nil {
+	if err := corev1.AddToScheme(scheme); err != nil {
 		b.Fatalf("Failed to add to scheme: %v", err)
 	}
 
@@ -450,7 +450,7 @@ func BenchmarkRepeatedUpdate(b *testing.B) {
 		return u
 	}
 
-	tests := []struct{
+	tests := []struct {
 		name string
 		objs []runtime.Object
 	}{
@@ -521,7 +521,7 @@ func BenchmarkConvertObjectToTyped(b *testing.B) {
 	}
 
 	scheme := runtime.NewScheme()
-	if err :=corev1.AddToScheme(scheme); err != nil {
+	if err := corev1.AddToScheme(scheme); err != nil {
 		b.Fatalf("Failed to add to scheme: %v", err)
 	}
 

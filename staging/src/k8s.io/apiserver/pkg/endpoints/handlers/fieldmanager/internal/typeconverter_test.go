@@ -26,13 +26,13 @@ import (
 	"sigs.k8s.io/structured-merge-diff/typed"
 	"sigs.k8s.io/yaml"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
-	corev1 "k8s.io/api/core/v1"
-	appsv1 "k8s.io/api/apps/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 
 	"k8s.io/kube-openapi/pkg/util/proto"
 	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
@@ -63,12 +63,12 @@ func TestTypeConverter(t *testing.T) {
 
 	testCases := []struct {
 		name string
-		gvk schema.GroupVersionKind
+		gvk  schema.GroupVersionKind
 		yaml string
 	}{
 		{
 			name: "apps/v1.Deployment",
-			gvk: appsv1.SchemeGroupVersion.WithKind("Deployment"),
+			gvk:  appsv1.SchemeGroupVersion.WithKind("Deployment"),
 			yaml: `
 apiVersion: apps/v1
 kind: Deployment
@@ -91,7 +91,7 @@ spec:
 `,
 		}, {
 			name: "extensions/v1beta1.Deployment",
-			gvk: extensionsv1beta1.SchemeGroupVersion.WithKind("Deployment"),
+			gvk:  extensionsv1beta1.SchemeGroupVersion.WithKind("Deployment"),
 			yaml: `
 apiVersion: extensions/v1beta1
 kind: Deployment
@@ -114,7 +114,7 @@ spec:
 `,
 		}, {
 			name: "v1.Pod",
-			gvk: corev1.SchemeGroupVersion.WithKind("Pod"),
+			gvk:  corev1.SchemeGroupVersion.WithKind("Pod"),
 			yaml: `
 apiVersion: v1
 kind: Pod
@@ -167,13 +167,13 @@ Final object:
 
 func testObjectToTypedReflect(t *testing.T, tc internal.TypeConverter, y string, gvk schema.GroupVersionKind) {
 	scheme := runtime.NewScheme()
-	if err :=corev1.AddToScheme(scheme); err != nil {
+	if err := corev1.AddToScheme(scheme); err != nil {
 		t.Fatalf("Failed to add to scheme: %v", err)
 	}
-	if err :=appsv1.AddToScheme(scheme); err != nil {
+	if err := appsv1.AddToScheme(scheme); err != nil {
 		t.Fatalf("Failed to add to scheme: %v", err)
 	}
-	if err :=extensionsv1beta1.AddToScheme(scheme); err != nil {
+	if err := extensionsv1beta1.AddToScheme(scheme); err != nil {
 		t.Fatalf("Failed to add to scheme: %v", err)
 	}
 
@@ -199,7 +199,7 @@ func testObjectToTypedReflect(t *testing.T, tc internal.TypeConverter, y string,
 	if err != nil {
 		t.Fatalf("Failed to marshal object: %v", err)
 	}
-	newTyped, err:= scheme.New(gvk)
+	newTyped, err := scheme.New(gvk)
 	if err != nil {
 		t.Fatalf("Failed to construct object: %v", err)
 	}
