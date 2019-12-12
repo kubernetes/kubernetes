@@ -568,7 +568,7 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 // queuedPodStore: pods queued before processing.
 // cache: scheduler cache that might contain assumed pods.
 func setupTestSchedulerWithOnePodOnNode(t *testing.T, queuedPodStore *clientcache.FIFO, scache internalcache.Cache,
-	informerFactory informers.SharedInformerFactory, stop chan struct{}, f st.RegisterFilterPluginFunc, pod *v1.Pod, node *v1.Node) (*Scheduler, chan *v1.Binding, chan error) {
+	informerFactory informers.SharedInformerFactory, stop chan struct{}, f st.RegisterPluginFunc, pod *v1.Pod, node *v1.Node) (*Scheduler, chan *v1.Binding, chan error) {
 
 	scheduler, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, f, nil)
 
@@ -679,7 +679,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 
 // queuedPodStore: pods queued before processing.
 // scache: scheduler cache that might contain assumed pods.
-func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, f st.RegisterFilterPluginFunc, recorder events.EventRecorder) (*Scheduler, chan *v1.Binding, chan error) {
+func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, f st.RegisterPluginFunc, recorder events.EventRecorder) (*Scheduler, chan *v1.Binding, chan error) {
 	registry := framework.Registry{}
 	plugins := &schedulerapi.Plugins{
 		Filter: &schedulerapi.PluginSet{},
@@ -736,7 +736,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 	return sched, bindingChan, errChan
 }
 
-func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, f st.RegisterFilterPluginFunc, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
+func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, f st.RegisterPluginFunc, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
 	registry := framework.Registry{}
 	plugins := &schedulerapi.Plugins{
 		Filter: &schedulerapi.PluginSet{},

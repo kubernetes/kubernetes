@@ -1191,6 +1191,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				features.EvenPodsSpread: true,
 			},
 			wantPlugins: map[string][]config.Plugin{
+				"PreFilterPlugin": {
+					{Name: "PodTopologySpread"},
+				},
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "TaintToleration"},
