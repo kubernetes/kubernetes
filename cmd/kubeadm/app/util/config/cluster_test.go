@@ -50,8 +50,8 @@ kubernetesVersion: ` + k8sVersionString + `
 	"ClusterStatus_v1beta1": []byte(`
 apiVersion: kubeadm.k8s.io/v1beta1
 kind: ClusterStatus
-apiEndpoints: 
-  ` + nodeName + `: 
+apiEndpoints:
+  ` + nodeName + `:
     advertiseAddress: 1.2.3.4
     bindPort: 1234
 `),
@@ -71,8 +71,8 @@ kubernetesVersion: ` + k8sVersionString + `
 	"ClusterStatus_v1beta2": []byte(`
 apiVersion: kubeadm.k8s.io/v1beta2
 kind: ClusterStatus
-apiEndpoints: 
-  ` + nodeName + `: 
+apiEndpoints:
+  ` + nodeName + `:
     advertiseAddress: 1.2.3.4
     bindPort: 1234
 `),
@@ -147,6 +147,44 @@ users:
   user:
       client-certificate: kubelet.pem
 `),
+	"configWithInvalidContext": []byte(`
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://10.0.2.15:6443
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: system:node:mynode
+  name: system:node:mynode@kubernetes
+current-context: invalidContext
+kind: Config
+preferences: {}
+users:
+- name: system:node:mynode
+  user:
+      client-certificate: kubelet.pem
+`),
+	"configWithInvalidUser": []byte(`
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://10.0.2.15:6443
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: invalidUser
+  name: system:node:mynode@kubernetes
+current-context: system:node:mynode@kubernetes
+kind: Config
+preferences: {}
+users:
+- name: system:node:mynode
+  user:
+      client-certificate: kubelet.pem
+`),
 }
 
 var pemFiles = map[string][]byte{
@@ -202,6 +240,16 @@ func TestGetNodeNameFromKubeletConfig(t *testing.T) {
 		{
 			name:              "invalid - without embedded or linked X509Cert",
 			kubeconfigContent: kubeletConfFiles["withoutX509Cert"],
+			expectedError:     true,
+		},
+		{
+			name:              "invalid - the current context is invalid",
+			kubeconfigContent: kubeletConfFiles["configWithInvalidContext"],
+			expectedError:     true,
+		},
+		{
+			name:              "invalid - the user of the current context is invalid",
+			kubeconfigContent: kubeletConfFiles["configWithInvalidUser"],
 			expectedError:     true,
 		},
 	}
