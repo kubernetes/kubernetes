@@ -262,7 +262,7 @@ func (c *csiDriverClient) NodePublishVolume(
 	if err != nil && !isFinalError(err) {
 		return volumetypes.NewUncertainProgressError(err.Error())
 	}
-	return nil
+	return err
 }
 
 func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, volumeID, volumePath string, newSize resource.Quantity) (resource.Quantity, error) {

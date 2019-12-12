@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
@@ -490,6 +490,7 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 
 	// If pod exists, reset remountRequired value
 	podObj.remountRequired = false
+	podObj.volumeMountStateForPod = markVolumeOpts.VolumeMountState
 	asw.attachedVolumes[volumeName].mountedPods[podName] = podObj
 	return nil
 }

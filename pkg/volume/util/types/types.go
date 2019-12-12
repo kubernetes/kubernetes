@@ -82,7 +82,7 @@ func NewUncertainProgressError(msg string) *UncertainProgressError {
 }
 
 // IsOperationFinishedError checks if given error is of type that indicates
-// operation is finished with an error.
+// operation is finished with a FINAL error.
 func IsOperationFinishedError(err error) bool {
 	if _, ok := err.(*UncertainProgressError); ok {
 		return false
