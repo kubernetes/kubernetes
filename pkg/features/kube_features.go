@@ -119,22 +119,6 @@ const (
 	// Allows all containers in a pod to share a process namespace.
 	PodShareProcessNamespace featuregate.Feature = "PodShareProcessNamespace"
 
-	// owner: @bsalamat
-	// alpha: v1.8
-	// beta: v1.11
-	// GA: v1.14
-	//
-	// Add priority to pods. Priority affects scheduling and preemption of pods.
-	PodPriority featuregate.Feature = "PodPriority"
-
-	// owner: @k82cn
-	// beta: v1.12
-	// GA: v1.17
-	//
-	// Taint nodes based on their condition status for 'NetworkUnavailable',
-	// 'MemoryPressure', 'PIDPressure' and 'DiskPressure'.
-	TaintNodesByCondition featuregate.Feature = "TaintNodesByCondition"
-
 	// owner: @sjenning
 	// alpha: v1.11
 	//
@@ -236,13 +220,6 @@ const (
 	// Enable Hyper-V containers on Windows
 	HyperVContainer featuregate.Feature = "HyperVContainer"
 
-	// owner: @k82cn
-	// beta: v1.12
-	// GA: v1.17
-	//
-	// Schedule DaemonSet Pods by default scheduler instead of DaemonSet controller
-	ScheduleDaemonSetPods featuregate.Feature = "ScheduleDaemonSetPods"
-
 	// owner: @mikedanese
 	// beta: v1.12
 	//
@@ -307,13 +284,6 @@ const (
 	// Allow subpath environment variable substitution
 	// Only applicable if the VolumeSubpath feature is also enabled
 	VolumeSubpathEnvExpansion featuregate.Feature = "VolumeSubpathEnvExpansion"
-
-	// owner: @vikaschoudhary16
-	// beta: v1.12
-	// ga: v1.17
-	//
-	// Enable resource quota scope selectors
-	ResourceQuotaScopeSelectors featuregate.Feature = "ResourceQuotaScopeSelectors"
 
 	// owner: @vladimirvivien
 	// alpha: v1.11
@@ -569,8 +539,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	Sysctls:                        {Default: true, PreRelease: featuregate.Beta},
 	EphemeralContainers:            {Default: false, PreRelease: featuregate.Alpha},
 	PodShareProcessNamespace:       {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
-	PodPriority:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.18
-	TaintNodesByCondition:          {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.18
 	QOSReserved:                    {Default: false, PreRelease: featuregate.Alpha},
 	ExpandPersistentVolumes:        {Default: true, PreRelease: featuregate.Beta},
 	ExpandInUsePersistentVolumes:   {Default: true, PreRelease: featuregate.Beta},
@@ -590,7 +558,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SupportPodPidsLimit:            {Default: true, PreRelease: featuregate.Beta},
 	SupportNodePidsLimit:           {Default: true, PreRelease: featuregate.Beta},
 	HyperVContainer:                {Default: false, PreRelease: featuregate.Alpha},
-	ScheduleDaemonSetPods:          {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.18
 	TokenRequest:                   {Default: true, PreRelease: featuregate.Beta},
 	TokenRequestProjection:         {Default: true, PreRelease: featuregate.Beta},
 	BoundServiceAccountTokenVolume: {Default: false, PreRelease: featuregate.Alpha},
@@ -610,7 +577,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	VolumeSubpath:                  {Default: true, PreRelease: featuregate.GA},
 	BalanceAttachedNodeVolumes:     {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSubpathEnvExpansion:      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19,
-	ResourceQuotaScopeSelectors:    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.18
 	CSIBlockVolume:                 {Default: true, PreRelease: featuregate.Beta},
 	CSIInlineVolume:                {Default: true, PreRelease: featuregate.Beta},
 	RuntimeClass:                   {Default: true, PreRelease: featuregate.Beta},
