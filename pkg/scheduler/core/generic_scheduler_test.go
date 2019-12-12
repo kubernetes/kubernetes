@@ -371,19 +371,17 @@ func TestGenericScheduler(t *testing.T) {
 
 	tests := []struct {
 		name                     string
-		registerFilterPlugins    []st.RegisterFilterPluginFunc
-		registerScorePlugins     []st.RegisterScorePluginFunc
+		registerPlugins          []st.RegisterPluginFunc
 		alwaysCheckAllPredicates bool
 		nodes                    []string
 		pvcs                     []v1.PersistentVolumeClaim
 		pod                      *v1.Pod
 		pods                     []*v1.Pod
-		buildPredMeta            bool // build predicates metadata or not
 		expectedHosts            sets.String
 		wErr                     error
 	}{
 		{
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("FalseFilter", NewFalseFilterPlugin),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -400,7 +398,7 @@ func TestGenericScheduler(t *testing.T) {
 			},
 		},
 		{
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
 			},
 			nodes:         []string{"machine1", "machine2"},
@@ -411,7 +409,7 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			// Fits on a machine where the pod ID matches the machine name
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("MatchFilter", NewMatchFilterPlugin),
 			},
 			nodes:         []string{"machine1", "machine2"},
@@ -421,10 +419,8 @@ func TestGenericScheduler(t *testing.T) {
 			wErr:          nil,
 		},
 		{
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
-			},
-			registerScorePlugins: []st.RegisterScorePluginFunc{
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 			},
 			nodes:         []string{"3", "2", "1"},
@@ -434,10 +430,8 @@ func TestGenericScheduler(t *testing.T) {
 			wErr:          nil,
 		},
 		{
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("MatchFilter", NewMatchFilterPlugin),
-			},
-			registerScorePlugins: []st.RegisterScorePluginFunc{
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 			},
 			nodes:         []string{"3", "2", "1"},
@@ -447,10 +441,8 @@ func TestGenericScheduler(t *testing.T) {
 			wErr:          nil,
 		},
 		{
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
-			},
-			registerScorePlugins: []st.RegisterScorePluginFunc{
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 				st.RegisterScorePlugin("ReverseNumericMap", newReverseNumericMapPlugin(), 2),
 			},
@@ -461,11 +453,9 @@ func TestGenericScheduler(t *testing.T) {
 			wErr:          nil,
 		},
 		{
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
 				st.RegisterFilterPlugin("FalseFilter", NewFalseFilterPlugin),
-			},
-			registerScorePlugins: []st.RegisterScorePluginFunc{
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 			},
 			nodes: []string{"3", "2", "1"},
@@ -483,11 +473,9 @@ func TestGenericScheduler(t *testing.T) {
 			},
 		},
 		{
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("NoPodsFilter", NewNoPodsFilterPlugin),
 				st.RegisterFilterPlugin("MatchFilter", NewMatchFilterPlugin),
-			},
-			registerScorePlugins: []st.RegisterScorePluginFunc{
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 			},
 			pods: []*v1.Pod{
@@ -516,7 +504,7 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			// Pod with existing PVC
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -541,7 +529,7 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			// Pod with non existing PVC
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -564,7 +552,7 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			// Pod with deleting PVC
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -587,10 +575,8 @@ func TestGenericScheduler(t *testing.T) {
 			wErr: fmt.Errorf("persistentvolumeclaim \"existingPVC\" is being deleted"),
 		},
 		{
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
-			},
-			registerScorePlugins: []st.RegisterScorePluginFunc{
 				st.RegisterScorePlugin("FalseMap", newFalseMapPlugin(), 1),
 				st.RegisterScorePlugin("TrueMap", newTrueMapPlugin(), 2),
 			},
@@ -601,8 +587,14 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			name: "test even pods spread predicate - 2 nodes with maxskew=1",
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
-				st.RegisterFilterPlugin(podtopologyspread.Name, podtopologyspread.New),
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterPluginAsExtensions(
+					podtopologyspread.Name,
+					1,
+					podtopologyspread.New,
+					"PreFilter",
+					"Filter",
+				),
 			},
 			nodes: []string{"machine1", "machine2"},
 			pod: &v1.Pod{
@@ -636,14 +628,19 @@ func TestGenericScheduler(t *testing.T) {
 					},
 				},
 			},
-			buildPredMeta: true,
 			expectedHosts: sets.NewString("machine2"),
 			wErr:          nil,
 		},
 		{
 			name: "test even pods spread predicate - 3 nodes with maxskew=2",
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
-				st.RegisterFilterPlugin(podtopologyspread.Name, podtopologyspread.New),
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterPluginAsExtensions(
+					podtopologyspread.Name,
+					1,
+					podtopologyspread.New,
+					"PreFilter",
+					"Filter",
+				),
 			},
 			nodes: []string{"machine1", "machine2", "machine3"},
 			pod: &v1.Pod{
@@ -695,19 +692,16 @@ func TestGenericScheduler(t *testing.T) {
 					},
 				},
 			},
-			buildPredMeta: true,
 			expectedHosts: sets.NewString("machine2", "machine3"),
 			wErr:          nil,
 		},
 		{
 			name: "test with filter plugin returning Unschedulable status",
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin(
 					"FakeFilter",
 					NewFakeFilterPlugin(map[string]framework.Code{"3": framework.Unschedulable}),
 				),
-			},
-			registerScorePlugins: []st.RegisterScorePluginFunc{
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 			},
 			nodes:         []string{"3"},
@@ -724,13 +718,11 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			name: "test with filter plugin returning UnschedulableAndUnresolvable status",
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin(
 					"FakeFilter",
 					NewFakeFilterPlugin(map[string]framework.Code{"3": framework.UnschedulableAndUnresolvable}),
 				),
-			},
-			registerScorePlugins: []st.RegisterScorePluginFunc{
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 			},
 			nodes:         []string{"3"},
@@ -747,13 +739,11 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			name: "test with partial failed filter plugin",
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin(
 					"FakeFilter",
 					NewFakeFilterPlugin(map[string]framework.Code{"1": framework.Unschedulable}),
 				),
-			},
-			registerScorePlugins: []st.RegisterScorePluginFunc{
 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
 			},
 			nodes:         []string{"1", "2"},
@@ -767,44 +757,42 @@ func TestGenericScheduler(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			registry := framework.Registry{}
-			plugins := &schedulerapi.Plugins{
-				Filter: &schedulerapi.PluginSet{},
-				Score:  &schedulerapi.PluginSet{},
-			}
-			var pluginConfigs []schedulerapi.PluginConfig
-			for _, f := range test.registerFilterPlugins {
-				f(&registry, plugins, pluginConfigs)
-			}
-			for _, f := range test.registerScorePlugins {
-				f(&registry, plugins, pluginConfigs)
-			}
-			fwk, _ := framework.NewFramework(registry, plugins, pluginConfigs)
-
 			cache := internalcache.New(time.Duration(0), wait.NeverStop)
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
 			}
+			var nodes []*v1.Node
 			for _, name := range test.nodes {
-				cache.AddNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"hostname": name}}})
+				node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"hostname": name}}}
+				nodes = append(nodes, node)
+				cache.AddNode(node)
 			}
+
+			registry := framework.Registry{}
+			plugins := &schedulerapi.Plugins{
+				PreFilter: &schedulerapi.PluginSet{},
+				Filter:    &schedulerapi.PluginSet{},
+				Score:     &schedulerapi.PluginSet{},
+			}
+			var pluginConfigs []schedulerapi.PluginConfig
+			for _, f := range test.registerPlugins {
+				f(&registry, plugins, pluginConfigs)
+			}
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
+			fwk, _ := framework.NewFramework(registry, plugins, pluginConfigs, framework.WithSnapshotSharedLister(snapshot))
+
 			pvcs := []v1.PersistentVolumeClaim{}
 			pvcs = append(pvcs, test.pvcs...)
-
 			pvcLister := fakelisters.PersistentVolumeClaimLister(pvcs)
 
-			predMetaProducer := algorithmpredicates.EmptyMetadataProducer
-			if test.buildPredMeta {
-				f := &algorithmpredicates.MetadataProducerFactory{}
-				predMetaProducer = f.GetPredicateMetadata
-			}
 			scheduler := NewGenericScheduler(
 				cache,
 				internalqueue.NewSchedulingQueue(nil),
 				nil,
-				predMetaProducer,
+				algorithmpredicates.EmptyMetadataProducer,
+				// test.prioritizers,
 				priorities.EmptyMetadataProducer,
-				emptySnapshot,
+				snapshot,
 				fwk,
 				[]algorithm.SchedulerExtender{},
 				nil,
@@ -829,7 +817,7 @@ func TestGenericScheduler(t *testing.T) {
 }
 
 // makeScheduler makes a simple genericScheduler for testing.
-func makeScheduler(nodes []*v1.Node, fns ...st.RegisterFilterPluginFunc) *genericScheduler {
+func makeScheduler(nodes []*v1.Node, fns ...st.RegisterPluginFunc) *genericScheduler {
 	cache := internalcache.New(time.Duration(0), wait.NeverStop)
 	for _, n := range nodes {
 		cache.AddNode(n)
@@ -1151,7 +1139,7 @@ func TestZeroRequest(t *testing.T) {
 				Score:  &schedulerapi.PluginSet{},
 			}
 			var pluginConfigs []schedulerapi.PluginConfig
-			pluginRegistrations := []st.RegisterScorePluginFunc{
+			pluginRegistrations := []st.RegisterPluginFunc{
 				st.RegisterScorePlugin(noderesources.LeastAllocatedName, noderesources.NewLeastAllocated, 1),
 				st.RegisterScorePlugin(noderesources.BalancedAllocationName, noderesources.NewBalancedAllocation, 1),
 				st.RegisterScorePlugin(defaultpodtopologyspread.Name, defaultpodtopologyspread.New, 1),
@@ -1314,7 +1302,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 
 	tests := []struct {
 		name                    string
-		registerFilterPlugins   []st.RegisterFilterPluginFunc
+		registerPlugins         []st.RegisterPluginFunc
 		nodes                   []string
 		pod                     *v1.Pod
 		pods                    []*v1.Pod
@@ -1325,7 +1313,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 	}{
 		{
 			name: "a pod that does not fit on any machine",
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("FalseFilter", NewFalseFilterPlugin),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1338,7 +1326,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		},
 		{
 			name: "a pod that fits with no preemption",
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1351,7 +1339,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		},
 		{
 			name: "a pod that fits on one machine with no preemption",
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("MatchFilter", NewMatchFilterPlugin),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1364,7 +1352,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		},
 		{
 			name: "a pod that fits on both machines when lower priority pods are preempted",
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1377,7 +1365,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		},
 		{
 			name: "a pod that would fit on the machines, but other pods running are higher priority",
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1390,7 +1378,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		},
 		{
 			name: "medium priority pod is preempted, but lower priority one stays as it is small",
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1404,7 +1392,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		},
 		{
 			name: "mixed priority pods are preempted",
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1420,7 +1408,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		},
 		{
 			name: "mixed priority pods are preempted, pick later StartTime one when priorities are equal",
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1436,7 +1424,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		},
 		{
 			name: "pod with anti-affinity is preempted",
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
 				st.RegisterFilterPlugin(interpodaffinity.Name, interpodaffinity.New),
 			},
@@ -1471,8 +1459,14 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		},
 		{
 			name: "preemption to resolve even pods spread FitError",
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
-				st.RegisterFilterPlugin(podtopologyspread.Name, podtopologyspread.New),
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterPluginAsExtensions(
+					podtopologyspread.Name,
+					1,
+					podtopologyspread.New,
+					"PreFilter",
+					"Filter",
+				),
 			},
 			nodes: []string{"node-a/zone1", "node-b/zone1", "node-x/zone2"},
 			pod: &v1.Pod{
@@ -1547,7 +1541,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		},
 		{
 			name: "get Unschedulable in the preemption phase when the filter plugins filtering the nodes",
-			registerFilterPlugins: []st.RegisterFilterPluginFunc{
+			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
 			},
 			nodes: []string{"machine1", "machine2"},
@@ -1591,7 +1585,8 @@ func TestSelectNodesForPreemption(t *testing.T) {
 
 			registry := framework.Registry{}
 			plugins := &schedulerapi.Plugins{
-				Filter: &schedulerapi.PluginSet{},
+				PreFilter: &schedulerapi.PluginSet{},
+				Filter:    &schedulerapi.PluginSet{},
 			}
 			var pluginConfigs []schedulerapi.PluginConfig
 			// For each test, prepend a FakeFilterPlugin.
@@ -1605,7 +1600,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			)
 			registerFakeFilterFunc(&registry, plugins, pluginConfigs)
 			// Next, register other filter plugins defined in test struct.
-			for _, f := range test.registerFilterPlugins {
+			for _, f := range test.registerPlugins {
 				f(&registry, plugins, pluginConfigs)
 			}
 			// Use a real snapshot since it's needed in some Filter Plugin (e.g., PodAffinity)
@@ -1639,6 +1634,11 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			newnode.ObjectMeta.Labels = map[string]string{"hostname": "newnode"}
 			nodes = append(nodes, newnode)
 			state := framework.NewCycleState()
+			// Some tests rely on PreFilter plugin to compute its CycleState.
+			preFilterStatus := fwk.RunPreFilterPlugins(context.Background(), state, test.pod)
+			if !preFilterStatus.IsSuccess() {
+				t.Errorf("Unexpected preFilterStatus: %v", preFilterStatus)
+			}
 			nodeToPods, err := g.selectNodesForPreemption(context.Background(), state, test.pod, nodes, nil)
 			if err != nil {
 				t.Error(err)
@@ -1660,7 +1660,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
 	tests := []struct {
 		name                 string
-		registerFilterPlugin st.RegisterFilterPluginFunc
+		registerFilterPlugin st.RegisterPluginFunc
 		nodes                []string
 		pod                  *v1.Pod
 		pods                 []*v1.Pod
@@ -2052,8 +2052,7 @@ func TestPreempt(t *testing.T) {
 		extenders             []*FakeExtender
 		failedNodeToStatusMap framework.NodeToStatusMap
 		nodeNames             []string
-		registerFilterPlugin  st.RegisterFilterPluginFunc
-		buildPredMeta         bool
+		registerPlugin        st.RegisterPluginFunc
 		expectedNode          string
 		expectedPods          []string // list of preempted pods
 	}{
@@ -2070,9 +2069,9 @@ func TestPreempt(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "m2.1", UID: types.UID("m2.1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority, NodeName: "machine2"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "m3.1", UID: types.UID("m3.1")}, Spec: v1.PodSpec{Containers: mediumContainers, Priority: &midPriority, NodeName: "machine3"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
 			},
-			registerFilterPlugin: st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
-			expectedNode:         "machine1",
-			expectedPods:         []string{"m1.1", "m1.2"},
+			registerPlugin: st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+			expectedNode:   "machine1",
+			expectedPods:   []string{"m1.1", "m1.2"},
 		},
 		{
 			name: "One node doesn't need any preemption",
@@ -2087,9 +2086,9 @@ func TestPreempt(t *testing.T) {
 
 				{ObjectMeta: metav1.ObjectMeta{Name: "m2.1", UID: types.UID("m2.1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority, NodeName: "machine2"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
 			},
-			registerFilterPlugin: st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
-			expectedNode:         "machine3",
-			expectedPods:         []string{},
+			registerPlugin: st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+			expectedNode:   "machine3",
+			expectedPods:   []string{},
 		},
 		{
 			name: "preemption for topology spread constraints",
@@ -2162,11 +2161,16 @@ func TestPreempt(t *testing.T) {
 				"node-b": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrTopologySpreadConstraintsNotMatch.GetReason()),
 				"node-x": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrTopologySpreadConstraintsNotMatch.GetReason()),
 			},
-			buildPredMeta:        true,
-			nodeNames:            []string{"node-a/zone1", "node-b/zone1", "node-x/zone2"},
-			registerFilterPlugin: st.RegisterFilterPlugin(podtopologyspread.Name, podtopologyspread.New),
-			expectedNode:         "node-b",
-			expectedPods:         []string{"pod-b1"},
+			nodeNames: []string{"node-a/zone1", "node-b/zone1", "node-x/zone2"},
+			registerPlugin: st.RegisterPluginAsExtensions(
+				podtopologyspread.Name,
+				1,
+				podtopologyspread.New,
+				"PreFilter",
+				"Filter",
+			),
+			expectedNode: "node-b",
+			expectedPods: []string{"pod-b1"},
 		},
 		{
 			name: "Scheduler extenders allow only machine1, otherwise machine3 would have been chosen",
@@ -2189,9 +2193,9 @@ func TestPreempt(t *testing.T) {
 					predicates: []fitPredicate{machine1PredicateExtender},
 				},
 			},
-			registerFilterPlugin: st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
-			expectedNode:         "machine1",
-			expectedPods:         []string{"m1.1", "m1.2"},
+			registerPlugin: st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+			expectedNode:   "machine1",
+			expectedPods:   []string{"m1.1", "m1.2"},
 		},
 		{
 			name: "Scheduler extenders do not allow any preemption",
@@ -2211,9 +2215,9 @@ func TestPreempt(t *testing.T) {
 					predicates: []fitPredicate{falsePredicateExtender},
 				},
 			},
-			registerFilterPlugin: st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
-			expectedNode:         "",
-			expectedPods:         []string{},
+			registerPlugin: st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+			expectedNode:   "",
+			expectedPods:   []string{},
 		},
 		{
 			name: "One scheduler extender allows only machine1, the other returns error but ignorable. Only machine1 would be chosen",
@@ -2237,9 +2241,9 @@ func TestPreempt(t *testing.T) {
 					predicates: []fitPredicate{machine1PredicateExtender},
 				},
 			},
-			registerFilterPlugin: st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
-			expectedNode:         "machine1",
-			expectedPods:         []string{"m1.1", "m1.2"},
+			registerPlugin: st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+			expectedNode:   "machine1",
+			expectedPods:   []string{"m1.1", "m1.2"},
 		},
 		{
 			name: "One scheduler extender allows only machine1, but it is not interested in given pod, otherwise machine1 would have been chosen",
@@ -2263,9 +2267,9 @@ func TestPreempt(t *testing.T) {
 					predicates: []fitPredicate{truePredicateExtender},
 				},
 			},
-			registerFilterPlugin: st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
-			expectedNode:         "machine3",
-			expectedPods:         []string{},
+			registerPlugin: st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+			expectedNode:   "machine3",
+			expectedPods:   []string{},
 		},
 		{
 			name: "no preempting in pod",
@@ -2280,9 +2284,9 @@ func TestPreempt(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "m2.1", UID: types.UID("m2.1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority, NodeName: "machine2"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "m3.1", UID: types.UID("m3.1")}, Spec: v1.PodSpec{Containers: mediumContainers, Priority: &midPriority, NodeName: "machine3"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
 			},
-			registerFilterPlugin: st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
-			expectedNode:         "",
-			expectedPods:         nil,
+			registerPlugin: st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+			expectedNode:   "",
+			expectedPods:   nil,
 		},
 		{
 			name: "PreemptionPolicy is nil",
@@ -2297,9 +2301,9 @@ func TestPreempt(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "m2.1", UID: types.UID("m2.1")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority, NodeName: "machine2"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "m3.1", UID: types.UID("m3.1")}, Spec: v1.PodSpec{Containers: mediumContainers, Priority: &midPriority, NodeName: "machine3"}, Status: v1.PodStatus{Phase: v1.PodRunning}},
 			},
-			registerFilterPlugin: st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
-			expectedNode:         "machine1",
-			expectedPods:         []string{"m1.1", "m1.2"},
+			registerPlugin: st.RegisterFilterPlugin(noderesources.FitName, noderesources.NewFit),
+			expectedNode:   "machine1",
+			expectedPods:   []string{"m1.1", "m1.2"},
 		},
 	}
 
@@ -2319,6 +2323,7 @@ func TestPreempt(t *testing.T) {
 			if len(test.nodeNames) != 0 {
 				nodeNames = test.nodeNames
 			}
+			var nodes []*v1.Node
 			for i, name := range nodeNames {
 				node := makeNode(name, 1000*5, priorityutil.DefaultMemoryRequest*5)
 				// if possible, split node name by '/' to form labels in a format of
@@ -2329,6 +2334,7 @@ func TestPreempt(t *testing.T) {
 				}
 				node.Name = node.ObjectMeta.Labels["hostname"]
 				cache.AddNode(node)
+				nodes = append(nodes, node)
 				nodeNames[i] = node.Name
 
 				// Set nodeInfo to extenders to mock extenders' cache for preemption.
@@ -2336,33 +2342,30 @@ func TestPreempt(t *testing.T) {
 				cachedNodeInfo.SetNode(node)
 				cachedNodeInfoMap[node.Name] = cachedNodeInfo
 			}
-			extenders := []algorithm.SchedulerExtender{}
+			var extenders []algorithm.SchedulerExtender
 			for _, extender := range test.extenders {
 				// Set nodeInfoMap as extenders cached node information.
 				extender.cachedNodeNameToInfo = cachedNodeInfoMap
 				extenders = append(extenders, extender)
 			}
-			predMetaProducer := algorithmpredicates.EmptyMetadataProducer
-			if test.buildPredMeta {
-				f := &algorithmpredicates.MetadataProducerFactory{}
-				predMetaProducer = f.GetPredicateMetadata
-			}
 
 			registry := framework.Registry{}
 			plugins := &schedulerapi.Plugins{
-				Filter: &schedulerapi.PluginSet{},
+				PreFilter: &schedulerapi.PluginSet{},
+				Filter:    &schedulerapi.PluginSet{},
 			}
 			var pluginConfigs []schedulerapi.PluginConfig
-			test.registerFilterPlugin(&registry, plugins, pluginConfigs)
-			fwk, _ := framework.NewFramework(registry, plugins, pluginConfigs)
+			test.registerPlugin(&registry, plugins, pluginConfigs)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
+			fwk, _ := framework.NewFramework(registry, plugins, pluginConfigs, framework.WithSnapshotSharedLister(snapshot))
 
 			scheduler := NewGenericScheduler(
 				cache,
 				internalqueue.NewSchedulingQueue(nil),
 				nil,
-				predMetaProducer,
+				algorithmpredicates.EmptyMetadataProducer,
 				priorities.EmptyMetadataProducer,
-				emptySnapshot,
+				snapshot,
 				fwk,
 				extenders,
 				nil,
@@ -2373,7 +2376,11 @@ func TestPreempt(t *testing.T) {
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				true)
 			state := framework.NewCycleState()
-			scheduler.Snapshot()
+			// Some tests rely on PreFilter plugin to compute its CycleState.
+			preFilterStatus := fwk.RunPreFilterPlugins(context.Background(), state, test.pod)
+			if !preFilterStatus.IsSuccess() {
+				t.Errorf("Unexpected preFilterStatus: %v", preFilterStatus)
+			}
 			// Call Preempt and check the expected results.
 			failedNodeToStatusMap := defaultFailedNodeToStatusMap
 			if test.failedNodeToStatusMap != nil {

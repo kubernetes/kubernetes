@@ -10,6 +10,7 @@ go_library(
         "//pkg/scheduler/algorithm/priorities:go_default_library",
         "//pkg/scheduler/framework/plugins/migration:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
+        "//pkg/scheduler/listers:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -21,8 +22,6 @@ go_test(
     srcs = ["pod_topology_spread_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/scheduler/algorithm/predicates:go_default_library",
-        "//pkg/scheduler/framework/plugins/migration:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/nodeinfo/snapshot:go_default_library",
         "//pkg/scheduler/testing:go_default_library",

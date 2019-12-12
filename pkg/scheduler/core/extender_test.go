@@ -361,16 +361,17 @@ var _ algorithm.SchedulerExtender = &FakeExtender{}
 
 func TestGenericSchedulerWithExtenders(t *testing.T) {
 	tests := []struct {
-		name                 string
-		registerFilterPlugin st.RegisterFilterPluginFunc
-		registerScorePlugin  st.RegisterScorePluginFunc
-		extenders            []FakeExtender
-		nodes                []string
-		expectedResult       ScheduleResult
-		expectsErr           bool
+		name            string
+		registerPlugins []st.RegisterPluginFunc
+		extenders       []FakeExtender
+		nodes           []string
+		expectedResult  ScheduleResult
+		expectsErr      bool
 	}{
 		{
-			registerFilterPlugin: st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			},
 			extenders: []FakeExtender{
 				{
 					predicates: []fitPredicate{truePredicateExtender},
@@ -384,7 +385,9 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name:       "test 1",
 		},
 		{
-			registerFilterPlugin: st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			},
 			extenders: []FakeExtender{
 				{
 					predicates: []fitPredicate{truePredicateExtender},
@@ -398,7 +401,9 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name:       "test 2",
 		},
 		{
-			registerFilterPlugin: st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			},
 			extenders: []FakeExtender{
 				{
 					predicates: []fitPredicate{truePredicateExtender},
@@ -416,7 +421,9 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name: "test 3",
 		},
 		{
-			registerFilterPlugin: st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			},
 			extenders: []FakeExtender{
 				{
 					predicates: []fitPredicate{machine2PredicateExtender},
@@ -430,7 +437,9 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name:       "test 4",
 		},
 		{
-			registerFilterPlugin: st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{truePredicateExtender},
@@ -447,7 +456,9 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name: "test 5",
 		},
 		{
-			registerFilterPlugin: st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{truePredicateExtender},
@@ -469,8 +480,10 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name: "test 6",
 		},
 		{
-			registerFilterPlugin: st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
-			registerScorePlugin:  st.RegisterScorePlugin("Machine2Prioritizer", newMachine2PrioritizerPlugin(), 20),
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterScorePlugin("Machine2Prioritizer", newMachine2PrioritizerPlugin(), 20),
+			},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{truePredicateExtender},
@@ -494,8 +507,10 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			// If scheduler sends the pod by mistake, the test would fail
 			// because of the errors from errorPredicateExtender and/or
 			// errorPrioritizerExtender.
-			registerFilterPlugin: st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
-			registerScorePlugin:  st.RegisterScorePlugin("Machine2Prioritizer", newMachine2PrioritizerPlugin(), 1),
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterScorePlugin("Machine2Prioritizer", newMachine2PrioritizerPlugin(), 1),
+			},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{errorPredicateExtender},
@@ -518,7 +533,9 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			//
 			// If scheduler did not ignore the extender, the test would fail
 			// because of the errors from errorPredicateExtender.
-			registerFilterPlugin: st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			},
 			extenders: []FakeExtender{
 				{
 					predicates: []fitPredicate{errorPredicateExtender},
@@ -560,9 +577,8 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				Score:  &schedulerapi.PluginSet{},
 			}
 			var pluginConfigs []schedulerapi.PluginConfig
-			test.registerFilterPlugin(&registry, plugins, pluginConfigs)
-			if test.registerScorePlugin != nil {
-				test.registerScorePlugin(&registry, plugins, pluginConfigs)
+			for _, f := range test.registerPlugins {
+				f(&registry, plugins, pluginConfigs)
 			}
 			fwk, _ := framework.NewFramework(registry, plugins, pluginConfigs)
 

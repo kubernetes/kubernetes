@@ -205,6 +205,7 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 		})
 	registry.RegisterPredicate(predicates.EvenPodsSpreadPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, podtopologyspread.Name, nil)
 			plugins.Filter = appendToPluginSet(plugins.Filter, podtopologyspread.Name, nil)
 			return
 		})

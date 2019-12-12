@@ -58,6 +58,7 @@ func defaultPredicates() sets.String {
 // The returned function is used to restore the state of registered predicates/priorities
 // when this function is called, and should be called in tests which may modify the value
 // of a feature gate temporarily.
+// TODO(Huang-Wei): refactor this function to have a clean way to disable/enable plugins.
 func ApplyFeatureGates() (restore func()) {
 	snapshot := scheduler.RegisteredPredicatesAndPrioritiesSnapshot()
 

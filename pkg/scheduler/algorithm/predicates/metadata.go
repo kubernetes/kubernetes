@@ -105,11 +105,11 @@ func (paths *criticalPaths) update(tpVal string, num int32) {
 	}
 }
 
-// evenPodsSpreadMetadata combines tpKeyToCriticalPaths and tpPairToMatchNum
+// PodTopologySpreadMetadata combines tpKeyToCriticalPaths and tpPairToMatchNum
 // to represent:
 // (1) critical paths where the least pods are matched on each spread constraint.
 // (2) number of pods matched on each spread constraint.
-type evenPodsSpreadMetadata struct {
+type PodTopologySpreadMetadata struct {
 	constraints []topologySpreadConstraint
 	// We record 2 critical paths instead of all critical paths here.
 	// criticalPaths[0].matchNum always holds the minimum matching number.
@@ -309,10 +309,6 @@ func (m *podFitsResourcesMetadata) clone() *podFitsResourcesMetadata {
 type predicateMetadata struct {
 	pod *v1.Pod
 
-	// evenPodsSpreadMetadata holds info of the minimum match number on each topology spread constraint,
-	// and the match number of all valid topology pairs.
-	evenPodsSpreadMetadata *evenPodsSpreadMetadata
-
 	serviceAffinityMetadata  *serviceAffinityMetadata
 	podFitsResourcesMetadata *podFitsResourcesMetadata
 }
@@ -357,27 +353,8 @@ func (f *MetadataProducerFactory) GetPredicateMetadata(pod *v1.Pod, sharedLister
 		return nil
 	}
 
-	var allNodes []*schedulernodeinfo.NodeInfo
-	if sharedLister != nil {
-		var err error
-		allNodes, err = sharedLister.NodeInfos().List()
-		if err != nil {
-			klog.Errorf("failed to list NodeInfos: %v", err)
-			return nil
-		}
-	}
-
-	// evenPodsSpreadMetadata represents how existing pods match "pod"
-	// on its spread constraints
-	evenPodsSpreadMetadata, err := getEvenPodsSpreadMetadata(pod, allNodes)
-	if err != nil {
-		klog.Errorf("Error calculating spreadConstraintsMap: %v", err)
-		return nil
-	}
-
 	predicateMetadata := &predicateMetadata{
 		pod:                      pod,
-		evenPodsSpreadMetadata:   evenPodsSpreadMetadata,
 		podFitsResourcesMetadata: getPodFitsResourcesMetedata(pod),
 	}
 	for predicateName, precomputeFunc := range predicateMetadataProducers {
@@ -414,7 +391,8 @@ func GetPodAffinityMetadata(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeInfo,
 	}, nil
 }
 
-func getEvenPodsSpreadMetadata(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeInfo) (*evenPodsSpreadMetadata, error) {
+// GetPodTopologySpreadMetadata computes pod topology spread metadata.
+func GetPodTopologySpreadMetadata(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeInfo) (*PodTopologySpreadMetadata, error) {
 	// We have feature gating in APIServer to strip the spec
 	// so don't need to re-check feature gate, just check length of constraints.
 	constraints, err := filterHardTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints)
@@ -429,7 +407,7 @@ func getEvenPodsSpreadMetadata(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeIn
 
 	// TODO(Huang-Wei): It might be possible to use "make(map[topologyPair]*int32)".
 	// In that case, need to consider how to init each tpPairToCount[pair] in an atomic fashion.
-	m := evenPodsSpreadMetadata{
+	m := PodTopologySpreadMetadata{
 		constraints:          constraints,
 		tpKeyToCriticalPaths: make(map[string]*criticalPaths, len(constraints)),
 		tpPairToMatchNum:     make(map[topologyPair]int32),
@@ -526,15 +504,17 @@ func (m topologyToMatchedTermCount) clone() topologyToMatchedTermCount {
 	return copy
 }
 
-func (m *evenPodsSpreadMetadata) addPod(addedPod, preemptorPod *v1.Pod, node *v1.Node) {
-	m.updatePod(addedPod, preemptorPod, node, 1)
+// AddPod updates the metadata with addedPod.
+func (m *PodTopologySpreadMetadata) AddPod(addedPod, preemptorPod *v1.Pod, node *v1.Node) {
+	m.updateWithPod(addedPod, preemptorPod, node, 1)
 }
 
-func (m *evenPodsSpreadMetadata) removePod(deletedPod, preemptorPod *v1.Pod, node *v1.Node) {
-	m.updatePod(deletedPod, preemptorPod, node, -1)
+// RemovePod updates the metadata with deletedPod.
+func (m *PodTopologySpreadMetadata) RemovePod(deletedPod, preemptorPod *v1.Pod, node *v1.Node) {
+	m.updateWithPod(deletedPod, preemptorPod, node, -1)
 }
 
-func (m *evenPodsSpreadMetadata) updatePod(updatedPod, preemptorPod *v1.Pod, node *v1.Node, delta int32) {
+func (m *PodTopologySpreadMetadata) updateWithPod(updatedPod, preemptorPod *v1.Pod, node *v1.Node, delta int32) {
 	if m == nil || updatedPod.Namespace != preemptorPod.Namespace || node == nil {
 		return
 	}
@@ -556,12 +536,13 @@ func (m *evenPodsSpreadMetadata) updatePod(updatedPod, preemptorPod *v1.Pod, nod
 	}
 }
 
-func (m *evenPodsSpreadMetadata) clone() *evenPodsSpreadMetadata {
-	// c could be nil when EvenPodsSpread feature is disabled
+// Clone makes a deep copy of PodTopologySpreadMetadata.
+func (m *PodTopologySpreadMetadata) Clone() *PodTopologySpreadMetadata {
+	// m could be nil when EvenPodsSpread feature is disabled
 	if m == nil {
 		return nil
 	}
-	cp := evenPodsSpreadMetadata{
+	cp := PodTopologySpreadMetadata{
 		// constraints are shared because they don't change.
 		constraints:          m.constraints,
 		tpKeyToCriticalPaths: make(map[string]*criticalPaths, len(m.tpKeyToCriticalPaths)),
@@ -584,7 +565,6 @@ func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod, node *v1.Node) erro
 	if deletedPodFullName == schedutil.GetPodFullName(meta.pod) {
 		return fmt.Errorf("deletedPod and meta.pod must not be the same")
 	}
-	meta.evenPodsSpreadMetadata.removePod(deletedPod, meta.pod, node)
 	meta.serviceAffinityMetadata.removePod(deletedPod, node)
 
 	return nil
@@ -601,10 +581,6 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, node *v1.Node) error {
 		return fmt.Errorf("node not found")
 	}
 
-	// Update meta.evenPodsSpreadMetadata if meta.pod has hard spread constraints
-	// and addedPod matches that
-	meta.evenPodsSpreadMetadata.addPod(addedPod, meta.pod, node)
-
 	meta.serviceAffinityMetadata.addPod(addedPod, meta.pod, node)
 
 	return nil
@@ -616,7 +592,6 @@ func (meta *predicateMetadata) ShallowCopy() Metadata {
 	newPredMeta := &predicateMetadata{
 		pod: meta.pod,
 	}
-	newPredMeta.evenPodsSpreadMetadata = meta.evenPodsSpreadMetadata.clone()
 	newPredMeta.serviceAffinityMetadata = meta.serviceAffinityMetadata.clone()
 	newPredMeta.podFitsResourcesMetadata = meta.podFitsResourcesMetadata.clone()
 	return (Metadata)(newPredMeta)

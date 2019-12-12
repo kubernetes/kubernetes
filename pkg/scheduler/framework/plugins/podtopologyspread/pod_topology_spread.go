@@ -26,32 +26,120 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // PodTopologySpread is a plugin that ensures pod's topologySpreadConstraints is satisfied.
 type PodTopologySpread struct {
-	handle framework.FrameworkHandle
+	snapshotSharedLister schedulerlisters.SharedLister
 }
 
+var _ framework.PreFilterPlugin = &PodTopologySpread{}
 var _ framework.FilterPlugin = &PodTopologySpread{}
 var _ framework.ScorePlugin = &PodTopologySpread{}
 
-// Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "PodTopologySpread"
+const (
+	// Name is the name of the plugin used in the plugin registry and configurations.
+	Name = "PodTopologySpread"
+
+	// preFilterStateKey is the key in CycleState to PodTopologySpread pre-computed data.
+	// Using the name of the plugin will likely help us avoid collisions with other plugins.
+	preFilterStateKey = "PreFilter" + Name
+)
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *PodTopologySpread) Name() string {
 	return Name
 }
 
+// preFilterState computed at PreFilter and used at Filter.
+type preFilterState struct {
+	meta *predicates.PodTopologySpreadMetadata
+}
+
+// Clone makes a copy of the given state.
+func (s *preFilterState) Clone() framework.StateData {
+	copy := &preFilterState{
+		meta: s.meta.Clone(),
+	}
+	return copy
+}
+
+// PreFilter invoked at the prefilter extension point.
+func (pl *PodTopologySpread) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
+	var meta *predicates.PodTopologySpreadMetadata
+	var allNodes []*nodeinfo.NodeInfo
+	var err error
+
+	if allNodes, err = pl.snapshotSharedLister.NodeInfos().List(); err != nil {
+		return framework.NewStatus(framework.Error, fmt.Sprintf("failed to list NodeInfos: %v", err))
+	}
+
+	if meta, err = predicates.GetPodTopologySpreadMetadata(pod, allNodes); err != nil {
+		return framework.NewStatus(framework.Error, fmt.Sprintf("Error calculating podTopologySpreadMetadata: %v", err))
+	}
+
+	s := &preFilterState{
+		meta: meta,
+	}
+	cycleState.Write(preFilterStateKey, s)
+
+	return nil
+}
+
+// PreFilterExtensions returns prefilter extensions, pod add and remove.
+func (pl *PodTopologySpread) PreFilterExtensions() framework.PreFilterExtensions {
+	return pl
+}
+
+// AddPod from pre-computed data in cycleState.
+func (pl *PodTopologySpread) AddPod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
+	meta, err := getPodTopologySpreadMetadata(cycleState)
+	if err != nil {
+		return framework.NewStatus(framework.Error, err.Error())
+	}
+
+	meta.AddPod(podToAdd, podToSchedule, nodeInfo.Node())
+	return nil
+}
+
+// RemovePod from pre-computed data in cycleState.
+func (pl *PodTopologySpread) RemovePod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
+	meta, err := getPodTopologySpreadMetadata(cycleState)
+	if err != nil {
+		return framework.NewStatus(framework.Error, err.Error())
+	}
+
+	meta.RemovePod(podToRemove, podToSchedule, nodeInfo.Node())
+	return nil
+}
+
+func getPodTopologySpreadMetadata(cycleState *framework.CycleState) (*predicates.PodTopologySpreadMetadata, error) {
+	c, err := cycleState.Read(preFilterStateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// It's possible that meta is set to nil intentionally.
+	if c == nil {
+		return nil, nil
+	}
+
+	s, ok := c.(*preFilterState)
+	if !ok {
+		return nil, fmt.Errorf("%+v convert to podtopologyspread.state error", c)
+	}
+	return s.meta, nil
+}
+
 // Filter invoked at the filter extension point.
 func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
-	meta, ok := migration.CovertStateRefToPredMeta(migration.PredicateMetadata(cycleState))
-	if !ok {
-		return migration.ErrorToFrameworkStatus(fmt.Errorf("%+v convert to predicates.Metadata error", cycleState))
+	meta, err := getPodTopologySpreadMetadata(cycleState)
+	if err != nil {
+		return framework.NewStatus(framework.Error, err.Error())
 	}
-	_, reasons, err := predicates.EvenPodsSpreadPredicate(pod, meta, nodeInfo)
+	_, reasons, err := predicates.PodTopologySpreadPredicate(pod, meta, nodeInfo)
 	return migration.PredicateResultToFrameworkStatus(reasons, err)
 }
 
@@ -59,7 +147,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 // The "score" returned in this function is the matching number of pods on the `nodeName`,
 // it is normalized later.
 func (pl *PodTopologySpread) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
-	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
+	nodeInfo, err := pl.snapshotSharedLister.NodeInfos().Get(nodeName)
 	if err != nil {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
 	}
@@ -72,7 +160,7 @@ func (pl *PodTopologySpread) Score(ctx context.Context, state *framework.CycleSt
 // NormalizeScore invoked after scoring all nodes.
 func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
 	meta := migration.PriorityMetadata(state)
-	err := priorities.CalculateEvenPodsSpreadPriorityReduce(pod, meta, pl.handle.SnapshotSharedLister(), scores)
+	err := priorities.CalculateEvenPodsSpreadPriorityReduce(pod, meta, pl.snapshotSharedLister, scores)
 	return migration.ErrorToFrameworkStatus(err)
 }
 
@@ -83,5 +171,8 @@ func (pl *PodTopologySpread) ScoreExtensions() framework.ScoreExtensions {
 
 // New initializes a new plugin and returns it.
 func New(_ *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin, error) {
-	return &PodTopologySpread{handle: h}, nil
+	if h.SnapshotSharedLister() == nil {
+		return nil, fmt.Errorf("SnapshotSharedlister is nil")
+	}
+	return &PodTopologySpread{snapshotSharedLister: h.SnapshotSharedLister()}, nil
 }

@@ -87,7 +87,7 @@ type extensionPoint struct {
 	// the set of plugins to be configured at this extension point.
 	plugins *config.PluginSet
 	// a pointer to the slice storing plugins implementations that will run at this
-	// extenstion point.
+	// extension point.
 	slicePtr interface{}
 }
 
