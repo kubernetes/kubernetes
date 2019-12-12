@@ -180,6 +180,10 @@ func (es mockScheduler) Snapshot() error {
 	return nil
 
 }
+func (es mockScheduler) Framework() framework.Framework {
+	return nil
+
+}
 
 func TestSchedulerCreation(t *testing.T) {
 	client := clientsetfake.NewSimpleClientset()
