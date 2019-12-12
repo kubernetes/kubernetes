@@ -400,7 +400,7 @@ func GetPodTopologySpreadMetadata(pod *v1.Pod, allNodes []*schedulernodeinfo.Nod
 		return nil, err
 	}
 	if len(constraints) == 0 {
-		return nil, nil
+		return &PodTopologySpreadMetadata{}, nil
 	}
 
 	var lock sync.Mutex
