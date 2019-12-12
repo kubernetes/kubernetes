@@ -141,6 +141,9 @@ type ScheduleAlgorithm interface {
 	// for cluster autoscaler integration.
 	// TODO(#85691): remove this once CA migrates to creating a Framework instead of a full scheduler.
 	Snapshot() error
+	// Framework returns the scheduler framework instance. This is needed  for cluster autoscaler integration.
+	// TODO(#85691): remove this once CA migrates to creating a Framework instead of a full scheduler.
+	Framework() framework.Framework
 }
 
 // ScheduleResult represents the result of one pod scheduled. It will contain
@@ -174,14 +177,20 @@ type genericScheduler struct {
 	nextStartNodeIndex       int
 }
 
-// snapshot snapshots scheduler cache and node infos for all fit and priority
+// Snapshot snapshots scheduler cache and node infos for all fit and priority
 // functions.
 func (g *genericScheduler) Snapshot() error {
 	// Used for all fit and priority funcs.
 	return g.cache.UpdateNodeInfoSnapshot(g.nodeInfoSnapshot)
 }
 
-// GetPredicateMetadataProducer returns the predicate metadata producer. This is needed
+// Framework returns the framework instance.
+func (g *genericScheduler) Framework() framework.Framework {
+	// Used for all fit and priority funcs.
+	return g.framework
+}
+
+// PredicateMetadataProducer returns the predicate metadata producer. This is needed
 // for cluster autoscaler integration.
 func (g *genericScheduler) PredicateMetadataProducer() predicates.MetadataProducer {
 	return g.predicateMetaProducer
