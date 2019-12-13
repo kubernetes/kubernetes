@@ -24,6 +24,7 @@ import (
 
 const (
 	bootstrapTokensSignerRoleName = "system:controller:bootstrap-signer"
+	bootstrapTokensSignerRoleBindingName = bootstrapTokensSignerRoleName
 )
 
 // Define container for all the test specification aimed at verifying
@@ -43,5 +44,6 @@ var _ = Describe("bootstrap signer", func() {
 		//    the bootstrapsigner controller is activated and the system:controller:bootstrap-signer
 		//    group will be automatically created
 		ExpectRole(f.ClientSet, kubeSystemNamespace, bootstrapTokensSignerRoleName)
+		ExpectRoleBinding(f.ClientSet, kubeSystemNamespace, bootstrapTokensSignerRoleBindingName)
 	})
 })
