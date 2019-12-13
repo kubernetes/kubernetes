@@ -44,6 +44,7 @@ const (
 	PLEGRelistDurationKey                = "pleg_relist_duration_seconds"
 	PLEGDiscardEventsKey                 = "pleg_discard_events"
 	PLEGRelistIntervalKey                = "pleg_relist_interval_seconds"
+	PLEGLastSeenKey                      = "pleg_last_seen_seconds"
 	EvictionsKey                         = "evictions"
 	EvictionStatsAgeKey                  = "eviction_stats_age_seconds"
 	PreemptionsKey                       = "preemptions"
@@ -183,6 +184,16 @@ var (
 			Name:           PLEGRelistIntervalKey,
 			Help:           "Interval in seconds between relisting in PLEG.",
 			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	// PLEGLastSeen is a Gauge giving the Unix timestamp when the Kubelet's
+	// Pod Lifecycle Event Generator (PLEG) was last seen active.
+	PLEGLastSeen = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PLEGLastSeenKey,
+			Help:           "Timestamp in seconds when PLEG was last seen active.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -522,6 +533,7 @@ func Register(containerCache kubecontainer.RuntimeCache, collectors ...metrics.S
 		legacyregistry.MustRegister(PLEGRelistDuration)
 		legacyregistry.MustRegister(PLEGDiscardEvents)
 		legacyregistry.MustRegister(PLEGRelistInterval)
+		legacyregistry.MustRegister(PLEGLastSeen)
 		legacyregistry.MustRegister(RuntimeOperations)
 		legacyregistry.MustRegister(RuntimeOperationsDuration)
 		legacyregistry.MustRegister(RuntimeOperationsErrors)
