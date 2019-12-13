@@ -18,18 +18,17 @@ package noderesources
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/runtime"
 	"reflect"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -93,11 +92,12 @@ func TestNodeResourcesFit(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
 
 	enoughPodsTests := []struct {
-		pod                      *v1.Pod
-		nodeInfo                 *schedulernodeinfo.NodeInfo
-		name                     string
-		ignoredExtendedResources sets.String
-		wantStatus               *framework.Status
+		pod               *v1.Pod
+		nodeInfo          *schedulernodeinfo.NodeInfo
+		name              string
+		ignoredResources  []byte
+		preFilterDisabled bool
+		wantStatus        *framework.Status
 	}{
 		{
 			pod: &v1.Pod{},
@@ -110,6 +110,18 @@ func TestNodeResourcesFit(t *testing.T) {
 			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 10, Memory: 20})),
 			name: "too many resources fails",
+			wantStatus: framework.NewStatus(
+				framework.Unschedulable,
+				predicates.NewInsufficientResourceError(v1.ResourceCPU, 2, 10, 10).GetReason(),
+				predicates.NewInsufficientResourceError(v1.ResourceMemory, 2, 10, 10).GetReason(),
+			),
+		},
+		{
+			pod: newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 10, Memory: 20})),
+			name:              "without prefilter",
+			preFilterDisabled: true,
 			wantStatus: framework.NewStatus(
 				framework.Unschedulable,
 				predicates.NewInsufficientResourceError(v1.ResourceCPU, 2, 10, 10).GetReason(),
@@ -318,9 +330,8 @@ func TestNodeResourcesFit(t *testing.T) {
 				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
 			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0})),
-			ignoredExtendedResources: sets.NewString(string(extendedResourceB)),
-			name:                     "skip checking ignored extended resource",
-			wantStatus:               framework.NewStatus(framework.Unschedulable, predicates.NewInsufficientResourceError(extendedResourceB, 2, 10, 10).GetReason()),
+			ignoredResources: []byte(`{"IgnoredResources" : ["example.com/bbb"]}`),
+			name:             "skip checking ignored extended resource",
 		},
 		{
 			pod: newResourceOverheadPod(
@@ -329,8 +340,7 @@ func TestNodeResourcesFit(t *testing.T) {
 			),
 			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 5})),
-			ignoredExtendedResources: sets.NewString(string(extendedResourceB)),
-			name:                     "resources + pod overhead fits",
+			name: "resources + pod overhead fits",
 		},
 		{
 			pod: newResourceOverheadPod(
@@ -339,24 +349,27 @@ func TestNodeResourcesFit(t *testing.T) {
 			),
 			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 5, Memory: 5})),
-			ignoredExtendedResources: sets.NewString(string(extendedResourceB)),
-			name:                     "requests + overhead does not fit for memory",
-			wantStatus:               framework.NewStatus(framework.Unschedulable, predicates.NewInsufficientResourceError(v1.ResourceMemory, 16, 5, 20).GetReason()),
+			name:       "requests + overhead does not fit for memory",
+			wantStatus: framework.NewStatus(framework.Unschedulable, predicates.NewInsufficientResourceError(v1.ResourceMemory, 16, 5, 20).GetReason()),
 		},
 	}
 
 	for _, test := range enoughPodsTests {
 		t.Run(test.name, func(t *testing.T) {
-			factory := &predicates.MetadataProducerFactory{}
-			meta := factory.GetPredicateMetadata(test.pod, nil)
-			state := framework.NewCycleState()
-			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
-
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 
-			p, _ := NewFit(nil, nil)
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, test.nodeInfo)
+			args := &runtime.Unknown{Raw: test.ignoredResources}
+			p, _ := NewFit(args, nil)
+			cycleState := framework.NewCycleState()
+			if !test.preFilterDisabled {
+				preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
+				if !preFilterStatus.IsSuccess() {
+					t.Errorf("prefilter failed with status: %v", preFilterStatus)
+				}
+			}
+
+			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
@@ -401,16 +414,17 @@ func TestNodeResourcesFit(t *testing.T) {
 	}
 	for _, test := range notEnoughPodsTests {
 		t.Run(test.name, func(t *testing.T) {
-			factory := &predicates.MetadataProducerFactory{}
-			meta := factory.GetPredicateMetadata(test.pod, nil)
-			state := framework.NewCycleState()
-			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
-
 			node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 1, 0, 0, 0)}}
 			test.nodeInfo.SetNode(&node)
 
 			p, _ := NewFit(nil, nil)
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, test.nodeInfo)
+			cycleState := framework.NewCycleState()
+			preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
+			if !preFilterStatus.IsSuccess() {
+				t.Errorf("prefilter failed with status: %v", preFilterStatus)
+			}
+
+			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
@@ -453,16 +467,17 @@ func TestNodeResourcesFit(t *testing.T) {
 
 	for _, test := range storagePodsTests {
 		t.Run(test.name, func(t *testing.T) {
-			factory := &predicates.MetadataProducerFactory{}
-			meta := factory.GetPredicateMetadata(test.pod, nil)
-			state := framework.NewCycleState()
-			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
-
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 
 			p, _ := NewFit(nil, nil)
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, test.nodeInfo)
+			cycleState := framework.NewCycleState()
+			preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
+			if !preFilterStatus.IsSuccess() {
+				t.Errorf("prefilter failed with status: %v", preFilterStatus)
+			}
+
+			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}

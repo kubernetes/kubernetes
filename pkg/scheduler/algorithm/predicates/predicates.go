@@ -780,10 +780,16 @@ func podName(pod *v1.Pod) string {
 	return pod.Namespace + "/" + pod.Name
 }
 
-// PodFitsResources checks if a node has sufficient resources, such as cpu, memory, gpu, opaque int resources etc to run a pod.
+// PodFitsResources is a wrapper around PodFitsResourcesPredicate that implements FitPredicate interface.
+// TODO(#85822): remove this function once predicate registration logic is deleted.
+func PodFitsResources(pod *v1.Pod, _ Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+	return PodFitsResourcesPredicate(pod, nil, nil, nodeInfo)
+}
+
+// PodFitsResourcesPredicate checks if a node has sufficient resources, such as cpu, memory, gpu, opaque int resources etc to run a pod.
 // First return value indicates whether a node has sufficient resources to run a pod while the second return value indicates the
-// predicate failure reasons if the node has insufficient resources to run the pod.
-func PodFitsResources(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+// predicate failure reasons if the node has insufficient resources to run the pod
+func PodFitsResourcesPredicate(pod *v1.Pod, podRequest *schedulernodeinfo.Resource, ignoredExtendedResources sets.String, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
@@ -795,17 +801,11 @@ func PodFitsResources(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.No
 		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourcePods, 1, int64(len(nodeInfo.Pods())), int64(allowedPodNumber)))
 	}
 
-	// No extended resources should be ignored by default.
-	ignoredExtendedResources := sets.NewString()
+	if ignoredExtendedResources == nil {
+		ignoredExtendedResources = sets.NewString()
+	}
 
-	var podRequest *schedulernodeinfo.Resource
-	if predicateMeta, ok := meta.(*predicateMetadata); ok && predicateMeta.podFitsResourcesMetadata != nil {
-		podRequest = predicateMeta.podFitsResourcesMetadata.podRequest
-		if predicateMeta.podFitsResourcesMetadata.ignoredExtendedResources != nil {
-			ignoredExtendedResources = predicateMeta.podFitsResourcesMetadata.ignoredExtendedResources
-		}
-	} else {
-		// We couldn't parse metadata - fallback to computing it.
+	if podRequest == nil {
 		podRequest = GetResourceRequest(pod)
 	}
 	if podRequest.MilliCPU == 0 &&
@@ -839,13 +839,11 @@ func PodFitsResources(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.No
 		}
 	}
 
-	if klog.V(10) {
-		if len(predicateFails) == 0 {
-			// We explicitly don't do klog.V(10).Infof() to avoid computing all the parameters if this is
-			// not logged. There is visible performance gain from it.
-			klog.Infof("Schedule Pod %+v on Node %+v is allowed, Node is running only %v out of %v Pods.",
-				podName(pod), node.Name, len(nodeInfo.Pods()), allowedPodNumber)
-		}
+	if klog.V(10) && len(predicateFails) == 0 {
+		// We explicitly don't do klog.V(10).Infof() to avoid computing all the parameters if this is
+		// not logged. There is visible performance gain from it.
+		klog.Infof("Schedule Pod %+v on Node %+v is allowed, Node is running only %v out of %v Pods.",
+			podName(pod), node.Name, len(nodeInfo.Pods()), allowedPodNumber)
 	}
 	return len(predicateFails) == 0, predicateFails, nil
 }
@@ -1144,43 +1142,11 @@ func haveOverlap(a1, a2 []string) bool {
 	return false
 }
 
-// GeneralPredicates checks whether noncriticalPredicates and EssentialPredicates pass. noncriticalPredicates are the predicates
-// that only non-critical pods need and EssentialPredicates are the predicates that all pods, including critical pods, need.
+// GeneralPredicates checks a group of predicates that the kubelet cares about.
+// DEPRECATED: this exist only because kubelet uses it. We should change kubelet to execute the individual predicates it requires.
 func GeneralPredicates(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
 	var predicateFails []PredicateFailureReason
-	for _, predicate := range []FitPredicate{noncriticalPredicates, EssentialPredicates} {
-		fit, reasons, err := predicate(pod, meta, nodeInfo)
-		if err != nil {
-			return false, predicateFails, err
-		}
-		if !fit {
-			predicateFails = append(predicateFails, reasons...)
-		}
-	}
-
-	return len(predicateFails) == 0, predicateFails, nil
-}
-
-// noncriticalPredicates are the predicates that only non-critical pods need.
-func noncriticalPredicates(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
-	var predicateFails []PredicateFailureReason
-	fit, reasons, err := PodFitsResources(pod, meta, nodeInfo)
-	if err != nil {
-		return false, predicateFails, err
-	}
-	if !fit {
-		predicateFails = append(predicateFails, reasons...)
-	}
-
-	return len(predicateFails) == 0, predicateFails, nil
-}
-
-// EssentialPredicates are the predicates that all pods, including critical pods, need.
-func EssentialPredicates(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
-	var predicateFails []PredicateFailureReason
-	// TODO: PodFitsHostPorts is essential for now, but kubelet should ideally
-	//       preempt pods to free up host ports too
-	for _, predicate := range []FitPredicate{PodFitsHost, PodFitsHostPorts, PodMatchNodeSelector} {
+	for _, predicate := range []FitPredicate{PodFitsResources, PodFitsHost, PodFitsHostPorts, PodMatchNodeSelector} {
 		fit, reasons, err := predicate(pod, meta, nodeInfo)
 		if err != nil {
 			return false, predicateFails, err

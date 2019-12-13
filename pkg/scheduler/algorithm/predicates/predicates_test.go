@@ -388,10 +388,7 @@ func TestPodFitsResources(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
-			RegisterPredicateMetadataProducerWithExtendedResourceOptions(test.ignoredExtendedResources)
-			factory := &MetadataProducerFactory{}
-			meta := factory.GetPredicateMetadata(test.pod, nil)
-			fits, reasons, err := PodFitsResources(test.pod, meta, test.nodeInfo)
+			fits, reasons, err := PodFitsResourcesPredicate(test.pod, GetResourceRequest(test.pod), test.ignoredExtendedResources, test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -448,8 +445,8 @@ func TestPodFitsResources(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 1, 0, 0, 0)}}
 			test.nodeInfo.SetNode(&node)
-			factory := &MetadataProducerFactory{}
-			fits, reasons, err := PodFitsResources(test.pod, factory.GetPredicateMetadata(test.pod, nil), test.nodeInfo)
+			fits, reasons, err := PodFitsResourcesPredicate(test.pod, GetResourceRequest(test.pod), nil, test.nodeInfo)
+
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -509,8 +506,7 @@ func TestPodFitsResources(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
-			factory := &MetadataProducerFactory{}
-			fits, reasons, err := PodFitsResources(test.pod, factory.GetPredicateMetadata(test.pod, nil), test.nodeInfo)
+			fits, reasons, err := PodFitsResourcesPredicate(test.pod, GetResourceRequest(test.pod), nil, test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

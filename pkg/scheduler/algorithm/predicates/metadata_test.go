@@ -228,13 +228,6 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 				Namespace: "testns",
 			},
 		},
-		podFitsResourcesMetadata: &podFitsResourcesMetadata{
-			podRequest: &schedulernodeinfo.Resource{
-				MilliCPU:         1000,
-				Memory:           300,
-				AllowedPodNumber: 4,
-			},
-		},
 		serviceAffinityMetadata: &serviceAffinityMetadata{
 			matchingPodList: []*v1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}},

@@ -99,6 +99,8 @@ type ConfigProducerArgs struct {
 	RequestedToCapacityRatioArgs *requestedtocapacityratio.Args
 	// ServiceAffinityArgs is the args for the ServiceAffinity plugin.
 	ServiceAffinityArgs *serviceaffinity.Args
+	// NodeResourcesFitArgs is the args for the NodeResources fit filter.
+	NodeResourcesFitArgs *noderesources.FitArgs
 }
 
 // ConfigProducer produces a framework's configuration.
@@ -119,9 +121,10 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 	}
 	// Register Predicates.
 	registry.RegisterPredicate(predicates.GeneralPred,
-		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			// GeneralPredicate is a combination of predicates.
 			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.FitName, nil)
+			pluginConfig = append(pluginConfig, makePluginConfig(noderesources.FitName, args.NodeResourcesFitArgs))
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodename.Name, nil)
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodeports.Name, nil)
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodeaffinity.Name, nil)
@@ -133,8 +136,9 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 			return
 		})
 	registry.RegisterPredicate(predicates.PodFitsResourcesPred,
-		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.FitName, nil)
+			pluginConfig = append(pluginConfig, makePluginConfig(noderesources.FitName, args.NodeResourcesFitArgs))
 			return
 		})
 	registry.RegisterPredicate(predicates.HostNamePred,
