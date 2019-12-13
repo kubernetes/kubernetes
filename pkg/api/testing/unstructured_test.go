@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -120,55 +119,58 @@ func doRoundTrip(t *testing.T, internalVersion schema.GroupVersion, externalVers
 }
 
 func TestRoundTrip(t *testing.T) {
-	for groupKey, group := range testapi.Groups {
-		for kind := range legacyscheme.Scheme.KnownTypes(*group.GroupVersion()) {
-			if nonRoundTrippableTypes.Has(kind) {
-				continue
-			}
-			t.Logf("Testing: %v in %v", kind, groupKey)
-			for i := 0; i < 50; i++ {
-				doRoundTrip(t, schema.GroupVersion{Group: groupKey, Version: runtime.APIVersionInternal}, *group.GroupVersion(), kind)
-				if t.Failed() {
-					break
-				}
+	for gvk := range legacyscheme.Scheme.AllKnownTypes() {
+		if nonRoundTrippableTypes.Has(gvk.Kind) {
+			continue
+		}
+		if gvk.Version == runtime.APIVersionInternal {
+			continue
+		}
+		t.Logf("Testing: %v in %v", gvk.Kind, gvk.GroupVersion().String())
+		for i := 0; i < 50; i++ {
+			doRoundTrip(t, schema.GroupVersion{Group: gvk.Group, Version: runtime.APIVersionInternal}, gvk.GroupVersion(), gvk.Kind)
+			if t.Failed() {
+				break
 			}
 		}
 	}
 }
 
 func TestRoundTripWithEmptyCreationTimestamp(t *testing.T) {
-	for groupKey, group := range testapi.Groups {
-		for kind := range legacyscheme.Scheme.KnownTypes(*group.GroupVersion()) {
-			if nonRoundTrippableTypes.Has(kind) {
-				continue
-			}
-			item, err := legacyscheme.Scheme.New(group.GroupVersion().WithKind(kind))
-			if err != nil {
-				t.Fatalf("Couldn't create external object %v: %v", kind, err)
-			}
-			t.Logf("Testing: %v in %v", kind, groupKey)
+	for gvk := range legacyscheme.Scheme.AllKnownTypes() {
+		if nonRoundTrippableTypes.Has(gvk.Kind) {
+			continue
+		}
+		if gvk.Version == runtime.APIVersionInternal {
+			continue
+		}
 
-			unstrBody, err := runtime.DefaultUnstructuredConverter.ToUnstructured(item)
-			if err != nil {
-				t.Fatalf("ToUnstructured failed: %v", err)
-			}
+		item, err := legacyscheme.Scheme.New(gvk)
+		if err != nil {
+			t.Fatalf("Couldn't create external object %v: %v", gvk, err)
+		}
+		t.Logf("Testing: %v in %v", gvk.Kind, gvk.GroupVersion().String())
 
-			unstructObj := &metaunstruct.Unstructured{}
-			unstructObj.Object = unstrBody
+		unstrBody, err := runtime.DefaultUnstructuredConverter.ToUnstructured(item)
+		if err != nil {
+			t.Fatalf("ToUnstructured failed: %v", err)
+		}
 
-			if meta, err := meta.Accessor(unstructObj); err == nil {
-				meta.SetCreationTimestamp(metav1.Time{})
-			} else {
-				t.Fatalf("Unable to set creation timestamp: %v", err)
-			}
+		unstructObj := &metaunstruct.Unstructured{}
+		unstructObj.Object = unstrBody
 
-			// attempt to re-convert unstructured object - conversion should not fail
-			// based on empty metadata fields, such as creationTimestamp
-			newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
-			err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructObj.Object, newObj)
-			if err != nil {
-				t.Fatalf("FromUnstructured failed: %v", err)
-			}
+		if meta, err := meta.Accessor(unstructObj); err == nil {
+			meta.SetCreationTimestamp(metav1.Time{})
+		} else {
+			t.Fatalf("Unable to set creation timestamp: %v", err)
+		}
+
+		// attempt to re-convert unstructured object - conversion should not fail
+		// based on empty metadata fields, such as creationTimestamp
+		newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructObj.Object, newObj)
+		if err != nil {
+			t.Fatalf("FromUnstructured failed: %v", err)
 		}
 	}
 }
