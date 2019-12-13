@@ -76,7 +76,7 @@ func (c *RESTClient) Patch(pt types.PatchType) *restclient.Request {
 	return c.Verb("PATCH").SetHeader("Content-Type", string(pt))
 }
 
-func (c *RESTClient) Apply(force bool, manager string) *restclient.Request {
+func (c *RESTClient) Apply(force bool, fieldManager string) *restclient.Request {
 	req := c.Patch(types.ApplyPatchType)
 
 	if force {
@@ -84,7 +84,7 @@ func (c *RESTClient) Apply(force bool, manager string) *restclient.Request {
 	}
 
 	if manager != "" {
-		req.Param("manager", manager)
+		req.Param("fieldManager", fieldManager)
 	}
 
 	return req

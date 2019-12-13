@@ -183,7 +183,7 @@ func (c *RESTClient) Patch(pt types.PatchType) *Request {
 }
 
 // Apply begins a PATCH request with the apply patch type.
-func (c *RESTClient) Apply(force bool, manager string) *Request {
+func (c *RESTClient) Apply(force bool, fieldManager string) *Request {
 	req := c.Patch(types.ApplyPatchType)
 
 	if force {
@@ -191,7 +191,7 @@ func (c *RESTClient) Apply(force bool, manager string) *Request {
 	}
 
 	if manager != "" {
-		req.Param("manager", manager)
+		req.Param("fieldManager", fieldManager)
 	}
 
 	return req
