@@ -2578,6 +2578,10 @@ func (c *Cloud) DeleteDisk(volumeName KubernetesVolumeID) (bool, error) {
 			klog.V(2).Infof("Volume %s not found when deleting it, assuming it's deleted", awsDisk.awsID)
 			return false, nil
 		}
+		if volerr.IsDanglingError(err) {
+			// The volume is still attached somewhere
+			return false, volerr.NewDeletedVolumeInUseError(err.Error())
+		}
 		klog.Error(err)
 	}
 
@@ -2598,7 +2602,7 @@ func (c *Cloud) checkIfAvailable(disk *awsDisk, opName string, instance string) 
 	}
 
 	volumeState := aws.StringValue(info.State)
-	opError := fmt.Sprintf("Error %s EBS volume %q", opName, disk.awsID)
+	opError := fmt.Sprintf("error %s EBS volume %q", opName, disk.awsID)
 	if len(instance) != 0 {
 		opError = fmt.Sprintf("%q to instance %q", opError, instance)
 	}
