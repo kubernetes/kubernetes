@@ -1308,9 +1308,9 @@ func NewPod(ds *apps.DaemonSet, nodeName string) *v1.Pod {
 //   - PodFitsHost: checks pod's NodeName against node
 //   - PodMatchNodeSelector: checks pod's NodeSelector and NodeAffinity against node
 //   - PodToleratesNodeTaints: exclude tainted node unless pod has specific toleration
-func checkNodeFitness(pod *v1.Pod, meta predicates.Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
+func checkNodeFitness(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
 	var predicateFails []predicates.PredicateFailureReason
-	fit, reasons, err := predicates.PodFitsHost(pod, meta, nodeInfo)
+	fit, reasons, err := predicates.PodFitsHost(pod, nil, nodeInfo)
 	if err != nil {
 		return false, predicateFails, err
 	}
@@ -1318,7 +1318,7 @@ func checkNodeFitness(pod *v1.Pod, meta predicates.Metadata, nodeInfo *scheduler
 		predicateFails = append(predicateFails, reasons...)
 	}
 
-	fit, reasons, err = predicates.PodMatchNodeSelector(pod, meta, nodeInfo)
+	fit, reasons, err = predicates.PodMatchNodeSelector(pod, nil, nodeInfo)
 	if err != nil {
 		return false, predicateFails, err
 	}
@@ -1341,7 +1341,7 @@ func checkNodeFitness(pod *v1.Pod, meta predicates.Metadata, nodeInfo *scheduler
 func Predicates(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
 	var predicateFails []predicates.PredicateFailureReason
 
-	fit, reasons, err := checkNodeFitness(pod, nil, nodeInfo)
+	fit, reasons, err := checkNodeFitness(pod, nodeInfo)
 	if err != nil {
 		return false, predicateFails, err
 	}
