@@ -45,7 +45,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/testapi:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/volume/persistentvolume/testing:go_default_library",
         "//pkg/controller/volume/persistentvolume/util:go_default_library",

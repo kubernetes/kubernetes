@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,7 +34,6 @@ import (
 	. "k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/testapi"
 )
 
 func parseSelectorOrDie(s string) fields.Selector {
@@ -71,7 +70,7 @@ func TestListWatchesCanList(t *testing.T) {
 	}{
 		// Node
 		{
-			location:      testapi.Default.ResourcePath("nodes", metav1.NamespaceAll, ""),
+			location:      "/api/v1/nodes",
 			resource:      "nodes",
 			namespace:     metav1.NamespaceAll,
 			fieldSelector: parseSelectorOrDie(""),
@@ -79,7 +78,7 @@ func TestListWatchesCanList(t *testing.T) {
 		// pod with "assigned" field selector.
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePath("pods", metav1.NamespaceAll, ""),
+				"/api/v1/pods",
 				buildQueryValues(url.Values{fieldSelectorQueryParamName: []string{"spec.host="}})),
 			resource:      "pods",
 			namespace:     metav1.NamespaceAll,
@@ -88,7 +87,7 @@ func TestListWatchesCanList(t *testing.T) {
 		// pod in namespace "foo"
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePath("pods", "foo", ""),
+				"/api/v1/namespaces/foo/pods",
 				buildQueryValues(url.Values{fieldSelectorQueryParamName: []string{"spec.host="}})),
 			resource:      "pods",
 			namespace:     "foo",
@@ -124,7 +123,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		// Node
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePath("nodes", metav1.NamespaceAll, ""),
+				"/api/v1/nodes",
 				buildQueryValues(url.Values{"watch": []string{"true"}})),
 			rv:            "",
 			resource:      "nodes",
@@ -133,7 +132,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		},
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePath("nodes", metav1.NamespaceAll, ""),
+				"/api/v1/nodes",
 				buildQueryValues(url.Values{"resourceVersion": []string{"42"}, "watch": []string{"true"}})),
 			rv:            "42",
 			resource:      "nodes",
@@ -143,7 +142,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		// pod with "assigned" field selector.
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePath("pods", metav1.NamespaceAll, ""),
+				"/api/v1/pods",
 				buildQueryValues(url.Values{fieldSelectorQueryParamName: []string{"spec.host="}, "resourceVersion": []string{"0"}, "watch": []string{"true"}})),
 			rv:            "0",
 			resource:      "pods",
@@ -153,7 +152,7 @@ func TestListWatchesCanWatch(t *testing.T) {
 		// pod with namespace foo and assigned field selector
 		{
 			location: buildLocation(
-				testapi.Default.ResourcePath("pods", "foo", ""),
+				"/api/v1/namespaces/foo/pods",
 				buildQueryValues(url.Values{fieldSelectorQueryParamName: []string{"spec.host="}, "resourceVersion": []string{"0"}, "watch": []string{"true"}})),
 			rv:            "0",
 			resource:      "pods",

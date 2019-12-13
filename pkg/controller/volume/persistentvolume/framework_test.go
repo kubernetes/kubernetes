@@ -40,7 +40,6 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
@@ -375,7 +374,7 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.Persisten
 		},
 	}
 	// Make sure ref.GetReference(claim) works
-	claim.ObjectMeta.SelfLink = testapi.Default.SelfLink("pvc", name)
+	claim.ObjectMeta.SelfLink = "/api/v1/namespaces/" + testNamespace + "/persistentvolumeclaims/" + name
 
 	if len(annotations) > 0 {
 		claim.Annotations = make(map[string]string)
