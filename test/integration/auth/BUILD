@@ -24,7 +24,6 @@ go_test(
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//cmd/kube-apiserver/app/testing:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/testapi:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",

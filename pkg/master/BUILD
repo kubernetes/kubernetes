@@ -149,7 +149,6 @@ go_test(
     race = "off",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/testapi:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/networking:go_default_library",
         "//pkg/apis/storage:go_default_library",
