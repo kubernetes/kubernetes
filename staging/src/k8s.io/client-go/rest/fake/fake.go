@@ -21,7 +21,6 @@ package fake
 import (
 	"net/http"
 	"net/url"
-	"strconv"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
