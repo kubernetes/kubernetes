@@ -17,12 +17,17 @@ limitations under the License.
 package testsuites
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"math"
+	"os"
+	"path"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -522,11 +527,11 @@ func StartPodLogs(f *framework.Framework) func() {
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	to := podlogs.LogOutput{
-		StatusWriter: ginkgo.GinkgoWriter,
+	to := logOutput{
+		statusWriter: ginkgo.GinkgoWriter,
 	}
 	if framework.TestContext.ReportDir == "" {
-		to.LogWriter = ginkgo.GinkgoWriter
+		to.logWriter = ginkgo.GinkgoWriter
 	} else {
 		test := ginkgo.CurrentGinkgoTestDescription()
 		reg := regexp.MustCompile("[^a-zA-Z0-9_-]+")
@@ -535,10 +540,10 @@ func StartPodLogs(f *framework.Framework) func() {
 		//
 		// TODO: use a deeper directory hierarchy once gubernator
 		// supports that (https://github.com/kubernetes/test-infra/issues/10289).
-		to.LogPathPrefix = framework.TestContext.ReportDir + "/" +
+		to.logPathPrefix = framework.TestContext.ReportDir + "/" +
 			reg.ReplaceAllString(test.FullTestText, "_") + "/"
 	}
-	podlogs.CopyAllLogs(ctx, cs, ns.Name, to)
+	copyAllLogs(ctx, cs, ns.Name, to)
 
 	// pod events are something that the framework already collects itself
 	// after a failed test. Logging them live is only useful for interactive
@@ -548,6 +553,166 @@ func StartPodLogs(f *framework.Framework) func() {
 	}
 
 	return cancel
+}
+
+// logOutput determines where output from CopyAllLogs goes.
+type logOutput struct {
+	// If not nil, errors will be logged here.
+	statusWriter io.Writer
+
+	// If not nil, all output goes to this writer with "<pod>/<container>:" as prefix.
+	logWriter io.Writer
+
+	// Base directory for one log file per container.
+	// The full path of each log file will be <log path prefix><pod>-<container>.log.
+	logPathPrefix string
+}
+
+// Matches harmless errors from pkg/kubelet/kubelet_pods.go.
+var expectedErrors = regexp.MustCompile(`container .* in pod .* is (terminated|waiting to start|not available)|the server could not find the requested resource`)
+
+// copyAllLogs follows the logs of all containers in all pods,
+// including those that get created in the future, and writes each log
+// line as configured in the output options. It does that until the
+// context is done or until an error occurs.
+//
+// Beware that there is currently no way to force log collection
+// before removing pods, which means that there is a known race
+// between "stop pod" and "collecting log entries". The alternative
+// would be a blocking function with collects logs from all currently
+// running pods, but that then would have the disadvantage that
+// already deleted pods aren't covered.
+func copyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to logOutput) error {
+	watcher, err := cs.CoreV1().Pods(ns).Watch(metav1.ListOptions{})
+	if err != nil {
+		return errors.Wrap(err, "cannot create Pod event watcher")
+	}
+
+	go func() {
+		var m sync.Mutex
+		logging := map[string]bool{}
+		check := func() {
+			m.Lock()
+			defer m.Unlock()
+
+			pods, err := cs.CoreV1().Pods(ns).List(metav1.ListOptions{})
+			if err != nil {
+				if to.statusWriter != nil {
+					fmt.Fprintf(to.statusWriter, "ERROR: get pod list in %s: %s\n", ns, err)
+				}
+				return
+			}
+
+			for _, pod := range pods.Items {
+				for i, c := range pod.Spec.Containers {
+					name := pod.ObjectMeta.Name + "/" + c.Name
+					if logging[name] ||
+						// sanity check, array should have entry for each container
+						len(pod.Status.ContainerStatuses) <= i ||
+						// Don't attempt to get logs for a container unless it is running or has terminated.
+						// Trying to get a log would just end up with an error that we would have to suppress.
+						(pod.Status.ContainerStatuses[i].State.Running == nil &&
+							pod.Status.ContainerStatuses[i].State.Terminated == nil) {
+						continue
+					}
+					readCloser, err := podlogs.LogsForPod(ctx, cs, ns, pod.ObjectMeta.Name,
+						&v1.PodLogOptions{
+							Container: c.Name,
+							Follow:    true,
+						})
+					if err != nil {
+						// We do get "normal" errors here, like trying to read too early.
+						// We can ignore those.
+						if to.statusWriter != nil &&
+							expectedErrors.FindStringIndex(err.Error()) == nil {
+							fmt.Fprintf(to.statusWriter, "WARNING: pod log: %s: %s\n", name, err)
+						}
+						continue
+					}
+
+					// Determine where we write. If this fails, we intentionally return without clearing
+					// the logging[name] flag, which prevents trying over and over again to
+					// create the output file.
+					var out io.Writer
+					var closer io.Closer
+					var prefix string
+					if to.logWriter != nil {
+						out = to.logWriter
+						prefix = name + ": "
+					} else {
+						var err error
+						filename := to.logPathPrefix + pod.ObjectMeta.Name + "-" + c.Name + ".log"
+						err = os.MkdirAll(path.Dir(filename), 0755)
+						if err != nil {
+							if to.statusWriter != nil {
+								fmt.Fprintf(to.statusWriter, "ERROR: pod log: create directory for %s: %s\n", filename, err)
+							}
+							return
+						}
+						// The test suite might run the same test multiple times,
+						// so we have to append here.
+						file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+						if err != nil {
+							if to.statusWriter != nil {
+								fmt.Fprintf(to.statusWriter, "ERROR: pod log: create file %s: %s\n", filename, err)
+							}
+							return
+						}
+						closer = file
+						out = file
+					}
+					go func() {
+						if closer != nil {
+							defer closer.Close()
+						}
+						defer func() {
+							m.Lock()
+							logging[name] = false
+							m.Unlock()
+							readCloser.Close()
+						}()
+						scanner := bufio.NewScanner(readCloser)
+						first := true
+						for scanner.Scan() {
+							line := scanner.Text()
+							// Filter out the expected "end of stream" error message,
+							// it would just confuse developers who don't know about it.
+							// Same for attempts to read logs from a container that
+							// isn't ready (yet?!).
+							if !strings.HasPrefix(line, "rpc error: code = Unknown desc = Error: No such container:") &&
+								!strings.HasPrefix(line, "Unable to retrieve container logs for ") {
+								if first {
+									if to.logWriter == nil {
+										// Because the same log might be written to multiple times
+										// in different test instances, log an extra line to separate them.
+										// Also provides some useful extra information.
+										fmt.Fprintf(out, "==== start of log for container %s ====\n", name)
+									}
+									first = false
+								}
+								fmt.Fprintf(out, "%s%s\n", prefix, scanner.Text())
+							}
+						}
+					}()
+					logging[name] = true
+				}
+			}
+		}
+
+		// Watch events to see whether we can start logging
+		// and log interesting ones.
+		check()
+		for {
+			select {
+			case <-watcher.ResultChan():
+				check()
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return nil
 }
 
 func getVolumeOpsFromMetricsForPlugin(ms testutil.Metrics, pluginName string) opCounts {
