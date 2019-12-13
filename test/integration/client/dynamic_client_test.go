@@ -32,8 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -208,7 +208,7 @@ func unstructuredToPod(obj *unstructured.Unstructured) (*v1.Pod, error) {
 		return nil, err
 	}
 	pod := new(v1.Pod)
-	err = runtime.DecodeInto(testapi.Default.Codec(), json, pod)
+	err = runtime.DecodeInto(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), json, pod)
 	pod.Kind = ""
 	pod.APIVersion = ""
 	return pod, err
@@ -220,6 +220,6 @@ func unstructuredToEvent(obj *unstructured.Unstructured) (*v1.Event, error) {
 		return nil, err
 	}
 	event := new(v1.Event)
-	err = runtime.DecodeInto(testapi.Default.Codec(), json, event)
+	err = runtime.DecodeInto(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), json, event)
 	return event, err
 }

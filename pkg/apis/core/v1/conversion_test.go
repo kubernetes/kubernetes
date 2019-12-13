@@ -25,7 +25,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -40,8 +40,10 @@ import (
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	utilpointer "k8s.io/utils/pointer"
 
-	// enforce that all types are installed
-	_ "k8s.io/kubernetes/pkg/api/testapi"
+	// ensure types are installed
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	// ensure types are installed corereplicationcontroller<->replicaset conversions
+	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 )
 
 func TestPodLogOptions(t *testing.T) {

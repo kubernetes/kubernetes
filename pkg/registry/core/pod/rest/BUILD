@@ -15,6 +15,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/core/pod/rest",
     deps = [
         "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/install:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/features:go_default_library",

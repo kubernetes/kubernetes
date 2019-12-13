@@ -40,7 +40,6 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
@@ -562,7 +561,7 @@ func makeTestPVC(name, size, node string, pvcBoundState int, pvName, resourceVer
 			Namespace:       "testns",
 			UID:             types.UID("pvc-uid"),
 			ResourceVersion: resourceVersion,
-			SelfLink:        testapi.Default.SelfLink("pvc", name),
+			SelfLink:        "/api/v1/namespaces/testns/persistentvolumeclaims/" + name,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			Resources: v1.ResourceRequirements{
