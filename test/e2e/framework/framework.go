@@ -22,7 +22,6 @@ limitations under the License.
 package framework
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -58,7 +57,6 @@ import (
 )
 
 const (
-	maxKubectlExecRetries = 5
 	// DefaultNamespaceDeletionTimeout is timeout duration for waiting for a namespace deletion.
 	DefaultNamespaceDeletionTimeout = 5 * time.Minute
 )
@@ -334,6 +332,11 @@ func (f *Framework) AfterEach() {
 				if err := f.ClientSet.CoreV1().Namespaces().Delete(ns.Name, nil); err != nil {
 					if !apierrors.IsNotFound(err) {
 						nsDeletionErrors[ns.Name] = err
+
+						// Dump namespace if we are unable to delete the namespace and the dump was not already performed.
+						if !ginkgo.CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
+							DumpAllNamespaceInfo(f.ClientSet, ns.Name)
+						}
 					} else {
 						Logf("Namespace %v was already deleted", ns.Name)
 					}
@@ -501,46 +504,6 @@ func (f *Framework) TestContainerOutputRegexp(scenarioName string, pod *v1.Pod, 
 	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, gomega.MatchRegexp)
 }
 
-// WriteFileViaContainer writes a file using kubectl exec echo <contents> > <path> via specified container
-// because of the primitive technique we're using here, we only allow ASCII alphanumeric characters
-func (f *Framework) WriteFileViaContainer(podName, containerName string, path string, contents string) error {
-	ginkgo.By("writing a file in the container")
-	allowedCharacters := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	for _, c := range contents {
-		if !strings.ContainsRune(allowedCharacters, c) {
-			return fmt.Errorf("Unsupported character in string to write: %v", c)
-		}
-	}
-	command := fmt.Sprintf("echo '%s' > '%s'; sync", contents, path)
-	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "/bin/sh", "-c", command)
-	if err != nil {
-		Logf("error running kubectl exec to write file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
-	}
-	return err
-}
-
-// ReadFileViaContainer reads a file using kubectl exec cat <path>.
-func (f *Framework) ReadFileViaContainer(podName, containerName string, path string) (string, error) {
-	ginkgo.By("reading a file in the container")
-
-	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "cat", path)
-	if err != nil {
-		Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
-	}
-	return string(stdout), err
-}
-
-// CheckFileSizeViaContainer returns the list of file size under the specified path.
-func (f *Framework) CheckFileSizeViaContainer(podName, containerName, path string) (string, error) {
-	ginkgo.By("checking a file size in the container")
-
-	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "ls", "-l", path)
-	if err != nil {
-		Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
-	}
-	return string(stdout), err
-}
-
 // CreateServiceForSimpleAppWithPods is a convenience wrapper to create a service and its matching pods all at once.
 func (f *Framework) CreateServiceForSimpleAppWithPods(contPort int, svcPort int, appName string, podSpec func(n v1.Node) v1.PodSpec, count int, block bool) (*v1.Service, error) {
 	var err error
@@ -663,51 +626,6 @@ func (kc *KubeConfig) FindCluster(name string) *KubeCluster {
 		}
 	}
 	return nil
-}
-
-func kubectlExecWithRetry(namespace string, podName, containerName string, args ...string) ([]byte, []byte, error) {
-	for numRetries := 0; numRetries < maxKubectlExecRetries; numRetries++ {
-		if numRetries > 0 {
-			Logf("Retrying kubectl exec (retry count=%v/%v)", numRetries+1, maxKubectlExecRetries)
-		}
-
-		stdOutBytes, stdErrBytes, err := kubectlExec(namespace, podName, containerName, args...)
-		if err != nil {
-			if strings.Contains(strings.ToLower(string(stdErrBytes)), "i/o timeout") {
-				// Retry on "i/o timeout" errors
-				Logf("Warning: kubectl exec encountered i/o timeout.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
-				continue
-			}
-			if strings.Contains(strings.ToLower(string(stdErrBytes)), "container not found") {
-				// Retry on "container not found" errors
-				Logf("Warning: kubectl exec encountered container not found.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
-				time.Sleep(2 * time.Second)
-				continue
-			}
-		}
-
-		return stdOutBytes, stdErrBytes, err
-	}
-	err := fmt.Errorf("Failed: kubectl exec failed %d times with \"i/o timeout\". Giving up", maxKubectlExecRetries)
-	return nil, nil, err
-}
-
-func kubectlExec(namespace string, podName, containerName string, args ...string) ([]byte, []byte, error) {
-	var stdout, stderr bytes.Buffer
-	cmdArgs := []string{
-		"exec",
-		fmt.Sprintf("--namespace=%v", namespace),
-		podName,
-		fmt.Sprintf("-c=%v", containerName),
-	}
-	cmdArgs = append(cmdArgs, args...)
-
-	cmd := KubectlCmd(cmdArgs...)
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-
-	Logf("Running '%s %s'", cmd.Path, strings.Join(cmdArgs, " "))
-	err := cmd.Run()
-	return stdout.Bytes(), stderr.Bytes(), err
 }
 
 // KubeDescribe is wrapper function for ginkgo describe.  Adds namespacing.

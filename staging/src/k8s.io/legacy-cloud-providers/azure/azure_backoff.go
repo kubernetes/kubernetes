@@ -668,6 +668,9 @@ func (az *Cloud) CreateOrUpdateVmssWithRetry(resourceGroupName string, VMScaleSe
 		// Since it is being deleted, we shouldn't send more CreateOrUpdate requests for it.
 		klog.V(3).Infof("CreateOrUpdateVmssWithRetry: verify the status of the vmss being created or updated")
 		vmss, err := az.VirtualMachineScaleSetsClient.Get(ctx, resourceGroupName, VMScaleSetName)
+		if err != nil {
+			klog.Warningf("CreateOrUpdateVmssWithRetry: error getting vmss: %s", err)
+		}
 		if vmss.ProvisioningState != nil && strings.EqualFold(*vmss.ProvisioningState, virtualMachineScaleSetsDeallocating) {
 			klog.V(3).Infof("CreateOrUpdateVmssWithRetry: found vmss %s being deleted, skipping", VMScaleSetName)
 			return true, nil
@@ -744,13 +747,15 @@ func (az *Cloud) processHTTPRetryResponse(service *v1.Service, reason string, re
 	}
 
 	if shouldRetryHTTPRequest(resp, err) {
-		if err != nil {
-			az.Event(service, v1.EventTypeWarning, reason, err.Error())
-			klog.Errorf("processHTTPRetryResponse: backoff failure, will retry, err=%v", err)
-		} else {
-			az.Event(service, v1.EventTypeWarning, reason, fmt.Sprintf("Azure HTTP response %d", resp.StatusCode))
-			klog.Errorf("processHTTPRetryResponse: backoff failure, will retry, HTTP response=%d", resp.StatusCode)
+		message := "processHTTPRetryResponse: backoff failure, will retry"
+		if resp != nil {
+			message = fmt.Sprintf("%s, HTTP response: %d", message, resp.StatusCode)
 		}
+		if err != nil {
+			message = fmt.Sprintf("%s, error: %v", message, err)
+		}
+		az.Event(service, v1.EventTypeWarning, reason, message)
+		klog.Error(message)
 
 		// suppress the error object so that backoff process continues
 		return false, nil
@@ -766,15 +771,17 @@ func (az *Cloud) processHTTPResponse(service *v1.Service, reason string, resp *h
 		return nil
 	}
 
-	if err != nil {
-		az.Event(service, v1.EventTypeWarning, reason, err.Error())
-		klog.Errorf("processHTTPRetryResponse failure with err: %v", err)
-	} else if resp != nil {
-		az.Event(service, v1.EventTypeWarning, reason, fmt.Sprintf("Azure HTTP response %d", resp.StatusCode))
-		klog.Errorf("processHTTPRetryResponse failure with HTTP response %q", resp.Status)
+	message := "processHTTPResponse failed"
+	if resp != nil {
+		message = fmt.Sprintf("%s, HTTP response: %d", message, resp.StatusCode)
 	}
+	if err != nil {
+		message = fmt.Sprintf("%s, error: %v", message, err)
+	}
+	az.Event(service, v1.EventTypeWarning, reason, message)
+	klog.Error(message)
 
-	return err
+	return fmt.Errorf(message)
 }
 
 func (cfg *Config) shouldOmitCloudProviderBackoff() bool {

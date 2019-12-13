@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	scheduler "k8s.io/kubernetes/pkg/scheduler"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -1450,6 +1451,11 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a permit plugin.
 	permitPlugin := &PermitPlugin{}
 	registry, plugins := initRegistryAndConfig(permitPlugin)
+	// Fit filter plugin must be registered.
+	registry.Register(noderesources.FitName, noderesources.NewFit)
+	plugins.Filter = &schedulerconfig.PluginSet{
+		Enabled: []schedulerconfig.Plugin{{Name: noderesources.FitName}},
+	}
 
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "preempt-with-permit-plugin", nil), 0,

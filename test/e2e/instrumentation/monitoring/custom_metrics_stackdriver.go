@@ -112,11 +112,11 @@ func testCustomMetrics(f *framework.Framework, kubeClient clientset.Interface, c
 	}
 	defer CleanupDescriptors(gcmService, projectID)
 
-	err = CreateAdapter(adapterDeployment)
+	err = CreateAdapter(f.Namespace.Name, adapterDeployment)
 	if err != nil {
 		framework.Failf("Failed to set up: %s", err)
 	}
-	defer CleanupAdapter(adapterDeployment)
+	defer CleanupAdapter(f.Namespace.Name, adapterDeployment)
 
 	_, err = kubeClient.RbacV1().ClusterRoleBindings().Create(HPAPermissions)
 	if err != nil {
@@ -159,11 +159,11 @@ func testExternalMetrics(f *framework.Framework, kubeClient clientset.Interface,
 	defer CleanupDescriptors(gcmService, projectID)
 
 	// Both deployments - for old and new resource model - expose External Metrics API.
-	err = CreateAdapter(AdapterForOldResourceModel)
+	err = CreateAdapter(f.Namespace.Name, AdapterForOldResourceModel)
 	if err != nil {
 		framework.Failf("Failed to set up: %s", err)
 	}
-	defer CleanupAdapter(AdapterForOldResourceModel)
+	defer CleanupAdapter(f.Namespace.Name, AdapterForOldResourceModel)
 
 	_, err = kubeClient.RbacV1().ClusterRoleBindings().Create(HPAPermissions)
 	if err != nil {

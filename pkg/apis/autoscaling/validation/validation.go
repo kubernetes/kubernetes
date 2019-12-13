@@ -30,6 +30,13 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+const (
+	// MaxPeriodSeconds is the largest allowed scaling policy period (in seconds)
+	MaxPeriodSeconds int32 = 1800
+	// MaxStabilizationWindowSeconds is the largest allowed stabilization window (in seconds)
+	MaxStabilizationWindowSeconds int32 = 3600
+)
+
 // ValidateScale validates a Scale and returns an ErrorList with any errors.
 func ValidateScale(scale *autoscaling.Scale) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -63,6 +70,9 @@ func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAut
 		allErrs = append(allErrs, refErrs...)
 	}
 	if refErrs := validateMetrics(autoscaler.Metrics, fldPath.Child("metrics"), autoscaler.MinReplicas); len(refErrs) > 0 {
+		allErrs = append(allErrs, refErrs...)
+	}
+	if refErrs := validateBehavior(autoscaler.Behavior, fldPath.Child("behavior")); len(refErrs) > 0 {
 		allErrs = append(allErrs, refErrs...)
 	}
 	return allErrs
@@ -162,6 +172,70 @@ func validateMetrics(metrics []autoscaling.MetricSpec, fldPath *field.Path, minR
 		}
 	}
 
+	return allErrs
+}
+
+func validateBehavior(behavior *autoscaling.HorizontalPodAutoscalerBehavior, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if behavior != nil {
+		if scaleUpErrs := validateScalingRules(behavior.ScaleUp, fldPath.Child("scaleUp")); len(scaleUpErrs) > 0 {
+			allErrs = append(allErrs, scaleUpErrs...)
+		}
+		if scaleDownErrs := validateScalingRules(behavior.ScaleDown, fldPath.Child("scaleDown")); len(scaleDownErrs) > 0 {
+			allErrs = append(allErrs, scaleDownErrs...)
+		}
+	}
+	return allErrs
+}
+
+var validSelectPolicyTypes = sets.NewString(string(autoscaling.MaxPolicySelect), string(autoscaling.MinPolicySelect), string(autoscaling.DisabledPolicySelect))
+var validSelectPolicyTypesList = validSelectPolicyTypes.List()
+
+func validateScalingRules(rules *autoscaling.HPAScalingRules, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if rules != nil {
+		if rules.StabilizationWindowSeconds != nil && *rules.StabilizationWindowSeconds < 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("stabilizationWindowSeconds"), rules.StabilizationWindowSeconds, "must be greater than or equal to zero"))
+		}
+		if rules.StabilizationWindowSeconds != nil && *rules.StabilizationWindowSeconds > MaxStabilizationWindowSeconds {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("stabilizationWindowSeconds"), rules.StabilizationWindowSeconds,
+				fmt.Sprintf("must be less than or equal to %v", MaxStabilizationWindowSeconds)))
+		}
+		if rules.SelectPolicy != nil && !validSelectPolicyTypes.Has(string(*rules.SelectPolicy)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("selectPolicy"), rules.SelectPolicy, validSelectPolicyTypesList))
+		}
+		policiesPath := fldPath.Child("policies")
+		if len(rules.Policies) == 0 {
+			allErrs = append(allErrs, field.Required(policiesPath, "must specify at least one Policy"))
+		}
+		for i, policy := range rules.Policies {
+			idxPath := policiesPath.Index(i)
+			if policyErrs := validateScalingPolicy(policy, idxPath); len(policyErrs) > 0 {
+				allErrs = append(allErrs, policyErrs...)
+			}
+		}
+	}
+	return allErrs
+}
+
+var validPolicyTypes = sets.NewString(string(autoscaling.PodsScalingPolicy), string(autoscaling.PercentScalingPolicy))
+var validPolicyTypesList = validPolicyTypes.List()
+
+func validateScalingPolicy(policy autoscaling.HPAScalingPolicy, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if policy.Type != autoscaling.PodsScalingPolicy && policy.Type != autoscaling.PercentScalingPolicy {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), policy.Type, validPolicyTypesList))
+	}
+	if policy.Value <= 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("value"), policy.Value, "must be greater than zero"))
+	}
+	if policy.PeriodSeconds <= 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("periodSeconds"), policy.PeriodSeconds, "must be greater than zero"))
+	}
+	if policy.PeriodSeconds > MaxPeriodSeconds {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("periodSeconds"), policy.PeriodSeconds,
+			fmt.Sprintf("must be less than or equal to %v", MaxPeriodSeconds)))
+	}
 	return allErrs
 }
 

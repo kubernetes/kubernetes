@@ -29,6 +29,8 @@ spec:
     spec:
       serviceAccountName: metadata-agent
       priorityClassName: system-node-critical
+      nodeSelector:
+        kubernetes.io/os: linux
       containers:
       - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:0.2-0.0.21-1
         imagePullPolicy: IfNotPresent
@@ -91,6 +93,8 @@ spec:
     spec:
       serviceAccountName: metadata-agent
       priorityClassName: system-cluster-critical
+      nodeSelector:
+        kubernetes.io/os: linux
       containers:
       - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:0.2-0.0.21-1
         imagePullPolicy: IfNotPresent

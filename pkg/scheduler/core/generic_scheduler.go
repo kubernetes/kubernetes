@@ -72,8 +72,9 @@ type FailedPredicateMap map[string][]predicates.PredicateFailureReason
 
 // FitError describes a fit error of a pod.
 type FitError struct {
-	Pod                   *v1.Pod
-	NumAllNodes           int
+	Pod         *v1.Pod
+	NumAllNodes int
+	// TODO(Huang-Wei): remove 'FailedPredicates'
 	FailedPredicates      FailedPredicateMap
 	FilteredNodesStatuses framework.NodeToStatusMap
 }
@@ -96,7 +97,9 @@ func (f *FitError) Error() string {
 	}
 
 	for _, status := range f.FilteredNodesStatuses {
-		reasons[status.Message()]++
+		for _, reason := range status.Reasons() {
+			reasons[reason]++
+		}
 	}
 
 	sortReasonsHistogram := func() []string {
@@ -138,6 +141,9 @@ type ScheduleAlgorithm interface {
 	// for cluster autoscaler integration.
 	// TODO(#85691): remove this once CA migrates to creating a Framework instead of a full scheduler.
 	Snapshot() error
+	// Framework returns the scheduler framework instance. This is needed  for cluster autoscaler integration.
+	// TODO(#85691): remove this once CA migrates to creating a Framework instead of a full scheduler.
+	Framework() framework.Framework
 }
 
 // ScheduleResult represents the result of one pod scheduled. It will contain
@@ -171,14 +177,20 @@ type genericScheduler struct {
 	nextStartNodeIndex       int
 }
 
-// snapshot snapshots scheduler cache and node infos for all fit and priority
+// Snapshot snapshots scheduler cache and node infos for all fit and priority
 // functions.
 func (g *genericScheduler) Snapshot() error {
 	// Used for all fit and priority funcs.
 	return g.cache.UpdateNodeInfoSnapshot(g.nodeInfoSnapshot)
 }
 
-// GetPredicateMetadataProducer returns the predicate metadata producer. This is needed
+// Framework returns the framework instance.
+func (g *genericScheduler) Framework() framework.Framework {
+	// Used for all fit and priority funcs.
+	return g.framework
+}
+
+// PredicateMetadataProducer returns the predicate metadata producer. This is needed
 // for cluster autoscaler integration.
 func (g *genericScheduler) PredicateMetadataProducer() predicates.MetadataProducer {
 	return g.predicateMetaProducer
@@ -199,7 +211,7 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 	if err := g.Snapshot(); err != nil {
 		return result, err
 	}
-	trace.Step("Snapshoting scheduler cache and node infos done")
+	trace.Step("Snapshotting scheduler cache and node infos done")
 
 	if len(g.nodeInfoSnapshot.NodeInfoList) == 0 {
 		return result, ErrNoNodesAvailable
@@ -474,12 +486,13 @@ func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes i
 
 // Filters the nodes to find the ones that fit based on the given predicate functions
 // Each node is passed through the predicate functions to determine if it is a fit
+// TODO(Huang-Wei): remove 'FailedPredicateMap' from the return parameters.
 func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, FailedPredicateMap, framework.NodeToStatusMap, error) {
 	var filtered []*v1.Node
 	failedPredicateMap := FailedPredicateMap{}
 	filteredNodesStatuses := framework.NodeToStatusMap{}
 
-	if len(g.predicates) == 0 && !g.framework.HasFilterPlugins() {
+	if !g.framework.HasFilterPlugins() {
 		filtered = g.nodeInfoSnapshot.ListNodes()
 	} else {
 		allNodes := len(g.nodeInfoSnapshot.NodeInfoList)
@@ -504,7 +517,7 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 			// We check the nodes starting from where we left off in the previous scheduling cycle,
 			// this is to make sure all nodes have the same chance of being examined across pods.
 			nodeInfo := g.nodeInfoSnapshot.NodeInfoList[(g.nextStartNodeIndex+i)%allNodes]
-			fits, failedPredicates, status, err := g.podFitsOnNode(
+			fits, _, status, err := g.podFitsOnNode(
 				ctx,
 				state,
 				pod,
@@ -528,9 +541,6 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 				predicateResultLock.Lock()
 				if !status.IsSuccess() {
 					filteredNodesStatuses[nodeInfo.Node().Name] = status
-				}
-				if len(failedPredicates) != 0 {
-					failedPredicateMap[nodeInfo.Node().Name] = failedPredicates
 				}
 				predicateResultLock.Unlock()
 			}
@@ -564,6 +574,7 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 				return []*v1.Node{}, FailedPredicateMap{}, framework.NodeToStatusMap{}, err
 			}
 
+			// TODO(Huang-Wei): refactor this to fill 'filteredNodesStatuses' instead of 'failedPredicateMap'.
 			for failedNodeName, failedMsg := range failedMap {
 				if _, found := failedPredicateMap[failedNodeName]; !found {
 					failedPredicateMap[failedNodeName] = []predicates.PredicateFailureReason{}
@@ -582,6 +593,7 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 // addNominatedPods adds pods with equal or greater priority which are nominated
 // to run on the node given in nodeInfo to meta and nodeInfo. It returns 1) whether
 // any pod was added, 2) augmented metadata, 3) augmented CycleState 4) augmented nodeInfo.
+// TODO(Huang-Wei): remove 'meta predicates.Metadata' from the signature.
 func (g *genericScheduler) addNominatedPods(ctx context.Context, pod *v1.Pod, meta predicates.Metadata, state *framework.CycleState,
 	nodeInfo *schedulernodeinfo.NodeInfo) (bool, predicates.Metadata,
 	*framework.CycleState, *schedulernodeinfo.NodeInfo, error) {
@@ -660,44 +672,16 @@ func (g *genericScheduler) podFitsOnNode(
 	// nominated pods are running because they are not running right now and in fact,
 	// they may end up getting scheduled to a different node.
 	for i := 0; i < 2; i++ {
-		metaToUse := meta
 		stateToUse := state
 		nodeInfoToUse := info
 		if i == 0 {
 			var err error
-			podsAdded, metaToUse, stateToUse, nodeInfoToUse, err = g.addNominatedPods(ctx, pod, meta, state, info)
+			podsAdded, _, stateToUse, nodeInfoToUse, err = g.addNominatedPods(ctx, pod, meta, state, info)
 			if err != nil {
 				return false, []predicates.PredicateFailureReason{}, nil, err
 			}
 		} else if !podsAdded || len(failedPredicates) != 0 || !status.IsSuccess() {
 			break
-		}
-
-		for _, predicateKey := range predicates.Ordering() {
-			var (
-				fit     bool
-				reasons []predicates.PredicateFailureReason
-				err     error
-			)
-
-			if predicate, exist := g.predicates[predicateKey]; exist {
-				fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
-				if err != nil {
-					return false, []predicates.PredicateFailureReason{}, nil, err
-				}
-
-				if !fit {
-					// eCache is available and valid, and predicates result is unfit, record the fail reasons
-					failedPredicates = append(failedPredicates, reasons...)
-					// if alwaysCheckAllPredicates is false, short circuit all predicates when one predicate fails.
-					if !alwaysCheckAllPredicates {
-						klog.V(5).Infoln("since alwaysCheckAllPredicates has not been set, the predicate " +
-							"evaluation is short circuited and there are chances " +
-							"of other predicates failing as well.")
-						break
-					}
-				}
-			}
 		}
 
 		status = g.framework.RunFilterPlugins(ctx, stateToUse, pod, nodeInfoToUse)
@@ -1061,7 +1045,7 @@ func filterPodsWithPDBViolation(pods []*v1.Pod, pdbs []*policy.PodDisruptionBudg
 					continue
 				}
 				// We have found a matching PDB.
-				if pdb.Status.PodDisruptionsAllowed <= 0 {
+				if pdb.Status.DisruptionsAllowed <= 0 {
 					pdbForPodIsViolated = true
 					break
 				}
@@ -1207,7 +1191,7 @@ func nodesWherePreemptionMightHelp(nodeNameToInfo map[string]*schedulernodeinfo.
 		// to rely less on such assumptions in the code when checking does not impose
 		// significant overhead.
 		// Also, we currently assume all failures returned by extender as resolvable.
-		if predicates.UnresolvablePredicateExists(failedPredicates) == nil {
+		if !predicates.UnresolvablePredicateExists(failedPredicates) {
 			klog.V(3).Infof("Node %v is a potential node for preemption.", name)
 			potentialNodes = append(potentialNodes, node.Node())
 		}
@@ -1268,6 +1252,7 @@ func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeCla
 }
 
 // NewGenericScheduler creates a genericScheduler object.
+// TODO(Huang-Wei): remove 'predicates' and 'alwaysCheckAllPredicates'.
 func NewGenericScheduler(
 	cache internalcache.Cache,
 	podQueue internalqueue.SchedulingQueue,

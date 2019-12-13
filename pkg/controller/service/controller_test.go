@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -1424,6 +1425,70 @@ func Test_getNodeConditionPredicate(t *testing.T) {
 
 			if result := getNodeConditionPredicate()(tt.input); result != tt.want {
 				t.Errorf("getNodeConditionPredicate() = %v, want %v", result, tt.want)
+			}
+		})
+	}
+}
+
+func TestListWithPredicate(t *testing.T) {
+	fakeInformerFactory := informers.NewSharedInformerFactory(&fake.Clientset{}, 0*time.Second)
+	var nodes []*v1.Node
+	for i := 0; i < 5; i++ {
+		var phase v1.NodePhase
+		if i%2 == 0 {
+			phase = v1.NodePending
+		} else {
+			phase = v1.NodeRunning
+		}
+		node := &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("node-%d", i),
+			},
+			Status: v1.NodeStatus{
+				Phase: phase,
+			},
+		}
+		nodes = append(nodes, node)
+		fakeInformerFactory.Core().V1().Nodes().Informer().GetStore().Add(node)
+	}
+
+	tests := []struct {
+		name      string
+		predicate NodeConditionPredicate
+		expect    []*v1.Node
+	}{
+		{
+			name: "ListWithPredicate filter Running node",
+			predicate: func(node *v1.Node) bool {
+				return node.Status.Phase == v1.NodeRunning
+			},
+			expect: []*v1.Node{nodes[1], nodes[3]},
+		},
+		{
+			name: "ListWithPredicate filter Pending node",
+			predicate: func(node *v1.Node) bool {
+				return node.Status.Phase == v1.NodePending
+			},
+			expect: []*v1.Node{nodes[0], nodes[2], nodes[4]},
+		},
+		{
+			name: "ListWithPredicate filter Terminated node",
+			predicate: func(node *v1.Node) bool {
+				return node.Status.Phase == v1.NodeTerminated
+			},
+			expect: nil,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			get, err := listWithPredicate(fakeInformerFactory.Core().V1().Nodes().Lister(), test.predicate)
+			sort.Slice(get, func(i, j int) bool {
+				return get[i].Name < get[j].Name
+			})
+			if err != nil {
+				t.Errorf("Error from ListWithPredicate: %v", err)
+			} else if !reflect.DeepEqual(get, test.expect) {
+				t.Errorf("Expect nodes %v, but got %v", test.expect, get)
 			}
 		})
 	}

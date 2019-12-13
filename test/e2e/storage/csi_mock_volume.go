@@ -465,7 +465,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				sc, pvc, pod := createPod(false)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
 
-				gomega.Expect(*sc.AllowVolumeExpansion).To(gomega.BeTrue(), "failed creating sc with allowed expansion")
+				framework.ExpectEqual(*sc.AllowVolumeExpansion, true, "failed creating sc with allowed expansion")
 
 				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod1: %v", err)
@@ -557,7 +557,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				sc, pvc, pod := createPod(false)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
 
-				gomega.Expect(*sc.AllowVolumeExpansion).To(gomega.BeTrue(), "failed creating sc with allowed expansion")
+				framework.ExpectEqual(*sc.AllowVolumeExpansion, true, "failed creating sc with allowed expansion")
 
 				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod1: %v", err)
@@ -592,7 +592,10 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 })
 
 func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) error {
-	var err error
+	reg, err := regexp.Compile(`max.+volume.+count`)
+	if err != nil {
+		return err
+	}
 	waitErr := wait.PollImmediate(10*time.Second, csiPodUnschedulableTimeout, func() (bool, error) {
 		pod, err = cs.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
 		if err != nil {
@@ -600,11 +603,10 @@ func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) error {
 		}
 		conditions := pod.Status.Conditions
 		for _, condition := range conditions {
-			matched, _ := regexp.MatchString("max.+volume.+count", condition.Message)
+			matched := reg.MatchString(condition.Message)
 			if condition.Reason == v1.PodReasonUnschedulable && matched {
 				return true, nil
 			}
-
 		}
 		return false, nil
 	})

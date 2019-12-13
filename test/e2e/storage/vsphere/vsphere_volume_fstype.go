@@ -130,6 +130,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 	framework.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(namespace).List(metav1.ListOptions{})
+	framework.ExpectNoError(err)
 
 	// Detach and delete volume
 	detachVolume(f, client, pod, persistentvolumes[0].Spec.VsphereVolume.VolumePath)
@@ -144,7 +145,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 			isFound = true
 		}
 	}
-	gomega.Expect(isFound).To(gomega.BeTrue(), "Unable to verify MountVolume.MountDevice failure")
+	framework.ExpectEqual(isFound, true, "Unable to verify MountVolume.MountDevice failure")
 }
 
 func createVolume(client clientset.Interface, namespace string, scParameters map[string]string) (*v1.PersistentVolumeClaim, []*v1.PersistentVolume) {

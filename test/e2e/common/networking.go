@@ -32,28 +32,26 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 		// expect exactly one unique hostname. Each of these endpoints reports
 		// its own hostname.
 		/*
-			Release : v1.9
+			Release : v1.9, v1.18
 			Testname: Networking, intra pod http
 			Description: Create a hostexec pod that is capable of curl to netcat commands. Create a test Pod that will act as a webserver front end exposing ports 8080 for tcp and 8081 for udp. The netserver service proxies are created on specified number of nodes.
 			The kubectl exec on the webserver container MUST reach a http port on the each of service proxy endpoints in the cluster and the request MUST be successful. Container will execute curl command to reach the service port within specified max retry limit and MUST result in reporting unique hostnames.
-			This test is marked LinuxOnly since HostNetwork is not supported on other platforms like Windows.
 		*/
-		framework.ConformanceIt("should function for intra-pod communication: http [LinuxOnly] [NodeConformance]", func() {
-			config := e2enetwork.NewCoreNetworkingTestConfig(f, true)
+		framework.ConformanceIt("should function for intra-pod communication: http [NodeConformance]", func() {
+			config := e2enetwork.NewCoreNetworkingTestConfig(f, false)
 			for _, endpointPod := range config.EndpointPods {
 				config.DialFromTestContainer("http", endpointPod.Status.PodIP, e2enetwork.EndpointHTTPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
 			}
 		})
 
 		/*
-			Release : v1.9
+			Release : v1.9, v1.18
 			Testname: Networking, intra pod udp
 			Description: Create a hostexec pod that is capable of curl to netcat commands. Create a test Pod that will act as a webserver front end exposing ports 8080 for tcp and 8081 for udp. The netserver service proxies are created on specified number of nodes.
 			The kubectl exec on the webserver container MUST reach a udp port on the each of service proxy endpoints in the cluster and the request MUST be successful. Container will execute curl command to reach the service port within specified max retry limit and MUST result in reporting unique hostnames.
-			This test is marked LinuxOnly since HostNetwork is not supported on other platforms like Windows.
 		*/
-		framework.ConformanceIt("should function for intra-pod communication: udp [LinuxOnly] [NodeConformance]", func() {
-			config := e2enetwork.NewCoreNetworkingTestConfig(f, true)
+		framework.ConformanceIt("should function for intra-pod communication: udp [NodeConformance]", func() {
+			config := e2enetwork.NewCoreNetworkingTestConfig(f, false)
 			for _, endpointPod := range config.EndpointPods {
 				config.DialFromTestContainer("udp", endpointPod.Status.PodIP, e2enetwork.EndpointUDPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
 			}

@@ -833,6 +833,14 @@ func (ImagePullCheck) Name() string {
 // Check pulls images required by kubeadm. This is a mutating check
 func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 	for _, image := range ipc.imageList {
+		ret, err := ipc.runtime.ImageExists(image)
+		if ret && err == nil {
+			klog.V(1).Infof("image exists: %s", image)
+			continue
+		}
+		if err != nil {
+			errorList = append(errorList, errors.Wrapf(err, "failed to check if image %s exists", image))
+		}
 		klog.V(1).Infof("pulling %s", image)
 		if err := ipc.runtime.PullImage(image); err != nil {
 			errorList = append(errorList, errors.Wrapf(err, "failed to pull image %s", image))
@@ -1009,6 +1017,7 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 			FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 			FileContentCheck{Path: ipv4Forward, Content: []byte{'1'}},
 			SwapCheck{},
+			InPathCheck{executable: "conntrack", mandatory: true, exec: execer},
 			InPathCheck{executable: "ip", mandatory: true, exec: execer},
 			InPathCheck{executable: "iptables", mandatory: true, exec: execer},
 			InPathCheck{executable: "mount", mandatory: true, exec: execer},

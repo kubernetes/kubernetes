@@ -321,6 +321,7 @@ func invokeInvalidPolicyTestNeg(client clientset.Interface, namespace string, sc
 	framework.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
+	framework.ExpectNoError(err)
 	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
 }
 
@@ -352,5 +353,6 @@ func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, masterN
 	dummyVMFullName := DummyVMPrefixName + "-" + fmt.Sprint(fnvHash.Sum32())
 	errorMsg := "Dummy VM - " + vmName + "is still present. Failing the test.."
 	nodeInfo := TestContext.NodeMapper.GetNodeInfo(masterNode)
-	gomega.Expect(nodeInfo.VSphere.IsVMPresent(dummyVMFullName, nodeInfo.DataCenterRef)).NotTo(gomega.BeTrue(), errorMsg)
+	isVMPresentFlag, _ := nodeInfo.VSphere.IsVMPresent(dummyVMFullName, nodeInfo.DataCenterRef)
+	framework.ExpectNotEqual(isVMPresentFlag, true, errorMsg)
 }

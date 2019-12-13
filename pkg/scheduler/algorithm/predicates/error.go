@@ -103,15 +103,14 @@ var unresolvablePredicateFailureErrors = map[PredicateFailureReason]struct{}{
 	ErrVolumeBindConflict:      {},
 }
 
-// UnresolvablePredicateExists checks if there is at least one unresolvable predicate failure reason, if true
-// returns the first one in the list.
-func UnresolvablePredicateExists(reasons []PredicateFailureReason) PredicateFailureReason {
+// UnresolvablePredicateExists checks if there is at least one unresolvable predicate failure reason.
+func UnresolvablePredicateExists(reasons []PredicateFailureReason) bool {
 	for _, r := range reasons {
 		if _, ok := unresolvablePredicateFailureErrors[r]; ok {
-			return r
+			return true
 		}
 	}
-	return nil
+	return false
 }
 
 // InsufficientResourceError is an error type that indicates what kind of resource limit is

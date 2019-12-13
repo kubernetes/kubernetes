@@ -30,6 +30,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -170,6 +171,106 @@ func BenchmarkKeyFunc(b *testing.B) {
 			key = keyFunc(hashPool, nil, jwtToken)
 		}
 		bKey = key
+	})
+}
+
+func TestSharedLookup(t *testing.T) {
+	var chewie = &authenticator.Response{User: &user.DefaultInfo{Name: "chewbacca"}}
+
+	t.Run("actually shared", func(t *testing.T) {
+		var lookups uint32
+		c := make(chan struct{})
+		a := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+			<-c
+			atomic.AddUint32(&lookups, 1)
+			return chewie, true, nil
+		}), true, time.Minute, 0)
+
+		var wg sync.WaitGroup
+		for i := 0; i < 10; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				a.AuthenticateToken(context.Background(), "")
+			}()
+		}
+
+		// no good way to make sure that all the callers are queued so we sleep.
+		time.Sleep(1 * time.Second)
+		close(c)
+		wg.Wait()
+
+		if lookups > 3 {
+			t.Fatalf("unexpected number of lookups: got=%d, wanted less than 3", lookups)
+		}
+	})
+
+	t.Run("first caller bails, second caller gets result", func(t *testing.T) {
+		c := make(chan struct{})
+		a := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+			<-c
+			return chewie, true, nil
+		}), true, time.Minute, 0)
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		ctx1, cancel1 := context.WithCancel(context.Background())
+		go func() {
+			defer wg.Done()
+			a.AuthenticateToken(ctx1, "")
+		}()
+
+		ctx2 := context.Background()
+
+		var (
+			resp *authenticator.Response
+			ok   bool
+			err  error
+		)
+		go func() {
+			defer wg.Done()
+			resp, ok, err = a.AuthenticateToken(ctx2, "")
+		}()
+
+		time.Sleep(1 * time.Second)
+		cancel1()
+		close(c)
+		wg.Wait()
+
+		if want := chewie; !cmp.Equal(resp, want) {
+			t.Errorf("Unexpected diff: %v", cmp.Diff(resp, want))
+		}
+		if !ok {
+			t.Errorf("Expected ok response")
+		}
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	})
+
+	t.Run("lookup panics", func(t *testing.T) {
+		a := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+			panic("uh oh")
+		}), true, time.Minute, 0)
+
+		_, _, err := a.AuthenticateToken(context.Background(), "")
+		if err != errAuthnCrash {
+			t.Errorf("expected error: %v", err)
+		}
+	})
+
+	t.Run("audiences are forwarded", func(t *testing.T) {
+		ctx := authenticator.WithAudiences(context.Background(), []string{"a"})
+		a := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+			auds, _ := authenticator.AudiencesFrom(ctx)
+			if got, want := auds, []string{"a"}; cmp.Equal(got, want) {
+				t.Fatalf("unexpeced audiences: %v", cmp.Diff(got, want))
+			}
+			return nil, false, nil
+		}), true, time.Minute, 0)
+
+		a.AuthenticateToken(ctx, "")
 	})
 }
 

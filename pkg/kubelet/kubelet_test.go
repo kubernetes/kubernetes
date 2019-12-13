@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
@@ -443,10 +442,6 @@ func (nl testNodeLister) Get(name string) (*v1.Node, error) {
 }
 
 func (nl testNodeLister) List(_ labels.Selector) (ret []*v1.Node, err error) {
-	return nl.nodes, nil
-}
-
-func (nl testNodeLister) ListWithPredicate(_ corelisters.NodeConditionPredicate) ([]*v1.Node, error) {
 	return nl.nodes, nil
 }
 

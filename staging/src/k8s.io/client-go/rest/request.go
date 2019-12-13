@@ -562,7 +562,7 @@ func (r *Request) tryThrottle() error {
 	}
 
 	if latency := time.Since(now); latency > longThrottleLatency {
-		klog.V(4).Infof("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String())
+		klog.V(3).Infof("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String())
 	}
 
 	return err

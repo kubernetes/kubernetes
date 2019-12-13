@@ -46,8 +46,8 @@ var _ TestSuite = &volumesTestSuite{}
 func InitVolumesTestSuite() TestSuite {
 	return &volumesTestSuite{
 		tsInfo: TestSuiteInfo{
-			name: "volumes",
-			testPatterns: []testpatterns.TestPattern{
+			Name: "volumes",
+			TestPatterns: []testpatterns.TestPattern{
 				// Default fsType
 				testpatterns.DefaultFsInlineVolume,
 				testpatterns.DefaultFsPreprovisionedPV,
@@ -72,18 +72,18 @@ func InitVolumesTestSuite() TestSuite {
 				testpatterns.BlockVolModePreprovisionedPV,
 				testpatterns.BlockVolModeDynamicPV,
 			},
-			supportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: volume.SizeRange{
 				Min: "1Mi",
 			},
 		},
 	}
 }
 
-func (t *volumesTestSuite) getTestSuiteInfo() TestSuiteInfo {
+func (t *volumesTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumesTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumesTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
 func skipExecTest(driver TestDriver) {
@@ -100,12 +100,12 @@ func skipTestIfBlockNotSupported(driver TestDriver) {
 	}
 }
 
-func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumesTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config        *PerTestConfig
 		driverCleanup func()
 
-		resource *genericVolumeTestResource
+		resource *VolumeResource
 
 		intreeOps   opCounts
 		migratedOps opCounts
@@ -127,9 +127,9 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
-		testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
-		l.resource = createGenericVolumeTestResource(driver, l.config, pattern, testVolumeSizeRange)
-		if l.resource.volSource == nil {
+		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
+		if l.resource.VolSource == nil {
 			framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 		}
 	}
@@ -137,7 +137,7 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 	cleanup := func() {
 		var errs []error
 		if l.resource != nil {
-			errs = append(errs, l.resource.cleanupResource())
+			errs = append(errs, l.resource.CleanupResource())
 			l.resource = nil
 		}
 
@@ -160,7 +160,7 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 
 		tests := []volume.Test{
 			{
-				Volume: *l.resource.volSource,
+				Volume: *l.resource.VolSource,
 				Mode:   pattern.VolMode,
 				File:   "index.html",
 				// Must match content
@@ -193,7 +193,7 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 			init()
 			defer cleanup()
 
-			testScriptInPod(f, l.resource.volType, l.resource.volSource, l.config)
+			testScriptInPod(f, l.resource.VolType, l.resource.VolSource, l.config)
 		})
 	}
 }

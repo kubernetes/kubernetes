@@ -17,7 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"fmt"
 	"math"
 	"time"
 
@@ -30,21 +29,6 @@ const (
 	// TODO: client should not apply this timeout to Watch calls. Increased from 30s until that is fixed.
 	SingleCallTimeout = 5 * time.Minute
 )
-
-// VerifyLatencyWithinThreshold verifies whether 50, 90 and 99th percentiles of a latency metric are
-// within the expected threshold.
-func VerifyLatencyWithinThreshold(threshold, actual LatencyMetric, metricName string) error {
-	if actual.Perc50 > threshold.Perc50 {
-		return fmt.Errorf("too high %v latency 50th percentile: %v", metricName, actual.Perc50)
-	}
-	if actual.Perc90 > threshold.Perc90 {
-		return fmt.Errorf("too high %v latency 90th percentile: %v", metricName, actual.Perc90)
-	}
-	if actual.Perc99 > threshold.Perc99 {
-		return fmt.Errorf("too high %v latency 99th percentile: %v", metricName, actual.Perc99)
-	}
-	return nil
-}
 
 // PodLatencyData encapsulates pod startup latency information.
 type PodLatencyData struct {

@@ -96,20 +96,22 @@ var (
 	// type.
 	DeprecatedDockerOperationsLatency = metrics.NewSummaryVec(
 		&metrics.SummaryOpts{
-			Subsystem:      kubeletSubsystem,
-			Name:           DeprecatedDockerOperationsLatencyKey,
-			Help:           "(Deprecated) Latency in microseconds of Docker operations. Broken down by operation type.",
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         kubeletSubsystem,
+			Name:              DeprecatedDockerOperationsLatencyKey,
+			Help:              "Latency in microseconds of Docker operations. Broken down by operation type.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 		[]string{"operation_type"},
 	)
 	// DeprecatedDockerOperations collects operation counts by operation type.
 	DeprecatedDockerOperations = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Subsystem:      kubeletSubsystem,
-			Name:           DeprecatedDockerOperationsKey,
-			Help:           "(Deprecated) Cumulative number of Docker operations by operation type.",
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         kubeletSubsystem,
+			Name:              DeprecatedDockerOperationsKey,
+			Help:              "Cumulative number of Docker operations by operation type.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 		[]string{"operation_type"},
 	)
@@ -117,20 +119,22 @@ var (
 	// type.
 	DeprecatedDockerOperationsErrors = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Subsystem:      kubeletSubsystem,
-			Name:           DeprecatedDockerOperationsErrorsKey,
-			Help:           "(Deprecated) Cumulative number of Docker operation errors by operation type.",
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         kubeletSubsystem,
+			Name:              DeprecatedDockerOperationsErrorsKey,
+			Help:              "Cumulative number of Docker operation errors by operation type.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 		[]string{"operation_type"},
 	)
 	// DeprecatedDockerOperationsTimeout collects operation timeouts by operation type.
 	DeprecatedDockerOperationsTimeout = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Subsystem:      kubeletSubsystem,
-			Name:           DeprecatedDockerOperationsTimeoutKey,
-			Help:           "(Deprecated) Cumulative number of Docker operation timeout by operation type.",
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         kubeletSubsystem,
+			Name:              DeprecatedDockerOperationsTimeoutKey,
+			Help:              "Cumulative number of Docker operation timeout by operation type.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 		[]string{"operation_type"},
 	)

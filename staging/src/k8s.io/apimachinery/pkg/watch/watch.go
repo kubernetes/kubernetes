@@ -90,7 +90,7 @@ func (w emptyWatch) ResultChan() <-chan Event {
 // FakeWatcher lets you test anything that consumes a watch.Interface; threadsafe.
 type FakeWatcher struct {
 	result  chan Event
-	Stopped bool
+	stopped bool
 	sync.Mutex
 }
 
@@ -110,24 +110,24 @@ func NewFakeWithChanSize(size int, blocking bool) *FakeWatcher {
 func (f *FakeWatcher) Stop() {
 	f.Lock()
 	defer f.Unlock()
-	if !f.Stopped {
+	if !f.stopped {
 		klog.V(4).Infof("Stopping fake watcher.")
 		close(f.result)
-		f.Stopped = true
+		f.stopped = true
 	}
 }
 
 func (f *FakeWatcher) IsStopped() bool {
 	f.Lock()
 	defer f.Unlock()
-	return f.Stopped
+	return f.stopped
 }
 
 // Reset prepares the watcher to be reused.
 func (f *FakeWatcher) Reset() {
 	f.Lock()
 	defer f.Unlock()
-	f.Stopped = false
+	f.stopped = false
 	f.result = make(chan Event)
 }
 

@@ -159,7 +159,7 @@ func NewKubeGenericRuntimeManager(
 	podStateProvider podStateProvider,
 	osInterface kubecontainer.OSInterface,
 	runtimeHelper kubecontainer.RuntimeHelper,
-	httpClient types.HttpGetter,
+	httpClient types.HTTPGetter,
 	imageBackOff *flowcontrol.Backoff,
 	serializeImagePulls bool,
 	imagePullQPS float32,
@@ -192,7 +192,7 @@ func NewKubeGenericRuntimeManager(
 		logReduction:        logreduction.NewLogReduction(identicalErrorDelay),
 	}
 
-	typedVersion, err := kubeRuntimeManager.runtimeService.Version(kubeRuntimeAPIVersion)
+	typedVersion, err := kubeRuntimeManager.getTypedVersion()
 	if err != nil {
 		klog.Errorf("Get runtime version failed: %v", err)
 		return nil, err
@@ -268,17 +268,15 @@ func newRuntimeVersion(version string) (*utilversion.Version, error) {
 func (m *kubeGenericRuntimeManager) getTypedVersion() (*runtimeapi.VersionResponse, error) {
 	typedVersion, err := m.runtimeService.Version(kubeRuntimeAPIVersion)
 	if err != nil {
-		klog.Errorf("Get remote runtime typed version failed: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("get remote runtime typed version failed: %v", err)
 	}
 	return typedVersion, nil
 }
 
 // Version returns the version information of the container runtime.
 func (m *kubeGenericRuntimeManager) Version() (kubecontainer.Version, error) {
-	typedVersion, err := m.runtimeService.Version(kubeRuntimeAPIVersion)
+	typedVersion, err := m.getTypedVersion()
 	if err != nil {
-		klog.Errorf("Get remote runtime version failed: %v", err)
 		return nil, err
 	}
 

@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -117,7 +117,7 @@ func getIP(iptype v1.NodeAddressType, node *v1.Node) (string, error) {
 
 func getSchedulable(nodes []v1.Node) (*v1.Node, error) {
 	for _, node := range nodes {
-		if node.Spec.Unschedulable == false {
+		if !node.Spec.Unschedulable {
 			return &node, nil
 		}
 	}

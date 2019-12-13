@@ -24,20 +24,25 @@ import (
 )
 
 type certificateExpirationTracker struct {
-	mu       sync.RWMutex
-	m        map[*Authenticator]time.Time
-	earliest time.Time
+	mu        sync.RWMutex
+	m         map[*Authenticator]time.Time
+	metricSet func(*time.Time)
 }
 
-var expirationMetrics = &certificateExpirationTracker{m: map[*Authenticator]time.Time{}}
+var expirationMetrics = &certificateExpirationTracker{
+	m: map[*Authenticator]time.Time{},
+	metricSet: func(e *time.Time) {
+		metrics.ClientCertExpiry.Set(e)
+	},
+}
 
-// set stores the given expiration time and updates the updates earliest.
+// set stores the given expiration time and updates the updates the certificate
+// expiry metric to the earliest expiration time.
 func (c *certificateExpirationTracker) set(a *Authenticator, t time.Time) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.m[a] = t
 
-	// update earliest
 	earliest := time.Time{}
 	for _, t := range c.m {
 		if t.IsZero() {
@@ -47,18 +52,9 @@ func (c *certificateExpirationTracker) set(a *Authenticator, t time.Time) {
 			earliest = t
 		}
 	}
-	c.earliest = earliest
-}
-
-// report reports the ttl to the earliest reported expiration time.
-// If no Authenticators have reported a certificate expiration, this reports nil.
-func (c *certificateExpirationTracker) report(now func() time.Time) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	if c.earliest.IsZero() {
-		metrics.ClientCertTTL.Set(nil)
+	if earliest.IsZero() {
+		c.metricSet(nil)
 	} else {
-		ttl := c.earliest.Sub(now())
-		metrics.ClientCertTTL.Set(&ttl)
+		c.metricSet(&earliest)
 	}
 }

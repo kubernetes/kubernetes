@@ -83,6 +83,7 @@ API rule violation: list_type_missing,k8s.io/api/autoscaling/v2beta1,HorizontalP
 API rule violation: list_type_missing,k8s.io/api/autoscaling/v2beta1,HorizontalPodAutoscalerSpec,Metrics
 API rule violation: list_type_missing,k8s.io/api/autoscaling/v2beta1,HorizontalPodAutoscalerStatus,Conditions
 API rule violation: list_type_missing,k8s.io/api/autoscaling/v2beta1,HorizontalPodAutoscalerStatus,CurrentMetrics
+API rule violation: list_type_missing,k8s.io/api/autoscaling/v2beta2,HPAScalingRules,Policies
 API rule violation: list_type_missing,k8s.io/api/autoscaling/v2beta2,HorizontalPodAutoscalerList,Items
 API rule violation: list_type_missing,k8s.io/api/autoscaling/v2beta2,HorizontalPodAutoscalerSpec,Metrics
 API rule violation: list_type_missing,k8s.io/api/autoscaling/v2beta2,HorizontalPodAutoscalerStatus,Conditions
@@ -534,7 +535,6 @@ API rule violation: names_match,k8s.io/api/core/v1,RBDVolumeSource,RBDPool
 API rule violation: names_match,k8s.io/api/core/v1,RBDVolumeSource,RadosUser
 API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,CephFS
 API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,StorageOS
-API rule violation: names_match,k8s.io/api/policy/v1beta1,PodDisruptionBudgetStatus,PodDisruptionsAllowed
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSON,Raw
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,Ref
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,Schema

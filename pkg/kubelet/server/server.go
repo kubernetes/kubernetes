@@ -328,7 +328,7 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 	// prober metrics are exposed under a different endpoint
 
 	p := compbasemetrics.NewKubeRegistry()
-	compbasemetrics.RegisterProcessStartTime(p.RawRegister)
+	_ = compbasemetrics.RegisterProcessStartTime(p.Register)
 	p.MustRegister(prober.ProberResults)
 	s.restfulCont.Handle(proberMetricsPath,
 		compbasemetrics.HandlerFor(p, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
