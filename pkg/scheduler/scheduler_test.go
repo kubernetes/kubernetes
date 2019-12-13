@@ -309,6 +309,12 @@ func TestScheduler(t *testing.T) {
 				AssumeFunc: func(pod *v1.Pod) {
 					gotAssumedPod = pod
 				},
+				IsAssumedPodFunc: func(pod *v1.Pod) bool {
+					if pod == nil || gotAssumedPod == nil {
+						return false
+					}
+					return pod.UID == gotAssumedPod.UID
+				},
 			}
 
 			s := &Scheduler{
