@@ -16,6 +16,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -25,6 +26,7 @@ go_library(
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
         "//vendor/sigs.k8s.io/structured-merge-diff/fieldpath:go_default_library",
         "//vendor/sigs.k8s.io/structured-merge-diff/merge:go_default_library",
+        "//vendor/sigs.k8s.io/structured-merge-diff/value:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )

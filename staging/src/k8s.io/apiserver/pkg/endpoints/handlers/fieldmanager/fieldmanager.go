@@ -18,14 +18,18 @@ package fieldmanager
 
 import (
 	"fmt"
+	"reflect"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/value"
 )
 
 // DefaultMaxUpdateManagers defines the default maximum retained number of managedFields entries from updates
@@ -159,3 +163,82 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, manager strin
 
 	return object, nil
 }
+
+// TODO(jpbetz): For experimenting only. If we provide conversions, we'll need a cleaner way to do it.
+func init() {
+	value.CustomTypeConverters[reflect.TypeOf(metav1.Time{})] = timeConverter{}
+	value.CustomTypeConverters[reflect.TypeOf(&metav1.Time{})] = timeConverter{}
+	value.CustomTypeConverters[reflect.TypeOf(resource.Quantity{})] = quantityConverter{}
+	value.CustomTypeConverters[reflect.TypeOf(&resource.Quantity{})] = quantityConverter{}
+	// TODO: IntOrString, &JSONSchemaPropsOrArray what else?
+}
+
+type timeConverter struct{}
+
+func (_ timeConverter) IsNull(v reflect.Value) bool {
+	t, ok := v.Interface().(metav1.Time)
+	if !ok {
+		panic("value is not a metav1.Time")
+	}
+	return t.IsZero()
+}
+
+func (_ timeConverter) ToString(v reflect.Value) string {
+	t, ok := v.Interface().(metav1.Time)
+	if !ok {
+		panic("value is not a metav1.Time")
+	}
+	if t.IsZero() {
+		panic("value is null, not string")
+	}
+	buf := make([]byte, 0, len(time.RFC3339))
+	// time cannot contain non escapable JSON characters
+	buf = t.UTC().AppendFormat(buf, time.RFC3339)
+	return string(buf)
+}
+
+// func (_ timeConverter) Equal(lhs reflect.Value, rhs reflect.Value) bool {
+// 	lhsTime, ok := lhs.Interface().(metav1.Time)
+// 	if !ok {
+// 		panic("Expected lhs value to be of type metav1.Time")
+// 	}
+// 	rhsInterface := rhs.Interface()
+// 	if rhsInterface == nil {
+// 		return false
+// 	}
+// 	rhsTime, ok := rhsInterface.(metav1.Time)
+// 	if !ok {
+// 		return false
+// 	}
+// 	return lhsTime.Equal(&rhsTime)
+// }
+
+type quantityConverter struct{}
+
+func (_ quantityConverter) IsNull(v reflect.Value) bool {
+	return false
+}
+
+func (_ quantityConverter) ToString(v reflect.Value) string {
+	quantity, ok := v.Interface().(resource.Quantity)
+	if !ok {
+		panic("value is not a resource.Quantity")
+	}
+	return quantity.String()
+}
+
+// func (_ quantityConverter) Equal(lhs reflect.Value, rhs reflect.Value) bool {
+// 	lhsTime, ok := lhs.Interface().(resource.Quantity)
+// 	if !ok {
+// 		panic("Expected lhs value to be of type time.Time")
+// 	}
+// 	rhsInterface := rhs.Interface()
+// 	if rhsInterface == nil {
+// 		return false
+// 	}
+// 	rhsTime, ok := rhsInterface.(resource.Quantity)
+// 	if !ok {
+// 		return false
+// 	}
+// 	return lhsTime.Equal(rhsTime)
+// }

@@ -37,32 +37,35 @@ func (fp Path) String() string {
 
 // Equals returns true if the two paths are equivalent.
 func (fp Path) Equals(fp2 Path) bool {
-	return !fp.Less(fp2) && !fp2.Less(fp)
+	if len(fp) != len(fp2) {
+		return false
+	}
+	for i := range fp {
+		if !fp[i].Equals(fp2[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 // Less provides a lexical order for Paths.
-func (fp Path) Less(rhs Path) bool {
+func (fp Path) Compare(rhs Path) int {
 	i := 0
 	for {
 		if i >= len(fp) && i >= len(rhs) {
 			// Paths are the same length and all items are equal.
-			return false
+			return 0
 		}
 		if i >= len(fp) {
 			// LHS is shorter.
-			return true
+			return -1
 		}
 		if i >= len(rhs) {
 			// RHS is shorter.
-			return false
+			return 1
 		}
-		if fp[i].Less(rhs[i]) {
-			// LHS is less; return
-			return true
-		}
-		if rhs[i].Less(fp[i]) {
-			// RHS is less; return
-			return false
+		if c := fp[i].Compare(rhs[i]); c != 0 {
+			return c
 		}
 		// The items are equal; continue.
 		i++
