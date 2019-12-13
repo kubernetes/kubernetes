@@ -123,32 +123,61 @@ func getSelector(pod *v1.Pod, sl corelisters.ServiceLister, cl corelisters.Repli
 		}
 	}
 
-	if rcs, err := cl.GetPodControllers(pod); err == nil {
-		for _, rc := range rcs {
-			labelSet = labels.Merge(labelSet, rc.Spec.Selector)
+	rcPod, rsPod, stsPod := false, false, false
+	for _, ref := range pod.OwnerReferences {
+		if ref.Controller != nil && *ref.Controller == true {
+			switch ref.Kind {
+			case "ReplicationController":
+				if ref.APIVersion == "v1" {
+					rcPod = true
+				}
+			case "ReplicaSet":
+				if ref.APIVersion == "apps/v1" || ref.APIVersion == "apps/v1beta2" || ref.APIVersion == "extensions/v1beta1" {
+					rsPod = true
+				}
+			case "StatefulSet":
+				if ref.APIVersion == "apps/v1" || ref.APIVersion == "apps/v1beta1" || ref.APIVersion == "apps/v1beta2" {
+					stsPod = true
+				}
+			default:
+				continue
+			}
+			break
+		}
+	}
+
+	if rcPod {
+		if rcs, err := cl.GetPodControllers(pod); err == nil {
+			for _, rc := range rcs {
+				labelSet = labels.Merge(labelSet, rc.Spec.Selector)
+			}
 		}
 	}
 
 	selector := labels.NewSelector()
 	if len(labelSet) != 0 {
-		selector = labelSet.AsSelector()
+		selector = labelSet.AsSelectorPreValidated()
 	}
 
-	if rss, err := rsl.GetPodReplicaSets(pod); err == nil {
-		for _, rs := range rss {
-			if other, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector); err == nil {
-				if r, ok := other.Requirements(); ok {
-					selector = selector.Add(r...)
+	if rsPod {
+		if rss, err := rsl.GetPodReplicaSets(pod); err == nil {
+			for _, rs := range rss {
+				if other, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector); err == nil {
+					if r, ok := other.Requirements(); ok {
+						selector = selector.Add(r...)
+					}
 				}
 			}
 		}
 	}
 
-	if sss, err := ssl.GetPodStatefulSets(pod); err == nil {
-		for _, ss := range sss {
-			if other, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector); err == nil {
-				if r, ok := other.Requirements(); ok {
-					selector = selector.Add(r...)
+	if stsPod {
+		if sss, err := ssl.GetPodStatefulSets(pod); err == nil {
+			for _, ss := range sss {
+				if other, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector); err == nil {
+					if r, ok := other.Requirements(); ok {
+						selector = selector.Add(r...)
+					}
 				}
 			}
 		}

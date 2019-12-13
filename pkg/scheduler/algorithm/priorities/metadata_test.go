@@ -17,9 +17,11 @@ limitations under the License.
 package priorities
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,7 +29,9 @@ import (
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
+	"k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 func TestPriorityMetadata(t *testing.T) {
@@ -183,5 +187,61 @@ func TestPriorityMetadata(t *testing.T) {
 				t.Errorf("expected %#v, got %#v", test.expected, ptData)
 			}
 		})
+	}
+}
+
+func BenchmarkTestGetSelector(b *testing.B) {
+	pod := st.MakePod().Name("pod-0").Label("service", "service-0").Obj()
+	pod.OwnerReferences = controllerRef("apps/v1", "ReplicaSet", "pod-0", "abc123")
+	var (
+		services []*v1.Service
+		rcs      []*v1.ReplicationController
+		rss      []*appsv1.ReplicaSet
+		stss     []*appsv1.StatefulSet
+	)
+
+	for i := 0; i < 1000; i++ {
+		service := v1.Service{
+			Spec: v1.ServiceSpec{
+				Selector: map[string]string{"service": fmt.Sprintf("service-%d", i)},
+			},
+		}
+		services = append(services, &service)
+
+		rc := v1.ReplicationController{
+			Spec: v1.ReplicationControllerSpec{
+				Selector: map[string]string{"rc": fmt.Sprintf("rc-%d", i)},
+			},
+		}
+		rcs = append(rcs, &rc)
+
+		rs := appsv1.ReplicaSet{
+			Spec: appsv1.ReplicaSetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"rs": fmt.Sprintf("rs-%d", i)},
+				},
+			},
+		}
+		rss = append(rss, &rs)
+
+		sts := appsv1.StatefulSet{
+			Spec: appsv1.StatefulSetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"sts": fmt.Sprintf("sts-%d", i)},
+				},
+			},
+		}
+		stss = append(stss, &sts)
+	}
+	ss := SelectorSpread{
+		serviceLister:     fake.ServiceLister(services),
+		controllerLister:  fake.ControllerLister(rcs),
+		replicaSetLister:  fake.ReplicaSetLister(rss),
+		statefulSetLister: fake.StatefulSetLister(stss),
+	}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_ = getSelector(pod, ss.serviceLister, ss.controllerLister, ss.replicaSetLister, ss.statefulSetLister)
 	}
 }
