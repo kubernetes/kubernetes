@@ -145,7 +145,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(pods[0].Name, metav1.GetOptions{})
 		podDeleted := (err != nil && errors.IsNotFound(err)) ||
 			(err == nil && preemptedPod.DeletionTimestamp != nil)
-		gomega.Expect(podDeleted).To(gomega.BeTrue())
+		framework.ExpectEqual(podDeleted, true)
 		// Other pods (mid priority ones) should be present.
 		for i := 1; i < len(pods); i++ {
 			livePod, err := cs.CoreV1().Pods(pods[i].Namespace).Get(pods[i].Name, metav1.GetOptions{})
@@ -214,7 +214,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(pods[0].Name, metav1.GetOptions{})
 		podDeleted := (err != nil && errors.IsNotFound(err)) ||
 			(err == nil && preemptedPod.DeletionTimestamp != nil)
-		gomega.Expect(podDeleted).To(gomega.BeTrue())
+		framework.ExpectEqual(podDeleted, true)
 		// Other pods (mid priority ones) should be present.
 		for i := 1; i < len(pods); i++ {
 			livePod, err := cs.CoreV1().Pods(pods[i].Namespace).Get(pods[i].Name, metav1.GetOptions{})

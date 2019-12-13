@@ -55,7 +55,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 		}
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		framework.ExpectError(err, "should be forbidden")
-		gomega.Expect(apierrs.IsForbidden(err)).To(gomega.BeTrue(), "should be forbidden error")
+		framework.ExpectEqual(apierrs.IsForbidden(err), true, "should be forbidden error")
 	})
 
 	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling [NodeFeature:RuntimeHandler] [Disruptive] ", func() {

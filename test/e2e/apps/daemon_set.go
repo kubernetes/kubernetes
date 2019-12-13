@@ -23,7 +23,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -478,7 +478,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 			rollbackPods[pod.Name] = true
 		}
 		for _, pod := range existingPods {
-			gomega.Expect(rollbackPods[pod.Name]).To(gomega.BeTrue(), fmt.Sprintf("unexpected pod %s be restarted", pod.Name))
+			framework.ExpectEqual(rollbackPods[pod.Name], true, fmt.Sprintf("unexpected pod %s be restarted", pod.Name))
 		}
 	})
 })

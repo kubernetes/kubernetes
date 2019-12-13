@@ -2198,7 +2198,7 @@ var _ = SIGDescribe("Services", func() {
 		lbIngress := &svc.Status.LoadBalancer.Ingress[0]
 		svcPort := int(svc.Spec.Ports[0].Port)
 		// should have an internal IP.
-		gomega.Expect(isInternalEndpoint(lbIngress)).To(gomega.BeTrue())
+		framework.ExpectEqual(isInternalEndpoint(lbIngress), true)
 
 		// ILBs are not accessible from the test orchestrator, so it's necessary to use
 		//  a pod to test the service.
@@ -3060,19 +3060,19 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(f *framework.Framewor
 	framework.ExpectNoError(err)
 
 	if !isTransitionTest {
-		gomega.Expect(checkAffinity(execPod, svcIP, servicePort, true)).To(gomega.BeTrue())
+		framework.ExpectEqual(checkAffinity(execPod, svcIP, servicePort, true), true)
 	}
 	if isTransitionTest {
 		_, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityNone
 		})
 		framework.ExpectNoError(err)
-		gomega.Expect(checkAffinity(execPod, svcIP, servicePort, false)).To(gomega.BeTrue())
+		framework.ExpectEqual(checkAffinity(execPod, svcIP, servicePort, false), true)
 		_, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		})
 		framework.ExpectNoError(err)
-		gomega.Expect(checkAffinity(execPod, svcIP, servicePort, true)).To(gomega.BeTrue())
+		framework.ExpectEqual(checkAffinity(execPod, svcIP, servicePort, true), true)
 	}
 }
 
@@ -3110,19 +3110,19 @@ func execAffinityTestForLBServiceWithOptionalTransition(f *framework.Framework, 
 	port := int(svc.Spec.Ports[0].Port)
 
 	if !isTransitionTest {
-		gomega.Expect(checkAffinity(nil, ingressIP, port, true)).To(gomega.BeTrue())
+		framework.ExpectEqual(checkAffinity(nil, ingressIP, port, true), true)
 	}
 	if isTransitionTest {
 		svc, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityNone
 		})
 		framework.ExpectNoError(err)
-		gomega.Expect(checkAffinity(nil, ingressIP, port, false)).To(gomega.BeTrue())
+		framework.ExpectEqual(checkAffinity(nil, ingressIP, port, false), true)
 		svc, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		})
 		framework.ExpectNoError(err)
-		gomega.Expect(checkAffinity(nil, ingressIP, port, true)).To(gomega.BeTrue())
+		framework.ExpectEqual(checkAffinity(nil, ingressIP, port, true), true)
 	}
 }
 

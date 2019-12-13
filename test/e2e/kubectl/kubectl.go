@@ -527,7 +527,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.By(fmt.Sprintf("creating the pod from %v", podYaml))
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pod-with-readiness-probe.yaml.in")))
 			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			gomega.Expect(e2epod.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout)).To(gomega.BeTrue())
+			framework.ExpectEqual(e2epod.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout), true)
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, simplePodSelector)
@@ -1385,7 +1385,7 @@ metadata:
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pause-pod.yaml.in")))
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-", nsFlag)
-			gomega.Expect(e2epod.CheckPodsRunningReady(c, ns, []string{pausePodName}, framework.PodStartTimeout)).To(gomega.BeTrue())
+			framework.ExpectEqual(e2epod.CheckPodsRunningReady(c, ns, []string{pausePodName}, framework.PodStartTimeout), true)
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, pausePodSelector)
@@ -1426,7 +1426,7 @@ metadata:
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("busybox-pod.yaml")))
 			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-", nsFlag)
-			gomega.Expect(e2epod.CheckPodsRunningReady(c, ns, []string{busyboxPodName}, framework.PodStartTimeout)).To(gomega.BeTrue())
+			framework.ExpectEqual(e2epod.CheckPodsRunningReady(c, ns, []string{busyboxPodName}, framework.PodStartTimeout), true)
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, busyboxPodSelector)
@@ -1969,7 +1969,7 @@ metadata:
 			ginkgo.By("verifying the job " + jobName + " was deleted")
 			_, err = c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
 			framework.ExpectError(err)
-			gomega.Expect(apierrs.IsNotFound(err)).To(gomega.BeTrue())
+			framework.ExpectEqual(apierrs.IsNotFound(err), true)
 		})
 	})
 
