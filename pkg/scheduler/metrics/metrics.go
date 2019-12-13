@@ -46,6 +46,7 @@ const (
 	// Binding - binding operation label value
 	Binding = "binding"
 	// E2eScheduling - e2e scheduling operation label value
+	E2eScheduling = "e2eScheduling"
 )
 
 // All the histogram based metrics have 1ms as size for the smallest bucket.

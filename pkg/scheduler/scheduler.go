@@ -743,6 +743,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		err := sched.bind(bindingCycleCtx, assumedPod, scheduleResult.SuggestedHost, state)
 		metrics.E2eSchedulingLatency.Observe(metrics.SinceInSeconds(start))
 		metrics.DeprecatedE2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
+		metrics.SchedulingLatency.WithLabelValues(metrics.E2eScheduling).Observe(metrics.SinceInSeconds(start))
 		if err != nil {
 			metrics.PodScheduleErrors.Inc()
 			// trigger un-reserve plugins to clean up state associated with the reserved Pod
