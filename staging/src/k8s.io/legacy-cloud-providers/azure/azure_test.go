@@ -59,6 +59,13 @@ func TestParseConfig(t *testing.T) {
 		"CloudProviderRateLimitBucketWrite": 1,
 		"cloudProviderRateLimitQPS": 1,
 		"CloudProviderRateLimitQPSWrite": 1,
+		"availabilitySetNodesCacheTTL": 100,
+		"vmssCacheTTL": 100,
+		"vmssVirtualMachinesCacheTTL": 100,
+		"vmCacheTTL": 100,
+		"lbCacheTTL": 100,
+		"nsgCacheTTL": 100,
+		"rtCacheTTL": 100,
 		"location": "location",
 		"maximumLoadBalancerRuleCount": 1,
 		"primaryAvailabilitySetName": "primaryAvailabilitySetName",
@@ -97,6 +104,13 @@ func TestParseConfig(t *testing.T) {
 		CloudProviderRateLimitBucketWrite: 1,
 		CloudProviderRateLimitQPS:         1,
 		CloudProviderRateLimitQPSWrite:    1,
+		AvailabilitySetNodesCacheTTL:      100,
+		VmssCacheTTL:                      100,
+		VmssVirtualMachinesCacheTTL:       100,
+		VMCacheTTL:                        100,
+		LbCacheTTL:                        100,
+		NsgCacheTTL:                       100,
+		RtCacheTTL:                        100,
 		Location:                          "location",
 		MaximumLoadBalancerRuleCount:      1,
 		PrimaryAvailabilitySetName:        "primaryAvailabilitySetName",
@@ -1572,7 +1586,14 @@ func TestNewCloudFromJSON(t *testing.T) {
 		"cloudProviderBackoff": true,
 		"cloudProviderRatelimit": true,
 		"cloudProviderRateLimitQPS": 0.5,
-		"cloudProviderRateLimitBucket": 5
+		"cloudProviderRateLimitBucket": 5,
+		"availabilitySetNodesCacheTTL": 100,
+		"vmssCacheTTL": 100,
+		"vmssVirtualMachinesCacheTTL": 100,
+		"vmCacheTTL": 100,
+		"lbCacheTTL": 100,
+		"nsgCacheTTL": 100,
+		"rtCacheTTL": 100,
 	}`
 	validateConfig(t, config)
 }
@@ -1622,6 +1643,13 @@ cloudProviderBackoffJitter: 1.0
 cloudProviderRatelimit: true
 cloudProviderRateLimitQPS: 0.5
 cloudProviderRateLimitBucket: 5
+availabilitySetNodesCacheTTL: 100
+vmssCacheTTL: 100
+vmssVirtualMachinesCacheTTL: 100
+vmCacheTTL: 100
+lbCacheTTL: 100
+nsgCacheTTL: 100
+rtCacheTTL: 100
 `
 	validateConfig(t, config)
 }
@@ -1694,6 +1722,27 @@ func validateConfig(t *testing.T, config string) {
 	}
 	if azureCloud.CloudProviderRateLimitBucket != 5 {
 		t.Errorf("got incorrect value for CloudProviderRateLimitBucket")
+	}
+	if azureCloud.AvailabilitySetNodesCacheTTL != 100 {
+		t.Errorf("got incorrect value for availabilitySetNodesCacheTTL")
+	}
+	if azureCloud.VmssCacheTTL != 100 {
+		t.Errorf("got incorrect value for vmssCacheTTL")
+	}
+	if azureCloud.VmssVirtualMachinesCacheTTL != 100 {
+		t.Errorf("got incorrect value for vmssVirtualMachinesCacheTTL")
+	}
+	if azureCloud.VMCacheTTL != 100 {
+		t.Errorf("got incorrect value for vmCacheTTL")
+	}
+	if azureCloud.LbCacheTTL != 100 {
+		t.Errorf("got incorrect value for lbCacheTTL")
+	}
+	if azureCloud.NsgCacheTTL != 100 {
+		t.Errorf("got incorrect value for nsgCacheTTL")
+	}
+	if azureCloud.RtCacheTTL != 100 {
+		t.Errorf("got incorrect value for rtCacheTTL")
 	}
 }
 
