@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -132,5 +133,38 @@ func TestInvalidCustomCollector(t *testing.T) {
 				registry.CustomMustRegister(customCollector)
 			}, tc.panicStr)
 		})
+	}
+}
+
+// TestCustomCollectorClearState guarantees `ClearState()` will fully clear a collector.
+// It is necessary because we may forget to clear some new-added fields in the future.
+func TestCustomCollectorClearState(t *testing.T) {
+	var currentVersion = parseVersion(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "17",
+		GitVersion: "v1.17.0-alpha-1.12345",
+	})
+
+	var (
+		alphaDesc = NewDesc("metric_alpha", "alpha metric", []string{"name"}, nil,
+			ALPHA, "")
+		stableDesc = NewDesc("metric_stable", "stable metrics", []string{"name"}, nil,
+			STABLE, "")
+		deprecatedDesc = NewDesc("metric_deprecated", "stable deprecated metrics", []string{"name"}, nil,
+			STABLE, "1.17.0")
+		hiddenDesc = NewDesc("metric_hidden", "stable hidden metrics", []string{"name"}, nil,
+			STABLE, "1.16.0")
+	)
+
+	benchmarkA := newTestCustomCollector(alphaDesc, stableDesc, deprecatedDesc, hiddenDesc)
+	benchmarkB := newTestCustomCollector(alphaDesc, stableDesc, deprecatedDesc, hiddenDesc)
+
+	if benchmarkA.Create(&currentVersion, benchmarkA) == false {
+		t.Fatal("collector should be created")
+	}
+	benchmarkA.ClearState()
+
+	if !reflect.DeepEqual(*benchmarkA, *benchmarkB) {
+		t.Fatal("custom collector state hasn't be fully cleared")
 	}
 }
