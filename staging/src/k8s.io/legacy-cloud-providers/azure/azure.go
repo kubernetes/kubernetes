@@ -174,6 +174,22 @@ type Config struct {
 	// LoadBalancerResourceGroup determines the specific resource group of the load balancer user want to use, working
 	// with LoadBalancerName
 	LoadBalancerResourceGroup string `json:"loadBalancerResourceGroup,omitempty" yaml:"loadBalancerResourceGroup,omitempty"`
+
+	// AvailabilitySetNodesCacheTTL sets the Cache TTL for availabilitySetNodesCache
+	// if not set, will use default value
+	AvailabilitySetNodesCacheTTL int `json:"availabilitySetNodesCacheTTL,omitempty" yaml:"availabilitySetNodesCacheTTL,omitempty"`
+	// VmssCacheTTL sets the cache TTL for VMSS
+	VmssCacheTTL int `json:"vmssCacheTTL,omitempty" yaml:"vmssCacheTTL,omitempty"`
+	// VmssVirtualMachinesCacheTTL sets the cache TTL for vmssVirtualMachines
+	VmssVirtualMachinesCacheTTL int `json:"vmssVirtualMachinesCacheTTL,omitempty" yaml:"vmssVirtualMachinesCacheTTL,omitempty"`
+	// VmCacheTTL sets the cache TTL for vm
+	VMCacheTTL int `json:"vmCacheTTL,omitempty" yaml:"vmCacheTTL,omitempty"`
+	// LbCacheTTL sets the cache TTL for load balancer
+	LbCacheTTL int `json:"lbCacheTTL,omitempty" yaml:"lbcacheTTL,omitempty"`
+	// NsgCacheTTL sets the cache TTL for network security group
+	NsgCacheTTL int `json:"nsgCacheTTL,omityempty" yaml:"nsgCacheTTL,omitempty"`
+	// RtCacheTTL sets the cache TTL for route table
+	RtCacheTTL int `json:"rtCacheTTL,omitempty" yaml:"rtCacheTTL,omitempty"`
 }
 
 var _ cloudprovider.Interface = (*Cloud)(nil)

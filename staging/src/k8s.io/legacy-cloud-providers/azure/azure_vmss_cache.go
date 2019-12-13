@@ -38,9 +38,9 @@ var (
 	vmssVirtualMachinesKey  = "k8svmssVirtualMachinesKey"
 	availabilitySetNodesKey = "k8sAvailabilitySetNodesKey"
 
-	availabilitySetNodesCacheTTL = 15 * time.Minute
-	vmssTTL                      = 10 * time.Minute
-	vmssVirtualMachinesTTL       = 10 * time.Minute
+	availabilitySetNodesCacheTTLDefault = 900 // in seconds
+	vmssCacheTTLDefault                 = 600 // in seconds
+	vmssVirtualMachinesCacheTTLDefault  = 600 // in seconds
 )
 
 type vmssVirtualMachinesEntry struct {
@@ -87,7 +87,10 @@ func (ss *scaleSet) newVMSSCache() (*timedCache, error) {
 		return localCache, nil
 	}
 
-	return newTimedcache(vmssTTL, getter)
+	if ss.Config.VmssCacheTTL == 0 {
+		return newTimedcache(time.Duration(vmssCacheTTLDefault)*time.Second, getter)
+	}
+	return newTimedcache(time.Duration(ss.Config.VmssCacheTTL)*time.Second, getter)
 }
 
 func extractVmssVMName(name string) (string, string, error) {
@@ -147,7 +150,10 @@ func (ss *scaleSet) newVMSSVirtualMachinesCache() (*timedCache, error) {
 		return localCache, nil
 	}
 
-	return newTimedcache(vmssVirtualMachinesTTL, getter)
+	if ss.Config.VmssVirtualMachinesCacheTTL == 0 {
+		return newTimedcache(time.Duration(vmssVirtualMachinesCacheTTLDefault)*time.Second, getter)
+	}
+	return newTimedcache(time.Duration(ss.Config.VmssVirtualMachinesCacheTTL)*time.Second, getter)
 }
 
 func (ss *scaleSet) deleteCacheForNode(nodeName string) error {
@@ -186,7 +192,10 @@ func (ss *scaleSet) newAvailabilitySetNodesCache() (*timedCache, error) {
 		return localCache, nil
 	}
 
-	return newTimedcache(availabilitySetNodesCacheTTL, getter)
+	if ss.Config.AvailabilitySetNodesCacheTTL == 0 {
+		return newTimedcache(time.Duration(availabilitySetNodesCacheTTLDefault)*time.Second, getter)
+	}
+	return newTimedcache(time.Duration(ss.Config.AvailabilitySetNodesCacheTTL)*time.Second, getter)
 }
 
 func (ss *scaleSet) isNodeManagedByAvailabilitySet(nodeName string, crt cacheReadType) (bool, error) {

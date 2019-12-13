@@ -35,10 +35,10 @@ import (
 )
 
 var (
-	vmCacheTTL  = time.Minute
-	lbCacheTTL  = 2 * time.Minute
-	nsgCacheTTL = 2 * time.Minute
-	rtCacheTTL  = 2 * time.Minute
+	vmCacheTTLDefault  = 60  // in seconds
+	lbCacheTTLDefault  = 120 // in seconds
+	nsgCacheTTLDefault = 120 // in seconds
+	rtCacheTTLDefault  = 120 // in seconds
 
 	azureNodeProviderIDRE    = regexp.MustCompile(`^azure:///subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Compute/(?:.*)`)
 	azureResourceGroupNameRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/(?:.*)`)
@@ -228,7 +228,10 @@ func (az *Cloud) newVMCache() (*timedCache, error) {
 		return &vm, nil
 	}
 
-	return newTimedcache(vmCacheTTL, getter)
+	if az.VMCacheTTL == 0 {
+		return newTimedcache(time.Duration(vmCacheTTLDefault)*time.Second, getter)
+	}
+	return newTimedcache(time.Duration(az.VMCacheTTL)*time.Second, getter)
 }
 
 func (az *Cloud) newLBCache() (*timedCache, error) {
@@ -250,7 +253,10 @@ func (az *Cloud) newLBCache() (*timedCache, error) {
 		return &lb, nil
 	}
 
-	return newTimedcache(lbCacheTTL, getter)
+	if az.LbCacheTTL == 0 {
+		return newTimedcache(time.Duration(lbCacheTTLDefault)*time.Second, getter)
+	}
+	return newTimedcache(time.Duration(az.LbCacheTTL)*time.Second, getter)
 }
 
 func (az *Cloud) newNSGCache() (*timedCache, error) {
@@ -271,7 +277,10 @@ func (az *Cloud) newNSGCache() (*timedCache, error) {
 		return &nsg, nil
 	}
 
-	return newTimedcache(nsgCacheTTL, getter)
+	if az.NsgCacheTTL == 0 {
+		return newTimedcache(time.Duration(nsgCacheTTLDefault)*time.Second, getter)
+	}
+	return newTimedcache(time.Duration(az.NsgCacheTTL)*time.Second, getter)
 }
 
 func (az *Cloud) newRouteTableCache() (*timedCache, error) {
@@ -292,7 +301,10 @@ func (az *Cloud) newRouteTableCache() (*timedCache, error) {
 		return &rt, nil
 	}
 
-	return newTimedcache(rtCacheTTL, getter)
+	if az.RtCacheTTL == 0 {
+		return newTimedcache(time.Duration(rtCacheTTLDefault)*time.Second, getter)
+	}
+	return newTimedcache(time.Duration(az.RtCacheTTL)*time.Second, getter)
 }
 
 func (az *Cloud) useStandardLoadBalancer() bool {
