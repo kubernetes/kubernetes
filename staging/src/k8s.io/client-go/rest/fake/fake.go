@@ -84,7 +84,6 @@ func (c *RESTClient) Apply(force bool, fieldManager string) *restclient.Request 
 	req = req.Param("fieldManager", fieldManager)
 	req = req.Param("force", strconv.FormatBool(force))
 
-
 	return req
 }
 
