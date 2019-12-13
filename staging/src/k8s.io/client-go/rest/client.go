@@ -186,13 +186,9 @@ func (c *RESTClient) Patch(pt types.PatchType) *Request {
 func (c *RESTClient) Apply(force bool, fieldManager string) *Request {
 	req := c.Patch(types.ApplyPatchType)
 
-	if force {
-		req.Param("force", "true")
-	}
-
-	if fieldManager != "" {
-		req.Param("fieldManager", fieldManager)
-	}
+	// add function's parameters as query parameters to the request
+	req.Param("fieldManager", fieldManager)
+	req.Param("force", strconv.FormatBool(force))
 
 	return req
 }
