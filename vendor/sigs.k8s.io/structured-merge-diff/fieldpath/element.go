@@ -49,50 +49,90 @@ type PathElement struct {
 
 // Less provides an order for path elements.
 func (e PathElement) Less(rhs PathElement) bool {
+	return e.Compare(rhs) < 0
+}
+
+// Compare provides an order for path elements.
+func (e PathElement) Compare(rhs PathElement) int {
 	if e.FieldName != nil {
 		if rhs.FieldName == nil {
-			return true
+			return -1
 		}
-		return *e.FieldName < *rhs.FieldName
+		return strings.Compare(*e.FieldName, *rhs.FieldName)
 	} else if rhs.FieldName != nil {
-		return false
+		return 1
 	}
 
 	if e.Key != nil {
 		if rhs.Key == nil {
-			return true
+			return -1
 		}
-		return e.Key.Less(*rhs.Key)
+		return e.Key.Compare(*rhs.Key)
 	} else if rhs.Key != nil {
-		return false
+		return 1
 	}
 
 	if e.Value != nil {
 		if rhs.Value == nil {
-			return true
+			return -1
 		}
-		return value.Less(*e.Value, *rhs.Value)
+		return value.Compare(*e.Value, *rhs.Value)
 	} else if rhs.Value != nil {
-		return false
+		return 1
 	}
 
 	if e.Index != nil {
 		if rhs.Index == nil {
-			return true
+			return -1
 		}
-		return *e.Index < *rhs.Index
+		if *e.Index < *rhs.Index {
+			return -1
+		} else if *e.Index == *rhs.Index {
+			return 0
+		}
+		return 1
 	} else if rhs.Index != nil {
-		// Yes, I know the next statement is the same.  But this way
-		// the obvious way of extending the function wil be bug-free.
-		return false
+		return 1
 	}
 
-	return false
+	return 0
 }
 
 // Equals returns true if both path elements are equal.
 func (e PathElement) Equals(rhs PathElement) bool {
-	return !e.Less(rhs) && !rhs.Less(e)
+	if e.FieldName != nil {
+		if rhs.FieldName == nil {
+			return false
+		}
+		return *e.FieldName == *rhs.FieldName
+	} else if rhs.FieldName != nil {
+		return false
+	}
+	if e.Key != nil {
+		if rhs.Key == nil {
+			return false
+		}
+		return e.Key.Equals(*rhs.Key)
+	} else if rhs.Key != nil {
+		return false
+	}
+	if e.Value != nil {
+		if rhs.Value == nil {
+			return false
+		}
+		return value.Equals(*e.Value, *rhs.Value)
+	} else if rhs.Value != nil {
+		return false
+	}
+	if e.Index != nil {
+		if rhs.Index == nil {
+			return false
+		}
+		return *e.Index == *rhs.Index
+	} else if rhs.Index != nil {
+		return false
+	}
+	return true
 }
 
 // String presents the path element as a human-readable string.

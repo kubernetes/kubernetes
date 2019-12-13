@@ -319,14 +319,12 @@ func (w *mergingWalker) visitMapItems(t *schema.Map, lhs, rhs value.Map) (errs V
 		lhs.Iterate(func(key string, val value.Value) bool {
 			var rval *value.Value
 			if rhs != nil {
+				// TODO: optimize this Get for the reflector? It's really expensive compared to iterate right now
 				if item, ok := rhs.Get(key); ok {
 					rval = &item
 				}
 			}
 			errs = append(errs, w.visitMapItem(t, out, key, &val, rval)...)
-			if rval != nil {
-				(*rval).Recycle()
-			}
 			return true
 		})
 	}

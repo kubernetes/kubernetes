@@ -79,3 +79,19 @@ func (f FieldList) Compare(rhs FieldList) int {
 		i++
 	}
 }
+
+// Equals returns true if the two fieldslist are equals, false otherwise.
+func (f FieldList) Equals(rhs FieldList) bool {
+	if len(f) != len(rhs) {
+		return false
+	}
+	for i := range f {
+		if f[i].Name != rhs[i].Name {
+			return false
+		}
+		if !Equals(f[i].Value, rhs[i].Value) {
+			return false
+		}
+	}
+	return true
+}

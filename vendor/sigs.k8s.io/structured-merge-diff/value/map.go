@@ -46,20 +46,26 @@ func MapLess(lhs, rhs Map) bool {
 	return MapCompare(lhs, rhs) == -1
 }
 
+type kv struct {key string; val Value}
+type kvs []kv
+func (a kvs) Len() int           { return len(a) }
+func (a kvs) Less(i, j int) bool { return a[i].key < a[j].key }
+func (a kvs) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+
 // Compare compares two maps lexically.
 func MapCompare(lhs, rhs Map) int {
-	lorder := make([]string, 0, lhs.Length())
-	lhs.Iterate(func(key string, _ Value) bool {
-		lorder = append(lorder, key)
+	lorder := make(kvs, 0, lhs.Length())
+	lhs.Iterate(func(key string, val Value) bool {
+		lorder = append(lorder, kv{key, val})
 		return true
 	})
-	sort.Strings(lorder)
-	rorder := make([]string, 0, rhs.Length())
-	rhs.Iterate(func(key string, _ Value) bool {
-		rorder = append(rorder, key)
+	sort.Sort(lorder)
+	rorder := make(kvs, 0, rhs.Length())
+	rhs.Iterate(func(key string, val Value) bool {
+		rorder = append(rorder, kv{key, val})
 		return true
 	})
-	sort.Strings(rorder)
+	sort.Sort(rorder)
 
 	i := 0
 	for {
@@ -75,16 +81,14 @@ func MapCompare(lhs, rhs Map) int {
 			// RHS is shorter.
 			return 1
 		}
-		if c := strings.Compare(lorder[i], rorder[i]); c != 0 {
+		lkv := lorder[i]
+		rkv := rorder[i]
+		if c := strings.Compare(lkv.key, rkv.key); c != 0 {
 			return c
 		}
-		litem, _ := lhs.Get(lorder[i])
-		ritem, _ := rhs.Get(rorder[i])
-		if c := Compare(litem, ritem); c != 0 {
+		if c := Compare(lkv.val, rkv.val); c != 0 {
 			return c
 		}
-		litem.Recycle()
-		ritem.Recycle()
 		// The items are equal; continue.
 		i++
 	}

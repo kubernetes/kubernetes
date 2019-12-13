@@ -25,6 +25,13 @@ import (
 	"sync"
 )
 
+type CustomTypeConverter interface {
+	//Equal(lhs reflect.Value, rhs reflect.Value) bool
+	ToString(v reflect.Value) string
+	IsNull(v reflect.Value) bool
+}
+var CustomTypeConverters = map[reflect.Type]CustomTypeConverter{}
+
 var reflectPool = sync.Pool{
 	New: func() interface{} {
 		return &reflectValue{}
@@ -44,6 +51,11 @@ func MustReflect(value interface{}) Value {
 }
 
 func wrap(value reflect.Value) (Value, error) {
+	if value.IsValid() {
+		if converter, ok := CustomTypeConverters[value.Type()]; ok {
+			return reflectConverted{Value: value, Converter: converter}, nil
+		}
+	}
 	if hasJsonMarshaler(value) {
 		return toUnstructured(value)
 	}
@@ -377,8 +389,16 @@ func (r reflectMap) Interface() interface{} {
 }
 
 func (r reflectMap) Equals(m Map) bool {
-	// TODO use reflect.DeepEqual
-	return MapCompare(r, m) == 0
+	if r.Length() != m.Length() {
+		return false
+	}
+	return m.Iterate(func(key string, value Value) bool {
+		lhsVal, ok := r.Get(key)
+		if !ok {
+			return false
+		}
+		return Equals(lhsVal, value)
+	})
 }
 
 type reflectStruct struct {
@@ -399,7 +419,7 @@ func (r reflectStruct) Get(key string) (Value, bool) {
 		return mustWrap(val), true
 	}
 	// TODO: decide how to handle invalid keys
-	return MustReflect(nil), false
+		return MustReflect(nil), false
 }
 
 func (r reflectStruct) Has(key string) bool {
@@ -465,8 +485,22 @@ func eachStructField(structVal reflect.Value, fn func(string, reflect.Value) boo
 }
 
 func (r reflectStruct) Equals(m Map) bool {
-	// TODO use reflect.DeepEqual
-	return MapCompare(r, m) == 0
+	if rhsStruct, ok := m.(reflectStruct); ok {
+		return reflect.DeepEqual(r.Value.Interface(), rhsStruct.Value.Interface())
+	}
+	if r.Length() != m.Length() {
+		return false
+	}
+	hints := getStructHints(r.Value.Type())
+
+	return m.Iterate(func(s string, value Value) bool {
+		fieldHint, ok := hints[s]
+		if !ok {
+			return false
+		}
+		lhsVal := fieldHint.lookupField(r.Value)
+		return Equals(mustWrap(lhsVal), value)
+	})
 }
 
 type reflectList struct {
@@ -564,4 +598,82 @@ func (o tagOptions) Contains(optionName string) bool {
 		s = next
 	}
 	return false
+}
+
+
+type reflectConverted struct {
+	Value reflect.Value
+	Converter CustomTypeConverter
+}
+
+func (r reflectConverted) IsMap() bool {
+	return false
+}
+
+func (r reflectConverted) IsList() bool {
+	return false
+}
+
+func (r reflectConverted) IsBool() bool {
+	return false
+}
+
+func (r reflectConverted) IsInt() bool {
+	return false
+}
+
+func (r reflectConverted) IsFloat() bool {
+	return false
+}
+
+func (r reflectConverted) IsString() bool {
+	return !r.IsNull()
+}
+
+func (r reflectConverted) IsNull() bool {
+	if safeIsNil(r.Value) {
+		return true
+	}
+	if r.Value.Kind() == reflect.Ptr {
+		return r.Converter.IsNull(r.Value.Elem())
+	}
+	return r.Converter.IsNull(r.Value)
+}
+
+func (r reflectConverted) Map() Map {
+	panic("value is not a map")
+}
+
+func (r reflectConverted) List() List {
+	panic("value is not a list")
+}
+
+func (r reflectConverted) Bool() bool {
+	panic("value is not a boolean")
+}
+
+func (r reflectConverted) Int() int64 {
+	panic("value is not a int")
+}
+
+func (r reflectConverted) Float() float64 {
+	panic("value is not a float")
+}
+
+func (r reflectConverted) String() string {
+	if r.Value.Kind() == reflect.Ptr {
+		return r.Converter.ToString(r.Value.Elem())
+	}
+	return r.Converter.ToString(r.Value)
+}
+
+func (r reflectConverted) Recycle() {
+
+}
+
+func (r reflectConverted) Interface() interface{} {
+	if r.IsNull() {
+		return nil
+	}
+	return r.String()
 }

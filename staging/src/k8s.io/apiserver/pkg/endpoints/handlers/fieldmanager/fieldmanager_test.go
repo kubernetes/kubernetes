@@ -559,6 +559,81 @@ func BenchmarkConvertObjectToTyped(b *testing.B) {
 	}
 }
 
+func BenchmarkCompare(b *testing.B) {
+	tests := []struct {
+		gvk schema.GroupVersionKind
+		obj []byte
+	}{
+		{
+			gvk: schema.FromAPIVersionAndKind("v1", "Pod"),
+			obj: getObjectBytes("pod.yaml"),
+		},
+		{
+			gvk: schema.FromAPIVersionAndKind("v1", "Node"),
+			obj: getObjectBytes("node.yaml"),
+		},
+		{
+			gvk: schema.FromAPIVersionAndKind("v1", "Endpoints"),
+			obj: getObjectBytes("endpoints.yaml"),
+		},
+	}
+
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		b.Fatalf("Failed to add to scheme: %v", err)
+	}
+
+	for _, test := range tests {
+		b.Run(test.gvk.Kind, func(b *testing.B) {
+			decoder := serializer.NewCodecFactory(scheme).UniversalDecoder(test.gvk.GroupVersion())
+			obj, err := runtime.Decode(decoder, test.obj)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			m := NewFakeOpenAPIModels()
+			typeConverter := NewFakeTypeConverter(m)
+			//var typeConverter internal.TypeConverter = internal.DeducedTypeConverter{}
+
+			tv1, err := typeConverter.ObjectToTyped(obj)
+			if err != nil {
+				b.Errorf("Error in ObjectToTyped: %v", err)
+			}
+			tv2, err := typeConverter.ObjectToTyped(obj)
+			if err != nil {
+				b.Errorf("Error in ObjectToTyped: %v", err)
+			}
+
+			b.Run("structured", func(b *testing.B) {
+				b.ReportAllocs()
+				for n := 0; n < b.N; n++ {
+					_, err = tv1.Compare(tv2)
+					if err != nil {
+						b.Errorf("Error in ObjectToTyped: %v", err)
+					}
+				}
+			})
+			utv1, err := typeConverter.ObjectToTyped(toUnstructured(b, obj))
+			if err != nil {
+				b.Errorf("Error in ObjectToTyped: %v", err)
+			}
+			utv2, err := typeConverter.ObjectToTyped(toUnstructured(b, obj))
+			if err != nil {
+				b.Errorf("Error in ObjectToTyped: %v", err)
+			}
+			b.Run("unstructured", func(b *testing.B) {
+				b.ReportAllocs()
+				for n := 0; n < b.N; n++ {
+					_, err = utv1.Compare(utv2)
+					if err != nil {
+						b.Errorf("Error in ObjectToTyped: %v", err)
+					}
+				}
+			})
+		})
+	}
+}
+
 func BenchmarkMerge(b *testing.B) {
 	tests := []struct {
 		gvk schema.GroupVersionKind

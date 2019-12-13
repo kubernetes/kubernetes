@@ -149,6 +149,19 @@ func Equals(lhs, rhs Value) bool {
 		}
 		return false
 	}
+	// if rc, ok := lhs.(reflectConverted); ok {
+	// 	if rcrhs, ok := rhs.(reflectConverted); ok {
+	// 		lval := rc.Value
+	// 		if lval.Kind() == reflect.Ptr {
+	// 			lval = lval.Elem()
+	// 		}
+	// 		rval := rcrhs.Value
+	// 		if rval.Kind() == reflect.Ptr {
+	// 			rval = rval.Elem()
+	// 		}
+	// 		return rc.Converter.Equal(lval, rval)
+	// 	}
+	// }
 	if lhs.IsString() {
 		if rhs.IsString() {
 			return lhs.String() == rhs.String()
