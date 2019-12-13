@@ -117,6 +117,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"PodFitsPorts",
 			),
 			wantPlugins: map[string][]config.Plugin{
+				"PreFilterPlugin": {
+					{Name: "ServiceAffinity"},
+				},
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeAffinity"},
@@ -160,6 +163,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}`,
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
+				"PreFilterPlugin": {
+					{Name: "ServiceAffinity"},
+				},
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
@@ -212,6 +218,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}`,
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
+				"PreFilterPlugin": {
+					{Name: "ServiceAffinity"},
+				},
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
@@ -274,6 +283,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -341,6 +351,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -419,6 +430,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -508,6 +520,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -598,6 +611,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -692,6 +706,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -798,6 +813,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -906,6 +922,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -1014,6 +1031,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -1127,6 +1145,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {

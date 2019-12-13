@@ -264,16 +264,7 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy, pluginArgs 
 			pluginArgs.ServiceAffinityArgs.AffinityLabels = append(pluginArgs.ServiceAffinityArgs.AffinityLabels, policy.Argument.ServiceAffinity.Labels...)
 
 			predicateFactory = func(args AlgorithmFactoryArgs) predicates.FitPredicate {
-				predicate, precomputationFunction := predicates.NewServiceAffinityPredicate(
-					args.SharedLister.NodeInfos(),
-					args.SharedLister.Pods(),
-					args.InformerFactory.Core().V1().Services().Lister(),
-					pluginArgs.ServiceAffinityArgs.AffinityLabels,
-				)
-
-				// Once we generate the predicate we should also Register the Precomputation
-				predicates.RegisterPredicateMetadataProducer(policyName, precomputationFunction)
-				return predicate
+				return nil
 			}
 		} else if policy.Argument.LabelsPresence != nil {
 			// We use the CheckNodeLabelPresencePred predicate name for all kNodeLabel custom predicates.
