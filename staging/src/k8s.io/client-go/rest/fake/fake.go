@@ -21,6 +21,7 @@ package fake
 import (
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -76,7 +77,7 @@ func (c *RESTClient) Patch(pt types.PatchType) *restclient.Request {
 	return c.Verb("PATCH").SetHeader("Content-Type", string(pt))
 }
 
-func (c *RESTClient) Apply(force bool, fieldManager string) *Request {
+func (c *RESTClient) Apply(force bool, fieldManager string) *restclient.Request {
 	req := c.Patch(types.ApplyPatchType)
 
 	// add function's parameters as query parameters to the request
