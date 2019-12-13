@@ -179,7 +179,8 @@ func (m *serviceAffinityMetadata) clone() *serviceAffinityMetadata {
 	return &copy
 }
 
-type podAffinityMetadata struct {
+// PodAffinityMetadata pre-computed state for inter-pod affinity predicate.
+type PodAffinityMetadata struct {
 	// A map of topology pairs to the number of existing pods that has anti-affinity terms that match the "pod".
 	topologyToMatchedExistingAntiAffinityTerms topologyToMatchedTermCount
 	// A map of topology pairs to the number of existing pods that match the affinity terms of the "pod".
@@ -225,7 +226,8 @@ func (m topologyToMatchedTermCount) updateWithAntiAffinityTerms(targetPod *v1.Po
 	}
 }
 
-func (m *podAffinityMetadata) updatePod(updatedPod, pod *v1.Pod, node *v1.Node, multiplier int64) error {
+// UpdateWithPod updates the metadata counters with the (anti)affinity matches for the given pod.
+func (m *PodAffinityMetadata) UpdateWithPod(updatedPod, pod *v1.Pod, node *v1.Node, multiplier int64) error {
 	if m == nil {
 		return nil
 	}
@@ -265,12 +267,13 @@ func (m *podAffinityMetadata) updatePod(updatedPod, pod *v1.Pod, node *v1.Node, 
 	return nil
 }
 
-func (m *podAffinityMetadata) clone() *podAffinityMetadata {
+// Clone makes a deep copy of PodAffinityMetadata.
+func (m *PodAffinityMetadata) Clone() *PodAffinityMetadata {
 	if m == nil {
 		return nil
 	}
 
-	copy := podAffinityMetadata{}
+	copy := PodAffinityMetadata{}
 	copy.topologyToMatchedAffinityTerms = m.topologyToMatchedAffinityTerms.clone()
 	copy.topologyToMatchedAntiAffinityTerms = m.topologyToMatchedAntiAffinityTerms.clone()
 	copy.topologyToMatchedExistingAntiAffinityTerms = m.topologyToMatchedExistingAntiAffinityTerms.clone()
@@ -327,7 +330,6 @@ type predicateMetadata struct {
 	evenPodsSpreadMetadata *evenPodsSpreadMetadata
 
 	serviceAffinityMetadata  *serviceAffinityMetadata
-	podAffinityMetadata      *podAffinityMetadata
 	podFitsResourcesMetadata *podFitsResourcesMetadata
 	podFitsHostPortsMetadata *podFitsHostPortsMetadata
 }
@@ -373,7 +375,6 @@ func (f *MetadataProducerFactory) GetPredicateMetadata(pod *v1.Pod, sharedLister
 	}
 
 	var allNodes []*schedulernodeinfo.NodeInfo
-	var havePodsWithAffinityNodes []*schedulernodeinfo.NodeInfo
 	if sharedLister != nil {
 		var err error
 		allNodes, err = sharedLister.NodeInfos().List()
@@ -381,12 +382,6 @@ func (f *MetadataProducerFactory) GetPredicateMetadata(pod *v1.Pod, sharedLister
 			klog.Errorf("failed to list NodeInfos: %v", err)
 			return nil
 		}
-		havePodsWithAffinityNodes, err = sharedLister.NodeInfos().HavePodsWithAffinityList()
-		if err != nil {
-			klog.Errorf("failed to list NodeInfos: %v", err)
-			return nil
-		}
-
 	}
 
 	// evenPodsSpreadMetadata represents how existing pods match "pod"
@@ -397,16 +392,9 @@ func (f *MetadataProducerFactory) GetPredicateMetadata(pod *v1.Pod, sharedLister
 		return nil
 	}
 
-	podAffinityMetadata, err := getPodAffinityMetadata(pod, allNodes, havePodsWithAffinityNodes)
-	if err != nil {
-		klog.Errorf("Error calculating podAffinityMetadata: %v", err)
-		return nil
-	}
-
 	predicateMetadata := &predicateMetadata{
 		pod:                      pod,
 		evenPodsSpreadMetadata:   evenPodsSpreadMetadata,
-		podAffinityMetadata:      podAffinityMetadata,
 		podFitsResourcesMetadata: getPodFitsResourcesMetedata(pod),
 		podFitsHostPortsMetadata: getPodFitsHostPortsMetadata(pod),
 	}
@@ -429,7 +417,8 @@ func getPodFitsResourcesMetedata(pod *v1.Pod) *podFitsResourcesMetadata {
 	}
 }
 
-func getPodAffinityMetadata(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeInfo, havePodsWithAffinityNodes []*schedulernodeinfo.NodeInfo) (*podAffinityMetadata, error) {
+// GetPodAffinityMetadata computes inter-pod affinity metadata.
+func GetPodAffinityMetadata(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeInfo, havePodsWithAffinityNodes []*schedulernodeinfo.NodeInfo) (*PodAffinityMetadata, error) {
 	// existingPodAntiAffinityMap will be used later for efficient check on existing pods' anti-affinity
 	existingPodAntiAffinityMap, err := getTPMapMatchingExistingAntiAffinity(pod, havePodsWithAffinityNodes)
 	if err != nil {
@@ -442,7 +431,7 @@ func getPodAffinityMetadata(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeInfo,
 		return nil, err
 	}
 
-	return &podAffinityMetadata{
+	return &PodAffinityMetadata{
 		topologyToMatchedAffinityTerms:             incomingPodAffinityMap,
 		topologyToMatchedAntiAffinityTerms:         incomingPodAntiAffinityMap,
 		topologyToMatchedExistingAntiAffinityTerms: existingPodAntiAffinityMap,
@@ -619,7 +608,6 @@ func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod, node *v1.Node) erro
 	if deletedPodFullName == schedutil.GetPodFullName(meta.pod) {
 		return fmt.Errorf("deletedPod and meta.pod must not be the same")
 	}
-	meta.podAffinityMetadata.updatePod(deletedPod, meta.pod, node, -1)
 	meta.evenPodsSpreadMetadata.removePod(deletedPod, meta.pod, node)
 	meta.serviceAffinityMetadata.removePod(deletedPod, node)
 
@@ -637,9 +625,6 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, node *v1.Node) error {
 		return fmt.Errorf("node not found")
 	}
 
-	if err := meta.podAffinityMetadata.updatePod(addedPod, meta.pod, node, 1); err != nil {
-		return err
-	}
 	// Update meta.evenPodsSpreadMetadata if meta.pod has hard spread constraints
 	// and addedPod matches that
 	meta.evenPodsSpreadMetadata.addPod(addedPod, meta.pod, node)
@@ -657,7 +642,6 @@ func (meta *predicateMetadata) ShallowCopy() Metadata {
 		podBestEffort: meta.podBestEffort,
 	}
 	newPredMeta.podFitsHostPortsMetadata = meta.podFitsHostPortsMetadata.clone()
-	newPredMeta.podAffinityMetadata = meta.podAffinityMetadata.clone()
 	newPredMeta.evenPodsSpreadMetadata = meta.evenPodsSpreadMetadata.clone()
 	newPredMeta.serviceAffinityMetadata = meta.serviceAffinityMetadata.clone()
 	newPredMeta.podFitsResourcesMetadata = meta.podFitsResourcesMetadata.clone()

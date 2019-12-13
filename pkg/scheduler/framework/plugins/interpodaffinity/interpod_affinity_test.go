@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
@@ -782,13 +782,14 @@ func TestSingleNode(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, []*v1.Node{test.node}))
-			factory := &predicates.MetadataProducerFactory{}
-			meta := factory.GetPredicateMetadata(test.pod, snapshot)
-			state := framework.NewCycleState()
-			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
-
 			p := &InterPodAffinity{
-				predicate: predicates.NewPodAffinityPredicate(snapshot.NodeInfos(), snapshot.Pods()),
+				snapshotSharedLister: snapshot,
+				podAffinityChecker:   predicates.NewPodAffinityChecker(snapshot),
+			}
+			state := framework.NewCycleState()
+			preFilterStatus := p.PreFilter(context.Background(), state, test.pod)
+			if !preFilterStatus.IsSuccess() {
+				t.Errorf("prefilter failed with status: %v", preFilterStatus)
 			}
 			gotStatus := p.Filter(context.Background(), state, test.pod, snapshot.NodeInfoMap[test.node.Name])
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
@@ -1619,13 +1620,14 @@ func TestMultipleNodes(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 			for indexNode, node := range test.nodes {
-				factory := &predicates.MetadataProducerFactory{}
-				meta := factory.GetPredicateMetadata(test.pod, snapshot)
-				state := framework.NewCycleState()
-				state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
-
 				p := &InterPodAffinity{
-					predicate: predicates.NewPodAffinityPredicate(snapshot.NodeInfos(), snapshot.Pods()),
+					snapshotSharedLister: snapshot,
+					podAffinityChecker:   predicates.NewPodAffinityChecker(snapshot),
+				}
+				state := framework.NewCycleState()
+				preFilterStatus := p.PreFilter(context.Background(), state, test.pod)
+				if !preFilterStatus.IsSuccess() {
+					t.Errorf("prefilter failed with status: %v", preFilterStatus)
 				}
 				gotStatus := p.Filter(context.Background(), state, test.pod, snapshot.NodeInfoMap[node.Name])
 				if !reflect.DeepEqual(gotStatus, test.wantStatuses[indexNode]) {
@@ -2275,6 +2277,280 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 
 			if !reflect.DeepEqual(test.expectedList, gotList) {
 				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedList, gotList)
+			}
+		})
+	}
+}
+
+func TestStateAddRemovePod(t *testing.T) {
+	var label1 = map[string]string{
+		"region": "r1",
+		"zone":   "z11",
+	}
+	var label2 = map[string]string{
+		"region": "r1",
+		"zone":   "z12",
+	}
+	var label3 = map[string]string{
+		"region": "r2",
+		"zone":   "z21",
+	}
+	selector1 := map[string]string{"foo": "bar"}
+	antiAffinityFooBar := &v1.PodAntiAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+			{
+				LabelSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "foo",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{"bar"},
+						},
+					},
+				},
+				TopologyKey: "region",
+			},
+		},
+	}
+	antiAffinityComplex := &v1.PodAntiAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+			{
+				LabelSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "foo",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{"bar", "buzz"},
+						},
+					},
+				},
+				TopologyKey: "region",
+			},
+			{
+				LabelSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "service",
+							Operator: metav1.LabelSelectorOpNotIn,
+							Values:   []string{"bar", "security", "test"},
+						},
+					},
+				},
+				TopologyKey: "zone",
+			},
+		},
+	}
+	affinityComplex := &v1.PodAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+			{
+				LabelSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "foo",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{"bar", "buzz"},
+						},
+					},
+				},
+				TopologyKey: "region",
+			},
+			{
+				LabelSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "service",
+							Operator: metav1.LabelSelectorOpNotIn,
+							Values:   []string{"bar", "security", "test"},
+						},
+					},
+				},
+				TopologyKey: "zone",
+			},
+		},
+	}
+
+	tests := []struct {
+		name         string
+		pendingPod   *v1.Pod
+		addedPod     *v1.Pod
+		existingPods []*v1.Pod
+		nodes        []*v1.Node
+		services     []*v1.Service
+	}{
+		{
+			name: "no affinity exist",
+			pendingPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pending", Labels: selector1},
+			},
+			existingPods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+					Spec: v1.PodSpec{NodeName: "nodeA"},
+				},
+				{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
+					Spec: v1.PodSpec{NodeName: "nodeC"},
+				},
+			},
+			addedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "addedPod", Labels: selector1},
+				Spec:       v1.PodSpec{NodeName: "nodeB"},
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: label3}},
+			},
+		},
+		{
+			name: "metadata anti-affinity terms are updated correctly after adding and removing a pod",
+			pendingPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pending", Labels: selector1},
+			},
+			existingPods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+					Spec: v1.PodSpec{NodeName: "nodeA"},
+				},
+				{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
+					Spec: v1.PodSpec{
+						NodeName: "nodeC",
+						Affinity: &v1.Affinity{
+							PodAntiAffinity: antiAffinityFooBar,
+						},
+					},
+				},
+			},
+			addedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "addedPod", Labels: selector1},
+				Spec: v1.PodSpec{
+					NodeName: "nodeB",
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: antiAffinityFooBar,
+					},
+				},
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: label3}},
+			},
+		},
+		{
+			name: "metadata anti-affinity terms are updated correctly after adding and removing a pod",
+			pendingPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pending", Labels: selector1},
+			},
+			existingPods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+					Spec: v1.PodSpec{NodeName: "nodeA"},
+				},
+				{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
+					Spec: v1.PodSpec{
+						NodeName: "nodeC",
+						Affinity: &v1.Affinity{
+							PodAntiAffinity: antiAffinityFooBar,
+						},
+					},
+				},
+			},
+			addedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "addedPod", Labels: selector1},
+				Spec: v1.PodSpec{
+					NodeName: "nodeA",
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: antiAffinityComplex,
+					},
+				},
+			},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector1}}},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: label3}},
+			},
+		},
+		{
+			name: "metadata matching pod affinity and anti-affinity are updated correctly after adding and removing a pod",
+			pendingPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pending", Labels: selector1},
+			},
+			existingPods: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+					Spec: v1.PodSpec{NodeName: "nodeA"},
+				},
+				{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
+					Spec: v1.PodSpec{
+						NodeName: "nodeC",
+						Affinity: &v1.Affinity{
+							PodAntiAffinity: antiAffinityFooBar,
+							PodAffinity:     affinityComplex,
+						},
+					},
+				},
+			},
+			addedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "addedPod", Labels: selector1},
+				Spec: v1.PodSpec{
+					NodeName: "nodeA",
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: antiAffinityComplex,
+					},
+				},
+			},
+			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector1}}},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: label3}},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// getMeta creates predicate meta data given the list of pods.
+			getState := func(pods []*v1.Pod) (*InterPodAffinity, *framework.CycleState, *predicates.PodAffinityMetadata, *nodeinfosnapshot.Snapshot) {
+				snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(pods, test.nodes))
+
+				p := &InterPodAffinity{
+					snapshotSharedLister: snapshot,
+					podAffinityChecker:   predicates.NewPodAffinityChecker(snapshot),
+				}
+				cycleState := framework.NewCycleState()
+				preFilterStatus := p.PreFilter(context.Background(), cycleState, test.pendingPod)
+				if !preFilterStatus.IsSuccess() {
+					t.Errorf("prefilter failed with status: %v", preFilterStatus)
+				}
+
+				meta, err := getPodAffinityMetadata(cycleState)
+				if err != nil {
+					t.Errorf("failed to get metadata from cycleState: %v", err)
+				}
+
+				return p, cycleState, meta, snapshot
+			}
+
+			// allPodsState is the state produced when all pods, including test.addedPod are given to prefilter.
+			_, _, allPodsMeta, _ := getState(append(test.existingPods, test.addedPod))
+
+			// state is produced for test.existingPods (without test.addedPod).
+			ipa, state, meta, snapshot := getState(test.existingPods)
+			// clone the state so that we can compare it later when performing Remove.
+			originalMeta := meta.Clone()
+
+			// Add test.addedPod to state1 and verify it is equal to allPodsState.
+			if err := ipa.AddPod(context.Background(), state, test.pendingPod, test.addedPod, snapshot.NodeInfoMap[test.addedPod.Spec.NodeName]); err != nil {
+				t.Errorf("error adding pod to meta: %v", err)
+			}
+
+			if !reflect.DeepEqual(allPodsMeta, meta) {
+				t.Errorf("State is not equal, got: %v, want: %v", meta, allPodsMeta)
+			}
+
+			// Remove the added pod pod and make sure it is equal to the original state.
+			if err := ipa.RemovePod(context.Background(), state, test.pendingPod, test.addedPod, snapshot.NodeInfoMap[test.addedPod.Spec.NodeName]); err != nil {
+				t.Errorf("error removing pod from meta: %v", err)
+			}
+			if !reflect.DeepEqual(originalMeta, meta) {
+				t.Errorf("State is not equal, got: %v, want: %v", meta, originalMeta)
 			}
 		})
 	}
