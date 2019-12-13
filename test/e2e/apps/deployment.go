@@ -27,7 +27,7 @@ import (
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
 	watchtools "k8s.io/client-go/tools/watch"
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -757,14 +758,14 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 
 	// First rollout's replicaset should have .spec.replicas = 8 too.
 	framework.Logf("Waiting for the first rollout's replicaset to have .spec.replicas = %d", minAvailableReplicas)
-	err = replicaset.WaitForReplicaSetTargetSpecReplicas(c, firstRS, minAvailableReplicas)
+	err = waitForReplicaSetTargetSpecReplicas(c, firstRS, minAvailableReplicas)
 	framework.ExpectNoError(err)
 
 	// The desired replicas wait makes sure that the RS controller has created expected number of pods.
 	framework.Logf("Waiting for the first rollout's replicaset of deployment %q to have desired number of replicas", deploymentName)
 	firstRS, err = c.AppsV1().ReplicaSets(ns).Get(firstRS.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-	err = replicaset.WaitForReplicaSetDesiredReplicas(c.AppsV1(), firstRS)
+	err = waitForReplicaSetDesiredReplicas(c.AppsV1(), firstRS)
 	framework.ExpectNoError(err)
 
 	// Checking state of second rollout's replicaset.
@@ -781,14 +782,14 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	// Second rollout's replicaset should have Deployment's (replicas + maxSurge - first RS's replicas) = 10 + 3 - 8 = 5 for .spec.replicas.
 	newReplicas := replicas + int32(maxSurge) - minAvailableReplicas
 	framework.Logf("Waiting for the second rollout's replicaset to have .spec.replicas = %d", newReplicas)
-	err = replicaset.WaitForReplicaSetTargetSpecReplicas(c, secondRS, newReplicas)
+	err = waitForReplicaSetTargetSpecReplicas(c, secondRS, newReplicas)
 	framework.ExpectNoError(err)
 
 	// The desired replicas wait makes sure that the RS controller has created expected number of pods.
 	framework.Logf("Waiting for the second rollout's replicaset of deployment %q to have desired number of replicas", deploymentName)
 	secondRS, err = c.AppsV1().ReplicaSets(ns).Get(secondRS.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-	err = replicaset.WaitForReplicaSetDesiredReplicas(c.AppsV1(), secondRS)
+	err = waitForReplicaSetDesiredReplicas(c.AppsV1(), secondRS)
 	framework.ExpectNoError(err)
 
 	// Check the deployment's minimum availability.
@@ -815,13 +816,13 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	// First rollout's replicaset should have .spec.replicas = 8 + (30-10)*(8/13) = 8 + 12 = 20 replicas.
 	// Note that 12 comes from rounding (30-10)*(8/13) to nearest integer.
 	framework.Logf("Verifying that first rollout's replicaset has .spec.replicas = 20")
-	err = replicaset.WaitForReplicaSetTargetSpecReplicas(c, firstRS, 20)
+	err = waitForReplicaSetTargetSpecReplicas(c, firstRS, 20)
 	framework.ExpectNoError(err)
 
 	// Second rollout's replicaset should have .spec.replicas = 5 + (30-10)*(5/13) = 5 + 8 = 13 replicas.
 	// Note that 8 comes from rounding (30-10)*(5/13) to nearest integer.
 	framework.Logf("Verifying that second rollout's replicaset has .spec.replicas = 13")
-	err = replicaset.WaitForReplicaSetTargetSpecReplicas(c, secondRS, 13)
+	err = waitForReplicaSetTargetSpecReplicas(c, secondRS, 13)
 	framework.ExpectNoError(err)
 }
 
@@ -1088,4 +1089,36 @@ func waitForDeploymentOldRSsNum(c clientset.Interface, ns, deploymentName string
 		testutil.LogReplicaSetsOfDeployment(d, oldRSs, nil, framework.Logf)
 	}
 	return pollErr
+}
+
+// waitForReplicaSetDesiredReplicas waits until the replicaset has desired number of replicas.
+func waitForReplicaSetDesiredReplicas(rsClient appsclient.ReplicaSetsGetter, replicaSet *appsv1.ReplicaSet) error {
+	desiredGeneration := replicaSet.Generation
+	err := wait.PollImmediate(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
+		rs, err := rsClient.ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return rs.Status.ObservedGeneration >= desiredGeneration && rs.Status.Replicas == *(replicaSet.Spec.Replicas) && rs.Status.Replicas == *(rs.Spec.Replicas), nil
+	})
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("replicaset %q never had desired number of replicas", replicaSet.Name)
+	}
+	return err
+}
+
+// waitForReplicaSetTargetSpecReplicas waits for .spec.replicas of a RS to equal targetReplicaNum
+func waitForReplicaSetTargetSpecReplicas(c clientset.Interface, replicaSet *appsv1.ReplicaSet, targetReplicaNum int32) error {
+	desiredGeneration := replicaSet.Generation
+	err := wait.PollImmediate(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
+		rs, err := c.AppsV1().ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return rs.Status.ObservedGeneration >= desiredGeneration && *rs.Spec.Replicas == targetReplicaNum, nil
+	})
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("replicaset %q never had desired number of .spec.replicas", replicaSet.Name)
+	}
+	return err
 }
