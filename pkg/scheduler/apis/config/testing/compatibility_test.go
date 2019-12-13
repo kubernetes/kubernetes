@@ -74,6 +74,24 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 			},
 		},
+		// This is a special test for the case where a policy is specified without specifying any filters.
+		{
+			name: "MandatoryFilters",
+			JSON: `{
+				"kind": "Policy",
+				"apiVersion": "v1",
+				"predicates": [
+				],
+				"priorities": [
+				]
+			}`,
+			wantPlugins: map[string][]config.Plugin{
+				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
+					{Name: "TaintToleration"},
+				},
+			},
+		},
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
 		{
