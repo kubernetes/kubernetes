@@ -83,7 +83,7 @@ func (c *RESTClient) Apply(force bool, fieldManager string) *restclient.Request 
 		req.Param("force", "true")
 	}
 
-	if manager != "" {
+	if fieldManager != "" {
 		req.Param("fieldManager", fieldManager)
 	}
 

@@ -44,7 +44,7 @@ type Interface interface {
 	Post() *Request
 	Put() *Request
 	Patch(pt types.PatchType) *Request
-	Apply() *Request
+	Apply(force bool, fieldManager string) *Request
 	Get() *Request
 	Delete() *Request
 	APIVersion() schema.GroupVersion
@@ -190,7 +190,7 @@ func (c *RESTClient) Apply(force bool, fieldManager string) *Request {
 		req.Param("force", "true")
 	}
 
-	if manager != "" {
+	if fieldManager != "" {
 		req.Param("fieldManager", fieldManager)
 	}
 
