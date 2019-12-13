@@ -18,7 +18,6 @@ package core
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -28,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -108,16 +108,28 @@ func machine2PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*framework.Node
 	return &result, nil
 }
 
-func machine2Prioritizer(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
-	node := nodeInfo.Node()
-	if node == nil {
-		return framework.NodeScore{}, errors.New("node not found")
+type machine2PrioritizerPlugin struct{}
+
+func newMachine2PrioritizerPlugin() framework.PluginFactory {
+	return func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+		return &machine2PrioritizerPlugin{}, nil
 	}
+}
+
+func (pl *machine2PrioritizerPlugin) Name() string {
+	return "Machine2Prioritizer"
+}
+
+func (pl *machine2PrioritizerPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeName string) (int64, *framework.Status) {
 	score := 10
-	if node.Name == "machine2" {
+	if nodeName == "machine2" {
 		score = 100
 	}
-	return framework.NodeScore{Name: node.Name, Score: int64(score)}, nil
+	return int64(score), nil
+}
+
+func (pl *machine2PrioritizerPlugin) ScoreExtensions() framework.ScoreExtensions {
+	return nil
 }
 
 type FakeExtender struct {
@@ -351,7 +363,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 	tests := []struct {
 		name                 string
 		registerFilterPlugin st.RegisterFilterPluginFunc
-		prioritizers         []priorities.PriorityConfig
+		registerScorePlugin  st.RegisterScorePluginFunc
 		extenders            []FakeExtender
 		nodes                []string
 		expectedResult       ScheduleResult
@@ -458,7 +470,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		},
 		{
 			registerFilterPlugin: st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
-			prioritizers:         []priorities.PriorityConfig{{Map: machine2Prioritizer, Weight: 20}},
+			registerScorePlugin:  st.RegisterScorePlugin("Machine2Prioritizer", newMachine2PrioritizerPlugin(), 20),
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{truePredicateExtender},
@@ -483,7 +495,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			// because of the errors from errorPredicateExtender and/or
 			// errorPrioritizerExtender.
 			registerFilterPlugin: st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
-			prioritizers:         []priorities.PriorityConfig{{Map: machine2Prioritizer, Weight: 1}},
+			registerScorePlugin:  st.RegisterScorePlugin("Machine2Prioritizer", newMachine2PrioritizerPlugin(), 1),
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{errorPredicateExtender},
@@ -545,9 +557,13 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			registry := framework.Registry{}
 			plugins := &schedulerapi.Plugins{
 				Filter: &schedulerapi.PluginSet{},
+				Score:  &schedulerapi.PluginSet{},
 			}
 			var pluginConfigs []schedulerapi.PluginConfig
 			test.registerFilterPlugin(&registry, plugins, pluginConfigs)
+			if test.registerScorePlugin != nil {
+				test.registerScorePlugin(&registry, plugins, pluginConfigs)
+			}
 			fwk, _ := framework.NewFramework(registry, plugins, pluginConfigs)
 
 			scheduler := NewGenericScheduler(
@@ -555,7 +571,6 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				queue,
 				nil,
 				predicates.EmptyMetadataProducer,
-				test.prioritizers,
 				priorities.EmptyMetadataProducer,
 				emptySnapshot,
 				fwk,

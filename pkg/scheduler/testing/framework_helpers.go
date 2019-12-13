@@ -35,3 +35,18 @@ func RegisterFilterPlugin(pluginName string, pluginNewFunc framework.PluginFacto
 		pluginConfigs = append(pluginConfigs, schedulerapi.PluginConfig{Name: pluginName})
 	}
 }
+
+// RegisterScorePluginFunc is a function signature used in method RegisterScorePlugin()
+// to register a Score Plugin to a given registry.
+type RegisterScorePluginFunc func(reg *framework.Registry, plugins *schedulerapi.Plugins, pluginConfigs []schedulerapi.PluginConfig)
+
+// RegisterScorePlugin returns a function to register a Score Plugin to a given registry.
+func RegisterScorePlugin(pluginName string, pluginNewFunc framework.PluginFactory, weight int32) RegisterScorePluginFunc {
+	return func(reg *framework.Registry, plugins *schedulerapi.Plugins, pluginConfigs []schedulerapi.PluginConfig) {
+		reg.Register(pluginName, pluginNewFunc)
+		plugins.Score.Enabled = append(plugins.Score.Enabled, schedulerapi.Plugin{Name: pluginName, Weight: weight})
+		//lint:ignore SA4006 this value of pluginConfigs is never used.
+		//lint:ignore SA4010 this result of append is never used.
+		pluginConfigs = append(pluginConfigs, schedulerapi.PluginConfig{Name: pluginName})
+	}
+}

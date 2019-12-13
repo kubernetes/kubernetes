@@ -227,7 +227,7 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		return nil, err
 	}
 
-	priorityConfigs, pluginsForPriorities, pluginConfigForPriorities, err := c.getPriorityConfigs(priorityKeys)
+	pluginsForPriorities, pluginConfigForPriorities, err := c.getPriorityConfigs(priorityKeys)
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +285,6 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		podQueue,
 		predicateFuncs,
 		predicateMetaProducer,
-		priorityConfigs,
 		priorityMetaProducer,
 		c.nodeInfoSnapshot,
 		framework,
@@ -327,20 +326,20 @@ func getBinderFunc(client clientset.Interface, extenders []algorithm.SchedulerEx
 	}
 }
 
+// getPriorityConfigs
 // getPriorityConfigs returns priorities configuration: ones that will run as priorities and ones that will run
 // as framework plugins. Specifically, a priority will run as a framework plugin if a plugin config producer was
 // registered for that priority.
-func (c *Configurator) getPriorityConfigs(priorityKeys sets.String) ([]priorities.PriorityConfig, *schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
+func (c *Configurator) getPriorityConfigs(priorityKeys sets.String) (*schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
 	allPriorityConfigs, err := getPriorityFunctionConfigs(priorityKeys, c.algorithmFactoryArgs)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	if c.pluginConfigProducerRegistry == nil {
-		return allPriorityConfigs, nil, nil, nil
+		return nil, nil, nil
 	}
 
-	var priorityConfigs []priorities.PriorityConfig
 	var plugins schedulerapi.Plugins
 	var pluginConfig []schedulerapi.PluginConfig
 	frameworkConfigProducers := c.pluginConfigProducerRegistry.PriorityToConfigProducer
@@ -351,11 +350,9 @@ func (c *Configurator) getPriorityConfigs(priorityKeys sets.String) ([]prioritie
 			pl, pc := producer(args)
 			plugins.Append(&pl)
 			pluginConfig = append(pluginConfig, pc...)
-		} else {
-			priorityConfigs = append(priorityConfigs, p)
 		}
 	}
-	return priorityConfigs, &plugins, pluginConfig, nil
+	return &plugins, pluginConfig, nil
 }
 
 // getPredicateConfigs returns predicates configuration: ones that will run as fitPredicates and ones that will run

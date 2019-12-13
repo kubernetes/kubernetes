@@ -270,9 +270,6 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 	if !foundPlugin(c.Plugins.Filter.Enabled, predicateOne) {
 		t.Errorf("Expected predicate PredicateOne from %q", schedulerapi.SchedulerDefaultProviderName)
 	}
-	if len(c.Algorithm.Prioritizers()) != 1 || c.Algorithm.Prioritizers()[0].Name != "PriorityOne" {
-		t.Errorf("Expected priority PriorityOne from %q", schedulerapi.SchedulerDefaultProviderName)
-	}
 }
 
 func foundPlugin(plugins []schedulerapi.Plugin, name string) bool {
@@ -315,9 +312,6 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 	}
 	if len(c.Algorithm.Predicates()) != 0 {
 		t.Error("Expected empty predicate sets")
-	}
-	if len(c.Algorithm.Prioritizers()) != 0 {
-		t.Error("Expected empty priority sets")
 	}
 }
 
@@ -852,15 +846,6 @@ func TestCreateWithFrameworkPlugins(t *testing.T) {
 	)
 	if diff := cmp.Diff(wantPredicates, gotPredicates); diff != "" {
 		t.Errorf("unexpected predicates diff (-want, +got): %s", diff)
-	}
-
-	gotPriorities := sets.NewString()
-	for _, p := range c.Algorithm.Prioritizers() {
-		gotPriorities.Insert(p.Name)
-	}
-	wantPriorities := sets.NewString(priorityThreeName)
-	if diff := cmp.Diff(wantPriorities, gotPriorities); diff != "" {
-		t.Errorf("unexpected priorities diff (-want, +got): %s", diff)
 	}
 
 	// Verify the aggregated configuration.

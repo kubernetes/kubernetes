@@ -167,9 +167,7 @@ func (es mockScheduler) Schedule(ctx context.Context, state *framework.CycleStat
 func (es mockScheduler) Predicates() map[string]predicates.FitPredicate {
 	return nil
 }
-func (es mockScheduler) Prioritizers() []priorities.PriorityConfig {
-	return nil
-}
+
 func (es mockScheduler) Extenders() []algorithm.SchedulerExtender {
 	return nil
 }
@@ -694,7 +692,6 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		internalqueue.NewSchedulingQueue(nil),
 		nil,
 		predicates.EmptyMetadataProducer,
-		[]priorities.PriorityConfig{},
 		priorities.EmptyMetadataProducer,
 		nodeinfosnapshot.NewEmptySnapshot(),
 		fwk,
@@ -753,7 +750,6 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		queue,
 		nil,
 		predicates.EmptyMetadataProducer,
-		[]priorities.PriorityConfig{},
 		priorities.EmptyMetadataProducer,
 		nodeinfosnapshot.NewEmptySnapshot(),
 		fwk,
@@ -1006,9 +1002,8 @@ func TestInitPolicyFromFile(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	for i, test := range []struct {
-		policy               string
-		expectedPredicates   sets.String
-		expectedPrioritizers sets.String
+		policy             string
+		expectedPredicates sets.String
 	}{
 		// Test json format policy file
 		{
@@ -1028,10 +1023,6 @@ func TestInitPolicyFromFile(t *testing.T) {
 				"PredicateOne",
 				"PredicateTwo",
 			),
-			expectedPrioritizers: sets.NewString(
-				"PriorityOne",
-				"PriorityTwo",
-			),
 		},
 		// Test yaml format policy file
 		{
@@ -1049,10 +1040,6 @@ priorities:
 			expectedPredicates: sets.NewString(
 				"PredicateOne",
 				"PredicateTwo",
-			),
-			expectedPrioritizers: sets.NewString(
-				"PriorityOne",
-				"PriorityTwo",
 			),
 		},
 	} {
@@ -1080,9 +1067,6 @@ priorities:
 		}
 		if !schedPredicates.Equal(test.expectedPredicates) {
 			t.Errorf("Expected predicates %v, got %v", test.expectedPredicates, schedPredicates)
-		}
-		if !schedPrioritizers.Equal(test.expectedPrioritizers) {
-			t.Errorf("Expected priority functions %v, got %v", test.expectedPrioritizers, schedPrioritizers)
 		}
 	}
 }
