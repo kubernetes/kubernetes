@@ -303,7 +303,7 @@ spec:
 	}
 
 	// Re-apply with force, should work fine.
-	result, err = rest.PatApply("apply_test")).
+	result, err = rest.Apply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("force", "true").
