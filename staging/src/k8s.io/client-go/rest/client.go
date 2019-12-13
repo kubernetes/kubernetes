@@ -183,8 +183,18 @@ func (c *RESTClient) Patch(pt types.PatchType) *Request {
 }
 
 // Apply begins a PATCH request with the apply patch type.
-func (c *RESTClient) Apply() *Request {
-	return c.Patch(types.ApplyPatchType)
+func (c *RESTClient) Apply(force bool, manager string) *Request {
+	req := c.Patch(types.ApplyPatchType)
+
+	if force {
+		req.Param("force", "true")
+	}
+
+	if manager != "" {
+		req.Param("manager", manager)
+	}
+
+	return req
 }
 
 // Get begins a GET request. Short for c.Verb("GET").
