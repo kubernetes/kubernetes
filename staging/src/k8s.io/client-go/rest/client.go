@@ -187,8 +187,8 @@ func (c *RESTClient) Apply(force bool, fieldManager string) *Request {
 	req := c.Patch(types.ApplyPatchType)
 
 	// add function's parameters as query parameters to the request
-	req.Param("fieldManager", fieldManager)
-	req.Param("force", strconv.FormatBool(force))
+	req = req.Param("fieldManager", fieldManager)
+	req = req.Param("force", strconv.FormatBool(force))
 
 	return req
 }
