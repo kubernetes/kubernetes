@@ -68,10 +68,9 @@ values:
   numVal: 1
   boolVal: true
   stringVal: "1"`, apiVersion, kind))
-	result, err := rest.Patch(types.ApplyPatchType).
+	result, err := rest.Apply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name("mytest").
-		Param("fieldManager", "apply_test").
 		Body(yamlBody).
 		DoRaw()
 	if err != nil {
@@ -88,10 +87,9 @@ values:
 	}
 
 	// Re-apply the same object, we should get conflicts now.
-	result, err = rest.Patch(types.ApplyPatchType).
+	result, err = rest.Apply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name("mytest").
-		Param("fieldManager", "apply_test").
 		Body(yamlBody).
 		DoRaw()
 	if err == nil {
@@ -106,11 +104,10 @@ values:
 	}
 
 	// Re-apply with force, should work fine.
-	result, err = rest.Patch(types.ApplyPatchType).
+	result, err = rest.Apply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name("mytest").
 		Param("force", "true").
-		Param("fieldManager", "apply_test").
 		Body(yamlBody).
 		DoRaw()
 	if err != nil {

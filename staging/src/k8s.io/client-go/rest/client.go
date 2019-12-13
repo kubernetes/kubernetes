@@ -44,7 +44,7 @@ type Interface interface {
 	Post() *Request
 	Put() *Request
 	Patch(pt types.PatchType) *Request
-	Apply(force bool, fieldManager string) *Request
+	Apply(fieldManager string) *Request
 	Get() *Request
 	Delete() *Request
 	APIVersion() schema.GroupVersion
@@ -183,12 +183,11 @@ func (c *RESTClient) Patch(pt types.PatchType) *Request {
 }
 
 // Apply begins a PATCH request with the apply patch type.
-func (c *RESTClient) Apply(force bool, fieldManager string) *Request {
+func (c *RESTClient) Apply(fieldManager string) *Request {
 	req := c.Patch(types.ApplyPatchType)
 
 	// add function's parameters as query parameters to the request
 	req = req.Param("fieldManager", fieldManager)
-	req = req.Param("force", strconv.FormatBool(force))
 
 	return req
 }

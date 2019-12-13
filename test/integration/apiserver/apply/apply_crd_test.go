@@ -76,10 +76,9 @@ metadata:
   name: %s
 spec:
   replicas: 1`, apiVersion, kind, name))
-	result, err := rest.Patch(types.ApplyPatchType).
+	result, err := rest.Apply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
-		Param("fieldManager", "apply_test").
 		Body(yamlBody).
 		DoRaw()
 	if err != nil {
@@ -99,10 +98,9 @@ spec:
 	verifyReplicas(t, result, 5)
 
 	// Re-apply, we should get conflicts now, since the number of replicas was changed.
-	result, err = rest.Patch(types.ApplyPatchType).
+	result, err = rest.Apply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
-		Param("fieldManager", "apply_test").
 		Body(yamlBody).
 		DoRaw()
 	if err == nil {
@@ -117,11 +115,10 @@ spec:
 	}
 
 	// Re-apply with force, should work fine.
-	result, err = rest.Patch(types.ApplyPatchType).
+	result, err = rest.Apply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("force", "true").
-		Param("fieldManager", "apply_test").
 		Body(yamlBody).
 		DoRaw()
 	if err != nil {
@@ -236,10 +233,9 @@ spec:
   - name: x
     containerPort: 80
     protocol: TCP`, apiVersion, kind, name))
-	result, err := rest.Patch(types.ApplyPatchType).
+	result, err := rest.Apply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
-		Param("fieldManager", "apply_test").
 		Body(yamlBody).
 		DoRaw()
 	if err != nil {
@@ -264,7 +260,7 @@ spec:
 	verifyFinalizersIncludes(t, result, "another-one")
 
 	// Re-apply the same config, should work fine, since finalizers should have the list-type extension 'set'.
-	result, err = rest.Patch(types.ApplyPatchType).
+	result, err = rest.Apply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("fieldManager", "apply_test").
@@ -290,10 +286,9 @@ spec:
 	verifyReplicas(t, result, 5)
 
 	// Re-apply, we should get conflicts now, since the number of replicas was changed.
-	result, err = rest.Patch(types.ApplyPatchType).
+	result, err = rest.Apply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
-		Param("fieldManager", "apply_test").
 		Body(yamlBody).
 		DoRaw()
 	if err == nil {
@@ -308,11 +303,10 @@ spec:
 	}
 
 	// Re-apply with force, should work fine.
-	result, err = rest.Patch(types.ApplyPatchType).
+	result, err = rest.PatApply("apply_test")).
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("force", "true").
-		Param("fieldManager", "apply_test").
 		Body(yamlBody).
 		DoRaw()
 	if err != nil {
@@ -321,10 +315,9 @@ spec:
 	verifyReplicas(t, result, 1)
 
 	// New applier tries to edit an existing list item, we should get conflicts.
-	result, err = rest.Patch(types.ApplyPatchType).
+	result, err = rest.Apply("apply_test_2").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
-		Param("fieldManager", "apply_test_2").
 		Body([]byte(fmt.Sprintf(`
 apiVersion: %s
 kind: %s
@@ -348,10 +341,9 @@ spec:
 	}
 
 	// New applier tries to add a new list item, should work fine.
-	result, err = rest.Patch(types.ApplyPatchType).
+	result, err = rest.Apply("apply_test_2").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
-		Param("fieldManager", "apply_test_2").
 		Body([]byte(fmt.Sprintf(`
 apiVersion: %s
 kind: %s
@@ -442,10 +434,9 @@ metadata:
 spec:
   cronSpec: "* * * * */5"
   replicas: 1`, apiVersion, kind, name))
-	result, err := rest.Patch(types.ApplyPatchType).
+	result, err := rest.Apply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
-		Param("fieldManager", "apply_test").
 		Body(yamlBody).
 		DoRaw()
 	if err != nil {
@@ -469,10 +460,9 @@ spec:
 	verifyFinalizersIncludes(t, result, "another-one")
 
 	// Re-apply the same config, should work fine, since finalizers should have the list-type extension 'set'.
-	result, err = rest.Patch(types.ApplyPatchType).
+	result, err = rest.ply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
-		Param("fieldManager", "apply_test").
 		SetHeader("Accept", "application/json").
 		Body(yamlBody).
 		DoRaw()
@@ -495,10 +485,9 @@ spec:
 	verifyReplicas(t, result, 5.0)
 
 	// Re-apply, we should get conflicts now, since the number of replicas was changed.
-	result, err = rest.Patch(types.ApplyPatchType).
+	result, err = rest.ply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
-		Param("fieldManager", "apply_test").
 		Body(yamlBody).
 		DoRaw()
 	if err == nil {
@@ -513,11 +502,10 @@ spec:
 	}
 
 	// Re-apply with force, should work fine.
-	result, err = rest.Patch(types.ApplyPatchType).
+	result, err = rest.ply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("force", "true").
-		Param("fieldManager", "apply_test").
 		Body(yamlBody).
 		DoRaw()
 	if err != nil {
@@ -666,10 +654,9 @@ metadata:
   name: %s
 spec:
   replicas: 1`, apiVersion, kind, name))
-	result, err := rest.Patch(types.ApplyPatchType).
+	result, err := rest.ply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
-		Param("fieldManager", "apply_test").
 		Body(yamlBody).
 		DoRaw()
 	if err != nil {
@@ -689,10 +676,9 @@ spec:
 	verifyReplicas(t, result, 5)
 
 	// Re-apply, we should get conflicts now, since the number of replicas was changed.
-	result, err = rest.Patch(types.ApplyPatchType).
+	result, err = rest.ply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
-		Param("fieldManager", "apply_test").
 		Body(yamlBody).
 		DoRaw()
 	if err == nil {
@@ -707,11 +693,10 @@ spec:
 	}
 
 	// Re-apply with force, should work fine.
-	result, err = rest.Patch(types.ApplyPatchType).
+	result, err = rest.ply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("force", "true").
-		Param("fieldManager", "apply_test").
 		Body(yamlBody).
 		DoRaw()
 	if err != nil {

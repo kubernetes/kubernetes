@@ -207,7 +207,7 @@ values: `+strings.Repeat("[", 3*1024*1024), apiVersion, kind))
 	})
 	t.Run("ApplyPatchType nested patch under limit", func(t *testing.T) {
 		patchBody := []byte(`{"value":` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + `}`)
-		err = rest.Patch(types.ApplyPatchType).Param("fieldManager", "test").AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "test").
+		err = rest.Apply("test").AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "test").
 			Body(patchBody).Do().Error()
 		if !apierrors.IsBadRequest(err) {
 			t.Errorf("expected bad request err, got %#v", err)

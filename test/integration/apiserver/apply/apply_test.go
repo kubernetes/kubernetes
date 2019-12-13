@@ -113,11 +113,10 @@ func TestApplyAlsoCreates(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		_, err := client.CoreV1().RESTClient().Apply("apply_test").
 			Namespace("default").
 			Resource(tc.resource).
 			Name(tc.name).
-			Param("fieldManager", "apply_test").
 			Body([]byte(tc.body)).
 			Do().
 			Get()
@@ -131,11 +130,10 @@ func TestApplyAlsoCreates(t *testing.T) {
 		}
 
 		// Test that we can re apply with a different field manager and don't get conflicts
-		_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		_, err = client.CoreV1().RESTClient().Apply("apply_test_2").
 			Namespace("default").
 			Resource(tc.resource).
 			Name(tc.name).
-			Param("fieldManager", "apply_test_2").
 			Body([]byte(tc.body)).
 			Do().
 			Get()
@@ -180,9 +178,8 @@ func TestNoOpUpdateSameResourceVersion(t *testing.T) {
 		}
 	}`)
 
-	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err := client.CoreV1().RESTClient().Apply("apply_test").
 		Namespace("default").
-		Param("fieldManager", "apply_test").
 		Resource(podResource).
 		Name(podName).
 		Body(podBytes).
@@ -255,11 +252,10 @@ func TestCreateOnApplyFailsWithUID(t *testing.T) {
 	_, client, closeFn := setup(t)
 	defer closeFn()
 
-	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err := client.CoreV1().RESTClient().Apply("apply_test").
 		Namespace("default").
 		Resource("pods").
 		Name("test-pod-uid").
-		Param("fieldManager", "apply_test").
 		Body([]byte(`{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -317,12 +313,11 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 		}
 	}`)
 
-	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err := client.CoreV1().RESTClient().Apply("apply_test").
 		AbsPath("/apis/apps/v1").
 		Namespace("default").
 		Resource("deployments").
 		Name("deployment").
-		Param("fieldManager", "apply_test").
 		Body(obj).Do().Get()
 	if err != nil {
 		t.Fatalf("Failed to create object using Apply patch: %v", err)
@@ -338,12 +333,11 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 		t.Fatalf("Failed to patch object: %v", err)
 	}
 
-	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err = client.CoreV1().RESTClient().Apply("apply_test").
 		AbsPath("/apis/apps/v1").
 		Namespace("default").
 		Resource("deployments").
 		Name("deployment").
-		Param("fieldManager", "apply_test").
 		Body([]byte(obj)).Do().Get()
 	if err == nil {
 		t.Fatalf("Expecting to get conflicts when applying object")
@@ -356,13 +350,12 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 		t.Fatalf("Expecting to get at least one conflict when applying object, got: %v", status.Status().Details.Causes)
 	}
 
-	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err = client.CoreV1().RESTClient().Apply("apply_test").
 		AbsPath("/apis/apps/v1").
 		Namespace("default").
 		Resource("deployments").
 		Name("deployment").
 		Param("force", "true").
-		Param("fieldManager", "apply_test").
 		Body([]byte(obj)).Do().Get()
 	if err != nil {
 		t.Fatalf("Failed to apply object with force: %v", err)
@@ -386,11 +379,10 @@ func TestApplyGroupsManySeparateUpdates(t *testing.T) {
 		},
 	}`)
 
-	object, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	object, err := client.CoreV1().RESTClient().Apply("apply_test").
 		AbsPath("/apis/admissionregistration.k8s.io/v1").
 		Resource("validatingwebhookconfigurations").
 		Name("webhook").
-		Param("fieldManager", "apply_test").
 		Body(obj).Do().Get()
 	if err != nil {
 		t.Fatalf("Failed to create object using Apply patch: %v", err)
@@ -445,11 +437,10 @@ func TestApplyManagedFields(t *testing.T) {
 	_, client, closeFn := setup(t)
 	defer closeFn()
 
-	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err := client.CoreV1().RESTClient().Apply("apply_test").
 		Namespace("default").
 		Resource("configmaps").
 		Name("test-cm").
-		Param("fieldManager", "apply_test").
 		Body([]byte(`{
 			"apiVersion": "v1",
 			"kind": "ConfigMap",
@@ -582,11 +573,10 @@ func TestApplyRemovesEmptyManagedFields(t *testing.T) {
 		}
 	}`)
 
-	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err := client.CoreV1().RESTClient().Apply("apply_test").
 		Namespace("default").
 		Resource("configmaps").
 		Name("test-cm").
-		Param("fieldManager", "apply_test").
 		Body(obj).
 		Do().
 		Get()
@@ -594,11 +584,10 @@ func TestApplyRemovesEmptyManagedFields(t *testing.T) {
 		t.Fatalf("Failed to create object using Apply patch: %v", err)
 	}
 
-	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err = client.CoreV1().RESTClient().Apply("apply_test").
 		Namespace("default").
 		Resource("configmaps").
 		Name("test-cm").
-		Param("fieldManager", "apply_test").
 		Body(obj).Do().Get()
 	if err != nil {
 		t.Fatalf("Failed to patch object: %v", err)
@@ -634,7 +623,7 @@ func TestApplyRequiresFieldManager(t *testing.T) {
 		}
 	}`)
 
-	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err := client.CoreV1().RESTClient().Apply("apply_test").
 		Namespace("default").
 		Resource("configmaps").
 		Name("test-cm").
@@ -645,11 +634,10 @@ func TestApplyRequiresFieldManager(t *testing.T) {
 		t.Fatalf("Apply should fail to create without fieldManager")
 	}
 
-	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err = client.CoreV1().RESTClient().Apply("apply_test").
 		Namespace("default").
 		Resource("configmaps").
 		Name("test-cm").
-		Param("fieldManager", "apply_test").
 		Body(obj).
 		Do().
 		Get()
@@ -699,12 +687,11 @@ func TestApplyRemoveContainerPort(t *testing.T) {
 		}
 	}`)
 
-	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err := client.CoreV1().RESTClient().Apply("apply_test").
 		AbsPath("/apis/apps/v1").
 		Namespace("default").
 		Resource("deployments").
 		Name("deployment").
-		Param("fieldManager", "apply_test").
 		Body(obj).Do().Get()
 	if err != nil {
 		t.Fatalf("Failed to create object using Apply patch: %v", err)
@@ -740,12 +727,11 @@ func TestApplyRemoveContainerPort(t *testing.T) {
 		}
 	}`)
 
-	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err = client.CoreV1().RESTClient().Apply("apply_test").
 		AbsPath("/apis/apps/v1").
 		Namespace("default").
 		Resource("deployments").
 		Name("deployment").
-		Param("fieldManager", "apply_test").
 		Body(obj).Do().Get()
 	if err != nil {
 		t.Fatalf("Failed to remove container port using Apply patch: %v", err)
@@ -799,12 +785,11 @@ func TestApplyFailsWithVersionMismatch(t *testing.T) {
 		}
 	}`)
 
-	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err := client.CoreV1().RESTClient().Apply("apply_test").
 		AbsPath("/apis/apps/v1").
 		Namespace("default").
 		Resource("deployments").
 		Name("deployment").
-		Param("fieldManager", "apply_test").
 		Body(obj).Do().Get()
 	if err != nil {
 		t.Fatalf("Failed to create object using Apply patch: %v", err)
@@ -839,12 +824,11 @@ func TestApplyFailsWithVersionMismatch(t *testing.T) {
 			}
 		}
 	}`)
-	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err = client.CoreV1().RESTClient().Apply("apply_test").
 		AbsPath("/apis/apps/v1").
 		Namespace("default").
 		Resource("deployments").
 		Name("deployment").
-		Param("fieldManager", "apply_test").
 		Body([]byte(obj)).Do().Get()
 	if err == nil {
 		t.Fatalf("Expecting to get version mismatch when applying object")
@@ -948,7 +932,7 @@ func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
 			}
 		}
 	}`)
-	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err = client.CoreV1().RESTClient().Apply("sidecar_controller").
 		AbsPath("/apis/apps/v1").
 		Namespace("default").
 		Resource("deployments").
@@ -1009,11 +993,10 @@ func TestClearManagedFieldsWithMergePatch(t *testing.T) {
 	_, client, closeFn := setup(t)
 	defer closeFn()
 
-	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err := client.CoreV1().RESTClient().Apply("apply_test").
 		Namespace("default").
 		Resource("configmaps").
 		Name("test-cm").
-		Param("fieldManager", "apply_test").
 		Body([]byte(`{
 			"apiVersion": "v1",
 			"kind": "ConfigMap",
@@ -1065,11 +1048,10 @@ func TestClearManagedFieldsWithStrategicMergePatch(t *testing.T) {
 	_, client, closeFn := setup(t)
 	defer closeFn()
 
-	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err := client.CoreV1().RESTClient().Apply("apply_test").
 		Namespace("default").
 		Resource("configmaps").
 		Name("test-cm").
-		Param("fieldManager", "apply_test").
 		Body([]byte(`{
 			"apiVersion": "v1",
 			"kind": "ConfigMap",
@@ -1125,11 +1107,10 @@ func TestClearManagedFieldsWithJSONPatch(t *testing.T) {
 	_, client, closeFn := setup(t)
 	defer closeFn()
 
-	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err := client.CoreV1().RESTClient().Apply("apply_test").
 		Namespace("default").
 		Resource("configmaps").
 		Name("test-cm").
-		Param("fieldManager", "apply_test").
 		Body([]byte(`{
 			"apiVersion": "v1",
 			"kind": "ConfigMap",
@@ -1181,11 +1162,10 @@ func TestClearManagedFieldsWithUpdate(t *testing.T) {
 	_, client, closeFn := setup(t)
 	defer closeFn()
 
-	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	_, err := client.CoreV1().RESTClient().Apply("apply_test").
 		Namespace("default").
 		Resource("configmaps").
 		Name("test-cm").
-		Param("fieldManager", "apply_test").
 		Body([]byte(`{
 			"apiVersion": "v1",
 			"kind": "ConfigMap",
@@ -1410,10 +1390,9 @@ func getPodBytesWhenEnabled(b *testing.B, pod v1.Pod, format string) []byte {
 	flag.Lookup("v").Value.Set("0")
 
 	pod.Name = "size-pod"
-	podB, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+	podB, err := client.CoreV1().RESTClient().Apply("apply_test").
 		Name(pod.Name).
 		Namespace("default").
-		Param("fieldManager", "apply_test").
 		Resource("pods").
 		SetHeader("Accept", format).
 		Body(encodePod(pod)).DoRaw()

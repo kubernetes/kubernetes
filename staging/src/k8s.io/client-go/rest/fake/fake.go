@@ -77,12 +77,11 @@ func (c *RESTClient) Patch(pt types.PatchType) *restclient.Request {
 	return c.Verb("PATCH").SetHeader("Content-Type", string(pt))
 }
 
-func (c *RESTClient) Apply(force bool, fieldManager string) *restclient.Request {
+func (c *RESTClient) Apply(fieldManager string) *restclient.Request {
 	req := c.Patch(types.ApplyPatchType)
 
 	// add function's parameters as query parameters to the request
 	req = req.Param("fieldManager", fieldManager)
-	req = req.Param("force", strconv.FormatBool(force))
 
 	return req
 }

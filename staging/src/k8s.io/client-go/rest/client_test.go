@@ -281,7 +281,7 @@ func TestHttpMethods(t *testing.T) {
 		t.Errorf("Patch : Object returned should not be nil")
 	}
 
-	request = c.Apply(false, "manager")
+	request = c.Apply("apply_test")
 	if request == nil {
 		t.Errorf("Apply : Object returned should not be nil")
 	}
