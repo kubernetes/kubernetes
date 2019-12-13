@@ -171,11 +171,14 @@ var nonRoundTrippableTypes = sets.NewString(
 var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions", "GetOptions", "CreateOptions", "UpdateOptions", "PatchOptions"}
 
 // TestCommonKindsRegistered verifies that all group/versions registered with
-// the testapi package have the common kinds.
+// the legacyscheme package have the common kinds.
 func TestCommonKindsRegistered(t *testing.T) {
 	for _, kind := range commonKinds {
-		for _, group := range testapi.Groups {
-			gv := group.GroupVersion()
+		for gvk := range legacyscheme.Scheme.AllKnownTypes() {
+			if gvk.Version == runtime.APIVersionInternal {
+				continue
+			}
+			gv := gvk.GroupVersion()
 			gvk := gv.WithKind(kind)
 			obj, err := legacyscheme.Scheme.New(gvk)
 			if err != nil {
@@ -186,7 +189,7 @@ func TestCommonKindsRegistered(t *testing.T) {
 			if obj, got, err = legacyscheme.Codecs.LegacyCodec().Decode([]byte(`{"kind":"`+kind+`"}`), &defaults, obj); err != nil || gvk != *got {
 				t.Errorf("expected %v: %v %v", gvk, got, err)
 			}
-			data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(*gv), obj)
+			data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(gv), obj)
 			if err != nil {
 				t.Errorf("expected %v: %v\n%s", gvk, err, string(data))
 				continue
