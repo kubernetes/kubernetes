@@ -147,7 +147,14 @@ func getNodeNameFromKubeletConfig(kubeconfigDir string) (string, error) {
 	}
 
 	// gets the info about the current user
-	authInfo := config.AuthInfos[config.Contexts[config.CurrentContext].AuthInfo]
+	currentContext, exists := config.Contexts[config.CurrentContext]
+	if !exists {
+		return "", errors.Errorf("invalid kubeconfig file %s: missing context %s", fileName, config.CurrentContext)
+	}
+	authInfo, exists := config.AuthInfos[currentContext.AuthInfo]
+	if !exists {
+		return "", errors.Errorf("invalid kubeconfig file %s: missing AuthInfo %s", fileName, currentContext.AuthInfo)
+	}
 
 	// gets the X509 certificate with current user credentials
 	var certs []*x509.Certificate
@@ -162,7 +169,7 @@ func getNodeNameFromKubeletConfig(kubeconfigDir string) (string, error) {
 			return "", err
 		}
 	} else {
-		return "", errors.New("invalid kubelet.conf. X509 certificate expected")
+		return "", errors.Errorf("invalid kubeconfig file %s. x509 certificate expected", fileName)
 	}
 
 	// We are only putting one certificate in the certificate pem file, so it's safe to just pick the first one
