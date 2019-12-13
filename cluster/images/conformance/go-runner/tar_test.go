@@ -32,6 +32,25 @@ import (
 )
 
 func TestTar(t *testing.T) {
+	tmp, err := ioutil.TempDir("", "testtar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmp)
+
+	if err := os.Mkdir(filepath.Join(tmp, "subdir"), os.FileMode(0755)); err != nil {
+		t.Fatal(err)
+	}
+	if err := ioutil.WriteFile(filepath.Join(tmp, "file1"), []byte(`file1 data`), os.FileMode(0644)); err != nil {
+		t.Fatal(err)
+	}
+	if err := ioutil.WriteFile(filepath.Join(tmp, "file2"), []byte(`file2 data`), os.FileMode(0644)); err != nil {
+		t.Fatal(err)
+	}
+	if err := ioutil.WriteFile(filepath.Join(tmp, "subdir", "file4"), []byte(`file4 data`), os.FileMode(0644)); err != nil {
+		t.Fatal(err)
+	}
+
 	testCases := []struct {
 		desc      string
 		dir       string
@@ -41,8 +60,8 @@ func TestTar(t *testing.T) {
 	}{
 		{
 			desc:    "Contents preserved and no self-reference",
-			dir:     "testdata/tartest",
-			outpath: "testdata/tartest/out.tar.gz",
+			dir:     tmp,
+			outpath: filepath.Join(tmp, "out.tar.gz"),
 			expect: map[string]string{
 				"file1":        "file1 data",
 				"file2":        "file2 data",
@@ -50,8 +69,8 @@ func TestTar(t *testing.T) {
 			},
 		}, {
 			desc:      "Errors if directory does not exist",
-			dir:       "testdata/does-not-exist",
-			outpath:   "testdata/tartest/out.tar.gz",
+			dir:       filepath.Join(tmp, "does-not-exist"),
+			outpath:   filepath.Join(tmp, "out.tar.gz"),
 			expectErr: "tar unable to stat directory",
 		},
 	}
