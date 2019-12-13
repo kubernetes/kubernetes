@@ -33,9 +33,9 @@ go_test(
     srcs = ["strategy_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/install:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
