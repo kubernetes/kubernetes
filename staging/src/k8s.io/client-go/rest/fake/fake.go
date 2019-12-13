@@ -76,6 +76,20 @@ func (c *RESTClient) Patch(pt types.PatchType) *restclient.Request {
 	return c.Verb("PATCH").SetHeader("Content-Type", string(pt))
 }
 
+func (c *RESTClient) Apply(force bool, manager string) *restclient.Request {
+	req := c.Patch(types.ApplyPatchType)
+
+	if force {
+		req.Param("force", "true")
+	}
+
+	if manager != "" {
+		req.Param("manager", manager)
+	}
+
+	return req
+}	
+
 func (c *RESTClient) Post() *restclient.Request {
 	return c.Verb("POST")
 }
