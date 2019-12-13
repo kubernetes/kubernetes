@@ -579,7 +579,7 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 				if _, found := failedPredicateMap[failedNodeName]; !found {
 					failedPredicateMap[failedNodeName] = []predicates.PredicateFailureReason{}
 				}
-				failedPredicateMap[failedNodeName] = append(failedPredicateMap[failedNodeName], predicates.NewFailureReason(failedMsg))
+				failedPredicateMap[failedNodeName] = append(failedPredicateMap[failedNodeName], predicates.NewPredicateFailureError(extender.Name(), failedMsg))
 			}
 			filtered = filteredList
 			if len(filtered) == 0 {
