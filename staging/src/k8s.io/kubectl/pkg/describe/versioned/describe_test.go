@@ -3511,20 +3511,30 @@ func getHugePageResourceList(pageSize, value string) corev1.ResourceList {
 	return res
 }
 
+// mergeResourceLists will merge resoure lists. When two lists have the same resourece, the value from
+// the last list will be present in the result
+func mergeResourceLists(resourceLists ...corev1.ResourceList) corev1.ResourceList {
+	result := corev1.ResourceList{}
+	for _, rl := range resourceLists {
+		for resource, quantity := range rl {
+			result[resource] = quantity
+		}
+	}
+	return result
+}
+
 func TestDescribeNode(t *testing.T) {
 	holderIdentity := "holder"
-	nodeCapacity := corev1.ResourceList{}
-	for _, rl := range []corev1.ResourceList{getHugePageResourceList("2Mi", "4Gi"), getResourceList("8", "24Gi"), getHugePageResourceList("1Gi", "0")} {
-		for resource, value := range rl {
-			nodeCapacity[resource] = value
-		}
-	}
-	nodeAllocatable := corev1.ResourceList{}
-	for _, rl := range []corev1.ResourceList{getHugePageResourceList("2Mi", "2Gi"), getResourceList("4", "12Gi"), getHugePageResourceList("1Gi", "0")} {
-		for resource, value := range rl {
-			nodeAllocatable[resource] = value
-		}
-	}
+	nodeCapacity := mergeResourceLists(
+		getHugePageResourceList("2Mi", "4Gi"),
+		getResourceList("8", "24Gi"),
+		getHugePageResourceList("1Gi", "0"),
+	)
+	nodeAllocatable := mergeResourceLists(
+		getHugePageResourceList("2Mi", "2Gi"),
+		getResourceList("4", "12Gi"),
+		getHugePageResourceList("1Gi", "0"),
+	)
 
 	fake := fake.NewSimpleClientset(
 		&corev1.Node{
