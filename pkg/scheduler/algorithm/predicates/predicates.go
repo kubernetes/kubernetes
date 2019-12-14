@@ -1097,13 +1097,18 @@ func (s *ServiceAffinity) checkServiceAffinity(pod *v1.Pod, meta Metadata, nodeI
 	return false, []PredicateFailureReason{ErrServiceAffinityViolated}, nil
 }
 
-// PodFitsHostPorts checks if a node has free ports for the requested pod ports.
-func PodFitsHostPorts(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
-	var wantPorts []*v1.ContainerPort
-	if predicateMeta, ok := meta.(*predicateMetadata); ok && predicateMeta.podFitsHostPortsMetadata != nil {
-		wantPorts = predicateMeta.podFitsHostPortsMetadata.podPorts
-	} else {
-		// We couldn't parse metadata - fallback to computing it.
+// PodFitsHostPorts is a wrapper around PodFitsHostPortsPredicate. This is needed until
+// we are able to get rid of the FitPredicate function signature.
+// TODO(#85822): remove this function once predicate registration logic is deleted.
+func PodFitsHostPorts(pod *v1.Pod, _ Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+	return PodFitsHostPortsPredicate(pod, nil, nodeInfo)
+}
+
+// PodFitsHostPortsPredicate checks if a node has free ports for the requested pod ports.
+func PodFitsHostPortsPredicate(pod *v1.Pod, meta []*v1.ContainerPort, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+	wantPorts := meta
+	if wantPorts == nil {
+		// Fallback to computing it.
 		wantPorts = schedutil.GetContainerPorts(pod)
 	}
 	if len(wantPorts) == 0 {
