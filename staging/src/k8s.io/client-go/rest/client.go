@@ -184,12 +184,7 @@ func (c *RESTClient) Patch(pt types.PatchType) *Request {
 
 // Apply begins a PATCH request with the apply patch type.
 func (c *RESTClient) Apply(fieldManager string) *Request {
-	req := c.Patch(types.ApplyPatchType)
-
-	// add function's parameters as query parameters to the request
-	req = req.Param("fieldManager", fieldManager)
-
-	return req
+	return c.Patch(types.ApplyPatchType).Param("fieldManager", fieldManager)
 }
 
 // Get begins a GET request. Short for c.Verb("GET").

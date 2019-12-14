@@ -77,12 +77,7 @@ func (c *RESTClient) Patch(pt types.PatchType) *restclient.Request {
 }
 
 func (c *RESTClient) Apply(fieldManager string) *restclient.Request {
-	req := c.Patch(types.ApplyPatchType)
-
-	// add function's parameters as query parameters to the request
-	req = req.Param("fieldManager", fieldManager)
-
-	return req
+	return c.Patch(types.ApplyPatchType).Param("fieldManager", fieldManager)
 }
 
 func (c *RESTClient) Post() *restclient.Request {
