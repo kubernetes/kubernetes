@@ -20,6 +20,7 @@ approvers:
   - oomichi
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
+  - SataQiu
   - sig-testing-approvers
   - smarterclayton
   - soltysh
