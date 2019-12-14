@@ -20,6 +20,7 @@ package azure
 
 import (
 	"testing"
+	"strconv"
 
 	"github.com/stretchr/testify/assert"
 
@@ -261,6 +262,90 @@ func TestGetAzureLoadBalancerName(t *testing.T) {
 			az.Config.LoadBalancerSku = loadBalancerSkuBasic
 		}
 		loadbalancerName := az.getAzureLoadBalancerName(c.clusterName, c.vmSet, c.isInternal)
+		assert.Equal(t, c.expected, loadbalancerName, c.description)
+	}
+}
+
+func TestGetLoadBalancingRuleName(t *testing.T) {
+	az := getTestCloud()
+	az.PrimaryAvailabilitySetName = "primary"
+
+	svc := &v1.Service{
+		ObjectMeta: meta.ObjectMeta{
+			Annotations: map[string]string{
+				ServiceAnnotationLoadBalancerInternalSubnet: "subnet",
+				ServiceAnnotationLoadBalancerInternal:       "true",
+			},
+			UID: "257b9655-5137-4ad2-b091-ef3f07043ad3",
+		},
+	}
+
+	cases := []struct {
+		description string
+		subnetName    string
+		isInternal    bool
+		useStandardLB bool
+		protocol      v1.Protocol
+		port          int32
+		expected      string
+	}{
+		{
+			description: "internal lb should have subnet name on the rule name",
+			subnetName:       "shortsubnet",
+			isInternal: true,
+			useStandardLB:    true,
+			protocol: v1.ProtocolTCP,
+			port: 9000,
+			expected: "a257b965551374ad2b091ef3f07043ad-shortsubnet-TCP-9000",
+		},
+		{
+			description: "internal standard lb should have subnet name on the rule name but truncated to 80 charactors",
+			subnetName:       "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
+			isInternal: true,
+			useStandardLB:    true,
+			protocol: v1.ProtocolTCP,
+			port: 9000,
+			expected: "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnngg-TCP-9000",
+		},
+		{
+			description: "internal basic lb should have subnet name on the rule name but truncated to 80 charactors",
+			subnetName:       "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
+			isInternal: true,
+			useStandardLB:    false,
+			protocol: v1.ProtocolTCP,
+			port: 9000,
+			expected: "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnngg-TCP-9000",
+		},
+		{
+			description: "external standard lb should not have subnet name on the rule name",
+			subnetName:       "shortsubnet",
+			isInternal: false,
+			useStandardLB:    true,
+			protocol: v1.ProtocolTCP,
+			port: 9000,
+			expected: "a257b965551374ad2b091ef3f07043ad-TCP-9000",
+		},
+		{
+			description: "external basic lb should not have subnet name on the rule name",
+			subnetName:       "shortsubnet",
+			isInternal: false,
+			useStandardLB:    false,
+			protocol: v1.ProtocolTCP,
+			port: 9000,
+			expected: "a257b965551374ad2b091ef3f07043ad-TCP-9000",
+		},
+	}
+
+	for _, c := range cases {
+		if c.useStandardLB {
+			az.Config.LoadBalancerSku = loadBalancerSkuStandard
+		} else {
+			az.Config.LoadBalancerSku = loadBalancerSkuBasic
+		}
+		svc.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = c.subnetName
+		svc.Annotations[ServiceAnnotationLoadBalancerInternal] = strconv.FormatBool(c.isInternal)
+
+		loadbalancerName := az.getLoadBalancerRuleName(svc, c.protocol, c.port)
 		assert.Equal(t, c.expected, loadbalancerName, c.description)
 	}
 }

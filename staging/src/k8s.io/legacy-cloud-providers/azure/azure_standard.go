@@ -274,12 +274,21 @@ func getBackendPoolName(ipv6DualStackEnabled bool, clusterName string, service *
 	return clusterName
 }
 
-func (az *Cloud) getLoadBalancerRuleName(service *v1.Service, protocol v1.Protocol, port int32, subnetName *string) string {
+func (az *Cloud) getLoadBalancerRuleName(service *v1.Service, protocol v1.Protocol, port int32) string {
 	prefix := az.getRulePrefix(service)
-	if subnetName == nil {
-		return fmt.Sprintf("%s-%s-%d", prefix, protocol, port)
+	ruleName := fmt.Sprintf("%s-%s-%d", prefix, protocol, port)
+	subnet := subnet(service)
+	if subnet == nil {
+		return ruleName
 	}
-	return fmt.Sprintf("%s-%s-%s-%d", prefix, *subnetName, protocol, port)
+
+	// Load balancer rule name must be less or equal to 80 charactors, so excluding the hyphen two segments cannot exceed 79
+	subnetSegment := *subnet
+	if len(ruleName) + len(subnetSegment) > 79 {
+		subnetSegment = subnetSegment[:79 - len(ruleName)]
+	}
+
+	return fmt.Sprintf("%s-%s-%s-%d", prefix, subnetSegment, protocol, port)
 }
 
 func (az *Cloud) getSecurityRuleName(service *v1.Service, port v1.ServicePort, sourceAddrPrefix string) string {
@@ -317,10 +326,17 @@ func (az *Cloud) serviceOwnsFrontendIP(fip network.FrontendIPConfiguration, serv
 	return strings.HasPrefix(*fip.Name, baseName)
 }
 
-func (az *Cloud) getFrontendIPConfigName(service *v1.Service, subnetName *string) string {
+func (az *Cloud) getFrontendIPConfigName(service *v1.Service) string {
 	baseName := az.GetLoadBalancerName(context.TODO(), "", service)
+	subnetName := subnet(service)
 	if subnetName != nil {
-		return fmt.Sprintf("%s-%s", baseName, *subnetName)
+		ipcName := fmt.Sprintf("%s-%s", baseName, *subnetName)
+		
+		// Azure lb front end configuration name must not exceed 80 charactors
+		if len(ipcName) > 80 {
+			ipcName = ipcName[:80]
+		}
+		return ipcName
 	}
 	return baseName
 }
