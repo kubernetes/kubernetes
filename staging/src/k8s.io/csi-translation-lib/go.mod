@@ -2,7 +2,7 @@
 
 module k8s.io/csi-translation-lib
 
-go 1.12
+go 1.13
 
 require (
 	k8s.io/api v0.0.0
