@@ -128,6 +128,9 @@ type SerializerInfo struct {
 	// StreamSerializer, if set, describes the streaming serialization format
 	// for this media type.
 	StreamSerializer *StreamSerializerInfo
+	// SupportsObject is used to determine if this serializer supports serializing the specified object.
+	// If SupportsObject is nil, all objects are assumed to be supported.
+	SupportsObject func(Object) bool
 }
 
 // StreamSerializerInfo contains information about a specific stream serialization format

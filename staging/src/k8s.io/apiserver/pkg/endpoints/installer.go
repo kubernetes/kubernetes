@@ -519,9 +519,31 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	allMediaTypes := append(mediaTypes, streamMediaTypes...)
 	ws.Produces(allMediaTypes...)
 
+	// limit standard serializers to ones that can encode our specific type
+	var (
+		standardSerializers   = []runtime.SerializerInfo{}
+		supportsAllMediaTypes = true
+	)
+	objInstance, err := a.group.Creater.New(fqKindToRegister)
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range a.group.Serializer.SupportedMediaTypes() {
+		if s.SupportsObject == nil || s.SupportsObject(objInstance) {
+			standardSerializers = append(standardSerializers, s)
+		} else {
+			supportsAllMediaTypes = false
+		}
+	}
+	if supportsAllMediaTypes {
+		standardSerializers = nil
+	}
+
 	kubeVerbs := map[string]struct{}{}
 	reqScope := handlers.RequestScope{
-		Serializer:      a.group.Serializer,
+		Serializer:          a.group.Serializer,
+		StandardSerializers: standardSerializers,
+
 		ParameterCodec:  a.group.ParameterCodec,
 		Creater:         a.group.Creater,
 		Convertor:       a.group.Convertor,

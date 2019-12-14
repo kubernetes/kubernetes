@@ -33,6 +33,7 @@ var serializerExtensions = []func(*runtime.Scheme) (serializerType, bool){}
 
 type serializerType struct {
 	AcceptContentTypes []string
+	SupportsObject     func(runtime.Object) bool
 	ContentType        string
 	FileExtensions     []string
 	// EncodesAsText should be true if this content type can be represented safely in UTF-8
@@ -94,6 +95,11 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 
 			Framer:           protobuf.LengthDelimitedFramer,
 			StreamSerializer: protoRawSerializer,
+
+			SupportsObject: func(obj runtime.Object) bool {
+				_, canEncodeProto := obj.(runtime.ProtobufMarshaller)
+				return canEncodeProto
+			},
 		},
 	}
 
@@ -188,6 +194,7 @@ func newCodecFactory(scheme *runtime.Scheme, serializers []serializerType) Codec
 				EncodesAsText:    d.EncodesAsText,
 				Serializer:       d.Serializer,
 				PrettySerializer: d.PrettySerializer,
+				SupportsObject:   d.SupportsObject,
 			}
 
 			mediaType, _, err := mime.ParseMediaType(info.MediaType)

@@ -302,8 +302,8 @@ func BenchmarkNegotiateMediaTypeOptions(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		options, _ := NegotiateMediaTypeOptions(header, accepted, DefaultEndpointRestrictions)
-		if options.Accepted != accepted[1] {
-			b.Errorf("Unexpected result")
+		if a, e := options.Accepted, accepted[1]; a.MediaType != e.MediaType || a.MediaTypeType != e.MediaTypeType || a.MediaTypeSubType != e.MediaTypeSubType {
+			b.Errorf("Unexpected result; got %#v, expected %#v", a, e)
 		}
 	}
 }

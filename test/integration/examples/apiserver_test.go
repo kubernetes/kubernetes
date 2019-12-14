@@ -32,6 +32,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
@@ -58,7 +59,8 @@ func TestAggregatedAPIServer(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	testServer := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true}, nil, framework.SharedEtcd())
+	storageConfig := framework.SharedEtcd()
+	testServer := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true}, nil, storageConfig)
 	defer testServer.TearDownFn()
 	kubeClientConfig := rest.CopyConfig(testServer.ClientConfig)
 	// force json because everything speaks it
@@ -85,6 +87,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 			"--authentication-kubeconfig", wardleToKASKubeConfigFile,
 			"--authorization-kubeconfig", wardleToKASKubeConfigFile,
 			"--etcd-servers", framework.GetEtcdURL(),
+			"--etcd-prefix", storageConfig.Prefix, // isolate data in etcd per test run
 			"--cert-dir", wardleCertDir,
 			"--kubeconfig", wardleToKASKubeConfigFile,
 		})
@@ -105,6 +108,25 @@ func TestAggregatedAPIServer(t *testing.T) {
 	testAPIGroupList(t, wardleClient.Discovery().RESTClient())
 	testAPIGroup(t, wardleClient.Discovery().RESTClient())
 	testAPIResourceList(t, wardleClient.Discovery().RESTClient())
+
+	// Make sure a create directly against the wardle API server works
+	fischer := `{"apiVersion":"wardle.example.com/v1alpha1","kind":"Fischer","metadata":{"labels":{"sample-label":"true"},"name":"foo"}}`
+	createResult, createErr := wardleClient.Discovery().RESTClient().Post().
+		AbsPath("/apis/wardle.example.com/v1alpha1/fischers").
+		Body([]byte(fischer)).
+		SetHeader("Content-Type", "application/json").                               // fischers only support JSON
+		SetHeader("Accept", "application/vnd.kubernetes.protobuf,application/json"). // ensure sample-apiserver negotiate fallback works
+		DoRaw()
+	if createErr != nil {
+		t.Fatal(createErr)
+	}
+	u := &unstructured.Unstructured{}
+	if err := json.Unmarshal(createResult, u); err != nil {
+		t.Fatal(err)
+	}
+	if u.GetName() != "foo" || u.GetAPIVersion() != "wardle.example.com/v1alpha1" || u.GetKind() != "Fischer" {
+		t.Fatalf("unexpected result: %s", string(createResult))
+	}
 
 	wardleCA, err := ioutil.ReadFile(directWardleClientConfig.CAFile)
 	if err != nil {
