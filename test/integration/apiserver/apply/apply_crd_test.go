@@ -460,7 +460,7 @@ spec:
 	verifyFinalizersIncludes(t, result, "another-one")
 
 	// Re-apply the same config, should work fine, since finalizers should have the list-type extension 'set'.
-	result, err = rest.ply("apply_test").
+	result, err = rest.Apply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		SetHeader("Accept", "application/json").
@@ -485,7 +485,7 @@ spec:
 	verifyReplicas(t, result, 5.0)
 
 	// Re-apply, we should get conflicts now, since the number of replicas was changed.
-	result, err = rest.ply("apply_test").
+	result, err = rest.Apply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Body(yamlBody).
@@ -502,7 +502,7 @@ spec:
 	}
 
 	// Re-apply with force, should work fine.
-	result, err = rest.ply("apply_test").
+	result, err = rest.Apply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("force", "true").
@@ -654,7 +654,7 @@ metadata:
   name: %s
 spec:
   replicas: 1`, apiVersion, kind, name))
-	result, err := rest.ply("apply_test").
+	result, err := rest.Apply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Body(yamlBody).
@@ -676,7 +676,7 @@ spec:
 	verifyReplicas(t, result, 5)
 
 	// Re-apply, we should get conflicts now, since the number of replicas was changed.
-	result, err = rest.ply("apply_test").
+	result, err = rest.Apply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Body(yamlBody).
@@ -693,7 +693,7 @@ spec:
 	}
 
 	// Re-apply with force, should work fine.
-	result, err = rest.ply("apply_test").
+	result, err = rest.Apply("apply_test").
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("force", "true").
