@@ -2,7 +2,7 @@
 
 module k8s.io/metrics
 
-go 1.12
+go 1.13
 
 require (
 	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
