@@ -21,8 +21,6 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -32,7 +30,7 @@ var (
 	hardSpread = v1.DoNotSchedule
 )
 
-func TestPodTopologySpread_Filter_SingleConstraint(t *testing.T) {
+func TestSingleConstraint(t *testing.T) {
 	tests := []struct {
 		name         string
 		pod          *v1.Pod
@@ -270,14 +268,16 @@ func TestPodTopologySpread_Filter_SingleConstraint(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, tt.nodes))
-			factory := &predicates.MetadataProducerFactory{}
-			meta := factory.GetPredicateMetadata(tt.pod, snapshot)
+			p := &PodTopologySpread{snapshotSharedLister: snapshot}
 			state := framework.NewCycleState()
-			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
-			plugin, _ := New(nil, nil)
+			preFilterStatus := p.PreFilter(context.Background(), state, tt.pod)
+			if !preFilterStatus.IsSuccess() {
+				t.Errorf("preFilter failed with status: %v", preFilterStatus)
+			}
+
 			for _, node := range tt.nodes {
 				nodeInfo, _ := snapshot.NodeInfos().Get(node.Name)
-				status := plugin.(*PodTopologySpread).Filter(context.Background(), state, tt.pod, nodeInfo)
+				status := p.Filter(context.Background(), state, tt.pod, nodeInfo)
 				if status.IsSuccess() != tt.fits[node.Name] {
 					t.Errorf("[%s]: expected %v got %v", node.Name, tt.fits[node.Name], status.IsSuccess())
 				}
@@ -286,7 +286,7 @@ func TestPodTopologySpread_Filter_SingleConstraint(t *testing.T) {
 	}
 }
 
-func TestPodTopologySpread_Filter_MultipleConstraints(t *testing.T) {
+func TestMultipleConstraints(t *testing.T) {
 	tests := []struct {
 		name         string
 		pod          *v1.Pod
@@ -468,14 +468,16 @@ func TestPodTopologySpread_Filter_MultipleConstraints(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, tt.nodes))
-			factory := &predicates.MetadataProducerFactory{}
-			meta := factory.GetPredicateMetadata(tt.pod, snapshot)
+			p := &PodTopologySpread{snapshotSharedLister: snapshot}
 			state := framework.NewCycleState()
-			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
-			plugin, _ := New(nil, nil)
+			preFilterStatus := p.PreFilter(context.Background(), state, tt.pod)
+			if !preFilterStatus.IsSuccess() {
+				t.Errorf("preFilter failed with status: %v", preFilterStatus)
+			}
+
 			for _, node := range tt.nodes {
 				nodeInfo, _ := snapshot.NodeInfos().Get(node.Name)
-				status := plugin.(*PodTopologySpread).Filter(context.Background(), state, tt.pod, nodeInfo)
+				status := p.Filter(context.Background(), state, tt.pod, nodeInfo)
 				if status.IsSuccess() != tt.fits[node.Name] {
 					t.Errorf("[%s]: expected %v got %v", node.Name, tt.fits[node.Name], status.IsSuccess())
 				}
