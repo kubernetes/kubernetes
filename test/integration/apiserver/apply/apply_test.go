@@ -623,7 +623,7 @@ func TestApplyRequiresFieldManager(t *testing.T) {
 		}
 	}`)
 
-	_, err := client.CoreV1().RESTClient().Apply("apply_test").
+	_, err := client.CoreV1().RESTClient().Apply("").
 		Namespace("default").
 		Resource("configmaps").
 		Name("test-cm").
@@ -634,7 +634,7 @@ func TestApplyRequiresFieldManager(t *testing.T) {
 		t.Fatalf("Apply should fail to create without fieldManager")
 	}
 
-	_, err = client.CoreV1().RESTClient().Apply("apply_test").
+	_, err = client.CoreV1().RESTClient().Apply("").
 		Namespace("default").
 		Resource("configmaps").
 		Name("test-cm").
