@@ -261,10 +261,7 @@ func TestGetLoadBalancingRuleName(t *testing.T) {
 
 	svc := &v1.Service{
 		ObjectMeta: meta.ObjectMeta{
-			Annotations: map[string]string{
-				ServiceAnnotationLoadBalancerInternalSubnet: "subnet",
-				ServiceAnnotationLoadBalancerInternal:       "true",
-			},
+			Annotations: map[string]string{ 	},
 			UID: "257b9655-5137-4ad2-b091-ef3f07043ad3",
 		},
 	}
@@ -334,7 +331,79 @@ func TestGetLoadBalancingRuleName(t *testing.T) {
 		svc.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = c.subnetName
 		svc.Annotations[ServiceAnnotationLoadBalancerInternal] = strconv.FormatBool(c.isInternal)
 
-		loadbalancerName := az.getLoadBalancerRuleName(svc, c.protocol, c.port)
+		loadbalancerRuleName := az.getLoadBalancerRuleName(svc, c.protocol, c.port)
+		assert.Equal(t, c.expected, loadbalancerRuleName, c.description)
+	}
+}
+
+func TestgetFrontendIPConfigName(t *testing.T) {
+	az := getTestCloud()
+	az.PrimaryAvailabilitySetName = "primary"
+
+	svc := &v1.Service{
+		ObjectMeta: meta.ObjectMeta{
+			Annotations: map[string]string{
+				ServiceAnnotationLoadBalancerInternalSubnet: "subnet",
+				ServiceAnnotationLoadBalancerInternal:       "true",
+			},
+			UID: "257b9655-5137-4ad2-b091-ef3f07043ad3",
+		},
+	}
+
+	cases := []struct {
+		description string
+		subnetName    string
+		isInternal    bool
+		useStandardLB bool
+		expected      string
+	}{
+		{
+			description: "internal lb should have subnet name on the frontend ip configuration name",
+			subnetName:       "shortsubnet",
+			isInternal: true,
+			useStandardLB:    true,
+			expected: "a257b965551374ad2b091ef3f07043ad-shortsubnet",
+		},
+		{
+			description: "internal standard lb should have subnet name on the frontend ip configuration name but truncated to 80 charactors",
+			subnetName:       "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
+			isInternal: true,
+			useStandardLB:    true,
+			expected: "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnngg",
+		},
+		{
+			description: "internal basic lb should have subnet name on the frontend ip configuration name but truncated to 80 charactors",
+			subnetName:       "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
+			isInternal: true,
+			useStandardLB:    false,
+			expected: "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnngg",
+		},
+		{
+			description: "external standard lb should not have subnet name on the frontend ip configuration name",
+			subnetName:       "shortsubnet",
+			isInternal: false,
+			useStandardLB:    true,
+			expected: "a257b965551374ad2b091ef3f07043ad",
+		},
+		{
+			description: "external basic lb should not have subnet name on the frontend ip configuration name",
+			subnetName:       "shortsubnet",
+			isInternal: false,
+			useStandardLB:    false,
+			expected: "a257b965551374ad2b091ef3f07043ad",
+		},
+	}
+
+	for _, c := range cases {
+		if c.useStandardLB {
+			az.Config.LoadBalancerSku = loadBalancerSkuStandard
+		} else {
+			az.Config.LoadBalancerSku = loadBalancerSkuBasic
+		}
+		svc.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = c.subnetName
+		svc.Annotations[ServiceAnnotationLoadBalancerInternal] = strconv.FormatBool(c.isInternal)
+
+		loadbalancerName := az.getFrontendIPConfigName(svc)
 		assert.Equal(t, c.expected, loadbalancerName, c.description)
 	}
 }
