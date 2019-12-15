@@ -23,6 +23,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -409,7 +410,11 @@ func AddKustomizeFlag(flags *pflag.FlagSet, value *string) {
 
 // AddDryRunFlag adds dry-run flag to a command. Usually used by mutations.
 func AddDryRunFlag(cmd *cobra.Command) {
-	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
+	cmd.Flags().String(
+		"dry-run",
+		"",
+		`Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`,
+	)
 }
 
 func AddServerSideApplyFlags(cmd *cobra.Command) {
@@ -498,8 +503,40 @@ func GetFieldManagerFlag(cmd *cobra.Command) string {
 	return GetFlagString(cmd, "field-manager")
 }
 
-func GetDryRunFlag(cmd *cobra.Command) bool {
-	return GetFlagBool(cmd, "dry-run")
+type DryRunStrategy int
+
+const (
+	DryRunNone DryRunStrategy = iota
+	DryRunClient
+	DryRunServer
+)
+
+func GetDryRunFlag(cmd *cobra.Command) (DryRunStrategy, error) {
+	var dryRunFlag = GetFlagString(cmd, "dry-run")
+	if dryRunFlag == "" {
+		klog.Warning(`The unset value for --dry-run is deprecated and a value will be required in a future version. Must be "none", "server", or "client".`)
+		return DryRunClient, nil
+	}
+	b, err := strconv.ParseBool(dryRunFlag)
+	// The flag is not a boolean
+	if err != nil {
+		switch dryRunFlag {
+		case "client":
+			return DryRunClient, nil
+		case "server":
+			return DryRunServer, nil
+		case "none":
+			return DryRunNone, nil
+		default:
+			return DryRunNone, fmt.Errorf(`Invalid dry-run value (%v). Must be "none", "server", or "client".`, dryRunFlag)
+		}
+	}
+	// The flag was a boolean, and indicates true, run client-side
+	if b {
+		klog.Warning(`Boolean values for --dry-run are deprecated and will be removed in a future version. Must be "none", "server", or "client".`)
+		return DryRunClient, nil
+	}
+	return DryRunNone, nil
 }
 
 // GetResourcesAndPairs retrieves resources and "KEY=VALUE or KEY-" pair args from given args
