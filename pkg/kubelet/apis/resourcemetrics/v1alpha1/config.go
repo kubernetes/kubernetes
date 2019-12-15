@@ -24,6 +24,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 )
 
+// This file contains a series of deprecated metrics which we emit them by endpoint `/metrics/resource/v1alpha1`.
+// These metrics have been adapted to new endpoint `/metrics/resource` as well as new `Desc`s.
+// In general, we don't need to maintain these deprecated metrics any more.
+// TODO(RainbowMango): Remove this file in release 1.20.0+.
+
 // Version is the string representation of the version of this configuration
 const Version = "v1alpha1"
 
@@ -33,28 +38,28 @@ var (
 		nil,
 		nil,
 		metrics.ALPHA,
-		"")
+		"1.18.0")
 
 	nodeMemoryUsageDesc = metrics.NewDesc("node_memory_working_set_bytes",
 		"Current working set of the node in bytes",
 		nil,
 		nil,
 		metrics.ALPHA,
-		"")
+		"1.18.0")
 
 	containerCPUUsageDesc = metrics.NewDesc("container_cpu_usage_seconds_total",
 		"Cumulative cpu time consumed by the container in core-seconds",
 		[]string{"container", "pod", "namespace"},
 		nil,
 		metrics.ALPHA,
-		"")
+		"1.18.0")
 
 	containerMemoryUsageDesc = metrics.NewDesc("container_memory_working_set_bytes",
 		"Current working set of the container in bytes",
 		[]string{"container", "pod", "namespace"},
 		nil,
 		metrics.ALPHA,
-		"")
+		"1.18.0")
 )
 
 // getNodeCPUMetrics returns CPU utilization of a node.
