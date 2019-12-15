@@ -124,9 +124,11 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			// GeneralPredicate is a combination of predicates.
 			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.FitName, nil)
+			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, noderesources.FitName, nil)
 			pluginConfig = append(pluginConfig, makePluginConfig(noderesources.FitName, args.NodeResourcesFitArgs))
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodename.Name, nil)
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodeports.Name, nil)
+			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, nodeports.Name, nil)
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodeaffinity.Name, nil)
 			return
 		})
@@ -138,6 +140,7 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 	registry.RegisterPredicate(predicates.PodFitsResourcesPred,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.FitName, nil)
+			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, noderesources.FitName, nil)
 			pluginConfig = append(pluginConfig, makePluginConfig(noderesources.FitName, args.NodeResourcesFitArgs))
 			return
 		})
@@ -149,6 +152,7 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 	registry.RegisterPredicate(predicates.PodFitsHostPortsPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodeports.Name, nil)
+			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, nodeports.Name, nil)
 			return
 		})
 	registry.RegisterPredicate(predicates.MatchNodeSelectorPred,

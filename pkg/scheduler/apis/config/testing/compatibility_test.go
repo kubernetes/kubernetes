@@ -64,6 +64,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
                   ]
 		}`,
 			wantPlugins: map[string][]config.Plugin{
+				"PreFilterPlugin": {
+					{Name: "NodeResourcesFit"},
+					{Name: "NodePorts"},
+				},
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeResourcesFit"},
@@ -118,6 +122,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 				},
 				"FilterPlugin": {
@@ -164,6 +169,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodePorts"},
+					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 				},
 				"FilterPlugin": {
@@ -219,6 +226,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodePorts"},
+					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 				},
 				"FilterPlugin": {
@@ -283,6 +292,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodePorts"},
+					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
@@ -351,6 +362,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodePorts"},
+					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
@@ -430,6 +443,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodePorts"},
+					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
@@ -520,6 +535,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodePorts"},
+					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
@@ -611,6 +628,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodePorts"},
+					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
@@ -706,6 +725,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodePorts"},
+					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
@@ -813,6 +834,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodePorts"},
+					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
@@ -922,6 +945,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodePorts"},
+					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
@@ -1031,6 +1056,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodePorts"},
+					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},
@@ -1145,6 +1172,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPredicates: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodePorts"},
+					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
 				},

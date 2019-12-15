@@ -126,6 +126,8 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 			}`,
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodeResourcesFit"},
+					{Name: "NodePorts"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -200,6 +202,8 @@ kind: Policy
 `,
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodeResourcesFit"},
+					{Name: "NodePorts"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
