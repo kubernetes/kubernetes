@@ -19,8 +19,8 @@ limitations under the License.
 package azure
 
 import (
-	"testing"
 	"strconv"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 
@@ -261,13 +261,13 @@ func TestGetLoadBalancingRuleName(t *testing.T) {
 
 	svc := &v1.Service{
 		ObjectMeta: meta.ObjectMeta{
-			Annotations: map[string]string{ 	},
-			UID: "257b9655-5137-4ad2-b091-ef3f07043ad3",
+			Annotations: map[string]string{},
+			UID:         "257b9655-5137-4ad2-b091-ef3f07043ad3",
 		},
 	}
 
 	cases := []struct {
-		description string
+		description   string
 		subnetName    string
 		isInternal    bool
 		useStandardLB bool
@@ -276,49 +276,49 @@ func TestGetLoadBalancingRuleName(t *testing.T) {
 		expected      string
 	}{
 		{
-			description: "internal lb should have subnet name on the rule name",
-			subnetName:       "shortsubnet",
-			isInternal: true,
-			useStandardLB:    true,
-			protocol: v1.ProtocolTCP,
-			port: 9000,
-			expected: "a257b965551374ad2b091ef3f07043ad-shortsubnet-TCP-9000",
+			description:   "internal lb should have subnet name on the rule name",
+			subnetName:    "shortsubnet",
+			isInternal:    true,
+			useStandardLB: true,
+			protocol:      v1.ProtocolTCP,
+			port:          9000,
+			expected:      "a257b965551374ad2b091ef3f07043ad-shortsubnet-TCP-9000",
 		},
 		{
-			description: "internal standard lb should have subnet name on the rule name but truncated to 80 charactors",
-			subnetName:       "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
-			isInternal: true,
-			useStandardLB:    true,
-			protocol: v1.ProtocolTCP,
-			port: 9000,
-			expected: "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnngg-TCP-9000",
+			description:   "internal standard lb should have subnet name on the rule name but truncated to 80 characters",
+			subnetName:    "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
+			isInternal:    true,
+			useStandardLB: true,
+			protocol:      v1.ProtocolTCP,
+			port:          9000,
+			expected:      "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnngg-TCP-9000",
 		},
 		{
-			description: "internal basic lb should have subnet name on the rule name but truncated to 80 charactors",
-			subnetName:       "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
-			isInternal: true,
-			useStandardLB:    false,
-			protocol: v1.ProtocolTCP,
-			port: 9000,
-			expected: "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnngg-TCP-9000",
+			description:   "internal basic lb should have subnet name on the rule name but truncated to 80 characters",
+			subnetName:    "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
+			isInternal:    true,
+			useStandardLB: false,
+			protocol:      v1.ProtocolTCP,
+			port:          9000,
+			expected:      "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnngg-TCP-9000",
 		},
 		{
-			description: "external standard lb should not have subnet name on the rule name",
-			subnetName:       "shortsubnet",
-			isInternal: false,
-			useStandardLB:    true,
-			protocol: v1.ProtocolTCP,
-			port: 9000,
-			expected: "a257b965551374ad2b091ef3f07043ad-TCP-9000",
+			description:   "external standard lb should not have subnet name on the rule name",
+			subnetName:    "shortsubnet",
+			isInternal:    false,
+			useStandardLB: true,
+			protocol:      v1.ProtocolTCP,
+			port:          9000,
+			expected:      "a257b965551374ad2b091ef3f07043ad-TCP-9000",
 		},
 		{
-			description: "external basic lb should not have subnet name on the rule name",
-			subnetName:       "shortsubnet",
-			isInternal: false,
-			useStandardLB:    false,
-			protocol: v1.ProtocolTCP,
-			port: 9000,
-			expected: "a257b965551374ad2b091ef3f07043ad-TCP-9000",
+			description:   "external basic lb should not have subnet name on the rule name",
+			subnetName:    "shortsubnet",
+			isInternal:    false,
+			useStandardLB: false,
+			protocol:      v1.ProtocolTCP,
+			port:          9000,
+			expected:      "a257b965551374ad2b091ef3f07043ad-TCP-9000",
 		},
 	}
 
@@ -351,46 +351,46 @@ func TestGetFrontendIPConfigName(t *testing.T) {
 	}
 
 	cases := []struct {
-		description string
+		description   string
 		subnetName    string
 		isInternal    bool
 		useStandardLB bool
 		expected      string
 	}{
 		{
-			description: "internal lb should have subnet name on the frontend ip configuration name",
-			subnetName:       "shortsubnet",
-			isInternal: true,
-			useStandardLB:    true,
-			expected: "a257b965551374ad2b091ef3f07043ad-shortsubnet",
+			description:   "internal lb should have subnet name on the frontend ip configuration name",
+			subnetName:    "shortsubnet",
+			isInternal:    true,
+			useStandardLB: true,
+			expected:      "a257b965551374ad2b091ef3f07043ad-shortsubnet",
 		},
 		{
-			description: "internal standard lb should have subnet name on the frontend ip configuration name but truncated to 80 charactors",
-			subnetName:       "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
-			isInternal: true,
-			useStandardLB:    true,
-			expected: "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnnggggggggggg",
+			description:   "internal standard lb should have subnet name on the frontend ip configuration name but truncated to 80 characters",
+			subnetName:    "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
+			isInternal:    true,
+			useStandardLB: true,
+			expected:      "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnnggggggggggg",
 		},
 		{
-			description: "internal basic lb should have subnet name on the frontend ip configuration name but truncated to 80 charactors",
-			subnetName:       "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
-			isInternal: true,
-			useStandardLB:    false,
-			expected: "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnnggggggggggg",
+			description:   "internal basic lb should have subnet name on the frontend ip configuration name but truncated to 80 characters",
+			subnetName:    "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
+			isInternal:    true,
+			useStandardLB: false,
+			expected:      "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnnggggggggggg",
 		},
 		{
-			description: "external standard lb should not have subnet name on the frontend ip configuration name",
-			subnetName:       "shortsubnet",
-			isInternal: false,
-			useStandardLB:    true,
-			expected: "a257b965551374ad2b091ef3f07043ad",
+			description:   "external standard lb should not have subnet name on the frontend ip configuration name",
+			subnetName:    "shortsubnet",
+			isInternal:    false,
+			useStandardLB: true,
+			expected:      "a257b965551374ad2b091ef3f07043ad",
 		},
 		{
-			description: "external basic lb should not have subnet name on the frontend ip configuration name",
-			subnetName:       "shortsubnet",
-			isInternal: false,
-			useStandardLB:    false,
-			expected: "a257b965551374ad2b091ef3f07043ad",
+			description:   "external basic lb should not have subnet name on the frontend ip configuration name",
+			subnetName:    "shortsubnet",
+			isInternal:    false,
+			useStandardLB: false,
+			expected:      "a257b965551374ad2b091ef3f07043ad",
 		},
 	}
 

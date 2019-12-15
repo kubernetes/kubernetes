@@ -65,7 +65,7 @@ const (
 	nodeLabelRole  = "kubernetes.io/role"
 	nicFailedState = "Failed"
 
-	storageAccountNameMaxLength = 24
+	storageAccountNameMaxLength   = 24
 	frontendIPConfigNameMaxLength = 80
 	loadBalancerRuleNameMaxLength = 80
 )
@@ -283,10 +283,10 @@ func (az *Cloud) getLoadBalancerRuleName(service *v1.Service, protocol v1.Protoc
 		return ruleName
 	}
 
-	// Load balancer rule name must be less or equal to 80 charactors, so excluding the hyphen two segments cannot exceed 79
+	// Load balancer rule name must be less or equal to 80 characters, so excluding the hyphen two segments cannot exceed 79
 	subnetSegment := *subnet
-	if len(ruleName) + len(subnetSegment) + 1 > loadBalancerRuleNameMaxLength {
-		subnetSegment = subnetSegment[:loadBalancerRuleNameMaxLength - len(ruleName) - 1]
+	if len(ruleName)+len(subnetSegment)+1 > loadBalancerRuleNameMaxLength {
+		subnetSegment = subnetSegment[:loadBalancerRuleNameMaxLength-len(ruleName)-1]
 	}
 
 	return fmt.Sprintf("%s-%s-%s-%d", prefix, subnetSegment, protocol, port)
@@ -332,8 +332,8 @@ func (az *Cloud) getFrontendIPConfigName(service *v1.Service) string {
 	subnetName := subnet(service)
 	if subnetName != nil {
 		ipcName := fmt.Sprintf("%s-%s", baseName, *subnetName)
-		
-		// Azure lb front end configuration name must not exceed 80 charactors
+
+		// Azure lb front end configuration name must not exceed 80 characters
 		if len(ipcName) > frontendIPConfigNameMaxLength {
 			ipcName = ipcName[:frontendIPConfigNameMaxLength]
 		}
