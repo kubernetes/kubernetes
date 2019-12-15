@@ -133,6 +133,7 @@ The Kubernetes in-tree storage plugin to Container Storage Interface (CSI) migra
 ## Known Issues
 - volumeDevices mapping ignored when container is privileged
 - The `Should recreate evicted statefulset` conformance [test]( https://github.com/kubernetes/kubernetes/blob/master/test/e2e/apps/statefulset.go) fails because `Pod ss-0 expected to be re-created at least once`. This was caused by the `Predicate PodFitsHostPorts failed` scheduling error. The root cause was a host port conflict for port `21017`. This port was in-use as an ephemeral port by another application running on the node. This will be looked at for the 1.18 release.
+- client-go discovery clients constructed using `NewDiscoveryClientForConfig` or `NewDiscoveryClientForConfigOrDie` default to rate limits that cause normal discovery request patterns to take several seconds. This is fixed in https://issue.k8s.io/86168 and will be resolved in v1.17.1. As a workaround, the `Burst` value can be adjusted higher in the rest.Config passed into `NewDiscoveryClientForConfig` or `NewDiscoveryClientForConfigOrDie`.
 
 ## Urgent Upgrade Notes
 ### (No, really, you MUST read this before you upgrade)
