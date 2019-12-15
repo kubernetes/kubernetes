@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "log_metrics.go",
+        "resource_metrics.go",
         "volume_stats.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/metrics/collectors",
@@ -22,6 +23,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "log_metrics_test.go",
+        "resource_metrics_test.go",
         "volume_stats_test.go",
     ],
     embed = [":go_default_library"],
@@ -30,6 +32,7 @@ go_test(
         "//pkg/kubelet/server/stats/testing:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/testutil:go_default_library",
+        "//vendor/github.com/stretchr/testify/mock:go_default_library",
     ],
 )
 
