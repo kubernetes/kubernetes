@@ -336,7 +336,7 @@ func TestGetLoadBalancingRuleName(t *testing.T) {
 	}
 }
 
-func TestgetFrontendIPConfigName(t *testing.T) {
+func TestGetFrontendIPConfigName(t *testing.T) {
 	az := getTestCloud()
 	az.PrimaryAvailabilitySetName = "primary"
 
@@ -369,14 +369,14 @@ func TestgetFrontendIPConfigName(t *testing.T) {
 			subnetName:       "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
 			isInternal: true,
 			useStandardLB:    true,
-			expected: "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnngg",
+			expected: "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnnggggggggggg",
 		},
 		{
 			description: "internal basic lb should have subnet name on the frontend ip configuration name but truncated to 80 charactors",
 			subnetName:       "averylonnnngggnnnnnnnnnnnnnnnnnnnnnngggggggggggggggggggggggggggggggggggggsubet",
 			isInternal: true,
 			useStandardLB:    false,
-			expected: "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnngg",
+			expected: "a257b965551374ad2b091ef3f07043ad-averylonnnngggnnnnnnnnnnnnnnnnnnnnnnggggggggggg",
 		},
 		{
 			description: "external standard lb should not have subnet name on the frontend ip configuration name",
@@ -403,7 +403,7 @@ func TestgetFrontendIPConfigName(t *testing.T) {
 		svc.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = c.subnetName
 		svc.Annotations[ServiceAnnotationLoadBalancerInternal] = strconv.FormatBool(c.isInternal)
 
-		loadbalancerName := az.getFrontendIPConfigName(svc)
-		assert.Equal(t, c.expected, loadbalancerName, c.description)
+		ipconfigName := az.getFrontendIPConfigName(svc)
+		assert.Equal(t, c.expected, ipconfigName, c.description)
 	}
 }
