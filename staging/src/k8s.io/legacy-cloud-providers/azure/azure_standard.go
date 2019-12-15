@@ -67,6 +67,8 @@ const (
 	nicFailedState = "Failed"
 
 	storageAccountNameMaxLength = 24
+	frontendIPConfigNameMaxLength = 80
+	loadBalancerRuleNameMaxLength = 80
 )
 
 var errNotInVMSet = errors.New("vm is not in the vmset")
@@ -285,8 +287,8 @@ func (az *Cloud) getLoadBalancerRuleName(service *v1.Service, protocol v1.Protoc
 
 	// Load balancer rule name must be less or equal to 80 charactors, so excluding the hyphen two segments cannot exceed 79
 	subnetSegment := *subnet
-	if len(ruleName) + len(subnetSegment) > 79 {
-		subnetSegment = subnetSegment[:79 - len(ruleName)]
+	if len(ruleName) + len(subnetSegment) + 1 > loadBalancerRuleNameMaxLength {
+		subnetSegment = subnetSegment[:loadBalancerRuleNameMaxLength - len(ruleName) - 1]
 	}
 
 	return fmt.Sprintf("%s-%s-%s-%d", prefix, subnetSegment, protocol, port)
@@ -334,8 +336,8 @@ func (az *Cloud) getFrontendIPConfigName(service *v1.Service) string {
 		ipcName := fmt.Sprintf("%s-%s", baseName, *subnetName)
 		
 		// Azure lb front end configuration name must not exceed 80 charactors
-		if len(ipcName) > 80 {
-			ipcName = ipcName[:80]
+		if len(ipcName) > frontendIPConfigNameMaxLength {
+			ipcName = ipcName[:frontendIPConfigNameMaxLength]
 		}
 		return ipcName
 	}
