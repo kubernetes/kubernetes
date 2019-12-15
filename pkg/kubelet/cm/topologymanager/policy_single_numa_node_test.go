@@ -31,16 +31,6 @@ func TestPolicySingleNumaNodeCanAdmitPodResult(t *testing.T) {
 			hint:     TopologyHint{nil, false},
 			expected: false,
 		},
-		{
-			name:     "NUMANodeAffinity has multiple NUMA Nodes masked in topology hints",
-			hint:     TopologyHint{NewTestSocketMask(0, 1), true},
-			expected: false,
-		},
-		{
-			name:     "NUMANodeAffinity has one NUMA Node masked in topology hints",
-			hint:     TopologyHint{NewTestSocketMask(0), true},
-			expected: true,
-		},
 	}
 
 	for _, tc := range tcases {
