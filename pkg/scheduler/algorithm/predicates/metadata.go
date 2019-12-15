@@ -281,36 +281,12 @@ func (m *PodAffinityMetadata) Clone() *PodAffinityMetadata {
 	return &copy
 }
 
-type podFitsResourcesMetadata struct {
-	// ignoredExtendedResources is a set of extended resource names that will
-	// be ignored in the PodFitsResources predicate.
-	//
-	// They can be scheduler extender managed resources, the consumption of
-	// which should be accounted only by the extenders. This set is synthesized
-	// from scheduler extender configuration and does not change per pod.
-	ignoredExtendedResources sets.String
-	podRequest               *schedulernodeinfo.Resource
-}
-
-func (m *podFitsResourcesMetadata) clone() *podFitsResourcesMetadata {
-	if m == nil {
-		return nil
-	}
-
-	copy := podFitsResourcesMetadata{}
-	copy.ignoredExtendedResources = m.ignoredExtendedResources
-	copy.podRequest = m.podRequest
-
-	return &copy
-}
-
 // NOTE: When new fields are added/removed or logic is changed, please make sure that
 // RemovePod, AddPod, and ShallowCopy functions are updated to work with the new changes.
 type predicateMetadata struct {
 	pod *v1.Pod
 
-	serviceAffinityMetadata  *serviceAffinityMetadata
-	podFitsResourcesMetadata *podFitsResourcesMetadata
+	serviceAffinityMetadata *serviceAffinityMetadata
 }
 
 // Ensure that predicateMetadata implements algorithm.Metadata.
@@ -332,17 +308,6 @@ func EmptyMetadataProducer(pod *v1.Pod, sharedLister schedulerlisters.SharedList
 	return nil
 }
 
-// RegisterPredicateMetadataProducerWithExtendedResourceOptions registers a
-// MetadataProducer that creates predicate metadata with the provided
-// options for extended resources.
-//
-// See the comments in "predicateMetadata" for the explanation of the options.
-func RegisterPredicateMetadataProducerWithExtendedResourceOptions(ignoredExtendedResources sets.String) {
-	RegisterPredicateMetadataProducer("PredicateWithExtendedResourceOptions", func(pm *predicateMetadata) {
-		pm.podFitsResourcesMetadata.ignoredExtendedResources = ignoredExtendedResources
-	})
-}
-
 // MetadataProducerFactory is a factory to produce Metadata.
 type MetadataProducerFactory struct{}
 
@@ -354,20 +319,13 @@ func (f *MetadataProducerFactory) GetPredicateMetadata(pod *v1.Pod, sharedLister
 	}
 
 	predicateMetadata := &predicateMetadata{
-		pod:                      pod,
-		podFitsResourcesMetadata: getPodFitsResourcesMetedata(pod),
+		pod: pod,
 	}
 	for predicateName, precomputeFunc := range predicateMetadataProducers {
 		klog.V(10).Infof("Precompute: %v", predicateName)
 		precomputeFunc(predicateMetadata)
 	}
 	return predicateMetadata
-}
-
-func getPodFitsResourcesMetedata(pod *v1.Pod) *podFitsResourcesMetadata {
-	return &podFitsResourcesMetadata{
-		podRequest: GetResourceRequest(pod),
-	}
 }
 
 // GetPodAffinityMetadata computes inter-pod affinity metadata.
@@ -593,7 +551,6 @@ func (meta *predicateMetadata) ShallowCopy() Metadata {
 		pod: meta.pod,
 	}
 	newPredMeta.serviceAffinityMetadata = meta.serviceAffinityMetadata.clone()
-	newPredMeta.podFitsResourcesMetadata = meta.podFitsResourcesMetadata.clone()
 	return (Metadata)(newPredMeta)
 }
 

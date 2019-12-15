@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
@@ -177,8 +178,8 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Scheduler,
 
 	var extenders []algorithm.SchedulerExtender
 	if len(policy.Extenders) != 0 {
-		ignoredExtendedResources := sets.NewString()
 		var ignorableExtenders []algorithm.SchedulerExtender
+		var ignoredExtendedResources []string
 		for ii := range policy.Extenders {
 			klog.V(2).Infof("Creating extender with config %+v", policy.Extenders[ii])
 			extender, err := core.NewHTTPExtender(&policy.Extenders[ii])
@@ -192,13 +193,15 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Scheduler,
 			}
 			for _, r := range policy.Extenders[ii].ManagedResources {
 				if r.IgnoredByScheduler {
-					ignoredExtendedResources.Insert(string(r.Name))
+					ignoredExtendedResources = append(ignoredExtendedResources, r.Name)
 				}
 			}
 		}
+		c.configProducerArgs.NodeResourcesFitArgs = &noderesources.FitArgs{
+			IgnoredResources: ignoredExtendedResources,
+		}
 		// place ignorable extenders to the tail of extenders
 		extenders = append(extenders, ignorableExtenders...)
-		predicates.RegisterPredicateMetadataProducerWithExtendedResourceOptions(ignoredExtendedResources)
 	}
 	// Providing HardPodAffinitySymmetricWeight in the policy config is the new and preferred way of providing the value.
 	// Give it higher precedence than scheduler CLI configuration when it is provided.
