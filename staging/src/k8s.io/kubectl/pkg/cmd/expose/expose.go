@@ -167,7 +167,7 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 }
 
 func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.DryRun = cmdutil.GetClientSideDryRun(cmd)
 
 	if o.DryRun {
 		o.PrintFlags.Complete("%s (dry run)")

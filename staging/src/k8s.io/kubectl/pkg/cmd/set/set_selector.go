@@ -129,7 +129,7 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 		return err
 	}
 
-	o.dryrun = cmdutil.GetDryRunFlag(cmd)
+	o.dryrun = cmdutil.GetClientSideDryRun(cmd)
 
 	o.resources, o.selector, err = getResourcesAndSelector(args)
 	if err != nil {

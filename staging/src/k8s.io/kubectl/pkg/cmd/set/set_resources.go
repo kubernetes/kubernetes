@@ -150,7 +150,7 @@ func (o *SetResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 
 	o.UpdatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 	o.Output = cmdutil.GetFlagString(cmd, "output")
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.DryRun = cmdutil.GetClientSideDryRun(cmd)
 
 	if o.DryRun {
 		o.PrintFlags.Complete("%s (dry run)")

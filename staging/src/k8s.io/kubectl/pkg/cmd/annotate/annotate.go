@@ -164,7 +164,7 @@ func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	}
 
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
-	o.dryrun = cmdutil.GetDryRunFlag(cmd)
+	o.dryrun = cmdutil.GetClientSideDryRun(cmd)
 
 	if o.dryrun {
 		o.PrintFlags.Complete("%s (dry run)")

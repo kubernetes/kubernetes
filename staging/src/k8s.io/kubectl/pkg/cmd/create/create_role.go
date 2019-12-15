@@ -235,7 +235,7 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 		return err
 	}
 
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.DryRun = cmdutil.GetClientSideDryRun(cmd)
 	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
 
 	if o.DryRun {

@@ -195,7 +195,7 @@ func (o *RollingUpdateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	if len(args) > 0 {
 		o.OldName = args[0]
 	}
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.DryRun = cmdutil.GetClientSideDryRun(cmd)
 	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.KeepOldName = len(args) == 1
 	o.ShouldValidate = cmdutil.GetFlagBool(cmd, "validate")

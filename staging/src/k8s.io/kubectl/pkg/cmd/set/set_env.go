@@ -216,7 +216,7 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 
 	o.updatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 	o.output = cmdutil.GetFlagString(cmd, "output")
-	o.dryRun = cmdutil.GetDryRunFlag(cmd)
+	o.dryRun = cmdutil.GetClientSideDryRun(cmd)
 
 	if o.dryRun {
 		// TODO(juanvallejo): This can be cleaned up even further by creating

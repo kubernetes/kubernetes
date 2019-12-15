@@ -132,7 +132,7 @@ func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.Builder = f.NewBuilder()
 	o.Cmd = cmd
 
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.DryRun = cmdutil.GetClientSideDryRun(cmd)
 	if o.DryRun {
 		o.PrintFlags.Complete("%s (dry run)")
 	}
