@@ -62,11 +62,11 @@ type CreateJobOptions struct {
 	From    string
 	Command []string
 
-	Namespace string
-	Client    batchv1client.BatchV1Interface
-	DryRun    bool
-	Builder   *resource.Builder
-	Cmd       *cobra.Command
+	Namespace    string
+	Client       batchv1client.BatchV1Interface
+	DryRunClient bool
+	Builder      *resource.Builder
+	Cmd          *cobra.Command
 
 	genericclioptions.IOStreams
 }
@@ -132,10 +132,17 @@ func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.Builder = f.NewBuilder()
 	o.Cmd = cmd
 
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
-	if o.DryRun {
-		o.PrintFlags.Complete("%s (dry run)")
+	var dryRunStrategy cmdutil.DryRunStrategy
+	dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
 	}
+	o.DryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	if dryRunStrategy == cmdutil.DryRunServer {
+		return fmt.Errorf("--dry-run=server not yet supported for this command")
+	}
+	o.PrintFlags.WithDryRunStrategy(dryRunStrategy)
+
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -190,7 +197,7 @@ func (o *CreateJobOptions) Run() error {
 
 		job = o.createJobFromCronJob(cronJob)
 	}
-	if !o.DryRun {
+	if !o.DryRunClient {
 		var err error
 		job, err = o.Client.Jobs(o.Namespace).Create(job)
 		if err != nil {
