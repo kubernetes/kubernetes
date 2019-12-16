@@ -543,6 +543,11 @@ func GetDryRunFlag(cmd *cobra.Command) (DryRunStrategy, error) {
 }
 
 // PrintFlagsWithDryRunStrategy sets a success message at print time for the dry run strategy
+//
+// TODO(juanvallejo): This can be cleaned up even further by creating
+// a PrintFlags struct that binds the --dry-run flag, and whose
+// ToPrinter method returns a printer that understands how to print
+// this success message.
 func PrintFlagsWithDryRunStrategy(printFlags *genericclioptions.PrintFlags, dryRunStrategy DryRunStrategy) *genericclioptions.PrintFlags {
 	switch dryRunStrategy {
 	case DryRunClient:
