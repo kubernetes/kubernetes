@@ -605,7 +605,7 @@ func TestHelperReplace(t *testing.T) {
 				RESTClient:      client,
 				NamespaceScoped: tt.NamespaceScoped,
 			}
-			_, err := modifier.Replace(tt.Namespace, "foo", tt.Overwrite, tt.Object)
+			_, err := modifier.Replace(tt.Namespace, "foo", tt.Overwrite, tt.Object, nil)
 			if (err != nil) != tt.Err {
 				t.Fatalf("unexpected error: %t %v", tt.Err, err)
 			}

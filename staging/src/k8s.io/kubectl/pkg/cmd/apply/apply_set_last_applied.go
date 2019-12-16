@@ -214,19 +214,19 @@ func (o *SetLastAppliedOptions) RunSetLastApplied() error {
 
 		if !o.dryRunClient {
 			mapping := info.ResourceMapping()
-			options := metav1.PatchOptions{}
-			if o.dryRunServer {
-				// If server-dry-run is requested but the type doesn't support it, fail right away.
-				if err := o.dryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
-					return err
-				}
-				options.DryRun = []string{metav1.DryRunAll}
-			}
 			client, err := o.unstructuredClientForMapping(mapping)
 			if err != nil {
 				return err
 			}
 			helper := resource.NewHelper(client, mapping)
+			options := metav1.PatchOptions{}
+			if o.dryRunServer {
+				// If server-dry-run is requested but the type doesn't support it, fail
+				if err := o.dryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
+					return err
+				}
+				options.DryRun = []string{metav1.DryRunAll}
+			}
 			finalObj, err = helper.Patch(o.namespace, info.Name, patch.PatchType, patch.Patch, &options)
 			if err != nil {
 				return err

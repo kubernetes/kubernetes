@@ -53,7 +53,9 @@ type AnnotateOptions struct {
 	// Common user flags
 	overwrite       bool
 	local           bool
-	dryrun          bool
+	dryRunClient    bool
+	dryRunServer    bool
+	dryRunVerifier  *cmdutil.DryRunVerifier
 	all             bool
 	resourceVersion string
 	selector        string
@@ -164,11 +166,26 @@ func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	}
 
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
-	o.dryrun = cmdutil.GetDryRunFlag(cmd)
-
-	if o.dryrun {
-		o.PrintFlags.Complete("%s (dry run)")
+	var dryRunStrategy cmdutil.DryRunStrategy
+	dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
 	}
+	o.dryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	o.dryRunServer = dryRunStrategy == cmdutil.DryRunServer
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	o.dryRunVerifier = &cmdutil.DryRunVerifier{
+		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamicClient)),
+		OpenAPIGetter: discoveryClient,
+	}
+	o.PrintFlags.WithDryRunStrategy(dryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -257,12 +274,19 @@ func (o AnnotateOptions) RunAnnotate() error {
 		var outputObj runtime.Object
 		obj := info.Object
 
-		if o.dryrun || o.local {
+		if o.dryRunClient || o.local {
 			if err := o.updateAnnotations(obj); err != nil {
 				return err
 			}
 			outputObj = obj
 		} else {
+			if o.dryRunServer {
+				// If server-dry-run is requested but the type doesn't support it, fail right away.
+				if err := o.dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+					return err
+				}
+			}
+
 			name, namespace := info.Name, info.Namespace
 
 			if len(o.resourceVersion) != 0 {
@@ -302,9 +326,17 @@ func (o AnnotateOptions) RunAnnotate() error {
 			helper := resource.NewHelper(client, mapping)
 
 			if createdPatch {
-				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, nil)
+				options := metav1.PatchOptions{}
+				if o.dryRunServer {
+					options.DryRun = []string{metav1.DryRunAll}
+				}
+				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, &options)
 			} else {
-				outputObj, err = helper.Replace(namespace, name, false, obj)
+				options := metav1.DeleteOptions{}
+				if o.dryRunServer {
+					options.DryRun = []string{metav1.DryRunAll}
+				}
+				outputObj, err = helper.Replace(namespace, name, false, obj, &options)
 			}
 			if err != nil {
 				return err
