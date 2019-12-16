@@ -319,7 +319,10 @@ type deleteNotification struct {
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, s.indexer)
+	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		KnownObjects:          s.indexer,
+		EmitDeltaTypeReplaced: true,
+	})
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -478,19 +481,19 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 	// from oldest to newest
 	for _, d := range obj.(Deltas) {
 		switch d.Type {
-		case Sync, Added, Updated:
-			isSync := d.Type == Sync
+		case Sync, Replaced, Added, Updated:
 			s.cacheMutationDetector.AddObject(d.Object)
 			if old, exists, err := s.indexer.Get(d.Object); err == nil && exists {
 				if err := s.indexer.Update(d.Object); err != nil {
 					return err
 				}
+				isSync := d.Type == Sync
 				s.processor.distribute(updateNotification{oldObj: old, newObj: d.Object}, isSync)
 			} else {
 				if err := s.indexer.Add(d.Object); err != nil {
 					return err
 				}
-				s.processor.distribute(addNotification{newObj: d.Object}, isSync)
+				s.processor.distribute(addNotification{newObj: d.Object}, false)
 			}
 		case Deleted:
 			if err := s.indexer.Delete(d.Object); err != nil {
