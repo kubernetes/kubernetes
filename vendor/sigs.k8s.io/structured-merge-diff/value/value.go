@@ -68,8 +68,43 @@ func ReadJSONIter(iter *jsoniter.Iterator) (Value, error) {
 }
 
 // WriteJSONStream writes a value into a JSON stream.
-func WriteJSONStream(v Value, stream *jsoniter.Stream) {
-	stream.WriteVal(v.Interface())
+func WriteJSONStream(v Value, stream Stream) {
+	switch {
+	case v.IsNull():
+		stream.WriteNil()
+	case v.IsFloat():
+		stream.WriteFloat64(v.Float())
+	case v.IsInt():
+		stream.WriteInt64(v.Int())
+	case v.IsBool():
+		stream.WriteBool(v.Bool())
+	case v.IsString():
+		stream.WriteString(v.String())
+	case v.IsList():
+		stream.WriteArrayStart()
+		for i := 0; i < v.List().Length(); i++ {
+			if i > 0 {
+				stream.WriteRaw(",")
+			}
+			WriteJSONStream(v.List().At(i), stream)
+		}
+		stream.WriteArrayEnd()
+	case v.IsMap():
+		stream.WriteObjectStart()
+		i := 0
+		v.Map().Iterate(func(k string, v Value) bool {
+			if i > 0 {
+				stream.WriteRaw(",")
+			}
+			stream.WriteObjectField(k)
+			WriteJSONStream(v, stream)
+			i++
+			return true
+		})
+		stream.WriteObjectEnd()
+	default:
+		stream.Write([]byte("invalid_value"))
+	}
 }
 
 // A Value corresponds to an 'atom' in the schema.
@@ -310,4 +345,23 @@ func Compare(lhs, rhs Value) int {
 
 	// Invalid Value-- nothing is set.
 	return 0
+}
+
+type Stream interface {
+	Write([]byte) (int, error)
+	WriteRaw(string)
+	WriteString(string)
+	WriteBool(bool)
+	WriteInt(int)
+	WriteInt64(int64)
+	WriteFloat64(float64)
+	WriteNil()
+	WriteArrayStart()
+	WriteArrayEnd()
+	WriteObjectStart()
+	WriteObjectEnd()
+	WriteObjectField(string)
+	Buffer() []byte
+	Flush() error
+	SetBuffer(buf []byte)
 }

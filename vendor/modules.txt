@@ -1931,8 +1931,9 @@ sigs.k8s.io/kustomize/pkg/transformers
 sigs.k8s.io/kustomize/pkg/transformers/config
 sigs.k8s.io/kustomize/pkg/transformers/config/defaultconfig
 sigs.k8s.io/kustomize/pkg/types
-# sigs.k8s.io/structured-merge-diff v0.0.0-20191214005427-7254e1d926bb => github.com/jpbetz/structured-merge-diff v0.0.0-20191214005427-7254e1d926bb
+# sigs.k8s.io/structured-merge-diff v0.0.0-20191216195027-c3b55dfd41fa => github.com/jennybuckley/structured-merge-diff v0.0.0-20191216195027-c3b55dfd41fa
 sigs.k8s.io/structured-merge-diff/fieldpath
+sigs.k8s.io/structured-merge-diff/fieldpath/strings
 sigs.k8s.io/structured-merge-diff/merge
 sigs.k8s.io/structured-merge-diff/schema
 sigs.k8s.io/structured-merge-diff/typed

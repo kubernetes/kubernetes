@@ -18,6 +18,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/json-iterator/go:go_default_library",
+        "//vendor/sigs.k8s.io/structured-merge-diff/fieldpath/strings:go_default_library",
         "//vendor/sigs.k8s.io/structured-merge-diff/value:go_default_library",
     ],
 )
@@ -31,7 +32,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//vendor/sigs.k8s.io/structured-merge-diff/fieldpath/strings:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

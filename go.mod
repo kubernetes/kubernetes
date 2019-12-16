@@ -523,7 +523,6 @@ replace (
 	gotest.tools/gotestsum => gotest.tools/gotestsum v0.3.5
 	grpc.go4.org => grpc.go4.org v0.0.0-20170609214715-11d0a25b4919
 	honnef.co/go/tools => honnef.co/go/tools v0.0.1-2019.2.2
-
 	k8s.io/api => ./staging/src/k8s.io/api
 	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
 	k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery
@@ -564,7 +563,7 @@ replace (
 	mvdan.cc/lint => mvdan.cc/lint v0.0.0-20170908181259-adc824a0674b
 	mvdan.cc/unparam => mvdan.cc/unparam v0.0.0-20190209190245-fbb59629db34
 	sigs.k8s.io/kustomize => sigs.k8s.io/kustomize v2.0.3+incompatible
-	sigs.k8s.io/structured-merge-diff => github.com/jpbetz/structured-merge-diff v0.0.0-20191214005427-7254e1d926bb
+	sigs.k8s.io/structured-merge-diff => github.com/jennybuckley/structured-merge-diff v0.0.0-20191216195027-c3b55dfd41fa
 	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.1.0
 	sourcegraph.com/sqs/pbtypes => sourcegraph.com/sqs/pbtypes v0.0.0-20180604144634-d3ebe8f20ae4
 	vbom.ml/util => vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc
