@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -119,7 +120,9 @@ type EnvOptions struct {
 	envArgs                []string
 	resources              []string
 	output                 string
-	dryRun                 bool
+	dryRunClient           bool
+	dryRunServer           bool
+	dryRunVerifier         *cmdutil.DryRunVerifier
 	builder                func() *resource.Builder
 	updatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	namespace              string
@@ -216,15 +219,29 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 
 	o.updatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 	o.output = cmdutil.GetFlagString(cmd, "output")
-	o.dryRun = cmdutil.GetDryRunFlag(cmd)
 
-	if o.dryRun {
-		// TODO(juanvallejo): This can be cleaned up even further by creating
-		// a PrintFlags struct that binds the --dry-run flag, and whose
-		// ToPrinter method returns a printer that understands how to print
-		// this success message.
-		o.PrintFlags.Complete("%s (dry run)")
+	var err error
+	var dryRunStrategy cmdutil.DryRunStrategy
+	dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
 	}
+	o.dryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	o.dryRunServer = dryRunStrategy == cmdutil.DryRunServer
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	o.dryRunVerifier = &cmdutil.DryRunVerifier{
+		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamicClient)),
+		OpenAPIGetter: discoveryClient,
+	}
+	o.PrintFlags.WithDryRunStrategy(dryRunStrategy)
+
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -484,14 +501,23 @@ func (o *EnvOptions) RunEnv() error {
 			continue
 		}
 
-		if o.Local || o.dryRun {
+		if o.Local || o.dryRunClient {
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				allErrs = append(allErrs, err)
 			}
 			continue
 		}
+		options := metav1.PatchOptions{}
+		if o.dryRunServer {
+			// If server-dry-run is requested but the type doesn't support it, fail right away.
+			if err := o.dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+				allErrs = append(allErrs, err)
+				continue
+			}
+			options.DryRun = []string{metav1.DryRunAll}
+		}
 
-		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, &options)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch env update to pod template: %v", err))
 			continue
