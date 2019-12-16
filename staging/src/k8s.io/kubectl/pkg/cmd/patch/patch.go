@@ -60,7 +60,7 @@ type PatchOptions struct {
 
 	namespace                    string
 	enforceNamespace             bool
-	dryRun                       bool
+	dryRunClient                 bool
 	outputFormat                 string
 	args                         []string
 	builder                      *resource.Builder
@@ -139,13 +139,19 @@ func (o *PatchOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	}
 
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
-	o.dryRun = cmdutil.GetFlagBool(cmd, "dry-run")
+	var dryRunStrategy cmdutil.DryRunStrategy
+	dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
+	}
+	o.dryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	if dryRunStrategy == cmdutil.DryRunServer {
+		return fmt.Errorf("--dry-run=server not yet supported for this command")
+	}
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.dryRun {
-			o.PrintFlags.Complete("%s (dry run)")
-		}
+		cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
 
 		return o.PrintFlags.ToPrinter()
 	}
@@ -210,7 +216,7 @@ func (o *PatchOptions) RunPatch() error {
 		count++
 		name, namespace := info.Name, info.Namespace
 
-		if !o.Local && !o.dryRun {
+		if !o.Local && !o.dryRunClient {
 			mapping := info.ResourceMapping()
 			client, err := o.unstructuredClientForMapping(mapping)
 			if err != nil {
