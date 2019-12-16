@@ -378,9 +378,10 @@ func structFromUnstructured(sv, dv reflect.Value) error {
 	for i := 0; i < dt.NumField(); i++ {
 		fieldInfo := fieldInfoFromField(dt, i)
 		fv := dv.Field(i)
-
-		if len(fieldInfo.name) == 0 {
-			// This field is inlined.
+		// This field is inlined.
+		// if not found fieldInfo.name of Anonymous field in json,the json is inline mode for this Anonymous field
+		_, ok := sv.Interface().(map[string]interface{})[fieldInfo.name]
+		if len(fieldInfo.name) == 0 || dt.Field(i).Anonymous && !ok {
 			if err := fromUnstructured(sv, fv); err != nil {
 				return err
 			}
