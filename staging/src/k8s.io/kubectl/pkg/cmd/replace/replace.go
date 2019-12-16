@@ -265,7 +265,7 @@ func (o *ReplaceOptions) Run(f cmdutil.Factory) error {
 		}
 
 		// Serialize the object with the annotation applied.
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Replace(info.Namespace, info.Name, true, info.Object)
+		obj, err := resource.NewHelper(info.Client, info.Mapping).Replace(info.Namespace, info.Name, true, info.Object, nil)
 		if err != nil {
 			return cmdutil.AddSourceToErr("replacing", info.Source, err)
 		}

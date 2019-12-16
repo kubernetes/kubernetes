@@ -152,9 +152,9 @@ func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, 
 		Get()
 }
 
-func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Object, options *metav1.DelteOptions) (runtime.Object, error) {
+func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Object, options *metav1.DeleteOptions) (runtime.Object, error) {
 	c := m.RESTClient
-	if options != nil {
+	if options == nil {
 		options = &metav1.DeleteOptions{}
 	}
 

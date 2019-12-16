@@ -320,7 +320,7 @@ func (o *LabelOptions) RunLabel() error {
 			if createdPatch {
 				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, nil)
 			} else {
-				outputObj, err = helper.Replace(namespace, name, false, obj)
+				outputObj, err = helper.Replace(namespace, name, false, obj, nil)
 			}
 			if err != nil {
 				return err
