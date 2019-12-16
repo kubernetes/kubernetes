@@ -35,8 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
-	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	openapitesting "k8s.io/kube-openapi/pkg/util/proto/testing"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/utils/exec"
 )
@@ -325,9 +325,7 @@ func TestDumpReaderToFile(t *testing.T) {
 	}
 }
 
-var (
-	fakeSchema = sptest.Fake{Path: filepath.Join("..", "..", "..", "testdata", "openapi", "swagger.json")}
-)
+var fakeSchema = openapitesting.Fake{Path: filepath.Join("..", "..", "..", "testdata", "openapi", "swagger.json")}
 
 func TestDryRunVerifier(t *testing.T) {
 	dryRunVerifier := DryRunVerifier{
