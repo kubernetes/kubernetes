@@ -92,6 +92,16 @@ type ApplyOptions struct {
 	EnforceNamespace bool
 
 	genericclioptions.IOStreams
+
+	// Objects (and some denormalized data) which are to be
+	// applied. The standard way to fill in this structure
+	// is by calling "GetObjects()", which will use the
+	// resource builder if "objectsCached" is false. The other
+	// way to set this field is to use "SetObjects()".
+	// Subsequent calls to "GetObjects()" after setting would
+	// not call the resource builder; only return the set objects.
+	objects       []*resource.Info
+	objectsCached bool
 }
 
 const (
@@ -146,6 +156,9 @@ func NewApplyOptions(ioStreams genericclioptions.IOStreams) *ApplyOptions {
 		Recorder: genericclioptions.NoopRecorder{},
 
 		IOStreams: ioStreams,
+
+		objects:       []*resource.Info{},
+		objectsCached: false,
 	}
 }
 
@@ -330,6 +343,37 @@ func isIncompatibleServerError(err error) bool {
 	return err.(*errors.StatusError).Status().Code == http.StatusUnsupportedMediaType
 }
 
+// GetObjects returns a (possibly cached) version of all the objects to apply
+// as a slice of pointer to resource.Info. The resource.Info contains the object
+// and some other denormalized data. This function should not be called until
+// AFTER the "complete" and "validate" methods have been called to ensure that
+// the ApplyOptions is filled in and valid.
+func (o *ApplyOptions) GetObjects() ([]*resource.Info, error) {
+	if !o.objectsCached {
+		// include the uninitialized objects by default if --prune is true
+		// unless explicitly set --include-uninitialized=false
+		r := o.Builder.
+			Unstructured().
+			Schema(o.Validator).
+			ContinueOnError().
+			NamespaceParam(o.Namespace).DefaultNamespace().
+			FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
+			LabelSelectorParam(o.Selector).
+			Flatten().
+			Do()
+		if err := r.Err(); err != nil {
+			return nil, err
+		}
+		infos, err := r.Infos()
+		if err != nil {
+			return nil, err
+		}
+		o.objects = infos
+		o.objectsCached = true
+	}
+	return o.objects, nil
+}
+
 // Run executes the `apply` command.
 func (o *ApplyOptions) Run() error {
 	var openapiSchema openapi.Resources
@@ -340,21 +384,6 @@ func (o *ApplyOptions) Run() error {
 	dryRunVerifier := &DryRunVerifier{
 		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(o.DynamicClient)),
 		OpenAPIGetter: o.DiscoveryClient,
-	}
-
-	// include the uninitialized objects by default if --prune is true
-	// unless explicitly set --include-uninitialized=false
-	r := o.Builder.
-		Unstructured().
-		Schema(o.Validator).
-		ContinueOnError().
-		NamespaceParam(o.Namespace).DefaultNamespace().
-		FilenameParam(o.EnforceNamespace, &o.DeleteOptions.FilenameOptions).
-		LabelSelectorParam(o.Selector).
-		Flatten().
-		Do()
-	if err := r.Err(); err != nil {
-		return err
 	}
 
 	var err error
@@ -375,11 +404,10 @@ func (o *ApplyOptions) Run() error {
 
 	count := 0
 
-	infos, err := r.Infos()
+	infos, err := o.GetObjects()
 	if err != nil {
 		return err
 	}
-
 	for _, info := range infos {
 
 		// If server-dry-run is requested but the type doesn't support it, fail right away.
