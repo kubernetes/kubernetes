@@ -50,6 +50,6 @@ const (
 
 	// TaintNodePIDPressure will be added when node has pid pressure
 	// and feature-gate for TaintNodesByCondition flag is enabled,
-	// and removed when node has enough disk.
+	// and removed when pid number is less than the system limit.
 	TaintNodePIDPressure = "node.kubernetes.io/pid-pressure"
 )
