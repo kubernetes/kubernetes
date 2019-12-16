@@ -307,7 +307,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		}
 	})
 
-	ginkgo.It("runs ReplicaSets to verify preemption running path", func() {
+	ginkgo.It("runs ReplicaSets to verify preemption running path [Flaky]", func() {
 		podNamesSeen := make(map[string]struct{})
 		stopCh := make(chan struct{})
 
