@@ -73,7 +73,7 @@ type AutoscaleOptions struct {
 	args             []string
 	enforceNamespace bool
 	namespace        string
-	dryRun           bool
+	dryRunClient     bool
 	builder          *resource.Builder
 	generatorFunc    func(string, *meta.RESTMapping) (generate.StructuredGenerator, error)
 
@@ -134,7 +134,16 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 // Complete verifies command line arguments and loads data from the command environment
 func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
-	o.dryRun = cmdutil.GetFlagBool(cmd, "dry-run")
+	var dryRunStrategy cmdutil.DryRunStrategy
+	dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
+	}
+	o.dryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	if dryRunStrategy == cmdutil.DryRunServer {
+		return fmt.Errorf("--dry-run=server not yet supported for this command")
+	}
+
 	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 	o.builder = f.NewBuilder()
 	discoveryClient, err := f.ToDiscoveryClient()
@@ -181,9 +190,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.dryRun {
-			o.PrintFlags.Complete("%s (dry run)")
-		}
+		cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
 
 		return o.PrintFlags.ToPrinter()
 	}
@@ -248,7 +255,7 @@ func (o *AutoscaleOptions) Run() error {
 			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
-		if o.dryRun {
+		if o.dryRunClient {
 			count++
 
 			printer, err := o.ToPrinter("created")
