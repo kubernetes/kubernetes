@@ -787,6 +787,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectEqual(scale.Status.Replicas, int32(1))
 
 			ginkgo.By("updating a scale subresource")
+			scale.ResourceVersion = "" // indicate the scale update should be unconditional
 			scale.Spec.Replicas = 2
 			scaleResult, err := c.AppsV1().StatefulSets(ns).UpdateScale(ssName, scale)
 			if err != nil {

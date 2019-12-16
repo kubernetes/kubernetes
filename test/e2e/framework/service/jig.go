@@ -680,6 +680,7 @@ func (j *TestJig) Scale(replicas int) error {
 		return fmt.Errorf("failed to get scale for RC %q: %v", rc, err)
 	}
 
+	scale.ResourceVersion = "" // indicate the scale update should be unconditional
 	scale.Spec.Replicas = int32(replicas)
 	_, err = j.Client.CoreV1().ReplicationControllers(j.Namespace).UpdateScale(rc, scale)
 	if err != nil {
