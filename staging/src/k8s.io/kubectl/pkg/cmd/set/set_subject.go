@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -65,7 +66,9 @@ type SubjectOptions struct {
 	ContainerSelector string
 	Output            string
 	All               bool
-	DryRun            bool
+	DryRunClient      bool
+	DryRunServer      bool
+	DryRunVerifier    *cmdutil.DryRunVerifier
 	Local             bool
 
 	Users           []string
@@ -120,11 +123,29 @@ func NewCmdSubject(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 // Complete completes all required options
 func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Output = cmdutil.GetFlagString(cmd, "output")
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
-	if o.DryRun {
-		o.PrintFlags.Complete("%s (dry run)")
+	var err error
+	var dryRunStrategy cmdutil.DryRunStrategy
+	dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
 	}
+	o.DryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	o.DryRunServer = dryRunStrategy == cmdutil.DryRunServer
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = &cmdutil.DryRunVerifier{
+		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamicClient)),
+		OpenAPIGetter: discoveryClient,
+	}
+
+	o.PrintFlags.WithDryRunStrategy(dryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -250,14 +271,23 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 			continue
 		}
 
-		if o.Local || o.DryRun {
+		if o.Local || o.DryRunClient {
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				allErrs = append(allErrs, err)
 			}
 			continue
 		}
+		options := metav1.PatchOptions{}
+		if o.DryRunServer {
+			// If server-dry-run is requested but the type doesn't support it, fail right away.
+			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+				allErrs = append(allErrs, err)
+				continue
+			}
+			options.DryRun = []string{metav1.DryRunAll}
+		}
 
-		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, &options)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch subjects to rolebinding: %v", err))
 			continue
