@@ -88,12 +88,13 @@ type IdentityConfiguration struct{}
 type KMSConfiguration struct {
 	// name is the name of the KMS plugin to be used.
 	Name string `json:"name"`
-	// cacheSize is the maximum number of secrets which are cached in memory. The default value is 1000.
+	// cachesize is the maximum number of secrets which are cached in memory. The default value is 1000.
+	// Set to a negative value to disable caching.
 	// +optional
 	CacheSize *int32 `json:"cachesize,omitempty"`
 	// endpoint is the gRPC server listening address, for example "unix:///var/run/kms-provider.sock".
 	Endpoint string `json:"endpoint"`
-	// Timeout for gRPC calls to kms-plugin (ex. 5s). The default is 3 seconds.
+	// timeout for gRPC calls to kms-plugin (ex. 5s). The default is 3 seconds.
 	// +optional
 	Timeout *metav1.Duration `json:"timeout,omitempty"`
 }
