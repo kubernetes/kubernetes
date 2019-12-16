@@ -17,12 +17,17 @@ limitations under the License.
 package storage
 
 import (
+	"encoding/json"
+	"time"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -153,6 +158,44 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 
 		ginkgo.By("Deleting the Namespace")
 		err := c.CoreV1().Namespaces().Delete(ns, nil)
+		framework.ExpectNoError(err)
+
+		start := time.Now()
+		logAt := start.Add(framework.DefaultNamespaceDeletionTimeout)
+		err = wait.Poll(time.Second, 2*framework.DefaultNamespaceDeletionTimeout, func() (bool, error) {
+			nsObject, err := c.CoreV1().Namespaces().Get(ns, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			if err != nil {
+				return false, err
+			}
+			// start logging the namespace content if it takes too long
+			if time.Now().After(logAt) {
+				logAt = time.Now().Add(time.Minute)
+				data, _ := json.Marshal(nsObject)
+				framework.Logf("namespace: %s", string(data))
+
+				if pod, err := c.CoreV1().Pods(ns).Get(clientPod.Name, metav1.GetOptions{}); apierrors.IsNotFound(err) {
+					framework.Logf("pod is gone")
+				} else if err != nil {
+					framework.Logf("error getting pod: %v", err)
+				} else {
+					data, _ := json.Marshal(pod)
+					framework.Logf("pod: %s", string(data))
+				}
+
+				if pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{}); apierrors.IsNotFound(err) {
+					framework.Logf("pvc is gone")
+				} else if err != nil {
+					framework.Logf("error getting pvc: %v", err)
+				} else {
+					data, _ := json.Marshal(pvc)
+					framework.Logf("pvc: %s", string(data))
+				}
+			}
+			return false, nil
+		})
 		framework.ExpectNoError(err)
 
 		err = framework.WaitForNamespacesDeleted(c, []string{ns}, framework.DefaultNamespaceDeletionTimeout)
