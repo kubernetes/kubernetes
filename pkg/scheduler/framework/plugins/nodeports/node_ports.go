@@ -79,7 +79,7 @@ func getPreFilterState(cycleState *framework.CycleState) (preFilterState, error)
 	if err != nil {
 		// The metadata wasn't pre-computed in prefilter. We ignore the error for now since
 		// Filter is able to handle that by computing it again.
-		klog.Error(err)
+		klog.V(5).Infof("Error reading %q from cycleState: %v", preFilterStateKey, err)
 		return nil, nil
 	}
 

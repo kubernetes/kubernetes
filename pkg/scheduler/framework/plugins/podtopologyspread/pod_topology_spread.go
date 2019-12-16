@@ -123,7 +123,7 @@ func getPodTopologySpreadMetadata(cycleState *framework.CycleState) (*predicates
 	if err != nil {
 		// The metadata wasn't pre-computed in prefilter. We ignore the error for now since
 		// we are able to handle that by computing it again (e.g. in Filter()).
-		klog.Error(err)
+		klog.V(5).Infof("Error reading %q from cycleState: %v", preFilterStateKey, err)
 		return nil, nil
 	}
 
