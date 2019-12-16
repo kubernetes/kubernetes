@@ -374,10 +374,13 @@ func (o *ApplyOptions) Run() error {
 	var objs []runtime.Object
 
 	count := 0
-	err = r.Visit(func(info *resource.Info, err error) error {
-		if err != nil {
-			return err
-		}
+
+	infos, err := r.Infos()
+	if err != nil {
+		return err
+	}
+
+	for _, info := range infos {
 
 		// If server-dry-run is requested but the type doesn't support it, fail right away.
 		if o.ServerDryRun {
@@ -449,7 +452,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 			count++
 			if len(output) > 0 && !shortOutput {
 				objs = append(objs, info.Object)
-				return nil
+				continue
 			}
 
 			printer, err := o.ToPrinter("serverside-applied")
@@ -457,7 +460,10 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 				return err
 			}
 
-			return printer.PrintObj(info.Object, o.Out)
+			if err = printer.PrintObj(info.Object, o.Out); err != nil {
+				return err
+			}
+			continue
 		}
 
 		// Get the modified configuration of the object. Embed the result
@@ -505,14 +511,17 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 
 			if printObject {
 				objs = append(objs, info.Object)
-				return nil
+				continue
 			}
 
 			printer, err := o.ToPrinter("created")
 			if err != nil {
 				return err
 			}
-			return printer.PrintObj(info.Object, o.Out)
+			if err = printer.PrintObj(info.Object, o.Out); err != nil {
+				return err
+			}
+			continue
 		}
 
 		metadata, err := meta.Accessor(info.Object)
@@ -557,24 +566,26 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 				if err != nil {
 					return err
 				}
-				return printer.PrintObj(info.Object, o.Out)
+				if err = printer.PrintObj(info.Object, o.Out); err != nil {
+					return err
+				}
+				continue
 			}
 		}
 		count++
 
 		if printObject {
 			objs = append(objs, info.Object)
-			return nil
+			continue
 		}
 
 		printer, err := o.ToPrinter("configured")
 		if err != nil {
 			return err
 		}
-		return printer.PrintObj(info.Object, o.Out)
-	})
-	if err != nil {
-		return err
+		if err = printer.PrintObj(info.Object, o.Out); err != nil {
+			return err
+		}
 	}
 
 	if count == 0 {
