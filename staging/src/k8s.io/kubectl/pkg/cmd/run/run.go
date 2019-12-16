@@ -119,7 +119,9 @@ type RunOptions struct {
 	DeleteFlags   *delete.DeleteFlags
 	DeleteOptions *delete.DeleteOptions
 
-	DryRun bool
+	DryRunClient   bool
+	DryRunServer   bool
+	DryRunVerifier *cmdutil.DryRunVerifier
 
 	PrintObj func(runtime.Object) error
 	Recorder genericclioptions.Recorder
@@ -222,16 +224,32 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 
 	o.ArgsLenAtDash = cmd.ArgsLenAtDash()
-	o.DryRun = cmdutil.GetFlagBool(cmd, "dry-run")
+	var dryRunStrategy cmdutil.DryRunStrategy
+	dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
+	}
+	o.DryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	o.DryRunServer = dryRunStrategy == cmdutil.DryRunServer
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = &cmdutil.DryRunVerifier{
+		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamicClient)),
+		OpenAPIGetter: discoveryClient,
+	}
 
 	attachFlag := cmd.Flags().Lookup("attach")
 	if !attachFlag.Changed && o.Interactive {
 		o.Attach = true
 	}
 
-	if o.DryRun {
-		o.PrintFlags.Complete("%s (dry run)")
-	}
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -300,7 +318,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		return cmdutil.UsageErrorf(cmd, "--rm should only be used for attached containers")
 	}
 
-	if o.Attach && o.DryRun {
+	if o.Attach && (o.DryRunClient || o.DryRunServer) {
 		return cmdutil.UsageErrorf(cmd, "--dry-run can't be used with attached containers options (--attach, --stdin, or --tty)")
 	}
 
@@ -700,7 +718,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 	}
 
 	actualObj := obj
-	if !o.DryRun {
+	if !o.DryRunClient {
 		if err := util.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), obj, scheme.DefaultJSONEncoder()); err != nil {
 			return nil, err
 		}
@@ -708,7 +726,15 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 		if err != nil {
 			return nil, err
 		}
-		actualObj, err = resource.NewHelper(client, mapping).Create(namespace, false, obj, nil)
+		options := metav1.CreateOptions{}
+		if o.DryRunServer {
+			// If server-dry-run is requested but the type doesn't support it, fail right away.
+			if err := o.DryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
+				return nil, err
+			}
+			options.DryRun = []string{metav1.DryRunAll}
+		}
+		actualObj, err = resource.NewHelper(client, mapping).Create(namespace, false, obj, &options)
 		if err != nil {
 			return nil, err
 		}
