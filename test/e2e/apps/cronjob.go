@@ -230,7 +230,7 @@ var _ = SIGDescribe("CronJob", func() {
 	})
 
 	// cleanup of successful/failed finished jobs, with successfulJobsHistoryLimit and failedJobsHistoryLimit
-	ginkgo.It("should delete successful/failed finished jobs with limit of one job", func() {
+	ginkgo.It("should delete successful/failed finished jobs with limit of one job [Flaky]", func() {
 
 		testCases := []struct {
 			description  string
