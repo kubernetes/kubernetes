@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
@@ -101,7 +102,13 @@ func (az *Cloud) getVirtualMachine(nodeName types.NodeName, crt cacheReadType) (
 		return vm, cloudprovider.InstanceNotFound
 	}
 
-	return *(cachedVM.(*compute.VirtualMachine)), nil
+	virtualMachines := cachedVM.(*sync.Map)
+	if vm, ok := virtualMachines.Load(vmName); ok {
+		result := vm.(*vmEntry)
+		return *(result.vm), nil
+	}
+
+	return compute.VirtualMachine{}, nil
 }
 
 func (az *Cloud) getRouteTable(crt cacheReadType) (routeTable network.RouteTable, exists bool, err error) {
@@ -198,6 +205,11 @@ func (az *Cloud) getSecurityGroup(crt cacheReadType) (nsg network.SecurityGroup,
 	return *(securityGroup.(*network.SecurityGroup)), nil
 }
 
+type vmEntry struct {
+	vm         *compute.VirtualMachine
+	lastUpdate time.Time
+}
+
 func (az *Cloud) newVMCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
 		// Currently InstanceView request are used by azure_zones, while the calls come after non-InstanceView
@@ -214,18 +226,30 @@ func (az *Cloud) newVMCache() (*timedCache, error) {
 			return nil, err
 		}
 
-		vm, err := az.VirtualMachinesClient.Get(ctx, resourceGroup, key, compute.InstanceView)
+		vmList, err := az.VirtualMachinesClient.List(ctx, resourceGroup)
 		exists, message, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
 		}
 
 		if !exists {
-			klog.V(2).Infof("Virtual machine %q not found with message: %q", key, message)
+			klog.V(2).Infof("Virtual machines under resource group %q not found with message: %q", resourceGroup, message)
 			return nil, nil
 		}
 
-		return &vm, nil
+		localCache := &sync.Map{}
+		for _, vm := range vmList {
+			if vm.Name == nil || *vm.Name == "" {
+				klog.Warning("failed to get the name of VM")
+				continue
+			}
+			localCache.Store(*vm.Name, &vmEntry{
+				vm:         &vm,
+				lastUpdate: time.Now().UTC(),
+			})
+		}
+
+		return localCache, nil
 	}
 
 	return newTimedcache(vmCacheTTL, getter)
