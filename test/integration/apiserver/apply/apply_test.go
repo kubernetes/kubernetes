@@ -980,6 +980,7 @@ func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
 		Operation:  metav1.ManagedFieldsOperationApply,
 		APIVersion: "apps/v1",
 		Time:       actual.Time,
+		FieldsType: "FieldsV2",
 		FieldsV2:   []byte{31, 139, 8, 0, 0, 0, 0, 0, 0, 255, 138, 54, 210, 49, 209, 81, 116, 137, 210, 137, 54, 209, 81, 116, 202, 214, 137, 54, 208, 81, 42, 206, 76, 73, 77, 78, 44, 138, 47, 75, 45, 42, 206, 204, 207, 83, 138, 141, 5, 169, 41, 2, 43, 113, 49, 6, 83, 16, 142, 155, 147, 78, 180, 161, 161, 78, 181, 98, 166, 21, 76, 147, 82, 45, 200, 8, 69, 83, 29, 3, 29, 197, 204, 88, 48, 0, 0, 0, 0, 255, 255},
 	}
 

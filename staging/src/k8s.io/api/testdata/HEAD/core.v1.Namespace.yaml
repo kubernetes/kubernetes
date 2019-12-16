@@ -15,6 +15,7 @@ metadata:
   managedFields:
   - apiVersion: "17"
     fieldsType: "18"
+    fieldsV2: Wg==
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -26,17 +27,17 @@ metadata:
     kind: "12"
     name: "13"
     uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "11042405498087606203"
+  resourceVersion: "16964250748386560239"
   selfLink: "5"
-  uid: "7"
+  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
 spec:
   finalizers:
-  - '@Hr鯹)晿'
+  - 脽ěĂ凗蓏Ŋ蛊ĉy緅縕
 status:
   conditions:
-  - lastTransitionTime: "2956-02-24T15:15:18Z"
+  - lastTransitionTime: "2059-10-03T11:19:35Z"
     message: "20"
     reason: "19"
-    status: Ȋ甞谐颋ǅSǡƏS$+½H牗洝尿
-    type: 夸eɑeʤ脽ěĂ凗蓏Ŋ蛊ĉy
-  phase: '`Ĩɘ.蘯6ċ'
+    status: Iņɖ
+    type: 亞螩B峅x4%a鯿rŎǀ朲^苣fƼ@h
+  phase: 谐颋ǅSǡƏS$+½H牗洝尿

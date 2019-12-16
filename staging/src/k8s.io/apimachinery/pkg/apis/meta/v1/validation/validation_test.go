@@ -282,6 +282,14 @@ func TestValidateMangedFieldsValid(t *testing.T) {
 			Operation:  metav1.ManagedFieldsOperationApply,
 			FieldsType: "FieldsV1",
 		},
+		{
+			Operation:  metav1.ManagedFieldsOperationUpdate,
+			FieldsType: "FieldsV2",
+		},
+		{
+			Operation:  metav1.ManagedFieldsOperationApply,
+			FieldsType: "FieldsV2",
+		},
 	}
 
 	for _, test := range tests {

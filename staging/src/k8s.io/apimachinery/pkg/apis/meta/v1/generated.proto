@@ -490,12 +490,16 @@ message ManagedFieldsEntry {
   optional Time time = 4;
 
   // FieldsType is the discriminator for the different fields format and version.
-  // There is currently only one possible value: "FieldsV1"
+  // There is currently only two possible values: "FieldsV1", "FieldsV2"
   optional string fieldsType = 6;
 
   // FieldsV1 holds the first JSON version format as described in the "FieldsV1" type.
   // +optional
   optional FieldsV1 fieldsV1 = 7;
+
+  // FieldsV2 TODO
+  // +optional
+  optional bytes fieldsV2 = 8;
 }
 
 // MicroTime is version of Time with microsecond level precision.

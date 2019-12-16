@@ -15,6 +15,7 @@ metadata:
   managedFields:
   - apiVersion: "17"
     fieldsType: "18"
+    fieldsV2: Wg==
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -26,22 +27,22 @@ metadata:
     kind: "12"
     name: "13"
     uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "11042405498087606203"
+  resourceVersion: "16964250748386560239"
   selfLink: "5"
-  uid: "7"
+  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
 spec:
   hard:
-    '@Hr鯹)晿': "617"
+    脽ěĂ凗蓏Ŋ蛊ĉy緅縕: "57"
   scopeSelector:
     matchExpressions:
-    - operator: 獚敆ȎțêɘĲ斬³;Ơ歿:狞夌碕ʂɭ
-      scopeName: ʕVŚ(ĿȊ甞谐颋ǅSǡƏS$+½H牗
+    - operator: 彀亞
+      scopeName: ?狱³-Ǐ忄*齧獚
       values:
       - "19"
   scopes:
-  - Ĩɘ.蘯6ċV夸eɑeʤ脽ěĂ
+  - 颋ǅ
 status:
   hard:
-    "": "929"
+    ɘĲ斬³;: "753"
   used:
-    $Iņɖ橙9ȫŚʒUɦOŖ樅: "934"
+    'rŎǀ朲^苣fƼ@hDrȮO励鹗塢ē ': "995"

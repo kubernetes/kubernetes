@@ -1119,11 +1119,15 @@ type ManagedFieldsEntry struct {
 	//Fields *Fields `json:"fields,omitempty" protobuf:"bytes,5,opt,name=fields,casttype=Fields"`
 
 	// FieldsType is the discriminator for the different fields format and version.
-	// There is currently only one possible value: "FieldsV1"
+	// There is currently only two possible values: "FieldsV1", "FieldsV2"
 	FieldsType string `json:"fieldsType,omitempty" protobuf:"bytes,6,opt,name=fieldsType"`
 	// FieldsV1 holds the first JSON version format as described in the "FieldsV1" type.
 	// +optional
 	FieldsV1 *FieldsV1 `json:"fieldsV1,omitempty" protobuf:"bytes,7,opt,name=fieldsV1"`
+
+	// FieldsV2 TODO
+	// +optional
+	FieldsV2 []byte `json:"fieldsV2,omitempty" protobuf:"bytes,8,opt,name=fieldsV2"`
 }
 
 // ManagedFieldsOperationType is the type of operation which lead to a ManagedFieldsEntry being created.

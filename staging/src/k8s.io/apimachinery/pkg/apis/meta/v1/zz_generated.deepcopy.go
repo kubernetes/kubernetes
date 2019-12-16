@@ -620,6 +620,11 @@ func (in *ManagedFieldsEntry) DeepCopyInto(out *ManagedFieldsEntry) {
 		*out = new(FieldsV1)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.FieldsV2 != nil {
+		in, out := &in.FieldsV2, &out.FieldsV2
+		*out = make([]byte, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

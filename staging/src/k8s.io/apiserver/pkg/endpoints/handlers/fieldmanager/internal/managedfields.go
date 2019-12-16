@@ -134,6 +134,7 @@ func BuildManagerIdentifier(encodedManager *metav1.ManagedFieldsEntry) (manager 
 
 	// Never include the fields in the manager identifier
 	encodedManagerCopy.FieldsV1 = nil
+	encodedManagerCopy.FieldsV2 = nil
 
 	// Never include the time in the manager identifier
 	encodedManagerCopy.Time = nil
@@ -154,13 +155,26 @@ func BuildManagerIdentifier(encodedManager *metav1.ManagedFieldsEntry) (manager 
 }
 
 func decodeVersionedSet(encodedVersionedSet *metav1.ManagedFieldsEntry) (versionedSet fieldpath.VersionedSet, err error) {
-	fields := EmptyFields
-	if encodedVersionedSet.FieldsV1 != nil {
-		fields = *encodedVersionedSet.FieldsV1
-	}
-	set, err := FieldsToSet(fields)
-	if err != nil {
-		return nil, fmt.Errorf("error decoding set: %v", err)
+	var set fieldpath.Set
+	switch encodedVersionedSet.FieldsType {
+	case "FieldsV1":
+		fields := EmptyFields
+		if encodedVersionedSet.FieldsV1 != nil {
+			fields = *encodedVersionedSet.FieldsV1
+		}
+		set, err = FieldsToSet(fields)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding set: %v", err)
+		}
+	case "FieldsV2":
+		fields := EmptyFieldsV2
+		if len(encodedVersionedSet.FieldsV2) != 0 {
+			fields = encodedVersionedSet.FieldsV2
+		}
+		set, err = FieldsToSetV2(fields)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding set: %v", err)
+		}
 	}
 	return fieldpath.NewVersionedSet(&set, fieldpath.APIVersion(encodedVersionedSet.APIVersion), encodedVersionedSet.Operation == metav1.ManagedFieldsOperationApply), nil
 }
@@ -228,12 +242,11 @@ func encodeManagerVersionedSet(manager string, versionedSet fieldpath.VersionedS
 	if versionedSet.Applied() {
 		encodedVersionedSet.Operation = metav1.ManagedFieldsOperationApply
 	}
-	encodedVersionedSet.FieldsType = "FieldsV1"
-	fields, err := SetToFields(*versionedSet.Set())
+	encodedVersionedSet.FieldsType = "FieldsV2"
+	encodedVersionedSet.FieldsV2, err = SetToFieldsV2(*versionedSet.Set())
 	if err != nil {
 		return nil, fmt.Errorf("error encoding set: %v", err)
 	}
-	encodedVersionedSet.FieldsV1 = &fields
 
 	return encodedVersionedSet, nil
 }

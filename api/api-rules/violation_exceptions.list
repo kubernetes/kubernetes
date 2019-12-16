@@ -413,6 +413,7 @@ API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,Field
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,LabelSelector,MatchExpressions
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,LabelSelectorRequirement,Values
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,List,Items
+API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,ManagedFieldsEntry,FieldsV2
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,ObjectMeta,Finalizers
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,ObjectMeta,ManagedFields
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,ObjectMeta,OwnerReferences

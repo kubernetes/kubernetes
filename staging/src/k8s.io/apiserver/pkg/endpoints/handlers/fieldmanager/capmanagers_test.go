@@ -112,7 +112,7 @@ func TestCapUpdateManagers(t *testing.T) {
 	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
 	f.fieldManager = NewCapManagersManager(&fakeManager{}, 3)
 
-	set := func(fields ...string) *metav1.FieldsV1 {
+	set := func(fields ...string) []byte {
 		s := fieldpath.NewSet()
 		for _, f := range fields {
 			s.Insert(fieldpath.MakePathOrDie(f))
@@ -121,16 +121,16 @@ func TestCapUpdateManagers(t *testing.T) {
 		if err != nil {
 			panic(fmt.Sprintf("error building ManagedFieldsEntry for test: %v", err))
 		}
-		return &metav1.FieldsV1{Raw: b}
+		return b
 	}
 
-	entry := func(name string, version string, order int, fields *metav1.FieldsV1) metav1.ManagedFieldsEntry {
+	entry := func(name string, version string, order int, fields []byte) metav1.ManagedFieldsEntry {
 		return metav1.ManagedFieldsEntry{
 			Manager:    name,
 			APIVersion: version,
 			Operation:  "Update",
-			FieldsType: "FieldsV1",
-			FieldsV1:   fields,
+			FieldsType: "FieldsV2",
+			FieldsV2:   fields,
 			Time:       &metav1.Time{Time: time.Time{}.Add(time.Hour * time.Duration(order))},
 		}
 	}

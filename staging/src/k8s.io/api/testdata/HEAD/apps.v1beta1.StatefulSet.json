@@ -6,8 +6,8 @@
     "generateName": "3",
     "namespace": "4",
     "selfLink": "5",
-    "uid": "7",
-    "resourceVersion": "11042405498087606203",
+    "uid": "ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e",
+    "resourceVersion": "16964250748386560239",
     "generation": 8071137005907523419,
     "creationTimestamp": null,
     "deletionGracePeriodSeconds": -4955867275792137171,
@@ -36,20 +36,24 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "fieldsV2": "Wg=="
       }
     ]
   },
   "spec": {
-    "replicas": 896585016,
+    "replicas": -1978186127,
     "selector": {
       "matchLabels": {
-        "74404d5---g8c2-k-91e.y5-g--58----0683-b-w7ld-6cs06xj-x5yv0wm-k18/M_-Nx.N_6-___._-.-W._AAn---v_-5-_8LXj": "6-4_WE-_JTrcd-2.-__E_Sv__26KX_R_.-.Nth._--S_4DA_-5_-4lQ42M--1"
+        "w9v--m0-1y5-g3/JFHn7y-74.-0MUORQQ.N2.1.L.l-Y._.-44..d.__g": "F-_3-n-_-__3u-.__P__.7U-Uo_F"
       },
       "matchExpressions": [
         {
-          "key": "50-u--25cu87--r7p-w1e67-8pj5t-kl-v0q6b68--nu5oii38fn-8.629b-jd-8c45-0-8--6n--w0--w---196g8d--iv1-5--5ht-a-29--0qso796/3___47._49pIB_o61ISU4--A_.XK_._M99",
-          "operator": "Exists"
+          "key": "5816m59-dx8----i--5-8t36b--09--23-u19m-35--d.vo61---4fy--9---7--9-9s-0-u5lj2--10pq-0-7-9-2-ekg-071b/YJTrcd-2.-__E_Sv__26KX_F",
+          "operator": "NotIn",
+          "values": [
+            "y_y_o0_5qN2_---_M.N_._a6.9bHjdH.-.5_.I8__.-AIw.__-___16"
+          ]
         }
       ]
     },
@@ -59,11 +63,11 @@
         "generateName": "26",
         "namespace": "27",
         "selfLink": "28",
-        "uid": "?Qȫş",
-        "resourceVersion": "1736621709629422270",
-        "generation": -8542870036622468681,
+        "uid": "g滠鼍ƭt?QȫşŇɜa頢ƛƟ)Ù",
+        "resourceVersion": "1755593733408306642",
+        "generation": 3557306139556084909,
         "creationTimestamp": null,
-        "deletionGracePeriodSeconds": -2575298329142810753,
+        "deletionGracePeriodSeconds": -2848337479447330428,
         "labels": {
           "30": "31"
         },
@@ -75,9 +79,9 @@
             "apiVersion": "34",
             "kind": "35",
             "name": "36",
-            "uid": "ƶȤ^}",
-            "controller": true,
-            "blockOwnerDeletion": true
+            "uid": "@Z^嫫猤痈C*ĕʄő芖{|ǘ\"^饣",
+            "controller": false,
+            "blockOwnerDeletion": false
           }
         ],
         "finalizers": [
@@ -87,9 +91,10 @@
         "managedFields": [
           {
             "manager": "39",
-            "operation": "躢",
+            "operation": "妻ƅTGS5Ǎ",
             "apiVersion": "40",
-            "fieldsType": "41"
+            "fieldsType": "41",
+            "fieldsV2": "KA=="
           }
         ]
       },
@@ -99,22 +104,21 @@
             "name": "42",
             "hostPath": {
               "path": "43",
-              "type": "ƛƟ)ÙæNǚ錯ƶRquA?瞲Ť倱\u003c"
+              "type": "ƶRquA?瞲Ť倱\u003cįXŋ朘"
             },
             "emptyDir": {
-              "medium": "Xŋ朘瑥A徙ɶɊł/擇ɦĽ胚O醔ɍ厶耈",
-              "sizeLimit": "473"
+              "medium": "A徙ɶɊł/擇ɦĽ胚",
+              "sizeLimit": "426"
             },
             "gcePersistentDisk": {
               "pdName": "44",
               "fsType": "45",
-              "partition": -1188153605
+              "partition": 636617833
             },
             "awsElasticBlockStore": {
               "volumeID": "46",
               "fsType": "47",
-              "partition": 912004803,
-              "readOnly": true
+              "partition": -1843754483
             },
             "gitRepo": {
               "repository": "48",
@@ -127,10 +131,10 @@
                 {
                   "key": "52",
                   "path": "53",
-                  "mode": -547518679
+                  "mode": 2064656704
                 }
               ],
-              "defaultMode": 332383000,
+              "defaultMode": 912004803,
               "optional": true
             },
             "nfs": {
@@ -141,7 +145,7 @@
             "iscsi": {
               "targetPortal": "56",
               "iqn": "57",
-              "lun": 994527057,
+              "lun": -547518679,
               "iscsiInterface": "58",
               "fsType": "59",
               "portals": [
@@ -159,8 +163,7 @@
               "readOnly": true
             },
             "persistentVolumeClaim": {
-              "claimName": "65",
-              "readOnly": true
+              "claimName": "65"
             },
             "rbd": {
               "monitors": [
@@ -173,7 +176,8 @@
               "keyring": "71",
               "secretRef": {
                 "name": "72"
-              }
+              },
+              "readOnly": true
             },
             "flexVolume": {
               "driver": "73",
@@ -181,7 +185,6 @@
               "secretRef": {
                 "name": "75"
               },
-              "readOnly": true,
               "options": {
                 "76": "77"
               }
@@ -189,6 +192,7 @@
             "cinder": {
               "volumeID": "78",
               "fsType": "79",
+              "readOnly": true,
               "secretRef": {
                 "name": "80"
               }
@@ -219,28 +223,26 @@
                   "resourceFieldRef": {
                     "containerName": "91",
                     "resource": "92",
-                    "divisor": "660"
+                    "divisor": "825"
                   },
-                  "mode": 1569992019
+                  "mode": -1319491110
                 }
               ],
-              "defaultMode": 824682619
+              "defaultMode": -1347926683
             },
             "fc": {
               "targetWWNs": [
                 "93"
               ],
-              "lun": -1740986684,
+              "lun": -1252931244,
               "fsType": "94",
-              "readOnly": true,
               "wwids": [
                 "95"
               ]
             },
             "azureFile": {
               "secretName": "96",
-              "shareName": "97",
-              "readOnly": true
+              "shareName": "97"
             },
             "configMap": {
               "name": "98",
@@ -248,11 +250,11 @@
                 {
                   "key": "99",
                   "path": "100",
-                  "mode": 195263908
+                  "mode": 870237686
                 }
               ],
-              "defaultMode": 1593906314,
-              "optional": false
+              "defaultMode": -252664583,
+              "optional": true
             },
             "vsphereVolume": {
               "volumePath": "101",
@@ -263,6 +265,7 @@
             "quobyte": {
               "registry": "105",
               "volume": "106",
+              "readOnly": true,
               "user": "107",
               "group": "108",
               "tenant": "109"
@@ -270,7 +273,7 @@
             "azureDisk": {
               "diskName": "110",
               "diskURI": "111",
-              "cachingMode": "|@?鷅bȻN",
+              "cachingMode": "d飼$俊跾|@?鷅bȻN",
               "fsType": "112",
               "readOnly": true,
               "kind": "榱*Gưoɘ檲"
@@ -1380,8 +1383,8 @@
           "generateName": "427",
           "namespace": "428",
           "selfLink": "429",
-          "uid": "`ȗ\u003c8^翜T蘈",
-          "resourceVersion": "6281861817195808867",
+          "uid": "?ȊJ赟鷆š",
+          "resourceVersion": "11427401501308732431",
           "generation": -8502907933203165744,
           "creationTimestamp": null,
           "deletionGracePeriodSeconds": -1824067601569574665,
@@ -1410,36 +1413,37 @@
               "manager": "440",
               "operation": "Bi攵\u0026ý\"ʀ废査Z綶Ā",
               "apiVersion": "441",
-              "fieldsType": "442"
+              "fieldsType": "442",
+              "fieldsV2": "yQ=="
             }
           ]
         },
         "spec": {
           "accessModes": [
-            "銲tHǽ÷閂抰^窄CǙķȈĐI梞ū"
+            "ɁºǱ秶ʑ韝e溣狣愿激H\\Ȳ"
           ],
           "selector": {
             "matchLabels": {
-              "p2P.B._A_090ERG2nV.__p_Y-.2__a_dWU_V-_Q_Ap._C": "a_o..p_B-d--Q5._D6_.d-n_9n.p.2-.-Qw__YT.1---.-o7.pJ-r"
+              "8g82--a-d----w----p1-2-xao.z-6-q-q0o90--g-09--d5ez1----b69x98--7g0e/qu.._.105-4e": "eo7.pJ-4-1WV.-__05._LsuH"
             },
             "matchExpressions": [
               {
-                "key": "f82-8_.UdWNn_U-...1P_.D8_t..-Ww2q.zv",
-                "operator": "Exists"
+                "key": "8",
+                "operator": "DoesNotExist"
               }
             ]
           },
           "resources": {
             "limits": {
-              "O^:": "847"
+              "籽š莾簏ì淵歔": "449"
             },
             "requests": {
-              "Ɍ蚊ơ鎊t潑": "199"
+              "_夦Ŕ": "11"
             }
           },
           "volumeName": "449",
           "storageClassName": "450",
-          "volumeMode": "ȳT",
+          "volumeMode": "媈",
           "dataSource": {
             "apiGroup": "451",
             "kind": "452",
@@ -1447,19 +1451,19 @@
           }
         },
         "status": {
-          "phase": "戱PRɄ",
+          "phase": "曰n夬",
           "accessModes": [
-            "熔ķ´ʑ潞Ĵ3Q蠯0"
+            ":BŐ埑Ô*ɾWȖ韝ƉşʁO^:犾"
           ],
           "capacity": {
-            "\\溮Ŀ傜NZ!š": "952"
+            "纾SȞ+½剎惃ȳTʬ戱PRɄɝ": "129"
           },
           "conditions": [
             {
-              "type": "僙R岹ÿŉx#綮ehɫ淫Ď眊:",
-              "status": "ƿOqõƨj2愴ňù廻@p",
-              "lastProbeTime": "2252-06-28T22:34:24Z",
-              "lastTransitionTime": "1974-04-29T05:51:38Z",
+              "type": "ɼ橈\"",
+              "status": "Ĵ3Q蠯0ƍ\\溮Ŀ",
+              "lastProbeTime": "2076-10-30T02:30:05Z",
+              "lastTransitionTime": "2136-06-08T15:20:47Z",
               "reason": "454",
               "message": "455"
             }
@@ -1468,29 +1472,29 @@
       }
     ],
     "serviceName": "456",
-    "podManagementPolicy": "ŞÜ4w}ĶƲ86±ļ$暣",
+    "podManagementPolicy": "ǒ",
     "updateStrategy": {
-      "type": "ǲ讱ȕ齐疅檎ǽ曖sƖTƫ",
+      "type": "!šZ_Z喣JȶZy傦ɵǊ\"M!轅諑",
       "rollingUpdate": {
-        "partition": 86666826
+        "partition": 750444429
       }
     },
-    "revisionHistoryLimit": 69142596
+    "revisionHistoryLimit": -1496313238
   },
   "status": {
-    "observedGeneration": 8145135462833081718,
-    "replicas": -1589158932,
-    "readyReplicas": -1470626063,
-    "currentReplicas": -2011137790,
-    "updatedReplicas": -126896219,
+    "observedGeneration": -7485777298552599101,
+    "replicas": 237606658,
+    "readyReplicas": -1986476721,
+    "currentReplicas": -144697117,
+    "updatedReplicas": -1746367307,
     "currentRevision": "457",
     "updateRevision": "458",
-    "collisionCount": 1664714908,
+    "collisionCount": -1857496730,
     "conditions": [
       {
-        "type": "靌瀞鈝Ń¥厀Ł8Ì",
-        "status": "",
-        "lastTransitionTime": "2456-08-06T13:26:39Z",
+        "type": "h嫨炛ʭŞÜ4w}ĶƲ86",
+        "status": "嚰s9咲ǲ讱ȕ齐疅檎ǽ曖sƖTƫ雮",
+        "lastTransitionTime": "2240-11-22T08:35:54Z",
         "reason": "459",
         "message": "460"
       }
