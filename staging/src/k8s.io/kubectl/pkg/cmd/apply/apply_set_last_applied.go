@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -49,7 +50,9 @@ type SetLastAppliedOptions struct {
 	infoList                     []*resource.Info
 	namespace                    string
 	enforceNamespace             bool
-	dryRun                       bool
+	dryRunClient                 bool
+	dryRunServer                 bool
+	dryRunVerifier               *cmdutil.DryRunVerifier
 	shortOutput                  bool
 	output                       string
 	patchBufferList              []PatchBuffer
@@ -118,11 +121,28 @@ func NewCmdApplySetLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IO
 
 // Complete populates dry-run and output flag options.
 func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
-	o.dryRun = cmdutil.GetDryRunFlag(cmd)
+	var dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
+	}
+	o.dryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	o.dryRunServer = dryRunStrategy == cmdutil.DryRunServer
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	o.dryRunVerifier = &cmdutil.DryRunVerifier{
+		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamicClient)),
+		OpenAPIGetter: discoveryClient,
+	}
+
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.shortOutput = o.output == "name"
 
-	var err error
 	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
@@ -130,14 +150,7 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	o.builder = f.NewBuilder()
 	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
 
-	if o.dryRun {
-		// TODO(juanvallejo): This can be cleaned up even further by creating
-		// a PrintFlags struct that binds the --dry-run flag, and whose
-		// ToPrinter method returns a printer that understands how to print
-		// this success message.
-		o.PrintFlags.Complete("%s (dry run)")
-	}
-	printer, err := o.PrintFlags.ToPrinter()
+	printer, err := o.PrintFlags.WithDryRunStrategy(dryRunStrategy).ToPrinter()
 	if err != nil {
 		return err
 	}
@@ -199,14 +212,22 @@ func (o *SetLastAppliedOptions) RunSetLastApplied() error {
 		info := o.infoList[i]
 		finalObj := info.Object
 
-		if !o.dryRun {
+		if !o.dryRunClient {
 			mapping := info.ResourceMapping()
+			options := metav1.PatchOptions{}
+			if o.dryRunServer {
+				// If server-dry-run is requested but the type doesn't support it, fail right away.
+				if err := o.dryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
+					return err
+				}
+				options.DryRun = []string{metav1.DryRunAll}
+			}
 			client, err := o.unstructuredClientForMapping(mapping)
 			if err != nil {
 				return err
 			}
 			helper := resource.NewHelper(client, mapping)
-			finalObj, err = helper.Patch(o.namespace, info.Name, patch.PatchType, patch.Patch, nil)
+			finalObj, err = helper.Patch(o.namespace, info.Name, patch.PatchType, patch.Patch, &options)
 			if err != nil {
 				return err
 			}
