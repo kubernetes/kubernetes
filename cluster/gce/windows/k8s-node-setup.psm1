@@ -1238,8 +1238,8 @@ function Verify-WorkerServices {
 }
 
 function DownloadAndInstall-Crictl {
-  $CRICTL_VERSION = "v1.16.1"
-  $CRICTL_SHA256 = "69a53602f9a8469d4a86284e318fe19b33e97577f7836f48e6f4fb2ed1822baa"
+  $CRICTL_VERSION = "v1.17.0"
+  $CRICTL_SHA256 = "781fd3bd15146a924c6fc2428b11d8a0f20fa04a0c8e00a9a5808f2cc37e0569"
 
   # Assume that presence of crictl.exe indicates that the crictl binaries
   # were already previously downloaded to this node.
@@ -1551,7 +1551,7 @@ function Restart-LoggingAgent {
       Throw ("Timeout while waiting for StackdriverLogging service to stop")
     }
   }
-  
+
   Start-Service StackdriverLogging
 }
 
@@ -1613,12 +1613,12 @@ function Install-LoggingAgent {
 function Configure-LoggingAgent {
   $fluentd_config_dir = "$STACKDRIVER_ROOT\LoggingAgent\config.d"
   $fluentd_config_file = "$fluentd_config_dir\k8s_containers.conf"
-  
+
   # Create a configuration file for kubernetes containers.
   # The config.d directory should have already been created automatically, but
   # try creating again just in case.
   New-Item $fluentd_config_dir -ItemType 'directory' -Force | Out-Null
-  
+
   $config = $FLUENTD_CONFIG.replace('NODE_NAME', (hostname))
   $config | Out-File -FilePath $fluentd_config_file -Encoding ASCII
   Log-Output "Wrote fluentd logging config to $fluentd_config_file"
