@@ -77,7 +77,7 @@ type DiffOptions struct {
 	OpenAPISchema    openapi.Resources
 	DiscoveryClient  discovery.DiscoveryInterface
 	DynamicClient    dynamic.Interface
-	DryRunVerifier   *apply.DryRunVerifier
+	DryRunVerifier   *cmdutil.DryRunVerifier
 	CmdNamespace     string
 	EnforceNamespace bool
 	Builder          *resource.Builder
@@ -321,7 +321,7 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 		Helper:          resource.NewHelper(obj.Info.Client, obj.Info.Mapping),
 		Overwrite:       true,
 		BackOff:         clockwork.NewRealClock(),
-		ServerDryRun:    true,
+		DryRunServer:    true,
 		OpenapiSchema:   obj.OpenAPI,
 		ResourceVersion: resourceVersion,
 	}
@@ -423,7 +423,7 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.DryRunVerifier = &apply.DryRunVerifier{
+	o.DryRunVerifier = &cmdutil.DryRunVerifier{
 		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(o.DynamicClient)),
 		OpenAPIGetter: o.DiscoveryClient,
 	}
