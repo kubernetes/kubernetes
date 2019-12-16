@@ -199,7 +199,7 @@ func (c *CreateClusterRoleOptions) RunCreateRole() error {
 	}
 
 	// Create ClusterRole.
-	if !c.DryRun {
+	if !c.DryRunClient {
 		clusterRole, err = c.Client.ClusterRoles().Create(clusterRole)
 		if err != nil {
 			return err

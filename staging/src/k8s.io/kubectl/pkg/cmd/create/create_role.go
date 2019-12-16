@@ -125,7 +125,7 @@ type CreateRoleOptions struct {
 	Resources     []ResourceOptions
 	ResourceNames []string
 
-	DryRun       bool
+	DryRunClient bool
 	OutputFormat string
 	Namespace    string
 	Client       clientgorbacv1.RbacV1Interface
@@ -235,12 +235,19 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 		return err
 	}
 
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
 
-	if o.DryRun {
-		o.PrintFlags.Complete("%s (dry run)")
+	var dryRunStrategy cmdutil.DryRunStrategy
+	dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
 	}
+	o.DryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	if dryRunStrategy == cmdutil.DryRunServer {
+		return fmt.Errorf("--dry-run=server not yet supported for this command")
+	}
+	o.PrintFlags.WithDryRunStrategy(dryRunStrategy)
+
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -340,7 +347,7 @@ func (o *CreateRoleOptions) RunCreateRole() error {
 	role.Rules = rules
 
 	// Create role.
-	if !o.DryRun {
+	if !o.DryRunClient {
 		role, err = o.Client.Roles(o.Namespace).Create(role)
 		if err != nil {
 			return err
