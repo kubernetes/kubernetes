@@ -185,7 +185,7 @@ func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamicClient)),
 		OpenAPIGetter: discoveryClient,
 	}
-	o.PrintFlags.WithDryRunStrategy(dryRunStrategy)
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err

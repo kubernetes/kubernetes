@@ -542,6 +542,17 @@ func GetDryRunFlag(cmd *cobra.Command) (DryRunStrategy, error) {
 	return DryRunNone, nil
 }
 
+// PrintFlagsWithDryRunStrategy sets a success message at print time for the dry run strategy
+func PrintFlagsWithDryRunStrategy(printFlags *genericclioptions.PrintFlags, dryRunStrategy DryRunStrategy) *genericclioptions.PrintFlags {
+	switch dryRunStrategy {
+	case DryRunClient:
+		printFlags.Complete("%s (dry run)")
+	case DryRunServer:
+		printFlags.Complete("%s (server dry run)")
+	}
+	return printFlags
+}
+
 // DryRunVerifier verifies if a given group-version-kind supports DryRun
 // against the current server. Sending dryRun requests to apiserver that
 // don't support it will result in objects being unwillingly persisted.

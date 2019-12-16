@@ -142,7 +142,7 @@ func (o *CreateCronJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	if dryRunStrategy == cmdutil.DryRunServer {
 		return fmt.Errorf("--dry-run=server not yet supported for this command")
 	}
-	o.PrintFlags.WithDryRunStrategy(dryRunStrategy)
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err

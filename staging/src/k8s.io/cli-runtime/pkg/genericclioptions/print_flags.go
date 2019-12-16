@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 type NoCompatiblePrinterError struct {
@@ -143,17 +142,6 @@ func (f *PrintFlags) WithDefaultOutput(output string) *PrintFlags {
 // WithTypeSetter sets a wrapper than will surround the returned printer with a printer to type resources
 func (f *PrintFlags) WithTypeSetter(scheme *runtime.Scheme) *PrintFlags {
 	f.TypeSetterPrinter = printers.NewTypeSetter(scheme)
-	return f
-}
-
-// WithDryRunStrategy sets a success message at print time for the dry run strategy
-func (f *PrintFlags) WithDryRunStrategy(dryRunStrategy cmdutil.DryRunStrategy) *PrintFlags {
-	switch dryRunStrategy {
-	case cmdutil.DryRunClient:
-		f.Complete("%s (dry run)")
-	case cmdutil.DryRunServer:
-		f.Complete("%s (server dry run)")
-	}
 	return f
 }
 
