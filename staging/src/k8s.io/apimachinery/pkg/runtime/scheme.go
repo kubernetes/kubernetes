@@ -638,24 +638,25 @@ func (s *Scheme) SetVersionPriority(versions ...schema.GroupVersion) error {
 
 // PrioritizedVersionsForGroup returns versions for a single group in priority order
 func (s *Scheme) PrioritizedVersionsForGroup(group string) []schema.GroupVersion {
-	ret := []schema.GroupVersion{}
+	gvs := make(map[schema.GroupVersion]int)
+	var ordinal int
+	ordinal = 0
 	for _, version := range s.versionPriority[group] {
-		ret = append(ret, schema.GroupVersion{Group: group, Version: version})
+		gvs[schema.GroupVersion{Group: group, Version: version}] = ordinal
+		ordinal++
 	}
 	for _, observedVersion := range s.observedVersions {
 		if observedVersion.Group != group {
 			continue
 		}
-		found := false
-		for _, existing := range ret {
-			if existing == observedVersion {
-				found = true
-				break
-			}
+		if _, found := gvs[observedVersion]; !found {
+			gvs[observedVersion] = ordinal
+			ordinal++
 		}
-		if !found {
-			ret = append(ret, observedVersion)
-		}
+	}
+	ret := make([]schema.GroupVersion, len(gvs), len(gvs))
+	for gv, order := range gvs {
+		ret[order] = gv
 	}
 
 	return ret
