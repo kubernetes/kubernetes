@@ -3540,8 +3540,8 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 	}
 }
 
-func getPodsTotalRequestsAndLimits(podList *corev1.PodList) (reqs map[corev1.ResourceName]resource.Quantity, limits map[corev1.ResourceName]resource.Quantity) {
-	reqs, limits = map[corev1.ResourceName]resource.Quantity{}, map[corev1.ResourceName]resource.Quantity{}
+func getPodsTotalRequestsAndLimits(podList *corev1.PodList) (reqs, limits corev1.ResourceList) {
+	reqs, limits = corev1.ResourceList{}, corev1.ResourceList{}
 	for _, pod := range podList.Items {
 		podReqs, podLimits := resourcehelper.PodRequestsAndLimits(&pod)
 		for podReqName, podReqValue := range podReqs {
