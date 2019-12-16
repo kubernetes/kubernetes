@@ -38,9 +38,9 @@ var (
 	vmssVirtualMachinesKey  = "k8svmssVirtualMachinesKey"
 	availabilitySetNodesKey = "k8sAvailabilitySetNodesKey"
 
-	availabilitySetNodesCacheTTLDefault = 900 // in seconds
-	vmssCacheTTLDefault                 = 600 // in seconds
-	vmssVirtualMachinesCacheTTLDefault  = 600 // in seconds
+	availabilitySetNodesCacheTTLDefaultInSeconds = 900
+	vmssCacheTTLDefaultInSeconds                 = 600
+	vmssVirtualMachinesCacheTTLDefaultInSeconds  = 600
 )
 
 type vmssVirtualMachinesEntry struct {
@@ -87,10 +87,10 @@ func (ss *scaleSet) newVMSSCache() (*timedCache, error) {
 		return localCache, nil
 	}
 
-	if ss.Config.VmssCacheTTL == 0 {
-		return newTimedcache(time.Duration(vmssCacheTTLDefault)*time.Second, getter)
+	if ss.Config.VmssCacheTTLInSeconds == 0 {
+		ss.Config.VmssCacheTTLInSeconds = vmssCacheTTLDefaultInSeconds
 	}
-	return newTimedcache(time.Duration(ss.Config.VmssCacheTTL)*time.Second, getter)
+	return newTimedcache(time.Duration(ss.Config.VmssCacheTTLInSeconds)*time.Second, getter)
 }
 
 func extractVmssVMName(name string) (string, string, error) {
@@ -150,10 +150,10 @@ func (ss *scaleSet) newVMSSVirtualMachinesCache() (*timedCache, error) {
 		return localCache, nil
 	}
 
-	if ss.Config.VmssVirtualMachinesCacheTTL == 0 {
-		return newTimedcache(time.Duration(vmssVirtualMachinesCacheTTLDefault)*time.Second, getter)
+	if ss.Config.VmssVirtualMachinesCacheTTLInSeconds == 0 {
+		ss.Config.VmssVirtualMachinesCacheTTLInSeconds = vmssVirtualMachinesCacheTTLDefaultInSeconds
 	}
-	return newTimedcache(time.Duration(ss.Config.VmssVirtualMachinesCacheTTL)*time.Second, getter)
+	return newTimedcache(time.Duration(ss.Config.VmssVirtualMachinesCacheTTLInSeconds)*time.Second, getter)
 }
 
 func (ss *scaleSet) deleteCacheForNode(nodeName string) error {
@@ -192,10 +192,10 @@ func (ss *scaleSet) newAvailabilitySetNodesCache() (*timedCache, error) {
 		return localCache, nil
 	}
 
-	if ss.Config.AvailabilitySetNodesCacheTTL == 0 {
-		return newTimedcache(time.Duration(availabilitySetNodesCacheTTLDefault)*time.Second, getter)
+	if ss.Config.AvailabilitySetNodesCacheTTLInSeconds == 0 {
+		ss.Config.AvailabilitySetNodesCacheTTLInSeconds = availabilitySetNodesCacheTTLDefaultInSeconds
 	}
-	return newTimedcache(time.Duration(ss.Config.AvailabilitySetNodesCacheTTL)*time.Second, getter)
+	return newTimedcache(time.Duration(ss.Config.AvailabilitySetNodesCacheTTLInSeconds)*time.Second, getter)
 }
 
 func (ss *scaleSet) isNodeManagedByAvailabilitySet(nodeName string, crt cacheReadType) (bool, error) {

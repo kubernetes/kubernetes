@@ -175,21 +175,21 @@ type Config struct {
 	// with LoadBalancerName
 	LoadBalancerResourceGroup string `json:"loadBalancerResourceGroup,omitempty" yaml:"loadBalancerResourceGroup,omitempty"`
 
-	// AvailabilitySetNodesCacheTTL sets the Cache TTL for availabilitySetNodesCache
+	// AvailabilitySetNodesCacheTTLInSeconds sets the Cache TTL for availabilitySetNodesCache
 	// if not set, will use default value
-	AvailabilitySetNodesCacheTTL int `json:"availabilitySetNodesCacheTTL,omitempty" yaml:"availabilitySetNodesCacheTTL,omitempty"`
-	// VmssCacheTTL sets the cache TTL for VMSS
-	VmssCacheTTL int `json:"vmssCacheTTL,omitempty" yaml:"vmssCacheTTL,omitempty"`
-	// VmssVirtualMachinesCacheTTL sets the cache TTL for vmssVirtualMachines
-	VmssVirtualMachinesCacheTTL int `json:"vmssVirtualMachinesCacheTTL,omitempty" yaml:"vmssVirtualMachinesCacheTTL,omitempty"`
-	// VmCacheTTL sets the cache TTL for vm
-	VMCacheTTL int `json:"vmCacheTTL,omitempty" yaml:"vmCacheTTL,omitempty"`
-	// LbCacheTTL sets the cache TTL for load balancer
-	LbCacheTTL int `json:"lbCacheTTL,omitempty" yaml:"lbcacheTTL,omitempty"`
-	// NsgCacheTTL sets the cache TTL for network security group
-	NsgCacheTTL int `json:"nsgCacheTTL,omityempty" yaml:"nsgCacheTTL,omitempty"`
-	// RtCacheTTL sets the cache TTL for route table
-	RtCacheTTL int `json:"rtCacheTTL,omitempty" yaml:"rtCacheTTL,omitempty"`
+	AvailabilitySetNodesCacheTTLInSeconds int `json:"availabilitySetNodesCacheTTLInSeconds,omitempty" yaml:"availabilitySetNodesCacheTTLInSeconds,omitempty"`
+	// VmssCacheTTLInSeconds sets the cache TTL for VMSS
+	VmssCacheTTLInSeconds int `json:"vmssCacheTTLInSeconds,omitempty" yaml:"vmssCacheTTLInSeconds,omitempty"`
+	// VmssVirtualMachinesCacheTTLInSeconds sets the cache TTL for vmssVirtualMachines
+	VmssVirtualMachinesCacheTTLInSeconds int `json:"vmssVirtualMachinesCacheTTLInSeconds,omitempty" yaml:"vmssVirtualMachinesCacheTTLInSeconds,omitempty"`
+	// VmCacheTTLInSeconds sets the cache TTL for vm
+	VMCacheTTLInSeconds int `json:"vmCacheTTLInSeconds,omitempty" yaml:"vmCacheTTLInSeconds,omitempty"`
+	// LoadBalancerCacheTTLInSeconds sets the cache TTL for load balancer
+	LoadBalancerCacheTTLInSeconds int `json:"loadBalancerCacheTTLInSeconds,omitempty" yaml:"loadBalancerCacheTTLInSeconds,omitempty"`
+	// NsgCacheTTLInSeconds sets the cache TTL for network security group
+	NsgCacheTTLInSeconds int `json:"nsgCacheTTLInSeconds,omitempty" yaml:"nsgCacheTTLInSeconds,omitempty"`
+	// RouteTableCacheTTLInSeconds sets the cache TTL for route table
+	RouteTableCacheTTLInSeconds int `json:"routeTableCacheTTLInSeconds,omitempty" yaml:"routeTableCacheTTLInSeconds,omitempty"`
 }
 
 var _ cloudprovider.Interface = (*Cloud)(nil)

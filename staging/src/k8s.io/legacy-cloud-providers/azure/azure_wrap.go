@@ -35,10 +35,10 @@ import (
 )
 
 var (
-	vmCacheTTLDefault  = 60  // in seconds
-	lbCacheTTLDefault  = 120 // in seconds
-	nsgCacheTTLDefault = 120 // in seconds
-	rtCacheTTLDefault  = 120 // in seconds
+	vmCacheTTLDefaultInSeconds           = 60
+	loadBalancerCacheTTLDefaultInSeconds = 120
+	nsgCacheTTLDefaultInSeconds          = 120
+	routeTableCacheTTLDefaultInSeconds   = 120
 
 	azureNodeProviderIDRE    = regexp.MustCompile(`^azure:///subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Compute/(?:.*)`)
 	azureResourceGroupNameRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/(?:.*)`)
@@ -228,10 +228,10 @@ func (az *Cloud) newVMCache() (*timedCache, error) {
 		return &vm, nil
 	}
 
-	if az.VMCacheTTL == 0 {
-		return newTimedcache(time.Duration(vmCacheTTLDefault)*time.Second, getter)
+	if az.VMCacheTTLInSeconds == 0 {
+		az.VMCacheTTLInSeconds = vmCacheTTLDefaultInSeconds
 	}
-	return newTimedcache(time.Duration(az.VMCacheTTL)*time.Second, getter)
+	return newTimedcache(time.Duration(az.VMCacheTTLInSeconds)*time.Second, getter)
 }
 
 func (az *Cloud) newLBCache() (*timedCache, error) {
@@ -253,10 +253,10 @@ func (az *Cloud) newLBCache() (*timedCache, error) {
 		return &lb, nil
 	}
 
-	if az.LbCacheTTL == 0 {
-		return newTimedcache(time.Duration(lbCacheTTLDefault)*time.Second, getter)
+	if az.LoadBalancerCacheTTLInSeconds == 0 {
+		az.LoadBalancerCacheTTLInSeconds = loadBalancerCacheTTLDefaultInSeconds
 	}
-	return newTimedcache(time.Duration(az.LbCacheTTL)*time.Second, getter)
+	return newTimedcache(time.Duration(az.LoadBalancerCacheTTLInSeconds)*time.Second, getter)
 }
 
 func (az *Cloud) newNSGCache() (*timedCache, error) {
@@ -277,10 +277,10 @@ func (az *Cloud) newNSGCache() (*timedCache, error) {
 		return &nsg, nil
 	}
 
-	if az.NsgCacheTTL == 0 {
-		return newTimedcache(time.Duration(nsgCacheTTLDefault)*time.Second, getter)
+	if az.NsgCacheTTLInSeconds == 0 {
+		az.NsgCacheTTLInSeconds = nsgCacheTTLDefaultInSeconds
 	}
-	return newTimedcache(time.Duration(az.NsgCacheTTL)*time.Second, getter)
+	return newTimedcache(time.Duration(az.NsgCacheTTLInSeconds)*time.Second, getter)
 }
 
 func (az *Cloud) newRouteTableCache() (*timedCache, error) {
@@ -301,10 +301,10 @@ func (az *Cloud) newRouteTableCache() (*timedCache, error) {
 		return &rt, nil
 	}
 
-	if az.RtCacheTTL == 0 {
-		return newTimedcache(time.Duration(rtCacheTTLDefault)*time.Second, getter)
+	if az.RouteTableCacheTTLInSeconds == 0 {
+		az.RouteTableCacheTTLInSeconds = routeTableCacheTTLDefaultInSeconds
 	}
-	return newTimedcache(time.Duration(az.RtCacheTTL)*time.Second, getter)
+	return newTimedcache(time.Duration(az.RouteTableCacheTTLInSeconds)*time.Second, getter)
 }
 
 func (az *Cloud) useStandardLoadBalancer() bool {
