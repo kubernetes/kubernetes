@@ -50,7 +50,9 @@ type CreateOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
-	DryRun bool
+	DryRunClient   bool
+	DryRunServer   bool
+	DryRunVerifier *cmdutil.DryRunVerifier
 
 	FilenameOptions  resource.FilenameOptions
 	Selector         string
@@ -191,11 +193,27 @@ func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
-
-	if o.DryRun {
-		o.PrintFlags.Complete("%s (dry run)")
+	var dryRunStrategy cmdutil.DryRunStrategy
+	dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
 	}
+	o.DryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	o.DryRunServer = dryRunStrategy == cmdutil.DryRunServer
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = &cmdutil.DryRunVerifier{
+		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamicClient)),
+		OpenAPIGetter: discoveryClient,
+	}
+	o.PrintFlags.WithDryRunStrategy(dryRunStrategy)
+
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -260,8 +278,16 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
-		if !o.DryRun {
-			if err := createAndRefresh(info); err != nil {
+		if !o.DryRunClient {
+			options := metav1.CreateOptions{}
+			if o.DryRunServer {
+				// If server-dry-run is requested but the type doesn't support it, fail right away.
+				if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+					return err
+				}
+				options.DryRun = []string{metav1.DryRunAll}
+			}
+			if err := createAndRefresh(info, &options); err != nil {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
 		}
@@ -298,8 +324,8 @@ func RunEditOnCreate(f cmdutil.Factory, printFlags *genericclioptions.PrintFlags
 }
 
 // createAndRefresh creates an object from input info and refreshes info with that object
-func createAndRefresh(info *resource.Info) error {
-	obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object, nil)
+func createAndRefresh(info *resource.Info, options *metav1.CreateOptions) error {
+	obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object, options)
 	if err != nil {
 		return err
 	}
@@ -328,8 +354,10 @@ type CreateSubcommandOptions struct {
 	Name string
 	// StructuredGenerator is the resource generator for the object being created
 	StructuredGenerator generate.StructuredGenerator
-	// DryRun is true if the command should be simulated but not run against the server
-	DryRun           bool
+	// DryRunClient is true if the command should be simulated but not run against the server
+	DryRunClient     bool
+	DryRunServer     bool
+	DryRunVerifier   *cmdutil.DryRunVerifier
 	CreateAnnotation bool
 
 	Namespace        string
@@ -360,12 +388,30 @@ func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 
 	o.Name = name
 	o.StructuredGenerator = generator
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+
+	var dryRunStrategy cmdutil.DryRunStrategy
+	dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
+	}
+	o.DryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	o.DryRunServer = dryRunStrategy == cmdutil.DryRunServer
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = &cmdutil.DryRunVerifier{
+		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamicClient)),
+		OpenAPIGetter: discoveryClient,
+	}
+	o.PrintFlags.WithDryRunStrategy(dryRunStrategy)
+
 	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 
-	if o.DryRun {
-		o.PrintFlags.Complete("%s (dry run)")
-	}
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -399,7 +445,7 @@ func (o *CreateSubcommandOptions) Run() error {
 	if err != nil {
 		return err
 	}
-	if !o.DryRun {
+	if !o.DryRunClient {
 		// create subcommands have compiled knowledge of things they create, so type them directly
 		gvks, _, err := scheme.Scheme.ObjectKinds(obj)
 		if err != nil {
@@ -409,6 +455,12 @@ func (o *CreateSubcommandOptions) Run() error {
 		mapping, err := o.Mapper.RESTMapping(schema.GroupKind{Group: gvk.Group, Kind: gvk.Kind}, gvk.Version)
 		if err != nil {
 			return err
+		}
+		if o.DryRunServer {
+			// If server-dry-run is requested but the type doesn't support it, fail right away.
+			if err := o.DryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
+				return err
+			}
 		}
 
 		if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, obj, scheme.DefaultJSONEncoder()); err != nil {
@@ -423,7 +475,12 @@ func (o *CreateSubcommandOptions) Run() error {
 		if mapping.Scope.Name() == meta.RESTScopeNameRoot {
 			o.Namespace = ""
 		}
-		actualObject, err := o.DynamicClient.Resource(mapping.Resource).Namespace(o.Namespace).Create(asUnstructured, metav1.CreateOptions{})
+
+		options := metav1.CreateOptions{}
+		if o.DryRunServer {
+			options.DryRun = []string{metav1.DryRunAll}
+		}
+		actualObject, err := o.DynamicClient.Resource(mapping.Resource).Namespace(o.Namespace).Create(asUnstructured, options)
 		if err != nil {
 			return err
 		}

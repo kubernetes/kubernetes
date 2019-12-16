@@ -140,7 +140,7 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 	options := &DeploymentOpts{
 		CreateSubcommandOptions: &CreateSubcommandOptions{
 			PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
-			DryRun:     true,
+			DryRunClient:     true,
 			IOStreams:  ioStreams,
 		},
 	}
