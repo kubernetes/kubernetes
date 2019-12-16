@@ -10,9 +10,14 @@ go_test(
     name = "go_default_test",
     srcs = [
         "certs_test.go",
+        "gke_filter_test.go",
         "round_trip_test.go",
         "webhook_v1_test.go",
         "webhook_v1beta1_test.go",
+    ],
+    data = [
+        "testdata/gcp_authz.config",
+        "testdata/other_authz.config",
     ],
     embed = [":go_default_library"],
     deps = [
@@ -30,7 +35,10 @@ go_test(
 
 go_library(
     name = "go_default_library",
-    srcs = ["webhook.go"],
+    srcs = [
+        "gke_filter.go",
+        "webhook.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/plugin/pkg/authorizer/webhook",
     importpath = "k8s.io/apiserver/plugin/pkg/authorizer/webhook",
     deps = [
@@ -47,6 +55,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/authorization/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )

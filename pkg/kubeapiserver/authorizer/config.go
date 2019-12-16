@@ -115,7 +115,7 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 			if config.WebhookRetryBackoff == nil {
 				return nil, nil, errors.New("retry backoff parameters for authorization webhook has not been specified")
 			}
-			webhookAuthorizer, err := webhook.New(config.WebhookConfigFile,
+			webhookAuthorizer, err := webhook.NewGkeApiserverWebhookAuthorizer(config.WebhookConfigFile,
 				config.WebhookVersion,
 				config.WebhookCacheAuthorizedTTL,
 				config.WebhookCacheUnauthorizedTTL,
