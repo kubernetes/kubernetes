@@ -17,6 +17,7 @@ limitations under the License.
 package expose
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -89,7 +90,10 @@ type ExposeServiceOptions struct {
 	PrintFlags      *genericclioptions.PrintFlags
 	PrintObj        printers.ResourcePrinterFunc
 
-	DryRun           bool
+	DryRunClient   bool
+	DryRunServer   bool
+	DryRunVerifier *cmdutil.DryRunVerifier
+
 	EnforceNamespace bool
 
 	Generators                func(string) map[string]generate.Generator
@@ -167,11 +171,28 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 }
 
 func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
-
-	if o.DryRun {
-		o.PrintFlags.Complete("%s (dry run)")
+	var err error
+	var dryRunStrategy cmdutil.DryRunStrategy
+	dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
 	}
+	o.DryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	o.DryRunServer = dryRunStrategy == cmdutil.DryRunServer
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = &cmdutil.DryRunVerifier{
+		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamicClient)),
+		OpenAPIGetter: discoveryClient,
+	}
+	o.PrintFlags.WithDryRunStrategy(dryRunStrategy)
+
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -325,8 +346,14 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
-		if o.DryRun {
+		if o.DryRunClient {
 			return o.PrintObj(object, o.Out)
+		}
+		if o.DryRunServer {
+			// If server-dry-run is requested but the type doesn't support it, fail right away.
+			if err := o.DryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+				return err
+			}
 		}
 		if err := util.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), object, scheme.DefaultJSONEncoder()); err != nil {
 			return err
@@ -344,8 +371,12 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		if err != nil {
 			return err
 		}
+		options := metav1.CreateOptions{}
+		if o.DryRunServer {
+			options.DryRun = []string{metav1.DryRunAll}
+		}
 		// Serialize the object with the annotation applied.
-		actualObject, err := o.DynamicClient.Resource(objMapping.Resource).Namespace(o.Namespace).Create(asUnstructured, metav1.CreateOptions{})
+		actualObject, err := o.DynamicClient.Resource(objMapping.Resource).Namespace(o.Namespace).Create(asUnstructured, options)
 		if err != nil {
 			return err
 		}
