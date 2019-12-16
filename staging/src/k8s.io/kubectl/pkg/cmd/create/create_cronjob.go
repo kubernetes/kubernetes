@@ -40,10 +40,10 @@ var (
 
 	cronjobExample = templates.Examples(`
 		# Create a cronjob
-		kubectl create cronjob my-job --image=busybox 
+		kubectl create cronjob my-job --image=busybox
 
 		# Create a cronjob with command
-		kubectl create cronjob my-job --image=busybox -- date 
+		kubectl create cronjob my-job --image=busybox -- date
 
 		# Create a cronjob with schedule
 		kubectl create cronjob test-job --image=busybox --schedule="*/1 * * * *"`)
@@ -60,11 +60,11 @@ type CreateCronJobOptions struct {
 	Command  []string
 	Restart  string
 
-	Namespace string
-	Client    batchv1beta1client.BatchV1beta1Interface
-	DryRun    bool
-	Builder   *resource.Builder
-	Cmd       *cobra.Command
+	Namespace    string
+	Client       batchv1beta1client.BatchV1beta1Interface
+	DryRunClient bool
+	Builder      *resource.Builder
+	Cmd          *cobra.Command
 
 	genericclioptions.IOStreams
 }
@@ -133,10 +133,16 @@ func (o *CreateCronJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	o.Builder = f.NewBuilder()
 	o.Cmd = cmd
 
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
-	if o.DryRun {
-		o.PrintFlags.Complete("%s (dry run)")
+	var dryRunStrategy cmdutil.DryRunStrategy
+	dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
 	}
+	o.DryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	if dryRunStrategy == cmdutil.DryRunServer {
+		return fmt.Errorf("--dry-run=server not yet supported for this command")
+	}
+	o.PrintFlags.WithDryRunStrategy(dryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -162,7 +168,7 @@ func (o *CreateCronJobOptions) Run() error {
 	var cronjob *batchv1beta1.CronJob
 	cronjob = o.createCronJob()
 
-	if !o.DryRun {
+	if !o.DryRunClient {
 		var err error
 		cronjob, err = o.Client.CronJobs(o.Namespace).Create(cronjob)
 		if err != nil {
