@@ -347,7 +347,8 @@ func isIncompatibleServerError(err error) bool {
 // as a slice of pointer to resource.Info. The resource.Info contains the object
 // and some other denormalized data. This function should not be called until
 // AFTER the "complete" and "validate" methods have been called to ensure that
-// the ApplyOptions is filled in and valid.
+// the ApplyOptions is filled in and valid. Returns an error if the resource
+// builder returns an error retrieving the objects.
 func (o *ApplyOptions) GetObjects() ([]*resource.Info, error) {
 	if !o.objectsCached {
 		// include the uninitialized objects by default if --prune is true
@@ -394,20 +395,17 @@ func (o *ApplyOptions) Run() error {
 		}
 	}
 
-	output := *o.PrintFlags.OutputFormat
-	shortOutput := output == "name"
-
 	visitedUids := sets.NewString()
 	visitedNamespaces := sets.NewString()
-
-	var objs []runtime.Object
-
-	count := 0
 
 	infos, err := o.GetObjects()
 	if err != nil {
 		return err
 	}
+	if len(infos) == 0 {
+		return fmt.Errorf("no objects passed to apply")
+	}
+
 	for _, info := range infos {
 
 		// If server-dry-run is requested but the type doesn't support it, fail right away.
@@ -477,9 +475,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 			}
 
 			visitedUids.Insert(string(metadata.GetUID()))
-			count++
-			if len(output) > 0 && !shortOutput {
-				objs = append(objs, info.Object)
+			if o.shouldPrintObject() {
 				continue
 			}
 
@@ -501,9 +497,6 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 		if err != nil {
 			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving modified configuration from:\n%s\nfor:", info.String()), info.Source, err)
 		}
-
-		// Print object only if output format other than "name" is specified
-		printObject := len(output) > 0 && !shortOutput
 
 		if err := info.Get(); err != nil {
 			if !errors.IsNotFound(err) {
@@ -535,10 +528,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 			}
 			visitedUids.Insert(string(metadata.GetUID()))
 
-			count++
-
-			if printObject {
-				objs = append(objs, info.Object)
+			if o.shouldPrintObject() {
 				continue
 			}
 
@@ -587,9 +577,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 
 			info.Refresh(patchedObject, true)
 
-			if string(patchBytes) == "{}" && !printObject {
-				count++
-
+			if string(patchBytes) == "{}" && !o.shouldPrintObject() {
 				printer, err := o.ToPrinter("unchanged")
 				if err != nil {
 					return err
@@ -600,10 +588,8 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 				continue
 			}
 		}
-		count++
 
-		if printObject {
-			objs = append(objs, info.Object)
+		if o.shouldPrintObject() {
 			continue
 		}
 
@@ -616,35 +602,8 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 		}
 	}
 
-	if count == 0 {
-		return fmt.Errorf("no objects passed to apply")
-	}
-
-	// print objects
-	if len(objs) > 0 {
-		printer, err := o.ToPrinter("")
-		if err != nil {
-			return err
-		}
-
-		objToPrint := objs[0]
-		if len(objs) > 1 {
-			list := &corev1.List{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "List",
-					APIVersion: "v1",
-				},
-				ListMeta: metav1.ListMeta{},
-			}
-			if err := meta.SetList(list, objs); err != nil {
-				return err
-			}
-
-			objToPrint = list
-		}
-		if err := printer.PrintObj(objToPrint, o.Out); err != nil {
-			return err
-		}
+	if err := o.printObjects(); err != nil {
+		return err
 	}
 
 	if !o.Prune {
@@ -686,6 +645,61 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 	for _, m := range nonNamespacedRESTMappings {
 		if err := p.prune(metav1.NamespaceNone, m); err != nil {
 			return fmt.Errorf("error pruning nonNamespaced object %v: %v", m.GroupVersionKind, err)
+		}
+	}
+
+	return nil
+}
+
+func (o *ApplyOptions) shouldPrintObject() bool {
+	// Print object only if output format other than "name" is specified
+	shouldPrint := false
+	output := *o.PrintFlags.OutputFormat
+	shortOutput := output == "name"
+	if len(output) > 0 && !shortOutput {
+		shouldPrint = true
+	}
+	return shouldPrint
+}
+
+func (o *ApplyOptions) printObjects() error {
+
+	if !o.shouldPrintObject() {
+		return nil
+	}
+
+	infos, err := o.GetObjects()
+	if err != nil {
+		return err
+	}
+
+	if len(infos) > 0 {
+		printer, err := o.ToPrinter("")
+		if err != nil {
+			return err
+		}
+
+		objToPrint := infos[0].Object
+		if len(infos) > 1 {
+			objs := []runtime.Object{}
+			for _, info := range infos {
+				objs = append(objs, info.Object)
+			}
+			list := &corev1.List{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "List",
+					APIVersion: "v1",
+				},
+				ListMeta: metav1.ListMeta{},
+			}
+			if err := meta.SetList(list, objs); err != nil {
+				return err
+			}
+
+			objToPrint = list
+		}
+		if err := printer.PrintObj(objToPrint, o.Out); err != nil {
+			return err
 		}
 	}
 
