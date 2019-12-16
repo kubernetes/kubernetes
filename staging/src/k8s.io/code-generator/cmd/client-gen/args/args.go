@@ -83,7 +83,7 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
 	pflag.BoolVar(&ca.ClientsetOnly, "clientset-only", ca.ClientsetOnly, "when set, client-gen only generates the clientset shell, without generating the individual typed clients")
 	pflag.BoolVar(&ca.FakeClient, "fake-clientset", ca.FakeClient, "when set, client-gen will generate the fake clientset that can be used in tests")
 
-	fs.StringArrayVar(&ca.PluralExceptions, "plural-exceptions", ca.PluralExceptions, "list of comma separated plural exception definitions in Type:PluralizedType form")
+	fs.StringSliceVar(&ca.PluralExceptions, "plural-exceptions", ca.PluralExceptions, "list of comma separated plural exception definitions in Type:PluralizedType form")
 
 	// support old flags
 	fs.SetNormalizeFunc(mapFlagName("clientset-path", "output-package", fs.GetNormalizeFunc()))
