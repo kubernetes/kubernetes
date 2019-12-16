@@ -211,7 +211,15 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		return cmdutil.UsageErrorf(cmd, "error: cannot specify both a node name and a --selector option")
 	}
 
-	o.drainer.DryRun = cmdutil.GetDryRunFlag(cmd)
+	var dryRunStrategy cmdutil.DryRunStrategy
+	dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
+	}
+	o.drainer.DryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	if dryRunStrategy == cmdutil.DryRunServer {
+		return fmt.Errorf("--dry-run=server not yet supported for this command")
+	}
 
 	if o.drainer.Client, err = f.KubernetesClientSet(); err != nil {
 		return err
@@ -232,9 +240,7 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.drainer.DryRun {
-			o.PrintFlags.Complete("%s (dry run)")
-		}
+		o.PrintFlags.WithDryRunStrategy(dryRunStrategy)
 
 		printer, err := o.PrintFlags.ToPrinter()
 		if err != nil {
@@ -325,7 +331,7 @@ func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error
 	if warnings := list.Warnings(); warnings != "" {
 		fmt.Fprintf(o.ErrOut, "WARNING: %s\n", warnings)
 	}
-	if o.drainer.DryRun {
+	if o.drainer.DryRunClient {
 		for _, pod := range list.Pods() {
 			fmt.Fprintf(o.Out, "evicting pod %s/%s (dry run)\n", pod.Namespace, pod.Name)
 		}
@@ -381,7 +387,7 @@ func (o *DrainCmdOptions) RunCordonOrUncordon(desired bool) error {
 				}
 				printObj(nodeInfo.Object, o.Out)
 			} else {
-				if !o.drainer.DryRun {
+				if !o.drainer.DryRunClient {
 					err, patchErr := c.PatchOrReplace(o.drainer.Client)
 					if patchErr != nil {
 						printError(patchErr)

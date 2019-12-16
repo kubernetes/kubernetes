@@ -66,8 +66,7 @@ type Helper struct {
 	Out    io.Writer
 	ErrOut io.Writer
 
-	// TODO(justinsb): unnecessary?
-	DryRun bool
+	DryRunClient bool
 
 	// OnPodDeletedOrEvicted is called when a pod is evicted/deleted; for printing progress output
 	OnPodDeletedOrEvicted func(pod *corev1.Pod, usingEviction bool)
