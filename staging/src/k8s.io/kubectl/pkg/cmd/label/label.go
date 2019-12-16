@@ -56,7 +56,9 @@ type LabelOptions struct {
 	overwrite       bool
 	list            bool
 	local           bool
-	dryrun          bool
+	dryRunClient    bool
+	dryRunServer    bool
+	dryRunVerifier  *cmdutil.DryRunVerifier
 	all             bool
 	resourceVersion string
 	selector        string
@@ -164,13 +166,30 @@ func (o *LabelOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	}
 
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
-	o.dryrun = cmdutil.GetDryRunFlag(cmd)
+
+	var dryRunStrategy cmdutil.DryRunStrategy
+	dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
+	}
+	o.dryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	o.dryRunServer = dryRunStrategy == cmdutil.DryRunServer
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	o.dryRunVerifier = &cmdutil.DryRunVerifier{
+		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamicClient)),
+		OpenAPIGetter: discoveryClient,
+	}
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.dryrun {
-			o.PrintFlags.Complete("%s (dry run)")
-		}
+		o.PrintFlags.WithDryRunStrategy(dryRunStrategy)
 
 		return o.PrintFlags.ToPrinter()
 	}
@@ -267,7 +286,7 @@ func (o *LabelOptions) RunLabel() error {
 		if err != nil {
 			return err
 		}
-		if o.dryrun || o.local || o.list {
+		if o.dryRunClient || o.local || o.list {
 			err = labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
 			if err != nil {
 				return err
@@ -279,6 +298,13 @@ func (o *LabelOptions) RunLabel() error {
 			dataChangeMsg = updateDataChangeMsg(oldData, newObj)
 			outputObj = info.Object
 		} else {
+			if o.dryRunServer {
+				// If server-dry-run is requested but the type doesn't support it, fail right away.
+				if err := o.dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+					return err
+				}
+			}
+
 			name, namespace := info.Name, info.Namespace
 			if err != nil {
 				return err
@@ -318,9 +344,17 @@ func (o *LabelOptions) RunLabel() error {
 			helper := resource.NewHelper(client, mapping)
 
 			if createdPatch {
+				options := metav1.PatchOptions{}
+				if o.dryRunServer {
+					options.DryRun = []string{metav1.DryRunAll}
+				}
 				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, nil)
 			} else {
-				outputObj, err = helper.Replace(namespace, name, false, obj, nil)
+				options := metav1.DeleteOptions{}
+				if o.dryRunServer {
+					options.DryRun = []string{metav1.DryRunAll}
+				}
+				outputObj, err = helper.Replace(namespace, name, false, obj, &options)
 			}
 			if err != nil {
 				return err
