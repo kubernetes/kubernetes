@@ -415,7 +415,7 @@ func AddKustomizeFlag(flags *pflag.FlagSet, value *string) {
 func AddDryRunFlag(cmd *cobra.Command) {
 	cmd.Flags().String(
 		"dry-run",
-		"",
+		"none",
 		`Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`,
 	)
 }
@@ -516,7 +516,7 @@ const (
 
 func GetDryRunFlag(cmd *cobra.Command) (DryRunStrategy, error) {
 	var dryRunFlag = GetFlagString(cmd, "dry-run")
-	if dryRunFlag == "" {
+	if dryRunFlag == "" && !cmd.Flags().Changed("dry-run") {
 		klog.Warning(`The unset value for --dry-run is deprecated and a value will be required in a future version. Must be "none", "server", or "client".`)
 		return DryRunClient, nil
 	}
