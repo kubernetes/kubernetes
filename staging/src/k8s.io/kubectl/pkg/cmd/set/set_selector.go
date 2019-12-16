@@ -44,7 +44,9 @@ type SetSelectorOptions struct {
 	ResourceBuilderFlags *genericclioptions.ResourceBuilderFlags
 	PrintFlags           *genericclioptions.PrintFlags
 	RecordFlags          *genericclioptions.RecordFlags
-	dryrun               bool
+	dryRunClient         bool
+	dryRunServer         bool
+	dryRunVerifier       *cmdutil.DryRunVerifier
 
 	// set by args
 	resources       []string
@@ -129,7 +131,26 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 		return err
 	}
 
-	o.dryrun = cmdutil.GetDryRunFlag(cmd)
+	var dryRunStrategy cmdutil.DryRunStrategy
+	dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
+	}
+	o.dryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	o.dryRunServer = dryRunStrategy == cmdutil.DryRunServer
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	o.dryRunVerifier = &cmdutil.DryRunVerifier{
+		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamicClient)),
+		OpenAPIGetter: discoveryClient,
+	}
+	o.PrintFlags.WithDryRunStrategy(dryRunStrategy)
 
 	o.resources, o.selector, err = getResourcesAndSelector(args)
 	if err != nil {
@@ -137,11 +158,8 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	}
 
 	o.ResourceFinder = o.ResourceBuilderFlags.ToBuilder(f, o.resources)
-	o.WriteToServer = !(*o.ResourceBuilderFlags.Local || o.dryrun)
+	o.WriteToServer = !(*o.ResourceBuilderFlags.Local || o.dryRunClient)
 
-	if o.dryrun {
-		o.PrintFlags.Complete("%s (dry run)")
-	}
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -204,8 +222,16 @@ func (o *SetSelectorOptions) RunSelector() error {
 		if !o.WriteToServer {
 			return o.PrintObj(info.Object, o.Out)
 		}
+		options := metav1.PatchOptions{}
+		if o.dryRunServer {
+			// If server-dry-run is requested but the type doesn't support it, fail right away.
+			if err := o.dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+				return err
+			}
+			options.DryRun = []string{metav1.DryRunAll}
+		}
 
-		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, &options)
 		if err != nil {
 			return err
 		}
