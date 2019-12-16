@@ -39,7 +39,7 @@ type UndoOptions struct {
 
 	Builder          func() *resource.Builder
 	ToRevision       int64
-	DryRun           bool
+	DryRunClient     bool
 	Resources        []string
 	Namespace        string
 	EnforceNamespace bool
@@ -104,18 +104,25 @@ func NewCmdRolloutUndo(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 // Complete completes al the required options
 func (o *UndoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Resources = args
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
 	var err error
+	var dryRunStrategy cmdutil.DryRunStrategy
+	dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
+	}
+	o.DryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	if dryRunStrategy == cmdutil.DryRunServer {
+		return fmt.Errorf("--dry-run=server not yet supported for this command")
+	}
+
 	if o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace(); err != nil {
 		return err
 	}
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.DryRun {
-			o.PrintFlags.Complete("%s (dry run)")
-		}
+		o.PrintFlags.WithDryRunStrategy(dryRunStrategy)
 		return o.PrintFlags.ToPrinter()
 	}
 
@@ -156,7 +163,7 @@ func (o *UndoOptions) RunUndo() error {
 			return err
 		}
 
-		result, err := rollbacker.Rollback(info.Object, nil, o.ToRevision, o.DryRun)
+		result, err := rollbacker.Rollback(info.Object, nil, o.ToRevision, o.DryRunClient)
 		if err != nil {
 			return err
 		}
