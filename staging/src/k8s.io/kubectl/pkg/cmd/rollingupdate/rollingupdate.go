@@ -90,7 +90,7 @@ type RollingUpdateOptions struct {
 	Period           time.Duration
 	Timeout          time.Duration
 	Interval         time.Duration
-	DryRun           bool
+	DryRunClient     bool
 	OutputFormat     string
 	Namespace        string
 	EnforceNamespace bool
@@ -195,17 +195,26 @@ func (o *RollingUpdateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	if len(args) > 0 {
 		o.OldName = args[0]
 	}
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.KeepOldName = len(args) == 1
 	o.ShouldValidate = cmdutil.GetFlagBool(cmd, "validate")
+
+	var dryRunStrategy cmdutil.DryRunStrategy
+	var err error
+	dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
+	}
+	o.DryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	if dryRunStrategy == cmdutil.DryRunServer {
+		return fmt.Errorf("--dry-run=server not yet supported for this command")
+	}
 
 	o.Validator = f.Validator
 	o.FindNewName = func(obj *corev1.ReplicationController) string {
 		return findNewName(args, obj)
 	}
 
-	var err error
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
@@ -225,9 +234,7 @@ func (o *RollingUpdateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.DryRun {
-			o.PrintFlags.Complete("%s (dry run)")
-		}
+		o.PrintFlags.WithDryRunStrategy(dryRunStrategy)
 
 		return o.PrintFlags.ToPrinter()
 	}
@@ -390,7 +397,7 @@ func (o *RollingUpdateOptions) Run() error {
 		newRc.Spec.Replicas = &t
 	}
 
-	if o.DryRun {
+	if o.DryRunClient {
 		oldRcData := &bytes.Buffer{}
 		newRcData := &bytes.Buffer{}
 		if o.OutputFormat == "" {
