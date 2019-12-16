@@ -34,16 +34,19 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
+	"k8s.io/kubectl/pkg/util/openapi"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -537,6 +540,45 @@ func GetDryRunFlag(cmd *cobra.Command) (DryRunStrategy, error) {
 		return DryRunClient, nil
 	}
 	return DryRunNone, nil
+}
+
+// DryRunVerifier verifies if a given group-version-kind supports DryRun
+// against the current server. Sending dryRun requests to apiserver that
+// don't support it will result in objects being unwillingly persisted.
+//
+// It reads the OpenAPI to see if the given GVK supports dryRun. If the
+// GVK can not be found, we assume that CRDs will have the same level of
+// support as "namespaces", and non-CRDs will not be supported. We
+// delay the check for CRDs as much as possible though, since it
+// requires an extra round-trip to the server.
+type DryRunVerifier struct {
+	Finder        CRDFinder
+	OpenAPIGetter discovery.OpenAPISchemaInterface
+}
+
+// HasSupport verifies if the given gvk supports DryRun. An error is
+// returned if it doesn't.
+func (v *DryRunVerifier) HasSupport(gvk schema.GroupVersionKind) error {
+	oapi, err := v.OpenAPIGetter.OpenAPISchema()
+	if err != nil {
+		return fmt.Errorf("failed to download openapi: %v", err)
+	}
+	supports, err := openapi.SupportsDryRun(oapi, gvk)
+	if err != nil {
+		// We assume that we couldn't find the type, then check for namespace:
+		supports, _ = openapi.SupportsDryRun(oapi, schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"})
+		// If namespace supports dryRun, then we will support dryRun for CRDs only.
+		if supports {
+			supports, err = v.Finder.HasCRD(gvk.GroupKind())
+			if err != nil {
+				return fmt.Errorf("failed to check CRD: %v", err)
+			}
+		}
+	}
+	if !supports {
+		return fmt.Errorf("%v doesn't support dry-run", gvk)
+	}
+	return nil
 }
 
 // GetResourcesAndPairs retrieves resources and "KEY=VALUE or KEY-" pair args from given args

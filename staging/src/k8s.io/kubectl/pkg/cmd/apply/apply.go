@@ -71,8 +71,8 @@ type ApplyOptions struct {
 	ForceConflicts  bool
 	FieldManager    string
 	Selector        string
-	DryRun          bool
-	ServerDryRun    bool
+	DryRunClient    bool
+	DryRunServer    bool
 	Prune           bool
 	PruneResources  []pruneResource
 	cmdBaseName     string
@@ -183,8 +183,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources in the namespace of the specified resource types.")
 	cmd.Flags().StringArrayVar(&o.PruneWhitelist, "prune-whitelist", o.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmd.Flags().BoolVar(&o.OpenAPIPatch, "openapi-patch", o.OpenAPIPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
-	cmd.Flags().BoolVar(&o.ServerDryRun, "server-dry-run", o.ServerDryRun, "If true, request will be sent to server with dry-run flag, which means the modifications won't be persisted. This is an alpha feature and flag.")
-	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it. Warning: --dry-run cannot accurately output the result of merging the local manifest and the server-side data. Use --server-dry-run to get the merged result instead.")
+	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddServerSideApplyFlags(cmd)
 
 	// apply subcommands
@@ -200,33 +199,29 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
 	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
 	o.FieldManager = cmdutil.GetFieldManagerFlag(cmd)
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+
+	var dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("could not get value for --dry-run: %v", err)
+	}
+	o.DryRunClient = dryRunStrategy == cmdutil.DryRunClient
+	o.DryRunServer = dryRunStrategy == cmdutil.DryRunServer
 
 	if o.ForceConflicts && !o.ServerSideApply {
 		return fmt.Errorf("--force-conflicts only works with --server-side")
 	}
 
-	if o.DryRun && o.ServerSideApply {
-		return fmt.Errorf("--dry-run doesn't work with --server-side (did you mean --server-dry-run instead?)")
-	}
-
-	if o.DryRun && o.ServerDryRun {
-		return fmt.Errorf("--dry-run and --server-dry-run can't be used together")
+	if o.DryRunClient && o.ServerSideApply {
+		return fmt.Errorf("--dry-run=client doesn't work with --server-side (did you mean --dry-run=server instead?)")
 	}
 
 	// allow for a success message operation to be specified at print time
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.DryRun {
-			o.PrintFlags.Complete("%s (dry run)")
-		}
-		if o.ServerDryRun {
-			o.PrintFlags.Complete("%s (server dry run)")
-		}
+		o.PrintFlags.WithDryRunStrategy(dryRunStrategy)
 		return o.PrintFlags.ToPrinter()
 	}
 
-	var err error
 	o.RecordFlags.Complete(cmd)
 	o.Recorder, err = o.RecordFlags.ToRecorder()
 	if err != nil {
@@ -337,7 +332,7 @@ func (o *ApplyOptions) Run() error {
 		openapiSchema = o.OpenAPISchema
 	}
 
-	dryRunVerifier := &DryRunVerifier{
+	var dryRunVerifier = &cmdutil.DryRunVerifier{
 		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(o.DynamicClient)),
 		OpenAPIGetter: o.DiscoveryClient,
 	}
@@ -380,7 +375,7 @@ func (o *ApplyOptions) Run() error {
 		}
 
 		// If server-dry-run is requested but the type doesn't support it, fail right away.
-		if o.ServerDryRun {
+		if o.DryRunServer {
 			if err := dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
 				return err
 			}
@@ -405,7 +400,7 @@ func (o *ApplyOptions) Run() error {
 				Force:        &o.ForceConflicts,
 				FieldManager: o.FieldManager,
 			}
-			if o.ServerDryRun {
+			if o.DryRunServer {
 				options.DryRun = []string{metav1.DryRunAll}
 			}
 
@@ -482,10 +477,10 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
 
-			if !o.DryRun {
+			if !o.DryRunClient {
 				// Then create the resource and skip the three-way merge
 				options := metav1.CreateOptions{}
-				if o.ServerDryRun {
+				if o.DryRunServer {
 					options.DryRun = []string{metav1.DryRunAll}
 				}
 				obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object, &options)
@@ -521,7 +516,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 		}
 		visitedUids.Insert(string(metadata.GetUID()))
 
-		if !o.DryRun {
+		if !o.DryRunClient {
 			annotationMap := metadata.GetAnnotations()
 			if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
 				fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
@@ -538,7 +533,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 				Cascade:       o.DeleteOptions.Cascade,
 				Timeout:       o.DeleteOptions.Timeout,
 				GracePeriod:   o.DeleteOptions.GracePeriod,
-				ServerDryRun:  o.ServerDryRun,
+				DryRunServer:  o.DryRunServer,
 				OpenapiSchema: openapiSchema,
 				Retries:       maxPatchRetry,
 			}
@@ -620,8 +615,8 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 		visitedUids:   visitedUids,
 
 		cascade:      o.DeleteOptions.Cascade,
-		dryRun:       o.DryRun,
-		serverDryRun: o.ServerDryRun,
+		dryRunClient: o.DryRunClient,
+		dryRunServer: o.DryRunServer,
 		gracePeriod:  o.DeleteOptions.GracePeriod,
 
 		toPrinter: o.ToPrinter,
@@ -712,8 +707,8 @@ type pruner struct {
 	fieldSelector string
 
 	cascade      bool
-	serverDryRun bool
-	dryRun       bool
+	dryRunServer bool
+	dryRunClient bool
 	gracePeriod  int
 
 	toPrinter func(string) (printers.ResourcePrinter, error)
@@ -752,7 +747,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) error {
 			continue
 		}
 		name := metadata.GetName()
-		if !p.dryRun {
+		if !p.dryRunClient {
 			if err := p.delete(namespace, name, mapping); err != nil {
 				return err
 			}
@@ -768,15 +763,15 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) error {
 }
 
 func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping) error {
-	return runDelete(namespace, name, mapping, p.dynamicClient, p.cascade, p.gracePeriod, p.serverDryRun)
+	return runDelete(namespace, name, mapping, p.dynamicClient, p.cascade, p.gracePeriod, p.dryRunServer)
 }
 
-func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascade bool, gracePeriod int, serverDryRun bool) error {
+func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascade bool, gracePeriod int, dryRunServer bool) error {
 	options := &metav1.DeleteOptions{}
 	if gracePeriod >= 0 {
 		options = metav1.NewDeleteOptions(int64(gracePeriod))
 	}
-	if serverDryRun {
+	if dryRunServer {
 		options.DryRun = []string{metav1.DryRunAll}
 	}
 	policy := metav1.DeletePropagationForeground
@@ -788,7 +783,7 @@ func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Inte
 }
 
 func (p *Patcher) delete(namespace, name string) error {
-	return runDelete(namespace, name, p.Mapping, p.DynamicClient, p.Cascade, p.GracePeriod, p.ServerDryRun)
+	return runDelete(namespace, name, p.Mapping, p.DynamicClient, p.Cascade, p.GracePeriod, p.DryRunServer)
 }
 
 // Patcher defines options to patch OpenAPI objects.
@@ -804,7 +799,7 @@ type Patcher struct {
 	Cascade      bool
 	Timeout      time.Duration
 	GracePeriod  int
-	ServerDryRun bool
+	DryRunServer bool
 
 	// If set, forces the patch against a specific resourceVersion
 	ResourceVersion *string
@@ -813,45 +808,6 @@ type Patcher struct {
 	Retries int
 
 	OpenapiSchema openapi.Resources
-}
-
-// DryRunVerifier verifies if a given group-version-kind supports DryRun
-// against the current server. Sending dryRun requests to apiserver that
-// don't support it will result in objects being unwillingly persisted.
-//
-// It reads the OpenAPI to see if the given GVK supports dryRun. If the
-// GVK can not be found, we assume that CRDs will have the same level of
-// support as "namespaces", and non-CRDs will not be supported. We
-// delay the check for CRDs as much as possible though, since it
-// requires an extra round-trip to the server.
-type DryRunVerifier struct {
-	Finder        cmdutil.CRDFinder
-	OpenAPIGetter discovery.OpenAPISchemaInterface
-}
-
-// HasSupport verifies if the given gvk supports DryRun. An error is
-// returned if it doesn't.
-func (v *DryRunVerifier) HasSupport(gvk schema.GroupVersionKind) error {
-	oapi, err := v.OpenAPIGetter.OpenAPISchema()
-	if err != nil {
-		return fmt.Errorf("failed to download openapi: %v", err)
-	}
-	supports, err := openapi.SupportsDryRun(oapi, gvk)
-	if err != nil {
-		// We assume that we couldn't find the type, then check for namespace:
-		supports, _ = openapi.SupportsDryRun(oapi, schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"})
-		// If namespace supports dryRun, then we will support dryRun for CRDs only.
-		if supports {
-			supports, err = v.Finder.HasCRD(gvk.GroupKind())
-			if err != nil {
-				return fmt.Errorf("failed to check CRD: %v", err)
-			}
-		}
-	}
-	if !supports {
-		return fmt.Errorf("%v doesn't support dry-run", gvk)
-	}
-	return nil
 }
 
 func addResourceVersion(patch []byte, rv string) ([]byte, error) {
@@ -949,7 +905,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	}
 
 	options := metav1.PatchOptions{}
-	if p.ServerDryRun {
+	if p.DryRunServer {
 		options.DryRun = []string{metav1.DryRunAll}
 	}
 
@@ -999,7 +955,7 @@ func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 		return modified, nil, err
 	}
 	options := metav1.CreateOptions{}
-	if p.ServerDryRun {
+	if p.DryRunServer {
 		options.DryRun = []string{metav1.DryRunAll}
 	}
 	createdObject, err := p.Helper.Create(namespace, true, versionedObject, &options)
