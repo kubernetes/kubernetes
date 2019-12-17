@@ -18,17 +18,15 @@ package predicates
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"sync"
-
-	"k8s.io/klog"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -127,56 +125,6 @@ type topologySpreadConstraint struct {
 	maxSkew     int32
 	topologyKey string
 	selector    labels.Selector
-}
-
-type serviceAffinityMetadata struct {
-	matchingPodList     []*v1.Pod
-	matchingPodServices []*v1.Service
-}
-
-func (m *serviceAffinityMetadata) addPod(addedPod *v1.Pod, pod *v1.Pod, node *v1.Node) {
-	// If addedPod is in the same namespace as the pod, update the list
-	// of matching pods if applicable.
-	if m == nil || addedPod.Namespace != pod.Namespace {
-		return
-	}
-
-	selector := CreateSelectorFromLabels(pod.Labels)
-	if selector.Matches(labels.Set(addedPod.Labels)) {
-		m.matchingPodList = append(m.matchingPodList, addedPod)
-	}
-}
-
-func (m *serviceAffinityMetadata) removePod(deletedPod *v1.Pod, node *v1.Node) {
-	deletedPodFullName := schedutil.GetPodFullName(deletedPod)
-
-	if m == nil ||
-		len(m.matchingPodList) == 0 ||
-		deletedPod.Namespace != m.matchingPodList[0].Namespace {
-		return
-	}
-
-	for i, pod := range m.matchingPodList {
-		if schedutil.GetPodFullName(pod) == deletedPodFullName {
-			m.matchingPodList = append(m.matchingPodList[:i], m.matchingPodList[i+1:]...)
-			break
-		}
-	}
-}
-
-func (m *serviceAffinityMetadata) clone() *serviceAffinityMetadata {
-	if m == nil {
-		return nil
-	}
-
-	copy := serviceAffinityMetadata{}
-
-	copy.matchingPodServices = append([]*v1.Service(nil),
-		m.matchingPodServices...)
-	copy.matchingPodList = append([]*v1.Pod(nil),
-		m.matchingPodList...)
-
-	return &copy
 }
 
 // PodAffinityMetadata pre-computed state for inter-pod affinity predicate.
@@ -283,10 +231,8 @@ func (m *PodAffinityMetadata) Clone() *PodAffinityMetadata {
 
 // NOTE: When new fields are added/removed or logic is changed, please make sure that
 // RemovePod, AddPod, and ShallowCopy functions are updated to work with the new changes.
+// TODO(ahg-g): remove, not use anymore.
 type predicateMetadata struct {
-	pod *v1.Pod
-
-	serviceAffinityMetadata *serviceAffinityMetadata
 }
 
 // Ensure that predicateMetadata implements algorithm.Metadata.
@@ -318,9 +264,7 @@ func (f *MetadataProducerFactory) GetPredicateMetadata(pod *v1.Pod, sharedLister
 		return nil
 	}
 
-	predicateMetadata := &predicateMetadata{
-		pod: pod,
-	}
+	predicateMetadata := &predicateMetadata{}
 	for predicateName, precomputeFunc := range predicateMetadataProducers {
 		klog.V(10).Infof("Precompute: %v", predicateName)
 		precomputeFunc(predicateMetadata)
@@ -519,38 +463,19 @@ func (m *PodTopologySpreadMetadata) Clone() *PodTopologySpreadMetadata {
 // RemovePod changes predicateMetadata assuming that the given `deletedPod` is
 // deleted from the system.
 func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod, node *v1.Node) error {
-	deletedPodFullName := schedutil.GetPodFullName(deletedPod)
-	if deletedPodFullName == schedutil.GetPodFullName(meta.pod) {
-		return fmt.Errorf("deletedPod and meta.pod must not be the same")
-	}
-	meta.serviceAffinityMetadata.removePod(deletedPod, node)
-
 	return nil
 }
 
 // AddPod changes predicateMetadata assuming that the given `addedPod` is added to the
 // system.
 func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, node *v1.Node) error {
-	addedPodFullName := schedutil.GetPodFullName(addedPod)
-	if addedPodFullName == schedutil.GetPodFullName(meta.pod) {
-		return fmt.Errorf("addedPod and meta.pod must not be the same")
-	}
-	if node == nil {
-		return fmt.Errorf("node not found")
-	}
-
-	meta.serviceAffinityMetadata.addPod(addedPod, meta.pod, node)
-
 	return nil
 }
 
 // ShallowCopy copies a metadata struct into a new struct and creates a copy of
 // its maps and slices, but it does not copy the contents of pointer values.
 func (meta *predicateMetadata) ShallowCopy() Metadata {
-	newPredMeta := &predicateMetadata{
-		pod: meta.pod,
-	}
-	newPredMeta.serviceAffinityMetadata = meta.serviceAffinityMetadata.clone()
+	newPredMeta := &predicateMetadata{}
 	return (Metadata)(newPredMeta)
 }
 

@@ -223,6 +223,7 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, serviceaffinity.Name, nil)
 			pluginConfig = append(pluginConfig, makePluginConfig(serviceaffinity.Name, args.ServiceAffinityArgs))
+			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, serviceaffinity.Name, nil)
 			return
 		})
 

@@ -17,7 +17,6 @@ limitations under the License.
 package predicates
 
 import (
-	"fmt"
 	"os"
 	"reflect"
 	"strconv"
@@ -36,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 var (
@@ -1721,170 +1719,6 @@ func TestNodeLabelPresence(t *testing.T) {
 				t.Errorf("expected: %v got %v", test.fits, fits)
 			}
 		})
-	}
-}
-
-func TestServiceAffinity(t *testing.T) {
-	selector := map[string]string{"foo": "bar"}
-	labels1 := map[string]string{
-		"region": "r1",
-		"zone":   "z11",
-	}
-	labels2 := map[string]string{
-		"region": "r1",
-		"zone":   "z12",
-	}
-	labels3 := map[string]string{
-		"region": "r2",
-		"zone":   "z21",
-	}
-	labels4 := map[string]string{
-		"region": "r2",
-		"zone":   "z22",
-	}
-	node1 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labels1}}
-	node2 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labels2}}
-	node3 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labels3}}
-	node4 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine4", Labels: labels4}}
-	node5 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine5", Labels: labels4}}
-	tests := []struct {
-		pod      *v1.Pod
-		pods     []*v1.Pod
-		services []*v1.Service
-		node     *v1.Node
-		labels   []string
-		fits     bool
-		name     string
-	}{
-		{
-			pod:    new(v1.Pod),
-			node:   &node1,
-			fits:   true,
-			labels: []string{"region"},
-			name:   "nothing scheduled",
-		},
-		{
-			pod:    &v1.Pod{Spec: v1.PodSpec{NodeSelector: map[string]string{"region": "r1"}}},
-			node:   &node1,
-			fits:   true,
-			labels: []string{"region"},
-			name:   "pod with region label match",
-		},
-		{
-			pod:    &v1.Pod{Spec: v1.PodSpec{NodeSelector: map[string]string{"region": "r2"}}},
-			node:   &node1,
-			fits:   false,
-			labels: []string{"region"},
-			name:   "pod with region label mismatch",
-		},
-		{
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
-			node:     &node1,
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
-			fits:     true,
-			labels:   []string{"region"},
-			name:     "service pod on same node",
-		},
-		{
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
-			node:     &node1,
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
-			fits:     true,
-			labels:   []string{"region"},
-			name:     "service pod on different node, region match",
-		},
-		{
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
-			node:     &node1,
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
-			fits:     false,
-			labels:   []string{"region"},
-			name:     "service pod on different node, region mismatch",
-		},
-		{
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
-			node:     &node1,
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}, ObjectMeta: metav1.ObjectMeta{Namespace: "ns2"}}},
-			fits:     true,
-			labels:   []string{"region"},
-			name:     "service in different namespace, region mismatch",
-		},
-		{
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns2"}}},
-			node:     &node1,
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}, ObjectMeta: metav1.ObjectMeta{Namespace: "ns1"}}},
-			fits:     true,
-			labels:   []string{"region"},
-			name:     "pod in different namespace, region mismatch",
-		},
-		{
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
-			node:     &node1,
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}, ObjectMeta: metav1.ObjectMeta{Namespace: "ns1"}}},
-			fits:     false,
-			labels:   []string{"region"},
-			name:     "service and pod in same namespace, region mismatch",
-		},
-		{
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
-			node:     &node1,
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
-			fits:     false,
-			labels:   []string{"region", "zone"},
-			name:     "service pod on different node, multiple labels, not all match",
-		},
-		{
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine5"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
-			node:     &node4,
-			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
-			fits:     true,
-			labels:   []string{"region", "zone"},
-			name:     "service pod on different node, multiple labels, all match",
-		},
-	}
-	expectedFailureReasons := []PredicateFailureReason{ErrServiceAffinityViolated}
-	for _, test := range tests {
-		testIt := func(skipPrecompute bool) {
-			t.Run(fmt.Sprintf("%v/skipPrecompute/%v", test.name, skipPrecompute), func(t *testing.T) {
-				nodes := []*v1.Node{&node1, &node2, &node3, &node4, &node5}
-				s := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
-
-				// Reimplementing the logic that the scheduler implements: Any time it makes a predicate, it registers any precomputations.
-				predicate, precompute := NewServiceAffinityPredicate(s.NodeInfos(), s.Pods(), fakelisters.ServiceLister(test.services), test.labels)
-				// Register a precomputation or Rewrite the precomputation to a no-op, depending on the state we want to test.
-				RegisterPredicateMetadataProducer("ServiceAffinityMetaProducer", func(pm *predicateMetadata) {
-					if !skipPrecompute {
-						precompute(pm)
-					}
-				})
-				factory := &MetadataProducerFactory{}
-				if pmeta, ok := (factory.GetPredicateMetadata(test.pod, s)).(*predicateMetadata); ok {
-					fits, reasons, err := predicate(test.pod, pmeta, s.NodeInfoMap[test.node.Name])
-					if err != nil {
-						t.Errorf("unexpected error: %v", err)
-					}
-					if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-						t.Errorf("unexpected failure reasons: %v, want: %v", reasons, expectedFailureReasons)
-					}
-					if fits != test.fits {
-						t.Errorf("expected: %v got %v", test.fits, fits)
-					}
-				} else {
-					t.Errorf("Error casting.")
-				}
-			})
-		}
-
-		testIt(false) // Confirm that the predicate works without precomputed data (resilience)
-		testIt(true)  // Confirm that the predicate works with the precomputed data (better performance)
 	}
 }
 
