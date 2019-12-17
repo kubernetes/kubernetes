@@ -48,6 +48,15 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 	}
 	if isManagedDisk {
 		managedDisk := &compute.ManagedDiskParameters{ID: &diskURI}
+		if diskEncryptionSetID == "" {
+			if vm.StorageProfile.OsDisk != nil &&
+				vm.StorageProfile.OsDisk.ManagedDisk != nil &&
+				vm.StorageProfile.OsDisk.ManagedDisk.DiskEncryptionSet != nil &&
+				vm.StorageProfile.OsDisk.ManagedDisk.DiskEncryptionSet.ID != nil {
+				// set diskEncryptionSet as value of os disk by default
+				diskEncryptionSetID = *vm.StorageProfile.OsDisk.ManagedDisk.DiskEncryptionSet.ID
+			}
+		}
 		if diskEncryptionSetID != "" {
 			managedDisk.DiskEncryptionSet = &compute.DiskEncryptionSetParameters{ID: &diskEncryptionSetID}
 		}
