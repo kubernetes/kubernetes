@@ -39,7 +39,7 @@ func TestPolicyNoneName(t *testing.T) {
 	}
 }
 
-func TestPolicyNoneMerge(t *testing.T) {
+func TestPolicyNoneCanAdmitPodResult(t *testing.T) {
 	tcases := []struct {
 		name           string
 		providersHints []map[string][]TopologyHint
