@@ -65,3 +65,13 @@ func NewDanglingError(msg string, node k8stypes.NodeName, devicePath string) err
 		DevicePath:  devicePath,
 	}
 }
+
+// IsDanglingError returns true if an error is DanglingAttachError
+func IsDanglingError(err error) bool {
+	switch err.(type) {
+	case *DanglingAttachError:
+		return true
+	default:
+		return false
+	}
+}
