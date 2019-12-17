@@ -179,6 +179,8 @@ func validateKMSConfiguration(c *config.KMSConfiguration, fieldPath *field.Path)
 	allErrs = append(allErrs, validateKMSTimeout(c, fieldPath.Child("timeout"))...)
 	allErrs = append(allErrs, validateKMSEndpoint(c, fieldPath.Child("endpoint"))...)
 	allErrs = append(allErrs, validateKMSCacheSize(c, fieldPath.Child("cachesize"))...)
+	allErrs = append(allErrs, validateKMSCacheHealthyTTL(c, fieldPath.Child("cacheHealthyTTL"))...)
+	allErrs = append(allErrs, validateKMSCacheUnHealthyTTL(c, fieldPath.Child("cacheUnHealthyTTL"))...)
 	return allErrs
 }
 
@@ -186,6 +188,24 @@ func validateKMSCacheSize(c *config.KMSConfiguration, fieldPath *field.Path) fie
 	allErrs := field.ErrorList{}
 	if *c.CacheSize <= 0 {
 		allErrs = append(allErrs, field.Invalid(fieldPath, *c.CacheSize, fmt.Sprintf(zeroOrNegativeErrFmt, "cachesize")))
+	}
+
+	return allErrs
+}
+
+func validateKMSCacheHealthyTTL(c *config.KMSConfiguration, fieldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if c.CacheHealthyTTL.Duration < 0 {
+		allErrs = append(allErrs, field.Invalid(fieldPath, c.CacheHealthyTTL, fmt.Sprintf(negativeValueErrFmt, "cacheHealthyTTL")))
+	}
+
+	return allErrs
+}
+
+func validateKMSCacheUnHealthyTTL(c *config.KMSConfiguration, fieldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if c.CacheUnHealthyTTL.Duration < 0 {
+		allErrs = append(allErrs, field.Invalid(fieldPath, c.CacheUnHealthyTTL, fmt.Sprintf(negativeValueErrFmt, "cacheUnHealthyTTL")))
 	}
 
 	return allErrs

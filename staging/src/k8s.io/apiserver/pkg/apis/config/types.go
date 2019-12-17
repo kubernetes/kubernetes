@@ -96,4 +96,23 @@ type KMSConfiguration struct {
 	// Timeout for gRPC calls to kms-plugin (ex. 5s). The default is 3 seconds.
 	// +optional
 	Timeout *metav1.Duration
+	// cacheHealthyTTL is the duration of time, after the last successful health check, during which
+	// kube-apiserver will not recheck the health status of the kms-plugin and will continue to
+	// return healthy status.
+	// By default this value is set to 20 seconds.
+	// Increasing this value may reduce operating costs of the plugin (especially in environments
+	// where calls to KMS are billable operations). However, doing so may delay the
+	// discovery of plugin's failure (ex. via a healthz probe).
+	// Setting this value to zero will disable caching of positive health check results.
+	// +optional
+	CacheHealthyTTL *metav1.Duration
+	// cacheUnHealthyTTL is the duration of time, after the last failed health check, during which
+	// kube-apiserver will not recheck the health status of the kms-plugin and will continue to
+	// return failed status.
+	// By default this value is set to 3 seconds.
+	// Reducing this value may lead to an earlier discovery in state changes of the plugin (ex. when
+	// the plugin is coming online).
+	// Setting this value to zero will disable caching of negative health check results.
+	// +optional
+	CacheUnHealthyTTL *metav1.Duration
 }

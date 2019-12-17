@@ -111,10 +111,12 @@ func TestLegacyConfig(t *testing.T) {
 						},
 					}},
 					{KMS: &apiserverconfig.KMSConfiguration{
-						Name:      "testprovider",
-						Endpoint:  "unix:///tmp/testprovider.sock",
-						CacheSize: &cacheSize,
-						Timeout:   &metav1.Duration{Duration: 3 * time.Second},
+						Name:              "testprovider",
+						Endpoint:          "unix:///tmp/testprovider.sock",
+						CacheSize:         &cacheSize,
+						Timeout:           &metav1.Duration{Duration: 3 * time.Second},
+						CacheHealthyTTL:   &metav1.Duration{Duration: 20 * time.Second},
+						CacheUnHealthyTTL: &metav1.Duration{Duration: 3 * time.Second},
 					}},
 					{AESCBC: &apiserverconfig.AESConfiguration{
 						Keys: []apiserverconfig.Key{
@@ -278,6 +280,8 @@ func TestKMSPluginHealthz(t *testing.T) {
 func TestKMSPluginHealthzTTL(t *testing.T) {
 	service, _ := newMockEnvelopeService("unix:///tmp/testprovider.sock", 3*time.Second)
 	errService, _ := newMockErrorEnvelopeService("unix:///tmp/testprovider.sock", 3*time.Second)
+	healthyTTL := 20 * time.Second
+	unHealthyTTL := 3 * time.Second
 
 	testCases := []struct {
 		desc    string
@@ -288,23 +292,27 @@ func TestKMSPluginHealthzTTL(t *testing.T) {
 			desc: "kms provider in good state",
 			probe: &kmsPluginProbe{
 				name:         "test",
-				ttl:          kmsPluginHealthzNegativeTTL,
+				ttl:          unHealthyTTL,
+				healthyTTL:   healthyTTL,
+				unHealthyTTL: unHealthyTTL,
 				Service:      service,
 				l:            &sync.Mutex{},
 				lastResponse: &kmsPluginHealthzResponse{},
 			},
-			wantTTL: kmsPluginHealthzPositiveTTL,
+			wantTTL: healthyTTL,
 		},
 		{
 			desc: "kms provider in bad state",
 			probe: &kmsPluginProbe{
 				name:         "test",
-				ttl:          kmsPluginHealthzPositiveTTL,
+				ttl:          unHealthyTTL,
+				healthyTTL:   healthyTTL,
+				unHealthyTTL: unHealthyTTL,
 				Service:      errService,
 				l:            &sync.Mutex{},
 				lastResponse: &kmsPluginHealthzResponse{},
 			},
-			wantTTL: kmsPluginHealthzNegativeTTL,
+			wantTTL: unHealthyTTL,
 		},
 	}
 

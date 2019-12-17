@@ -266,6 +266,86 @@ func TestKMSProviderTimeout(t *testing.T) {
 	}
 }
 
+func TestKMSProviderHealthyTTL(t *testing.T) {
+	healthyTTLField := field.NewPath("resource").Index(0).Child("provider").Index(0).Child("kms").Child("cacheHealthyTTL")
+	positiveTTL := &metav1.Duration{Duration: 1 * time.Minute}
+	negativeTTL := &metav1.Duration{Duration: -1 * time.Minute}
+	zeroTTL := &metav1.Duration{Duration: 0 * time.Minute}
+
+	testCases := []struct {
+		desc string
+		in   *config.KMSConfiguration
+		want field.ErrorList
+	}{
+		{
+			desc: "positive ttl",
+			in:   &config.KMSConfiguration{CacheHealthyTTL: positiveTTL},
+			want: field.ErrorList{},
+		},
+		{
+			desc: "negative ttl",
+			in:   &config.KMSConfiguration{CacheHealthyTTL: negativeTTL},
+			want: field.ErrorList{
+				field.Invalid(healthyTTLField, negativeTTL, fmt.Sprintf(negativeValueErrFmt, "cacheHealthyTTL")),
+			},
+		},
+		{
+			desc: "zero ttl",
+			in:   &config.KMSConfiguration{CacheHealthyTTL: zeroTTL},
+			want: field.ErrorList{},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			got := validateKMSCacheHealthyTTL(tt.in, healthyTTLField)
+			if d := cmp.Diff(tt.want, got); d != "" {
+				t.Fatalf("KMS Provider validation mismatch (-want +got):\n%s", d)
+			}
+		})
+	}
+}
+
+func TestKMSProviderUnHealthyTTL(t *testing.T) {
+	unHealthyTTLField := field.NewPath("resource").Index(0).Child("provider").Index(0).Child("kms").Child("cacheUnHealthyTTL")
+	positiveTTL := &metav1.Duration{Duration: 1 * time.Minute}
+	negativeTTL := &metav1.Duration{Duration: -1 * time.Minute}
+	zeroTTL := &metav1.Duration{Duration: 0 * time.Minute}
+
+	testCases := []struct {
+		desc string
+		in   *config.KMSConfiguration
+		want field.ErrorList
+	}{
+		{
+			desc: "positive ttl",
+			in:   &config.KMSConfiguration{CacheUnHealthyTTL: positiveTTL},
+			want: field.ErrorList{},
+		},
+		{
+			desc: "negative ttl",
+			in:   &config.KMSConfiguration{CacheUnHealthyTTL: negativeTTL},
+			want: field.ErrorList{
+				field.Invalid(unHealthyTTLField, negativeTTL, fmt.Sprintf(negativeValueErrFmt, "cacheUnHealthyTTL")),
+			},
+		},
+		{
+			desc: "zero ttl",
+			in:   &config.KMSConfiguration{CacheUnHealthyTTL: zeroTTL},
+			want: field.ErrorList{},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			got := validateKMSCacheUnHealthyTTL(tt.in, unHealthyTTLField)
+			if d := cmp.Diff(tt.want, got); d != "" {
+				t.Fatalf("KMS Provider validation mismatch (-want +got):\n%s", d)
+			}
+		})
+	}
+}
+
 func TestKMSEndpoint(t *testing.T) {
 	endpointField := field.NewPath("Resource").Index(0).Child("Provider").Index(0).Child("kms").Child("endpoint")
 	testCases := []struct {

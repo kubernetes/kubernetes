@@ -34,12 +34,22 @@ func TestKMSProviderTimeoutDefaults(t *testing.T) {
 		{
 			desc: "timeout not supplied",
 			in:   &KMSConfiguration{},
-			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &defaultCacheSize},
+			want: &KMSConfiguration{
+				Timeout:           defaultTimeout,
+				CacheSize:         &defaultCacheSize,
+				CacheHealthyTTL:   defaultCacheHealthyTTL,
+				CacheUnHealthyTTL: defaultCacheUnHealthyTTL,
+			},
 		},
 		{
 			desc: "timeout supplied",
 			in:   &KMSConfiguration{Timeout: &v1.Duration{Duration: 1 * time.Minute}},
-			want: &KMSConfiguration{Timeout: &v1.Duration{Duration: 1 * time.Minute}, CacheSize: &defaultCacheSize},
+			want: &KMSConfiguration{
+				Timeout:           &v1.Duration{Duration: 1 * time.Minute},
+				CacheSize:         &defaultCacheSize,
+				CacheHealthyTTL:   defaultCacheHealthyTTL,
+				CacheUnHealthyTTL: defaultCacheUnHealthyTTL,
+			},
 		},
 	}
 
@@ -67,17 +77,88 @@ func TestKMSProviderCacheDefaults(t *testing.T) {
 		{
 			desc: "cache size not supplied",
 			in:   &KMSConfiguration{},
-			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &defaultCacheSize},
+			want: &KMSConfiguration{
+				Timeout:           defaultTimeout,
+				CacheSize:         &defaultCacheSize,
+				CacheHealthyTTL:   defaultCacheHealthyTTL,
+				CacheUnHealthyTTL: defaultCacheUnHealthyTTL,
+			},
 		},
 		{
 			desc: "cache of zero size supplied",
 			in:   &KMSConfiguration{CacheSize: &zero},
-			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &zero},
+			want: &KMSConfiguration{
+				Timeout:           defaultTimeout,
+				CacheSize:         &zero,
+				CacheHealthyTTL:   defaultCacheHealthyTTL,
+				CacheUnHealthyTTL: defaultCacheUnHealthyTTL,
+			},
 		},
 		{
 			desc: "positive cache size supplied",
 			in:   &KMSConfiguration{CacheSize: &ten},
-			want: &KMSConfiguration{Timeout: defaultTimeout, CacheSize: &ten},
+			want: &KMSConfiguration{
+				Timeout:           defaultTimeout,
+				CacheSize:         &ten,
+				CacheHealthyTTL:   defaultCacheHealthyTTL,
+				CacheUnHealthyTTL: defaultCacheUnHealthyTTL,
+			},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			SetDefaults_KMSConfiguration(tt.in)
+			if d := cmp.Diff(tt.want, tt.in); d != "" {
+				t.Fatalf("KMS Provider mismatch (-want +got):\n%s", d)
+			}
+		})
+	}
+}
+
+func TestKMSProviderHealthCacheTTLDefaults(t *testing.T) {
+	zeroDuration := &v1.Duration{Duration: 0}
+	positiveDuration := &v1.Duration{Duration: 1 * time.Second}
+	testCases := []struct {
+		desc string
+		in   *KMSConfiguration
+		want *KMSConfiguration
+	}{
+		{
+			desc: "ttl cache duration not supplied",
+			in:   &KMSConfiguration{},
+			want: &KMSConfiguration{
+				Timeout:           defaultTimeout,
+				CacheSize:         &defaultCacheSize,
+				CacheHealthyTTL:   defaultCacheHealthyTTL,
+				CacheUnHealthyTTL: defaultCacheUnHealthyTTL,
+			},
+		},
+		{
+			desc: "ttl cache of zero duration is supplied",
+			in: &KMSConfiguration{
+				CacheHealthyTTL:   zeroDuration,
+				CacheUnHealthyTTL: zeroDuration,
+			},
+			want: &KMSConfiguration{
+				Timeout:           defaultTimeout,
+				CacheSize:         &defaultCacheSize,
+				CacheHealthyTTL:   zeroDuration,
+				CacheUnHealthyTTL: zeroDuration,
+			},
+		},
+		{
+			desc: "ttl cache of positive duration is supplied",
+			in: &KMSConfiguration{
+				CacheHealthyTTL:   positiveDuration,
+				CacheUnHealthyTTL: positiveDuration,
+			},
+			want: &KMSConfiguration{
+				Timeout:           defaultTimeout,
+				CacheSize:         &defaultCacheSize,
+				CacheHealthyTTL:   positiveDuration,
+				CacheUnHealthyTTL: positiveDuration,
+			},
 		},
 	}
 

@@ -24,8 +24,10 @@ import (
 )
 
 var (
-	defaultTimeout         = &metav1.Duration{Duration: 3 * time.Second}
-	defaultCacheSize int32 = 1000
+	defaultCacheSize         int32 = 1000
+	defaultTimeout                 = &metav1.Duration{Duration: 3 * time.Second}
+	defaultCacheHealthyTTL         = &metav1.Duration{Duration: 20 * time.Second}
+	defaultCacheUnHealthyTTL       = &metav1.Duration{Duration: 3 * time.Second}
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -40,5 +42,13 @@ func SetDefaults_KMSConfiguration(obj *KMSConfiguration) {
 
 	if obj.CacheSize == nil {
 		obj.CacheSize = &defaultCacheSize
+	}
+
+	if obj.CacheHealthyTTL == nil {
+		obj.CacheHealthyTTL = defaultCacheHealthyTTL
+	}
+
+	if obj.CacheUnHealthyTTL == nil {
+		obj.CacheUnHealthyTTL = defaultCacheUnHealthyTTL
 	}
 }

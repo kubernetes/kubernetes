@@ -107,6 +107,16 @@ func (in *KMSConfiguration) DeepCopyInto(out *KMSConfiguration) {
 		*out = new(v1.Duration)
 		**out = **in
 	}
+	if in.CacheHealthyTTL != nil {
+		in, out := &in.CacheHealthyTTL, &out.CacheHealthyTTL
+		*out = new(v1.Duration)
+		**out = **in
+	}
+	if in.CacheUnHealthyTTL != nil {
+		in, out := &in.CacheUnHealthyTTL, &out.CacheUnHealthyTTL
+		*out = new(v1.Duration)
+		**out = **in
+	}
 	return
 }
 
