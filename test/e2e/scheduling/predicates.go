@@ -454,11 +454,14 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectEqual(labelPod.Spec.NodeName, nodeName)
 	})
 
-	// 1. Run a pod to get an available node, then delete the pod
-	// 2. Taint the node with a random taint
-	// 3. Try to relaunch the pod with tolerations tolerate the taints on node,
-	// and the pod's nodeName specified to the name of node found in step 1
-	ginkgo.It("validates that taints-tolerations is respected if matching", func() {
+	/*
+			Release : v1.18
+			Testname: Scheduler, taints-tolerations matching
+			Description: Find an available node and taint it with a key with effect NoSchedule. Schedule a pod with a
+		        corresponding nodeLabel and toleration spec such that it should only be able to run on the selected node.
+		        Ensure that the pod is scheduled and running on the node.
+	*/
+	framework.ConformanceIt("validates that taints-tolerations is respected if matching [Disruptive]", func() {
 		nodeName := getNodeThatCanRunPodWithoutToleration(f)
 
 		ginkgo.By("Trying to apply a random taint on the found node.")
@@ -486,12 +489,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			NodeSelector: map[string]string{labelKey: labelValue},
 		})
 
-		// check that pod got scheduled. We intentionally DO NOT check that the
-		// pod is running because this will create a race condition with the
-		// kubelet and the scheduler: the scheduler might have scheduled a pod
-		// already when the kubelet does not know about its new taint yet. The
-		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, tolerationPodName))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(cs, ns, tolerationPodName))
 		deployedPod, err := cs.CoreV1().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(deployedPod.Spec.NodeName, nodeName)
