@@ -566,6 +566,7 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 			job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobComplete, "", ""))
 			now := metav1.Now()
 			job.Status.CompletionTime = &now
+			jm.recorder.Event(&job, v1.EventTypeNormal, "Completed", "Job completed")
 		}
 	}
 
