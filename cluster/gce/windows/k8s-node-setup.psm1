@@ -1492,7 +1492,7 @@ function Install_Containerd {
 # Register and start containerd service.
 function Start_Containerd {
   Log-Output "Creating containerd service"
-  containerd.exe --register-service
+  containerd.exe --register-service --log-file ${env:LOGS_DIR}/containerd.log
   Log-Output "Starting containerd service"
   Start-Service containerd
 }
@@ -1710,6 +1710,20 @@ $FLUENTD_CONFIG = @'
   path /etc/kubernetes/logs/kube-proxy.log
   pos_file /etc/kubernetes/logs/gcp-kube-proxy.log.pos
   tag kube-proxy
+</source>
+
+# Example:
+# time="2019-12-10T21:27:59.836946700Z" level=info msg="loading plugin \"io.containerd.grpc.v1.cri\"..." type=io.containerd.grpc.v1
+<source>
+  @type tail
+  format multiline
+  multiline_flush_interval 5s
+  format_firstline /^time=/
+  format1 /^time="(?<time>[^ ]*)" level=(?<severity>\w*) (?<message>.*)/
+  time_format %Y-%m-%dT%H:%M:%S.%N%z
+  path /etc/kubernetes/logs/containerd.log
+  pos_file /etc/kubernetes/logs/gcp-containerd.log.pos
+  tag container-runtime
 </source>
 
 <match reform.**>
