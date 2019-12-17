@@ -206,7 +206,7 @@ func stopDeployment(c clientset.Interface, ns, deploymentName string) {
 	framework.Logf("Ensuring deployment %s was deleted", deploymentName)
 	_, err = c.AppsV1().Deployments(ns).Get(deployment.Name, metav1.GetOptions{})
 	framework.ExpectError(err)
-	gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+	framework.ExpectEqual(errors.IsNotFound(err), true)
 	framework.Logf("Ensuring deployment %s's RSes were deleted", deploymentName)
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	framework.ExpectNoError(err)

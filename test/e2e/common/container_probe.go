@@ -82,7 +82,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		}
 
 		restartCount := getRestartCount(p)
-		gomega.Expect(restartCount == 0).To(gomega.BeTrue(), "pod should have a restart count of 0 but got %v", restartCount)
+		framework.ExpectEqual(restartCount, 0, "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
 	/*
@@ -108,7 +108,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		framework.ExpectNotEqual(isReady, true, "pod should be not ready")
 
 		restartCount := getRestartCount(p)
-		gomega.Expect(restartCount == 0).To(gomega.BeTrue(), "pod should have a restart count of 0 but got %v", restartCount)
+		framework.ExpectEqual(restartCount, 0, "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
 	/*
