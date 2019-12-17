@@ -184,17 +184,35 @@ func (_ timeConverter) IsNull(v reflect.Value) bool {
 }
 
 func (_ timeConverter) ToString(v reflect.Value) string {
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
 	t, ok := v.Interface().(metav1.Time)
 	if !ok {
 		panic("value is not a metav1.Time")
 	}
 	if t.IsZero() {
-		panic("value is null, not string")
+		return ""
 	}
 	buf := make([]byte, 0, len(time.RFC3339))
 	// time cannot contain non escapable JSON characters
 	buf = t.UTC().AppendFormat(buf, time.RFC3339)
 	return string(buf)
+}
+
+func (_ timeConverter) FromString(s string) reflect.Value {
+	if s == "" {
+		return reflect.ValueOf(metav1.NewTime(time.Time{}))
+	}
+	pt, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse time: %v", err))
+	}
+
+	t := pt.Local()
+	return reflect.ValueOf(metav1.NewTime(t))
+
+
 }
 
 // func (_ timeConverter) Equal(lhs reflect.Value, rhs reflect.Value) bool {
@@ -225,6 +243,10 @@ func (_ quantityConverter) ToString(v reflect.Value) string {
 		panic("value is not a resource.Quantity")
 	}
 	return quantity.String()
+}
+
+func (_ quantityConverter) FromString(s string) reflect.Value {
+	return reflect.ValueOf(resource.MustParse(s))
 }
 
 // func (_ quantityConverter) Equal(lhs reflect.Value, rhs reflect.Value) bool {

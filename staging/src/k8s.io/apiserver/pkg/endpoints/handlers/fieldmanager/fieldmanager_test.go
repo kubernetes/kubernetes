@@ -489,16 +489,11 @@ func BenchmarkRepeatedUpdate(b *testing.B) {
 }
 
 func toUnstructured(b *testing.B, o runtime.Object) *unstructured.Unstructured {
-	data, err := json.Marshal(o)
-	if err != nil {
-		b.Fatalf("Failed to marshal to json: %v", err)
-	}
-	u := &unstructured.Unstructured{Object: map[string]interface{}{}}
-	err = json.Unmarshal(data, u)
+	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(o)
 	if err != nil {
 		b.Fatalf("Failed to unmarshal to json: %v", err)
 	}
-	return u
+	return &unstructured.Unstructured{Object: u}
 }
 
 func BenchmarkConvertObjectToTyped(b *testing.B) {
@@ -552,6 +547,66 @@ func BenchmarkConvertObjectToTyped(b *testing.B) {
 					_, err := typeConverter.ObjectToTyped(toUnstructured(b, obj))
 					if err != nil {
 						b.Errorf("Error in ObjectToTyped: %v", err)
+					}
+				}
+			})
+		})
+	}
+}
+
+func BenchmarkToFromUnstructured(b *testing.B) {
+	tests := []struct {
+		gvk schema.GroupVersionKind
+		obj []byte
+	}{
+		{
+			gvk: schema.FromAPIVersionAndKind("v1", "Pod"),
+			obj: getObjectBytes("pod.yaml"),
+		},
+		{
+			gvk: schema.FromAPIVersionAndKind("v1", "Node"),
+			obj: getObjectBytes("node.yaml"),
+		},
+		{
+			gvk: schema.FromAPIVersionAndKind("v1", "Endpoints"),
+			obj: getObjectBytes("endpoints.yaml"),
+		},
+	}
+
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		b.Fatalf("Failed to add to scheme: %v", err)
+	}
+
+	for _, test := range tests {
+		b.Run(test.gvk.Kind, func(b *testing.B) {
+			decoder := serializer.NewCodecFactory(scheme).UniversalDecoder(test.gvk.GroupVersion())
+			obj, err := runtime.Decode(decoder, test.obj)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+
+			b.Run("ToUnstructured", func(b *testing.B) {
+				b.ReportAllocs()
+				for n := 0; n < b.N; n++ {
+					_, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+					if err != nil {
+						b.Errorf("Error in ToUnstructured: %v", err)
+					}
+				}
+			})
+			u := toUnstructured(b, obj)
+			b.Run("FromUnstructured", func(b *testing.B) {
+				b.ReportAllocs()
+				for n := 0; n < b.N; n++ {
+					obj, err := scheme.New(test.gvk)
+					if err != nil {
+						b.Errorf("Error in scheme.New: %v", err)
+					}
+					err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, obj)
+					if err != nil {
+						b.Errorf("Error in FromUnstructured: %v", err)
 					}
 				}
 			})
