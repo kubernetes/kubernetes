@@ -308,14 +308,14 @@ func makeFakeCmd(fakeCmd *testingexec.FakeCmd, cmd string, args ...string) testi
 	}
 }
 
-func makeFakeOutput(output string, rc int) testingexec.FakeCombinedOutputAction {
+func makeFakeOutput(output string, rc int) testingexec.FakeAction {
 	o := output
 	var e error
 	if rc != 0 {
 		e = testingexec.FakeExitError{Status: rc}
 	}
-	return func() ([]byte, error) {
-		return []byte(o), e
+	return func() ([]byte, []byte, error) {
+		return []byte(o), nil, e
 	}
 }
 

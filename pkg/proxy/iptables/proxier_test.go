@@ -246,7 +246,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 			} else {
 				simErr = fmt.Errorf(tc.simulatedErr)
 			}
-			cmdFunc := func() ([]byte, error) { return []byte(cmdOutput), simErr }
+			cmdFunc := func() ([]byte, []byte, error) { return []byte(cmdOutput), nil, simErr }
 			fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
 			fexec.CommandScript = append(fexec.CommandScript, execFunc)
 		}

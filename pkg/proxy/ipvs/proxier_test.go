@@ -98,9 +98,9 @@ func (fake *fakeIPSetVersioner) GetVersion() (string, error) {
 
 func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset utilipset.Interface, nodeIPs []net.IP, excludeCIDRs []*net.IPNet, endpointSlicesEnabled bool) *Proxier {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return []byte("dummy device have been created"), nil },
-			func() ([]byte, error) { return []byte(""), nil },
+		CombinedOutputScript: []fakeexec.FakeAction{
+			func() ([]byte, []byte, error) { return []byte("dummy device have been created"), nil, nil },
+			func() ([]byte, []byte, error) { return []byte(""), nil, nil },
 		},
 	}
 	fexec := &fakeexec.FakeExec{

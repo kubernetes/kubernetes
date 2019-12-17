@@ -49,11 +49,11 @@ func testIPTablesVersionCmds(t *testing.T, protocol Protocol) {
 	protoStr := protocolStr(protocol)
 
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version response (for runner instantiation)
-			func() ([]byte, error) { return []byte(iptablesCmd + version), nil },
+			func() ([]byte, []byte, error) { return []byte(iptablesCmd + version), nil, nil },
 			// iptables-restore version response (for runner instantiation)
-			func() ([]byte, error) { return []byte(iptablesRestoreCmd + version), nil },
+			func() ([]byte, []byte, error) { return []byte(iptablesRestoreCmd + version), nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -87,15 +87,15 @@ func testEnsureChain(t *testing.T, protocol Protocol) {
 	protoStr := protocolStr(protocol)
 
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
 			// Success.
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 			// Exists.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 			// Failure.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 2} },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 2} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -147,13 +147,13 @@ func TestEnsureChainIpv6(t *testing.T) {
 
 func TestFlushChain(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
 			// Success.
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 			// Failure.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -184,13 +184,13 @@ func TestFlushChain(t *testing.T) {
 
 func TestDeleteChain(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
 			// Success.
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 			// Failure.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -221,11 +221,11 @@ func TestDeleteChain(t *testing.T) {
 
 func TestEnsureRuleAlreadyExists(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
 			// Success.
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -254,13 +254,13 @@ func TestEnsureRuleAlreadyExists(t *testing.T) {
 
 func TestEnsureRuleNew(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
 			// Status 1 on the first call.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 			// Success on the second call.
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -290,11 +290,11 @@ func TestEnsureRuleNew(t *testing.T) {
 
 func TestEnsureRuleErrorChecking(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
 			// Status 2 on the first call.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 2} },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 2} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -317,13 +317,13 @@ func TestEnsureRuleErrorChecking(t *testing.T) {
 
 func TestEnsureRuleErrorCreating(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
 			// Status 1 on the first call.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 			// Status 1 on the second call.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -347,11 +347,11 @@ func TestEnsureRuleErrorCreating(t *testing.T) {
 
 func TestDeleteRuleDoesNotExist(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
 			// Status 1 on the first call.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -377,13 +377,13 @@ func TestDeleteRuleDoesNotExist(t *testing.T) {
 
 func TestDeleteRuleExists(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
 			// Success on the first call.
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 			// Success on the second call.
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -410,11 +410,11 @@ func TestDeleteRuleExists(t *testing.T) {
 
 func TestDeleteRuleErrorChecking(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
 			// Status 2 on the first call.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 2} },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 2} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -437,13 +437,13 @@ func TestDeleteRuleErrorChecking(t *testing.T) {
 
 func TestDeleteRuleErrorDeleting(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
 			// Success on the first call.
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 			// Status 1 on the second call.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -479,9 +479,9 @@ func TestGetIPTablesHasCheckCommand(t *testing.T) {
 
 	for _, testCase := range testCases {
 		fcmd := fakeexec.FakeCmd{
-			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-				func() ([]byte, error) { return []byte(testCase.Version), nil },
-				func() ([]byte, error) { return []byte(testCase.Version), nil },
+			CombinedOutputScript: []fakeexec.FakeAction{
+				func() ([]byte, []byte, error) { return []byte(testCase.Version), nil, nil },
+				func() ([]byte, []byte, error) { return []byte(testCase.Version), nil, nil },
 			},
 		}
 		fexec := fakeexec.FakeExec{
@@ -538,9 +538,9 @@ COMMIT
 # Completed on Wed Oct 29 14:56:01 2014`
 
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// Success.
-			func() ([]byte, error) { return []byte(iptablesSaveOutput), nil },
+			func() ([]byte, []byte, error) { return []byte(iptablesSaveOutput), nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -581,9 +581,9 @@ COMMIT
 # Completed on Wed Oct 29 14:56:01 2014`
 
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// Success.
-			func() ([]byte, error) { return []byte(iptablesSaveOutput), nil },
+			func() ([]byte, []byte, error) { return []byte(iptablesSaveOutput), nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -633,13 +633,13 @@ func TestIPTablesWaitFlag(t *testing.T) {
 
 func TestWaitFlagUnavailable(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.4.19"), nil },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.4.19"), nil, nil },
 			// iptables-restore version check
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 			// Success.
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -666,13 +666,13 @@ func TestWaitFlagUnavailable(t *testing.T) {
 
 func TestWaitFlagOld(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.4.20"), nil },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.4.20"), nil, nil },
 			// iptables-restore version check
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 			// Success.
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -700,13 +700,13 @@ func TestWaitFlagOld(t *testing.T) {
 
 func TestWaitFlagNew(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.4.22"), nil },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.4.22"), nil, nil },
 			// iptables-restore version check
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 			// Success.
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -746,11 +746,11 @@ COMMIT
 	stderrOutput := "#STDERR OUTPUT" // SaveInto() should should NOT capture stderr into the buffer
 
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte(iptablesCmd + version), nil },
+			func() ([]byte, []byte, error) { return []byte(iptablesCmd + version), nil, nil },
 		},
-		RunScript: []fakeexec.FakeRunAction{
+		RunScript: []fakeexec.FakeAction{
 			func() ([]byte, []byte, error) { return []byte(output), []byte(stderrOutput), nil },
 			func() ([]byte, []byte, error) { return nil, []byte(stderrOutput), &fakeexec.FakeExitError{Status: 1} },
 		},
@@ -811,14 +811,14 @@ func testRestore(t *testing.T, protocol Protocol) {
 	protoStr := protocolStr(protocol)
 
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte(iptablesCmd + version), nil },
-			func() ([]byte, error) { return []byte{}, nil },
-			func() ([]byte, error) { return []byte{}, nil },
-			func() ([]byte, error) { return []byte{}, nil },
-			func() ([]byte, error) { return []byte{}, nil },
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte(iptablesCmd + version), nil, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -899,11 +899,11 @@ func TestRestoreIPv6(t *testing.T) {
 // TestRestoreAll tests only the simplest use case, as flag handling code is already tested in TestRestore
 func TestRestoreAll(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
-			func() ([]byte, error) { return []byte{}, nil },
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -940,11 +940,11 @@ func TestRestoreAll(t *testing.T) {
 // TestRestoreAllWait tests that the "wait" flag is passed to a compatible iptables-restore
 func TestRestoreAllWait(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.9.22"), nil },
-			func() ([]byte, error) { return []byte{}, nil },
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -982,13 +982,13 @@ func TestRestoreAllWait(t *testing.T) {
 // to an old iptables-restore
 func TestRestoreAllWaitOldIptablesRestore(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.4.22"), nil },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.4.22"), nil, nil },
 			// iptables-restore version check
-			func() ([]byte, error) { return []byte{}, nil },
-			func() ([]byte, error) { return []byte{}, nil },
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -1031,11 +1031,11 @@ func TestRestoreAllWaitOldIptablesRestore(t *testing.T) {
 // support the --wait argument
 func TestRestoreAllGrabNewLock(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.4.22"), nil },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.4.22"), nil, nil },
 			// iptables-restore version check
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -1073,11 +1073,11 @@ func TestRestoreAllGrabNewLock(t *testing.T) {
 // version that does not support the --wait argument
 func TestRestoreAllGrabOldLock(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.4.22"), nil },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.4.22"), nil, nil },
 			// iptables-restore version check
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -1110,13 +1110,13 @@ func TestRestoreAllGrabOldLock(t *testing.T) {
 // to a seemingly-old-but-actually-new iptables-restore
 func TestRestoreAllWaitBackportedIptablesRestore(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
-			func() ([]byte, error) { return []byte("iptables v1.4.22"), nil },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.4.22"), nil, nil },
 			// iptables-restore version check
-			func() ([]byte, error) { return []byte("iptables v1.4.22"), nil },
-			func() ([]byte, error) { return []byte{}, nil },
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return []byte("iptables v1.4.22"), nil, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := fakeexec.FakeExec{

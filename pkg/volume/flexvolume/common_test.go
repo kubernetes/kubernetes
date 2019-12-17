@@ -19,12 +19,12 @@ package flexvolume
 import (
 	"encoding/json"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/test/utils/harness"
 	"k8s.io/utils/exec"
-	"k8s.io/utils/exec/testing"
+	testingexec "k8s.io/utils/exec/testing"
 )
 
 func testPlugin(h *harness.Harness) (*flexVolumeAttachablePlugin, string) {
@@ -39,7 +39,7 @@ func testPlugin(h *harness.Harness) (*flexVolumeAttachablePlugin, string) {
 	}, rootDir
 }
 
-func assertDriverCall(t *harness.Harness, output testingexec.FakeCombinedOutputAction, expectedCommand string, expectedArgs ...string) testingexec.FakeCommandAction {
+func assertDriverCall(t *harness.Harness, output testingexec.FakeAction, expectedCommand string, expectedArgs ...string) testingexec.FakeCommandAction {
 	return func(cmd string, args ...string) exec.Cmd {
 		if cmd != "/plugin/test" {
 			t.Errorf("Wrong executable called: got %v, expected %v", cmd, "/plugin/test")
@@ -53,7 +53,7 @@ func assertDriverCall(t *harness.Harness, output testingexec.FakeCombinedOutputA
 		}
 		return &testingexec.FakeCmd{
 			Argv:                 args,
-			CombinedOutputScript: []testingexec.FakeCombinedOutputAction{output},
+			CombinedOutputScript: []testingexec.FakeAction{output},
 		}
 	}
 }
@@ -64,21 +64,21 @@ func fakeRunner(fakeCommands ...testingexec.FakeCommandAction) exec.Interface {
 	}
 }
 
-func fakeResultOutput(result interface{}) testingexec.FakeCombinedOutputAction {
-	return func() ([]byte, error) {
+func fakeResultOutput(result interface{}) testingexec.FakeAction {
+	return func() ([]byte, []byte, error) {
 		bytes, err := json.Marshal(result)
 		if err != nil {
 			panic("Unable to marshal result: " + err.Error())
 		}
-		return bytes, nil
+		return bytes, nil, nil
 	}
 }
 
-func successOutput() testingexec.FakeCombinedOutputAction {
+func successOutput() testingexec.FakeAction {
 	return fakeResultOutput(&DriverStatus{StatusSuccess, "", "", "", true, nil, 0})
 }
 
-func notSupportedOutput() testingexec.FakeCombinedOutputAction {
+func notSupportedOutput() testingexec.FakeAction {
 	return fakeResultOutput(&DriverStatus{StatusNotSupported, "", "", "", false, nil, 0})
 }
 

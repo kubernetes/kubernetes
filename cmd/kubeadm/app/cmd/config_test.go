@@ -198,12 +198,12 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 
 func TestImagesPull(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return nil, nil },
+		CombinedOutputScript: []fakeexec.FakeAction{
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
 		},
 	}
 
