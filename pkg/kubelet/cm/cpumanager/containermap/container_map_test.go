@@ -14,13 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cpumanager
+package containermap
 
 import (
 	"testing"
-
-	"k8s.io/api/core/v1"
-	apimachinery "k8s.io/apimachinery/pkg/types"
 )
 
 func TestContainerMap(t *testing.T) {
@@ -37,33 +34,47 @@ func TestContainerMap(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		pod := v1.Pod{}
-		pod.UID = apimachinery.UID(tc.podUID)
-
 		// Build a new containerMap from the testCases, checking proper
 		// addition, retrieval along the way.
-		cm := newContainerMap()
+		cm := NewContainerMap()
 		for i := range tc.containerNames {
-			container := v1.Container{Name: tc.containerNames[i]}
+			cm.Add(tc.podUID, tc.containerNames[i], tc.containerIDs[i])
 
-			cm.Add(&pod, &container, tc.containerIDs[i])
-			containerID, err := cm.Get(&pod, &container)
+			containerID, err := cm.GetContainerID(tc.podUID, tc.containerNames[i])
 			if err != nil {
-				t.Errorf("error adding and retrieving container: %v", err)
+				t.Errorf("error adding and retrieving containerID: %v", err)
 			}
 			if containerID != tc.containerIDs[i] {
 				t.Errorf("mismatched containerIDs %v, %v", containerID, tc.containerIDs[i])
+			}
+
+			podUID, containerName, err := cm.GetContainerRef(containerID)
+			if err != nil {
+				t.Errorf("error retrieving container reference: %v", err)
+			}
+			if podUID != tc.podUID {
+				t.Errorf("mismatched pod UID %v, %v", tc.podUID, podUID)
+			}
+			if containerName != tc.containerNames[i] {
+				t.Errorf("mismatched container Name %v, %v", tc.containerNames[i], containerName)
 			}
 		}
 
 		// Remove all entries from the containerMap, checking proper removal of
 		// each along the way.
 		for i := range tc.containerNames {
-			container := v1.Container{Name: tc.containerNames[i]}
-			cm.Remove(tc.containerIDs[i])
-			containerID, err := cm.Get(&pod, &container)
+			cm.RemoveByContainerID(tc.containerIDs[i])
+			containerID, err := cm.GetContainerID(tc.podUID, tc.containerNames[i])
 			if err == nil {
 				t.Errorf("unexpected retrieval of containerID after removal: %v", containerID)
+			}
+
+			cm.Add(tc.podUID, tc.containerNames[i], tc.containerIDs[i])
+
+			cm.RemoveByContainerRef(tc.podUID, tc.containerNames[i])
+			podUID, containerName, err := cm.GetContainerRef(tc.containerIDs[i])
+			if err == nil {
+				t.Errorf("unexpected retrieval of container reference after removal: (%v, %v)", podUID, containerName)
 			}
 		}
 

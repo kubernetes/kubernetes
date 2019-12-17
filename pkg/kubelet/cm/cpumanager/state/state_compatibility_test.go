@@ -30,8 +30,10 @@ const compatibilityTestingCheckpoint = "cpumanager_state_compatibility_test"
 
 var state = &stateMemory{
 	assignments: ContainerCPUAssignments{
-		"container1": cpuset.NewCPUSet(4, 5, 6),
-		"container2": cpuset.NewCPUSet(1, 2, 3),
+		"pod": map[string]cpuset.CPUSet{
+			"container1": cpuset.NewCPUSet(4, 5, 6),
+			"container2": cpuset.NewCPUSet(1, 2, 3),
+		},
 	},
 	defaultCPUSet: cpuset.NewCPUSet(1, 2, 3),
 }
@@ -44,12 +46,12 @@ func TestFileToCheckpointCompatibility(t *testing.T) {
 	// ensure testing state is removed after testing
 	defer os.Remove(statePath)
 
-	fileState := NewFileState(statePath, "none")
+	fileState := NewFileState(statePath, "none", nil)
 
 	fileState.SetDefaultCPUSet(state.defaultCPUSet)
 	fileState.SetCPUAssignments(state.assignments)
 
-	restoredState, err := NewCheckpointState(testingDir, compatibilityTestingCheckpoint, "none")
+	restoredState, err := NewCheckpointState(testingDir, compatibilityTestingCheckpoint, "none", nil)
 	if err != nil {
 		t.Fatalf("could not restore file state: %v", err)
 	}
@@ -68,13 +70,13 @@ func TestCheckpointToFileCompatibility(t *testing.T) {
 	// ensure testing checkpoint is removed after testing
 	defer cpm.RemoveCheckpoint(compatibilityTestingCheckpoint)
 
-	checkpointState, err := NewCheckpointState(testingDir, compatibilityTestingCheckpoint, "none")
+	checkpointState, err := NewCheckpointState(testingDir, compatibilityTestingCheckpoint, "none", nil)
 	require.NoError(t, err)
 
 	checkpointState.SetDefaultCPUSet(state.defaultCPUSet)
 	checkpointState.SetCPUAssignments(state.assignments)
 
-	restoredState := NewFileState(path.Join(testingDir, compatibilityTestingCheckpoint), "none")
+	restoredState := NewFileState(path.Join(testingDir, compatibilityTestingCheckpoint), "none", nil)
 
 	AssertStateEqual(t, restoredState, state)
 }

@@ -31,13 +31,13 @@ import (
 )
 
 func TestGetTopologyHints(t *testing.T) {
-	testPod1 := makePod("2", "2")
+	testPod1 := makePod("fakePod", "fakeContainer", "2", "2")
 	testContainer1 := &testPod1.Spec.Containers[0]
-	testPod2 := makePod("5", "5")
+	testPod2 := makePod("fakePod", "fakeContainer", "5", "5")
 	testContainer2 := &testPod2.Spec.Containers[0]
-	testPod3 := makePod("7", "7")
+	testPod3 := makePod("fakePod", "fakeContainer", "7", "7")
 	testContainer3 := &testPod3.Spec.Containers[0]
-	testPod4 := makePod("11", "11")
+	testPod4 := makePod("fakePod", "fakeContainer", "11", "11")
 	testContainer4 := &testPod4.Spec.Containers[0]
 
 	firstSocketMask, _ := bitmask.NewBitMask(0)
@@ -156,7 +156,9 @@ func TestGetTopologyHints(t *testing.T) {
 			pod:       *testPod1,
 			container: *testContainer1,
 			assignments: state.ContainerCPUAssignments{
-				"": cpuset.NewCPUSet(0, 6),
+				string(testPod1.UID): map[string]cpuset.CPUSet{
+					testContainer1.Name: cpuset.NewCPUSet(0, 6),
+				},
 			},
 			defaultCPUSet: cpuset.NewCPUSet(),
 			expectedHints: []topologymanager.TopologyHint{
@@ -175,7 +177,9 @@ func TestGetTopologyHints(t *testing.T) {
 			pod:       *testPod1,
 			container: *testContainer1,
 			assignments: state.ContainerCPUAssignments{
-				"": cpuset.NewCPUSet(3, 9),
+				string(testPod1.UID): map[string]cpuset.CPUSet{
+					testContainer1.Name: cpuset.NewCPUSet(3, 9),
+				},
 			},
 			defaultCPUSet: cpuset.NewCPUSet(),
 			expectedHints: []topologymanager.TopologyHint{
@@ -194,7 +198,9 @@ func TestGetTopologyHints(t *testing.T) {
 			pod:       *testPod4,
 			container: *testContainer4,
 			assignments: state.ContainerCPUAssignments{
-				"": cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+				string(testPod4.UID): map[string]cpuset.CPUSet{
+					testContainer4.Name: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+				},
 			},
 			defaultCPUSet: cpuset.NewCPUSet(),
 			expectedHints: []topologymanager.TopologyHint{
@@ -209,7 +215,9 @@ func TestGetTopologyHints(t *testing.T) {
 			pod:       *testPod1,
 			container: *testContainer1,
 			assignments: state.ContainerCPUAssignments{
-				"": cpuset.NewCPUSet(0, 6, 3, 9),
+				string(testPod1.UID): map[string]cpuset.CPUSet{
+					testContainer1.Name: cpuset.NewCPUSet(0, 6, 3, 9),
+				},
 			},
 			defaultCPUSet: cpuset.NewCPUSet(),
 			expectedHints: []topologymanager.TopologyHint{},
@@ -219,7 +227,9 @@ func TestGetTopologyHints(t *testing.T) {
 			pod:       *testPod4,
 			container: *testContainer4,
 			assignments: state.ContainerCPUAssignments{
-				"": cpuset.NewCPUSet(0, 6, 3, 9),
+				string(testPod4.UID): map[string]cpuset.CPUSet{
+					testContainer4.Name: cpuset.NewCPUSet(0, 6, 3, 9),
+				},
 			},
 			defaultCPUSet: cpuset.NewCPUSet(),
 			expectedHints: []topologymanager.TopologyHint{},
