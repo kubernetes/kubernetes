@@ -104,6 +104,8 @@ func TestCompatibility(t *testing.T) {
 			name: "No Provider specified",
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodeResourcesFit"},
+					{Name: "NodePorts"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -139,6 +141,8 @@ func TestCompatibility(t *testing.T) {
 			provider: config.SchedulerDefaultProviderName,
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodeResourcesFit"},
+					{Name: "NodePorts"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -174,6 +178,8 @@ func TestCompatibility(t *testing.T) {
 			provider: ClusterAutoscalerProvider,
 			wantPlugins: map[string][]config.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodeResourcesFit"},
+					{Name: "NodePorts"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
