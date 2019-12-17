@@ -71,9 +71,12 @@ func FieldsToSetV2(b []byte) (s fieldpath.Set, err error) {
 // SetToFieldsV2 TODO
 func SetToFieldsV2(s fieldpath.Set) ([]byte, error) {
 	buf := bytes.Buffer{}
-	w := gzip.NewWriter(&buf)
+	w, err := gzip.NewWriterLevel(&buf, gzip.BestSpeed)
+	if err != nil {
+		return nil, err
+	}
 	defer w.Close()
-	err := s.ToJSONStream_V2Experimental(w)
+	err = s.ToJSONStream_V2Experimental(w)
 	if err != nil {
 		return nil, err
 	}
