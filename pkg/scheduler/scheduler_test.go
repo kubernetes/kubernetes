@@ -695,7 +695,6 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 		false,
-		false,
 		schedulerapi.DefaultPercentageOfNodesToScore,
 		false,
 	)
@@ -751,7 +750,6 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		nil,
 		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
-		false,
 		false,
 		schedulerapi.DefaultPercentageOfNodesToScore,
 		false,

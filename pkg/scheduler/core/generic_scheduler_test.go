@@ -370,15 +370,14 @@ func TestGenericScheduler(t *testing.T) {
 	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
 
 	tests := []struct {
-		name                     string
-		registerPlugins          []st.RegisterPluginFunc
-		alwaysCheckAllPredicates bool
-		nodes                    []string
-		pvcs                     []v1.PersistentVolumeClaim
-		pod                      *v1.Pod
-		pods                     []*v1.Pod
-		expectedHosts            sets.String
-		wErr                     error
+		name            string
+		registerPlugins []st.RegisterPluginFunc
+		nodes           []string
+		pvcs            []v1.PersistentVolumeClaim
+		pod             *v1.Pod
+		pods            []*v1.Pod
+		expectedHosts   sets.String
+		wErr            error
 	}{
 		{
 			registerPlugins: []st.RegisterPluginFunc{
@@ -789,7 +788,6 @@ func TestGenericScheduler(t *testing.T) {
 				cache,
 				internalqueue.NewSchedulingQueue(nil),
 				nil,
-				// test.prioritizers,
 				priorities.EmptyMetadataProducer,
 				snapshot,
 				fwk,
@@ -797,7 +795,6 @@ func TestGenericScheduler(t *testing.T) {
 				nil,
 				pvcLister,
 				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
-				test.alwaysCheckAllPredicates,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				false)
@@ -839,7 +836,7 @@ func makeScheduler(nodes []*v1.Node, fns ...st.RegisterPluginFunc) *genericSched
 		priorities.EmptyMetadataProducer,
 		emptySnapshot,
 		fwk,
-		nil, nil, nil, nil, false, false,
+		nil, nil, nil, nil, false,
 		schedulerapi.DefaultPercentageOfNodesToScore, false)
 	cache.UpdateNodeInfoSnapshot(s.(*genericScheduler).nodeInfoSnapshot)
 	return s.(*genericScheduler)
@@ -967,7 +964,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			priorities.EmptyMetadataProducer,
 			emptySnapshot,
 			fwk,
-			nil, nil, nil, nil, false, false,
+			nil, nil, nil, nil, false,
 			schedulerapi.DefaultPercentageOfNodesToScore, false).(*genericScheduler)
 		cache.UpdateNodeInfoSnapshot(scheduler.nodeInfoSnapshot)
 		queue.UpdateNominatedPodForNode(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("nominated")}, Spec: v1.PodSpec{Priority: &midPriority}}, "1")
@@ -1167,7 +1164,6 @@ func TestZeroRequest(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				false,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				false).(*genericScheduler)
@@ -1614,7 +1610,6 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				nil,
 				nil,
 				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
-				false,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				false)
@@ -2362,7 +2357,6 @@ func TestPreempt(t *testing.T) {
 				nil,
 				informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
 				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
-				false,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				true)

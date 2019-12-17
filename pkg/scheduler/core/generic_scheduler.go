@@ -157,7 +157,6 @@ type genericScheduler struct {
 	prioritizers             []priorities.PriorityConfig
 	framework                framework.Framework
 	extenders                []algorithm.SchedulerExtender
-	alwaysCheckAllPredicates bool
 	nodeInfoSnapshot         *nodeinfosnapshot.Snapshot
 	volumeBinder             *volumebinder.VolumeBinder
 	pvcLister                corelisters.PersistentVolumeClaimLister
@@ -1134,7 +1133,7 @@ func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeCla
 }
 
 // NewGenericScheduler creates a genericScheduler object.
-// TODO(Huang-Wei): remove 'predicates' and 'alwaysCheckAllPredicates'.
+// TODO(Huang-Wei): remove 'predicates'.
 func NewGenericScheduler(
 	cache internalcache.Cache,
 	podQueue internalqueue.SchedulingQueue,
@@ -1146,7 +1145,6 @@ func NewGenericScheduler(
 	volumeBinder *volumebinder.VolumeBinder,
 	pvcLister corelisters.PersistentVolumeClaimLister,
 	pdbLister policylisters.PodDisruptionBudgetLister,
-	alwaysCheckAllPredicates bool,
 	disablePreemption bool,
 	percentageOfNodesToScore int32,
 	enableNonPreempting bool) ScheduleAlgorithm {
@@ -1161,7 +1159,6 @@ func NewGenericScheduler(
 		volumeBinder:             volumeBinder,
 		pvcLister:                pvcLister,
 		pdbLister:                pdbLister,
-		alwaysCheckAllPredicates: alwaysCheckAllPredicates,
 		disablePreemption:        disablePreemption,
 		percentageOfNodesToScore: percentageOfNodesToScore,
 		enableNonPreempting:      enableNonPreempting,
