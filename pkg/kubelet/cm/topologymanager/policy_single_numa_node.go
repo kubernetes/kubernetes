@@ -140,12 +140,6 @@ func (p *singleNumaNodePolicy) filterHints(allResourcesHints [][]TopologyHint) (
 }
 
 func (p *singleNumaNodePolicy) mergeProvidersHints(providersHints []map[string][]TopologyHint) TopologyHint {
-	// Set the default hint to return from this function as an any-NUMANode
-	// affinity with an unpreferred allocation. This will only be returned if
-	// no better hint can be found when merging hints from each hint provider.
-	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
-	defaultHint := TopologyHint{defaultAffinity, false}
-
 	// Loop through all provider hints and save an accumulated list of the
 	// hints returned by each hint provider. If no hints are provided, assume
 	// that provider has no preference for topology-aware allocation.
@@ -169,7 +163,7 @@ func (p *singleNumaNodePolicy) mergeProvidersHints(providersHints []map[string][
 				klog.Infof("[topologymanager] Hint Provider has no possible NUMA affinities for resource '%s'",
 					resource)
 				// return defaultHint which will fail pod admission
-				return defaultHint
+				return TopologyHint{}
 			}
 			klog.Infof("[topologymanager] TopologyHints for resource '%v': %v", resource, hints[resource])
 			allResourcesHints = append(allResourcesHints, hints[resource])
@@ -180,8 +174,7 @@ func (p *singleNumaNodePolicy) mergeProvidersHints(providersHints []map[string][
 	// to true to allow scheduling.
 	if len(allResourcesHints) == 0 {
 		klog.Infof("[topologymanager] No preference for NUMA affinity from all providers")
-		defaultHint.Preferred = true
-		return defaultHint
+		return TopologyHint{nil, true}
 	}
 
 	var noAffinityPreferredOnly bool
@@ -189,7 +182,7 @@ func (p *singleNumaNodePolicy) mergeProvidersHints(providersHints []map[string][
 	// If no hints, then policy cannot be satisfied
 	if len(allResourcesHints) == 0 {
 		klog.Infof("[topologymanager] No hints that align to a single NUMA node.")
-		return defaultHint
+		return TopologyHint{}
 	}
 	// If there is a resource with empty hints after filtering, then policy cannot be satisfied.
 	// In the event that the only hints that exist are {nil true} update default hint preferred
@@ -198,14 +191,18 @@ func (p *singleNumaNodePolicy) mergeProvidersHints(providersHints []map[string][
 		if len(hints) == 0 {
 			klog.Infof("[topologymanager] No hints that align to a single NUMA node for resource.")
 			if !noAffinityPreferredOnly {
-				return defaultHint
+				return TopologyHint{}
 			} else if noAffinityPreferredOnly {
-				defaultHint.Preferred = true
-				return defaultHint
+				return TopologyHint{nil, true}
 			}
 		}
 	}
 
+	// Set the bestHint to return from this function as an any-NUMANode
+	// affinity with an unpreferred allocation. This will only be returned if
+	// no better hint can be found when merging hints from each hint provider.
+	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
+	bestHint := TopologyHint{defaultAffinity, false}
 	p.iterateAllProviderTopologyHints(allResourcesHints, func(permutation []TopologyHint) {
 		mergedHint := p.mergePermutation(permutation)
 		// Only consider mergedHints that result in a NUMANodeAffinity == 1 to
@@ -216,13 +213,13 @@ func (p *singleNumaNodePolicy) mergeProvidersHints(providersHints []map[string][
 
 		// If the current defaultHint is the same size as the new mergedHint,
 		// do not update defaultHint
-		if mergedHint.NUMANodeAffinity.Count() == defaultHint.NUMANodeAffinity.Count() {
+		if mergedHint.NUMANodeAffinity.Count() == bestHint.NUMANodeAffinity.Count() {
 			return
 		}
 		// In all other cases, update defaultHint to the current mergedHint
-		defaultHint = mergedHint
+		bestHint = mergedHint
 	})
-	return defaultHint
+	return bestHint
 }
 
 func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
