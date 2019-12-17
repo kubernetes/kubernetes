@@ -240,7 +240,8 @@ func doCleanSubPaths(mounter mount.Interface, podDir string, volumeName string) 
 				return err
 			}
 
-			if info.IsDir() {
+			// We need to check that info is not nil. This may happen when the incoming err is not nil due to stale mounts or permission errors.
+			if info != nil && info.IsDir() {
 				// skip subdirs of the volume: it only matters the first level to unmount, otherwise it would try to unmount subdir of the volume
 				return filepath.SkipDir
 			}
