@@ -101,10 +101,10 @@ type ApplyOptions struct {
 	// Function run after the objects are generated and
 	// stored in the "objects" field, but before the
 	// apply is run on these objects.
-	preProcessorFn func(*ApplyOptions) error
+	PreProcessorFn func() error
 	// Function run after all objects have been applied.
-	// The standard postprocessorFn is "PrintAndPrune()".
-	postProcessorFn func(*ApplyOptions) error
+	// The standard PostProcessorFn is "PrintAndPrunePostProcessor()".
+	PostProcessorFn func() error
 }
 
 var (
@@ -156,8 +156,6 @@ func NewApplyOptions(ioStreams genericclioptions.IOStreams) *ApplyOptions {
 
 		VisitedUids:       sets.NewString(),
 		VisitedNamespaces: sets.NewString(),
-
-		postProcessorFn: PrintAndPrune,
 	}
 }
 
@@ -288,6 +286,8 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		}
 	}
 
+	o.PostProcessorFn = o.PrintAndPrunePostProcessor()
+
 	return nil
 }
 
@@ -350,6 +350,13 @@ func (o *ApplyOptions) GetObjects() ([]*resource.Info, error) {
 	return o.objects, nil
 }
 
+// SetObjects stores the set of objects (as resource.Info) to be
+// subsequently applied.
+func (o *ApplyOptions) SetObjects(infos []*resource.Info) {
+	o.objects = infos
+	o.objectsCached = true
+}
+
 // Run executes the `apply` command.
 func (o *ApplyOptions) Run() error {
 
@@ -358,6 +365,15 @@ func (o *ApplyOptions) Run() error {
 		OpenAPIGetter: o.DiscoveryClient,
 	}
 
+	if o.PreProcessorFn != nil {
+		klog.V(4).Infof("Running apply pre-processor function")
+		if err := o.PreProcessorFn(); err != nil {
+			return err
+		}
+	}
+
+	// Generates the objects using the resource builder if they have not
+	// already been stored by calling "SetObjects()" in the pre-processor.
 	infos, err := o.GetObjects()
 	if err != nil {
 		return err
@@ -365,7 +381,6 @@ func (o *ApplyOptions) Run() error {
 	if len(infos) == 0 {
 		return fmt.Errorf("no objects passed to apply")
 	}
-
 	for _, info := range infos {
 
 		// If server-dry-run is requested but the type doesn't support it, fail right away.
@@ -541,13 +556,11 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 		}
 	}
 
-	if err := o.printObjects(); err != nil {
-		return err
-	}
-
-	if o.Prune {
-		p := newPruner(o)
-		return p.pruneAll(o)
+	if o.PostProcessorFn != nil {
+		klog.V(4).Infof("Running apply post-processor function")
+		if err := o.PostProcessorFn(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -625,6 +638,27 @@ func (o *ApplyOptions) MarkObjectVisited(info *resource.Info) error {
 	}
 	o.VisitedUids.Insert(string(metadata.GetUID()))
 	return nil
+}
+
+// PrintAndPrune returns a function which meets the PostProcessorFn
+// function signature. This returned function prints all the
+// objects as a list (if configured for that), and prunes the
+// objects not applied. The returned function is the standard
+// apply post processor.
+func (o *ApplyOptions) PrintAndPrunePostProcessor() func() error {
+
+	return func() error {
+		if err := o.printObjects(); err != nil {
+			return err
+		}
+
+		if o.Prune {
+			p := newPruner(o)
+			return p.pruneAll(o)
+		}
+
+		return nil
+	}
 }
 
 // DryRunVerifier verifies if a given group-version-kind supports DryRun
