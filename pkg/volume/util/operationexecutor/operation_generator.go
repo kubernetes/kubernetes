@@ -580,6 +580,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				devicePath,
 				deviceMountPath)
 			if err != nil {
+				og.markDeviceErrorState(volumeToMount, devicePath, deviceMountPath, err, actualStateOfWorld)
 				// On failure, return error. Caller will log and retry.
 				return volumeToMount.GenerateError("MountVolume.MountDevice failed", err)
 			}
@@ -621,7 +622,19 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			FsGroup:     fsGroup,
 			DesiredSize: volumeToMount.DesiredSizeLimit,
 		})
+		// Update actual state of world
+		markOpts := MarkVolumeOpts{
+			PodName:             volumeToMount.PodName,
+			PodUID:              volumeToMount.Pod.UID,
+			VolumeName:          volumeToMount.VolumeName,
+			Mounter:             volumeMounter,
+			OuterVolumeSpecName: volumeToMount.OuterVolumeSpecName,
+			VolumeGidVolume:     volumeToMount.VolumeGidValue,
+			VolumeSpec:          volumeToMount.VolumeSpec,
+			VolumeMountState:    VolumeMounted,
+		}
 		if mountErr != nil {
+			og.markVolumeErrorState(volumeToMount, markOpts, mountErr, actualStateOfWorld)
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateError("MountVolume.SetUp failed", mountErr)
 		}
@@ -647,16 +660,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			}
 		}
 
-		// Update actual state of world
-		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(
-			volumeToMount.PodName,
-			volumeToMount.Pod.UID,
-			volumeToMount.VolumeName,
-			volumeMounter,
-			nil,
-			volumeToMount.OuterVolumeSpecName,
-			volumeToMount.VolumeGidValue,
-			volumeToMount.VolumeSpec)
+		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(markOpts)
 		if markVolMountedErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateError("MountVolume.MarkVolumeAsMounted failed", markVolMountedErr)
@@ -677,6 +681,49 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		EventRecorderFunc: eventRecorderFunc,
 		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(volumePluginName, volumeToMount.VolumeSpec), "volume_mount"),
 	}
+}
+
+func (og *operationGenerator) markDeviceErrorState(volumeToMount VolumeToMount, devicePath, deviceMountPath string, mountError error, actualStateOfWorld ActualStateOfWorldMounterUpdater) {
+	if volumetypes.IsOperationFinishedError(mountError) &&
+		actualStateOfWorld.GetDeviceMountState(volumeToMount.VolumeName) == DeviceMountUncertain {
+		// Only devices which were uncertain can be marked as unmounted
+		markDeviceUnmountError := actualStateOfWorld.MarkDeviceAsUnmounted(volumeToMount.VolumeName)
+		if markDeviceUnmountError != nil {
+			klog.Errorf(volumeToMount.GenerateErrorDetailed("MountDevice.MarkDeviceAsUnmounted failed", markDeviceUnmountError).Error())
+		}
+		return
+	}
+
+	if volumetypes.IsUncertainProgressError(mountError) &&
+		actualStateOfWorld.GetDeviceMountState(volumeToMount.VolumeName) == DeviceNotMounted {
+		// only devices which are not mounted can be marked as uncertain. We do not want to mark a device
+		// which was previously marked as mounted here as uncertain.
+		markDeviceUncertainError := actualStateOfWorld.MarkDeviceAsUncertain(volumeToMount.VolumeName, devicePath, deviceMountPath)
+		if markDeviceUncertainError != nil {
+			klog.Errorf(volumeToMount.GenerateErrorDetailed("MountDevice.MarkDeviceAsUncertain failed", markDeviceUncertainError).Error())
+		}
+	}
+
+}
+
+func (og *operationGenerator) markVolumeErrorState(volumeToMount VolumeToMount, markOpts MarkVolumeOpts, mountError error, actualStateOfWorld ActualStateOfWorldMounterUpdater) {
+	if volumetypes.IsOperationFinishedError(mountError) &&
+		actualStateOfWorld.GetVolumeMountState(volumeToMount.VolumeName, markOpts.PodName) == VolumeMountUncertain {
+		t := actualStateOfWorld.MarkVolumeAsUnmounted(volumeToMount.PodName, volumeToMount.VolumeName)
+		if t != nil {
+			klog.Errorf(volumeToMount.GenerateErrorDetailed("MountVolume.MarkVolumeAsUnmounted failed", t).Error())
+		}
+		return
+	}
+
+	if volumetypes.IsUncertainProgressError(mountError) &&
+		actualStateOfWorld.GetVolumeMountState(volumeToMount.VolumeName, markOpts.PodName) == VolumeNotMounted {
+		t := actualStateOfWorld.MarkVolumeMountAsUncertain(markOpts)
+		if t != nil {
+			klog.Errorf(volumeToMount.GenerateErrorDetailed("MountVolume.MarkVolumeMountAsUncertain failed", t).Error())
+		}
+	}
+
 }
 
 func (og *operationGenerator) GenerateUnmountVolumeFunc(
@@ -982,16 +1029,18 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			return volumeToMount.GenerateError("MapVolume.MarkVolumeAsMounted failed while expanding volume", resizeError)
 		}
 
-		// Update actual state of world
-		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(
-			volumeToMount.PodName,
-			volumeToMount.Pod.UID,
-			volumeToMount.VolumeName,
-			nil,
-			blockVolumeMapper,
-			volumeToMount.OuterVolumeSpecName,
-			volumeToMount.VolumeGidValue,
-			volumeToMount.VolumeSpec)
+		markVolumeOpts := MarkVolumeOpts{
+			PodName:             volumeToMount.PodName,
+			PodUID:              volumeToMount.Pod.UID,
+			VolumeName:          volumeToMount.VolumeName,
+			BlockVolumeMapper:   blockVolumeMapper,
+			OuterVolumeSpecName: volumeToMount.OuterVolumeSpecName,
+			VolumeGidVolume:     volumeToMount.VolumeGidValue,
+			VolumeSpec:          volumeToMount.VolumeSpec,
+			VolumeMountState:    VolumeMounted,
+		}
+
+		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(markVolumeOpts)
 		if markVolMountedErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateError("MapVolume.MarkVolumeAsMounted failed", markVolMountedErr)

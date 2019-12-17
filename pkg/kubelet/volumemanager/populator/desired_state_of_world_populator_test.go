@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -854,8 +855,16 @@ func reconcileASW(asw cache.ActualStateOfWorld, dsw cache.DesiredStateOfWorld, t
 		if err != nil {
 			t.Fatalf("Unexpected error when MarkVolumeAsAttached: %v", err)
 		}
-		err = asw.MarkVolumeAsMounted(volumeToMount.PodName, volumeToMount.Pod.UID,
-			volumeToMount.VolumeName, nil, nil, volumeToMount.OuterVolumeSpecName, volumeToMount.VolumeGidValue, volumeToMount.VolumeSpec)
+		markVolumeOpts := operationexecutor.MarkVolumeOpts{
+			PodName:             volumeToMount.PodName,
+			PodUID:              volumeToMount.Pod.UID,
+			VolumeName:          volumeToMount.VolumeName,
+			OuterVolumeSpecName: volumeToMount.OuterVolumeSpecName,
+			VolumeGidVolume:     volumeToMount.VolumeGidValue,
+			VolumeSpec:          volumeToMount.VolumeSpec,
+			VolumeMountState:    operationexecutor.VolumeMounted,
+		}
+		err = asw.MarkVolumeAsMounted(markVolumeOpts)
 		if err != nil {
 			t.Fatalf("Unexpected error when MarkVolumeAsMounted: %v", err)
 		}

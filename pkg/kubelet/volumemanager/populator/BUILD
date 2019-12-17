@@ -63,6 +63,7 @@ go_test(
         "//pkg/volume/csimigration:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util:go_default_library",
+        "//pkg/volume/util/operationexecutor:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",

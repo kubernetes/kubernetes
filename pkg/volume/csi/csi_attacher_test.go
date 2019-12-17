@@ -44,7 +44,9 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 var (
@@ -1054,73 +1056,107 @@ func TestAttacherGetDeviceMountPath(t *testing.T) {
 
 func TestAttacherMountDevice(t *testing.T) {
 	pvName := "test-pv"
+	nonFinalError := volumetypes.NewUncertainProgressError("")
+	transientError := volumetypes.NewTransientOperationFailure("")
+
 	testCases := []struct {
-		testName        string
-		volName         string
-		devicePath      string
-		deviceMountPath string
-		stageUnstageSet bool
-		shouldFail      bool
-		spec            *volume.Spec
+		testName         string
+		volName          string
+		devicePath       string
+		deviceMountPath  string
+		stageUnstageSet  bool
+		shouldFail       bool
+		createAttachment bool
+		exitError        error
+		spec             *volume.Spec
 	}{
 		{
-			testName:        "normal PV",
-			volName:         "test-vol1",
-			devicePath:      "path1",
-			deviceMountPath: "path2",
-			stageUnstageSet: true,
-			spec:            volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
+			testName:         "normal PV",
+			volName:          "test-vol1",
+			devicePath:       "path1",
+			deviceMountPath:  "path2",
+			stageUnstageSet:  true,
+			createAttachment: true,
+			spec:             volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
 		},
 		{
-			testName:        "normal PV with mount options",
-			volName:         "test-vol1",
-			devicePath:      "path1",
-			deviceMountPath: "path2",
-			stageUnstageSet: true,
-			spec:            volume.NewSpecFromPersistentVolume(makeTestPVWithMountOptions(pvName, 10, testDriver, "test-vol1", []string{"test-op"}), false),
+			testName:         "normal PV with mount options",
+			volName:          "test-vol1",
+			devicePath:       "path1",
+			deviceMountPath:  "path2",
+			stageUnstageSet:  true,
+			createAttachment: true,
+			spec:             volume.NewSpecFromPersistentVolume(makeTestPVWithMountOptions(pvName, 10, testDriver, "test-vol1", []string{"test-op"}), false),
 		},
 		{
-			testName:        "no vol name",
-			volName:         "",
-			devicePath:      "path1",
-			deviceMountPath: "path2",
-			stageUnstageSet: true,
-			shouldFail:      true,
-			spec:            volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, ""), false),
+			testName:         "normal PV but with missing attachment should result in no-change",
+			volName:          "test-vol1",
+			devicePath:       "path1",
+			deviceMountPath:  "path2",
+			stageUnstageSet:  true,
+			createAttachment: false,
+			shouldFail:       true,
+			exitError:        transientError,
+			spec:             volume.NewSpecFromPersistentVolume(makeTestPVWithMountOptions(pvName, 10, testDriver, "test-vol1", []string{"test-op"}), false),
 		},
 		{
-			testName:        "no device path",
-			volName:         "test-vol1",
-			devicePath:      "",
-			deviceMountPath: "path2",
-			stageUnstageSet: true,
-			shouldFail:      false,
-			spec:            volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
+			testName:         "no vol name",
+			volName:          "",
+			devicePath:       "path1",
+			deviceMountPath:  "path2",
+			stageUnstageSet:  true,
+			shouldFail:       true,
+			createAttachment: true,
+			spec:             volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, ""), false),
 		},
 		{
-			testName:        "no device mount path",
-			volName:         "test-vol1",
-			devicePath:      "path1",
-			deviceMountPath: "",
-			stageUnstageSet: true,
-			shouldFail:      true,
-			spec:            volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
+			testName:         "no device path",
+			volName:          "test-vol1",
+			devicePath:       "",
+			deviceMountPath:  "path2",
+			stageUnstageSet:  true,
+			shouldFail:       false,
+			createAttachment: true,
+			spec:             volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
 		},
 		{
-			testName:        "stage_unstage cap not set",
-			volName:         "test-vol1",
-			devicePath:      "path1",
-			deviceMountPath: "path2",
-			stageUnstageSet: false,
-			spec:            volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
+			testName:         "no device mount path",
+			volName:          "test-vol1",
+			devicePath:       "path1",
+			deviceMountPath:  "",
+			stageUnstageSet:  true,
+			shouldFail:       true,
+			createAttachment: true,
+			spec:             volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
 		},
 		{
-			testName:        "failure with volume source",
-			volName:         "test-vol1",
-			devicePath:      "path1",
-			deviceMountPath: "path2",
-			shouldFail:      true,
-			spec:            volume.NewSpecFromVolume(makeTestVol(pvName, testDriver)),
+			testName:         "stage_unstage cap not set",
+			volName:          "test-vol1",
+			devicePath:       "path1",
+			deviceMountPath:  "path2",
+			stageUnstageSet:  false,
+			createAttachment: true,
+			spec:             volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
+		},
+		{
+			testName:         "failure with volume source",
+			volName:          "test-vol1",
+			devicePath:       "path1",
+			deviceMountPath:  "path2",
+			shouldFail:       true,
+			createAttachment: true,
+			spec:             volume.NewSpecFromVolume(makeTestVol(pvName, testDriver)),
+		},
+		{
+			testName:         "pv with nodestage timeout should result in in-progress device",
+			volName:          fakecsi.NodeStageTimeOut_VolumeID,
+			devicePath:       "path1",
+			deviceMountPath:  "path2",
+			stageUnstageSet:  true,
+			createAttachment: true,
+			spec:             volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, fakecsi.NodeStageTimeOut_VolumeID), false),
+			exitError:        nonFinalError,
+			shouldFail:       true,
 		},
 	}
 
@@ -1146,18 +1182,20 @@ func TestAttacherMountDevice(t *testing.T) {
 			nodeName := string(csiAttacher.plugin.host.GetNodeName())
 			attachID := getAttachmentName(tc.volName, testDriver, nodeName)
 
-			// Set up volume attachment
-			attachment := makeTestAttachment(attachID, nodeName, pvName)
-			_, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Create(attachment)
-			if err != nil {
-				t.Fatalf("failed to attach: %v", err)
+			if tc.createAttachment {
+				// Set up volume attachment
+				attachment := makeTestAttachment(attachID, nodeName, pvName)
+				_, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Create(attachment)
+				if err != nil {
+					t.Fatalf("failed to attach: %v", err)
+				}
+				go func() {
+					fakeWatcher.Delete(attachment)
+				}()
 			}
-			go func() {
-				fakeWatcher.Delete(attachment)
-			}()
 
 			// Run
-			err = csiAttacher.MountDevice(tc.spec, tc.devicePath, tc.deviceMountPath)
+			err := csiAttacher.MountDevice(tc.spec, tc.devicePath, tc.deviceMountPath)
 
 			// Verify
 			if err != nil {
@@ -1168,6 +1206,10 @@ func TestAttacherMountDevice(t *testing.T) {
 			}
 			if err == nil && tc.shouldFail {
 				t.Errorf("test should fail, but no error occurred")
+			}
+
+			if tc.exitError != nil && reflect.TypeOf(tc.exitError) != reflect.TypeOf(err) {
+				t.Fatalf("expected exitError: %v got: %v", tc.exitError, err)
 			}
 
 			// Verify call goes through all the way

@@ -164,9 +164,21 @@ func (rc *reconciler) reconcile() {
 	// referenced by a pod that was deleted and is now referenced by another
 	// pod is unmounted from the first pod before being mounted to the new
 	// pod.
+	rc.unmountVolumes()
 
+	// Next we mount required volumes. This function could also trigger
+	// attach if kubelet is responsible for attaching volumes.
+	// If underlying PVC was resized while in-use then this function also handles volume
+	// resizing.
+	rc.mountAttachVolumes()
+
+	// Ensure devices that should be detached/unmounted are detached/unmounted.
+	rc.unmountDetachDevices()
+}
+
+func (rc *reconciler) unmountVolumes() {
 	// Ensure volumes that should be unmounted are unmounted.
-	for _, mountedVolume := range rc.actualStateOfWorld.GetMountedVolumes() {
+	for _, mountedVolume := range rc.actualStateOfWorld.GetAllMountedVolumes() {
 		if !rc.desiredStateOfWorld.PodExistsInVolume(mountedVolume.PodName, mountedVolume.VolumeName) {
 			// Volume is mounted, unmount it
 			klog.V(5).Infof(mountedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountVolume", ""))
@@ -184,7 +196,9 @@ func (rc *reconciler) reconcile() {
 			}
 		}
 	}
+}
 
+func (rc *reconciler) mountAttachVolumes() {
 	// Ensure volumes that should be attached/mounted are attached/mounted.
 	for _, volumeToMount := range rc.desiredStateOfWorld.GetVolumesToMount() {
 		volMounted, devicePath, err := rc.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName)
@@ -274,13 +288,14 @@ func (rc *reconciler) reconcile() {
 			}
 		}
 	}
+}
 
-	// Ensure devices that should be detached/unmounted are detached/unmounted.
+func (rc *reconciler) unmountDetachDevices() {
 	for _, attachedVolume := range rc.actualStateOfWorld.GetUnmountedVolumes() {
 		// Check IsOperationPending to avoid marking a volume as detached if it's in the process of mounting.
 		if !rc.desiredStateOfWorld.VolumeExists(attachedVolume.VolumeName) &&
 			!rc.operationExecutor.IsOperationPending(attachedVolume.VolumeName, nestedpendingoperations.EmptyUniquePodName) {
-			if attachedVolume.GloballyMounted {
+			if attachedVolume.DeviceMayBeMounted() {
 				// Volume is globally mounted to device, unmount it
 				klog.V(5).Infof(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountDevice", ""))
 				err := rc.operationExecutor.UnmountDevice(
@@ -625,15 +640,18 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 			klog.Errorf("Could not add volume information to actual state of world: %v", err)
 			continue
 		}
-		err = rc.actualStateOfWorld.MarkVolumeAsMounted(
-			volume.podName,
-			types.UID(volume.podName),
-			volume.volumeName,
-			volume.mounter,
-			volume.blockVolumeMapper,
-			volume.outerVolumeSpecName,
-			volume.volumeGidValue,
-			volume.volumeSpec)
+		markVolumeOpts := operationexecutor.MarkVolumeOpts{
+			PodName:             volume.podName,
+			PodUID:              types.UID(volume.podName),
+			VolumeName:          volume.volumeName,
+			Mounter:             volume.mounter,
+			BlockVolumeMapper:   volume.blockVolumeMapper,
+			OuterVolumeSpecName: volume.outerVolumeSpecName,
+			VolumeGidVolume:     volume.volumeGidValue,
+			VolumeSpec:          volume.volumeSpec,
+			VolumeMountState:    operationexecutor.VolumeMounted,
+		}
+		err = rc.actualStateOfWorld.MarkVolumeAsMounted(markVolumeOpts)
 		if err != nil {
 			klog.Errorf("Could not add pod to volume information to actual state of world: %v", err)
 			continue
