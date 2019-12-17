@@ -214,25 +214,8 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 
 	labels := map[string]string{"name": gitServerPodName}
 
-	gitServerPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   gitServerPodName,
-			Labels: labels,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:            "git-repo",
-					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:            []string{"fake-gitserver"},
-					ImagePullPolicy: "IfNotPresent",
-					Ports: []v1.ContainerPort{
-						{ContainerPort: int32(containerPort)},
-					},
-				},
-			},
-		},
-	}
+	gitServerPod := e2epod.NewAgnhostPod(f.Namespace.Name, gitServerPodName, nil, nil, []v1.ContainerPort{{ContainerPort: int32(containerPort)}}, "fake-gitserver")
+	gitServerPod.ObjectMeta.Labels = labels
 	f.PodClient().CreateSync(gitServerPod)
 
 	// Portal IP and port
