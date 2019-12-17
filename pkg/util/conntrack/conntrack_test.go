@@ -36,11 +36,11 @@ func familyParamStr(isIPv6 bool) string {
 
 func TestExecConntrackTool(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
-			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
-			func() ([]byte, error) {
-				return []byte(""), fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted")
+		CombinedOutputScript: []fakeexec.FakeAction{
+			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
+			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
+			func() ([]byte, []byte, error) {
+				return []byte(""), nil, fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted")
 			},
 		},
 	}
@@ -85,13 +85,13 @@ func TestExecConntrackTool(t *testing.T) {
 
 func TestClearUDPConntrackForIP(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
-			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
-			func() ([]byte, error) {
-				return []byte(""), fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted")
+		CombinedOutputScript: []fakeexec.FakeAction{
+			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
+			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
+			func() ([]byte, []byte, error) {
+				return []byte(""), nil, fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted")
 			},
-			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
+			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -133,12 +133,12 @@ func TestClearUDPConntrackForIP(t *testing.T) {
 
 func TestClearUDPConntrackForPort(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
-			func() ([]byte, error) {
-				return []byte(""), fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted")
+		CombinedOutputScript: []fakeexec.FakeAction{
+			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
+			func() ([]byte, []byte, error) {
+				return []byte(""), nil, fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted")
 			},
-			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
+			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -179,12 +179,12 @@ func TestClearUDPConntrackForPort(t *testing.T) {
 
 func TestDeleteUDPConnections(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
-			func() ([]byte, error) {
-				return []byte(""), fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted")
+		CombinedOutputScript: []fakeexec.FakeAction{
+			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
+			func() ([]byte, []byte, error) {
+				return []byte(""), nil, fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted")
 			},
-			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
+			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -237,12 +237,12 @@ func TestDeleteUDPConnections(t *testing.T) {
 
 func TestClearUDPConntrackForPortNAT(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
-			func() ([]byte, error) {
-				return []byte(""), fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted")
+		CombinedOutputScript: []fakeexec.FakeAction{
+			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
+			func() ([]byte, []byte, error) {
+				return []byte(""), nil, fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted")
 			},
-			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
+			func() ([]byte, []byte, error) { return []byte("1 flow entries have been deleted"), nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
