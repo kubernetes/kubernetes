@@ -387,19 +387,19 @@ func doTestSetUp(scenario struct {
 	allErrs := []error{}
 
 	// Construct combined outputs from expected commands
-	var fakeOutputs []fakeexec.FakeCombinedOutputAction
+	var fakeOutputs []fakeexec.FakeAction
 	var fcmd fakeexec.FakeCmd
 	for _, expected := range expecteds {
 		if expected.cmd[1] == "clone" {
-			fakeOutputs = append(fakeOutputs, func() ([]byte, error) {
+			fakeOutputs = append(fakeOutputs, func() ([]byte, []byte, error) {
 				// git clone, it creates new dir/files
 				os.MkdirAll(filepath.Join(fcmd.Dirs[0], expected.dir), 0750)
-				return []byte{}, nil
+				return []byte{}, nil, nil
 			})
 		} else {
 			// git checkout || git reset, they create nothing
-			fakeOutputs = append(fakeOutputs, func() ([]byte, error) {
-				return []byte{}, nil
+			fakeOutputs = append(fakeOutputs, func() ([]byte, []byte, error) {
+				return []byte{}, nil, nil
 			})
 		}
 	}

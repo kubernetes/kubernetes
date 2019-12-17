@@ -65,8 +65,8 @@ func TestNextClassID(t *testing.T) {
 	}
 	for _, test := range tests {
 		fcmd := fakeexec.FakeCmd{
-			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-				func() ([]byte, error) { return []byte(test.output), test.err },
+			CombinedOutputScript: []fakeexec.FakeAction{
+				func() ([]byte, []byte, error) { return []byte(test.output), nil, test.err },
 			},
 		}
 		fexec := fakeexec.FakeExec{
@@ -247,8 +247,8 @@ func TestFindCIDRClass(t *testing.T) {
 	}
 	for _, test := range tests {
 		fcmd := fakeexec.FakeCmd{
-			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-				func() ([]byte, error) { return []byte(test.output), test.err },
+			CombinedOutputScript: []fakeexec.FakeAction{
+				func() ([]byte, []byte, error) { return []byte(test.output), nil, test.err },
 			},
 		}
 		fexec := fakeexec.FakeExec{
@@ -286,8 +286,8 @@ func TestFindCIDRClass(t *testing.T) {
 
 func TestGetCIDRs(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return []byte(tcFilterOutput), nil },
+		CombinedOutputScript: []fakeexec.FakeAction{
+			func() ([]byte, []byte, error) { return []byte(tcFilterOutput), nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -351,13 +351,13 @@ func TestLimit(t *testing.T) {
 
 	for _, test := range tests {
 		fcmd := fakeexec.FakeCmd{
-			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-				func() ([]byte, error) { return []byte(tcClassOutput), test.err },
-				func() ([]byte, error) { return []byte{}, test.err },
-				func() ([]byte, error) { return []byte{}, test.err },
-				func() ([]byte, error) { return []byte(tcClassOutput2), test.err },
-				func() ([]byte, error) { return []byte{}, test.err },
-				func() ([]byte, error) { return []byte{}, test.err },
+			CombinedOutputScript: []fakeexec.FakeAction{
+				func() ([]byte, []byte, error) { return []byte(tcClassOutput), nil, test.err },
+				func() ([]byte, []byte, error) { return []byte{}, nil, test.err },
+				func() ([]byte, []byte, error) { return []byte{}, nil, test.err },
+				func() ([]byte, []byte, error) { return []byte(tcClassOutput2), nil, test.err },
+				func() ([]byte, []byte, error) { return []byte{}, nil, test.err },
+				func() ([]byte, []byte, error) { return []byte{}, nil, test.err },
 			},
 		}
 
@@ -467,10 +467,10 @@ func TestReset(t *testing.T) {
 	}
 	for _, test := range tests {
 		fcmd := fakeexec.FakeCmd{
-			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-				func() ([]byte, error) { return []byte(tcFilterOutput), test.err },
-				func() ([]byte, error) { return []byte{}, test.err },
-				func() ([]byte, error) { return []byte{}, test.err },
+			CombinedOutputScript: []fakeexec.FakeAction{
+				func() ([]byte, []byte, error) { return []byte(tcFilterOutput), nil, test.err },
+				func() ([]byte, []byte, error) { return []byte{}, nil, test.err },
+				func() ([]byte, []byte, error) { return []byte{}, nil, test.err },
 			},
 		}
 
@@ -526,8 +526,8 @@ var tcQdisc = "qdisc htb 1: root refcnt 2 r2q 10 default 30 direct_packets_stat 
 
 func TestReconcileInterfaceExists(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return []byte(tcQdisc), nil },
+		CombinedOutputScript: []fakeexec.FakeAction{
+			func() ([]byte, []byte, error) { return []byte(tcQdisc), nil, nil },
 		},
 	}
 
@@ -564,9 +564,9 @@ func TestReconcileInterfaceExists(t *testing.T) {
 
 func testReconcileInterfaceHasNoData(t *testing.T, output string) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return []byte(output), nil },
-			func() ([]byte, error) { return []byte(output), nil },
+		CombinedOutputScript: []fakeexec.FakeAction{
+			func() ([]byte, []byte, error) { return []byte(output), nil, nil },
+			func() ([]byte, []byte, error) { return []byte(output), nil, nil },
 		},
 	}
 
@@ -637,10 +637,10 @@ var tcQdiscWrong = []string{
 func TestReconcileInterfaceIsWrong(t *testing.T) {
 	for _, test := range tcQdiscWrong {
 		fcmd := fakeexec.FakeCmd{
-			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-				func() ([]byte, error) { return []byte(test), nil },
-				func() ([]byte, error) { return []byte("\n"), nil },
-				func() ([]byte, error) { return []byte("\n"), nil },
+			CombinedOutputScript: []fakeexec.FakeAction{
+				func() ([]byte, []byte, error) { return []byte(test), nil, nil },
+				func() ([]byte, []byte, error) { return []byte("\n"), nil, nil },
+				func() ([]byte, []byte, error) { return []byte("\n"), nil, nil },
 			},
 		}
 

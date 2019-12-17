@@ -87,10 +87,13 @@ func (fake *FakeExec) LookPath(file string) (string, error) {
 // FakeCmd is a simple scripted Cmd type.
 type FakeCmd struct {
 	Argv                 []string
-	CombinedOutputScript []FakeCombinedOutputAction
+	CombinedOutputScript []FakeAction
 	CombinedOutputCalls  int
 	CombinedOutputLog    [][]string
-	RunScript            []FakeRunAction
+	OutputScript         []FakeAction
+	OutputCalls          int
+	OutputLog            [][]string
+	RunScript            []FakeAction
 	RunCalls             int
 	RunLog               [][]string
 	Dirs                 []string
@@ -120,11 +123,8 @@ type FakeStdIOPipeResponse struct {
 	Error      error
 }
 
-// FakeCombinedOutputAction is a function type
-type FakeCombinedOutputAction func() ([]byte, error)
-
-// FakeRunAction is a function type
-type FakeRunAction func() ([]byte, []byte, error)
+// FakeAction is a function type
+type FakeAction func() ([]byte, []byte, error)
 
 // SetDir sets the directory
 func (fake *FakeCmd) SetDir(dir string) {
@@ -213,12 +213,26 @@ func (fake *FakeCmd) CombinedOutput() ([]byte, error) {
 	i := fake.CombinedOutputCalls
 	fake.CombinedOutputLog = append(fake.CombinedOutputLog, append([]string{}, fake.Argv...))
 	fake.CombinedOutputCalls++
-	return fake.CombinedOutputScript[i]()
+	stdout, _, err := fake.CombinedOutputScript[i]()
+	return stdout, err
 }
 
 // Output is the response from the command
 func (fake *FakeCmd) Output() ([]byte, error) {
-	return nil, fmt.Errorf("unimplemented")
+	if fake.DisableScripts {
+		return []byte{}, nil
+	}
+	if fake.OutputCalls > len(fake.OutputScript)-1 {
+		panic("ran out of Output() actions")
+	}
+	if fake.OutputLog == nil {
+		fake.OutputLog = [][]string{}
+	}
+	i := fake.OutputCalls
+	fake.OutputLog = append(fake.OutputLog, append([]string{}, fake.Argv...))
+	fake.OutputCalls++
+	stdout, _, err := fake.OutputScript[i]()
+	return stdout, err
 }
 
 // Stop is to stop the process
