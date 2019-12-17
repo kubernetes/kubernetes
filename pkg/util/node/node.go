@@ -202,7 +202,7 @@ func SetNodeCondition(c clientset.Interface, node types.NodeName, condition v1.N
 	if err != nil {
 		return nil
 	}
-	_, err = c.CoreV1().Nodes().PatchStatus(string(node), patch)
+	_, err = c.CoreV1().Nodes().PatchStatus(context.TODO(), string(node), patch)
 	return err
 }
 
