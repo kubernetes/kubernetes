@@ -28,20 +28,13 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
-	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // Metadata interface represents anything that can access a predicate metadata.
-type Metadata interface {
-	ShallowCopy() Metadata
-	AddPod(addedPod *v1.Pod, node *v1.Node) error
-	RemovePod(deletedPod *v1.Pod, node *v1.Node) error
-}
-
-// MetadataProducer is a function that computes predicate metadata for a given pod.
-type MetadataProducer func(pod *v1.Pod, sharedLister schedulerlisters.SharedLister) Metadata
+// DEPRECATED.
+type Metadata interface{}
 
 // AntiAffinityTerm's topology key value used in predicate metadata
 type topologyPair struct {
@@ -227,49 +220,6 @@ func (m *PodAffinityMetadata) Clone() *PodAffinityMetadata {
 	copy.topologyToMatchedExistingAntiAffinityTerms = m.topologyToMatchedExistingAntiAffinityTerms.clone()
 
 	return &copy
-}
-
-// NOTE: When new fields are added/removed or logic is changed, please make sure that
-// RemovePod, AddPod, and ShallowCopy functions are updated to work with the new changes.
-// TODO(ahg-g): remove, not use anymore.
-type predicateMetadata struct {
-}
-
-// Ensure that predicateMetadata implements algorithm.Metadata.
-var _ Metadata = &predicateMetadata{}
-
-// predicateMetadataProducer function produces predicate metadata. It is stored in a global variable below
-// and used to modify the return values of MetadataProducer
-type predicateMetadataProducer func(pm *predicateMetadata)
-
-var predicateMetadataProducers = make(map[string]predicateMetadataProducer)
-
-// RegisterPredicateMetadataProducer registers a MetadataProducer.
-func RegisterPredicateMetadataProducer(predicateName string, precomp predicateMetadataProducer) {
-	predicateMetadataProducers[predicateName] = precomp
-}
-
-// EmptyMetadataProducer returns a no-op MetadataProducer type.
-func EmptyMetadataProducer(pod *v1.Pod, sharedLister schedulerlisters.SharedLister) Metadata {
-	return nil
-}
-
-// MetadataProducerFactory is a factory to produce Metadata.
-type MetadataProducerFactory struct{}
-
-// GetPredicateMetadata returns the predicateMetadata which will be used by various predicates.
-func (f *MetadataProducerFactory) GetPredicateMetadata(pod *v1.Pod, sharedLister schedulerlisters.SharedLister) Metadata {
-	// If we cannot compute metadata, just return nil
-	if pod == nil {
-		return nil
-	}
-
-	predicateMetadata := &predicateMetadata{}
-	for predicateName, precomputeFunc := range predicateMetadataProducers {
-		klog.V(10).Infof("Precompute: %v", predicateName)
-		precomputeFunc(predicateMetadata)
-	}
-	return predicateMetadata
 }
 
 // GetPodAffinityMetadata computes inter-pod affinity metadata.
@@ -458,25 +408,6 @@ func (m *PodTopologySpreadMetadata) Clone() *PodTopologySpreadMetadata {
 		cp.tpPairToMatchNum[copyPair] = matchNum
 	}
 	return &cp
-}
-
-// RemovePod changes predicateMetadata assuming that the given `deletedPod` is
-// deleted from the system.
-func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod, node *v1.Node) error {
-	return nil
-}
-
-// AddPod changes predicateMetadata assuming that the given `addedPod` is added to the
-// system.
-func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, node *v1.Node) error {
-	return nil
-}
-
-// ShallowCopy copies a metadata struct into a new struct and creates a copy of
-// its maps and slices, but it does not copy the contents of pointer values.
-func (meta *predicateMetadata) ShallowCopy() Metadata {
-	newPredMeta := &predicateMetadata{}
-	return (Metadata)(newPredMeta)
 }
 
 // A processed version of v1.PodAffinityTerm.

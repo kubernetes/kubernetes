@@ -852,8 +852,7 @@ func TestVolumeCountConflicts(t *testing.T) {
 			getFakeStorageClassLister(test.filterName),
 			getFakePVLister(test.filterName),
 			getFakePVCLister(test.filterName))
-		factory := &MetadataProducerFactory{}
-		fits, reasons, err := pred(test.newPod, factory.GetPredicateMetadata(test.newPod, nil), node)
+		fits, reasons, err := pred(test.newPod, nil, node)
 		if err != nil {
 			t.Errorf("Using allocatable [%s]%s: unexpected error: %v", test.filterName, test.test, err)
 		}

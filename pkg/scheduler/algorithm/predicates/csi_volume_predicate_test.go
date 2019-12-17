@@ -457,8 +457,7 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 				getFakeCSIPVCLister(test.filterName, "csi-sc", test.driverNames...),
 				getFakeCSIStorageClassLister("csi-sc", test.driverNames[0]))
 
-			factory := &MetadataProducerFactory{}
-			fits, reasons, err := pred(test.newPod, factory.GetPredicateMetadata(test.newPod, nil), node)
+			fits, reasons, err := pred(test.newPod, nil, node)
 			if err != nil {
 				t.Errorf("Using allocatable [%s]%s: unexpected error: %v", test.filterName, test.test, err)
 			}

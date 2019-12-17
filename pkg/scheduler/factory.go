@@ -240,11 +240,6 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		return nil, err
 	}
 
-	predicateMetaProducer, err := getPredicateMetadataProducer(c.algorithmFactoryArgs)
-	if err != nil {
-		return nil, err
-	}
-
 	// Combine all framework configurations. If this results in any duplication, framework
 	// instantiation should fail.
 	var plugins schedulerapi.Plugins
@@ -287,7 +282,6 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		c.schedulerCache,
 		podQueue,
 		predicateFuncs,
-		predicateMetaProducer,
 		priorityMetaProducer,
 		c.nodeInfoSnapshot,
 		framework,

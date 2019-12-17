@@ -789,7 +789,6 @@ func TestGenericScheduler(t *testing.T) {
 				cache,
 				internalqueue.NewSchedulingQueue(nil),
 				nil,
-				algorithmpredicates.EmptyMetadataProducer,
 				// test.prioritizers,
 				priorities.EmptyMetadataProducer,
 				snapshot,
@@ -837,7 +836,6 @@ func makeScheduler(nodes []*v1.Node, fns ...st.RegisterPluginFunc) *genericSched
 		cache,
 		internalqueue.NewSchedulingQueue(nil),
 		nil,
-		algorithmpredicates.EmptyMetadataProducer,
 		priorities.EmptyMetadataProducer,
 		emptySnapshot,
 		fwk,
@@ -966,7 +964,6 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			cache,
 			queue,
 			nil,
-			algorithmpredicates.EmptyMetadataProducer,
 			priorities.EmptyMetadataProducer,
 			emptySnapshot,
 			fwk,
@@ -1123,7 +1120,7 @@ func TestZeroRequest(t *testing.T) {
 
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 
-			metaDataProducer := priorities.NewMetadataFactory(
+			metadataProducer := priorities.NewMetadataFactory(
 				informerFactory.Core().V1().Services().Lister(),
 				informerFactory.Core().V1().ReplicationControllers().Lister(),
 				informerFactory.Apps().V1().ReplicaSets().Lister(),
@@ -1131,7 +1128,7 @@ func TestZeroRequest(t *testing.T) {
 				1,
 			)
 
-			metaData := metaDataProducer(test.pod, test.nodes, snapshot)
+			metadata := metadataProducer(test.pod, test.nodes, snapshot)
 
 			registry := framework.Registry{}
 			plugins := &schedulerapi.Plugins{
@@ -1163,8 +1160,7 @@ func TestZeroRequest(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				nil,
-				metaDataProducer,
+				metadataProducer,
 				emptySnapshot,
 				fwk,
 				[]algorithm.SchedulerExtender{},
@@ -1181,7 +1177,7 @@ func TestZeroRequest(t *testing.T) {
 				context.Background(),
 				framework.NewCycleState(),
 				test.pod,
-				metaData,
+				metadata,
 				test.nodes,
 			)
 			if err != nil {
@@ -1607,12 +1603,10 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
 			fwk, _ := framework.NewFramework(registry, plugins, pluginConfigs, framework.WithSnapshotSharedLister(snapshot))
 
-			factory := &algorithmpredicates.MetadataProducerFactory{}
 			scheduler := NewGenericScheduler(
 				nil,
 				internalqueue.NewSchedulingQueue(nil),
 				nil,
-				factory.GetPredicateMetadata,
 				priorities.EmptyMetadataProducer,
 				snapshot,
 				fwk,
@@ -1863,11 +1857,9 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			test.registerFilterPlugin(&registry, plugins, pluginConfigs)
 			fwk, _ := framework.NewFramework(registry, plugins, pluginConfigs, framework.WithSnapshotSharedLister(snapshot))
 
-			factory := algorithmpredicates.MetadataProducerFactory{}
 			g := &genericScheduler{
-				framework:             fwk,
-				nodeInfoSnapshot:      snapshot,
-				predicateMetaProducer: factory.GetPredicateMetadata,
+				framework:        fwk,
+				nodeInfoSnapshot: snapshot,
 			}
 			assignDefaultStartTime(test.pods)
 
@@ -2363,7 +2355,6 @@ func TestPreempt(t *testing.T) {
 				cache,
 				internalqueue.NewSchedulingQueue(nil),
 				nil,
-				algorithmpredicates.EmptyMetadataProducer,
 				priorities.EmptyMetadataProducer,
 				snapshot,
 				fwk,
