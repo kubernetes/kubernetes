@@ -18,7 +18,6 @@ package internal
 
 import (
 	"bytes"
-	"compress/gzip"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -59,29 +58,14 @@ func SetToFields(s fieldpath.Set) (f metav1.FieldsV1, err error) {
 
 // FieldsToSetV2 TODO
 func FieldsToSetV2(b []byte) (s fieldpath.Set, err error) {
-	r, err := gzip.NewReader(bytes.NewReader(b))
-	if err != nil {
-		return s, err
-	}
-	defer r.Close()
-	err = s.FromJSON(r)
+	err = s.FromJSON(bytes.NewReader(b))
 	return s, err
 }
 
 // SetToFieldsV2 TODO
 func SetToFieldsV2(s fieldpath.Set) ([]byte, error) {
 	buf := bytes.Buffer{}
-	w, err := gzip.NewWriterLevel(&buf, gzip.BestSpeed)
-	if err != nil {
-		return nil, err
-	}
-	defer w.Close()
-	err = s.ToJSONStream_V2Experimental(w)
-	if err != nil {
-		return nil, err
-	}
-	err = w.Flush()
-	if err != nil {
+	if err := s.ToJSONStream_V2Experimental(&buf); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
