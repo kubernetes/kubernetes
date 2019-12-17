@@ -268,6 +268,7 @@ func newProxyServer(
 		OOMScoreAdj:            config.OOMScoreAdj,
 		ConfigSyncPeriod:       config.ConfigSyncPeriod.Duration,
 		HealthzServer:          healthzServer,
+		UseEndpointSlices:      utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice),
 	}, nil
 }
 
