@@ -597,6 +597,7 @@ func (s *ProxyServer) Run() error {
 			w.Header().Set("X-Content-Type-Options", "nosniff")
 			fmt.Fprintf(w, "%s", s.ProxyMode)
 		})
+		//lint:ignore SA1019 See the Metrics Stability Migration KEP
 		proxyMux.Handle("/metrics", legacyregistry.Handler())
 		if s.EnableProfiling {
 			routes.Profiling{}.Install(proxyMux)
