@@ -49,14 +49,14 @@ type pruner struct {
 	out io.Writer
 }
 
-func newPruner(o *ApplyOptions, visitedUids sets.String, visitedNamespaces sets.String) pruner {
+func newPruner(o *ApplyOptions) pruner {
 	return pruner{
 		mapper:        o.Mapper,
 		dynamicClient: o.DynamicClient,
 
 		labelSelector:     o.Selector,
-		visitedUids:       visitedUids,
-		visitedNamespaces: visitedNamespaces,
+		visitedUids:       o.VisitedUids,
+		visitedNamespaces: o.VisitedNamespaces,
 
 		cascade:      o.DeleteOptions.Cascade,
 		dryRun:       o.DryRun,

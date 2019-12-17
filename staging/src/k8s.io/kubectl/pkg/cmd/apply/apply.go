@@ -92,6 +92,19 @@ type ApplyOptions struct {
 	// not call the resource builder; only return the set objects.
 	objects       []*resource.Info
 	objectsCached bool
+
+	// Stores visited objects/namespaces for later use
+	// calculating the set of objects to prune.
+	VisitedUids       sets.String
+	VisitedNamespaces sets.String
+
+	// Function run after the objects are generated and
+	// stored in the "objects" field, but before the
+	// apply is run on these objects.
+	preProcessorFn func(*ApplyOptions) error
+	// Function run after all objects have been applied.
+	// The standard postprocessorFn is "PrintAndPrune()".
+	postProcessorFn func(*ApplyOptions) error
 }
 
 var (
@@ -140,6 +153,11 @@ func NewApplyOptions(ioStreams genericclioptions.IOStreams) *ApplyOptions {
 
 		objects:       []*resource.Info{},
 		objectsCached: false,
+
+		VisitedUids:       sets.NewString(),
+		VisitedNamespaces: sets.NewString(),
+
+		postProcessorFn: PrintAndPrune,
 	}
 }
 
@@ -340,9 +358,6 @@ func (o *ApplyOptions) Run() error {
 		OpenAPIGetter: o.DiscoveryClient,
 	}
 
-	visitedUids := sets.NewString()
-	visitedNamespaces := sets.NewString()
-
 	infos, err := o.GetObjects()
 	if err != nil {
 		return err
@@ -360,9 +375,7 @@ func (o *ApplyOptions) Run() error {
 			}
 		}
 
-		if info.Namespaced() {
-			visitedNamespaces.Insert(info.Namespace)
-		}
+		o.MarkNamespaceVisited(info)
 
 		if err := o.Recorder.Record(info.Object); err != nil {
 			klog.V(4).Infof("error recording current command: %v", err)
@@ -414,12 +427,11 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 			}
 
 			info.Refresh(obj, true)
-			metadata, err := meta.Accessor(info.Object)
-			if err != nil {
+
+			if err := o.MarkObjectVisited(info); err != nil {
 				return err
 			}
 
-			visitedUids.Insert(string(metadata.GetUID()))
 			if o.shouldPrintObject() {
 				continue
 			}
@@ -467,11 +479,9 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 				info.Refresh(obj, true)
 			}
 
-			metadata, err := meta.Accessor(info.Object)
-			if err != nil {
+			if err := o.MarkObjectVisited(info); err != nil {
 				return err
 			}
-			visitedUids.Insert(string(metadata.GetUID()))
 
 			if o.shouldPrintObject() {
 				continue
@@ -487,13 +497,12 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 			continue
 		}
 
-		metadata, err := meta.Accessor(info.Object)
-		if err != nil {
+		if err := o.MarkObjectVisited(info); err != nil {
 			return err
 		}
-		visitedUids.Insert(string(metadata.GetUID()))
 
 		if !o.DryRun {
+			metadata, _ := meta.Accessor(info.Object)
 			annotationMap := metadata.GetAnnotations()
 			if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
 				fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
@@ -537,7 +546,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 	}
 
 	if o.Prune {
-		p := newPruner(o, visitedUids, visitedNamespaces)
+		p := newPruner(o)
 		return p.pruneAll(o)
 	}
 
@@ -596,6 +605,25 @@ func (o *ApplyOptions) printObjects() error {
 		}
 	}
 
+	return nil
+}
+
+// MarkNamespaceVisited keeps track of which namespaces the applied
+// objects belong to. Used for pruning.
+func (o *ApplyOptions) MarkNamespaceVisited(info *resource.Info) {
+	if info.Namespaced() {
+		o.VisitedNamespaces.Insert(info.Namespace)
+	}
+}
+
+// MarkNamespaceVisited keeps track of UIDs of the applied
+// objects. Used for pruning.
+func (o *ApplyOptions) MarkObjectVisited(info *resource.Info) error {
+	metadata, err := meta.Accessor(info.Object)
+	if err != nil {
+		return err
+	}
+	o.VisitedUids.Insert(string(metadata.GetUID()))
 	return nil
 }
 
