@@ -109,12 +109,21 @@ func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL,
 
 // AuthenticateToken implements authenticator.Token
 func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	doneAuthenticating := stats.authenticating()
+
 	auds, audsOk := authenticator.AudiencesFrom(ctx)
 
 	key := keyFunc(a.hashPool, auds, token)
 	if record, ok := a.cache.get(key); ok {
+		// Record cache hit
+		doneAuthenticating(true)
 		return record.resp, record.ok, record.err
 	}
+
+	// Record cache miss
+	doneBlocking := stats.blocking()
+	defer doneBlocking()
+	defer doneAuthenticating(false)
 
 	type lookup struct {
 		resp *authenticator.Response
@@ -122,6 +131,7 @@ func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token 
 	}
 
 	c := a.group.DoChan(key, func() (val interface{}, err error) {
+		doneFetching := stats.fetching()
 		// We're leaving the request handling stack so we need to handle crashes
 		// ourselves. Log a stack trace and return a 500 if something panics.
 		defer func() {
@@ -134,6 +144,7 @@ func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token 
 				buf = buf[:runtime.Stack(buf, false)]
 				klog.Errorf("%v\n%s", r, buf)
 			}
+			doneFetching(err == nil)
 		}()
 
 		// Check again for a cached record. We may have raced with a fetch.
