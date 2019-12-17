@@ -19,7 +19,6 @@ limitations under the License.
 package mount
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -289,55 +288,53 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 		}
 	}
 
-	// Try to mount the disk
-	klog.V(4).Infof("Attempting to mount disk: %s %s %s", fstype, source, target)
-	mountErr := mounter.Interface.Mount(source, target, fstype, options)
-	if mountErr != nil {
-		// Mount failed. This indicates either that the disk is unformatted or
-		// it contains an unexpected filesystem.
-		existingFormat, err := mounter.GetDiskFormat(source)
-		if err != nil {
-			return err
+	// Check if the disk is already formatted
+	existingFormat, err := mounter.GetDiskFormat(source)
+	if err != nil {
+		return err
+	}
+
+	// Use 'ext4' as the default
+	if len(fstype) == 0 {
+		fstype = "ext4"
+	}
+
+	if existingFormat == "" {
+		// Do not attempt to format the disk if mounting as readonly, return an error to reflect this.
+		if readOnly {
+			return fmt.Errorf("cannot mount unformatted disk %s as we are manipulating it in read-only mode", source)
 		}
-		if existingFormat == "" {
-			if readOnly {
-				// Don't attempt to format if mounting as readonly, return an error to reflect this.
-				return errors.New("failed to mount unformatted volume as read only")
-			}
 
-			// Disk is unformatted so format it.
-			args := []string{source}
-			// Use 'ext4' as the default
-			if len(fstype) == 0 {
-				fstype = "ext4"
+		// Disk is unformatted so format it.
+		args := []string{source}
+		if fstype == "ext4" || fstype == "ext3" {
+			args = []string{
+				"-F",  // Force flag
+				"-m0", // Zero blocks reserved for super-user
+				source,
 			}
+		}
 
-			if fstype == "ext4" || fstype == "ext3" {
-				args = []string{
-					"-F",  // Force flag
-					"-m0", // Zero blocks reserved for super-user
-					source,
-				}
-			}
-			klog.Infof("Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", source, fstype, args)
-			_, err := mounter.Exec.Command("mkfs."+fstype, args...).CombinedOutput()
-			if err == nil {
-				// the disk has been formatted successfully try to mount it again.
-				klog.Infof("Disk successfully formatted (mkfs): %s - %s %s", fstype, source, target)
-				return mounter.Interface.Mount(source, target, fstype, options)
-			}
+		klog.Infof("Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", source, fstype, args)
+		_, err := mounter.Exec.Command("mkfs."+fstype, args...).CombinedOutput()
+		if err != nil {
 			klog.Errorf("format of disk %q failed: type:(%q) target:(%q) options:(%q)error:(%v)", source, fstype, target, options, err)
 			return err
 		}
-		// Disk is already formatted and failed to mount
-		if len(fstype) == 0 || fstype == existingFormat {
-			// This is mount error
-			return mountErr
-		}
-		// Block device is formatted with unexpected filesystem, let the user know
-		return fmt.Errorf("failed to mount the volume as %q, it already contains %s. Mount error: %v", fstype, existingFormat, mountErr)
+
+		klog.Infof("Disk successfully formatted (mkfs): %s - %s %s", fstype, source, target)
+	} else if fstype != existingFormat {
+		// Verify that the disk is formatted with filesystem type we are expecting
+		klog.Warningf("Configured to mount disk %s as %s but current format is %s, things might break", source, existingFormat, fstype)
 	}
-	return mountErr
+
+	// Mount the disk
+	klog.V(4).Infof("Attempting to mount disk %s in %s format at %s", source, fstype, target)
+	if err := mounter.Interface.Mount(source, target, fstype, options); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // GetDiskFormat uses 'blkid' to see if the given disk is unformatted
