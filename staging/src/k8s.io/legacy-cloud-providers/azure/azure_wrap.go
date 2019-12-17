@@ -35,10 +35,10 @@ import (
 )
 
 var (
-	vmCacheTTL  = time.Minute
-	lbCacheTTL  = 2 * time.Minute
-	nsgCacheTTL = 2 * time.Minute
-	rtCacheTTL  = 2 * time.Minute
+	vmCacheTTLDefaultInSeconds           = 60
+	loadBalancerCacheTTLDefaultInSeconds = 120
+	nsgCacheTTLDefaultInSeconds          = 120
+	routeTableCacheTTLDefaultInSeconds   = 120
 
 	azureNodeProviderIDRE    = regexp.MustCompile(`^azure:///subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Compute/(?:.*)`)
 	azureResourceGroupNameRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/(?:.*)`)
@@ -228,7 +228,10 @@ func (az *Cloud) newVMCache() (*timedCache, error) {
 		return &vm, nil
 	}
 
-	return newTimedcache(vmCacheTTL, getter)
+	if az.VMCacheTTLInSeconds == 0 {
+		az.VMCacheTTLInSeconds = vmCacheTTLDefaultInSeconds
+	}
+	return newTimedcache(time.Duration(az.VMCacheTTLInSeconds)*time.Second, getter)
 }
 
 func (az *Cloud) newLBCache() (*timedCache, error) {
@@ -250,7 +253,10 @@ func (az *Cloud) newLBCache() (*timedCache, error) {
 		return &lb, nil
 	}
 
-	return newTimedcache(lbCacheTTL, getter)
+	if az.LoadBalancerCacheTTLInSeconds == 0 {
+		az.LoadBalancerCacheTTLInSeconds = loadBalancerCacheTTLDefaultInSeconds
+	}
+	return newTimedcache(time.Duration(az.LoadBalancerCacheTTLInSeconds)*time.Second, getter)
 }
 
 func (az *Cloud) newNSGCache() (*timedCache, error) {
@@ -271,7 +277,10 @@ func (az *Cloud) newNSGCache() (*timedCache, error) {
 		return &nsg, nil
 	}
 
-	return newTimedcache(nsgCacheTTL, getter)
+	if az.NsgCacheTTLInSeconds == 0 {
+		az.NsgCacheTTLInSeconds = nsgCacheTTLDefaultInSeconds
+	}
+	return newTimedcache(time.Duration(az.NsgCacheTTLInSeconds)*time.Second, getter)
 }
 
 func (az *Cloud) newRouteTableCache() (*timedCache, error) {
@@ -292,7 +301,10 @@ func (az *Cloud) newRouteTableCache() (*timedCache, error) {
 		return &rt, nil
 	}
 
-	return newTimedcache(rtCacheTTL, getter)
+	if az.RouteTableCacheTTLInSeconds == 0 {
+		az.RouteTableCacheTTLInSeconds = routeTableCacheTTLDefaultInSeconds
+	}
+	return newTimedcache(time.Duration(az.RouteTableCacheTTLInSeconds)*time.Second, getter)
 }
 
 func (az *Cloud) useStandardLoadBalancer() bool {
