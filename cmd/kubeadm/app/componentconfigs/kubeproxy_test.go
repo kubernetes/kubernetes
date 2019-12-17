@@ -77,6 +77,9 @@ var kubeProxyMarshalCases = []struct {
 			  scheduler: ""
 			  strictARP: false
 			  syncPeriod: 0s
+			  tcpFinTimeout: 0s
+			  tcpTimeout: 0s
+			  udpTimeout: 0s
 			kind: KubeProxyConfiguration
 			metricsBindAddress: ""
 			mode: ""
@@ -128,6 +131,9 @@ var kubeProxyMarshalCases = []struct {
 			  scheduler: ""
 			  strictARP: false
 			  syncPeriod: 0s
+			  tcpFinTimeout: 0s
+			  tcpTimeout: 0s
+			  udpTimeout: 0s
 			kind: KubeProxyConfiguration
 			metricsBindAddress: ""
 			mode: ""
