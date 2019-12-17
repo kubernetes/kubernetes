@@ -176,7 +176,7 @@ func init() {
 
 type timeConverter struct{}
 
-func (_ timeConverter) IsNull(v reflect.Value) bool {
+func (timeConverter) IsNull(v reflect.Value) bool {
 	t, ok := v.Interface().(metav1.Time)
 	if !ok {
 		panic("value is not a metav1.Time")
@@ -184,7 +184,7 @@ func (_ timeConverter) IsNull(v reflect.Value) bool {
 	return t.IsZero()
 }
 
-func (_ timeConverter) ToString(v reflect.Value) string {
+func (timeConverter) ToString(v reflect.Value) string {
 	t, ok := v.Interface().(metav1.Time)
 	if !ok {
 		panic("value is not a metav1.Time")
@@ -216,11 +216,11 @@ func (_ timeConverter) ToString(v reflect.Value) string {
 
 type quantityConverter struct{}
 
-func (_ quantityConverter) IsNull(v reflect.Value) bool {
+func (quantityConverter) IsNull(v reflect.Value) bool {
 	return false
 }
 
-func (_ quantityConverter) ToString(v reflect.Value) string {
+func (quantityConverter) ToString(v reflect.Value) string {
 	quantity, ok := v.Interface().(resource.Quantity)
 	if !ok {
 		panic("value is not a resource.Quantity")

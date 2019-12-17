@@ -37,7 +37,7 @@ var EmptyFields metav1.FieldsV1 = func() metav1.FieldsV1 {
 
 // EmptyFieldsV2 represents a set with no paths
 // It looks like metav1.Fields{Raw: []byte("{}")}
-var EmptyFieldsV2 []byte = func() []byte {
+var EmptyFieldsV2 = func() []byte {
 	f, err := SetToFieldsV2(*fieldpath.NewSet())
 	if err != nil {
 		panic("should never happen")
@@ -57,7 +57,7 @@ func SetToFields(s fieldpath.Set) (f metav1.FieldsV1, err error) {
 	return f, err
 }
 
-// FieldsToSet creates a set paths from an input trie of fields
+// FieldsToSetV2 TODO
 func FieldsToSetV2(b []byte) (s fieldpath.Set, err error) {
 	r, err := gzip.NewReader(bytes.NewReader(b))
 	if err != nil {
@@ -68,7 +68,7 @@ func FieldsToSetV2(b []byte) (s fieldpath.Set, err error) {
 	return s, err
 }
 
-// SetToFields creates a trie of fields from an input set of paths
+// SetToFieldsV2 TODO
 func SetToFieldsV2(s fieldpath.Set) ([]byte, error) {
 	buf := bytes.Buffer{}
 	w := gzip.NewWriter(&buf)
