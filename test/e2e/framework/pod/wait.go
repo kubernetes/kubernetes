@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
@@ -534,49 +533,6 @@ func WaitForPodsWithLabelRunningReady(c clientset.Interface, ns string, label la
 			return true, nil
 		})
 	return pods, err
-}
-
-// WaitForPodsInactive waits until there are no active pods left in the PodStore.
-// This is to make a fair comparison of deletion time between DeleteRCAndPods
-// and DeleteRCAndWaitForGC, because the RC controller decreases status.replicas
-// when the pod is inactvie.
-func WaitForPodsInactive(ps *testutils.PodStore, interval, timeout time.Duration) error {
-	var activePods []*v1.Pod
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		pods := ps.List()
-		activePods = controller.FilterActivePods(pods)
-		if len(activePods) != 0 {
-			return false, nil
-		}
-		return true, nil
-	})
-
-	if err == wait.ErrWaitTimeout {
-		for _, pod := range activePods {
-			e2elog.Logf("ERROR: Pod %q running on %q is still active", pod.Name, pod.Spec.NodeName)
-		}
-		return fmt.Errorf("there are %d active pods. E.g. %q on node %q", len(activePods), activePods[0].Name, activePods[0].Spec.NodeName)
-	}
-	return err
-}
-
-// WaitForPodsGone waits until there are no pods left in the PodStore.
-func WaitForPodsGone(ps *testutils.PodStore, interval, timeout time.Duration) error {
-	var pods []*v1.Pod
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		if pods = ps.List(); len(pods) == 0 {
-			return true, nil
-		}
-		return false, nil
-	})
-
-	if err == wait.ErrWaitTimeout {
-		for _, pod := range pods {
-			e2elog.Logf("ERROR: Pod %q still exists. Node: %q", pod.Name, pod.Spec.NodeName)
-		}
-		return fmt.Errorf("there are %d pods left. E.g. %q on node %q", len(pods), pods[0].Name, pods[0].Spec.NodeName)
-	}
-	return err
 }
 
 // WaitForPodsReady waits for the pods to become ready.

@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 var (
@@ -90,7 +89,7 @@ func getScheduledAndUnscheduledPods(c clientset.Interface, masterNodes sets.Stri
 		}
 	}
 	pods.Items = filteredPods
-	return e2epod.GetPodsScheduled(masterNodes, pods)
+	return GetPodsScheduled(masterNodes, pods)
 }
 
 // getDeletingPods returns whether there are any pods marked for deletion.
