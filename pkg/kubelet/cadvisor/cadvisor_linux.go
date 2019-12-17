@@ -83,7 +83,7 @@ func init() {
 }
 
 // New creates a new cAdvisor Interface for linux systems.
-func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats bool) (Interface, error) {
+func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats bool, cpuOvercommitFactor uint, memoryOvercommitFactor uint) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
 	includedMetrics := cadvisormetrics.MetricSet{
@@ -104,6 +104,18 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, includedMetrics, http.DefaultClient, cgroupRoots)
 	if err != nil {
 		return nil, err
+	}
+
+	machineInfo, err := m.GetMachineInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	if cpuOvercommitFactor > 0 {
+		machineInfo.NumCores *= int(cpuOvercommitFactor)
+	}
+	if memoryOvercommitFactor > 0 {
+		machineInfo.MemoryCapacity *= uint64(memoryOvercommitFactor)
 	}
 
 	if _, err := os.Stat(rootPath); err != nil {

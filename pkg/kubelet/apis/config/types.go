@@ -335,6 +335,11 @@ type KubeletConfiguration struct {
 	// This provide a "static" CPU list rather than the "dynamic" list by system-reserved and kube-reserved.
 	// This option overwrites CPUs provided by system-reserved and kube-reserved.
 	ReservedSystemCPUs string
+
+	// These options specifies the ratio to oversold node resources.
+	// If 0, these fields are ignored.
+	CPUOvercommitFactor uint
+	MemoryOvercommitFactor uint
 }
 
 type KubeletAuthorizationMode string
