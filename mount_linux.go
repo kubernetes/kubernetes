@@ -267,6 +267,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	}
 
 	options = append(options, "defaults")
+	var mountErrorValue MountErrorType
 
 	if !readOnly {
 		// Run fsck on the disk to fix repairable issues, only do this for volumes requested as rw.
@@ -281,7 +282,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 			case isExitError && ee.ExitStatus() == fsckErrorsCorrected:
 				klog.Infof("Device %s has errors which were corrected by fsck.", source)
 			case isExitError && ee.ExitStatus() == fsckErrorsUncorrected:
-				return fmt.Errorf("'fsck' found errors on device %s but could not correct them: %s", source, string(out))
+				return NewMountError(HasFilesystemErrors, "'fsck' found errors on device %s but could not correct them: %s", source, string(out))
 			case isExitError && ee.ExitStatus() > fsckErrorsUncorrected:
 				klog.Infof("`fsck` error %s", string(out))
 			}
@@ -302,7 +303,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	if existingFormat == "" {
 		// Do not attempt to format the disk if mounting as readonly, return an error to reflect this.
 		if readOnly {
-			return fmt.Errorf("cannot mount unformatted disk %s as we are manipulating it in read-only mode", source)
+			return NewMountError(UnformattedReadOnly, "cannot mount unformatted disk %s as we are manipulating it in read-only mode", source)
 		}
 
 		// Disk is unformatted so format it.
@@ -319,19 +320,20 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 		_, err := mounter.Exec.Command("mkfs."+fstype, args...).CombinedOutput()
 		if err != nil {
 			klog.Errorf("format of disk %q failed: type:(%q) target:(%q) options:(%q)error:(%v)", source, fstype, target, options, err)
-			return err
+			return NewMountError(FormatFailed, err.Error())
 		}
 
 		klog.Infof("Disk successfully formatted (mkfs): %s - %s %s", fstype, source, target)
 	} else if fstype != existingFormat {
 		// Verify that the disk is formatted with filesystem type we are expecting
+		mountErrorValue = FilesystemMismatch
 		klog.Warningf("Configured to mount disk %s as %s but current format is %s, things might break", source, existingFormat, fstype)
 	}
 
 	// Mount the disk
 	klog.V(4).Infof("Attempting to mount disk %s in %s format at %s", source, fstype, target)
 	if err := mounter.Interface.Mount(source, target, fstype, options); err != nil {
-		return err
+		return NewMountError(mountErrorValue, err.Error())
 	}
 
 	return nil
