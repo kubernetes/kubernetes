@@ -53,44 +53,6 @@ func (p *bestEffortPolicy) Merge(providersHints []map[string][]TopologyHint) (To
 	return hint, admit
 }
 
-// Iterate over all permutations of hints in 'allProviderHints [][]TopologyHint'.
-//
-// This procedure is implemented as a recursive function over the set of hints
-// in 'allproviderHints[i]'. It applies the function 'callback' to each
-// permutation as it is found. It is the equivalent of:
-//
-// for i := 0; i < len(providerHints[0]); i++
-//     for j := 0; j < len(providerHints[1]); j++
-//         for k := 0; k < len(providerHints[2]); k++
-//             ...
-//             for z := 0; z < len(providerHints[-1]); z++
-//                 permutation := []TopologyHint{
-//                     providerHints[0][i],
-//                     providerHints[1][j],
-//                     providerHints[2][k],
-//                     ...
-//                     providerHints[-1][z]
-//                 }
-//                 callback(permutation)
-func (p *bestEffortPolicy) iterateAllProviderTopologyHints(allProviderHints [][]TopologyHint, callback func([]TopologyHint)) {
-	// Internal helper function to accumulate the permutation before calling the callback.
-	var iterate func(i int, accum []TopologyHint)
-	iterate = func(i int, accum []TopologyHint) {
-		// Base case: we have looped through all providers and have a full permutation.
-		if i == len(allProviderHints) {
-			callback(accum)
-			return
-		}
-
-		// Loop through all hints for provider 'i', and recurse to build the
-		// the permutation of this hint with all hints from providers 'i++'.
-		for j := range allProviderHints[i] {
-			iterate(i+1, append(accum, allProviderHints[i][j]))
-		}
-	}
-	iterate(0, []TopologyHint{})
-}
-
 // Merge a TopologyHints permutation to a single hint by performing a bitwise-AND
 // of their affinity masks. The hint shall be preferred if all hits in the permutation
 // are preferred.
@@ -163,7 +125,7 @@ func (p *bestEffortPolicy) mergeProvidersHints(providersHints []map[string][]Top
 	// permutations that have at least one NUMA ID set. If no merged mask can be
 	// found that has at least one NUMA ID set, return the 'defaultAffinity'.
 	bestHint := TopologyHint{defaultAffinity, false}
-	p.iterateAllProviderTopologyHints(allProviderHints, func(permutation []TopologyHint) {
+	iterateAllProviderTopologyHints(allProviderHints, func(permutation []TopologyHint) {
 		// Get the NUMANodeAffinity from each hint in the permutation and see if any
 		// of them encode unpreferred allocations.
 		mergedHint := p.mergePermutation(permutation)
