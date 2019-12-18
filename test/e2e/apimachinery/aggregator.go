@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net"
 	"strings"
 	"time"
 
@@ -198,6 +199,12 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	podLabels := map[string]string{"app": "sample-apiserver", "apiserver": "true"}
 	replicas := int32(1)
 	zero := int64(0)
+	etcdLocalhostAddress := "127.0.0.1"
+	if framework.TestContext.ClusterIsIPv6() {
+		etcdLocalhostAddress = "::1"
+	}
+	etcdURL := fmt.Sprintf("http://%s", net.JoinHostPort(etcdLocalhostAddress, "2379"))
+
 	mounts := []v1.VolumeMount{
 		{
 			Name:      "apiserver-certs",
@@ -218,7 +225,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 			Name:         "sample-apiserver",
 			VolumeMounts: mounts,
 			Args: []string{
-				"--etcd-servers=http://localhost:2379",
+				fmt.Sprintf("--etcd-servers=%s", etcdURL),
 				"--tls-cert-file=/apiserver.local.config/certificates/tls.crt",
 				"--tls-private-key-file=/apiserver.local.config/certificates/tls.key",
 				"--audit-log-path=-",
@@ -232,6 +239,10 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 			Image: etcdImage,
 			Command: []string{
 				"/usr/local/bin/etcd",
+				"--listen-client-urls",
+				etcdURL,
+				"--advertise-client-urls",
+				etcdURL,
 			},
 		},
 	}
