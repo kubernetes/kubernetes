@@ -21,8 +21,16 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/kubectl/pkg/util/openapi"
 )
+
+func NewDryRunVerifier(dynamicClient dynamic.Interface, discoveryClient discovery.DiscoveryInterface) *DryRunVerifier {
+	return &DryRunVerifier{
+		Finder:        NewCRDFinder(CRDFromDynamic(dynamicClient)),
+		OpenAPIGetter: discoveryClient,
+	}
+}
 
 // DryRunVerifier verifies if a given group-version-kind supports DryRun
 // against the current server. Sending dryRun requests to apiserver that

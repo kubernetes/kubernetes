@@ -330,11 +330,6 @@ func (o *ApplyOptions) Run() error {
 		openapiSchema = o.OpenAPISchema
 	}
 
-	var dryRunVerifier = &resource.DryRunVerifier{
-		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(o.DynamicClient)),
-		OpenAPIGetter: o.DiscoveryClient,
-	}
-
 	// include the uninitialized objects by default if --prune is true
 	// unless explicitly set --include-uninitialized=false
 	r := o.Builder.
@@ -372,13 +367,6 @@ func (o *ApplyOptions) Run() error {
 			return err
 		}
 
-		// If server-dry-run is requested but the type doesn't support it, fail right away.
-		if o.DryRunStrategy.Server() {
-			if err := dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-				return err
-			}
-		}
-
 		if info.Namespaced() {
 			visitedNamespaces.Insert(info.Namespace)
 		}
@@ -401,7 +389,7 @@ func (o *ApplyOptions) Run() error {
 
 			obj, err := resource.
 				NewHelper(info.Client, info.Mapping).
-				WithDryRun(o.DryRunStrategy.Server()).
+				WithDryRun(o.DryRunStrategy.Server(), o.DynamicClient, o.DiscoveryClient).
 				Patch(
 					info.Namespace,
 					info.Name,
@@ -479,7 +467,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 				// Then create the resource and skip the three-way merge
 				obj, err := resource.
 					NewHelper(info.Client, info.Mapping).
-					WithDryRun(o.DryRunStrategy.Server()).
+					WithDryRun(o.DryRunStrategy.Server(), o.DynamicClient, o.DiscoveryClient).
 					Create(info.Namespace, true, info.Object, nil)
 				if err != nil {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
@@ -521,7 +509,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 
 			helper := resource.
 				NewHelper(info.Client, info.Mapping).
-				WithDryRun(o.DryRunStrategy.Server())
+				WithDryRun(o.DryRunStrategy.Server(), o.DynamicClient, o.DiscoveryClient)
 			patcher := &Patcher{
 				Mapping:       info.Mapping,
 				Helper:        helper,

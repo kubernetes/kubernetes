@@ -23,8 +23,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 )
 
 var metadataAccessor = meta.NewAccessor()
@@ -41,6 +44,10 @@ type Helper struct {
 	// If true, then use server-side dry-run to not persist changes to storage
 	// for verbs and resources that support server-side dry-run.
 	DryRunServer bool
+	// Checks for support for dry-run for the given group-version-kind
+	DryRunVerifier *DryRunVerifier
+	// The resource group-version-kind
+	GVK schema.GroupVersionKind
 }
 
 // NewHelper creates a Helper from a ResourceMapping
@@ -49,11 +56,13 @@ func NewHelper(client RESTClient, mapping *meta.RESTMapping) *Helper {
 		Resource:        mapping.Resource.Resource,
 		RESTClient:      client,
 		NamespaceScoped: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
+		GVK:             mapping.GroupVersionKind,
 	}
 }
 
-func (m *Helper) WithDryRun(dryRunServer bool) *Helper {
+func (m *Helper) WithDryRun(dryRunServer bool, dynamicClient dynamic.Interface, discoveryClient discovery.DiscoveryInterface) *Helper {
 	m.DryRunServer = true
+	m.DryRunVerifier = NewDryRunVerifier(dynamicClient, discoveryClient)
 	return m
 }
 
@@ -111,7 +120,9 @@ func (m *Helper) DeleteWithOptions(namespace, name string, options *metav1.Delet
 		options = &metav1.DeleteOptions{}
 	}
 	if m.DryRunServer {
-		options.DryRun = []string{metav1.DryRunAll}
+		if err := m.DryRunVerifier.HasSupport(m.GVK); err != nil {
+			options.DryRun = []string{metav1.DryRunAll}
+		}
 	}
 
 	return m.RESTClient.Delete().
@@ -128,7 +139,9 @@ func (m *Helper) Create(namespace string, modify bool, obj runtime.Object, optio
 		options = &metav1.CreateOptions{}
 	}
 	if m.DryRunServer {
-		options.DryRun = []string{metav1.DryRunAll}
+		if err := m.DryRunVerifier.HasSupport(m.GVK); err != nil {
+			options.DryRun = []string{metav1.DryRunAll}
+		}
 	}
 	if modify {
 		// Attempt to version the object based on client logic.
@@ -161,7 +174,9 @@ func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, 
 		options = &metav1.PatchOptions{}
 	}
 	if m.DryRunServer {
-		options.DryRun = []string{metav1.DryRunAll}
+		if err := m.DryRunVerifier.HasSupport(m.GVK); err != nil {
+			options.DryRun = []string{metav1.DryRunAll}
+		}
 	}
 	return m.RESTClient.Patch(pt).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
@@ -179,7 +194,9 @@ func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Obj
 		options = &metav1.DeleteOptions{}
 	}
 	if m.DryRunServer {
-		options.DryRun = []string{metav1.DryRunAll}
+		if err := m.DryRunVerifier.HasSupport(m.GVK); err != nil {
+			options.DryRun = []string{metav1.DryRunAll}
+		}
 	}
 
 	// Attempt to version the object based on client logic.
