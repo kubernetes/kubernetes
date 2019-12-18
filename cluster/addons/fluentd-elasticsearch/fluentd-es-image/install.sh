@@ -28,7 +28,7 @@ BUILD_DEPS="make gcc g++ libc6-dev ruby-dev libffi-dev"
 
 # apt install
 apt-get update
-apt-get install -y --no-install-recommends "${BUILD_DEPS}" ca-certificates libjemalloc2 ruby
+apt-get install -y --no-install-recommends ${BUILD_DEPS} ca-certificates libjemalloc2 ruby
 
 # ruby install
 echo 'gem: --no-document' >> /etc/gemrc 
