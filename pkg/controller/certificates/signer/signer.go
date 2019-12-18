@@ -104,7 +104,7 @@ func (s *signer) handle(csr *capi.CertificateSigningRequest) error {
 }
 
 func (s *signer) sign(csr *capi.CertificateSigningRequest) (*capi.CertificateSigningRequest, error) {
-	x509cr, err := capihelper.ParseCSR(csr)
+	x509cr, err := capihelper.ParseCSR(csr.Spec.Request)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse csr %q: %v", csr.Name, err)
 	}

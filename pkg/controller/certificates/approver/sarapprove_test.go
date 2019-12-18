@@ -242,7 +242,7 @@ func testRecognizer(t *testing.T, cases []func(b *csrBuilder), recognizeFunc fun
 		c(&b)
 		t.Run(fmt.Sprintf("csr:%#v", b), func(t *testing.T) {
 			csr := makeFancyTestCsr(b)
-			x509cr, err := k8s_certificates_v1beta1.ParseCSR(csr)
+			x509cr, err := k8s_certificates_v1beta1.ParseCSR(csr.Spec.Request)
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}
