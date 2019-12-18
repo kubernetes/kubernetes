@@ -156,10 +156,6 @@ type mockScheduler struct {
 	err    error
 }
 
-func (es mockScheduler) PredicateMetadataProducer() predicates.MetadataProducer {
-	return nil
-
-}
 func (es mockScheduler) Schedule(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (core.ScheduleResult, error) {
 	return es.result, es.err
 }
@@ -691,7 +687,6 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		scache,
 		internalqueue.NewSchedulingQueue(nil),
 		nil,
-		predicates.EmptyMetadataProducer,
 		priorities.EmptyMetadataProducer,
 		nodeinfosnapshot.NewEmptySnapshot(),
 		fwk,
@@ -749,7 +744,6 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		scache,
 		queue,
 		nil,
-		predicates.EmptyMetadataProducer,
 		priorities.EmptyMetadataProducer,
 		nodeinfosnapshot.NewEmptySnapshot(),
 		fwk,

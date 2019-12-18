@@ -129,10 +129,6 @@ type ScheduleAlgorithm interface {
 	// Prioritizers returns a slice of priority config. This is exposed for
 	// testing.
 	Extenders() []algorithm.SchedulerExtender
-	// GetPredicateMetadataProducer returns the predicate metadata producer. This is needed
-	// for cluster autoscaler integration.
-	// TODO(#85691): remove this once CA migrates to creating a Framework instead of a full scheduler.
-	PredicateMetadataProducer() predicates.MetadataProducer
 	// Snapshot snapshots scheduler cache and node infos. This is needed
 	// for cluster autoscaler integration.
 	// TODO(#85691): remove this once CA migrates to creating a Framework instead of a full scheduler.
@@ -158,7 +154,6 @@ type genericScheduler struct {
 	schedulingQueue          internalqueue.SchedulingQueue
 	predicates               map[string]predicates.FitPredicate
 	priorityMetaProducer     priorities.MetadataProducer
-	predicateMetaProducer    predicates.MetadataProducer
 	prioritizers             []priorities.PriorityConfig
 	framework                framework.Framework
 	extenders                []algorithm.SchedulerExtender
@@ -184,12 +179,6 @@ func (g *genericScheduler) Snapshot() error {
 func (g *genericScheduler) Framework() framework.Framework {
 	// Used for all fit and priority funcs.
 	return g.framework
-}
-
-// PredicateMetadataProducer returns the predicate metadata producer. This is needed
-// for cluster autoscaler integration.
-func (g *genericScheduler) PredicateMetadataProducer() predicates.MetadataProducer {
-	return g.predicateMetaProducer
 }
 
 // Schedule tries to schedule the given pod to one of the nodes in the node list.
@@ -436,7 +425,7 @@ func (g *genericScheduler) processPreemptionWithExtenders(
 // priority of the given "pod" and are nominated to run on the given node.
 // Note: We could possibly check if the nominated lower priority pods still fit
 // and return those that no longer fit, but that would require lots of
-// manipulation of NodeInfo and PredicateMeta per nominated pod. It may not be
+// manipulation of NodeInfo and PreFilter state per nominated pod. It may not be
 // worth the complexity, especially because we generally expect to have a very
 // small number of nominated pods per node.
 func (g *genericScheduler) getLowerPriorityNominatedPods(pod *v1.Pod, nodeName string) []*v1.Pod {
@@ -504,23 +493,11 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 		)
 
 		ctx, cancel := context.WithCancel(ctx)
-
-		// We can use the same metadata producer for all nodes.
-		meta := g.predicateMetaProducer(pod, g.nodeInfoSnapshot)
-		state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
-
 		checkNode := func(i int) {
 			// We check the nodes starting from where we left off in the previous scheduling cycle,
 			// this is to make sure all nodes have the same chance of being examined across pods.
 			nodeInfo := g.nodeInfoSnapshot.NodeInfoList[(g.nextStartNodeIndex+i)%allNodes]
-			fits, _, status, err := g.podFitsOnNode(
-				ctx,
-				state,
-				pod,
-				meta,
-				nodeInfo,
-				g.alwaysCheckAllPredicates,
-			)
+			fits, _, status, err := g.podFitsOnNode(ctx, state, pod, nodeInfo)
 			if err != nil {
 				errCh.SendErrorWithCancel(err, cancel)
 				return
@@ -587,44 +564,32 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 }
 
 // addNominatedPods adds pods with equal or greater priority which are nominated
-// to run on the node given in nodeInfo to meta and nodeInfo. It returns 1) whether
-// any pod was added, 2) augmented metadata, 3) augmented CycleState 4) augmented nodeInfo.
-// TODO(Huang-Wei): remove 'meta predicates.Metadata' from the signature.
-func (g *genericScheduler) addNominatedPods(ctx context.Context, pod *v1.Pod, meta predicates.Metadata, state *framework.CycleState,
-	nodeInfo *schedulernodeinfo.NodeInfo) (bool, predicates.Metadata,
-	*framework.CycleState, *schedulernodeinfo.NodeInfo, error) {
+// to run on the node. It returns 1) whether any pod was added, 2) augmented cycleState,
+// 3) augmented nodeInfo.
+func (g *genericScheduler) addNominatedPods(ctx context.Context, pod *v1.Pod, state *framework.CycleState,
+	nodeInfo *schedulernodeinfo.NodeInfo) (bool, *framework.CycleState, *schedulernodeinfo.NodeInfo, error) {
 	if g.schedulingQueue == nil || nodeInfo == nil || nodeInfo.Node() == nil {
 		// This may happen only in tests.
-		return false, meta, state, nodeInfo, nil
+		return false, state, nodeInfo, nil
 	}
 	nominatedPods := g.schedulingQueue.NominatedPodsForNode(nodeInfo.Node().Name)
 	if len(nominatedPods) == 0 {
-		return false, meta, state, nodeInfo, nil
+		return false, state, nodeInfo, nil
 	}
 	nodeInfoOut := nodeInfo.Clone()
-	var metaOut predicates.Metadata
-	if meta != nil {
-		metaOut = meta.ShallowCopy()
-	}
 	stateOut := state.Clone()
-	stateOut.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: metaOut})
 	podsAdded := false
 	for _, p := range nominatedPods {
 		if podutil.GetPodPriority(p) >= podutil.GetPodPriority(pod) && p.UID != pod.UID {
 			nodeInfoOut.AddPod(p)
-			if metaOut != nil {
-				if err := metaOut.AddPod(p, nodeInfoOut.Node()); err != nil {
-					return false, meta, state, nodeInfo, err
-				}
-			}
 			status := g.framework.RunPreFilterExtensionAddPod(ctx, stateOut, pod, p, nodeInfoOut)
 			if !status.IsSuccess() {
-				return false, meta, state, nodeInfo, status.AsError()
+				return false, state, nodeInfo, status.AsError()
 			}
 			podsAdded = true
 		}
 	}
-	return podsAdded, metaOut, stateOut, nodeInfoOut, nil
+	return podsAdded, stateOut, nodeInfoOut, nil
 }
 
 // podFitsOnNode checks whether a node given by NodeInfo satisfies the given predicate functions.
@@ -636,21 +601,19 @@ func (g *genericScheduler) addNominatedPods(ctx context.Context, pod *v1.Pod, me
 // pods nominated to run on the node.
 // When it is called from Preempt, we should remove the victims of preemption and
 // add the nominated pods. Removal of the victims is done by SelectVictimsOnNode().
-// It removes victims from meta and NodeInfo before calling this function.
+// It removes victims from PreFilter state and NodeInfo before calling this function.
 func (g *genericScheduler) podFitsOnNode(
 	ctx context.Context,
 	state *framework.CycleState,
 	pod *v1.Pod,
-	meta predicates.Metadata,
 	info *schedulernodeinfo.NodeInfo,
-	alwaysCheckAllPredicates bool,
 ) (bool, []predicates.PredicateFailureReason, *framework.Status, error) {
 	var failedPredicates []predicates.PredicateFailureReason
 	var status *framework.Status
 
 	podsAdded := false
 	// We run predicates twice in some cases. If the node has greater or equal priority
-	// nominated pods, we run them when those pods are added to meta and nodeInfo.
+	// nominated pods, we run them when those pods are added to PreFilter state and nodeInfo.
 	// If all predicates succeed in this pass, we run them again when these
 	// nominated pods are not added. This second pass is necessary because some
 	// predicates such as inter-pod affinity may not pass without the nominated pods.
@@ -672,7 +635,7 @@ func (g *genericScheduler) podFitsOnNode(
 		nodeInfoToUse := info
 		if i == 0 {
 			var err error
-			podsAdded, _, stateToUse, nodeInfoToUse, err = g.addNominatedPods(ctx, pod, meta, state, info)
+			podsAdded, stateToUse, nodeInfoToUse, err = g.addNominatedPods(ctx, pod, state, info)
 			if err != nil {
 				return false, []predicates.PredicateFailureReason{}, nil, err
 			}
@@ -929,21 +892,14 @@ func (g *genericScheduler) selectNodesForPreemption(
 	nodeToVictims := map[*v1.Node]*extenderv1.Victims{}
 	var resultLock sync.Mutex
 
-	// We can use the same metadata producer for all nodes.
-	meta := g.predicateMetaProducer(pod, g.nodeInfoSnapshot)
 	checkNode := func(i int) {
 		nodeName := potentialNodes[i].Name
 		if g.nodeInfoSnapshot.NodeInfoMap[nodeName] == nil {
 			return
 		}
 		nodeInfoCopy := g.nodeInfoSnapshot.NodeInfoMap[nodeName].Clone()
-		var metaCopy predicates.Metadata
-		if meta != nil {
-			metaCopy = meta.ShallowCopy()
-		}
 		stateCopy := state.Clone()
-		stateCopy.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: metaCopy})
-		pods, numPDBViolations, fits := g.selectVictimsOnNode(ctx, stateCopy, pod, metaCopy, nodeInfoCopy, pdbs)
+		pods, numPDBViolations, fits := g.selectVictimsOnNode(ctx, stateCopy, pod, nodeInfoCopy, pdbs)
 		if fits {
 			resultLock.Lock()
 			victims := extenderv1.Victims{
@@ -1016,7 +972,6 @@ func (g *genericScheduler) selectVictimsOnNode(
 	ctx context.Context,
 	state *framework.CycleState,
 	pod *v1.Pod,
-	meta predicates.Metadata,
 	nodeInfo *schedulernodeinfo.NodeInfo,
 	pdbs []*policy.PodDisruptionBudget,
 ) ([]*v1.Pod, int, bool) {
@@ -1026,11 +981,6 @@ func (g *genericScheduler) selectVictimsOnNode(
 		if err := nodeInfo.RemovePod(rp); err != nil {
 			return err
 		}
-		if meta != nil {
-			if err := meta.RemovePod(rp, nodeInfo.Node()); err != nil {
-				return err
-			}
-		}
 		status := g.framework.RunPreFilterExtensionRemovePod(ctx, state, pod, rp, nodeInfo)
 		if !status.IsSuccess() {
 			return status.AsError()
@@ -1039,11 +989,6 @@ func (g *genericScheduler) selectVictimsOnNode(
 	}
 	addPod := func(ap *v1.Pod) error {
 		nodeInfo.AddPod(ap)
-		if meta != nil {
-			if err := meta.AddPod(ap, nodeInfo.Node()); err != nil {
-				return err
-			}
-		}
 		status := g.framework.RunPreFilterExtensionAddPod(ctx, state, pod, ap, nodeInfo)
 		if !status.IsSuccess() {
 			return status.AsError()
@@ -1067,7 +1012,7 @@ func (g *genericScheduler) selectVictimsOnNode(
 	// inter-pod affinity to one or more victims, but we have decided not to
 	// support this case for performance reasons. Having affinity to lower
 	// priority pods is not a recommended configuration anyway.
-	if fits, _, _, err := g.podFitsOnNode(ctx, state, pod, meta, nodeInfo, false); !fits {
+	if fits, _, _, err := g.podFitsOnNode(ctx, state, pod, nodeInfo); !fits {
 		if err != nil {
 			klog.Warningf("Encountered error while selecting victims on node %v: %v", nodeInfo.Node().Name, err)
 		}
@@ -1085,7 +1030,7 @@ func (g *genericScheduler) selectVictimsOnNode(
 		if err := addPod(p); err != nil {
 			return false, err
 		}
-		fits, _, _, _ := g.podFitsOnNode(ctx, state, pod, meta, nodeInfo, false)
+		fits, _, _, _ := g.podFitsOnNode(ctx, state, pod, nodeInfo)
 		if !fits {
 			if err := removePod(p); err != nil {
 				return false, err
@@ -1194,7 +1139,6 @@ func NewGenericScheduler(
 	cache internalcache.Cache,
 	podQueue internalqueue.SchedulingQueue,
 	predicates map[string]predicates.FitPredicate,
-	predicateMetaProducer predicates.MetadataProducer,
 	priorityMetaProducer priorities.MetadataProducer,
 	nodeInfoSnapshot *nodeinfosnapshot.Snapshot,
 	framework framework.Framework,
@@ -1210,7 +1154,6 @@ func NewGenericScheduler(
 		cache:                    cache,
 		schedulingQueue:          podQueue,
 		predicates:               predicates,
-		predicateMetaProducer:    predicateMetaProducer,
 		priorityMetaProducer:     priorityMetaProducer,
 		framework:                framework,
 		extenders:                extenders,

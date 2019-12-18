@@ -22,13 +22,6 @@ import (
 )
 
 func init() {
-	// Register functions that extract metadata used by predicates computations.
-	scheduler.RegisterPredicateMetadataProducerFactory(
-		func(args scheduler.AlgorithmFactoryArgs) predicates.MetadataProducer {
-			f := &predicates.MetadataProducerFactory{}
-			return f.GetPredicateMetadata
-		})
-
 	// IMPORTANT NOTES for predicate developers:
 	// Registers predicates and priorities that are not enabled by default, but user can pick when creating their
 	// own set of priorities/predicates.

@@ -51,9 +51,6 @@ type AlgorithmFactoryArgs struct {
 // PriorityMetadataProducerFactory produces MetadataProducer from the given args.
 type PriorityMetadataProducerFactory func(AlgorithmFactoryArgs) priorities.MetadataProducer
 
-// PredicateMetadataProducerFactory produces MetadataProducer from the given args.
-type PredicateMetadataProducerFactory func(AlgorithmFactoryArgs) predicates.MetadataProducer
-
 // FitPredicateFactory produces a FitPredicate from the given args.
 type FitPredicateFactory func(AlgorithmFactoryArgs) predicates.FitPredicate
 
@@ -78,8 +75,7 @@ var (
 	algorithmProviderMap   = make(map[string]AlgorithmProviderConfig)
 
 	// Registered metadata producers
-	priorityMetadataProducerFactory  PriorityMetadataProducerFactory
-	predicateMetadataProducerFactory PredicateMetadataProducerFactory
+	priorityMetadataProducerFactory PriorityMetadataProducerFactory
 )
 
 // AlgorithmProviderConfig is used to store the configuration of algorithm providers.
@@ -316,13 +312,6 @@ func RegisterPriorityMetadataProducerFactory(f PriorityMetadataProducerFactory) 
 	priorityMetadataProducerFactory = f
 }
 
-// RegisterPredicateMetadataProducerFactory registers a MetadataProducer.
-func RegisterPredicateMetadataProducerFactory(f PredicateMetadataProducerFactory) {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
-	predicateMetadataProducerFactory = f
-}
-
 // RegisterPriorityMapReduceFunction registers a priority function with the algorithm registry. Returns the name,
 // with which the function was registered.
 func RegisterPriorityMapReduceFunction(
@@ -543,16 +532,6 @@ func getPriorityMetadataProducer(args AlgorithmFactoryArgs) (priorities.Metadata
 		return priorities.EmptyMetadataProducer, nil
 	}
 	return priorityMetadataProducerFactory(args), nil
-}
-
-func getPredicateMetadataProducer(args AlgorithmFactoryArgs) (predicates.MetadataProducer, error) {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
-
-	if predicateMetadataProducerFactory == nil {
-		return predicates.EmptyMetadataProducer, nil
-	}
-	return predicateMetadataProducerFactory(args), nil
 }
 
 func getPriorityFunctionConfigs(names sets.String, args AlgorithmFactoryArgs) ([]priorities.PriorityConfig, error) {
