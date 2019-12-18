@@ -283,6 +283,99 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				},
 			},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						To: []networking.NetworkPolicyPeer{
+							{
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"c": "d"},
+								},
+							},
+						},
+					},
+				},
+				Ingress: []networking.NetworkPolicyIngressRule{
+					{
+						From: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									CIDR:   "fd00:192:168::/48",
+									Except: []string{"fd00:192:168:3::/64", "fd00:192:168:4::/64"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []networking.NetworkPolicyIngressRule{
+					{
+						From: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									CIDR:   "fd00:192:168::/48",
+									Except: []string{"fd00:192:168:3::/64", "fd00:192:168:4::/64"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						To: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									CIDR:   "fd00:192:168::/48",
+									Except: []string{"fd00:192:168:3::/64", "fd00:192:168:4::/64"},
+								},
+							},
+						},
+					},
+				},
+				PolicyTypes: []networking.PolicyType{networking.PolicyTypeEgress},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						To: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									CIDR:   "fd00:192:168::/48",
+									Except: []string{"fd00:192:168:3::/64", "fd00:192:168:4::/64"},
+								},
+							},
+						},
+					},
+				},
+				PolicyTypes: []networking.PolicyType{networking.PolicyTypeIngress, networking.PolicyTypeEgress},
+			},
+		},
 	}
 
 	// Success cases are expected to pass validation.
@@ -562,6 +655,26 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				},
 			},
 		},
+		"invalid ipv6 cidr format": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []networking.NetworkPolicyIngressRule{
+					{
+						From: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									CIDR:   "fd00:192:168::",
+									Except: []string{"fd00:192:168:3::/64", "fd00:192:168:4::/64"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 		"except field is an empty string": {
 			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Spec: networking.NetworkPolicySpec{
@@ -595,6 +708,26 @@ func TestValidateNetworkPolicy(t *testing.T) {
 								IPBlock: &networking.IPBlock{
 									CIDR:   "192.168.8.0/24",
 									Except: []string{"192.168.9.1/24"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"except IPv6 is outside of CIDR range": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []networking.NetworkPolicyIngressRule{
+					{
+						From: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									CIDR:   "fd00:192:168:1::/64",
+									Except: []string{"fd00:192:168:2::/64"},
 								},
 							},
 						},
