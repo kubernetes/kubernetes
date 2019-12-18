@@ -2350,23 +2350,23 @@ COMMIT
 :KUBE-NODEPORTS - [0:0]
 :KUBE-POSTROUTING - [0:0]
 :KUBE-MARK-MASQ - [0:0]
-:KUBE-SVC-AHZNAGK3SCETOS2T - [0:0]
-:KUBE-SEP-PXD6POUVGD2I37UY - [0:0]
-:KUBE-SEP-SOKZUIT7SCEVIP33 - [0:0]
-:KUBE-SEP-WVE3FAB34S7NZGDJ - [0:0]
+:KUBE-SVC-CW3AQCZPGQ5G56X3 - [0:0]
+:KUBE-SEP-7O2UCMTPXKLP45P3 - [0:0]
+:KUBE-SEP-YQ3A6XKPT42MSHMR - [0:0]
+:KUBE-SEP-LJVHDBBAW75N3SGO - [0:0]
 -A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -m mark --mark  -j MASQUERADE
 -A KUBE-MARK-MASQ -j MARK --set-xmark 
--A KUBE-SERVICES -m comment --comment "ns1/svc1: cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
--A KUBE-SERVICES -m comment --comment "ns1/svc1: cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 -j KUBE-SVC-AHZNAGK3SCETOS2T
--A KUBE-SVC-AHZNAGK3SCETOS2T -m comment --comment ns1/svc1: -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-PXD6POUVGD2I37UY
--A KUBE-SEP-PXD6POUVGD2I37UY -m comment --comment ns1/svc1: -s 10.0.1.1/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-PXD6POUVGD2I37UY -m comment --comment ns1/svc1: -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
--A KUBE-SVC-AHZNAGK3SCETOS2T -m comment --comment ns1/svc1: -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-SOKZUIT7SCEVIP33
--A KUBE-SEP-SOKZUIT7SCEVIP33 -m comment --comment ns1/svc1: -s 10.0.1.2/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-SOKZUIT7SCEVIP33 -m comment --comment ns1/svc1: -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
--A KUBE-SVC-AHZNAGK3SCETOS2T -m comment --comment ns1/svc1: -j KUBE-SEP-WVE3FAB34S7NZGDJ
--A KUBE-SEP-WVE3FAB34S7NZGDJ -m comment --comment ns1/svc1: -s 10.0.1.3/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-WVE3FAB34S7NZGDJ -m comment --comment ns1/svc1: -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:http cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1:http cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 -j KUBE-SVC-CW3AQCZPGQ5G56X3
+-A KUBE-SVC-CW3AQCZPGQ5G56X3 -m comment --comment ns1/svc1:http -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-7O2UCMTPXKLP45P3
+-A KUBE-SEP-7O2UCMTPXKLP45P3 -m comment --comment ns1/svc1:http -s 10.0.1.1/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-7O2UCMTPXKLP45P3 -m comment --comment ns1/svc1:http -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
+-A KUBE-SVC-CW3AQCZPGQ5G56X3 -m comment --comment ns1/svc1:http -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-YQ3A6XKPT42MSHMR
+-A KUBE-SEP-YQ3A6XKPT42MSHMR -m comment --comment ns1/svc1:http -s 10.0.1.2/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-YQ3A6XKPT42MSHMR -m comment --comment ns1/svc1:http -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
+-A KUBE-SVC-CW3AQCZPGQ5G56X3 -m comment --comment ns1/svc1:http -j KUBE-SEP-LJVHDBBAW75N3SGO
+-A KUBE-SEP-LJVHDBBAW75N3SGO -m comment --comment ns1/svc1:http -s 10.0.1.3/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-LJVHDBBAW75N3SGO -m comment --comment ns1/svc1:http -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 COMMIT
 `
@@ -2385,7 +2385,7 @@ COMMIT
 		Spec: v1.ServiceSpec{
 			ClusterIP: "172.20.1.1",
 			Selector:  map[string]string{"foo": "bar"},
-			Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
+			Ports:     []v1.ServicePort{{Name: "http", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
 		},
 	})
 
@@ -2397,7 +2397,7 @@ COMMIT
 			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
 		},
 		Ports: []discovery.EndpointPort{{
-			Name:     utilpointer.StringPtr(""),
+			Name:     utilpointer.StringPtr("http"),
 			Port:     utilpointer.Int32Ptr(80),
 			Protocol: &tcpProtocol,
 		}},
