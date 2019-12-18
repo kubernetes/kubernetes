@@ -166,7 +166,6 @@ export PATH
   --network="${KUBE_GCE_NETWORK:-${KUBE_GKE_NETWORK:-e2e}}" \
   --node-tag="${NODE_TAG:-}" \
   --master-tag="${MASTER_TAG:-}" \
-  --cluster-monitoring-mode="${KUBE_ENABLE_CLUSTER_MONITORING:-standalone}" \
   --dns-domain="${KUBE_DNS_DOMAIN:-cluster.local}" \
   --ginkgo.slowSpecThreshold="${GINKGO_SLOW_SPEC_THRESHOLD:-300}" \
   ${KUBE_CONTAINER_RUNTIME:+"--container-runtime=${KUBE_CONTAINER_RUNTIME}"} \

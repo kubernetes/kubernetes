@@ -55,7 +55,6 @@ function create-kubemark-master {
     export KUBE_ENABLE_CLUSTER_DNS=false
     export KUBE_ENABLE_NODE_LOGGING=false
     export KUBE_ENABLE_METRICS_SERVER=false
-    export KUBE_ENABLE_CLUSTER_MONITORING="none"
     export KUBE_ENABLE_L7_LOADBALANCING="none"
 
     # Unset env variables set by kubetest for 'root cluster'. We need recompute them
