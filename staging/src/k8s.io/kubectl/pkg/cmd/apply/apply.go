@@ -72,6 +72,7 @@ type ApplyOptions struct {
 	FieldManager    string
 	Selector        string
 	DryRunStrategy  cmdutil.DryRunStrategy
+	DryRunVerifier  *resource.DryRunVerifier
 	Prune           bool
 	PruneResources  []pruneResource
 	cmdBaseName     string
@@ -195,15 +196,27 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 
 // Complete verifies if ApplyOptions are valid and without conflicts.
 func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	var err error
+
 	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
 	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
 	o.FieldManager = cmdutil.GetFieldManagerFlag(cmd)
 
-	var dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	o.DiscoveryClient, err = f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+
+	o.DynamicClient, err = f.DynamicClient()
+	if err != nil {
+		return err
+	}
+
+	o.DryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
 	if err != nil {
 		return fmt.Errorf("could not get value for --dry-run: %v", err)
 	}
-	o.DryRunStrategy = dryRunStrategy
+	o.DryRunVerifier = resource.NewDryRunVerifier(o.DynamicClient, o.DiscoveryClient)
 
 	if o.ForceConflicts && !o.ServerSideApply {
 		return fmt.Errorf("--force-conflicts only works with --server-side")
@@ -216,7 +229,7 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	// allow for a success message operation to be specified at print time
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
+		cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 		return o.PrintFlags.ToPrinter()
 	}
 
@@ -226,16 +239,7 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.DiscoveryClient, err = f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	o.DeleteOptions = o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
+	o.DeleteOptions = o.DeleteFlags.ToOptions(o.DynamicClient, o.IOStreams)
 	err = o.DeleteOptions.FilenameOptions.RequireFilenameOrKustomize()
 	if err != nil {
 		return err
@@ -248,11 +252,6 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 	o.Builder = f.NewBuilder()
 	o.Mapper, err = f.ToRESTMapper()
-	if err != nil {
-		return err
-	}
-
-	o.DynamicClient, err = f.DynamicClient()
 	if err != nil {
 		return err
 	}
@@ -389,7 +388,7 @@ func (o *ApplyOptions) Run() error {
 
 			obj, err := resource.
 				NewHelper(info.Client, info.Mapping).
-				WithDryRun(o.DryRunStrategy.Server(), o.DynamicClient, o.DiscoveryClient).
+				WithDryRun(o.DryRunStrategy.Server(), o.DryRunVerifier).
 				Patch(
 					info.Namespace,
 					info.Name,
@@ -467,7 +466,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 				// Then create the resource and skip the three-way merge
 				obj, err := resource.
 					NewHelper(info.Client, info.Mapping).
-					WithDryRun(o.DryRunStrategy.Server(), o.DynamicClient, o.DiscoveryClient).
+					WithDryRun(o.DryRunStrategy.Server(), o.DryRunVerifier).
 					Create(info.Namespace, true, info.Object, nil)
 				if err != nil {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
@@ -509,7 +508,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 
 			helper := resource.
 				NewHelper(info.Client, info.Mapping).
-				WithDryRun(o.DryRunStrategy.Server(), o.DynamicClient, o.DiscoveryClient)
+				WithDryRun(o.DryRunStrategy.Server(), o.DryRunVerifier)
 			patcher := &Patcher{
 				Mapping:       info.Mapping,
 				Helper:        helper,

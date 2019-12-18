@@ -26,8 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/dynamic"
 )
 
 var metadataAccessor = meta.NewAccessor()
@@ -60,9 +58,9 @@ func NewHelper(client RESTClient, mapping *meta.RESTMapping) *Helper {
 	}
 }
 
-func (m *Helper) WithDryRun(dryRunServer bool, dynamicClient dynamic.Interface, discoveryClient discovery.DiscoveryInterface) *Helper {
+func (m *Helper) WithDryRun(dryRunServer bool, dryRunVerifier *DryRunVerifier) *Helper {
 	m.DryRunServer = dryRunServer
-	m.DryRunVerifier = NewDryRunVerifier(dynamicClient, discoveryClient)
+	m.DryRunVerifier = dryRunVerifier
 	return m
 }
 
