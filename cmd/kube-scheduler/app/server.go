@@ -24,6 +24,8 @@ import (
 	"net/http"
 	"os"
 	goruntime "runtime"
+	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -68,6 +70,8 @@ type Option func(framework.Registry) error
 
 // NewSchedulerCommand creates a *cobra.Command object with default parameters and registryOptions
 func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
+	metrics.BeginInitTime = time.Now()
+
 	opts, err := options.NewOptions()
 	if err != nil {
 		klog.Fatalf("unable to initialize command options: %v", err)
@@ -249,12 +253,17 @@ func Run(ctx context.Context, cc schedulerserverconfig.CompletedConfig, outOfTre
 	// Wait for all caches to sync before scheduling.
 	cc.InformerFactory.WaitForCacheSync(ctx.Done())
 
+	metrics.CurrentHostName = strings.Split(cc.LeaderElection.Lock.Identity(), "_")[0]
+	initLatencyMap := map[string]string{"hostname": metrics.CurrentHostName}
+	metrics.InitLatency.With(initLatencyMap).Set(metrics.SinceInMicroseconds(metrics.BeginInitTime))
+
 	// If leader election is enabled, runCommand via LeaderElector until done and exit.
 	if cc.LeaderElection != nil {
 		cc.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
 			OnStartedLeading: sched.Run,
 			OnStoppedLeading: func() {
 				klog.Fatalf("leaderelection lost")
+				metrics.HasLeader.With(map[string]string{"hostname": metrics.CurrentHostName}).Set(0)
 			},
 		}
 		leaderElector, err := leaderelection.NewLeaderElector(*cc.LeaderElection)
