@@ -120,6 +120,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguratio
 	if err := Convert_v1alpha1_KubeProxyWinkernelConfiguration_To_config_KubeProxyWinkernelConfiguration(&in.Winkernel, &out.Winkernel, s); err != nil {
 		return err
 	}
+	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
 	return nil
 }
 
@@ -157,6 +158,7 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 	if err := Convert_config_KubeProxyWinkernelConfiguration_To_v1alpha1_KubeProxyWinkernelConfiguration(&in.Winkernel, &out.Winkernel, s); err != nil {
 		return err
 	}
+	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
 	return nil
 }
 

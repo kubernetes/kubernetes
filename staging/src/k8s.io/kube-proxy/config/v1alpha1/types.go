@@ -158,6 +158,8 @@ type KubeProxyConfiguration struct {
 	NodePortAddresses []string `json:"nodePortAddresses"`
 	// winkernel contains winkernel-related configuration options.
 	Winkernel KubeProxyWinkernelConfiguration `json:"winkernel"`
+	// ShowHiddenMetricsForVersion is the version for which you want to show hidden metrics.
+	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion"`
 }
 
 // Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'
