@@ -234,7 +234,7 @@ func (o *RollingUpdateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		o.PrintFlags.Complete(dryRunStrategy.PrintTemplate())
+		cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
 
 		return o.PrintFlags.ToPrinter()
 	}

@@ -141,7 +141,7 @@ func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	if dryRunStrategy == cmdutil.DryRunServer {
 		return fmt.Errorf("--dry-run=server not yet supported for this command")
 	}
-	o.PrintFlags.Complete(dryRunStrategy.PrintTemplate())
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
 
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
