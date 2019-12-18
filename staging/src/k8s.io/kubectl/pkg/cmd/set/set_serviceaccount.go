@@ -150,7 +150,7 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 		return err
 	}
 	o.dryRunVerifier = &cmdutil.DryRunVerifier{
-		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamicClient)),
+		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(dynamicClient)),
 		OpenAPIGetter: discoveryClient,
 	}
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)

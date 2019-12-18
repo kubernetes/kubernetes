@@ -240,7 +240,7 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 	o.DryRunVerifier = &cmdutil.DryRunVerifier{
-		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamicClient)),
+		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(dynamicClient)),
 		OpenAPIGetter: discoveryClient,
 	}
 

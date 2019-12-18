@@ -38,6 +38,9 @@ type Helper struct {
 	RESTClient RESTClient
 	// True if the resource type is scoped to namespaces
 	NamespaceScoped bool
+	// If true, then use server-side dry-run to not persist changes to storage
+	// for verbs and resources that support server-side dry-run.
+	DryRunServer bool
 }
 
 // NewHelper creates a Helper from a ResourceMapping
@@ -47,6 +50,11 @@ func NewHelper(client RESTClient, mapping *meta.RESTMapping) *Helper {
 		RESTClient:      client,
 		NamespaceScoped: mapping.Scope.Name() == meta.RESTScopeNameNamespace,
 	}
+}
+
+func (m *Helper) WithDryRun(dryRunServer bool) *Helper {
+	m.DryRunServer = true
+	return m
 }
 
 func (m *Helper) Get(namespace, name string, export bool) (runtime.Object, error) {
@@ -99,10 +107,18 @@ func (m *Helper) Delete(namespace, name string) (runtime.Object, error) {
 }
 
 func (m *Helper) DeleteWithOptions(namespace, name string, options *metav1.DeleteOptions) (runtime.Object, error) {
+	if options == nil {
+		options = &metav1.DeleteOptions{}
+	}
+	if m.DryRunServer {
+		options.DryRun = []string{metav1.DryRunAll}
+	}
+
 	return m.RESTClient.Delete().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Name(name).
+		// Delete options are in the body?
 		Body(options).
 		Do().
 		Get()
@@ -111,6 +127,9 @@ func (m *Helper) DeleteWithOptions(namespace, name string, options *metav1.Delet
 func (m *Helper) Create(namespace string, modify bool, obj runtime.Object, options *metav1.CreateOptions) (runtime.Object, error) {
 	if options == nil {
 		options = &metav1.CreateOptions{}
+	}
+	if m.DryRunServer {
+		options.DryRun = []string{metav1.DryRunAll}
 	}
 	if modify {
 		// Attempt to version the object based on client logic.
@@ -142,6 +161,9 @@ func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, 
 	if options == nil {
 		options = &metav1.PatchOptions{}
 	}
+	if m.DryRunServer {
+		options.DryRun = []string{metav1.DryRunAll}
+	}
 	return m.RESTClient.Patch(pt).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
@@ -156,6 +178,9 @@ func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Obj
 	c := m.RESTClient
 	if options == nil {
 		options = &metav1.DeleteOptions{}
+	}
+	if m.DryRunServer {
+		options.DryRun = []string{metav1.DryRunAll}
 	}
 
 	// Attempt to version the object based on client logic.

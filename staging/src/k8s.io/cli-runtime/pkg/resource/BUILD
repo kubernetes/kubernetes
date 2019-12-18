@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "builder.go",
         "client.go",
+        "crd_finder.go",
         "doc.go",
         "fake.go",
         "helper.go",
@@ -39,6 +40,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/kustomize:go_default_library",
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
+        "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/restmapper:go_default_library",
@@ -52,6 +54,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "builder_test.go",
+        "crd_finder_test.go",
         "helper_test.go",
         "scheme_test.go",
         "visitor_test.go",

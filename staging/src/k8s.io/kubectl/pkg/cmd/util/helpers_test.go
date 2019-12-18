@@ -26,7 +26,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/googleapis/gnostic/OpenAPIv2"
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/cli-runtime/pkg/resource"
 	openapitesting "k8s.io/kube-openapi/pkg/util/proto/testing"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/utils/exec"
@@ -329,7 +330,7 @@ var fakeSchema = openapitesting.Fake{Path: filepath.Join("..", "..", "..", "test
 
 func TestDryRunVerifier(t *testing.T) {
 	dryRunVerifier := DryRunVerifier{
-		Finder: NewCRDFinder(func() ([]schema.GroupKind, error) {
+		Finder: resource.NewCRDFinder(func() ([]schema.GroupKind, error) {
 			return []schema.GroupKind{
 				{
 					Group: "crd.com",
@@ -373,7 +374,7 @@ func (EmptyOpenAPI) OpenAPISchema() (*openapi_v2.Document, error) {
 
 func TestDryRunVerifierNoOpenAPI(t *testing.T) {
 	dryRunVerifier := DryRunVerifier{
-		Finder: NewCRDFinder(func() ([]schema.GroupKind, error) {
+		Finder: resource.NewCRDFinder(func() ([]schema.GroupKind, error) {
 			return []schema.GroupKind{
 				{
 					Group: "crd.com",

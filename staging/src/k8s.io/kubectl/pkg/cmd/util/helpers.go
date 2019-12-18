@@ -514,6 +514,18 @@ const (
 	DryRunServer
 )
 
+func (d DryRunStrategy) Client() bool {
+	return d == DryRunClient
+}
+
+func (d DryRunStrategy) Server() bool {
+	return d == DryRunServer
+}
+
+func (d DryRunStrategy) None() bool {
+	return d == DryRunNone
+}
+
 func GetDryRunFlag(cmd *cobra.Command) (DryRunStrategy, error) {
 	var dryRunFlag = GetFlagString(cmd, "dry-run")
 	if dryRunFlag == "" && !cmd.Flags().Changed("dry-run") {
@@ -568,7 +580,7 @@ func PrintFlagsWithDryRunStrategy(printFlags *genericclioptions.PrintFlags, dryR
 // delay the check for CRDs as much as possible though, since it
 // requires an extra round-trip to the server.
 type DryRunVerifier struct {
-	Finder        CRDFinder
+	Finder        resource.CRDFinder
 	OpenAPIGetter discovery.OpenAPISchemaInterface
 }
 

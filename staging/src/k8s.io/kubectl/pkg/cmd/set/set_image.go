@@ -160,7 +160,7 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		return err
 	}
 	o.DryRunVerifier = &cmdutil.DryRunVerifier{
-		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamicClient)),
+		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(dynamicClient)),
 		OpenAPIGetter: discoveryClient,
 	}
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)

@@ -424,7 +424,7 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 
 	o.DryRunVerifier = &cmdutil.DryRunVerifier{
-		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(o.DynamicClient)),
+		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(o.DynamicClient)),
 		OpenAPIGetter: o.DiscoveryClient,
 	}
 

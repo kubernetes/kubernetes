@@ -136,7 +136,7 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 		return err
 	}
 	o.dryRunVerifier = &cmdutil.DryRunVerifier{
-		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamicClient)),
+		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(dynamicClient)),
 		OpenAPIGetter: discoveryClient,
 	}
 

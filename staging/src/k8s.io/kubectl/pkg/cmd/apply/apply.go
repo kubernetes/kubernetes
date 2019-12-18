@@ -71,8 +71,7 @@ type ApplyOptions struct {
 	ForceConflicts  bool
 	FieldManager    string
 	Selector        string
-	DryRunClient    bool
-	DryRunServer    bool
+	DryRunStrategy  cmdutil.DryRunStrategy
 	Prune           bool
 	PruneResources  []pruneResource
 	cmdBaseName     string
@@ -204,14 +203,13 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	if err != nil {
 		return fmt.Errorf("could not get value for --dry-run: %v", err)
 	}
-	o.DryRunClient = dryRunStrategy == cmdutil.DryRunClient
-	o.DryRunServer = dryRunStrategy == cmdutil.DryRunServer
+	o.DryRunStrategy = dryRunStrategy
 
 	if o.ForceConflicts && !o.ServerSideApply {
 		return fmt.Errorf("--force-conflicts only works with --server-side")
 	}
 
-	if o.DryRunClient && o.ServerSideApply {
+	if o.DryRunStrategy.Client() && o.ServerSideApply {
 		return fmt.Errorf("--dry-run=client doesn't work with --server-side (did you mean --dry-run=server instead?)")
 	}
 
@@ -333,7 +331,7 @@ func (o *ApplyOptions) Run() error {
 	}
 
 	var dryRunVerifier = &cmdutil.DryRunVerifier{
-		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(o.DynamicClient)),
+		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(o.DynamicClient)),
 		OpenAPIGetter: o.DiscoveryClient,
 	}
 
@@ -375,7 +373,7 @@ func (o *ApplyOptions) Run() error {
 		}
 
 		// If server-dry-run is requested but the type doesn't support it, fail right away.
-		if o.DryRunServer {
+		if o.DryRunStrategy.Server() {
 			if err := dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
 				return err
 			}
@@ -400,17 +398,17 @@ func (o *ApplyOptions) Run() error {
 				Force:        &o.ForceConflicts,
 				FieldManager: o.FieldManager,
 			}
-			if o.DryRunServer {
-				options.DryRun = []string{metav1.DryRunAll}
-			}
 
-			obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(
-				info.Namespace,
-				info.Name,
-				types.ApplyPatchType,
-				data,
-				&options,
-			)
+			obj, err := resource.
+				NewHelper(info.Client, info.Mapping).
+				WithDryRun(o.DryRunStrategy.Server()).
+				Patch(
+					info.Namespace,
+					info.Name,
+					types.ApplyPatchType,
+					data,
+					&options,
+				)
 			if err != nil {
 				if isIncompatibleServerError(err) {
 					err = fmt.Errorf("Server-side apply not available on the server: (%v)", err)
@@ -477,13 +475,12 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
 
-			if !o.DryRunClient {
+			if !o.DryRunStrategy.Client() {
 				// Then create the resource and skip the three-way merge
-				options := metav1.CreateOptions{}
-				if o.DryRunServer {
-					options.DryRun = []string{metav1.DryRunAll}
-				}
-				obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object, &options)
+				obj, err := resource.
+					NewHelper(info.Client, info.Mapping).
+					WithDryRun(o.DryRunStrategy.Server()).
+					Create(info.Namespace, true, info.Object, nil)
 				if err != nil {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
 				}
@@ -516,13 +513,15 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 		}
 		visitedUids.Insert(string(metadata.GetUID()))
 
-		if !o.DryRunClient {
+		if !o.DryRunStrategy.Client() {
 			annotationMap := metadata.GetAnnotations()
 			if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
 				fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
 			}
 
-			helper := resource.NewHelper(info.Client, info.Mapping)
+			helper := resource.
+				NewHelper(info.Client, info.Mapping).
+				WithDryRun(o.DryRunStrategy.Server())
 			patcher := &Patcher{
 				Mapping:       info.Mapping,
 				Helper:        helper,
@@ -533,7 +532,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 				Cascade:       o.DeleteOptions.Cascade,
 				Timeout:       o.DeleteOptions.Timeout,
 				GracePeriod:   o.DeleteOptions.GracePeriod,
-				DryRunServer:  o.DryRunServer,
+				DryRunServer:  o.DryRunStrategy.Server(),
 				OpenapiSchema: openapiSchema,
 				Retries:       maxPatchRetry,
 			}
@@ -614,10 +613,9 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 		labelSelector: o.Selector,
 		visitedUids:   visitedUids,
 
-		cascade:      o.DeleteOptions.Cascade,
-		dryRunClient: o.DryRunClient,
-		dryRunServer: o.DryRunServer,
-		gracePeriod:  o.DeleteOptions.GracePeriod,
+		cascade:        o.DeleteOptions.Cascade,
+		dryRunStrategy: o.DryRunStrategy,
+		gracePeriod:    o.DeleteOptions.GracePeriod,
 
 		toPrinter: o.ToPrinter,
 
@@ -706,10 +704,9 @@ type pruner struct {
 	labelSelector string
 	fieldSelector string
 
-	cascade      bool
-	dryRunServer bool
-	dryRunClient bool
-	gracePeriod  int
+	cascade        bool
+	dryRunStrategy cmdutil.DryRunStrategy
+	gracePeriod    int
 
 	toPrinter func(string) (printers.ResourcePrinter, error)
 
@@ -747,7 +744,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) error {
 			continue
 		}
 		name := metadata.GetName()
-		if !p.dryRunClient {
+		if !p.dryRunStrategy.Client() {
 			if err := p.delete(namespace, name, mapping); err != nil {
 				return err
 			}
@@ -763,7 +760,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) error {
 }
 
 func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping) error {
-	return runDelete(namespace, name, mapping, p.dynamicClient, p.cascade, p.gracePeriod, p.dryRunServer)
+	return runDelete(namespace, name, mapping, p.dynamicClient, p.cascade, p.gracePeriod, p.dryRunStrategy.Server())
 }
 
 func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascade bool, gracePeriod int, dryRunServer bool) error {
@@ -904,12 +901,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		}
 	}
 
-	options := metav1.PatchOptions{}
-	if p.DryRunServer {
-		options.DryRun = []string{metav1.DryRunAll}
-	}
-
-	patchedObj, err := p.Helper.Patch(namespace, name, patchType, patch, &options)
+	patchedObj, err := p.Helper.Patch(namespace, name, patchType, patch, nil)
 	return patch, patchedObj, err
 }
 
@@ -954,15 +946,11 @@ func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 	if err != nil {
 		return modified, nil, err
 	}
-	options := metav1.CreateOptions{}
-	if p.DryRunServer {
-		options.DryRun = []string{metav1.DryRunAll}
-	}
-	createdObject, err := p.Helper.Create(namespace, true, versionedObject, &options)
+	createdObject, err := p.Helper.Create(namespace, true, versionedObject, nil)
 	if err != nil {
 		// restore the original object if we fail to create the new one
 		// but still propagate and advertise error to user
-		recreated, recreateErr := p.Helper.Create(namespace, true, original, &options)
+		recreated, recreateErr := p.Helper.Create(namespace, true, original, nil)
 		if recreateErr != nil {
 			err = fmt.Errorf("An error occurred force-replacing the existing object with the newly provided one:\n\n%v.\n\nAdditionally, an error occurred attempting to restore the original object:\n\n%v", err, recreateErr)
 		} else {

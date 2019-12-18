@@ -14,14 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util_test
+package resource
 
 import (
 	"errors"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubectl/pkg/cmd/util"
 )
 
 func TestCacheCRDFinder(t *testing.T) {
@@ -30,7 +29,7 @@ func TestCacheCRDFinder(t *testing.T) {
 		called += 1
 		return nil, nil
 	}
-	finder := util.NewCRDFinder(getter)
+	finder := NewCRDFinder(getter)
 	if called != 0 {
 		t.Fatalf("Creating the finder shouldn't call the getter, has called = %v", called)
 	}
@@ -55,7 +54,7 @@ func TestCRDFinderErrors(t *testing.T) {
 	getter := func() ([]schema.GroupKind, error) {
 		return nil, errors.New("not working")
 	}
-	finder := util.NewCRDFinder(getter)
+	finder := NewCRDFinder(getter)
 	found, err := finder.HasCRD(schema.GroupKind{Group: "", Kind: "Pod"})
 	if found == true {
 		t.Fatalf("Found the CRD with non-working getter function")
@@ -78,7 +77,7 @@ func TestCRDFinder(t *testing.T) {
 			},
 		}, nil
 	}
-	finder := util.NewCRDFinder(getter)
+	finder := NewCRDFinder(getter)
 
 	if found, _ := finder.HasCRD(schema.GroupKind{Group: "crd.com", Kind: "MyCRD"}); !found {
 		t.Fatalf("Failed to find CRD MyCRD")
