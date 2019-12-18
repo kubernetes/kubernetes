@@ -121,8 +121,9 @@ func (m *Helper) DeleteWithOptions(namespace, name string, options *metav1.Delet
 	}
 	if m.DryRunServer {
 		if err := m.DryRunVerifier.HasSupport(m.GVK); err != nil {
-			options.DryRun = []string{metav1.DryRunAll}
+			return nil, err
 		}
+		options.DryRun = []string{metav1.DryRunAll}
 	}
 
 	return m.RESTClient.Delete().
@@ -140,8 +141,9 @@ func (m *Helper) Create(namespace string, modify bool, obj runtime.Object, optio
 	}
 	if m.DryRunServer {
 		if err := m.DryRunVerifier.HasSupport(m.GVK); err != nil {
-			options.DryRun = []string{metav1.DryRunAll}
+			return nil, err
 		}
+		options.DryRun = []string{metav1.DryRunAll}
 	}
 	if modify {
 		// Attempt to version the object based on client logic.
@@ -175,8 +177,9 @@ func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, 
 	}
 	if m.DryRunServer {
 		if err := m.DryRunVerifier.HasSupport(m.GVK); err != nil {
-			options.DryRun = []string{metav1.DryRunAll}
+			return nil, err
 		}
+		options.DryRun = []string{metav1.DryRunAll}
 	}
 	return m.RESTClient.Patch(pt).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
@@ -195,8 +198,9 @@ func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Obj
 	}
 	if m.DryRunServer {
 		if err := m.DryRunVerifier.HasSupport(m.GVK); err != nil {
-			options.DryRun = []string{metav1.DryRunAll}
+			return nil, err
 		}
+		options.DryRun = []string{metav1.DryRunAll}
 	}
 
 	// Attempt to version the object based on client logic.
