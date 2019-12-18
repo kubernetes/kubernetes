@@ -741,7 +741,9 @@ func (vs *VSphere) NodeAddressesByProviderID(ctx context.Context, providerID str
 
 // AddSSHKeyToAllInstances add SSH key to all instances
 func (vs *VSphere) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return cloudprovider.NotImplemented
+	// When using SSH tunnels with the vsphere provider, keys must be installed via an alternative
+	// channel. See b/130912154 for context
+	return nil
 }
 
 // CurrentNodeName gives the current node name

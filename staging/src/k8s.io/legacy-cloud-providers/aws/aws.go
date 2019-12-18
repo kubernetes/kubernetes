@@ -925,7 +925,9 @@ func newEc2Filter(name string, values ...string) *ec2.Filter {
 
 // AddSSHKeyToAllInstances is currently not implemented.
 func (c *Cloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return cloudprovider.NotImplemented
+	// When using SSH tunnels with the vsphere provider, keys must be installed via an alternative
+	// channel. See b/130912154 for context
+	return nil
 }
 
 // CurrentNodeName returns the name of the current node
