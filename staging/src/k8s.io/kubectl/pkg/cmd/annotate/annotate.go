@@ -23,17 +23,16 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
-
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/klog"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
@@ -53,8 +52,7 @@ type AnnotateOptions struct {
 	// Common user flags
 	overwrite       bool
 	local           bool
-	dryRunClient    bool
-	dryRunServer    bool
+	dryRunStrategy  cmdutil.DryRunStrategy
 	dryRunVerifier  *resource.DryRunVerifier
 	all             bool
 	resourceVersion string
@@ -166,26 +164,20 @@ func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	}
 
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
-	var dryRunStrategy cmdutil.DryRunStrategy
-	dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
+	o.dryRunStrategy, err = cmdutil.GetDryRunFlag(cmd)
 	if err != nil {
 		return fmt.Errorf("could not get value for --dry-run: %v", err)
-	}
-	o.dryRunClient = dryRunStrategy == cmdutil.DryRunClient
-	o.dryRunServer = dryRunStrategy == cmdutil.DryRunServer
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
 	}
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {
 		return err
 	}
-	o.dryRunVerifier = &resource.DryRunVerifier{
-		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(dynamicClient)),
-		OpenAPIGetter: discoveryClient,
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
 	}
-	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
+	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.dryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -274,19 +266,12 @@ func (o AnnotateOptions) RunAnnotate() error {
 		var outputObj runtime.Object
 		obj := info.Object
 
-		if o.dryRunClient || o.local {
+		if o.dryRunStrategy.Client() || o.local {
 			if err := o.updateAnnotations(obj); err != nil {
 				return err
 			}
 			outputObj = obj
 		} else {
-			if o.dryRunServer {
-				// If server-dry-run is requested but the type doesn't support it, fail right away.
-				if err := o.dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-					return err
-				}
-			}
-
 			name, namespace := info.Name, info.Namespace
 
 			if len(o.resourceVersion) != 0 {
@@ -323,20 +308,13 @@ func (o AnnotateOptions) RunAnnotate() error {
 			if err != nil {
 				return err
 			}
-			helper := resource.NewHelper(client, mapping)
+			helper := resource.NewHelper(client, mapping).
+				WithDryRun(o.dryRunStrategy.Server(), o.dryRunVerifier)
 
 			if createdPatch {
-				options := metav1.PatchOptions{}
-				if o.dryRunServer {
-					options.DryRun = []string{metav1.DryRunAll}
-				}
-				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, &options)
+				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, nil)
 			} else {
-				options := metav1.DeleteOptions{}
-				if o.dryRunServer {
-					options.DryRun = []string{metav1.DryRunAll}
-				}
-				outputObj, err = helper.Replace(namespace, name, false, obj, &options)
+				outputObj, err = helper.Replace(namespace, name, false, obj, nil)
 			}
 			if err != nil {
 				return err
