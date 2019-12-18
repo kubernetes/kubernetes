@@ -779,7 +779,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	// Helper containing boilerplate common to starting all types of containers.
 	// typeName is a label used to describe this type of container in log messages,
 	// currently: "container", "init container" or "ephemeral container"
-	start := func(typeName string, container *v1.Container) error {
+	start := func(typeName string, container *v1.Container, shouldRunAsync bool) error {
 		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, container.Name)
 		result.AddSyncResult(startContainerResult)
 
@@ -792,7 +792,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 
 		klog.V(4).Infof("Creating %v %+v in pod %v", typeName, container, format.Pod(pod))
 		// NOTE (aramase) podIPs are populated for single stack and dual stack clusters. Send only podIPs.
-		if msg, err := m.startContainer(podSandboxID, podSandboxConfig, container, pod, podStatus, pullSecrets, podIP, podIPs); err != nil {
+		if msg, err := m.startContainer(podSandboxID, podSandboxConfig, container, pod, podStatus, pullSecrets, podIP, podIPs, shouldRunAsync); err != nil {
 			startContainerResult.Fail(err, msg)
 			// known errors that are logged in other places are logged at higher levels here to avoid
 			// repetitive log spam
@@ -815,14 +815,16 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
 		for _, idx := range podContainerChanges.EphemeralContainersToStart {
 			c := (*v1.Container)(&pod.Spec.EphemeralContainers[idx].EphemeralContainerCommon)
-			start("ephemeral container", c)
+			shouldRunAsync := true
+			start("ephemeral container", c, shouldRunAsync)
 		}
 	}
 
 	// Step 6: start the init container.
 	if container := podContainerChanges.NextInitContainerToStart; container != nil {
 		// Start the next init container.
-		if err := start("init container", container); err != nil {
+		shouldRunAsync := false
+		if err := start("init container", container, shouldRunAsync); err != nil {
 			return
 		}
 
@@ -831,8 +833,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	}
 
 	// Step 7: start containers in podContainerChanges.ContainersToStart.
+	shouldRunAsync := true
 	for _, idx := range podContainerChanges.ContainersToStart {
-		start("container", &pod.Spec.Containers[idx])
+		start("container", &pod.Spec.Containers[idx], shouldRunAsync)
 	}
 
 	return
