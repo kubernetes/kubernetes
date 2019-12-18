@@ -32,6 +32,7 @@ Mode: ""
 NodePortAddresses: null
 OOMScoreAdj: -999
 PortRange: ""
+ShowHiddenMetricsForVersion: ""
 UDPIdleTimeout: 250ms
 Winkernel:
   EnableDSR: false

@@ -83,6 +83,7 @@ var kubeProxyMarshalCases = []struct {
 			nodePortAddresses: null
 			oomScoreAdj: null
 			portRange: ""
+			showHiddenMetricsForVersion: ""
 			udpIdleTimeout: 0s
 			winkernel:
 			  enableDSR: false
@@ -134,6 +135,7 @@ var kubeProxyMarshalCases = []struct {
 			nodePortAddresses: null
 			oomScoreAdj: null
 			portRange: ""
+			showHiddenMetricsForVersion: ""
 			udpIdleTimeout: 0s
 			winkernel:
 			  enableDSR: false
