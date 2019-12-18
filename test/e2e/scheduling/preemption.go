@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -289,7 +290,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		nodeCopy := node.DeepCopy()
 		// force it to update
 		nodeCopy.ResourceVersion = "0"
-		nodeCopy.Status.Capacity[fakecpu] = resource.MustParse("800")
+		nodeCopy.Status.Capacity[fakecpu] = resource.MustParse("1000")
 		node, err = cs.CoreV1().Nodes().UpdateStatus(nodeCopy)
 		framework.ExpectNoError(err)
 
@@ -307,7 +308,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		}
 	})
 
-	ginkgo.It("runs ReplicaSets to verify preemption running path [Flaky]", func() {
+	ginkgo.It("runs ReplicaSets to verify preemption running path", func() {
 		podNamesSeen := make(map[string]struct{})
 		stopCh := make(chan struct{})
 
@@ -338,7 +339,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		// prepare four ReplicaSet
 		rsConfs := []pauseRSConfig{
 			{
-				Replicas: int32(5),
+				Replicas: int32(1),
 				PodConfig: pausePodConfig{
 					Name:              "pod1",
 					Namespace:         ns,
@@ -346,13 +347,13 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 					PriorityClassName: "p1",
 					NodeSelector:      map[string]string{"kubernetes.io/hostname": nodeHostNameLabel},
 					Resources: &v1.ResourceRequirements{
-						Requests: v1.ResourceList{fakecpu: resource.MustParse("40")},
-						Limits:   v1.ResourceList{fakecpu: resource.MustParse("40")},
+						Requests: v1.ResourceList{fakecpu: resource.MustParse("200")},
+						Limits:   v1.ResourceList{fakecpu: resource.MustParse("200")},
 					},
 				},
 			},
 			{
-				Replicas: int32(4),
+				Replicas: int32(1),
 				PodConfig: pausePodConfig{
 					Name:              "pod2",
 					Namespace:         ns,
@@ -360,13 +361,13 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 					PriorityClassName: "p2",
 					NodeSelector:      map[string]string{"kubernetes.io/hostname": nodeHostNameLabel},
 					Resources: &v1.ResourceRequirements{
-						Requests: v1.ResourceList{fakecpu: resource.MustParse("50")},
-						Limits:   v1.ResourceList{fakecpu: resource.MustParse("50")},
+						Requests: v1.ResourceList{fakecpu: resource.MustParse("300")},
+						Limits:   v1.ResourceList{fakecpu: resource.MustParse("300")},
 					},
 				},
 			},
 			{
-				Replicas: int32(4),
+				Replicas: int32(1),
 				PodConfig: pausePodConfig{
 					Name:              "pod3",
 					Namespace:         ns,
@@ -374,39 +375,36 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 					PriorityClassName: "p3",
 					NodeSelector:      map[string]string{"kubernetes.io/hostname": nodeHostNameLabel},
 					Resources: &v1.ResourceRequirements{
-						Requests: v1.ResourceList{fakecpu: resource.MustParse("95")},
-						Limits:   v1.ResourceList{fakecpu: resource.MustParse("95")},
-					},
-				},
-			},
-			{
-				Replicas: int32(1),
-				PodConfig: pausePodConfig{
-					Name:              "pod4",
-					Namespace:         ns,
-					Labels:            map[string]string{"name": "pod4"},
-					PriorityClassName: "p4",
-					NodeSelector:      map[string]string{"kubernetes.io/hostname": nodeHostNameLabel},
-					Resources: &v1.ResourceRequirements{
-						Requests: v1.ResourceList{fakecpu: resource.MustParse("400")},
-						Limits:   v1.ResourceList{fakecpu: resource.MustParse("400")},
+						Requests: v1.ResourceList{fakecpu: resource.MustParse("450")},
+						Limits:   v1.ResourceList{fakecpu: resource.MustParse("450")},
 					},
 				},
 			},
 		}
-		// create ReplicaSet{1,2,3} so as to occupy 780/800 fake resource
-		rsNum := len(rsConfs)
-		for i := 0; i < rsNum-1; i++ {
+		// create ReplicaSet{1,2,3} so as to occupy 950/1000 fake resource
+		for i := range rsConfs {
 			runPauseRS(f, rsConfs[i])
 		}
 
 		framework.Logf("pods created so far: %v", podNamesSeen)
 		framework.Logf("length of pods created so far: %v", len(podNamesSeen))
 
-		// create ReplicaSet4
-		// if runPauseRS failed, it means ReplicaSet4 cannot be scheduled even after 1 minute
-		// which is unacceptable
-		runPauseRS(f, rsConfs[rsNum-1])
+		// create a Preemptor Pod
+		// if the 'NominatedNodeName' field of Preemptor Pod isn't set within 2 minutes,
+		// it denotes the preemption logic doesn't work, in which case we should fail it out.
+		preemptorPodConf := pausePodConfig{
+			Name:              "pod4",
+			Namespace:         ns,
+			Labels:            map[string]string{"name": "pod4"},
+			PriorityClassName: "p4",
+			NodeSelector:      map[string]string{"kubernetes.io/hostname": nodeHostNameLabel},
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{fakecpu: resource.MustParse("500")},
+				Limits:   v1.ResourceList{fakecpu: resource.MustParse("500")},
+			},
+		}
+		preemptorPod := createPod(f, preemptorPodConf)
+		waitForNominatedNodeNameWithTimeout(f, preemptorPod, framework.PodGetTimeout)
 
 		framework.Logf("pods created so far: %v", podNamesSeen)
 		framework.Logf("length of pods created so far: %v", len(podNamesSeen))
@@ -414,7 +412,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		// count pods number of ReplicaSet{1,2,3}, if it's more than expected replicas
 		// then it denotes its pods have been over-preempted
 		// "*2" means pods of ReplicaSet{1,2} are expected to be only preempted once
-		maxRSPodsSeen := []int{5 * 2, 4 * 2, 4}
+		maxRSPodsSeen := []int{1 * 2, 1 * 2, 1}
 		rsPodsSeen := []int{0, 0, 0}
 		for podName := range podNamesSeen {
 			if strings.HasPrefix(podName, "rs-pod1") {
@@ -472,6 +470,32 @@ func createPauseRS(f *framework.Framework, conf pauseRSConfig) *appsv1.ReplicaSe
 
 func runPauseRS(f *framework.Framework, conf pauseRSConfig) *appsv1.ReplicaSet {
 	rs := createPauseRS(f, conf)
-	framework.ExpectNoError(replicaset.WaitForReplicaSetTargetAvailableReplicas(f.ClientSet, rs, conf.Replicas))
+	framework.ExpectNoError(replicaset.WaitForReplicaSetTargetAvailableReplicasWithTimeout(f.ClientSet, rs, conf.Replicas, framework.PodGetTimeout))
 	return rs
+}
+
+func createPod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
+	namespace := conf.Namespace
+	if len(namespace) == 0 {
+		namespace = f.Namespace.Name
+	}
+	pod, err := f.ClientSet.CoreV1().Pods(namespace).Create(initPausePod(f, conf))
+	framework.ExpectNoError(err)
+	return pod
+}
+
+func waitForNominatedNodeNameWithTimeout(f *framework.Framework, pod *v1.Pod, timeout time.Duration) {
+	err := wait.Poll(2*time.Second, timeout, func() (bool, error) {
+		pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		// DEBUG only
+		framework.Logf("[DEBUG] Status.NominatedNodeName=%v for %v/%v", pod.Status.NominatedNodeName, pod.Namespace, pod.Name)
+		if len(pod.Status.NominatedNodeName) > 0 {
+			return true, nil
+		}
+		return false, err
+	})
+	framework.ExpectNoError(err, "NominatedNodeName field was not set for Pod %v/%v", pod.Namespace, pod.Name)
 }
