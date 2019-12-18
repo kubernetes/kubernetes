@@ -35,7 +35,7 @@ echo 'gem: --no-document' >> /etc/gemrc
 gem install --file Gemfile
 
 # cleanup
-apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false "${BUILD_DEPS}"
+apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false ${BUILD_DEPS}
 apt-get clean -y
 rm -rf \
    /var/cache/debconf/* \
