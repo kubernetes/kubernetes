@@ -51,9 +51,6 @@ type DryRunVerifier struct {
 // HasSupport verifies if the given gvk supports DryRun. An error is
 // returned if it doesn't.
 func (v *DryRunVerifier) HasSupport(gvk schema.GroupVersionKind) error {
-	if v.OpenAPIGetter == nil {
-		return fmt.Errorf("failed to download openapi: no openapi getter")
-	}
 	oapi, err := v.OpenAPIGetter.OpenAPISchema()
 	if err != nil {
 		return fmt.Errorf("failed to download openapi: %v", err)

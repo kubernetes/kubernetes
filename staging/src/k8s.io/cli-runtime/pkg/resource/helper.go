@@ -61,7 +61,7 @@ func NewHelper(client RESTClient, mapping *meta.RESTMapping) *Helper {
 }
 
 func (m *Helper) WithDryRun(dryRunServer bool, dynamicClient dynamic.Interface, discoveryClient discovery.DiscoveryInterface) *Helper {
-	m.DryRunServer = true
+	m.DryRunServer = dryRunServer
 	m.DryRunVerifier = NewDryRunVerifier(dynamicClient, discoveryClient)
 	return m
 }
