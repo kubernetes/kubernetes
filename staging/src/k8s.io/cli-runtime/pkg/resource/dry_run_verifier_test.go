@@ -98,3 +98,59 @@ func TestDryRunVerifierNoOpenAPI(t *testing.T) {
 		t.Fatalf("MyCRD doesn't support dry-run, yet no error found")
 	}
 }
+
+func TestSupportsDryRun(t *testing.T) {
+	doc, err := fakeSchema.OpenAPISchema()
+	if err != nil {
+		t.Fatalf("Failed to get OpenAPI Schema: %v", err)
+	}
+
+	tests := []struct {
+		gvk      schema.GroupVersionKind
+		success  bool
+		supports bool
+	}{
+		{
+			gvk: schema.GroupVersionKind{
+				Group:   "",
+				Version: "v1",
+				Kind:    "Pod",
+			},
+			success:  true,
+			supports: true,
+		},
+		{
+			gvk: schema.GroupVersionKind{
+				Group:   "",
+				Version: "v1",
+				Kind:    "UnknownKind",
+			},
+			success:  false,
+			supports: false,
+		},
+		{
+			gvk: schema.GroupVersionKind{
+				Group:   "",
+				Version: "v1",
+				Kind:    "NodeProxyOptions",
+			},
+			success:  true,
+			supports: false,
+		},
+	}
+
+	for _, test := range tests {
+		supports, err := SupportsDryRun(doc, test.gvk)
+		if supports != test.supports || ((err == nil) != test.success) {
+			errStr := "nil"
+			if test.success == false {
+				errStr = "err"
+			}
+			t.Errorf("SupportsDryRun(doc, %v) = (%v, %v), expected (%v, %v)",
+				test.gvk,
+				supports, err,
+				test.supports, errStr,
+			)
+		}
+	}
+}

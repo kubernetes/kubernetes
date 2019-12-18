@@ -17,12 +17,14 @@ limitations under the License.
 package resource
 
 import (
+	"errors"
 	"fmt"
 
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
+	yaml "gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/kubectl/pkg/util/openapi"
 )
 
 func NewDryRunVerifier(dynamicClient dynamic.Interface, discoveryClient discovery.DiscoveryInterface) *DryRunVerifier {
@@ -49,14 +51,17 @@ type DryRunVerifier struct {
 // HasSupport verifies if the given gvk supports DryRun. An error is
 // returned if it doesn't.
 func (v *DryRunVerifier) HasSupport(gvk schema.GroupVersionKind) error {
+	if v.OpenAPIGetter == nil {
+		return fmt.Errorf("failed to download openapi: no openapi getter")
+	}
 	oapi, err := v.OpenAPIGetter.OpenAPISchema()
 	if err != nil {
 		return fmt.Errorf("failed to download openapi: %v", err)
 	}
-	supports, err := openapi.SupportsDryRun(oapi, gvk)
+	supports, err := SupportsDryRun(oapi, gvk)
 	if err != nil {
 		// We assume that we couldn't find the type, then check for namespace:
-		supports, _ = openapi.SupportsDryRun(oapi, schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"})
+		supports, _ = SupportsDryRun(oapi, schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"})
 		// If namespace supports dryRun, then we will support dryRun for CRDs only.
 		if supports {
 			supports, err = v.Finder.HasCRD(gvk.GroupKind())
@@ -69,4 +74,44 @@ func (v *DryRunVerifier) HasSupport(gvk schema.GroupVersionKind) error {
 		return fmt.Errorf("%v doesn't support dry-run", gvk)
 	}
 	return nil
+}
+
+// SupportsDryRun is a method that let's us look in the OpenAPI if the
+// specific group-version-kind supports the dryRun query parameter for
+// the PATCH end-point.
+func SupportsDryRun(doc *openapi_v2.Document, gvk schema.GroupVersionKind) (bool, error) {
+	for _, path := range doc.GetPaths().GetPath() {
+		// Is this describing the gvk we're looking for?
+		if !hasGVKExtension(path.GetValue().GetPatch().GetVendorExtension(), gvk) {
+			continue
+		}
+		for _, param := range path.GetValue().GetPatch().GetParameters() {
+			if param.GetParameter().GetNonBodyParameter().GetQueryParameterSubSchema().GetName() == "dryRun" {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+
+	return false, errors.New("couldn't find GVK in openapi")
+}
+
+func hasGVKExtension(extensions []*openapi_v2.NamedAny, gvk schema.GroupVersionKind) bool {
+	for _, extension := range extensions {
+		if extension.GetValue().GetYaml() == "" ||
+			extension.GetName() != "x-kubernetes-group-version-kind" {
+			continue
+		}
+		var value map[string]string
+		err := yaml.Unmarshal([]byte(extension.GetValue().GetYaml()), &value)
+		if err != nil {
+			continue
+		}
+
+		if value["group"] == gvk.Group && value["kind"] == gvk.Kind && value["version"] == gvk.Version {
+			return true
+		}
+		return false
+	}
+	return false
 }

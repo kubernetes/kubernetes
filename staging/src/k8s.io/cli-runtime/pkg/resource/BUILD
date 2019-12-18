@@ -45,9 +45,10 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/restmapper:go_default_library",
-        "//staging/src/k8s.io/kubectl/pkg/util/openapi:go_default_library",
+        "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/golang.org/x/text/encoding/unicode:go_default_library",
         "//vendor/golang.org/x/text/transform:go_default_library",
+        "//vendor/gopkg.in/yaml.v2:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/fs:go_default_library",
     ],
 )
