@@ -17,10 +17,8 @@ limitations under the License.
 package delete
 
 import (
-	"encoding/json"
-	"io"
-	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -96,17 +94,13 @@ func TestDeleteObjectByTuple(t *testing.T) {
 	}
 }
 
-func hasExpectedPropagationPolicy(body io.ReadCloser, policy *metav1.DeletionPropagation) bool {
-	if body == nil || policy == nil {
-		return body == nil && policy == nil
+func hasExpectedPropagationPolicy(queryParams url.Values, policy *metav1.DeletionPropagation) bool {
+	var actual = queryParams.Get("propagationPolicy")
+	if actual == "" || policy == nil {
+		return actual == "" && policy == nil
 	}
-	var parsedBody metav1.DeleteOptions
-	rawBody, _ := ioutil.ReadAll(body)
-	json.Unmarshal(rawBody, &parsedBody)
-	if parsedBody.PropagationPolicy == nil {
-		return false
-	}
-	return *policy == *parsedBody.PropagationPolicy
+	var expect = string(*policy)
+	return expect == actual
 }
 
 // Tests that DeleteOptions.OrphanDependents is appropriately set while deleting objects.
@@ -123,9 +117,9 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m, b := req.URL.Path, req.Method, req.Body; {
+			switch p, m, q := req.URL.Path, req.Method, req.URL.Query(); {
 
-			case p == "/namespaces/test/secrets/mysecret" && m == "DELETE" && hasExpectedPropagationPolicy(b, policy):
+			case p == "/namespaces/test/secrets/mysecret" && m == "DELETE" && hasExpectedPropagationPolicy(q, policy):
 
 				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			default:

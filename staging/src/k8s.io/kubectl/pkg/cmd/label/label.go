@@ -58,7 +58,7 @@ type LabelOptions struct {
 	local           bool
 	dryRunClient    bool
 	dryRunServer    bool
-	dryRunVerifier  *cmdutil.DryRunVerifier
+	dryRunVerifier  *resource.DryRunVerifier
 	all             bool
 	resourceVersion string
 	selector        string
@@ -182,7 +182,7 @@ func (o *LabelOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if err != nil {
 		return err
 	}
-	o.dryRunVerifier = &cmdutil.DryRunVerifier{
+	o.dryRunVerifier = &resource.DryRunVerifier{
 		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(dynamicClient)),
 		OpenAPIGetter: discoveryClient,
 	}

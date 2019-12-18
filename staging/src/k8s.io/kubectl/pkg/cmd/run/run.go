@@ -121,7 +121,7 @@ type RunOptions struct {
 
 	DryRunClient   bool
 	DryRunServer   bool
-	DryRunVerifier *cmdutil.DryRunVerifier
+	DryRunVerifier *resource.DryRunVerifier
 
 	PrintObj func(runtime.Object) error
 	Recorder genericclioptions.Recorder
@@ -239,7 +239,7 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = &cmdutil.DryRunVerifier{
+	o.DryRunVerifier = &resource.DryRunVerifier{
 		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(dynamicClient)),
 		OpenAPIGetter: discoveryClient,
 	}

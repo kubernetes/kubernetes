@@ -77,7 +77,7 @@ type DiffOptions struct {
 	OpenAPISchema    openapi.Resources
 	DiscoveryClient  discovery.DiscoveryInterface
 	DynamicClient    dynamic.Interface
-	DryRunVerifier   *cmdutil.DryRunVerifier
+	DryRunVerifier   *resource.DryRunVerifier
 	CmdNamespace     string
 	EnforceNamespace bool
 	Builder          *resource.Builder
@@ -423,7 +423,7 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.DryRunVerifier = &cmdutil.DryRunVerifier{
+	o.DryRunVerifier = &resource.DryRunVerifier{
 		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(o.DynamicClient)),
 		OpenAPIGetter: o.DiscoveryClient,
 	}

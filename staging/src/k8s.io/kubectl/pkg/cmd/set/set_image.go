@@ -49,7 +49,7 @@ type SetImageOptions struct {
 	Selector       string
 	DryRunClient   bool
 	DryRunServer   bool
-	DryRunVerifier *cmdutil.DryRunVerifier
+	DryRunVerifier *resource.DryRunVerifier
 	All            bool
 	Output         string
 	Local          bool
@@ -159,7 +159,7 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = &cmdutil.DryRunVerifier{
+	o.DryRunVerifier = &resource.DryRunVerifier{
 		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(dynamicClient)),
 		OpenAPIGetter: discoveryClient,
 	}

@@ -65,7 +65,7 @@ type SetServiceAccountOptions struct {
 	fileNameOptions        resource.FilenameOptions
 	dryRunClient           bool
 	dryRunServer           bool
-	dryRunVerifier         *cmdutil.DryRunVerifier
+	dryRunVerifier         *resource.DryRunVerifier
 	shortOutput            bool
 	all                    bool
 	output                 string
@@ -149,7 +149,7 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	if err != nil {
 		return err
 	}
-	o.dryRunVerifier = &cmdutil.DryRunVerifier{
+	o.dryRunVerifier = &resource.DryRunVerifier{
 		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(dynamicClient)),
 		OpenAPIGetter: discoveryClient,
 	}

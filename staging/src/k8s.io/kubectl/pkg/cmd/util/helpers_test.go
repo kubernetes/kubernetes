@@ -21,12 +21,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
 
-	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -36,8 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/cli-runtime/pkg/resource"
-	openapitesting "k8s.io/kube-openapi/pkg/util/proto/testing"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/utils/exec"
 )
@@ -323,79 +319,5 @@ func TestDumpReaderToFile(t *testing.T) {
 	stringData := string(data)
 	if stringData != testString {
 		t.Fatalf("Wrong file content %s != %s", testString, stringData)
-	}
-}
-
-var fakeSchema = openapitesting.Fake{Path: filepath.Join("..", "..", "..", "testdata", "openapi", "swagger.json")}
-
-func TestDryRunVerifier(t *testing.T) {
-	dryRunVerifier := DryRunVerifier{
-		Finder: resource.NewCRDFinder(func() ([]schema.GroupKind, error) {
-			return []schema.GroupKind{
-				{
-					Group: "crd.com",
-					Kind:  "MyCRD",
-				},
-				{
-					Group: "crd.com",
-					Kind:  "MyNewCRD",
-				},
-			}, nil
-		}),
-		OpenAPIGetter: &fakeSchema,
-	}
-
-	err := dryRunVerifier.HasSupport(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "NodeProxyOptions"})
-	if err == nil {
-		t.Fatalf("NodeProxyOptions doesn't support dry-run, yet no error found")
-	}
-
-	err = dryRunVerifier.HasSupport(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"})
-	if err != nil {
-		t.Fatalf("Pod should support dry-run: %v", err)
-	}
-
-	err = dryRunVerifier.HasSupport(schema.GroupVersionKind{Group: "crd.com", Version: "v1", Kind: "MyCRD"})
-	if err != nil {
-		t.Fatalf("MyCRD should support dry-run: %v", err)
-	}
-
-	err = dryRunVerifier.HasSupport(schema.GroupVersionKind{Group: "crd.com", Version: "v1", Kind: "Random"})
-	if err == nil {
-		t.Fatalf("Random doesn't support dry-run, yet no error found")
-	}
-}
-
-type EmptyOpenAPI struct{}
-
-func (EmptyOpenAPI) OpenAPISchema() (*openapi_v2.Document, error) {
-	return &openapi_v2.Document{}, nil
-}
-
-func TestDryRunVerifierNoOpenAPI(t *testing.T) {
-	dryRunVerifier := DryRunVerifier{
-		Finder: resource.NewCRDFinder(func() ([]schema.GroupKind, error) {
-			return []schema.GroupKind{
-				{
-					Group: "crd.com",
-					Kind:  "MyCRD",
-				},
-				{
-					Group: "crd.com",
-					Kind:  "MyNewCRD",
-				},
-			}, nil
-		}),
-		OpenAPIGetter: EmptyOpenAPI{},
-	}
-
-	err := dryRunVerifier.HasSupport(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"})
-	if err == nil {
-		t.Fatalf("Pod doesn't support dry-run, yet no error found")
-	}
-
-	err = dryRunVerifier.HasSupport(schema.GroupVersionKind{Group: "crd.com", Version: "v1", Kind: "MyCRD"})
-	if err == nil {
-		t.Fatalf("MyCRD doesn't support dry-run, yet no error found")
 	}
 }

@@ -122,7 +122,7 @@ type EnvOptions struct {
 	output                 string
 	dryRunClient           bool
 	dryRunServer           bool
-	dryRunVerifier         *cmdutil.DryRunVerifier
+	dryRunVerifier         *resource.DryRunVerifier
 	builder                func() *resource.Builder
 	updatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	namespace              string
@@ -236,7 +236,7 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	if err != nil {
 		return err
 	}
-	o.dryRunVerifier = &cmdutil.DryRunVerifier{
+	o.dryRunVerifier = &resource.DryRunVerifier{
 		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(dynamicClient)),
 		OpenAPIGetter: discoveryClient,
 	}

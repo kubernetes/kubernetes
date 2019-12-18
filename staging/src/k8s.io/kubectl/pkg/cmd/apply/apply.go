@@ -330,7 +330,7 @@ func (o *ApplyOptions) Run() error {
 		openapiSchema = o.OpenAPISchema
 	}
 
-	var dryRunVerifier = &cmdutil.DryRunVerifier{
+	var dryRunVerifier = &resource.DryRunVerifier{
 		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(o.DynamicClient)),
 		OpenAPIGetter: o.DiscoveryClient,
 	}

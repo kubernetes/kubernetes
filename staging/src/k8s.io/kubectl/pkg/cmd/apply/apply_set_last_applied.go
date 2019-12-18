@@ -52,7 +52,7 @@ type SetLastAppliedOptions struct {
 	enforceNamespace             bool
 	dryRunClient                 bool
 	dryRunServer                 bool
-	dryRunVerifier               *cmdutil.DryRunVerifier
+	dryRunVerifier               *resource.DryRunVerifier
 	shortOutput                  bool
 	output                       string
 	patchBufferList              []PatchBuffer
@@ -135,7 +135,7 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	if err != nil {
 		return err
 	}
-	o.dryRunVerifier = &cmdutil.DryRunVerifier{
+	o.dryRunVerifier = &resource.DryRunVerifier{
 		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(dynamicClient)),
 		OpenAPIGetter: discoveryClient,
 	}

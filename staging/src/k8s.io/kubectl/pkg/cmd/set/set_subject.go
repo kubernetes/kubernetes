@@ -68,7 +68,7 @@ type SubjectOptions struct {
 	All               bool
 	DryRunClient      bool
 	DryRunServer      bool
-	DryRunVerifier    *cmdutil.DryRunVerifier
+	DryRunVerifier    *resource.DryRunVerifier
 	Local             bool
 
 	Users           []string
@@ -140,7 +140,7 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = &cmdutil.DryRunVerifier{
+	o.DryRunVerifier = &resource.DryRunVerifier{
 		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(dynamicClient)),
 		OpenAPIGetter: discoveryClient,
 	}

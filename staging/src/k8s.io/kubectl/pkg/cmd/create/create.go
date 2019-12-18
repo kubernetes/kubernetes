@@ -52,7 +52,7 @@ type CreateOptions struct {
 
 	DryRunClient   bool
 	DryRunServer   bool
-	DryRunVerifier *cmdutil.DryRunVerifier
+	DryRunVerifier *resource.DryRunVerifier
 
 	FilenameOptions  resource.FilenameOptions
 	Selector         string
@@ -208,7 +208,7 @@ func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = &cmdutil.DryRunVerifier{
+	o.DryRunVerifier = &resource.DryRunVerifier{
 		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(dynamicClient)),
 		OpenAPIGetter: discoveryClient,
 	}
@@ -357,7 +357,7 @@ type CreateSubcommandOptions struct {
 	// DryRunClient is true if the command should be simulated but not run against the server
 	DryRunClient     bool
 	DryRunServer     bool
-	DryRunVerifier   *cmdutil.DryRunVerifier
+	DryRunVerifier   *resource.DryRunVerifier
 	CreateAnnotation bool
 
 	Namespace        string
@@ -404,7 +404,7 @@ func (o *CreateSubcommandOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = &cmdutil.DryRunVerifier{
+	o.DryRunVerifier = &resource.DryRunVerifier{
 		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(dynamicClient)),
 		OpenAPIGetter: discoveryClient,
 	}

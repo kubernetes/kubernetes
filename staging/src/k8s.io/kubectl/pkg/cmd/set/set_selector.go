@@ -46,7 +46,7 @@ type SetSelectorOptions struct {
 	RecordFlags          *genericclioptions.RecordFlags
 	dryRunClient         bool
 	dryRunServer         bool
-	dryRunVerifier       *cmdutil.DryRunVerifier
+	dryRunVerifier       *resource.DryRunVerifier
 
 	// set by args
 	resources       []string
@@ -146,7 +146,7 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	if err != nil {
 		return err
 	}
-	o.dryRunVerifier = &cmdutil.DryRunVerifier{
+	o.dryRunVerifier = &resource.DryRunVerifier{
 		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(dynamicClient)),
 		OpenAPIGetter: discoveryClient,
 	}

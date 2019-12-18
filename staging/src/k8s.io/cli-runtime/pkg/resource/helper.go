@@ -118,8 +118,7 @@ func (m *Helper) DeleteWithOptions(namespace, name string, options *metav1.Delet
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Name(name).
-		// Delete options are in the body?
-		Body(options).
+		VersionedParams(options, metav1.ParameterCodec).
 		Do().
 		Get()
 }

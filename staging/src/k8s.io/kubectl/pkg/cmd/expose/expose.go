@@ -92,7 +92,7 @@ type ExposeServiceOptions struct {
 
 	DryRunClient   bool
 	DryRunServer   bool
-	DryRunVerifier *cmdutil.DryRunVerifier
+	DryRunVerifier *resource.DryRunVerifier
 
 	EnforceNamespace bool
 
@@ -187,7 +187,7 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = &cmdutil.DryRunVerifier{
+	o.DryRunVerifier = &resource.DryRunVerifier{
 		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(dynamicClient)),
 		OpenAPIGetter: discoveryClient,
 	}

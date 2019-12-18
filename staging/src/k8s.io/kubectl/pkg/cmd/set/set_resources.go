@@ -77,7 +77,7 @@ type SetResourcesOptions struct {
 
 	DryRunClient   bool
 	DryRunServer   bool
-	DryRunVerifier *cmdutil.DryRunVerifier
+	DryRunVerifier *resource.DryRunVerifier
 
 	PrintObj printers.ResourcePrinterFunc
 	Recorder genericclioptions.Recorder
@@ -169,7 +169,7 @@ func (o *SetResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = &cmdutil.DryRunVerifier{
+	o.DryRunVerifier = &resource.DryRunVerifier{
 		Finder:        resource.NewCRDFinder(resource.CRDFromDynamic(dynamicClient)),
 		OpenAPIGetter: discoveryClient,
 	}
