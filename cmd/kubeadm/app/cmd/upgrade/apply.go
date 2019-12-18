@@ -18,23 +18,24 @@ package upgrade
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/upgrade/apply"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
 const (
@@ -57,6 +58,32 @@ type applyFlags struct {
 // sessionIsInteractive returns true if the session is of an interactive type (the default, can be opted out of with -y, -f or --dry-run)
 func (f *applyFlags) sessionIsInteractive() bool {
 	return !(f.nonInteractiveMode || f.dryRun || f.force)
+}
+
+// compile-time assert that the local data object satisfies the phases data interface.
+var _ phases.ApplyData = &applyData{}
+
+// nodeData defines all the runtime information used when running the kubeadm upgrade node worklow;
+// this data is shared across all the phases that are included in the workflow.
+type applyData struct {
+	renewCerts                bool
+	cfg                       *kubeadmapi.InitConfiguration
+	dryRun                    bool
+	ignorePreflightErrors     sets.String
+	userVersion               version.Version
+	kubeConfigPath            string
+	configPath                string
+	outputWriter              io.Writer
+	client                    clientset.Interface
+	waiter                    apiclient.Waiter
+	kustomizeDir              string
+	featureGate               string
+	etcdUpgrade               bool
+	imagePullTimeout          time.Duration
+	allowExperimentalUpgrades bool
+	allowRCUpgrades           bool
+	force                     bool
+	versionGetter             upgrade.VersionGetter
 }
 
 // NewCmdApply returns the cobra command for `kubeadm upgrade apply`
@@ -110,53 +137,18 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 //   - Uploads the newly used configuration to the cluster ConfigMap
 func runApply(flags *applyFlags, userVersion string) error {
 
-	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
-
-	klog.V(1).Infoln("[upgrade/apply] retrieving configuration from cluster")
-	client, cfg, versionGetter, err := upgrade.GetUpgradeVariables(flags.applyPlanFlags.kubeConfigPath, flags.applyPlanFlags.cfgPath, flags.dryRun, userVersion)
+	applyData, err := newApplyData(flags, userVersion)
 	if err != nil {
 		return err
 	}
 
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(flags.applyPlanFlags.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
-	if err != nil {
-		return err
-	}
-
-	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
-	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
-
-	klog.V(1).Infoln("[upgrade/apply] verifying health of cluster")
-	err = upgrade.EnforceRequirements(client, cfg, ignorePreflightErrorsSet, flags.featureGatesString, flags.dryRun)
-	if err != nil {
+	if err = phases.RunPreflightChecksPhase(applyData); err != nil {
 		return err
 	}
 
 	// If the user told us to print this information out; do it!
 	if flags.printConfig {
-		printConfiguration(&cfg.ClusterConfiguration, os.Stdout)
-	}
-
-	// Validate requested and validate actual version
-	klog.V(1).Infoln("[upgrade/apply] validating requested and actual version")
-	if err := configutil.NormalizeKubernetesVersion(&cfg.ClusterConfiguration); err != nil {
-		return err
-	}
-
-	// Use normalized version string in all following code.
-	newK8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
-	if err != nil {
-		return errors.Errorf("unable to parse normalized version %q as a semantic version", cfg.KubernetesVersion)
-	}
-
-	if err := features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
-		return err
-	}
-
-	// Enforce the version skew policies
-	klog.V(1).Infoln("[upgrade/version] enforcing version skew policies")
-	if err := EnforceVersionPolicies(cfg.KubernetesVersion, newK8sVersion, flags, versionGetter); err != nil {
-		return errors.Wrap(err, "[upgrade/version] FATAL")
+		printConfiguration(&applyData.Cfg().ClusterConfiguration, os.Stdout)
 	}
 
 	// If the current session is interactive, ask the user whether they really want to upgrade.
@@ -166,30 +158,22 @@ func runApply(flags *applyFlags, userVersion string) error {
 		}
 	}
 
-	waiter := getWaiter(flags.dryRun, client)
-
-	// Use a prepuller implementation based on creating DaemonSets
-	// and block until all DaemonSets are ready; then we know for sure that all control plane images are cached locally
-	klog.V(1).Infoln("[upgrade/apply] creating prepuller")
-	prepuller := upgrade.NewDaemonSetPrepuller(client, waiter, &cfg.ClusterConfiguration)
-	componentsToPrepull := constants.ControlPlaneComponents
-	if cfg.Etcd.External == nil && flags.etcdUpgrade {
-		componentsToPrepull = append(componentsToPrepull, constants.Etcd)
-	}
-	if err := upgrade.PrepullImagesInParallel(prepuller, flags.imagePullTimeout, componentsToPrepull); err != nil {
-		return errors.Wrap(err, "[upgrade/prepull] Failed prepulled the images for the control plane components error")
-	}
-
 	// Now; perform the upgrade procedure
 	klog.V(1).Infoln("[upgrade/apply] performing upgrade")
-	if err := PerformControlPlaneUpgrade(flags, client, waiter, cfg); err != nil {
+	if err := PerformControlPlaneUpgrade(flags, applyData.Client(), applyData.Waiter(), applyData.Cfg()); err != nil {
 		return errors.Wrap(err, "[upgrade/apply] FATAL")
 	}
 
-	// Upgrade RBAC rules and addons.
-	klog.V(1).Infoln("[upgrade/postupgrade] upgrading RBAC rules and addons")
-	if err := upgrade.PerformPostUpgradeTasks(client, cfg, newK8sVersion, flags.dryRun); err != nil {
+	// Perform postupgrade tasks.
+	klog.V(1).Infoln("[upgrade/postupgrade] running post-upgrade tasks")
+	if err := upgrade.PerformPostUpgradeTasks(applyData.Client(), applyData.Cfg(), applyData.UserVersion(), flags.dryRun); err != nil {
 		return errors.Wrap(err, "[upgrade/postupgrade] FATAL post-upgrade error")
+	}
+
+	// perform addon tasks
+	klog.V(1).Infoln("[upgrade/addons] upgrading addons")
+	if err := addons.UpgradeAddons(applyData.Client(), applyData.Cfg(), flags.dryRun); err != nil {
+		return errors.Wrap(err, "[upgrade/addons] FATAL addons error")
 	}
 
 	if flags.dryRun {
@@ -198,11 +182,127 @@ func runApply(flags *applyFlags, userVersion string) error {
 	}
 
 	fmt.Println("")
-	fmt.Printf("[upgrade/successful] SUCCESS! Your cluster was upgraded to %q. Enjoy!\n", cfg.KubernetesVersion)
+	fmt.Printf("[upgrade/successful] SUCCESS! Your cluster was upgraded to %q. Enjoy!\n", applyData.Cfg().KubernetesVersion)
 	fmt.Println("")
 	fmt.Println("[upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets if you haven't already done so.")
 
 	return nil
+}
+
+func newApplyData(flags *applyFlags, userVersion string) (*applyData, error) {
+
+	klog.V(1).Infoln("[upgrade/apply] verifying health of cluster")
+	klog.V(1).Infoln("[upgrade/apply] retrieving configuration from cluster")
+	client, cfg, versionGetter, err := upgrade.GetUpgradeVariables(flags.applyPlanFlags.kubeConfigPath, flags.applyPlanFlags.cfgPath, flags.dryRun, userVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(flags.applyPlanFlags.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
+	if err != nil {
+		return nil, err
+	}
+
+	// Use normalized version string in all following code.
+	newK8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
+	if err != nil {
+		return nil, errors.Errorf("unable to parse normalized version %q as a semantic version", cfg.KubernetesVersion)
+	}
+
+	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
+	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
+
+	waiter := getWaiter(flags.dryRun, client)
+
+	return &applyData{
+		renewCerts:                flags.renewCerts,
+		kubeConfigPath:            flags.kubeConfigPath,
+		configPath:                flags.cfgPath,
+		kustomizeDir:              flags.kustomizeDir,
+		featureGate:               flags.featureGatesString,
+		etcdUpgrade:               flags.etcdUpgrade,
+		imagePullTimeout:          flags.imagePullTimeout,
+		allowExperimentalUpgrades: flags.allowExperimentalUpgrades,
+		allowRCUpgrades:           flags.allowRCUpgrades,
+		force:                     flags.force,
+		waiter:                    waiter,
+		dryRun:                    flags.dryRun,
+		userVersion:               *newK8sVersion,
+		ignorePreflightErrors:     ignorePreflightErrorsSet,
+		versionGetter:             versionGetter,
+		client:                    client,
+		cfg:                       cfg,
+	}, nil
+}
+
+// RenewCerts returns the renewCerts flag.
+func (d *applyData) RenewCerts() bool {
+	return d.renewCerts
+}
+
+// Cfg returns the kubadmapi.InitConfiguration
+func (d *applyData) Cfg() *kubeadmapi.InitConfiguration {
+	return d.cfg
+}
+
+func (d *applyData) DryRun() bool {
+	return d.dryRun
+}
+
+func (d *applyData) IgnorePreflightErrors() sets.String {
+	return d.ignorePreflightErrors
+}
+
+func (d *applyData) UserVersion() *version.Version {
+	return &d.userVersion
+}
+
+func (d *applyData) KubeConfigPath() string {
+	return d.kubeConfigPath
+}
+
+func (d *applyData) ConfigPath() string {
+	return d.configPath
+}
+
+func (d *applyData) Client() clientset.Interface {
+	return d.client
+}
+
+func (d *applyData) Waiter() apiclient.Waiter {
+	return d.waiter
+}
+
+func (d *applyData) KustomizeDir() string {
+	return d.kustomizeDir
+}
+
+func (d *applyData) FeatureGates() string {
+	return d.featureGate
+}
+
+func (d *applyData) UpgradeETCD() bool {
+	return d.etcdUpgrade
+}
+
+func (d *applyData) ImagePullTimeout() time.Duration {
+	return d.imagePullTimeout
+}
+
+func (d *applyData) AllowExperimentalUpgrades() bool {
+	return d.allowExperimentalUpgrades
+}
+
+func (d *applyData) AllowRCUpgrades() bool {
+	return d.allowRCUpgrades
+}
+
+func (d *applyData) Force() bool {
+	return d.force
+}
+
+func (d *applyData) VersionGetter() upgrade.VersionGetter {
+	return d.versionGetter
 }
 
 // EnforceVersionPolicies makes sure that the version the user specified is valid to upgrade to

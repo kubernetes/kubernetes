@@ -28,6 +28,7 @@ import (
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 )
@@ -99,6 +100,7 @@ func checkUnsupportedPlugins(client clientset.Interface) error {
 	return nil
 }
 
+// RunPreflightChecks runs the preflight checks for kubeadm upgrade apply
 func RunPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.String, cfg *kubeadmapi.ClusterConfiguration) error {
 	fmt.Println("[preflight] Running pre-flight checks.")
 	err := preflight.RunRootCheckOnly(ignorePreflightErrors)
@@ -124,5 +126,47 @@ func checkMigration(client clientset.Interface) error {
 	if err != nil {
 		return errors.Wrap(err, "CoreDNS will not be upgraded")
 	}
+	return nil
+}
+
+// EnforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
+func EnforceRequirements(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrorsSet sets.String, featureGatesString string, dryRun bool) error {
+	// Check if the cluster is self-hosted
+	if IsControlPlaneSelfHosted(client) {
+		return errors.New("cannot upgrade a self-hosted control plane")
+	}
+
+	// Fetch the configuration from a file or ConfigMap and validate it
+	fmt.Println("[upgrade/config] Making sure the configuration is correct:")
+
+	var err error
+	// If features gates are passed to the command line, use it (otherwise use featureGates from configuration)
+	if featureGatesString != "" {
+		cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString)
+		if err != nil {
+			return errors.Wrap(err, "[upgrade/config] FATAL")
+		}
+	}
+
+	// Check if feature gate flags used in the cluster are consistent with the set of features currently supported by kubeadm
+	if msg := features.CheckDeprecatedFlags(&features.InitFeatureGates, cfg.FeatureGates); len(msg) > 0 {
+		for _, m := range msg {
+			fmt.Printf("[upgrade/config] %s\n", m)
+		}
+		return errors.New("[upgrade/config] FATAL. Unable to upgrade a cluster using deprecated feature-gate flags. Please see the release notes")
+	}
+
+	// Ensure the user is root
+	klog.V(1).Info("running preflight checks")
+	if err := RunPreflightChecks(client, ignorePreflightErrorsSet, &cfg.ClusterConfiguration); err != nil {
+		return err
+	}
+
+	// Run healthchecks against the cluster
+	if err := CheckClusterHealth(client, &cfg.ClusterConfiguration, ignorePreflightErrorsSet); err != nil {
+		return errors.Wrap(err, "[upgrade/health] FATAL")
+	}
+
+	// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
 	return nil
 }
