@@ -26,7 +26,7 @@ import (
 
 // EmptyFields represents a set with no paths
 // It looks like metav1.Fields{Raw: []byte("{}")}
-var EmptyFields metav1.FieldsV1 = func() metav1.FieldsV1 {
+var EmptyFields = func() metav1.FieldsV1 {
 	f, err := SetToFields(*fieldpath.NewSet())
 	if err != nil {
 		panic("should never happen")
