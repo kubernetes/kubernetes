@@ -21,8 +21,8 @@ KUBEMARK_DIRECTORY="${KUBE_ROOT}/test/kubemark"
 RESOURCE_DIRECTORY="${KUBEMARK_DIRECTORY}/resources"
 
 # Generate secret and configMap for the hollow-node pods to work, prepare
-# manifests of the hollow-node and heapster replication controllers from
-# templates, and finally create these resources through kubectl.
+# manifests of the hollow-node and heapster deployments from templates,
+# and finally create these resources through kubectl.
 function create-kube-hollow-node-resources {
   # Create kubeconfig for Kubelet.
   KUBELET_KUBECONFIG_CONTENTS="$(cat <<EOF
@@ -225,7 +225,7 @@ EOF
   "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/addons" --namespace="kubemark"
   set-registry-secrets
 
-  # Create the replication controller for hollow-nodes.
+  # Create the deployment for hollow-nodes.
   # We allow to override the NUM_REPLICAS when running Cluster Autoscaler.
   NUM_REPLICAS=${NUM_REPLICAS:-${KUBEMARK_NUM_NODES}}
   sed "s/{{numreplicas}}/${NUM_REPLICAS}/g" "${RESOURCE_DIRECTORY}/hollow-node_template.yaml" > "${RESOURCE_DIRECTORY}/hollow-node.yaml"
@@ -250,7 +250,7 @@ EOF
   sed -i'' -e "s'{{kubemark_mig_config}}'${KUBEMARK_MIG_CONFIG:-}'g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/hollow-node.yaml" --namespace="kubemark"
 
-  echo "Created secrets, configMaps, replication-controllers required for hollow-nodes."
+  echo "Created secrets, configMaps, deployments required for hollow-nodes."
 }
 
 # Wait until all hollow-nodes are running or there is a timeout.
