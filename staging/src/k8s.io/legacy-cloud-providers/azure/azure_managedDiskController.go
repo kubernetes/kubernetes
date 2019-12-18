@@ -69,6 +69,10 @@ type ManagedDiskOptions struct {
 	DiskIOPSReadWrite string
 	// Throughput Cap (MBps) for UltraSSD disk
 	DiskMBpsReadWrite string
+	// if SourceResourceID is not empty, then it's a disk copy operation(for snapshot)
+	SourceResourceID string
+	// The type of source
+	SourceType string
 	// ResourceId of the disk encryption set to use for enabling encryption at rest.
 	DiskEncryptionSetID string
 }
@@ -99,9 +103,14 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 
 	diskSizeGB := int32(options.SizeGB)
 	diskSku := compute.DiskStorageAccountTypes(options.StorageAccountType)
+
+	creationData, err := getValidCreationData(c.common.subscriptionID, options.ResourceGroup, options.SourceResourceID, options.SourceType)
+	if err != nil {
+		return "", err
+	}
 	diskProperties := compute.DiskProperties{
 		DiskSizeGB:   &diskSizeGB,
-		CreationData: &compute.CreationData{CreateOption: compute.Empty},
+		CreationData: &creationData,
 	}
 
 	if diskSku == compute.UltraSSDLRS {
