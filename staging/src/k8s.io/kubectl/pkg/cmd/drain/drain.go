@@ -240,7 +240,7 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinterFunc, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
+		o.PrintFlags.Complete(dryRunStrategy.PrintTemplate())
 
 		printer, err := o.PrintFlags.ToPrinter()
 		if err != nil {

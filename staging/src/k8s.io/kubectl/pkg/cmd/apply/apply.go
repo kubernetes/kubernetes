@@ -218,7 +218,7 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	// allow for a success message operation to be specified at print time
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
+		o.PrintFlags.Complete(dryRunStrategy.PrintTemplate())
 		return o.PrintFlags.ToPrinter()
 	}
 

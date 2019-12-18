@@ -173,7 +173,7 @@ func (o *SetResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamicClient)),
 		OpenAPIGetter: discoveryClient,
 	}
-	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
+	o.PrintFlags.Complete(dryRunStrategy.PrintTemplate())
 
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {

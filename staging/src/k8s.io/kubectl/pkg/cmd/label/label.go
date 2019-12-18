@@ -189,7 +189,7 @@ func (o *LabelOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
+		o.PrintFlags.Complete(dryRunStrategy.PrintTemplate())
 
 		return o.PrintFlags.ToPrinter()
 	}

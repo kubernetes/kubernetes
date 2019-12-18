@@ -150,7 +150,7 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	o.builder = f.NewBuilder()
 	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
 
-	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
+	o.PrintFlags.Complete(dryRunStrategy.PrintTemplate())
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err

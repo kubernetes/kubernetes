@@ -145,7 +145,7 @@ func (o *SubjectOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		OpenAPIGetter: discoveryClient,
 	}
 
-	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
+	o.PrintFlags.Complete(dryRunStrategy.PrintTemplate())
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err

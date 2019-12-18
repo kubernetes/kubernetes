@@ -246,7 +246,7 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	if dryRunStrategy == cmdutil.DryRunServer {
 		return fmt.Errorf("--dry-run=server not yet supported for this command")
 	}
-	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
+	o.PrintFlags.Complete(dryRunStrategy.PrintTemplate())
 
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {

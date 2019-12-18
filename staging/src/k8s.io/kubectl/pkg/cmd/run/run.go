@@ -249,7 +249,7 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		o.Attach = true
 	}
 
-	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, dryRunStrategy)
+	o.PrintFlags.Complete(dryRunStrategy.PrintTemplate())
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
