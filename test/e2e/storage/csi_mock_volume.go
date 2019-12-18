@@ -793,8 +793,12 @@ func checkPodLogs(cs clientset.Interface, namespace, driverPodName, driverContai
 	if foundAttributes.Len() != 0 {
 		return fmt.Errorf("some unexpected volume attributes were found: %+v", foundAttributes.List())
 	}
-	if numNodePublishVolume != numNodeUnpublishVolume {
-		return fmt.Errorf("number of NodePublishVolume %d != number of NodeUnpublishVolume %d", numNodePublishVolume, numNodeUnpublishVolume)
+	if numNodePublishVolume == 0 {
+		return fmt.Errorf("NodePublish was never called")
+	}
+
+	if numNodeUnpublishVolume == 0 {
+		return fmt.Errorf("NodeUnpublish was never called")
 	}
 	return nil
 }
