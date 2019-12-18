@@ -229,7 +229,9 @@ type KubeletConfiguration struct {
 	// because promiscuous-bridge assumes the existence of a container bridge named cbr0.
 	HairpinMode string
 	// maxPods is the number of pods that can run on this Kubelet.
-	MaxPods int32
+	MaxPods int64
+	// minPods is the number of pods that can run on this Kubelet.
+	MinPods int64
 	// The CIDR to use for pod IP addresses, only used in standalone mode.
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string
@@ -268,9 +270,13 @@ type KubeletConfiguration struct {
 	// amount of a given resource the kubelet will reclaim when performing a pod eviction while
 	// that resource is under pressure. For example: {"imagefs.available": "2Gi"}
 	EvictionMinimumReclaim map[string]string
-	// podsPerCore is the maximum number of pods per core. Cannot exceed MaxPods.
+	// podsPerCore is the maximum number of pods per core. Must be between MinPods and MaxPods.
 	// If 0, this field is ignored.
-	PodsPerCore int32
+	PodsPerCore float64
+	// podNumPerResource is the ResourceList used to calculate pod number with node Allocatable.
+	// pod number must be between MinPods and MaxPods.
+	// If nil, this field is ignored.
+	PodNumPerResource map[string]string
 	// enableControllerAttachDetach enables the Attach/Detach controller to
 	// manage attachment/detachment of volumes scheduled to this node, and
 	// disables kubelet from executing any attach/detach operations

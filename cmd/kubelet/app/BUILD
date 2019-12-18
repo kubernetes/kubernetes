@@ -8,10 +8,7 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "server_bootstrap_test.go",
-        "server_test.go",
-    ],
+    srcs = ["server_bootstrap_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/certificates/v1beta1:go_default_library",
@@ -42,6 +39,7 @@ go_library(
         "//cmd/kubelet/app/options:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/helper:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/cloudprovider/providers:go_default_library",
         "//pkg/credentialprovider:go_default_library",
@@ -68,7 +66,6 @@ go_library(
         "//pkg/kubelet/kubeletconfig/configfiles:go_default_library",
         "//pkg/kubelet/server:go_default_library",
         "//pkg/kubelet/server/streaming:go_default_library",
-        "//pkg/kubelet/stats/pidlimit:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/filesystem:go_default_library",
@@ -109,7 +106,6 @@ go_library(
         "//pkg/volume/util/subpath:go_default_library",
         "//pkg/volume/vsphere_volume:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",

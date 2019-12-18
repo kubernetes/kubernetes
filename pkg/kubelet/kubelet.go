@@ -60,6 +60,7 @@ import (
 	"k8s.io/klog"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
@@ -381,6 +382,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 	}
 
+	podNumPerResource, err := helper.ParseResourceList(kubeCfg.PodNumPerResource)
+	if err != nil {
+		return nil, err
+	}
+
 	hostname, err := nodeutil.GetHostname(hostnameOverride)
 	if err != nil {
 		return nil, err
@@ -525,8 +531,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		mounter:                                 kubeDeps.Mounter,
 		hostutil:                                kubeDeps.HostUtil,
 		subpather:                               kubeDeps.Subpather,
-		maxPods:                                 int(kubeCfg.MaxPods),
-		podsPerCore:                             int(kubeCfg.PodsPerCore),
+		maxPods:                                 kubeCfg.MaxPods,
+		minPods:                                 kubeCfg.MinPods,
+		podsPerCore:                             kubeCfg.PodsPerCore,
+		podNumPerResource:                       podNumPerResource,
 		syncLoopMonitor:                         atomic.Value{},
 		daemonEndpoints:                         daemonEndpoints,
 		containerManager:                        kubeDeps.ContainerManager,
@@ -1115,7 +1123,10 @@ type Kubelet struct {
 	containerManager cm.ContainerManager
 
 	// Maximum Number of Pods which can be run by this Kubelet
-	maxPods int
+	maxPods int64
+
+	// Minimum Number of Pods which can be run by this Kubelet
+	minPods int64
 
 	// Monitor Kubelet's sync loop
 	syncLoopMonitor atomic.Value
@@ -1172,7 +1183,10 @@ type Kubelet struct {
 	lifecycle.PodSyncHandlers
 
 	// the number of allowed pods per core
-	podsPerCore int
+	podsPerCore float64
+
+	// the ResourceList to calculate pod num
+	podNumPerResource v1.ResourceList
 
 	// enableControllerAttachDetach indicates the Attach/Detach controller
 	// should manage attachment/detachment of volumes scheduled to this node,

@@ -120,7 +120,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 0},
 		TopologyManagerPolicy:       "",
 	}
-	const numErrsErrorCase1 = 26
+	const numErrsErrorCase1 = 27
 	if allErrors := ValidateKubeletConfiguration(errorCase1); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase1 {
 		t.Errorf("expect %d errors, got %v", numErrsErrorCase1, len(allErrors.(utilerrors.Aggregate).Errors()))
 	}

@@ -140,7 +140,7 @@ type HollowKubletOptions struct {
 	KubeletPort         int
 	KubeletReadOnlyPort int
 	MaxPods             int
-	PodsPerCore         int
+	PodsPerCore         float64
 	NodeLabels          map[string]string
 }
 
@@ -181,8 +181,8 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	c.NodeStatusReportFrequency.Duration = 5 * time.Minute
 	c.SyncFrequency.Duration = 10 * time.Second
 	c.EvictionPressureTransitionPeriod.Duration = 5 * time.Minute
-	c.MaxPods = int32(opt.MaxPods)
-	c.PodsPerCore = int32(opt.PodsPerCore)
+	c.MaxPods = int64(opt.MaxPods)
+	c.PodsPerCore = opt.PodsPerCore
 	c.ClusterDNS = []string{}
 	c.ImageGCHighThresholdPercent = 90
 	c.ImageGCLowThresholdPercent = 80

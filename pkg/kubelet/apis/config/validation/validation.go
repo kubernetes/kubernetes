@@ -88,11 +88,20 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if kc.MaxPods < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: MaxPods (--max-pods) %v must not be a negative number", kc.MaxPods))
 	}
+	if kc.MinPods < 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: MinPods (--min-pods) %v must not be a negative number", kc.MinPods))
+	}
+	if kc.MaxPods < kc.MinPods {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: MaxPods (--max-pods) %v must be bigger than  MinPods (--min-pods) %v", kc.MaxPods, kc.MinPods))
+	}
 	if utilvalidation.IsInRange(int(kc.OOMScoreAdj), -1000, 1000) != nil {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: OOMScoreAdj (--oom-score-adj) %v must be between -1000 and 1000, inclusive", kc.OOMScoreAdj))
 	}
 	if kc.PodsPerCore < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: PodsPerCore (--pods-per-core) %v must not be a negative number", kc.PodsPerCore))
+	}
+	if kc.PodsPerCore > 0 && kc.PodNumPerResource != nil {
+		allErrors = append(allErrors, fmt.Errorf("conflict configuration: PodNumPerResource (--pod-num-per-resource) %v conflict with PodsPerCore (--pods-per-core) %v", kc.PodNumPerResource, kc.PodsPerCore))
 	}
 	if utilvalidation.IsValidPortNum(int(kc.Port)) != nil {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: Port (--port) %v must be between 1 and 65535, inclusive", kc.Port))

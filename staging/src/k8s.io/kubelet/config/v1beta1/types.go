@@ -459,7 +459,7 @@ type KubeletConfiguration struct {
 	// Default: "promiscuous-bridge"
 	// +optional
 	HairpinMode string `json:"hairpinMode,omitempty"`
-	// maxPods is the number of pods that can run on this Kubelet.
+	// maxPods is the max number of pods that can run on this Kubelet.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
 	// changes may cause Pods to fail admission on Kubelet restart, and may change
 	// the value reported in Node.Status.Capacity[v1.ResourcePods], thus affecting
@@ -467,7 +467,12 @@ type KubeletConfiguration struct {
 	// as more Pods can be packed into a single node.
 	// Default: 110
 	// +optional
-	MaxPods int32 `json:"maxPods,omitempty"`
+	MaxPods int64 `json:"maxPods,omitempty"`
+	// minPods is the min number of pods that can run on this Kubelet.
+	// It only works when PodsPerCore or PodNumPerResource is provided.
+	// Default: 0
+	// +optional
+	MinPods int64 `json:"minPods,omitempty"`
 	// The CIDR to use for pod IP addresses, only used in standalone mode.
 	// In cluster mode, this is obtained from the master.
 	// Dynamic Kubelet Config (beta): This field should always be set to the empty default.
@@ -593,7 +598,7 @@ type KubeletConfiguration struct {
 	// Default: nil
 	// +optional
 	EvictionMinimumReclaim map[string]string `json:"evictionMinimumReclaim,omitempty"`
-	// podsPerCore is the maximum number of pods per core. Cannot exceed MaxPods.
+	// podsPerCore is the maximum number of pods per core. Must be between MinPods and MaxPods.
 	// If 0, this field is ignored.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
 	// changes may cause Pods to fail admission on Kubelet restart, and may change
@@ -602,7 +607,20 @@ type KubeletConfiguration struct {
 	// as more Pods can be packed into a single node.
 	// Default: 0
 	// +optional
-	PodsPerCore int32 `json:"podsPerCore,omitempty"`
+	PodsPerCore float64 `json:"podsPerCore,omitempty"`
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// that describe resources that a standard pod request.
+	// Currently cpu, memory and local storage for root file system are supported.
+	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
+	// If nil, this field is ignored.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// changes may cause Pods to fail admission on Kubelet restart, and may change
+	// the value reported in Node.Status.Capacity[v1.ResourcePods], thus affecting
+	// future scheduling decisions. Increasing this value may also decrease performance,
+	// as more Pods can be packed into a single node.
+	// Default: nil
+	// +optional
+	PodNumPerResource map[string]string `json:"podNumPerResource,omitempty"`
 	// enableControllerAttachDetach enables the Attach/Detach controller to
 	// manage attachment/detachment of volumes scheduled to this node, and
 	// disables kubelet from executing any attach/detach operations

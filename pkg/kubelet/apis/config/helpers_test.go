@@ -223,5 +223,7 @@ var (
 		"TypeMeta.APIVersion",
 		"TypeMeta.Kind",
 		"VolumeStatsAggPeriod.Duration",
+		"MinPods",
+		"PodNumPerResource[*]",
 	)
 )

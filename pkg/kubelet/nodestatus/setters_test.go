@@ -367,8 +367,10 @@ func TestMachineInfo(t *testing.T) {
 	cases := []struct {
 		desc                         string
 		node                         *v1.Node
-		maxPods                      int
-		podsPerCore                  int
+		minPods                      int64
+		maxPods                      int64
+		podsPerCore                  float64
+		podNumPerResource            v1.ResourceList
 		machineInfo                  *cadvisorapiv1.MachineInfo
 		machineInfoError             error
 		capacity                     v1.ResourceList
@@ -407,10 +409,11 @@ func TestMachineInfo(t *testing.T) {
 			},
 		},
 		{
-			desc:        "podsPerCore greater than zero, but less than maxPods/cores",
+			desc:        "podsPerCore greater than minPods/cores, but less than maxPods/cores",
 			node:        &v1.Node{},
-			maxPods:     10,
-			podsPerCore: 4,
+			minPods:     10,
+			maxPods:     110,
+			podsPerCore: 10,
 			machineInfo: &cadvisorapiv1.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
@@ -420,12 +423,12 @@ func TestMachineInfo(t *testing.T) {
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
 						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(8, resource.DecimalSI),
+						v1.ResourcePods:   *resource.NewQuantity(20, resource.DecimalSI),
 					},
 					Allocatable: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
 						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(8, resource.DecimalSI),
+						v1.ResourcePods:   *resource.NewQuantity(20, resource.DecimalSI),
 					},
 				},
 			},
@@ -433,8 +436,118 @@ func TestMachineInfo(t *testing.T) {
 		{
 			desc:        "podsPerCore greater than maxPods/cores",
 			node:        &v1.Node{},
-			maxPods:     10,
-			podsPerCore: 6,
+			minPods:     10,
+			maxPods:     110,
+			podsPerCore: 60,
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				NumCores:       2,
+				MemoryCapacity: 1024,
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+					},
+				},
+			},
+		},
+		{
+			desc:        "podsPerCore less than minPods/cores",
+			node:        &v1.Node{},
+			minPods:     10,
+			maxPods:     110,
+			podsPerCore: 0.5,
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				NumCores:       2,
+				MemoryCapacity: 1024,
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(10, resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(10, resource.DecimalSI),
+					},
+				},
+			},
+		},
+		{
+			desc:    "podNumPerResource greater than minPods/cores, but less than maxPods/cores",
+			node:    &v1.Node{},
+			minPods: 10,
+			maxPods: 110,
+			podNumPerResource: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(60, resource.BinarySI),
+			},
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				NumCores:       2,
+				MemoryCapacity: 1024,
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(17, resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(17, resource.DecimalSI),
+					},
+				},
+			},
+		},
+		{
+			desc:    "podNumPerResource greater than maxPods/cores",
+			node:    &v1.Node{},
+			minPods: 10,
+			maxPods: 110,
+			podNumPerResource: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(6, resource.BinarySI),
+			},
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				NumCores:       2,
+				MemoryCapacity: 1024,
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+					},
+				},
+			},
+		},
+		{
+			desc:    "podNumPerResource less than minPods/cores",
+			node:    &v1.Node{},
+			minPods: 10,
+			maxPods: 110,
+			podNumPerResource: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(128, resource.BinarySI),
+			},
 			machineInfo: &cadvisorapiv1.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
@@ -762,8 +875,8 @@ func TestMachineInfo(t *testing.T) {
 				})
 			}
 			// construct setter
-			setter := MachineInfo(nodeName, tc.maxPods, tc.podsPerCore, machineInfoFunc, capacityFunc,
-				devicePluginResourceCapacityFunc, nodeAllocatableReservationFunc, recordEventFunc)
+			setter := MachineInfo(nodeName, tc.minPods, tc.maxPods, tc.podsPerCore, tc.podNumPerResource,
+				machineInfoFunc, capacityFunc, devicePluginResourceCapacityFunc, nodeAllocatableReservationFunc, recordEventFunc)
 			// call setter on node
 			if err := setter(tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -778,7 +891,6 @@ func TestMachineInfo(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestVersionInfo(t *testing.T) {

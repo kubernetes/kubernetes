@@ -18,7 +18,6 @@ package nodestatus
 
 import (
 	"fmt"
-	"math"
 	"net"
 	goruntime "runtime"
 	"strings"
@@ -26,7 +25,7 @@ import (
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -229,8 +228,10 @@ func hasAddressValue(addresses []v1.NodeAddress, addressValue string) bool {
 
 // MachineInfo returns a Setter that updates machine-related information on the node.
 func MachineInfo(nodeName string,
-	maxPods int,
-	podsPerCore int,
+	minPods int64,
+	maxPods int64,
+	podsPerCore float64,
+	podNumPerResource v1.ResourceList,
 	machineInfoFunc func() (*cadvisorapiv1.MachineInfo, error), // typically Kubelet.GetCachedMachineInfo
 	capacityFunc func() v1.ResourceList, // typically Kubelet.containerManager.GetCapacity
 	devicePluginResourceCapacityFunc func() (v1.ResourceList, v1.ResourceList, []string), // typically Kubelet.containerManager.GetDevicePluginResourceCapacity
@@ -264,14 +265,6 @@ func MachineInfo(nodeName string,
 
 			for rName, rCap := range cadvisor.CapacityFromMachineInfo(info) {
 				node.Status.Capacity[rName] = rCap
-			}
-
-			if podsPerCore > 0 {
-				node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(
-					int64(math.Min(float64(info.NumCores*podsPerCore), float64(maxPods))), resource.DecimalSI)
-			} else {
-				node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(
-					int64(maxPods), resource.DecimalSI)
 			}
 
 			if node.Status.NodeInfo.BootID != "" &&
@@ -364,6 +357,38 @@ func MachineInfo(nodeName string,
 				node.Status.Allocatable[v1.ResourceMemory] = allocatableMemory
 			}
 		}
+
+		if err != nil {
+			return nil
+		}
+		// calculate the pod num
+		var podNum = maxPods
+		if podsPerCore > 0 {
+			tmpNum := int64(float64(info.NumCores) * podsPerCore)
+			if tmpNum < podNum {
+				podNum = tmpNum
+			}
+		} else if podNumPerResource != nil {
+			for k, v := range podNumPerResource {
+				allocate := node.Status.Allocatable[k]
+				tmpNum := allocate.MilliValue() / v.MilliValue()
+				if tmpNum < podNum {
+					podNum = tmpNum
+				}
+			}
+		}
+		if podNum < minPods {
+			podNum = minPods
+		}
+		node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(podNum, resource.DecimalSI)
+		allocatablePods := node.Status.Capacity[v1.ResourcePods]
+		if reservedPods, ok := allocatableReservation[v1.ResourcePods]; ok {
+			allocatablePods.Sub(reservedPods)
+			if allocatablePods.Sign() < 0 {
+				allocatablePods.Set(0)
+			}
+		}
+		node.Status.Allocatable[v1.ResourcePods] = allocatablePods
 		return nil
 	}
 }
