@@ -59,44 +59,17 @@ func TestPolicySingleNumaNodeFilterHints(t *testing.T) {
 		name              string
 		allResources      [][]TopologyHint
 		expectedResources [][]TopologyHint
-		expectedExists    bool
 	}{
 		{
 			name:              "filter empty resources",
 			allResources:      [][]TopologyHint{},
 			expectedResources: [][]TopologyHint(nil),
-			expectedExists:    false,
 		},
 		{
-			name: "filter hints with nil socket mask, preferred true",
-			allResources: [][]TopologyHint{
-				{
-					{NUMANodeAffinity: nil, Preferred: true},
-				},
-			},
-			expectedResources: [][]TopologyHint{
-				[]TopologyHint(nil),
-			},
-			expectedExists: true,
-		},
-
-		{
-			name: "filter hints with nil socket mask, preferred false",
+			name: "filter hints with nil socket mask 1/2",
 			allResources: [][]TopologyHint{
 				{
 					{NUMANodeAffinity: nil, Preferred: false},
-				},
-			},
-			expectedResources: [][]TopologyHint{
-				[]TopologyHint(nil),
-			},
-			expectedExists: false,
-		},
-		{
-			name: "filter hints with nil socket mask, preferred both true",
-			allResources: [][]TopologyHint{
-				{
-					{NUMANodeAffinity: nil, Preferred: true},
 				},
 				{
 					{NUMANodeAffinity: nil, Preferred: true},
@@ -106,43 +79,9 @@ func TestPolicySingleNumaNodeFilterHints(t *testing.T) {
 				[]TopologyHint(nil),
 				[]TopologyHint(nil),
 			},
-			expectedExists: true,
 		},
 		{
-			name: "filter hints with nil socket mask, preferred both false",
-			allResources: [][]TopologyHint{
-				{
-					{NUMANodeAffinity: nil, Preferred: false},
-				},
-				{
-					{NUMANodeAffinity: nil, Preferred: false},
-				},
-			},
-			expectedResources: [][]TopologyHint{
-				[]TopologyHint(nil),
-				[]TopologyHint(nil),
-			},
-			expectedExists: false,
-		},
-
-		{
-			name: "filter hints with nil socket mask, preferred true and false",
-			allResources: [][]TopologyHint{
-				{
-					{NUMANodeAffinity: nil, Preferred: true},
-				},
-				{
-					{NUMANodeAffinity: nil, Preferred: false},
-				},
-			},
-			expectedResources: [][]TopologyHint{
-				[]TopologyHint(nil),
-				[]TopologyHint(nil),
-			},
-			expectedExists: false,
-		},
-		{
-			name: "filter hints with nil socket mask",
+			name: "filter hints with nil socket mask 2/2",
 			allResources: [][]TopologyHint{
 				{
 					{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
@@ -161,7 +100,6 @@ func TestPolicySingleNumaNodeFilterHints(t *testing.T) {
 					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
 				},
 			},
-			expectedExists: false,
 		},
 		{
 			name: "filter hints with empty resource socket mask",
@@ -180,7 +118,6 @@ func TestPolicySingleNumaNodeFilterHints(t *testing.T) {
 				},
 				[]TopologyHint(nil),
 			},
-			expectedExists: false,
 		},
 		{
 			name: "filter hints with wide sockemask",
@@ -212,21 +149,16 @@ func TestPolicySingleNumaNodeFilterHints(t *testing.T) {
 				[]TopologyHint(nil),
 				[]TopologyHint(nil),
 			},
-			expectedExists: false,
 		},
 	}
 
 	numaNodes := []int{0, 1, 2, 3}
 	for _, tc := range tcases {
 		policy := NewSingleNumaNodePolicy(numaNodes)
-		actual, exists := policy.(*singleNumaNodePolicy).filterHints(tc.allResources)
+		actual := policy.(*singleNumaNodePolicy).filterHints(tc.allResources)
 		if !reflect.DeepEqual(tc.expectedResources, actual) {
 			t.Errorf("Test Case: %s", tc.name)
 			t.Errorf("Expected result to be %v, got %v", tc.expectedResources, actual)
-		}
-		if !reflect.DeepEqual(tc.expectedResources, actual) {
-			t.Errorf("Test Case: %s", tc.name)
-			t.Errorf("Expected result to be %v, got %v", tc.expectedExists, exists)
 		}
 	}
 }
