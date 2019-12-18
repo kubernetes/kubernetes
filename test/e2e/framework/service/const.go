@@ -56,13 +56,17 @@ const (
 	// LoadBalancerCreateTimeoutLarge is the maximum time to wait for a load balancer to be created/modified.
 	LoadBalancerCreateTimeoutLarge = 2 * time.Hour
 
+	// LoadBalancerPropagationTimeoutDefault is the default time to wait for pods to
+	// be targeted by load balancers.
+	LoadBalancerPropagationTimeoutDefault = 10 * time.Minute
+
 	// LoadBalancerCleanupTimeout is the time required by the loadbalancer to cleanup, proportional to numApps/Ing.
 	// Bring the cleanup timeout back down to 5m once b/33588344 is resolved.
 	LoadBalancerCleanupTimeout = 15 * time.Minute
 
 	// LoadBalancerPollTimeout is the time required by the loadbalancer to poll.
 	// On average it takes ~6 minutes for a single backend to come online in GCE.
-	LoadBalancerPollTimeout = 15 * time.Minute
+	LoadBalancerPollTimeout = 22 * time.Minute
 	// LoadBalancerPollInterval is the interval value in which the loadbalancer polls.
 	LoadBalancerPollInterval = 30 * time.Second
 
@@ -71,10 +75,6 @@ const (
 
 	// TestTimeout is used for most polling/waiting activities
 	TestTimeout = 60 * time.Second
-
-	// AffinityConfirmCount is the number of needed continuous requests to confirm that
-	// affinity is enabled.
-	AffinityConfirmCount = 15
 
 	// ServiceEndpointsTimeout is the maximum time in which endpoints for the service should be created.
 	ServiceEndpointsTimeout = 2 * time.Minute

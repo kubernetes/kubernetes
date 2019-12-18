@@ -541,14 +541,6 @@ func (ReplicaSetStatus) SwaggerDoc() map[string]string {
 	return map_ReplicaSetStatus
 }
 
-var map_ReplicationControllerDummy = map[string]string{
-	"": "Dummy definition",
-}
-
-func (ReplicationControllerDummy) SwaggerDoc() map[string]string {
-	return map_ReplicationControllerDummy
-}
-
 var map_RollbackConfig = map[string]string{
 	"":         "DEPRECATED.",
 	"revision": "The revision to rollback to. If set to 0, rollback to the last revision.",

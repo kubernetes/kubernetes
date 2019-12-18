@@ -215,7 +215,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					writeCmd := createWriteCmd(volumeDir, testFile, testFileContent, testVol.localVolumeType)
 
 					ginkgo.By("Writing in pod1")
-					podRWCmdExec(pod1, writeCmd)
+					podRWCmdExec(f, pod1, writeCmd)
 				})
 
 				ginkgo.AfterEach(func() {
@@ -226,28 +226,28 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				ginkgo.It("should be able to mount volume and read from pod1", func() {
 					ginkgo.By("Reading in pod1")
 					// testFileContent was written in BeforeEach
-					testReadFileContent(volumeDir, testFile, testFileContent, pod1, testVolType)
+					testReadFileContent(f, volumeDir, testFile, testFileContent, pod1, testVolType)
 				})
 
 				ginkgo.It("should be able to mount volume and write from pod1", func() {
 					// testFileContent was written in BeforeEach
-					testReadFileContent(volumeDir, testFile, testFileContent, pod1, testVolType)
+					testReadFileContent(f, volumeDir, testFile, testFileContent, pod1, testVolType)
 
 					ginkgo.By("Writing in pod1")
 					writeCmd := createWriteCmd(volumeDir, testFile, testVol.ltr.Path /*writeTestFileContent*/, testVolType)
-					podRWCmdExec(pod1, writeCmd)
+					podRWCmdExec(f, pod1, writeCmd)
 				})
 			})
 
 			ginkgo.Context("Two pods mounting a local volume at the same time", func() {
 				ginkgo.It("should be able to write from pod1 and read from pod2", func() {
-					twoPodsReadWriteTest(config, testVol)
+					twoPodsReadWriteTest(f, config, testVol)
 				})
 			})
 
 			ginkgo.Context("Two pods mounting a local volume one after the other", func() {
 				ginkgo.It("should be able to write from pod1 and read from pod2", func() {
-					twoPodsReadWriteSerialTest(config, testVol)
+					twoPodsReadWriteSerialTest(f, config, testVol)
 				})
 			})
 
@@ -703,7 +703,7 @@ func testPodWithNodeConflict(config *localTestConfig, testVolType localVolumeTyp
 // The tests below are run against multiple mount point types
 
 // Test two pods at the same time, write from pod1, and read from pod2
-func twoPodsReadWriteTest(config *localTestConfig, testVol *localTestVolume) {
+func twoPodsReadWriteTest(f *framework.Framework, config *localTestConfig, testVol *localTestVolume) {
 	ginkgo.By("Creating pod1 to write to the PV")
 	pod1, pod1Err := createLocalPod(config, testVol, nil)
 	framework.ExpectNoError(pod1Err)
@@ -712,10 +712,10 @@ func twoPodsReadWriteTest(config *localTestConfig, testVol *localTestVolume) {
 	writeCmd := createWriteCmd(volumeDir, testFile, testFileContent, testVol.localVolumeType)
 
 	ginkgo.By("Writing in pod1")
-	podRWCmdExec(pod1, writeCmd)
+	podRWCmdExec(f, pod1, writeCmd)
 
 	// testFileContent was written after creating pod1
-	testReadFileContent(volumeDir, testFile, testFileContent, pod1, testVol.localVolumeType)
+	testReadFileContent(f, volumeDir, testFile, testFileContent, pod1, testVol.localVolumeType)
 
 	ginkgo.By("Creating pod2 to read from the PV")
 	pod2, pod2Err := createLocalPod(config, testVol, nil)
@@ -723,15 +723,15 @@ func twoPodsReadWriteTest(config *localTestConfig, testVol *localTestVolume) {
 	verifyLocalPod(config, testVol, pod2, config.node0.Name)
 
 	// testFileContent was written after creating pod1
-	testReadFileContent(volumeDir, testFile, testFileContent, pod2, testVol.localVolumeType)
+	testReadFileContent(f, volumeDir, testFile, testFileContent, pod2, testVol.localVolumeType)
 
 	writeCmd = createWriteCmd(volumeDir, testFile, testVol.ltr.Path /*writeTestFileContent*/, testVol.localVolumeType)
 
 	ginkgo.By("Writing in pod2")
-	podRWCmdExec(pod2, writeCmd)
+	podRWCmdExec(f, pod2, writeCmd)
 
 	ginkgo.By("Reading in pod1")
-	testReadFileContent(volumeDir, testFile, testVol.ltr.Path, pod1, testVol.localVolumeType)
+	testReadFileContent(f, volumeDir, testFile, testVol.ltr.Path, pod1, testVol.localVolumeType)
 
 	ginkgo.By("Deleting pod1")
 	e2epod.DeletePodOrFail(config.client, config.ns, pod1.Name)
@@ -740,7 +740,7 @@ func twoPodsReadWriteTest(config *localTestConfig, testVol *localTestVolume) {
 }
 
 // Test two pods one after other, write from pod1, and read from pod2
-func twoPodsReadWriteSerialTest(config *localTestConfig, testVol *localTestVolume) {
+func twoPodsReadWriteSerialTest(f *framework.Framework, config *localTestConfig, testVol *localTestVolume) {
 	ginkgo.By("Creating pod1")
 	pod1, pod1Err := createLocalPod(config, testVol, nil)
 	framework.ExpectNoError(pod1Err)
@@ -749,10 +749,10 @@ func twoPodsReadWriteSerialTest(config *localTestConfig, testVol *localTestVolum
 	writeCmd := createWriteCmd(volumeDir, testFile, testFileContent, testVol.localVolumeType)
 
 	ginkgo.By("Writing in pod1")
-	podRWCmdExec(pod1, writeCmd)
+	podRWCmdExec(f, pod1, writeCmd)
 
 	// testFileContent was written after creating pod1
-	testReadFileContent(volumeDir, testFile, testFileContent, pod1, testVol.localVolumeType)
+	testReadFileContent(f, volumeDir, testFile, testFileContent, pod1, testVol.localVolumeType)
 
 	ginkgo.By("Deleting pod1")
 	e2epod.DeletePodOrFail(config.client, config.ns, pod1.Name)
@@ -763,7 +763,7 @@ func twoPodsReadWriteSerialTest(config *localTestConfig, testVol *localTestVolum
 	verifyLocalPod(config, testVol, pod2, config.node0.Name)
 
 	ginkgo.By("Reading in pod2")
-	testReadFileContent(volumeDir, testFile, testFileContent, pod2, testVol.localVolumeType)
+	testReadFileContent(f, volumeDir, testFile, testFileContent, pod2, testVol.localVolumeType)
 
 	ginkgo.By("Deleting pod2")
 	e2epod.DeletePodOrFail(config.client, config.ns, pod2.Name)
@@ -806,7 +806,7 @@ func setupLocalVolumes(config *localTestConfig, localVolumeType localVolumeType,
 	vols := []*localTestVolume{}
 	for i := 0; i < count; i++ {
 		ltrType, ok := setupLocalVolumeMap[localVolumeType]
-		gomega.Expect(ok).To(gomega.BeTrue())
+		framework.ExpectEqual(ok, true)
 		ltr := config.ltrMgr.Create(node, ltrType, nil)
 		vols = append(vols, &localTestVolume{
 			ltr:             ltr,
@@ -1015,16 +1015,16 @@ func createReadCmd(testFileDir string, testFile string, volumeType localVolumeTy
 }
 
 // Read testFile and evaluate whether it contains the testFileContent
-func testReadFileContent(testFileDir string, testFile string, testFileContent string, pod *v1.Pod, volumeType localVolumeType) {
+func testReadFileContent(f *framework.Framework, testFileDir string, testFile string, testFileContent string, pod *v1.Pod, volumeType localVolumeType) {
 	readCmd := createReadCmd(testFileDir, testFile, volumeType)
-	readOut := podRWCmdExec(pod, readCmd)
+	readOut := podRWCmdExec(f, pod, readCmd)
 	gomega.Expect(readOut).To(gomega.ContainSubstring(testFileContent))
 }
 
 // Execute a read or write command in a pod.
 // Fail on error
-func podRWCmdExec(pod *v1.Pod, cmd string) string {
-	out, err := utils.PodExec(pod, cmd)
+func podRWCmdExec(f *framework.Framework, pod *v1.Pod, cmd string) string {
+	out, err := utils.PodExec(f, pod, cmd)
 	framework.Logf("podRWCmdExec out: %q err: %v", out, err)
 	framework.ExpectNoError(err)
 	return out
@@ -1182,9 +1182,10 @@ func validateStatefulSet(config *localTestConfig, ss *appsv1.StatefulSet, anti b
 // and skips if a disk of that type does not exist on the node
 func SkipUnlessLocalSSDExists(config *localTestConfig, ssdInterface, filesystemType string, node *v1.Node) {
 	ssdCmd := fmt.Sprintf("ls -1 /mnt/disks/by-uuid/google-local-ssds-%s-%s/ | wc -l", ssdInterface, filesystemType)
-	res, err := config.hostExec.IssueCommandWithResult(ssdCmd, node)
+	res, err := config.hostExec.Execute(ssdCmd, node)
+	utils.LogResult(res)
 	framework.ExpectNoError(err)
-	num, err := strconv.Atoi(strings.TrimSpace(res))
+	num, err := strconv.Atoi(strings.TrimSpace(res.Stdout))
 	framework.ExpectNoError(err)
 	if num < 1 {
 		framework.Skipf("Requires at least 1 %s %s localSSD ", ssdInterface, filesystemType)

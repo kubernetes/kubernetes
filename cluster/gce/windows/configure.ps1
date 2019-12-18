@@ -131,16 +131,9 @@ try {
   Create-Directories
   Download-HelperScripts
 
-  # Even if Stackdriver is already installed, the function will still [re]start the service.
-  if (IsLoggingEnabled $kube_env) {
-    Install-LoggingAgent
-    Configure-LoggingAgent
-    Restart-LoggingAgent
-  }
-
-  Create-DockerRegistryKey
-  Configure-Dockerd
-  Pull-InfraContainer
+  DownloadAndInstall-Crictl
+  Setup-ContainerRuntime
+  DownloadAndInstall-AuthPlugin
   DownloadAndInstall-KubernetesBinaries
   Create-NodePki
   Create-KubeletKubeconfig
@@ -152,13 +145,22 @@ try {
   Configure-GcePdTools
   Configure-Kubelet
 
+  # Even if Stackdriver is already installed, the function will still [re]start the service.
+  if (IsLoggingEnabled $kube_env) {
+    Install-LoggingAgent
+    Configure-LoggingAgent
+    Restart-LoggingAgent
+  }
   Start-WorkerServices
   Log-Output 'Waiting 15 seconds for node to join cluster.'
   Start-Sleep 15
   Verify-WorkerServices
 
   $config = New-FileRotationConfig
+  # TODO(random-liu): Generate containerd log into the log directory.
   Schedule-LogRotation -Pattern '.*\.log$' -Path ${env:LOGS_DIR} -RepetitionInterval $(New-Timespan -Hour 1) -Config $config
+
+  Pull-InfraContainer
 }
 catch {
   Write-Host 'Exception caught in script:'

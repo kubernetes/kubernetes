@@ -25,7 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
@@ -184,8 +184,8 @@ func TestImageLocalityPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
-			list, err := priorityFunction(ImageLocalityPriorityMap, nil, &priorityMetadata{totalNumNodes: len(test.nodes)})(test.pod, nodeNameToInfo, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
+			list, err := runMapReducePriority(ImageLocalityPriorityMap, nil, &priorityMetadata{totalNumNodes: len(test.nodes)}, test.pod, snapshot, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -202,18 +202,21 @@ func TestImageLocalityPriority(t *testing.T) {
 
 func TestNormalizedImageName(t *testing.T) {
 	for _, testCase := range []struct {
+		Name   string
 		Input  string
 		Output string
 	}{
-		{Input: "root", Output: "root:latest"},
-		{Input: "root:tag", Output: "root:tag"},
-		{Input: "gcr.io:5000/root", Output: "gcr.io:5000/root:latest"},
-		{Input: "root@" + getImageFakeDigest("root"), Output: "root@" + getImageFakeDigest("root")},
+		{Name: "add :latest postfix 1", Input: "root", Output: "root:latest"},
+		{Name: "add :latest postfix 2", Input: "gcr.io:5000/root", Output: "gcr.io:5000/root:latest"},
+		{Name: "keep it as is 1", Input: "root:tag", Output: "root:tag"},
+		{Name: "keep it as is 2", Input: "root@" + getImageFakeDigest("root"), Output: "root@" + getImageFakeDigest("root")},
 	} {
-		image := normalizedImageName(testCase.Input)
-		if image != testCase.Output {
-			t.Errorf("expected image reference: %q, got %q", testCase.Output, image)
-		}
+		t.Run(testCase.Name, func(t *testing.T) {
+			image := normalizedImageName(testCase.Input)
+			if image != testCase.Output {
+				t.Errorf("expected image reference: %q, got %q", testCase.Output, image)
+			}
+		})
 	}
 }
 

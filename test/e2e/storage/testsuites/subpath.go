@@ -21,21 +21,24 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
+
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-
-	"time"
-
-	"github.com/onsi/ginkgo"
 )
 
 var (
@@ -58,36 +61,37 @@ var _ TestSuite = &subPathTestSuite{}
 func InitSubPathTestSuite() TestSuite {
 	return &subPathTestSuite{
 		tsInfo: TestSuiteInfo{
-			name: "subPath",
-			testPatterns: []testpatterns.TestPattern{
+			Name: "subPath",
+			TestPatterns: []testpatterns.TestPattern{
 				testpatterns.DefaultFsInlineVolume,
 				testpatterns.DefaultFsPreprovisionedPV,
 				testpatterns.DefaultFsDynamicPV,
 				testpatterns.NtfsDynamicPV,
 			},
-			supportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: volume.SizeRange{
 				Min: "1Mi",
 			},
 		},
 	}
 }
 
-func (s *subPathTestSuite) getTestSuiteInfo() TestSuiteInfo {
+func (s *subPathTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *subPathTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *subPathTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
 	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(
 		testpatterns.PreprovisionedPV,
 		testpatterns.InlineVolume))
 }
 
-func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config        *PerTestConfig
 		driverCleanup func()
 
-		resource          *genericVolumeTestResource
+		hostExec          utils.HostExec
+		resource          *VolumeResource
 		roVolSource       *v1.VolumeSource
 		pod               *v1.Pod
 		formatPod         *v1.Pod
@@ -114,27 +118,28 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, driver.GetDriverInfo().InTreePluginName)
-		testVolumeSizeRange := s.getTestSuiteInfo().supportedSizeRange
-		l.resource = createGenericVolumeTestResource(driver, l.config, pattern, testVolumeSizeRange)
+		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
+		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
+		l.hostExec = utils.NewHostExec(f)
 
 		// Setup subPath test dependent resource
 		volType := pattern.VolType
 		switch volType {
 		case testpatterns.InlineVolume:
 			if iDriver, ok := driver.(InlineVolumeTestDriver); ok {
-				l.roVolSource = iDriver.GetVolumeSource(true, pattern.FsType, l.resource.volume)
+				l.roVolSource = iDriver.GetVolumeSource(true, pattern.FsType, l.resource.Volume)
 			}
 		case testpatterns.PreprovisionedPV:
 			l.roVolSource = &v1.VolumeSource{
 				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-					ClaimName: l.resource.pvc.Name,
+					ClaimName: l.resource.Pvc.Name,
 					ReadOnly:  true,
 				},
 			}
 		case testpatterns.DynamicPV:
 			l.roVolSource = &v1.VolumeSource{
 				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-					ClaimName: l.resource.pvc.Name,
+					ClaimName: l.resource.Pvc.Name,
 					ReadOnly:  true,
 				},
 			}
@@ -143,11 +148,11 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		}
 
 		subPath := f.Namespace.Name
-		l.pod = SubpathTestPod(f, subPath, l.resource.volType, l.resource.volSource, true)
+		l.pod = SubpathTestPod(f, subPath, string(volType), l.resource.VolSource, true)
 		l.pod.Spec.NodeName = l.config.ClientNodeName
 		l.pod.Spec.NodeSelector = l.config.ClientNodeSelector
 
-		l.formatPod = volumeFormatPod(f, l.resource.volSource)
+		l.formatPod = volumeFormatPod(f, l.resource.VolSource)
 		l.formatPod.Spec.NodeName = l.config.ClientNodeName
 		l.formatPod.Spec.NodeSelector = l.config.ClientNodeSelector
 
@@ -157,25 +162,31 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 	}
 
 	cleanup := func() {
+		var errs []error
 		if l.pod != nil {
 			ginkgo.By("Deleting pod")
 			err := e2epod.DeletePodWithWait(f.ClientSet, l.pod)
-			framework.ExpectNoError(err, "while deleting pod")
+			errs = append(errs, err)
 			l.pod = nil
 		}
 
 		if l.resource != nil {
-			l.resource.cleanupResource()
+			errs = append(errs, l.resource.CleanupResource())
 			l.resource = nil
 		}
 
-		if l.driverCleanup != nil {
-			l.driverCleanup()
-			l.driverCleanup = nil
+		errs = append(errs, tryFunc(l.driverCleanup))
+		l.driverCleanup = nil
+		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
+
+		if l.hostExec != nil {
+			l.hostExec.Cleanup()
 		}
 
 		validateMigrationVolumeOpCounts(f.ClientSet, driver.GetDriverInfo().InTreePluginName, l.intreeOps, l.migratedOps)
 	}
+
+	driverName := driver.GetDriverInfo().Name
 
 	ginkgo.It("should support non-existent path", func() {
 		init()
@@ -332,19 +343,19 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		init()
 		defer cleanup()
 
-		testSubpathReconstruction(f, l.pod, false)
+		testSubpathReconstruction(f, l.hostExec, l.pod, false)
 	})
 
 	ginkgo.It("should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]", func() {
 		init()
 		defer cleanup()
 
-		if strings.HasPrefix(l.resource.volType, "hostPath") || strings.HasPrefix(l.resource.volType, "csi-hostpath") {
+		if strings.HasPrefix(driverName, "hostPath") {
 			// TODO: This skip should be removed once #61446 is fixed
-			framework.Skipf("%s volume type does not support reconstruction, skipping", l.resource.volType)
+			framework.Skipf("Driver %s does not support reconstruction, skipping", driverName)
 		}
 
-		testSubpathReconstruction(f, l.pod, true)
+		testSubpathReconstruction(f, l.hostExec, l.pod, true)
 	})
 
 	ginkgo.It("should support readOnly directory specified in the volumeMount", func() {
@@ -381,7 +392,7 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		init()
 		defer cleanup()
 		if l.roVolSource == nil {
-			framework.Skipf("Volume type %v doesn't support readOnly source", l.resource.volType)
+			framework.Skipf("Driver %s on volume type %s doesn't support readOnly source", driverName, pattern.VolType)
 		}
 
 		origpod := l.pod.DeepCopy()
@@ -409,7 +420,7 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		init()
 		defer cleanup()
 		if l.roVolSource == nil {
-			framework.Skipf("Volume type %v doesn't support readOnly source", l.resource.volType)
+			framework.Skipf("Driver %s on volume type %s doesn't support readOnly source", driverName, pattern.VolType)
 		}
 
 		// Format the volume while it's writable
@@ -877,8 +888,17 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	framework.ExpectNoError(err, "while waiting for container to stabilize")
 }
 
-func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete bool) {
+func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, pod *v1.Pod, forceDelete bool) {
 	// This is mostly copied from TestVolumeUnmountsFromDeletedPodWithForceOption()
+
+	// Disruptive test run serially, we can cache all voluem global mount
+	// points and verify after the test that we do not leak any global mount point.
+	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+	framework.ExpectNoError(err, "while listing scheduable nodes")
+	globalMountPointsByNode := make(map[string]sets.String, len(nodeList.Items))
+	for _, node := range nodeList.Items {
+		globalMountPointsByNode[node.Name] = utils.FindVolumeGlobalMountPoints(hostExec, &node)
+	}
 
 	// Change to busybox
 	pod.Spec.Containers[0].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
@@ -893,7 +913,7 @@ func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete 
 
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
-	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	framework.ExpectNoError(err, "while creating pod")
 
 	err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
@@ -902,7 +922,24 @@ func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete 
 	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "while getting pod")
 
+	var podNode *v1.Node
+	for i := range nodeList.Items {
+		if nodeList.Items[i].Name == pod.Spec.NodeName {
+			podNode = &nodeList.Items[i]
+		}
+	}
+	framework.ExpectNotEqual(podNode, nil, "pod node should exist in scheduable nodes")
+
 	utils.TestVolumeUnmountsFromDeletedPodWithForceOption(f.ClientSet, f, pod, forceDelete, true)
+
+	if podNode != nil {
+		mountPoints := globalMountPointsByNode[podNode.Name]
+		mountPointsAfter := utils.FindVolumeGlobalMountPoints(hostExec, podNode)
+		s1 := mountPointsAfter.Difference(mountPoints)
+		s2 := mountPoints.Difference(mountPointsAfter)
+		gomega.Expect(s1).To(gomega.BeEmpty(), "global mount points leaked: %v", s1)
+		gomega.Expect(s2).To(gomega.BeEmpty(), "global mount points not found: %v", s2)
+	}
 }
 
 func formatVolume(f *framework.Framework, pod *v1.Pod) {
@@ -927,5 +964,5 @@ func podContainerExec(pod *v1.Pod, containerIndex int, command string) (string, 
 		shell = "/bin/sh"
 		option = "-c"
 	}
-	return framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", pod.Namespace), pod.Name, "--container", pod.Spec.Containers[containerIndex].Name, "--", shell, option, command)
+	return framework.RunKubectl(pod.Namespace, "exec", fmt.Sprintf("--namespace=%s", pod.Namespace), pod.Name, "--container", pod.Spec.Containers[containerIndex].Name, "--", shell, option, command)
 }

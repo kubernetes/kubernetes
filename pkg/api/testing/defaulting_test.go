@@ -79,6 +79,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "autoscaling", Version: "v1", Kind: "HorizontalPodAutoscalerList"}:                {},
 		{Group: "autoscaling", Version: "v2beta1", Kind: "HorizontalPodAutoscaler"}:               {},
 		{Group: "autoscaling", Version: "v2beta1", Kind: "HorizontalPodAutoscalerList"}:           {},
+		{Group: "autoscaling", Version: "v2beta2", Kind: "HorizontalPodAutoscaler"}:               {},
+		{Group: "autoscaling", Version: "v2beta2", Kind: "HorizontalPodAutoscalerList"}:           {},
 		{Group: "batch", Version: "v1", Kind: "Job"}:                                              {},
 		{Group: "batch", Version: "v1", Kind: "JobList"}:                                          {},
 		{Group: "batch", Version: "v1beta1", Kind: "CronJob"}:                                     {},
@@ -91,6 +93,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequestList"}: {},
 		{Group: "discovery.k8s.io", Version: "v1alpha1", Kind: "EndpointSlice"}:                   {},
 		{Group: "discovery.k8s.io", Version: "v1alpha1", Kind: "EndpointSliceList"}:               {},
+		{Group: "discovery.k8s.io", Version: "v1beta1", Kind: "EndpointSlice"}:                    {},
+		{Group: "discovery.k8s.io", Version: "v1beta1", Kind: "EndpointSliceList"}:                {},
 		{Group: "kubeadm.k8s.io", Version: "v1alpha1", Kind: "MasterConfiguration"}:               {},
 		// This object contains only int fields which currently breaks the defaulting test because
 		// it's pretty stupid. Once we add non integer fields, we should uncomment this.

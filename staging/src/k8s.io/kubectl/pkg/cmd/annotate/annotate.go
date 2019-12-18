@@ -264,6 +264,16 @@ func (o AnnotateOptions) RunAnnotate() error {
 			outputObj = obj
 		} else {
 			name, namespace := info.Name, info.Namespace
+
+			if len(o.resourceVersion) != 0 {
+				// ensure resourceVersion is always sent in the patch by clearing it from the starting JSON
+				accessor, err := meta.Accessor(obj)
+				if err != nil {
+					return err
+				}
+				accessor.SetResourceVersion("")
+			}
+
 			oldData, err := json.Marshal(obj)
 			if err != nil {
 				return err
@@ -318,7 +328,7 @@ func validateAnnotations(removeAnnotations []string, newAnnotations map[string]s
 			if modifyRemoveBuf.Len() > 0 {
 				modifyRemoveBuf.WriteString(", ")
 			}
-			modifyRemoveBuf.WriteString(fmt.Sprintf(removeAnnotation))
+			modifyRemoveBuf.WriteString(fmt.Sprint(removeAnnotation))
 		}
 	}
 	if modifyRemoveBuf.Len() > 0 {

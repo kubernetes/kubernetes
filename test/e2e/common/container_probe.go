@@ -66,7 +66,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		framework.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
-		gomega.Expect(isReady).To(gomega.BeTrue(), "pod should be ready")
+		framework.ExpectEqual(isReady, true, "pod should be ready")
 
 		// We assume the pod became ready when the container became ready. This
 		// is true for a single container pod.
@@ -82,7 +82,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		}
 
 		restartCount := getRestartCount(p)
-		gomega.Expect(restartCount == 0).To(gomega.BeTrue(), "pod should have a restart count of 0 but got %v", restartCount)
+		framework.ExpectEqual(restartCount, 0, "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
 	/*
@@ -104,11 +104,11 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		p, err := podClient.Get(p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
-		isReady, err := testutils.PodRunningReady(p)
-		gomega.Expect(isReady).NotTo(gomega.BeTrue(), "pod should be not ready")
+		isReady, _ := testutils.PodRunningReady(p)
+		framework.ExpectNotEqual(isReady, true, "pod should be not ready")
 
 		restartCount := getRestartCount(p)
-		gomega.Expect(restartCount == 0).To(gomega.BeTrue(), "pod should have a restart count of 0 but got %v", restartCount)
+		framework.ExpectEqual(restartCount, 0, "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
 	/*
@@ -269,7 +269,7 @@ func GetContainerStartedTime(p *v1.Pod, containerName string) (time.Time, error)
 			continue
 		}
 		if status.State.Running == nil {
-			return time.Time{}, fmt.Errorf("Container is not running")
+			return time.Time{}, fmt.Errorf("container is not running")
 		}
 		return status.State.Running.StartedAt.Time, nil
 	}
@@ -282,7 +282,7 @@ func GetTransitionTimeForReadyCondition(p *v1.Pod) (time.Time, error) {
 			return cond.LastTransitionTime.Time, nil
 		}
 	}
-	return time.Time{}, fmt.Errorf("No ready condition can be found for pod")
+	return time.Time{}, fmt.Errorf("no ready condition can be found for pod")
 }
 
 func getRestartCount(p *v1.Pod) int {

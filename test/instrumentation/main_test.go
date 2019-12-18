@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/component-base/metrics"
 )
 
 const fakeFilename = "testdata/metric.go"
@@ -304,7 +304,7 @@ var _ = custom.NewCounter(
 			metric: metric{
 				Name:           "histogram",
 				StabilityLevel: "STABLE",
-				Buckets:        prometheus.LinearBuckets(1, 1, 3),
+				Buckets:        metrics.LinearBuckets(1, 1, 3),
 				Type:           histogramMetricType,
 			},
 			src: `
@@ -324,7 +324,7 @@ var _ = metrics.NewHistogram(
 			metric: metric{
 				Name:           "histogram",
 				StabilityLevel: "STABLE",
-				Buckets:        prometheus.ExponentialBuckets(1, 2, 3),
+				Buckets:        metrics.ExponentialBuckets(1, 2, 3),
 				Type:           histogramMetricType,
 			},
 			src: `
@@ -344,7 +344,7 @@ var _ = metrics.NewHistogram(
 			metric: metric{
 				Name:           "histogram",
 				StabilityLevel: "STABLE",
-				Buckets:        prometheus.DefBuckets,
+				Buckets:        metrics.DefBuckets,
 				Type:           histogramMetricType,
 			},
 			src: `

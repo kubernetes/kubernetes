@@ -496,3 +496,83 @@ func (client BastionHostsClient) ListByResourceGroupComplete(ctx context.Context
 	result.page, err = client.ListByResourceGroup(ctx, resourceGroupName)
 	return
 }
+
+// UpdateTags updates bastion host tags.
+// Parameters:
+// resourceGroupName - the resource group name of the BastionHost.
+// bastionHostName - the name of the bastionHost.
+// bastionHostParameters - parameters supplied to update a bastion host tags.
+func (client BastionHostsClient) UpdateTags(ctx context.Context, resourceGroupName string, bastionHostName string, bastionHostParameters TagsObject) (result BastionHostsUpdateTagsFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/BastionHostsClient.UpdateTags")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	req, err := client.UpdateTagsPreparer(ctx, resourceGroupName, bastionHostName, bastionHostParameters)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "network.BastionHostsClient", "UpdateTags", nil, "Failure preparing request")
+		return
+	}
+
+	result, err = client.UpdateTagsSender(req)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "network.BastionHostsClient", "UpdateTags", result.Response(), "Failure sending request")
+		return
+	}
+
+	return
+}
+
+// UpdateTagsPreparer prepares the UpdateTags request.
+func (client BastionHostsClient) UpdateTagsPreparer(ctx context.Context, resourceGroupName string, bastionHostName string, bastionHostParameters TagsObject) (*http.Request, error) {
+	pathParameters := map[string]interface{}{
+		"bastionHostName":   autorest.Encode("path", bastionHostName),
+		"resourceGroupName": autorest.Encode("path", resourceGroupName),
+		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
+	}
+
+	const APIVersion = "2019-06-01"
+	queryParameters := map[string]interface{}{
+		"api-version": APIVersion,
+	}
+
+	preparer := autorest.CreatePreparer(
+		autorest.AsContentType("application/json; charset=utf-8"),
+		autorest.AsPatch(),
+		autorest.WithBaseURL(client.BaseURI),
+		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/bastionHosts/{bastionHostName}", pathParameters),
+		autorest.WithJSON(bastionHostParameters),
+		autorest.WithQueryParameters(queryParameters))
+	return preparer.Prepare((&http.Request{}).WithContext(ctx))
+}
+
+// UpdateTagsSender sends the UpdateTags request. The method will close the
+// http.Response Body if it receives an error.
+func (client BastionHostsClient) UpdateTagsSender(req *http.Request) (future BastionHostsUpdateTagsFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req, sd...)
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
+	return
+}
+
+// UpdateTagsResponder handles the response to the UpdateTags request. The method always
+// closes the http.Response Body.
+func (client BastionHostsClient) UpdateTagsResponder(resp *http.Response) (result BastionHost, err error) {
+	err = autorest.Respond(
+		resp,
+		client.ByInspecting(),
+		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated),
+		autorest.ByUnmarshallingJSON(&result),
+		autorest.ByClosing())
+	result.Response = autorest.Response{Response: resp}
+	return
+}

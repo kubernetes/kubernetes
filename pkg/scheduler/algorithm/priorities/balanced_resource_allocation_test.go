@@ -27,7 +27,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 // getExistingVolumeCountForNode gets the current number of volumes on node.
@@ -401,17 +401,16 @@ func TestBalancedResourceAllocation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 			if len(test.pod.Spec.Volumes) > 0 {
 				maxVolumes := 5
-				for _, info := range nodeNameToInfo {
+				for _, info := range snapshot.NodeInfoMap {
 					info.TransientInfo.TransNodeInfo.AllocatableVolumesCount = getExistingVolumeCountForNode(info.Pods(), maxVolumes)
 					info.TransientInfo.TransNodeInfo.RequestedVolumes = len(test.pod.Spec.Volumes)
 				}
 			}
-			function := priorityFunction(BalancedResourceAllocationMap, nil, nil)
 
-			list, err := function(test.pod, nodeNameToInfo, test.nodes)
+			list, err := runMapReducePriority(BalancedResourceAllocationMap, nil, nil, test.pod, snapshot, test.nodes)
 
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)

@@ -18,7 +18,6 @@ package storage
 
 import (
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -125,7 +124,7 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 
 		ginkgo.By("Deleting the Claim")
 		framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Unable to delete PVC ", pvc.Name)
-		gomega.Expect(verifyGCEDiskAttached(diskName, node)).To(gomega.BeTrue())
+		framework.ExpectEqual(verifyGCEDiskAttached(diskName, node), true)
 
 		ginkgo.By("Deleting the Pod")
 		framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod), "Failed to delete pod ", clientPod.Name)
@@ -140,7 +139,7 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 
 		ginkgo.By("Deleting the Persistent Volume")
 		framework.ExpectNoError(e2epv.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
-		gomega.Expect(verifyGCEDiskAttached(diskName, node)).To(gomega.BeTrue())
+		framework.ExpectEqual(verifyGCEDiskAttached(diskName, node), true)
 
 		ginkgo.By("Deleting the client pod")
 		framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod), "Failed to delete pod ", clientPod.Name)
@@ -150,7 +149,7 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 	})
 
 	// Test that a Pod and PVC attached to a GCEPD successfully unmounts and detaches when the encompassing Namespace is deleted.
-	ginkgo.It("should test that deleting the Namespace of a PVC and Pod causes the successful detach of Persistent Disk", func() {
+	ginkgo.It("should test that deleting the Namespace of a PVC and Pod causes the successful detach of Persistent Disk [Flaky]", func() {
 
 		ginkgo.By("Deleting the Namespace")
 		err := c.CoreV1().Namespaces().Delete(ns, nil)

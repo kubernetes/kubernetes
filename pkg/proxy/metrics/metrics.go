@@ -41,11 +41,12 @@ var (
 	// DeprecatedSyncProxyRulesLatency is the latency of one round of kube-proxy syncing proxy rules.
 	DeprecatedSyncProxyRulesLatency = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Subsystem:      kubeProxySubsystem,
-			Name:           "sync_proxy_rules_latency_microseconds",
-			Help:           "(Deprecated) SyncProxyRules latency in microseconds",
-			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         kubeProxySubsystem,
+			Name:              "sync_proxy_rules_latency_microseconds",
+			Help:              "SyncProxyRules latency in microseconds",
+			Buckets:           metrics.ExponentialBuckets(1000, 2, 15),
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 	)
 

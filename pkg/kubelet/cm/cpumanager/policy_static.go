@@ -19,7 +19,7 @@ package cpumanager
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
@@ -75,10 +75,6 @@ type staticPolicy struct {
 	topology *topology.CPUTopology
 	// set of CPUs that is not available for exclusive assignment
 	reserved cpuset.CPUSet
-	// containerMap provides a mapping from
-	// (pod, container) -> containerID
-	// for all containers a pod
-	containerMap containerMap
 	// topology manager reference to get container Topology affinity
 	affinity topologymanager.Store
 }
@@ -89,14 +85,19 @@ var _ Policy = &staticPolicy{}
 // NewStaticPolicy returns a CPU manager policy that does not change CPU
 // assignments for exclusively pinned guaranteed containers after the main
 // container process starts.
-func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, affinity topologymanager.Store) Policy {
+func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store) Policy {
 	allCPUs := topology.CPUDetails.CPUs()
-	// takeByTopology allocates CPUs associated with low-numbered cores from
-	// allCPUs.
-	//
-	// For example: Given a system with 8 CPUs available and HT enabled,
-	// if numReservedCPUs=2, then reserved={0,4}
-	reserved, _ := takeByTopology(topology, allCPUs, numReservedCPUs)
+	var reserved cpuset.CPUSet
+	if reservedCPUs.Size() > 0 {
+		reserved = reservedCPUs
+	} else {
+		// takeByTopology allocates CPUs associated with low-numbered cores from
+		// allCPUs.
+		//
+		// For example: Given a system with 8 CPUs available and HT enabled,
+		// if numReservedCPUs=2, then reserved={0,4}
+		reserved, _ = takeByTopology(topology, allCPUs, numReservedCPUs)
+	}
 
 	if reserved.Size() != numReservedCPUs {
 		panic(fmt.Sprintf("[cpumanager] unable to reserve the required amount of CPUs (size of %s did not equal %d)", reserved, numReservedCPUs))
@@ -105,10 +106,9 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, affini
 	klog.Infof("[cpumanager] reserved %d CPUs (\"%s\") not available for exclusive assignment", reserved.Size(), reserved)
 
 	return &staticPolicy{
-		topology:     topology,
-		reserved:     reserved,
-		containerMap: newContainerMap(),
-		affinity:     affinity,
+		topology: topology,
+		reserved: reserved,
+		affinity: affinity,
 	}
 }
 
@@ -148,11 +148,13 @@ func (p *staticPolicy) validateState(s state.State) error {
 	}
 
 	// 2. Check if state for static policy is consistent
-	for cID, cset := range tmpAssignments {
-		// None of the cpu in DEFAULT cset should be in s.assignments
-		if !tmpDefaultCPUset.Intersection(cset).IsEmpty() {
-			return fmt.Errorf("container id: %s cpuset: \"%s\" overlaps with default cpuset \"%s\"",
-				cID, cset.String(), tmpDefaultCPUset.String())
+	for pod := range tmpAssignments {
+		for container, cset := range tmpAssignments[pod] {
+			// None of the cpu in DEFAULT cset should be in s.assignments
+			if !tmpDefaultCPUset.Intersection(cset).IsEmpty() {
+				return fmt.Errorf("pod: %s, container: %s cpuset: \"%s\" overlaps with default cpuset \"%s\"",
+					pod, container, cset.String(), tmpDefaultCPUset.String())
+			}
 		}
 	}
 
@@ -165,8 +167,10 @@ func (p *staticPolicy) validateState(s state.State) error {
 	// the set of CPUs stored in the state.
 	totalKnownCPUs := tmpDefaultCPUset.Clone()
 	tmpCPUSets := []cpuset.CPUSet{}
-	for _, cset := range tmpAssignments {
-		tmpCPUSets = append(tmpCPUSets, cset)
+	for pod := range tmpAssignments {
+		for _, cset := range tmpAssignments[pod] {
+			tmpCPUSets = append(tmpCPUSets, cset)
+		}
 	}
 	totalKnownCPUs = totalKnownCPUs.UnionAll(tmpCPUSets)
 	if !totalKnownCPUs.Equals(p.topology.CPUDetails.CPUs()) {
@@ -182,38 +186,14 @@ func (p *staticPolicy) assignableCPUs(s state.State) cpuset.CPUSet {
 	return s.GetDefaultCPUSet().Difference(p.reserved)
 }
 
-func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Container, containerID string) (rerr error) {
-	// So long as this function does not return an error,
-	// add (pod, container, containerID) to the containerMap.
-	defer func() {
-		if rerr == nil {
-			p.containerMap.Add(pod, container, containerID)
-		}
-	}()
-
+func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Container) error {
 	if numCPUs := p.guaranteedCPUs(pod, container); numCPUs != 0 {
-		klog.Infof("[cpumanager] static policy: AddContainer (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
+		klog.Infof("[cpumanager] static policy: AddContainer (pod: %s, container: %s)", pod.Name, container.Name)
 		// container belongs in an exclusively allocated pool
 
-		if _, ok := s.GetCPUSet(containerID); ok {
-			klog.Infof("[cpumanager] static policy: container already present in state, skipping (container: %s, container id: %s)", container.Name, containerID)
+		if _, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
+			klog.Infof("[cpumanager] static policy: container already present in state, skipping (pod: %s, container: %s)", pod.Name, container.Name)
 			return nil
-		}
-
-		// Proactively remove CPUs from init containers that have already run.
-		// They are guaranteed to have run to completion before any other
-		// container is run.
-		for _, initContainer := range pod.Spec.InitContainers {
-			if container.Name != initContainer.Name {
-				initContainerID, err := p.containerMap.Get(pod, &initContainer)
-				if err != nil {
-					continue
-				}
-				err = p.RemoveContainer(s, initContainerID)
-				if err != nil {
-					klog.Warningf("[cpumanager] unable to remove init container (container id: %s, error: %v)", initContainerID, err)
-				}
-			}
 		}
 
 		// Call Topology Manager to get the aligned socket affinity across all hint providers.
@@ -223,27 +203,19 @@ func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Co
 		// Allocate CPUs according to the NUMA affinity contained in the hint.
 		cpuset, err := p.allocateCPUs(s, numCPUs, hint.NUMANodeAffinity)
 		if err != nil {
-			klog.Errorf("[cpumanager] unable to allocate %d CPUs (container id: %s, error: %v)", numCPUs, containerID, err)
+			klog.Errorf("[cpumanager] unable to allocate %d CPUs (pod: %s, container: %s, error: %v)", numCPUs, pod.Name, container.Name, err)
 			return err
 		}
-		s.SetCPUSet(containerID, cpuset)
+		s.SetCPUSet(string(pod.UID), container.Name, cpuset)
 	}
 	// container belongs in the shared pool (nothing to do; use default cpuset)
 	return nil
 }
 
-func (p *staticPolicy) RemoveContainer(s state.State, containerID string) (rerr error) {
-	// So long as this function does not return an error,
-	// remove containerID from the containerMap.
-	defer func() {
-		if rerr == nil {
-			p.containerMap.Remove(containerID)
-		}
-	}()
-
-	klog.Infof("[cpumanager] static policy: RemoveContainer (container id: %s)", containerID)
-	if toRelease, ok := s.GetCPUSet(containerID); ok {
-		s.Delete(containerID)
+func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerName string) error {
+	klog.Infof("[cpumanager] static policy: RemoveContainer (pod: %s, container: %s)", podUID, containerName)
+	if toRelease, ok := s.GetCPUSet(podUID, containerName); ok {
+		s.Delete(podUID, containerName)
 		// Mutate the shared pool, adding released cpus.
 		s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(toRelease))
 	}
@@ -318,6 +290,22 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod v1.Pod, container v1.
 	// to still be in the Guaranteed QOS tier.
 	if requested == 0 {
 		return nil
+	}
+
+	// Short circuit to regenerate the same hints if there are already
+	// guaranteed CPUs allocated to the Container. This might happen after a
+	// kubelet restart, for example.
+	if allocated, exists := s.GetCPUSet(string(pod.UID), container.Name); exists {
+		if allocated.Size() != requested {
+			klog.Errorf("[cpumanager] CPUs already allocated to (pod %v, container %v) with different number than request: requested: %d, allocated: %d", string(pod.UID), container.Name, requested, allocated.Size())
+			return map[string][]topologymanager.TopologyHint{
+				string(v1.ResourceCPU): {},
+			}
+		}
+		klog.Infof("[cpumanager] Regenerating TopologyHints for CPUs already allocated to (pod %v, container %v)", string(pod.UID), container.Name)
+		return map[string][]topologymanager.TopologyHint{
+			string(v1.ResourceCPU): p.generateCPUTopologyHints(allocated, requested),
+		}
 	}
 
 	// Get a list of available CPUs.

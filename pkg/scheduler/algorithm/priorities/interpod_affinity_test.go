@@ -17,27 +17,15 @@ limitations under the License.
 package priorities
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
-
-type FakeNodeListInfo []*v1.Node
-
-func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
-	for _, node := range nodes {
-		if node.Name == nodeName {
-			return node, nil
-		}
-	}
-	return nil, fmt.Errorf("Unable to find node: %s", nodeName)
-}
 
 func TestInterPodAffinityPriority(t *testing.T) {
 	labelRgChina := map[string]string{
@@ -369,7 +357,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
 			},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: framework.MaxNodeScore}, {Name: "machine3", Score: 0}},
-			name:         "Affinity symmetry: considred only the preferredDuringSchedulingIgnoredDuringExecution in pod affinity symmetry",
+			name:         "Affinity symmetry: considered only the preferredDuringSchedulingIgnoredDuringExecution in pod affinity symmetry",
 		},
 		{
 			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
@@ -383,7 +371,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
 			},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}, {Name: "machine3", Score: 0}},
-			name:         "Affinity symmetry: considred RequiredDuringSchedulingIgnoredDuringExecution in pod affinity symmetry",
+			name:         "Affinity symmetry: considered RequiredDuringSchedulingIgnoredDuringExecution in pod affinity symmetry",
 		},
 
 		// The pod to schedule prefer to stay away from some existing pods at node level using the pod anti affinity.
@@ -526,17 +514,25 @@ func TestInterPodAffinityPriority(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
-			interPodAffinity := InterPodAffinity{
-				info:                  FakeNodeListInfo(test.nodes),
-				hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+			allNodes := append([]*v1.Node{}, test.nodes...)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
+
+			meta := &priorityMetadata{
+				topologyScore: buildTopologyPairToScore(test.pod, snapshot, allNodes, v1.DefaultHardPodAffinitySymmetricWeight),
 			}
-			list, err := interPodAffinity.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+			var gotList framework.NodeScoreList
+			for _, n := range test.nodes {
+				nodeName := n.Name
+				nodeScore, err := CalculateInterPodAffinityPriorityMap(test.pod, meta, snapshot.NodeInfoMap[nodeName])
+				if err != nil {
+					t.Error(err)
+				}
+				gotList = append(gotList, nodeScore)
 			}
-			if !reflect.DeepEqual(test.expectedList, list) {
-				t.Errorf("expected \n\t%#v, \ngot \n\t%#v\n", test.expectedList, list)
+
+			CalculateInterPodAffinityPriorityReduce(test.pod, meta, snapshot, gotList)
+			if !reflect.DeepEqual(gotList, test.expectedList) {
+				t.Errorf("CalculateInterPodAffinityPriority() = %#v, want %#v", gotList, test.expectedList)
 			}
 		})
 	}
@@ -614,17 +610,25 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
-			ipa := InterPodAffinity{
-				info:                  FakeNodeListInfo(test.nodes),
-				hardPodAffinityWeight: test.hardPodAffinityWeight,
+			allNodes := append([]*v1.Node{}, test.nodes...)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
+
+			meta := &priorityMetadata{
+				topologyScore: buildTopologyPairToScore(test.pod, snapshot, allNodes, test.hardPodAffinityWeight),
 			}
-			list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+			var gotList framework.NodeScoreList
+			for _, n := range test.nodes {
+				nodeName := n.Name
+				nodeScore, err := CalculateInterPodAffinityPriorityMap(test.pod, meta, snapshot.NodeInfoMap[nodeName])
+				if err != nil {
+					t.Error(err)
+				}
+				gotList = append(gotList, nodeScore)
 			}
-			if !reflect.DeepEqual(test.expectedList, list) {
-				t.Errorf("expected \n\t%#v, \ngot \n\t%#v\n", test.expectedList, list)
+
+			CalculateInterPodAffinityPriorityReduce(test.pod, meta, snapshot, gotList)
+			if !reflect.DeepEqual(gotList, test.expectedList) {
+				t.Errorf("CalculateInterPodAffinityPriority() = %#v, want %#v", gotList, test.expectedList)
 			}
 		})
 	}
@@ -668,17 +672,24 @@ func BenchmarkInterPodAffinityPriority(b *testing.B) {
 		},
 	}
 
-	for _, tt := range tests {
-		b.Run(tt.name, func(b *testing.B) {
-			existingPods, allNodes := tt.prepFunc(tt.existingPodsNum, tt.allNodesNum)
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(existingPods, allNodes)
-			interPodAffinity := InterPodAffinity{
-				info:                  FakeNodeListInfo(allNodes),
-				hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+	for _, test := range tests {
+		b.Run(test.name, func(b *testing.B) {
+			existingPods, allNodes := test.prepFunc(test.existingPodsNum, test.allNodesNum)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(existingPods, allNodes))
+
+			meta := &priorityMetadata{
+				topologyScore: buildTopologyPairToScore(test.pod, snapshot, allNodes, v1.DefaultHardPodAffinitySymmetricWeight),
 			}
 			b.ResetTimer()
+
 			for i := 0; i < b.N; i++ {
-				interPodAffinity.CalculateInterPodAffinityPriority(tt.pod, nodeNameToInfo, allNodes)
+				var gotList framework.NodeScoreList
+				for _, n := range allNodes {
+					nodeName := n.Name
+					nodeScore, _ := CalculateInterPodAffinityPriorityMap(test.pod, meta, snapshot.NodeInfoMap[nodeName])
+					gotList = append(gotList, nodeScore)
+				}
+				CalculateInterPodAffinityPriorityReduce(test.pod, meta, snapshot, gotList)
 			}
 		})
 	}

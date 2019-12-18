@@ -28,7 +28,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -2951,7 +2951,7 @@ func compareEndpointsMaps(t *testing.T, tci int, newMap proxy.EndpointsMap, expe
 					t.Errorf("Failed to cast proxy.BaseEndpointInfo")
 					continue
 				}
-				if *newEp != *(expected[x][i]) {
+				if !reflect.DeepEqual(*newEp, *(expected[x][i])) {
 					t.Errorf("[%d] expected new[%v][%d] to be %v, got %v", tci, x, i, expected[x][i], newEp)
 				}
 			}
@@ -3702,7 +3702,6 @@ func TestEndpointSliceE2E(t *testing.T) {
 	// Add initial service
 	serviceName := "svc1"
 	namespaceName := "ns1"
-
 	fp.OnServiceAdd(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
 		Spec: v1.ServiceSpec{
@@ -3713,7 +3712,6 @@ func TestEndpointSliceE2E(t *testing.T) {
 	})
 
 	// Add initial endpoint slice
-	ipAddressType := discovery.AddressTypeIP
 	tcpProtocol := v1.ProtocolTCP
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3726,7 +3724,7 @@ func TestEndpointSliceE2E(t *testing.T) {
 			Port:     utilpointer.Int32Ptr(80),
 			Protocol: &tcpProtocol,
 		}},
-		AddressType: &ipAddressType,
+		AddressType: discovery.AddressTypeIPv4,
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"10.0.1.1"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},

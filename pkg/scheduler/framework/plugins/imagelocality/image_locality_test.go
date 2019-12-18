@@ -17,24 +17,28 @@ limitations under the License.
 package imagelocality
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
-	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/informers"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
+
+var mb int64 = 1024 * 1024
 
 func TestImageLocalityPriority(t *testing.T) {
 	test40250 := v1.PodSpec{
 		Containers: []v1.Container{
 			{
+
 				Image: "gcr.io/40",
 			},
 			{
@@ -186,28 +190,30 @@ func TestImageLocalityPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			metaDataProducer := priorities.NewPriorityMetadataFactory(
-				schedulertesting.FakeServiceLister([]*v1.Service{}),
-				schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
-				schedulertesting.FakeReplicaSetLister([]*apps.ReplicaSet{}),
-				schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
+			client := clientsetfake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(nil, test.nodes)
+			metaDataProducer := priorities.NewMetadataFactory(
+				informerFactory.Core().V1().Services().Lister(),
+				informerFactory.Core().V1().ReplicationControllers().Lister(),
+				informerFactory.Apps().V1().ReplicaSets().Lister(),
+				informerFactory.Apps().V1().StatefulSets().Lister(),
+				1,
+			)
 
-			meta := metaDataProducer(test.pod, nodeNameToInfo)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(nil, test.nodes))
+			meta := metaDataProducer(test.pod, test.nodes, snapshot)
 
 			state := framework.NewCycleState()
 			state.Write(migration.PrioritiesStateKey, &migration.PrioritiesStateData{Reference: meta})
 
-			fh, _ := framework.NewFramework(nil, nil, nil)
-			snapshot := fh.NodeInfoSnapshot()
-			snapshot.NodeInfoMap = schedulernodeinfo.CreateNodeNameToInfoMap(nil, test.nodes)
+			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 
 			p, _ := New(nil, fh)
 			var gotList framework.NodeScoreList
 			for _, n := range test.nodes {
 				nodeName := n.ObjectMeta.Name
-				score, status := p.(framework.ScorePlugin).Score(state, test.pod, nodeName)
+				score, status := p.(framework.ScorePlugin).Score(context.Background(), state, test.pod, nodeName)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}

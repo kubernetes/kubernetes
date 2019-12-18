@@ -30,10 +30,6 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
 	utilnet "k8s.io/utils/net"
-
-	// Azure route controller changes behavior if ipv6dual stack feature is turned on
-	// remove this once the feature graduates
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // copied to minimize the number of cross reference
@@ -46,8 +42,8 @@ const (
 // ListRoutes lists all managed routes that belong to the specified clusterName
 func (az *Cloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
 	klog.V(10).Infof("ListRoutes: START clusterName=%q", clusterName)
-	routeTable, existsRouteTable, err := az.getRouteTable()
-	routes, err := processRoutes(routeTable, existsRouteTable, err)
+	routeTable, existsRouteTable, err := az.getRouteTable(cacheReadTypeDefault)
+	routes, err := processRoutes(az.ipv6DualStackEnabled, routeTable, existsRouteTable, err)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +59,7 @@ func (az *Cloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpr
 		if cidr, ok := az.routeCIDRs[nodeName]; ok {
 			routes = append(routes, &cloudprovider.Route{
 				Name:            nodeName,
-				TargetNode:      mapRouteNameToNodeName(nodeName),
+				TargetNode:      mapRouteNameToNodeName(az.ipv6DualStackEnabled, nodeName),
 				DestinationCIDR: cidr,
 			})
 		}
@@ -73,7 +69,7 @@ func (az *Cloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpr
 }
 
 // Injectable for testing
-func processRoutes(routeTable network.RouteTable, exists bool, err error) ([]*cloudprovider.Route, error) {
+func processRoutes(ipv6DualStackEnabled bool, routeTable network.RouteTable, exists bool, err error) ([]*cloudprovider.Route, error) {
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +81,7 @@ func processRoutes(routeTable network.RouteTable, exists bool, err error) ([]*cl
 	if routeTable.RouteTablePropertiesFormat != nil && routeTable.Routes != nil {
 		kubeRoutes = make([]*cloudprovider.Route, len(*routeTable.Routes))
 		for i, route := range *routeTable.Routes {
-			instance := mapRouteNameToNodeName(*route.Name)
+			instance := mapRouteNameToNodeName(ipv6DualStackEnabled, *route.Name)
 			cidr := *route.AddressPrefix
 			klog.V(10).Infof("ListRoutes: * instance=%q, cidr=%q", instance, cidr)
 
@@ -102,7 +98,7 @@ func processRoutes(routeTable network.RouteTable, exists bool, err error) ([]*cl
 }
 
 func (az *Cloud) createRouteTableIfNotExists(clusterName string, kubeRoute *cloudprovider.Route) error {
-	if _, existsRouteTable, err := az.getRouteTable(); err != nil {
+	if _, existsRouteTable, err := az.getRouteTable(cacheReadTypeDefault); err != nil {
 		klog.V(2).Infof("createRouteTableIfNotExists error: couldn't get routetable. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
 		return err
 	} else if existsRouteTable {
@@ -141,7 +137,7 @@ func (az *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint s
 		return err
 	}
 	if unmanaged {
-		if utilfeature.DefaultFeatureGate.Enabled(IPv6DualStack) {
+		if az.ipv6DualStackEnabled {
 			//TODO (khenidak) add support for unmanaged nodes when the feature reaches  beta
 			return fmt.Errorf("unmanaged nodes are not supported in dual stack mode")
 		}
@@ -156,7 +152,7 @@ func (az *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint s
 	if err := az.createRouteTableIfNotExists(clusterName, kubeRoute); err != nil {
 		return err
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(IPv6DualStack) {
+	if !az.ipv6DualStackEnabled {
 		targetIP, _, err = az.getIPForMachine(kubeRoute.TargetNode)
 		if err != nil {
 			return err
@@ -178,7 +174,7 @@ func (az *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint s
 			return err
 		}
 	}
-	routeName := mapNodeNameToRouteName(kubeRoute.TargetNode, string(kubeRoute.DestinationCIDR))
+	routeName := mapNodeNameToRouteName(az.ipv6DualStackEnabled, kubeRoute.TargetNode, string(kubeRoute.DestinationCIDR))
 	route := network.Route{
 		Name: to.StringPtr(routeName),
 		RoutePropertiesFormat: &network.RoutePropertiesFormat{
@@ -217,7 +213,7 @@ func (az *Cloud) DeleteRoute(ctx context.Context, clusterName string, kubeRoute 
 
 	klog.V(2).Infof("DeleteRoute: deleting route. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
 
-	routeName := mapNodeNameToRouteName(kubeRoute.TargetNode, string(kubeRoute.DestinationCIDR))
+	routeName := mapNodeNameToRouteName(az.ipv6DualStackEnabled, kubeRoute.TargetNode, string(kubeRoute.DestinationCIDR))
 	err = az.DeleteRouteWithName(routeName)
 	if err != nil {
 		return err
@@ -231,16 +227,16 @@ func (az *Cloud) DeleteRoute(ctx context.Context, clusterName string, kubeRoute 
 // These two functions enable stashing the instance name in the route
 // and then retrieving it later when listing. This is needed because
 // Azure does not let you put tags/descriptions on the Route itself.
-func mapNodeNameToRouteName(nodeName types.NodeName, cidr string) string {
-	if !utilfeature.DefaultFeatureGate.Enabled(IPv6DualStack) {
+func mapNodeNameToRouteName(ipv6DualStackEnabled bool, nodeName types.NodeName, cidr string) string {
+	if !ipv6DualStackEnabled {
 		return fmt.Sprintf("%s", nodeName)
 	}
 	return fmt.Sprintf(routeNameFmt, nodeName, cidrtoRfc1035(cidr))
 }
 
 // Used with mapNodeNameToRouteName. See comment on mapNodeNameToRouteName.
-func mapRouteNameToNodeName(routeName string) types.NodeName {
-	if !utilfeature.DefaultFeatureGate.Enabled(IPv6DualStack) {
+func mapRouteNameToNodeName(ipv6DualStackEnabled bool, routeName string) types.NodeName {
+	if !ipv6DualStackEnabled {
 		return types.NodeName(fmt.Sprintf("%s", routeName))
 	}
 	parts := strings.Split(routeName, routeNameSeparator)

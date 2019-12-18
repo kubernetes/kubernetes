@@ -18,6 +18,7 @@ package kubemark
 
 import (
 	"fmt"
+	"net"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -44,6 +45,7 @@ type HollowProxy struct {
 
 type FakeProxier struct {
 	proxyconfig.NoopEndpointSliceHandler
+	proxyconfig.NoopNodeHandler
 }
 
 func (*FakeProxier) Sync() {}
@@ -77,6 +79,11 @@ func NewHollowProxyOrDie(
 	var err error
 
 	if useRealProxier {
+		nodeIP := utilnode.GetNodeIP(client, nodeName)
+		if nodeIP == nil {
+			klog.V(0).Infof("can't determine this node's IP, assuming 127.0.0.1")
+			nodeIP = net.ParseIP("127.0.0.1")
+		}
 		// Real proxier with fake iptables, sysctl, etc underneath it.
 		//var err error
 		proxier, err = iptables.NewProxier(
@@ -89,7 +96,7 @@ func NewHollowProxyOrDie(
 			0,
 			"10.0.0.0/8",
 			nodeName,
-			utilnode.GetNodeIP(client, nodeName),
+			nodeIP,
 			recorder,
 			nil,
 			[]string{},

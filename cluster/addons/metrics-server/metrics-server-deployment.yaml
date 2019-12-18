@@ -46,6 +46,8 @@ spec:
     spec:
       priorityClassName: system-cluster-critical
       serviceAccountName: metrics-server
+      nodeSelector:
+        kubernetes.io/os: linux
       containers:
       - name: metrics-server
         image: k8s.gcr.io/metrics-server-amd64:v0.3.6
@@ -62,7 +64,7 @@ spec:
           name: https
           protocol: TCP
       - name: metrics-server-nanny
-        image: k8s.gcr.io/addon-resizer:1.8.6
+        image: k8s.gcr.io/addon-resizer:1.8.7
         resources:
           limits:
             cpu: 100m

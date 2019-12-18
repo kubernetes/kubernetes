@@ -109,7 +109,7 @@ var _ = SIGDescribe("[Feature:Windows] [Feature:WindowsGMSA] GMSA Full [Slow]", 
 			}
 
 			ginkgo.By("creating the GMSA custom resource")
-			customResourceCleanup, err := createGmsaCustomResource(crdManifestContents)
+			customResourceCleanup, err := createGmsaCustomResource(f.Namespace.Name, crdManifestContents)
 			defer customResourceCleanup()
 			if err != nil {
 				framework.Failf(err.Error())
@@ -235,9 +235,9 @@ func deployGmsaWebhook(f *framework.Framework, deployScriptPath string) (func(),
 
 	// regardless of whether the deployment succeeded, let's do a best effort at cleanup
 	cleanUpFunc = func() {
-		framework.RunKubectl("delete", "--filename", manifestsFile)
-		framework.RunKubectl("delete", "CustomResourceDefinition", "gmsacredentialspecs.windows.k8s.io")
-		framework.RunKubectl("delete", "CertificateSigningRequest", fmt.Sprintf("%s.%s", name, namespace))
+		framework.RunKubectl(f.Namespace.Name, "delete", "--filename", manifestsFile)
+		framework.RunKubectl(f.Namespace.Name, "delete", "CustomResourceDefinition", "gmsacredentialspecs.windows.k8s.io")
+		framework.RunKubectl(f.Namespace.Name, "delete", "CertificateSigningRequest", fmt.Sprintf("%s.%s", name, namespace))
 		os.RemoveAll(tempDir)
 	}
 
@@ -245,7 +245,8 @@ func deployGmsaWebhook(f *framework.Framework, deployScriptPath string) (func(),
 		"--file", manifestsFile,
 		"--name", name,
 		"--namespace", namespace,
-		"--certs-dir", certsDir)
+		"--certs-dir", certsDir,
+		"--tolerate-master")
 
 	output, err := cmd.CombinedOutput()
 	if err == nil {
@@ -261,7 +262,7 @@ func deployGmsaWebhook(f *framework.Framework, deployScriptPath string) (func(),
 // of the manifest file retrieved from the worker node.
 // It returns a function to clean up both the temp file it creates and
 // the API object it creates when done with testing.
-func createGmsaCustomResource(crdManifestContents string) (func(), error) {
+func createGmsaCustomResource(ns string, crdManifestContents string) (func(), error) {
 	cleanUpFunc := func() {}
 
 	tempFile, err := ioutil.TempFile("", "")
@@ -271,7 +272,7 @@ func createGmsaCustomResource(crdManifestContents string) (func(), error) {
 	defer tempFile.Close()
 
 	cleanUpFunc = func() {
-		framework.RunKubectl("delete", "--filename", tempFile.Name())
+		framework.RunKubectl(ns, "delete", "--filename", tempFile.Name())
 		os.Remove(tempFile.Name())
 	}
 
@@ -281,7 +282,7 @@ func createGmsaCustomResource(crdManifestContents string) (func(), error) {
 		return cleanUpFunc, err
 	}
 
-	output, err := framework.RunKubectl("apply", "--filename", tempFile.Name())
+	output, err := framework.RunKubectl(ns, "apply", "--filename", tempFile.Name())
 	if err != nil {
 		err = errors.Wrapf(err, "unable to create custom resource, output:\n%s", output)
 	}
@@ -391,5 +392,5 @@ func createPodWithGmsa(f *framework.Framework, serviceAccountName string) string
 
 func runKubectlExecInNamespace(namespace string, args ...string) (string, error) {
 	namespaceOption := fmt.Sprintf("--namespace=%s", namespace)
-	return framework.RunKubectl(append([]string{"exec", namespaceOption}, args...)...)
+	return framework.RunKubectl(namespace, append([]string{"exec", namespaceOption}, args...)...)
 }

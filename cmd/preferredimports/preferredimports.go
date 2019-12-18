@@ -27,7 +27,6 @@ import (
 	"go/format"
 	"go/parser"
 	"go/token"
-	"golang.org/x/crypto/ssh/terminal"
 	"io/ioutil"
 	"log"
 	"os"
@@ -35,6 +34,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
@@ -51,7 +52,6 @@ type analyzer struct {
 	ctx       build.Context
 	failed    bool
 	donePaths map[string]interface{}
-	errors    []string
 }
 
 func newAnalyzer() *analyzer {

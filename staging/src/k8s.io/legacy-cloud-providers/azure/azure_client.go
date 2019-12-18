@@ -26,7 +26,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-04-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 
@@ -1404,7 +1404,7 @@ func (az *azStorageAccountClient) ListKeys(ctx context.Context, resourceGroupNam
 		klog.V(10).Infof("azStorageAccountClient.ListKeys(%q,%q): end", resourceGroupName, accountName)
 	}()
 
-	result, err = az.client.ListKeys(ctx, resourceGroupName, accountName)
+	result, err = az.client.ListKeys(ctx, resourceGroupName, accountName, storage.Kerb)
 	mc.Observe(err)
 	return
 }

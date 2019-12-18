@@ -20,7 +20,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
-type singleNumaNodePolicy struct{}
+type singleNumaNodePolicy struct {
+	//List of NUMA Nodes available on the underlying machine
+	numaNodes []int
+}
 
 var _ Policy = &singleNumaNodePolicy{}
 
@@ -28,16 +31,16 @@ var _ Policy = &singleNumaNodePolicy{}
 const PolicySingleNumaNode string = "single-numa-node"
 
 // NewSingleNumaNodePolicy returns single-numa-node policy.
-func NewSingleNumaNodePolicy() Policy {
-	return &singleNumaNodePolicy{}
+func NewSingleNumaNodePolicy(numaNodes []int) Policy {
+	return &singleNumaNodePolicy{numaNodes: numaNodes}
 }
 
 func (p *singleNumaNodePolicy) Name() string {
 	return PolicySingleNumaNode
 }
 
-func (p *singleNumaNodePolicy) CanAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
-	if !hint.Preferred || hint.NUMANodeAffinity.Count() > 1 {
+func (p *singleNumaNodePolicy) canAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
+	if !hint.Preferred {
 		return lifecycle.PodAdmitResult{
 			Admit:   false,
 			Reason:  "Topology Affinity Error",
@@ -47,4 +50,10 @@ func (p *singleNumaNodePolicy) CanAdmitPodResult(hint *TopologyHint) lifecycle.P
 	return lifecycle.PodAdmitResult{
 		Admit: true,
 	}
+}
+
+func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
+	hint := mergeProvidersHints(p, p.numaNodes, providersHints)
+	admit := p.canAdmitPodResult(&hint)
+	return hint, admit
 }

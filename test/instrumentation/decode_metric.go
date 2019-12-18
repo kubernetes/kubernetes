@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/component-base/metrics"
 )
 
@@ -209,7 +208,7 @@ func (c *metricDecoder) decodeBuckets(expr ast.Expr) ([]float64, error) {
 		variableName := v.Sel.String()
 		importName, ok := v.X.(*ast.Ident)
 		if ok && importName.String() == c.prometheusImportName && variableName == "DefBuckets" {
-			return prometheus.DefBuckets, nil
+			return metrics.DefBuckets, nil
 		}
 	case *ast.CallExpr:
 		se, ok := v.Fun.(*ast.SelectorExpr)
@@ -230,9 +229,9 @@ func (c *metricDecoder) decodeBuckets(expr ast.Expr) ([]float64, error) {
 		}
 		switch functionName {
 		case "LinearBuckets":
-			return prometheus.LinearBuckets(firstArg, secondArg, thirdArg), nil
+			return metrics.LinearBuckets(firstArg, secondArg, thirdArg), nil
 		case "ExponentialBuckets":
-			return prometheus.ExponentialBuckets(firstArg, secondArg, thirdArg), nil
+			return metrics.ExponentialBuckets(firstArg, secondArg, thirdArg), nil
 		}
 	}
 	return nil, newDecodeErrorf(expr, errBuckets)

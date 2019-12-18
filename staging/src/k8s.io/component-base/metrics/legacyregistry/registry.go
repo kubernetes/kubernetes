@@ -43,24 +43,18 @@ func init() {
 // Deprecated: Please note the issues described in the doc comment of
 // InstrumentHandler. You might want to consider using promhttp.Handler instead.
 func Handler() http.Handler {
-	return prometheus.InstrumentHandler("prometheus", promhttp.HandlerFor(defaultRegistry, promhttp.HandlerOpts{}))
+	return promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, promhttp.HandlerFor(defaultRegistry, promhttp.HandlerOpts{}))
 }
 
 // Register registers a collectable metric but uses the global registry
 func Register(c metrics.Registerable) error {
 	err := defaultRegistry.Register(c)
-	// sideload global prom registry as fallback
-	prometheus.Register(c)
 	return err
 }
 
 // MustRegister registers registerable metrics but uses the global registry.
 func MustRegister(cs ...metrics.Registerable) {
 	defaultRegistry.MustRegister(cs...)
-	// sideload global prom registry as fallback
-	for _, c := range cs {
-		prometheus.Register(c)
-	}
 }
 
 // RawMustRegister registers prometheus collectors but uses the global registry, this
@@ -69,19 +63,23 @@ func MustRegister(cs ...metrics.Registerable) {
 // Deprecated
 func RawMustRegister(cs ...prometheus.Collector) {
 	defaultRegistry.RawMustRegister(cs...)
-	// sideload global prom registry as fallback
-	for _, c := range cs {
-		prometheus.Register(c)
-	}
 }
 
-// RawRegister registers a prometheus collector but uses the global registry, this
-// bypasses the metric stability framework
-//
-// Deprecated
-func RawRegister(c prometheus.Collector) error {
-	err := defaultRegistry.RawRegister(c)
-	// sideload global prom registry as fallback
-	prometheus.Register(c)
+// CustomRegister registers a custom collector but uses the global registry.
+func CustomRegister(c metrics.StableCollector) error {
+	err := defaultRegistry.CustomRegister(c)
+
+	//TODO(RainbowMango): Maybe we can wrap this error by error wrapping.(Golang 1.13)
+	_ = prometheus.Register(c)
+
 	return err
+}
+
+// CustomMustRegister registers custom collectors but uses the global registry.
+func CustomMustRegister(cs ...metrics.StableCollector) {
+	defaultRegistry.CustomMustRegister(cs...)
+
+	for _, c := range cs {
+		prometheus.MustRegister(c)
+	}
 }

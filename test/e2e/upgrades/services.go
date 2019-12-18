@@ -43,27 +43,31 @@ func shouldTestPDBs() bool { return framework.ProviderIs("gce", "gke") }
 // Setup creates a service with a load balancer and makes sure it's reachable.
 func (t *ServiceUpgradeTest) Setup(f *framework.Framework) {
 	serviceName := "service-test"
-	jig := e2eservice.NewTestJig(f.ClientSet, serviceName)
+	jig := e2eservice.NewTestJig(f.ClientSet, f.Namespace.Name, serviceName)
 
 	ns := f.Namespace
+	cs := f.ClientSet
 
 	ginkgo.By("creating a TCP service " + serviceName + " with type=LoadBalancer in namespace " + ns.Name)
-	tcpService := jig.CreateTCPServiceOrFail(ns.Name, func(s *v1.Service) {
+	_, err := jig.CreateTCPService(func(s *v1.Service) {
 		s.Spec.Type = v1.ServiceTypeLoadBalancer
 	})
-	tcpService = jig.WaitForLoadBalancerOrFail(ns.Name, tcpService.Name, e2eservice.LoadBalancerCreateTimeoutDefault)
-	jig.SanityCheckService(tcpService, v1.ServiceTypeLoadBalancer)
+	framework.ExpectNoError(err)
+	tcpService, err := jig.WaitForLoadBalancer(e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
+	framework.ExpectNoError(err)
 
 	// Get info to hit it with
 	tcpIngressIP := e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
 	svcPort := int(tcpService.Spec.Ports[0].Port)
 
 	ginkgo.By("creating pod to be part of service " + serviceName)
-	rc := jig.RunOrFail(ns.Name, jig.AddRCAntiAffinity)
+	rc, err := jig.Run(jig.AddRCAntiAffinity)
+	framework.ExpectNoError(err)
 
 	if shouldTestPDBs() {
 		ginkgo.By("creating a PodDisruptionBudget to cover the ReplicationController")
-		jig.CreatePDBOrFail(ns.Name, rc)
+		_, err = jig.CreatePDB(rc)
+		framework.ExpectNoError(err)
 	}
 
 	// Hit it once before considering ourselves ready
@@ -111,11 +115,9 @@ func (t *ServiceUpgradeTest) test(f *framework.Framework, done <-chan struct{}, 
 		<-done
 	}
 
-	// Sanity check and hit it once more
+	// Hit it once more
 	ginkgo.By("hitting the pod through the service's LoadBalancer")
 	e2eservice.TestReachableHTTP(t.tcpIngressIP, t.svcPort, e2eservice.LoadBalancerLagTimeoutDefault)
-	t.jig.SanityCheckService(t.tcpService, v1.ServiceTypeLoadBalancer)
-
 	if testFinalizer {
 		defer func() {
 			ginkgo.By("Check that service can be deleted with finalizer")

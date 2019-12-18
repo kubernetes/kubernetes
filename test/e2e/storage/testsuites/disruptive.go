@@ -18,7 +18,9 @@ package testsuites
 
 import (
 	"github.com/onsi/ginkgo"
+
 	v1 "k8s.io/api/core/v1"
+	errors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -37,9 +39,9 @@ var _ TestSuite = &disruptiveTestSuite{}
 func InitDisruptiveTestSuite() TestSuite {
 	return &disruptiveTestSuite{
 		tsInfo: TestSuiteInfo{
-			name:       "disruptive",
-			featureTag: "[Disruptive]",
-			testPatterns: []testpatterns.TestPattern{
+			Name:       "disruptive",
+			FeatureTag: "[Disruptive]",
+			TestPatterns: []testpatterns.TestPattern{
 				// FSVolMode is already covered in subpath testsuite
 				testpatterns.DefaultFsInlineVolume,
 				testpatterns.FsVolModePreprovisionedPV,
@@ -50,16 +52,15 @@ func InitDisruptiveTestSuite() TestSuite {
 		},
 	}
 }
-
-func (s *disruptiveTestSuite) getTestSuiteInfo() TestSuiteInfo {
+func (s *disruptiveTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *disruptiveTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *disruptiveTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
 	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(testpatterns.PreprovisionedPV))
 }
 
-func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *disruptiveTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config        *PerTestConfig
 		driverCleanup func()
@@ -67,8 +68,8 @@ func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpattern
 		cs clientset.Interface
 		ns *v1.Namespace
 
-		// genericVolumeTestResource contains pv, pvc, sc, etc., owns cleaning that up
-		resource *genericVolumeTestResource
+		// VolumeResource contains pv, pvc, sc, etc., owns cleaning that up
+		resource *VolumeResource
 		pod      *v1.Pod
 	}
 	var l local
@@ -93,27 +94,28 @@ func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpattern
 			framework.Skipf("Driver %s doesn't support %v -- skipping", driver.GetDriverInfo().Name, pattern.VolMode)
 		}
 
-		testVolumeSizeRange := s.getTestSuiteInfo().supportedSizeRange
-		l.resource = createGenericVolumeTestResource(driver, l.config, pattern, testVolumeSizeRange)
+		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
+		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 	}
 
 	cleanup := func() {
+		var errs []error
 		if l.pod != nil {
 			ginkgo.By("Deleting pod")
 			err := e2epod.DeletePodWithWait(f.ClientSet, l.pod)
-			framework.ExpectNoError(err, "while deleting pod")
+			errs = append(errs, err)
 			l.pod = nil
 		}
 
 		if l.resource != nil {
-			l.resource.cleanupResource()
+			err := l.resource.CleanupResource()
+			errs = append(errs, err)
 			l.resource = nil
 		}
 
-		if l.driverCleanup != nil {
-			l.driverCleanup()
-			l.driverCleanup = nil
-		}
+		errs = append(errs, tryFunc(l.driverCleanup))
+		l.driverCleanup = nil
+		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 	}
 
 	type testBody func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod)
@@ -145,12 +147,6 @@ func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpattern
 			if (pattern.VolMode == v1.PersistentVolumeBlock && t.runTestBlock != nil) ||
 				(pattern.VolMode == v1.PersistentVolumeFilesystem && t.runTestFile != nil) {
 				ginkgo.It(t.testItStmt, func() {
-
-					if pattern.VolMode == v1.PersistentVolumeBlock && driver.GetDriverInfo().InTreePluginName == "kubernetes.io/local-volume" {
-						// TODO: https://github.com/kubernetes/kubernetes/issues/74552
-						framework.Skipf("Local volume volume plugin does not support block volume reconstruction (#74552)")
-					}
-
 					init()
 					defer cleanup()
 
@@ -158,9 +154,9 @@ func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpattern
 					var pvcs []*v1.PersistentVolumeClaim
 					var inlineSources []*v1.VolumeSource
 					if pattern.VolType == testpatterns.InlineVolume {
-						inlineSources = append(inlineSources, l.resource.volSource)
+						inlineSources = append(inlineSources, l.resource.VolSource)
 					} else {
-						pvcs = append(pvcs, l.resource.pvc)
+						pvcs = append(pvcs, l.resource.Pvc)
 					}
 					ginkgo.By("Creating a pod with pvc")
 					l.pod, err = e2epod.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, pvcs, inlineSources, false, "", false, false, e2epv.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)

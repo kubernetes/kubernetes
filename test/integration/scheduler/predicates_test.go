@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -64,7 +64,7 @@ func TestInterPodAffinity(t *testing.T) {
 
 	cs := context.clientSet
 	podLabel := map[string]string{"service": "securityscan"}
-	// podLabel2 := map[string]string{"security": "S1"}
+	podLabel2 := map[string]string{"security": "S1"}
 
 	tests := []struct {
 		pod       *v1.Pod
@@ -74,7 +74,7 @@ func TestInterPodAffinity(t *testing.T) {
 		errorType string
 		test      string
 	}{
-		/*{
+		{
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
@@ -91,7 +91,6 @@ func TestInterPodAffinity(t *testing.T) {
 											{
 												Key:      "security",
 												Operator: metav1.LabelSelectorOpDoesNotExist,
-												Values:   []string{"securityscan"},
 											},
 										},
 									},
@@ -586,7 +585,7 @@ func TestInterPodAffinity(t *testing.T) {
 			node: nodes[0],
 			fits: false,
 			test: "satisfies the PodAffinity but doesn't satisfies the PodAntiAffinity with the existing pod",
-		},*/
+		},
 		{
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -875,56 +874,6 @@ func TestInterPodAffinity(t *testing.T) {
 			}
 		}
 	}
-}
-
-// TestNodePIDPressure verifies that scheduler's CheckNodePIDPressurePredicate predicate
-// functions works correctly.
-func TestNodePIDPressure(t *testing.T) {
-	context := initTest(t, "node-pid-pressure")
-	defer cleanupTest(t, context)
-	// Add a node.
-	node, err := createNode(context.clientSet, "testnode", nil)
-	if err != nil {
-		t.Fatalf("Cannot create node: %v", err)
-	}
-
-	cs := context.clientSet
-
-	// Adds PID pressure condition to the node.
-	node.Status.Conditions = []v1.NodeCondition{
-		{
-			Type:   v1.NodePIDPressure,
-			Status: v1.ConditionTrue,
-		},
-	}
-
-	// Update node condition.
-	err = updateNodeStatus(context.clientSet, node)
-	if err != nil {
-		t.Fatalf("Cannot update node: %v", err)
-	}
-
-	// Create test pod.
-	testPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "pidpressure-fake-name"},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{Name: "container", Image: imageutils.GetPauseImageName()},
-			},
-		},
-	}
-
-	testPod, err = cs.CoreV1().Pods(context.ns.Name).Create(testPod)
-	if err != nil {
-		t.Fatalf("Test Failed: error: %v, while creating pod", err)
-	}
-
-	err = waitForPodUnschedulable(cs, testPod)
-	if err != nil {
-		t.Errorf("Test Failed: error, %v, while waiting for scheduled", err)
-	}
-
-	cleanupPods(cs, t, []*v1.Pod{testPod})
 }
 
 // TestEvenPodsSpreadPredicate verifies that EvenPodsSpread predicate functions well.

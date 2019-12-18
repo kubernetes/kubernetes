@@ -121,7 +121,7 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 				organizations:  []string{kubeadmconstants.SystemPrivilegedGroup},
 			},
 			{
-				kubeConfigFile: kubeadmconstants.KubeletBootstrapKubeConfigFileName,
+				kubeConfigFile: kubeadmconstants.KubeletKubeConfigFileName,
 				clientName:     fmt.Sprintf("%s%s", kubeadmconstants.NodesUserPrefix, cfg.NodeRegistration.Name),
 				organizations:  []string{kubeadmconstants.NodesGroup},
 			},
@@ -217,6 +217,8 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1", "myOrg2")
 	configWithAnotherClusterCa := setupdKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1", "myOrg2")
 	configWithAnotherClusterAddress := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://3.4.5.6:3456", "myOrg1", "test-cluster", "myOrg2")
+	invalidConfig := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1", "myOrg2")
+	invalidConfig.CurrentContext = "invalid context"
 
 	var tests = []struct {
 		name               string
@@ -227,6 +229,12 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 		{ // if there is no existing KubeConfig, creates the kubeconfig
 			name:       "KubeConfig doesn't exist",
 			kubeConfig: config,
+		},
+		{ // if KubeConfig is invalid raise error
+			name:               "KubeConfig is invalid",
+			existingKubeConfig: invalidConfig,
+			kubeConfig:         invalidConfig,
+			expectedError:      true,
 		},
 		{ // if KubeConfig is equal to the existingKubeConfig - refers to the same cluster -, use the existing (Test idempotency)
 			name:               "KubeConfig refers to the same cluster",
@@ -557,8 +565,8 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 		},
 		"some files don't exist": {
 			filesToWrite: map[string]*clientcmdapi.Config{
-				kubeadmconstants.AdminKubeConfigFileName:            config,
-				kubeadmconstants.KubeletBootstrapKubeConfigFileName: config,
+				kubeadmconstants.AdminKubeConfigFileName:   config,
+				kubeadmconstants.KubeletKubeConfigFileName: config,
 			},
 			initConfig:    initConfig,
 			expectedError: true,
@@ -566,7 +574,7 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 		"some files have invalid CA": {
 			filesToWrite: map[string]*clientcmdapi.Config{
 				kubeadmconstants.AdminKubeConfigFileName:             config,
-				kubeadmconstants.KubeletBootstrapKubeConfigFileName:  config,
+				kubeadmconstants.KubeletKubeConfigFileName:           config,
 				kubeadmconstants.ControllerManagerKubeConfigFileName: configWithAnotherClusterCa,
 				kubeadmconstants.SchedulerKubeConfigFileName:         config,
 			},
@@ -576,7 +584,7 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 		"some files have invalid Server Url": {
 			filesToWrite: map[string]*clientcmdapi.Config{
 				kubeadmconstants.AdminKubeConfigFileName:             config,
-				kubeadmconstants.KubeletBootstrapKubeConfigFileName:  config,
+				kubeadmconstants.KubeletKubeConfigFileName:           config,
 				kubeadmconstants.ControllerManagerKubeConfigFileName: config,
 				kubeadmconstants.SchedulerKubeConfigFileName:         configWithAnotherServerURL,
 			},
@@ -586,7 +594,7 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 		"all files are valid": {
 			filesToWrite: map[string]*clientcmdapi.Config{
 				kubeadmconstants.AdminKubeConfigFileName:             config,
-				kubeadmconstants.KubeletBootstrapKubeConfigFileName:  config,
+				kubeadmconstants.KubeletKubeConfigFileName:           config,
 				kubeadmconstants.ControllerManagerKubeConfigFileName: config,
 				kubeadmconstants.SchedulerKubeConfigFileName:         config,
 			},

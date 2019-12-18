@@ -46,7 +46,7 @@ type topologyTest struct {
 	intreeOps   opCounts
 	migratedOps opCounts
 
-	resource      genericVolumeTestResource
+	resource      VolumeResource
 	pod           *v1.Pod
 	allTopologies []topology
 }
@@ -59,8 +59,8 @@ var _ TestSuite = &topologyTestSuite{}
 func InitTopologyTestSuite() TestSuite {
 	return &topologyTestSuite{
 		tsInfo: TestSuiteInfo{
-			name: "topology",
-			testPatterns: []testpatterns.TestPattern{
+			Name: "topology",
+			TestPatterns: []testpatterns.TestPattern{
 				testpatterns.TopologyImmediate,
 				testpatterns.TopologyDelayed,
 			},
@@ -68,14 +68,14 @@ func InitTopologyTestSuite() TestSuite {
 	}
 }
 
-func (t *topologyTestSuite) getTestSuiteInfo() TestSuiteInfo {
+func (t *topologyTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *topologyTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *topologyTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
-func (t *topologyTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	var (
 		dInfo   = driver.GetDriverInfo()
 		dDriver DynamicPVTestDriver
@@ -104,17 +104,15 @@ func (t *topologyTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 	f := framework.NewDefaultFramework("topology")
 
 	init := func() topologyTest {
-		const numTestTopologies = 2
 
 		l := topologyTest{}
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 
-		l.resource = genericVolumeTestResource{
-			driver:  driver,
-			config:  l.config,
-			pattern: pattern,
+		l.resource = VolumeResource{
+			Config:  l.config,
+			Pattern: pattern,
 		}
 
 		// After driver is installed, check driver topologies on nodes
@@ -135,17 +133,17 @@ func (t *topologyTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 			framework.Skipf("Not enough topologies in cluster -- skipping")
 		}
 
-		l.resource.sc = dDriver.GetDynamicProvisionStorageClass(l.config, pattern.FsType)
-		framework.ExpectNotEqual(l.resource.sc, nil, "driver failed to provide a StorageClass")
-		l.resource.sc.VolumeBindingMode = &pattern.BindingMode
+		l.resource.Sc = dDriver.GetDynamicProvisionStorageClass(l.config, pattern.FsType)
+		framework.ExpectNotEqual(l.resource.Sc, nil, "driver failed to provide a StorageClass")
+		l.resource.Sc.VolumeBindingMode = &pattern.BindingMode
 
-		testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
+		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
 		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
 		claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
 		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
-		l.resource.pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
+		l.resource.Pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			ClaimSize:        claimSize,
-			StorageClassName: &(l.resource.sc.Name),
+			StorageClassName: &(l.resource.Sc.Name),
 		}, l.config.Framework.Namespace.Name)
 
 		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
@@ -153,10 +151,10 @@ func (t *topologyTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 	}
 
 	cleanup := func(l topologyTest) {
-		t.cleanupResources(cs, &l)
-		if l.driverCleanup != nil {
-			l.driverCleanup()
-		}
+		t.CleanupResources(cs, &l)
+		err := tryFunc(l.driverCleanup)
+		l.driverCleanup = nil
+		framework.ExpectNoError(err, "while cleaning up driver")
 
 		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
@@ -172,7 +170,7 @@ func (t *topologyTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 		if len(l.allTopologies) > dInfo.NumAllowedTopologies {
 			excludedIndex = rand.Intn(len(l.allTopologies))
 		}
-		allowedTopologies := t.setAllowedTopologies(l.resource.sc, l.allTopologies, excludedIndex)
+		allowedTopologies := t.setAllowedTopologies(l.resource.Sc, l.allTopologies, excludedIndex)
 
 		t.createResources(cs, &l, nil)
 
@@ -201,7 +199,7 @@ func (t *topologyTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 
 		// Exclude one topology
 		excludedIndex := rand.Intn(len(l.allTopologies))
-		t.setAllowedTopologies(l.resource.sc, l.allTopologies, excludedIndex)
+		t.setAllowedTopologies(l.resource.Sc, l.allTopologies, excludedIndex)
 
 		// Set pod nodeSelector to the excluded topology
 		exprs := []v1.NodeSelectorRequirement{}
@@ -322,19 +320,19 @@ func (t *topologyTestSuite) verifyNodeTopology(node *v1.Node, allowedTopos []top
 
 func (t *topologyTestSuite) createResources(cs clientset.Interface, l *topologyTest, affinity *v1.Affinity) {
 	var err error
-	framework.Logf("Creating storage class object and pvc object for driver - sc: %v, pvc: %v", l.resource.sc, l.resource.pvc)
+	framework.Logf("Creating storage class object and pvc object for driver - sc: %v, pvc: %v", l.resource.Sc, l.resource.Pvc)
 
 	ginkgo.By("Creating sc")
-	l.resource.sc, err = cs.StorageV1().StorageClasses().Create(l.resource.sc)
+	l.resource.Sc, err = cs.StorageV1().StorageClasses().Create(l.resource.Sc)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Creating pvc")
-	l.resource.pvc, err = cs.CoreV1().PersistentVolumeClaims(l.resource.pvc.Namespace).Create(l.resource.pvc)
+	l.resource.Pvc, err = cs.CoreV1().PersistentVolumeClaims(l.resource.Pvc.Namespace).Create(l.resource.Pvc)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Creating pod")
 	l.pod = e2epod.MakeSecPod(l.config.Framework.Namespace.Name,
-		[]*v1.PersistentVolumeClaim{l.resource.pvc},
+		[]*v1.PersistentVolumeClaim{l.resource.Pvc},
 		nil,
 		false,
 		"",
@@ -347,11 +345,13 @@ func (t *topologyTestSuite) createResources(cs clientset.Interface, l *topologyT
 	framework.ExpectNoError(err)
 }
 
-func (t *topologyTestSuite) cleanupResources(cs clientset.Interface, l *topologyTest) {
+func (t *topologyTestSuite) CleanupResources(cs clientset.Interface, l *topologyTest) {
 	if l.pod != nil {
 		ginkgo.By("Deleting pod")
 		err := e2epod.DeletePodWithWait(cs, l.pod)
 		framework.ExpectNoError(err, "while deleting pod")
 	}
-	l.resource.cleanupResource()
+
+	err := l.resource.CleanupResource()
+	framework.ExpectNoError(err, "while clean up resource")
 }

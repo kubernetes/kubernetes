@@ -848,10 +848,10 @@ var _ = SIGDescribe("StatefulSet", func() {
 	})
 })
 
-func kubectlExecWithRetries(args ...string) (out string) {
+func kubectlExecWithRetries(ns string, args ...string) (out string) {
 	var err error
 	for i := 0; i < 3; i++ {
-		if out, err = framework.RunKubectl(args...); err == nil {
+		if out, err = framework.RunKubectl(ns, args...); err == nil {
 			return
 		}
 		framework.Logf("Retrying %v:\nerror %v\nstdout %v", args, err, out)
@@ -916,7 +916,7 @@ func (z *zookeeperTester) write(statefulPodIndex int, kv map[string]string) {
 	ns := fmt.Sprintf("--namespace=%v", z.ss.Namespace)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh create /%v %v", k, v)
-		framework.Logf(framework.RunKubectlOrDie("exec", ns, name, "--", "/bin/sh", "-c", cmd))
+		framework.Logf(framework.RunKubectlOrDie(z.ss.Namespace, "exec", ns, name, "--", "/bin/sh", "-c", cmd))
 	}
 }
 
@@ -924,7 +924,7 @@ func (z *zookeeperTester) read(statefulPodIndex int, key string) string {
 	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
 	ns := fmt.Sprintf("--namespace=%v", z.ss.Namespace)
 	cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh get /%v", key)
-	return lastLine(framework.RunKubectlOrDie("exec", ns, name, "--", "/bin/sh", "-c", cmd))
+	return lastLine(framework.RunKubectlOrDie(z.ss.Namespace, "exec", ns, name, "--", "/bin/sh", "-c", cmd))
 }
 
 type mysqlGaleraTester struct {
@@ -941,7 +941,7 @@ func (m *mysqlGaleraTester) mysqlExec(cmd, ns, podName string) string {
 	// TODO: Find a readiness probe for mysql that guarantees writes will
 	// succeed and ditch retries. Current probe only reads, so there's a window
 	// for a race.
-	return kubectlExecWithRetries(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
+	return kubectlExecWithRetries(ns, fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 
 func (m *mysqlGaleraTester) deploy(ns string) *appsv1.StatefulSet {
@@ -981,7 +981,7 @@ func (m *redisTester) name() string {
 
 func (m *redisTester) redisExec(cmd, ns, podName string) string {
 	cmd = fmt.Sprintf("/opt/redis/redis-cli -h %v %v", podName, cmd)
-	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
+	return framework.RunKubectlOrDie(ns, fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 
 func (m *redisTester) deploy(ns string) *appsv1.StatefulSet {
@@ -1012,7 +1012,7 @@ func (c *cockroachDBTester) name() string {
 
 func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
 	cmd = fmt.Sprintf("/cockroach/cockroach sql --insecure --host %s.cockroachdb -e \"%v\"", podName, cmd)
-	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
+	return framework.RunKubectlOrDie(ns, fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 
 func (c *cockroachDBTester) deploy(ns string) *appsv1.StatefulSet {

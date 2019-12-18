@@ -35,8 +35,6 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -407,7 +405,7 @@ func (az *Cloud) getServiceLoadBalancerStatus(service *v1.Service, lb *network.L
 		return nil, nil
 	}
 	isInternal := requiresInternalLoadBalancer(service)
-	lbFrontendIPConfigName := az.getFrontendIPConfigName(service, subnet(service))
+	lbFrontendIPConfigName := az.getFrontendIPConfigName(service)
 	serviceName := getServiceName(service)
 	for _, ipConfiguration := range *lb.FrontendIPConfigurations {
 		if lbFrontendIPConfigName == *ipConfiguration.Name {
@@ -563,7 +561,7 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(IPv6DualStack) {
+	if az.ipv6DualStackEnabled {
 		// TODO: (khenidak) if we ever enable IPv6 single stack, then we should
 		// not wrap the following in a feature gate
 		ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
@@ -695,9 +693,9 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 	}
 	lbName := *lb.Name
 	klog.V(2).Infof("reconcileLoadBalancer for service(%s): lb(%s) wantLb(%t) resolved load balancer name", serviceName, lbName, wantLb)
-	lbFrontendIPConfigName := az.getFrontendIPConfigName(service, subnet(service))
+	lbFrontendIPConfigName := az.getFrontendIPConfigName(service)
 	lbFrontendIPConfigID := az.getFrontendIPConfigID(lbName, lbFrontendIPConfigName)
-	lbBackendPoolName := getBackendPoolName(clusterName, service)
+	lbBackendPoolName := getBackendPoolName(az.ipv6DualStackEnabled, clusterName, service)
 	lbBackendPoolID := az.getBackendPoolID(lbName, lbBackendPoolName)
 
 	lbIdleTimeout, err := getIdleTimeout(service)
@@ -962,7 +960,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 
 			if isInternal {
 				// Refresh updated lb which will be used later in other places.
-				newLB, exist, err := az.getAzureLoadBalancer(lbName)
+				newLB, exist, err := az.getAzureLoadBalancer(lbName, cacheReadTypeDefault)
 				if err != nil {
 					klog.V(2).Infof("reconcileLoadBalancer for service(%s): getAzureLoadBalancer(%s) failed: %v", serviceName, lbName, err)
 					return nil, err
@@ -1028,7 +1026,7 @@ func (az *Cloud) reconcileLoadBalancerRule(
 		}
 
 		for _, protocol := range protocols {
-			lbRuleName := az.getLoadBalancerRuleName(service, protocol, port.Port, subnet(service))
+			lbRuleName := az.getLoadBalancerRuleName(service, protocol, port.Port)
 			klog.V(2).Infof("reconcileLoadBalancerRule lb name (%s) rule name (%s)", lbName, lbRuleName)
 
 			transportProto, _, probeProto, err := getProtocolsFromKubernetesProtocol(protocol)
@@ -1096,8 +1094,9 @@ func (az *Cloud) reconcileLoadBalancerRule(
 				expectedRule.LoadBalancingRulePropertiesFormat.IdleTimeoutInMinutes = lbIdleTimeout
 			}
 
-			// we didn't construct the probe objects for UDP or SCTP because they're not used/needed/allowed
-			if protocol != v1.ProtocolUDP && protocol != v1.ProtocolSCTP {
+			// we didn't construct the probe objects for UDP or SCTP because they're not allowed on Azure.
+			// However, when externalTrafficPolicy is Local, Kubernetes HTTP health check would be used for probing.
+			if servicehelpers.NeedsHealthCheck(service) || (protocol != v1.ProtocolUDP && protocol != v1.ProtocolSCTP) {
 				expectedRule.Probe = &network.SubResource{
 					ID: to.StringPtr(az.getLoadBalancerProbeID(lbName, lbRuleName)),
 				}
@@ -1125,7 +1124,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		ports = []v1.ServicePort{}
 	}
 
-	sg, err := az.getSecurityGroup()
+	sg, err := az.getSecurityGroup(cacheReadTypeDefault)
 	if err != nil {
 		return nil, err
 	}
@@ -1466,7 +1465,7 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lbNa
 	}
 
 	if lbName != "" {
-		loadBalancer, _, err := az.getAzureLoadBalancer(lbName)
+		loadBalancer, _, err := az.getAzureLoadBalancer(lbName, cacheReadTypeDefault)
 		if err != nil {
 			return nil, err
 		}
@@ -1642,7 +1641,7 @@ func equalLoadBalancingRulePropertiesFormat(s *network.LoadBalancingRuleProperti
 		reflect.DeepEqual(s.EnableTCPReset, t.EnableTCPReset) &&
 		reflect.DeepEqual(s.DisableOutboundSnat, t.DisableOutboundSnat)
 
-	if wantLB {
+	if wantLB && s.IdleTimeoutInMinutes != nil && t.IdleTimeoutInMinutes != nil {
 		return properties && reflect.DeepEqual(s.IdleTimeoutInMinutes, t.IdleTimeoutInMinutes)
 	}
 	return properties

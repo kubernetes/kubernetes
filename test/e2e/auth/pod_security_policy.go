@@ -31,16 +31,13 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2epsp "k8s.io/kubernetes/test/e2e/framework/psp"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const nobodyUser = int64(65534)
@@ -54,7 +51,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 	var c clientset.Interface
 	var ns string // Test namespace, for convenience
 	ginkgo.BeforeEach(func() {
-		if !e2epsp.IsPodSecurityPolicyEnabled(f.ClientSet) {
+		if !framework.IsPodSecurityPolicyEnabled(f.ClientSet) {
 			framework.Skipf("PodSecurityPolicy not enabled")
 		}
 		if !auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
@@ -117,7 +114,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 			p, err = c.CoreV1().Pods(ns).Get(p.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			validated, found := p.Annotations[psputil.ValidatedPSPAnnotation]
-			gomega.Expect(found).To(gomega.BeTrue(), "PSP annotation not found")
+			framework.ExpectEqual(found, true, "PSP annotation not found")
 			framework.ExpectEqual(validated, expectedPSP.Name, "Unexpected validated PSP")
 		})
 	})
@@ -125,7 +122,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 
 func expectForbidden(err error) {
 	framework.ExpectError(err, "should be forbidden")
-	gomega.Expect(apierrs.IsForbidden(err)).To(gomega.BeTrue(), "should be forbidden error")
+	framework.ExpectEqual(apierrs.IsForbidden(err), true, "should be forbidden error")
 }
 
 func testPrivilegedPods(tester func(pod *v1.Pod)) {
@@ -169,7 +166,7 @@ func testPrivilegedPods(tester func(pod *v1.Pod)) {
 		tester(hostipc)
 	})
 
-	if common.IsAppArmorSupported() {
+	if framework.IsAppArmorSupported() {
 		ginkgo.By("Running a custom AppArmor profile pod", func() {
 			aa := restrictedPod("apparmor")
 			// Every node is expected to have the docker-default profile.

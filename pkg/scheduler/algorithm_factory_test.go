@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	"k8s.io/kubernetes/pkg/scheduler/api"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
 func TestAlgorithmNameValidation(t *testing.T) {
@@ -52,15 +52,15 @@ func TestAlgorithmNameValidation(t *testing.T) {
 }
 
 func TestBuildScoringFunctionShapeFromRequestedToCapacityRatioArguments(t *testing.T) {
-	arguments := api.RequestedToCapacityRatioArguments{
-		UtilizationShape: []api.UtilizationShapePoint{
+	arguments := schedulerapi.RequestedToCapacityRatioArguments{
+		Shape: []schedulerapi.UtilizationShapePoint{
 			{Utilization: 10, Score: 1},
 			{Utilization: 30, Score: 5},
 			{Utilization: 70, Score: 2},
 		},
-		Resources: []api.ResourceSpec{
-			{Name: v1.ResourceCPU},
-			{Name: v1.ResourceMemory},
+		Resources: []schedulerapi.ResourceSpec{
+			{Name: string(v1.ResourceCPU)},
+			{Name: string(v1.ResourceMemory)},
 		},
 	}
 	builtShape, resources := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(&arguments)
@@ -78,8 +78,8 @@ func TestBuildScoringFunctionShapeFromRequestedToCapacityRatioArguments(t *testi
 }
 
 func TestBuildScoringFunctionShapeFromRequestedToCapacityRatioArgumentsNilResourceToWeightMap(t *testing.T) {
-	arguments := api.RequestedToCapacityRatioArguments{
-		UtilizationShape: []api.UtilizationShapePoint{
+	arguments := schedulerapi.RequestedToCapacityRatioArguments{
+		Shape: []schedulerapi.UtilizationShapePoint{
 			{Utilization: 10, Score: 1},
 			{Utilization: 30, Score: 5},
 			{Utilization: 70, Score: 2},

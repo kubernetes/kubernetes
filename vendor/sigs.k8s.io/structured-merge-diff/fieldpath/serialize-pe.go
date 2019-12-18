@@ -83,14 +83,18 @@ func DeserializePathElement(s string) (PathElement, error) {
 	case peKeySepBytes[0]:
 		iter := readPool.BorrowIterator(b)
 		defer readPool.ReturnIterator(iter)
-		v, err := value.ReadJSONIter(iter)
-		if err != nil {
-			return PathElement{}, err
-		}
-		if v.MapValue == nil {
-			return PathElement{}, fmt.Errorf("expected key value pairs but got %#v", v)
-		}
-		return PathElement{Key: v.MapValue}, nil
+		fields := value.FieldList{}
+		iter.ReadObjectCB(func(iter *jsoniter.Iterator, key string) bool {
+			v, err := value.ReadJSONIter(iter)
+			if err != nil {
+				iter.Error = err
+				return false
+			}
+			fields = append(fields, value.Field{Name: key, Value: v})
+			return true
+		})
+		fields.Sort()
+		return PathElement{Key: &fields}, iter.Error
 	case peIndexSepBytes[0]:
 		i, err := strconv.Atoi(s[2:])
 		if err != nil {
@@ -129,8 +133,15 @@ func serializePathElementToWriter(w io.Writer, pe PathElement) error {
 		if _, err := stream.Write(peKeySepBytes); err != nil {
 			return err
 		}
-		v := value.Value{MapValue: pe.Key}
-		v.WriteJSONStream(stream)
+		stream.WriteObjectStart()
+		for i, field := range *pe.Key {
+			if i > 0 {
+				stream.WriteMore()
+			}
+			stream.WriteObjectField(field.Name)
+			field.Value.WriteJSONStream(stream)
+		}
+		stream.WriteObjectEnd()
 	case pe.Value != nil:
 		if _, err := stream.Write(peValueSepBytes); err != nil {
 			return err

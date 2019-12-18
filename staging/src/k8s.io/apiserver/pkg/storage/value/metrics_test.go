@@ -48,68 +48,52 @@ func TestTotals(t *testing.T) {
 			prefix: NewPrefixTransformers(nil, nonStatusErrTransformer),
 			metrics: []string{
 				"apiserver_storage_transformation_operations_total",
-				"apiserver_storage_transformation_failures_total",
 			},
 			want: `
-# HELP apiserver_storage_transformation_failures_total [ALPHA] (Deprecated) Total number of failed transformation operations.
-# TYPE apiserver_storage_transformation_failures_total counter
-apiserver_storage_transformation_failures_total{transformation_type="from_storage"} 1
-apiserver_storage_transformation_failures_total{transformation_type="to_storage"} 1
-# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
-# TYPE apiserver_storage_transformation_operations_total counter
-apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
-apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="to_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
-`,
+				# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+				# TYPE apiserver_storage_transformation_operations_total counter
+				apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
+				apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="to_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
+				`,
 		},
 		{
 			desc:   "ok",
 			prefix: NewPrefixTransformers(nil, okTransformer),
 			metrics: []string{
 				"apiserver_storage_transformation_operations_total",
-				"apiserver_storage_transformation_failures_total",
 			},
 			want: `
-# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
-# TYPE apiserver_storage_transformation_operations_total counter
-apiserver_storage_transformation_operations_total{status="OK",transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
-apiserver_storage_transformation_operations_total{status="OK",transformation_type="to_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
-`,
+				# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+				# TYPE apiserver_storage_transformation_operations_total counter
+				apiserver_storage_transformation_operations_total{status="OK",transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
+				apiserver_storage_transformation_operations_total{status="OK",transformation_type="to_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
+				`,
 		},
 		{
 			desc:   "failed precondition",
 			prefix: NewPrefixTransformers(nil, failedPreconditionErrTransformer),
 			metrics: []string{
 				"apiserver_storage_transformation_operations_total",
-				"apiserver_storage_transformation_failures_total",
 			},
 			want: `
-# HELP apiserver_storage_transformation_failures_total [ALPHA] (Deprecated) Total number of failed transformation operations.
-# TYPE apiserver_storage_transformation_failures_total counter
-apiserver_storage_transformation_failures_total{transformation_type="from_storage"} 1
-apiserver_storage_transformation_failures_total{transformation_type="to_storage"} 1
-# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
-# TYPE apiserver_storage_transformation_operations_total counter
-apiserver_storage_transformation_operations_total{status="FailedPrecondition",transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
-apiserver_storage_transformation_operations_total{status="FailedPrecondition",transformation_type="to_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
-`,
+				# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+				# TYPE apiserver_storage_transformation_operations_total counter
+				apiserver_storage_transformation_operations_total{status="FailedPrecondition",transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
+				apiserver_storage_transformation_operations_total{status="FailedPrecondition",transformation_type="to_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
+				`,
 		},
 		{
 			desc:   "internal",
 			prefix: NewPrefixTransformers(nil, internalErrTransformer),
 			metrics: []string{
 				"apiserver_storage_transformation_operations_total",
-				"apiserver_storage_transformation_failures_total",
 			},
 			want: `
-# HELP apiserver_storage_transformation_failures_total [ALPHA] (Deprecated) Total number of failed transformation operations.
-# TYPE apiserver_storage_transformation_failures_total counter
-apiserver_storage_transformation_failures_total{transformation_type="from_storage"} 1
-apiserver_storage_transformation_failures_total{transformation_type="to_storage"} 1
-# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
-# TYPE apiserver_storage_transformation_operations_total counter
-apiserver_storage_transformation_operations_total{status="Internal",transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
-apiserver_storage_transformation_operations_total{status="Internal",transformation_type="to_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
-`,
+				# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
+				# TYPE apiserver_storage_transformation_operations_total counter
+				apiserver_storage_transformation_operations_total{status="Internal",transformation_type="from_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
+				apiserver_storage_transformation_operations_total{status="Internal",transformation_type="to_storage",transformer_prefix="k8s:enc:kms:v1:"} 1
+				`,
 		},
 	}
 

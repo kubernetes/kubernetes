@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"time"
@@ -26,7 +27,7 @@ import (
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,17 +37,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
+	watchtools "k8s.io/client-go/tools/watch"
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/replicaset"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	testutil "k8s.io/kubernetes/test/utils"
 	utilpointer "k8s.io/utils/pointer"
 )
 
 const (
+	poll          = 2 * time.Second
 	dRetryPeriod  = 2 * time.Second
 	dRetryTimeout = 5 * time.Minute
 )
@@ -118,6 +123,10 @@ var _ = SIGDescribe("Deployment", func() {
 	*/
 	framework.ConformanceIt("deployment should support proportional scaling", func() {
 		testProportionalScalingDeployment(f)
+	})
+	ginkgo.It("should not disrupt a cloud load-balancer's connectivity during rollout", func() {
+		framework.SkipUnlessProviderIs("aws", "azure", "gce", "gke")
+		testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f)
 	})
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
 	// See https://github.com/kubernetes/kubernetes/issues/29229
@@ -197,7 +206,7 @@ func stopDeployment(c clientset.Interface, ns, deploymentName string) {
 	framework.Logf("Ensuring deployment %s was deleted", deploymentName)
 	_, err = c.AppsV1().Deployments(ns).Get(deployment.Name, metav1.GetOptions{})
 	framework.ExpectError(err)
-	gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+	framework.ExpectEqual(errors.IsNotFound(err), true)
 	framework.Logf("Ensuring deployment %s's RSes were deleted", deploymentName)
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	framework.ExpectNoError(err)
@@ -328,7 +337,7 @@ func testRecreateDeployment(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	framework.Logf("Watching deployment %q to verify that new pods will not run with olds pods", deploymentName)
-	err = e2edeploy.WatchRecreateDeployment(c, deployment)
+	err = watchRecreateDeployment(c, deployment)
 	framework.ExpectNoError(err)
 }
 
@@ -398,7 +407,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting for deployment %s history to be cleaned up", deploymentName))
-	err = e2edeploy.WaitForDeploymentOldRSsNum(c, ns, deploymentName, int(*revisionHistoryLimit))
+	err = waitForDeploymentOldRSsNum(c, ns, deploymentName, int(*revisionHistoryLimit))
 	framework.ExpectNoError(err)
 }
 
@@ -749,14 +758,14 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 
 	// First rollout's replicaset should have .spec.replicas = 8 too.
 	framework.Logf("Waiting for the first rollout's replicaset to have .spec.replicas = %d", minAvailableReplicas)
-	err = replicaset.WaitForReplicaSetTargetSpecReplicas(c, firstRS, minAvailableReplicas)
+	err = waitForReplicaSetTargetSpecReplicas(c, firstRS, minAvailableReplicas)
 	framework.ExpectNoError(err)
 
 	// The desired replicas wait makes sure that the RS controller has created expected number of pods.
 	framework.Logf("Waiting for the first rollout's replicaset of deployment %q to have desired number of replicas", deploymentName)
 	firstRS, err = c.AppsV1().ReplicaSets(ns).Get(firstRS.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-	err = replicaset.WaitForReplicaSetDesiredReplicas(c.AppsV1(), firstRS)
+	err = waitForReplicaSetDesiredReplicas(c.AppsV1(), firstRS)
 	framework.ExpectNoError(err)
 
 	// Checking state of second rollout's replicaset.
@@ -773,14 +782,14 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	// Second rollout's replicaset should have Deployment's (replicas + maxSurge - first RS's replicas) = 10 + 3 - 8 = 5 for .spec.replicas.
 	newReplicas := replicas + int32(maxSurge) - minAvailableReplicas
 	framework.Logf("Waiting for the second rollout's replicaset to have .spec.replicas = %d", newReplicas)
-	err = replicaset.WaitForReplicaSetTargetSpecReplicas(c, secondRS, newReplicas)
+	err = waitForReplicaSetTargetSpecReplicas(c, secondRS, newReplicas)
 	framework.ExpectNoError(err)
 
 	// The desired replicas wait makes sure that the RS controller has created expected number of pods.
 	framework.Logf("Waiting for the second rollout's replicaset of deployment %q to have desired number of replicas", deploymentName)
 	secondRS, err = c.AppsV1().ReplicaSets(ns).Get(secondRS.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-	err = replicaset.WaitForReplicaSetDesiredReplicas(c.AppsV1(), secondRS)
+	err = waitForReplicaSetDesiredReplicas(c.AppsV1(), secondRS)
 	framework.ExpectNoError(err)
 
 	// Check the deployment's minimum availability.
@@ -807,13 +816,13 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	// First rollout's replicaset should have .spec.replicas = 8 + (30-10)*(8/13) = 8 + 12 = 20 replicas.
 	// Note that 12 comes from rounding (30-10)*(8/13) to nearest integer.
 	framework.Logf("Verifying that first rollout's replicaset has .spec.replicas = 20")
-	err = replicaset.WaitForReplicaSetTargetSpecReplicas(c, firstRS, 20)
+	err = waitForReplicaSetTargetSpecReplicas(c, firstRS, 20)
 	framework.ExpectNoError(err)
 
 	// Second rollout's replicaset should have .spec.replicas = 5 + (30-10)*(5/13) = 5 + 8 = 13 replicas.
 	// Note that 8 comes from rounding (30-10)*(5/13) to nearest integer.
 	framework.Logf("Verifying that second rollout's replicaset has .spec.replicas = 13")
-	err = replicaset.WaitForReplicaSetTargetSpecReplicas(c, secondRS, 13)
+	err = waitForReplicaSetTargetSpecReplicas(c, secondRS, 13)
 	framework.ExpectNoError(err)
 }
 
@@ -855,4 +864,261 @@ func orphanDeploymentReplicaSets(c clientset.Interface, d *appsv1.Deployment) er
 	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &trueVar}
 	deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(d.UID))
 	return c.AppsV1().Deployments(d.Namespace).Delete(d.Name, deleteOptions)
+}
+
+func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f *framework.Framework) {
+	ns := f.Namespace.Name
+	c := f.ClientSet
+
+	name := "test-rolling-update-with-lb"
+	framework.Logf("Creating Deployment %q", name)
+	podLabels := map[string]string{"name": name}
+	replicas := int32(3)
+	d := e2edeploy.NewDeployment(name, replicas, podLabels, AgnhostImageName, AgnhostImage, appsv1.RollingUpdateDeploymentStrategyType)
+	// NewDeployment assigned the same value to both d.Spec.Selector and
+	// d.Spec.Template.Labels, so mutating the one would mutate the other.
+	// Thus we need to set d.Spec.Template.Labels to a new value if we want
+	// to mutate it alone.
+	d.Spec.Template.Labels = map[string]string{
+		"iteration": "0",
+		"name":      name,
+	}
+	d.Spec.Template.Spec.Containers[0].Args = []string{"netexec", "--http-port=80", "--udp-port=80"}
+	// To ensure that a node that had a local endpoint prior to a rolling
+	// update continues to have a local endpoint throughout the rollout, we
+	// need an affinity policy that will cause pods to be scheduled on the
+	// same nodes as old pods, and we need the deployment to scale up a new
+	// pod before deleting an old pod.  This affinity policy will define
+	// inter-pod affinity for pods of different rollouts and anti-affinity
+	// for pods of the same rollout, so it will need to be updated when
+	// performing a rollout.
+	setAffinities(d, false)
+	d.Spec.Strategy.RollingUpdate = &appsv1.RollingUpdateDeployment{
+		MaxSurge:       intOrStrP(1),
+		MaxUnavailable: intOrStrP(0),
+	}
+	deployment, err := c.AppsV1().Deployments(ns).Create(d)
+	framework.ExpectNoError(err)
+	err = e2edeploy.WaitForDeploymentComplete(c, deployment)
+	framework.ExpectNoError(err)
+
+	framework.Logf("Creating a service %s with type=LoadBalancer and externalTrafficPolicy=Local in namespace %s", name, ns)
+	jig := e2eservice.NewTestJig(c, ns, name)
+	jig.Labels = podLabels
+	service, err := jig.CreateLoadBalancerService(e2eservice.GetServiceLoadBalancerCreationTimeout(c), func(svc *v1.Service) {
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+	})
+	framework.ExpectNoError(err)
+
+	lbNameOrAddress := e2eservice.GetIngressPoint(&service.Status.LoadBalancer.Ingress[0])
+	svcPort := int(service.Spec.Ports[0].Port)
+
+	framework.Logf("Hitting the replica set's pods through the service's load balancer")
+	timeout := e2eservice.LoadBalancerLagTimeoutDefault
+	if framework.ProviderIs("aws") {
+		timeout = e2eservice.LoadBalancerLagTimeoutAWS
+	}
+	e2eservice.TestReachableHTTP(lbNameOrAddress, svcPort, timeout)
+
+	framework.Logf("Starting a goroutine to watch the service's endpoints in the background")
+	done := make(chan struct{})
+	failed := make(chan struct{})
+	defer close(done)
+	go func() {
+		defer ginkgo.GinkgoRecover()
+		expectedNodes, err := jig.GetEndpointNodeNames()
+		framework.ExpectNoError(err)
+		// The affinity policy should ensure that before an old pod is
+		// deleted, a new pod will have been created on the same node.
+		// Thus the set of nodes with local endpoints for the service
+		// should remain unchanged.
+		wait.Until(func() {
+			actualNodes, err := jig.GetEndpointNodeNames()
+			framework.ExpectNoError(err)
+			if !actualNodes.Equal(expectedNodes) {
+				framework.Logf("The set of nodes with local endpoints changed; started with %v, now have %v", expectedNodes.List(), actualNodes.List())
+				failed <- struct{}{}
+			}
+		}, framework.Poll, done)
+	}()
+
+	framework.Logf("Triggering a rolling deployment several times")
+	for i := 1; i <= 3; i++ {
+		framework.Logf("Updating label deployment %q pod spec (iteration #%d)", name, i)
+		deployment, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, d.Name, func(update *appsv1.Deployment) {
+			update.Spec.Template.Labels["iteration"] = fmt.Sprintf("%d", i)
+			setAffinities(update, true)
+		})
+		framework.ExpectNoError(err)
+
+		framework.Logf("Waiting for observed generation %d", deployment.Generation)
+		err = e2edeploy.WaitForObservedDeployment(c, ns, name, deployment.Generation)
+		framework.ExpectNoError(err)
+
+		framework.Logf("Make sure deployment %q is complete", name)
+		err = e2edeploy.WaitForDeploymentCompleteAndCheckRolling(c, deployment)
+		framework.ExpectNoError(err)
+	}
+
+	select {
+	case <-failed:
+		framework.Failf("Connectivity to the load balancer was interrupted")
+	case <-time.After(1 * time.Minute):
+	}
+}
+
+// setAffinities set PodAntiAffinity across pods from the same generation
+// of Deployment and if, explicitly requested, also affinity with pods
+// from other generations.
+// It is required to make those "Required" so that in large clusters where
+// scheduler may not score all nodes if a lot of them are feasible, the
+// test will also have a chance to pass.
+func setAffinities(d *appsv1.Deployment, setAffinity bool) {
+	affinity := &v1.Affinity{
+		PodAntiAffinity: &v1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+				{
+					TopologyKey: "kubernetes.io/hostname",
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "name",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{d.Spec.Template.Labels["name"]},
+							},
+							{
+								Key:      "iteration",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{d.Spec.Template.Labels["iteration"]},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	if setAffinity {
+		affinity.PodAffinity = &v1.PodAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+				{
+					TopologyKey: "kubernetes.io/hostname",
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "name",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{d.Spec.Template.Labels["name"]},
+							},
+							{
+								Key:      "iteration",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{d.Spec.Template.Labels["iteration"]},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+	d.Spec.Template.Spec.Affinity = affinity
+}
+
+// watchRecreateDeployment watches Recreate deployments and ensures no new pods will run at the same time with
+// old pods.
+func watchRecreateDeployment(c clientset.Interface, d *appsv1.Deployment) error {
+	if d.Spec.Strategy.Type != appsv1.RecreateDeploymentStrategyType {
+		return fmt.Errorf("deployment %q does not use a Recreate strategy: %s", d.Name, d.Spec.Strategy.Type)
+	}
+
+	w, err := c.AppsV1().Deployments(d.Namespace).Watch(metav1.SingleObject(metav1.ObjectMeta{Name: d.Name, ResourceVersion: d.ResourceVersion}))
+	if err != nil {
+		return err
+	}
+
+	status := d.Status
+
+	condition := func(event watch.Event) (bool, error) {
+		d := event.Object.(*appsv1.Deployment)
+		status = d.Status
+
+		if d.Status.UpdatedReplicas > 0 && d.Status.Replicas != d.Status.UpdatedReplicas {
+			_, allOldRSs, err := deploymentutil.GetOldReplicaSets(d, c.AppsV1())
+			newRS, nerr := deploymentutil.GetNewReplicaSet(d, c.AppsV1())
+			if err == nil && nerr == nil {
+				framework.Logf("%+v", d)
+				testutil.LogReplicaSetsOfDeployment(d, allOldRSs, newRS, framework.Logf)
+				testutil.LogPodsOfDeployment(c, d, append(allOldRSs, newRS), framework.Logf)
+			}
+			return false, fmt.Errorf("deployment %q is running new pods alongside old pods: %#v", d.Name, status)
+		}
+
+		return *(d.Spec.Replicas) == d.Status.Replicas &&
+			*(d.Spec.Replicas) == d.Status.UpdatedReplicas &&
+			d.Generation <= d.Status.ObservedGeneration, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	_, err = watchtools.UntilWithoutRetry(ctx, w, condition)
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("deployment %q never completed: %#v", d.Name, status)
+	}
+	return err
+}
+
+// waitForDeploymentOldRSsNum waits for the deployment to clean up old rcs.
+func waitForDeploymentOldRSsNum(c clientset.Interface, ns, deploymentName string, desiredRSNum int) error {
+	var oldRSs []*appsv1.ReplicaSet
+	var d *appsv1.Deployment
+
+	pollErr := wait.PollImmediate(poll, 5*time.Minute, func() (bool, error) {
+		deployment, err := c.AppsV1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		d = deployment
+
+		_, oldRSs, err = deploymentutil.GetOldReplicaSets(deployment, c.AppsV1())
+		if err != nil {
+			return false, err
+		}
+		return len(oldRSs) == desiredRSNum, nil
+	})
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("%d old replica sets were not cleaned up for deployment %q", len(oldRSs)-desiredRSNum, deploymentName)
+		testutil.LogReplicaSetsOfDeployment(d, oldRSs, nil, framework.Logf)
+	}
+	return pollErr
+}
+
+// waitForReplicaSetDesiredReplicas waits until the replicaset has desired number of replicas.
+func waitForReplicaSetDesiredReplicas(rsClient appsclient.ReplicaSetsGetter, replicaSet *appsv1.ReplicaSet) error {
+	desiredGeneration := replicaSet.Generation
+	err := wait.PollImmediate(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
+		rs, err := rsClient.ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return rs.Status.ObservedGeneration >= desiredGeneration && rs.Status.Replicas == *(replicaSet.Spec.Replicas) && rs.Status.Replicas == *(rs.Spec.Replicas), nil
+	})
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("replicaset %q never had desired number of replicas", replicaSet.Name)
+	}
+	return err
+}
+
+// waitForReplicaSetTargetSpecReplicas waits for .spec.replicas of a RS to equal targetReplicaNum
+func waitForReplicaSetTargetSpecReplicas(c clientset.Interface, replicaSet *appsv1.ReplicaSet, targetReplicaNum int32) error {
+	desiredGeneration := replicaSet.Generation
+	err := wait.PollImmediate(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
+		rs, err := c.AppsV1().ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return rs.Status.ObservedGeneration >= desiredGeneration && *rs.Spec.Replicas == targetReplicaNum, nil
+	})
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("replicaset %q never had desired number of .spec.replicas", replicaSet.Name)
+	}
+	return err
 }

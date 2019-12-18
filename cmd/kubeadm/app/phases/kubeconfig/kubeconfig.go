@@ -136,7 +136,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 				Organizations: []string{kubeadmconstants.SystemPrivilegedGroup},
 			},
 		},
-		kubeadmconstants.KubeletBootstrapKubeConfigFileName: {
+		kubeadmconstants.KubeletKubeConfigFileName: {
 			CACert:     caCert,
 			APIServer:  controlPlaneEndpoint,
 			ClientName: fmt.Sprintf("%s%s", kubeadmconstants.NodesUserPrefix, cfg.NodeRegistration.Name),
@@ -221,13 +221,16 @@ func validateKubeConfig(outDir, filename string, config *clientcmdapi.Config) er
 		return errors.Wrapf(err, "failed to load kubeconfig file %s that already exists on disk", kubeConfigFilePath)
 	}
 
-	expectedCtx := config.CurrentContext
-	expectedCluster := config.Contexts[expectedCtx].Cluster
-	currentCtx := currentConfig.CurrentContext
-	if currentConfig.Contexts[currentCtx] == nil {
+	expectedCtx, exists := config.Contexts[config.CurrentContext]
+	if !exists {
+		return errors.Errorf("failed to find expected context %s", config.CurrentContext)
+	}
+	expectedCluster := expectedCtx.Cluster
+	currentCtx, exists := currentConfig.Contexts[currentConfig.CurrentContext]
+	if !exists {
 		return errors.Errorf("failed to find CurrentContext in Contexts of the kubeconfig file %s", kubeConfigFilePath)
 	}
-	currentCluster := currentConfig.Contexts[currentCtx].Cluster
+	currentCluster := currentCtx.Cluster
 	if currentConfig.Clusters[currentCluster] == nil {
 		return errors.Errorf("failed to find the given CurrentContext Cluster in Clusters of the kubeconfig file %s", kubeConfigFilePath)
 	}
@@ -348,7 +351,7 @@ func writeKubeConfigFromSpec(out io.Writer, spec *kubeConfigSpec, clustername st
 func ValidateKubeconfigsForExternalCA(outDir string, cfg *kubeadmapi.InitConfiguration) error {
 	kubeConfigFileNames := []string{
 		kubeadmconstants.AdminKubeConfigFileName,
-		kubeadmconstants.KubeletBootstrapKubeConfigFileName,
+		kubeadmconstants.KubeletKubeConfigFileName,
 		kubeadmconstants.ControllerManagerKubeConfigFileName,
 		kubeadmconstants.SchedulerKubeConfigFileName,
 	}

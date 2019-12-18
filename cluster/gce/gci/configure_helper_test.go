@@ -106,33 +106,36 @@ func (c *ManifestTestCase) mustCreateManifestDstDir() {
 	}
 }
 
-func (c *ManifestTestCase) mustCreateEnv(envTemplate string, env interface{}) string {
+func (c *ManifestTestCase) mustInvokeFunc(env interface{}, scriptName, targetTemplate string, templates ...string) {
+	envScriptPath := c.mustCreateEnv(env, targetTemplate, templates...)
+	args := fmt.Sprintf("source %q ; source %q; %s", envScriptPath, scriptName, c.manifestFuncName)
+	cmd := exec.Command("bash", "-c", args)
+
+	bs, err := cmd.CombinedOutput()
+	if err != nil {
+		c.t.Logf("%q", bs)
+		c.t.Fatalf("Failed to run %q: %v", scriptName, err)
+	}
+	c.t.Logf("%s", string(bs))
+}
+
+func (c *ManifestTestCase) mustCreateEnv(env interface{}, target string, templates ...string) string {
 	f, err := os.Create(filepath.Join(c.kubeHome, envScriptFileName))
 	if err != nil {
 		c.t.Fatalf("Failed to create envScript: %v", err)
 	}
 	defer f.Close()
 
-	t := template.Must(template.New("env").Parse(envTemplate))
+	t, err := template.ParseFiles(templates...)
+	if err != nil {
+		c.t.Fatalf("Failed to parse files %q, err: %v", templates, err)
+	}
 
-	if err = t.Execute(f, env); err != nil {
-		c.t.Fatalf("Failed to execute template: %v", err)
+	if err = t.ExecuteTemplate(f, target, env); err != nil {
+		c.t.Fatalf("Failed to execute template %s, err: %v", target, err)
 	}
 
 	return f.Name()
-}
-
-func (c *ManifestTestCase) mustInvokeFunc(envTemplate, scriptName string, env interface{}) {
-	envScriptPath := c.mustCreateEnv(envTemplate, env)
-	args := fmt.Sprintf("source %s ; source %s; %s", envScriptPath, scriptName, c.manifestFuncName)
-	cmd := exec.Command("bash", "-c", args)
-
-	bs, err := cmd.CombinedOutput()
-	if err != nil {
-		c.t.Logf("%s", bs)
-		c.t.Fatalf("Failed to run %s: %v", scriptName, err)
-	}
-	c.t.Logf("%s", string(bs))
 }
 
 func (c *ManifestTestCase) mustLoadPodFromManifest() {
@@ -147,7 +150,9 @@ func (c *ManifestTestCase) mustLoadPodFromManifest() {
 }
 
 func (c *ManifestTestCase) tearDown() {
-	os.RemoveAll(c.kubeHome)
+	if err := os.RemoveAll(c.kubeHome); err != nil {
+		c.t.Fatalf("Failed to teardown: %s", err)
+	}
 }
 
 func copyFile(src, dst string) (err error) {

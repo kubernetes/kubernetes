@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/util/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	kubeexternalinformers "k8s.io/client-go/informers"
@@ -57,6 +58,7 @@ func createAPIExtensionsConfig(
 		&genericConfig,
 		externalInformers,
 		genericConfig.LoopbackClientConfig,
+		feature.DefaultFeatureGate,
 		pluginInitializers...)
 	if err != nil {
 		return nil, err
@@ -89,6 +91,9 @@ func createAPIExtensionsConfig(
 			ServiceResolver:      serviceResolver,
 		},
 	}
+
+	// we need to clear the poststarthooks so we don't add them multiple times to all the servers (that fails)
+	apiextensionsConfig.GenericConfig.PostStartHooks = map[string]genericapiserver.PostStartHookConfigEntry{}
 
 	return apiextensionsConfig, nil
 }

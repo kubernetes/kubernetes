@@ -98,113 +98,6 @@ func TestTranslatePDInTreeStorageClassToCSI(t *testing.T) {
 	}
 }
 
-func TestTranslateAllowedTopologies(t *testing.T) {
-	testCases := []struct {
-		name            string
-		topology        []v1.TopologySelectorTerm
-		expectedToplogy []v1.TopologySelectorTerm
-		expErr          bool
-	}{
-		{
-			name:     "no translation",
-			topology: generateToplogySelectors(GCEPDTopologyKey, []string{"foo", "bar"}),
-			expectedToplogy: []v1.TopologySelectorTerm{
-				{
-					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
-						{
-							Key:    GCEPDTopologyKey,
-							Values: []string{"foo", "bar"},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "translate",
-			topology: []v1.TopologySelectorTerm{
-				{
-					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
-						{
-							Key:    "failure-domain.beta.kubernetes.io/zone",
-							Values: []string{"foo", "bar"},
-						},
-					},
-				},
-			},
-			expectedToplogy: []v1.TopologySelectorTerm{
-				{
-					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
-						{
-							Key:    GCEPDTopologyKey,
-							Values: []string{"foo", "bar"},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "combo",
-			topology: []v1.TopologySelectorTerm{
-				{
-					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
-						{
-							Key:    "failure-domain.beta.kubernetes.io/zone",
-							Values: []string{"foo", "bar"},
-						},
-						{
-							Key:    GCEPDTopologyKey,
-							Values: []string{"boo", "baz"},
-						},
-					},
-				},
-			},
-			expectedToplogy: []v1.TopologySelectorTerm{
-				{
-					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
-						{
-							Key:    GCEPDTopologyKey,
-							Values: []string{"foo", "bar"},
-						},
-						{
-							Key:    GCEPDTopologyKey,
-							Values: []string{"boo", "baz"},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "some other key",
-			topology: []v1.TopologySelectorTerm{
-				{
-					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
-						{
-							Key:    "test",
-							Values: []string{"foo", "bar"},
-						},
-					},
-				},
-			},
-			expErr: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Logf("Running test: %v", tc.name)
-		gotTop, err := translateAllowedTopologies(tc.topology)
-		if err != nil && !tc.expErr {
-			t.Errorf("Did not expect an error, got: %v", err)
-		}
-		if err == nil && tc.expErr {
-			t.Errorf("Expected an error but did not get one")
-		}
-
-		if !reflect.DeepEqual(gotTop, tc.expectedToplogy) {
-			t.Errorf("Expected topology: %v, but got: %v", tc.expectedToplogy, gotTop)
-		}
-	}
-}
-
 func TestRepairVolumeHandle(t *testing.T) {
 	testCases := []struct {
 		name                 string
@@ -367,5 +260,37 @@ func TestBackwardCompatibleAccessModes(t *testing.T) {
 		if !reflect.DeepEqual(tc.expAccessModes, got) {
 			t.Fatalf("Expected access modes: %v, instead got: %v", tc.expAccessModes, got)
 		}
+	}
+}
+
+func TestInlineReadOnly(t *testing.T) {
+	g := NewGCEPersistentDiskCSITranslator()
+	pv, err := g.TranslateInTreeInlineVolumeToCSI(&v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+				PDName:   "foo",
+				ReadOnly: true,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to translate in tree inline volume to CSI: %v", err)
+	}
+
+	if pv == nil || pv.Spec.PersistentVolumeSource.CSI == nil {
+		t.Fatal("PV or volume source unexpectedly nil")
+	}
+
+	if !pv.Spec.PersistentVolumeSource.CSI.ReadOnly {
+		t.Error("PV readonly value not true")
+	}
+
+	ams := pv.Spec.AccessModes
+	if len(ams) != 1 {
+		t.Errorf("got am %v, expected length of 1", ams)
+	}
+
+	if ams[0] != v1.ReadOnlyMany {
+		t.Errorf("got am %v, expected access mode of ReadOnlyMany", ams[0])
 	}
 }

@@ -33,6 +33,7 @@ import (
 	tokencache "k8s.io/apiserver/pkg/authentication/token/cache"
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	tokenunion "k8s.io/apiserver/pkg/authentication/token/union"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/plugin/pkg/authenticator/password/passwordfile"
 	"k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth"
@@ -67,6 +68,7 @@ type Config struct {
 	ServiceAccountIssuer        string
 	APIAudiences                authenticator.Audiences
 	WebhookTokenAuthnConfigFile string
+	WebhookTokenAuthnVersion    string
 	WebhookTokenAuthnCacheTTL   time.Duration
 
 	TokenSuccessCacheTTL time.Duration
@@ -77,10 +79,10 @@ type Config struct {
 	// TODO, this is the only non-serializable part of the entire config.  Factor it out into a clientconfig
 	ServiceAccountTokenGetter   serviceaccount.ServiceAccountTokenGetter
 	BootstrapTokenAuthenticator authenticator.Token
-	// ClientVerifyOptionFn are the options for verifying incoming connections using mTLS and directly assigning to users.
+	// ClientCAContentProvider are the options for verifying incoming connections using mTLS and directly assigning to users.
 	// Generally this is the CA bundle file used to authenticate client certificates
 	// If this value is nil, then mutual TLS is disabled.
-	ClientVerifyOptionFn x509.VerifyOptionFunc
+	ClientCAContentProvider dynamiccertificates.CAContentProvider
 }
 
 // New returns an authenticator.Request or an error that supports the standard
@@ -94,7 +96,7 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 	// Add the front proxy authenticator if requested
 	if config.RequestHeaderConfig != nil {
 		requestHeaderAuthenticator := headerrequest.NewDynamicVerifyOptionsSecure(
-			config.RequestHeaderConfig.VerifyOptionFn,
+			config.RequestHeaderConfig.CAContentProvider.VerifyOptions,
 			config.RequestHeaderConfig.AllowedClientNames,
 			config.RequestHeaderConfig.UsernameHeaders,
 			config.RequestHeaderConfig.GroupHeaders,
@@ -120,8 +122,8 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 	}
 
 	// X509 methods
-	if config.ClientVerifyOptionFn != nil {
-		certAuth := x509.NewDynamic(config.ClientVerifyOptionFn, x509.CommonNameUserConversion)
+	if config.ClientCAContentProvider != nil {
+		certAuth := x509.NewDynamic(config.ClientCAContentProvider.VerifyOptions, x509.CommonNameUserConversion)
 		authenticators = append(authenticators, certAuth)
 	}
 
@@ -178,7 +180,7 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		tokenAuthenticators = append(tokenAuthenticators, oidcAuth)
 	}
 	if len(config.WebhookTokenAuthnConfigFile) > 0 {
-		webhookTokenAuth, err := newWebhookTokenAuthenticator(config.WebhookTokenAuthnConfigFile, config.WebhookTokenAuthnCacheTTL, config.APIAudiences)
+		webhookTokenAuth, err := newWebhookTokenAuthenticator(config.WebhookTokenAuthnConfigFile, config.WebhookTokenAuthnVersion, config.WebhookTokenAuthnCacheTTL, config.APIAudiences)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -304,8 +306,8 @@ func newServiceAccountAuthenticator(iss string, keyfiles []string, apiAudiences 
 	return tokenAuthenticator, nil
 }
 
-func newWebhookTokenAuthenticator(webhookConfigFile string, ttl time.Duration, implicitAuds authenticator.Audiences) (authenticator.Token, error) {
-	webhookTokenAuthenticator, err := webhook.New(webhookConfigFile, implicitAuds)
+func newWebhookTokenAuthenticator(webhookConfigFile string, version string, ttl time.Duration, implicitAuds authenticator.Audiences) (authenticator.Token, error) {
+	webhookTokenAuthenticator, err := webhook.New(webhookConfigFile, version, implicitAuds)
 	if err != nil {
 		return nil, err
 	}

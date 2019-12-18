@@ -32,6 +32,9 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
@@ -89,7 +92,6 @@ filegroup(
         "//staging/src/k8s.io/kubectl/pkg/util/logs:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/openapi:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/podutils:all-srcs",
-        "//staging/src/k8s.io/kubectl/pkg/util/printers:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/qos:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/rbac:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/resource:all-srcs",

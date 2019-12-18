@@ -13,6 +13,43 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+# Configures etcd related flags of kube-apiserver.
+function configure-etcd-params {
+  local -n params_ref=$1
+
+  if [[ -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_SERVER_KEY:-}" && -n "${ETCD_APISERVER_SERVER_CERT:-}" && -n "${ETCD_APISERVER_CLIENT_KEY:-}" && -n "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
+      params_ref+=" --etcd-servers=${ETCD_SERVERS:-https://127.0.0.1:2379}"
+      params_ref+=" --etcd-cafile=${ETCD_APISERVER_CA_CERT_PATH}"
+      params_ref+=" --etcd-certfile=${ETCD_APISERVER_CLIENT_CERT_PATH}"
+      params_ref+=" --etcd-keyfile=${ETCD_APISERVER_CLIENT_KEY_PATH}"
+  elif [[ -z "${ETCD_APISERVER_CA_KEY:-}" && -z "${ETCD_APISERVER_CA_CERT:-}" && -z "${ETCD_APISERVER_SERVER_KEY:-}" && -z "${ETCD_APISERVER_SERVER_CERT:-}" && -z "${ETCD_APISERVER_CLIENT_KEY:-}" && -z "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
+      params_ref+=" --etcd-servers=${ETCD_SERVERS:-http://127.0.0.1:2379}"
+      echo "WARNING: ALL of ETCD_APISERVER_CA_KEY, ETCD_APISERVER_CA_CERT, ETCD_APISERVER_SERVER_KEY, ETCD_APISERVER_SERVER_CERT, ETCD_APISERVER_CLIENT_KEY and ETCD_APISERVER_CLIENT_CERT are missing, mTLS between etcd server and kube-apiserver is not enabled."
+  else
+      echo "ERROR: Some of ETCD_APISERVER_CA_KEY, ETCD_APISERVER_CA_CERT, ETCD_APISERVER_SERVER_KEY, ETCD_APISERVER_SERVER_CERT, ETCD_APISERVER_CLIENT_KEY and ETCD_APISERVER_CLIENT_CERT are missing, mTLS between etcd server and kube-apiserver cannot be enabled. Please provide all mTLS credential."
+      exit 1
+  fi
+
+  if [[ -z "${ETCD_SERVERS:-}" ]]; then
+    params_ref+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-/events#http://127.0.0.1:4002}"
+  elif [[ -n "${ETCD_SERVERS_OVERRIDES:-}" ]]; then
+    params_ref+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-}"
+  fi
+
+  if [[ -n "${STORAGE_BACKEND:-}" ]]; then
+    params_ref+=" --storage-backend=${STORAGE_BACKEND}"
+  fi
+
+  if [[ -n "${STORAGE_MEDIA_TYPE:-}" ]]; then
+    params_ref+=" --storage-media-type=${STORAGE_MEDIA_TYPE}"
+  fi
+
+  if [[ -n "${ETCD_COMPACTION_INTERVAL_SEC:-}" ]]; then
+    params_ref+=" --etcd-compaction-interval=${ETCD_COMPACTION_INTERVAL_SEC}s"
+  fi
+}
+
 # Starts kubernetes apiserver.
 # It prepares the log file, loads the docker image, calculates variables, sets them
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
@@ -34,23 +71,10 @@ function start-kube-apiserver {
   params+=" --allow-privileged=true"
   params+=" --cloud-provider=gce"
   params+=" --client-ca-file=${CA_CERT_BUNDLE_PATH}"
-  if [[ -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_SERVER_KEY:-}" && -n "${ETCD_APISERVER_SERVER_CERT:-}" && -n "${ETCD_APISERVER_CLIENT_KEY:-}" && -n "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
-      params+=" --etcd-servers=${ETCD_SERVERS:-https://127.0.0.1:2379}"
-      params+=" --etcd-cafile=${ETCD_APISERVER_CA_CERT_PATH}"
-      params+=" --etcd-certfile=${ETCD_APISERVER_CLIENT_CERT_PATH}"
-      params+=" --etcd-keyfile=${ETCD_APISERVER_CLIENT_KEY_PATH}"
-  elif [[ -z "${ETCD_APISERVER_CA_KEY:-}" && -z "${ETCD_APISERVER_CA_CERT:-}" && -z "${ETCD_APISERVER_SERVER_KEY:-}" && -z "${ETCD_APISERVER_SERVER_CERT:-}" && -z "${ETCD_APISERVER_CLIENT_KEY:-}" && -z "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
-      params+=" --etcd-servers=${ETCD_SERVERS:-http://127.0.0.1:2379}"
-      echo "WARNING: ALL of ETCD_APISERVER_CA_KEY, ETCD_APISERVER_CA_CERT, ETCD_APISERVER_SERVER_KEY, ETCD_APISERVER_SERVER_CERT, ETCD_APISERVER_CLIENT_KEY and ETCD_APISERVER_CLIENT_CERT are missing, mTLS between etcd server and kube-apiserver is not enabled."
-  else
-      echo "ERROR: Some of ETCD_APISERVER_CA_KEY, ETCD_APISERVER_CA_CERT, ETCD_APISERVER_SERVER_KEY, ETCD_APISERVER_SERVER_CERT, ETCD_APISERVER_CLIENT_KEY and ETCD_APISERVER_CLIENT_CERT are missing, mTLS between etcd server and kube-apiserver cannot be enabled. Please provide all mTLS credential."
-      exit 1
-  fi
-  if [[ -z "${ETCD_SERVERS:-}" ]]; then
-    params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-/events#http://127.0.0.1:4002}"
-  elif [[ -n "${ETCD_SERVERS_OVERRIDES:-}" ]]; then
-    params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-}"
-  fi
+
+  # params is passed by reference, so no "$"
+  configure-etcd-params params
+
   params+=" --secure-port=443"
   if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
     # Default is :8080
@@ -80,15 +104,7 @@ function start-kube-apiserver {
   if [[ -n "${KUBE_PASSWORD:-}" && -n "${KUBE_USER:-}" ]]; then
     params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
   fi
-  if [[ -n "${STORAGE_BACKEND:-}" ]]; then
-    params+=" --storage-backend=${STORAGE_BACKEND}"
-  fi
-  if [[ -n "${STORAGE_MEDIA_TYPE:-}" ]]; then
-    params+=" --storage-media-type=${STORAGE_MEDIA_TYPE}"
-  fi
-  if [[ -n "${ETCD_COMPACTION_INTERVAL_SEC:-}" ]]; then
-    params+=" --etcd-compaction-interval=${ETCD_COMPACTION_INTERVAL_SEC}s"
-  fi
+
   if [[ -n "${KUBE_APISERVER_REQUEST_TIMEOUT_SEC:-}" ]]; then
     params+=" --request-timeout=${KUBE_APISERVER_REQUEST_TIMEOUT_SEC}s"
   fi
@@ -267,7 +283,6 @@ function start-kube-apiserver {
       params+=" --authentication-token-webhook-cache-ttl=${GCP_AUTHN_CACHE_TTL}"
     fi
   fi
-
 
   local authorization_mode="RBAC"
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"

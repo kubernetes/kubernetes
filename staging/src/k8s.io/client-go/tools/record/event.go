@@ -132,6 +132,25 @@ type EventBroadcaster interface {
 	Shutdown()
 }
 
+// EventRecorderAdapter is a wrapper around a "k8s.io/client-go/tools/record".EventRecorder
+// implementing the new "k8s.io/client-go/tools/events".EventRecorder interface.
+type EventRecorderAdapter struct {
+	recorder EventRecorder
+}
+
+// NewEventRecorderAdapter returns an adapter implementing the new
+// "k8s.io/client-go/tools/events".EventRecorder interface.
+func NewEventRecorderAdapter(recorder EventRecorder) *EventRecorderAdapter {
+	return &EventRecorderAdapter{
+		recorder: recorder,
+	}
+}
+
+// Eventf is a wrapper around v1 Eventf
+func (a *EventRecorderAdapter) Eventf(regarding, _ runtime.Object, eventtype, reason, action, note string, args ...interface{}) {
+	a.recorder.Eventf(regarding, eventtype, reason, note, args...)
+}
+
 // Creates a new event broadcaster.
 func NewBroadcaster() EventBroadcaster {
 	return &eventBroadcasterImpl{

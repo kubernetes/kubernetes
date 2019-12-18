@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	internal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -73,8 +73,8 @@ type webhookConverter struct {
 	conversionReviewVersions []string
 }
 
-func webhookClientConfigForCRD(crd *internal.CustomResourceDefinition) *webhook.ClientConfig {
-	apiConfig := crd.Spec.Conversion.WebhookClientConfig
+func webhookClientConfigForCRD(crd *apiextensionsv1.CustomResourceDefinition) *webhook.ClientConfig {
+	apiConfig := crd.Spec.Conversion.Webhook.ClientConfig
 	ret := webhook.ClientConfig{
 		Name:     fmt.Sprintf("conversion_webhook_for_%s", crd.Name),
 		CABundle: apiConfig.CABundle,
@@ -86,7 +86,7 @@ func webhookClientConfigForCRD(crd *internal.CustomResourceDefinition) *webhook.
 		ret.Service = &webhook.ClientConfigService{
 			Name:      apiConfig.Service.Name,
 			Namespace: apiConfig.Service.Namespace,
-			Port:      apiConfig.Service.Port,
+			Port:      *apiConfig.Service.Port,
 		}
 		if apiConfig.Service.Path != nil {
 			ret.Service.Path = *apiConfig.Service.Path
@@ -97,7 +97,7 @@ func webhookClientConfigForCRD(crd *internal.CustomResourceDefinition) *webhook.
 
 var _ crConverterInterface = &webhookConverter{}
 
-func (f *webhookConverterFactory) NewWebhookConverter(crd *internal.CustomResourceDefinition) (*webhookConverter, error) {
+func (f *webhookConverterFactory) NewWebhookConverter(crd *apiextensionsv1.CustomResourceDefinition) (*webhookConverter, error) {
 	restClient, err := f.clientManager.HookClient(*webhookClientConfigForCRD(crd))
 	if err != nil {
 		return nil, err
@@ -108,7 +108,7 @@ func (f *webhookConverterFactory) NewWebhookConverter(crd *internal.CustomResour
 		name:          crd.Name,
 		nopConverter:  nopConverter{},
 
-		conversionReviewVersions: crd.Spec.Conversion.ConversionReviewVersions,
+		conversionReviewVersions: crd.Spec.Conversion.Webhook.ConversionReviewVersions,
 	}, nil
 }
 

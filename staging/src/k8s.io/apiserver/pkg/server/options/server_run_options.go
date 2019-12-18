@@ -117,9 +117,9 @@ func (s *ServerRunOptions) Validate() []error {
 	}
 
 	if s.EnableInflightQuotaHandler {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.RequestManagement) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) {
 			errors = append(errors, fmt.Errorf("--enable-inflight-quota-handler can not be set if feature "+
-				"gate RequestManagement is disabled"))
+				"gate APIPriorityAndFairness is disabled"))
 		}
 		if s.MaxMutatingRequestsInFlight != 0 {
 			errors = append(errors, fmt.Errorf("--max-mutating-requests-inflight=%v "+

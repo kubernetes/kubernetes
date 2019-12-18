@@ -24,8 +24,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/coreos/etcd/integration"
-	"github.com/coreos/etcd/pkg/transport"
+	"go.etcd.io/etcd/integration"
+	"go.etcd.io/etcd/pkg/transport"
 
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,9 +54,9 @@ func TestTLSConnection(t *testing.T) {
 	defer os.RemoveAll(filepath.Dir(certFile))
 
 	tlsInfo := &transport.TLSInfo{
-		CertFile: certFile,
-		KeyFile:  keyFile,
-		CAFile:   caFile,
+		CertFile:      certFile,
+		KeyFile:       keyFile,
+		TrustedCAFile: caFile,
 	}
 
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{
@@ -68,10 +68,10 @@ func TestTLSConnection(t *testing.T) {
 	cfg := storagebackend.Config{
 		Type: storagebackend.StorageTypeETCD3,
 		Transport: storagebackend.TransportConfig{
-			ServerList: []string{cluster.Members[0].GRPCAddr()},
-			CertFile:   certFile,
-			KeyFile:    keyFile,
-			CAFile:     caFile,
+			ServerList:    []string{cluster.Members[0].GRPCAddr()},
+			CertFile:      certFile,
+			KeyFile:       keyFile,
+			TrustedCAFile: caFile,
 		},
 		Codec: codec,
 	}

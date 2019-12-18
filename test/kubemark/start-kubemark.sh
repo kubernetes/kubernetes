@@ -38,6 +38,7 @@ KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
 KUBEMARK_DIRECTORY="${KUBE_ROOT}/test/kubemark"
 RESOURCE_DIRECTORY="${KUBEMARK_DIRECTORY}/resources"
 LOCAL_KUBECONFIG="${RESOURCE_DIRECTORY}/kubeconfig.kubemark"
+INTERNAL_KUBECONFIG="${RESOURCE_DIRECTORY}/kubeconfig-internal.kubemark"
 
 # Generate a random 6-digit alphanumeric tag for the kubemark image.
 # Used to uniquify image builds across different invocations of this script.
@@ -96,12 +97,12 @@ function create-kube-hollow-node-resources {
   # It's bad that all component shares the same kubeconfig.
   # TODO(https://github.com/kubernetes/kubernetes/issues/79883): Migrate all components to separate credentials.
   "${KUBECTL}" create secret generic "kubeconfig" --type=Opaque --namespace="kubemark" \
-    --from-file=kubelet.kubeconfig="${LOCAL_KUBECONFIG}" \
-    --from-file=kubeproxy.kubeconfig="${LOCAL_KUBECONFIG}" \
-    --from-file=npd.kubeconfig="${LOCAL_KUBECONFIG}" \
-    --from-file=heapster.kubeconfig="${LOCAL_KUBECONFIG}" \
-    --from-file=cluster_autoscaler.kubeconfig="${LOCAL_KUBECONFIG}" \
-    --from-file=dns.kubeconfig="${LOCAL_KUBECONFIG}"
+    --from-file=kubelet.kubeconfig="${HOLLOWNODE_KUBECONFIG}" \
+    --from-file=kubeproxy.kubeconfig="${HOLLOWNODE_KUBECONFIG}" \
+    --from-file=npd.kubeconfig="${HOLLOWNODE_KUBECONFIG}" \
+    --from-file=heapster.kubeconfig="${HOLLOWNODE_KUBECONFIG}" \
+    --from-file=cluster_autoscaler.kubeconfig="${HOLLOWNODE_KUBECONFIG}" \
+    --from-file=dns.kubeconfig="${HOLLOWNODE_KUBECONFIG}"
 
   # Create addon pods.
   # Heapster.
@@ -149,15 +150,27 @@ function create-kube-hollow-node-resources {
   if [ "${NUM_NODES}" -gt 1000 ]; then
     proxy_cpu=50
   fi
-  proxy_mem_per_node=50
+  proxy_cpu=${KUBEMARK_HOLLOW_PROXY_MILLICPU:-$proxy_cpu}
+  proxy_mem_per_node=${KUBEMARK_HOLLOW_PROXY_MEM_PER_NODE_KB:-50}
   proxy_mem=$((100 * 1024 + proxy_mem_per_node*NUM_NODES))
-  sed -i'' -e "s@{{HOLLOW_PROXY_CPU}}@${proxy_cpu}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s@{{HOLLOW_PROXY_MEM}}@${proxy_mem}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  hollow_node_labels=${HOLLOW_NODE_LABELS:-$(calculate-node-labels)}
+  hollow_kubelet_params=$(eval "for param in ${HOLLOW_KUBELET_TEST_ARGS:-}; do echo -n \\\"\$param\\\",; done")
+  hollow_kubelet_params=${hollow_kubelet_params%?}
+  hollow_proxy_params=$(eval "for param in ${HOLLOW_PROXY_TEST_ARGS:-}; do echo -n \\\"\$param\\\",; done")
+  hollow_proxy_params=${hollow_proxy_params%?}
+
+  sed -i'' -e "s@{{hollow_kubelet_millicpu}}@${KUBEMARK_HOLLOW_KUBELET_MILLICPU:-40}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s@{{hollow_kubelet_mem_Ki}}@${KUBEMARK_HOLLOW_KUBELET_MEM_KB:-$((100*1024))}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s@{{hollow_proxy_millicpu}}@${proxy_cpu}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s@{{hollow_proxy_mem_Ki}}@${proxy_mem}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s@{{npd_millicpu}}@${KUBEMARK_NPD_MILLICPU:-20}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s@{{npd_mem_Ki}}@${KUBEMARK_NPD_MEM_KB:-$((20*1024))}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s@{{kubemark_image_registry}}@${KUBEMARK_IMAGE_REGISTRY}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s@{{kubemark_image_tag}}@${KUBEMARK_IMAGE_TAG}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s@{{master_ip}}@${MASTER_IP}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s@{{hollow_kubelet_params}}@${HOLLOW_KUBELET_TEST_ARGS}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s@{{hollow_proxy_params}}@${HOLLOW_PROXY_TEST_ARGS}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s@{{hollow_node_labels}}@${hollow_node_labels}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s@{{hollow_kubelet_params}}@${hollow_kubelet_params}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s@{{hollow_proxy_params}}@${hollow_proxy_params}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s@{{kubemark_mig_config}}@${KUBEMARK_MIG_CONFIG:-}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/hollow-node.yaml" --namespace="kubemark"
 
@@ -215,7 +228,13 @@ function start-hollow-nodes {
 detect-project &> /dev/null
 create-kubemark-master
 
-MASTER_IP=$(grep server "$LOCAL_KUBECONFIG" | awk -F "/" '{print $3}')
+if [ -f "${INTERNAL_KUBECONFIG}" ]; then
+    HOLLOWNODE_KUBECONFIG="${INTERNAL_KUBECONFIG}"
+else
+    HOLLOWNODE_KUBECONFIG="${LOCAL_KUBECONFIG}"
+fi
+
+MASTER_IP=$(grep server "${HOLLOWNODE_KUBECONFIG}" | awk -F "/" '{print $3}')
 
 start-hollow-nodes
 

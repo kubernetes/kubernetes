@@ -679,7 +679,7 @@ function start_cloud_controller_manager {
 function wait_node_ready(){
   # check the nodes information after kubelet daemon start
   local nodes_stats="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' get nodes"
-  local node_name=$KUBELET_HOST
+  local node_name=$HOSTNAME_OVERRIDE
   local system_node_wait_time=30
   local interval_time=2
   kube::util::wait_for_success "$system_node_wait_time" "$interval_time" "$nodes_stats | grep $node_name"

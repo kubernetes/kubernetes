@@ -30,7 +30,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -296,10 +296,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 		if tc.protocol == UDP {
 			isIPv6 := func(ip string) bool {
 				netIP := net.ParseIP(ip)
-				if netIP.To4() == nil {
-					return true
-				}
-				return false
+				return netIP.To4() == nil
 			}
 			endpointIP := utilproxy.IPPart(tc.endpoint)
 			expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s --dst-nat %s -p udp", tc.svcIP, endpointIP)
@@ -2392,7 +2389,6 @@ COMMIT
 		},
 	})
 
-	ipAddressType := discovery.AddressTypeIP
 	tcpProtocol := v1.ProtocolTCP
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2405,7 +2401,7 @@ COMMIT
 			Port:     utilpointer.Int32Ptr(80),
 			Protocol: &tcpProtocol,
 		}},
-		AddressType: &ipAddressType,
+		AddressType: discovery.AddressTypeIPv4,
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"10.0.1.1"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},

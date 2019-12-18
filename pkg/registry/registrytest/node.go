@@ -114,5 +114,7 @@ func (r *NodeRegistry) DeleteNode(ctx context.Context, nodeID string) error {
 }
 
 func (r *NodeRegistry) WatchNodes(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+	r.Lock()
+	defer r.Unlock()
 	return nil, r.Err
 }

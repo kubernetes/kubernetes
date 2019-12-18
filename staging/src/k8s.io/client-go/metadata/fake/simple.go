@@ -317,7 +317,6 @@ func (c *metadataResourceClient) List(opts metav1.ListOptions) (*metav1.PartialO
 	if !ok {
 		return nil, fmt.Errorf("incoming object is incorrect type %T", obj)
 	}
-	fmt.Printf("DEBUG: %#v\n", inputList)
 
 	list := &metav1.PartialObjectMetadataList{
 		ListMeta: inputList.ListMeta,

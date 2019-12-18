@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -56,6 +57,7 @@ func EnforceVersionPolicies(versionGetter VersionGetter, newK8sVersionStr string
 		skewErrors.Mandatory = append(skewErrors.Mandatory, errors.Wrap(err, "Unable to fetch cluster version"))
 		return skewErrors
 	}
+	fmt.Printf("[upgrade/versions] Cluster version: %s\n", clusterVersionStr)
 
 	kubeadmVersionStr, kubeadmVersion, err := versionGetter.KubeadmVersion()
 	if err != nil {
@@ -63,6 +65,7 @@ func EnforceVersionPolicies(versionGetter VersionGetter, newK8sVersionStr string
 		skewErrors.Mandatory = append(skewErrors.Mandatory, errors.Wrap(err, "Unable to fetch kubeadm version"))
 		return skewErrors
 	}
+	fmt.Printf("[upgrade/versions] kubeadm version: %s\n", kubeadmVersionStr)
 
 	kubeletVersions, err := versionGetter.KubeletVersions()
 	if err != nil {

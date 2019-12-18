@@ -24,14 +24,13 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializers "k8s.io/apiserver/pkg/admission/initializer"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	schedulingv1listers "k8s.io/client-go/listers/scheduling/v1"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -53,12 +52,14 @@ func Register(plugins *admission.Plugins) {
 // Plugin is an implementation of admission.Interface.
 type Plugin struct {
 	*admission.Handler
-	client kubernetes.Interface
-	lister schedulingv1listers.PriorityClassLister
+	client                kubernetes.Interface
+	lister                schedulingv1listers.PriorityClassLister
+	nonPreemptingPriority bool
 }
 
 var _ admission.MutationInterface = &Plugin{}
 var _ admission.ValidationInterface = &Plugin{}
+var _ genericadmissioninitializers.WantsFeatures = &Plugin{}
 var _ = genericadmissioninitializers.WantsExternalKubeInformerFactory(&Plugin{})
 var _ = genericadmissioninitializers.WantsExternalKubeClientSet(&Plugin{})
 
@@ -78,6 +79,11 @@ func (p *Plugin) ValidateInitialization() error {
 		return fmt.Errorf("%s requires a lister", PluginName)
 	}
 	return nil
+}
+
+// InspectFeatureGates allows setting bools without taking a dep on a global variable
+func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
+	p.nonPreemptingPriority = featureGates.Enabled(features.NonPreemptingPriority)
 }
 
 // SetExternalKubeClientSet implements the WantsInternalKubeClientSet interface.
@@ -105,7 +111,6 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	if len(a.GetSubresource()) != 0 {
 		return nil
 	}
-
 	switch a.GetResource().GroupResource() {
 	case podResource:
 		if operation == admission.Create || operation == admission.Update {
@@ -136,20 +141,6 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 	default:
 		return nil
 	}
-}
-
-// priorityClassPermittedInNamespace returns true if we allow the given priority class name in the
-// given namespace. It currently checks that system priorities are created only in the system namespace.
-func priorityClassPermittedInNamespace(priorityClassName string, namespace string) bool {
-	// Only allow system priorities in the system namespace. This is to prevent abuse or incorrect
-	// usage of these priorities. Pods created at these priorities could preempt system critical
-	// components.
-	for _, spc := range scheduling.SystemPriorityClasses() {
-		if spc.Name == priorityClassName && namespace != metav1.NamespaceSystem {
-			return false
-		}
-	}
-	return true
 }
 
 // admitPod makes sure a new pod does not set spec.Priority field. It also makes sure that the PriorityClassName exists if it is provided and resolves the pod priority from the PriorityClassName.
@@ -187,11 +178,6 @@ func (p *Plugin) admitPod(a admission.Attributes) error {
 			}
 			pod.Spec.PriorityClassName = pcName
 		} else {
-			pcName := pod.Spec.PriorityClassName
-			if !priorityClassPermittedInNamespace(pcName, a.GetNamespace()) {
-				return admission.NewForbidden(a, fmt.Errorf("pods with %v priorityClass is not permitted in %v namespace", pcName, a.GetNamespace()))
-			}
-
 			// Try resolving the priority class name.
 			pc, err := p.lister.Get(pod.Spec.PriorityClassName)
 			if err != nil {
@@ -211,7 +197,7 @@ func (p *Plugin) admitPod(a admission.Attributes) error {
 		}
 		pod.Spec.Priority = &priority
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority) {
+		if p.nonPreemptingPriority {
 			var corePolicy core.PreemptionPolicy
 			if preemptionPolicy != nil {
 				corePolicy = core.PreemptionPolicy(*preemptionPolicy)

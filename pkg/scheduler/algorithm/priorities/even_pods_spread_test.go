@@ -22,17 +22,17 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-func Test_topologySpreadConstraintsMap_initialize(t *testing.T) {
+func Test_podTopologySpreadMap_initialize(t *testing.T) {
 	tests := []struct {
 		name                string
 		pod                 *v1.Pod
 		nodes               []*v1.Node
-		wantNodeNameMap     map[string]int32
-		wantTopologyPairMap map[topologyPair]*int32
+		wantNodeNameSet     map[string]struct{}
+		wantTopologyPairMap map[topologyPair]*int64
 	}{
 		{
 			name: "normal case",
@@ -45,17 +45,17 @@ func Test_topologySpreadConstraintsMap_initialize(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
-			wantNodeNameMap: map[string]int32{
-				"node-a": 0,
-				"node-b": 0,
-				"node-x": 0,
+			wantNodeNameSet: map[string]struct{}{
+				"node-a": {},
+				"node-b": {},
+				"node-x": {},
 			},
-			wantTopologyPairMap: map[topologyPair]*int32{
-				{key: "zone", value: "zone1"}:  new(int32),
-				{key: "zone", value: "zone2"}:  new(int32),
-				{key: "node", value: "node-a"}: new(int32),
-				{key: "node", value: "node-b"}: new(int32),
-				{key: "node", value: "node-x"}: new(int32),
+			wantTopologyPairMap: map[topologyPair]*int64{
+				{key: "zone", value: "zone1"}:  new(int64),
+				{key: "zone", value: "zone2"}:  new(int64),
+				{key: "node", value: "node-a"}: new(int64),
+				{key: "node", value: "node-b"}: new(int64),
+				{key: "node", value: "node-x"}: new(int64),
 			},
 		},
 		{
@@ -69,26 +69,28 @@ func Test_topologySpreadConstraintsMap_initialize(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 				st.MakeNode().Name("node-x").Label("node", "node-x").Obj(),
 			},
-			wantNodeNameMap: map[string]int32{
-				"node-a": 0,
-				"node-b": 0,
+			wantNodeNameSet: map[string]struct{}{
+				"node-a": {},
+				"node-b": {},
 			},
-			wantTopologyPairMap: map[topologyPair]*int32{
-				{key: "zone", value: "zone1"}:  new(int32),
-				{key: "node", value: "node-a"}: new(int32),
-				{key: "node", value: "node-b"}: new(int32),
+			wantTopologyPairMap: map[topologyPair]*int64{
+				{key: "zone", value: "zone1"}:  new(int64),
+				{key: "node", value: "node-a"}: new(int64),
+				{key: "node", value: "node-b"}: new(int64),
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tMap := newTopologySpreadConstraintsMap()
-			tMap.initialize(tt.pod, tt.nodes)
-			if !reflect.DeepEqual(tMap.nodeNameToPodCounts, tt.wantNodeNameMap) {
-				t.Errorf("initilize().nodeNameToPodCounts = %#v, want %#v", tMap.nodeNameToPodCounts, tt.wantNodeNameMap)
+			m := newTopologySpreadConstraintsMap()
+			if err := m.initialize(tt.pod, tt.nodes); err != nil {
+				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(tMap.topologyPairToPodCounts, tt.wantTopologyPairMap) {
-				t.Errorf("initilize().topologyPairToPodCounts = %#v, want %#v", tMap.topologyPairToPodCounts, tt.wantTopologyPairMap)
+			if !reflect.DeepEqual(m.nodeNameSet, tt.wantNodeNameSet) {
+				t.Errorf("initilize().nodeNameSet = %#v, want %#v", m.nodeNameSet, tt.wantNodeNameSet)
+			}
+			if !reflect.DeepEqual(m.topologyPairToPodCounts, tt.wantTopologyPairMap) {
+				t.Errorf("initilize().topologyPairToPodCounts = %#v, want %#v", m.topologyPairToPodCounts, tt.wantTopologyPairMap)
 			}
 		})
 	}
@@ -434,11 +436,31 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			allNodes := append([]*v1.Node{}, tt.nodes...)
 			allNodes = append(allNodes, tt.failedNodes...)
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(tt.existingPods, allNodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, allNodes))
 
-			got, _ := CalculateEvenPodsSpreadPriority(tt.pod, nodeNameToInfo, tt.nodes)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("CalculateEvenPodsSpreadPriority() = %#v, want %#v", got, tt.want)
+			tpSpreadMap, err := buildPodTopologySpreadMap(tt.pod, tt.nodes, snapshot.NodeInfoList)
+			if err != nil {
+				t.Fatal(err)
+			}
+			meta := &priorityMetadata{
+				podTopologySpreadMap: tpSpreadMap,
+			}
+			var gotList framework.NodeScoreList
+			for _, n := range tt.nodes {
+				nodeName := n.Name
+				nodeScore, err := CalculateEvenPodsSpreadPriorityMap(tt.pod, meta, snapshot.NodeInfoMap[nodeName])
+				if err != nil {
+					t.Error(err)
+				}
+				gotList = append(gotList, nodeScore)
+			}
+
+			err = CalculateEvenPodsSpreadPriorityReduce(tt.pod, meta, snapshot, gotList)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(gotList, tt.want) {
+				t.Errorf("CalculateEvenPodsSpreadPriorityReduce() = %#v, want %#v", gotList, tt.want)
 			}
 		})
 	}
@@ -455,7 +477,7 @@ func BenchmarkTestCalculateEvenPodsSpreadPriority(b *testing.B) {
 		{
 			name: "1000nodes/single-constraint-zone",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, v1.LabelZoneFailureDomain, softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPodsNum:  10000,
 			allNodesNum:      1000,
@@ -464,7 +486,7 @@ func BenchmarkTestCalculateEvenPodsSpreadPriority(b *testing.B) {
 		{
 			name: "1000nodes/single-constraint-node",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, v1.LabelHostname, softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPodsNum:  10000,
 			allNodesNum:      1000,
@@ -473,8 +495,8 @@ func BenchmarkTestCalculateEvenPodsSpreadPriority(b *testing.B) {
 		{
 			name: "1000nodes/two-constraints-zone-node",
 			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
-				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				SpreadConstraint(1, v1.LabelZoneFailureDomain, softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, v1.LabelHostname, softSpread, st.MakeLabelSelector().Exists("bar").Obj()).
 				Obj(),
 			existingPodsNum:  10000,
 			allNodesNum:      1000,
@@ -483,11 +505,28 @@ func BenchmarkTestCalculateEvenPodsSpreadPriority(b *testing.B) {
 	}
 	for _, tt := range tests {
 		b.Run(tt.name, func(b *testing.B) {
-			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(existingPods, allNodes)
+			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(existingPods, allNodes))
+			tpSpreadMap, err := buildPodTopologySpreadMap(tt.pod, filteredNodes, snapshot.NodeInfoList)
+			if err != nil {
+				b.Fatal(err)
+			}
+			meta := &priorityMetadata{
+				podTopologySpreadMap: tpSpreadMap,
+			}
 			b.ResetTimer()
+
 			for i := 0; i < b.N; i++ {
-				CalculateEvenPodsSpreadPriority(tt.pod, nodeNameToInfo, filteredNodes)
+				var gotList framework.NodeScoreList
+				for _, n := range filteredNodes {
+					nodeName := n.Name
+					nodeScore, _ := CalculateEvenPodsSpreadPriorityMap(tt.pod, meta, snapshot.NodeInfoMap[nodeName])
+					gotList = append(gotList, nodeScore)
+				}
+				err := CalculateEvenPodsSpreadPriorityReduce(tt.pod, meta, snapshot, gotList)
+				if err != nil {
+					b.Fatal(err)
+				}
 			}
 		})
 	}

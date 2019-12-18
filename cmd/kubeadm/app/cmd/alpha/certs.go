@@ -79,8 +79,8 @@ func newCmdCertsUtility(out io.Writer) *cobra.Command {
 		Short:   "Commands related to handling kubernetes certificates",
 	}
 
-	cmd.AddCommand(newCmdCertsRenewal())
-	cmd.AddCommand(newCmdCertsExpiration(out, kubeadmconstants.KubernetesDir))
+	cmd.AddCommand(newCmdCertsRenewal(out))
+	cmd.AddCommand(newCmdCertsExpiration(out, constants.KubernetesDir))
 	cmd.AddCommand(NewCmdCertificateKey())
 	return cmd
 }
@@ -104,7 +104,7 @@ func NewCmdCertificateKey() *cobra.Command {
 }
 
 // newCmdCertsRenewal creates a new `cert renew` command.
-func newCmdCertsRenewal() *cobra.Command {
+func newCmdCertsRenewal(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "renew",
 		Short: "Renew certificates for a Kubernetes cluster",
@@ -112,7 +112,7 @@ func newCmdCertsRenewal() *cobra.Command {
 		RunE:  cmdutil.SubCmdRunE("renew"),
 	}
 
-	cmd.AddCommand(getRenewSubCommands(kubeadmconstants.KubernetesDir)...)
+	cmd.AddCommand(getRenewSubCommands(out, constants.KubernetesDir)...)
 
 	return cmd
 }
@@ -126,12 +126,13 @@ type renewFlags struct {
 	csrPath        string
 }
 
-func getRenewSubCommands(kdir string) []*cobra.Command {
+func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 	flags := &renewFlags{
 		cfg: kubeadmapiv1beta2.ClusterConfiguration{
 			// Setting kubernetes version to a default value in order to allow a not necessary internet lookup
 			KubernetesVersion: constants.CurrentKubernetesVersion.String(),
 		},
+		kubeconfigPath: kubeadmconstants.GetAdminKubeConfigPath(),
 	}
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(&flags.cfg)
@@ -144,8 +145,6 @@ func getRenewSubCommands(kdir string) []*cobra.Command {
 	}
 
 	cmdList := []*cobra.Command{}
-	funcList := []func() error{}
-
 	for _, handler := range rm.Certificates() {
 		// get the cobra.Command skeleton for this command
 		cmd := &cobra.Command{
@@ -157,14 +156,18 @@ func getRenewSubCommands(kdir string) []*cobra.Command {
 		// get the implementation of renewing this certificate
 		renewalFunc := func(handler *renewal.CertificateRenewHandler) func() error {
 			return func() error {
-				return renewCert(flags, kdir, handler)
+				// Get cluster configuration (from --config, kubeadm-config ConfigMap, or default as a fallback)
+				internalcfg, err := getInternalCfg(flags.cfgPath, flags.kubeconfigPath, flags.cfg, out, "renew")
+				if err != nil {
+					return err
+				}
+
+				return renewCert(flags, kdir, internalcfg, handler)
 			}
 		}(handler)
 		// install the implementation into the command
 		cmd.RunE = func(*cobra.Command, []string) error { return renewalFunc() }
 		cmdList = append(cmdList, cmd)
-		// Collect renewal functions for `renew all`
-		funcList = append(funcList, renewalFunc)
 	}
 
 	allCmd := &cobra.Command{
@@ -172,8 +175,21 @@ func getRenewSubCommands(kdir string) []*cobra.Command {
 		Short: "Renew all available certificates",
 		Long:  allLongDesc,
 		RunE: func(*cobra.Command, []string) error {
-			for _, f := range funcList {
-				if err := f(); err != nil {
+			// Get cluster configuration (from --config, kubeadm-config ConfigMap, or default as a fallback)
+			internalcfg, err := getInternalCfg(flags.cfgPath, flags.kubeconfigPath, flags.cfg, out, "renew")
+			if err != nil {
+				return err
+			}
+
+			// Get a renewal manager for a actual Cluster configuration
+			rm, err := renewal.NewManager(&internalcfg.ClusterConfiguration, kdir)
+			if err != nil {
+				return nil
+			}
+
+			// Renew certificates
+			for _, handler := range rm.Certificates() {
+				if err := renewCert(flags, kdir, internalcfg, handler); err != nil {
 					return err
 				}
 			}
@@ -195,16 +211,16 @@ func addRenewFlags(cmd *cobra.Command, flags *renewFlags) {
 	cmd.Flags().BoolVar(&flags.useAPI, "use-api", flags.useAPI, "Use the Kubernetes certificate API to renew certificates")
 }
 
-func renewCert(flags *renewFlags, kdir string, handler *renewal.CertificateRenewHandler) error {
-	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(flags.cfgPath, &kubeadmapiv1beta2.InitConfiguration{}, &flags.cfg)
-	if err != nil {
-		return err
-	}
-
+func renewCert(flags *renewFlags, kdir string, internalcfg *kubeadmapi.InitConfiguration, handler *renewal.CertificateRenewHandler) error {
 	// Get a renewal manager for the given cluster configuration
 	rm, err := renewal.NewManager(&internalcfg.ClusterConfiguration, kdir)
 	if err != nil {
 		return err
+	}
+
+	if ok, _ := rm.CertificateExists(handler.Name); !ok {
+		fmt.Printf("MISSING! %s\n", handler.LongName)
+		return nil
 	}
 
 	// if the renewal operation is set to generate CSR request only
@@ -246,6 +262,25 @@ func renewCert(flags *renewFlags, kdir string, handler *renewal.CertificateRenew
 	return nil
 }
 
+func getInternalCfg(cfgPath string, kubeconfigPath string, cfg kubeadmapiv1beta2.ClusterConfiguration, out io.Writer, logPrefix string) (*kubeadmapi.InitConfiguration, error) {
+	// In case the user is not providing a custom config, try to get current config from the cluster.
+	// NB. this operation should not block, because we want to allow certificate renewal also in case of not-working clusters
+	if cfgPath == "" {
+		client, err := kubeconfigutil.ClientSetFromFile(kubeconfigPath)
+		if err == nil {
+			internalcfg, err := configutil.FetchInitConfigurationFromCluster(client, out, logPrefix, false)
+			if err == nil {
+				fmt.Println() // add empty line to separate the FetchInitConfigurationFromCluster output from the command output
+				return internalcfg, nil
+			}
+			fmt.Printf("[%s] Error reading configuration from the Cluster. Falling back to default configuration\n\n", logPrefix)
+		}
+	}
+
+	// Otherwise read config from --config if provided, otherwise use default configuration
+	return configutil.LoadOrDefaultInitConfiguration(cfgPath, &kubeadmapiv1beta2.InitConfiguration{}, &cfg)
+}
+
 // newCmdCertsExpiration creates a new `cert check-expiration` command.
 func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 	flags := &expirationFlags{
@@ -253,6 +288,7 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 			// Setting kubernetes version to a default value in order to allow a not necessary internet lookup
 			KubernetesVersion: constants.CurrentKubernetesVersion.String(),
 		},
+		kubeconfigPath: kubeadmconstants.GetAdminKubeConfigPath(),
 	}
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(&flags.cfg)
@@ -262,7 +298,8 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 		Short: "Check certificates expiration for a Kubernetes cluster",
 		Long:  expirationLongDesc,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			internalcfg, err := configutil.LoadOrDefaultInitConfiguration(flags.cfgPath, &kubeadmapiv1beta2.InitConfiguration{}, &flags.cfg)
+			// Get cluster configuration (from --config, kubeadm-config ConfigMap, or default as a fallback)
+			internalcfg, err := getInternalCfg(flags.cfgPath, flags.kubeconfigPath, flags.cfg, out, "check-expiration")
 			if err != nil {
 				return err
 			}
@@ -283,36 +320,54 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 			w := tabwriter.NewWriter(out, 10, 4, 3, ' ', 0)
 			fmt.Fprintln(w, "CERTIFICATE\tEXPIRES\tRESIDUAL TIME\tCERTIFICATE AUTHORITY\tEXTERNALLY MANAGED")
 			for _, handler := range rm.Certificates() {
-				e, err := rm.GetCertificateExpirationInfo(handler.Name)
-				if err != nil {
-					return err
+				if ok, _ := rm.CertificateExists(handler.Name); ok {
+					e, err := rm.GetCertificateExpirationInfo(handler.Name)
+					if err != nil {
+						return err
+					}
+
+					s := fmt.Sprintf("%s\t%s\t%s\t%s\t%-8v",
+						e.Name,
+						e.ExpirationDate.Format("Jan 02, 2006 15:04 MST"),
+						duration.ShortHumanDuration(e.ResidualTime()),
+						handler.CAName,
+						yesNo(e.ExternallyManaged),
+					)
+
+					fmt.Fprintln(w, s)
+					continue
 				}
 
-				s := fmt.Sprintf("%s\t%s\t%s\t%s\t%-8v",
-					e.Name,
-					e.ExpirationDate.Format("Jan 02, 2006 15:04 MST"),
-					duration.ShortHumanDuration(e.ResidualTime()),
-					handler.CAName,
-					yesNo(e.ExternallyManaged),
+				// the certificate does not exist (for any reason)
+				s := fmt.Sprintf("!MISSING! %s\t\t\t\t",
+					handler.Name,
 				)
-
 				fmt.Fprintln(w, s)
 			}
 			fmt.Fprintln(w)
 			fmt.Fprintln(w, "CERTIFICATE AUTHORITY\tEXPIRES\tRESIDUAL TIME\tEXTERNALLY MANAGED")
 			for _, handler := range rm.CAs() {
-				e, err := rm.GetCAExpirationInfo(handler.Name)
-				if err != nil {
-					return err
+				if ok, _ := rm.CAExists(handler.Name); ok {
+					e, err := rm.GetCAExpirationInfo(handler.Name)
+					if err != nil {
+						return err
+					}
+
+					s := fmt.Sprintf("%s\t%s\t%s\t%-8v",
+						e.Name,
+						e.ExpirationDate.Format("Jan 02, 2006 15:04 MST"),
+						duration.ShortHumanDuration(e.ResidualTime()),
+						yesNo(e.ExternallyManaged),
+					)
+
+					fmt.Fprintln(w, s)
+					continue
 				}
 
-				s := fmt.Sprintf("%s\t%s\t%s\t%-8v",
-					e.Name,
-					e.ExpirationDate.Format("Jan 02, 2006 15:04 MST"),
-					duration.ShortHumanDuration(e.ResidualTime()),
-					yesNo(e.ExternallyManaged),
+				// the CA does not exist (for any reason)
+				s := fmt.Sprintf("!MISSING! %s\t\t\t",
+					handler.Name,
 				)
-
 				fmt.Fprintln(w, s)
 			}
 			w.Flush()
@@ -325,11 +380,13 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 }
 
 type expirationFlags struct {
-	cfgPath string
-	cfg     kubeadmapiv1beta2.ClusterConfiguration
+	cfgPath        string
+	kubeconfigPath string
+	cfg            kubeadmapiv1beta2.ClusterConfiguration
 }
 
 func addExpirationFlags(cmd *cobra.Command, flags *expirationFlags) {
 	options.AddConfigFlag(cmd.Flags(), &flags.cfgPath)
 	options.AddCertificateDirFlag(cmd.Flags(), &flags.cfg.CertificatesDir)
+	options.AddKubeConfigFlag(cmd.Flags(), &flags.kubeconfigPath)
 }

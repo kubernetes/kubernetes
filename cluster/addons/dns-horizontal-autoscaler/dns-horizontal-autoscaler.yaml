@@ -33,7 +33,7 @@ rules:
   - apiGroups: [""]
     resources: ["replicationcontrollers/scale"]
     verbs: ["get", "update"]
-  - apiGroups: ["extensions","apps"]
+  - apiGroups: ["apps"]
     resources: ["deployments/scale", "replicasets/scale"]
     verbs: ["get", "update"]
 # Remove the configmaps rule once below issue is fixed:
@@ -103,4 +103,6 @@ spec:
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
+      nodeSelector:
+        beta.kubernetes.io/os: linux
       serviceAccountName: kube-dns-autoscaler

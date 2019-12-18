@@ -6,6 +6,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/fuzz/yaml",
     visibility = ["//visibility:private"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],

@@ -84,3 +84,12 @@ type PromRegistry interface {
 type Gatherer interface {
 	prometheus.Gatherer
 }
+
+// GaugeFunc is a Gauge whose value is determined at collect time by calling a
+// provided function.
+//
+// To create GaugeFunc instances, use NewGaugeFunc.
+type GaugeFunc interface {
+	Metric
+	Collector
+}

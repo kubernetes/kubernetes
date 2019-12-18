@@ -26,7 +26,7 @@ import (
 	"net"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -137,7 +137,8 @@ func newProxyServer(
 	if nodeIP.IsUnspecified() {
 		nodeIP = utilnode.GetNodeIP(client, hostname)
 		if nodeIP == nil {
-			return nil, fmt.Errorf("unable to get node IP for hostname %s", hostname)
+			klog.V(0).Infof("can't determine this node's IP, assuming 127.0.0.1; if this is incorrect, please set the --bind-address flag")
+			nodeIP = net.ParseIP("127.0.0.1")
 		}
 	}
 	if proxyMode == proxyModeIPTables {
@@ -192,6 +193,9 @@ func newProxyServer(
 				config.IPVS.MinSyncPeriod.Duration,
 				config.IPVS.ExcludeCIDRs,
 				config.IPVS.StrictARP,
+				config.IPVS.TCPTimeout.Duration,
+				config.IPVS.TCPFinTimeout.Duration,
+				config.IPVS.UDPTimeout.Duration,
 				config.IPTables.MasqueradeAll,
 				int(*config.IPTables.MasqueradeBit),
 				cidrTuple(config.ClusterCIDR),
@@ -213,6 +217,9 @@ func newProxyServer(
 				config.IPVS.MinSyncPeriod.Duration,
 				config.IPVS.ExcludeCIDRs,
 				config.IPVS.StrictARP,
+				config.IPVS.TCPTimeout.Duration,
+				config.IPVS.TCPFinTimeout.Duration,
+				config.IPVS.UDPTimeout.Duration,
 				config.IPTables.MasqueradeAll,
 				int(*config.IPTables.MasqueradeBit),
 				config.ClusterCIDR,
@@ -267,6 +274,7 @@ func newProxyServer(
 		OOMScoreAdj:            config.OOMScoreAdj,
 		ConfigSyncPeriod:       config.ConfigSyncPeriod.Duration,
 		HealthzServer:          healthzServer,
+		UseEndpointSlices:      utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice),
 	}, nil
 }
 

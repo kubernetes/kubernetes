@@ -275,7 +275,7 @@ type ValidatingWebhook struct {
 	// +optional
 	ObjectSelector *metav1.LabelSelector `json:"objectSelector,omitempty" protobuf:"bytes,10,opt,name=objectSelector"`
 
-	// SideEffects states whether this webhookk has side effects.
+	// SideEffects states whether this webhook has side effects.
 	// Acceptable values are: Unknown, None, Some, NoneOnDryRun
 	// Webhooks with side effects MUST implement a reconciliation system, since a request may be
 	// rejected by a future step in the admission change and the side effects therefore need to be undone.
@@ -407,7 +407,7 @@ type MutatingWebhook struct {
 	// +optional
 	ObjectSelector *metav1.LabelSelector `json:"objectSelector,omitempty" protobuf:"bytes,11,opt,name=objectSelector"`
 
-	// SideEffects states whether this webhookk has side effects.
+	// SideEffects states whether this webhook has side effects.
 	// Acceptable values are: Unknown, None, Some, NoneOnDryRun
 	// Webhooks with side effects MUST implement a reconciliation system, since a request may be
 	// rejected by a future step in the admission change and the side effects therefore need to be undone.

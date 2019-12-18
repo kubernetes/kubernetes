@@ -17,6 +17,7 @@ limitations under the License.
 package imagelocality
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -26,14 +27,12 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
-var mb int64 = 1024 * 1024
-
-// ImageLocality is a plugin that checks if a pod tolerates a node's taints.
+// ImageLocality is a score plugin that favors nodes that already have requested pod container's images.
 type ImageLocality struct {
 	handle framework.FrameworkHandle
 }
 
-var _ = framework.ScorePlugin(&ImageLocality{})
+var _ framework.ScorePlugin = &ImageLocality{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = "ImageLocality"
@@ -44,10 +43,10 @@ func (pl *ImageLocality) Name() string {
 }
 
 // Score invoked at the score extension point.
-func (pl *ImageLocality) Score(state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
-	nodeInfo, exist := pl.handle.NodeInfoSnapshot().NodeInfoMap[nodeName]
-	if !exist {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("node %q does not exist in NodeInfoSnapshot", nodeName))
+func (pl *ImageLocality) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
+	if err != nil {
+		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
 	}
 
 	meta := migration.PriorityMetadata(state)

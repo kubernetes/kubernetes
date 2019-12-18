@@ -18,8 +18,6 @@ package upgrade
 
 import (
 	"fmt"
-	"io"
-
 	"github.com/pkg/errors"
 
 	"k8s.io/api/core/v1"
@@ -46,14 +44,12 @@ type VersionGetter interface {
 // KubeVersionGetter handles the version-fetching mechanism from external sources
 type KubeVersionGetter struct {
 	client clientset.Interface
-	w      io.Writer
 }
 
 // NewKubeVersionGetter returns a new instance of KubeVersionGetter
-func NewKubeVersionGetter(client clientset.Interface, writer io.Writer) VersionGetter {
+func NewKubeVersionGetter(client clientset.Interface) VersionGetter {
 	return &KubeVersionGetter{
 		client: client,
-		w:      writer,
 	}
 }
 
@@ -63,7 +59,6 @@ func (g *KubeVersionGetter) ClusterVersion() (string, *versionutil.Version, erro
 	if err != nil {
 		return "", nil, errors.Wrap(err, "Couldn't fetch cluster version from the API Server")
 	}
-	fmt.Fprintf(g.w, "[upgrade/versions] Cluster version: %s\n", clusterVersionInfo.String())
 
 	clusterVersion, err := versionutil.ParseSemantic(clusterVersionInfo.String())
 	if err != nil {
@@ -75,7 +70,6 @@ func (g *KubeVersionGetter) ClusterVersion() (string, *versionutil.Version, erro
 // KubeadmVersion gets kubeadm version
 func (g *KubeVersionGetter) KubeadmVersion() (string, *versionutil.Version, error) {
 	kubeadmVersionInfo := version.Get()
-	fmt.Fprintf(g.w, "[upgrade/versions] kubeadm version: %s\n", kubeadmVersionInfo.String())
 
 	kubeadmVersion, err := versionutil.ParseSemantic(kubeadmVersionInfo.String())
 	if err != nil {
@@ -89,10 +83,6 @@ func (g *KubeVersionGetter) VersionFromCILabel(ciVersionLabel, description strin
 	versionStr, err := kubeadmutil.KubernetesReleaseVersion(ciVersionLabel)
 	if err != nil {
 		return "", nil, errors.Wrapf(err, "Couldn't fetch latest %s from the internet", description)
-	}
-
-	if description != "" {
-		fmt.Fprintf(g.w, "[upgrade/versions] Latest %s: %s\n", description, versionStr)
 	}
 
 	ver, err := versionutil.ParseSemantic(versionStr)
@@ -143,7 +133,11 @@ func NewOfflineVersionGetter(versionGetter VersionGetter, version string) Versio
 // VersionFromCILabel will return the version that was passed into the struct
 func (o *OfflineVersionGetter) VersionFromCILabel(ciVersionLabel, description string) (string, *versionutil.Version, error) {
 	if o.version == "" {
-		return o.VersionGetter.VersionFromCILabel(ciVersionLabel, description)
+		versionStr, version, err := o.VersionGetter.VersionFromCILabel(ciVersionLabel, description)
+		if err == nil {
+			fmt.Printf("[upgrade/versions] Latest %s: %s\n", description, versionStr)
+		}
+		return versionStr, version, err
 	}
 	ver, err := versionutil.ParseSemantic(o.version)
 	if err != nil {

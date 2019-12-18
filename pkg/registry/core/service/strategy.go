@@ -23,11 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -121,6 +120,10 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && !serviceIPFamilyInUse(oldSvc) {
 		newSvc.Spec.IPFamily = nil
 	}
+	// Drop TopologyKeys if ServiceTopology is not enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && !topologyKeysInUse(oldSvc) {
+		newSvc.Spec.TopologyKeys = nil
+	}
 }
 
 // returns true if svc.Spec.ServiceIPFamily field is in use
@@ -132,6 +135,14 @@ func serviceIPFamilyInUse(svc *api.Service) bool {
 		return true
 	}
 	return false
+}
+
+// returns true if svc.Spec.TopologyKeys field is in use
+func topologyKeysInUse(svc *api.Service) bool {
+	if svc == nil {
+		return false
+	}
+	return len(svc.Spec.TopologyKeys) > 0
 }
 
 type serviceStatusStrategy struct {

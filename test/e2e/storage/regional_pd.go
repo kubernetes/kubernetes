@@ -214,11 +214,10 @@ func testZonalFailover(c clientset.Interface, ns string) {
 		}
 	}()
 
-	err = framework.WaitForStatefulSetReplicasReady(statefulSet.Name, ns, c, framework.Poll, statefulSetReadyTimeout)
+	err = waitForStatefulSetReplicasReady(statefulSet.Name, ns, c, framework.Poll, statefulSetReadyTimeout)
 	if err != nil {
 		pod := getPod(c, ns, regionalPDLabels)
-		gomega.Expect(podutil.IsPodReadyConditionTrue(pod.Status)).To(gomega.BeTrue(),
-			"The statefulset pod has the following conditions: %s", pod.Status.Conditions)
+		framework.ExpectEqual(podutil.IsPodReadyConditionTrue(pod.Status), true, "The statefulset pod has the following conditions: %s", pod.Status.Conditions)
 		framework.ExpectNoError(err)
 	}
 
@@ -266,11 +265,10 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	})
 	framework.ExpectNoError(err, "Error waiting for pod to be scheduled in a different zone (%q): %v", otherZone, err)
 
-	err = framework.WaitForStatefulSetReplicasReady(statefulSet.Name, ns, c, 3*time.Second, framework.RestartPodReadyAgainTimeout)
+	err = waitForStatefulSetReplicasReady(statefulSet.Name, ns, c, 3*time.Second, framework.RestartPodReadyAgainTimeout)
 	if err != nil {
 		pod := getPod(c, ns, regionalPDLabels)
-		gomega.Expect(podutil.IsPodReadyConditionTrue(pod.Status)).To(gomega.BeTrue(),
-			"The statefulset pod has the following conditions: %s", pod.Status.Conditions)
+		framework.ExpectEqual(podutil.IsPodReadyConditionTrue(pod.Status), true, "The statefulset pod has the following conditions: %s", pod.Status.Conditions)
 		framework.ExpectNoError(err)
 	}
 
@@ -628,4 +626,22 @@ func checkZonesFromLabelAndAffinity(pv *v1.PersistentVolume, zones sets.String, 
 			framework.Failf("label %s not found in term %v", v1.LabelZoneFailureDomain, term)
 		}
 	}
+}
+
+// waitForStatefulSetReplicasReady waits for all replicas of a StatefulSet to become ready or until timeout occurs, whichever comes first.
+func waitForStatefulSetReplicasReady(statefulSetName, ns string, c clientset.Interface, Poll, timeout time.Duration) error {
+	framework.Logf("Waiting up to %v for StatefulSet %s to have all replicas ready", timeout, statefulSetName)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
+		sts, err := c.AppsV1().StatefulSets(ns).Get(statefulSetName, metav1.GetOptions{})
+		if err != nil {
+			framework.Logf("Get StatefulSet %s failed, ignoring for %v: %v", statefulSetName, Poll, err)
+			continue
+		}
+		if sts.Status.ReadyReplicas == *sts.Spec.Replicas {
+			framework.Logf("All %d replicas of StatefulSet %s are ready. (%v)", sts.Status.ReadyReplicas, statefulSetName, time.Since(start))
+			return nil
+		}
+		framework.Logf("StatefulSet %s found but there are %d ready replicas and %d total replicas.", statefulSetName, sts.Status.ReadyReplicas, *sts.Spec.Replicas)
+	}
+	return fmt.Errorf("StatefulSet %s still has unready pods within %v", statefulSetName, timeout)
 }

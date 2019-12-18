@@ -38,11 +38,11 @@ _CRI_TARBALL_ARCH_SHA256 = {
     "windows-amd64": "7d092dcb3b1af2edf75477d5d049a70e8c0d1ac8242b1dff2de7e6aa084e3615",
 }
 
-ETCD_VERSION = "3.3.17"
+ETCD_VERSION = "3.4.3"
 _ETCD_TARBALL_ARCH_SHA256 = {
-    "amd64": "8c1168a24d17a2d6772f8148ea35d4f3398c51f1e23db90c849d506adb387060",
-    "arm64": "0ea20dfbf3085f584f788287fd398979d0f1271549be6497d81ec635b9b4c121",
-    "ppc64le": "49cef090eb67f0d24ebd1733303ed2088c291ad47c60f57746da9f689aa1de7a",
+    "amd64": "6c642b723a86941b99753dff6c00b26d3b033209b15ee33325dc8e7f4cd68f07",
+    "arm64": "01bd849ad99693600bd59db8d0e66ac64aac1e3801900665c31bd393972e3554",
+    "ppc64le": "3f20888d6efb7f2665ebe278860eec6e8fc9555624e56c3d93f5a6b6dd90a21a",
 }
 
 # Dependencies needed for a Kubernetes "release", e.g. building docker images,
@@ -73,21 +73,21 @@ def cri_tarballs():
 
 # Use go get -u github.com/estesp/manifest-tool to find these values
 _DEBIAN_BASE_DIGEST = {
-    "manifest": "sha256:6966a0aedd7592c18ff2dd803c08bd85780ee19f5e3a2e7cf908a4cd837afcde",
-    "amd64": "sha256:8ccb65cd2dd7e0c24193d0742a20e4a673dbd11af5a33f16fcd471a31486866c",
-    "arm": "sha256:3432b41de3f6dfffdc1386fce961cfd1f9f8e208b3a35070e10ef3e2a733cb17",
-    "arm64": "sha256:9189251e1d1eb4126d6e6add2e272338f9c8a6a3db38863044625bca4b667f31",
-    "ppc64le": "sha256:50aa659e1e75e4231ee8293c3b4115e5755bb0517142b9b4bddbc134bf4354db",
-    "s390x": "sha256:bbb8ee3a2aaca738c00809f450233d98029fea4e319d8faaa30aa94c8b17a806",
+    "manifest": "sha256:ebda8587ec0f49eb88ee3a608ef018484908cbc5aa32556a0d78356088c185d4",
+    "amd64": "sha256:d7be39e143d4e6677a28c81c0a84868b40800fc979dea1848bb19d526668a00c",
+    "arm": "sha256:fc731da13b0bc9013b85a86b583fc92e50869b5bc8e7aa6ca730ec0240954c7d",
+    "arm64": "sha256:12502c3eed050fa9b6d5fe353a44bfc5f437dc325c8912b1a48dcc180df36f1e",
+    "ppc64le": "sha256:4277aa59b63c5a1369e6d84a295ecc4ffa08985dcf114de9f7b6de1af4fcbc86",
+    "s390x": "sha256:78ef2a6b017539379c1654b4e52ba8519bfec821c62d0b3a1dbd15104b711e21",
 }
 
 _DEBIAN_IPTABLES_DIGEST = {
-    "manifest": "sha256:b522b0035dba3ac2d5c0dbaaf8217bd66248e790332ccfdf653e0f943a280dcf",
-    "amd64": "sha256:adc40e9ec817c15d35b26d1d6aa4d0f8096fba4c99e26a026159bb0bc98c6a89",
-    "arm": "sha256:58e8a1d3b187eed2d8d3664cd1c9723e5029698714a24dfca4b6ef42ea27a9d4",
-    "arm64": "sha256:1a63fdd216fe7b84561d40ab1ebaa0daae1fc73e4232a6caffbd8353d9a14cea",
-    "ppc64le": "sha256:9f90adbc7513cc96d92fcec7633c4b29e766dd31cf876af03c0b54374e22fa9c",
-    "s390x": "sha256:4f147708deff2a0163ee49b6980cc95423514bec5f4091612d65773b898fbdae",
+    "manifest": "sha256:d1cd487e89fb4cba853cd3a948a6e9016faf66f2a7bb53cb1ac6b6c9cb58f5ed",
+    "amd64": "sha256:852d3c569932059bcab3a52cb6105c432d85b4b7bbd5fc93153b78010e34a783",
+    "arm": "sha256:c10f01b414a7cd4b2f3e26e152c90c64a1e781d99f83a6809764cf74ecbc46c3",
+    "arm64": "sha256:5725e6fde13a6405cf800e22846ebd2bde24b0860f1dc3f6f5f256f03cfa85bd",
+    "ppc64le": "sha256:b6d6e56a0c34c0393dcba0d5faaa531b92e5876114c5ab5a90e82e4889724c5a",
+    "s390x": "sha256:39e67e9bf25d67fe35bd9dcb25367277e5967368e02f2741e0efd4ce8874db14",
 }
 
 _DEBIAN_HYPERKUBE_BASE_DIGEST = {
@@ -113,7 +113,7 @@ def debian_image_dependencies():
             digest = _digest(_DEBIAN_BASE_DIGEST, arch),
             registry = "k8s.gcr.io",
             repository = "debian-base",
-            tag = "0.4.1",  # ignored, but kept here for documentation
+            tag = "v2.0.0",  # ignored, but kept here for documentation
         )
 
         container_pull(
@@ -122,7 +122,7 @@ def debian_image_dependencies():
             digest = _digest(_DEBIAN_IPTABLES_DIGEST, arch),
             registry = "k8s.gcr.io",
             repository = "debian-iptables",
-            tag = "v11.0.2",  # ignored, but kept here for documentation
+            tag = "v12.0.1",  # ignored, but kept here for documentation
         )
 
         container_pull(

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"encoding/json"
@@ -34,13 +34,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/kubernetes/scheme"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	kubeletpodresourcesv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
@@ -287,6 +288,11 @@ func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, er
 		ComponentConfig kubeletconfigv1beta1.KubeletConfiguration `json:"kubeletconfig"`
 	}
 
+	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
+	if err != nil {
+		return nil, err
+	}
+
 	configz := configzWrapper{}
 	kubeCfg := kubeletconfig.KubeletConfiguration{}
 
@@ -300,7 +306,7 @@ func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, er
 		return nil, err
 	}
 
-	err = scheme.Scheme.Convert(&configz.ComponentConfig, &kubeCfg, nil)
+	err = scheme.Convert(&configz.ComponentConfig, &kubeCfg, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -332,15 +338,27 @@ func newKubeletConfigMap(name string, internalKC *kubeletconfig.KubeletConfigura
 	return cmap
 }
 
+// listNamespaceEvents lists the events in the given namespace.
+func listNamespaceEvents(c clientset.Interface, ns string) error {
+	ls, err := c.CoreV1().Events(ns).List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, event := range ls.Items {
+		klog.Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
+	}
+	return nil
+}
+
 func logPodEvents(f *framework.Framework) {
 	framework.Logf("Summary of pod events during the test:")
-	err := framework.ListNamespaceEvents(f.ClientSet, f.Namespace.Name)
+	err := listNamespaceEvents(f.ClientSet, f.Namespace.Name)
 	framework.ExpectNoError(err)
 }
 
 func logNodeEvents(f *framework.Framework) {
 	framework.Logf("Summary of node events during the test:")
-	err := framework.ListNamespaceEvents(f.ClientSet, "")
+	err := listNamespaceEvents(f.ClientSet, "")
 	framework.ExpectNoError(err)
 }
 

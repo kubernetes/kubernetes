@@ -42,23 +42,21 @@ var _ = SIGDescribe("Services", func() {
 		serviceName := "nodeport-test"
 		ns := f.Namespace.Name
 
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		nodeIP, err := e2enode.PickIP(jig.Client)
-		if err != nil {
-			framework.Logf("Unexpected error occurred: %v", err)
-		}
-		// TODO: write a wrapper for ExpectNoErrorWithOffset()
-		framework.ExpectNoErrorWithOffset(0, err)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
-		e2eservice := jig.CreateTCPServiceOrFail(ns, func(svc *v1.Service) {
+		svc, err := jig.CreateTCPService(func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeNodePort
 		})
-		jig.SanityCheckService(e2eservice, v1.ServiceTypeNodePort)
-		nodePort := int(e2eservice.Spec.Ports[0].NodePort)
+		framework.ExpectNoError(err)
+
+		nodePort := int(svc.Spec.Ports[0].NodePort)
 
 		ginkgo.By("creating Pod to be part of service " + serviceName)
-		jig.RunOrFail(ns, nil)
+		_, err = jig.Run(nil)
+		framework.ExpectNoError(err)
 
 		//using hybrid_network methods
 		ginkgo.By("creating Windows testing Pod")

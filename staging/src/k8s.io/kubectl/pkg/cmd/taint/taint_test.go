@@ -243,7 +243,7 @@ func TestTaint(t *testing.T) {
 			defer tf.Cleanup()
 
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := scheme.Codecs
+			ns := scheme.Codecs.WithoutConversion()
 
 			tf.Client = &fake.RESTClient{
 				NegotiatedSerializer: ns,
@@ -252,9 +252,9 @@ func TestTaint(t *testing.T) {
 					m := &MyReq{req}
 					switch {
 					case m.isFor("GET", "/nodes"):
-						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, oldNode)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, oldNode)}, nil
 					case m.isFor("GET", "/nodes/node-name"):
-						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, oldNode)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, oldNode)}, nil
 					case m.isFor("PATCH", "/nodes/node-name"):
 						tainted = true
 						data, err := ioutil.ReadAll(req.Body)
@@ -280,7 +280,7 @@ func TestTaint(t *testing.T) {
 						if !equalTaints(expectNewNode.Spec.Taints, newNode.Spec.Taints) {
 							t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, expectNewNode.Spec.Taints, newNode.Spec.Taints)
 						}
-						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, newNode)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, newNode)}, nil
 					case m.isFor("PUT", "/nodes/node-name"):
 						tainted = true
 						data, err := ioutil.ReadAll(req.Body)
@@ -294,7 +294,7 @@ func TestTaint(t *testing.T) {
 						if !equalTaints(expectNewNode.Spec.Taints, newNode.Spec.Taints) {
 							t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, expectNewNode.Spec.Taints, newNode.Spec.Taints)
 						}
-						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, newNode)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, newNode)}, nil
 					default:
 						t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
 						return nil, nil

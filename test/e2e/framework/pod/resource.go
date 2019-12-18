@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -42,7 +41,6 @@ import (
 )
 
 // TODO: Move to its own subpkg.
-// expectNoErrorWithRetries to their own subpackages within framework.
 // expectNoError checks if "err" is set, and if so, fails assertion while logging the error.
 func expectNoError(err error, explain ...interface{}) {
 	expectNoErrorWithOffset(1, err, explain...)
@@ -146,33 +144,6 @@ func (r ProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 		return false, nil
 	}
 	return true, nil
-}
-
-// CountRemainingPods queries the server to count number of remaining pods, and number of pods that had a missing deletion timestamp.
-func CountRemainingPods(c clientset.Interface, namespace string) (int, int, error) {
-	// check for remaining pods
-	pods, err := c.CoreV1().Pods(namespace).List(metav1.ListOptions{})
-	if err != nil {
-		return 0, 0, err
-	}
-
-	// nothing remains!
-	if len(pods.Items) == 0 {
-		return 0, 0, nil
-	}
-
-	// stuff remains, log about it
-	LogPodStates(pods.Items)
-
-	// check if there were any pods with missing deletion timestamp
-	numPods := len(pods.Items)
-	missingTimestamp := 0
-	for _, pod := range pods.Items {
-		if pod.DeletionTimestamp == nil {
-			missingTimestamp++
-		}
-	}
-	return numPods, missingTimestamp, nil
 }
 
 func podRunning(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
@@ -322,15 +293,6 @@ func podsRunning(c clientset.Interface, pods *v1.PodList) []error {
 	return e
 }
 
-// DumpAllPodInfo logs basic info for all pods.
-func DumpAllPodInfo(c clientset.Interface) {
-	pods, err := c.CoreV1().Pods("").List(metav1.ListOptions{})
-	if err != nil {
-		e2elog.Logf("unable to fetch pod debug info: %v", err)
-	}
-	LogPodStates(pods.Items)
-}
-
 // LogPodStates logs basic info of provided pods for debugging.
 func LogPodStates(pods []v1.Pod) {
 	// Find maximum widths for pod, node, and phase strings for column printing.
@@ -442,17 +404,6 @@ func NewExecPodSpec(ns, name string, hostNetwork bool) *v1.Pod {
 	return pod
 }
 
-// LaunchHostExecPod launches a hostexec pod in the given namespace and waits
-// until it's Running
-func LaunchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
-	hostExecPod := NewExecPodSpec(ns, name, true)
-	pod, err := client.CoreV1().Pods(ns).Create(hostExecPod)
-	expectNoError(err)
-	err = WaitForPodRunningInNamespace(client, pod)
-	expectNoError(err)
-	return pod
-}
-
 // newExecPodSpec returns the pod spec of exec pod
 func newExecPodSpec(ns, generateName string) *v1.Pod {
 	immediate := int64(0)
@@ -497,32 +448,6 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 	})
 	expectNoError(err)
 	return execPod
-}
-
-// CreatePodOrFail creates a pod with the specified containerPorts.
-func CreatePodOrFail(c clientset.Interface, ns, name string, labels map[string]string, containerPorts []v1.ContainerPort) {
-	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", name, ns))
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   name,
-			Labels: labels,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "pause",
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:  []string{"pause"},
-					Ports: containerPorts,
-					// Add a dummy environment variable to work around a docker issue.
-					// https://github.com/docker/docker/issues/14203
-					Env: []v1.EnvVar{{Name: "FOO", Value: " "}},
-				},
-			},
-		},
-	}
-	_, err := c.CoreV1().Pods(ns).Create(pod)
-	expectNoError(err, "failed to create pod %s in namespace %s", name, ns)
 }
 
 // CheckPodsRunningReady returns whether all pods whose names are listed in
@@ -615,41 +540,4 @@ func GetPodsInNamespace(c clientset.Interface, ns string, ignoreLabels map[strin
 		filtered = append(filtered, &p)
 	}
 	return filtered, nil
-}
-
-// GetPodsScheduled returns a number of currently scheduled and not scheduled Pods.
-func GetPodsScheduled(masterNodes sets.String, pods *v1.PodList) (scheduledPods, notScheduledPods []v1.Pod) {
-	for _, pod := range pods.Items {
-		if !masterNodes.Has(pod.Spec.NodeName) {
-			if pod.Spec.NodeName != "" {
-				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				gomega.Expect(scheduledCondition != nil).To(gomega.Equal(true))
-				gomega.Expect(scheduledCondition.Status).To(gomega.Equal(v1.ConditionTrue))
-				scheduledPods = append(scheduledPods, pod)
-			} else {
-				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				gomega.Expect(scheduledCondition != nil).To(gomega.Equal(true))
-				gomega.Expect(scheduledCondition.Status).To(gomega.Equal(v1.ConditionFalse))
-				if scheduledCondition.Reason == "Unschedulable" {
-
-					notScheduledPods = append(notScheduledPods, pod)
-				}
-			}
-		}
-	}
-	return
-}
-
-// PatchContainerImages replaces the specified Container Registry with a custom
-// one provided via the KUBE_TEST_REPO_LIST env variable
-func PatchContainerImages(containers []v1.Container) error {
-	var err error
-	for _, c := range containers {
-		c.Image, err = imageutils.ReplaceRegistryInImageURL(c.Image)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }

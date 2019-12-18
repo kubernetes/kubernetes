@@ -10,10 +10,14 @@ build --verbose_failures
 test --test_output=errors
 
 # Include git version info
+build --stamp
 build --workspace_status_command hack/print-workspace-status.sh
 
 # Make /tmp hermetic
 build --sandbox_tmpfs_path=/tmp
+
+# This tag is required to build github.com/opencontainers/selinux correctly
+build --define gotags=selinux
 
 # Ensure that Bazel never runs as root, which can cause unit tests to fail.
 # This flag requires Bazel 0.5.0+

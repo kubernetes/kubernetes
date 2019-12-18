@@ -20,14 +20,17 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	"k8s.io/kubernetes/pkg/scheduler/core"
 )
 
 func init() {
 	// Register functions that extract metadata used by priorities computations.
 	scheduler.RegisterPriorityMetadataProducerFactory(
-		func(args scheduler.PluginFactoryArgs) priorities.PriorityMetadataProducer {
-			return priorities.NewPriorityMetadataFactory(args.ServiceLister, args.ControllerLister, args.ReplicaSetLister, args.StatefulSetLister)
+		func(args scheduler.AlgorithmFactoryArgs) priorities.MetadataProducer {
+			serviceLister := args.InformerFactory.Core().V1().Services().Lister()
+			controllerLister := args.InformerFactory.Core().V1().ReplicationControllers().Lister()
+			replicaSetLister := args.InformerFactory.Apps().V1().ReplicaSets().Lister()
+			statefulSetLister := args.InformerFactory.Apps().V1().StatefulSets().Lister()
+			return priorities.NewMetadataFactory(serviceLister, controllerLister, replicaSetLister, statefulSetLister, args.HardPodAffinitySymmetricWeight)
 		})
 
 	// ServiceSpreadingPriority is a priority config factory that spreads pods by minimizing
@@ -37,16 +40,13 @@ func init() {
 	scheduler.RegisterPriorityConfigFactory(
 		priorities.ServiceSpreadingPriority,
 		scheduler.PriorityConfigFactory{
-			MapReduceFunction: func(args scheduler.PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
-				return priorities.NewSelectorSpreadPriority(args.ServiceLister, algorithm.EmptyControllerLister{}, algorithm.EmptyReplicaSetLister{}, algorithm.EmptyStatefulSetLister{})
+			MapReduceFunction: func(args scheduler.AlgorithmFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
+				serviceLister := args.InformerFactory.Core().V1().Services().Lister()
+				return priorities.NewSelectorSpreadPriority(serviceLister, algorithm.EmptyControllerLister{}, algorithm.EmptyReplicaSetLister{}, algorithm.EmptyStatefulSetLister{})
 			},
 			Weight: 1,
 		},
 	)
-	// EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
-	// Register the priority function so that its available
-	// but do not include it as part of the default priorities
-	scheduler.RegisterPriorityMapReduceFunction(priorities.EqualPriority, core.EqualPriorityMap, nil, 1)
 	// Optional, cluster-autoscaler friendly priority function - give used nodes higher priority.
 	scheduler.RegisterPriorityMapReduceFunction(priorities.MostRequestedPriority, priorities.MostRequestedPriorityMap, nil, 1)
 	scheduler.RegisterPriorityMapReduceFunction(
@@ -58,23 +58,19 @@ func init() {
 	scheduler.RegisterPriorityConfigFactory(
 		priorities.SelectorSpreadPriority,
 		scheduler.PriorityConfigFactory{
-			MapReduceFunction: func(args scheduler.PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
-				return priorities.NewSelectorSpreadPriority(args.ServiceLister, args.ControllerLister, args.ReplicaSetLister, args.StatefulSetLister)
+			MapReduceFunction: func(args scheduler.AlgorithmFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
+				serviceLister := args.InformerFactory.Core().V1().Services().Lister()
+				controllerLister := args.InformerFactory.Core().V1().ReplicationControllers().Lister()
+				replicaSetLister := args.InformerFactory.Apps().V1().ReplicaSets().Lister()
+				statefulSetLister := args.InformerFactory.Apps().V1().StatefulSets().Lister()
+				return priorities.NewSelectorSpreadPriority(serviceLister, controllerLister, replicaSetLister, statefulSetLister)
 			},
 			Weight: 1,
 		},
 	)
 	// pods should be placed in the same topological domain (e.g. same node, same rack, same zone, same power domain, etc.)
 	// as some other pods, or, conversely, should not be placed in the same topological domain as some other pods.
-	scheduler.RegisterPriorityConfigFactory(
-		priorities.InterPodAffinityPriority,
-		scheduler.PriorityConfigFactory{
-			Function: func(args scheduler.PluginFactoryArgs) priorities.PriorityFunction {
-				return priorities.NewInterPodAffinityPriority(args.NodeInfo, args.HardPodAffinitySymmetricWeight)
-			},
-			Weight: 1,
-		},
-	)
+	scheduler.RegisterPriorityMapReduceFunction(priorities.InterPodAffinityPriority, priorities.CalculateInterPodAffinityPriorityMap, priorities.CalculateInterPodAffinityPriorityReduce, 1)
 
 	// Prioritize nodes by least requested utilization.
 	scheduler.RegisterPriorityMapReduceFunction(priorities.LeastRequestedPriority, priorities.LeastRequestedPriorityMap, nil, 1)

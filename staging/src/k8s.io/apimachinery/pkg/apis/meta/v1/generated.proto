@@ -163,6 +163,7 @@ message DeleteOptions {
 
   // Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be
   // returned.
+  // +k8s:conversion-gen=false
   // +optional
   optional Preconditions preconditions = 2;
 
@@ -416,9 +417,6 @@ message ListOptions {
   // If this is not a watch, this field is ignored.
   // If the feature gate WatchBookmarks is not enabled in apiserver,
   // this field is ignored.
-  //
-  // This field is beta.
-  //
   // +optional
   optional bool allowWatchBookmarks = 9;
 

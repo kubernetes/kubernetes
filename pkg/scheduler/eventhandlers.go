@@ -24,7 +24,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -159,59 +158,11 @@ func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 }
 
 func (sched *Scheduler) onCSINodeAdd(obj interface{}) {
-	csiNode, ok := obj.(*storagev1beta1.CSINode)
-	if !ok {
-		klog.Errorf("cannot convert to *storagev1beta1.CSINode: %v", obj)
-		return
-	}
-
-	if err := sched.SchedulerCache.AddCSINode(csiNode); err != nil {
-		klog.Errorf("scheduler cache AddCSINode failed: %v", err)
-	}
-
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.CSINodeAdd)
 }
 
 func (sched *Scheduler) onCSINodeUpdate(oldObj, newObj interface{}) {
-	oldCSINode, ok := oldObj.(*storagev1beta1.CSINode)
-	if !ok {
-		klog.Errorf("cannot convert oldObj to *storagev1beta1.CSINode: %v", oldObj)
-		return
-	}
-
-	newCSINode, ok := newObj.(*storagev1beta1.CSINode)
-	if !ok {
-		klog.Errorf("cannot convert newObj to *storagev1beta1.CSINode: %v", newObj)
-		return
-	}
-
-	if err := sched.SchedulerCache.UpdateCSINode(oldCSINode, newCSINode); err != nil {
-		klog.Errorf("scheduler cache UpdateCSINode failed: %v", err)
-	}
-
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.CSINodeUpdate)
-}
-
-func (sched *Scheduler) onCSINodeDelete(obj interface{}) {
-	var csiNode *storagev1beta1.CSINode
-	switch t := obj.(type) {
-	case *storagev1beta1.CSINode:
-		csiNode = t
-	case cache.DeletedFinalStateUnknown:
-		var ok bool
-		csiNode, ok = t.Obj.(*storagev1beta1.CSINode)
-		if !ok {
-			klog.Errorf("cannot convert to *storagev1beta1.CSINode: %v", t.Obj)
-			return
-		}
-	default:
-		klog.Errorf("cannot convert to *storagev1beta1.CSINode: %v", t)
-		return
-	}
-
-	if err := sched.SchedulerCache.RemoveCSINode(csiNode); err != nil {
-		klog.Errorf("scheduler cache RemoveCSINode failed: %v", err)
-	}
 }
 
 func (sched *Scheduler) addPodToSchedulingQueue(obj interface{}) {
@@ -253,6 +204,7 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 		// Volume binder only wants to keep unassigned pods
 		sched.VolumeBinder.DeletePodBindings(pod)
 	}
+	sched.Framework.RejectWaitingPod(pod.UID)
 }
 
 func (sched *Scheduler) addPodToCache(obj interface{}) {
@@ -446,11 +398,10 @@ func AddAllEventHandlers(
 	)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		informerFactory.Storage().V1beta1().CSINodes().Informer().AddEventHandler(
+		informerFactory.Storage().V1().CSINodes().Informer().AddEventHandler(
 			cache.ResourceEventHandlerFuncs{
 				AddFunc:    sched.onCSINodeAdd,
 				UpdateFunc: sched.onCSINodeUpdate,
-				DeleteFunc: sched.onCSINodeDelete,
 			},
 		)
 	}

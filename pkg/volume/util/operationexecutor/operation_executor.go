@@ -25,13 +25,12 @@ import (
 	"time"
 
 	"k8s.io/klog"
+	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
@@ -161,23 +160,48 @@ func NewOperationExecutor(
 	}
 }
 
+// MarkVolumeOpts is an struct to pass arguments to MountVolume functions
+type MarkVolumeOpts struct {
+	PodName             volumetypes.UniquePodName
+	PodUID              types.UID
+	VolumeName          v1.UniqueVolumeName
+	Mounter             volume.Mounter
+	BlockVolumeMapper   volume.BlockVolumeMapper
+	OuterVolumeSpecName string
+	VolumeGidVolume     string
+	VolumeSpec          *volume.Spec
+	VolumeMountState    VolumeMountState
+}
+
 // ActualStateOfWorldMounterUpdater defines a set of operations updating the actual
 // state of the world cache after successful mount/unmount.
 type ActualStateOfWorldMounterUpdater interface {
 	// Marks the specified volume as mounted to the specified pod
-	MarkVolumeAsMounted(podName volumetypes.UniquePodName, podUID types.UID, volumeName v1.UniqueVolumeName, mounter volume.Mounter, blockVolumeMapper volume.BlockVolumeMapper, outerVolumeSpecName string, volumeGidValue string, volumeSpec *volume.Spec) error
+	MarkVolumeAsMounted(markVolumeOpts MarkVolumeOpts) error
 
 	// Marks the specified volume as unmounted from the specified pod
 	MarkVolumeAsUnmounted(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error
 
+	// MarkVolumeMountAsUncertain marks state of volume mount for the pod uncertain
+	MarkVolumeMountAsUncertain(markVolumeOpts MarkVolumeOpts) error
+
 	// Marks the specified volume as having been globally mounted.
 	MarkDeviceAsMounted(volumeName v1.UniqueVolumeName, devicePath, deviceMountPath string) error
+
+	// MarkDeviceAsUncertain marks device state in global mount path as uncertain
+	MarkDeviceAsUncertain(volumeName v1.UniqueVolumeName, devicePath, deviceMountPath string) error
 
 	// Marks the specified volume as having its global mount unmounted.
 	MarkDeviceAsUnmounted(volumeName v1.UniqueVolumeName) error
 
 	// Marks the specified volume's file system resize request is finished.
 	MarkVolumeAsResized(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error
+
+	// GetDeviceMountState returns mount state of the device in global path
+	GetDeviceMountState(volumeName v1.UniqueVolumeName) DeviceMountState
+
+	// GetVolumeMountState returns mount state of the volume for the Pod
+	GetVolumeMountState(volumName v1.UniqueVolumeName, podName volumetypes.UniquePodName) VolumeMountState
 }
 
 // ActualStateOfWorldAttacherUpdater defines a set of operations updating the
@@ -354,6 +378,35 @@ type VolumeToMount struct {
 	// (if so implemented)
 	DesiredSizeLimit *resource.Quantity
 }
+
+// DeviceMountState represents device mount state in a global path.
+type DeviceMountState string
+
+const (
+	// DeviceGloballyMounted means device has been globally mounted successfully
+	DeviceGloballyMounted DeviceMountState = "DeviceGloballyMounted"
+
+	// DeviceMountUncertain means device may not be mounted but a mount operation may be
+	// in-progress which can cause device mount to succeed.
+	DeviceMountUncertain DeviceMountState = "DeviceMountUncertain"
+
+	// DeviceNotMounted means device has not been mounted globally.
+	DeviceNotMounted DeviceMountState = "DeviceNotMounted"
+)
+
+// VolumeMountState represents volume mount state in a path local to the pod.
+type VolumeMountState string
+
+const (
+	// VolumeMounted means volume has been mounted in pod's local path
+	VolumeMounted VolumeMountState = "VolumeMounted"
+
+	// VolumeMountUncertain means volume may or may not be mounted in pods' local path
+	VolumeMountUncertain VolumeMountState = "VolumeMountUncertain"
+
+	// VolumeNotMounted means volume has not be mounted in pod's local path
+	VolumeNotMounted VolumeMountState = "VolumeNotMounted"
+)
 
 // GenerateMsgDetailed returns detailed msgs for volumes to mount
 func (volume *VolumeToMount) GenerateMsgDetailed(prefixMsg, suffixMsg string) (detailedMsg string) {
@@ -640,45 +693,25 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 				continue
 			}
 
-			// Migration: Must also check the Node since Attach would have been done with in-tree if node is not using Migration
-			nu, err := nodeUsingCSIPlugin(oe.operationGenerator.GetCSITranslator(), oe.operationGenerator.GetVolumePluginMgr(), volumeAttached.VolumeSpec, node)
+			volumePlugin, err :=
+				oe.operationGenerator.GetVolumePluginMgr().FindPluginBySpec(volumeAttached.VolumeSpec)
 			if err != nil {
-				klog.Errorf(volumeAttached.GenerateErrorDetailed("VolumesAreAttached.NodeUsingCSIPlugin failed", err).Error())
+				klog.Errorf(
+					"VolumesAreAttached.FindPluginBySpec failed for volume %q (spec.Name: %q) on node %q with error: %v",
+					volumeAttached.VolumeName,
+					volumeAttached.VolumeSpec.Name(),
+					volumeAttached.NodeName,
+					err)
 				continue
 			}
-
-			var volumePlugin volume.VolumePlugin
-			if useCSIPlugin(oe.operationGenerator.GetCSITranslator(), oe.operationGenerator.GetVolumePluginMgr(), volumeAttached.VolumeSpec) && nu {
-				// The volume represented by this spec is CSI and thus should be migrated
-				volumePlugin, err = oe.operationGenerator.GetVolumePluginMgr().FindPluginByName(csi.CSIPluginName)
-				if err != nil || volumePlugin == nil {
-					klog.Errorf(
-						"VolumesAreAttached.Name failed for volume %q (spec.Name: %q) on node %q with error: %v",
-						volumeAttached.VolumeName,
-						volumeAttached.VolumeSpec.Name(),
-						volumeAttached.NodeName,
-						err)
-					continue
-				}
-
-				csiSpec, err := translateSpec(oe.operationGenerator.GetCSITranslator(), volumeAttached.VolumeSpec)
-				if err != nil {
-					klog.Errorf(volumeAttached.GenerateErrorDetailed("VolumesAreAttached.TranslateSpec failed", err).Error())
-					continue
-				}
-				volumeAttached.VolumeSpec = csiSpec
-			} else {
-				volumePlugin, err =
-					oe.operationGenerator.GetVolumePluginMgr().FindPluginBySpec(volumeAttached.VolumeSpec)
-				if err != nil || volumePlugin == nil {
-					klog.Errorf(
-						"VolumesAreAttached.FindPluginBySpec failed for volume %q (spec.Name: %q) on node %q with error: %v",
-						volumeAttached.VolumeName,
-						volumeAttached.VolumeSpec.Name(),
-						volumeAttached.NodeName,
-						err)
-					continue
-				}
+			if volumePlugin == nil {
+				// should never happen since FindPluginBySpec always returns error if volumePlugin = nil
+				klog.Errorf(
+					"Failed to find volume plugin for volume %q (spec.Name: %q) on node %q",
+					volumeAttached.VolumeName,
+					volumeAttached.VolumeSpec.Name(),
+					volumeAttached.NodeName)
+				continue
 			}
 
 			pluginName := volumePlugin.GetPluginName()

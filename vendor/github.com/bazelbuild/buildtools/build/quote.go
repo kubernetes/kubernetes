@@ -59,10 +59,10 @@ var esc = [256]byte{
 // being used as shell arguments containing regular expressions.
 const notEsc = " !#$%&()*+,-./:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ{|}~"
 
-// unquote unquotes the quoted string, returning the actual
+// Unquote unquotes the quoted string, returning the actual
 // string value, whether the original was triple-quoted, and
 // an error describing invalid input.
-func unquote(quoted string) (s string, triple bool, err error) {
+func Unquote(quoted string) (s string, triple bool, err error) {
 	// Check for raw prefix: means don't interpret the inner \.
 	raw := false
 	if strings.HasPrefix(quoted, "r") {

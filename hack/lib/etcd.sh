@@ -16,7 +16,7 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-3.3.17}
+ETCD_VERSION=${ETCD_VERSION:-3.4.3}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 export KUBE_INTEGRATION_ETCD_URL="http://${ETCD_HOST}:${ETCD_PORT}"
@@ -46,7 +46,7 @@ kube::etcd::validate() {
   fi
 
   # validate installed version is at least equal to minimum
-  version=$(etcd --version | tail -n +1 | head -n 1 | cut -d " " -f 3)
+  version=$(etcd --version | grep Version | tail -n +1 | head -n 1 | cut -d " " -f 3)
   if [[ $(kube::etcd::version "${ETCD_VERSION}") -gt $(kube::etcd::version "${version}") ]]; then
    export PATH=${KUBE_ROOT}/third_party/etcd:${PATH}
    hash etcd
@@ -80,8 +80,8 @@ kube::etcd::start() {
   ETCD_PID=$!
 
   echo "Waiting for etcd to come up."
-  kube::util::wait_for_url "${KUBE_INTEGRATION_ETCD_URL}/v2/machines" "etcd: " 0.25 80
-  curl -fs -X PUT "${KUBE_INTEGRATION_ETCD_URL}/v2/keys/_test"
+  kube::util::wait_for_url "${KUBE_INTEGRATION_ETCD_URL}/health" "etcd: " 0.25 80
+  curl -fs -X POST "${KUBE_INTEGRATION_ETCD_URL}/v3/kv/put" -d '{"key": "X3Rlc3Q=", "value": ""}'
 }
 
 kube::etcd::stop() {

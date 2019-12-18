@@ -214,19 +214,19 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 		err.ErrStatus.Details.Causes = append(err.ErrStatus.Details.Causes, metav1.StatusCause{Type: "DisruptionBudget", Message: fmt.Sprintf("The disruption budget %s is still being processed by the server.", pdb.Name)})
 		return err
 	}
-	if pdb.Status.PodDisruptionsAllowed < 0 {
+	if pdb.Status.DisruptionsAllowed < 0 {
 		return errors.NewForbidden(policy.Resource("poddisruptionbudget"), pdb.Name, fmt.Errorf("pdb disruptions allowed is negative"))
 	}
 	if len(pdb.Status.DisruptedPods) > MaxDisruptedPodSize {
 		return errors.NewForbidden(policy.Resource("poddisruptionbudget"), pdb.Name, fmt.Errorf("DisruptedPods map too big - too many evictions not confirmed by PDB controller"))
 	}
-	if pdb.Status.PodDisruptionsAllowed == 0 {
+	if pdb.Status.DisruptionsAllowed == 0 {
 		err := errors.NewTooManyRequests("Cannot evict pod as it would violate the pod's disruption budget.", 0)
 		err.ErrStatus.Details.Causes = append(err.ErrStatus.Details.Causes, metav1.StatusCause{Type: "DisruptionBudget", Message: fmt.Sprintf("The disruption budget %s needs %d healthy pods and has %d currently", pdb.Name, pdb.Status.DesiredHealthy, pdb.Status.CurrentHealthy)})
 		return err
 	}
 
-	pdb.Status.PodDisruptionsAllowed--
+	pdb.Status.DisruptionsAllowed--
 	// If this is a dry-run, we don't need to go any further than that.
 	if dryRun == true {
 		return nil

@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 
@@ -31,7 +32,6 @@ import (
 
 	// import DefaultProvider
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults"
-	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -46,10 +46,11 @@ func StartApiserver() (string, ShutdownFunc) {
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
-	framework.RunAMasterUsingServer(framework.NewIntegrationTestMasterConfig(), s, h)
+	_, _, closeFn := framework.RunAMasterUsingServer(framework.NewIntegrationTestMasterConfig(), s, h)
 
 	shutdownFunc := func() {
 		klog.Infof("destroying API server")
+		closeFn()
 		s.Close()
 		klog.Infof("destroyed API server")
 	}
@@ -59,30 +60,31 @@ func StartApiserver() (string, ShutdownFunc) {
 // StartScheduler configures and starts a scheduler given a handle to the clientSet interface
 // and event broadcaster. It returns the running scheduler and the shutdown function to stop it.
 func StartScheduler(clientSet clientset.Interface) (*scheduler.Scheduler, coreinformers.PodInformer, ShutdownFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 	podInformer := informerFactory.Core().V1().Pods()
-	stopCh := make(chan struct{})
 	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
 		Interface: clientSet.EventsV1beta1().Events("")})
 
-	evtBroadcaster.StartRecordingToSink(stopCh)
+	evtBroadcaster.StartRecordingToSink(ctx.Done())
 
 	recorder := evtBroadcaster.NewRecorder(
 		legacyscheme.Scheme,
 		v1.DefaultSchedulerName,
 	)
 
-	sched, err := createScheduler(clientSet, informerFactory, podInformer, recorder, stopCh)
+	sched, err := createScheduler(clientSet, informerFactory, podInformer, recorder, ctx.Done())
 	if err != nil {
 		klog.Fatalf("Error creating scheduler: %v", err)
 	}
 
-	informerFactory.Start(stopCh)
-	sched.Run()
+	informerFactory.Start(ctx.Done())
+	go sched.Run(ctx)
 
 	shutdownFunc := func() {
 		klog.Infof("destroying scheduler")
-		close(stopCh)
+		cancel()
 		klog.Infof("destroyed scheduler")
 	}
 	return sched, podInformer, shutdownFunc
@@ -96,16 +98,11 @@ func createScheduler(
 	recorder events.EventRecorder,
 	stopCh <-chan struct{},
 ) (*scheduler.Scheduler, error) {
-	defaultProviderName := schedulerconfig.SchedulerDefaultProviderName
-
 	return scheduler.New(
 		clientSet,
 		informerFactory,
 		podInformer,
 		recorder,
-		schedulerconfig.SchedulerAlgorithmSource{
-			Provider: &defaultProviderName,
-		},
 		stopCh,
 	)
 }

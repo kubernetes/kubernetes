@@ -20,12 +20,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
+	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 func controllerRef(kind, name, uid string) []metav1.OwnerReference {
@@ -337,28 +338,30 @@ func TestSelectorSpreadPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, makeNodeList(test.nodes))
+			nodes := makeNodeList(test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
 			selectorSpread := SelectorSpread{
-				serviceLister:     schedulertesting.FakeServiceLister(test.services),
-				controllerLister:  schedulertesting.FakeControllerLister(test.rcs),
-				replicaSetLister:  schedulertesting.FakeReplicaSetLister(test.rss),
-				statefulSetLister: schedulertesting.FakeStatefulSetLister(test.sss),
+				serviceLister:     fakelisters.ServiceLister(test.services),
+				controllerLister:  fakelisters.ControllerLister(test.rcs),
+				replicaSetLister:  fakelisters.ReplicaSetLister(test.rss),
+				statefulSetLister: fakelisters.StatefulSetLister(test.sss),
 			}
 
-			metaDataProducer := NewPriorityMetadataFactory(
-				schedulertesting.FakeServiceLister(test.services),
-				schedulertesting.FakeControllerLister(test.rcs),
-				schedulertesting.FakeReplicaSetLister(test.rss),
-				schedulertesting.FakeStatefulSetLister(test.sss))
-			metaData := metaDataProducer(test.pod, nodeNameToInfo)
+			metaDataProducer := NewMetadataFactory(
+				fakelisters.ServiceLister(test.services),
+				fakelisters.ControllerLister(test.rcs),
+				fakelisters.ReplicaSetLister(test.rss),
+				fakelisters.StatefulSetLister(test.sss),
+				1,
+			)
+			metaData := metaDataProducer(test.pod, nodes, snapshot)
 
-			ttp := priorityFunction(selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce, metaData)
-			list, err := ttp(test.pod, nodeNameToInfo, makeNodeList(test.nodes))
+			list, err := runMapReducePriority(selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce, metaData, test.pod, snapshot, makeNodeList(test.nodes))
 			if err != nil {
 				t.Errorf("unexpected error: %v \n", err)
 			}
-			if !reflect.DeepEqual(test.expectedList, list) {
-				t.Errorf("expected %#v, got %#v", test.expectedList, list)
+			if diff := cmp.Diff(test.expectedList, list); diff != "" {
+				t.Errorf("wrong priorities produced (-want, +got): %s", diff)
 			}
 		})
 	}
@@ -573,22 +576,24 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, makeLabeledNodeList(labeledNodes))
+			nodes := makeLabeledNodeList(labeledNodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
 			selectorSpread := SelectorSpread{
-				serviceLister:     schedulertesting.FakeServiceLister(test.services),
-				controllerLister:  schedulertesting.FakeControllerLister(test.rcs),
-				replicaSetLister:  schedulertesting.FakeReplicaSetLister(test.rss),
-				statefulSetLister: schedulertesting.FakeStatefulSetLister(test.sss),
+				serviceLister:     fakelisters.ServiceLister(test.services),
+				controllerLister:  fakelisters.ControllerLister(test.rcs),
+				replicaSetLister:  fakelisters.ReplicaSetLister(test.rss),
+				statefulSetLister: fakelisters.StatefulSetLister(test.sss),
 			}
 
-			metaDataProducer := NewPriorityMetadataFactory(
-				schedulertesting.FakeServiceLister(test.services),
-				schedulertesting.FakeControllerLister(test.rcs),
-				schedulertesting.FakeReplicaSetLister(test.rss),
-				schedulertesting.FakeStatefulSetLister(test.sss))
-			metaData := metaDataProducer(test.pod, nodeNameToInfo)
-			ttp := priorityFunction(selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce, metaData)
-			list, err := ttp(test.pod, nodeNameToInfo, makeLabeledNodeList(labeledNodes))
+			metaDataProducer := NewMetadataFactory(
+				fakelisters.ServiceLister(test.services),
+				fakelisters.ControllerLister(test.rcs),
+				fakelisters.ReplicaSetLister(test.rss),
+				fakelisters.StatefulSetLister(test.sss),
+				1,
+			)
+			metaData := metaDataProducer(test.pod, nodes, snapshot)
+			list, err := runMapReducePriority(selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce, metaData, test.pod, snapshot, makeLabeledNodeList(labeledNodes))
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -765,17 +770,19 @@ func TestZoneSpreadPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, makeLabeledNodeList(test.nodes))
-			zoneSpread := ServiceAntiAffinity{podLister: schedulertesting.FakePodLister(test.pods), serviceLister: schedulertesting.FakeServiceLister(test.services), label: "zone"}
+			nodes := makeLabeledNodeList(labeledNodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
+			zoneSpread := ServiceAntiAffinity{podLister: snapshot.Pods(), serviceLister: fakelisters.ServiceLister(test.services), labels: []string{"zone"}}
 
-			metaDataProducer := NewPriorityMetadataFactory(
-				schedulertesting.FakeServiceLister(test.services),
-				schedulertesting.FakeControllerLister(rcs),
-				schedulertesting.FakeReplicaSetLister(rss),
-				schedulertesting.FakeStatefulSetLister(sss))
-			metaData := metaDataProducer(test.pod, nodeNameToInfo)
-			ttp := priorityFunction(zoneSpread.CalculateAntiAffinityPriorityMap, zoneSpread.CalculateAntiAffinityPriorityReduce, metaData)
-			list, err := ttp(test.pod, nodeNameToInfo, makeLabeledNodeList(test.nodes))
+			metaDataProducer := NewMetadataFactory(
+				fakelisters.ServiceLister(test.services),
+				fakelisters.ControllerLister(rcs),
+				fakelisters.ReplicaSetLister(rss),
+				fakelisters.StatefulSetLister(sss),
+				1,
+			)
+			metaData := metaDataProducer(test.pod, nodes, snapshot)
+			list, err := runMapReducePriority(zoneSpread.CalculateAntiAffinityPriorityMap, zoneSpread.CalculateAntiAffinityPriorityReduce, metaData, test.pod, snapshot, makeLabeledNodeList(test.nodes))
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -787,29 +794,6 @@ func TestZoneSpreadPriority(t *testing.T) {
 				t.Errorf("expected %#v, got %#v", test.expectedList, list)
 			}
 		})
-	}
-}
-
-func TestGetNodeClassificationByLabels(t *testing.T) {
-	const machine01 = "machine01"
-	const machine02 = "machine02"
-	const zoneA = "zoneA"
-	zone1 := map[string]string{
-		"zone": zoneA,
-	}
-	labeledNodes := map[string]map[string]string{
-		machine01: zone1,
-	}
-	expectedNonLabeledNodes := []string{machine02}
-	serviceAffinity := ServiceAntiAffinity{label: "zone"}
-	newLabeledNodes, noNonLabeledNodes := serviceAffinity.getNodeClassificationByLabels(makeLabeledNodeList(labeledNodes))
-	noLabeledNodes, newnonLabeledNodes := serviceAffinity.getNodeClassificationByLabels(makeNodeList(expectedNonLabeledNodes))
-	label, _ := newLabeledNodes[machine01]
-	if label != zoneA && len(noNonLabeledNodes) != 0 {
-		t.Errorf("Expected only labeled node with label zoneA and no noNonLabeledNodes")
-	}
-	if len(noLabeledNodes) != 0 && newnonLabeledNodes[0] != machine02 {
-		t.Errorf("Expected only non labelled nodes")
 	}
 }
 

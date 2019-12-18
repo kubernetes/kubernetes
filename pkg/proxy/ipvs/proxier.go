@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -30,15 +31,18 @@ import (
 	"sync/atomic"
 	"time"
 
+	"k8s.io/klog"
+	utilexec "k8s.io/utils/exec"
+	utilnet "k8s.io/utils/net"
+
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
@@ -50,8 +54,6 @@ import (
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
-	utilexec "k8s.io/utils/exec"
-	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -200,6 +202,7 @@ type Proxier struct {
 	serviceMap   proxy.ServiceMap
 	endpointsMap proxy.EndpointsMap
 	portsMap     map[utilproxy.LocalPort]utilproxy.Closeable
+	nodeLabels   map[string]string
 	// endpointsSynced, endpointSlicesSynced, and servicesSynced are set to true when
 	// corresponding objects are synced after startup. This is used to avoid updating
 	// ipvs rules with some partial data after kube-proxy restart.
@@ -324,6 +327,9 @@ func NewProxier(ipt utiliptables.Interface,
 	minSyncPeriod time.Duration,
 	excludeCIDRs []string,
 	strictARP bool,
+	tcpTimeout time.Duration,
+	tcpFinTimeout time.Duration,
+	udpTimeout time.Duration,
 	masqueradeAll bool,
 	masqueradeBit int,
 	clusterCIDR string,
@@ -399,14 +405,18 @@ func NewProxier(ipt utiliptables.Interface,
 		}
 	}
 
+	// Configure IPVS timeouts if any one of the timeout parameters have been set.
+	// This is the equivalent to running ipvsadm --set, a value of 0 indicates the
+	// current system timeout should be preserved
+	if tcpTimeout > 0 || tcpFinTimeout > 0 || udpTimeout > 0 {
+		if err := ipvs.ConfigureTimeouts(tcpTimeout, tcpFinTimeout, udpTimeout); err != nil {
+			klog.Warningf("failed to configure IPVS timeouts: %v", err)
+		}
+	}
+
 	// Generate the masquerade mark to use for SNAT rules.
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x/%#08x", masqueradeValue, masqueradeValue)
-
-	if nodeIP == nil {
-		klog.Warningf("invalid nodeIP, initializing kube-proxy with 127.0.0.1 as nodeIP")
-		nodeIP = net.ParseIP("127.0.0.1")
-	}
 
 	isIPv6 := utilnet.IsIPv6(nodeIP)
 
@@ -485,6 +495,9 @@ func NewDualStackProxier(
 	minSyncPeriod time.Duration,
 	excludeCIDRs []string,
 	strictARP bool,
+	tcpTimeout time.Duration,
+	tcpFinTimeout time.Duration,
+	udpTimeout time.Duration,
 	masqueradeAll bool,
 	masqueradeBit int,
 	clusterCIDR [2]string,
@@ -501,7 +514,8 @@ func NewDualStackProxier(
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(ipt[0], ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
-		masqueradeAll, masqueradeBit, clusterCIDR[0], hostname, nodeIP[0],
+		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
+		clusterCIDR[0], hostname, nodeIP[0],
 		recorder, healthzServer, scheduler, nodePortAddresses)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
@@ -509,7 +523,8 @@ func NewDualStackProxier(
 
 	ipv6Proxier, err := NewProxier(ipt[1], ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
-		masqueradeAll, masqueradeBit, clusterCIDR[1], hostname, nodeIP[1],
+		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
+		clusterCIDR[1], hostname, nodeIP[1],
 		nil, nil, scheduler, nodePortAddresses)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
@@ -901,8 +916,92 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 	proxier.syncProxyRules()
 }
 
+// OnNodeAdd is called whenever creation of new node object
+// is observed.
+func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
+	if node.Name != proxier.hostname {
+		klog.Errorf("Received a watch event for a node %s that doesn't match the current node %v", node.Name, proxier.hostname)
+		return
+	}
+
+	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
+		return
+	}
+
+	proxier.mu.Lock()
+	proxier.nodeLabels = node.Labels
+	proxier.mu.Unlock()
+
+	proxier.syncProxyRules()
+}
+
+// OnNodeUpdate is called whenever modification of an existing
+// node object is observed.
+func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
+	if node.Name != proxier.hostname {
+		klog.Errorf("Received a watch event for a node %s that doesn't match the current node %v", node.Name, proxier.hostname)
+		return
+	}
+
+	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
+		return
+	}
+
+	proxier.mu.Lock()
+	proxier.nodeLabels = node.Labels
+	proxier.mu.Unlock()
+
+	proxier.syncProxyRules()
+}
+
+// OnNodeDelete is called whever deletion of an existing node
+// object is observed.
+func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
+	if node.Name != proxier.hostname {
+		klog.Errorf("Received a watch event for a node %s that doesn't match the current node %v", node.Name, proxier.hostname)
+		return
+	}
+	proxier.mu.Lock()
+	proxier.nodeLabels = nil
+	proxier.mu.Unlock()
+
+	proxier.syncProxyRules()
+}
+
+// OnNodeSynced is called once all the initial event handlers were
+// called and the state is fully propagated to local cache.
+func (proxier *Proxier) OnNodeSynced() {
+}
+
 // EntryInvalidErr indicates if an ipset entry is invalid or not
 const EntryInvalidErr = "error adding entry %s to ipset %s"
+
+func getLocalAddrs() ([]net.IP, error) {
+	var localAddrs []net.IP
+
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, addr := range addrs {
+		ip, _, err := net.ParseCIDR(addr.String())
+		if err != nil {
+			return nil, err
+		}
+		localAddrs = append(localAddrs, ip)
+	}
+	return localAddrs, nil
+}
+
+func ipExists(ip net.IP, addrs []net.IP) bool {
+	for _, addr := range addrs {
+		if ip.Equal(addr) {
+			return true
+		}
+	}
+	return false
+}
 
 // This is where all of the ipvs calls happen.
 // assumes proxier.mu is held
@@ -923,6 +1022,11 @@ func (proxier *Proxier) syncProxyRules() {
 		metrics.DeprecatedSyncProxyRulesLatency.Observe(metrics.SinceInMicroseconds(start))
 		klog.V(4).Infof("syncProxyRules took %v", time.Since(start))
 	}()
+
+	localAddrs, err := getLocalAddrs()
+	if err != nil {
+		klog.Errorf("Failed to get local addresses during proxy sync: %v", err)
+	}
 
 	// We assume that if this was called, we really want to sync them,
 	// even if nothing changed in the meantime. In other words, callers are
@@ -960,7 +1064,7 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.createAndLinkeKubeChain()
 
 	// make sure dummy interface exists in the system where ipvs Proxier will bind service address on it
-	_, err := proxier.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+	_, err = proxier.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
 	if err != nil {
 		klog.Errorf("Failed to create dummy interface: %s, error: %v", DefaultDummyDevice, err)
 		return
@@ -1105,11 +1209,10 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Capture externalIPs.
 		for _, externalIP := range svcInfo.ExternalIPStrings() {
-			if local, err := utilproxy.IsLocalIP(externalIP); err != nil {
-				klog.Errorf("can't determine if IP is local, assuming not: %v", err)
-				// We do not start listening on SCTP ports, according to our agreement in the
-				// SCTP support KEP
-			} else if local && (svcInfo.Protocol() != v1.ProtocolSCTP) {
+			if len(localAddrs) == 0 {
+				klog.Errorf("couldn't find any local IPs, assuming %s is not local", externalIP)
+			} else if (svcInfo.Protocol() != v1.ProtocolSCTP) && ipExists(net.ParseIP(externalIP), localAddrs) {
+				// We do not start listening on SCTP ports, according to our agreement in the SCTP support KEP
 				lp := utilproxy.LocalPort{
 					Description: "externalIP for " + svcNameString,
 					IP:          externalIP,
@@ -1840,7 +1943,18 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 		curEndpoints.Insert(des.String())
 	}
 
-	for _, epInfo := range proxier.endpointsMap[svcPortName] {
+	endpoints := proxier.endpointsMap[svcPortName]
+
+	// Service Topology will not be enabled in the following cases:
+	// 1. externalTrafficPolicy=Local (mutually exclusive with service topology).
+	// 2. ServiceTopology is not enabled.
+	// 3. EndpointSlice is not enabled (service topology depends on endpoint slice
+	// to get topology information).
+	if !onlyNodeLocalEndpoints && utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
+		endpoints = proxy.FilterTopologyEndpoint(proxier.nodeLabels, proxier.serviceMap[svcPortName].TopologyKeys(), endpoints)
+	}
+
+	for _, epInfo := range endpoints {
 		if onlyNodeLocalEndpoints && !epInfo.GetIsLocal() {
 			continue
 		}

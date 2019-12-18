@@ -357,30 +357,6 @@ func (n *NodeInfo) SetTaints(newTaints []v1.Taint) {
 	n.taints = newTaints
 }
 
-// MemoryPressureCondition returns the memory pressure condition status on this node.
-func (n *NodeInfo) MemoryPressureCondition() v1.ConditionStatus {
-	if n == nil {
-		return v1.ConditionUnknown
-	}
-	return n.memoryPressureCondition
-}
-
-// DiskPressureCondition returns the disk pressure condition status on this node.
-func (n *NodeInfo) DiskPressureCondition() v1.ConditionStatus {
-	if n == nil {
-		return v1.ConditionUnknown
-	}
-	return n.diskPressureCondition
-}
-
-// PIDPressureCondition returns the pid pressure condition status on this node.
-func (n *NodeInfo) PIDPressureCondition() v1.ConditionStatus {
-	if n == nil {
-		return v1.ConditionUnknown
-	}
-	return n.pidPressureCondition
-}
-
 // RequestedResource returns aggregated resource request of pods on this node.
 func (n *NodeInfo) RequestedResource() Resource {
 	if n == nil {
@@ -572,11 +548,21 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			n.UpdateUsedPorts(pod, false)
 
 			n.generation = nextGeneration()
-
+			n.resetSlicesIfEmpty()
 			return nil
 		}
 	}
 	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
+}
+
+// resets the slices to nil so that we can do DeepEqual in unit tests.
+func (n *NodeInfo) resetSlicesIfEmpty() {
+	if len(n.podsWithAffinity) == 0 {
+		n.podsWithAffinity = nil
+	}
+	if len(n.pods) == 0 {
+		n.pods = nil
+	}
 }
 
 func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64) {

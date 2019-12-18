@@ -68,7 +68,7 @@ go_test(
     srcs = ["rollout_pause_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",

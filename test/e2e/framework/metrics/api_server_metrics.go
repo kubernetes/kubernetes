@@ -16,22 +16,24 @@ limitations under the License.
 
 package metrics
 
+import "k8s.io/component-base/metrics/testutil"
+
 // APIServerMetrics is metrics for API server
-type APIServerMetrics Metrics
+type APIServerMetrics testutil.Metrics
 
 // Equal returns true if all metrics are the same as the arguments.
 func (m *APIServerMetrics) Equal(o APIServerMetrics) bool {
-	return (*Metrics)(m).Equal(Metrics(o))
+	return (*testutil.Metrics)(m).Equal(testutil.Metrics(o))
 }
 
 func newAPIServerMetrics() APIServerMetrics {
-	result := NewMetrics()
+	result := testutil.NewMetrics()
 	return APIServerMetrics(result)
 }
 
 func parseAPIServerMetrics(data string) (APIServerMetrics, error) {
 	result := newAPIServerMetrics()
-	if err := parseMetrics(data, (*Metrics)(&result)); err != nil {
+	if err := testutil.ParseMetrics(data, (*testutil.Metrics)(&result)); err != nil {
 		return APIServerMetrics{}, err
 	}
 	return result, nil

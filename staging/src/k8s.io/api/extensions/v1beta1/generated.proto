@@ -1025,10 +1025,6 @@ message ReplicaSetStatus {
   repeated ReplicaSetCondition conditions = 6;
 }
 
-// Dummy definition
-message ReplicationControllerDummy {
-}
-
 // DEPRECATED.
 message RollbackConfig {
   // The revision to rollback to. If set to 0, rollback to the last revision.

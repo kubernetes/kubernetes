@@ -17,67 +17,73 @@ limitations under the License.
 package plugins
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	corelisters "k8s.io/client-go/listers/core/v1"
-	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodepreferavoidpods"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/requestedtocapacityratio"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 // RegistryArgs arguments needed to create default plugin factories.
 type RegistryArgs struct {
-	SchedulerCache     internalcache.Cache
-	ServiceLister      algorithm.ServiceLister
-	ControllerLister   algorithm.ControllerLister
-	ReplicaSetLister   algorithm.ReplicaSetLister
-	StatefulSetLister  algorithm.StatefulSetLister
-	PDBLister          algorithm.PDBLister
-	PVLister           corelisters.PersistentVolumeLister
-	PVCLister          corelisters.PersistentVolumeClaimLister
-	StorageClassLister storagelistersv1.StorageClassLister
-	VolumeBinder       *volumebinder.VolumeBinder
+	VolumeBinder *volumebinder.VolumeBinder
 }
 
-// NewDefaultRegistry builds a default registry with all the default plugins.
-// This is the registry that Kubernetes default scheduler uses. A scheduler that
-// runs custom plugins, can pass a different Registry when initializing the scheduler.
+// NewDefaultRegistry builds the default registry with all the in-tree plugins.
+// This is the registry that Kubernetes default scheduler uses. A scheduler that runs out of tree
+// plugins can register additional plugins through the WithFrameworkOutOfTreeRegistry option.
 func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
-	pvInfo := &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: args.PVLister}
-	pvcInfo := &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: args.PVCLister}
-	classInfo := &predicates.CachedStorageClassInfo{StorageClassLister: args.StorageClassLister}
-
 	return framework.Registry{
-		imagelocality.Name:       imagelocality.New,
-		tainttoleration.Name:     tainttoleration.New,
-		noderesources.Name:       noderesources.New,
-		nodename.Name:            nodename.New,
-		nodeports.Name:           nodeports.New,
-		nodepreferavoidpods.Name: nodepreferavoidpods.New,
-		nodeaffinity.Name:        nodeaffinity.New,
+		defaultpodtopologyspread.Name:        defaultpodtopologyspread.New,
+		imagelocality.Name:                   imagelocality.New,
+		tainttoleration.Name:                 tainttoleration.New,
+		nodename.Name:                        nodename.New,
+		nodeports.Name:                       nodeports.New,
+		nodepreferavoidpods.Name:             nodepreferavoidpods.New,
+		nodeaffinity.Name:                    nodeaffinity.New,
+		podtopologyspread.Name:               podtopologyspread.New,
+		nodeunschedulable.Name:               nodeunschedulable.New,
+		noderesources.FitName:                noderesources.NewFit,
+		noderesources.BalancedAllocationName: noderesources.NewBalancedAllocation,
+		noderesources.MostAllocatedName:      noderesources.NewMostAllocated,
+		noderesources.LeastAllocatedName:     noderesources.NewLeastAllocated,
 		volumebinding.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 			return volumebinding.NewFromVolumeBinder(args.VolumeBinder), nil
 		},
-		volumerestrictions.Name: volumerestrictions.New,
-		volumezone.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
-			return volumezone.New(pvInfo, pvcInfo, classInfo), nil
-		},
+		volumerestrictions.Name:        volumerestrictions.New,
+		volumezone.Name:                volumezone.New,
+		nodevolumelimits.CSIName:       nodevolumelimits.NewCSI,
+		nodevolumelimits.EBSName:       nodevolumelimits.NewEBS,
+		nodevolumelimits.GCEPDName:     nodevolumelimits.NewGCEPD,
+		nodevolumelimits.AzureDiskName: nodevolumelimits.NewAzureDisk,
+		nodevolumelimits.CinderName:    nodevolumelimits.NewCinder,
+		interpodaffinity.Name:          interpodaffinity.New,
+		nodelabel.Name:                 nodelabel.New,
+		requestedtocapacityratio.Name:  requestedtocapacityratio.New,
+		serviceaffinity.Name:           serviceaffinity.New,
 	}
 }
 
@@ -87,6 +93,14 @@ func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 type ConfigProducerArgs struct {
 	// Weight used for priority functions.
 	Weight int32
+	// NodeLabelArgs is the args for the NodeLabel plugin.
+	NodeLabelArgs *nodelabel.Args
+	// RequestedToCapacityRatioArgs is the args for the RequestedToCapacityRatio plugin.
+	RequestedToCapacityRatioArgs *requestedtocapacityratio.Args
+	// ServiceAffinityArgs is the args for the ServiceAffinity plugin.
+	ServiceAffinityArgs *serviceaffinity.Args
+	// NodeResourcesFitArgs is the args for the NodeResources fit filter.
+	NodeResourcesFitArgs *noderesources.FitArgs
 }
 
 // ConfigProducer produces a framework's configuration.
@@ -105,14 +119,29 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 		PredicateToConfigProducer: make(map[string]ConfigProducer),
 		PriorityToConfigProducer:  make(map[string]ConfigProducer),
 	}
+	// Register Predicates.
+	registry.RegisterPredicate(predicates.GeneralPred,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			// GeneralPredicate is a combination of predicates.
+			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.FitName, nil)
+			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, noderesources.FitName, nil)
+			pluginConfig = append(pluginConfig, makePluginConfig(noderesources.FitName, args.NodeResourcesFitArgs))
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodename.Name, nil)
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodeports.Name, nil)
+			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, nodeports.Name, nil)
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodeaffinity.Name, nil)
+			return
+		})
 	registry.RegisterPredicate(predicates.PodToleratesNodeTaintsPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, tainttoleration.Name, nil)
 			return
 		})
 	registry.RegisterPredicate(predicates.PodFitsResourcesPred,
-		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
-			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.Name, nil)
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.FitName, nil)
+			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, noderesources.FitName, nil)
+			pluginConfig = append(pluginConfig, makePluginConfig(noderesources.FitName, args.NodeResourcesFitArgs))
 			return
 		})
 	registry.RegisterPredicate(predicates.HostNamePred,
@@ -123,11 +152,17 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 	registry.RegisterPredicate(predicates.PodFitsHostPortsPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodeports.Name, nil)
+			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, nodeports.Name, nil)
 			return
 		})
 	registry.RegisterPredicate(predicates.MatchNodeSelectorPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodeaffinity.Name, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.CheckNodeUnschedulablePred,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodeunschedulable.Name, nil)
 			return
 		})
 	registry.RegisterPredicate(predicates.CheckVolumeBindingPred,
@@ -145,25 +180,127 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 			plugins.Filter = appendToPluginSet(plugins.Filter, volumezone.Name, nil)
 			return
 		})
+	registry.RegisterPredicate(predicates.MaxCSIVolumeCountPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodevolumelimits.CSIName, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.MaxEBSVolumeCountPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodevolumelimits.EBSName, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.MaxGCEPDVolumeCountPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodevolumelimits.GCEPDName, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.MaxAzureDiskVolumeCountPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodevolumelimits.AzureDiskName, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.MaxCinderVolumeCountPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodevolumelimits.CinderName, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.MatchInterPodAffinityPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, interpodaffinity.Name, nil)
+			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, interpodaffinity.Name, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.EvenPodsSpreadPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, podtopologyspread.Name, nil)
+			plugins.Filter = appendToPluginSet(plugins.Filter, podtopologyspread.Name, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.CheckNodeLabelPresencePred,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodelabel.Name, nil)
+			pluginConfig = append(pluginConfig, makePluginConfig(nodelabel.Name, args.NodeLabelArgs))
+			return
+		})
+	registry.RegisterPredicate(predicates.CheckServiceAffinityPred,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, serviceaffinity.Name, nil)
+			pluginConfig = append(pluginConfig, makePluginConfig(serviceaffinity.Name, args.ServiceAffinityArgs))
+			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, serviceaffinity.Name, nil)
+			return
+		})
 
+	// Register Priorities.
+	registry.RegisterPriority(priorities.SelectorSpreadPriority,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, defaultpodtopologyspread.Name, &args.Weight)
+			return
+		})
 	registry.RegisterPriority(priorities.TaintTolerationPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, tainttoleration.Name, &args.Weight)
 			return
 		})
-
+	registry.RegisterPriority(priorities.NodeAffinityPriority,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, nodeaffinity.Name, &args.Weight)
+			return
+		})
 	registry.RegisterPriority(priorities.ImageLocalityPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, imagelocality.Name, &args.Weight)
 			return
 		})
-
+	registry.RegisterPriority(priorities.InterPodAffinityPriority,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, interpodaffinity.Name, &args.Weight)
+			return
+		})
 	registry.RegisterPriority(priorities.NodePreferAvoidPodsPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, nodepreferavoidpods.Name, &args.Weight)
 			return
 		})
+	registry.RegisterPriority(priorities.MostRequestedPriority,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, noderesources.MostAllocatedName, &args.Weight)
+			return
+		})
+	registry.RegisterPriority(priorities.BalancedResourceAllocation,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, noderesources.BalancedAllocationName, &args.Weight)
+			return
+		})
+	registry.RegisterPriority(priorities.LeastRequestedPriority,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, noderesources.LeastAllocatedName, &args.Weight)
+			return
+		})
+	registry.RegisterPriority(priorities.EvenPodsSpreadPriority,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, podtopologyspread.Name, &args.Weight)
+			return
+		})
+	registry.RegisterPriority(requestedtocapacityratio.Name,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, requestedtocapacityratio.Name, &args.Weight)
+			pluginConfig = append(pluginConfig, makePluginConfig(requestedtocapacityratio.Name, args.RequestedToCapacityRatioArgs))
+			return
+		})
 
+	registry.RegisterPriority(nodelabel.Name,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, nodelabel.Name, &args.Weight)
+			pluginConfig = append(pluginConfig, makePluginConfig(nodelabel.Name, args.NodeLabelArgs))
+			return
+		})
+	registry.RegisterPriority(serviceaffinity.Name,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, serviceaffinity.Name, &args.Weight)
+			pluginConfig = append(pluginConfig, makePluginConfig(serviceaffinity.Name, args.ServiceAffinityArgs))
+			return
+		})
 	return registry
 }
 
@@ -195,4 +332,17 @@ func appendToPluginSet(set *config.PluginSet, name string, weight *int32) *confi
 	}
 	set.Enabled = append(set.Enabled, cfg)
 	return set
+}
+
+func makePluginConfig(pluginName string, args interface{}) config.PluginConfig {
+	encoding, err := json.Marshal(args)
+	if err != nil {
+		klog.Fatal(fmt.Errorf("Failed to marshal %+v: %v", args, err))
+		return config.PluginConfig{}
+	}
+	config := config.PluginConfig{
+		Name: pluginName,
+		Args: runtime.Unknown{Raw: encoding},
+	}
+	return config
 }

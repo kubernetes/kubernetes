@@ -42,6 +42,17 @@ type KubeOpts struct {
 	StabilityLevel    StabilityLevel
 }
 
+// BuildFQName joins the given three name components by "_". Empty name
+// components are ignored. If the name parameter itself is empty, an empty
+// string is returned, no matter what. Metric implementations included in this
+// library use this function internally to generate the fully-qualified metric
+// name from the name component in their Opts. Users of the library will only
+// need this function if they implement their own Metric or instantiate a Desc
+// (with NewDesc) directly.
+func BuildFQName(namespace, subsystem, name string) string {
+	return prometheus.BuildFQName(namespace, subsystem, name)
+}
+
 // StabilityLevel represents the API guarantees for a given defined metric.
 type StabilityLevel string
 
@@ -205,16 +216,28 @@ func (o *SummaryOpts) annotateStabilityLevel() {
 	})
 }
 
+// Deprecated: DefObjectives will not be used as the default objectives in
+// v1.0.0 of the library. The default Summary will have no quantiles then.
+var (
+	defObjectives = map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
+)
+
 // convenience function to allow easy transformation to the prometheus
 // counterpart. This will do more once we have a proper label abstraction
 func (o SummaryOpts) toPromSummaryOpts() prometheus.SummaryOpts {
+	// we need to retain existing quantile behavior for backwards compatibility,
+	// so let's do what prometheus used to do prior to v1.
+	objectives := o.Objectives
+	if objectives == nil {
+		objectives = defObjectives
+	}
 	return prometheus.SummaryOpts{
 		Namespace:   o.Namespace,
 		Subsystem:   o.Subsystem,
 		Name:        o.Name,
 		Help:        o.Help,
 		ConstLabels: o.ConstLabels,
-		Objectives:  o.Objectives,
+		Objectives:  objectives,
 		MaxAge:      o.MaxAge,
 		AgeBuckets:  o.AgeBuckets,
 		BufCap:      o.BufCap,

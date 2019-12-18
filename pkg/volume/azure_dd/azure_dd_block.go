@@ -22,15 +22,15 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog"
+	"k8s.io/utils/mount"
+	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
-	utilstrings "k8s.io/utils/strings"
 )
 
 var _ volume.VolumePlugin = &azureDataDiskPlugin{}
@@ -119,10 +119,6 @@ func (plugin *azureDataDiskPlugin) newUnmapperInternal(volName string, podUID ty
 	return &azureDataDiskUnmapper{dataDisk: disk}, nil
 }
 
-func (c *azureDataDiskUnmapper) TearDownDevice(mapPath, devicePath string) error {
-	return nil
-}
-
 type azureDataDiskUnmapper struct {
 	*dataDisk
 }
@@ -135,14 +131,6 @@ type azureDataDiskMapper struct {
 }
 
 var _ volume.BlockVolumeMapper = &azureDataDiskMapper{}
-
-func (b *azureDataDiskMapper) SetUpDevice() (string, error) {
-	return "", nil
-}
-
-func (b *azureDataDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return util.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
-}
 
 // GetGlobalMapPath returns global map path and error
 // path: plugins/kubernetes.io/{PluginName}/volumeDevices/volumeID

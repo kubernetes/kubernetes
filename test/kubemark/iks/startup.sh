@@ -235,13 +235,18 @@ EOF
   fi
   proxy_mem_per_node=50
   proxy_mem=$((100 * 1024 + proxy_mem_per_node*NUM_NODES))
+  hollow_kubelet_params=$(eval "for param in ${HOLLOW_KUBELET_TEST_ARGS:-}; do echo -n \\\"\$param\\\",; done")
+  hollow_kubelet_params=${hollow_kubelet_params%?}
+  hollow_proxy_params=$(eval "for param in ${HOLLOW_PROXY_TEST_ARGS:-}; do echo -n \\\"\$param\\\",; done")
+  hollow_proxy_params=${hollow_proxy_params%?}
+
   sed -i'' -e "s/{{HOLLOW_PROXY_CPU}}/${proxy_cpu}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{HOLLOW_PROXY_MEM}}/${proxy_mem}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s'{{kubemark_image_registry}}'${KUBEMARK_IMAGE_REGISTRY}${KUBE_NAMESPACE}'g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{kubemark_image_tag}}/${KUBEMARK_IMAGE_TAG}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{master_ip}}/${MASTER_IP}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s/{{hollow_kubelet_params}}/${HOLLOW_KUBELET_TEST_ARGS:-}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s/{{hollow_proxy_params}}/${HOLLOW_PROXY_TEST_ARGS:-}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s/{{hollow_kubelet_params}}/${hollow_kubelet_params}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s/{{hollow_proxy_params}}/${hollow_proxy_params}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s'{{kubemark_mig_config}}'${KUBEMARK_MIG_CONFIG:-}'g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/hollow-node.yaml" --namespace="kubemark"
 

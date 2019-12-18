@@ -79,11 +79,12 @@ var (
 		&metrics.SummaryOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      DeprecatedSchedulingLatencyName,
-			Help:      "(Deprecated) Scheduling latency in seconds split by sub-parts of the scheduling operation",
+			Help:      "Scheduling latency in seconds split by sub-parts of the scheduling operation",
 			// Make the sliding window of 5h.
 			// TODO: The value for this should be based on some SLI definition (long term).
-			MaxAge:         5 * time.Hour,
-			StabilityLevel: metrics.ALPHA,
+			MaxAge:            5 * time.Hour,
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 		[]string{OperationLabel},
 	)
@@ -98,11 +99,12 @@ var (
 	)
 	DeprecatedE2eSchedulingLatency = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "e2e_scheduling_latency_microseconds",
-			Help:           "(Deprecated) E2e scheduling latency in microseconds (scheduling algorithm + binding)",
-			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         SchedulerSubsystem,
+			Name:              "e2e_scheduling_latency_microseconds",
+			Help:              "E2e scheduling latency in microseconds (scheduling algorithm + binding)",
+			Buckets:           metrics.ExponentialBuckets(1000, 2, 15),
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 	)
 	SchedulingAlgorithmLatency = metrics.NewHistogram(
@@ -116,11 +118,12 @@ var (
 	)
 	DeprecatedSchedulingAlgorithmLatency = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "scheduling_algorithm_latency_microseconds",
-			Help:           "(Deprecated) Scheduling algorithm latency in microseconds",
-			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         SchedulerSubsystem,
+			Name:              "scheduling_algorithm_latency_microseconds",
+			Help:              "Scheduling algorithm latency in microseconds",
+			Buckets:           metrics.ExponentialBuckets(1000, 2, 15),
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 	)
 	SchedulingAlgorithmPredicateEvaluationDuration = metrics.NewHistogram(
@@ -134,11 +137,12 @@ var (
 	)
 	DeprecatedSchedulingAlgorithmPredicateEvaluationDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "scheduling_algorithm_predicate_evaluation",
-			Help:           "(Deprecated) Scheduling algorithm predicate evaluation duration in microseconds",
-			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         SchedulerSubsystem,
+			Name:              "scheduling_algorithm_predicate_evaluation",
+			Help:              "Scheduling algorithm predicate evaluation duration in microseconds",
+			Buckets:           metrics.ExponentialBuckets(1000, 2, 15),
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 	)
 	SchedulingAlgorithmPriorityEvaluationDuration = metrics.NewHistogram(
@@ -152,14 +156,15 @@ var (
 	)
 	DeprecatedSchedulingAlgorithmPriorityEvaluationDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "scheduling_algorithm_priority_evaluation",
-			Help:           "(Deprecated) Scheduling algorithm priority evaluation duration in microseconds",
-			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         SchedulerSubsystem,
+			Name:              "scheduling_algorithm_priority_evaluation",
+			Help:              "Scheduling algorithm priority evaluation duration in microseconds",
+			Buckets:           metrics.ExponentialBuckets(1000, 2, 15),
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 	)
-	SchedulingAlgorithmPremptionEvaluationDuration = metrics.NewHistogram(
+	SchedulingAlgorithmPreemptionEvaluationDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "scheduling_algorithm_preemption_evaluation_seconds",
@@ -168,13 +173,14 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	DeprecatedSchedulingAlgorithmPremptionEvaluationDuration = metrics.NewHistogram(
+	DeprecatedSchedulingAlgorithmPreemptionEvaluationDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "scheduling_algorithm_preemption_evaluation",
-			Help:           "(Deprecated) Scheduling algorithm preemption evaluation duration in microseconds",
-			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         SchedulerSubsystem,
+			Name:              "scheduling_algorithm_preemption_evaluation",
+			Help:              "Scheduling algorithm preemption evaluation duration in microseconds",
+			Buckets:           metrics.ExponentialBuckets(1000, 2, 15),
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 	)
 	BindingLatency = metrics.NewHistogram(
@@ -188,11 +194,12 @@ var (
 	)
 	DeprecatedBindingLatency = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "binding_latency_microseconds",
-			Help:           "(Deprecated) Binding latency in microseconds",
-			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         SchedulerSubsystem,
+			Name:              "binding_latency_microseconds",
+			Help:              "Binding latency in microseconds",
+			Buckets:           metrics.ExponentialBuckets(1000, 2, 15),
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 	)
 	PreemptionVictims = metrics.NewHistogram(
@@ -211,7 +218,6 @@ var (
 			Help:           "Total preemption attempts in the cluster till now",
 			StabilityLevel: metrics.ALPHA,
 		})
-
 	pendingPods = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -219,12 +225,20 @@ var (
 			Help:           "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"queue"})
+	SchedulerGoroutines = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "scheduler_goroutines",
+			Help:           "Number of running goroutines split by the work they do such as binding.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"work"})
 
 	PodSchedulingDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "pod_scheduling_duration_seconds",
-			Help:           "E2e latency for a pod being scheduled which may include multiple scheduling attempts.",
+			Subsystem: SchedulerSubsystem,
+			Name:      "pod_scheduling_duration_seconds",
+			Help:      "E2e latency for a pod being scheduled which may include multiple scheduling attempts.",
+			// Start with 1ms with the last bucket being [~16s, Inf)
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		})
@@ -240,13 +254,26 @@ var (
 
 	FrameworkExtensionPointDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "framework_extension_point_duration_seconds",
-			Help:           "Latency for running all plugins of a specific extension point.",
-			Buckets:        nil,
+			Subsystem: SchedulerSubsystem,
+			Name:      "framework_extension_point_duration_seconds",
+			Help:      "Latency for running all plugins of a specific extension point.",
+			// Start with 0.1ms with the last bucket being [~200ms, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.0001, 2, 12),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"extension_point", "status"})
+
+	PluginExecutionDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      "plugin_execution_duration_seconds",
+			Help:      "Duration for running a plugin at a specific extension point.",
+			// Start with 0.01ms with the last bucket being [~22ms, Inf). We use a small factor (1.5)
+			// so that we have better granularity since plugin latency is very sensitive.
+			Buckets:        metrics.ExponentialBuckets(0.00001, 1.5, 20),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"plugin", "extension_point", "status"})
 
 	SchedulerQueueIncomingPods = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -255,6 +282,24 @@ var (
 			Help:           "Number of pods added to scheduling queues by event and queue type.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"queue", "event"})
+
+	PermitWaitDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "permit_wait_duration_seconds",
+			Help:           "Duration of waiting in RunPermitPlugins.",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"result"})
+
+	CacheSize = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "scheduler_cache_size",
+			Help:           "Number of nodes, pods, and assumed (bound) pods in the scheduler cache.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"type"})
 
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
@@ -270,15 +315,19 @@ var (
 		DeprecatedSchedulingAlgorithmPredicateEvaluationDuration,
 		SchedulingAlgorithmPriorityEvaluationDuration,
 		DeprecatedSchedulingAlgorithmPriorityEvaluationDuration,
-		SchedulingAlgorithmPremptionEvaluationDuration,
-		DeprecatedSchedulingAlgorithmPremptionEvaluationDuration,
+		SchedulingAlgorithmPreemptionEvaluationDuration,
+		DeprecatedSchedulingAlgorithmPreemptionEvaluationDuration,
 		PreemptionVictims,
 		PreemptionAttempts,
 		pendingPods,
 		PodSchedulingDuration,
 		PodSchedulingAttempts,
 		FrameworkExtensionPointDuration,
+		PluginExecutionDuration,
 		SchedulerQueueIncomingPods,
+		SchedulerGoroutines,
+		PermitWaitDuration,
+		CacheSize,
 	}
 )
 

@@ -145,7 +145,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(pods[0].Name, metav1.GetOptions{})
 		podDeleted := (err != nil && errors.IsNotFound(err)) ||
 			(err == nil && preemptedPod.DeletionTimestamp != nil)
-		gomega.Expect(podDeleted).To(gomega.BeTrue())
+		framework.ExpectEqual(podDeleted, true)
 		// Other pods (mid priority ones) should be present.
 		for i := 1; i < len(pods); i++ {
 			livePod, err := cs.CoreV1().Pods(pods[i].Namespace).Get(pods[i].Name, metav1.GetOptions{})
@@ -194,6 +194,14 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 
 		ginkgo.By("Run a critical pod that use 60% of a node resources.")
 		// Create a critical pod and make sure it is scheduled.
+		defer func() {
+			// Clean-up the critical pod
+			// Always run cleanup to make sure the pod is properly cleaned up.
+			err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete("critical-pod", metav1.NewDeleteOptions(0))
+			if err != nil && !errors.IsNotFound(err) {
+				framework.Failf("Error cleanup pod `%s/%s`: %v", metav1.NamespaceSystem, "critical-pod", err)
+			}
+		}()
 		runPausePod(f, pausePodConfig{
 			Name:              "critical-pod",
 			Namespace:         metav1.NamespaceSystem,
@@ -204,14 +212,9 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		})
 		// Make sure that the lowest priority pod is deleted.
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(pods[0].Name, metav1.GetOptions{})
-		defer func() {
-			// Clean-up the critical pod
-			err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete("critical-pod", metav1.NewDeleteOptions(0))
-			framework.ExpectNoError(err)
-		}()
 		podDeleted := (err != nil && errors.IsNotFound(err)) ||
 			(err == nil && preemptedPod.DeletionTimestamp != nil)
-		gomega.Expect(podDeleted).To(gomega.BeTrue())
+		framework.ExpectEqual(podDeleted, true)
 		// Other pods (mid priority ones) should be present.
 		for i := 1; i < len(pods); i++ {
 			livePod, err := cs.CoreV1().Pods(pods[i].Namespace).Get(pods[i].Name, metav1.GetOptions{})
@@ -304,7 +307,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		}
 	})
 
-	ginkgo.It("runs ReplicaSets to verify preemption running path", func() {
+	ginkgo.It("runs ReplicaSets to verify preemption running path [Flaky]", func() {
 		podNamesSeen := make(map[string]struct{})
 		stopCh := make(chan struct{})
 

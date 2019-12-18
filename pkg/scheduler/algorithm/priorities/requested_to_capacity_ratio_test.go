@@ -25,7 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 func TestCreatingFunctionShapeErrorsIfEmptyPoints(t *testing.T) {
@@ -240,8 +240,8 @@ func TestRequestedToCapacityRatio(t *testing.T) {
 
 		newPod := buildResourcesPod("", test.requested)
 
-		nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(scheduledPods, nodes)
-		list, err := priorityFunction(RequestedToCapacityRatioResourceAllocationPriorityDefault().PriorityMap, nil, nil)(newPod, nodeNameToInfo, nodes)
+		snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(scheduledPods, nodes))
+		list, err := runMapReducePriority(RequestedToCapacityRatioResourceAllocationPriorityDefault().PriorityMap, nil, nil, newPod, snapshot, nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -386,11 +386,11 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 			functionShape, _ := NewFunctionShape([]FunctionShapePoint{{0, 0}, {100, 10}})
 			resourceToWeightMap := ResourceToWeightMap{v1.ResourceName("intel.com/foo"): 1}
 			prior := RequestedToCapacityRatioResourceAllocationPriority(functionShape, resourceToWeightMap)
-			list, err := priorityFunction(prior.PriorityMap, nil, nil)(test.pod, nodeNameToInfo, test.nodes)
+			list, err := runMapReducePriority(prior.PriorityMap, nil, nil, test.pod, snapshot, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -611,11 +611,11 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 			functionShape, _ := NewFunctionShape([]FunctionShapePoint{{0, 0}, {100, 10}})
 			resourceToWeightMap := ResourceToWeightMap{v1.ResourceName("intel.com/foo"): 3, v1.ResourceName("intel.com/bar"): 5}
 			prior := RequestedToCapacityRatioResourceAllocationPriority(functionShape, resourceToWeightMap)
-			list, err := priorityFunction(prior.PriorityMap, nil, nil)(test.pod, nodeNameToInfo, test.nodes)
+			list, err := runMapReducePriority(prior.PriorityMap, nil, nil, test.pod, snapshot, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

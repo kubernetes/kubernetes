@@ -107,9 +107,6 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 		})
 		framework.ExpectNoError(err, "failed to create proxy service")
 
-		config, err = framework.LoadConfig()
-		framework.ExpectNoError(err, "failed to load config")
-
 		var podIP string
 		// get pod ip
 		err = wait.Poll(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {

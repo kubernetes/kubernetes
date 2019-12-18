@@ -41,7 +41,7 @@ import (
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
-	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
@@ -171,7 +171,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]describe.Desc
 		{Group: corev1.GroupName, Kind: "Endpoints"}:                              &EndpointsDescriber{c},
 		{Group: corev1.GroupName, Kind: "ConfigMap"}:                              &ConfigMapDescriber{c},
 		{Group: corev1.GroupName, Kind: "PriorityClass"}:                          &PriorityClassDescriber{c},
-		{Group: discoveryv1alpha1.GroupName, Kind: "EndpointSlice"}:               &EndpointSliceDescriber{c},
+		{Group: discoveryv1beta1.GroupName, Kind: "EndpointSlice"}:                &EndpointSliceDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "ReplicaSet"}:                  &ReplicaSetDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "NetworkPolicy"}:               &NetworkPolicyDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "PodSecurityPolicy"}:           &PodSecurityPolicyDescriber{c},
@@ -777,10 +777,11 @@ func describePodIPs(pod *corev1.Pod, w PrefixWriter, space string) {
 }
 
 func describeVolumes(volumes []corev1.Volume, w PrefixWriter, space string) {
-	if volumes == nil || len(volumes) == 0 {
+	if len(volumes) == 0 {
 		w.Write(LEVEL_0, "%sVolumes:\t<none>\n", space)
 		return
 	}
+
 	w.Write(LEVEL_0, "%sVolumes:\n", space)
 	for _, volume := range volumes {
 		nameIndent := ""
@@ -1268,9 +1269,10 @@ func printCSIVolumeSource(csi *corev1.CSIVolumeSource, w PrefixWriter) {
 func printCSIPersistentVolumeSource(csi *corev1.CSIPersistentVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tCSI (a Container Storage Interface (CSI) volume source)\n"+
 		"    Driver:\t%v\n"+
+		"    FSType:\t%v\n"+
 		"    VolumeHandle:\t%v\n"+
 		"    ReadOnly:\t%v\n",
-		csi.Driver, csi.VolumeHandle, csi.ReadOnly)
+		csi.Driver, csi.FSType, csi.VolumeHandle, csi.ReadOnly)
 	printCSIPersistentVolumeAttributesMultiline(w, "VolumeAttributes", csi.VolumeAttributes)
 }
 
@@ -2426,7 +2428,6 @@ func describeIngressTLS(w PrefixWriter, ingTLS []networkingv1beta1.IngressTLS) {
 			w.Write(LEVEL_1, "%v terminates %v\n", t.SecretName, strings.Join(t.Hosts, ","))
 		}
 	}
-	return
 }
 
 // TODO: Move from annotations into Ingress status.
@@ -2435,7 +2436,6 @@ func describeIngressAnnotations(w PrefixWriter, annotations map[string]string) {
 	for k, v := range annotations {
 		w.Write(LEVEL_1, "%v:\t%s\n", k, v)
 	}
-	return
 }
 
 // ServiceDescriber generates information about a service.
@@ -2622,7 +2622,7 @@ type EndpointSliceDescriber struct {
 }
 
 func (d *EndpointSliceDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
-	c := d.DiscoveryV1alpha1().EndpointSlices(namespace)
+	c := d.DiscoveryV1beta1().EndpointSlices(namespace)
 
 	eps, err := c.Get(name, metav1.GetOptions{})
 	if err != nil {
@@ -2637,7 +2637,7 @@ func (d *EndpointSliceDescriber) Describe(namespace, name string, describerSetti
 	return describeEndpointSlice(eps, events)
 }
 
-func describeEndpointSlice(eps *discoveryv1alpha1.EndpointSlice, events *corev1.EventList) (string, error) {
+func describeEndpointSlice(eps *discoveryv1beta1.EndpointSlice, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", eps.Name)
@@ -2645,11 +2645,7 @@ func describeEndpointSlice(eps *discoveryv1alpha1.EndpointSlice, events *corev1.
 		printLabelsMultiline(w, "Labels", eps.Labels)
 		printAnnotationsMultiline(w, "Annotations", eps.Annotations)
 
-		addressType := "<unset>"
-		if eps.AddressType != nil {
-			addressType = string(*eps.AddressType)
-		}
-		w.Write(LEVEL_0, "AddressType:\t%s\n", addressType)
+		w.Write(LEVEL_0, "AddressType:\t%s\n", string(eps.AddressType))
 
 		if len(eps.Ports) == 0 {
 			w.Write(LEVEL_0, "Ports: <unset>\n")
@@ -2742,8 +2738,8 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 
 		for _, s := range secrets.Items {
 			if s.Type == corev1.SecretTypeServiceAccountToken {
-				name, _ := s.Annotations[corev1.ServiceAccountNameKey]
-				uid, _ := s.Annotations[corev1.ServiceAccountUIDKey]
+				name := s.Annotations[corev1.ServiceAccountNameKey]
+				uid := s.Annotations[corev1.ServiceAccountUIDKey]
 				if name == serviceAccount.Name && uid == string(serviceAccount.UID) {
 					tokens = append(tokens, s)
 				}
@@ -3261,10 +3257,15 @@ func describeCertificateSigningRequest(csr *certificatesv1beta1.CertificateSigni
 		printListHelper(w, "\t", "StreetAddress", cr.Subject.StreetAddress)
 		printListHelper(w, "\t", "PostalCode", cr.Subject.PostalCode)
 
-		if len(cr.DNSNames)+len(cr.EmailAddresses)+len(cr.IPAddresses) > 0 {
+		if len(cr.DNSNames)+len(cr.EmailAddresses)+len(cr.IPAddresses)+len(cr.URIs) > 0 {
 			w.Write(LEVEL_0, "Subject Alternative Names:\n")
 			printListHelper(w, "\t", "DNS Names", cr.DNSNames)
 			printListHelper(w, "\t", "Email Addresses", cr.EmailAddresses)
+			var uris []string
+			for _, uri := range cr.URIs {
+				uris = append(uris, uri.String())
+			}
+			printListHelper(w, "\t", "URIs", uris)
 			var ipaddrs []string
 			for _, ipaddr := range cr.IPAddresses {
 				ipaddrs = append(ipaddrs, ipaddr.String())
@@ -3391,6 +3392,12 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 		}
 		w.Write(LEVEL_0, "Min replicas:\t%s\n", minReplicas)
 		w.Write(LEVEL_0, "Max replicas:\t%d\n", hpa.Spec.MaxReplicas)
+		// only print the hpa behavior if present
+		if hpa.Spec.Behavior != nil {
+			w.Write(LEVEL_0, "Behavior:\n")
+			printDirectionBehavior(w, "Scale Up", hpa.Spec.Behavior.ScaleUp)
+			printDirectionBehavior(w, "Scale Down", hpa.Spec.Behavior.ScaleDown)
+		}
 		w.Write(LEVEL_0, "%s pods:\t", hpa.Spec.ScaleTargetRef.Kind)
 		w.Write(LEVEL_0, "%d current / %d desired\n", hpa.Status.CurrentReplicas, hpa.Status.DesiredReplicas)
 
@@ -3409,6 +3416,26 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 
 		return nil
 	})
+}
+
+func printDirectionBehavior(w PrefixWriter, direction string, rules *autoscalingv2beta2.HPAScalingRules) {
+	if rules != nil {
+		w.Write(LEVEL_1, "%s:\n", direction)
+		if rules.StabilizationWindowSeconds != nil {
+			w.Write(LEVEL_2, "Stabilization Window: %d seconds\n", *rules.StabilizationWindowSeconds)
+		}
+		if len(rules.Policies) > 0 {
+			if rules.SelectPolicy != nil {
+				w.Write(LEVEL_2, "Select Policy: %s\n", *rules.SelectPolicy)
+			} else {
+				w.Write(LEVEL_2, "Select Policy: %s\n", autoscalingv2beta2.MaxPolicySelect)
+			}
+			w.Write(LEVEL_2, "Policies:\n")
+			for _, p := range rules.Policies {
+				w.Write(LEVEL_3, "- Type: %s\tValue: %d\tPeriod: %d seconds\n", p.Type, p.Value, p.PeriodSeconds)
+			}
+		}
+	}
 }
 
 func describeHorizontalPodAutoscalerV1(hpa *autoscalingv1.HorizontalPodAutoscaler, events *corev1.EventList, d *HorizontalPodAutoscalerDescriber) (string, error) {
@@ -3741,11 +3768,36 @@ func describeNetworkPolicySpec(nps networkingv1.NetworkPolicySpec, w PrefixWrite
 	} else {
 		w.Write(LEVEL_2, "%s\n", metav1.FormatLabelSelector(&nps.PodSelector))
 	}
-	w.Write(LEVEL_1, "Allowing ingress traffic:\n")
-	printNetworkPolicySpecIngressFrom(nps.Ingress, "    ", w)
-	w.Write(LEVEL_1, "Allowing egress traffic:\n")
-	printNetworkPolicySpecEgressTo(nps.Egress, "    ", w)
+
+	ingressEnabled, egressEnabled := getPolicyType(nps)
+	if ingressEnabled {
+		w.Write(LEVEL_1, "Allowing ingress traffic:\n")
+		printNetworkPolicySpecIngressFrom(nps.Ingress, "    ", w)
+	} else {
+		w.Write(LEVEL_1, "Not affecting ingress traffic\n")
+	}
+	if egressEnabled {
+		w.Write(LEVEL_1, "Allowing egress traffic:\n")
+		printNetworkPolicySpecEgressTo(nps.Egress, "    ", w)
+	} else {
+		w.Write(LEVEL_1, "Not affecting egress traffic\n")
+
+	}
 	w.Write(LEVEL_1, "Policy Types: %v\n", policyTypesToString(nps.PolicyTypes))
+}
+
+func getPolicyType(nps networkingv1.NetworkPolicySpec) (bool, bool) {
+	var ingress, egress bool
+	for _, pt := range nps.PolicyTypes {
+		switch pt {
+		case networkingv1.PolicyTypeIngress:
+			ingress = true
+		case networkingv1.PolicyTypeEgress:
+			egress = true
+		}
+	}
+
+	return ingress, egress
 }
 
 func printNetworkPolicySpecIngressFrom(npirs []networkingv1.NetworkPolicyIngressRule, initialIndent string, w PrefixWriter) {
@@ -3956,7 +4008,7 @@ func describePodDisruptionBudget(pdb *policyv1beta1.PodDisruptionBudget, events 
 			w.Write(LEVEL_0, "Selector:\t<unset>\n")
 		}
 		w.Write(LEVEL_0, "Status:\n")
-		w.Write(LEVEL_2, "Allowed disruptions:\t%d\n", pdb.Status.PodDisruptionsAllowed)
+		w.Write(LEVEL_2, "Allowed disruptions:\t%d\n", pdb.Status.DisruptionsAllowed)
 		w.Write(LEVEL_2, "Current:\t%d\n", pdb.Status.CurrentHealthy)
 		w.Write(LEVEL_2, "Desired:\t%d\n", pdb.Status.DesiredHealthy)
 		w.Write(LEVEL_2, "Total:\t%d\n", pdb.Status.ExpectedPods)
@@ -4319,7 +4371,7 @@ func printLabelsMultiline(w PrefixWriter, title string, labels map[string]string
 func printLabelsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, labels map[string]string, skip sets.String) {
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
-	if labels == nil || len(labels) == 0 {
+	if len(labels) == 0 {
 		w.WriteLine("<none>")
 		return
 	}
@@ -4357,7 +4409,7 @@ func printNodeTaintsMultiline(w PrefixWriter, title string, taints []corev1.Tain
 func printTaintsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, taints []corev1.Taint) {
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
-	if taints == nil || len(taints) == 0 {
+	if len(taints) == 0 {
 		w.WriteLine("<none>")
 		return
 	}
@@ -4388,7 +4440,7 @@ func printPodsMultiline(w PrefixWriter, title string, pods []corev1.Pod) {
 func printPodsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, pods []corev1.Pod) {
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
-	if pods == nil || len(pods) == 0 {
+	if len(pods) == 0 {
 		w.WriteLine("<none>")
 		return
 	}
@@ -4419,7 +4471,7 @@ func printPodTolerationsMultiline(w PrefixWriter, title string, tolerations []co
 func printTolerationsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, tolerations []corev1.Toleration) {
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
-	if tolerations == nil || len(tolerations) == 0 {
+	if len(tolerations) == 0 {
 		w.WriteLine("<none>")
 		return
 	}

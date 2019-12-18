@@ -40,6 +40,14 @@ func (rl *ResourceList) Memory() *resource.Quantity {
 	return &resource.Quantity{Format: resource.BinarySI}
 }
 
+// Storage returns the Storage limit if specified.
+func (rl *ResourceList) Storage() *resource.Quantity {
+	if val, ok := (*rl)[ResourceStorage]; ok {
+		return &val
+	}
+	return &resource.Quantity{Format: resource.BinarySI}
+}
+
 // Pods returns the list of pods
 func (rl *ResourceList) Pods() *resource.Quantity {
 	if val, ok := (*rl)[ResourcePods]; ok {

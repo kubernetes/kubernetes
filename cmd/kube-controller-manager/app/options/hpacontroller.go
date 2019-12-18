@@ -58,6 +58,8 @@ func (o *HPAControllerOptions) ApplyTo(cfg *poautosclerconfig.HPAControllerConfi
 	cfg.HorizontalPodAutoscalerUseRESTClients = o.HorizontalPodAutoscalerUseRESTClients
 	cfg.HorizontalPodAutoscalerCPUInitializationPeriod = o.HorizontalPodAutoscalerCPUInitializationPeriod
 	cfg.HorizontalPodAutoscalerInitialReadinessDelay = o.HorizontalPodAutoscalerInitialReadinessDelay
+	cfg.HorizontalPodAutoscalerUpscaleForbiddenWindow = o.HorizontalPodAutoscalerUpscaleForbiddenWindow
+	cfg.HorizontalPodAutoscalerDownscaleForbiddenWindow = o.HorizontalPodAutoscalerDownscaleForbiddenWindow
 
 	return nil
 }

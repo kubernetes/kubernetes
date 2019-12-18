@@ -85,7 +85,7 @@ func TestVMSSVMCache(t *testing.T) {
 	for i := range virtualMachines {
 		vm := virtualMachines[i]
 		vmName := to.String(vm.OsProfile.ComputerName)
-		ssName, instanceID, realVM, err := ss.getVmssVM(vmName)
+		ssName, instanceID, realVM, err := ss.getVmssVM(vmName, cacheReadTypeDefault)
 		assert.NoError(t, err)
 		assert.Equal(t, "vmss", ssName)
 		assert.Equal(t, to.String(vm.InstanceID), instanceID)
@@ -99,14 +99,14 @@ func TestVMSSVMCache(t *testing.T) {
 	assert.NoError(t, err)
 
 	// the VM should be removed from cache after deleteCacheForNode().
-	cached, err := ss.vmssVMCache.Get(vmssVirtualMachinesKey)
+	cached, err := ss.vmssVMCache.Get(vmssVirtualMachinesKey, cacheReadTypeDefault)
 	assert.NoError(t, err)
 	cachedVirtualMachines := cached.(*sync.Map)
 	_, ok := cachedVirtualMachines.Load(vmName)
 	assert.Equal(t, false, ok)
 
 	// the VM should be get back after another cache refresh.
-	ssName, instanceID, realVM, err := ss.getVmssVM(vmName)
+	ssName, instanceID, realVM, err := ss.getVmssVM(vmName, cacheReadTypeDefault)
 	assert.NoError(t, err)
 	assert.Equal(t, "vmss", ssName)
 	assert.Equal(t, to.String(vm.InstanceID), instanceID)

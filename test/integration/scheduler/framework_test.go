@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -29,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	scheduler "k8s.io/kubernetes/pkg/scheduler"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -92,6 +94,7 @@ type UnreservePlugin struct {
 }
 
 type PermitPlugin struct {
+	name                string
 	numPermitCalled     int
 	failPermit          bool
 	rejectPermit        bool
@@ -99,6 +102,7 @@ type PermitPlugin struct {
 	waitAndRejectPermit bool
 	waitAndAllowPermit  bool
 	allowPermit         bool
+	cancelled           bool
 	fh                  framework.FrameworkHandle
 }
 
@@ -115,18 +119,18 @@ const (
 	permitPluginName             = "permit-plugin"
 )
 
-var _ = framework.PreFilterPlugin(&PreFilterPlugin{})
-var _ = framework.ScorePlugin(&ScorePlugin{})
-var _ = framework.FilterPlugin(&FilterPlugin{})
-var _ = framework.ScorePlugin(&ScorePlugin{})
-var _ = framework.ScorePlugin(&ScoreWithNormalizePlugin{})
-var _ = framework.ReservePlugin(&ReservePlugin{})
-var _ = framework.PostFilterPlugin(&PostFilterPlugin{})
-var _ = framework.PreBindPlugin(&PreBindPlugin{})
-var _ = framework.BindPlugin(&BindPlugin{})
-var _ = framework.PostBindPlugin(&PostBindPlugin{})
-var _ = framework.UnreservePlugin(&UnreservePlugin{})
-var _ = framework.PermitPlugin(&PermitPlugin{})
+var _ framework.PreFilterPlugin = &PreFilterPlugin{}
+var _ framework.ScorePlugin = &ScorePlugin{}
+var _ framework.FilterPlugin = &FilterPlugin{}
+var _ framework.ScorePlugin = &ScorePlugin{}
+var _ framework.ScorePlugin = &ScoreWithNormalizePlugin{}
+var _ framework.ReservePlugin = &ReservePlugin{}
+var _ framework.PostFilterPlugin = &PostFilterPlugin{}
+var _ framework.PreBindPlugin = &PreBindPlugin{}
+var _ framework.BindPlugin = &BindPlugin{}
+var _ framework.PostBindPlugin = &PostBindPlugin{}
+var _ framework.UnreservePlugin = &UnreservePlugin{}
+var _ framework.PermitPlugin = &PermitPlugin{}
 
 // newPlugin returns a plugin factory with specified Plugin.
 func newPlugin(plugin framework.Plugin) framework.PluginFactory {
@@ -148,7 +152,7 @@ func (sp *ScorePlugin) reset() {
 }
 
 // Score returns the score of scheduling a pod on a specific node.
-func (sp *ScorePlugin) Score(state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (sp *ScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
 	sp.numScoreCalled++
 	if sp.failScore {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", p.Name))
@@ -179,13 +183,13 @@ func (sp *ScoreWithNormalizePlugin) reset() {
 }
 
 // Score returns the score of scheduling a pod on a specific node.
-func (sp *ScoreWithNormalizePlugin) Score(state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (sp *ScoreWithNormalizePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
 	sp.numScoreCalled++
 	score := int64(10)
 	return score, nil
 }
 
-func (sp *ScoreWithNormalizePlugin) NormalizeScore(state *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
+func (sp *ScoreWithNormalizePlugin) NormalizeScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
 	sp.numNormalizeScoreCalled++
 	return nil
 }
@@ -207,7 +211,7 @@ func (fp *FilterPlugin) reset() {
 
 // Filter is a test function that returns an error or nil, depending on the
 // value of "failFilter".
-func (fp *FilterPlugin) Filter(state *framework.CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+func (fp *FilterPlugin) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	fp.numFilterCalled++
 
 	if fp.failFilter {
@@ -224,7 +228,7 @@ func (rp *ReservePlugin) Name() string {
 
 // Reserve is a test function that returns an error or nil, depending on the
 // value of "failReserve".
-func (rp *ReservePlugin) Reserve(state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (rp *ReservePlugin) Reserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	rp.numReserveCalled++
 	if rp.failReserve {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
@@ -243,7 +247,7 @@ func (*PostFilterPlugin) Name() string {
 }
 
 // PostFilter is a test function.
-func (pfp *PostFilterPlugin) PostFilter(_ *framework.CycleState, pod *v1.Pod, _ []*v1.Node, _ framework.NodeToStatusMap) *framework.Status {
+func (pfp *PostFilterPlugin) PostFilter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, _ []*v1.Node, _ framework.NodeToStatusMap) *framework.Status {
 	pfp.numPostFilterCalled++
 	if pfp.failPostFilter {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
@@ -264,7 +268,7 @@ func (pp *PreBindPlugin) Name() string {
 }
 
 // PreBind is a test function that returns (true, nil) or errors for testing.
-func (pp *PreBindPlugin) PreBind(state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (pp *PreBindPlugin) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	pp.numPreBindCalled++
 	if pp.failPreBind {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
@@ -288,7 +292,7 @@ func (bp *BindPlugin) Name() string {
 	return bp.PluginName
 }
 
-func (bp *BindPlugin) Bind(state *framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
+func (bp *BindPlugin) Bind(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
 	bp.numBindCalled++
 	if bp.pluginInvokeEventChan != nil {
 		bp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: bp.Name(), val: bp.numBindCalled}
@@ -318,7 +322,7 @@ func (pp *PostBindPlugin) Name() string {
 }
 
 // PostBind is a test function, which counts the number of times called.
-func (pp *PostBindPlugin) PostBind(state *framework.CycleState, pod *v1.Pod, nodeName string) {
+func (pp *PostBindPlugin) PostBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
 	pp.numPostBindCalled++
 	if pp.pluginInvokeEventChan != nil {
 		pp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: pp.Name(), val: pp.numPostBindCalled}
@@ -341,7 +345,7 @@ func (pp *PreFilterPlugin) PreFilterExtensions() framework.PreFilterExtensions {
 }
 
 // PreFilter is a test function that returns (true, nil) or errors for testing.
-func (pp *PreFilterPlugin) PreFilter(state *framework.CycleState, pod *v1.Pod) *framework.Status {
+func (pp *PreFilterPlugin) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
 	pp.numPreFilterCalled++
 	if pp.failPreFilter {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
@@ -366,7 +370,7 @@ func (up *UnreservePlugin) Name() string {
 
 // Unreserve is a test function that returns an error or nil, depending on the
 // value of "failUnreserve".
-func (up *UnreservePlugin) Unreserve(state *framework.CycleState, pod *v1.Pod, nodeName string) {
+func (up *UnreservePlugin) Unreserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
 	up.numUnreserveCalled++
 	if up.pluginInvokeEventChan != nil {
 		up.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: up.Name(), val: up.numUnreserveCalled}
@@ -380,11 +384,11 @@ func (up *UnreservePlugin) reset() {
 
 // Name returns name of the plugin.
 func (pp *PermitPlugin) Name() string {
-	return permitPluginName
+	return pp.name
 }
 
 // Permit implements the permit test plugin.
-func (pp *PermitPlugin) Permit(state *framework.CycleState, pod *v1.Pod, nodeName string) (*framework.Status, time.Duration) {
+func (pp *PermitPlugin) Permit(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (*framework.Status, time.Duration) {
 	pp.numPermitCalled++
 	if pp.failPermit {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name)), 0
@@ -393,8 +397,15 @@ func (pp *PermitPlugin) Permit(state *framework.CycleState, pod *v1.Pod, nodeNam
 		return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name)), 0
 	}
 	if pp.timeoutPermit {
+		go func() {
+			select {
+			case <-ctx.Done():
+				pp.cancelled = true
+			}
+		}()
 		return framework.NewStatus(framework.Wait, ""), 3 * time.Second
 	}
+
 	if pp.allowPermit && pod.Name != "waiting-pod" {
 		return nil, 0
 	}
@@ -415,11 +426,21 @@ func (pp *PermitPlugin) Permit(state *framework.CycleState, pod *v1.Pod, nodeNam
 			return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name)), 0
 		}
 		if pp.waitAndAllowPermit {
-			pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { wp.Allow() })
+			pp.allowAllPods()
 			return nil, 0
 		}
 	}
 	return nil, 0
+}
+
+// allowAllPods allows all waiting pods.
+func (pp *PermitPlugin) allowAllPods() {
+	pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { wp.Allow(pp.name) })
+}
+
+// rejectAllPods rejects all waiting pods.
+func (pp *PermitPlugin) rejectAllPods() {
+	pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { wp.Reject("rejectAllPods") })
 }
 
 // reset used to reset permit plugin.
@@ -431,6 +452,7 @@ func (pp *PermitPlugin) reset() {
 	pp.waitAndRejectPermit = false
 	pp.waitAndAllowPermit = false
 	pp.allowPermit = false
+	pp.cancelled = false
 }
 
 // newPermitPlugin returns a factory for permit plugin with specified PermitPlugin.
@@ -683,17 +705,10 @@ func TestPrebindPlugin(t *testing.T) {
 			},
 		},
 	}
-	// Set reserve prebind config for testing
-	preBindPluginConfig := []schedulerconfig.PluginConfig{
-		{
-			Name: preBindPluginName,
-			Args: runtime.Unknown{},
-		},
-	}
+
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "prebind-plugin", nil), 2,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkPluginConfig(preBindPluginConfig),
 		scheduler.WithFrameworkDefaultRegistry(registry))
 	defer cleanupTest(t, context)
 
@@ -773,22 +788,10 @@ func TestUnreservePlugin(t *testing.T) {
 			},
 		},
 	}
-	// Set unreserve and prebind plugin config for testing
-	pluginConfig := []schedulerconfig.PluginConfig{
-		{
-			Name: unreservePluginName,
-			Args: runtime.Unknown{},
-		},
-		{
-			Name: preBindPluginName,
-			Args: runtime.Unknown{},
-		},
-	}
 
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "unreserve-plugin", nil), 2,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkPluginConfig(pluginConfig),
 		scheduler.WithFrameworkDefaultRegistry(registry))
 	defer cleanupTest(t, context)
 
@@ -875,30 +878,10 @@ func TestBindPlugin(t *testing.T) {
 			Enabled: []schedulerconfig.Plugin{{Name: postBindPlugin.Name()}},
 		},
 	}
-	// Set reserve and bind config for testing
-	pluginConfig := []schedulerconfig.PluginConfig{
-		{
-			Name: unreservePlugin.Name(),
-			Args: runtime.Unknown{},
-		},
-		{
-			Name: bindPlugin1.Name(),
-			Args: runtime.Unknown{},
-		},
-		{
-			Name: bindPlugin2.Name(),
-			Args: runtime.Unknown{},
-		},
-		{
-			Name: postBindPlugin.Name(),
-			Args: runtime.Unknown{},
-		},
-	}
 
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t, testContext, false, nil, time.Second,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkPluginConfig(pluginConfig),
 		scheduler.WithFrameworkDefaultRegistry(registry),
 		scheduler.WithFrameworkConfigProducerRegistry(nil))
 	defer cleanupTest(t, context)
@@ -1056,22 +1039,10 @@ func TestPostBindPlugin(t *testing.T) {
 			},
 		},
 	}
-	// Set reserve prebind and postbind config for testing
-	pluginConfig := []schedulerconfig.PluginConfig{
-		{
-			Name: preBindPluginName,
-			Args: runtime.Unknown{},
-		},
-		{
-			Name: postBindPluginName,
-			Args: runtime.Unknown{},
-		},
-	}
 
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "postbind-plugin", nil), 2,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkPluginConfig(pluginConfig),
 		scheduler.WithFrameworkDefaultRegistry(registry))
 	defer cleanupTest(t, context)
 
@@ -1122,31 +1093,12 @@ func TestPostBindPlugin(t *testing.T) {
 // TestPermitPlugin tests invocation of permit plugins.
 func TestPermitPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a permit plugin.
-	perPlugin := &PermitPlugin{}
-	registry := framework.Registry{permitPluginName: newPermitPlugin(perPlugin)}
-
-	// Setup initial permit plugin for testing.
-	plugins := &schedulerconfig.Plugins{
-		Permit: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: permitPluginName,
-				},
-			},
-		},
-	}
-	// Set permit plugin config for testing
-	pluginConfig := []schedulerconfig.PluginConfig{
-		{
-			Name: permitPluginName,
-			Args: runtime.Unknown{},
-		},
-	}
+	perPlugin := &PermitPlugin{name: permitPluginName}
+	registry, plugins := initRegistryAndConfig(perPlugin)
 
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "permit-plugin", nil), 2,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkPluginConfig(pluginConfig),
 		scheduler.WithFrameworkDefaultRegistry(registry))
 	defer cleanupTest(t, context)
 
@@ -1225,34 +1177,112 @@ func TestPermitPlugin(t *testing.T) {
 	}
 }
 
+// TestMultiplePermitPlugins tests multiple permit plugins returning wait for a same pod.
+func TestMultiplePermitPlugins(t *testing.T) {
+	// Create a plugin registry for testing.
+	perPlugin1 := &PermitPlugin{name: "permit-plugin-1"}
+	perPlugin2 := &PermitPlugin{name: "permit-plugin-2"}
+	registry, plugins := initRegistryAndConfig(perPlugin1, perPlugin2)
+
+	// Create the master and the scheduler with the test plugin set.
+	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "multi-permit-plugin", nil), 2,
+		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithFrameworkDefaultRegistry(registry))
+	defer cleanupTest(t, context)
+
+	// Both permit plugins will return Wait for permitting
+	perPlugin1.timeoutPermit = true
+	perPlugin2.timeoutPermit = true
+
+	// Create a test pod.
+	podName := "test-pod"
+	pod, err := createPausePod(context.clientSet,
+		initPausePod(context.clientSet, &pausePodConfig{Name: podName, Namespace: context.ns.Name}))
+	if err != nil {
+		t.Errorf("Error while creating a test pod: %v", err)
+	}
+
+	var waitingPod framework.WaitingPod
+	// Wait until the test pod is actually waiting.
+	wait.Poll(10*time.Millisecond, 30*time.Second, func() (bool, error) {
+		waitingPod = perPlugin1.fh.GetWaitingPod(pod.UID)
+		return waitingPod != nil, nil
+	})
+
+	// Check the number of pending permits
+	if l := len(waitingPod.GetPendingPlugins()); l != 2 {
+		t.Errorf("Expected the number of pending plugins is 2, but got %d", l)
+	}
+
+	perPlugin1.allowAllPods()
+	// Check the number of pending permits
+	if l := len(waitingPod.GetPendingPlugins()); l != 1 {
+		t.Errorf("Expected the number of pending plugins is 1, but got %d", l)
+	}
+
+	perPlugin2.allowAllPods()
+	if err = waitForPodToSchedule(context.clientSet, pod); err != nil {
+		t.Errorf("Expected the pod to be scheduled. error: %v", err)
+	}
+
+	if perPlugin1.numPermitCalled == 0 || perPlugin2.numPermitCalled == 0 {
+		t.Errorf("Expected the permit plugin to be called.")
+	}
+
+	cleanupPods(context.clientSet, t, []*v1.Pod{pod})
+}
+
+// TestPermitPluginsCancelled tests whether all permit plugins are cancelled when pod is rejected.
+func TestPermitPluginsCancelled(t *testing.T) {
+	// Create a plugin registry for testing.
+	perPlugin1 := &PermitPlugin{name: "permit-plugin-1"}
+	perPlugin2 := &PermitPlugin{name: "permit-plugin-2"}
+	registry, plugins := initRegistryAndConfig(perPlugin1, perPlugin2)
+
+	// Create the master and the scheduler with the test plugin set.
+	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "permit-plugins", nil), 2,
+		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithFrameworkDefaultRegistry(registry))
+	defer cleanupTest(t, context)
+
+	// Both permit plugins will return Wait for permitting
+	perPlugin1.timeoutPermit = true
+	perPlugin2.timeoutPermit = true
+
+	// Create a test pod.
+	podName := "test-pod"
+	pod, err := createPausePod(context.clientSet,
+		initPausePod(context.clientSet, &pausePodConfig{Name: podName, Namespace: context.ns.Name}))
+	if err != nil {
+		t.Errorf("Error while creating a test pod: %v", err)
+	}
+
+	var waitingPod framework.WaitingPod
+	// Wait until the test pod is actually waiting.
+	wait.Poll(10*time.Millisecond, 30*time.Second, func() (bool, error) {
+		waitingPod = perPlugin1.fh.GetWaitingPod(pod.UID)
+		return waitingPod != nil, nil
+	})
+
+	perPlugin1.rejectAllPods()
+	// Wait some time for the permit plugins to be cancelled
+	err = wait.Poll(10*time.Millisecond, 30*time.Second, func() (bool, error) {
+		return perPlugin1.cancelled && perPlugin2.cancelled, nil
+	})
+	if err != nil {
+		t.Errorf("Expected all permit plugins to be cancelled")
+	}
+}
+
 // TestCoSchedulingWithPermitPlugin tests invocation of permit plugins.
 func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a permit plugin.
-	permitPlugin := &PermitPlugin{}
-	registry := framework.Registry{permitPluginName: newPermitPlugin(permitPlugin)}
-
-	// Setup initial permit plugin for testing.
-	plugins := &schedulerconfig.Plugins{
-		Permit: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: permitPluginName,
-				},
-			},
-		},
-	}
-	// Set permit plugin config for testing
-	pluginConfig := []schedulerconfig.PluginConfig{
-		{
-			Name: permitPluginName,
-			Args: runtime.Unknown{},
-		},
-	}
+	permitPlugin := &PermitPlugin{name: permitPluginName}
+	registry, plugins := initRegistryAndConfig(permitPlugin)
 
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "permit-plugin", nil), 2,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkPluginConfig(pluginConfig),
 		scheduler.WithFrameworkDefaultRegistry(registry))
 	defer cleanupTest(t, context)
 
@@ -1420,30 +1450,16 @@ func TestPostFilterPlugin(t *testing.T) {
 func TestPreemptWithPermitPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a permit plugin.
 	permitPlugin := &PermitPlugin{}
-	registry := framework.Registry{permitPluginName: newPermitPlugin(permitPlugin)}
-
-	// Setup initial permit plugin for testing.
-	plugins := &schedulerconfig.Plugins{
-		Permit: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: permitPluginName,
-				},
-			},
-		},
-	}
-	// Set permit plugin config for testing
-	pluginConfig := []schedulerconfig.PluginConfig{
-		{
-			Name: permitPluginName,
-			Args: runtime.Unknown{},
-		},
+	registry, plugins := initRegistryAndConfig(permitPlugin)
+	// Fit filter plugin must be registered.
+	registry.Register(noderesources.FitName, noderesources.NewFit)
+	plugins.Filter = &schedulerconfig.PluginSet{
+		Enabled: []schedulerconfig.Plugin{{Name: noderesources.FitName}},
 	}
 
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "preempt-with-permit-plugin", nil), 0,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkPluginConfig(pluginConfig),
 		scheduler.WithFrameworkDefaultRegistry(registry))
 	defer cleanupTest(t, context)
 
@@ -1517,4 +1533,23 @@ func initTestSchedulerForFrameworkTest(t *testing.T, context *testContext, nodeC
 		}
 	}
 	return c
+}
+
+// initRegistryAndConfig returns registry and plugins config based on give plugins.
+// TODO: refactor it to a more generic functions that accepts all kinds of Plugins as arguments
+func initRegistryAndConfig(pp ...*PermitPlugin) (registry framework.Registry, plugins *schedulerconfig.Plugins) {
+	if len(pp) == 0 {
+		return
+	}
+
+	registry = framework.Registry{}
+	plugins = &schedulerconfig.Plugins{
+		Permit: &schedulerconfig.PluginSet{},
+	}
+
+	for _, p := range pp {
+		registry.Register(p.Name(), newPermitPlugin(p))
+		plugins.Permit.Enabled = append(plugins.Permit.Enabled, schedulerconfig.Plugin{Name: p.Name()})
+	}
+	return
 }

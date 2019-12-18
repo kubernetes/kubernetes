@@ -22,7 +22,7 @@ go_library(
         "//pkg/quota/v1/generic:go_default_library",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota:go_default_library",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota/install:go_default_library",
-        "//plugin/pkg/admission/resourcequota/apis/resourcequota/v1beta1:go_default_library",
+        "//plugin/pkg/admission/resourcequota/apis/resourcequota/v1:go_default_library",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota/validation:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -49,7 +49,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["admission_test.go"],
+    srcs = [
+        "admission_test.go",
+        "config_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",

@@ -75,10 +75,6 @@ func (plugin *testPlugins) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *testPlugins) IsMigratedToCSI() bool {
-	return false
-}
-
 func (plugin *testPlugins) RequiresRemount() bool {
 	return false
 }

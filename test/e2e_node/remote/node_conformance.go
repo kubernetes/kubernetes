@@ -34,6 +34,7 @@ import (
 // ConformanceRemote contains the specific functions in the node conformance test suite.
 type ConformanceRemote struct{}
 
+// InitConformanceRemote initializes the node conformance test suite.
 func InitConformanceRemote() TestSuite {
 	return &ConformanceRemote{}
 }
@@ -68,9 +69,8 @@ var timestamp = getTimestamp()
 func getConformanceTestImageName(systemSpecName string) string {
 	if systemSpecName == "" {
 		return fmt.Sprintf("%s/node-test-%s:%s", conformanceRegistry, conformanceArch, timestamp)
-	} else {
-		return fmt.Sprintf("%s/node-test-%s-%s:%s", conformanceRegistry, systemSpecName, conformanceArch, timestamp)
 	}
+	return fmt.Sprintf("%s/node-test-%s-%s:%s", conformanceRegistry, systemSpecName, conformanceArch, timestamp)
 }
 
 // buildConformanceTest builds node conformance test image tarball into binDir.

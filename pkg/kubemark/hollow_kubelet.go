@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/klog"
+	"k8s.io/utils/mount"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
@@ -31,7 +34,6 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/cephfs"
@@ -57,8 +59,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/test/utils"
-
-	"k8s.io/klog"
 )
 
 type HollowKubelet struct {
@@ -111,7 +111,7 @@ func NewHollowKubelet(
 		VolumePlugins:      volumePlugins(),
 		TLSOptions:         nil,
 		OOMAdjuster:        oom.NewFakeOOMAdjuster(),
-		Mounter:            mount.New("" /* default mount path */),
+		Mounter:            &mount.FakeMounter{},
 		Subpather:          &subpath.FakeSubpath{},
 		HostUtil:           hostutil.NewFakeHostUtil(nil),
 	}
@@ -159,6 +159,7 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	f.MinimumGCAge = metav1.Duration{Duration: 1 * time.Minute}
 	f.MaxContainerCount = 100
 	f.MaxPerPodContainerCount = 2
+	f.NodeLabels = opt.NodeLabels
 	f.RegisterNode = true
 	f.RegisterSchedulable = true
 	f.ProviderID = fmt.Sprintf("kubemark://%v", opt.NodeName)
@@ -177,7 +178,7 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	c.FileCheckFrequency.Duration = 20 * time.Second
 	c.HTTPCheckFrequency.Duration = 20 * time.Second
 	c.NodeStatusUpdateFrequency.Duration = 10 * time.Second
-	c.NodeStatusReportFrequency.Duration = time.Minute
+	c.NodeStatusReportFrequency.Duration = 5 * time.Minute
 	c.SyncFrequency.Duration = 10 * time.Second
 	c.EvictionPressureTransitionPeriod.Duration = 5 * time.Minute
 	c.MaxPods = int32(opt.MaxPods)

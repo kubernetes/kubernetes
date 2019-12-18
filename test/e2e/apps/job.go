@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
@@ -162,7 +162,7 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By("Ensuring job was deleted")
 		_, err = jobutil.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
 		framework.ExpectError(err, "failed to ensure job %s was deleted in namespace: %s", job.Name, f.Namespace.Name)
-		gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
+		framework.ExpectEqual(errors.IsNotFound(err), true)
 	})
 
 	/*

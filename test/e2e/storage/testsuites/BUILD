@@ -27,7 +27,6 @@ go_library(
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1:go_default_library",
-        "//staging/src/k8s.io/api/storage/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -42,6 +41,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/storage/names:go_default_library",
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/testutil:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib/plugins:go_default_library",
         "//test/e2e/framework:go_default_library",
@@ -56,6 +56,7 @@ go_library(
         "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
     ],
 )
 
@@ -75,7 +76,13 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["base_test.go"],
+    srcs = [
+        "api_test.go",
+        "base_test.go",
+    ],
     embed = [":go_default_library"],
-    deps = ["//test/e2e/framework/volume:go_default_library"],
+    deps = [
+        "//test/e2e/framework/volume:go_default_library",
+        "//test/e2e/storage/testpatterns:go_default_library",
+    ],
 )

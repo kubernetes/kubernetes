@@ -28,6 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
@@ -45,8 +46,8 @@ var _ TestSuite = &volumesTestSuite{}
 func InitVolumesTestSuite() TestSuite {
 	return &volumesTestSuite{
 		tsInfo: TestSuiteInfo{
-			name: "volumes",
-			testPatterns: []testpatterns.TestPattern{
+			Name: "volumes",
+			TestPatterns: []testpatterns.TestPattern{
 				// Default fsType
 				testpatterns.DefaultFsInlineVolume,
 				testpatterns.DefaultFsPreprovisionedPV,
@@ -71,18 +72,18 @@ func InitVolumesTestSuite() TestSuite {
 				testpatterns.BlockVolModePreprovisionedPV,
 				testpatterns.BlockVolModeDynamicPV,
 			},
-			supportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: volume.SizeRange{
 				Min: "1Mi",
 			},
 		},
 	}
 }
 
-func (t *volumesTestSuite) getTestSuiteInfo() TestSuiteInfo {
+func (t *volumesTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumesTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumesTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
 func skipExecTest(driver TestDriver) {
@@ -99,12 +100,12 @@ func skipTestIfBlockNotSupported(driver TestDriver) {
 	}
 }
 
-func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumesTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config        *PerTestConfig
 		driverCleanup func()
 
-		resource *genericVolumeTestResource
+		resource *VolumeResource
 
 		intreeOps   opCounts
 		migratedOps opCounts
@@ -126,24 +127,23 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
-		testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
-		l.resource = createGenericVolumeTestResource(driver, l.config, pattern, testVolumeSizeRange)
-		if l.resource.volSource == nil {
+		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
+		if l.resource.VolSource == nil {
 			framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 		}
 	}
 
 	cleanup := func() {
+		var errs []error
 		if l.resource != nil {
-			l.resource.cleanupResource()
+			errs = append(errs, l.resource.CleanupResource())
 			l.resource = nil
 		}
 
-		if l.driverCleanup != nil {
-			l.driverCleanup()
-			l.driverCleanup = nil
-		}
-
+		errs = append(errs, tryFunc(l.driverCleanup))
+		l.driverCleanup = nil
+		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 
@@ -160,7 +160,7 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 
 		tests := []volume.Test{
 			{
-				Volume: *l.resource.volSource,
+				Volume: *l.resource.VolSource,
 				Mode:   pattern.VolMode,
 				File:   "index.html",
 				// Must match content
@@ -178,9 +178,9 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		// local), plugin skips setting fsGroup if volume is already mounted
 		// and we don't have reliable way to detect volumes are unmounted or
 		// not before starting the second pod.
-		volume.InjectContent(f.ClientSet, config, fsGroup, pattern.FsType, tests)
+		volume.InjectContent(f, config, fsGroup, pattern.FsType, tests)
 		if driver.GetDriverInfo().Capabilities[CapPersistence] {
-			volume.TestVolumeClient(f.ClientSet, config, fsGroup, pattern.FsType, tests)
+			volume.TestVolumeClient(f, config, fsGroup, pattern.FsType, tests)
 		} else {
 			ginkgo.By("Skipping persistence check for non-persistent volume")
 		}
@@ -193,7 +193,7 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 			init()
 			defer cleanup()
 
-			testScriptInPod(f, l.resource.volType, l.resource.volSource, l.config)
+			testScriptInPod(f, string(pattern.VolType), l.resource.VolSource, l.config)
 		})
 	}
 }

@@ -210,14 +210,14 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 	ginkgo.It("should create service with cluster ip from primary service range [Feature:IPv6DualStackAlphaFeature:Phase2]", func() {
 		serviceName := "defaultclusterip"
 		ns := f.Namespace.Name
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 
 		defaultIPFamily := v1.IPv4Protocol
 		if framework.TestContext.ClusterIsIPv6() {
 			defaultIPFamily = v1.IPv6Protocol
 		}
 
-		t := e2eservice.NewServerTest(cs, ns, serviceName)
+		t := NewServerTest(cs, ns, serviceName)
 		defer func() {
 			defer ginkgo.GinkgoRecover()
 			if errs := t.Cleanup(); len(errs) != 0 {
@@ -229,7 +229,8 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		service := createService(t.ServiceName, t.Namespace, t.Labels, nil)
 
 		jig.Labels = t.Labels
-		jig.CreateServicePods(cs, ns, 2)
+		err := jig.CreateServicePods(2)
+		framework.ExpectNoError(err)
 		svc, err := t.CreateService(service)
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
@@ -251,9 +252,9 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		ns := f.Namespace.Name
 		ipv4 := v1.IPv4Protocol
 
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 
-		t := e2eservice.NewServerTest(cs, ns, serviceName)
+		t := NewServerTest(cs, ns, serviceName)
 		defer func() {
 			defer ginkgo.GinkgoRecover()
 			if errs := t.Cleanup(); len(errs) != 0 {
@@ -265,7 +266,8 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		service := createService(t.ServiceName, t.Namespace, t.Labels, &ipv4)
 
 		jig.Labels = t.Labels
-		jig.CreateServicePods(cs, ns, 2)
+		err := jig.CreateServicePods(2)
+		framework.ExpectNoError(err)
 		svc, err := t.CreateService(service)
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
@@ -287,9 +289,9 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		ns := f.Namespace.Name
 		ipv6 := v1.IPv6Protocol
 
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 
-		t := e2eservice.NewServerTest(cs, ns, serviceName)
+		t := NewServerTest(cs, ns, serviceName)
 		defer func() {
 			defer ginkgo.GinkgoRecover()
 			if errs := t.Cleanup(); len(errs) != 0 {
@@ -301,7 +303,8 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		service := createService(t.ServiceName, t.Namespace, t.Labels, &ipv6)
 
 		jig.Labels = t.Labels
-		jig.CreateServicePods(cs, ns, 2)
+		err := jig.CreateServicePods(2)
+		framework.ExpectNoError(err)
 		svc, err := t.CreateService(service)
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 

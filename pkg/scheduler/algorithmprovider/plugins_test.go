@@ -20,20 +20,18 @@ import (
 	"fmt"
 	"testing"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
 var (
 	algorithmProviderNames = []string{
-		scheduler.DefaultProvider,
+		schedulerapi.SchedulerDefaultProviderName,
 	}
 )
 
 func TestDefaultConfigExists(t *testing.T) {
-	p, err := scheduler.GetAlgorithmProvider(scheduler.DefaultProvider)
+	p, err := scheduler.GetAlgorithmProvider(schedulerapi.SchedulerDefaultProviderName)
 	if err != nil {
 		t.Errorf("error retrieving default provider: %v", err)
 	}
@@ -81,18 +79,11 @@ func TestApplyFeatureGates(t *testing.T) {
 				t.Fatalf("Error retrieving provider: %v", err)
 			}
 
-			if !p.FitPredicateKeys.Has("CheckNodeCondition") {
-				t.Fatalf("Failed to find predicate: 'CheckNodeCondition'")
-			}
-
 			if !p.FitPredicateKeys.Has("PodToleratesNodeTaints") {
 				t.Fatalf("Failed to find predicate: 'PodToleratesNodeTaints'")
 			}
 		})
 	}
-
-	// Apply features for algorithm providers.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintNodesByCondition, true)()
 
 	defer ApplyFeatureGates()()
 
@@ -105,10 +96,6 @@ func TestApplyFeatureGates(t *testing.T) {
 
 			if !p.FitPredicateKeys.Has("PodToleratesNodeTaints") {
 				t.Fatalf("Failed to find predicate: 'PodToleratesNodeTaints'")
-			}
-
-			if p.FitPredicateKeys.Has("CheckNodeCondition") {
-				t.Fatalf("Unexpected predicate: 'CheckNodeCondition'")
 			}
 		})
 	}

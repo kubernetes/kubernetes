@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -19,6 +14,7 @@ go_library(
         "service_accounts.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/auth",
+    visibility = ["//visibility:public"],
     deps = [
         "//pkg/master/ports:go_default_library",
         "//pkg/security/apparmor:go_default_library",
@@ -51,14 +47,13 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/typed/certificates/v1beta1:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
-        "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/auth:go_default_library",
         "//test/e2e/framework/deployment:go_default_library",
         "//test/e2e/framework/job:go_default_library",
+        "//test/e2e/framework/kubectl:go_default_library",
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
-        "//test/e2e/framework/psp:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
@@ -79,4 +74,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

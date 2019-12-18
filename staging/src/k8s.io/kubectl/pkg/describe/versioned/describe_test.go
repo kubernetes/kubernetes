@@ -30,7 +30,7 @@ import (
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
-	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -1753,7 +1753,7 @@ func TestDescribePodDisruptionBudget(t *testing.T) {
 			MinAvailable: &minAvailable,
 		},
 		Status: policyv1beta1.PodDisruptionBudgetStatus{
-			PodDisruptionsAllowed: 5,
+			DisruptionsAllowed: 5,
 		},
 	})
 	s := PodDisruptionBudgetDescriber{f}
@@ -1773,6 +1773,7 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 	minReplicasVal := int32(2)
 	targetUtilizationVal := int32(80)
 	currentUtilizationVal := int32(50)
+	maxSelectPolicy := autoscalingv2beta2.MaxPolicySelect
 	metricLabelSelector, err := metav1.ParseToLabelSelector("label=value")
 	if err != nil {
 		t.Errorf("unable to parse label selector: %v", err)
@@ -2417,6 +2418,75 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 				},
 			},
 		},
+		{
+			"scale up behavior specified",
+			autoscalingv2beta2.HorizontalPodAutoscaler{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
+						Name: "behavior-target",
+						Kind: "Deployment",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscalingv2beta2.MetricSpec{
+						{
+							Type: autoscalingv2beta2.ResourceMetricSourceType,
+							Resource: &autoscalingv2beta2.ResourceMetricSource{
+								Name: corev1.ResourceCPU,
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:               autoscalingv2beta2.UtilizationMetricType,
+									AverageUtilization: &targetUtilizationVal,
+								},
+							},
+						},
+					},
+					Behavior: &autoscalingv2beta2.HorizontalPodAutoscalerBehavior{
+						ScaleUp: &autoscalingv2beta2.HPAScalingRules{
+							StabilizationWindowSeconds: utilpointer.Int32Ptr(30),
+							SelectPolicy:               &maxSelectPolicy,
+							Policies: []autoscalingv2beta2.HPAScalingPolicy{
+								{Type: autoscalingv2beta2.PodsScalingPolicy, Value: 10, PeriodSeconds: 10},
+								{Type: autoscalingv2beta2.PercentScalingPolicy, Value: 10, PeriodSeconds: 10},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			"scale down behavior specified",
+			autoscalingv2beta2.HorizontalPodAutoscaler{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
+						Name: "behavior-target",
+						Kind: "Deployment",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscalingv2beta2.MetricSpec{
+						{
+							Type: autoscalingv2beta2.ResourceMetricSourceType,
+							Resource: &autoscalingv2beta2.ResourceMetricSource{
+								Name: corev1.ResourceCPU,
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:               autoscalingv2beta2.UtilizationMetricType,
+									AverageUtilization: &targetUtilizationVal,
+								},
+							},
+						},
+					},
+					Behavior: &autoscalingv2beta2.HorizontalPodAutoscalerBehavior{
+						ScaleDown: &autoscalingv2beta2.HPAScalingRules{
+							StabilizationWindowSeconds: utilpointer.Int32Ptr(30),
+							Policies: []autoscalingv2beta2.HPAScalingPolicy{
+								{Type: autoscalingv2beta2.PodsScalingPolicy, Value: 10, PeriodSeconds: 10},
+								{Type: autoscalingv2beta2.PercentScalingPolicy, Value: 10, PeriodSeconds: 10},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range testsV2beta2 {
@@ -2582,7 +2652,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"EndpointSliceDescriber": &EndpointSliceDescriber{
-			fake.NewSimpleClientset(&discoveryv1alpha1.EndpointSlice{
+			fake.NewSimpleClientset(&discoveryv1beta1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -3133,7 +3203,262 @@ Spec:
 		},
 	})
 	d := NetworkPolicyDescriber{versionedFake}
-	out, err := d.Describe("", "network-policy-1", describe.DescriberSettings{})
+	out, err := d.Describe("default", "network-policy-1", describe.DescriberSettings{})
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+	if out != expectedOut {
+		t.Errorf("want:\n%s\ngot:\n%s", expectedOut, out)
+	}
+}
+
+func TestDescribeIngressNetworkPolicies(t *testing.T) {
+	expectedTime, err := time.Parse("2006-01-02 15:04:05 Z0700 MST", "2017-06-04 21:45:56 -0700 PDT")
+	if err != nil {
+		t.Errorf("unable to parse time %q error: %s", "2017-06-04 21:45:56 -0700 PDT", err)
+	}
+	expectedOut := `Name:         network-policy-1
+Namespace:    default
+Created on:   2017-06-04 21:45:56 -0700 PDT
+Labels:       <none>
+Annotations:  <none>
+Spec:
+  PodSelector:     foo in (bar1,bar2),foo2 notin (bar1,bar2),id1=app1,id2=app2
+  Allowing ingress traffic:
+    To Port: 80/TCP
+    To Port: 82/TCP
+    From:
+      NamespaceSelector: id=ns1,id2=ns2
+      PodSelector: id=pod1,id2=pod2
+    From:
+      PodSelector: id=app2,id2=app3
+    From:
+      NamespaceSelector: id=app2,id2=app3
+    From:
+      NamespaceSelector: foo in (bar1,bar2),id=app2,id2=app3
+    From:
+      IPBlock:
+        CIDR: 192.168.0.0/16
+        Except: 192.168.3.0/24, 192.168.4.0/24
+    ----------
+    To Port: <any> (traffic allowed to all ports)
+    From: <any> (traffic not restricted by source)
+  Not affecting egress traffic
+  Policy Types: Ingress
+`
+
+	port80 := intstr.FromInt(80)
+	port82 := intstr.FromInt(82)
+	protoTCP := corev1.ProtocolTCP
+
+	versionedFake := fake.NewSimpleClientset(&networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "network-policy-1",
+			Namespace:         "default",
+			CreationTimestamp: metav1.NewTime(expectedTime),
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"id1": "app1",
+					"id2": "app2",
+				},
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{Key: "foo", Operator: "In", Values: []string{"bar1", "bar2"}},
+					{Key: "foo2", Operator: "NotIn", Values: []string{"bar1", "bar2"}},
+				},
+			},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{
+				{
+					Ports: []networkingv1.NetworkPolicyPort{
+						{Port: &port80},
+						{Port: &port82, Protocol: &protoTCP},
+					},
+					From: []networkingv1.NetworkPolicyPeer{
+						{
+							PodSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "pod1",
+									"id2": "pod2",
+								},
+							},
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "ns1",
+									"id2": "ns2",
+								},
+							},
+						},
+						{
+							PodSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+							},
+						},
+						{
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+							},
+						},
+						{
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{Key: "foo", Operator: "In", Values: []string{"bar1", "bar2"}},
+								},
+							},
+						},
+						{
+							IPBlock: &networkingv1.IPBlock{
+								CIDR:   "192.168.0.0/16",
+								Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
+							},
+						},
+					},
+				},
+				{},
+			},
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
+		},
+	})
+	d := NetworkPolicyDescriber{versionedFake}
+	out, err := d.Describe("default", "network-policy-1", describe.DescriberSettings{})
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+	if out != expectedOut {
+		t.Errorf("want:\n%s\ngot:\n%s", expectedOut, out)
+	}
+}
+
+func TestDescribeIsolatedEgressNetworkPolicies(t *testing.T) {
+	expectedTime, err := time.Parse("2006-01-02 15:04:05 Z0700 MST", "2017-06-04 21:45:56 -0700 PDT")
+	if err != nil {
+		t.Errorf("unable to parse time %q error: %s", "2017-06-04 21:45:56 -0700 PDT", err)
+	}
+	expectedOut := `Name:         network-policy-1
+Namespace:    default
+Created on:   2017-06-04 21:45:56 -0700 PDT
+Labels:       <none>
+Annotations:  <none>
+Spec:
+  PodSelector:     foo in (bar1,bar2),foo2 notin (bar1,bar2),id1=app1,id2=app2
+  Allowing ingress traffic:
+    To Port: 80/TCP
+    To Port: 82/TCP
+    From:
+      NamespaceSelector: id=ns1,id2=ns2
+      PodSelector: id=pod1,id2=pod2
+    From:
+      PodSelector: id=app2,id2=app3
+    From:
+      NamespaceSelector: id=app2,id2=app3
+    From:
+      NamespaceSelector: foo in (bar1,bar2),id=app2,id2=app3
+    From:
+      IPBlock:
+        CIDR: 192.168.0.0/16
+        Except: 192.168.3.0/24, 192.168.4.0/24
+    ----------
+    To Port: <any> (traffic allowed to all ports)
+    From: <any> (traffic not restricted by source)
+  Allowing egress traffic:
+    <none> (Selected pods are isolated for egress connectivity)
+  Policy Types: Ingress, Egress
+`
+
+	port80 := intstr.FromInt(80)
+	port82 := intstr.FromInt(82)
+	protoTCP := corev1.ProtocolTCP
+
+	versionedFake := fake.NewSimpleClientset(&networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "network-policy-1",
+			Namespace:         "default",
+			CreationTimestamp: metav1.NewTime(expectedTime),
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"id1": "app1",
+					"id2": "app2",
+				},
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{Key: "foo", Operator: "In", Values: []string{"bar1", "bar2"}},
+					{Key: "foo2", Operator: "NotIn", Values: []string{"bar1", "bar2"}},
+				},
+			},
+			Ingress: []networkingv1.NetworkPolicyIngressRule{
+				{
+					Ports: []networkingv1.NetworkPolicyPort{
+						{Port: &port80},
+						{Port: &port82, Protocol: &protoTCP},
+					},
+					From: []networkingv1.NetworkPolicyPeer{
+						{
+							PodSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "pod1",
+									"id2": "pod2",
+								},
+							},
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "ns1",
+									"id2": "ns2",
+								},
+							},
+						},
+						{
+							PodSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+							},
+						},
+						{
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+							},
+						},
+						{
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{Key: "foo", Operator: "In", Values: []string{"bar1", "bar2"}},
+								},
+							},
+						},
+						{
+							IPBlock: &networkingv1.IPBlock{
+								CIDR:   "192.168.0.0/16",
+								Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
+							},
+						},
+					},
+				},
+				{},
+			},
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress, networkingv1.PolicyTypeEgress},
+		},
+	})
+	d := NetworkPolicyDescriber{versionedFake}
+	out, err := d.Describe("default", "network-policy-1", describe.DescriberSettings{})
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
 	}
@@ -3261,20 +3586,19 @@ func TestDescribeStatefulSet(t *testing.T) {
 }
 
 func TestDescribeEndpointSlice(t *testing.T) {
-	addressTypeIP := discoveryv1alpha1.AddressTypeIP
 	protocolTCP := corev1.ProtocolTCP
 	port80 := int32(80)
 
-	fake := fake.NewSimpleClientset(&discoveryv1alpha1.EndpointSlice{
+	fake := fake.NewSimpleClientset(&discoveryv1beta1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo.123",
 			Namespace: "bar",
 		},
-		AddressType: &addressTypeIP,
-		Endpoints: []discoveryv1alpha1.Endpoint{
+		AddressType: discoveryv1beta1.AddressTypeIPv4,
+		Endpoints: []discoveryv1beta1.Endpoint{
 			{
 				Addresses:  []string{"1.2.3.4", "1.2.3.5"},
-				Conditions: discoveryv1alpha1.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discoveryv1beta1.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
 				TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-123"},
 				Topology: map[string]string{
 					"topology.kubernetes.io/zone":   "us-central1-a",
@@ -3282,7 +3606,7 @@ func TestDescribeEndpointSlice(t *testing.T) {
 				},
 			}, {
 				Addresses:  []string{"1.2.3.6", "1.2.3.7"},
-				Conditions: discoveryv1alpha1.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Conditions: discoveryv1beta1.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
 				TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-124"},
 				Topology: map[string]string{
 					"topology.kubernetes.io/zone":   "us-central1-b",
@@ -3290,7 +3614,7 @@ func TestDescribeEndpointSlice(t *testing.T) {
 				},
 			},
 		},
-		Ports: []discoveryv1alpha1.EndpointPort{
+		Ports: []discoveryv1beta1.EndpointPort{
 			{
 				Protocol: &protocolTCP,
 				Port:     &port80,
@@ -3309,7 +3633,7 @@ func TestDescribeEndpointSlice(t *testing.T) {
 Namespace:    bar
 Labels:       <none>
 Annotations:  <none>
-AddressType:  IP
+AddressType:  IPv4
 Ports:
   Name     Port  Protocol
   ----     ----  --------

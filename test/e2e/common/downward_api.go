@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -72,7 +73,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 		expectations := []string{
 			fmt.Sprintf("POD_NAME=%v", podName),
 			fmt.Sprintf("POD_NAMESPACE=%v", f.Namespace.Name),
-			fmt.Sprintf("POD_IP=%v|%v", framework.RegexIPv4, framework.RegexIPv6),
+			fmt.Sprintf("POD_IP=%v|%v", e2enetwork.RegexIPv4, e2enetwork.RegexIPv6),
 		}
 
 		testDownwardAPI(f, podName, env, expectations)
@@ -98,7 +99,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 		}
 
 		expectations := []string{
-			fmt.Sprintf("HOST_IP=%v|%v", framework.RegexIPv4, framework.RegexIPv6),
+			fmt.Sprintf("HOST_IP=%v|%v", e2enetwork.RegexIPv4, e2enetwork.RegexIPv6),
 		}
 
 		testDownwardAPI(f, podName, env, expectations)

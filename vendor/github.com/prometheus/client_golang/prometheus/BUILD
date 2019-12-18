@@ -14,11 +14,12 @@ go_library(
         "gauge.go",
         "go_collector.go",
         "histogram.go",
-        "http.go",
         "labels.go",
         "metric.go",
         "observer.go",
         "process_collector.go",
+        "process_collector_other.go",
+        "process_collector_windows.go",
         "registry.go",
         "summary.go",
         "timer.go",
@@ -29,7 +30,7 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/prometheus/client_golang/prometheus",
     importpath = "github.com/prometheus/client_golang/prometheus",
-    visibility = ["//visibility:public"],
+    visibility = ["//staging/src/k8s.io/component-base/metrics:prometheus_import_allow_list"],
     deps = [
         "//vendor/github.com/beorn7/perks/quantile:go_default_library",
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
@@ -37,8 +38,45 @@ go_library(
         "//vendor/github.com/prometheus/client_model/go:go_default_library",
         "//vendor/github.com/prometheus/common/expfmt:go_default_library",
         "//vendor/github.com/prometheus/common/model:go_default_library",
-        "//vendor/github.com/prometheus/procfs:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/prometheus/procfs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//vendor/github.com/prometheus/procfs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//vendor/github.com/prometheus/procfs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/github.com/prometheus/procfs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/github.com/prometheus/procfs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/github.com/prometheus/procfs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//vendor/github.com/prometheus/procfs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/github.com/prometheus/procfs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//vendor/github.com/prometheus/procfs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//vendor/github.com/prometheus/procfs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//vendor/github.com/prometheus/procfs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/golang.org/x/sys/windows:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

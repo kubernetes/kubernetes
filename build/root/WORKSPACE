@@ -44,8 +44,8 @@ http_archive(
 
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "5c02dd4436332f8efa982ce2102daf7c041ae95c2bc7f2d26aceed20dc47def8",
-    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/v0.18.11/rules_go-v0.18.11.tar.gz"),
+    sha256 = "9976c2572587aa71f81b502cc870ef8058f6de37f5fcfaade6a5996934b4a324",
+    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/v0.19.8/rules_go-v0.19.8.tar.gz"),
 )
 
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
@@ -53,7 +53,7 @@ load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_depe
 go_rules_dependencies()
 
 go_register_toolchains(
-    go_version = "1.12.10",
+    go_version = "1.13.4",
 )
 
 http_archive(
@@ -73,11 +73,11 @@ container_repositories()
 load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 
 container_pull(
-    name = "official_busybox",
-    digest = "sha256:5e8e0509e829bb8f990249135a36e81a3ecbe94294e7a185cc14616e5fad96bd",
-    registry = "index.docker.io",
-    repository = "library/busybox",
-    tag = "latest",  # ignored, but kept here for documentation
+    name = "distroless_base",
+    digest = "sha256:7fa7445dfbebae4f4b7ab0e6ef99276e96075ae42584af6286ba080750d6dfe5",
+    registry = "gcr.io",
+    repository = "distroless/base",
+    tag = "latest",  # ignored when digest provided, but kept here for documentation.
 )
 
 load("//build:workspace.bzl", "release_dependencies")

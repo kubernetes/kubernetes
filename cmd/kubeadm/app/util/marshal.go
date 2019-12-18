@@ -30,6 +30,7 @@ import (
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -73,8 +74,8 @@ func UnmarshalFromYamlForCodecs(buffer []byte, gv schema.GroupVersion, codecs se
 
 // SplitYAMLDocuments reads the YAML bytes per-document, unmarshals the TypeMeta information from each document
 // and returns a map between the GroupVersionKind of the document and the document bytes
-func SplitYAMLDocuments(yamlBytes []byte) (map[schema.GroupVersionKind][]byte, error) {
-	gvkmap := map[schema.GroupVersionKind][]byte{}
+func SplitYAMLDocuments(yamlBytes []byte) (kubeadmapi.DocumentMap, error) {
+	gvkmap := kubeadmapi.DocumentMap{}
 	knownKinds := map[string]bool{}
 	errs := []error{}
 	buf := bytes.NewBuffer(yamlBytes)

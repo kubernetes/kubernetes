@@ -30,13 +30,18 @@ spec:
       serviceAccountName: csi-resizer
       containers:
         - name: csi-resizer
-          image: quay.io/k8scsi/csi-resizer:v0.2.0
+          image: quay.io/k8scsi/csi-resizer:v0.3.0
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"
           env:
             - name: ADDRESS
               value: /csi/csi.sock
+          securityContext:
+            # This is necessary only for systems with SELinux, where
+            # non-privileged sidecar containers cannot access unix domain socket
+            # created by privileged CSI driver container.
+            privileged: true
           imagePullPolicy: Always
           volumeMounts:
             - mountPath: /csi

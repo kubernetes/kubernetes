@@ -17,8 +17,9 @@ limitations under the License.
 package priorities
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -31,29 +32,21 @@ type PriorityMapFunction func(pod *v1.Pod, meta interface{}, nodeInfo *scheduler
 // final scores for all nodes.
 // TODO: Figure out the exact API of this method.
 // TODO: Change interface{} to a specific type.
-type PriorityReduceFunction func(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, result framework.NodeScoreList) error
+type PriorityReduceFunction func(pod *v1.Pod, meta interface{}, sharedLister schedulerlisters.SharedLister, result framework.NodeScoreList) error
 
-// PriorityMetadataProducer is a function that computes metadata for a given pod. This
+// MetadataProducer is a function that computes metadata for a given pod. This
 // is now used for only for priority functions. For predicates please use PredicateMetadataProducer.
-type PriorityMetadataProducer func(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo) interface{}
-
-// PriorityFunction is a function that computes scores for all nodes.
-// DEPRECATED
-// Use Map-Reduce pattern for priority functions.
-type PriorityFunction func(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (framework.NodeScoreList, error)
+type MetadataProducer func(pod *v1.Pod, filteredNodes []*v1.Node, sharedLister schedulerlisters.SharedLister) interface{}
 
 // PriorityConfig is a config used for a priority function.
 type PriorityConfig struct {
 	Name   string
 	Map    PriorityMapFunction
 	Reduce PriorityReduceFunction
-	// TODO: Remove it after migrating all functions to
-	// Map-Reduce pattern.
-	Function PriorityFunction
-	Weight   int64
+	Weight int64
 }
 
-// EmptyPriorityMetadataProducer returns a no-op PriorityMetadataProducer type.
-func EmptyPriorityMetadataProducer(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo) interface{} {
+// EmptyMetadataProducer returns a no-op MetadataProducer type.
+func EmptyMetadataProducer(pod *v1.Pod, filteredNodes []*v1.Node, sharedLister schedulerlisters.SharedLister) interface{} {
 	return nil
 }

@@ -1142,7 +1142,7 @@ message EnvVar {
 // EnvVarSource represents a source for the value of an EnvVar.
 message EnvVarSource {
   // Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations,
-  // spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP.
+  // spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
   // +optional
   optional ObjectFieldSelector fieldRef = 1;
 
@@ -3384,7 +3384,6 @@ message PodSpec {
   // in the same pod, and the first process in each container will not be assigned PID 1.
   // HostPID and ShareProcessNamespace cannot both be set.
   // Optional: Default to false.
-  // This field is beta-level and may be disabled with the PodShareProcessNamespace feature.
   // +k8s:conversion-gen=false
   // +optional
   optional bool shareProcessNamespace = 27;
@@ -4742,6 +4741,21 @@ message ServiceSpec {
   // cluster (e.g. IPv6 in IPv4 only cluster) is an error condition and will fail during clusterIP assignment.
   // +optional
   optional string ipFamily = 15;
+
+  // topologyKeys is a preference-order list of topology keys which
+  // implementations of services should use to preferentially sort endpoints
+  // when accessing this Service, it can not be used at the same time as
+  // externalTrafficPolicy=Local.
+  // Topology keys must be valid label keys and at most 16 keys may be specified.
+  // Endpoints are chosen based on the first topology key with available backends.
+  // If this field is specified and all entries have no backends that match
+  // the topology of the client, the service has no backends for that client
+  // and connections should fail.
+  // The special value "*" may be used to mean "any topology". This catch-all
+  // value, if used, only makes sense as the last value in the list.
+  // If this is not specified or empty, no topology constraints will be applied.
+  // +optional
+  repeated string topologyKeys = 16;
 }
 
 // ServiceStatus represents the current status of a service.
@@ -5257,7 +5271,7 @@ message WindowsSecurityContextOptions {
   // Defaults to the user specified in image metadata if unspecified.
   // May also be set in PodSecurityContext. If set in both SecurityContext and
   // PodSecurityContext, the value specified in SecurityContext takes precedence.
-  // This field is alpha-level and it is only honored by servers that enable the WindowsRunAsUserName feature flag.
+  // This field is beta-level and may be disabled with the WindowsRunAsUserName feature flag.
   // +optional
   optional string runAsUserName = 3;
 }

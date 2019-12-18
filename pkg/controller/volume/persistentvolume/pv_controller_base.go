@@ -44,6 +44,7 @@ import (
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 
 	"k8s.io/klog"
 )
@@ -94,7 +95,6 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 		volumeQueue:                   workqueue.NewNamed("volumes"),
 		resyncPeriod:                  p.SyncPeriod,
 		operationTimestamps:           metrics.NewOperationStartTimeCache(),
-		translator:                    csitrans.New(),
 	}
 
 	// Prober is nil because PV is not aware of Flexvolume.
@@ -128,6 +128,11 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 	controller.podListerSynced = p.PodInformer.Informer().HasSynced
 	controller.NodeLister = p.NodeInformer.Lister()
 	controller.NodeListerSynced = p.NodeInformer.Informer().HasSynced
+
+	csiTranslator := csitrans.New()
+	controller.translator = csiTranslator
+	controller.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator)
+
 	return controller, nil
 }
 

@@ -12,7 +12,7 @@ import (
 	"github.com/coredns/corefile-migration/migration/corefile"
 )
 
-// Deprecated returns a list of deprecation notifications affecting the guven Corefile.  Notifications are returned for
+// Deprecated returns a list of deprecation notifications affecting the given Corefile.  Notifications are returned for
 // any deprecated, removed, or ignored plugins/directives present in the Corefile.  Notifications are also returned for
 // any new default plugins that would be added in a migration.
 func Deprecated(fromCoreDNSVersion, toCoreDNSVersion, corefileStr string) ([]Notice, error) {
@@ -26,9 +26,6 @@ func Unsupported(fromCoreDNSVersion, toCoreDNSVersion, corefileStr string) ([]No
 }
 
 func getStatus(fromCoreDNSVersion, toCoreDNSVersion, corefileStr, status string) ([]Notice, error) {
-	if fromCoreDNSVersion == toCoreDNSVersion {
-		return nil, nil
-	}
 	err := validUpMigration(fromCoreDNSVersion, toCoreDNSVersion)
 	if err != nil {
 		return nil, err
@@ -40,7 +37,9 @@ func getStatus(fromCoreDNSVersion, toCoreDNSVersion, corefileStr, status string)
 	notices := []Notice{}
 	v := fromCoreDNSVersion
 	for {
-		v = Versions[v].nextVersion
+		if fromCoreDNSVersion != toCoreDNSVersion {
+			v = Versions[v].nextVersion
+		}
 		for _, s := range cf.Servers {
 			for _, p := range s.Plugins {
 				vp, present := Versions[v].plugins[p.Name]
@@ -417,9 +416,13 @@ func validateVersion(fromCoreDNSVersion string) error {
 }
 
 func validUpMigration(fromCoreDNSVersion, toCoreDNSVersion string) error {
+
 	err := validateVersion(fromCoreDNSVersion)
 	if err != nil {
 		return err
+	}
+	if fromCoreDNSVersion == toCoreDNSVersion {
+		return nil
 	}
 	for next := Versions[fromCoreDNSVersion].nextVersion; next != ""; next = Versions[next].nextVersion {
 		if next != toCoreDNSVersion {

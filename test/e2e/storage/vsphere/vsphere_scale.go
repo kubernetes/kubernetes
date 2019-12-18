@@ -82,8 +82,8 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 		volumesPerPod = GetAndExpectIntEnvVar(VCPScaleVolumesPerPod)
 
 		numberOfInstances = GetAndExpectIntEnvVar(VCPScaleInstances)
-		gomega.Expect(numberOfInstances > 5).NotTo(gomega.BeTrue(), "Maximum allowed instances are 5")
-		gomega.Expect(numberOfInstances > volumeCount).NotTo(gomega.BeTrue(), "Number of instances should be less than the total volume count")
+		framework.ExpectNotEqual(numberOfInstances > 5, true, "Maximum allowed instances are 5")
+		framework.ExpectNotEqual(numberOfInstances > volumeCount, true, "Number of instances should be less than the total volume count")
 
 		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)
 		datastoreName = GetAndExpectStringEnvVar(StorageClassDatastoreName)
@@ -157,6 +157,7 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 			}
 		}
 		podList, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
+		framework.ExpectNoError(err, "Failed to list pods")
 		for _, pod := range podList.Items {
 			pvcClaimList = append(pvcClaimList, getClaimsForPod(&pod, volumesPerPod)...)
 			ginkgo.By("Deleting pod")

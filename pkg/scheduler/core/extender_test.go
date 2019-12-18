@@ -17,6 +17,7 @@ limitations under the License.
 package core
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -26,19 +27,22 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -104,16 +108,28 @@ func machine2PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*framework.Node
 	return &result, nil
 }
 
-func machine2Prioritizer(_ *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (framework.NodeScoreList, error) {
-	result := []framework.NodeScore{}
-	for _, node := range nodes {
-		score := 10
-		if node.Name == "machine2" {
-			score = 100
-		}
-		result = append(result, framework.NodeScore{Name: node.Name, Score: int64(score)})
+type machine2PrioritizerPlugin struct{}
+
+func newMachine2PrioritizerPlugin() framework.PluginFactory {
+	return func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+		return &machine2PrioritizerPlugin{}, nil
 	}
-	return result, nil
+}
+
+func (pl *machine2PrioritizerPlugin) Name() string {
+	return "Machine2Prioritizer"
+}
+
+func (pl *machine2PrioritizerPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeName string) (int64, *framework.Status) {
+	score := 10
+	if nodeName == "machine2" {
+		score = 100
+	}
+	return int64(score), nil
+}
+
+func (pl *machine2PrioritizerPlugin) ScoreExtensions() framework.ScoreExtensions {
+	return nil
 }
 
 type FakeExtender struct {
@@ -345,17 +361,17 @@ var _ algorithm.SchedulerExtender = &FakeExtender{}
 
 func TestGenericSchedulerWithExtenders(t *testing.T) {
 	tests := []struct {
-		name           string
-		predicates     map[string]predicates.FitPredicate
-		prioritizers   []priorities.PriorityConfig
-		extenders      []FakeExtender
-		nodes          []string
-		expectedResult ScheduleResult
-		expectsErr     bool
+		name            string
+		registerPlugins []st.RegisterPluginFunc
+		extenders       []FakeExtender
+		nodes           []string
+		expectedResult  ScheduleResult
+		expectsErr      bool
 	}{
 		{
-			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
-			prioritizers: []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			},
 			extenders: []FakeExtender{
 				{
 					predicates: []fitPredicate{truePredicateExtender},
@@ -369,8 +385,9 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name:       "test 1",
 		},
 		{
-			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
-			prioritizers: []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			},
 			extenders: []FakeExtender{
 				{
 					predicates: []fitPredicate{truePredicateExtender},
@@ -384,8 +401,9 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name:       "test 2",
 		},
 		{
-			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
-			prioritizers: []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			},
 			extenders: []FakeExtender{
 				{
 					predicates: []fitPredicate{truePredicateExtender},
@@ -403,8 +421,9 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name: "test 3",
 		},
 		{
-			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
-			prioritizers: []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			},
 			extenders: []FakeExtender{
 				{
 					predicates: []fitPredicate{machine2PredicateExtender},
@@ -418,8 +437,9 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name:       "test 4",
 		},
 		{
-			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
-			prioritizers: []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{truePredicateExtender},
@@ -436,8 +456,9 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name: "test 5",
 		},
 		{
-			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
-			prioritizers: []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{truePredicateExtender},
@@ -459,8 +480,10 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			name: "test 6",
 		},
 		{
-			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
-			prioritizers: []priorities.PriorityConfig{{Function: machine2Prioritizer, Weight: 20}},
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterScorePlugin("Machine2Prioritizer", newMachine2PrioritizerPlugin(), 20),
+			},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{truePredicateExtender},
@@ -484,8 +507,10 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			// If scheduler sends the pod by mistake, the test would fail
 			// because of the errors from errorPredicateExtender and/or
 			// errorPrioritizerExtender.
-			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
-			prioritizers: []priorities.PriorityConfig{{Function: machine2Prioritizer, Weight: 1}},
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+				st.RegisterScorePlugin("Machine2Prioritizer", newMachine2PrioritizerPlugin(), 1),
+			},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{errorPredicateExtender},
@@ -508,8 +533,9 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			//
 			// If scheduler did not ignore the extender, the test would fail
 			// because of the errors from errorPredicateExtender.
-			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
-			prioritizers: []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterFilterPlugin("TrueFilter", NewTrueFilterPlugin),
+			},
 			extenders: []FakeExtender{
 				{
 					predicates: []fitPredicate{errorPredicateExtender},
@@ -532,6 +558,9 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+
 			extenders := []algorithm.SchedulerExtender{}
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
@@ -540,25 +569,37 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			for _, name := range test.nodes {
 				cache.AddNode(createNode(name))
 			}
-			queue := internalqueue.NewSchedulingQueue(nil, nil)
+			queue := internalqueue.NewSchedulingQueue(nil)
+
+			registry := framework.Registry{}
+			plugins := &schedulerapi.Plugins{
+				Filter: &schedulerapi.PluginSet{},
+				Score:  &schedulerapi.PluginSet{},
+			}
+			var pluginConfigs []schedulerapi.PluginConfig
+			for _, f := range test.registerPlugins {
+				f(&registry, plugins, pluginConfigs)
+			}
+			fwk, _ := framework.NewFramework(registry, plugins, pluginConfigs)
+
 			scheduler := NewGenericScheduler(
 				cache,
 				queue,
-				test.predicates,
-				predicates.EmptyPredicateMetadataProducer,
-				test.prioritizers,
-				priorities.EmptyPriorityMetadataProducer,
-				emptyFramework,
+				nil,
+				predicates.EmptyMetadataProducer,
+				priorities.EmptyMetadataProducer,
+				emptySnapshot,
+				fwk,
 				extenders,
 				nil,
-				schedulertesting.FakePersistentVolumeClaimLister{},
-				schedulertesting.FakePDBLister{},
+				informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
+				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 				false,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				false)
 			podIgnored := &v1.Pod{}
-			result, err := scheduler.Schedule(framework.NewCycleState(), podIgnored)
+			result, err := scheduler.Schedule(context.Background(), framework.NewCycleState(), podIgnored)
 			if test.expectsErr {
 				if err == nil {
 					t.Errorf("Unexpected non-error, result %+v", result)

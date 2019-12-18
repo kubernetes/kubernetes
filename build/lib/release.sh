@@ -28,6 +28,7 @@ readonly RELEASE_STAGE="${LOCAL_OUTPUT_ROOT}/release-stage"
 readonly RELEASE_TARS="${LOCAL_OUTPUT_ROOT}/release-tars"
 readonly RELEASE_IMAGES="${LOCAL_OUTPUT_ROOT}/release-images"
 
+KUBE_BUILD_HYPERKUBE=${KUBE_BUILD_HYPERKUBE:-y}
 KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-y}
 KUBE_BUILD_PULL_LATEST_IMAGES=${KUBE_BUILD_PULL_LATEST_IMAGES:-y}
 
@@ -278,6 +279,23 @@ function kube::release::sha1() {
   fi
 }
 
+function kube::release::build_hyperkube_image() {
+  local -r arch="$1"
+  local -r registry="$2"
+  local -r version="$3"
+  local -r save_dir="${4-}"
+  kube::log::status "Building hyperkube image for arch: ${arch}"
+  ARCH="${arch}" REGISTRY="${registry}" VERSION="${version}" \
+    make -C cluster/images/hyperkube/ build >/dev/null
+
+  local hyperkube_tag="${registry}/hyperkube-${arch}:${version}"
+  if [[ -n "${save_dir}" ]]; then
+    "${DOCKER[@]}" save "${hyperkube_tag}" > "${save_dir}/hyperkube-${arch}.tar"
+  fi
+  kube::log::status "Deleting hyperkube image ${hyperkube_tag}"
+  "${DOCKER[@]}" rmi "${hyperkube_tag}" &>/dev/null || true
+}
+
 function kube::release::build_conformance_image() {
   local -r arch="$1"
   local -r registry="$2"
@@ -378,6 +396,10 @@ EOF
       ) &
     done
 
+    if [[ "${KUBE_BUILD_HYPERKUBE}" =~ [yY] ]]; then
+      kube::release::build_hyperkube_image "${arch}" "${docker_registry}" \
+        "${docker_tag}" "${images_dir}" &
+    fi
     if [[ "${KUBE_BUILD_CONFORMANCE}" =~ [yY] ]]; then
       kube::release::build_conformance_image "${arch}" "${docker_registry}" \
         "${docker_tag}" "${images_dir}" &

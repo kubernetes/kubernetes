@@ -33,7 +33,6 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	componentbaseconfig "k8s.io/component-base/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -161,6 +160,7 @@ nodePortAddresses:
 		clusterCIDR        string
 		healthzBindAddress string
 		metricsBindAddress string
+		extraConfig        string
 	}{
 		{
 			name:               "iptables mode, IPv4 all-zeros bind address",
@@ -219,6 +219,30 @@ nodePortAddresses:
 			healthzBindAddress: "[fd00:1::5]:12345",
 			metricsBindAddress: "[fd00:2::5]:23456",
 		},
+		{
+			// Test for unknown field within config.
+			// For v1alpha1 a lenient path is implemented and will throw a
+			// strict decoding warning instead of failing to load
+			name:               "unknown field",
+			mode:               "iptables",
+			bindAddress:        "9.8.7.6",
+			clusterCIDR:        "1.2.3.0/24",
+			healthzBindAddress: "1.2.3.4:12345",
+			metricsBindAddress: "2.3.4.5:23456",
+			extraConfig:        "foo: bar",
+		},
+		{
+			// Test for duplicate field within config.
+			// For v1alpha1 a lenient path is implemented and will throw a
+			// strict decoding warning instead of failing to load
+			name:               "duplicate field",
+			mode:               "iptables",
+			bindAddress:        "9.8.7.6",
+			clusterCIDR:        "1.2.3.0/24",
+			healthzBindAddress: "1.2.3.4:12345",
+			metricsBindAddress: "2.3.4.5:23456",
+			extraConfig:        "bindAddress: 9.8.7.6",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -268,11 +292,17 @@ nodePortAddresses:
 
 		options := NewOptions()
 
-		yaml := fmt.Sprintf(
+		baseYAML := fmt.Sprintf(
 			yamlTemplate, tc.bindAddress, tc.clusterCIDR,
 			tc.healthzBindAddress, tc.metricsBindAddress, tc.mode)
+
+		// Append additional configuration to the base yaml template
+		yaml := fmt.Sprintf("%s\n%s", baseYAML, tc.extraConfig)
+
 		config, err := options.loadConfig([]byte(yaml))
+
 		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
+
 		if !reflect.DeepEqual(expected, config) {
 			t.Fatalf("unexpected config for %s, diff = %s", tc.name, diff.ObjectDiff(config, expected))
 		}
@@ -281,10 +311,15 @@ nodePortAddresses:
 
 // TestLoadConfigFailures tests failure modes for loadConfig()
 func TestLoadConfigFailures(t *testing.T) {
-	yamlTemplate := `bindAddress: 0.0.0.0
-clusterCIDR: "1.2.3.0/24"
-configSyncPeriod: 15s
-kind: KubeProxyConfiguration`
+	// TODO(phenixblue): Uncomment below template when v1alpha2+ of kube-proxy config is
+	// released with strict decoding. These associated tests will fail with
+	// the lenient codec and only one config API version.
+	/*
+			yamlTemplate := `bindAddress: 0.0.0.0
+		clusterCIDR: "1.2.3.0/24"
+		configSyncPeriod: 15s
+		kind: KubeProxyConfiguration`
+	*/
 
 	testCases := []struct {
 		name    string
@@ -307,16 +342,21 @@ kind: KubeProxyConfiguration`
 			config: "bindAddress: ::",
 			expErr: "mapping values are not allowed in this context",
 		},
-		{
-			name:    "Duplicate fields",
-			config:  fmt.Sprintf("%s\nbindAddess: 1.2.3.4", yamlTemplate),
-			checkFn: kuberuntime.IsStrictDecodingError,
-		},
-		{
-			name:    "Unknown field",
-			config:  fmt.Sprintf("%s\nfoo: bar", yamlTemplate),
-			checkFn: kuberuntime.IsStrictDecodingError,
-		},
+		// TODO(phenixblue): Uncomment below tests when v1alpha2+ of kube-proxy config is
+		// released with strict decoding. These tests will fail with the
+		// lenient codec and only one config API version.
+		/*
+			{
+				name:    "Duplicate fields",
+				config:  fmt.Sprintf("%s\nbindAddress: 1.2.3.4", yamlTemplate),
+				checkFn: kuberuntime.IsStrictDecodingError,
+			},
+			{
+				name:    "Unknown field",
+				config:  fmt.Sprintf("%s\nfoo: bar", yamlTemplate),
+				checkFn: kuberuntime.IsStrictDecodingError,
+			},
+		*/
 	}
 
 	version := "apiVersion: kubeproxy.config.k8s.io/v1alpha1"

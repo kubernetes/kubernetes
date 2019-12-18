@@ -19,7 +19,6 @@ package controlplane
 import (
 	"fmt"
 	"net"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -59,7 +58,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeAPIServer)),
 			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), "/healthz", int(endpoint.BindPort), v1.URISchemeHTTPS),
 			Resources:       staticpodutil.ComponentResources("250m"),
-			Env:             getProxyEnvVars(),
+			Env:             kubeadmutil.GetProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer)),
 		kubeadmconstants.KubeControllerManager: staticpodutil.ComponentPod(v1.Container{
 			Name:            kubeadmconstants.KubeControllerManager,
@@ -67,9 +66,9 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			ImagePullPolicy: v1.PullIfNotPresent,
 			Command:         getControllerManagerCommand(cfg),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeControllerManager)),
-			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), "/healthz", kubeadmconstants.InsecureKubeControllerManagerPort, v1.URISchemeHTTP),
+			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeControllerManagerPort, v1.URISchemeHTTPS),
 			Resources:       staticpodutil.ComponentResources("200m"),
-			Env:             getProxyEnvVars(),
+			Env:             kubeadmutil.GetProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager)),
 		kubeadmconstants.KubeScheduler: staticpodutil.ComponentPod(v1.Container{
 			Name:            kubeadmconstants.KubeScheduler,
@@ -77,9 +76,9 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			ImagePullPolicy: v1.PullIfNotPresent,
 			Command:         getSchedulerCommand(cfg),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeScheduler)),
-			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/healthz", kubeadmconstants.InsecureSchedulerPort, v1.URISchemeHTTP),
+			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeSchedulerPort, v1.URISchemeHTTPS),
 			Resources:       staticpodutil.ComponentResources("100m"),
-			Env:             getProxyEnvVars(),
+			Env:             kubeadmutil.GetProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeScheduler)),
 	}
 	return staticPodSpecs
@@ -163,7 +162,12 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 		}
 	} else {
 		// Default to etcd static pod on localhost
-		defaultArguments["etcd-servers"] = fmt.Sprintf("https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort)
+		// localhost IP family should be the same that the AdvertiseAddress
+		etcdLocalhostAddress := "127.0.0.1"
+		if utilsnet.IsIPv6String(localAPIEndpoint.AdvertiseAddress) {
+			etcdLocalhostAddress = "::1"
+		}
+		defaultArguments["etcd-servers"] = fmt.Sprintf("https://%s", net.JoinHostPort(etcdLocalhostAddress, strconv.Itoa(kubeadmconstants.EtcdListenClientPort)))
 		defaultArguments["etcd-cafile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName)
 		defaultArguments["etcd-certfile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientCertName)
 		defaultArguments["etcd-keyfile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientKeyName)
@@ -176,7 +180,7 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 		}
 	}
 
-	// TODO: The following code should be remvoved after dual-stack is GA.
+	// TODO: The following code should be removed after dual-stack is GA.
 	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
 	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {
 		defaultArguments["feature-gates"] = fmt.Sprintf("%s=%t", features.IPv6DualStack, enabled)
@@ -261,11 +265,13 @@ func isValidAuthzMode(authzMode string) bool {
 // the available bits to maximize the number used for nodes, but still have the node
 // CIDR be a multiple of eight.
 //
-func calcNodeCidrSize(podSubnet string) string {
+func calcNodeCidrSize(podSubnet string) (string, bool) {
 	maskSize := "24"
+	isIPv6 := false
 	if ip, podCidr, err := net.ParseCIDR(podSubnet); err == nil {
 		if utilsnet.IsIPv6(ip) {
 			var nodeCidrSize int
+			isIPv6 = true
 			podNetSize, totalBits := podCidr.Mask.Size()
 			switch {
 			case podNetSize == 112:
@@ -281,7 +287,7 @@ func calcNodeCidrSize(podSubnet string) string {
 			maskSize = strconv.Itoa(nodeCidrSize)
 		}
 	}
-	return maskSize
+	return maskSize, isIPv6
 }
 
 // getControllerManagerCommand builds the right controller manager command from the given config object and version
@@ -316,20 +322,39 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string 
 	// Let the controller-manager allocate Node CIDRs for the Pod network.
 	// Each node will get a subspace of the address CIDR provided with --pod-network-cidr.
 	if cfg.Networking.PodSubnet != "" {
-		// TODO(Arvinderpal): Needs to be fixed once PR #73977 lands. Should be a list of maskSizes.
-		maskSize := calcNodeCidrSize(cfg.Networking.PodSubnet)
 		defaultArguments["allocate-node-cidrs"] = "true"
 		defaultArguments["cluster-cidr"] = cfg.Networking.PodSubnet
-		defaultArguments["node-cidr-mask-size"] = maskSize
 		if cfg.Networking.ServiceSubnet != "" {
 			defaultArguments["service-cluster-ip-range"] = cfg.Networking.ServiceSubnet
 		}
 	}
 
+	// Set cluster name
+	if cfg.ClusterName != "" {
+		defaultArguments["cluster-name"] = cfg.ClusterName
+	}
+
 	// TODO: The following code should be remvoved after dual-stack is GA.
 	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
-	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {
+	enabled, present := cfg.FeatureGates[features.IPv6DualStack]
+	if present {
 		defaultArguments["feature-gates"] = fmt.Sprintf("%s=%t", features.IPv6DualStack, enabled)
+	}
+	if cfg.Networking.PodSubnet != "" {
+		if enabled {
+			// any errors will be caught during validation
+			subnets := strings.Split(cfg.Networking.PodSubnet, ",")
+			for _, podSubnet := range subnets {
+				if maskSize, isIPv6 := calcNodeCidrSize(podSubnet); isIPv6 {
+					defaultArguments["node-cidr-mask-size-ipv6"] = maskSize
+				} else {
+					defaultArguments["node-cidr-mask-size-ipv4"] = maskSize
+				}
+			}
+		} else {
+			maskSize, _ := calcNodeCidrSize(cfg.Networking.PodSubnet)
+			defaultArguments["node-cidr-mask-size"] = maskSize
+		}
 	}
 
 	command := []string{"kube-controller-manager"}
@@ -358,23 +383,4 @@ func getSchedulerCommand(cfg *kubeadmapi.ClusterConfiguration) []string {
 	command := []string{"kube-scheduler"}
 	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.Scheduler.ExtraArgs)...)
 	return command
-}
-
-// getProxyEnvVars builds a list of environment variables to use in the control plane containers in order to use the right proxy
-func getProxyEnvVars() []v1.EnvVar {
-	envs := []v1.EnvVar{}
-	for _, env := range os.Environ() {
-		pos := strings.Index(env, "=")
-		if pos == -1 {
-			// malformed environment variable, skip it.
-			continue
-		}
-		name := env[:pos]
-		value := env[pos+1:]
-		if strings.HasSuffix(strings.ToLower(name), "_proxy") && value != "" {
-			envVar := v1.EnvVar{Name: name, Value: value}
-			envs = append(envs, envVar)
-		}
-	}
-	return envs
 }

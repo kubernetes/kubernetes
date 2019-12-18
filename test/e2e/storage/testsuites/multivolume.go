@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -44,29 +45,29 @@ var _ TestSuite = &multiVolumeTestSuite{}
 func InitMultiVolumeTestSuite() TestSuite {
 	return &multiVolumeTestSuite{
 		tsInfo: TestSuiteInfo{
-			name: "multiVolume [Slow]",
-			testPatterns: []testpatterns.TestPattern{
+			Name: "multiVolume [Slow]",
+			TestPatterns: []testpatterns.TestPattern{
 				testpatterns.FsVolModePreprovisionedPV,
 				testpatterns.FsVolModeDynamicPV,
 				testpatterns.BlockVolModePreprovisionedPV,
 				testpatterns.BlockVolModeDynamicPV,
 			},
-			supportedSizeRange: volume.SizeRange{
+			SupportedSizeRange: volume.SizeRange{
 				Min: "1Mi",
 			},
 		},
 	}
 }
 
-func (t *multiVolumeTestSuite) getTestSuiteInfo() TestSuiteInfo {
+func (t *multiVolumeTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *multiVolumeTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *multiVolumeTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
 	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(testpatterns.PreprovisionedPV))
 }
 
-func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config        *PerTestConfig
 		driverCleanup func()
@@ -74,7 +75,7 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		cs        clientset.Interface
 		ns        *v1.Namespace
 		driver    TestDriver
-		resources []*genericVolumeTestResource
+		resources []*VolumeResource
 
 		intreeOps   opCounts
 		migratedOps opCounts
@@ -109,15 +110,14 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 	}
 
 	cleanup := func() {
+		var errs []error
 		for _, resource := range l.resources {
-			resource.cleanupResource()
+			errs = append(errs, resource.CleanupResource())
 		}
 
-		if l.driverCleanup != nil {
-			l.driverCleanup()
-			l.driverCleanup = nil
-		}
-
+		errs = append(errs, tryFunc(l.driverCleanup))
+		l.driverCleanup = nil
+		framework.ExpectNoError(errors.NewAggregate(errs), "while cleanup resource")
 		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 
@@ -141,10 +141,10 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		numVols := 2
 
 		for i := 0; i < numVols; i++ {
-			testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
-			resource := createGenericVolumeTestResource(driver, l.config, pattern, testVolumeSizeRange)
+			testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+			resource := CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 			l.resources = append(l.resources, resource)
-			pvcs = append(pvcs, resource.pvc)
+			pvcs = append(pvcs, resource.Pvc)
 		}
 
 		TestAccessMultipleVolumesAcrossPodRecreation(l.config.Framework, l.cs, l.ns.Name,
@@ -184,10 +184,10 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		numVols := 2
 
 		for i := 0; i < numVols; i++ {
-			testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
-			resource := createGenericVolumeTestResource(driver, l.config, pattern, testVolumeSizeRange)
+			testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+			resource := CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 			l.resources = append(l.resources, resource)
-			pvcs = append(pvcs, resource.pvc)
+			pvcs = append(pvcs, resource.Pvc)
 		}
 
 		TestAccessMultipleVolumesAcrossPodRecreation(l.config.Framework, l.cs, l.ns.Name,
@@ -223,10 +223,10 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 				// 1st volume should be block and set filesystem for 2nd and later volumes
 				curPattern.VolMode = v1.PersistentVolumeFilesystem
 			}
-			testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
-			resource := createGenericVolumeTestResource(driver, l.config, curPattern, testVolumeSizeRange)
+			testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+			resource := CreateVolumeResource(driver, l.config, curPattern, testVolumeSizeRange)
 			l.resources = append(l.resources, resource)
-			pvcs = append(pvcs, resource.pvc)
+			pvcs = append(pvcs, resource.Pvc)
 		}
 
 		TestAccessMultipleVolumesAcrossPodRecreation(l.config.Framework, l.cs, l.ns.Name,
@@ -275,10 +275,10 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 				// 1st volume should be block and set filesystem for 2nd and later volumes
 				curPattern.VolMode = v1.PersistentVolumeFilesystem
 			}
-			testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
-			resource := createGenericVolumeTestResource(driver, l.config, curPattern, testVolumeSizeRange)
+			testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+			resource := CreateVolumeResource(driver, l.config, curPattern, testVolumeSizeRange)
 			l.resources = append(l.resources, resource)
-			pvcs = append(pvcs, resource.pvc)
+			pvcs = append(pvcs, resource.Pvc)
 		}
 
 		TestAccessMultipleVolumesAcrossPodRecreation(l.config.Framework, l.cs, l.ns.Name,
@@ -301,13 +301,13 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		}
 
 		// Create volume
-		testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
-		resource := createGenericVolumeTestResource(l.driver, l.config, pattern, testVolumeSizeRange)
+		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		resource := CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
 		l.resources = append(l.resources, resource)
 
 		// Test access to the volume from pods on different node
 		TestConcurrentAccessToSingleVolume(l.config.Framework, l.cs, l.ns.Name,
-			e2epod.NodeSelection{Name: l.config.ClientNodeName}, resource.pvc, numPods, true /* sameNode */)
+			e2epod.NodeSelection{Name: l.config.ClientNodeName}, resource.Pvc, numPods, true /* sameNode */)
 	})
 
 	// This tests below configuration:
@@ -336,13 +336,13 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		}
 
 		// Create volume
-		testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
-		resource := createGenericVolumeTestResource(l.driver, l.config, pattern, testVolumeSizeRange)
+		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		resource := CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
 		l.resources = append(l.resources, resource)
 
 		// Test access to the volume from pods on different node
 		TestConcurrentAccessToSingleVolume(l.config.Framework, l.cs, l.ns.Name,
-			e2epod.NodeSelection{Name: l.config.ClientNodeName}, resource.pvc, numPods, false /* sameNode */)
+			e2epod.NodeSelection{Name: l.config.ClientNodeName}, resource.Pvc, numPods, false /* sameNode */)
 	})
 }
 
@@ -365,18 +365,18 @@ func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, n
 		index := i + 1
 		path := fmt.Sprintf("/mnt/volume%d", index)
 		ginkgo.By(fmt.Sprintf("Checking if the volume%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
-		utils.CheckVolumeModeOfPath(pod, *pvc.Spec.VolumeMode, path)
+		utils.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, path)
 
 		if readSeedBase > 0 {
 			ginkgo.By(fmt.Sprintf("Checking if read from the volume%d works properly", index))
-			utils.CheckReadFromPath(pod, *pvc.Spec.VolumeMode, path, byteLen, readSeedBase+int64(i))
+			utils.CheckReadFromPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, readSeedBase+int64(i))
 		}
 
 		ginkgo.By(fmt.Sprintf("Checking if write to the volume%d works properly", index))
-		utils.CheckWriteToPath(pod, *pvc.Spec.VolumeMode, path, byteLen, writeSeedBase+int64(i))
+		utils.CheckWriteToPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, writeSeedBase+int64(i))
 
 		ginkgo.By(fmt.Sprintf("Checking if read from the volume%d works properly", index))
-		utils.CheckReadFromPath(pod, *pvc.Spec.VolumeMode, path, byteLen, writeSeedBase+int64(i))
+		utils.CheckReadFromPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, writeSeedBase+int64(i))
 	}
 
 	pod, err = cs.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
@@ -452,22 +452,22 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 	for i, pod := range pods {
 		index := i + 1
 		ginkgo.By(fmt.Sprintf("Checking if the volume in pod%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
-		utils.CheckVolumeModeOfPath(pod, *pvc.Spec.VolumeMode, path)
+		utils.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, path)
 
 		if i != 0 {
 			ginkgo.By(fmt.Sprintf("From pod%d, checking if reading the data that pod%d write works properly", index, index-1))
 			// For 1st pod, no one has written data yet, so pass the read check
-			utils.CheckReadFromPath(pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
+			utils.CheckReadFromPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
 		}
 
 		// Update the seed and check if write/read works properly
 		seed = time.Now().UTC().UnixNano()
 
 		ginkgo.By(fmt.Sprintf("Checking if write to the volume in pod%d works properly", index))
-		utils.CheckWriteToPath(pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
+		utils.CheckWriteToPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
 
 		ginkgo.By(fmt.Sprintf("Checking if read from the volume in pod%d works properly", index))
-		utils.CheckReadFromPath(pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
+		utils.CheckReadFromPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
 	}
 
 	// Delete the last pod and remove from slice of pods
@@ -483,7 +483,7 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		index := i + 1
 		// index of pod and index of pvc match, because pods are created above way
 		ginkgo.By(fmt.Sprintf("Rechecking if the volume in pod%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
-		utils.CheckVolumeModeOfPath(pod, *pvc.Spec.VolumeMode, "/mnt/volume1")
+		utils.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, "/mnt/volume1")
 
 		if i == 0 {
 			// This time there should be data that last pod wrote, for 1st pod
@@ -491,15 +491,15 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		} else {
 			ginkgo.By(fmt.Sprintf("From pod%d, rechecking if reading the data that pod%d write works properly", index, index-1))
 		}
-		utils.CheckReadFromPath(pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
+		utils.CheckReadFromPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
 
 		// Update the seed and check if write/read works properly
 		seed = time.Now().UTC().UnixNano()
 
 		ginkgo.By(fmt.Sprintf("Rechecking if write to the volume in pod%d works properly", index))
-		utils.CheckWriteToPath(pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
+		utils.CheckWriteToPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
 
 		ginkgo.By(fmt.Sprintf("Rechecking if read from the volume in pod%d works properly", index))
-		utils.CheckReadFromPath(pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
+		utils.CheckReadFromPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
 	}
 }

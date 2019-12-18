@@ -108,7 +108,11 @@ function log() {
 function generate_prune_whitelist_flags() {
   local -r resources=( "$@" )
   for resource in "${resources[@]}"; do
-    printf "%s" "--prune-whitelist ${resource} "
+    # Check if $resource isn't composed just of whitespaces by replacing ' '
+    # with '' and checking whether the resulting string is not empty.
+    if [[ -n "${resource// /}" ]]; then
+      printf "%s" "--prune-whitelist ${resource} "
+    fi
   done
 }
 
@@ -116,7 +120,7 @@ function generate_prune_whitelist_flags() {
 # besides the default ones.
 extra_prune_whitelist=
 if [ -n "${KUBECTL_EXTRA_PRUNE_WHITELIST:-}" ]; then
-  extra_prune_whitelist=( "${KUBECTL_EXTRA_PRUNE_WHITELIST:-}" )
+  read -ra extra_prune_whitelist <<< "${KUBECTL_EXTRA_PRUNE_WHITELIST}"
 fi
 prune_whitelist=( "${KUBECTL_PRUNE_WHITELIST[@]}"  "${extra_prune_whitelist[@]}" )
 prune_whitelist_flags=$(generate_prune_whitelist_flags "${prune_whitelist[@]}")

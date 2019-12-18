@@ -17,7 +17,6 @@ aliases:
   sig-auth-authenticators-reviewers:
     - deads2k
     - enj
-    - jianhuiz
     - lavalamp
     - liggitt
     - mikedanese
@@ -151,6 +150,7 @@ aliases:
     - draveness
     - hex108
     - alculquicondor
+    - liu-cong
 
   sig-cli-maintainers:
     - adohe
@@ -171,9 +171,7 @@ aliases:
     - derekwaynecarr
     - dixudx
     - dims
-    - dshulyak
     - eparis
-    - ghodss
     - juanvallejo
     - mengqiy
     - rootfs
@@ -213,9 +211,7 @@ aliases:
     - pmorie
     - resouer
     - sjenning
-    - sjpotter
     - tallclair
-    - tmrts
     - vishh
     - yifan-gu
     - yujuhong
@@ -226,7 +222,6 @@ aliases:
     - caseydavenport
     - danwinship
     - dcbw
-    - dnardo
     - freehan
     - johnbelamaric
     - mrhohn
@@ -237,7 +232,6 @@ aliases:
     - caseydavenport
     - danwinship
     - dcbw
-    - dnardo
     - freehan
     - johnbelamaric
     - mrhohn
@@ -285,6 +279,7 @@ aliases:
     - monotek
     - logicalhan
     - RainbowMango
+    - serathius
 
   api-approvers:
     - erictune
@@ -420,6 +415,14 @@ aliases:
     - derekwaynecarr
     - tallclair
     - yujuhong
+
+  sig-scalability-approvers:
+    - mm4tt
+    - wojtek-t
+
+  sig-scalability-reviewers:
+    - mm4tt
+    - wojtek-t
   
   sig-scheduling-api-reviewers:
       - bsalamat
@@ -462,7 +465,6 @@ aliases:
     - kow3ns          # Apps
     - lavalamp        # API Machinery
     - liggitt         # Auth
-    - lukemarsden     # Cluster Lifecycle
     - luxas           # Cluster Lifecycle
     - marcoceppi      # On Premise
     - mattfarina      # Apps
@@ -481,3 +483,9 @@ aliases:
     - timothysc       # Cluster Lifecycle, Scheduling
     - wojtek-t        # Scalability
     - zehicle         # Cluster Ops
+
+  # conformance aliases https://git.k8s.io/enhancements/keps/sig-architecture/20190412-conformance-behaviors.md
+  conformance-behavior-approvers:
+    - bgrant0607
+    - smarterclayton
+    - johnbelamaric

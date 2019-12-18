@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -43,11 +43,30 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 )
 
+func TestFormatResourceName(t *testing.T) {
+	tests := []struct {
+		kind schema.GroupKind
+		name string
+		want string
+	}{
+		{schema.GroupKind{}, "", ""},
+		{schema.GroupKind{}, "name", "name"},
+		{schema.GroupKind{Kind: "Kind"}, "", "kind/"}, // should not happen in practice
+		{schema.GroupKind{Kind: "Kind"}, "name", "kind/name"},
+		{schema.GroupKind{Group: "group", Kind: "Kind"}, "name", "kind.group/name"},
+	}
+	for _, tt := range tests {
+		if got := formatResourceName(tt.kind, tt.name, true); got != tt.want {
+			t.Errorf("formatResourceName(%q, %q) = %q, want %q", tt.kind, tt.name, got, tt.want)
+		}
+	}
+}
+
 type TestPrintHandler struct {
 	numCalls int
 }
 
-func (t *TestPrintHandler) TableHandler(columnDefinitions []metav1beta1.TableColumnDefinition, printFunc interface{}) error {
+func (t *TestPrintHandler) TableHandler(columnDefinitions []metav1.TableColumnDefinition, printFunc interface{}) error {
 	t.numCalls++
 	return nil
 }
@@ -68,7 +87,7 @@ func TestPrintEvent(t *testing.T) {
 	tests := []struct {
 		event    api.Event
 		options  printers.GenerateOptions
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		// Basic event; no generate options
 		{
@@ -89,7 +108,7 @@ func TestPrintEvent(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Last Seen, Type, Reason, Object, Message
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"2d", "Normal", "Event Reason", "pod/Pod Name", "Message Data"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"2d", "Normal", "Event Reason", "pod/Pod Name", "Message Data"}}},
 		},
 		// Basic event; generate options=Wide
 		{
@@ -113,7 +132,7 @@ func TestPrintEvent(t *testing.T) {
 			},
 			options: printers.GenerateOptions{Wide: true},
 			// Columns: Last Seen, Type, Reason, Object, Subobject, Message, First Seen, Count, Name
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"2d", "Warning", "Event Reason", "deployment/Deployment Name", "spec.containers{foo}", "kubelet, Node1", "Message Data", "3d", int64(6), "event2"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"2d", "Warning", "Event Reason", "deployment/Deployment Name", "spec.containers{foo}", "kubelet, Node1", "Message Data", "3d", int64(6), "event2"}}},
 		},
 	}
 
@@ -190,7 +209,7 @@ func TestPrintEventsResultSorted(t *testing.T) {
 func TestPrintNamespace(t *testing.T) {
 	tests := []struct {
 		namespace api.Namespace
-		expected  []metav1beta1.TableRow
+		expected  []metav1.TableRow
 	}{
 		// Basic namespace with status and age.
 		{
@@ -204,7 +223,7 @@ func TestPrintNamespace(t *testing.T) {
 				},
 			},
 			// Columns: Name, Status, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"namespace1", "FooStatus", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"namespace1", "FooStatus", "0s"}}},
 		},
 		// Basic namespace without status or age.
 		{
@@ -214,7 +233,7 @@ func TestPrintNamespace(t *testing.T) {
 				},
 			},
 			// Columns: Name, Status, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"namespace2", "", "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"namespace2", "", "<unknown>"}}},
 		},
 	}
 
@@ -235,7 +254,7 @@ func TestPrintNamespace(t *testing.T) {
 func TestPrintSecret(t *testing.T) {
 	tests := []struct {
 		secret   api.Secret
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		// Basic namespace with type, data, and age.
 		{
@@ -250,7 +269,7 @@ func TestPrintSecret(t *testing.T) {
 				},
 			},
 			// Columns: Name, Type, Data, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"secret1", "kubernetes.io/service-account-token", int64(1), "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"secret1", "kubernetes.io/service-account-token", int64(1), "0s"}}},
 		},
 		// Basic namespace with type and age; no data.
 		{
@@ -262,7 +281,7 @@ func TestPrintSecret(t *testing.T) {
 				Type: "kubernetes.io/service-account-token",
 			},
 			// Columns: Name, Type, Data, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"secret1", "kubernetes.io/service-account-token", int64(0), "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"secret1", "kubernetes.io/service-account-token", int64(0), "0s"}}},
 		},
 	}
 
@@ -283,7 +302,7 @@ func TestPrintSecret(t *testing.T) {
 func TestPrintServiceAccount(t *testing.T) {
 	tests := []struct {
 		serviceAccount api.ServiceAccount
-		expected       []metav1beta1.TableRow
+		expected       []metav1.TableRow
 	}{
 		// Basic service account without secrets
 		{
@@ -295,7 +314,7 @@ func TestPrintServiceAccount(t *testing.T) {
 				Secrets: []api.ObjectReference{},
 			},
 			// Columns: Name, (Num) Secrets, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"sa1", int64(0), "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"sa1", int64(0), "0s"}}},
 		},
 		// Basic service account with two secrets.
 		{
@@ -310,7 +329,7 @@ func TestPrintServiceAccount(t *testing.T) {
 				},
 			},
 			// Columns: Name, (Num) Secrets, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"sa1", int64(2), "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"sa1", int64(2), "0s"}}},
 		},
 	}
 
@@ -332,7 +351,7 @@ func TestPrintNodeStatus(t *testing.T) {
 
 	table := []struct {
 		node     api.Node
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		{
 			node: api.Node{
@@ -340,7 +359,7 @@ func TestPrintNodeStatus(t *testing.T) {
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"foo1", "Ready", "<none>", "<unknown>", ""}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"foo1", "Ready", "<none>", "<unknown>", ""}}},
 		},
 		{
 			node: api.Node{
@@ -349,7 +368,7 @@ func TestPrintNodeStatus(t *testing.T) {
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"foo2", "Ready,SchedulingDisabled", "<none>", "<unknown>", ""}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"foo2", "Ready,SchedulingDisabled", "<none>", "<unknown>", ""}}},
 		},
 		{
 			node: api.Node{
@@ -359,7 +378,7 @@ func TestPrintNodeStatus(t *testing.T) {
 					{Type: api.NodeReady, Status: api.ConditionTrue}}},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"foo3", "Ready", "<none>", "<unknown>", ""}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"foo3", "Ready", "<none>", "<unknown>", ""}}},
 		},
 		{
 			node: api.Node{
@@ -367,7 +386,7 @@ func TestPrintNodeStatus(t *testing.T) {
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionFalse}}},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"foo4", "NotReady", "<none>", "<unknown>", ""}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"foo4", "NotReady", "<none>", "<unknown>", ""}}},
 		},
 		{
 			node: api.Node{
@@ -376,7 +395,7 @@ func TestPrintNodeStatus(t *testing.T) {
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionFalse}}},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"foo5", "NotReady,SchedulingDisabled", "<none>", "<unknown>", ""}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"foo5", "NotReady,SchedulingDisabled", "<none>", "<unknown>", ""}}},
 		},
 		{
 			node: api.Node{
@@ -384,7 +403,7 @@ func TestPrintNodeStatus(t *testing.T) {
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: "InvalidValue", Status: api.ConditionTrue}}},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"foo6", "Unknown", "<none>", "<unknown>", ""}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"foo6", "Unknown", "<none>", "<unknown>", ""}}},
 		},
 		{
 			node: api.Node{
@@ -392,7 +411,7 @@ func TestPrintNodeStatus(t *testing.T) {
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{}}},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"foo7", "Unknown", "<none>", "<unknown>", ""}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"foo7", "Unknown", "<none>", "<unknown>", ""}}},
 		},
 		{
 			node: api.Node{
@@ -401,7 +420,7 @@ func TestPrintNodeStatus(t *testing.T) {
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: "InvalidValue", Status: api.ConditionTrue}}},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"foo8", "Unknown,SchedulingDisabled", "<none>", "<unknown>", ""}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"foo8", "Unknown,SchedulingDisabled", "<none>", "<unknown>", ""}}},
 		},
 		{
 			node: api.Node{
@@ -410,7 +429,7 @@ func TestPrintNodeStatus(t *testing.T) {
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{}}},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"foo9", "Unknown,SchedulingDisabled", "<none>", "<unknown>", ""}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"foo9", "Unknown,SchedulingDisabled", "<none>", "<unknown>", ""}}},
 		},
 	}
 
@@ -432,14 +451,14 @@ func TestPrintNodeRole(t *testing.T) {
 
 	table := []struct {
 		node     api.Node
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		{
 			node: api.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo9"},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"foo9", "Unknown", "<none>", "<unknown>", ""}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"foo9", "Unknown", "<none>", "<unknown>", ""}}},
 		},
 		{
 			node: api.Node{
@@ -449,7 +468,7 @@ func TestPrintNodeRole(t *testing.T) {
 				},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"foo10", "Unknown", "master,node,proxy", "<unknown>", ""}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"foo10", "Unknown", "master,node,proxy", "<unknown>", ""}}},
 		},
 		{
 			node: api.Node{
@@ -459,7 +478,7 @@ func TestPrintNodeRole(t *testing.T) {
 				},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"foo11", "Unknown", "node", "<unknown>", ""}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"foo11", "Unknown", "node", "<unknown>", ""}}},
 		},
 	}
 
@@ -481,7 +500,7 @@ func TestPrintNodeOSImage(t *testing.T) {
 
 	table := []struct {
 		node     api.Node
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		{
 			node: api.Node{
@@ -492,7 +511,7 @@ func TestPrintNodeOSImage(t *testing.T) {
 				},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion, NodeInternalIP, NodeExternalIP, OSImage, KernelVersion, ContainerRuntimeVersion
-			expected: []metav1beta1.TableRow{
+			expected: []metav1.TableRow{
 				{
 					Cells: []interface{}{"foo1", "Unknown", "<none>", "<unknown>", "", "<none>", "1.1.1.1", "fake-os-image", "<unknown>", "<unknown>"},
 				},
@@ -507,7 +526,7 @@ func TestPrintNodeOSImage(t *testing.T) {
 				},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion, NodeInternalIP, NodeExternalIP, OSImage, KernelVersion, ContainerRuntimeVersion
-			expected: []metav1beta1.TableRow{
+			expected: []metav1.TableRow{
 				{
 					Cells: []interface{}{"foo2", "Unknown", "<none>", "<unknown>", "", "<none>", "1.1.1.1", "<unknown>", "fake-kernel-version", "<unknown>"},
 				},
@@ -533,7 +552,7 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 
 	table := []struct {
 		node     api.Node
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		{
 			node: api.Node{
@@ -544,7 +563,7 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 				},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion, NodeInternalIP, NodeExternalIP, OSImage, KernelVersion, ContainerRuntimeVersion
-			expected: []metav1beta1.TableRow{
+			expected: []metav1.TableRow{
 				{
 					Cells: []interface{}{"foo1", "Unknown", "<none>", "<unknown>", "", "<none>", "1.1.1.1", "<unknown>", "fake-kernel-version", "<unknown>"},
 				},
@@ -559,7 +578,7 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 				},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion, NodeInternalIP, NodeExternalIP, OSImage, KernelVersion, ContainerRuntimeVersion
-			expected: []metav1beta1.TableRow{
+			expected: []metav1.TableRow{
 				{
 					Cells: []interface{}{"foo2", "Unknown", "<none>", "<unknown>", "", "<none>", "1.1.1.1", "fake-os-image", "<unknown>", "<unknown>"},
 				},
@@ -585,7 +604,7 @@ func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
 
 	table := []struct {
 		node     api.Node
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		{
 			node: api.Node{
@@ -596,7 +615,7 @@ func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
 				},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion, NodeInternalIP, NodeExternalIP, OSImage, KernelVersion, ContainerRuntimeVersion
-			expected: []metav1beta1.TableRow{
+			expected: []metav1.TableRow{
 				{
 					Cells: []interface{}{"foo1", "Unknown", "<none>", "<unknown>", "", "<none>", "1.1.1.1", "<unknown>", "<unknown>", "foo://1.2.3"},
 				},
@@ -611,7 +630,7 @@ func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
 				},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion, NodeInternalIP, NodeExternalIP, OSImage, KernelVersion, ContainerRuntimeVersion
-			expected: []metav1beta1.TableRow{
+			expected: []metav1.TableRow{
 				{
 					Cells: []interface{}{"foo2", "Unknown", "<none>", "<unknown>", "", "<none>", "1.1.1.1", "<unknown>", "<unknown>", "<unknown>"},
 				},
@@ -637,7 +656,7 @@ func TestPrintNodeName(t *testing.T) {
 
 	table := []struct {
 		node     api.Node
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		{
 			node: api.Node{
@@ -645,14 +664,14 @@ func TestPrintNodeName(t *testing.T) {
 				Status:     api.NodeStatus{},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"127.0.0.1", "Unknown", "<none>", "<unknown>", ""}}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"127.0.0.1", "Unknown", "<none>", "<unknown>", ""}}}},
 		{
 			node: api.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: ""},
 				Status:     api.NodeStatus{},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"", "Unknown", "<none>", "<unknown>", ""}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"", "Unknown", "<none>", "<unknown>", ""}}},
 		},
 	}
 
@@ -674,7 +693,7 @@ func TestPrintNodeExternalIP(t *testing.T) {
 
 	table := []struct {
 		node     api.Node
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		{
 			node: api.Node{
@@ -682,7 +701,7 @@ func TestPrintNodeExternalIP(t *testing.T) {
 				Status:     api.NodeStatus{Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}}},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion, NodeInternalIP, NodeExternalIP, OSImage, KernelVersion, ContainerRuntimeVersion
-			expected: []metav1beta1.TableRow{
+			expected: []metav1.TableRow{
 				{
 					Cells: []interface{}{"foo1", "Unknown", "<none>", "<unknown>", "", "<none>", "1.1.1.1", "<unknown>", "<unknown>", "<unknown>"},
 				},
@@ -694,7 +713,7 @@ func TestPrintNodeExternalIP(t *testing.T) {
 				Status:     api.NodeStatus{Addresses: []api.NodeAddress{{Type: api.NodeInternalIP, Address: "1.1.1.1"}}},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion, NodeInternalIP, NodeExternalIP, OSImage, KernelVersion, ContainerRuntimeVersion
-			expected: []metav1beta1.TableRow{
+			expected: []metav1.TableRow{
 				{
 					Cells: []interface{}{"foo2", "Unknown", "<none>", "<unknown>", "", "1.1.1.1", "<none>", "<unknown>", "<unknown>", "<unknown>"},
 				},
@@ -709,7 +728,7 @@ func TestPrintNodeExternalIP(t *testing.T) {
 					{Type: api.NodeExternalIP, Address: "4.4.4.4"},
 				}},
 			},
-			expected: []metav1beta1.TableRow{
+			expected: []metav1.TableRow{
 				{
 					Cells: []interface{}{"foo3", "Unknown", "<none>", "<unknown>", "", "3.3.3.3", "2.2.2.2", "<unknown>", "<unknown>", "<unknown>"},
 				},
@@ -735,7 +754,7 @@ func TestPrintNodeInternalIP(t *testing.T) {
 
 	table := []struct {
 		node     api.Node
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		{
 			node: api.Node{
@@ -743,7 +762,7 @@ func TestPrintNodeInternalIP(t *testing.T) {
 				Status:     api.NodeStatus{Addresses: []api.NodeAddress{{Type: api.NodeInternalIP, Address: "1.1.1.1"}}},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion, NodeInternalIP, NodeExternalIP, OSImage, KernelVersion, ContainerRuntimeVersion
-			expected: []metav1beta1.TableRow{
+			expected: []metav1.TableRow{
 				{
 					Cells: []interface{}{"foo1", "Unknown", "<none>", "<unknown>", "", "1.1.1.1", "<none>", "<unknown>", "<unknown>", "<unknown>"},
 				},
@@ -755,7 +774,7 @@ func TestPrintNodeInternalIP(t *testing.T) {
 				Status:     api.NodeStatus{Addresses: []api.NodeAddress{{Type: api.NodeExternalIP, Address: "1.1.1.1"}}},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion, NodeInternalIP, NodeExternalIP, OSImage, KernelVersion, ContainerRuntimeVersion
-			expected: []metav1beta1.TableRow{
+			expected: []metav1.TableRow{
 				{
 					Cells: []interface{}{"foo2", "Unknown", "<none>", "<unknown>", "", "<none>", "1.1.1.1", "<unknown>", "<unknown>", "<unknown>"},
 				},
@@ -771,7 +790,7 @@ func TestPrintNodeInternalIP(t *testing.T) {
 				}},
 			},
 			// Columns: Name, Status, Roles, Age, KubeletVersion, NodeInternalIP, NodeExternalIP, OSImage, KernelVersion, ContainerRuntimeVersion
-			expected: []metav1beta1.TableRow{
+			expected: []metav1.TableRow{
 				{
 					Cells: []interface{}{"foo3", "Unknown", "<none>", "<unknown>", "", "2.2.2.2", "3.3.3.3", "<unknown>", "<unknown>", "<unknown>"},
 				},
@@ -817,7 +836,7 @@ func TestPrintIngress(t *testing.T) {
 		},
 	}
 	// Columns: Name, Hosts, Address, Ports, Age
-	expected := []metav1beta1.TableRow{{Cells: []interface{}{"test1", "*", "2.3.4.5", "80", "10y"}}}
+	expected := []metav1.TableRow{{Cells: []interface{}{"test1", "*", "2.3.4.5", "80", "10y"}}}
 
 	rows, err := printIngress(&ingress, printers.GenerateOptions{})
 	if err != nil {
@@ -833,7 +852,7 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 	tests := []struct {
 		service  api.Service
 		options  printers.GenerateOptions
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		// Test load balancer service with multiple external IP's
 		{
@@ -851,7 +870,7 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Type, Cluster-IP, External-IP, Port(s), Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"service1", "LoadBalancer", "1.2.3.4", "2.3.4.5,3.4.5.6", "80/TCP", "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"service1", "LoadBalancer", "1.2.3.4", "2.3.4.5,3.4.5.6", "80/TCP", "<unknown>"}}},
 		},
 		// Test load balancer service with pending external IP.
 		{
@@ -865,7 +884,7 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Type, Cluster-IP, External-IP, Port(s), Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"service2", "LoadBalancer", "1.3.4.5", "<pending>", "80/TCP,8090/UDP,8000/TCP,7777/SCTP", "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"service2", "LoadBalancer", "1.3.4.5", "<pending>", "80/TCP,8090/UDP,8000/TCP,7777/SCTP", "<unknown>"}}},
 		},
 		// Test load balancer service with multiple ports.
 		{
@@ -883,7 +902,7 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Type, Cluster-IP, External-IP, Port(s), Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"service3", "LoadBalancer", "1.4.5.6", "2.3.4.5", "80/TCP,8090/UDP,8000/TCP", "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"service3", "LoadBalancer", "1.4.5.6", "2.3.4.5", "80/TCP,8090/UDP,8000/TCP", "<unknown>"}}},
 		},
 		// Long external IP's list gets elided.
 		{
@@ -901,7 +920,7 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Type, Cluster-IP, External-IP, Port(s), Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"service4", "LoadBalancer", "1.5.6.7", "2.3.4.5,3.4.5...", "80/TCP,8090/UDP,8000/TCP", "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"service4", "LoadBalancer", "1.5.6.7", "2.3.4.5,3.4.5...", "80/TCP,8090/UDP,8000/TCP", "<unknown>"}}},
 		},
 		// Generate options: Wide, includes selectors.
 		{
@@ -920,7 +939,7 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 			},
 			options: printers.GenerateOptions{Wide: true},
 			// Columns: Name, Type, Cluster-IP, External-IP, Port(s), Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"service4", "LoadBalancer", "1.5.6.7", "2.3.4.5,3.4.5.6,5.6.7.8", "80/TCP,8090/UDP,8000/TCP", "<unknown>", "foo=bar"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"service4", "LoadBalancer", "1.5.6.7", "2.3.4.5,3.4.5.6,5.6.7.8", "80/TCP,8090/UDP,8000/TCP", "<unknown>", "foo=bar"}}},
 		},
 	}
 
@@ -941,7 +960,7 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 func TestPrintPod(t *testing.T) {
 	tests := []struct {
 		pod    api.Pod
-		expect []metav1beta1.TableRow
+		expect []metav1.TableRow
 	}{
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -956,7 +975,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test container error overwrites pod phase
@@ -971,7 +990,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test the same as the above but with Terminated state and the first container overwrites the rest
@@ -986,7 +1005,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test3", "0/2", "ContainerWaitingReason", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test3", "0/2", "ContainerWaitingReason", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test ready is not enough for reporting running
@@ -1001,7 +1020,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test4", "1/2", "podPhase", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test4", "1/2", "podPhase", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test ready is not enough for reporting running
@@ -1017,7 +1036,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test5", "1/2", "podReason", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test5", "1/2", "podReason", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test pod has 2 containers, one is running and the other is completed.
@@ -1033,7 +1052,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test6", "1/2", "Running", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test6", "1/2", "Running", int64(6), "<unknown>"}}},
 		},
 	}
 
@@ -1057,7 +1076,7 @@ func TestPrintPodwide(t *testing.T) {
 	condition3 := "condition3"
 	tests := []struct {
 		pod    api.Pod
-		expect []metav1beta1.TableRow
+		expect []metav1.TableRow
 	}{
 		{
 			// Test when the NodeName and PodIP are not none
@@ -1098,7 +1117,7 @@ func TestPrintPodwide(t *testing.T) {
 					NominatedNodeName: "node1",
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "1.1.1.1", "test1", "node1", "1/3"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "1.1.1.1", "test1", "node1", "1/3"}}},
 		},
 		{
 			// Test when the NodeName and PodIP are not none
@@ -1139,7 +1158,7 @@ func TestPrintPodwide(t *testing.T) {
 					NominatedNodeName: "node1",
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "1.1.1.1", "test1", "node1", "1/3"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "1.1.1.1", "test1", "node1", "1/3"}}},
 		},
 		{
 			// Test when the NodeName and PodIP are none
@@ -1157,7 +1176,7 @@ func TestPrintPodwide(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", int64(6), "<unknown>", "<none>", "<none>", "<none>", "<none>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", int64(6), "<unknown>", "<none>", "<none>", "<none>", "<none>"}}},
 		},
 	}
 
@@ -1211,18 +1230,18 @@ func TestPrintPodConditions(t *testing.T) {
 	}
 	tests := []struct {
 		pod    *api.Pod
-		expect []metav1beta1.TableRow
+		expect []metav1.TableRow
 	}{
 		// Should not have TableRowCondition
 		{
 			pod: runningPod,
 			// Columns: Name, Ready, Reason, Restarts, Age
-			expect: []metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "Running", int64(6), "<unknown>"}}},
+			expect: []metav1.TableRow{{Cells: []interface{}{"test1", "1/2", "Running", int64(6), "<unknown>"}}},
 		},
 		// Should have TableRowCondition: podSuccessConditions
 		{
 			pod: succeededPod,
-			expect: []metav1beta1.TableRow{
+			expect: []metav1.TableRow{
 				{
 					// Columns: Name, Ready, Reason, Restarts, Age
 					Cells:      []interface{}{"test1", "1/2", "Succeeded", int64(6), "<unknown>"},
@@ -1233,7 +1252,7 @@ func TestPrintPodConditions(t *testing.T) {
 		// Should have TableRowCondition: podFailedCondition
 		{
 			pod: failedPod,
-			expect: []metav1beta1.TableRow{
+			expect: []metav1.TableRow{
 				{
 					// Columns: Name, Ready, Reason, Restarts, Age
 					Cells:      []interface{}{"test2", "1/2", "Failed", int64(6), "<unknown>"},
@@ -1260,7 +1279,7 @@ func TestPrintPodConditions(t *testing.T) {
 func TestPrintPodList(t *testing.T) {
 	tests := []struct {
 		pods   api.PodList
-		expect []metav1beta1.TableRow
+		expect []metav1.TableRow
 	}{
 		// Test podList's pod: name, num of containers, restarts, container ready status
 		{
@@ -1289,7 +1308,7 @@ func TestPrintPodList(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "2/2", "podPhase", int64(6), "<unknown>"}}, {Cells: []interface{}{"test2", "1/1", "podPhase", int64(1), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test1", "2/2", "podPhase", int64(6), "<unknown>"}}, {Cells: []interface{}{"test2", "1/1", "podPhase", int64(1), "<unknown>"}}},
 		},
 	}
 
@@ -1311,7 +1330,7 @@ func TestPrintPodList(t *testing.T) {
 func TestPrintNonTerminatedPod(t *testing.T) {
 	tests := []struct {
 		pod    api.Pod
-		expect []metav1beta1.TableRow
+		expect []metav1.TableRow
 	}{
 		{
 			// Test pod phase Running should be printed
@@ -1327,7 +1346,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 				},
 			},
 			// Columns: Name, Ready, Reason, Restarts, Age
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "Running", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test1", "1/2", "Running", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test pod phase Pending should be printed
@@ -1343,7 +1362,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 				},
 			},
 			// Columns: Name, Ready, Reason, Restarts, Age
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "Pending", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test2", "1/2", "Pending", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test pod phase Unknown should be printed
@@ -1359,7 +1378,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 				},
 			},
 			// Columns: Name, Ready, Reason, Restarts, Age
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test3", "1/2", "Unknown", int64(6), "<unknown>"}}},
+			[]metav1.TableRow{{Cells: []interface{}{"test3", "1/2", "Unknown", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test pod phase Succeeded should be printed
@@ -1375,7 +1394,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 				},
 			},
 			// Columns: Name, Ready, Reason, Restarts, Age
-			[]metav1beta1.TableRow{
+			[]metav1.TableRow{
 				{
 					Cells:      []interface{}{"test4", "1/2", "Succeeded", int64(6), "<unknown>"},
 					Conditions: podSuccessConditions,
@@ -1396,7 +1415,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 				},
 			},
 			// Columns: Name, Ready, Reason, Restarts, Age
-			[]metav1beta1.TableRow{
+			[]metav1.TableRow{
 				{
 					Cells:      []interface{}{"test5", "1/2", "Failed", int64(6), "<unknown>"},
 					Conditions: podFailedConditions,
@@ -1423,7 +1442,7 @@ func TestPrintPodTemplate(t *testing.T) {
 	tests := []struct {
 		podTemplate api.PodTemplate
 		options     printers.GenerateOptions
-		expected    []metav1beta1.TableRow
+		expected    []metav1.TableRow
 	}{
 		// Test basic pod template with no containers.
 		{
@@ -1439,7 +1458,7 @@ func TestPrintPodTemplate(t *testing.T) {
 
 			options: printers.GenerateOptions{},
 			// Columns: Name, Containers, Images, Pod Labels
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"pod-template-1", "", "", "<none>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"pod-template-1", "", "", "<none>"}}},
 		},
 		// Test basic pod template with two containers.
 		{
@@ -1464,7 +1483,7 @@ func TestPrintPodTemplate(t *testing.T) {
 
 			options: printers.GenerateOptions{},
 			// Columns: Name, Containers, Images, Pod Labels
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"pod-template-2", "fake-container1,fake-container2", "fake-image1,fake-image2", "<none>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"pod-template-2", "fake-container1,fake-container2", "fake-image1,fake-image2", "<none>"}}},
 		},
 		// Test basic pod template with pod labels
 		{
@@ -1483,7 +1502,7 @@ func TestPrintPodTemplate(t *testing.T) {
 
 			options: printers.GenerateOptions{},
 			// Columns: Name, Containers, Images, Pod Labels
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"pod-template-3", "", "", "foo=bar"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"pod-template-3", "", "", "foo=bar"}}},
 		},
 	}
 
@@ -1533,7 +1552,7 @@ func TestPrintPodTemplateList(t *testing.T) {
 	}
 
 	// Columns: Name, Containers, Images, Pod Labels
-	expectedRows := []metav1beta1.TableRow{
+	expectedRows := []metav1.TableRow{
 		{Cells: []interface{}{"pod-template-1", "", "", "foo=bar"}},
 		{Cells: []interface{}{"pod-template-2", "", "", "a=b"}},
 	}
@@ -1636,21 +1655,21 @@ func TestPrintDeployment(t *testing.T) {
 	tests := []struct {
 		deployment apps.Deployment
 		options    printers.GenerateOptions
-		expected   []metav1beta1.TableRow
+		expected   []metav1.TableRow
 	}{
 		// Test Deployment with no generate options.
 		{
 			deployment: testDeployment,
 			options:    printers.GenerateOptions{},
 			// Columns: Name, ReadyReplicas, UpdatedReplicas, AvailableReplicas, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test1", "0/5", int64(2), int64(1), "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "0/5", int64(2), int64(1), "0s"}}},
 		},
 		// Test generate options: Wide.
 		{
 			deployment: testDeployment,
 			options:    printers.GenerateOptions{Wide: true},
 			// Columns: Name, ReadyReplicas, UpdatedReplicas, AvailableReplicas, Age, Containers, Images, Selectors
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test1", "0/5", int64(2), int64(1), "0s", "fake-container1,fake-container2", "fake-image1,fake-image2", "foo=bar"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "0/5", int64(2), int64(1), "0s", "fake-container1,fake-container2", "fake-image1,fake-image2", "foo=bar"}}},
 		},
 	}
 
@@ -1704,21 +1723,21 @@ func TestPrintDaemonSet(t *testing.T) {
 	tests := []struct {
 		daemonSet apps.DaemonSet
 		options   printers.GenerateOptions
-		expected  []metav1beta1.TableRow
+		expected  []metav1.TableRow
 	}{
 		// Test generate daemon set with no generate options.
 		{
 			daemonSet: testDaemonSet,
 			options:   printers.GenerateOptions{},
 			// Columns: Name, Num Desired, Num Current, Num Ready, Num Updated, Num Available, Selectors, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test1", int64(3), int64(2), int64(1), int64(2), int64(0), "<none>", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", int64(3), int64(2), int64(1), int64(2), int64(0), "<none>", "0s"}}},
 		},
 		// Test generate daemon set with "Wide" generate options.
 		{
 			daemonSet: testDaemonSet,
 			options:   printers.GenerateOptions{Wide: true},
 			// Columns: Name, Num Desired, Num Current, Num Ready, Num Updated, Num Available, Node Selectors, Age, Containers, Images, Labels
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test1", int64(3), int64(2), int64(1), int64(2), int64(0), "<none>", "0s", "fake-container1,fake-container2", "fake-image1,fake-image2", "foo=bar"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", int64(3), int64(2), int64(1), int64(2), int64(0), "<none>", "0s", "fake-container1,fake-container2", "fake-image1,fake-image2", "foo=bar"}}},
 		},
 	}
 
@@ -1790,7 +1809,7 @@ func TestPrintDaemonSetList(t *testing.T) {
 	}
 
 	// Columns: Name, Num Desired, Num Current, Num Ready, Num Updated, Num Available, Selectors, Age
-	expectedRows := []metav1beta1.TableRow{
+	expectedRows := []metav1.TableRow{
 		{Cells: []interface{}{"daemonset1", int64(3), int64(2), int64(1), int64(2), int64(0), "<none>", "0s"}},
 		{Cells: []interface{}{"daemonset2", int64(2), int64(4), int64(9), int64(3), int64(3), "<none>", "0s"}},
 	}
@@ -1813,7 +1832,7 @@ func TestPrintJob(t *testing.T) {
 	tests := []struct {
 		job      batch.Job
 		options  printers.GenerateOptions
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		{
 			// Generate table rows for Job with no generate options.
@@ -1846,7 +1865,7 @@ func TestPrintJob(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Completions, Duration, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"job1", "1/2", "", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"job1", "1/2", "", "0s"}}},
 		},
 		// Generate table rows for Job with generate options "Wide".
 		{
@@ -1879,7 +1898,7 @@ func TestPrintJob(t *testing.T) {
 			},
 			options: printers.GenerateOptions{Wide: true},
 			// Columns: Name, Completions, Duration, Age, Containers, Images, Selectors
-			expected: []metav1beta1.TableRow{
+			expected: []metav1.TableRow{
 				{
 					Cells: []interface{}{"job1", "1/2", "", "0s", "fake-job-container1,fake-job-container2", "fake-job-image1,fake-job-image2", "job-label=job-label-value"},
 				},
@@ -1901,7 +1920,7 @@ func TestPrintJob(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Completions, Duration, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"job2", "0/1", "", "10y"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"job2", "0/1", "", "10y"}}},
 		},
 		// Job with duration.
 		{
@@ -1921,7 +1940,7 @@ func TestPrintJob(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Completions, Duration, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"job3", "0/1", "30m", "10y"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"job3", "0/1", "30m", "10y"}}},
 		},
 		{
 			job: batch.Job{
@@ -1939,7 +1958,7 @@ func TestPrintJob(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Completions, Duration, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"job4", "0/1", "20m", "10y"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"job4", "0/1", "20m", "10y"}}},
 		},
 	}
 
@@ -2020,7 +2039,7 @@ func TestPrintJobList(t *testing.T) {
 	}
 
 	// Columns: Name, Completions, Duration, Age
-	expectedRows := []metav1beta1.TableRow{
+	expectedRows := []metav1.TableRow{
 		{Cells: []interface{}{"job1", "1/2", "", "0s"}},
 		{Cells: []interface{}{"job2", "2/2", "20m", "0s"}},
 	}
@@ -2047,7 +2066,7 @@ func TestPrintHPA(t *testing.T) {
 	}
 	tests := []struct {
 		hpa      autoscaling.HorizontalPodAutoscaler
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		// minReplicas unset
 		{
@@ -2066,7 +2085,7 @@ func TestPrintHPA(t *testing.T) {
 				},
 			},
 			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "<none>", "<unset>", int64(10), int64(4), "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "<none>", "<unset>", int64(10), int64(4), "<unknown>"}}},
 		},
 		// external source type, target average value (no current)
 		{
@@ -2101,7 +2120,7 @@ func TestPrintHPA(t *testing.T) {
 				},
 			},
 			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "<unknown>/100m (avg)", "2", int64(10), int64(4), "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "<unknown>/100m (avg)", "2", int64(10), int64(4), "<unknown>"}}},
 		},
 		// external source type, target average value
 		{
@@ -2150,7 +2169,7 @@ func TestPrintHPA(t *testing.T) {
 				},
 			},
 			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "50m/100m (avg)", "2", int64(10), int64(4), "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "50m/100m (avg)", "2", int64(10), int64(4), "<unknown>"}}},
 		},
 		// external source type, target value (no current)
 		{
@@ -2185,7 +2204,7 @@ func TestPrintHPA(t *testing.T) {
 				},
 			},
 			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "<unknown>/100m", "2", int64(10), int64(4), "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "<unknown>/100m", "2", int64(10), int64(4), "<unknown>"}}},
 		},
 		// external source type, target value
 		{
@@ -2233,7 +2252,7 @@ func TestPrintHPA(t *testing.T) {
 				},
 			},
 			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "50m/100m", "2", int64(10), int64(4), "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "50m/100m", "2", int64(10), int64(4), "<unknown>"}}},
 		},
 		// pods source type (no current)
 		{
@@ -2267,7 +2286,7 @@ func TestPrintHPA(t *testing.T) {
 				},
 			},
 			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "<unknown>/100m", "2", int64(10), int64(4), "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "<unknown>/100m", "2", int64(10), int64(4), "<unknown>"}}},
 		},
 		// pods source type
 		{
@@ -2314,7 +2333,7 @@ func TestPrintHPA(t *testing.T) {
 				},
 			},
 			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "50m/100m", "2", int64(10), int64(4), "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "50m/100m", "2", int64(10), int64(4), "<unknown>"}}},
 		},
 		// object source type (no current)
 		{
@@ -2352,7 +2371,7 @@ func TestPrintHPA(t *testing.T) {
 				},
 			},
 			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "<unknown>/100m", "2", int64(10), int64(4), "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "<unknown>/100m", "2", int64(10), int64(4), "<unknown>"}}},
 		},
 		// object source type
 		{
@@ -2407,7 +2426,7 @@ func TestPrintHPA(t *testing.T) {
 				},
 			},
 			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "50m/100m", "2", int64(10), int64(4), "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "50m/100m", "2", int64(10), int64(4), "<unknown>"}}},
 		},
 		// resource source type, targetVal (no current)
 		{
@@ -2439,7 +2458,7 @@ func TestPrintHPA(t *testing.T) {
 				},
 			},
 			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "<unknown>/100m", "2", int64(10), int64(4), "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "<unknown>/100m", "2", int64(10), int64(4), "<unknown>"}}},
 		},
 		// resource source type, targetVal
 		{
@@ -2482,7 +2501,7 @@ func TestPrintHPA(t *testing.T) {
 				},
 			},
 			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "50m/100m", "2", int64(10), int64(4), "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "50m/100m", "2", int64(10), int64(4), "<unknown>"}}},
 		},
 		// resource source type, targetUtil (no current)
 		{
@@ -2514,7 +2533,7 @@ func TestPrintHPA(t *testing.T) {
 				},
 			},
 			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "<unknown>/80%", "2", int64(10), int64(4), "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "<unknown>/80%", "2", int64(10), int64(4), "<unknown>"}}},
 		},
 		// resource source type, targetUtil
 		{
@@ -2558,7 +2577,7 @@ func TestPrintHPA(t *testing.T) {
 				},
 			},
 			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "50%/80%", "2", int64(10), int64(4), "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "50%/80%", "2", int64(10), int64(4), "<unknown>"}}},
 		},
 		// multiple specs
 		{
@@ -2637,7 +2656,7 @@ func TestPrintHPA(t *testing.T) {
 				},
 			},
 			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "50m/100m, 50%/80% + 1 more...", "2", int64(10), int64(4), "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "50m/100m, 50%/80% + 1 more...", "2", int64(10), int64(4), "<unknown>"}}},
 		},
 	}
 
@@ -2661,7 +2680,7 @@ func TestPrintService(t *testing.T) {
 	tests := []struct {
 		service  api.Service
 		options  printers.GenerateOptions
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		{
 			// Test name, cluster ip, port with protocol
@@ -2681,7 +2700,7 @@ func TestPrintService(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Type, Cluster-IP, External-IP, Port(s), Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test1", "ClusterIP", "10.9.8.7", "<none>", "2233/tcp", "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "ClusterIP", "10.9.8.7", "<none>", "2233/tcp", "<unknown>"}}},
 		},
 		{
 			// Test generate options: Wide includes selectors.
@@ -2701,7 +2720,7 @@ func TestPrintService(t *testing.T) {
 			},
 			options: printers.GenerateOptions{Wide: true},
 			// Columns: Name, Type, Cluster-IP, External-IP, Port(s), Age, Selector
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test1", "ClusterIP", "10.9.8.7", "<none>", "2233/tcp", "<unknown>", "foo=bar"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "ClusterIP", "10.9.8.7", "<none>", "2233/tcp", "<unknown>", "foo=bar"}}},
 		},
 		{
 			// Test NodePort service
@@ -2721,7 +2740,7 @@ func TestPrintService(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Type, Cluster-IP, External-IP, Port(s), Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test2", "NodePort", "10.9.8.7", "<none>", "8888:9999/tcp", "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test2", "NodePort", "10.9.8.7", "<none>", "8888:9999/tcp", "<unknown>"}}},
 		},
 		{
 			// Test LoadBalancer service
@@ -2740,7 +2759,7 @@ func TestPrintService(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Type, Cluster-IP, External-IP, Port(s), Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test3", "LoadBalancer", "10.9.8.7", "<pending>", "8888/tcp", "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test3", "LoadBalancer", "10.9.8.7", "<pending>", "8888/tcp", "<unknown>"}}},
 		},
 		{
 			// Test LoadBalancer service with single ExternalIP and no LoadBalancerStatus
@@ -2760,7 +2779,7 @@ func TestPrintService(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Type, Cluster-IP, External-IP, Port(s), Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test4", "LoadBalancer", "10.9.8.7", "80.11.12.10", "8888/tcp", "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test4", "LoadBalancer", "10.9.8.7", "80.11.12.10", "8888/tcp", "<unknown>"}}},
 		},
 		{
 			// Test LoadBalancer service with single ExternalIP
@@ -2790,7 +2809,7 @@ func TestPrintService(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Type, Cluster-IP, External-IP, Port(s), Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test5", "LoadBalancer", "10.9.8.7", "3.4.5.6,80.11.12.10", "8888/tcp", "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test5", "LoadBalancer", "10.9.8.7", "3.4.5.6,80.11.12.10", "8888/tcp", "<unknown>"}}},
 		},
 		{
 			// Test LoadBalancer service with mul ExternalIPs
@@ -2824,7 +2843,7 @@ func TestPrintService(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Type, Cluster-IP, External-IP, Port(s), Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test6", "LoadBalancer", "10.9.8.7", "2.3.4.5,3.4.5.6,80.11.12.10,80.11.12.11", "8888/tcp", "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test6", "LoadBalancer", "10.9.8.7", "2.3.4.5,3.4.5.6,80.11.12.10,80.11.12.11", "8888/tcp", "<unknown>"}}},
 		},
 		{
 			// Test ExternalName service
@@ -2837,7 +2856,7 @@ func TestPrintService(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Type, Cluster-IP, External-IP, Port(s), Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test7", "ExternalName", "<none>", "my.database.example.com", "<none>", "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test7", "ExternalName", "<none>", "my.database.example.com", "<none>", "<unknown>"}}},
 		},
 	}
 
@@ -2888,7 +2907,7 @@ func TestPrintServiceList(t *testing.T) {
 	}
 
 	// Columns: Name, Type, Cluster-IP, External-IP, Port(s), Age
-	expectedRows := []metav1beta1.TableRow{
+	expectedRows := []metav1.TableRow{
 		{Cells: []interface{}{"service1", "ClusterIP", "10.9.8.7", "<none>", "2233/tcp", "<unknown>"}},
 		{Cells: []interface{}{"service2", "NodePort", "1.2.3.4", "<none>", "5566/udp", "<unknown>"}},
 	}
@@ -2910,7 +2929,7 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 	maxUnavailable := intstr.FromInt(11)
 	tests := []struct {
 		pdb      policy.PodDisruptionBudget
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		// Min Available set, no Max Available.
 		{
@@ -2924,11 +2943,11 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 					MinAvailable: &minAvailable,
 				},
 				Status: policy.PodDisruptionBudgetStatus{
-					PodDisruptionsAllowed: 5,
+					DisruptionsAllowed: 5,
 				},
 			},
 			// Columns: Name, Min Available, Max Available, Allowed Disruptions, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"pdb1", "22", "N/A", int64(5), "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"pdb1", "22", "N/A", int64(5), "0s"}}},
 		},
 		// Max Available set, no Min Available.
 		{
@@ -2942,11 +2961,11 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 					MaxUnavailable: &maxUnavailable,
 				},
 				Status: policy.PodDisruptionBudgetStatus{
-					PodDisruptionsAllowed: 5,
+					DisruptionsAllowed: 5,
 				},
 			},
 			// Columns: Name, Min Available, Max Available, Allowed Disruptions, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"pdb2", "N/A", "11", int64(5), "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"pdb2", "N/A", "11", int64(5), "0s"}}},
 		}}
 
 	for i, test := range tests {
@@ -2979,7 +2998,7 @@ func TestPrintPodDisruptionBudgetList(t *testing.T) {
 					MaxUnavailable: &maxUnavailable,
 				},
 				Status: policy.PodDisruptionBudgetStatus{
-					PodDisruptionsAllowed: 5,
+					DisruptionsAllowed: 5,
 				},
 			},
 			{
@@ -2992,14 +3011,14 @@ func TestPrintPodDisruptionBudgetList(t *testing.T) {
 					MinAvailable: &minAvailable,
 				},
 				Status: policy.PodDisruptionBudgetStatus{
-					PodDisruptionsAllowed: 3,
+					DisruptionsAllowed: 3,
 				},
 			},
 		},
 	}
 
 	// Columns: Name, Min Available, Max Available, Allowed Disruptions, Age
-	expectedRows := []metav1beta1.TableRow{
+	expectedRows := []metav1.TableRow{
 		{Cells: []interface{}{"pdb1", "N/A", "11", int64(5), "0s"}},
 		{Cells: []interface{}{"pdb2", "22", "N/A", int64(3), "0s"}},
 	}
@@ -3019,7 +3038,7 @@ func TestPrintPodDisruptionBudgetList(t *testing.T) {
 func TestPrintControllerRevision(t *testing.T) {
 	tests := []struct {
 		history  apps.ControllerRevision
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		{
 			history: apps.ControllerRevision{
@@ -3037,7 +3056,7 @@ func TestPrintControllerRevision(t *testing.T) {
 				},
 				Revision: 1,
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test1", "daemonset.apps/foo", int64(1), "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "daemonset.apps/foo", int64(1), "0s"}}},
 		},
 		{
 			history: apps.ControllerRevision{
@@ -3054,7 +3073,7 @@ func TestPrintControllerRevision(t *testing.T) {
 				},
 				Revision: 2,
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test2", "<none>", int64(2), "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test2", "<none>", int64(2), "0s"}}},
 		},
 		{
 			history: apps.ControllerRevision{
@@ -3065,7 +3084,7 @@ func TestPrintControllerRevision(t *testing.T) {
 				},
 				Revision: 3,
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test3", "<none>", int64(3), "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test3", "<none>", int64(3), "0s"}}},
 		},
 		{
 			history: apps.ControllerRevision{
@@ -3076,7 +3095,7 @@ func TestPrintControllerRevision(t *testing.T) {
 				},
 				Revision: 4,
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test4", "<none>", int64(4), "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test4", "<none>", int64(4), "0s"}}},
 		},
 	}
 
@@ -3101,7 +3120,7 @@ func boolP(b bool) *bool {
 func TestPrintConfigMap(t *testing.T) {
 	tests := []struct {
 		configMap api.ConfigMap
-		expected  []metav1beta1.TableRow
+		expected  []metav1.TableRow
 	}{
 		// Basic config map with no data.
 		{
@@ -3112,7 +3131,7 @@ func TestPrintConfigMap(t *testing.T) {
 				},
 			},
 			// Columns: Name, Data, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"configmap1", int64(0), "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"configmap1", int64(0), "0s"}}},
 		},
 		// Basic config map with one data entry
 		{
@@ -3126,7 +3145,7 @@ func TestPrintConfigMap(t *testing.T) {
 				},
 			},
 			// Columns: Name, (Num) Data, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"configmap2", int64(1), "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"configmap2", int64(1), "0s"}}},
 		},
 		// Basic config map with one data and one binary data entry.
 		{
@@ -3143,7 +3162,7 @@ func TestPrintConfigMap(t *testing.T) {
 				},
 			},
 			// Columns: Name, (Num) Data, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"configmap3", int64(2), "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"configmap3", int64(2), "0s"}}},
 		},
 	}
 
@@ -3164,7 +3183,7 @@ func TestPrintConfigMap(t *testing.T) {
 func TestPrintNetworkPolicy(t *testing.T) {
 	tests := []struct {
 		policy   networking.NetworkPolicy
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		// Basic network policy with empty spec.
 		{
@@ -3176,7 +3195,7 @@ func TestPrintNetworkPolicy(t *testing.T) {
 				Spec: networking.NetworkPolicySpec{},
 			},
 			// Columns: Name, Pod-Selector, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"policy1", "<none>", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"policy1", "<none>", "0s"}}},
 		},
 		// Basic network policy with pod selector.
 		{
@@ -3190,7 +3209,7 @@ func TestPrintNetworkPolicy(t *testing.T) {
 				},
 			},
 			// Columns: Name, Pod-Selector, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"policy2", "foo=bar", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"policy2", "foo=bar", "0s"}}},
 		},
 	}
 
@@ -3212,7 +3231,7 @@ func TestPrintRoleBinding(t *testing.T) {
 	tests := []struct {
 		binding  rbac.RoleBinding
 		options  printers.GenerateOptions
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		// Basic role binding
 		{
@@ -3234,7 +3253,7 @@ func TestPrintRoleBinding(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"binding1", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"binding1", "Role/extension-apiserver-authentication-reader", "0s"}}},
 		},
 		// Generate options=Wide; print subject and roles.
 		{
@@ -3265,7 +3284,7 @@ func TestPrintRoleBinding(t *testing.T) {
 			},
 			options: printers.GenerateOptions{Wide: true},
 			// Columns: Name, Age, Role, Users, Groups, ServiceAccounts
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"binding2", "0s", "Role/role-name", "user-name", "group-name", "service-account-namespace/service-account-name"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"binding2", "Role/role-name", "0s", "user-name", "group-name", "service-account-namespace/service-account-name"}}},
 		},
 	}
 
@@ -3287,7 +3306,7 @@ func TestPrintClusterRoleBinding(t *testing.T) {
 	tests := []struct {
 		binding  rbac.ClusterRoleBinding
 		options  printers.GenerateOptions
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		// Basic cluster role binding
 		{
@@ -3309,7 +3328,7 @@ func TestPrintClusterRoleBinding(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"binding1", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"binding1", "Role/extension-apiserver-authentication-reader", "0s"}}},
 		},
 		// Generate options=Wide; print subject and roles.
 		{
@@ -3340,7 +3359,7 @@ func TestPrintClusterRoleBinding(t *testing.T) {
 			},
 			options: printers.GenerateOptions{Wide: true},
 			// Columns: Name, Age, Role, Users, Groups, ServiceAccounts
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"binding2", "0s", "Role/role-name", "user-name", "group-name", "service-account-namespace/service-account-name"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"binding2", "Role/role-name", "0s", "user-name", "group-name", "service-account-namespace/service-account-name"}}},
 		},
 	}
 
@@ -3360,7 +3379,7 @@ func TestPrintClusterRoleBinding(t *testing.T) {
 func TestPrintCertificateSigningRequest(t *testing.T) {
 	tests := []struct {
 		csr      certificates.CertificateSigningRequest
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		// Basic CSR with no spec or status; defaults to status: Pending.
 		{
@@ -3373,7 +3392,7 @@ func TestPrintCertificateSigningRequest(t *testing.T) {
 				Status: certificates.CertificateSigningRequestStatus{},
 			},
 			// Columns: Name, Age, Requestor, Condition
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"csr1", "0s", "", "Pending"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"csr1", "0s", "", "Pending"}}},
 		},
 		// Basic CSR with Spec and Status=Approved.
 		{
@@ -3394,7 +3413,7 @@ func TestPrintCertificateSigningRequest(t *testing.T) {
 				},
 			},
 			// Columns: Name, Age, Requestor, Condition
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"csr2", "0s", "CSR Requestor", "Approved"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"csr2", "0s", "CSR Requestor", "Approved"}}},
 		},
 		// Basic CSR with Spec and Status=Approved; certificate issued.
 		{
@@ -3416,7 +3435,7 @@ func TestPrintCertificateSigningRequest(t *testing.T) {
 				},
 			},
 			// Columns: Name, Age, Requestor, Condition
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"csr2", "0s", "CSR Requestor", "Approved,Issued"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"csr2", "0s", "CSR Requestor", "Approved,Issued"}}},
 		},
 		// Basic CSR with Spec and Status=Denied.
 		{
@@ -3437,7 +3456,7 @@ func TestPrintCertificateSigningRequest(t *testing.T) {
 				},
 			},
 			// Columns: Name, Age, Requestor, Condition
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"csr3", "0s", "CSR Requestor", "Denied"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"csr3", "0s", "CSR Requestor", "Denied"}}},
 		},
 	}
 
@@ -3459,7 +3478,7 @@ func TestPrintReplicationController(t *testing.T) {
 	tests := []struct {
 		rc       api.ReplicationController
 		options  printers.GenerateOptions
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		// Basic print replication controller without replicas or status.
 		{
@@ -3491,7 +3510,7 @@ func TestPrintReplicationController(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Desired, Current, Ready, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"rc1", int64(0), int64(0), int64(0), "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"rc1", int64(0), int64(0), int64(0), "<unknown>"}}},
 		},
 		// Basic print replication controller with replicas; does not print containers or labels
 		{
@@ -3528,7 +3547,7 @@ func TestPrintReplicationController(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Desired, Current, Ready, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"rc1", int64(5), int64(3), int64(1), "<unknown>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"rc1", int64(5), int64(3), int64(1), "<unknown>"}}},
 		},
 		// Generate options: Wide; print containers and labels.
 		{
@@ -3564,7 +3583,7 @@ func TestPrintReplicationController(t *testing.T) {
 			},
 			options: printers.GenerateOptions{Wide: true},
 			// Columns: Name, Desired, Current, Ready, Age, Containers, Images, Selector
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"rc1", int64(5), int64(3), int64(1), "<unknown>", "test", "test_image", "a=b"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"rc1", int64(5), int64(3), int64(1), "<unknown>", "test", "test_image", "a=b"}}},
 		},
 	}
 
@@ -3586,7 +3605,7 @@ func TestPrintReplicaSet(t *testing.T) {
 	tests := []struct {
 		replicaSet apps.ReplicaSet
 		options    printers.GenerateOptions
-		expected   []metav1beta1.TableRow
+		expected   []metav1.TableRow
 	}{
 		// Generate options empty
 		{
@@ -3620,7 +3639,7 @@ func TestPrintReplicaSet(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Desired, Current, Ready, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test1", int64(5), int64(5), int64(2), "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", int64(5), int64(5), int64(2), "0s"}}},
 		},
 		// Generate options "Wide"
 		{
@@ -3654,7 +3673,7 @@ func TestPrintReplicaSet(t *testing.T) {
 			},
 			options: printers.GenerateOptions{Wide: true},
 			// Columns: Name, Desired, Current, Ready, Age, Containers, Images, Selector
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test1", int64(5), int64(5), int64(2), "0s", "fake-container1,fake-container2", "fake-image1,fake-image2", "foo=bar"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", int64(5), int64(5), int64(2), "0s", "fake-container1,fake-container2", "fake-image1,fake-image2", "foo=bar"}}},
 		},
 	}
 
@@ -3722,7 +3741,7 @@ func TestPrintReplicaSetList(t *testing.T) {
 	}
 
 	// Columns: Name, Desired, Current, Ready, Age
-	expectedRows := []metav1beta1.TableRow{
+	expectedRows := []metav1.TableRow{
 		{Cells: []interface{}{"replicaset1", int64(5), int64(5), int64(2), "0s"}},
 		{Cells: []interface{}{"replicaset2", int64(4), int64(3), int64(1), "0s"}},
 	}
@@ -3743,7 +3762,7 @@ func TestPrintStatefulSet(t *testing.T) {
 	tests := []struct {
 		statefulSet apps.StatefulSet
 		options     printers.GenerateOptions
-		expected    []metav1beta1.TableRow
+		expected    []metav1.TableRow
 	}{
 		// Basic stateful set; no generate options.
 		{
@@ -3776,7 +3795,7 @@ func TestPrintStatefulSet(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Ready, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test1", "2/5", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "0s"}}},
 		},
 		// Generate options "Wide"; includes containers and images.
 		{
@@ -3809,7 +3828,7 @@ func TestPrintStatefulSet(t *testing.T) {
 			},
 			options: printers.GenerateOptions{Wide: true},
 			// Columns: Name, Ready, Age, Containers, Images
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test1", "2/5", "0s", "fake-container1,fake-container2", "fake-image1,fake-image2"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "2/5", "0s", "fake-container1,fake-container2", "fake-image1,fake-image2"}}},
 		},
 	}
 
@@ -3836,7 +3855,7 @@ func TestPrintPersistentVolume(t *testing.T) {
 	}
 	tests := []struct {
 		pv       api.PersistentVolume
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		{
 			// Test bound
@@ -3855,7 +3874,7 @@ func TestPrintPersistentVolume(t *testing.T) {
 					Phase: api.VolumeBound,
 				},
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test1", "4Gi", "ROX", "", "Bound", "default/test", "", "", "<unknown>", "<unset>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "4Gi", "ROX", "", "Bound", "default/test", "", "", "<unknown>", "<unset>"}}},
 		},
 		{
 			// Test failed
@@ -3874,7 +3893,7 @@ func TestPrintPersistentVolume(t *testing.T) {
 					Phase: api.VolumeFailed,
 				},
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test2", "4Gi", "ROX", "", "Failed", "default/test", "", "", "<unknown>", "<unset>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test2", "4Gi", "ROX", "", "Failed", "default/test", "", "", "<unknown>", "<unset>"}}},
 		},
 		{
 			// Test pending
@@ -3893,7 +3912,7 @@ func TestPrintPersistentVolume(t *testing.T) {
 					Phase: api.VolumePending,
 				},
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test3", "10Gi", "RWX", "", "Pending", "default/test", "", "", "<unknown>", "<unset>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test3", "10Gi", "RWX", "", "Pending", "default/test", "", "", "<unknown>", "<unset>"}}},
 		},
 		{
 			// Test pending, storageClass
@@ -3913,7 +3932,7 @@ func TestPrintPersistentVolume(t *testing.T) {
 					Phase: api.VolumePending,
 				},
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test4", "10Gi", "RWO", "", "Pending", "default/test", "my-scn", "", "<unknown>", "<unset>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test4", "10Gi", "RWO", "", "Pending", "default/test", "my-scn", "", "<unknown>", "<unset>"}}},
 		},
 		{
 			// Test available
@@ -3933,7 +3952,7 @@ func TestPrintPersistentVolume(t *testing.T) {
 					Phase: api.VolumeAvailable,
 				},
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test5", "10Gi", "RWO", "", "Available", "default/test", "my-scn", "", "<unknown>", "<unset>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test5", "10Gi", "RWO", "", "Available", "default/test", "my-scn", "", "<unknown>", "<unset>"}}},
 		},
 		{
 			// Test released
@@ -3953,7 +3972,7 @@ func TestPrintPersistentVolume(t *testing.T) {
 					Phase: api.VolumeReleased,
 				},
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test6", "10Gi", "RWO", "", "Released", "default/test", "my-scn", "", "<unknown>", "<unset>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test6", "10Gi", "RWO", "", "Released", "default/test", "my-scn", "", "<unknown>", "<unset>"}}},
 		},
 	}
 
@@ -3976,7 +3995,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 	myScn := "my-scn"
 	tests := []struct {
 		pvc      api.PersistentVolumeClaim
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -3996,7 +4015,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test1", "Bound", "my-volume", "4Gi", "ROX", "", "<unknown>", "Filesystem"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test1", "Bound", "my-volume", "4Gi", "ROX", "", "<unknown>", "Filesystem"}}},
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -4015,7 +4034,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test2", "Lost", "", "", "", "", "<unknown>", "Filesystem"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test2", "Lost", "", "", "", "", "<unknown>", "Filesystem"}}},
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -4035,7 +4054,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test3", "Pending", "my-volume", "10Gi", "RWX", "", "<unknown>", "Filesystem"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test3", "Pending", "my-volume", "10Gi", "RWX", "", "<unknown>", "Filesystem"}}},
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -4056,7 +4075,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test4", "Pending", "my-volume", "10Gi", "RWO", "my-scn", "<unknown>", "Filesystem"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test4", "Pending", "my-volume", "10Gi", "RWO", "my-scn", "<unknown>", "Filesystem"}}},
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -4076,7 +4095,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test5", "Pending", "my-volume", "10Gi", "RWO", "my-scn", "<unknown>", "<unset>"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"test5", "Pending", "my-volume", "10Gi", "RWO", "my-scn", "<unknown>", "<unset>"}}},
 		},
 	}
 
@@ -4097,7 +4116,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 func TestPrintComponentStatus(t *testing.T) {
 	tests := []struct {
 		componentStatus api.ComponentStatus
-		expected        []metav1beta1.TableRow
+		expected        []metav1.TableRow
 	}{
 		// Basic component status without conditions
 		{
@@ -4108,7 +4127,7 @@ func TestPrintComponentStatus(t *testing.T) {
 				Conditions: []api.ComponentCondition{},
 			},
 			// Columns: Name, Status, Message, Error
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"cs1", "Unknown", "", ""}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"cs1", "Unknown", "", ""}}},
 		},
 		// Basic component status with healthy condition.
 		{
@@ -4126,7 +4145,7 @@ func TestPrintComponentStatus(t *testing.T) {
 				},
 			},
 			// Columns: Name, Status, Message, Error
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"cs2", "Healthy", "test message", "test error"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"cs2", "Healthy", "test message", "test error"}}},
 		},
 		// Basic component status with healthy condition.
 		{
@@ -4144,7 +4163,7 @@ func TestPrintComponentStatus(t *testing.T) {
 				},
 			},
 			// Columns: Name, Status, Message, Error
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"cs3", "Unhealthy", "test message", "test error"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"cs3", "Unhealthy", "test message", "test error"}}},
 		},
 	}
 
@@ -4168,7 +4187,7 @@ func TestPrintCronJob(t *testing.T) {
 	tests := []struct {
 		cronjob  batch.CronJob
 		options  printers.GenerateOptions
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		// Basic cron job; does not print containers, images, or labels.
 		{
@@ -4207,7 +4226,7 @@ func TestPrintCronJob(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Schedule, Suspend, Active, Last Schedule, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"cronjob1", "0/5 * * * ?", "False", int64(0), "0s", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"cronjob1", "0/5 * * * ?", "False", int64(0), "0s", "0s"}}},
 		},
 		// Generate options: Wide; prints containers, images, and labels.
 		{
@@ -4246,7 +4265,7 @@ func TestPrintCronJob(t *testing.T) {
 			},
 			options: printers.GenerateOptions{Wide: true},
 			// Columns: Name, Schedule, Suspend, Active, Last Schedule, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"cronjob1", "0/5 * * * ?", "False", int64(0), "0s", "0s", "fake-job-container1,fake-job-container2", "fake-job-image1,fake-job-image2", "a=b"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"cronjob1", "0/5 * * * ?", "False", int64(0), "0s", "0s", "fake-job-container1,fake-job-container2", "fake-job-image1,fake-job-image2", "a=b"}}},
 		},
 		// CronJob with Last Schedule and Age
 		{
@@ -4265,7 +4284,7 @@ func TestPrintCronJob(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Schedule, Suspend, Active, Last Schedule, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"cronjob2", "0/5 * * * ?", "False", int64(0), "30s", "5m"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"cronjob2", "0/5 * * * ?", "False", int64(0), "30s", "5m"}}},
 		},
 		// CronJob without Last Schedule
 		{
@@ -4282,7 +4301,7 @@ func TestPrintCronJob(t *testing.T) {
 			},
 			options: printers.GenerateOptions{},
 			// Columns: Name, Schedule, Suspend, Active, Last Schedule, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"cronjob3", "0/5 * * * ?", "False", int64(0), "<none>", "5m"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"cronjob3", "0/5 * * * ?", "False", int64(0), "<none>", "5m"}}},
 		},
 	}
 
@@ -4348,7 +4367,7 @@ func TestPrintCronJobList(t *testing.T) {
 	}
 
 	// Columns: Name, Schedule, Suspend, Active, Last Schedule, Age
-	expectedRows := []metav1beta1.TableRow{
+	expectedRows := []metav1.TableRow{
 		{Cells: []interface{}{"cronjob1", "0/5 * * * ?", "False", int64(0), "0s", "0s"}},
 		{Cells: []interface{}{"cronjob2", "4/5 1 1 1 ?", "False", int64(0), "20m", "0s"}},
 	}
@@ -4366,9 +4385,13 @@ func TestPrintCronJobList(t *testing.T) {
 }
 
 func TestPrintStorageClass(t *testing.T) {
+	policyDelte := api.PersistentVolumeReclaimDelete
+	policyRetain := api.PersistentVolumeReclaimRetain
+	bindModeImmediate := storage.VolumeBindingImmediate
+	bindModeWait := storage.VolumeBindingWaitForFirstConsumer
 	tests := []struct {
 		sc       storage.StorageClass
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		{
 			sc: storage.StorageClass{
@@ -4378,7 +4401,8 @@ func TestPrintStorageClass(t *testing.T) {
 				},
 				Provisioner: "kubernetes.io/glusterfs",
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"sc1", "kubernetes.io/glusterfs", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"sc1", "kubernetes.io/glusterfs", "Delete",
+				"Immediate", false, "0s"}}},
 		},
 		{
 			sc: storage.StorageClass{
@@ -4388,7 +4412,60 @@ func TestPrintStorageClass(t *testing.T) {
 				},
 				Provisioner: "kubernetes.io/nfs",
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"sc2", "kubernetes.io/nfs", "5m"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"sc2", "kubernetes.io/nfs", "Delete",
+				"Immediate", false, "5m"}}},
+		},
+		{
+			sc: storage.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "sc3",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Provisioner:   "kubernetes.io/nfs",
+				ReclaimPolicy: &policyDelte,
+			},
+			expected: []metav1.TableRow{{Cells: []interface{}{"sc3", "kubernetes.io/nfs", "Delete",
+				"Immediate", false, "5m"}}},
+		},
+		{
+			sc: storage.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "sc4",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Provisioner:       "kubernetes.io/nfs",
+				ReclaimPolicy:     &policyRetain,
+				VolumeBindingMode: &bindModeImmediate,
+			},
+			expected: []metav1.TableRow{{Cells: []interface{}{"sc4", "kubernetes.io/nfs", "Retain",
+				"Immediate", false, "5m"}}},
+		},
+		{
+			sc: storage.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "sc5",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Provisioner:       "kubernetes.io/nfs",
+				ReclaimPolicy:     &policyRetain,
+				VolumeBindingMode: &bindModeWait,
+			},
+			expected: []metav1.TableRow{{Cells: []interface{}{"sc5", "kubernetes.io/nfs", "Retain",
+				"WaitForFirstConsumer", false, "5m"}}},
+		},
+		{
+			sc: storage.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "sc6",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Provisioner:          "kubernetes.io/nfs",
+				ReclaimPolicy:        &policyRetain,
+				AllowVolumeExpansion: boolP(true),
+				VolumeBindingMode:    &bindModeWait,
+			},
+			expected: []metav1.TableRow{{Cells: []interface{}{"sc6", "kubernetes.io/nfs", "Retain",
+				"WaitForFirstConsumer", true, "5m"}}},
 		},
 	}
 
@@ -4411,7 +4488,7 @@ func TestPrintLease(t *testing.T) {
 	holder2 := "holder2"
 	tests := []struct {
 		lease    coordination.Lease
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		{
 			lease: coordination.Lease{
@@ -4423,7 +4500,7 @@ func TestPrintLease(t *testing.T) {
 					HolderIdentity: &holder1,
 				},
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"lease1", "holder1", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"lease1", "holder1", "0s"}}},
 		},
 		{
 			lease: coordination.Lease{
@@ -4435,7 +4512,7 @@ func TestPrintLease(t *testing.T) {
 					HolderIdentity: &holder2,
 				},
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"lease2", "holder2", "5m"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"lease2", "holder2", "5m"}}},
 		},
 	}
 
@@ -4456,7 +4533,7 @@ func TestPrintLease(t *testing.T) {
 func TestPrintPriorityClass(t *testing.T) {
 	tests := []struct {
 		pc       scheduling.PriorityClass
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		{
 			pc: scheduling.PriorityClass{
@@ -4466,7 +4543,7 @@ func TestPrintPriorityClass(t *testing.T) {
 				},
 				Value: 1,
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"pc1", int64(1), bool(false), "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"pc1", int64(1), bool(false), "0s"}}},
 		},
 		{
 			pc: scheduling.PriorityClass{
@@ -4477,7 +4554,7 @@ func TestPrintPriorityClass(t *testing.T) {
 				Value:         1000000000,
 				GlobalDefault: true,
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"pc2", int64(1000000000), bool(true), "5m"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"pc2", int64(1000000000), bool(true), "5m"}}},
 		},
 	}
 
@@ -4498,7 +4575,7 @@ func TestPrintPriorityClass(t *testing.T) {
 func TestPrintRuntimeClass(t *testing.T) {
 	tests := []struct {
 		rc       nodeapi.RuntimeClass
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		{
 			rc: nodeapi.RuntimeClass{
@@ -4508,7 +4585,7 @@ func TestPrintRuntimeClass(t *testing.T) {
 				},
 				Handler: "h1",
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"rc1", "h1", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"rc1", "h1", "0s"}}},
 		},
 		{
 			rc: nodeapi.RuntimeClass{
@@ -4518,7 +4595,7 @@ func TestPrintRuntimeClass(t *testing.T) {
 				},
 				Handler: "h2",
 			},
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"rc2", "h2", "5m"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"rc2", "h2", "5m"}}},
 		},
 	}
 
@@ -4540,7 +4617,7 @@ func TestPrintEndpoint(t *testing.T) {
 
 	tests := []struct {
 		endpoint api.Endpoints
-		expected []metav1beta1.TableRow
+		expected []metav1.TableRow
 	}{
 		// Basic endpoint with no IP's
 		{
@@ -4551,7 +4628,7 @@ func TestPrintEndpoint(t *testing.T) {
 				},
 			},
 			// Columns: Name, Endpoints, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"endpoint1", "<none>", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"endpoint1", "<none>", "0s"}}},
 		},
 		// Endpoint with no ports
 		{
@@ -4574,7 +4651,7 @@ func TestPrintEndpoint(t *testing.T) {
 				},
 			},
 			// Columns: Name, Endpoints, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"endpoint3", "1.2.3.4,5.6.7.8", "5m"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"endpoint3", "1.2.3.4,5.6.7.8", "5m"}}},
 		},
 		// Basic endpoint with two IP's and one port
 		{
@@ -4603,7 +4680,7 @@ func TestPrintEndpoint(t *testing.T) {
 				},
 			},
 			// Columns: Name, Endpoints, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"endpoint2", "1.2.3.4:8001,5.6.7.8:8001", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"endpoint2", "1.2.3.4:8001,5.6.7.8:8001", "0s"}}},
 		},
 		// Basic endpoint with greater than three IP's triggering "more" string
 		{
@@ -4638,7 +4715,7 @@ func TestPrintEndpoint(t *testing.T) {
 				},
 			},
 			// Columns: Name, Endpoints, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"endpoint2", "1.2.3.4:8001,5.6.7.8:8001,9.8.7.6:8001 + 1 more...", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"endpoint2", "1.2.3.4:8001,5.6.7.8:8001,9.8.7.6:8001 + 1 more...", "0s"}}},
 		},
 	}
 
@@ -4658,12 +4735,11 @@ func TestPrintEndpoint(t *testing.T) {
 }
 
 func TestPrintEndpointSlice(t *testing.T) {
-	ipAddressType := discovery.AddressTypeIP
 	tcpProtocol := api.ProtocolTCP
 
 	tests := []struct {
 		endpointSlice discovery.EndpointSlice
-		expected      []metav1beta1.TableRow
+		expected      []metav1.TableRow
 	}{
 		{
 			endpointSlice: discovery.EndpointSlice{
@@ -4671,7 +4747,7 @@ func TestPrintEndpointSlice(t *testing.T) {
 					Name:              "abcslice.123",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
-				AddressType: &ipAddressType,
+				AddressType: discovery.AddressTypeIPv4,
 				Ports: []discovery.EndpointPort{{
 					Name:     utilpointer.StringPtr("http"),
 					Port:     utilpointer.Int32Ptr(80),
@@ -4682,14 +4758,14 @@ func TestPrintEndpointSlice(t *testing.T) {
 				}},
 			},
 			// Columns: Name, AddressType, Ports, Endpoints, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"abcslice.123", "IP", "80", "10.1.2.3,2001:db8::1234:5678", "0s"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"abcslice.123", "IPv4", "80", "10.1.2.3,2001:db8::1234:5678", "0s"}}},
 		}, {
 			endpointSlice: discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "longerslicename.123",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
 				},
-				AddressType: &ipAddressType,
+				AddressType: discovery.AddressTypeIPv6,
 				Ports: []discovery.EndpointPort{{
 					Name:     utilpointer.StringPtr("http"),
 					Port:     utilpointer.Int32Ptr(80),
@@ -4706,14 +4782,14 @@ func TestPrintEndpointSlice(t *testing.T) {
 				}},
 			},
 			// Columns: Name, AddressType, Ports, Endpoints, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"longerslicename.123", "IP", "80,443", "10.1.2.3,2001:db8::1234:5678,10.2.3.4 + 1 more...", "5m"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"longerslicename.123", "IPv6", "80,443", "10.1.2.3,2001:db8::1234:5678,10.2.3.4 + 1 more...", "5m"}}},
 		}, {
 			endpointSlice: discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "multiportslice.123",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
 				},
-				AddressType: &ipAddressType,
+				AddressType: discovery.AddressTypeIPv4,
 				Ports: []discovery.EndpointPort{{
 					Name:     utilpointer.StringPtr("http"),
 					Port:     utilpointer.Int32Ptr(80),
@@ -4738,7 +4814,7 @@ func TestPrintEndpointSlice(t *testing.T) {
 				}},
 			},
 			// Columns: Name, AddressType, Ports, Endpoints, Age
-			expected: []metav1beta1.TableRow{{Cells: []interface{}{"multiportslice.123", "IP", "80,443,3000 + 1 more...", "10.1.2.3,2001:db8::1234:5678,10.2.3.4 + 1 more...", "5m"}}},
+			expected: []metav1.TableRow{{Cells: []interface{}{"multiportslice.123", "IPv4", "80,443,3000 + 1 more...", "10.1.2.3,2001:db8::1234:5678,10.2.3.4 + 1 more...", "5m"}}},
 		},
 	}
 

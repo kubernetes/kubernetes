@@ -4,7 +4,6 @@ metadata:
   name: calico-typha
   namespace: kube-system
   labels:
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
     k8s-app: calico-typha
 spec:
@@ -24,7 +23,7 @@ spec:
       hostNetwork: true
       serviceAccountName: calico
       containers:
-      - image: gcr.io/projectcalico-org/typha:v3.8.2
+      - image: gcr.io/projectcalico-org/typha:v3.8.3
         name: calico-typha
         ports:
         - containerPort: 5473

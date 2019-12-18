@@ -18,7 +18,6 @@ go_library(
     deps = [
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
-        "//vendor/github.com/prometheus/client_golang/prometheus/promhttp:go_default_library",
         "//vendor/github.com/prometheus/client_model/go:go_default_library",
         "//vendor/github.com/prometheus/common/expfmt:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",

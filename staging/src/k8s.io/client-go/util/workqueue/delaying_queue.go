@@ -35,14 +35,17 @@ type DelayingInterface interface {
 
 // NewDelayingQueue constructs a new workqueue with delayed queuing ability
 func NewDelayingQueue() DelayingInterface {
-	return newDelayingQueue(clock.RealClock{}, "")
+	return NewDelayingQueueWithCustomClock(clock.RealClock{}, "")
 }
 
+// NewNamedDelayingQueue constructs a new named workqueue with delayed queuing ability
 func NewNamedDelayingQueue(name string) DelayingInterface {
-	return newDelayingQueue(clock.RealClock{}, name)
+	return NewDelayingQueueWithCustomClock(clock.RealClock{}, name)
 }
 
-func newDelayingQueue(clock clock.Clock, name string) DelayingInterface {
+// NewDelayingQueueWithCustomClock constructs a new named workqueue
+// with ability to inject real or fake clock for testing purposes
+func NewDelayingQueueWithCustomClock(clock clock.Clock, name string) DelayingInterface {
 	ret := &delayingType{
 		Interface:       NewNamed(name),
 		clock:           clock,

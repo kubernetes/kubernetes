@@ -1,8 +1,0 @@
-apiVersion: v1
-container: "2"
-follow: true
-kind: PodLogOptions
-limitBytes: 5323465663502687351
-sinceSeconds: 1002466899136229878
-tailLines: -6357999603795826160
-timestamps: true

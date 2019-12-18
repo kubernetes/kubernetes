@@ -112,9 +112,15 @@ type Config struct {
 	// initialized using a generic, multi-use cert/key pair which will be
 	// quickly replaced with a unique cert/key pair.
 	BootstrapKeyPEM []byte
-	// CertificateExpiration will record a metric that shows the remaining
-	// lifetime of the certificate.
-	CertificateExpiration Gauge
+	// CertificateRotation will record a metric showing the time in seconds
+	// that certificates lived before being rotated. This metric is a histogram
+	// because there is value in keeping a history of rotation cadences. It
+	// allows one to setup monitoring and alerting of unexpected rotation
+	// behavior and track trends in rotation frequency.
+	CertificateRotation Histogram
+	// CertifcateRenewFailure will record a metric that keeps track of
+	// certificate renewal failures.
+	CertificateRenewFailure Counter
 }
 
 // Store is responsible for getting and updating the current certificate.
@@ -137,6 +143,17 @@ type Store interface {
 // updated.
 type Gauge interface {
 	Set(float64)
+}
+
+// Histogram will record the time a rotated certificate was used before being
+// rotated.
+type Histogram interface {
+	Observe(float64)
+}
+
+// Counter will wrap a counter with labels
+type Counter interface {
+	Inc()
 }
 
 // NoCertKeyError indicates there is no cert/key currently available.
@@ -162,7 +179,8 @@ type manager struct {
 
 	certStore Store
 
-	certificateExpiration Gauge
+	certificateRotation     Histogram
+	certificateRenewFailure Counter
 
 	// the following variables must only be accessed under certAccessLock
 	certAccessLock sync.RWMutex
@@ -174,6 +192,9 @@ type manager struct {
 	clientFn         CSRClientFunc
 	stopCh           chan struct{}
 	stopped          bool
+
+	// Set to time.Now but can be stubbed out for testing
+	now func() time.Time
 }
 
 // NewManager returns a new certificate manager. A certificate manager is
@@ -194,15 +215,17 @@ func NewManager(config *Config) (Manager, error) {
 	}
 
 	m := manager{
-		stopCh:                make(chan struct{}),
-		clientFn:              config.ClientFn,
-		getTemplate:           getTemplate,
-		dynamicTemplate:       config.GetTemplate != nil,
-		usages:                config.Usages,
-		certStore:             config.CertificateStore,
-		cert:                  cert,
-		forceRotation:         forceRotation,
-		certificateExpiration: config.CertificateExpiration,
+		stopCh:                  make(chan struct{}),
+		clientFn:                config.ClientFn,
+		getTemplate:             getTemplate,
+		dynamicTemplate:         config.GetTemplate != nil,
+		usages:                  config.Usages,
+		certStore:               config.CertificateStore,
+		cert:                    cert,
+		forceRotation:           forceRotation,
+		certificateRotation:     config.CertificateRotation,
+		certificateRenewFailure: config.CertificateRenewFailure,
+		now:                     time.Now,
 	}
 
 	return &m, nil
@@ -215,7 +238,7 @@ func NewManager(config *Config) (Manager, error) {
 func (m *manager) Current() *tls.Certificate {
 	m.certAccessLock.RLock()
 	defer m.certAccessLock.RUnlock()
-	if m.cert != nil && m.cert.Leaf != nil && time.Now().After(m.cert.Leaf.NotAfter) {
+	if m.cert != nil && m.cert.Leaf != nil && m.now().After(m.cert.Leaf.NotAfter) {
 		klog.V(2).Infof("Current certificate is expired.")
 		return nil
 	}
@@ -256,7 +279,7 @@ func (m *manager) Start() {
 	templateChanged := make(chan struct{})
 	go wait.Until(func() {
 		deadline := m.nextRotationDeadline()
-		if sleepInterval := deadline.Sub(time.Now()); sleepInterval > 0 {
+		if sleepInterval := deadline.Sub(m.now()); sleepInterval > 0 {
 			klog.V(2).Infof("Waiting %v for next certificate rotation", sleepInterval)
 
 			timer := time.NewTimer(sleepInterval)
@@ -383,6 +406,9 @@ func (m *manager) rotateCerts() (bool, error) {
 	template, csrPEM, keyPEM, privateKey, err := m.generateCSR()
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to generate a certificate signing request: %v", err))
+		if m.certificateRenewFailure != nil {
+			m.certificateRenewFailure.Inc()
+		}
 		return false, nil
 	}
 
@@ -390,6 +416,9 @@ func (m *manager) rotateCerts() (bool, error) {
 	client, err := m.getClient()
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to load a client to request certificates: %v", err))
+		if m.certificateRenewFailure != nil {
+			m.certificateRenewFailure.Inc()
+		}
 		return false, nil
 	}
 
@@ -398,6 +427,9 @@ func (m *manager) rotateCerts() (bool, error) {
 	req, err := csr.RequestCertificate(client, csrPEM, "", m.usages, privateKey)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Failed while requesting a signed certificate from the master: %v", err))
+		if m.certificateRenewFailure != nil {
+			m.certificateRenewFailure.Inc()
+		}
 		return false, m.updateServerError(err)
 	}
 
@@ -412,16 +444,25 @@ func (m *manager) rotateCerts() (bool, error) {
 	crtPEM, err := csr.WaitForCertificate(ctx, client, req)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("certificate request was not signed: %v", err))
+		if m.certificateRenewFailure != nil {
+			m.certificateRenewFailure.Inc()
+		}
 		return false, nil
 	}
 
 	cert, err := m.certStore.Update(crtPEM, keyPEM)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to store the new cert/key pair: %v", err))
+		if m.certificateRenewFailure != nil {
+			m.certificateRenewFailure.Inc()
+		}
 		return false, nil
 	}
 
-	m.updateCached(cert)
+	if old := m.updateCached(cert); old != nil && m.certificateRotation != nil {
+		m.certificateRotation.Observe(m.now().Sub(old.Leaf.NotBefore).Seconds())
+	}
+
 	return true, nil
 }
 
@@ -490,14 +531,14 @@ func (m *manager) nextRotationDeadline() time.Time {
 	// forceRotation is not protected by locks
 	if m.forceRotation {
 		m.forceRotation = false
-		return time.Now()
+		return m.now()
 	}
 
 	m.certAccessLock.RLock()
 	defer m.certAccessLock.RUnlock()
 
 	if !m.certSatisfiesTemplateLocked() {
-		return time.Now()
+		return m.now()
 	}
 
 	notAfter := m.cert.Leaf.NotAfter
@@ -505,9 +546,6 @@ func (m *manager) nextRotationDeadline() time.Time {
 	deadline := m.cert.Leaf.NotBefore.Add(jitteryDuration(totalDuration))
 
 	klog.V(2).Infof("Certificate expiration is %v, rotation deadline is %v", notAfter, deadline)
-	if m.certificateExpiration != nil {
-		m.certificateExpiration.Set(float64(notAfter.Unix()))
-	}
 	return deadline
 }
 
@@ -523,13 +561,15 @@ var jitteryDuration = func(totalDuration float64) time.Duration {
 	return wait.Jitter(time.Duration(totalDuration), 0.2) - time.Duration(totalDuration*0.3)
 }
 
-// updateCached sets the most recent retrieved cert. It also sets the server
-// as assumed healthy.
-func (m *manager) updateCached(cert *tls.Certificate) {
+// updateCached sets the most recent retrieved cert and returns the old cert.
+// It also sets the server as assumed healthy.
+func (m *manager) updateCached(cert *tls.Certificate) *tls.Certificate {
 	m.certAccessLock.Lock()
 	defer m.certAccessLock.Unlock()
 	m.serverHealth = true
+	old := m.cert
 	m.cert = cert
+	return old
 }
 
 // updateServerError takes an error returned by the server and infers

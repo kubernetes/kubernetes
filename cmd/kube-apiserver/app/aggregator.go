@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/klog"
 
-	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
+	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -38,6 +38,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/util/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
@@ -73,6 +74,7 @@ func createAggregatorConfig(
 		&genericConfig,
 		externalInformers,
 		genericConfig.LoopbackClientConfig,
+		feature.DefaultFeatureGate,
 		pluginInitializers...)
 	if err != nil {
 		return nil, err
@@ -118,6 +120,9 @@ func createAggregatorConfig(
 		},
 	}
 
+	// we need to clear the poststarthooks so we don't add them multiple times to all the servers (that fails)
+	aggregatorConfig.GenericConfig.PostStartHooks = map[string]genericapiserver.PostStartHookConfigEntry{}
+
 	return aggregatorConfig, nil
 }
 
@@ -135,7 +140,7 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 	autoRegistrationController := autoregister.NewAutoRegisterController(aggregatorServer.APIRegistrationInformers.Apiregistration().V1().APIServices(), apiRegistrationClient)
 	apiServices := apiServicesToRegister(delegateAPIServer, autoRegistrationController)
 	crdRegistrationController := crdregistration.NewCRDRegistrationController(
-		apiExtensionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
+		apiExtensionInformers.Apiextensions().V1().CustomResourceDefinitions(),
 		autoRegistrationController)
 
 	err = aggregatorServer.GenericAPIServer.AddPostStartHook("kube-apiserver-autoregistration", func(context genericapiserver.PostStartHookContext) error {
@@ -246,8 +251,6 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	// can reasonably expect seems questionable.
 	{Group: "extensions", Version: "v1beta1"}: {group: 17900, version: 1},
 	// to my knowledge, nothing below here collides
-	{Group: "apps", Version: "v1beta1"}:                         {group: 17800, version: 1},
-	{Group: "apps", Version: "v1beta2"}:                         {group: 17800, version: 9},
 	{Group: "apps", Version: "v1"}:                              {group: 17800, version: 15},
 	{Group: "events.k8s.io", Version: "v1beta1"}:                {group: 17750, version: 5},
 	{Group: "authentication.k8s.io", Version: "v1"}:             {group: 17700, version: 15},
@@ -283,6 +286,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "auditregistration.k8s.io", Version: "v1alpha1"}:    {group: 16400, version: 1},
 	{Group: "node.k8s.io", Version: "v1alpha1"}:                 {group: 16300, version: 1},
 	{Group: "node.k8s.io", Version: "v1beta1"}:                  {group: 16300, version: 9},
+	{Group: "discovery.k8s.io", Version: "v1beta1"}:             {group: 16200, version: 12},
 	{Group: "discovery.k8s.io", Version: "v1alpha1"}:            {group: 16200, version: 9},
 	// Append a new group to the end of the list if unsure.
 	// You can use min(existing group)-100 as the initial value for a group.

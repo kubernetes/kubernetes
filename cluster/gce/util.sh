@@ -796,7 +796,12 @@ function construct-linux-kubelet-flags {
   fi
   if [[ "${CONTAINER_RUNTIME:-}" != "docker" ]]; then
     flags+=" --container-runtime=remote"
+    if [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
+      CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
+      flags+=" --runtime-cgroups=/system.slice/containerd.service"
+    fi
   fi
+
   if [[ -n "${CONTAINER_RUNTIME_ENDPOINT:-}" ]]; then
     flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
   fi
@@ -834,17 +839,6 @@ function construct-windows-kubelet-flags {
   # Many of these flags were adapted from
   # https://github.com/Microsoft/SDN/blob/master/Kubernetes/windows/start-kubelet.ps1.
   flags+=" --config=${WINDOWS_KUBELET_CONFIG_FILE}"
-
-  # Path to a kubeconfig file that will be used to get client certificate for
-  # kubelet. If the file specified by --kubeconfig does not exist, the bootstrap
-  # kubeconfig is used to request a client certificate from the API server. On
-  # success, a kubeconfig file referencing the generated client certificate and
-  # key is written to the path specified by --kubeconfig. The client certificate
-  # and key file will be stored in the directory pointed by --cert-dir.
-  #
-  # See also:
-  # https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet-tls-bootstrapping/
-  flags+=" --bootstrap-kubeconfig=${WINDOWS_BOOTSTRAP_KUBECONFIG_FILE}"
   flags+=" --kubeconfig=${WINDOWS_KUBECONFIG_FILE}"
 
   # The directory where the TLS certs are located.
@@ -873,7 +867,7 @@ function construct-windows-kubelet-flags {
   flags+=" --logtostderr=false"
 
   # Configure the file path for host dns configuration
-  flags+=" --resolv-conf=${WINDOWS_CNI_CONFIG_DIR}\hostdns.conf"
+  flags+=" --resolv-conf=${WINDOWS_CNI_DIR}\hostdns.conf"
 
   # Both --cgroups-per-qos and --enforce-node-allocatable should be disabled on
   # windows; the latter requires the former to be enabled to work.
@@ -885,6 +879,14 @@ function construct-windows-kubelet-flags {
   # TODO(#78628): Re-enable KubeletPodResources when the issue is fixed.
   # Force disable KubeletPodResources feature on Windows until #78628 is fixed.
   flags+=" --feature-gates=KubeletPodResources=false"
+
+  if [[ "${CONTAINER_RUNTIME:-}" != "docker" ]]; then
+    flags+=" --container-runtime=remote"
+    if [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
+      CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-npipe:////./pipe/containerd-containerd}
+      flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
+    fi
+  fi
 
   KUBELET_ARGS="${flags}"
 }
@@ -950,9 +952,6 @@ function print-common-kubelet-config {
   declare quoted_dns_server_ip
   declare quoted_dns_domain
   quoted_dns_server_ip=$(yaml-quote "${DNS_SERVER_IP}")
-  if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
-    quoted_dns_server_ip=$(yaml-quote "${LOCAL_DNS_IP}")
-  fi
   quoted_dns_domain=$(yaml-quote "${DNS_DOMAIN}")
   cat <<EOF
 kind: KubeletConfiguration
@@ -1056,7 +1055,7 @@ function print-windows-node-kubelet-config {
   cat <<EOF
 authentication:
   x509:
-    clientCAFile: '${WINDOWS_PKI_DIR}\ca-certificates.crt'
+    clientCAFile: '${WINDOWS_CA_FILE}'
 EOF
 }
 
@@ -1123,8 +1122,6 @@ NETWORK_PROJECT_ID: $(yaml-quote ${NETWORK_PROJECT})
 SERVICE_CLUSTER_IP_RANGE: $(yaml-quote ${SERVICE_CLUSTER_IP_RANGE})
 KUBERNETES_MASTER_NAME: $(yaml-quote ${KUBERNETES_MASTER_NAME})
 ALLOCATE_NODE_CIDRS: $(yaml-quote ${ALLOCATE_NODE_CIDRS:-false})
-ENABLE_CLUSTER_MONITORING: $(yaml-quote ${ENABLE_CLUSTER_MONITORING:-none})
-ENABLE_PROMETHEUS_MONITORING: $(yaml-quote ${ENABLE_PROMETHEUS_MONITORING:-false})
 ENABLE_METRICS_SERVER: $(yaml-quote ${ENABLE_METRICS_SERVER:-false})
 ENABLE_METADATA_AGENT: $(yaml-quote ${ENABLE_METADATA_AGENT:-none})
 METADATA_AGENT_CPU_REQUEST: $(yaml-quote ${METADATA_AGENT_CPU_REQUEST:-})
@@ -1175,6 +1172,7 @@ MULTIZONE: $(yaml-quote ${MULTIZONE:-})
 MULTIMASTER: $(yaml-quote ${MULTIMASTER:-})
 NON_MASQUERADE_CIDR: $(yaml-quote ${NON_MASQUERADE_CIDR:-})
 ENABLE_DEFAULT_STORAGE_CLASS: $(yaml-quote ${ENABLE_DEFAULT_STORAGE_CLASS:-})
+ENABLE_VOLUME_SNAPSHOTS: $(yaml-quote ${ENABLE_VOLUME_SNAPSHOTS:-})
 ENABLE_APISERVER_ADVANCED_AUDIT: $(yaml-quote ${ENABLE_APISERVER_ADVANCED_AUDIT:-})
 ENABLE_APISERVER_DYNAMIC_AUDIT: $(yaml-quote ${ENABLE_APISERVER_DYNAMIC_AUDIT:-})
 ENABLE_CACHE_MUTATION_DETECTOR: $(yaml-quote ${ENABLE_CACHE_MUTATION_DETECTOR:-false})
@@ -1524,6 +1522,7 @@ CNI_DIR: $(yaml-quote ${WINDOWS_CNI_DIR})
 CNI_CONFIG_DIR: $(yaml-quote ${WINDOWS_CNI_CONFIG_DIR})
 MANIFESTS_DIR: $(yaml-quote ${WINDOWS_MANIFESTS_DIR})
 PKI_DIR: $(yaml-quote ${WINDOWS_PKI_DIR})
+CA_FILE_PATH: $(yaml-quote ${WINDOWS_CA_FILE})
 KUBELET_CONFIG_FILE: $(yaml-quote ${WINDOWS_KUBELET_CONFIG_FILE})
 KUBEPROXY_ARGS: $(yaml-quote ${KUBEPROXY_ARGS})
 KUBECONFIG_FILE: $(yaml-quote ${WINDOWS_KUBECONFIG_FILE})
@@ -2288,8 +2287,8 @@ function kube-up() {
     create-loadbalancer
     # If replication of master fails, we need to ensure that the replica is removed from etcd clusters.
     if ! replicate-master; then
-      remove-replica-from-etcd 2379 || true
-      remove-replica-from-etcd 4002 || true
+      remove-replica-from-etcd 2379 true || true
+      remove-replica-from-etcd 4002 false || true
     fi
   else
     check-existing
@@ -2495,6 +2494,10 @@ function detect-subnetworks() {
 #   NETWORK
 function create-cloud-nat-router() {
   if [[ ${GCE_PRIVATE_CLUSTER:-} == "true" ]]; then
+    if gcloud compute routers describe "$NETWORK-nat-router" --project $NETWORK_PROJECT --region $REGION &>/dev/null; then
+      echo "Cloud nat already exists"
+      return 0
+    fi
     gcloud compute routers create "$NETWORK-nat-router" \
       --project $NETWORK_PROJECT \
       --region $REGION \
@@ -2503,8 +2506,9 @@ function create-cloud-nat-router() {
       --project $NETWORK_PROJECT \
       --router-region $REGION \
       --router "$NETWORK-nat-router" \
-      --nat-all-subnet-ip-ranges \
-      --auto-allocate-nat-external-ips
+      --nat-primary-subnet-ip-ranges \
+      --auto-allocate-nat-external-ips \
+      ${GCE_PRIVATE_CLUSTER_PORTS_PER_VM:+--min-ports-per-vm ${GCE_PRIVATE_CLUSTER_PORTS_PER_VM}}
   fi
 }
 
@@ -2751,17 +2755,21 @@ function create-master() {
 #
 # $1: etcd client port
 # $2: etcd internal port
+# $3: whether etcd communication should use mtls
 # returns the result of ssh command which adds replica
-#### WARNING: THIS DOESN'T WORK IN CLUSTERS WITH MTLS ENABLED.
-# TODO(mborsz): Fix this
 function add-replica-to-etcd() {
   local -r client_port="${1}"
   local -r internal_port="${2}"
-  gcloud compute ssh "${EXISTING_MASTER_NAME}" \
-    --project "${PROJECT}" \
-    --zone "${EXISTING_MASTER_ZONE}" \
-    --command \
-      "curl localhost:${client_port}/v2/members -XPOST -H \"Content-Type: application/json\" -d '{\"peerURLs\":[\"https://${REPLICA_NAME}:${internal_port}\"]}' -s"
+  local -r use_mtls="${3}"
+
+  TLSARG=""
+  PROTO="http://"
+  if [[ "${use_mtls}" == "true" ]]; then
+    # Keep in sync with ETCD_APISERVER_CA_CERT_PATH, ETCD_APISERVER_CLIENT_CERT_PATH and ETCD_APISERVER_CLIENT_KEY_PATH in configure-helper.sh.
+    TLSARG="--cacert /etc/srv/kubernetes/pki/etcd-apiserver-ca.crt --cert /etc/srv/kubernetes/pki/etcd-apiserver-client.crt --key /etc/srv/kubernetes/pki/etcd-apiserver-client.key"
+    PROTO="https://"
+  fi
+  run-gcloud-command "${EXISTING_MASTER_NAME}" "${EXISTING_MASTER_ZONE}" "curl ${TLSARG} ${PROTO}127.0.0.1:${client_port}/v2/members -XPOST -H \"Content-Type: application/json\" -d '{\"peerURLs\":[\"https://${REPLICA_NAME}:${internal_port}\"]}' -s"
   return $?
 }
 
@@ -2787,11 +2795,11 @@ function replicate-master() {
   echo "Experimental: replicating existing master ${EXISTING_MASTER_ZONE}/${EXISTING_MASTER_NAME} as ${ZONE}/${REPLICA_NAME}"
 
   # Before we do anything else, we should configure etcd to expect more replicas.
-  if ! add-replica-to-etcd 2379 2380; then
+  if ! add-replica-to-etcd 2379 2380 true; then
     echo "Failed to add master replica to etcd cluster."
     return 1
   fi
-  if ! add-replica-to-etcd 4002 2381; then
+  if ! add-replica-to-etcd 4002 2381 false; then
     echo "Failed to add master replica to etcd events cluster."
     return 1
   fi
@@ -3401,17 +3409,21 @@ function check-cluster() {
 #   EXISTING_MASTER_ZONE
 #
 # $1: etcd client port
+# $2: whether etcd communication should use mtls
 # returns the result of ssh command which removes replica
-#### WARNING: THIS DOESN'T WORK IN CLUSTERS WITH MTLS ENABLED.
-# TODO(mborsz): Fix this
 function remove-replica-from-etcd() {
   local -r port="${1}"
+  local -r use_mtls="${2}"
+
+  TLSARG=""
+  PROTO="http://"
+  if [[ "${use_mtls}" == "true" ]]; then
+    # Keep in sync with ETCD_APISERVER_CA_CERT_PATH, ETCD_APISERVER_CLIENT_CERT_PATH and ETCD_APISERVER_CLIENT_KEY_PATH in configure-helper.sh.
+    TLSARG="--cacert /etc/srv/kubernetes/pki/etcd-apiserver-ca.crt --cert /etc/srv/kubernetes/pki/etcd-apiserver-client.crt --key /etc/srv/kubernetes/pki/etcd-apiserver-client.key"
+    PROTO="https://"
+  fi
   [[ -n "${EXISTING_MASTER_NAME}" ]] || return
-  gcloud compute ssh "${EXISTING_MASTER_NAME}" \
-    --project "${PROJECT}" \
-    --zone "${EXISTING_MASTER_ZONE}" \
-    --command \
-    "curl -s localhost:${port}/v2/members/\$(curl -s localhost:${port}/v2/members -XGET | sed 's/{\\\"id/\n/g' | grep ${REPLICA_NAME}\\\" | cut -f 3 -d \\\") -XDELETE -L 2>/dev/null"
+  run-gcloud-command "${EXISTING_MASTER_NAME}" "${EXISTING_MASTER_ZONE}" "curl -s ${TLSARG} ${PROTO}127.0.0.1:${port}/v2/members/\$(curl -s ${TLSARG} ${PROTO}127.0.0.1:${port}/v2/members -XGET | sed 's/{\\\"id/\n/g' | grep ${REPLICA_NAME}\\\" | cut -f 3 -d \\\") -XDELETE -L 2>/dev/null"
   local -r res=$?
   echo "Removing etcd replica, name: ${REPLICA_NAME}, port: ${port}, result: ${res}"
   return "${res}"
@@ -3496,8 +3508,8 @@ function kube-down() {
   set-existing-master
 
   # Un-register the master replica from etcd and events etcd.
-  remove-replica-from-etcd 2379
-  remove-replica-from-etcd 4002
+  remove-replica-from-etcd 2379 true
+  remove-replica-from-etcd 4002 false
 
   # Delete the master replica (if it exists).
   if gcloud compute instances describe "${REPLICA_NAME}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
@@ -3843,19 +3855,12 @@ function check-resources() {
     return 1
   fi
 
-  if [[ ${GCE_PRIVATE_CLUSTER:-} == "true" ]]; then
-    if gcloud compute routers describe --project "${NETWORK_PROJECT}" --region "${REGION}" "${NETWORK}-nat-router" &>/dev/null; then
-      KUBE_RESOURCE_FOUND="Cloud NAT router"
-      return 1
-    fi
-  fi
-
   # No resources found.
   return 0
 }
 
 # -----------------------------------------------------------------------------
-# Cluster specific test helpers used from hack/e2e.go
+# Cluster specific test helpers
 
 # Execute prior to running tests to build a release if required for env.
 #
@@ -3866,8 +3871,7 @@ function test-build-release() {
   "${KUBE_ROOT}/build/release.sh"
 }
 
-# Execute prior to running tests to initialize required structure. This is
-# called from hack/e2e.go only when running -up.
+# Execute prior to running tests to initialize required structure.
 #
 # Assumed vars:
 #   Variables from config.sh
@@ -3923,8 +3927,7 @@ function test-setup() {
   done
 }
 
-# Execute after running tests to perform any required clean-up. This is called
-# from hack/e2e.go
+# Execute after running tests to perform any required clean-up.
 function test-teardown() {
   detect-project
   echo "Shutting down test cluster in background."

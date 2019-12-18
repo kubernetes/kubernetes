@@ -19,8 +19,8 @@ package predicates
 import (
 	"strings"
 
-	"k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -67,7 +67,7 @@ func FilterPodsByNamespace(pods []*v1.Pod, ns string) []*v1.Pod {
 
 // CreateSelectorFromLabels is used to define a selector that corresponds to the keys in a map.
 func CreateSelectorFromLabels(aL map[string]string) labels.Selector {
-	if aL == nil || len(aL) == 0 {
+	if len(aL) == 0 {
 		return labels.Everything()
 	}
 	return labels.Set(aL).AsSelector()
@@ -97,7 +97,7 @@ func SetPredicatesOrderingDuringTest(value []string) func() {
 
 // isCSIMigrationOn returns a boolean value indicating whether
 // the CSI migration has been enabled for a particular storage plugin.
-func isCSIMigrationOn(csiNode *storagev1beta1.CSINode, pluginName string) bool {
+func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
 	if csiNode == nil || len(pluginName) == 0 {
 		return false
 	}

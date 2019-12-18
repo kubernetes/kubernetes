@@ -41,12 +41,17 @@ func PredicateResultToFrameworkStatus(reasons []predicates.PredicateFailureReaso
 		return nil
 	}
 
-	if r := predicates.UnresolvablePredicateExists(reasons); r != nil {
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, r.GetReason())
+	code := framework.Unschedulable
+	if predicates.UnresolvablePredicateExists(reasons) {
+		code = framework.UnschedulableAndUnresolvable
 	}
 
-	// We will just use the first reason.
-	return framework.NewStatus(framework.Unschedulable, reasons[0].GetReason())
+	// We will keep all failure reasons.
+	var failureReasons []string
+	for _, reason := range reasons {
+		failureReasons = append(failureReasons, reason.GetReason())
+	}
+	return framework.NewStatus(code, failureReasons...)
 }
 
 // ErrorToFrameworkStatus converts an error to a framework status.
@@ -57,18 +62,18 @@ func ErrorToFrameworkStatus(err error) *framework.Status {
 	return nil
 }
 
-// PredicatesStateData is a pointer to PredicateMetadata. In the normal case, StateData is supposed to
+// PredicatesStateData is a pointer to Metadata. In the normal case, StateData is supposed to
 // be generated and stored in CycleState by a framework plugin (like a PreFilter pre-computing data for
 // its corresponding Filter). However, during migration, the scheduler will inject a pointer to
-// PredicateMetadata into CycleState. This "hack" is necessary because during migration Filters that implement
+// Metadata into CycleState. This "hack" is necessary because during migration Filters that implement
 // predicates functionality will be calling into the existing predicate functions, and need
-// to pass PredicateMetadata.
+// to pass Metadata.
 type PredicatesStateData struct {
 	Reference interface{}
 }
 
 // Clone is supposed to make a copy of the data, but since this is just a pointer, we are practically
-// just copying the pointer. This is ok because the actual reference to the PredicateMetadata
+// just copying the pointer. This is ok because the actual reference to the Metadata
 // copy that is made by generic_scheduler during preemption cycle will be injected again outside
 // the framework.
 func (p *PredicatesStateData) Clone() framework.StateData {
@@ -118,4 +123,14 @@ func PredicateMetadata(state *framework.CycleState) interface{} {
 		klog.Errorf("reading key %q from CycleState, continuing without metadata: %v", PredicatesStateKey, err)
 	}
 	return meta
+}
+
+// CovertStateRefToPredMeta checks if 'stateRef' is nil, if it is, return nil;
+// otherwise covert it to predicates metadata and return.
+func CovertStateRefToPredMeta(stateRef interface{}) (predicates.Metadata, bool) {
+	if stateRef == nil {
+		return nil, true
+	}
+	meta, ok := stateRef.(predicates.Metadata)
+	return meta, ok
 }

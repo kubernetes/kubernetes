@@ -29,7 +29,7 @@ function setup-os-params {
   # Reset core_pattern. On GCI, the default core_pattern pipes the core dumps to
   # /sbin/crash_reporter which is more restrictive in saving crash dumps. So for
   # now, set a generic core_pattern that users can work with.
-  echo "core.%e.%p.%t" > /proc/sys/kernel/core_pattern
+  echo "/core.%e.%p.%t" > /proc/sys/kernel/core_pattern
 }
 
 # secure_random generates a secure random string of bytes. This function accepts
@@ -1245,6 +1245,12 @@ current-context: service-account-context
 EOF
 }
 
+function create-node-problem-detector-kubeconfig-from-kubelet {
+  echo "Creating node-problem-detector kubeconfig from /var/lib/kubelet/kubeconfig"
+  mkdir -p /var/lib/node-problem-detector
+  cp /var/lib/kubelet/kubeconfig /var/lib/node-problem-detector/kubeconfig
+}
+
 function create-master-etcd-auth {
   if [[ -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
     local -r auth_dir="/etc/srv/kubernetes"
@@ -1261,6 +1267,7 @@ function create-master-etcd-apiserver-auth {
      ETCD_APISERVER_CA_KEY_PATH="${auth_dir}/etcd-apiserver-ca.key"
      echo "${ETCD_APISERVER_CA_KEY}" | base64 --decode > "${ETCD_APISERVER_CA_KEY_PATH}"
 
+     # Keep in sync with add-replica-to-etcd/remove-replica-from-etcd in util.sh.
      ETCD_APISERVER_CA_CERT_PATH="${auth_dir}/etcd-apiserver-ca.crt"
      echo "${ETCD_APISERVER_CA_CERT}" | base64 --decode | gunzip > "${ETCD_APISERVER_CA_CERT_PATH}"
 
@@ -1270,9 +1277,11 @@ function create-master-etcd-apiserver-auth {
      ETCD_APISERVER_SERVER_CERT_PATH="${auth_dir}/etcd-apiserver-server.crt"
      echo "${ETCD_APISERVER_SERVER_CERT}" | base64 --decode | gunzip > "${ETCD_APISERVER_SERVER_CERT_PATH}"
 
+     # Keep in sync with add-replica-to-etcd/remove-replica-from-etcd in util.sh.
      ETCD_APISERVER_CLIENT_KEY_PATH="${auth_dir}/etcd-apiserver-client.key"
      echo "${ETCD_APISERVER_CLIENT_KEY}" | base64 --decode > "${ETCD_APISERVER_CLIENT_KEY_PATH}"
 
+     # Keep in sync with add-replica-to-etcd/remove-replica-from-etcd in util.sh.
      ETCD_APISERVER_CLIENT_CERT_PATH="${auth_dir}/etcd-apiserver-client.crt"
      echo "${ETCD_APISERVER_CLIENT_CERT}" | base64 --decode | gunzip > "${ETCD_APISERVER_CLIENT_CERT_PATH}"
    fi
@@ -2073,6 +2082,45 @@ function start-fluentd-resource-update {
   wait-for-apiserver-and-update-fluentd &
 }
 
+# VolumeSnapshot CRDs and controller are installed by cluster addon manager,
+# which may not be available at this point. Run this as a background process.
+function wait-for-volumesnapshot-crd-and-controller {
+  # Wait until volumesnapshot CRDs and controller are in place.
+  echo "Wait until volume snapshot CRDs are installed"
+  until kubectl get volumesnapshotclasses.snapshot.storage.k8s.io
+  do
+    sleep 10
+  done
+
+  until kubectl get volumesnapshotcontents.snapshot.storage.k8s.io
+  do
+    sleep 10
+  done
+
+  until kubectl get volumesnapshots.snapshot.storage.k8s.io
+  do
+    sleep 10
+  done
+
+  echo "Wait until volume snapshot RBAC rules are installed"
+  until kubectl get clusterrolebinding volume-snapshot-controller-role
+  do
+    sleep 10
+  done
+
+  echo "Wait until volume snapshot controller is installed"
+  until kubectl get statefulset volume-snapshot-controller | grep volume-snapshot-controller | grep "1/1"
+  do
+    sleep 10
+  done
+}
+
+# Trigger background process that will wait for volumesnapshot CRDs
+# and snapshot-controller to be installed
+function start-volumesnapshot-crd-and-controller {
+  wait-for-volumesnapshot-crd-and-controller &
+}
+
 # Update {{ fluentd_container_runtime_service }} with actual container runtime name,
 # and {{ container_runtime_endpoint }} with actual container runtime
 # endpoint.
@@ -2276,67 +2324,7 @@ EOF
     prepare-kube-proxy-manifest-variables "$src_dir/kube-proxy/kube-proxy-ds.yaml"
     setup-addon-manifests "addons" "kube-proxy"
   fi
-  # Setup prometheus stack for monitoring kubernetes cluster
-  if [[ "${ENABLE_PROMETHEUS_MONITORING:-}" == "true" ]]; then
-    setup-addon-manifests "addons" "prometheus"
-  fi
-  # Setup cluster monitoring using heapster
-  if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "influxdb" ]] || \
-     [[ "${ENABLE_CLUSTER_MONITORING:-}" == "google" ]] || \
-     [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" ]] || \
-     [[ "${ENABLE_CLUSTER_MONITORING:-}" == "standalone" ]] || \
-     [[ "${ENABLE_CLUSTER_MONITORING:-}" == "googleinfluxdb" ]]; then
-    local -r file_dir="cluster-monitoring/${ENABLE_CLUSTER_MONITORING}"
-    setup-addon-manifests "addons" "cluster-monitoring"
-    setup-addon-manifests "addons" "${file_dir}"
-    # Replace the salt configurations with variable values.
-    base_metrics_memory="${HEAPSTER_GCP_BASE_MEMORY:-140Mi}"
-    base_eventer_memory="190Mi"
-    base_metrics_cpu="${HEAPSTER_GCP_BASE_CPU:-80m}"
-    nanny_memory="90Mi"
-    local heapster_min_cluster_size="16"
-    local metrics_memory_per_node="${HEAPSTER_GCP_MEMORY_PER_NODE:-4}"
-    local -r metrics_cpu_per_node="${HEAPSTER_GCP_CPU_PER_NODE:-0.5}"
-    local -r eventer_memory_per_node="500"
-    local -r nanny_memory_per_node="200"
-    if [[ "${ENABLE_SYSTEM_ADDON_RESOURCE_OPTIMIZATIONS:-}" == "true" ]]; then
-      base_metrics_memory="${HEAPSTER_GCP_BASE_MEMORY:-100Mi}"
-      base_metrics_cpu="${HEAPSTER_GCP_BASE_CPU:-10m}"
-      metrics_memory_per_node="${HEAPSTER_GCP_MEMORY_PER_NODE:-4}"
-      heapster_min_cluster_size="5"
-    fi
-    if [[ -n "${NUM_NODES:-}" && "${NUM_NODES}" -ge 1 ]]; then
-      num_kube_nodes="$((${NUM_NODES}+1))"
-      nanny_memory="$((${num_kube_nodes} * ${nanny_memory_per_node} + 90 * 1024))Ki"
-    fi
-    controller_yaml="${dst_dir}/${file_dir}"
-    if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "googleinfluxdb" ]]; then
-      controller_yaml="${controller_yaml}/heapster-controller-combined.yaml"
-    else
-      controller_yaml="${controller_yaml}/heapster-controller.yaml"
-    fi
-
-    sed -i -e "s@{{ cluster_name }}@${CLUSTER_NAME}@g" "${controller_yaml}"
-    sed -i -e "s@{{ cluster_location }}@${ZONE}@g" "${controller_yaml}"
-    sed -i -e "s@{{ *base_metrics_memory *}}@${base_metrics_memory}@g" "${controller_yaml}"
-    sed -i -e "s@{{ *base_metrics_cpu *}}@${base_metrics_cpu}@g" "${controller_yaml}"
-    sed -i -e "s@{{ *base_eventer_memory *}}@${base_eventer_memory}@g" "${controller_yaml}"
-    sed -i -e "s@{{ *metrics_memory_per_node *}}@${metrics_memory_per_node}@g" "${controller_yaml}"
-    sed -i -e "s@{{ *eventer_memory_per_node *}}@${eventer_memory_per_node}@g" "${controller_yaml}"
-    sed -i -e "s@{{ *nanny_memory *}}@${nanny_memory}@g" "${controller_yaml}"
-    sed -i -e "s@{{ *metrics_cpu_per_node *}}@${metrics_cpu_per_node}@g" "${controller_yaml}"
-    sed -i -e "s@{{ *heapster_min_cluster_size *}}@${heapster_min_cluster_size}@g" "${controller_yaml}"
-    update-prometheus-to-sd-parameters ${controller_yaml}
-
-    if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" ]]; then
-      use_old_resources="${HEAPSTER_USE_OLD_STACKDRIVER_RESOURCES:-true}"
-      use_new_resources="${HEAPSTER_USE_NEW_STACKDRIVER_RESOURCES:-false}"
-      sed -i -e "s@{{ use_old_resources }}@${use_old_resources}@g" "${controller_yaml}"
-      sed -i -e "s@{{ use_new_resources }}@${use_new_resources}@g" "${controller_yaml}"
-    fi
-  fi
-  if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" ]] ||
-     ([[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]] &&
+  if ([[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]] &&
      [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]); then
     if [[ "${ENABLE_METADATA_AGENT:-}" == "stackdriver" ]]; then
       metadata_agent_cpu_request="${METADATA_AGENT_CPU_REQUEST:-40m}"
@@ -2426,8 +2414,11 @@ EOF
     setup-addon-manifests "addons" "node-problem-detector"
   fi
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-    # Setup role binding for standalone node problem detector.
-    setup-addon-manifests "addons" "node-problem-detector/standalone" "node-problem-detector"
+    # Setup role binding(s) for standalone node problem detector.
+    if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
+      setup-addon-manifests "addons" "node-problem-detector/standalone"
+    fi
+    setup-addon-manifests "addons" "node-problem-detector/kubelet-user-standalone" "node-problem-detector"
   fi
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
     setup-addon-manifests "admission-controls" "limit-range" "gce"
@@ -2444,6 +2435,11 @@ EOF
   fi
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
+  fi
+  if [[ "${ENABLE_VOLUME_SNAPSHOTS:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "volumesnapshots/crd"
+    setup-addon-manifests "addons" "volumesnapshots/volume-snapshot-controller"
+    start-volumesnapshot-crd-and-controller
   fi
   if [[ "${ENABLE_IP_MASQ_AGENT:-}" == "true" ]]; then
     setup-addon-manifests "addons" "ip-masq-agent"
@@ -2782,7 +2778,14 @@ function main() {
       create-kubeproxy-user-kubeconfig
     fi
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-      create-node-problem-detector-kubeconfig ${KUBERNETES_MASTER_NAME}
+      if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
+        create-node-problem-detector-kubeconfig ${KUBERNETES_MASTER_NAME}
+      elif [[ -f "/var/lib/kubelet/kubeconfig" ]]; then
+        create-node-problem-detector-kubeconfig-from-kubelet
+      else
+        echo "Either NODE_PROBLEM_DETECTOR_TOKEN or /var/lib/kubelet/kubeconfig must be set"
+        exit 1
+      fi
     fi
   fi
 

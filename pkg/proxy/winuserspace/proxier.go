@@ -83,6 +83,8 @@ func logTimeout(err error) bool {
 type Proxier struct {
 	// EndpointSlice support has not been added for this proxier yet.
 	config.NoopEndpointSliceHandler
+	// TODO(imroc): implement node handler for winuserspace proxier.
+	config.NoopNodeHandler
 
 	loadBalancer   LoadBalancer
 	mu             sync.Mutex // protects serviceMap
@@ -189,7 +191,7 @@ func (proxier *Proxier) cleanupStaleStickySessions() {
 			},
 			Port: name.Port,
 		}
-		if servicePortNameMap[servicePortName] == false {
+		if !servicePortNameMap[servicePortName] {
 			// ensure cleanup sticky sessions only gets called once per serviceportname
 			servicePortNameMap[servicePortName] = true
 			proxier.loadBalancer.CleanupStaleStickySessions(servicePortName)

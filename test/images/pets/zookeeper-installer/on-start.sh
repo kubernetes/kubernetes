@@ -36,7 +36,7 @@ MY_ID_FILE=/tmp/zookeeper/myid
 HOSTNAME=$(hostname)
 
 while read -ra LINE; do
-    PEERS=("${PEERS[@]}" "$LINE")
+    PEERS=("${PEERS[@]}" "${LINE[0]}")
 done
 
 # Don't add the first member as an observer

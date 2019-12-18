@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -51,8 +52,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 	ginkgo.It("should serve a basic image on each replica with a private image", func() {
 		// requires private images
 		framework.SkipUnlessProviderIs("gce", "gke")
-		privateimage := imageutils.GetConfig(imageutils.Agnhost)
-		privateimage.SetRegistry(imageutils.PrivateRegistry)
+		privateimage := imageutils.GetConfig(imageutils.AgnhostPrivate)
 		TestReplicationControllerServeImageOrFail(f, "private", privateimage.GetE2EImage())
 	})
 
@@ -227,7 +227,7 @@ func testReplicationControllerConditionCheck(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Scaling down rc %q to satisfy pod quota", name))
-	rc, err = framework.UpdateReplicationControllerWithRetries(c, namespace, name, func(update *v1.ReplicationController) {
+	rc, err = updateReplicationControllerWithRetries(c, namespace, name, func(update *v1.ReplicationController) {
 		x := int32(2)
 		update.Spec.Replicas = &x
 	})
@@ -347,4 +347,33 @@ func testRCReleaseControlledNotMatching(f *framework.Framework) {
 		return true, nil
 	})
 	framework.ExpectNoError(err)
+}
+
+type updateRcFunc func(d *v1.ReplicationController)
+
+// updateReplicationControllerWithRetries retries updating the given rc on conflict with the following steps:
+// 1. Get latest resource
+// 2. applyUpdate
+// 3. Update the resource
+func updateReplicationControllerWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateRcFunc) (*v1.ReplicationController, error) {
+	var rc *v1.ReplicationController
+	var updateErr error
+	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		var err error
+		if rc, err = c.CoreV1().ReplicationControllers(namespace).Get(name, metav1.GetOptions{}); err != nil {
+			return false, err
+		}
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(rc)
+		if rc, err = c.CoreV1().ReplicationControllers(namespace).Update(rc); err == nil {
+			framework.Logf("Updating replication controller %q", name)
+			return true, nil
+		}
+		updateErr = err
+		return false, nil
+	})
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("couldn't apply the provided updated to rc %q: %v", name, updateErr)
+	}
+	return rc, pollErr
 }

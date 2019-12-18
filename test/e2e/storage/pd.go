@@ -33,13 +33,16 @@ import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -52,7 +55,6 @@ const (
 	nodeStatusTimeout   = 10 * time.Minute
 	nodeStatusPollTime  = 1 * time.Second
 	podEvictTimeout     = 2 * time.Minute
-	maxReadRetry        = 3
 	minNodes            = 2
 )
 
@@ -181,13 +183,16 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					containerName = "mycontainer"
 					testFile = "/testpd1/tracker"
 					testFileContents = fmt.Sprintf("%v", rand.Int())
-					framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
+					tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+					framework.ExpectNoError(tk.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
 					framework.Logf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name)
 					ginkgo.By("verifying PD is present in node0's VolumeInUse list")
 					framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* shouldExist */))
 					ginkgo.By("deleting host0Pod") // delete this pod before creating next pod
 					framework.ExpectNoError(podClient.Delete(host0Pod.Name, podDelOpt), "Failed to delete host0Pod")
 					framework.Logf("deleted host0Pod %q", host0Pod.Name)
+					e2epod.WaitForPodToDisappear(cs, host0Pod.Namespace, host0Pod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+					framework.Logf("deleted host0Pod %q disappeared", host0Pod.Name)
 				}
 
 				ginkgo.By("creating host1Pod on node1")
@@ -202,7 +207,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					framework.Logf("deleted host0Pod %q", host0Pod.Name)
 				} else {
 					ginkgo.By("verifying PD contents in host1Pod")
-					verifyPDContentsViaContainer(f, host1Pod.Name, containerName, map[string]string{testFile: testFileContents})
+					verifyPDContentsViaContainer(ns, f, host1Pod.Name, containerName, map[string]string{testFile: testFileContents})
 					framework.Logf("verified PD contents in pod %q", host1Pod.Name)
 					ginkgo.By("verifying PD is removed from node0")
 					framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, false /* shouldExist */))
@@ -286,7 +291,8 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 						testFile := fmt.Sprintf("/testpd%d/tracker%d", x, i)
 						testFileContents := fmt.Sprintf("%v", rand.Int())
 						fileAndContentToVerify[testFile] = testFileContents
-						framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
+						tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+						framework.ExpectNoError(tk.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
 						framework.Logf("wrote %q to file %q in pod %q (container %q) on node %q", testFileContents, testFile, host0Pod.Name, containerName, host0Name)
 					}
 
@@ -294,7 +300,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					if numContainers > 1 {
 						containerName = fmt.Sprintf("mycontainer%v", rand.Intn(numContainers)+1)
 					}
-					verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
+					verifyPDContentsViaContainer(ns, f, host0Pod.Name, containerName, fileAndContentToVerify)
 
 					ginkgo.By("deleting host0Pod")
 					framework.ExpectNoError(podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0)), "Failed to delete host0Pod")
@@ -318,10 +324,12 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 			disruptOp int    // disruptive operation performed on target node
 		}
 		tests := []testT{
-			{
-				descr:     "node is deleted",
-				disruptOp: deleteNode,
-			},
+			// https://github.com/kubernetes/kubernetes/issues/85972
+			// This test case is flawed. Disabling for now.
+			// {
+			//		descr:     "node is deleted",
+			//		disruptOp: deleteNode,
+			// },
 			{
 				descr:     "node's API object is deleted",
 				disruptOp: deleteNodeObj,
@@ -380,7 +388,8 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 				ginkgo.By("writing content to host0Pod")
 				testFile := "/testpd1/tracker"
 				testFileContents := fmt.Sprintf("%v", rand.Int())
-				framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
+				tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+				framework.ExpectNoError(tk.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
 				framework.Logf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name)
 
 				ginkgo.By("verifying PD is present in node0's VolumeInUse list")
@@ -392,7 +401,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to create gcloud client err=%v", err))
 					output, err := gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
-					gomega.Expect(true, strings.Contains(string(output), string(host0Name)))
+					framework.ExpectEqual(true, strings.Contains(string(output), string(host0Name)))
 
 					ginkgo.By("deleting host0")
 					err = gceCloud.DeleteInstance(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone, string(host0Name))
@@ -402,7 +411,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					framework.ExpectEqual(numNodes, origNodeCnt, fmt.Sprintf("Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt))
 					output, err = gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
-					gomega.Expect(false, strings.Contains(string(output), string(host0Name)))
+					framework.ExpectEqual(true, strings.Contains(string(output), string(host0Name)))
 
 				} else if disruptOp == deleteNodeObj {
 					ginkgo.By("deleting host0's node api object")
@@ -450,30 +459,16 @@ func countReadyNodes(c clientset.Interface, hostName types.NodeName) int {
 	return len(nodes.Items)
 }
 
-func verifyPDContentsViaContainer(f *framework.Framework, podName, containerName string, fileAndContentToVerify map[string]string) {
+func verifyPDContentsViaContainer(namespace string, f *framework.Framework, podName, containerName string, fileAndContentToVerify map[string]string) {
 	for filePath, expectedContents := range fileAndContentToVerify {
-		var value string
-		// Add a retry to avoid temporal failure in reading the content
-		for i := 0; i < maxReadRetry; i++ {
-			v, err := f.ReadFileViaContainer(podName, containerName, filePath)
-			value = v
-			if err != nil {
-				framework.Logf("Error reading file: %v", err)
-			}
-			framework.ExpectNoError(err)
-			framework.Logf("Read file %q with content: %v (iteration %d)", filePath, v, i)
-			if strings.TrimSpace(v) != strings.TrimSpace(expectedContents) {
-				framework.Logf("Warning: read content <%q> does not match execpted content <%q>.", v, expectedContents)
-				size, err := f.CheckFileSizeViaContainer(podName, containerName, filePath)
-				if err != nil {
-					framework.Logf("Error checking file size: %v", err)
-				}
-				framework.Logf("Check file %q size: %q", filePath, size)
-			} else {
-				break
-			}
+		// No retry loop as there should not be temporal based failures
+		tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
+		v, err := tk.ReadFileViaContainer(podName, containerName, filePath)
+		framework.ExpectNoError(err, "Error reading file %s via container %s", filePath, containerName)
+		framework.Logf("Read file %q with content: %v", filePath, v)
+		if strings.TrimSpace(v) != strings.TrimSpace(expectedContents) {
+			framework.Failf("Read content <%q> does not match execpted content <%q>.", v, expectedContents)
 		}
-		framework.ExpectEqual(strings.TrimSpace(value), strings.TrimSpace(expectedContents))
 	}
 }
 
@@ -494,13 +489,17 @@ func detachPD(nodeName types.NodeName, pdName string) error {
 		return err
 
 	} else if framework.TestContext.Provider == "aws" {
-		client := ec2.New(session.New())
+		awsSession, err := session.NewSession()
+		if err != nil {
+			return fmt.Errorf("error creating session: %v", err)
+		}
+		client := ec2.New(awsSession)
 		tokens := strings.Split(pdName, "/")
 		awsVolumeID := tokens[len(tokens)-1]
 		request := ec2.DetachVolumeInput{
 			VolumeId: aws.String(awsVolumeID),
 		}
-		_, err := client.DetachVolume(&request)
+		_, err = client.DetachVolume(&request)
 		if err != nil {
 			return fmt.Errorf("error detaching EBS volume: %v", err)
 		}

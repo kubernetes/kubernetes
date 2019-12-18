@@ -17,7 +17,9 @@ limitations under the License.
 package nodename
 
 import (
-	"k8s.io/api/core/v1"
+	"context"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
@@ -28,7 +30,7 @@ import (
 // NodeName is a plugin that checks if a pod spec node name matches the current node.
 type NodeName struct{}
 
-var _ = framework.FilterPlugin(&NodeName{})
+var _ framework.FilterPlugin = &NodeName{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = "NodeName"
@@ -39,7 +41,7 @@ func (pl *NodeName) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *NodeName) Filter(_ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
+func (pl *NodeName) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	_, reasons, err := predicates.PodFitsHost(pod, nil, nodeInfo)
 	return migration.PredicateResultToFrameworkStatus(reasons, err)
 }

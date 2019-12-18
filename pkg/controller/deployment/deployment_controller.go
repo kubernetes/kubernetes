@@ -231,7 +231,7 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 // getDeploymentsForReplicaSet returns a list of Deployments that potentially
 // match a ReplicaSet.
 func (dc *DeploymentController) getDeploymentsForReplicaSet(rs *apps.ReplicaSet) []*apps.Deployment {
-	deployments, err := dc.dLister.GetDeploymentsForReplicaSet(rs)
+	deployments, err := util.GetDeploymentsForReplicaSet(dc.dLister, rs)
 	if err != nil || len(deployments) == 0 {
 		return nil
 	}
@@ -475,7 +475,7 @@ func (dc *DeploymentController) processNextWorkItem() bool {
 }
 
 func (dc *DeploymentController) handleErr(err error, key interface{}) {
-	if err == nil {
+	if err == nil || errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 		dc.queue.Forget(key)
 		return
 	}

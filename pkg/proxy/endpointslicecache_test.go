@@ -22,8 +22,9 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -152,11 +153,13 @@ func TestEndpointsMapFromESC(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			esCache := NewEndpointSliceCache(tc.hostname, nil, nil, nil)
 
+			cmc := newCacheMutationCheck(tc.endpointSlices)
 			for _, endpointSlice := range tc.endpointSlices {
 				esCache.updatePending(endpointSlice, false)
 			}
 
 			compareEndpointsMapsStr(t, esCache.getEndpointsMap(tc.namespacedName, esCache.trackerByServiceMap[tc.namespacedName].pending), tc.expectedMap)
+			cmc.Check(t)
 		})
 	}
 }
@@ -176,9 +179,9 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 			},
 			expectedMap: spToEndpointMap{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
-					"10.0.1.1": &BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: false},
-					"10.0.1.2": &BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true},
-					"10.0.1.3": &BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: false},
+					"10.0.1.1": &BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: false, Topology: map[string]string{"kubernetes.io/hostname": "host2"}},
+					"10.0.1.2": &BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true, Topology: map[string]string{"kubernetes.io/hostname": "host1"}},
+					"10.0.1.3": &BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: false, Topology: map[string]string{"kubernetes.io/hostname": "host2"}},
 				},
 			},
 		},
@@ -315,6 +318,8 @@ func TestEsInfoChanged(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			cmc := newCacheMutationCheck([]*discovery.EndpointSlice{tc.initialSlice})
+
 			if tc.initialSlice != nil {
 				tc.cache.updatePending(tc.initialSlice, false)
 				tc.cache.checkoutChanges()
@@ -331,12 +336,13 @@ func TestEsInfoChanged(t *testing.T) {
 			if tc.expectChanged != changed {
 				t.Errorf("Expected esInfoChanged() to return %t, got %t", tc.expectChanged, changed)
 			}
+
+			cmc.Check(t)
 		})
 	}
 }
 
 func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, offset, numEndpoints, unreadyMod int, hosts []string, portNums []*int32) *discovery.EndpointSlice {
-	ipAddressType := discovery.AddressTypeIP
 	tcpProtocol := v1.ProtocolTCP
 
 	endpointSlice := &discovery.EndpointSlice{
@@ -346,7 +352,7 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
 		},
 		Ports:       []discovery.EndpointPort{},
-		AddressType: &ipAddressType,
+		AddressType: discovery.AddressTypeIPv4,
 		Endpoints:   []discovery.Endpoint{},
 	}
 
@@ -378,4 +384,46 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 
 func generateEndpointSlice(serviceName, namespace string, sliceNum, numEndpoints, unreadyMod int, hosts []string, portNums []*int32) *discovery.EndpointSlice {
 	return generateEndpointSliceWithOffset(serviceName, namespace, sliceNum, sliceNum, numEndpoints, unreadyMod, hosts, portNums)
+}
+
+// cacheMutationCheck helps ensure that cached objects have not been changed
+// in any way throughout a test run.
+type cacheMutationCheck struct {
+	objects []cacheObject
+}
+
+// cacheObject stores a reference to an original object as well as a deep copy
+// of that object to track any mutations in the original object.
+type cacheObject struct {
+	original runtime.Object
+	deepCopy runtime.Object
+}
+
+// newCacheMutationCheck initializes a cacheMutationCheck with EndpointSlices.
+func newCacheMutationCheck(endpointSlices []*discovery.EndpointSlice) cacheMutationCheck {
+	cmc := cacheMutationCheck{}
+	for _, endpointSlice := range endpointSlices {
+		cmc.Add(endpointSlice)
+	}
+	return cmc
+}
+
+// Add appends a runtime.Object and a deep copy of that object into the
+// cacheMutationCheck.
+func (cmc *cacheMutationCheck) Add(o runtime.Object) {
+	cmc.objects = append(cmc.objects, cacheObject{
+		original: o,
+		deepCopy: o.DeepCopyObject(),
+	})
+}
+
+// Check verifies that no objects in the cacheMutationCheck have been mutated.
+func (cmc *cacheMutationCheck) Check(t *testing.T) {
+	for _, o := range cmc.objects {
+		if !reflect.DeepEqual(o.original, o.deepCopy) {
+			// Cached objects can't be safely mutated and instead should be deep
+			// copied before changed in any way.
+			t.Errorf("Cached object was unexpectedly mutated. Original: %+v, Mutated: %+v", o.deepCopy, o.original)
+		}
+	}
 }

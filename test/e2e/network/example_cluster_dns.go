@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -28,6 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -37,6 +39,9 @@ import (
 
 const (
 	dnsReadyTimeout = time.Minute
+
+	// RespondingTimeout is how long to wait for a service to be responding.
+	RespondingTimeout = 2 * time.Minute
 )
 
 const queryDNSPythonTemplate string = `
@@ -87,11 +92,11 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		}
 
 		for _, ns := range namespaces {
-			framework.RunKubectlOrDie("create", "-f", backendRcYaml, getNsCmdFlag(ns))
+			framework.RunKubectlOrDie(ns.Name, "create", "-f", backendRcYaml, getNsCmdFlag(ns))
 		}
 
 		for _, ns := range namespaces {
-			framework.RunKubectlOrDie("create", "-f", backendSvcYaml, getNsCmdFlag(ns))
+			framework.RunKubectlOrDie(ns.Name, "create", "-f", backendSvcYaml, getNsCmdFlag(ns))
 		}
 
 		// wait for objects
@@ -110,7 +115,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 			framework.ExpectNoError(err, "waiting for all pods to respond")
 			framework.Logf("found %d backend pods responding in namespace %s", len(pods.Items), ns.Name)
 
-			err = e2eservice.WaitForServiceResponding(c, ns.Name, backendSvcName)
+			err = waitForServiceResponding(c, ns.Name, backendSvcName)
 			framework.ExpectNoError(err, "waiting for the service to respond")
 		}
 
@@ -139,7 +144,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 
 		// create a pod in each namespace
 		for _, ns := range namespaces {
-			framework.NewKubectlCommand("create", "-f", "-", getNsCmdFlag(ns)).WithStdinData(updatedPodYaml).ExecOrDie()
+			framework.NewKubectlCommand(ns.Name, "create", "-f", "-", getNsCmdFlag(ns)).WithStdinData(updatedPodYaml).ExecOrDie(ns.Name)
 		}
 
 		// wait until the pods have been scheduler, i.e. are not Pending anymore. Remember
@@ -170,4 +175,41 @@ func prepareResourceWithReplacedString(inputFile, old, new string) string {
 	framework.ExpectNoError(err, "failed to read from file: %s", inputFile)
 	podYaml := strings.Replace(string(data), old, new, 1)
 	return podYaml
+}
+
+// waitForServiceResponding waits for the service to be responding.
+func waitForServiceResponding(c clientset.Interface, ns, name string) error {
+	ginkgo.By(fmt.Sprintf("trying to dial the service %s.%s via the proxy", ns, name))
+
+	return wait.PollImmediate(framework.Poll, RespondingTimeout, func() (done bool, err error) {
+		proxyRequest, errProxy := e2eservice.GetServicesProxyRequest(c, c.CoreV1().RESTClient().Get())
+		if errProxy != nil {
+			framework.Logf("Failed to get services proxy request: %v:", errProxy)
+			return false, nil
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
+		defer cancel()
+
+		body, err := proxyRequest.Namespace(ns).
+			Context(ctx).
+			Name(name).
+			Do().
+			Raw()
+		if err != nil {
+			if ctx.Err() != nil {
+				framework.Failf("Failed to GET from service %s: %v", name, err)
+				return true, err
+			}
+			framework.Logf("Failed to GET from service %s: %v:", name, err)
+			return false, nil
+		}
+		got := string(body)
+		if len(got) == 0 {
+			framework.Logf("Service %s: expected non-empty response", name)
+			return false, err // stop polling
+		}
+		framework.Logf("Service %s: found nonempty answer: %s", name, got)
+		return true, nil
+	})
 }
