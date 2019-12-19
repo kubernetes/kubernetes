@@ -41,6 +41,34 @@ func TestPolicyNoneName(t *testing.T) {
 
 func TestPolicyNoneCanAdmitPodResult(t *testing.T) {
 	tcases := []struct {
+		name     string
+		hint     TopologyHint
+		expected bool
+	}{
+		{
+			name:     "Preferred is set to false in topology hints",
+			hint:     TopologyHint{nil, false},
+			expected: true,
+		},
+		{
+			name:     "Preferred is set to true in topology hints",
+			hint:     TopologyHint{nil, true},
+			expected: true,
+		},
+	}
+
+	for _, tc := range tcases {
+		policy := NewNonePolicy()
+		result := policy.(*nonePolicy).canAdmitPodResult(&tc.hint)
+
+		if result.Admit != tc.expected {
+			t.Errorf("Expected Admit field in result to be %t, got %t", tc.expected, result.Admit)
+		}
+	}
+}
+
+func TestPolicyNoneMerge(t *testing.T) {
+	tcases := []struct {
 		name           string
 		providersHints []map[string][]TopologyHint
 		expectedHint   TopologyHint
