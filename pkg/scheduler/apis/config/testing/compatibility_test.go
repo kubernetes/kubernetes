@@ -313,6 +313,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
 				},
+				"PostFilterPlugin": {
+					{Name: "InterPodAffinity"},
+				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
 					{Name: "ImageLocality", Weight: 2},
@@ -381,6 +384,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "GCEPDLimits"},
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
+				},
+				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
@@ -462,6 +468,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "GCEPDLimits"},
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
+				},
+				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
@@ -556,6 +565,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
 				},
+				"PostFilterPlugin": {
+					{Name: "InterPodAffinity"},
+				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
 					{Name: "ImageLocality", Weight: 2},
@@ -648,6 +660,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
+				},
+				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
@@ -745,6 +760,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
+				},
+				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
@@ -854,6 +872,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
+				},
+				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
@@ -968,6 +989,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
 				},
+				"PostFilterPlugin": {
+					{Name: "InterPodAffinity"},
+				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
 					{Name: "ImageLocality", Weight: 2},
@@ -1078,6 +1102,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "CinderLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
+				},
+				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
@@ -1194,6 +1221,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "CinderLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
+				},
+				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {

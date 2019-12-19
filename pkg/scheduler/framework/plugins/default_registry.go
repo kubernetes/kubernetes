@@ -101,6 +101,8 @@ type ConfigProducerArgs struct {
 	ServiceAffinityArgs *serviceaffinity.Args
 	// NodeResourcesFitArgs is the args for the NodeResources fit filter.
 	NodeResourcesFitArgs *noderesources.FitArgs
+	// InterPodAffinityArgs is the args for InterPodAffinity plugin
+	InterPodAffinityArgs *interpodaffinity.Args
 }
 
 // ConfigProducer produces a framework's configuration.
@@ -254,7 +256,9 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 		})
 	registry.RegisterPriority(priorities.InterPodAffinityPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.PostFilter = appendToPluginSet(plugins.PostFilter, interpodaffinity.Name, nil)
 			plugins.Score = appendToPluginSet(plugins.Score, interpodaffinity.Name, &args.Weight)
+			pluginConfig = append(pluginConfig, makePluginConfig(interpodaffinity.Name, args.InterPodAffinityArgs))
 			return
 		})
 	registry.RegisterPriority(priorities.NodePreferAvoidPodsPriority,

@@ -64,7 +64,6 @@ type priorityMetadata struct {
 	podFirstServiceSelector labels.Selector
 	totalNumNodes           int
 	podTopologySpreadMap    *podTopologySpreadMap
-	topologyScore           topologyPairToScore
 }
 
 // PriorityMetadata is a MetadataProducer.  Node info can be nil.
@@ -99,7 +98,6 @@ func (pmf *MetadataFactory) PriorityMetadata(
 		podFirstServiceSelector: getFirstServiceSelector(pod, pmf.serviceLister),
 		totalNumNodes:           totalNumNodes,
 		podTopologySpreadMap:    tpSpreadMap,
-		topologyScore:           buildTopologyPairToScore(pod, sharedLister, filteredNodes, pmf.hardPodAffinityWeight),
 	}
 }
 
