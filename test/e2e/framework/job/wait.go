@@ -17,15 +17,12 @@ limitations under the License.
 package job
 
 import (
-	"fmt"
-	"strings"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	jobutil "k8s.io/kubernetes/pkg/controller/job"
@@ -99,30 +96,6 @@ func WaitForJobGone(c clientset.Interface, ns, jobName string, timeout time.Dura
 		}
 		return false, err
 	})
-}
-
-// EnsureAllJobPodsRunning uses c to check in the Job named jobName in ns
-// is running, returning an error if the expected parallelism is not
-// satisfied.
-func EnsureAllJobPodsRunning(c clientset.Interface, ns, jobName string, parallelism int32) error {
-	label := labels.SelectorFromSet(labels.Set(map[string]string{JobSelectorKey: jobName}))
-	options := metav1.ListOptions{LabelSelector: label.String()}
-	pods, err := c.CoreV1().Pods(ns).List(options)
-	if err != nil {
-		return err
-	}
-	podsSummary := make([]string, 0, parallelism)
-	count := int32(0)
-	for _, p := range pods.Items {
-		if p.Status.Phase == v1.PodRunning {
-			count++
-		}
-		podsSummary = append(podsSummary, fmt.Sprintf("%s (%s: %s)", p.ObjectMeta.Name, p.Status.Phase, p.Status.Message))
-	}
-	if count != parallelism {
-		return fmt.Errorf("job has %d of %d expected running pods: %s", count, parallelism, strings.Join(podsSummary, ", "))
-	}
-	return nil
 }
 
 // WaitForAllJobPodsGone waits for all pods for the Job named jobName in namespace ns
