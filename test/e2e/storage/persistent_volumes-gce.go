@@ -147,18 +147,4 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 		ginkgo.By("Verifying Persistent Disk detaches")
 		framework.ExpectNoError(waitForPDDetach(diskName, node), "PD ", diskName, " did not detach")
 	})
-
-	// Test that a Pod and PVC attached to a GCEPD successfully unmounts and detaches when the encompassing Namespace is deleted.
-	ginkgo.It("should test that deleting the Namespace of a PVC and Pod causes the successful detach of Persistent Disk [Flaky]", func() {
-
-		ginkgo.By("Deleting the Namespace")
-		err := c.CoreV1().Namespaces().Delete(ns, nil)
-		framework.ExpectNoError(err)
-
-		err = framework.WaitForNamespacesDeleted(c, []string{ns}, framework.DefaultNamespaceDeletionTimeout)
-		framework.ExpectNoError(err)
-
-		ginkgo.By("Verifying Persistent Disk detaches")
-		framework.ExpectNoError(waitForPDDetach(diskName, node), "PD ", diskName, " did not detach")
-	})
 })
