@@ -61,6 +61,20 @@ func TestIsControllerEnabled(t *testing.T) {
 			expected:                     false,
 		},
 		{
+			name:                         "on by star, not off by name",
+			controllerName:               "alpha",
+			controllers:                  []string{"*", "-charlie"},
+			disabledByDefaultControllers: []string{"delta", "echo"},
+			expected:                     true,
+		},
+		{
+			name:                         "off by name with star",
+			controllerName:               "charlie",
+			controllers:                  []string{"*", "-charlie"},
+			disabledByDefaultControllers: []string{"delta", "echo"},
+			expected:                     false,
+		},
+		{
 			name:                         "off by default implicit, no star",
 			controllerName:               "foxtrot",
 			controllers:                  []string{"alpha", "bravo", "-charlie"},
