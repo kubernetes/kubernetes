@@ -457,8 +457,17 @@ function Get_MgmtSubnet {
   $addr = (Get-NetIPAddress `
       -InterfaceAlias ${net_adapter}.ifAlias `
       -AddressFamily IPv4).IPAddress
-  $mask = (Get-WmiObject Win32_NetworkAdapterConfiguration |
-      Where-Object InterfaceIndex -eq $(${net_adapter}.ifIndex)).IPSubnet[0]
+  # Get the adapter's mask from the registry rather than WMI or some other
+  # approach: this is compatible with Windows' forthcoming LWVNICs (lightweight
+  # VNICs).
+  # https://github.com/kubernetes-sigs/sig-windows-tools/pull/16/commits/c5b5c67d5da6c23ad870cb16146eaa58131caf29
+  $adapter_registry = Get-Item `
+      -Path ("HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\" +
+             "Parameters\Interfaces\$($net_adapter.InterfaceGuid)")
+  # In this command the value name is 'DhcpSubnetMask' for current network
+  # interfaces but could be different for "LWVNIC" interfaces.
+  $mask = ($adapter_registry.GetValueNames() -like "*SubnetMask" |
+           % { $adapter_registry.GetValue($_) })
   $mgmt_subnet = `
     (ConvertTo_DecimalIP ${addr}) -band (ConvertTo_DecimalIP ${mask})
   $mgmt_subnet = ConvertTo_DottedDecimalIP ${mgmt_subnet}
