@@ -199,6 +199,7 @@ func ff(n, m int) int {
 }
 
 func TestUniformDistribution(t *testing.T) {
+	t.Skip("this sometimes takes too long to run")
 	const spare = 64 - MaxHashBits
 	tests := []struct {
 		deckSize, handSize int
