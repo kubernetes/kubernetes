@@ -71,16 +71,14 @@ func New(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.P
 		return nil, err
 	}
 	return &NodeLabel{
-		handle:    handle,
-		predicate: predicates.NewNodeLabelPredicate(args.PresentLabels, args.AbsentLabels),
-		Args:      args,
+		handle: handle,
+		Args:   args,
 	}, nil
 }
 
 // NodeLabel checks whether a pod can fit based on the node labels which match a filter that it requests.
 type NodeLabel struct {
-	handle    framework.FrameworkHandle
-	predicate predicates.FitPredicate
+	handle framework.FrameworkHandle
 	Args
 }
 
@@ -93,10 +91,31 @@ func (pl *NodeLabel) Name() string {
 }
 
 // Filter invoked at the filter extension point.
+// It checks whether all of the specified labels exists on a node or not, regardless of their value
+//
+// Consider the cases where the nodes are placed in regions/zones/racks and these are identified by labels
+// In some cases, it is required that only nodes that are part of ANY of the defined regions/zones/racks be selected
+//
+// Alternately, eliminating nodes that have a certain label, regardless of value, is also useful
+// A node may have a label with "retiring" as key and the date as the value
+// and it may be desirable to avoid scheduling new pods on this node.
 func (pl *NodeLabel) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
-	// Note that NodeLabelPredicate doesn't use predicate metadata, hence passing nil here.
-	_, reasons, err := pl.predicate(pod, nil, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
+	node := nodeInfo.Node()
+	nodeLabels := labels.Set(node.Labels)
+	check := func(labels []string, presence bool) bool {
+		for _, label := range labels {
+			exists := nodeLabels.Has(label)
+			if (exists && !presence) || (!exists && presence) {
+				return false
+			}
+		}
+		return true
+	}
+	if check(pl.PresentLabels, true) && check(pl.AbsentLabels, false) {
+		return nil
+	}
+
+	return migration.PredicateResultToFrameworkStatus([]predicates.PredicateFailureReason{predicates.ErrNodeLabelPresenceViolated}, nil)
 }
 
 // Score invoked at the score extension point.

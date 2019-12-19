@@ -1651,69 +1651,6 @@ func TestPodFitsSelector(t *testing.T) {
 	}
 }
 
-func TestNodeLabelPresence(t *testing.T) {
-	label := map[string]string{"foo": "bar", "bar": "foo"}
-	tests := []struct {
-		pod           *v1.Pod
-		presentLabels []string
-		absentLabels  []string
-		fits          bool
-		name          string
-	}{
-		{
-			presentLabels: []string{"baz"},
-			fits:          false,
-			name:          "label does not match, presence true",
-		},
-		{
-			absentLabels: []string{"baz"},
-			fits:         true,
-			name:         "label does not match, presence false",
-		},
-		{
-			presentLabels: []string{"foo", "baz"},
-			fits:          false,
-			name:          "one label matches, presence true",
-		},
-		{
-			absentLabels: []string{"foo", "baz"},
-			fits:         false,
-			name:         "one label matches, presence false",
-		},
-		{
-			presentLabels: []string{"foo", "bar"},
-			fits:          true,
-			name:          "all labels match, presence true",
-		},
-		{
-			absentLabels: []string{"foo", "bar"},
-			fits:         false,
-			name:         "all labels match, presence false",
-		},
-	}
-	expectedFailureReasons := []PredicateFailureReason{ErrNodeLabelPresenceViolated}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			node := v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: label}}
-			nodeInfo := schedulernodeinfo.NewNodeInfo()
-			nodeInfo.SetNode(&node)
-
-			labelChecker := NodeLabelChecker{test.presentLabels, test.absentLabels}
-			fits, reasons, err := labelChecker.CheckNodeLabelPresence(test.pod, nil, nodeInfo)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-				t.Errorf("unexpected failure reasons: %v, want: %v", reasons, expectedFailureReasons)
-			}
-			if fits != test.fits {
-				t.Errorf("expected: %v got %v", test.fits, fits)
-			}
-		})
-	}
-}
-
 func newPodWithPort(hostPorts ...int) *v1.Pod {
 	networkPorts := []v1.ContainerPort{}
 	for _, port := range hostPorts {

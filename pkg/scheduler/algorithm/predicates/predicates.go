@@ -939,59 +939,6 @@ func PodFitsHost(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInf
 	return false, []PredicateFailureReason{ErrPodNotMatchHostName}, nil
 }
 
-// NodeLabelChecker contains information to check node labels for a predicate.
-type NodeLabelChecker struct {
-	// presentLabels should be present for the node to be considered a fit for hosting the pod
-	presentLabels []string
-	// absentLabels should be absent for the node to be considered a fit for hosting the pod
-	absentLabels []string
-}
-
-// NewNodeLabelPredicate creates a predicate which evaluates whether a pod can fit based on the
-// node labels which match a filter that it requests.
-func NewNodeLabelPredicate(presentLabels []string, absentLabels []string) FitPredicate {
-	labelChecker := &NodeLabelChecker{
-		presentLabels: presentLabels,
-		absentLabels:  absentLabels,
-	}
-	return labelChecker.CheckNodeLabelPresence
-}
-
-// CheckNodeLabelPresence checks whether all of the specified labels exists on a node or not, regardless of their value
-// If "presence" is false, then returns false if any of the requested labels matches any of the node's labels,
-// otherwise returns true.
-// If "presence" is true, then returns false if any of the requested labels does not match any of the node's labels,
-// otherwise returns true.
-//
-// Consider the cases where the nodes are placed in regions/zones/racks and these are identified by labels
-// In some cases, it is required that only nodes that are part of ANY of the defined regions/zones/racks be selected
-//
-// Alternately, eliminating nodes that have a certain label, regardless of value, is also useful
-// A node may have a label with "retiring" as key and the date as the value
-// and it may be desirable to avoid scheduling new pods on this node.
-func (n *NodeLabelChecker) CheckNodeLabelPresence(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
-	node := nodeInfo.Node()
-	if node == nil {
-		return false, nil, fmt.Errorf("node not found")
-	}
-
-	nodeLabels := labels.Set(node.Labels)
-	check := func(labels []string, presence bool) bool {
-		for _, label := range labels {
-			exists := nodeLabels.Has(label)
-			if (exists && !presence) || (!exists && presence) {
-				return false
-			}
-		}
-		return true
-	}
-	if check(n.presentLabels, true) && check(n.absentLabels, false) {
-		return true, nil, nil
-	}
-
-	return false, []PredicateFailureReason{ErrNodeLabelPresenceViolated}, nil
-}
-
 // PodFitsHostPorts is a wrapper around PodFitsHostPortsPredicate. This is needed until
 // we are able to get rid of the FitPredicate function signature.
 // TODO(#85822): remove this function once predicate registration logic is deleted.
