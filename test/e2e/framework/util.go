@@ -446,9 +446,9 @@ func restclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 type ClientConfigGetter func() (*restclient.Config, error)
 
 // LoadConfig returns a config for a rest client with the UserAgent set to include the current test name.
-func LoadConfig() (config *restclient.Config, err error) {
+func LoadConfig(noUserAgent ...bool) (config *restclient.Config, err error) {
 	defer func() {
-		if err == nil && config != nil {
+		if err == nil && config != nil && len(noUserAgent) == 0 {
 			testDesc := ginkgo.CurrentGinkgoTestDescription()
 			if len(testDesc.ComponentTexts) > 0 {
 				componentTexts := strings.Join(testDesc.ComponentTexts, " ")
@@ -481,8 +481,8 @@ func LoadConfig() (config *restclient.Config, err error) {
 }
 
 // LoadClientset returns clientset for connecting to kubernetes clusters.
-func LoadClientset() (*clientset.Clientset, error) {
-	config, err := LoadConfig()
+func LoadClientset(noUserAgent ...bool) (*clientset.Clientset, error) {
+	config, err := LoadConfig(noUserAgent...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating client: %v", err.Error())
 	}
