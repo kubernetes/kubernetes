@@ -326,6 +326,9 @@ function detect_binary {
       ppc64le*)
         host_arch=ppc64le
         ;;
+      mips64el*)
+        host_arch=mips64el
+        ;;
       *)
         echo "Unsupported host arch. Must be x86_64, 386, arm, arm64, s390x or ppc64le." >&2
         exit 1
