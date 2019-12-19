@@ -54,23 +54,6 @@ func (p *singleNumaNodePolicy) canAdmitPodResult(hint *TopologyHint) lifecycle.P
 	}
 }
 
-// Merge a TopologyHints permutation to a single hint by performing a bitwise-AND
-// of their affinity masks. At this point, all hints have single numa node affinity
-// and preferred-true.
-func (p *singleNumaNodePolicy) mergePermutation(permutation []TopologyHint) TopologyHint {
-	preferred := true
-	var numaAffinities []bitmask.BitMask
-	for _, hint := range permutation {
-		numaAffinities = append(numaAffinities, hint.NUMANodeAffinity)
-	}
-
-	// Merge the affinities using a bitwise-and operation.
-	mergedAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
-	mergedAffinity.And(numaAffinities...)
-	// Build a mergedHint from the merged affinity mask.
-	return TopologyHint{mergedAffinity, preferred}
-}
-
 // Return hints that have valid bitmasks with exactly one bit set.
 func (p *singleNumaNodePolicy) filterHints(allResourcesHints [][]TopologyHint) [][]TopologyHint {
 	var filteredResourcesHints [][]TopologyHint
@@ -145,7 +128,7 @@ func (p *singleNumaNodePolicy) mergeProvidersHints(providersHints []map[string][
 	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
 	bestHint := TopologyHint{defaultAffinity, false}
 	iterateAllProviderTopologyHints(allResourcesHints, func(permutation []TopologyHint) {
-		mergedHint := p.mergePermutation(permutation)
+		mergedHint := mergePermutation(p.numaNodes, permutation)
 		// Only consider mergedHints that result in a NUMANodeAffinity == 1 to
 		// replace the current defaultHint.
 		if mergedHint.NUMANodeAffinity.Count() != 1 {
