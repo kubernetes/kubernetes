@@ -684,6 +684,7 @@ func (az *Cloud) isFrontendIPChanged(clusterName string, config network.Frontend
 // nodes only used if wantLb is true
 func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node, wantLb bool) (*network.LoadBalancer, error) {
 	isInternal := requiresInternalLoadBalancer(service)
+	isBackendPoolPreConfigured := az.isBackendPoolPreConfigured(service)
 	serviceName := getServiceName(service)
 	klog.V(2).Infof("reconcileLoadBalancer for service(%s) - wantLb(%t): started", serviceName, wantLb)
 	lb, _, _, err := az.getServiceLoadBalancer(service, clusterName, nodes, wantLb)
@@ -723,6 +724,14 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 			}
 		}
 		if !foundBackendPool {
+			if isBackendPoolPreConfigured {
+				klog.V(2).Infof("reconcileLoadBalancer for service (%s)(%t): lb backendpool - PreConfiguredBackendPoolLoadBalancerTypes %s has been set but can not find corresponding backend pool, ignoring it",
+					serviceName,
+					wantLb,
+					az.PreConfiguredBackendPoolLoadBalancerTypes)
+				isBackendPoolPreConfigured = false
+			}
+
 			newBackendPools = append(newBackendPools, network.BackendAddressPool{
 				Name: to.StringPtr(lbBackendPoolName),
 			})
@@ -928,28 +937,32 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 	// If it is not exist, and no change to that, we don't CreateOrUpdate LB
 	if dirtyLb {
 		if lb.FrontendIPConfigurations == nil || len(*lb.FrontendIPConfigurations) == 0 {
-			// When FrontendIPConfigurations is empty, we need to delete the Azure load balancer resource itself,
-			// because an Azure load balancer cannot have an empty FrontendIPConfigurations collection
-			klog.V(2).Infof("reconcileLoadBalancer for service(%s): lb(%s) - deleting; no remaining frontendIPConfigurations", serviceName, lbName)
+			if isBackendPoolPreConfigured {
+				klog.V(2).Infof("reconcileLoadBalancer for service(%s): lb(%s) - ignore cleanup of dirty lb because the lb is pre-confiruged", serviceName, lbName)
+			} else {
+				// When FrontendIPConfigurations is empty, we need to delete the Azure load balancer resource itself,
+				// because an Azure load balancer cannot have an empty FrontendIPConfigurations collection
+				klog.V(2).Infof("reconcileLoadBalancer for service(%s): lb(%s) - deleting; no remaining frontendIPConfigurations", serviceName, lbName)
 
-			// Remove backend pools from vmSets. This is required for virtual machine scale sets before removing the LB.
-			vmSetName := az.mapLoadBalancerNameToVMSet(lbName, clusterName)
-			klog.V(10).Infof("EnsureBackendPoolDeleted(%s,%s) for service %s: start", lbBackendPoolID, vmSetName, serviceName)
-			err := az.vmSet.EnsureBackendPoolDeleted(service, lbBackendPoolID, vmSetName, lb.BackendAddressPools)
-			if err != nil {
-				klog.Errorf("EnsureBackendPoolDeleted(%s) for service %s failed: %v", lbBackendPoolID, serviceName, err)
-				return nil, err
-			}
-			klog.V(10).Infof("EnsureBackendPoolDeleted(%s) for service %s: end", lbBackendPoolID, serviceName)
+				// Remove backend pools from vmSets. This is required for virtual machine scale sets before removing the LB.
+				vmSetName := az.mapLoadBalancerNameToVMSet(lbName, clusterName)
+				klog.V(10).Infof("EnsureBackendPoolDeleted(%s,%s) for service %s: start", lbBackendPoolID, vmSetName, serviceName)
+				err := az.vmSet.EnsureBackendPoolDeleted(service, lbBackendPoolID, vmSetName, lb.BackendAddressPools)
+				if err != nil {
+					klog.Errorf("EnsureBackendPoolDeleted(%s) for service %s failed: %v", lbBackendPoolID, serviceName, err)
+					return nil, err
+				}
+				klog.V(10).Infof("EnsureBackendPoolDeleted(%s) for service %s: end", lbBackendPoolID, serviceName)
 
-			// Remove the LB.
-			klog.V(10).Infof("reconcileLoadBalancer: az.DeleteLB(%q): start", lbName)
-			err = az.DeleteLB(service, lbName)
-			if err != nil {
-				klog.V(2).Infof("reconcileLoadBalancer for service(%s) abort backoff: lb(%s) - deleting; no remaining frontendIPConfigurations", serviceName, lbName)
-				return nil, err
+				// Remove the LB.
+				klog.V(10).Infof("reconcileLoadBalancer: az.DeleteLB(%q): start", lbName)
+				err = az.DeleteLB(service, lbName)
+				if err != nil {
+					klog.V(2).Infof("reconcileLoadBalancer for service(%s) abort backoff: lb(%s) - deleting; no remaining frontendIPConfigurations", serviceName, lbName)
+					return nil, err
+				}
+				klog.V(10).Infof("az.DeleteLB(%q): end", lbName)
 			}
-			klog.V(10).Infof("az.DeleteLB(%q): end", lbName)
 		} else {
 			klog.V(2).Infof("reconcileLoadBalancer: reconcileLoadBalancer for service(%s): lb(%s) - updating", serviceName, lbName)
 			err := az.CreateOrUpdateLB(service, *lb)
@@ -973,7 +986,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 		}
 	}
 
-	if wantLb && nodes != nil {
+	if wantLb && nodes != nil && !isBackendPoolPreConfigured {
 		// Add the machines to the backend pool if they're not already
 		vmSetName := az.mapLoadBalancerNameToVMSet(lbName, clusterName)
 		// Etag would be changed when updating backend pools, so invalidate lbCache after it.
@@ -1693,6 +1706,23 @@ func (az *Cloud) getPublicIPAddressResourceGroup(service *v1.Service) string {
 	}
 
 	return az.ResourceGroup
+}
+
+func (az *Cloud) isBackendPoolPreConfigured(service *v1.Service) bool {
+	preConfigured := false
+	isInternal := requiresInternalLoadBalancer(service)
+
+	if az.PreConfiguredBackendPoolLoadBalancerTypes == PreConfiguredBackendPoolLoadBalancerTypesAll {
+		preConfigured = true
+	}
+	if (az.PreConfiguredBackendPoolLoadBalancerTypes == PreConfiguredBackendPoolLoadBalancerTypesInteral) && isInternal {
+		preConfigured = true
+	}
+	if (az.PreConfiguredBackendPoolLoadBalancerTypes == PreConfiguredBackendPoolLoadBalancerTypesExternal) && !isInternal {
+		preConfigured = true
+	}
+
+	return preConfigured
 }
 
 // Check if service requires an internal load balancer.
