@@ -17,10 +17,7 @@ limitations under the License.
 package metrics
 
 import (
-	"math"
 	"time"
-
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 const (
@@ -46,20 +43,3 @@ type LatencySlice []PodLatencyData
 func (a LatencySlice) Len() int           { return len(a) }
 func (a LatencySlice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a LatencySlice) Less(i, j int) bool { return a[i].Latency < a[j].Latency }
-
-// ExtractLatencyMetrics returns latency metrics for each percentile(50th, 90th and 99th).
-func ExtractLatencyMetrics(latencies []PodLatencyData) LatencyMetric {
-	length := len(latencies)
-	perc50 := latencies[int(math.Ceil(float64(length*50)/100))-1].Latency
-	perc90 := latencies[int(math.Ceil(float64(length*90)/100))-1].Latency
-	perc99 := latencies[int(math.Ceil(float64(length*99)/100))-1].Latency
-	perc100 := latencies[length-1].Latency
-	return LatencyMetric{Perc50: perc50, Perc90: perc90, Perc99: perc99, Perc100: perc100}
-}
-
-// PrintLatencies outputs latencies to log with readable format.
-func PrintLatencies(latencies []PodLatencyData, header string) {
-	metrics := ExtractLatencyMetrics(latencies)
-	e2elog.Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:])
-	e2elog.Logf("perc50: %v, perc90: %v, perc99: %v", metrics.Perc50, metrics.Perc90, metrics.Perc99)
-}
