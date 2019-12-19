@@ -1060,6 +1060,18 @@ func ensureStaticIP(s CloudAddressService, name, serviceName, region, existingIP
 		existed = true
 	}
 
+	// If address exists, get it by IP, because name might be different.
+	// This can specifically happen if the IP was changed from ephemeral to static,
+	// which results in a new name for the IP.
+	if existingIP != "" {
+		addr, err := s.GetRegionAddressByIP(region, existingIP)
+		if err != nil {
+			return "", false, fmt.Errorf("error getting static IP address: %v", err)
+		}
+		return addr.Address, existed, nil
+	}
+
+	// Otherwise, get address by name
 	addr, err := s.GetRegionAddress(name, region)
 	if err != nil {
 		return "", false, fmt.Errorf("error getting static IP address: %v", err)
