@@ -179,6 +179,8 @@ func NewDockerClientFromConfig(config *ClientConfig) libdocker.Interface {
 			config.DockerEndpoint,
 			config.RuntimeRequestTimeout,
 			config.ImagePullProgressDeadline,
+			config.WithTraceDisabled,
+			config.EnableSleep,
 		)
 		return client
 	}
