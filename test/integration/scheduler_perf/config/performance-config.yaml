@@ -1,0 +1,176 @@
+- template:
+    desc: SchedulingBasic
+    initPods:
+      podTemplatePath: config/pod-default.yaml
+    podsToSchedule:
+      podTemplatePath: config/pod-default.yaml
+  params:
+    - numNodes: 500
+      numInitPods: 500
+      numPodsToSchedule: 1000
+    - numNodes: 5000
+      numInitPods: 5000
+      numPodsToSchedule: 1000
+- template:
+    desc: SchedulingPodAntiAffinity
+    nodes:
+      uniqueNodeLabelStrategy:
+        labelKey: kubernetes.io/hostname
+    initPods:
+      podTemplatePath: config/pod-with-pod-anti-affinity.yaml
+    podsToSchedule:
+      podTemplatePath: config/pod-with-pod-anti-affinity.yaml
+  params:
+    - numNodes: 500
+      numInitPods: 100
+      numPodsToSchedule: 400
+    - numNodes: 5000
+      numInitPods: 1000
+      numPodsToSchedule: 1000
+- template:
+    desc: SchedulingSecrets
+    initPods:
+      podTemplatePath: config/pod-with-secret-volume.yaml
+    podsToSchedule:
+      podTemplatePath: config/pod-with-secret-volume.yaml
+  params:
+    - numNodes: 500
+      numInitPods: 500
+      numPodsToSchedule: 1000
+    - numNodes: 5000
+      numInitPods: 5000
+      numPodsToSchedule: 1000
+- template:
+    desc: SchedulingInTreePVs
+    initPods:
+      persistentVolumeTemplatePath: config/pv-aws.yaml
+      persistentVolumeClaimTemplatePath: config/pvc.yaml
+    podsToSchedule:
+      persistentVolumeTemplatePath: config/pv-aws.yaml
+      persistentVolumeClaimTemplatePath: config/pvc.yaml
+  params:
+    - numNodes: 500
+      numInitPods: 500
+      numPodsToSchedule: 1000
+    - numNodes: 5000
+      numInitPods: 5000
+      numPodsToSchedule: 1000
+- template:
+    desc: SchedulingMigratedInTreePVs
+    nodes:
+      nodeTemplatePath: config/node-default.yaml
+      nodeAllocatableStrategy:
+        nodeAllocatable:
+          attachable-volumes-csi-ebs.csi.aws.com: 39
+        csiNodeAllocatable:
+          ebs.csi.aws.com:
+            count: 39
+        migratedPlugins:
+          - "kubernetes.io/aws-ebs"
+    initPods:
+      persistentVolumeTemplatePath: config/pv-aws.yaml
+      persistentVolumeClaimTemplatePath: config/pvc.yaml
+    podsToSchedule:
+      persistentVolumeTemplatePath: config/pv-aws.yaml
+      persistentVolumeClaimTemplatePath: config/pvc.yaml
+    featureGates:
+      CSIMigration: true
+      CSIMigrationAWS: true
+  params:
+    - numNodes: 500
+      numInitPods: 500
+      numPodsToSchedule: 1000
+    - numNodes: 5000
+      numInitPods: 5000
+      numPodsToSchedule: 1000
+- template:
+    desc: SchedulingCSIPVs
+    nodes:
+      nodeTemplatePath: config/node-default.yaml
+      nodeAllocatableStrategy:
+        nodeAllocatable:
+          attachable-volumes-csi-ebs.csi.aws.com: 39
+        csiNodeAllocatable:
+          ebs.csi.aws.com:
+            count: 39
+    initPods:
+      persistentVolumeTemplatePath: config/pv-csi.yaml
+      persistentVolumeClaimTemplatePath: config/pvc.yaml
+    podsToSchedule:
+      persistentVolumeTemplatePath: config/pv-csi.yaml
+      persistentVolumeClaimTemplatePath: config/pvc.yaml
+  params:
+    - numNodes: 500
+      numInitPods: 500
+      numPodsToSchedule: 1000
+    - numNodes: 5000
+      numInitPods: 5000
+      numPodsToSchedule: 1000
+- template:
+    desc: SchedulingPodAffinity
+    nodes:
+      nodeTemplatePath: config/node-default.yaml
+      labelNodeStrategy:
+        labelKey: "failure-domain.beta.kubernetes.io/zone"
+        labelValue: "zone1"
+    initPods:
+      podTemplatePath: config/pod-with-pod-affinity.yaml
+    podsToSchedule:
+      podTemplatePath: config/pod-with-pod-affinity.yaml
+  params:
+    - numNodes: 500
+      numInitPods: 500
+      numPodsToSchedule: 1000
+    - numNodes: 5000
+      numInitPods: 5000
+      numPodsToSchedule: 1000
+- template:
+    desc: SchedulingPreferredPodAffinity
+    nodes:
+      uniqueNodeLabelStrategy:
+        labelKey: kubernetes.io/hostname
+    initPods:
+      podTemplatePath: config/pod-with-preferred-pod-affinity.yaml
+    podsToSchedule:
+      podTemplatePath: config/pod-with-preferred-pod-affinity.yaml
+  params:
+    - numNodes: 500
+      numInitPods: 500
+      numPodsToSchedule: 1000
+    - numNodes: 5000
+      numInitPods: 5000
+      numPodsToSchedule: 1000
+- template:
+    desc: SchedulingPreferredPodAntiAffinity
+    nodes:
+      uniqueNodeLabelStrategy:
+        labelKey: kubernetes.io/hostname
+    initPods:
+      podTemplatePath: config/pod-with-preferred-pod-anti-affinity.yaml
+    podsToSchedule:
+      podTemplatePath: config/pod-with-preferred-pod-anti-affinity.yaml
+  params:
+    - numNodes: 500
+      numInitPods: 500
+      numPodsToSchedule: 1000
+    - numNodes: 5000
+      numInitPods: 5000
+      numPodsToSchedule: 1000
+- template:
+    desc: SchedulingNodeAffinity
+    nodes:
+      nodeTemplatePath: config/node-default.yaml
+      labelNodePrepareStrategy:
+        labelKey: "failure-domain.beta.kubernetes.io/zone"
+        labelValue: "zone1"
+    initPods:
+      podTemplatePath: config/pod-with-node-affinity.yaml
+    podsToSchedule:
+      podTemplatePath: config/pod-with-node-affinity.yaml
+  params:
+    - numNodes: 500
+      numInitPods: 500
+      numPodsToSchedule: 1000
+    - numNodes: 5000
+      numInitPods: 5000
+      numPodsToSchedule: 1000

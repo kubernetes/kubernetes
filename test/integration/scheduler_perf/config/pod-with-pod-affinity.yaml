@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: affinity-pod-
+  labels:
+    foo: ""
+spec:
+  affinity:
+    podAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            foo: ""
+        topologyKey: failure-domain.beta.kubernetes.io/zone
+        namespaces: ["sched-test", "sched-setup"]
+  containers:
+  - image: k8s.gcr.io/pause:3.1
+    name: pause
+    ports:
+    - containerPort: 80
+    resources:
+      limits:
+        cpu: 100m
+        memory: 500Mi
+      requests:
+        cpu: 100m
+        memory: 500Mi
