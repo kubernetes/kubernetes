@@ -461,7 +461,6 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				init(tp)
 				defer cleanup()
 
-				ns := f.Namespace.Name
 				sc, pvc, pod := createPod(false)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
 
@@ -505,8 +504,9 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					checkPVCSize()
 				} else {
 					ginkgo.By("Checking for conditions on pvc")
-					pvc, err = m.cs.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err, "While fetching pvc after controller resize")
+					npvc, err := testsuites.WaitForPendingFSResizeCondition(pvc, m.cs)
+					framework.ExpectNoError(err, "While waiting for pvc to have fs resizing condition")
+					pvc = npvc
 
 					inProgressConditions := pvc.Status.Conditions
 					if len(inProgressConditions) > 0 {
