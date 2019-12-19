@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -111,11 +112,6 @@ type Configurator struct {
 
 	algorithmFactoryArgs AlgorithmFactoryArgs
 	configProducerArgs   *plugins.ConfigProducerArgs
-}
-
-// GetHardPodAffinitySymmetricWeight is exposed for testing.
-func (c *Configurator) GetHardPodAffinitySymmetricWeight() int32 {
-	return c.hardPodAffinitySymmetricWeight
 }
 
 // Create creates a scheduler with the default algorithm provider.
@@ -221,8 +217,12 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Scheduler,
 func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*Scheduler, error) {
 	klog.V(2).Infof("Creating scheduler with fit predicates '%v' and priority functions '%v'", predicateKeys, priorityKeys)
 
-	if c.GetHardPodAffinitySymmetricWeight() < 1 || c.GetHardPodAffinitySymmetricWeight() > 100 {
-		return nil, fmt.Errorf("invalid hardPodAffinitySymmetricWeight: %d, must be in the range 1-100", c.GetHardPodAffinitySymmetricWeight())
+	if c.hardPodAffinitySymmetricWeight < 1 || c.hardPodAffinitySymmetricWeight > 100 {
+		return nil, fmt.Errorf("invalid hardPodAffinitySymmetricWeight: %d, must be in the range 1-100", c.hardPodAffinitySymmetricWeight)
+	}
+
+	c.configProducerArgs.InterPodAffinityArgs = &interpodaffinity.Args{
+		HardPodAffinityWeight: c.hardPodAffinitySymmetricWeight,
 	}
 
 	predicateFuncs, pluginsForPredicates, pluginConfigForPredicates, err := c.getPredicateConfigs(predicateKeys)

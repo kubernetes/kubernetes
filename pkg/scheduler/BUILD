@@ -21,6 +21,7 @@ go_library(
         "//pkg/scheduler/apis/config/validation:go_default_library",
         "//pkg/scheduler/core:go_default_library",
         "//pkg/scheduler/framework/plugins:go_default_library",
+        "//pkg/scheduler/framework/plugins/interpodaffinity:go_default_library",
         "//pkg/scheduler/framework/plugins/nodelabel:go_default_library",
         "//pkg/scheduler/framework/plugins/noderesources:go_default_library",
         "//pkg/scheduler/framework/plugins/requestedtocapacityratio:go_default_library",

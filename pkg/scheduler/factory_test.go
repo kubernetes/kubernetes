@@ -116,7 +116,7 @@ func TestCreateFromConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateFromConfig failed: %v", err)
 	}
-	hpa := factory.GetHardPodAffinitySymmetricWeight()
+	hpa := factory.hardPodAffinitySymmetricWeight
 	if hpa != v1.DefaultHardPodAffinitySymmetricWeight {
 		t.Errorf("Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", v1.DefaultHardPodAffinitySymmetricWeight, hpa)
 	}
@@ -205,7 +205,7 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 	factory.CreateFromConfig(policy)
-	hpa := factory.GetHardPodAffinitySymmetricWeight()
+	hpa := factory.hardPodAffinitySymmetricWeight
 	if hpa != 10 {
 		t.Errorf("Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", 10, hpa)
 	}

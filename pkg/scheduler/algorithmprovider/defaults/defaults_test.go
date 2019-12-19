@@ -124,6 +124,9 @@ func TestCompatibility(t *testing.T) {
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
 				},
+				"PostFilterPlugin": {
+					{Name: "InterPodAffinity"},
+				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
 					{Name: "ImageLocality", Weight: 1},
@@ -161,6 +164,9 @@ func TestCompatibility(t *testing.T) {
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
 				},
+				"PostFilterPlugin": {
+					{Name: "InterPodAffinity"},
+				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
 					{Name: "ImageLocality", Weight: 1},
@@ -196,6 +202,9 @@ func TestCompatibility(t *testing.T) {
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
+				},
+				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {

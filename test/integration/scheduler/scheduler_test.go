@@ -146,6 +146,9 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
 				},
+				"PostFilterPlugin": {
+					{Name: "InterPodAffinity"},
+				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
 					{Name: "ImageLocality", Weight: 1},
@@ -220,6 +223,9 @@ kind: Policy
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
+				},
+				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {

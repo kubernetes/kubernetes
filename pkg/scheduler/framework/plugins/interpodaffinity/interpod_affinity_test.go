@@ -18,16 +18,14 @@ package interpodaffinity
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/informers"
-	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
@@ -57,7 +55,7 @@ func createPodWithAffinityTerms(namespace, nodeName string, labels map[string]st
 
 }
 
-func TestSingleNode(t *testing.T) {
+func TestRequiredAffinitySingleNode(t *testing.T) {
 	podLabel := map[string]string{"service": "securityscan"}
 	labels1 := map[string]string{
 		"region": "r1",
@@ -783,8 +781,8 @@ func TestSingleNode(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, []*v1.Node{test.node}))
 			p := &InterPodAffinity{
-				snapshotSharedLister: snapshot,
-				podAffinityChecker:   predicates.NewPodAffinityChecker(snapshot),
+				sharedLister:       snapshot,
+				podAffinityChecker: predicates.NewPodAffinityChecker(snapshot),
 			}
 			state := framework.NewCycleState()
 			preFilterStatus := p.PreFilter(context.Background(), state, test.pod)
@@ -799,7 +797,7 @@ func TestSingleNode(t *testing.T) {
 	}
 }
 
-func TestMultipleNodes(t *testing.T) {
+func TestRequiredAffinityMultipleNodes(t *testing.T) {
 	podLabelA := map[string]string{
 		"foo": "bar",
 	}
@@ -1621,8 +1619,8 @@ func TestMultipleNodes(t *testing.T) {
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 			for indexNode, node := range test.nodes {
 				p := &InterPodAffinity{
-					snapshotSharedLister: snapshot,
-					podAffinityChecker:   predicates.NewPodAffinityChecker(snapshot),
+					sharedLister:       snapshot,
+					podAffinityChecker: predicates.NewPodAffinityChecker(snapshot),
 				}
 				state := framework.NewCycleState()
 				preFilterStatus := p.PreFilter(context.Background(), state, test.pod)
@@ -1638,7 +1636,7 @@ func TestMultipleNodes(t *testing.T) {
 	}
 }
 
-func TestInterPodAffinityPriority(t *testing.T) {
+func TestPreferredAffinity(t *testing.T) {
 	labelRgChina := map[string]string{
 		"region": "China",
 	}
@@ -2127,35 +2125,27 @@ func TestInterPodAffinityPriority(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
-			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
+			p := &InterPodAffinity{
+				sharedLister:          snapshot,
+				podAffinityChecker:    predicates.NewPodAffinityChecker(snapshot),
+				hardPodAffinityWeight: 1,
+			}
 
-			client := clientsetfake.NewSimpleClientset()
-			informerFactory := informers.NewSharedInformerFactory(client, 0)
-
-			metaDataProducer := priorities.NewMetadataFactory(
-				informerFactory.Core().V1().Services().Lister(),
-				informerFactory.Core().V1().ReplicationControllers().Lister(),
-				informerFactory.Apps().V1().ReplicaSets().Lister(),
-				informerFactory.Apps().V1().StatefulSets().Lister(),
-				1,
-			)
-
-			metaData := metaDataProducer(test.pod, test.nodes, snapshot)
-
-			state.Write(migration.PrioritiesStateKey, &migration.PrioritiesStateData{Reference: metaData})
-
-			p, _ := New(nil, fh)
+			status := p.PostFilter(context.Background(), state, test.pod, test.nodes, nil)
+			if !status.IsSuccess() {
+				t.Errorf("unexpected error: %v", status)
+			}
 			var gotList framework.NodeScoreList
 			for _, n := range test.nodes {
 				nodeName := n.ObjectMeta.Name
-				score, status := p.(framework.ScorePlugin).Score(context.Background(), state, test.pod, nodeName)
+				score, status := p.Score(context.Background(), state, test.pod, nodeName)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
 				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
 			}
 
-			status := p.(framework.ScorePlugin).ScoreExtensions().NormalizeScore(context.Background(), state, test.pod, gotList)
+			status = p.ScoreExtensions().NormalizeScore(context.Background(), state, test.pod, gotList)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
@@ -2168,7 +2158,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 	}
 }
 
-func TestHardPodAffinitySymmetricWeight(t *testing.T) {
+func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	podLabelServiceS1 := map[string]string{
 		"service": "S1",
 	}
@@ -2244,22 +2234,12 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 
-			client := clientsetfake.NewSimpleClientset()
-			informerFactory := informers.NewSharedInformerFactory(client, 0)
-
-			metaDataProducer := priorities.NewMetadataFactory(
-				informerFactory.Core().V1().Services().Lister(),
-				informerFactory.Core().V1().ReplicationControllers().Lister(),
-				informerFactory.Apps().V1().ReplicaSets().Lister(),
-				informerFactory.Apps().V1().StatefulSets().Lister(),
-				test.hardPodAffinityWeight,
-			)
-
-			metaData := metaDataProducer(test.pod, test.nodes, snapshot)
-
-			state.Write(migration.PrioritiesStateKey, &migration.PrioritiesStateData{Reference: metaData})
-
-			p, _ := New(nil, fh)
+			args := &runtime.Unknown{Raw: []byte(fmt.Sprintf(`{"hardPodAffinityWeight":%d}`, test.hardPodAffinityWeight))}
+			p, _ := New(args, fh)
+			status := p.(framework.PostFilterPlugin).PostFilter(context.Background(), state, test.pod, test.nodes, nil)
+			if !status.IsSuccess() {
+				t.Errorf("unexpected error: %v", status)
+			}
 			var gotList framework.NodeScoreList
 			for _, n := range test.nodes {
 				nodeName := n.ObjectMeta.Name
@@ -2270,7 +2250,7 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
 			}
 
-			status := p.(framework.ScorePlugin).ScoreExtensions().NormalizeScore(context.Background(), state, test.pod, gotList)
+			status = p.(framework.ScorePlugin).ScoreExtensions().NormalizeScore(context.Background(), state, test.pod, gotList)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
@@ -2282,7 +2262,7 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 	}
 }
 
-func TestStateAddRemovePod(t *testing.T) {
+func TestPreFilterStateAddRemovePod(t *testing.T) {
 	var label1 = map[string]string{
 		"region": "r1",
 		"zone":   "z11",
@@ -2511,8 +2491,8 @@ func TestStateAddRemovePod(t *testing.T) {
 				snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(pods, test.nodes))
 
 				p := &InterPodAffinity{
-					snapshotSharedLister: snapshot,
-					podAffinityChecker:   predicates.NewPodAffinityChecker(snapshot),
+					sharedLister:       snapshot,
+					podAffinityChecker: predicates.NewPodAffinityChecker(snapshot),
 				}
 				cycleState := framework.NewCycleState()
 				preFilterStatus := p.PreFilter(context.Background(), cycleState, test.pendingPod)
