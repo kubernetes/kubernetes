@@ -77,7 +77,7 @@ type DiffOptions struct {
 	OpenAPISchema    openapi.Resources
 	DiscoveryClient  discovery.DiscoveryInterface
 	DynamicClient    dynamic.Interface
-	DryRunVerifier   *apply.DryRunVerifier
+	DryRunVerifier   *resource.DryRunVerifier
 	CmdNamespace     string
 	EnforceNamespace bool
 	Builder          *resource.Builder
@@ -295,7 +295,7 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 	// Build the patcher, and then apply the patch with dry-run, unless the object doesn't exist, in which case we need to create it.
 	if obj.Live() == nil {
 		// Dry-run create if the object doesn't exist.
-		return resource.NewHelper(obj.Info.Client, obj.Info.Mapping).Create(
+		return resource.NewHelper(obj.Info.Client, obj.Info.Mapping).CreateWithOptions(
 			obj.Info.Namespace,
 			true,
 			obj.LocalObj,
@@ -427,10 +427,7 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.DryRunVerifier = &apply.DryRunVerifier{
-		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(o.DynamicClient)),
-		OpenAPIGetter: o.DiscoveryClient,
-	}
+	o.DryRunVerifier = resource.NewDryRunVerifier(o.DynamicClient, o.DiscoveryClient)
 
 	o.CmdNamespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
