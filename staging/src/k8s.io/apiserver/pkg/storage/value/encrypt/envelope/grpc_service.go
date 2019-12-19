@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/klog"
@@ -50,6 +51,17 @@ type gRPCService struct {
 	callTimeout    time.Duration
 	mux            sync.RWMutex
 	versionChecked bool
+	failingHealthz uint32 // atomic, 1 == true, 0 == false
+}
+
+// serviceCache makes repeat calls to NewGRPCService with the same parameters return the same
+// underlying Service object.  This allows state coordination with an external healthz checker.
+var serviceCache sync.Map
+
+// TODO include all parameters from KMSConfiguration in the key
+type serviceCacheKey struct {
+	endpoint    string
+	callTimeout time.Duration
 }
 
 // NewGRPCService returns an envelope.Service which use gRPC to communicate the remote KMS provider.
@@ -85,7 +97,12 @@ func NewGRPCService(endpoint string, callTimeout time.Duration) (Service, error)
 	}
 
 	s.kmsClient = kmsapi.NewKeyManagementServiceClient(s.connection)
-	return s, nil
+
+	cachedService, loaded := serviceCache.LoadOrStore(serviceCacheKey{endpoint: endpoint, callTimeout: callTimeout}, s)
+	if loaded {
+		_ = s.connection.Close() // close the new connection because we are using the cache
+	}
+	return cachedService.(Service), nil
 }
 
 // Parse the endpoint to extract schema, host or path.
@@ -144,6 +161,7 @@ func (g *gRPCService) Decrypt(cipher []byte) ([]byte, error) {
 	request := &kmsapi.DecryptRequest{Cipher: cipher, Version: kmsapiVersion}
 	response, err := g.kmsClient.Decrypt(ctx, request)
 	if err != nil {
+		g.recordFailingHealthz()
 		return nil, err
 	}
 	return response.Plain, nil
@@ -157,6 +175,7 @@ func (g *gRPCService) Encrypt(plain []byte) ([]byte, error) {
 	request := &kmsapi.EncryptRequest{Plain: plain, Version: kmsapiVersion}
 	response, err := g.kmsClient.Encrypt(ctx, request)
 	if err != nil {
+		g.recordFailingHealthz()
 		return nil, err
 	}
 	return response.Cipher, nil
@@ -178,4 +197,16 @@ func (g *gRPCService) interceptor(
 	}
 
 	return invoker(ctx, method, req, reply, cc, opts...)
+}
+
+func (g *gRPCService) recordFailingHealthz() {
+	atomic.StoreUint32(&g.failingHealthz, 1) // true
+}
+
+func (g *gRPCService) RecordPassingHealthz() {
+	atomic.StoreUint32(&g.failingHealthz, 0) // false
+}
+
+func (g *gRPCService) FailedSinceLastRecordPassingHealthz() bool {
+	return atomic.LoadUint32(&g.failingHealthz) == 1 // failingHealthz == true
 }

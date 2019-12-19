@@ -240,6 +240,7 @@ resources:
 	// Stage 2 - kms-plugin for provider-1 is down. Therefore, expect the health check for provider-1
 	// to fail, but provider-2 should still be OK
 	pluginMock1.EnterFailedState()
+	_, _ = test.createSecret(testSecret+"-0", testNamespace) // probe the API to invoke the KMS plugin otherwise it will stay healthy
 	mustBeUnHealthy(t, "kms-provider-0", test.kubeAPIServer.ClientConfig)
 	mustBeHealthy(t, "kms-provider-1", test.kubeAPIServer.ClientConfig)
 	pluginMock1.ExitFailedState()
@@ -249,6 +250,7 @@ resources:
 	// Need to sleep since health check chases responses for 3 seconds.
 	pluginMock2.EnterFailedState()
 	mustBeHealthy(t, "kms-provider-0", test.kubeAPIServer.ClientConfig)
+	// TODO this test will fail until we seed data into etcd that would use this plugin for a read
 	mustBeUnHealthy(t, "kms-provider-1", test.kubeAPIServer.ClientConfig)
 }
 

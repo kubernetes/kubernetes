@@ -17,6 +17,7 @@ limitations under the License.
 package encryptionconfig
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
@@ -49,7 +50,7 @@ const (
 	secretboxTransformerPrefixV1 = "k8s:enc:secretbox:v1:"
 	kmsTransformerPrefixV1       = "k8s:enc:kms:v1:"
 	kmsPluginHealthzNegativeTTL  = 3 * time.Second
-	kmsPluginHealthzPositiveTTL  = 20 * time.Second
+	kmsPluginHealthzPositiveTTL  = time.Hour
 )
 
 type kmsPluginHealthzResponse struct {
@@ -58,9 +59,9 @@ type kmsPluginHealthzResponse struct {
 }
 
 type kmsPluginProbe struct {
-	name string
-	ttl  time.Duration
-	envelope.Service
+	name         string
+	ttl          time.Duration
+	service      envelope.Service
 	lastResponse *kmsPluginHealthzResponse
 	l            *sync.Mutex
 }
@@ -107,7 +108,7 @@ func getKMSPluginProbes(reader io.Reader) ([]*kmsPluginProbe, error) {
 	for _, r := range config.Resources {
 		for _, p := range r.Providers {
 			if p.KMS != nil {
-				s, err := envelope.NewGRPCService(p.KMS.Endpoint, p.KMS.Timeout.Duration)
+				service, err := envelope.NewGRPCService(p.KMS.Endpoint, p.KMS.Timeout.Duration)
 				if err != nil {
 					return nil, fmt.Errorf("could not configure KMS-Plugin's probe %q, error: %v", p.KMS.Name, err)
 				}
@@ -115,7 +116,7 @@ func getKMSPluginProbes(reader io.Reader) ([]*kmsPluginProbe, error) {
 				result = append(result, &kmsPluginProbe{
 					name:         p.KMS.Name,
 					ttl:          kmsPluginHealthzNegativeTTL,
-					Service:      s,
+					service:      service,
 					l:            &sync.Mutex{},
 					lastResponse: &kmsPluginHealthzResponse{},
 				})
@@ -131,18 +132,26 @@ func (h *kmsPluginProbe) Check() error {
 	h.l.Lock()
 	defer h.l.Unlock()
 
-	if (time.Since(h.lastResponse.received)) < h.ttl {
-		return h.lastResponse.err
+	if time.Since(h.lastResponse.received) < h.ttl {
+		if err := h.lastResponse.err; err != nil {
+			return err
+		}
+		if !h.service.FailedSinceLastRecordPassingHealthz() {
+			return nil
+		}
 	}
 
-	p, err := h.Service.Encrypt([]byte("ping"))
+	pong, err := h.service.Encrypt([]byte("ping"))
 	if err != nil {
 		h.lastResponse = &kmsPluginHealthzResponse{err: err, received: time.Now()}
 		h.ttl = kmsPluginHealthzNegativeTTL
 		return fmt.Errorf("failed to perform encrypt section of the healthz check for KMS Provider %s, error: %v", h.name, err)
 	}
 
-	if _, err := h.Service.Decrypt(p); err != nil {
+	if ping, err := h.service.Decrypt(pong); err != nil || !bytes.Equal([]byte("ping"), ping) {
+		if err == nil {
+			err = errors.New("decrypt sent wrong response to healthz ping")
+		}
 		h.lastResponse = &kmsPluginHealthzResponse{err: err, received: time.Now()}
 		h.ttl = kmsPluginHealthzNegativeTTL
 		return fmt.Errorf("failed to perform decrypt section of the healthz check for KMS Provider %s, error: %v", h.name, err)
@@ -150,6 +159,7 @@ func (h *kmsPluginProbe) Check() error {
 
 	h.lastResponse = &kmsPluginHealthzResponse{err: nil, received: time.Now()}
 	h.ttl = kmsPluginHealthzPositiveTTL
+	h.service.RecordPassingHealthz()
 	return nil
 }
 

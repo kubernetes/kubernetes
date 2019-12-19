@@ -41,6 +41,13 @@ type Service interface {
 	Decrypt(data []byte) ([]byte, error)
 	// Encrypt bytes to a ciphertext.
 	Encrypt(data []byte) ([]byte, error)
+
+	// FailedSinceLastRecordPassingHealthz must return true if either Encrypt or Decrypt
+	// has returned a non-nil error since the last time RecordPassingHealthz was called.
+	FailedSinceLastRecordPassingHealthz() bool
+	// RecordPassingHealthz allows an external healthz checker to record that this Service
+	// is working as expected (i.e. both Encrypt and Decrypt are returning nil errors).
+	RecordPassingHealthz()
 }
 
 type envelopeTransformer struct {
