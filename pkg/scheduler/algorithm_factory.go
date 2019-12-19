@@ -278,10 +278,7 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy, pluginArgs 
 				pluginArgs.NodeLabelArgs.AbsentLabels = append(pluginArgs.NodeLabelArgs.AbsentLabels, policy.Argument.LabelsPresence.Labels...)
 			}
 			predicateFactory = func(_ AlgorithmFactoryArgs) predicates.FitPredicate {
-				return predicates.NewNodeLabelPredicate(
-					pluginArgs.NodeLabelArgs.PresentLabels,
-					pluginArgs.NodeLabelArgs.AbsentLabels,
-				)
+				return nil
 			}
 		}
 	} else if predicateFactory, ok = fitPredicateMap[policyName]; ok {
@@ -399,10 +396,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, configPr
 			schedulerFactoryMutex.RUnlock()
 			pcf = &PriorityConfigFactory{
 				MapReduceFunction: func(_ AlgorithmFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
-					return priorities.NewNodeLabelPriority(
-						configProducerArgs.NodeLabelArgs.PresentLabelsPreference,
-						configProducerArgs.NodeLabelArgs.AbsentLabelsPreference,
-					)
+					return nil, nil
 				},
 				Weight: weight,
 			}
