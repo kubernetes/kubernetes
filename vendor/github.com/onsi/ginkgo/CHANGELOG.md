@@ -1,3 +1,11 @@
+## 1.11.0
+
+### Features
+- Add syscall for riscv64 architecture [f66e896]
+- teamcity reporter: output location of test failure as well as test definition (#626) [9869142]
+- teamcity reporter: output newline after every service message (#625) [3cfa02d]
+- Add support for go module when running `generate` command (#578) [9c89e3f]
+
 ## 1.10.3
 
 ### Fixes
