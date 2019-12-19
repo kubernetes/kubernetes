@@ -385,10 +385,12 @@ func (o *ApplyOptions) Run() error {
 				Force:        &o.ForceConflicts,
 				FieldManager: o.FieldManager,
 			}
+			var helper = resource.NewHelper(info.Client, info.Mapping)
+			if o.DryRunStrategy.Server() {
+				helper = helper.DryRun(o.DryRunVerifier)
+			}
 
-			obj, err := resource.
-				NewHelper(info.Client, info.Mapping).
-				WithDryRun(o.DryRunStrategy.Server(), o.DryRunVerifier).
+			obj, err := helper.
 				Patch(
 					info.Namespace,
 					info.Name,
@@ -464,9 +466,11 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 
 			if !o.DryRunStrategy.Client() {
 				// Then create the resource and skip the three-way merge
-				obj, err := resource.
-					NewHelper(info.Client, info.Mapping).
-					WithDryRun(o.DryRunStrategy.Server(), o.DryRunVerifier).
+				var helper = resource.NewHelper(info.Client, info.Mapping)
+				if o.DryRunStrategy.Server() {
+					helper = helper.DryRun(o.DryRunVerifier)
+				}
+				obj, err := helper.
 					Create(info.Namespace, true, info.Object, nil)
 				if err != nil {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
@@ -506,9 +510,10 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 				fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
 			}
 
-			helper := resource.
-				NewHelper(info.Client, info.Mapping).
-				WithDryRun(o.DryRunStrategy.Server(), o.DryRunVerifier)
+			var helper = resource.NewHelper(info.Client, info.Mapping)
+			if o.DryRunStrategy.Server() {
+				helper = helper.DryRun(o.DryRunVerifier)
+			}
 			patcher := &Patcher{
 				Mapping:       info.Mapping,
 				Helper:        helper,

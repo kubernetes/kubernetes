@@ -58,8 +58,8 @@ func NewHelper(client RESTClient, mapping *meta.RESTMapping) *Helper {
 	}
 }
 
-func (m *Helper) WithDryRun(dryRunServer bool, dryRunVerifier *DryRunVerifier) *Helper {
-	m.DryRunServer = dryRunServer
+func (m *Helper) DryRun(dryRunVerifier *DryRunVerifier) *Helper {
+	m.DryRunServer = true
 	m.DryRunVerifier = dryRunVerifier
 	return m
 }

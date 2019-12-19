@@ -308,8 +308,10 @@ func (o AnnotateOptions) RunAnnotate() error {
 			if err != nil {
 				return err
 			}
-			helper := resource.NewHelper(client, mapping).
-				WithDryRun(o.dryRunStrategy.Server(), o.dryRunVerifier)
+			var helper = resource.NewHelper(client, mapping)
+			if o.dryRunStrategy.Server() {
+				helper = helper.DryRun(o.dryRunVerifier)
+			}
 
 			if createdPatch {
 				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, nil)
