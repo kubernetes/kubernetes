@@ -439,9 +439,6 @@ func (p *parser) resetInsertionMode() {
 		case a.Select:
 			if !last {
 				for ancestor, first := n, p.oe[0]; ancestor != first; {
-					if ancestor == first {
-						break
-					}
 					ancestor = p.oe[p.oe.index(ancestor)-1]
 					switch ancestor.DataAtom {
 					case a.Template:
@@ -633,7 +630,16 @@ func inHeadIM(p *parser) bool {
 			p.oe.pop()
 			p.acknowledgeSelfClosingTag()
 			return true
-		case a.Script, a.Title, a.Noscript, a.Noframes, a.Style:
+		case a.Noscript:
+			p.addElement()
+			if p.scripting {
+				p.setOriginalIM()
+				p.im = textIM
+			} else {
+				p.im = inHeadNoscriptIM
+			}
+			return true
+		case a.Script, a.Title, a.Noframes, a.Style:
 			p.addElement()
 			p.setOriginalIM()
 			p.im = textIM
@@ -692,6 +698,49 @@ func inHeadIM(p *parser) bool {
 	}
 
 	p.parseImpliedToken(EndTagToken, a.Head, a.Head.String())
+	return false
+}
+
+// 12.2.6.4.5.
+func inHeadNoscriptIM(p *parser) bool {
+	switch p.tok.Type {
+	case DoctypeToken:
+		// Ignore the token.
+		return true
+	case StartTagToken:
+		switch p.tok.DataAtom {
+		case a.Html:
+			return inBodyIM(p)
+		case a.Basefont, a.Bgsound, a.Link, a.Meta, a.Noframes, a.Style:
+			return inHeadIM(p)
+		case a.Head, a.Noscript:
+			// Ignore the token.
+			return true
+		}
+	case EndTagToken:
+		switch p.tok.DataAtom {
+		case a.Noscript, a.Br:
+		default:
+			// Ignore the token.
+			return true
+		}
+	case TextToken:
+		s := strings.TrimLeft(p.tok.Data, whitespace)
+		if len(s) == 0 {
+			// It was all whitespace.
+			return inHeadIM(p)
+		}
+	case CommentToken:
+		return inHeadIM(p)
+	}
+	p.oe.pop()
+	if p.top().DataAtom != a.Head {
+		panic("html: the new current node will be a head element.")
+	}
+	p.im = inHeadIM
+	if p.tok.DataAtom == a.Noscript {
+		return true
+	}
 	return false
 }
 
@@ -904,7 +953,7 @@ func inBodyIM(p *parser) bool {
 		case a.A:
 			for i := len(p.afe) - 1; i >= 0 && p.afe[i].Type != scopeMarkerNode; i-- {
 				if n := p.afe[i]; n.Type == ElementNode && n.DataAtom == a.A {
-					p.inBodyEndTagFormatting(a.A)
+					p.inBodyEndTagFormatting(a.A, "a")
 					p.oe.remove(n)
 					p.afe.remove(n)
 					break
@@ -918,7 +967,7 @@ func inBodyIM(p *parser) bool {
 		case a.Nobr:
 			p.reconstructActiveFormattingElements()
 			if p.elementInScope(defaultScope, a.Nobr) {
-				p.inBodyEndTagFormatting(a.Nobr)
+				p.inBodyEndTagFormatting(a.Nobr, "nobr")
 				p.reconstructActiveFormattingElements()
 			}
 			p.addFormattingElement()
@@ -1126,7 +1175,7 @@ func inBodyIM(p *parser) bool {
 		case a.H1, a.H2, a.H3, a.H4, a.H5, a.H6:
 			p.popUntil(defaultScope, a.H1, a.H2, a.H3, a.H4, a.H5, a.H6)
 		case a.A, a.B, a.Big, a.Code, a.Em, a.Font, a.I, a.Nobr, a.S, a.Small, a.Strike, a.Strong, a.Tt, a.U:
-			p.inBodyEndTagFormatting(p.tok.DataAtom)
+			p.inBodyEndTagFormatting(p.tok.DataAtom, p.tok.Data)
 		case a.Applet, a.Marquee, a.Object:
 			if p.popUntil(defaultScope, p.tok.DataAtom) {
 				p.clearActiveFormattingElements()
@@ -1137,7 +1186,7 @@ func inBodyIM(p *parser) bool {
 		case a.Template:
 			return inHeadIM(p)
 		default:
-			p.inBodyEndTagOther(p.tok.DataAtom)
+			p.inBodyEndTagOther(p.tok.DataAtom, p.tok.Data)
 		}
 	case CommentToken:
 		p.addChild(&Node{
@@ -1164,7 +1213,7 @@ func inBodyIM(p *parser) bool {
 	return true
 }
 
-func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom) {
+func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom, tagName string) {
 	// This is the "adoption agency" algorithm, described at
 	// https://html.spec.whatwg.org/multipage/syntax.html#adoptionAgency
 
@@ -1186,7 +1235,7 @@ func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom) {
 			}
 		}
 		if formattingElement == nil {
-			p.inBodyEndTagOther(tagAtom)
+			p.inBodyEndTagOther(tagAtom, tagName)
 			return
 		}
 		feIndex := p.oe.index(formattingElement)
@@ -1291,9 +1340,17 @@ func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom) {
 // inBodyEndTagOther performs the "any other end tag" algorithm for inBodyIM.
 // "Any other end tag" handling from 12.2.6.5 The rules for parsing tokens in foreign content
 // https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-inforeign
-func (p *parser) inBodyEndTagOther(tagAtom a.Atom) {
+func (p *parser) inBodyEndTagOther(tagAtom a.Atom, tagName string) {
 	for i := len(p.oe) - 1; i >= 0; i-- {
-		if p.oe[i].DataAtom == tagAtom {
+		// Two element nodes have the same tag if they have the same Data (a
+		// string-typed field). As an optimization, for common HTML tags, each
+		// Data string is assigned a unique, non-zero DataAtom (a uint32-typed
+		// field), since integer comparison is faster than string comparison.
+		// Uncommon (custom) tags get a zero DataAtom.
+		//
+		// The if condition here is equivalent to (p.oe[i].Data == tagName).
+		if (p.oe[i].DataAtom == tagAtom) &&
+			((tagAtom != 0) || (p.oe[i].Data == tagName)) {
 			p.oe = p.oe[:i]
 			break
 		}
@@ -1687,8 +1744,9 @@ func inCellIM(p *parser) bool {
 				return true
 			}
 			// Close the cell and reprocess.
-			p.popUntil(tableScope, a.Td, a.Th)
-			p.clearActiveFormattingElements()
+			if p.popUntil(tableScope, a.Td, a.Th) {
+				p.clearActiveFormattingElements()
+			}
 			p.im = inRowIM
 			return false
 		}
@@ -2242,6 +2300,33 @@ func (p *parser) parse() error {
 //
 // The input is assumed to be UTF-8 encoded.
 func Parse(r io.Reader) (*Node, error) {
+	return ParseWithOptions(r)
+}
+
+// ParseFragment parses a fragment of HTML and returns the nodes that were
+// found. If the fragment is the InnerHTML for an existing element, pass that
+// element in context.
+//
+// It has the same intricacies as Parse.
+func ParseFragment(r io.Reader, context *Node) ([]*Node, error) {
+	return ParseFragmentWithOptions(r, context)
+}
+
+// ParseOption configures a parser.
+type ParseOption func(p *parser)
+
+// ParseOptionEnableScripting configures the scripting flag.
+// https://html.spec.whatwg.org/multipage/webappapis.html#enabling-and-disabling-scripting
+//
+// By default, scripting is enabled.
+func ParseOptionEnableScripting(enable bool) ParseOption {
+	return func(p *parser) {
+		p.scripting = enable
+	}
+}
+
+// ParseWithOptions is like Parse, with options.
+func ParseWithOptions(r io.Reader, opts ...ParseOption) (*Node, error) {
 	p := &parser{
 		tokenizer: NewTokenizer(r),
 		doc: &Node{
@@ -2251,6 +2336,11 @@ func Parse(r io.Reader) (*Node, error) {
 		framesetOK: true,
 		im:         initialIM,
 	}
+
+	for _, f := range opts {
+		f(p)
+	}
+
 	err := p.parse()
 	if err != nil {
 		return nil, err
@@ -2258,12 +2348,8 @@ func Parse(r io.Reader) (*Node, error) {
 	return p.doc, nil
 }
 
-// ParseFragment parses a fragment of HTML and returns the nodes that were
-// found. If the fragment is the InnerHTML for an existing element, pass that
-// element in context.
-//
-// It has the same intricacies as Parse.
-func ParseFragment(r io.Reader, context *Node) ([]*Node, error) {
+// ParseFragmentWithOptions is like ParseFragment, with options.
+func ParseFragmentWithOptions(r io.Reader, context *Node, opts ...ParseOption) ([]*Node, error) {
 	contextTag := ""
 	if context != nil {
 		if context.Type != ElementNode {
@@ -2285,6 +2371,10 @@ func ParseFragment(r io.Reader, context *Node) ([]*Node, error) {
 		scripting: true,
 		fragment:  true,
 		context:   context,
+	}
+
+	for _, f := range opts {
+		f(p)
 	}
 
 	root := &Node{

@@ -10,6 +10,9 @@ go_library(
     importpath = "github.com/opencontainers/selinux/go-selinux/label",
     visibility = ["//visibility:public"],
     deps = select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/opencontainers/selinux/go-selinux:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/opencontainers/selinux/go-selinux:go_default_library",
         ],

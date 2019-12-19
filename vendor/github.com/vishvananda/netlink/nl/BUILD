@@ -23,6 +23,9 @@ go_library(
     importpath = "github.com/vishvananda/netlink/nl",
     visibility = ["//visibility:public"],
     deps = select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/vishvananda/netns:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/vishvananda/netns:go_default_library",
         ],

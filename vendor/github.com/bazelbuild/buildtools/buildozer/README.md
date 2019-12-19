@@ -4,25 +4,12 @@ Buildozer is a command line tool to rewrite multiple
 [Bazel](https://github.com/bazelbuild/bazel) BUILD files using
 standard commands.
 
-## Dependencies
-
-1. Protobuf go runtime: to download
-`go get -u github.com/golang/protobuf/{proto,protoc-gen-go}`
-
-
 ## Installation
 
-1. Change directory to the buildifier/buildozer
+1. Build a binary and put it into your $GOPATH/bin:
 
 ```bash
-gopath=$(go env GOPATH)
-cd $gopath/src/github.com/bazelbuild/buildtools/buildozer
-```
-
-2. Install
-
-```bash
-go install
+go get github.com/bazelbuild/buildtools/buildozer
 ```
 
 ## Usage
@@ -77,7 +64,7 @@ Buildozer supports the following commands(`'command args'`):
 
   * `add <attr> <value(s)>`: Adds value(s) to a list attribute of a rule. If a
     value is already present in the list, it is not added.
-  * `new_load <path> <symbol(s)>`: Add a load statement for the given path,
+  * `new_load <path> <[to=]from(s)>`: Add a load statement for the given path,
     importing the symbols. Before using this, make sure to run
     `buildozer 'fix movePackageToTop'`. Afterwards, consider running
     `buildozer 'fix unusedLoads'`.
@@ -96,6 +83,8 @@ Buildozer supports the following commands(`'command args'`):
   * `remove <attr> <value(s)>`: Removes `value(s)` from the list `attr`. The
     wildcard `*` matches all attributes. Lists containing none of the `value(s)` are
     not modified.
+  * `remove_comment <attr>? <value>?`: Removes the comment attached to the rule,
+    an attribute, or a specific value in a list.
   * `rename <old_attr> <new_attr>`: Rename the `old_attr` to `new_attr` which must
     not yet exist.
   * `replace <attr> <old_value> <new_value>`: Replaces `old_value` with `new_value`
@@ -117,6 +106,11 @@ Buildozer supports the following commands(`'command args'`):
     exists in the `to_rule`, it will be overwritten.
   * `copy_no_overwrite <attr> <from_rule>`:  Copies the value of `attr` between
     rules. If it exists in the `to_rule`, no action is taken.
+  * `dict_add <attr> <(key:value)(s)>`:  Sets the value of a key for the dict
+    attribute `attr`. If the key was already present, it will _not_ be overwritten
+  * `dict_set <attr> <(key:value)(s)>`:  Sets the value of a key for the dict
+    attribute `attr`. If the key was already present, its old value is replaced.
+  * `dict_delete <attr> <key(s)>`:  Deletes the key for the dict attribute `attr`.
 
 Here, `<attr>` represents an attribute (being `add`ed/`rename`d/`delete`d etc.),
 e.g.: `srcs`, `<value(s)>` represents values of the attribute and so on.
@@ -124,7 +118,7 @@ A '?' indicates that the preceding argument is optional.
 
 The fix command without a fix specified applied to all eligible fixes.
 Use `//path/to/pkg:__pkg__` as label for file level changes like `new_load` and
-`new_rule`.
+`new`.
 A transformation can be applied to all rules of a particular kind by using
 `%rule_kind` at the end of the label(see examples below).
 

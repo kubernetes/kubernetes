@@ -291,6 +291,8 @@ func (c *Conn) listUnitsInternal(f storeFunc) ([]UnitStatus, error) {
 // ListUnits returns an array with all currently loaded units. Note that
 // units may be known by multiple names at the same time, and hence there might
 // be more unit names loaded than actual units behind them.
+// Also note that a unit is only loaded if it is active and/or enabled.
+// Units that are both disabled and inactive will thus not be returned.
 func (c *Conn) ListUnits() ([]UnitStatus, error) {
 	return c.listUnitsInternal(c.sysobj.Call("org.freedesktop.systemd1.Manager.ListUnits", 0).Store)
 }

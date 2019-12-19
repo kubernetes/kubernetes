@@ -21,12 +21,12 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/bazelbuild/bazel-gazelle/internal/config"
-	"github.com/bazelbuild/bazel-gazelle/internal/repos"
+	"github.com/bazelbuild/bazel-gazelle/config"
 	"github.com/bazelbuild/bazel-gazelle/internal/version"
+	"github.com/bazelbuild/bazel-gazelle/repo"
 )
 
-var minimumRulesGoVersion = version.Version{0, 13, 0}
+var minimumRulesGoVersion = version.Version{0, 19, 0}
 
 // checkRulesGoVersion checks whether a compatible version of rules_go is
 // being used in the workspace. A message will be logged if an incompatible
@@ -39,7 +39,7 @@ func checkRulesGoVersion(repoRoot string) {
 	const message = `Gazelle may not be compatible with this version of rules_go.
 Update io_bazel_rules_go to a newer version in your WORKSPACE file.`
 
-	rulesGoPath, err := repos.FindExternalRepo(repoRoot, config.RulesGoRepoName)
+	rulesGoPath, err := repo.FindExternalRepo(repoRoot, config.RulesGoRepoName)
 	if err != nil {
 		return
 	}

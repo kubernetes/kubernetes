@@ -12,6 +12,14 @@ go_library(
     importpath = "k8s.io/legacy-cloud-providers/openstack/util/mount",
     visibility = ["//visibility:public"],
     deps = select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+            "//vendor/k8s.io/klog:go_default_library",
+            "//vendor/k8s.io/utils/exec:go_default_library",
+            "//vendor/k8s.io/utils/io:go_default_library",
+            "//vendor/k8s.io/utils/path:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",

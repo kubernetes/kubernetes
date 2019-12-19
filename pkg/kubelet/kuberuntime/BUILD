@@ -71,6 +71,9 @@ go_library(
         "//vendor/google.golang.org/grpc/status:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//pkg/kubelet/qos:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/kubelet/qos:go_default_library",
         ],
