@@ -21,9 +21,9 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -60,8 +60,8 @@ func validateNoConflict(presentLabels []string, absentLabels []string) error {
 
 // New initializes a new plugin and returns it.
 func New(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
-	args := &Args{}
-	if err := framework.DecodeInto(plArgs, args); err != nil {
+	args := Args{}
+	if err := framework.DecodeInto(plArgs, &args); err != nil {
 		return nil, err
 	}
 	if err := validateNoConflict(args.PresentLabels, args.AbsentLabels); err != nil {
@@ -70,20 +70,18 @@ func New(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.P
 	if err := validateNoConflict(args.PresentLabelsPreference, args.AbsentLabelsPreference); err != nil {
 		return nil, err
 	}
-	// Note that the reduce function is always nil therefore it's ignored.
-	prioritize, _ := priorities.NewNodeLabelPriority(args.PresentLabelsPreference, args.AbsentLabelsPreference)
 	return &NodeLabel{
-		handle:     handle,
-		predicate:  predicates.NewNodeLabelPredicate(args.PresentLabels, args.AbsentLabels),
-		prioritize: prioritize,
+		handle:    handle,
+		predicate: predicates.NewNodeLabelPredicate(args.PresentLabels, args.AbsentLabels),
+		Args:      args,
 	}, nil
 }
 
 // NodeLabel checks whether a pod can fit based on the node labels which match a filter that it requests.
 type NodeLabel struct {
-	handle     framework.FrameworkHandle
-	predicate  predicates.FitPredicate
-	prioritize priorities.PriorityMapFunction
+	handle    framework.FrameworkHandle
+	predicate predicates.FitPredicate
+	Args
 }
 
 var _ framework.FilterPlugin = &NodeLabel{}
@@ -107,9 +105,23 @@ func (pl *NodeLabel) Score(ctx context.Context, state *framework.CycleState, pod
 	if err != nil {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
 	}
-	// Note that node label priority function doesn't use metadata, hence passing nil here.
-	s, err := pl.prioritize(pod, nil, nodeInfo)
-	return s.Score, migration.ErrorToFrameworkStatus(err)
+
+	node := nodeInfo.Node()
+	score := int64(0)
+	for _, label := range pl.PresentLabelsPreference {
+		if labels.Set(node.Labels).Has(label) {
+			score += framework.MaxNodeScore
+		}
+	}
+	for _, label := range pl.AbsentLabelsPreference {
+		if !labels.Set(node.Labels).Has(label) {
+			score += framework.MaxNodeScore
+		}
+	}
+	// Take average score for each label to ensure the score doesn't exceed MaxNodeScore.
+	score /= int64(len(pl.PresentLabelsPreference) + len(pl.AbsentLabelsPreference))
+
+	return score, nil
 }
 
 // ScoreExtensions of the Score plugin.

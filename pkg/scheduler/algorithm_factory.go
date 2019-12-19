@@ -399,10 +399,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, configPr
 			schedulerFactoryMutex.RUnlock()
 			pcf = &PriorityConfigFactory{
 				MapReduceFunction: func(_ AlgorithmFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
-					return priorities.NewNodeLabelPriority(
-						configProducerArgs.NodeLabelArgs.PresentLabelsPreference,
-						configProducerArgs.NodeLabelArgs.AbsentLabelsPreference,
-					)
+					return nil, nil
 				},
 				Weight: weight,
 			}

@@ -17,7 +17,6 @@ go_library(
         "metadata.go",
         "most_requested.go",
         "node_affinity.go",
-        "node_label.go",
         "node_prefer_avoid_pods.go",
         "priorities.go",
         "reduce.go",
