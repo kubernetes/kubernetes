@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: first-rc
+spec:
+  replicas: 1
+  selector:
+    app: mock
+  template:
+    metadata:
+      labels:
+        app: mock
+    spec:
+      containers:
+      - name: mock-container
+        image: k8s.gcr.io/pause:3.1
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: second-rc
+spec:
+  replicas: 1
+  selector:
+    app: mock
+  template:
+    metadata:
+      labels:
+        app: mock
+    spec:
+      containers:
+      - name: mock-container
+        image: k8s.gcr.io/pause:3.1

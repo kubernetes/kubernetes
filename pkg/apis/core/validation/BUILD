@@ -54,7 +54,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/testapi:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/features:go_default_library",

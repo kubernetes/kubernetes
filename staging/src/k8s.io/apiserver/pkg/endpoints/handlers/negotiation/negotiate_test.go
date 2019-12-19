@@ -280,3 +280,30 @@ func TestNegotiate(t *testing.T) {
 		}
 	}
 }
+
+func fakeSerializerInfoSlice() []runtime.SerializerInfo {
+	result := make([]runtime.SerializerInfo, 2)
+	result[0] = runtime.SerializerInfo{
+		MediaType:        "application/json",
+		MediaTypeType:    "application",
+		MediaTypeSubType: "json",
+	}
+	result[1] = runtime.SerializerInfo{
+		MediaType:        "application/vnd.kubernetes.protobuf",
+		MediaTypeType:    "application",
+		MediaTypeSubType: "vnd.kubernetes.protobuf",
+	}
+	return result
+}
+
+func BenchmarkNegotiateMediaTypeOptions(b *testing.B) {
+	accepted := fakeSerializerInfoSlice()
+	header := "application/vnd.kubernetes.protobuf,*/*"
+
+	for i := 0; i < b.N; i++ {
+		options, _ := NegotiateMediaTypeOptions(header, accepted, DefaultEndpointRestrictions)
+		if options.Accepted != accepted[1] {
+			b.Errorf("Unexpected result")
+		}
+	}
+}

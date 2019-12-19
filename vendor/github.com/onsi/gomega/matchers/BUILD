@@ -10,6 +10,7 @@ go_library(
         "be_a_regular_file.go",
         "be_an_existing_file.go",
         "be_closed_matcher.go",
+        "be_element_of_matcher.go",
         "be_empty_matcher.go",
         "be_equivalent_to_matcher.go",
         "be_false_matcher.go",

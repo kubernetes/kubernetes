@@ -5,7 +5,6 @@
   "name":"kube-scheduler",
   "namespace": "kube-system",
   "annotations": {
-    "scheduler.alpha.kubernetes.io/critical-pod": "",
     "seccomp.security.alpha.kubernetes.io/pod": "docker/default"
   },
   "labels": {
@@ -14,6 +13,7 @@
   }
 },
 "spec":{
+"priorityClass": "system-node-critical",
 "hostNetwork": true,
 "containers":[
     {

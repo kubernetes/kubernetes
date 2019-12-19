@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	subsystems = subsystemSet{
+	subsystemsLegacy = subsystemSet{
 		&CpusetGroup{},
 		&DevicesGroup{},
 		&MemoryGroup{},
@@ -32,6 +32,14 @@ var (
 		&PerfEventGroup{},
 		&FreezerGroup{},
 		&NameGroup{GroupName: "name=systemd", Join: true},
+	}
+	subsystemsUnified = subsystemSet{
+		&CpusetGroupV2{},
+		&FreezerGroupV2{},
+		&CpuGroupV2{},
+		&MemoryGroupV2{},
+		&IOGroupV2{},
+		&PidsGroupV2{},
 	}
 	HugePageSizes, _ = cgroups.GetHugePageSize()
 )
@@ -129,6 +137,13 @@ func isIgnorableError(rootless bool, err error) bool {
 	return errno == unix.EROFS || errno == unix.EPERM || errno == unix.EACCES
 }
 
+func (m *Manager) getSubsystems() subsystemSet {
+	if cgroups.IsCgroup2UnifiedMode() {
+		return subsystemsUnified
+	}
+	return subsystemsLegacy
+}
+
 func (m *Manager) Apply(pid int) (err error) {
 	if m.Cgroups == nil {
 		return nil
@@ -158,7 +173,7 @@ func (m *Manager) Apply(pid int) (err error) {
 		return cgroups.EnterPid(m.Paths, pid)
 	}
 
-	for _, sys := range subsystems {
+	for _, sys := range m.getSubsystems() {
 		// TODO: Apply should, ideally, be reentrant or be broken up into a separate
 		// create and join phase so that the cgroup hierarchy for a container can be
 		// created then join consists of writing the process pids to cgroup.procs
@@ -214,7 +229,7 @@ func (m *Manager) GetStats() (*cgroups.Stats, error) {
 	defer m.mu.Unlock()
 	stats := cgroups.NewStats()
 	for name, path := range m.Paths {
-		sys, err := subsystems.Get(name)
+		sys, err := m.getSubsystems().Get(name)
 		if err == errSubsystemDoesNotExist || !cgroups.PathExists(path) {
 			continue
 		}
@@ -226,14 +241,18 @@ func (m *Manager) GetStats() (*cgroups.Stats, error) {
 }
 
 func (m *Manager) Set(container *configs.Config) error {
+	if container.Cgroups == nil {
+		return nil
+	}
+
 	// If Paths are set, then we are just joining cgroups paths
 	// and there is no need to set any values.
-	if m.Cgroups.Paths != nil {
+	if m.Cgroups != nil && m.Cgroups.Paths != nil {
 		return nil
 	}
 
 	paths := m.GetPaths()
-	for _, sys := range subsystems {
+	for _, sys := range m.getSubsystems() {
 		path := paths[sys.Name()]
 		if err := sys.Set(path, container.Cgroups); err != nil {
 			if m.Rootless && sys.Name() == "devices" {
@@ -262,11 +281,15 @@ func (m *Manager) Set(container *configs.Config) error {
 // Freeze toggles the container's freezer cgroup depending on the state
 // provided
 func (m *Manager) Freeze(state configs.FreezerState) error {
+	if m.Cgroups == nil {
+		return errors.New("cannot toggle freezer: cgroups not configured for container")
+	}
+
 	paths := m.GetPaths()
 	dir := paths["freezer"]
 	prevState := m.Cgroups.Resources.Freezer
 	m.Cgroups.Resources.Freezer = state
-	freezer, err := subsystems.Get("freezer")
+	freezer, err := m.getSubsystems().Get("freezer")
 	if err != nil {
 		return err
 	}

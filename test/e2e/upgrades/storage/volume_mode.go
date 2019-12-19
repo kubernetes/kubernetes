@@ -24,6 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
@@ -36,10 +38,9 @@ const devicePath = "/mnt/volume1"
 // formatted and mounted like a nil/Filesystem PV after a downgrade to a version
 // where the BlockVolume feature is disabled
 type VolumeModeDowngradeTest struct {
-	pvSource *v1.PersistentVolumeSource
-	pv       *v1.PersistentVolume
-	pvc      *v1.PersistentVolumeClaim
-	pod      *v1.Pod
+	pv  *v1.PersistentVolume
+	pvc *v1.PersistentVolumeClaim
+	pod *v1.Pod
 }
 
 // Name returns the tracking name of the test.
@@ -75,15 +76,15 @@ func (t *VolumeModeDowngradeTest) Setup(f *framework.Framework) {
 
 	ginkgo.By("Creating a PVC")
 	block := v1.PersistentVolumeBlock
-	pvcConfig := framework.PersistentVolumeClaimConfig{
+	pvcConfig := e2epv.PersistentVolumeClaimConfig{
 		StorageClassName: nil,
 		VolumeMode:       &block,
 	}
-	t.pvc = framework.MakePersistentVolumeClaim(pvcConfig, ns)
-	t.pvc, err = framework.CreatePVC(cs, ns, t.pvc)
+	t.pvc = e2epv.MakePersistentVolumeClaim(pvcConfig, ns)
+	t.pvc, err = e2epv.CreatePVC(cs, ns, t.pvc)
 	framework.ExpectNoError(err)
 
-	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, ns, t.pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, ns, t.pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
 	framework.ExpectNoError(err)
 
 	t.pvc, err = cs.CoreV1().PersistentVolumeClaims(t.pvc.Namespace).Get(t.pvc.Name, metav1.GetOptions{})
@@ -93,14 +94,14 @@ func (t *VolumeModeDowngradeTest) Setup(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Consuming the PVC before downgrade")
-	t.pod, err = framework.CreateSecPod(cs, ns, []*v1.PersistentVolumeClaim{t.pvc}, false, "", false, false, framework.SELinuxLabel, nil, framework.PodStartTimeout)
+	t.pod, err = e2epod.CreateSecPod(cs, ns, []*v1.PersistentVolumeClaim{t.pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, framework.PodStartTimeout)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Checking if PV exists as expected volume mode")
-	utils.CheckVolumeModeOfPath(t.pod, block, devicePath)
+	utils.CheckVolumeModeOfPath(f, t.pod, block, devicePath)
 
 	ginkgo.By("Checking if read/write to PV works properly")
-	utils.CheckReadWriteToPath(t.pod, block, devicePath)
+	utils.CheckReadWriteToPath(f, t.pod, block, devicePath)
 }
 
 // Test waits for the downgrade to complete, and then verifies that a pod can no
@@ -110,13 +111,13 @@ func (t *VolumeModeDowngradeTest) Test(f *framework.Framework, done <-chan struc
 	<-done
 
 	ginkgo.By("Verifying that nothing exists at the device path in the pod")
-	utils.VerifyExecInPodFail(t.pod, fmt.Sprintf("test -e %s", devicePath), 1)
+	utils.VerifyExecInPodFail(f, t.pod, fmt.Sprintf("test -e %s", devicePath), 1)
 }
 
 // Teardown cleans up any remaining resources.
 func (t *VolumeModeDowngradeTest) Teardown(f *framework.Framework) {
 	ginkgo.By("Deleting the pod")
-	framework.ExpectNoError(framework.DeletePodWithWait(f, f.ClientSet, t.pod))
+	framework.ExpectNoError(e2epod.DeletePodWithWait(f.ClientSet, t.pod))
 
 	ginkgo.By("Deleting the PVC")
 	framework.ExpectNoError(f.ClientSet.CoreV1().PersistentVolumeClaims(t.pvc.Namespace).Delete(t.pvc.Name, nil))

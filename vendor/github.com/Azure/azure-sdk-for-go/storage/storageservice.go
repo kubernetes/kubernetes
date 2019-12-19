@@ -22,10 +22,12 @@ import (
 
 // ServiceProperties represents the storage account service properties
 type ServiceProperties struct {
-	Logging       *Logging
-	HourMetrics   *Metrics
-	MinuteMetrics *Metrics
-	Cors          *Cors
+	Logging               *Logging
+	HourMetrics           *Metrics
+	MinuteMetrics         *Metrics
+	Cors                  *Cors
+	DeleteRetentionPolicy *RetentionPolicy // blob storage only
+	StaticWebsite         *StaticWebsite   // blob storage only
 }
 
 // Logging represents the Azure Analytics Logging settings
@@ -65,6 +67,16 @@ type CorsRule struct {
 	AllowedHeaders  string
 }
 
+// StaticWebsite - The properties that enable an account to host a static website
+type StaticWebsite struct {
+	// Enabled - Indicates whether this account is hosting a static website
+	Enabled bool
+	// IndexDocument - The default name of the index page under each directory
+	IndexDocument *string
+	// ErrorDocument404Path - The absolute path of the custom 404 page
+	ErrorDocument404Path *string
+}
+
 func (c Client) getServiceProperties(service string, auth authentication) (*ServiceProperties, error) {
 	query := url.Values{
 		"restype": {"service"},
@@ -102,16 +114,23 @@ func (c Client) setServiceProperties(props ServiceProperties, service string, au
 	// Ideally, StorageServiceProperties would be the output struct
 	// This is to avoid golint stuttering, while generating the correct XML
 	type StorageServiceProperties struct {
-		Logging       *Logging
-		HourMetrics   *Metrics
-		MinuteMetrics *Metrics
-		Cors          *Cors
+		Logging               *Logging
+		HourMetrics           *Metrics
+		MinuteMetrics         *Metrics
+		Cors                  *Cors
+		DeleteRetentionPolicy *RetentionPolicy
+		StaticWebsite         *StaticWebsite
 	}
 	input := StorageServiceProperties{
 		Logging:       props.Logging,
 		HourMetrics:   props.HourMetrics,
 		MinuteMetrics: props.MinuteMetrics,
 		Cors:          props.Cors,
+	}
+	// only set these fields for blob storage else it's invalid XML
+	if service == blobServiceName {
+		input.DeleteRetentionPolicy = props.DeleteRetentionPolicy
+		input.StaticWebsite = props.StaticWebsite
 	}
 
 	body, length, err := xmlMarshal(input)

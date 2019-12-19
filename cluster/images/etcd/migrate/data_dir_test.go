@@ -151,9 +151,12 @@ func TestBackup(t *testing.T) {
 
 func newTestPath(t *testing.T) string {
 	path, err := ioutil.TempDir("", "etcd-migrate-test-")
-	os.Chmod(path, 0777)
 	if err != nil {
 		t.Fatalf("Failed to create tmp dir for test: %v", err)
+	}
+	err = os.Chmod(path, 0777)
+	if err != nil {
+		t.Fatalf("Failed to granting permission to tmp dir for test: %v", err)
 	}
 	return path
 }

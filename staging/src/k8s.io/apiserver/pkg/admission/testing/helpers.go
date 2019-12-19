@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -40,11 +41,11 @@ type reinvoker struct {
 
 // Admit reinvokes the admission handler and reports a test error if the admission handler performs
 // non-idempotent mutatations to the admission object.
-func (r *reinvoker) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (r *reinvoker) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	r.t.Helper()
 	outputs := []runtime.Object{}
 	for i := 0; i < 2; i++ {
-		err := r.admission.Admit(a, o)
+		err := r.admission.Admit(ctx, a, o)
 		if err != nil {
 			return err
 		}

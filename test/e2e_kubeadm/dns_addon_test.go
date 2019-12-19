@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -43,7 +43,7 @@ var (
 
 // Define container for all the test specification aimed at verifying
 // that kubeadm configures the dns as expected
-var _ = KubeadmDescribe("DNS addon", func() {
+var _ = Describe("DNS addon", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("DNS")
@@ -92,7 +92,7 @@ var _ = KubeadmDescribe("DNS addon", func() {
 
 				d := GetDeployment(f.ClientSet, kubeSystemNamespace, kubeDNSDeploymentName)
 
-				gomega.Expect(d.Spec.Template.Spec.ServiceAccountName).To(gomega.Equal(kubeDNSServiceAccountName))
+				framework.ExpectEqual(d.Spec.Template.Spec.ServiceAccountName, kubeDNSServiceAccountName)
 			})
 		})
 	})
@@ -137,7 +137,7 @@ var _ = KubeadmDescribe("DNS addon", func() {
 
 				d := GetDeployment(f.ClientSet, kubeSystemNamespace, coreDNSDeploymentName)
 
-				gomega.Expect(d.Spec.Template.Spec.ServiceAccountName).To(gomega.Equal(coreDNSServiceAccountName))
+				framework.ExpectEqual(d.Spec.Template.Spec.ServiceAccountName, coreDNSServiceAccountName)
 			})
 		})
 	})

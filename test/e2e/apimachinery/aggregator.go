@@ -29,10 +29,10 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructuredv1 "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
@@ -41,7 +41,6 @@ import (
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
@@ -49,8 +48,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 )
-
-var serverAggregatorVersion = utilversion.MustParseSemantic("v1.10.0")
 
 const (
 	aggregatorServicePort = 7443
@@ -81,29 +78,29 @@ var _ = SIGDescribe("Aggregator", func() {
 		if aggrclient == nil {
 			config, err := framework.LoadConfig()
 			if err != nil {
-				e2elog.Failf("could not load config: %v", err)
+				framework.Failf("could not load config: %v", err)
 			}
 			aggrclient, err = aggregatorclient.NewForConfig(config)
 			if err != nil {
-				e2elog.Failf("could not create aggregator client: %v", err)
+				framework.Failf("could not create aggregator client: %v", err)
 			}
 		}
 	})
 
 	/*
 		    Testname: aggregator-supports-the-sample-apiserver
-		    Description: Ensure that the sample-apiserver code from 1.10 and compiled against 1.10
+		    Description: Ensure that the sample-apiserver code from 1.17 and compiled against 1.17
 			will work on the current Aggregator/API-Server.
 	*/
-	framework.ConformanceIt("Should be able to support the 1.10 Sample API Server using the current Aggregator", func() {
-		// Testing a 1.10 version of the sample-apiserver
+	framework.ConformanceIt("Should be able to support the 1.17 Sample API Server using the current Aggregator", func() {
+		// Testing a 1.17 version of the sample-apiserver
 		TestSampleAPIServer(f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer))
 	})
 })
 
 func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientset, namespace string) {
 	// delete the APIService first to avoid causing discovery errors
-	_ = aggrclient.ApiregistrationV1().APIServices().Delete("v1alpha1.wardle.k8s.io", nil)
+	_ = aggrclient.ApiregistrationV1().APIServices().Delete("v1alpha1.wardle.example.com", nil)
 
 	_ = client.AppsV1().Deployments(namespace).Delete("sample-apiserver-deployment", nil)
 	_ = client.CoreV1().Secrets(namespace).Delete("sample-apiserver-secret", nil)
@@ -148,8 +145,8 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 		// role for listing ValidatingWebhookConfiguration/MutatingWebhookConfiguration/Namespaces
 		ObjectMeta: metav1.ObjectMeta{Name: "sample-apiserver-reader"},
 		Rules: []rbacv1.PolicyRule{
-			rbacv1helpers.NewRule("list").Groups("").Resources("namespaces").RuleOrDie(),
-			rbacv1helpers.NewRule("list").Groups("admissionregistration.k8s.io").Resources("*").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch").Groups("").Resources("namespaces").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch").Groups("admissionregistration.k8s.io").Resources("*").RuleOrDie(),
 		},
 	})
 	framework.ExpectNoError(err, "creating cluster role %s", "sample-apiserver-reader")
@@ -329,21 +326,21 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 
 	// kubectl create -f apiservice.yaml
 	_, err = aggrclient.ApiregistrationV1().APIServices().Create(&apiregistrationv1.APIService{
-		ObjectMeta: metav1.ObjectMeta{Name: "v1alpha1.wardle.k8s.io"},
+		ObjectMeta: metav1.ObjectMeta{Name: "v1alpha1.wardle.example.com"},
 		Spec: apiregistrationv1.APIServiceSpec{
 			Service: &apiregistrationv1.ServiceReference{
 				Namespace: namespace,
 				Name:      "sample-api",
 				Port:      pointer.Int32Ptr(aggregatorServicePort),
 			},
-			Group:                "wardle.k8s.io",
+			Group:                "wardle.example.com",
 			Version:              "v1alpha1",
 			CABundle:             context.signingCert,
 			GroupPriorityMinimum: 2000,
 			VersionPriority:      200,
 		},
 	})
-	framework.ExpectNoError(err, "creating apiservice %s with namespace %s", "v1alpha1.wardle.k8s.io", namespace)
+	framework.ExpectNoError(err, "creating apiservice %s with namespace %s", "v1alpha1.wardle.example.com", namespace)
 
 	var (
 		currentAPIService *apiregistrationv1.APIService
@@ -352,10 +349,10 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 
 	err = pollTimed(100*time.Millisecond, 60*time.Second, func() (bool, error) {
 
-		currentAPIService, _ = aggrclient.ApiregistrationV1().APIServices().Get("v1alpha1.wardle.k8s.io", metav1.GetOptions{})
+		currentAPIService, _ = aggrclient.ApiregistrationV1().APIServices().Get("v1alpha1.wardle.example.com", metav1.GetOptions{})
 		currentPods, _ = client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
 
-		request := restClient.Get().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders")
+		request := restClient.Get().AbsPath("/apis/wardle.example.com/v1alpha1/namespaces/default/flunders")
 		request.SetHeader("Accept", "application/json")
 		_, err := request.DoRaw()
 		if err != nil {
@@ -375,16 +372,16 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	}, "Waited %s for the sample-apiserver to be ready to handle requests.")
 	if err != nil {
 		currentAPIServiceJSON, _ := json.Marshal(currentAPIService)
-		e2elog.Logf("current APIService: %s", string(currentAPIServiceJSON))
+		framework.Logf("current APIService: %s", string(currentAPIServiceJSON))
 
 		currentPodsJSON, _ := json.Marshal(currentPods)
-		e2elog.Logf("current pods: %s", string(currentPodsJSON))
+		framework.Logf("current pods: %s", string(currentPodsJSON))
 
 		if currentPods != nil {
 			for _, pod := range currentPods.Items {
 				for _, container := range pod.Spec.Containers {
 					logs, err := e2epod.GetPodLogs(client, namespace, pod.Name, container.Name)
-					e2elog.Logf("logs of %s/%s (error: %v): %s", pod.Name, container.Name, err, logs)
+					framework.Logf("logs of %s/%s (error: %v): %s", pod.Name, container.Name, err, logs)
 				}
 			}
 		}
@@ -394,44 +391,51 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	flunderName := generateFlunderName("rest-flunder")
 
 	// kubectl create -f flunders-1.yaml -v 9
-	// curl -k -v -XPOST https://localhost/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
-	// Request Body: {"apiVersion":"wardle.k8s.io/v1alpha1","kind":"Flunder","metadata":{"labels":{"sample-label":"true"},"name":"test-flunder","namespace":"default"}}
-	flunder := `{"apiVersion":"wardle.k8s.io/v1alpha1","kind":"Flunder","metadata":{"labels":{"sample-label":"true"},"name":"` + flunderName + `","namespace":"default"}}`
-	result := restClient.Post().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders").Body([]byte(flunder)).Do()
+	// curl -k -v -XPOST https://localhost/apis/wardle.example.com/v1alpha1/namespaces/default/flunders
+	// Request Body: {"apiVersion":"wardle.example.com/v1alpha1","kind":"Flunder","metadata":{"labels":{"sample-label":"true"},"name":"test-flunder","namespace":"default"}}
+	flunder := `{"apiVersion":"wardle.example.com/v1alpha1","kind":"Flunder","metadata":{"labels":{"sample-label":"true"},"name":"` + flunderName + `","namespace":"default"}}`
+	result := restClient.Post().AbsPath("/apis/wardle.example.com/v1alpha1/namespaces/default/flunders").Body([]byte(flunder)).SetHeader("Accept", "application/json").Do()
 	framework.ExpectNoError(result.Error(), "creating a new flunders resource")
 	var statusCode int
 	result.StatusCode(&statusCode)
 	if statusCode != 201 {
-		e2elog.Failf("Flunders client creation response was status %d, not 201", statusCode)
+		framework.Failf("Flunders client creation response was status %d, not 201", statusCode)
 	}
+	u := &unstructured.Unstructured{}
+	if err := result.Into(u); err != nil {
+		framework.ExpectNoError(err, "reading created response")
+	}
+	framework.ExpectEqual(u.GetAPIVersion(), "wardle.example.com/v1alpha1")
+	framework.ExpectEqual(u.GetKind(), "Flunder")
+	framework.ExpectEqual(u.GetName(), flunderName)
 
 	pods, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
-	framework.ExpectNoError(result.Error(), "getting pods for flunders service")
+	framework.ExpectNoError(err, "getting pods for flunders service")
 
 	// kubectl get flunders -v 9
-	// curl -k -v -XGET https://localhost/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
-	contents, err := restClient.Get().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders").SetHeader("Accept", "application/json").DoRaw()
+	// curl -k -v -XGET https://localhost/apis/wardle.example.com/v1alpha1/namespaces/default/flunders
+	contents, err := restClient.Get().AbsPath("/apis/wardle.example.com/v1alpha1/namespaces/default/flunders").SetHeader("Accept", "application/json").DoRaw()
 	framework.ExpectNoError(err, "attempting to get a newly created flunders resource")
 	var flundersList samplev1alpha1.FlunderList
 	err = json.Unmarshal(contents, &flundersList)
-	validateErrorWithDebugInfo(f, err, pods, "Error in unmarshalling %T response from server %s", contents, "/apis/wardle.k8s.io/v1alpha1")
+	validateErrorWithDebugInfo(f, err, pods, "Error in unmarshalling %T response from server %s", contents, "/apis/wardle.example.com/v1alpha1")
 	if len(flundersList.Items) != 1 {
-		e2elog.Failf("failed to get back the correct flunders list %v", flundersList)
+		framework.Failf("failed to get back the correct flunders list %v", flundersList)
 	}
 
 	// kubectl delete flunder test-flunder -v 9
-	// curl -k -v -XDELETE  https://35.193.112.40/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders/test-flunder
-	_, err = restClient.Delete().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders/" + flunderName).DoRaw()
+	// curl -k -v -XDELETE  https://35.193.112.40/apis/wardle.example.com/v1alpha1/namespaces/default/flunders/test-flunder
+	_, err = restClient.Delete().AbsPath("/apis/wardle.example.com/v1alpha1/namespaces/default/flunders/" + flunderName).DoRaw()
 	validateErrorWithDebugInfo(f, err, pods, "attempting to delete a newly created flunders(%v) resource", flundersList.Items)
 
 	// kubectl get flunders -v 9
-	// curl -k -v -XGET https://localhost/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
-	contents, err = restClient.Get().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders").SetHeader("Accept", "application/json").DoRaw()
+	// curl -k -v -XGET https://localhost/apis/wardle.example.com/v1alpha1/namespaces/default/flunders
+	contents, err = restClient.Get().AbsPath("/apis/wardle.example.com/v1alpha1/namespaces/default/flunders").SetHeader("Accept", "application/json").DoRaw()
 	framework.ExpectNoError(err, "confirming delete of a newly created flunders resource")
 	err = json.Unmarshal(contents, &flundersList)
-	validateErrorWithDebugInfo(f, err, pods, "Error in unmarshalling %T response from server %s", contents, "/apis/wardle.k8s.io/v1alpha1")
+	validateErrorWithDebugInfo(f, err, pods, "Error in unmarshalling %T response from server %s", contents, "/apis/wardle.example.com/v1alpha1")
 	if len(flundersList.Items) != 0 {
-		e2elog.Failf("failed to get back the correct deleted flunders list %v", flundersList)
+		framework.Failf("failed to get back the correct deleted flunders list %v", flundersList)
 	}
 
 	flunderName = generateFlunderName("dynamic-flunder")
@@ -440,19 +444,19 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	resources, discoveryErr := client.Discovery().ServerPreferredNamespacedResources()
 	groupVersionResources, err := discovery.GroupVersionResources(resources)
 	framework.ExpectNoError(err, "getting group version resources for dynamic client")
-	gvr := schema.GroupVersionResource{Group: "wardle.k8s.io", Version: "v1alpha1", Resource: "flunders"}
+	gvr := schema.GroupVersionResource{Group: "wardle.example.com", Version: "v1alpha1", Resource: "flunders"}
 	_, ok := groupVersionResources[gvr]
 	if !ok {
-		e2elog.Failf("could not find group version resource for dynamic client and wardle/flunders (discovery error: %v, discovery results: %#v)", discoveryErr, groupVersionResources)
+		framework.Failf("could not find group version resource for dynamic client and wardle/flunders (discovery error: %v, discovery results: %#v)", discoveryErr, groupVersionResources)
 	}
 	dynamicClient := f.DynamicClient.Resource(gvr).Namespace(namespace)
 
 	// kubectl create -f flunders-1.yaml
-	// Request Body: {"apiVersion":"wardle.k8s.io/v1alpha1","kind":"Flunder","metadata":{"labels":{"sample-label":"true"},"name":"test-flunder","namespace":"default"}}
+	// Request Body: {"apiVersion":"wardle.example.com/v1alpha1","kind":"Flunder","metadata":{"labels":{"sample-label":"true"},"name":"test-flunder","namespace":"default"}}
 	testFlunder := samplev1alpha1.Flunder{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Flunder",
-			APIVersion: "wardle.k8s.io/v1alpha1",
+			APIVersion: "wardle.example.com/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{Name: flunderName},
 		Spec:       samplev1alpha1.FlunderSpec{},
@@ -462,14 +466,14 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	unstruct := &unstructuredv1.Unstructured{}
 	err = unstruct.UnmarshalJSON(jsonFlunder)
 	framework.ExpectNoError(err, "unmarshalling test-flunder as unstructured for create using dynamic client")
-	unstruct, err = dynamicClient.Create(unstruct, metav1.CreateOptions{})
+	_, err = dynamicClient.Create(unstruct, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 
 	// kubectl get flunders
 	unstructuredList, err := dynamicClient.List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 	if len(unstructuredList.Items) != 1 {
-		e2elog.Failf("failed to get back the correct flunders list %v from the dynamic client", unstructuredList)
+		framework.Failf("failed to get back the correct flunders list %v from the dynamic client", unstructuredList)
 	}
 
 	// kubectl delete flunder test-flunder
@@ -480,19 +484,19 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	unstructuredList, err = dynamicClient.List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 	if len(unstructuredList.Items) != 0 {
-		e2elog.Failf("failed to get back the correct deleted flunders list %v from the dynamic client", unstructuredList)
+		framework.Failf("failed to get back the correct deleted flunders list %v from the dynamic client", unstructuredList)
 	}
 
 	cleanTest(client, aggrclient, namespace)
 }
 
 // pollTimed will call Poll but time how long Poll actually took.
-// It will then e2elog.Logf the msg with the duration of the Poll.
+// It will then framework.Logf the msg with the duration of the Poll.
 // It is assumed that msg will contain one %s for the elapsed time.
 func pollTimed(interval, timeout time.Duration, condition wait.ConditionFunc, msg string) error {
 	defer func(start time.Time, msg string) {
 		elapsed := time.Since(start)
-		e2elog.Logf(msg, elapsed)
+		framework.Logf(msg, elapsed)
 	}(time.Now(), msg)
 	return wait.Poll(interval, timeout, condition)
 }
@@ -513,7 +517,7 @@ func validateErrorWithDebugInfo(f *framework.Framework, err error, pods *v1.PodL
 			msg += fmt.Sprintf("\nOriginal pods in %s:\n%v", namespace, pods)
 		}
 
-		e2elog.Failf(msg)
+		framework.Failf(msg)
 	}
 }
 

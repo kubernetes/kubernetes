@@ -103,7 +103,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	// Now apply kube reserved and system reserved limits if required.
 	if nc.EnforceNodeAllocatable.Has(kubetypes.SystemReservedEnforcementKey) {
 		klog.V(2).Infof("Enforcing System reserved on cgroup %q with limits: %+v", nc.SystemReservedCgroupName, nc.SystemReserved)
-		if err := enforceExistingCgroup(cm.cgroupManager, ParseCgroupfsToCgroupName(nc.SystemReservedCgroupName), nc.SystemReserved); err != nil {
+		if err := enforceExistingCgroup(cm.cgroupManager, cm.cgroupManager.CgroupName(nc.SystemReservedCgroupName), nc.SystemReserved); err != nil {
 			message := fmt.Sprintf("Failed to enforce System Reserved Cgroup Limits on %q: %v", nc.SystemReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
 			return fmt.Errorf(message)
@@ -112,7 +112,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	}
 	if nc.EnforceNodeAllocatable.Has(kubetypes.KubeReservedEnforcementKey) {
 		klog.V(2).Infof("Enforcing kube reserved on cgroup %q with limits: %+v", nc.KubeReservedCgroupName, nc.KubeReserved)
-		if err := enforceExistingCgroup(cm.cgroupManager, ParseCgroupfsToCgroupName(nc.KubeReservedCgroupName), nc.KubeReserved); err != nil {
+		if err := enforceExistingCgroup(cm.cgroupManager, cm.cgroupManager.CgroupName(nc.KubeReservedCgroupName), nc.KubeReserved); err != nil {
 			message := fmt.Sprintf("Failed to enforce Kube Reserved Cgroup Limits on %q: %v", nc.KubeReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
 			return fmt.Errorf(message)
@@ -177,7 +177,7 @@ func (cm *containerManagerImpl) getNodeAllocatableAbsolute() v1.ResourceList {
 func (cm *containerManagerImpl) getNodeAllocatableAbsoluteImpl(capacity v1.ResourceList) v1.ResourceList {
 	result := make(v1.ResourceList)
 	for k, v := range capacity {
-		value := *(v.Copy())
+		value := v.DeepCopy()
 		if cm.NodeConfig.SystemReserved != nil {
 			value.Sub(cm.NodeConfig.SystemReserved[k])
 		}
@@ -237,7 +237,7 @@ func (cm *containerManagerImpl) validateNodeAllocatable() error {
 	}
 
 	if len(errors) > 0 {
-		return fmt.Errorf("Invalid Node Allocatable configuration. %s", strings.Join(errors, " "))
+		return fmt.Errorf("invalid Node Allocatable configuration. %s", strings.Join(errors, " "))
 	}
 	return nil
 }

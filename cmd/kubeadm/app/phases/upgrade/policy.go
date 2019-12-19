@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -56,6 +57,7 @@ func EnforceVersionPolicies(versionGetter VersionGetter, newK8sVersionStr string
 		skewErrors.Mandatory = append(skewErrors.Mandatory, errors.Wrap(err, "Unable to fetch cluster version"))
 		return skewErrors
 	}
+	fmt.Printf("[upgrade/versions] Cluster version: %s\n", clusterVersionStr)
 
 	kubeadmVersionStr, kubeadmVersion, err := versionGetter.KubeadmVersion()
 	if err != nil {
@@ -63,6 +65,7 @@ func EnforceVersionPolicies(versionGetter VersionGetter, newK8sVersionStr string
 		skewErrors.Mandatory = append(skewErrors.Mandatory, errors.Wrap(err, "Unable to fetch kubeadm version"))
 		return skewErrors
 	}
+	fmt.Printf("[upgrade/versions] kubeadm version: %s\n", kubeadmVersionStr)
 
 	kubeletVersions, err := versionGetter.KubeletVersions()
 	if err != nil {
@@ -71,7 +74,7 @@ func EnforceVersionPolicies(versionGetter VersionGetter, newK8sVersionStr string
 	}
 
 	// Make sure the new version is a supported version (higher than the minimum one supported)
-	if constants.MinimumControlPlaneVersion.AtLeast(newK8sVersion) {
+	if !newK8sVersion.AtLeast(constants.MinimumControlPlaneVersion) {
 		// This must not happen, kubeadm always supports a minimum version; and we can't go below that
 		skewErrors.Mandatory = append(skewErrors.Mandatory, errors.Errorf("Specified version to upgrade to %q is equal to or lower than the minimum supported version %q. Please specify a higher version to upgrade to", newK8sVersionStr, clusterVersionStr))
 	}

@@ -36,7 +36,7 @@ var testDrivers = []func() testsuites.TestDriver{
 	drivers.InitCinderDriver,
 	drivers.InitGcePdDriver,
 	drivers.InitVSphereDriver,
-	drivers.InitAzureDriver,
+	drivers.InitAzureDiskDriver,
 	drivers.InitAwsDriver,
 	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectory),
 	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryLink),
@@ -57,6 +57,9 @@ var testSuites = []func() testsuites.TestSuite{
 	testsuites.InitProvisioningTestSuite,
 	testsuites.InitMultiVolumeTestSuite,
 	testsuites.InitVolumeExpandTestSuite,
+	testsuites.InitDisruptiveTestSuite,
+	testsuites.InitVolumeLimitsTestSuite,
+	testsuites.InitTopologyTestSuite,
 }
 
 // This executes testSuites for in-tree volumes.

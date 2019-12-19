@@ -22,8 +22,8 @@ import (
 	"strings"
 	"testing"
 
-	_ "github.com/coreos/etcd/etcdserver/api/v3rpc" // Force package logger init.
 	"github.com/coreos/pkg/capnslog"
+	_ "go.etcd.io/etcd/etcdserver/api/v3rpc" // Force package logger init.
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -54,8 +54,7 @@ func TestMain(m *testing.M) {
 func TestScaleSubresources(t *testing.T) {
 	clientSet, tearDown := setupWithOptions(t, nil, []string{
 		"--runtime-config",
-		// TODO(liggitt): remove these once apps/v1beta1, apps/v1beta2, and extensions/v1beta1 can no longer be served
-		"api/all=true,extensions/v1beta1/deployments=true,extensions/v1beta1/replicationcontrollers=true,extensions/v1beta1/replicasets=true",
+		"api/all=true",
 	})
 	defer tearDown()
 
@@ -66,18 +65,6 @@ func TestScaleSubresources(t *testing.T) {
 
 	expectedScaleSubresources := map[schema.GroupVersionResource]schema.GroupVersionKind{
 		makeGVR("", "v1", "replicationcontrollers/scale"): makeGVK("autoscaling", "v1", "Scale"),
-
-		// TODO(liggitt): remove these once apps/v1beta1, apps/v1beta2, and extensions/v1beta1 can no longer be served
-		makeGVR("extensions", "v1beta1", "deployments/scale"):            makeGVK("extensions", "v1beta1", "Scale"),
-		makeGVR("extensions", "v1beta1", "replicationcontrollers/scale"): makeGVK("extensions", "v1beta1", "Scale"),
-		makeGVR("extensions", "v1beta1", "replicasets/scale"):            makeGVK("extensions", "v1beta1", "Scale"),
-
-		makeGVR("apps", "v1beta1", "deployments/scale"):  makeGVK("apps", "v1beta1", "Scale"),
-		makeGVR("apps", "v1beta1", "statefulsets/scale"): makeGVK("apps", "v1beta1", "Scale"),
-
-		makeGVR("apps", "v1beta2", "deployments/scale"):  makeGVK("apps", "v1beta2", "Scale"),
-		makeGVR("apps", "v1beta2", "replicasets/scale"):  makeGVK("apps", "v1beta2", "Scale"),
-		makeGVR("apps", "v1beta2", "statefulsets/scale"): makeGVK("apps", "v1beta2", "Scale"),
 
 		makeGVR("apps", "v1", "deployments/scale"):  makeGVK("autoscaling", "v1", "Scale"),
 		makeGVR("apps", "v1", "replicasets/scale"):  makeGVK("autoscaling", "v1", "Scale"),
@@ -231,7 +218,7 @@ func setupWithOptions(t *testing.T, instanceOptions *apitesting.TestServerInstan
 	// StartTestServerOrDie to work with the etcd instance already started by the
 	// integration test scripts.
 	// See https://github.com/kubernetes/kubernetes/issues/49489.
-	repo, err := capnslog.GetRepoLogger("github.com/coreos/etcd")
+	repo, err := capnslog.GetRepoLogger("go.etcd.io/etcd")
 	if err != nil {
 		t.Fatalf("couldn't configure logging: %v", err)
 	}

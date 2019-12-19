@@ -208,8 +208,6 @@ func (f *RemoteRuntime) ExecSync(ctx context.Context, req *kubeapi.ExecSyncReque
 			return nil, err
 		}
 		exitCode = int32(exitError.ExitStatus())
-
-		return nil, err
 	}
 
 	return &kubeapi.ExecSyncResponse{

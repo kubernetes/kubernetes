@@ -38,7 +38,7 @@ const (
 )
 
 type HandlerRunner struct {
-	httpGetter       kubetypes.HttpGetter
+	httpGetter       kubetypes.HTTPGetter
 	commandRunner    kubecontainer.ContainerCommandRunner
 	containerManager podStatusProvider
 }
@@ -47,7 +47,7 @@ type podStatusProvider interface {
 	GetPodStatus(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
 }
 
-func NewHandlerRunner(httpGetter kubetypes.HttpGetter, commandRunner kubecontainer.ContainerCommandRunner, containerManager podStatusProvider) kubecontainer.HandlerRunner {
+func NewHandlerRunner(httpGetter kubetypes.HTTPGetter, commandRunner kubecontainer.ContainerCommandRunner, containerManager podStatusProvider) kubecontainer.HandlerRunner {
 	return &HandlerRunner{
 		httpGetter:       httpGetter,
 		commandRunner:    commandRunner,
@@ -74,7 +74,7 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod,
 		}
 		return msg, err
 	default:
-		err := fmt.Errorf("Invalid handler: %v", handler)
+		err := fmt.Errorf("invalid handler: %v", handler)
 		msg := fmt.Sprintf("Cannot run handler: %v", err)
 		klog.Errorf(msg)
 		return msg, err

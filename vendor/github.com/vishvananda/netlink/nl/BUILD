@@ -12,6 +12,7 @@ go_library(
         "nl_linux.go",
         "nl_unspecified.go",
         "route_linux.go",
+        "seg6_linux.go",
         "syscall.go",
         "tc_linux.go",
         "xfrm_linux.go",
@@ -23,8 +24,13 @@ go_library(
     importpath = "github.com/vishvananda/netlink/nl",
     visibility = ["//visibility:public"],
     deps = select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/vishvananda/netns:go_default_library",
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/vishvananda/netns:go_default_library",
+            "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],
     }),

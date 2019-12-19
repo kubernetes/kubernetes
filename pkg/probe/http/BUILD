@@ -12,8 +12,8 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/probe/http",
     deps = [
         "//pkg/probe:go_default_library",
-        "//pkg/version:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//staging/src/k8s.io/component-base/version:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/io:go_default_library",
     ],

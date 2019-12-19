@@ -27,11 +27,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/metrics/testutil"
 	dockermetrics "k8s.io/kubernetes/pkg/kubelet/dockershim/metrics"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-
-	"github.com/prometheus/common/model"
 )
 
 const (
@@ -39,16 +38,16 @@ const (
 )
 
 // KubeletMetrics is metrics for kubelet
-type KubeletMetrics Metrics
+type KubeletMetrics testutil.Metrics
 
 // Equal returns true if all metrics are the same as the arguments.
 func (m *KubeletMetrics) Equal(o KubeletMetrics) bool {
-	return (*Metrics)(m).Equal(Metrics(o))
+	return (*testutil.Metrics)(m).Equal(testutil.Metrics(o))
 }
 
 // NewKubeletMetrics returns new metrics which are initialized.
 func NewKubeletMetrics() KubeletMetrics {
-	result := NewMetrics()
+	result := testutil.NewMetrics()
 	return KubeletMetrics(result)
 }
 
@@ -69,7 +68,7 @@ func GrabKubeletMetricsWithoutProxy(nodeName, path string) (KubeletMetrics, erro
 
 func parseKubeletMetrics(data string) (KubeletMetrics, error) {
 	result := NewKubeletMetrics()
-	if err := parseMetrics(data, (*Metrics)(&result)); err != nil {
+	if err := testutil.ParseMetrics(data, (*testutil.Metrics)(&result)); err != nil {
 		return KubeletMetrics{}, err
 	}
 	return result, nil
@@ -77,8 +76,7 @@ func parseKubeletMetrics(data string) (KubeletMetrics, error) {
 
 func (g *Grabber) getMetricsFromNode(nodeName string, kubeletPort int) (string, error) {
 	// There's a problem with timing out during proxy. Wrapping this in a goroutine to prevent deadlock.
-	// Hanging goroutine will be leaked.
-	finished := make(chan struct{})
+	finished := make(chan struct{}, 1)
 	var err error
 	var rawOutput []byte
 	go func() {
@@ -134,9 +132,9 @@ func getKubeletMetricsFromNode(c clientset.Interface, nodeName string) (KubeletM
 	return grabber.GrabFromKubelet(nodeName)
 }
 
-// getKubeletMetrics gets all metrics in kubelet subsystem from specified node and trims
+// GetKubeletMetrics gets all metrics in kubelet subsystem from specified node and trims
 // the subsystem prefix.
-func getKubeletMetrics(c clientset.Interface, nodeName string) (KubeletMetrics, error) {
+func GetKubeletMetrics(c clientset.Interface, nodeName string) (KubeletMetrics, error) {
 	ms, err := getKubeletMetricsFromNode(c, nodeName)
 	if err != nil {
 		return KubeletMetrics{}, err
@@ -183,7 +181,7 @@ func GetKubeletLatencyMetrics(ms KubeletMetrics, filterMetricNames sets.String) 
 			latency := sample.Value
 			operation := string(sample.Metric["operation_type"])
 			var quantile float64
-			if val, ok := sample.Metric[model.QuantileLabel]; ok {
+			if val, ok := sample.Metric[testutil.QuantileLabel]; ok {
 				var err error
 				if quantile, err = strconv.ParseFloat(string(val), 64); err != nil {
 					continue
@@ -203,7 +201,7 @@ func GetKubeletLatencyMetrics(ms KubeletMetrics, filterMetricNames sets.String) 
 
 // HighLatencyKubeletOperations logs and counts the high latency metrics exported by the kubelet server via /metrics.
 func HighLatencyKubeletOperations(c clientset.Interface, threshold time.Duration, nodeName string, logFunc func(fmt string, args ...interface{})) (KubeletLatencyMetrics, error) {
-	ms, err := getKubeletMetrics(c, nodeName)
+	ms, err := GetKubeletMetrics(c, nodeName)
 	if err != nil {
 		return KubeletLatencyMetrics{}, err
 	}

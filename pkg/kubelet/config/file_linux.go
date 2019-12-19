@@ -16,7 +16,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Reads the pod configuration from file or a directory of files.
 package config
 
 import (
@@ -50,17 +49,17 @@ func (e *retryableError) Error() string {
 
 func (s *sourceFile) startWatch() {
 	backOff := flowcontrol.NewBackOff(retryPeriod, maxRetryPeriod)
-	backOffId := "watch"
+	backOffID := "watch"
 
 	go wait.Forever(func() {
-		if backOff.IsInBackOffSinceUpdate(backOffId, time.Now()) {
+		if backOff.IsInBackOffSinceUpdate(backOffID, time.Now()) {
 			return
 		}
 
 		if err := s.doWatch(); err != nil {
 			klog.Errorf("Unable to read config path %q: %v", s.path, err)
 			if _, retryable := err.(*retryableError); !retryable {
-				backOff.Next(backOffId, time.Now())
+				backOff.Next(backOffID, time.Now())
 			}
 		}
 	}, retryPeriod)
@@ -130,11 +129,11 @@ func (s *sourceFile) produceWatchEvent(e *fsnotify.Event) error {
 func (s *sourceFile) consumeWatchEvent(e *watchEvent) error {
 	switch e.eventType {
 	case podAdd, podModify:
-		if pod, err := s.extractFromFile(e.fileName); err != nil {
+		pod, err := s.extractFromFile(e.fileName)
+		if err != nil {
 			return fmt.Errorf("can't process config file %q: %v", e.fileName, err)
-		} else {
-			return s.store.Add(pod)
 		}
+		return s.store.Add(pod)
 	case podDelete:
 		if objKey, keyExist := s.fileKeyMapping[e.fileName]; keyExist {
 			pod, podExist, err := s.store.GetByKey(objKey)
@@ -145,9 +144,8 @@ func (s *sourceFile) consumeWatchEvent(e *watchEvent) error {
 			} else {
 				if err = s.store.Delete(pod); err != nil {
 					return fmt.Errorf("failed to remove deleted pod from cache: %v", err)
-				} else {
-					delete(s.fileKeyMapping, e.fileName)
 				}
+				delete(s.fileKeyMapping, e.fileName)
 			}
 		}
 	}

@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -87,7 +86,7 @@ func getSelfhostingSubCommand(in io.Reader) *cobra.Command {
 		Short:   "Convert a static Pod-hosted control plane into a self-hosted one",
 		Long:    selfhostingLongDesc,
 		Example: selfhostingExample,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 
 			var err error
 
@@ -97,28 +96,31 @@ func getSelfhostingSubCommand(in io.Reader) *cobra.Command {
 				s := bufio.NewScanner(in)
 				s.Scan()
 
-				err = s.Err()
-				kubeadmutil.CheckErr(err)
+				if err = s.Err(); err != nil {
+					return err
+				}
 
 				if strings.ToLower(s.Text()) != "y" {
-					kubeadmutil.CheckErr(errors.New("aborted pivot operation"))
+					return errors.New("aborted pivot operation")
 				}
 			}
 
 			fmt.Println("[pivot] pivoting cluster to self-hosted")
 
 			if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
-				kubeadmutil.CheckErr(err)
+				return err
 			}
 
 			if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
-				kubeadmutil.CheckErr(err)
+				return err
 			}
 
 			// Gets the Kubernetes client
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
 			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
 			// of the version from the internet when executing LoadOrDefaultInitConfiguration
@@ -126,12 +128,13 @@ func getSelfhostingSubCommand(in io.Reader) *cobra.Command {
 
 			// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 			internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, &kubeadmapiv1beta2.InitConfiguration{}, cfg)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
 			// Converts the Static Pod-hosted control plane into a self-hosted one
 			waiter := apiclient.NewKubeWaiter(client, 2*time.Minute, os.Stdout)
-			err = selfhosting.CreateSelfHostedControlPlane(constants.GetStaticPodDirectory(), constants.KubernetesDir, internalcfg, client, waiter, false, certsInSecrets)
-			kubeadmutil.CheckErr(err)
+			return selfhosting.CreateSelfHostedControlPlane(constants.GetStaticPodDirectory(), constants.KubernetesDir, internalcfg, client, waiter, false, certsInSecrets)
 		},
 	}
 

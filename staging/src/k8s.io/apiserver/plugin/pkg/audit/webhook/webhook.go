@@ -18,6 +18,7 @@ limitations under the License.
 package webhook
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
+	utiltrace "k8s.io/utils/trace"
 )
 
 const (
@@ -42,9 +44,27 @@ func init() {
 	install.Install(audit.Scheme)
 }
 
+// retryOnError enforces the webhook client to retry requests
+// on error regardless of its nature.
+// The default implementation considers a very limited set of
+// 'retriable' errors, assuming correct use of HTTP codes by
+// external webhooks.
+// That may easily lead to dropped audit events. In fact, there is
+// hardly any error that could be a justified reason NOT to retry
+// sending audit events if there is even a slight chance that the
+// receiving service gets back to normal at some point.
+func retryOnError(err error) bool {
+	if err != nil {
+		return true
+	}
+	return false
+}
+
 func loadWebhook(configFile string, groupVersion schema.GroupVersion, initialBackoff time.Duration) (*webhook.GenericWebhook, error) {
-	return webhook.NewGenericWebhook(audit.Scheme, audit.Codecs, configFile,
+	w, err := webhook.NewGenericWebhook(audit.Scheme, audit.Codecs, configFile,
 		[]schema.GroupVersion{groupVersion}, initialBackoff)
+	w.ShouldRetry = retryOnError
+	return w, err
 }
 
 type backend struct {
@@ -59,6 +79,7 @@ func NewDynamicBackend(rc *rest.RESTClient, initialBackoff time.Duration) audit.
 		w: &webhook.GenericWebhook{
 			RestClient:     rc,
 			InitialBackoff: initialBackoff,
+			ShouldRetry:    retryOnError,
 		},
 		name: fmt.Sprintf("dynamic_%s", PluginName),
 	}
@@ -94,7 +115,15 @@ func (b *backend) processEvents(ev ...*auditinternal.Event) error {
 	for _, e := range ev {
 		list.Items = append(list.Items, *e)
 	}
-	return b.w.WithExponentialBackoff(func() rest.Result {
+	return b.w.WithExponentialBackoff(context.Background(), func() rest.Result {
+		trace := utiltrace.New("Call Audit Events webhook",
+			utiltrace.Field{"name", b.name},
+			utiltrace.Field{"event-count", len(list.Items)})
+		// Only log audit webhook traces that exceed a 25ms per object limit plus a 50ms
+		// request overhead allowance. The high per object limit used here is primarily to
+		// allow enough time for the serialization/deserialization of audit events, which
+		// contain nested request and response objects plus additional event fields.
+		defer trace.LogIfLong(time.Duration(50+25*len(list.Items)) * time.Millisecond)
 		return b.w.RestClient.Post().Body(&list).Do()
 	}).Error()
 }

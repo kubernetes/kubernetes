@@ -28,7 +28,9 @@ const (
 	closedMsg = "heap is closed"
 )
 
+// LessFunc is used to compare two objects in the heap.
 type LessFunc func(interface{}, interface{}) bool
+
 type heapItem struct {
 	obj   interface{} // The object which is stored in the heap.
 	index int         // The index of the object's key in the Heap.queue.
@@ -158,7 +160,7 @@ func (h *Heap) Add(obj interface{}) error {
 	return nil
 }
 
-// Adds all the items in the list to the queue and then signals the condition
+// BulkAdd adds all the items in the list to the queue and then signals the condition
 // variable. It is useful when the caller would like to add all of the items
 // to the queue before consumer starts processing them.
 func (h *Heap) BulkAdd(list []interface{}) error {
@@ -249,11 +251,11 @@ func (h *Heap) Pop() (interface{}, error) {
 		h.cond.Wait()
 	}
 	obj := heap.Pop(h.data)
-	if obj != nil {
-		return obj, nil
-	} else {
+	if obj == nil {
 		return nil, fmt.Errorf("object was removed from heap data")
 	}
+
+	return obj, nil
 }
 
 // List returns a list of all the items.

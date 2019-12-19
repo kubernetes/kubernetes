@@ -28,8 +28,7 @@ import (
 )
 
 const (
-	rsGracefulDeletePeriod = 15 * time.Minute
-	rsCheckDeleteInterval  = 1 * time.Minute
+	rsCheckDeleteInterval = 1 * time.Minute
 )
 
 // listItem stores real server information and the process time.

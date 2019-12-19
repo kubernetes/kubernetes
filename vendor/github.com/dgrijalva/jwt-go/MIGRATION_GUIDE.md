@@ -56,8 +56,9 @@ This simple parsing example:
 is directly mapped to:
 
 ```go
-	if token, err := request.ParseFromRequest(tokenString, request.OAuth2Extractor, req, keyLookupFunc); err == nil {
-		fmt.Printf("Token for user %v expires %v", token.Claims["user"], token.Claims["exp"])
+	if token, err := request.ParseFromRequest(req, request.OAuth2Extractor, keyLookupFunc); err == nil {
+		claims := token.Claims.(jwt.MapClaims)
+		fmt.Printf("Token for user %v expires %v", claims["user"], claims["exp"])
 	}
 ```
 

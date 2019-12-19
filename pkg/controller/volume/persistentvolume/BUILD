@@ -24,8 +24,8 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/util/goroutinemap:go_default_library",
         "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
-        "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
+        "//pkg/volume/csimigration:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/recyclerclient:go_default_library",
         "//pkg/volume/util/subpath:go_default_library",
@@ -56,6 +56,8 @@ go_library(
         "//staging/src/k8s.io/cloud-provider/volume/errors:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/k8s.io/utils/mount:go_default_library",
     ],
 )
 
@@ -72,7 +74,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/testapi:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/volume/persistentvolume/testing:go_default_library",
@@ -101,6 +102,7 @@ go_test(
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/tools/reference:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/csi-translation-lib:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

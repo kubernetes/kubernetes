@@ -398,11 +398,3 @@ func toInt64(v interface{}) (int64, bool) {
 	}
 	return 0, false
 }
-
-// NewErrorWithValidationError appends package type and method name in
-// validation error.
-//
-// Deprecated: Please use validation.NewError() instead.
-func NewErrorWithValidationError(err error, packageType, method string) error {
-	return NewError(packageType, method, err.Error())
-}

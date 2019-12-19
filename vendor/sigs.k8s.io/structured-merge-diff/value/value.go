@@ -34,83 +34,148 @@ type Value struct {
 	Null         bool // represents an explicit `"foo" = null`
 }
 
+// Equals returns true iff the two values are equal.
+func (v Value) Equals(rhs Value) bool {
+	if v.FloatValue != nil || rhs.FloatValue != nil {
+		var lf float64
+		if v.FloatValue != nil {
+			lf = float64(*v.FloatValue)
+		} else if v.IntValue != nil {
+			lf = float64(*v.IntValue)
+		} else {
+			return false
+		}
+		var rf float64
+		if rhs.FloatValue != nil {
+			rf = float64(*rhs.FloatValue)
+		} else if rhs.IntValue != nil {
+			rf = float64(*rhs.IntValue)
+		} else {
+			return false
+		}
+		return lf == rf
+	}
+	if v.IntValue != nil {
+		if rhs.IntValue != nil {
+			return *v.IntValue == *rhs.IntValue
+		}
+		return false
+	}
+	if v.StringValue != nil {
+		if rhs.StringValue != nil {
+			return *v.StringValue == *rhs.StringValue
+		}
+		return false
+	}
+	if v.BooleanValue != nil {
+		if rhs.BooleanValue != nil {
+			return *v.BooleanValue == *rhs.BooleanValue
+		}
+		return false
+	}
+	if v.ListValue != nil {
+		if rhs.ListValue != nil {
+			return v.ListValue.Equals(rhs.ListValue)
+		}
+		return false
+	}
+	if v.MapValue != nil {
+		if rhs.MapValue != nil {
+			return v.MapValue.Equals(rhs.MapValue)
+		}
+		return false
+	}
+	if v.Null {
+		if rhs.Null {
+			return true
+		}
+		return false
+	}
+	// No field is set, on either objects.
+	return true
+}
+
 // Less provides a total ordering for Value (so that they can be sorted, even
 // if they are of different types).
 func (v Value) Less(rhs Value) bool {
+	return v.Compare(rhs) == -1
+}
+
+// Compare provides a total ordering for Value (so that they can be
+// sorted, even if they are of different types). The result will be 0 if
+// v==rhs, -1 if v < rhs, and +1 if v > rhs.
+func (v Value) Compare(rhs Value) int {
 	if v.FloatValue != nil {
 		if rhs.FloatValue == nil {
 			// Extra: compare floats and ints numerically.
 			if rhs.IntValue != nil {
-				return float64(*v.FloatValue) < float64(*rhs.IntValue)
+				return v.FloatValue.Compare(Float(*rhs.IntValue))
 			}
-			return true
+			return -1
 		}
-		return *v.FloatValue < *rhs.FloatValue
+		return v.FloatValue.Compare(*rhs.FloatValue)
 	} else if rhs.FloatValue != nil {
 		// Extra: compare floats and ints numerically.
 		if v.IntValue != nil {
-			return float64(*v.IntValue) < float64(*rhs.FloatValue)
+			return Float(*v.IntValue).Compare(*rhs.FloatValue)
 		}
-		return false
+		return 1
 	}
 
 	if v.IntValue != nil {
 		if rhs.IntValue == nil {
-			return true
+			return -1
 		}
-		return *v.IntValue < *rhs.IntValue
+		return v.IntValue.Compare(*rhs.IntValue)
 	} else if rhs.IntValue != nil {
-		return false
+		return 1
 	}
 
 	if v.StringValue != nil {
 		if rhs.StringValue == nil {
-			return true
+			return -1
 		}
-		return *v.StringValue < *rhs.StringValue
+		return strings.Compare(string(*v.StringValue), string(*rhs.StringValue))
 	} else if rhs.StringValue != nil {
-		return false
+		return 1
 	}
 
 	if v.BooleanValue != nil {
 		if rhs.BooleanValue == nil {
-			return true
+			return -1
 		}
-		if *v.BooleanValue == *rhs.BooleanValue {
-			return false
-		}
-		return *v.BooleanValue == false
+		return v.BooleanValue.Compare(*rhs.BooleanValue)
 	} else if rhs.BooleanValue != nil {
-		return false
+		return 1
 	}
 
 	if v.ListValue != nil {
 		if rhs.ListValue == nil {
-			return true
+			return -1
 		}
-		return v.ListValue.Less(rhs.ListValue)
+		return v.ListValue.Compare(rhs.ListValue)
 	} else if rhs.ListValue != nil {
-		return false
+		return 1
 	}
 	if v.MapValue != nil {
 		if rhs.MapValue == nil {
-			return true
+			return -1
 		}
-		return v.MapValue.Less(rhs.MapValue)
+		return v.MapValue.Compare(rhs.MapValue)
 	} else if rhs.MapValue != nil {
-		return false
+		return 1
 	}
 	if v.Null {
 		if !rhs.Null {
-			return true
+			return -1
 		}
-		return false
+		return 0
 	} else if rhs.Null {
-		return false
+		return 1
 	}
 
 	// Invalid Value-- nothing is set.
-	return false
+	return 0
 }
 
 type Int int64
@@ -118,10 +183,96 @@ type Float float64
 type String string
 type Boolean bool
 
+// Compare compares integers. The result will be 0 if i==rhs, -1 if i <
+// rhs, and +1 if i > rhs.
+func (i Int) Compare(rhs Int) int {
+	if i > rhs {
+		return 1
+	} else if i < rhs {
+		return -1
+	}
+	return 0
+}
+
+// Compare compares floats. The result will be 0 if f==rhs, -1 if f <
+// rhs, and +1 if f > rhs.
+func (f Float) Compare(rhs Float) int {
+	if f > rhs {
+		return 1
+	} else if f < rhs {
+		return -1
+	}
+	return 0
+}
+
+// Compare compares booleans. The result will be 0 if b==rhs, -1 if b <
+// rhs, and +1 if b > rhs.
+func (b Boolean) Compare(rhs Boolean) int {
+	if b == rhs {
+		return 0
+	} else if b == false {
+		return -1
+	}
+	return 1
+}
+
 // Field is an individual key-value pair.
 type Field struct {
 	Name  string
 	Value Value
+}
+
+// FieldList is a list of key-value pairs. Each field is expected to
+// have a different name.
+type FieldList []Field
+
+// Sort sorts the field list by Name.
+func (f FieldList) Sort() {
+	if len(f) < 2 {
+		return
+	}
+	if len(f) == 2 {
+		if f[1].Name < f[0].Name {
+			f[0], f[1] = f[1], f[0]
+		}
+		return
+	}
+	sort.SliceStable(f, func(i, j int) bool {
+		return f[i].Name < f[j].Name
+	})
+}
+
+// Less compares two lists lexically.
+func (f FieldList) Less(rhs FieldList) bool {
+	return f.Compare(rhs) == -1
+}
+
+// Less compares two lists lexically. The result will be 0 if f==rhs, -1
+// if f < rhs, and +1 if f > rhs.
+func (f FieldList) Compare(rhs FieldList) int {
+	i := 0
+	for {
+		if i >= len(f) && i >= len(rhs) {
+			// Maps are the same length and all items are equal.
+			return 0
+		}
+		if i >= len(f) {
+			// F is shorter.
+			return -1
+		}
+		if i >= len(rhs) {
+			// RHS is shorter.
+			return 1
+		}
+		if c := strings.Compare(f[i].Name, rhs[i].Name); c != 0 {
+			return c
+		}
+		if c := f[i].Value.Compare(rhs[i].Value); c != 0 {
+			return c
+		}
+		// The items are equal; continue.
+		i++
+	}
 }
 
 // List is a list of items.
@@ -129,29 +280,44 @@ type List struct {
 	Items []Value
 }
 
+// Equals compares two lists lexically.
+func (l *List) Equals(rhs *List) bool {
+	if len(l.Items) != len(rhs.Items) {
+		return false
+	}
+
+	for i, lv := range l.Items {
+		if !lv.Equals(rhs.Items[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 // Less compares two lists lexically.
 func (l *List) Less(rhs *List) bool {
+	return l.Compare(rhs) == -1
+}
+
+// Compare compares two lists lexically. The result will be 0 if l==rhs, -1
+// if l < rhs, and +1 if l > rhs.
+func (l *List) Compare(rhs *List) int {
 	i := 0
 	for {
 		if i >= len(l.Items) && i >= len(rhs.Items) {
 			// Lists are the same length and all items are equal.
-			return false
+			return 0
 		}
 		if i >= len(l.Items) {
 			// LHS is shorter.
-			return true
+			return -1
 		}
 		if i >= len(rhs.Items) {
 			// RHS is shorter.
-			return false
+			return 1
 		}
-		if l.Items[i].Less(rhs.Items[i]) {
-			// LHS is less; return
-			return true
-		}
-		if rhs.Items[i].Less(l.Items[i]) {
-			// RHS is less; return
-			return false
+		if c := l.Items[i].Compare(rhs.Items[i]); c != 0 {
+			return c
 		}
 		// The items are equal; continue.
 		i++
@@ -167,13 +333,13 @@ type Map struct {
 
 	// may be nil; lazily constructed.
 	// TODO: Direct modifications to Items above will cause serious problems.
-	index map[string]*Field
+	index map[string]int
 	// may be empty; lazily constructed.
 	// TODO: Direct modifications to Items above will cause serious problems.
 	order []int
 }
 
-func (m *Map) computeOrder() {
+func (m *Map) computeOrder() []int {
 	if len(m.order) != len(m.Items) {
 		m.order = make([]int, len(m.Items))
 		for i := range m.order {
@@ -183,39 +349,94 @@ func (m *Map) computeOrder() {
 			return m.Items[m.order[i]].Name < m.Items[m.order[j]].Name
 		})
 	}
+	return m.order
+}
+
+// Equals compares two maps lexically.
+func (m *Map) Equals(rhs *Map) bool {
+	if len(m.Items) != len(rhs.Items) {
+		return false
+	}
+	for _, lfield := range m.Items {
+		rfield, ok := rhs.Get(lfield.Name)
+		if !ok {
+			return false
+		}
+		if !lfield.Value.Equals(rfield.Value) {
+			return false
+		}
+	}
+	return true
 }
 
 // Less compares two maps lexically.
 func (m *Map) Less(rhs *Map) bool {
-	m.computeOrder()
-	rhs.computeOrder()
+	return m.Compare(rhs) == -1
+}
+
+// Compare compares two maps lexically.
+func (m *Map) Compare(rhs *Map) int {
+	var noAllocL, noAllocR [2]int
+	var morder, rorder []int
+
+	// For very short maps (<2 elements) this permits us to avoid
+	// allocating the order array. We could make this accomodate larger
+	// maps, but 2 items should be enough to cover most path element
+	// comparisons, and at some point there will be diminishing returns.
+	// This has a large effect on the path element deserialization test,
+	// because everything is sorted / compared, but only once.
+	switch len(m.Items) {
+	case 0:
+		morder = noAllocL[0:0]
+	case 1:
+		morder = noAllocL[0:1]
+	case 2:
+		morder = noAllocL[0:2]
+		if m.Items[0].Name > m.Items[1].Name {
+			morder[0] = 1
+		} else {
+			morder[1] = 1
+		}
+	default:
+		morder = m.computeOrder()
+	}
+
+	switch len(rhs.Items) {
+	case 0:
+		rorder = noAllocR[0:0]
+	case 1:
+		rorder = noAllocR[0:1]
+	case 2:
+		rorder = noAllocR[0:2]
+		if rhs.Items[0].Name > rhs.Items[1].Name {
+			rorder[0] = 1
+		} else {
+			rorder[1] = 1
+		}
+	default:
+		rorder = rhs.computeOrder()
+	}
 
 	i := 0
 	for {
-		if i >= len(m.order) && i >= len(rhs.order) {
+		if i >= len(morder) && i >= len(rorder) {
 			// Maps are the same length and all items are equal.
-			return false
+			return 0
 		}
-		if i >= len(m.order) {
+		if i >= len(morder) {
 			// LHS is shorter.
-			return true
+			return -1
 		}
-		if i >= len(rhs.order) {
+		if i >= len(rorder) {
 			// RHS is shorter.
-			return false
+			return 1
 		}
-		fa, fb := &m.Items[m.order[i]], &rhs.Items[rhs.order[i]]
-		if fa.Name != fb.Name {
-			// the map having the field name that sorts lexically less is "less"
-			return fa.Name < fb.Name
+		fa, fb := &m.Items[morder[i]], &rhs.Items[rorder[i]]
+		if c := strings.Compare(fa.Name, fb.Name); c != 0 {
+			return c
 		}
-		if fa.Value.Less(fb.Value) {
-			// LHS is less; return
-			return true
-		}
-		if fb.Value.Less(fa.Value) {
-			// RHS is less; return
-			return false
+		if c := fa.Value.Compare(fb.Value); c != 0 {
+			return c
 		}
 		// The items are equal; continue.
 		i++
@@ -225,14 +446,16 @@ func (m *Map) Less(rhs *Map) bool {
 // Get returns the (Field, true) or (nil, false) if it is not present
 func (m *Map) Get(key string) (*Field, bool) {
 	if m.index == nil {
-		m.index = map[string]*Field{}
+		m.index = map[string]int{}
 		for i := range m.Items {
-			f := &m.Items[i]
-			m.index[f.Name] = f
+			m.index[m.Items[i].Name] = i
 		}
 	}
 	f, ok := m.index[key]
-	return f, ok
+	if !ok {
+		return nil, false
+	}
+	return &m.Items[f], true
 }
 
 // Set inserts or updates the given item.
@@ -242,7 +465,8 @@ func (m *Map) Set(key string, value Value) {
 		return
 	}
 	m.Items = append(m.Items, Field{Name: key, Value: value})
-	m.index = nil // Since the append might have reallocated
+	i := len(m.Items) - 1
+	m.index[key] = i
 	m.order = nil
 }
 

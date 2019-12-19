@@ -204,7 +204,7 @@ func getDataFromDisk(cfg *kubeadmapi.InitConfiguration, key []byte) (map[string]
 	secretData := map[string][]byte{}
 	for certName, certPath := range certsToTransfer(cfg) {
 		cert, err := loadAndEncryptCert(certPath, key)
-		if err == nil || (err != nil && os.IsNotExist(err)) {
+		if err == nil || os.IsNotExist(err) {
 			secretData[certOrKeyNameToSecretName(certName)] = cert
 		} else {
 			return nil, err

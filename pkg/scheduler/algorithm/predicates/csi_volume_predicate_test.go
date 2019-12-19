@@ -23,13 +23,14 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 )
 
 const (
@@ -433,15 +434,14 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 		},
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()
 	// running attachable predicate tests with feature gate and limit present on nodes
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
-			node := getNodeWithPodAndVolumeLimits(test.limitSource, test.existingPods, int64(test.maxVols), test.driverNames...)
+			node, csiNode := getNodeWithPodAndVolumeLimits(test.limitSource, test.existingPods, int64(test.maxVols), test.driverNames...)
 			if test.migrationEnabled {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, true)()
-				enableMigrationOnNode(node, csilibplugins.AWSEBSInTreePluginName)
+				enableMigrationOnNode(csiNode, csilibplugins.AWSEBSInTreePluginName)
 			} else {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, false)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, false)()
@@ -452,11 +452,12 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 				expectedFailureReasons = []PredicateFailureReason{test.expectedFailureReason}
 			}
 
-			pred := NewCSIMaxVolumeLimitPredicate(getFakeCSIPVInfo(test.filterName, test.driverNames...),
-				getFakeCSIPVCInfo(test.filterName, "csi-sc", test.driverNames...),
-				getFakeCSIStorageClassInfo("csi-sc", test.driverNames[0]))
+			pred := NewCSIMaxVolumeLimitPredicate(getFakeCSINodeLister(csiNode),
+				getFakeCSIPVLister(test.filterName, test.driverNames...),
+				getFakeCSIPVCLister(test.filterName, "csi-sc", test.driverNames...),
+				getFakeCSIStorageClassLister("csi-sc", test.driverNames[0]))
 
-			fits, reasons, err := pred(test.newPod, GetPredicateMetadata(test.newPod, nil), node)
+			fits, reasons, err := pred(test.newPod, nil, node)
 			if err != nil {
 				t.Errorf("Using allocatable [%s]%s: unexpected error: %v", test.filterName, test.test, err)
 			}
@@ -470,8 +471,8 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 	}
 }
 
-func getFakeCSIPVInfo(volumeName string, driverNames ...string) FakePersistentVolumeInfo {
-	pvInfos := FakePersistentVolumeInfo{}
+func getFakeCSIPVLister(volumeName string, driverNames ...string) fakelisters.PersistentVolumeLister {
+	pvLister := fakelisters.PersistentVolumeLister{}
 	for _, driver := range driverNames {
 		for j := 0; j < 4; j++ {
 			volumeHandle := fmt.Sprintf("%s-%s-%d", volumeName, driver, j)
@@ -508,15 +509,15 @@ func getFakeCSIPVInfo(volumeName string, driverNames ...string) FakePersistentVo
 					},
 				}
 			}
-			pvInfos = append(pvInfos, pv)
+			pvLister = append(pvLister, pv)
 		}
 
 	}
-	return pvInfos
+	return pvLister
 }
 
-func getFakeCSIPVCInfo(volumeName, scName string, driverNames ...string) FakePersistentVolumeClaimInfo {
-	pvcInfos := FakePersistentVolumeClaimInfo{}
+func getFakeCSIPVCLister(volumeName, scName string, driverNames ...string) fakelisters.PersistentVolumeClaimLister {
+	pvcLister := fakelisters.PersistentVolumeClaimLister{}
 	for _, driver := range driverNames {
 		for j := 0; j < 4; j++ {
 			v := fmt.Sprintf("%s-%s-%d", volumeName, driver, j)
@@ -524,28 +525,27 @@ func getFakeCSIPVCInfo(volumeName, scName string, driverNames ...string) FakePer
 				ObjectMeta: metav1.ObjectMeta{Name: v},
 				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: v},
 			}
-			pvcInfos = append(pvcInfos, pvc)
+			pvcLister = append(pvcLister, pvc)
 		}
 	}
 
-	pvcInfos = append(pvcInfos, v1.PersistentVolumeClaim{
+	pvcLister = append(pvcLister, v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: volumeName + "-4"},
 		Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &scName},
 	})
-	pvcInfos = append(pvcInfos, v1.PersistentVolumeClaim{
+	pvcLister = append(pvcLister, v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: volumeName + "-5"},
 		Spec:       v1.PersistentVolumeClaimSpec{},
 	})
 	// a pvc with missing PV but available storageclass.
-	pvcInfos = append(pvcInfos, v1.PersistentVolumeClaim{
+	pvcLister = append(pvcLister, v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: volumeName + "-6"},
 		Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &scName, VolumeName: "missing-in-action"},
 	})
-	return pvcInfos
+	return pvcLister
 }
 
-func enableMigrationOnNode(nodeInfo *schedulernodeinfo.NodeInfo, pluginName string) {
-	csiNode := nodeInfo.CSINode()
+func enableMigrationOnNode(csiNode *storagev1.CSINode, pluginName string) {
 	nodeInfoAnnotations := csiNode.GetAnnotations()
 	if nodeInfoAnnotations == nil {
 		nodeInfoAnnotations = map[string]string{}
@@ -557,14 +557,20 @@ func enableMigrationOnNode(nodeInfo *schedulernodeinfo.NodeInfo, pluginName stri
 	nodeInfoAnnotations[v1.MigratedPluginsAnnotationKey] = nas
 
 	csiNode.Annotations = nodeInfoAnnotations
-	nodeInfo.SetCSINode(csiNode)
 }
 
-func getFakeCSIStorageClassInfo(scName, provisionerName string) FakeStorageClassInfo {
-	return FakeStorageClassInfo{
+func getFakeCSIStorageClassLister(scName, provisionerName string) fakelisters.StorageClassLister {
+	return fakelisters.StorageClassLister{
 		{
 			ObjectMeta:  metav1.ObjectMeta{Name: scName},
 			Provisioner: provisionerName,
 		},
 	}
+}
+
+func getFakeCSINodeLister(csiNode *storagev1.CSINode) fakelisters.CSINodeLister {
+	if csiNode != nil {
+		return fakelisters.CSINodeLister(*csiNode)
+	}
+	return fakelisters.CSINodeLister{}
 }

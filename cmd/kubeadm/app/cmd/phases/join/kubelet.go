@@ -93,12 +93,15 @@ func getKubeletStartJoinData(c workflow.RunData) (*kubeadmapi.JoinConfiguration,
 // runKubeletStartJoinPhase executes the kubelet TLS bootstrap process.
 // This process is executed by the kubelet and completes with the node joining the cluster
 // with a dedicates set of credentials as required by the node authorizer
-func runKubeletStartJoinPhase(c workflow.RunData) error {
+func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	cfg, initCfg, tlsBootstrapCfg, err := getKubeletStartJoinData(c)
 	if err != nil {
 		return err
 	}
 	bootstrapKubeConfigFile := kubeadmconstants.GetBootstrapKubeletKubeConfigPath()
+
+	// Deletes the bootstrapKubeConfigFile, so the credential used for TLS bootstrap is removed from disk
+	defer os.Remove(bootstrapKubeConfigFile)
 
 	// Write the bootstrap kubelet config file or the TLS-Bootstrapped kubelet config file down to disk
 	klog.V(1).Infof("[kubelet-start] writing bootstrap kubelet config file at %s", bootstrapKubeConfigFile)
@@ -144,7 +147,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) error {
 	}
 
 	// Try to start the kubelet service in case it's inactive
-	klog.V(1).Infoln("[kubelet-start] Starting the kubelet")
+	fmt.Println("[kubelet-start] Starting the kubelet")
 	kubeletphase.TryStartKubelet()
 
 	// Now the kubelet will perform the TLS Bootstrap, transforming /etc/kubernetes/bootstrap-kubelet.conf to /etc/kubernetes/kubelet.conf

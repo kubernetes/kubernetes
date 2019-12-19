@@ -32,7 +32,9 @@ import (
 const (
 	// StatusTooManyRequests means the server experienced too many requests within a
 	// given window and that the client must wait to perform the action again.
-	StatusTooManyRequests = 429
+	// DEPRECATED: please use http.StatusTooManyRequests, this will be removed in
+	// the future version.
+	StatusTooManyRequests = http.StatusTooManyRequests
 )
 
 // StatusError is an error intended for consumption by a REST API server; it can also be
@@ -66,6 +68,28 @@ func (e *StatusError) DebugError() (string, []interface{}) {
 		return "server response object: %s", []interface{}{string(out)}
 	}
 	return "server response object: %#v", []interface{}{e.ErrStatus}
+}
+
+// HasStatusCause returns true if the provided error has a details cause
+// with the provided type name.
+func HasStatusCause(err error, name metav1.CauseType) bool {
+	_, ok := StatusCause(err, name)
+	return ok
+}
+
+// StatusCause returns the named cause from the provided error if it exists and
+// the error is of the type APIStatus. Otherwise it returns false.
+func StatusCause(err error, name metav1.CauseType) (metav1.StatusCause, bool) {
+	apierr, ok := err.(APIStatus)
+	if !ok || apierr == nil || apierr.Status().Details == nil {
+		return metav1.StatusCause{}, false
+	}
+	for _, cause := range apierr.Status().Details.Causes {
+		if cause.Type == name {
+			return cause, true
+		}
+	}
+	return metav1.StatusCause{}, false
 }
 
 // UnexpectedObjectError can be returned by FromObject if it's passed a non-status object.
@@ -199,6 +223,7 @@ func NewApplyConflict(causes []metav1.StatusCause, message string) *StatusError 
 }
 
 // NewGone returns an error indicating the item no longer available at the server and no forwarding address is known.
+// DEPRECATED: Please use NewResourceExpired instead.
 func NewGone(message string) *StatusError {
 	return &StatusError{metav1.Status{
 		Status:  metav1.StatusFailure,
@@ -349,7 +374,7 @@ func NewTimeoutError(message string, retryAfterSeconds int) *StatusError {
 func NewTooManyRequestsError(message string) *StatusError {
 	return &StatusError{metav1.Status{
 		Status:  metav1.StatusFailure,
-		Code:    StatusTooManyRequests,
+		Code:    http.StatusTooManyRequests,
 		Reason:  metav1.StatusReasonTooManyRequests,
 		Message: fmt.Sprintf("Too many requests: %s", message),
 	}}

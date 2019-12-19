@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Reads the pod configuration from an HTTP GET response.
 package config
 
 import (
@@ -43,6 +42,7 @@ type sourceURL struct {
 	client      *http.Client
 }
 
+// NewSourceURL specifies the URL where to read the Pod configuration from, then watches it for changes.
 func NewSourceURL(url string, header http.Header, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
 	config := &sourceURL{
 		url:      url,
@@ -106,7 +106,7 @@ func (s *sourceURL) extractFromURL() error {
 		return fmt.Errorf("zero-length data received from %v", s.url)
 	}
 	// Short circuit if the data has not changed since the last time it was read.
-	if bytes.Compare(data, s.data) == 0 {
+	if bytes.Equal(data, s.data) {
 		return nil
 	}
 	s.data = data
@@ -138,6 +138,6 @@ func (s *sourceURL) extractFromURL() error {
 	}
 
 	return fmt.Errorf("%v: received '%v', but couldn't parse as "+
-		"single (%v) or multiple pods (%v).\n",
+		"single (%v) or multiple pods (%v)",
 		s.url, string(data), singlePodErr, multiPodErr)
 }

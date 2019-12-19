@@ -25,12 +25,13 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/limitrange"
 )
 
+// REST implements a RESTStorage for limit ranges.
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against limitranges.
-func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
+// NewREST returns a RESTStorage object that will work against limit ranges.
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.LimitRange{} },
 		NewListFunc:              func() runtime.Object { return &api.LimitRangeList{} },
@@ -43,9 +44,9 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, err
 	}
-	return &REST{store}
+	return &REST{store}, nil
 }
 
 // Implement ShortNamesProvider

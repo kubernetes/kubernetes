@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -28,7 +30,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	azstorage "github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/rubiojr/go-vhd/vhd"
@@ -298,10 +300,9 @@ func (c *BlobDiskController) getStorageAccountKey(SAName string) (string, error)
 				klog.Warningf("azureDisk - account %s was not cached while getting keys", SAName)
 				return *v.Value, nil
 			}
+			c.accounts[SAName].key = *v.Value
+			return c.accounts[SAName].key, nil
 		}
-
-		c.accounts[SAName].key = *v.Value
-		return c.accounts[SAName].key, nil
 	}
 
 	return "", fmt.Errorf("couldn't find key named key1 in storage account:%s keys", SAName)
@@ -343,7 +344,7 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 	}
 
 	// account exists but not ready yet
-	if provisionState != storage.Succeeded {
+	if provisionState != storage.ProvisioningStateSucceeded {
 		// we don't want many attempts to validate the account readiness
 		// here hence we are locking
 		counter := 1
@@ -374,7 +375,7 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 				return false, nil // error performing the query - retryable
 			}
 
-			if provisionState == storage.Succeeded {
+			if provisionState == storage.ProvisioningStateSucceeded {
 				return true, nil
 			}
 

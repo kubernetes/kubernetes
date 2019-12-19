@@ -21,7 +21,3 @@ package internalversion
 // TestTypeListerExpansion allows custom methods to be added to
 // TestTypeLister.
 type TestTypeListerExpansion interface{}
-
-// TestTypeNamespaceListerExpansion allows custom methods to be added to
-// TestTypeNamespaceLister.
-type TestTypeNamespaceListerExpansion interface{}

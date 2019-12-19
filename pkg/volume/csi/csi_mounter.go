@@ -19,6 +19,7 @@ package csi
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -28,12 +29,14 @@ import (
 	"k8s.io/klog"
 
 	api "k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -45,32 +48,33 @@ var (
 		driverName,
 		nodeName,
 		attachmentID,
-		csiVolumeMode string
+		volumeLifecycleMode string
 	}{
 		"specVolID",
 		"volumeHandle",
 		"driverName",
 		"nodeName",
 		"attachmentID",
-		"csiVolumeMode",
+		"volumeLifecycleMode",
 	}
 )
 
 type csiMountMgr struct {
 	csiClientGetter
-	k8s            kubernetes.Interface
-	plugin         *csiPlugin
-	driverName     csiDriverName
-	csiVolumeMode  csiVolumeMode
-	volumeID       string
-	specVolumeID   string
-	readOnly       bool
-	spec           *volume.Spec
-	pod            *api.Pod
-	podUID         types.UID
-	options        volume.VolumeOptions
-	publishContext map[string]string
-	kubeVolHost    volume.KubeletVolumeHost
+	k8s                 kubernetes.Interface
+	plugin              *csiPlugin
+	driverName          csiDriverName
+	volumeLifecycleMode storage.VolumeLifecycleMode
+	volumeID            string
+	specVolumeID        string
+	readOnly            bool
+	supportsSELinux     bool
+	spec                *volume.Spec
+	pod                 *api.Pod
+	podUID              types.UID
+	options             volume.VolumeOptions
+	publishContext      map[string]string
+	kubeVolHost         volume.KubeletVolumeHost
 	volume.MetricsProvider
 }
 
@@ -104,8 +108,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	mounted, err := isDirMounted(c.plugin, dir)
 	if err != nil {
-		klog.Error(log("mounter.SetUpAt failed while checking mount status for dir [%s]", dir))
-		return err
+		return errors.New(log("mounter.SetUpAt failed while checking mount status for dir [%s]: %v", dir, err))
 	}
 
 	if mounted {
@@ -115,16 +118,15 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	csi, err := c.csiClientGetter.Get()
 	if err != nil {
-		klog.Error(log("mounter.SetUpAt failed to get CSI client: %v", err))
-		return err
+		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get CSI client: %v", err))
+
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 
 	volSrc, pvSrc, err := getSourceFromSpec(c.spec)
 	if err != nil {
-		klog.Error(log("mounter.SetupAt failed to get CSI persistent source: %v", err))
-		return err
+		return errors.New(log("mounter.SetupAt failed to get CSI persistent source: %v", err))
 	}
 
 	driverName := c.driverName
@@ -147,8 +149,8 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
 			return fmt.Errorf("CSIInlineVolume feature required")
 		}
-		if c.csiVolumeMode != ephemeralVolumeMode {
-			return fmt.Errorf("unexpected volume mode: %s", c.csiVolumeMode)
+		if c.volumeLifecycleMode != storage.VolumeLifecycleEphemeral {
+			return fmt.Errorf("unexpected volume mode: %s", c.volumeLifecycleMode)
 		}
 		if volSrc.FSType != nil {
 			fsType = *volSrc.FSType
@@ -162,8 +164,8 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 			secretRef = &api.SecretReference{Name: secretName, Namespace: ns}
 		}
 	case pvSrc != nil:
-		if c.csiVolumeMode != persistentVolumeMode {
-			return fmt.Errorf("unexpected driver mode: %s", c.csiVolumeMode)
+		if c.volumeLifecycleMode != storage.VolumeLifecyclePersistent {
+			return fmt.Errorf("unexpected driver mode: %s", c.volumeLifecycleMode)
 		}
 
 		fsType = pvSrc.FSType
@@ -184,15 +186,13 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		// Check for STAGE_UNSTAGE_VOLUME set and populate deviceMountPath if so
 		stageUnstageSet, err := csi.NodeSupportsStageUnstage(ctx)
 		if err != nil {
-			klog.Error(log("mounter.SetUpAt failed to check for STAGE_UNSTAGE_VOLUME capabilty: %v", err))
-			return err
+			return errors.New(log("mounter.SetUpAt failed to check for STAGE_UNSTAGE_VOLUME capability: %v", err))
 		}
 
 		if stageUnstageSet {
 			deviceMountPath, err = makeDeviceMountPath(c.plugin, c.spec)
 			if err != nil {
-				klog.Error(log("mounter.SetUpAt failed to make device mount path: %v", err))
-				return err
+				return errors.New(log("mounter.SetUpAt failed to make device mount path: %v", err))
 			}
 		}
 
@@ -201,7 +201,8 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 			nodeName := string(c.plugin.host.GetNodeName())
 			c.publishContext, err = c.plugin.getPublishContext(c.k8s, volumeHandle, string(driverName), nodeName)
 			if err != nil {
-				return err
+				// we could have a transient error associated with fetching publish context
+				return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to fetch publishContext: %v", err))
 			}
 			publishContext = c.publishContext
 		}
@@ -212,8 +213,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	// create target_dir before call to NodePublish
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		klog.Error(log("mouter.SetUpAt failed to create dir %#v:  %v", dir, err))
-		return err
+		return errors.New(log("mounter.SetUpAt failed to create dir %#v:  %v", dir, err))
 	}
 	klog.V(4).Info(log("created target path successfully [%s]", dir))
 
@@ -221,8 +221,8 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	if secretRef != nil {
 		nodePublishSecrets, err = getCredentialsFromSecret(c.k8s, secretRef)
 		if err != nil {
-			return fmt.Errorf("fetching NodePublishSecretRef %s/%s failed: %v",
-				secretRef.Namespace, secretRef.Name, err)
+			return volumetypes.NewTransientOperationFailure(fmt.Sprintf("fetching NodePublishSecretRef %s/%s failed: %v",
+				secretRef.Namespace, secretRef.Name, err))
 		}
 
 	}
@@ -230,8 +230,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	// Inject pod information into volume_attributes
 	podAttrs, err := c.podAttributes()
 	if err != nil {
-		klog.Error(log("mouter.SetUpAt failed to assemble volume attributes: %v", err))
-		return err
+		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to assemble volume attributes: %v", err))
 	}
 	if podAttrs != nil {
 		if volAttribs == nil {
@@ -258,32 +257,31 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	)
 
 	if err != nil {
-		klog.Errorf(log("mounter.SetupAt failed: %v", err))
-		if removeMountDirErr := removeMountDir(c.plugin, dir); removeMountDirErr != nil {
-			klog.Error(log("mounter.SetupAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, removeMountDirErr))
+		// If operation finished with error then we can remove the mount directory.
+		if volumetypes.IsOperationFinishedError(err) {
+			if removeMountDirErr := removeMountDir(c.plugin, dir); removeMountDirErr != nil {
+				klog.Error(log("mounter.SetupAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, removeMountDirErr))
+			}
 		}
 		return err
+	}
+
+	c.supportsSELinux, err = c.kubeVolHost.GetHostUtil().GetSELinuxSupport(dir)
+	if err != nil {
+		klog.V(2).Info(log("error checking for SELinux support: %s", err))
 	}
 
 	// apply volume ownership
 	// The following logic is derived from https://github.com/kubernetes/kubernetes/issues/66323
 	// if fstype is "", then skip fsgroup (could be indication of non-block filesystem)
 	// if fstype is provided and pv.AccessMode == ReadWriteOnly, then apply fsgroup
-
 	err = c.applyFSGroup(fsType, mounterArgs.FsGroup)
 	if err != nil {
-		// attempt to rollback mount.
-		fsGrpErr := fmt.Errorf("applyFSGroup failed for vol %s: %v", c.volumeID, err)
-		if unpubErr := csi.NodeUnpublishVolume(ctx, c.volumeID, dir); unpubErr != nil {
-			klog.Error(log("NodeUnpublishVolume failed for [%s]: %v", c.volumeID, unpubErr))
-			return fsGrpErr
-		}
-
-		if unmountErr := removeMountDir(c.plugin, dir); unmountErr != nil {
-			klog.Error(log("removeMountDir failed for [%s]: %v", dir, unmountErr))
-			return fsGrpErr
-		}
-		return fsGrpErr
+		// At this point mount operation is successful:
+		//   1. Since volume can not be used by the pod because of invalid permissions, we must return error
+		//   2. Since mount is successful, we must record volume as mounted in uncertain state, so it can be
+		//      cleaned up.
+		return volumetypes.NewUncertainProgressError(fmt.Sprintf("applyFSGroup failed for vol %s: %v", c.volumeID, err))
 	}
 
 	klog.V(4).Infof(log("mounter.SetUp successfully requested NodePublish [%s]", dir))
@@ -326,7 +324,7 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 		"csi.storage.k8s.io/serviceAccount.name": c.pod.Spec.ServiceAccountName,
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-		attrs["csi.storage.k8s.io/ephemeral"] = strconv.FormatBool(c.csiVolumeMode == ephemeralVolumeMode)
+		attrs["csi.storage.k8s.io/ephemeral"] = strconv.FormatBool(c.volumeLifecycleMode == storage.VolumeLifecycleEphemeral)
 	}
 
 	klog.V(4).Infof(log("CSIDriver %q requires pod information", c.driverName))
@@ -334,18 +332,10 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 }
 
 func (c *csiMountMgr) GetAttributes() volume.Attributes {
-	path := c.GetPath()
-	hu := c.kubeVolHost.GetHostUtil()
-	supportSelinux, err := hu.GetSELinuxSupport(path)
-	if err != nil {
-		klog.V(2).Info(log("error checking for SELinux support: %s", err))
-		// Best guess
-		supportSelinux = false
-	}
 	return volume.Attributes{
 		ReadOnly:        c.readOnly,
 		Managed:         !c.readOnly,
-		SupportsSELinux: supportSelinux,
+		SupportsSELinux: c.supportsSELinux,
 	}
 }
 
@@ -361,22 +351,19 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	volID := c.volumeID
 	csi, err := c.csiClientGetter.Get()
 	if err != nil {
-		klog.Error(log("mounter.SetUpAt failed to get CSI client: %v", err))
-		return err
+		return errors.New(log("mounter.SetUpAt failed to get CSI client: %v", err))
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 
 	if err := csi.NodeUnpublishVolume(ctx, volID, dir); err != nil {
-		klog.Errorf(log("mounter.TearDownAt failed: %v", err))
-		return err
+		return errors.New(log("mounter.TearDownAt failed: %v", err))
 	}
 
 	// clean mount point dir
 	if err := removeMountDir(c.plugin, dir); err != nil {
-		klog.Error(log("mounter.TearDownAt failed to clean mount dir [%s]: %v", dir, err))
-		return err
+		return errors.New(log("mounter.TearDownAt failed to clean mount dir [%s]: %v", dir, err))
 	}
 	klog.V(4).Infof(log("mounter.TearDownAt successfully unmounted dir [%s]", dir))
 
@@ -442,22 +429,19 @@ func removeMountDir(plug *csiPlugin, mountPath string) error {
 	if !mnt {
 		klog.V(4).Info(log("dir not mounted, deleting it [%s]", mountPath))
 		if err := os.Remove(mountPath); err != nil && !os.IsNotExist(err) {
-			klog.Error(log("failed to remove dir [%s]: %v", mountPath, err))
-			return err
+			return errors.New(log("failed to remove dir [%s]: %v", mountPath, err))
 		}
 		// remove volume data file as well
 		volPath := path.Dir(mountPath)
 		dataFile := filepath.Join(volPath, volDataFileName)
 		klog.V(4).Info(log("also deleting volume info data file [%s]", dataFile))
 		if err := os.Remove(dataFile); err != nil && !os.IsNotExist(err) {
-			klog.Error(log("failed to delete volume data file [%s]: %v", dataFile, err))
-			return err
+			return errors.New(log("failed to delete volume data file [%s]: %v", dataFile, err))
 		}
 		// remove volume path
 		klog.V(4).Info(log("deleting volume path [%s]", volPath))
 		if err := os.Remove(volPath); err != nil && !os.IsNotExist(err) {
-			klog.Error(log("failed to delete volume path [%s]: %v", volPath, err))
-			return err
+			return errors.New(log("failed to delete volume path [%s]: %v", volPath, err))
 		}
 	}
 	return nil

@@ -41,7 +41,8 @@ def go_pkg(pkg):
         ...
     )
     """
-    return go_prefix + "/" + pkg.replace("staging/src/", "vendor/", maxsplit = 1)
+    count = 1
+    return go_prefix + "/" + pkg.replace("staging/src/", "vendor/", count)
 
 def openapi_deps():
     deps = [
@@ -59,7 +60,7 @@ def applies(pkg, prefixes, default):
             return True
     return False
 
-def gen_openapi(outs, output_pkg, include_pkgs=[], exclude_pkgs=[]):
+def gen_openapi(outs, output_pkg, include_pkgs = [], exclude_pkgs = []):
     """Calls openapi-gen to produce the zz_generated.openapi.go file,
     which should be provided in outs.
     output_pkg should be set to the full go package name for this generated file.

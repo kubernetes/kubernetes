@@ -17,15 +17,17 @@ limitations under the License.
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog"
 )
@@ -64,7 +66,7 @@ func (m *BaseControllerRefManager) CanAdopt() error {
 //
 // No reconciliation will be attempted if the controller is being deleted.
 func (m *BaseControllerRefManager) ClaimObject(obj metav1.Object, match func(metav1.Object) bool, adopt, release func(metav1.Object) error) (bool, error) {
-	controllerRef := metav1.GetControllerOf(obj)
+	controllerRef := metav1.GetControllerOfNoCopy(obj)
 	if controllerRef != nil {
 		if controllerRef.UID != m.Controller.GetUID() {
 			// Owned by someone else. Ignore.
@@ -213,11 +215,12 @@ func (m *PodControllerRefManager) AdoptPod(pod *v1.Pod) error {
 	}
 	// Note that ValidateOwnerReferences() will reject this patch if another
 	// OwnerReference exists with controller=true.
-	addControllerPatch := fmt.Sprintf(
-		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],"uid":"%s"}}`,
-		m.controllerKind.GroupVersion(), m.controllerKind.Kind,
-		m.Controller.GetName(), m.Controller.GetUID(), pod.UID)
-	return m.podControl.PatchPod(pod.Namespace, pod.Name, []byte(addControllerPatch))
+
+	patchBytes, err := ownerRefControllerPatch(m.Controller, m.controllerKind, pod.UID)
+	if err != nil {
+		return err
+	}
+	return m.podControl.PatchPod(pod.Namespace, pod.Name, patchBytes)
 }
 
 // ReleasePod sends a patch to free the pod from the control of the controller.
@@ -225,8 +228,11 @@ func (m *PodControllerRefManager) AdoptPod(pod *v1.Pod) error {
 func (m *PodControllerRefManager) ReleasePod(pod *v1.Pod) error {
 	klog.V(2).Infof("patching pod %s_%s to remove its controllerRef to %s/%s:%s",
 		pod.Namespace, pod.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
-	deleteOwnerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, m.Controller.GetUID(), pod.UID)
-	err := m.podControl.PatchPod(pod.Namespace, pod.Name, []byte(deleteOwnerRefPatch))
+	patchBytes, err := deleteOwnerRefStrategicMergePatch(pod.UID, m.Controller.GetUID())
+	if err != nil {
+		return err
+	}
+	err = m.podControl.PatchPod(pod.Namespace, pod.Name, patchBytes)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// If the pod no longer exists, ignore it.
@@ -335,11 +341,11 @@ func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(rs *apps.ReplicaSet) er
 	}
 	// Note that ValidateOwnerReferences() will reject this patch if another
 	// OwnerReference exists with controller=true.
-	addControllerPatch := fmt.Sprintf(
-		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],"uid":"%s"}}`,
-		m.controllerKind.GroupVersion(), m.controllerKind.Kind,
-		m.Controller.GetName(), m.Controller.GetUID(), rs.UID)
-	return m.rsControl.PatchReplicaSet(rs.Namespace, rs.Name, []byte(addControllerPatch))
+	patchBytes, err := ownerRefControllerPatch(m.Controller, m.controllerKind, rs.UID)
+	if err != nil {
+		return err
+	}
+	return m.rsControl.PatchReplicaSet(rs.Namespace, rs.Name, patchBytes)
 }
 
 // ReleaseReplicaSet sends a patch to free the ReplicaSet from the control of the Deployment controller.
@@ -347,8 +353,11 @@ func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(rs *apps.ReplicaSet) er
 func (m *ReplicaSetControllerRefManager) ReleaseReplicaSet(replicaSet *apps.ReplicaSet) error {
 	klog.V(2).Infof("patching ReplicaSet %s_%s to remove its controllerRef to %s/%s:%s",
 		replicaSet.Namespace, replicaSet.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
-	deleteOwnerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, m.Controller.GetUID(), replicaSet.UID)
-	err := m.rsControl.PatchReplicaSet(replicaSet.Namespace, replicaSet.Name, []byte(deleteOwnerRefPatch))
+	patchBytes, err := deleteOwnerRefStrategicMergePatch(replicaSet.UID, m.Controller.GetUID())
+	if err != nil {
+		return err
+	}
+	err = m.rsControl.PatchReplicaSet(replicaSet.Namespace, replicaSet.Name, patchBytes)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// If the ReplicaSet no longer exists, ignore it.
@@ -470,11 +479,11 @@ func (m *ControllerRevisionControllerRefManager) AdoptControllerRevision(history
 	}
 	// Note that ValidateOwnerReferences() will reject this patch if another
 	// OwnerReference exists with controller=true.
-	addControllerPatch := fmt.Sprintf(
-		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],"uid":"%s"}}`,
-		m.controllerKind.GroupVersion(), m.controllerKind.Kind,
-		m.Controller.GetName(), m.Controller.GetUID(), history.UID)
-	return m.crControl.PatchControllerRevision(history.Namespace, history.Name, []byte(addControllerPatch))
+	patchBytes, err := ownerRefControllerPatch(m.Controller, m.controllerKind, history.UID)
+	if err != nil {
+		return err
+	}
+	return m.crControl.PatchControllerRevision(history.Namespace, history.Name, patchBytes)
 }
 
 // ReleaseControllerRevision sends a patch to free the ControllerRevision from the control of its controller.
@@ -482,8 +491,12 @@ func (m *ControllerRevisionControllerRefManager) AdoptControllerRevision(history
 func (m *ControllerRevisionControllerRefManager) ReleaseControllerRevision(history *apps.ControllerRevision) error {
 	klog.V(2).Infof("patching ControllerRevision %s_%s to remove its controllerRef to %s/%s:%s",
 		history.Namespace, history.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
-	deleteOwnerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, m.Controller.GetUID(), history.UID)
-	err := m.crControl.PatchControllerRevision(history.Namespace, history.Name, []byte(deleteOwnerRefPatch))
+	patchBytes, err := deleteOwnerRefStrategicMergePatch(history.UID, m.Controller.GetUID())
+	if err != nil {
+		return err
+	}
+
+	err = m.crControl.PatchControllerRevision(history.Namespace, history.Name, patchBytes)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// If the ControllerRevision no longer exists, ignore it.
@@ -498,4 +511,65 @@ func (m *ControllerRevisionControllerRefManager) ReleaseControllerRevision(histo
 		}
 	}
 	return err
+}
+
+type objectForDeleteOwnerRefStrategicMergePatch struct {
+	Metadata objectMetaForMergePatch `json:"metadata"`
+}
+
+type objectMetaForMergePatch struct {
+	UID             types.UID           `json:"uid"`
+	OwnerReferences []map[string]string `json:"ownerReferences"`
+}
+
+func deleteOwnerRefStrategicMergePatch(dependentUID types.UID, ownerUIDs ...types.UID) ([]byte, error) {
+	var pieces []map[string]string
+	for _, ownerUID := range ownerUIDs {
+		pieces = append(pieces, map[string]string{"$patch": "delete", "uid": string(ownerUID)})
+	}
+	patch := objectForDeleteOwnerRefStrategicMergePatch{
+		Metadata: objectMetaForMergePatch{
+			UID:             dependentUID,
+			OwnerReferences: pieces,
+		},
+	}
+	patchBytes, err := json.Marshal(&patch)
+	if err != nil {
+		return nil, err
+	}
+	return patchBytes, nil
+}
+
+type objectForAddOwnerRefPatch struct {
+	Metadata objectMetaForPatch `json:"metadata"`
+}
+
+type objectMetaForPatch struct {
+	OwnerReferences []metav1.OwnerReference `json:"ownerReferences"`
+	UID             types.UID               `json:"uid"`
+}
+
+func ownerRefControllerPatch(controller metav1.Object, controllerKind schema.GroupVersionKind, uid types.UID) ([]byte, error) {
+	blockOwnerDeletion := true
+	isController := true
+	addControllerPatch := objectForAddOwnerRefPatch{
+		Metadata: objectMetaForPatch{
+			UID: uid,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         controllerKind.GroupVersion().String(),
+					Kind:               controllerKind.Kind,
+					Name:               controller.GetName(),
+					UID:                controller.GetUID(),
+					Controller:         &isController,
+					BlockOwnerDeletion: &blockOwnerDeletion,
+				},
+			},
+		},
+	}
+	patchBytes, err := json.Marshal(&addControllerPatch)
+	if err != nil {
+		return nil, err
+	}
+	return patchBytes, nil
 }

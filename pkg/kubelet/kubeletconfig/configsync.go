@@ -213,7 +213,7 @@ func latestNodeConfigSource(store cache.Store, nodeName string) (*apiv1.NodeConf
 		utillog.Errorf(err.Error())
 		return nil, err
 	} else if !ok {
-		err := fmt.Errorf("Node %q does not exist in the informer's store, can't sync config source", nodeName)
+		err := fmt.Errorf("node %q does not exist in the informer's store, can't sync config source", nodeName)
 		utillog.Errorf(err.Error())
 		return nil, err
 	}

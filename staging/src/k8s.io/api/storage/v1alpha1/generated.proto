@@ -35,7 +35,7 @@ option go_package = "v1alpha1";
 // VolumeAttachment objects are non-namespaced.
 message VolumeAttachment {
   // Standard object metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -53,7 +53,7 @@ message VolumeAttachment {
 // VolumeAttachmentList is a collection of VolumeAttachment objects.
 message VolumeAttachmentList {
   // Standard list metadata
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 

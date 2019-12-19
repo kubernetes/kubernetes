@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	"k8s.io/kubernetes/test/e2e/instrumentation/logging/utils"
 
@@ -156,7 +155,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 					podName := fmt.Sprintf("synthlogger-%s", string(uuid.NewUUID()))
 					err := utils.NewLoadLoggingPod(podName, "", 1, 1*time.Second).Start(f)
 					if err != nil {
-						e2elog.Logf("Failed to create a logging pod: %v", err)
+						framework.Logf("Failed to create a logging pod: %v", err)
 					}
 					return false, nil
 				}, stopCh)

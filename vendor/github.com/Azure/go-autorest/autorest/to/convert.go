@@ -145,3 +145,8 @@ func Float64(i *float64) float64 {
 func Float64Ptr(i float64) *float64 {
 	return &i
 }
+
+// ByteSlicePtr returns a pointer to the passed byte slice.
+func ByteSlicePtr(b []byte) *[]byte {
+	return &b
+}

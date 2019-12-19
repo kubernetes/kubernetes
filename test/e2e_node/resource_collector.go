@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"bytes"
@@ -44,12 +44,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e_node/perftype"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -65,6 +64,8 @@ var (
 	systemContainers map[string]string
 )
 
+// ResourceCollector is a collector object which collects
+// resource usage periodically from Cadvisor.
 type ResourceCollector struct {
 	client  *cadvisorclient.Client
 	request *cadvisorapiv2.RequestOptions
@@ -97,7 +98,7 @@ func (r *ResourceCollector) Start() {
 			kubeletstatsv1alpha1.SystemContainerRuntime: runtimeContainer,
 		}
 	} else {
-		e2elog.Failf("Failed to get runtime container name in test-e2e-node resource collector.")
+		framework.Failf("Failed to get runtime container name in test-e2e-node resource collector.")
 	}
 
 	wait.Poll(1*time.Second, 1*time.Minute, func() (bool, error) {
@@ -109,7 +110,7 @@ func (r *ResourceCollector) Start() {
 		return false, err
 	})
 
-	Expect(r.client).NotTo(BeNil(), "cadvisor client not ready")
+	gomega.Expect(r.client).NotTo(gomega.BeNil(), "cadvisor client not ready")
 
 	r.request = &cadvisorapiv2.RequestOptions{IdType: "name", Count: 1, Recursive: false}
 	r.stopCh = make(chan struct{})
@@ -146,9 +147,9 @@ func (r *ResourceCollector) GetCPUSummary() e2ekubelet.ContainersCPUSummary {
 func (r *ResourceCollector) LogLatest() {
 	summary, err := r.GetLatest()
 	if err != nil {
-		e2elog.Logf("%v", err)
+		framework.Logf("%v", err)
 	}
-	e2elog.Logf("%s", formatResourceUsageStats(summary))
+	framework.Logf("%s", formatResourceUsageStats(summary))
 }
 
 // collectStats collects resource usage from Cadvisor.
@@ -156,12 +157,12 @@ func (r *ResourceCollector) collectStats(oldStatsMap map[string]*cadvisorapiv2.C
 	for _, name := range systemContainers {
 		ret, err := r.client.Stats(name, r.request)
 		if err != nil {
-			e2elog.Logf("Error getting container stats, err: %v", err)
+			framework.Logf("Error getting container stats, err: %v", err)
 			return
 		}
 		cStats, ok := ret[name]
 		if !ok {
-			e2elog.Logf("Missing info/stats for container %q", name)
+			framework.Logf("Missing info/stats for container %q", name)
 			return
 		}
 
@@ -191,15 +192,15 @@ func computeContainerResourceUsage(name string, oldStats, newStats *cadvisorapiv
 func (r *ResourceCollector) GetLatest() (e2ekubelet.ResourceUsagePerContainer, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
-	kubeletstatsv1alpha1 := make(e2ekubelet.ResourceUsagePerContainer)
+	resourceUsage := make(e2ekubelet.ResourceUsagePerContainer)
 	for key, name := range systemContainers {
 		contStats, ok := r.buffers[name]
 		if !ok || len(contStats) == 0 {
 			return nil, fmt.Errorf("No resource usage data for %s container (%s)", key, name)
 		}
-		kubeletstatsv1alpha1[key] = contStats[len(contStats)-1]
+		resourceUsage[key] = contStats[len(contStats)-1]
 	}
-	return kubeletstatsv1alpha1, nil
+	return resourceUsage, nil
 }
 
 type resourceUsageByCPU []*e2ekubelet.ContainerResourceUsage
@@ -272,7 +273,7 @@ func formatCPUSummary(summary e2ekubelet.ContainersCPUSummary) string {
 	w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
 	fmt.Fprintf(w, "%s\n", strings.Join(header, "\t"))
 
-	for _, containerName := range framework.TargetContainers() {
+	for _, containerName := range e2ekubelet.TargetContainers() {
 		var s []string
 		s = append(s, fmt.Sprintf("%q", containerName))
 		data, ok := summary[containerName]
@@ -371,14 +372,14 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 	for _, pod := range pods {
 		wg.Add(1)
 		go func(pod *v1.Pod) {
-			defer GinkgoRecover()
+			defer ginkgo.GinkgoRecover()
 			defer wg.Done()
 
 			err := f.PodClient().Delete(pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
 			framework.ExpectNoError(err)
 
-			Expect(e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
-				30*time.Second, 10*time.Minute)).NotTo(HaveOccurred())
+			gomega.Expect(e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
+				30*time.Second, 10*time.Minute)).NotTo(gomega.HaveOccurred())
 		}(pod)
 	}
 	wg.Wait()
@@ -440,7 +441,7 @@ func newTestPods(numPods int, volume bool, imageName, podType string) []*v1.Pod 
 	return pods
 }
 
-// GetResourceSeriesWithLabels gets the time series of resource usage of each container.
+// GetResourceTimeSeries gets the time series of resource usage of each container.
 func (r *ResourceCollector) GetResourceTimeSeries() map[string]*perftype.ResourceSeries {
 	resourceSeries := make(map[string]*perftype.ResourceSeries)
 	for key, name := range systemContainers {
@@ -462,12 +463,12 @@ const kubeletProcessName = "kubelet"
 
 func getPidsForProcess(name, pidFile string) ([]int, error) {
 	if len(pidFile) > 0 {
-		if pid, err := getPidFromPidFile(pidFile); err == nil {
+		pid, err := getPidFromPidFile(pidFile)
+		if err == nil {
 			return []int{pid}, nil
-		} else {
-			// log the error and fall back to pidof
-			runtime.HandleError(err)
 		}
+		// log the error and fall back to pidof
+		runtime.HandleError(err)
 	}
 	return procfs.PidOf(name)
 }

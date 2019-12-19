@@ -147,16 +147,30 @@ func generateUpdateErrorFunc(t *testing.T, failures int) clienttesting.ReactionF
 }
 
 func TestPVCProtectionController(t *testing.T) {
-	pvcVer := schema.GroupVersionResource{
+	pvcGVR := schema.GroupVersionResource{
 		Group:    v1.GroupName,
 		Version:  "v1",
 		Resource: "persistentvolumeclaims",
+	}
+	podGVR := schema.GroupVersionResource{
+		Group:    v1.GroupName,
+		Version:  "v1",
+		Resource: "pods",
+	}
+	podGVK := schema.GroupVersionKind{
+		Group:   v1.GroupName,
+		Version: "v1",
+		Kind:    "Pod",
 	}
 
 	tests := []struct {
 		name string
 		// Object to insert into fake kubeclient before the test starts.
 		initialObjects []runtime.Object
+		// Whether not to insert the content of initialObjects into the
+		// informers before the test starts. Set it to true to simulate the case
+		// where informers have not been notified yet of certain API objects.
+		informersAreLate bool
 		// Optional client reactors.
 		reactors []reaction
 		// PVC event to simulate. This PVC will be automatically added to
@@ -180,7 +194,7 @@ func TestPVCProtectionController(t *testing.T) {
 			name:       "StorageObjectInUseProtection Enabled, PVC without finalizer -> finalizer is added",
 			updatedPVC: pvc(),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, withProtectionFinalizer(pvc())),
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, withProtectionFinalizer(pvc())),
 			},
 			storageObjectInUseProtectionEnabled: true,
 		},
@@ -208,11 +222,11 @@ func TestPVCProtectionController(t *testing.T) {
 			},
 			expectedActions: []clienttesting.Action{
 				// This fails
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, withProtectionFinalizer(pvc())),
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, withProtectionFinalizer(pvc())),
 				// This fails too
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, withProtectionFinalizer(pvc())),
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, withProtectionFinalizer(pvc())),
 				// This succeeds
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, withProtectionFinalizer(pvc())),
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, withProtectionFinalizer(pvc())),
 			},
 			storageObjectInUseProtectionEnabled: true,
 		},
@@ -220,7 +234,8 @@ func TestPVCProtectionController(t *testing.T) {
 			name:       "StorageObjectInUseProtection Enabled, deleted PVC with finalizer -> finalizer is removed",
 			updatedPVC: deleted(withProtectionFinalizer(pvc())),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
 			storageObjectInUseProtectionEnabled: true,
 		},
@@ -228,7 +243,8 @@ func TestPVCProtectionController(t *testing.T) {
 			name:       "StorageObjectInUseProtection Disabled, deleted PVC with finalizer -> finalizer is removed",
 			updatedPVC: deleted(withProtectionFinalizer(pvc())),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
 			storageObjectInUseProtectionEnabled: false,
 		},
@@ -243,17 +259,20 @@ func TestPVCProtectionController(t *testing.T) {
 				},
 			},
 			expectedActions: []clienttesting.Action{
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				// Fails
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				// Fails too
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				// Succeeds
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
 			storageObjectInUseProtectionEnabled: true,
 		},
 		{
-			name: "deleted PVC with finalizer + pods with the PVC exists -> finalizer is not removed",
+			name: "deleted PVC with finalizer + pod with the PVC exists -> finalizer is not removed",
 			initialObjects: []runtime.Object{
 				withPVC(defaultPVCName, pod()),
 			},
@@ -261,23 +280,36 @@ func TestPVCProtectionController(t *testing.T) {
 			expectedActions: []clienttesting.Action{},
 		},
 		{
-			name: "deleted PVC with finalizer + pods with unrelated PVC and EmptyDir exists -> finalizer is removed",
+			name: "deleted PVC with finalizer + pod with unrelated PVC and EmptyDir exists -> finalizer is removed",
 			initialObjects: []runtime.Object{
 				withEmptyDir(withPVC("unrelatedPVC", pod())),
 			},
 			updatedPVC: deleted(withProtectionFinalizer(pvc())),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
 			storageObjectInUseProtectionEnabled: true,
 		},
 		{
-			name: "deleted PVC with finalizer + pods with the PVC finished but is not deleted -> finalizer is not removed",
+			name: "deleted PVC with finalizer + pod with the PVC finished but is not deleted -> finalizer is not removed",
 			initialObjects: []runtime.Object{
 				withStatus(v1.PodFailed, withPVC(defaultPVCName, pod())),
 			},
 			updatedPVC:                          deleted(withProtectionFinalizer(pvc())),
 			expectedActions:                     []clienttesting.Action{},
+			storageObjectInUseProtectionEnabled: true,
+		},
+		{
+			name: "deleted PVC with finalizer + pod with the PVC exists but is not in the Informer's cache yet -> finalizer is not removed",
+			initialObjects: []runtime.Object{
+				withPVC(defaultPVCName, pod()),
+			},
+			informersAreLate: true,
+			updatedPVC:       deleted(withProtectionFinalizer(pvc())),
+			expectedActions: []clienttesting.Action{
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+			},
 			storageObjectInUseProtectionEnabled: true,
 		},
 		//
@@ -308,7 +340,8 @@ func TestPVCProtectionController(t *testing.T) {
 			},
 			updatedPod: unscheduled(withPVC(defaultPVCName, pod())),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
 			storageObjectInUseProtectionEnabled: true,
 		},
@@ -319,7 +352,8 @@ func TestPVCProtectionController(t *testing.T) {
 			},
 			deletedPod: withStatus(v1.PodRunning, withPVC(defaultPVCName, pod())),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
 			storageObjectInUseProtectionEnabled: true,
 		},
@@ -331,7 +365,8 @@ func TestPVCProtectionController(t *testing.T) {
 			deletedPod: withPVC(defaultPVCName, pod()),
 			updatedPod: withUID("uid2", pod()),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
 			storageObjectInUseProtectionEnabled: true,
 		},
@@ -368,15 +403,26 @@ func TestPVCProtectionController(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		// Create client with initial data
-		objs := test.initialObjects
+		// Create initial data for client and informers.
+		var (
+			clientObjs    []runtime.Object
+			informersObjs []runtime.Object
+		)
 		if test.updatedPVC != nil {
-			objs = append(objs, test.updatedPVC)
+			clientObjs = append(clientObjs, test.updatedPVC)
+			informersObjs = append(informersObjs, test.updatedPVC)
 		}
 		if test.updatedPod != nil {
-			objs = append(objs, test.updatedPod)
+			clientObjs = append(clientObjs, test.updatedPod)
+			informersObjs = append(informersObjs, test.updatedPod)
 		}
-		client := fake.NewSimpleClientset(objs...)
+		clientObjs = append(clientObjs, test.initialObjects...)
+		if !test.informersAreLate {
+			informersObjs = append(informersObjs, test.initialObjects...)
+		}
+
+		// Create client with initial data
+		client := fake.NewSimpleClientset(clientObjs...)
 
 		// Create informers
 		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
@@ -385,7 +431,7 @@ func TestPVCProtectionController(t *testing.T) {
 
 		// Populate the informers with initial objects so the controller can
 		// Get() and List() it.
-		for _, obj := range objs {
+		for _, obj := range informersObjs {
 			switch obj.(type) {
 			case *v1.PersistentVolumeClaim:
 				pvcInformer.Informer().GetStore().Add(obj)
@@ -435,7 +481,7 @@ func TestPVCProtectionController(t *testing.T) {
 			}
 			currentActionCount := len(client.Actions())
 			if currentActionCount < len(test.expectedActions) {
-				// Do not log evey wait, only when the action count changes.
+				// Do not log every wait, only when the action count changes.
 				if lastReportedActionCount < currentActionCount {
 					klog.V(5).Infof("Test %q: got %d actions out of %d, waiting for the rest", test.name, currentActionCount, len(test.expectedActions))
 					lastReportedActionCount = currentActionCount

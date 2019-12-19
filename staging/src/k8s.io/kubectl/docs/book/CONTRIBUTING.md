@@ -4,22 +4,23 @@
 
 ### Fixing Issues
 
-1. Open an Issue
-1. Create a PR
-1. Email PR to sig-cli@googlegroups.com with subject `Kubectl Book: Fix Issue <Issue> in <PR>`
+1. Open an Issue on [kubernetes/kubectl](https://github.com/kubernetes/kubectl/issues) repository
+1. Edit files under [kubernetes/kubernetes/tree/master/staging/src/k8s.io/kubectl/docs/book](https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/kubectl/docs/book)
+1. Create a PR on [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes) repository
+1. Email PR to kubernetes-sig-cli@googlegroups.com with subject `Kubectl Book: Fix Issue <Issue> in <PR>`
 1. Optional: Come to sig-cli meeting to discuss
 
 ### Adding New Content
 
-1. Open an Issue with proposed content
-1. Email sig-cli@googlegroups.com with subject `Kubectl Book: Proposed Content <Issue>`
+1. Open an Issue with proposed content on [kubernetes/kubectl](https://github.com/kubernetes/kubectl/issues) repository
+1. Email kubernetes-sig-cli@googlegroups.com with subject `Kubectl Book: Proposed Content <Issue>`
 1. Optional: Come to sig-cli meeting to discuss
 
 ## Editing
 
 ### Running Locally
 
-- Install [GitBook Toolchain](https://toolchain.gitbook.com/setup.html)
+- Install [GitBook Toolchain](https://docs.gitbook.com/)
 - From `docs/book` run `npm install`  to install node_modules locally (don't run install, it updates the shrinkwrap.json)
 - From `docs/book` run `gitbook serve`
 - Go to `http://localhost:4000` in a browser

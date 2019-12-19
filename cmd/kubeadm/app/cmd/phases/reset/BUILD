@@ -7,6 +7,8 @@ go_library(
         "data.go",
         "preflight.go",
         "removeetcdmember.go",
+        "unmount.go",
+        "unmount_linux.go",
         "updateclusterstatus.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/reset",

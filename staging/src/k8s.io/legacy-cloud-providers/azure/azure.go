@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -20,13 +22,19 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/azure"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -39,10 +47,6 @@ import (
 	"k8s.io/klog"
 	"k8s.io/legacy-cloud-providers/azure/auth"
 	"sigs.k8s.io/yaml"
-
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/azure"
 )
 
 const (
@@ -79,6 +83,11 @@ var (
 
 // Config holds the configuration parsed from the --cloud-config flag
 // All fields are required unless otherwise specified
+// NOTE: Cloud config files should follow the same Kubernetes deprecation policy as
+// flags or CLIs. Config fields should not change behavior in incompatible ways and
+// should be deprecated for at least 2 release prior to removing.
+// See https://kubernetes.io/docs/reference/using-api/deprecation-policy/#deprecating-a-flag-or-cli
+// for more details.
 type Config struct {
 	auth.AzureAuthConfig
 
@@ -158,6 +167,29 @@ type Config struct {
 
 	// The cloud configure type for Azure cloud provider. Supported values are file, secret and merge.
 	CloudConfigType cloudConfigType `json:"cloudConfigType,omitempty" yaml:"cloudConfigType,omitempty"`
+
+	// LoadBalancerName determines the specific name of the load balancer user want to use, working with
+	// LoadBalancerResourceGroup
+	LoadBalancerName string `json:"loadBalancerName,omitempty" yaml:"loadBalancerName,omitempty"`
+	// LoadBalancerResourceGroup determines the specific resource group of the load balancer user want to use, working
+	// with LoadBalancerName
+	LoadBalancerResourceGroup string `json:"loadBalancerResourceGroup,omitempty" yaml:"loadBalancerResourceGroup,omitempty"`
+
+	// AvailabilitySetNodesCacheTTLInSeconds sets the Cache TTL for availabilitySetNodesCache
+	// if not set, will use default value
+	AvailabilitySetNodesCacheTTLInSeconds int `json:"availabilitySetNodesCacheTTLInSeconds,omitempty" yaml:"availabilitySetNodesCacheTTLInSeconds,omitempty"`
+	// VmssCacheTTLInSeconds sets the cache TTL for VMSS
+	VmssCacheTTLInSeconds int `json:"vmssCacheTTLInSeconds,omitempty" yaml:"vmssCacheTTLInSeconds,omitempty"`
+	// VmssVirtualMachinesCacheTTLInSeconds sets the cache TTL for vmssVirtualMachines
+	VmssVirtualMachinesCacheTTLInSeconds int `json:"vmssVirtualMachinesCacheTTLInSeconds,omitempty" yaml:"vmssVirtualMachinesCacheTTLInSeconds,omitempty"`
+	// VmCacheTTLInSeconds sets the cache TTL for vm
+	VMCacheTTLInSeconds int `json:"vmCacheTTLInSeconds,omitempty" yaml:"vmCacheTTLInSeconds,omitempty"`
+	// LoadBalancerCacheTTLInSeconds sets the cache TTL for load balancer
+	LoadBalancerCacheTTLInSeconds int `json:"loadBalancerCacheTTLInSeconds,omitempty" yaml:"loadBalancerCacheTTLInSeconds,omitempty"`
+	// NsgCacheTTLInSeconds sets the cache TTL for network security group
+	NsgCacheTTLInSeconds int `json:"nsgCacheTTLInSeconds,omitempty" yaml:"nsgCacheTTLInSeconds,omitempty"`
+	// RouteTableCacheTTLInSeconds sets the cache TTL for route table
+	RouteTableCacheTTLInSeconds int `json:"routeTableCacheTTLInSeconds,omitempty" yaml:"routeTableCacheTTLInSeconds,omitempty"`
 }
 
 var _ cloudprovider.Interface = (*Cloud)(nil)
@@ -187,6 +219,8 @@ type Cloud struct {
 	metadata                *InstanceMetadataService
 	vmSet                   VMSet
 
+	// ipv6DualStack allows overriding for unit testing.  It's normally initialized from featuregates
+	ipv6DualStackEnabled bool
 	// Lock for access to node caches, includes nodeZones, nodeResourceGroups, and unmanagedNodes.
 	nodeCachesLock sync.Mutex
 	// nodeZones is a mapping from Zone to a sets.String of Node's names in the Zone
@@ -226,11 +260,37 @@ type Cloud struct {
 }
 
 func init() {
+	// In go-autorest SDK https://github.com/Azure/go-autorest/blob/master/autorest/sender.go#L258-L287,
+	// if ARM returns http.StatusTooManyRequests, the sender doesn't increase the retry attempt count,
+	// hence the Azure clients will keep retrying forever until it get a status code other than 429.
+	// So we explicitly removes http.StatusTooManyRequests from autorest.StatusCodesForRetry.
+	// Refer https://github.com/Azure/go-autorest/issues/398.
+	// TODO(feiskyer): Use autorest.SendDecorator to customize the retry policy when new Azure SDK is available.
+	statusCodesForRetry := make([]int, 0)
+	for _, code := range autorest.StatusCodesForRetry {
+		if code != http.StatusTooManyRequests {
+			statusCodesForRetry = append(statusCodesForRetry, code)
+		}
+	}
+	autorest.StatusCodesForRetry = statusCodesForRetry
+
 	cloudprovider.RegisterCloudProvider(CloudProviderName, NewCloud)
 }
 
 // NewCloud returns a Cloud with initialized clients
 func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
+	az, err := NewCloudWithoutFeatureGates(configReader)
+	if err != nil {
+		return nil, err
+	}
+	az.ipv6DualStackEnabled = utilfeature.DefaultFeatureGate.Enabled(IPv6DualStack)
+
+	return az, nil
+}
+
+// NewCloudWithoutFeatureGates returns a Cloud without trying to wire the feature gates.  This is used by the unit tests
+// that don't load the actual features being used in the cluster.
+func NewCloudWithoutFeatureGates(configReader io.Reader) (*Cloud, error) {
 	config, err := parseConfig(configReader)
 	if err != nil {
 		return nil, err
@@ -242,6 +302,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		unmanagedNodes:     sets.NewString(),
 		routeCIDRs:         map[string]string{},
 	}
+
 	err = az.InitializeCloudFromConfig(config, false)
 	if err != nil {
 		return nil, err
@@ -280,7 +341,7 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 		}
 	}
 
-	env, err := auth.ParseAzureEnvironment(config.Cloud)
+	env, err := auth.ParseAzureEnvironment(config.Cloud, config.ResourceManagerEndpoint, config.IdentitySystem)
 	if err != nil {
 		return err
 	}
@@ -569,6 +630,7 @@ func initDiskControllers(az *Cloud) error {
 		resourceGroup:         az.ResourceGroup,
 		subscriptionID:        az.SubscriptionID,
 		cloud:                 az,
+		vmLockMap:             newLockMap(),
 	}
 
 	az.BlobDiskController = &BlobDiskController{common: common}

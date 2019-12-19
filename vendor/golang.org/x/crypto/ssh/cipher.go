@@ -149,8 +149,8 @@ type streamPacketCipher struct {
 	macResult   []byte
 }
 
-// readPacket reads and decrypt a single packet from the reader argument.
-func (s *streamPacketCipher) readPacket(seqNum uint32, r io.Reader) ([]byte, error) {
+// readCipherPacket reads and decrypt a single packet from the reader argument.
+func (s *streamPacketCipher) readCipherPacket(seqNum uint32, r io.Reader) ([]byte, error) {
 	if _, err := io.ReadFull(r, s.prefix[:]); err != nil {
 		return nil, err
 	}
@@ -221,8 +221,8 @@ func (s *streamPacketCipher) readPacket(seqNum uint32, r io.Reader) ([]byte, err
 	return s.packetData[:length-paddingLength-1], nil
 }
 
-// writePacket encrypts and sends a packet of data to the writer argument
-func (s *streamPacketCipher) writePacket(seqNum uint32, w io.Writer, rand io.Reader, packet []byte) error {
+// writeCipherPacket encrypts and sends a packet of data to the writer argument
+func (s *streamPacketCipher) writeCipherPacket(seqNum uint32, w io.Writer, rand io.Reader, packet []byte) error {
 	if len(packet) > maxPacket {
 		return errors.New("ssh: packet too large")
 	}
@@ -327,7 +327,7 @@ func newGCMCipher(key, iv, unusedMacKey []byte, unusedAlgs directionAlgorithms) 
 
 const gcmTagSize = 16
 
-func (c *gcmCipher) writePacket(seqNum uint32, w io.Writer, rand io.Reader, packet []byte) error {
+func (c *gcmCipher) writeCipherPacket(seqNum uint32, w io.Writer, rand io.Reader, packet []byte) error {
 	// Pad out to multiple of 16 bytes. This is different from the
 	// stream cipher because that encrypts the length too.
 	padding := byte(packetSizeMultiple - (1+len(packet))%packetSizeMultiple)
@@ -370,7 +370,7 @@ func (c *gcmCipher) incIV() {
 	}
 }
 
-func (c *gcmCipher) readPacket(seqNum uint32, r io.Reader) ([]byte, error) {
+func (c *gcmCipher) readCipherPacket(seqNum uint32, r io.Reader) ([]byte, error) {
 	if _, err := io.ReadFull(r, c.prefix[:]); err != nil {
 		return nil, err
 	}
@@ -486,8 +486,8 @@ type cbcError string
 
 func (e cbcError) Error() string { return string(e) }
 
-func (c *cbcCipher) readPacket(seqNum uint32, r io.Reader) ([]byte, error) {
-	p, err := c.readPacketLeaky(seqNum, r)
+func (c *cbcCipher) readCipherPacket(seqNum uint32, r io.Reader) ([]byte, error) {
+	p, err := c.readCipherPacketLeaky(seqNum, r)
 	if err != nil {
 		if _, ok := err.(cbcError); ok {
 			// Verification error: read a fixed amount of
@@ -500,7 +500,7 @@ func (c *cbcCipher) readPacket(seqNum uint32, r io.Reader) ([]byte, error) {
 	return p, err
 }
 
-func (c *cbcCipher) readPacketLeaky(seqNum uint32, r io.Reader) ([]byte, error) {
+func (c *cbcCipher) readCipherPacketLeaky(seqNum uint32, r io.Reader) ([]byte, error) {
 	blockSize := c.decrypter.BlockSize()
 
 	// Read the header, which will include some of the subsequent data in the
@@ -576,7 +576,7 @@ func (c *cbcCipher) readPacketLeaky(seqNum uint32, r io.Reader) ([]byte, error) 
 	return c.packetData[prefixLen:paddingStart], nil
 }
 
-func (c *cbcCipher) writePacket(seqNum uint32, w io.Writer, rand io.Reader, packet []byte) error {
+func (c *cbcCipher) writeCipherPacket(seqNum uint32, w io.Writer, rand io.Reader, packet []byte) error {
 	effectiveBlockSize := maxUInt32(cbcMinPacketSizeMultiple, c.encrypter.BlockSize())
 
 	// Length of encrypted portion of the packet (header, payload, padding).
@@ -665,7 +665,7 @@ func newChaCha20Cipher(key, unusedIV, unusedMACKey []byte, unusedAlgs directionA
 	return c, nil
 }
 
-func (c *chacha20Poly1305Cipher) readPacket(seqNum uint32, r io.Reader) ([]byte, error) {
+func (c *chacha20Poly1305Cipher) readCipherPacket(seqNum uint32, r io.Reader) ([]byte, error) {
 	nonce := [3]uint32{0, 0, bits.ReverseBytes32(seqNum)}
 	s := chacha20.New(c.contentKey, nonce)
 	var polyKey [32]byte
@@ -723,7 +723,7 @@ func (c *chacha20Poly1305Cipher) readPacket(seqNum uint32, r io.Reader) ([]byte,
 	return plain, nil
 }
 
-func (c *chacha20Poly1305Cipher) writePacket(seqNum uint32, w io.Writer, rand io.Reader, payload []byte) error {
+func (c *chacha20Poly1305Cipher) writeCipherPacket(seqNum uint32, w io.Writer, rand io.Reader, payload []byte) error {
 	nonce := [3]uint32{0, 0, bits.ReverseBytes32(seqNum)}
 	s := chacha20.New(c.contentKey, nonce)
 	var polyKey [32]byte

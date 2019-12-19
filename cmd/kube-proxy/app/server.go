@@ -28,10 +28,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
+	gerrors "github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
-	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/selection"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -47,14 +55,20 @@ import (
 	"k8s.io/client-go/tools/record"
 	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/version"
+	"k8s.io/component-base/version/verflag"
+	"k8s.io/klog"
 	"k8s.io/kube-proxy/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	"k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
+	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
+	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1"
 	"k8s.io/kubernetes/pkg/proxy/apis/config/validation"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
@@ -69,16 +83,8 @@ import (
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	"k8s.io/kubernetes/pkg/util/oom"
-	"k8s.io/kubernetes/pkg/version"
-	"k8s.io/kubernetes/pkg/version/verflag"
 	"k8s.io/utils/exec"
 	utilpointer "k8s.io/utils/pointer"
-
-	"github.com/fsnotify/fsnotify"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-	"k8s.io/klog"
 )
 
 const (
@@ -100,7 +106,7 @@ type Options struct {
 	ConfigFile string
 	// WriteConfigTo is the path where the default configuration will be written.
 	WriteConfigTo string
-	// CleanupAndExit, when true, makes the proxy server clean up iptables rules, then exit.
+	// CleanupAndExit, when true, makes the proxy server clean up iptables and ipvs rules, then exit.
 	CleanupAndExit bool
 	// CleanupIPVS, when true, makes the proxy server clean up ipvs rules before running.
 	CleanupIPVS bool
@@ -128,9 +134,6 @@ type Options struct {
 	// metricsPort is the port to be used by the metrics server.
 	metricsPort int32
 
-	scheme *runtime.Scheme
-	codecs serializer.CodecFactory
-
 	// hostnameOverride, if set from the command line flag, takes precedence over the `HostnameOverride` value from the config file
 	hostnameOverride string
 }
@@ -147,6 +150,12 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.master, "master", o.master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&o.hostnameOverride, "hostname-override", o.hostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 	fs.StringVar(&o.config.IPVS.Scheduler, "ipvs-scheduler", o.config.IPVS.Scheduler, "The ipvs scheduler type when proxy mode is ipvs")
+	fs.StringVar(&o.config.ShowHiddenMetricsForVersion, "show-hidden-metrics-for-version", o.config.ShowHiddenMetricsForVersion,
+		"The previous version for which you want to show hidden metrics. "+
+			"Only the previous minor version is meaningful, other values will not be allowed. "+
+			"The format is <major>.<minor>, e.g.: '1.16'. "+
+			"The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics, "+
+			"rather than being surprised when they are permanently removed in the release after that.")
 
 	fs.StringSliceVar(&o.config.IPVS.ExcludeCIDRs, "ipvs-exclude-cidrs", o.config.IPVS.ExcludeCIDRs, "A comma-separated list of CIDR's which the ipvs proxier should not touch when cleaning up IPVS rules.")
 	fs.StringSliceVar(&o.config.NodePortAddresses, "nodeport-addresses", o.config.NodePortAddresses,
@@ -154,6 +163,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 
 	fs.BoolVar(&o.CleanupAndExit, "cleanup", o.CleanupAndExit, "If true cleanup iptables and ipvs rules and exit.")
 	fs.BoolVar(&o.CleanupIPVS, "cleanup-ipvs", o.CleanupIPVS, "If true and --cleanup is specified, kube-proxy will also flush IPVS rules, in addition to normal cleanup.")
+	fs.MarkDeprecated("cleanup-ipvs", "In a future release, running --cleanup will always flush IPVS rules")
 
 	fs.Var(utilflag.IPVar{Val: &o.config.BindAddress}, "bind-address", "The IP address for the proxy server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
 	fs.Var(utilflag.IPVar{Val: &o.config.HealthzBindAddress}, "healthz-bind-address", "The IP address for the health check server to serve on (set to `0.0.0.0` for all IPv4 interfaces and `::` for all IPv6 interfaces)")
@@ -177,6 +187,9 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&o.config.IPTables.MinSyncPeriod.Duration, "iptables-min-sync-period", o.config.IPTables.MinSyncPeriod.Duration, "The minimum interval of how often the iptables rules can be refreshed as endpoints and services change (e.g. '5s', '1m', '2h22m').")
 	fs.DurationVar(&o.config.IPVS.SyncPeriod.Duration, "ipvs-sync-period", o.config.IPVS.SyncPeriod.Duration, "The maximum interval of how often ipvs rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
 	fs.DurationVar(&o.config.IPVS.MinSyncPeriod.Duration, "ipvs-min-sync-period", o.config.IPVS.MinSyncPeriod.Duration, "The minimum interval of how often the ipvs rules can be refreshed as endpoints and services change (e.g. '5s', '1m', '2h22m').")
+	fs.DurationVar(&o.config.IPVS.TCPTimeout.Duration, "ipvs-tcp-timeout", o.config.IPVS.TCPTimeout.Duration, "The timeout for idle IPVS TCP connections, 0 to leave as-is. (e.g. '5s', '1m', '2h22m').")
+	fs.DurationVar(&o.config.IPVS.TCPFinTimeout.Duration, "ipvs-tcpfin-timeout", o.config.IPVS.TCPFinTimeout.Duration, "The timeout for IPVS TCP connections after receiving a FIN packet, 0 to leave as-is. (e.g. '5s', '1m', '2h22m').")
+	fs.DurationVar(&o.config.IPVS.UDPTimeout.Duration, "ipvs-udp-timeout", o.config.IPVS.UDPTimeout.Duration, "The timeout for IPVS UDP packets, 0 to leave as-is. (e.g. '5s', '1m', '2h22m').")
 	fs.DurationVar(&o.config.Conntrack.TCPEstablishedTimeout.Duration, "conntrack-tcp-timeout-established", o.config.Conntrack.TCPEstablishedTimeout.Duration, "Idle timeout for established TCP connections (0 to leave as-is)")
 	fs.DurationVar(
 		&o.config.Conntrack.TCPCloseWaitTimeout.Duration, "conntrack-tcp-timeout-close-wait",
@@ -198,8 +211,6 @@ func NewOptions() *Options {
 		config:      new(kubeproxyconfig.KubeProxyConfiguration),
 		healthzPort: ports.ProxyHealthzPort,
 		metricsPort: ports.ProxyStatusPort,
-		scheme:      scheme.Scheme,
-		codecs:      scheme.Codecs,
 		CleanupIPVS: true,
 		errCh:       make(chan error),
 	}
@@ -255,6 +266,7 @@ func (o *Options) eventHandler(ent fsnotify.Event) {
 	if eventOpIs(fsnotify.Write) || eventOpIs(fsnotify.Rename) {
 		// error out when ConfigFile is updated
 		o.errCh <- fmt.Errorf("content of the proxy server's configuration file was updated")
+		return
 	}
 	o.errCh <- nil
 }
@@ -332,12 +344,12 @@ func (o *Options) runLoop() error {
 
 func (o *Options) writeConfigFile() (err error) {
 	const mediaType = runtime.ContentTypeYAML
-	info, ok := runtime.SerializerInfoForMediaType(o.codecs.SupportedMediaTypes(), mediaType)
+	info, ok := runtime.SerializerInfoForMediaType(proxyconfigscheme.Codecs.SupportedMediaTypes(), mediaType)
 	if !ok {
 		return fmt.Errorf("unable to locate encoder -- %q is not a supported media type", mediaType)
 	}
 
-	encoder := o.codecs.EncoderForVersion(info.Serializer, v1alpha1.SchemeGroupVersion)
+	encoder := proxyconfigscheme.Codecs.EncoderForVersion(info.Serializer, v1alpha1.SchemeGroupVersion)
 
 	configFile, err := os.Create(o.WriteConfigTo)
 	if err != nil {
@@ -371,6 +383,20 @@ func addressFromDeprecatedFlags(addr string, port int32) string {
 	return proxyutil.AppendPortIfNeeded(addr, port)
 }
 
+// newLenientSchemeAndCodecs returns a scheme that has only v1alpha1 registered into
+// it and a CodecFactory with strict decoding disabled.
+func newLenientSchemeAndCodecs() (*runtime.Scheme, *serializer.CodecFactory, error) {
+	lenientScheme := runtime.NewScheme()
+	if err := kubeproxyconfig.AddToScheme(lenientScheme); err != nil {
+		return nil, nil, fmt.Errorf("failed to add kube-proxy config API to lenient scheme: %v", err)
+	}
+	if err := kubeproxyconfigv1alpha1.AddToScheme(lenientScheme); err != nil {
+		return nil, nil, fmt.Errorf("failed to add kube-proxy config v1alpha1 API to lenient scheme: %v", err)
+	}
+	lenientCodecs := serializer.NewCodecFactory(lenientScheme, serializer.DisableStrict)
+	return lenientScheme, &lenientCodecs, nil
+}
+
 // loadConfigFromFile loads the contents of file and decodes it as a
 // KubeProxyConfiguration object.
 func (o *Options) loadConfigFromFile(file string) (*kubeproxyconfig.KubeProxyConfiguration, error) {
@@ -382,12 +408,34 @@ func (o *Options) loadConfigFromFile(file string) (*kubeproxyconfig.KubeProxyCon
 	return o.loadConfig(data)
 }
 
-// loadConfig decodes data as a KubeProxyConfiguration object.
+// loadConfig decodes a serialized KubeProxyConfiguration to the internal type.
 func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfiguration, error) {
-	configObj, gvk, err := o.codecs.UniversalDecoder().Decode(data, nil, nil)
+
+	configObj, gvk, err := proxyconfigscheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
-		return nil, err
+		// Try strict decoding first. If that fails decode with a lenient
+		// decoder, which has only v1alpha1 registered, and log a warning.
+		// The lenient path is to be dropped when support for v1alpha1 is dropped.
+		if !runtime.IsStrictDecodingError(err) {
+			return nil, gerrors.Wrap(err, "failed to decode")
+		}
+
+		_, lenientCodecs, lenientErr := newLenientSchemeAndCodecs()
+		if lenientErr != nil {
+			return nil, lenientErr
+		}
+
+		configObj, gvk, lenientErr = lenientCodecs.UniversalDecoder().Decode(data, nil, nil)
+		if lenientErr != nil {
+			// Lenient decoding failed with the current version, return the
+			// original strict error.
+			return nil, fmt.Errorf("failed lenient decoding: %v", err)
+		}
+
+		// Continue with the v1alpha1 object that was decoded leniently, but emit a warning.
+		klog.Warningf("using lenient decoding as strict decoding failed: %v", err)
 	}
+
 	proxyConfig, ok := configObj.(*kubeproxyconfig.KubeProxyConfiguration)
 	if !ok {
 		return nil, fmt.Errorf("got unexpected config type: %v", gvk)
@@ -397,14 +445,14 @@ func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfigurati
 
 // ApplyDefaults applies the default values to Options.
 func (o *Options) ApplyDefaults(in *kubeproxyconfig.KubeProxyConfiguration) (*kubeproxyconfig.KubeProxyConfiguration, error) {
-	external, err := o.scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
+	external, err := proxyconfigscheme.Scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	o.scheme.Default(external)
+	proxyconfigscheme.Scheme.Default(external)
 
-	internal, err := o.scheme.ConvertToVersion(external, kubeproxyconfig.SchemeGroupVersion)
+	internal, err := proxyconfigscheme.Scheme.ConvertToVersion(external, kubeproxyconfig.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -441,7 +489,10 @@ with the apiserver API to configure the proxy.`,
 			if err := opts.Validate(args); err != nil {
 				klog.Fatalf("failed validate: %v", err)
 			}
-			klog.Fatal(opts.Run())
+
+			if err := opts.Run(); err != nil {
+				klog.Exit(err)
+			}
 		},
 	}
 
@@ -468,7 +519,7 @@ type ProxyServer struct {
 	IpvsInterface          utilipvs.Interface
 	IpsetInterface         utilipset.Interface
 	execer                 exec.Interface
-	Proxier                proxy.ProxyProvider
+	Proxier                proxy.Provider
 	Broadcaster            record.EventBroadcaster
 	Recorder               record.EventRecorder
 	ConntrackConfiguration kubeproxyconfig.KubeProxyConntrackConfiguration
@@ -478,9 +529,10 @@ type ProxyServer struct {
 	CleanupIPVS            bool
 	MetricsBindAddress     string
 	EnableProfiling        bool
+	UseEndpointSlices      bool
 	OOMScoreAdj            *int32
 	ConfigSyncPeriod       time.Duration
-	HealthzServer          *healthcheck.HealthzServer
+	HealthzServer          *healthcheck.ProxierHealthServer
 }
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
@@ -550,9 +602,12 @@ func (s *ProxyServer) Run() error {
 		proxyMux := mux.NewPathRecorderMux("kube-proxy")
 		healthz.InstallHandler(proxyMux)
 		proxyMux.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			w.Header().Set("X-Content-Type-Options", "nosniff")
 			fmt.Fprintf(w, "%s", s.ProxyMode)
 		})
-		proxyMux.Handle("/metrics", prometheus.Handler())
+		//lint:ignore SA1019 See the Metrics Stability Migration KEP
+		proxyMux.Handle("/metrics", legacyregistry.Handler())
 		if s.EnableProfiling {
 			routes.Profiling{}.Install(proxyMux)
 		}
@@ -606,12 +661,26 @@ func (s *ProxyServer) Run() error {
 		}
 	}
 
+	noProxyName, err := labels.NewRequirement(apis.LabelServiceProxyName, selection.DoesNotExist, nil)
+	if err != nil {
+		return err
+	}
+
+	noHeadlessEndpoints, err := labels.NewRequirement(v1.IsHeadlessService, selection.DoesNotExist, nil)
+	if err != nil {
+		return err
+	}
+
+	labelSelector := labels.NewSelector()
+	labelSelector = labelSelector.Add(*noProxyName, *noHeadlessEndpoints)
+
+	// Make informers that filter out objects that want a non-default service proxy.
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
-		informers.WithTweakListOptions(func(options *v1meta.ListOptions) {
-			options.LabelSelector = "!" + apis.LabelServiceProxyName
+		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+			options.LabelSelector = labelSelector.String()
 		}))
 
-	// Create configs (i.e. Watches for Services and Endpoints)
+	// Create configs (i.e. Watches for Services and Endpoints or EndpointSlices)
 	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
@@ -619,13 +688,34 @@ func (s *ProxyServer) Run() error {
 	serviceConfig.RegisterEventHandler(s.Proxier)
 	go serviceConfig.Run(wait.NeverStop)
 
-	endpointsConfig := config.NewEndpointsConfig(informerFactory.Core().V1().Endpoints(), s.ConfigSyncPeriod)
-	endpointsConfig.RegisterEventHandler(s.Proxier)
-	go endpointsConfig.Run(wait.NeverStop)
+	if s.UseEndpointSlices {
+		endpointSliceConfig := config.NewEndpointSliceConfig(informerFactory.Discovery().V1beta1().EndpointSlices(), s.ConfigSyncPeriod)
+		endpointSliceConfig.RegisterEventHandler(s.Proxier)
+		go endpointSliceConfig.Run(wait.NeverStop)
+	} else {
+		endpointsConfig := config.NewEndpointsConfig(informerFactory.Core().V1().Endpoints(), s.ConfigSyncPeriod)
+		endpointsConfig.RegisterEventHandler(s.Proxier)
+		go endpointsConfig.Run(wait.NeverStop)
+	}
 
 	// This has to start after the calls to NewServiceConfig and NewEndpointsConfig because those
 	// functions must configure their shared informer event handlers first.
 	informerFactory.Start(wait.NeverStop)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) {
+		// Make an informer that selects for our nodename.
+		currentNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
+			informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+				options.FieldSelector = fields.OneTermEqualSelector("metadata.name", s.NodeRef.Name).String()
+			}))
+		nodeConfig := config.NewNodeConfig(currentNodeInformerFactory.Core().V1().Nodes(), s.ConfigSyncPeriod)
+		nodeConfig.RegisterEventHandler(s.Proxier)
+		go nodeConfig.Run(wait.NeverStop)
+
+		// This has to start after the calls to NewNodeConfig because that must
+		// configure the shared informer event handler first.
+		currentNodeInformerFactory.Start(wait.NeverStop)
+	}
 
 	// Birth Cry after the birth is successful
 	s.birthCry()

@@ -24,8 +24,6 @@ spec:
     metadata:
       labels:
         k8s-app: ip-masq-agent
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-node-critical
       serviceAccountName: ip-masq-agent

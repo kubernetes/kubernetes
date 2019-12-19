@@ -11,6 +11,9 @@ go_library(
     importpath = "github.com/docker/docker/pkg/parsers/operatingsystem",
     visibility = ["//visibility:public"],
     deps = select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/mattn/go-shellwords:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/mattn/go-shellwords:go_default_library",
         ],

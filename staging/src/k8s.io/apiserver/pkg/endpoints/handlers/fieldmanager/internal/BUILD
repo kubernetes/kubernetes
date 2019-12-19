@@ -27,7 +27,6 @@ go_library(
         "//vendor/sigs.k8s.io/structured-merge-diff/merge:go_default_library",
         "//vendor/sigs.k8s.io/structured-merge-diff/typed:go_default_library",
         "//vendor/sigs.k8s.io/structured-merge-diff/value:go_default_library",
-        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 
@@ -41,7 +40,7 @@ go_test(
         "typeconverter_test.go",
         "versionconverter_test.go",
     ],
-    data = ["//api/openapi-spec"],
+    data = glob(["testdata/**"]),
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

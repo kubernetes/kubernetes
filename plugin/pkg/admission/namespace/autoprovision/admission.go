@@ -17,6 +17,7 @@ limitations under the License.
 package autoprovision
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -55,7 +56,7 @@ var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Provision{
 var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&Provision{})
 
 // Admit makes an admission decision based on the request attributes
-func (p *Provision) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *Provision) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	// Don't create a namespace if the request is for a dry-run.
 	if a.IsDryRun() {
 		return nil

@@ -26,15 +26,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/config"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/conntrack"
@@ -109,6 +110,11 @@ type asyncRunnerInterface interface {
 // Proxier is a simple proxy for TCP connections between a localhost:lport
 // and services that provide the actual implementations.
 type Proxier struct {
+	// EndpointSlice support has not been added for this proxier yet.
+	config.NoopEndpointSliceHandler
+	// TODO(imroc): implement node handler for userspace proxier.
+	config.NoopNodeHandler
+
 	loadBalancer    LoadBalancer
 	mu              sync.Mutex // protects serviceMap
 	serviceMap      map[proxy.ServicePortName]*ServiceInfo
@@ -138,8 +144,8 @@ type Proxier struct {
 	stopChan chan struct{}
 }
 
-// assert Proxier is a ProxyProvider
-var _ proxy.ProxyProvider = &Proxier{}
+// assert Proxier is a proxy.Provider
+var _ proxy.Provider = &Proxier{}
 
 // A key for the portMap.  The ip has to be a string because slices can't be map
 // keys.
@@ -167,11 +173,6 @@ var (
 	// the caller provided invalid input.
 	ErrProxyOnLocalhost = fmt.Errorf("cannot proxy on localhost")
 )
-
-// IsProxyLocked returns true if the proxy could not acquire the lock on iptables.
-func IsProxyLocked(err error) bool {
-	return strings.Contains(err.Error(), "holding the xtables lock")
-}
 
 // NewProxier returns a new Proxier given a LoadBalancer and an address on
 // which to listen.  Because of the iptables logic, It is assumed that there
@@ -674,7 +675,7 @@ func sameConfig(info *ServiceInfo, service *v1.Service, port *v1.ServicePort) bo
 	if !ipsEqual(info.externalIPs, service.Spec.ExternalIPs) {
 		return false
 	}
-	if !helper.LoadBalancerStatusEqual(&info.loadBalancerStatus, &service.Status.LoadBalancer) {
+	if !servicehelper.LoadBalancerStatusEqual(&info.loadBalancerStatus, &service.Status.LoadBalancer) {
 		return false
 	}
 	if info.sessionAffinityType != service.Spec.SessionAffinity {

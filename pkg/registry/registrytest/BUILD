@@ -19,7 +19,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/registrytest",
     deps = [
-        "//pkg/api/testapi:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/kubeapiserver:go_default_library",
         "//pkg/util/slice:go_default_library",

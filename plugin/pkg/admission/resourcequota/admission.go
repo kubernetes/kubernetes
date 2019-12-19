@@ -17,6 +17,7 @@ limitations under the License.
 package resourcequota
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"time"
@@ -131,7 +132,7 @@ func (a *QuotaAdmission) ValidateInitialization() error {
 }
 
 // Validate makes admission decisions while enforcing quota
-func (a *QuotaAdmission) Validate(attr admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (a *QuotaAdmission) Validate(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	// ignore all operations that correspond to sub-resource actions
 	if attr.GetSubresource() != "" {
 		return nil

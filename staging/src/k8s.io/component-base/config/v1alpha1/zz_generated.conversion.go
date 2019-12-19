@@ -34,36 +34,6 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*ClientConnectionConfiguration)(nil), (*config.ClientConnectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(a.(*ClientConnectionConfiguration), b.(*config.ClientConnectionConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.ClientConnectionConfiguration)(nil), (*ClientConnectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(a.(*config.ClientConnectionConfiguration), b.(*ClientConnectionConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*DebuggingConfiguration)(nil), (*config.DebuggingConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(a.(*DebuggingConfiguration), b.(*config.DebuggingConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.DebuggingConfiguration)(nil), (*DebuggingConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(a.(*config.DebuggingConfiguration), b.(*DebuggingConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*LeaderElectionConfiguration)(nil), (*config.LeaderElectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(a.(*LeaderElectionConfiguration), b.(*config.LeaderElectionConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.LeaderElectionConfiguration)(nil), (*LeaderElectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(a.(*config.LeaderElectionConfiguration), b.(*LeaderElectionConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*config.ClientConnectionConfiguration)(nil), (*ClientConnectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(a.(*config.ClientConnectionConfiguration), b.(*ClientConnectionConfiguration), scope)
 	}); err != nil {
@@ -116,14 +86,22 @@ func autoConvert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnecti
 }
 
 func autoConvert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(in *DebuggingConfiguration, out *config.DebuggingConfiguration, s conversion.Scope) error {
-	out.EnableProfiling = in.EnableProfiling
-	out.EnableContentionProfiling = in.EnableContentionProfiling
+	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableProfiling, &out.EnableProfiling, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableContentionProfiling, &out.EnableContentionProfiling, s); err != nil {
+		return err
+	}
 	return nil
 }
 
 func autoConvert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(in *config.DebuggingConfiguration, out *DebuggingConfiguration, s conversion.Scope) error {
-	out.EnableProfiling = in.EnableProfiling
-	out.EnableContentionProfiling = in.EnableContentionProfiling
+	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableProfiling, &out.EnableProfiling, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableContentionProfiling, &out.EnableContentionProfiling, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -135,6 +113,8 @@ func autoConvert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionCo
 	out.RenewDeadline = in.RenewDeadline
 	out.RetryPeriod = in.RetryPeriod
 	out.ResourceLock = in.ResourceLock
+	out.ResourceName = in.ResourceName
+	out.ResourceNamespace = in.ResourceNamespace
 	return nil
 }
 
@@ -146,5 +126,7 @@ func autoConvert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionCo
 	out.RenewDeadline = in.RenewDeadline
 	out.RetryPeriod = in.RetryPeriod
 	out.ResourceLock = in.ResourceLock
+	out.ResourceName = in.ResourceName
+	out.ResourceNamespace = in.ResourceNamespace
 	return nil
 }

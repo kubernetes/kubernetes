@@ -24,7 +24,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 
 	"reflect"
 	"strings"
@@ -656,5 +660,225 @@ func TestMakeAbsolutePath(t *testing.T) {
 				t.Errorf("[%s] Expected %s saw %s", test.name, test.expectedPath, path)
 			}
 		}
+	}
+}
+
+func TestGetPodVolumeNames(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	tests := []struct {
+		name            string
+		pod             *v1.Pod
+		expectedMounts  sets.String
+		expectedDevices sets.String
+	}{
+		{
+			name: "empty pod",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{},
+			},
+			expectedMounts:  sets.NewString(),
+			expectedDevices: sets.NewString(),
+		},
+		{
+			name: "pod with volumes",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container",
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name: "vol1",
+								},
+								{
+									Name: "vol2",
+								},
+							},
+							VolumeDevices: []v1.VolumeDevice{
+								{
+									Name: "vol3",
+								},
+								{
+									Name: "vol4",
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "vol1",
+						},
+						{
+							Name: "vol2",
+						},
+						{
+							Name: "vol3",
+						},
+						{
+							Name: "vol4",
+						},
+					},
+				},
+			},
+			expectedMounts:  sets.NewString("vol1", "vol2"),
+			expectedDevices: sets.NewString("vol3", "vol4"),
+		},
+		{
+			name: "pod with init containers",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "initContainer",
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name: "vol1",
+								},
+								{
+									Name: "vol2",
+								},
+							},
+							VolumeDevices: []v1.VolumeDevice{
+								{
+									Name: "vol3",
+								},
+								{
+									Name: "vol4",
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "vol1",
+						},
+						{
+							Name: "vol2",
+						},
+						{
+							Name: "vol3",
+						},
+						{
+							Name: "vol4",
+						},
+					},
+				},
+			},
+			expectedMounts:  sets.NewString("vol1", "vol2"),
+			expectedDevices: sets.NewString("vol3", "vol4"),
+		},
+		{
+			name: "pod with multiple containers",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "initContainer1",
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name: "vol1",
+								},
+							},
+						},
+						{
+							Name: "initContainer2",
+							VolumeDevices: []v1.VolumeDevice{
+								{
+									Name: "vol2",
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name: "vol3",
+								},
+							},
+						},
+						{
+							Name: "container2",
+							VolumeDevices: []v1.VolumeDevice{
+								{
+									Name: "vol4",
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "vol1",
+						},
+						{
+							Name: "vol2",
+						},
+						{
+							Name: "vol3",
+						},
+						{
+							Name: "vol4",
+						},
+					},
+				},
+			},
+			expectedMounts:  sets.NewString("vol1", "vol3"),
+			expectedDevices: sets.NewString("vol2", "vol4"),
+		},
+		{
+			name: "pod with ephemeral containers",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name: "vol1",
+								},
+							},
+						},
+					},
+					EphemeralContainers: []v1.EphemeralContainer{
+						{
+							EphemeralContainerCommon: v1.EphemeralContainerCommon{
+								Name: "debugger",
+								VolumeMounts: []v1.VolumeMount{
+									{
+										Name: "vol1",
+									},
+									{
+										Name: "vol2",
+									},
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "vol1",
+						},
+						{
+							Name: "vol2",
+						},
+					},
+				},
+			},
+			expectedMounts:  sets.NewString("vol1", "vol2"),
+			expectedDevices: sets.NewString(),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mounts, devices := GetPodVolumeNames(test.pod)
+			if !mounts.Equal(test.expectedMounts) {
+				t.Errorf("Expected mounts: %q, got %q", mounts.List(), test.expectedMounts.List())
+			}
+			if !devices.Equal(test.expectedDevices) {
+				t.Errorf("Expected devices: %q, got %q", devices.List(), test.expectedDevices.List())
+			}
+		})
 	}
 }

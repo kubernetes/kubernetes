@@ -24,7 +24,7 @@ import (
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -32,7 +32,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -72,7 +71,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			if err != nil {
 				return false, err
 			}
-			return pdb.Status.PodDisruptionsAllowed > 0, nil
+			return pdb.Status.DisruptionsAllowed > 0, nil
 		})
 		framework.ExpectNoError(err)
 	})
@@ -311,7 +310,7 @@ func waitForPodsOrDie(cs kubernetes.Interface, ns string, n int) {
 			return false, fmt.Errorf("pods is nil")
 		}
 		if len(pods.Items) < n {
-			e2elog.Logf("pods: %v < %v", len(pods.Items), n)
+			framework.Logf("pods: %v < %v", len(pods.Items), n)
 			return false, nil
 		}
 		ready := 0
@@ -321,7 +320,7 @@ func waitForPodsOrDie(cs kubernetes.Interface, ns string, n int) {
 			}
 		}
 		if ready < n {
-			e2elog.Logf("running pods: %v < %v", ready, n)
+			framework.Logf("running pods: %v < %v", ready, n)
 			return false, nil
 		}
 		return true, nil

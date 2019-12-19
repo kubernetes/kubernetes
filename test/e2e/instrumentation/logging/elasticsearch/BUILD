@@ -20,7 +20,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//test/e2e/framework:go_default_library",
-        "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/service:go_default_library",
         "//test/e2e/instrumentation/common:go_default_library",

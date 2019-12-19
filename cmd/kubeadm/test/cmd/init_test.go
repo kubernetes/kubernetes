@@ -29,7 +29,7 @@ import (
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
-func runKubeadmInit(args ...string) (string, string, error) {
+func runKubeadmInit(args ...string) (string, string, int, error) {
 	kubeadmPath := getKubeadmPath()
 	kubeadmArgs := []string{"init", "--dry-run", "--ignore-preflight-errors=all"}
 	kubeadmArgs = append(kubeadmArgs, args...)
@@ -66,7 +66,7 @@ func TestCmdInitToken(t *testing.T) {
 
 	for _, rt := range initTest {
 		t.Run(rt.name, func(t *testing.T) {
-			_, _, err := runKubeadmInit(rt.args)
+			_, _, _, err := runKubeadmInit(rt.args)
 			if (err == nil) != rt.expected {
 				t.Fatalf(dedent.Dedent(`
 					CmdInitToken test case %q failed with an error: %v
@@ -110,7 +110,7 @@ func TestCmdInitKubernetesVersion(t *testing.T) {
 
 	for _, rt := range initTest {
 		t.Run(rt.name, func(t *testing.T) {
-			_, _, err := runKubeadmInit(rt.args)
+			_, _, _, err := runKubeadmInit(rt.args)
 			if (err == nil) != rt.expected {
 				t.Fatalf(dedent.Dedent(`
 					CmdInitKubernetesVersion test case %q failed with an error: %v
@@ -180,11 +180,21 @@ func TestCmdInitConfig(t *testing.T) {
 			args:     "--kubernetes-version=1.11.0 --config=testdata/init/v1beta2.yaml",
 			expected: false,
 		},
+		{
+			name:     "can load current component config",
+			args:     "--config=testdata/init/current-component-config.yaml",
+			expected: true,
+		},
+		{
+			name:     "can't load old component config",
+			args:     "--config=testdata/init/old-component-config.yaml",
+			expected: false,
+		},
 	}
 
 	for _, rt := range initTest {
 		t.Run(rt.name, func(t *testing.T) {
-			_, _, err := runKubeadmInit(rt.args)
+			_, _, _, err := runKubeadmInit(rt.args)
 			if (err == nil) != rt.expected {
 				t.Fatalf(dedent.Dedent(`
 						CmdInitConfig test case %q failed with an error: %v
@@ -235,7 +245,7 @@ func TestCmdInitCertPhaseCSR(t *testing.T) {
 			csrDir := testutil.SetupTempDir(t)
 			cert := &certs.KubeadmCertKubeletClient
 			kubeadmPath := getKubeadmPath()
-			_, stderr, err := RunCmd(kubeadmPath,
+			_, stderr, _, err := RunCmd(kubeadmPath,
 				"init",
 				"phase",
 				"certs",
@@ -303,7 +313,7 @@ func TestCmdInitAPIPort(t *testing.T) {
 
 	for _, rt := range initTest {
 		t.Run(rt.name, func(t *testing.T) {
-			_, _, err := runKubeadmInit(rt.args)
+			_, _, _, err := runKubeadmInit(rt.args)
 			if (err == nil) != rt.expected {
 				t.Fatalf(dedent.Dedent(`
 							CmdInitAPIPort test case %q failed with an error: %v
@@ -316,6 +326,55 @@ func TestCmdInitAPIPort(t *testing.T) {
 					rt.args,
 					rt.expected,
 					(err == nil),
+				)
+			}
+		})
+	}
+}
+
+// TestCmdInitFeatureGates test that feature gates won't make kubeadm panic.
+// When go panics it will exit with a 2 code. While we don't expect the init
+// calls to succeed in these tests, we ensure that the exit code of calling
+// kubeadm with different feature gates is not 2.
+func TestCmdInitFeatureGates(t *testing.T) {
+	const PanicExitcode = 2
+
+	if *kubeadmCmdSkip {
+		t.Log("kubeadm cmd tests being skipped")
+		t.Skip()
+	}
+
+	initTest := []struct {
+		name string
+		args string
+	}{
+		{
+			name: "no feature gates passed",
+			args: "",
+		},
+		{
+			name: "feature gate CoreDNS=true",
+			args: "--feature-gates=CoreDNS=true",
+		},
+		{
+			name: "feature gate IPv6DualStack=true",
+			args: "--feature-gates=IPv6DualStack=true",
+		},
+	}
+
+	for _, rt := range initTest {
+		t.Run(rt.name, func(t *testing.T) {
+			_, _, exitcode, err := runKubeadmInit(rt.args)
+			if exitcode == PanicExitcode {
+				t.Fatalf(dedent.Dedent(`
+							CmdInitFeatureGates test case %q failed with an error: %v
+							command 'kubeadm init %s'
+                got exit code: %t (panic); unexpected
+							`),
+					rt.name,
+					err,
+					rt.args,
+					PanicExitcode,
 				)
 			}
 		})

@@ -19,10 +19,14 @@ package ipallocator
 import (
 	"errors"
 	"fmt"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
+
 	"math/big"
 	"net"
+
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
+	"k8s.io/utils/integer"
+	utilnet "k8s.io/utils/net"
 )
 
 // Interface manages the allocation of IP addresses out of a range. Interface
@@ -32,6 +36,7 @@ type Interface interface {
 	AllocateNext() (net.IP, error)
 	Release(net.IP) error
 	ForEach(func(net.IP))
+	CIDR() net.IPNet
 
 	// For testing
 	Has(ip net.IP) bool
@@ -78,9 +83,9 @@ type Range struct {
 }
 
 // NewAllocatorCIDRRange creates a Range over a net.IPNet, calling allocatorFactory to construct the backing store.
-func NewAllocatorCIDRRange(cidr *net.IPNet, allocatorFactory allocator.AllocatorFactory) *Range {
-	max := RangeSize(cidr)
-	base := bigForIP(cidr.IP)
+func NewAllocatorCIDRRange(cidr *net.IPNet, allocatorFactory allocator.AllocatorFactory) (*Range, error) {
+	max := integer.Int64Min(utilnet.RangeSize(cidr), 1<<16)
+	base := utilnet.BigForIP(cidr.IP)
 	rangeSpec := cidr.String()
 
 	r := Range{
@@ -88,14 +93,15 @@ func NewAllocatorCIDRRange(cidr *net.IPNet, allocatorFactory allocator.Allocator
 		base: base.Add(base, big.NewInt(1)), // don't use the network base
 		max:  maximum(0, int(max-2)),        // don't use the network broadcast,
 	}
-	r.alloc = allocatorFactory(r.max, rangeSpec)
-	return &r
+	var err error
+	r.alloc, err = allocatorFactory(r.max, rangeSpec)
+	return &r, err
 }
 
 // Helper that wraps NewAllocatorCIDRRange, for creating a range backed by an in-memory store.
-func NewCIDRRange(cidr *net.IPNet) *Range {
-	return NewAllocatorCIDRRange(cidr, func(max int, rangeSpec string) allocator.Interface {
-		return allocator.NewAllocationMap(max, rangeSpec)
+func NewCIDRRange(cidr *net.IPNet) (*Range, error) {
+	return NewAllocatorCIDRRange(cidr, func(max int, rangeSpec string) (allocator.Interface, error) {
+		return allocator.NewAllocationMap(max, rangeSpec), nil
 	})
 }
 
@@ -105,7 +111,10 @@ func NewFromSnapshot(snap *api.RangeAllocation) (*Range, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := NewCIDRRange(ipnet)
+	r, err := NewCIDRRange(ipnet)
+	if err != nil {
+		return nil, err
+	}
 	if err := r.Restore(ipnet, snap.Data); err != nil {
 		return nil, err
 	}
@@ -164,7 +173,7 @@ func (r *Range) AllocateNext() (net.IP, error) {
 	if !ok {
 		return nil, ErrFull
 	}
-	return addIPOffset(r.base, offset), nil
+	return utilnet.AddIPOffset(r.base, offset), nil
 }
 
 // Release releases the IP back to the pool. Releasing an
@@ -182,7 +191,7 @@ func (r *Range) Release(ip net.IP) error {
 // ForEach calls the provided function for each allocated IP.
 func (r *Range) ForEach(fn func(net.IP)) {
 	r.alloc.ForEach(func(offset int) {
-		ip, _ := GetIndexedIP(r.net, offset+1) // +1 because Range doesn't store IP 0
+		ip, _ := utilnet.GetIndexedIP(r.net, offset+1) // +1 because Range doesn't store IP 0
 		fn(ip)
 	})
 }
@@ -220,7 +229,9 @@ func (r *Range) Restore(net *net.IPNet, data []byte) error {
 	if !ok {
 		return fmt.Errorf("not a snapshottable allocator")
 	}
-	snapshottable.Restore(net.String(), data)
+	if err := snapshottable.Restore(net.String(), data); err != nil {
+		return fmt.Errorf("restoring snapshot encountered %v", err)
+	}
 	return nil
 }
 
@@ -238,49 +249,8 @@ func (r *Range) contains(ip net.IP) (bool, int) {
 	return true, offset
 }
 
-// bigForIP creates a big.Int based on the provided net.IP
-func bigForIP(ip net.IP) *big.Int {
-	b := ip.To4()
-	if b == nil {
-		b = ip.To16()
-	}
-	return big.NewInt(0).SetBytes(b)
-}
-
-// addIPOffset adds the provided integer offset to a base big.Int representing a
-// net.IP
-func addIPOffset(base *big.Int, offset int) net.IP {
-	return net.IP(big.NewInt(0).Add(base, big.NewInt(int64(offset))).Bytes())
-}
-
 // calculateIPOffset calculates the integer offset of ip from base such that
 // base + offset = ip. It requires ip >= base.
 func calculateIPOffset(base *big.Int, ip net.IP) int {
-	return int(big.NewInt(0).Sub(bigForIP(ip), base).Int64())
-}
-
-// RangeSize returns the size of a range in valid addresses.
-func RangeSize(subnet *net.IPNet) int64 {
-	ones, bits := subnet.Mask.Size()
-	if bits == 32 && (bits-ones) >= 31 || bits == 128 && (bits-ones) >= 127 {
-		return 0
-	}
-	// For IPv6, the max size will be limited to 65536
-	// This is due to the allocator keeping track of all the
-	// allocated IP's in a bitmap. This will keep the size of
-	// the bitmap to 64k.
-	if bits == 128 && (bits-ones) >= 16 {
-		return int64(1) << uint(16)
-	} else {
-		return int64(1) << uint(bits-ones)
-	}
-}
-
-// GetIndexedIP returns a net.IP that is subnet.IP + index in the contiguous IP space.
-func GetIndexedIP(subnet *net.IPNet, index int) (net.IP, error) {
-	ip := addIPOffset(bigForIP(subnet.IP), index)
-	if !subnet.Contains(ip) {
-		return nil, fmt.Errorf("can't generate IP with index %d from subnet. subnet too small. subnet: %q", index, subnet)
-	}
-	return ip, nil
+	return int(big.NewInt(0).Sub(utilnet.BigForIP(ip), base).Int64())
 }

@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"io"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
-	"k8s.io/api/admissionregistration/v1beta1"
+	"k8s.io/api/admissionregistration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
@@ -65,7 +66,14 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 		return nil, err
 	}
 
-	cm, err := webhookutil.NewClientManager(admissionv1beta1.SchemeGroupVersion, admissionv1beta1.AddToScheme)
+	cm, err := webhookutil.NewClientManager(
+		[]schema.GroupVersion{
+			admissionv1beta1.SchemeGroupVersion,
+			admissionv1.SchemeGroupVersion,
+		},
+		admissionv1beta1.AddToScheme,
+		admissionv1.AddToScheme,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +155,7 @@ func (a *Webhook) ShouldCallHook(h webhook.WebhookAccessor, attr admission.Attri
 			break
 		}
 	}
-	if invocation == nil && h.GetMatchPolicy() != nil && *h.GetMatchPolicy() == v1beta1.Equivalent {
+	if invocation == nil && h.GetMatchPolicy() != nil && *h.GetMatchPolicy() == v1.Equivalent {
 		attrWithOverride := &attrWithResourceOverride{Attributes: attr}
 		equivalents := o.GetEquivalentResourceMapper().EquivalentResourcesFor(attr.GetResource(), attr.GetSubresource())
 		// honor earlier rules first
@@ -203,7 +211,7 @@ type attrWithResourceOverride struct {
 func (a *attrWithResourceOverride) GetResource() schema.GroupVersionResource { return a.resource }
 
 // Dispatch is called by the downstream Validate or Admit methods.
-func (a *Webhook) Dispatch(attr admission.Attributes, o admission.ObjectInterfaces) error {
+func (a *Webhook) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) error {
 	if rules.IsWebhookConfigurationResource(attr) {
 		return nil
 	}
@@ -211,8 +219,5 @@ func (a *Webhook) Dispatch(attr admission.Attributes, o admission.ObjectInterfac
 		return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
 	}
 	hooks := a.hookSource.Webhooks()
-	// TODO: Figure out if adding one second timeout make sense here.
-	ctx := context.TODO()
-
 	return a.dispatcher.Dispatch(ctx, attr, o, hooks)
 }

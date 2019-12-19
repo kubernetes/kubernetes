@@ -45,11 +45,11 @@ type ConfigMapMutator func(*v1.ConfigMap) error
 func CreateOrUpdateConfigMap(client clientset.Interface, cm *v1.ConfigMap) error {
 	if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(cm); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
-			return errors.Wrap(err, "unable to create configmap")
+			return errors.Wrap(err, "unable to create ConfigMap")
 		}
 
 		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Update(cm); err != nil {
-			return errors.Wrap(err, "unable to update configmap")
+			return errors.Wrap(err, "unable to update ConfigMap")
 		}
 	}
 	return nil
@@ -60,13 +60,27 @@ func CreateOrUpdateConfigMap(client clientset.Interface, cm *v1.ConfigMap) error
 // to conflicts, and a retry will be issued if the ConfigMap was modified on the server between the refresh and the update (while the mutation was
 // taking place)
 func CreateOrMutateConfigMap(client clientset.Interface, cm *v1.ConfigMap, mutator ConfigMapMutator) error {
-	if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(cm); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return errors.Wrap(err, "unable to create ConfigMap")
+	var lastError error
+	err := wait.ExponentialBackoff(wait.Backoff{
+		Steps:    20,
+		Duration: 500 * time.Millisecond,
+		Factor:   1.0,
+		Jitter:   0.1,
+	}, func() (bool, error) {
+		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(cm); err != nil {
+			lastError = err
+			if apierrors.IsAlreadyExists(err) {
+				lastError = MutateConfigMap(client, metav1.ObjectMeta{Namespace: cm.ObjectMeta.Namespace, Name: cm.ObjectMeta.Name}, mutator)
+				return lastError == nil, nil
+			}
+			return false, nil
 		}
-		return MutateConfigMap(client, metav1.ObjectMeta{Namespace: cm.ObjectMeta.Namespace, Name: cm.ObjectMeta.Name}, mutator)
+		return true, nil
+	})
+	if err == nil {
+		return nil
 	}
-	return nil
+	return lastError
 }
 
 // MutateConfigMap takes a ConfigMap Object Meta (namespace and name), retrieves the resource from the server and tries to mutate it
@@ -100,7 +114,7 @@ func CreateOrRetainConfigMap(client clientset.Interface, cm *v1.ConfigMap, confi
 		}
 		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(cm); err != nil {
 			if !apierrors.IsAlreadyExists(err) {
-				return errors.Wrap(err, "unable to create configmap")
+				return errors.Wrap(err, "unable to create ConfigMap")
 			}
 		}
 	}
@@ -142,6 +156,21 @@ func CreateOrUpdateDeployment(client clientset.Interface, deploy *apps.Deploymen
 
 		if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Update(deploy); err != nil {
 			return errors.Wrap(err, "unable to update deployment")
+		}
+	}
+	return nil
+}
+
+// CreateOrRetainDeployment creates a Deployment if the target resource doesn't exist. If the resource exists already, this function will retain the resource instead.
+func CreateOrRetainDeployment(client clientset.Interface, deploy *apps.Deployment, deployName string) error {
+	if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Get(deployName, metav1.GetOptions{}); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil
+		}
+		if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Create(deploy); err != nil {
+			if !apierrors.IsAlreadyExists(err) {
+				return errors.Wrap(err, "unable to create deployment")
+			}
 		}
 	}
 	return nil

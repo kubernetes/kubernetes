@@ -23,6 +23,7 @@ import (
 	"net/url"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -41,7 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"k8s.io/kubernetes/pkg/registry/core/pod"
+	registrypod "k8s.io/kubernetes/pkg/registry/core/pod"
 	podrest "k8s.io/kubernetes/pkg/registry/core/pod/rest"
 )
 
@@ -49,6 +50,7 @@ import (
 type PodStorage struct {
 	Pod                 *REST
 	Binding             *BindingREST
+	LegacyBinding       *LegacyBindingREST
 	Eviction            *EvictionREST
 	Status              *StatusREST
 	EphemeralContainers *EphemeralContainersREST
@@ -66,38 +68,40 @@ type REST struct {
 }
 
 // NewStorage returns a RESTStorage object that will work against pods.
-func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) PodStorage {
+func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) (PodStorage, error) {
 
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.Pod{} },
 		NewListFunc:              func() runtime.Object { return &api.PodList{} },
-		PredicateFunc:            pod.MatchPod,
+		PredicateFunc:            registrypod.MatchPod,
 		DefaultQualifiedResource: api.Resource("pods"),
 
-		CreateStrategy:      pod.Strategy,
-		UpdateStrategy:      pod.Strategy,
-		DeleteStrategy:      pod.Strategy,
+		CreateStrategy:      registrypod.Strategy,
+		UpdateStrategy:      registrypod.Strategy,
+		DeleteStrategy:      registrypod.Strategy,
 		ReturnDeletedObject: true,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{
 		RESTOptions: optsGetter,
-		AttrFunc:    pod.GetAttrs,
-		TriggerFunc: map[string]storage.IndexerFunc{"spec.nodeName": pod.NodeNameTriggerFunc},
+		AttrFunc:    registrypod.GetAttrs,
+		TriggerFunc: map[string]storage.IndexerFunc{"spec.nodeName": registrypod.NodeNameTriggerFunc},
 	}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return PodStorage{}, err
 	}
 
 	statusStore := *store
-	statusStore.UpdateStrategy = pod.StatusStrategy
+	statusStore.UpdateStrategy = registrypod.StatusStrategy
 	ephemeralContainersStore := *store
-	ephemeralContainersStore.UpdateStrategy = pod.EphemeralContainersStrategy
+	ephemeralContainersStore.UpdateStrategy = registrypod.EphemeralContainersStrategy
 
+	bindingREST := &BindingREST{store: store}
 	return PodStorage{
 		Pod:                 &REST{store, proxyTransport},
 		Binding:             &BindingREST{store: store},
+		LegacyBinding:       &LegacyBindingREST{bindingREST},
 		Eviction:            newEvictionStorage(store, podDisruptionBudgetClient),
 		Status:              &StatusREST{store: &statusStore},
 		EphemeralContainers: &EphemeralContainersREST{store: &ephemeralContainersStore},
@@ -106,7 +110,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		Exec:                &podrest.ExecREST{Store: store, KubeletConn: k},
 		Attach:              &podrest.AttachREST{Store: store, KubeletConn: k},
 		PortForward:         &podrest.PortForwardREST{Store: store, KubeletConn: k},
-	}
+	}, nil
 }
 
 // Implement Redirector.
@@ -114,7 +118,7 @@ var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a pods location from its HostIP
 func (r *REST) ResourceLocation(ctx context.Context, name string) (*url.URL, http.RoundTripper, error) {
-	return pod.ResourceLocation(r, r.proxyTransport, ctx, name)
+	return registrypod.ResourceLocation(r, r.proxyTransport, ctx, name)
 }
 
 // Implement ShortNamesProvider
@@ -148,11 +152,18 @@ func (r *BindingREST) New() runtime.Object {
 	return &api.Binding{}
 }
 
-var _ = rest.Creater(&BindingREST{})
+var _ = rest.NamedCreater(&BindingREST{})
 
 // Create ensures a pod is bound to a specific host.
-func (r *BindingREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (out runtime.Object, err error) {
-	binding := obj.(*api.Binding)
+func (r *BindingREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (out runtime.Object, err error) {
+	binding, ok := obj.(*api.Binding)
+	if !ok {
+		return nil, errors.NewBadRequest(fmt.Sprintf("not a Binding object: %#v", obj))
+	}
+
+	if name != binding.Name {
+		return nil, errors.NewBadRequest("name in URL does not match name in Binding object")
+	}
 
 	// TODO: move me to a binding strategy
 	if errs := validation.ValidatePodBinding(binding); len(errs) != 0 {
@@ -160,7 +171,7 @@ func (r *BindingREST) Create(ctx context.Context, obj runtime.Object, createVali
 	}
 
 	if createValidation != nil {
-		if err := createValidation(binding.DeepCopyObject()); err != nil {
+		if err := createValidation(ctx, binding.DeepCopyObject()); err != nil {
 			return nil, err
 		}
 	}
@@ -216,6 +227,32 @@ func (r *BindingREST) assignPod(ctx context.Context, podID string, machine strin
 		}
 	}
 	return
+}
+
+var _ = rest.Creater(&LegacyBindingREST{})
+
+// LegacyBindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.
+type LegacyBindingREST struct {
+	bindingRest *BindingREST
+}
+
+// NamespaceScoped fulfill rest.Scoper
+func (r *LegacyBindingREST) NamespaceScoped() bool {
+	return r.bindingRest.NamespaceScoped()
+}
+
+// New creates a new binding resource
+func (r *LegacyBindingREST) New() runtime.Object {
+	return r.bindingRest.New()
+}
+
+// Create ensures a pod is bound to a specific host.
+func (r *LegacyBindingREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (out runtime.Object, err error) {
+	metadata, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, errors.NewBadRequest(fmt.Sprintf("not a Binding object: %T", obj))
+	}
+	return r.bindingRest.Create(ctx, metadata.GetName(), obj, createValidation, options)
 }
 
 // StatusREST implements the REST endpoint for changing the status of a pod.

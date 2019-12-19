@@ -38,7 +38,11 @@ func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "serviceaccounts",
 	}
-	return NewREST(restOptions, nil, nil, 0, nil, nil), server
+	rest, err := NewREST(restOptions, nil, nil, 0, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
+	return rest, server
 }
 
 func validNewServiceAccount(name string) *api.ServiceAccount {

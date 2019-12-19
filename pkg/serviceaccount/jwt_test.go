@@ -22,6 +22,8 @@ import (
 	"strings"
 	"testing"
 
+	jose "gopkg.in/square/go-jose.v2"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -54,6 +56,13 @@ B4Ycr0PqfzZcvy8efTtFQ/Jnc4Bp1zUtFXt7+QeevePtQ2EcyELXE0i63T1CujRM
 WwIDAQAB
 -----END PUBLIC KEY-----
 `
+
+// Obtained by:
+//
+//   1. Serializing rsaPublicKey as DER
+//   2. Taking the SHA256 of the DER bytes
+//   3. URLSafe Base64-encoding the sha bytes
+const rsaKeyID = "JHJehTTTZlsspKHT-GaJxK7Kd1NQgZJu3fyK6K_QDYU"
 
 const rsaPrivateKey = `-----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEA249XwEo9k4tM8fMxV7zxOhcrP+WvXn917koM5Qr2ZXs4vo26
@@ -97,6 +106,13 @@ MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPL
 X2i8uIp/C/ASqiIGUeeKQtX0/IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
 -----END PUBLIC KEY-----`
 
+// Obtained by:
+//
+//   1. Serializing ecdsaPublicKey as DER
+//   2. Taking the SHA256 of the DER bytes
+//   3. URLSafe Base64-encoding the sha bytes
+const ecdsaKeyID = "SoABiieYuNx4UdqYvZRVeuC6SihxgLrhLy9peHMHpTc"
+
 func getPrivateKey(data string) interface{} {
 	key, _ := keyutil.ParsePrivateKeyPEM([]byte(data))
 	return key
@@ -106,6 +122,7 @@ func getPublicKey(data string) interface{} {
 	keys, _ := keyutil.ParsePublicKeysPEM([]byte(data))
 	return keys[0]
 }
+
 func TestTokenGenerateAndValidate(t *testing.T) {
 	expectedUserName := "system:serviceaccount:test:my-service-account"
 	expectedUserUID := "12345"
@@ -147,6 +164,8 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		"token": []byte(rsaToken),
 	}
 
+	checkJSONWebSignatureHasKeyID(t, rsaToken, rsaKeyID)
+
 	// Generate the ECDSA token
 	ecdsaGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, getPrivateKey(ecdsaPrivateKey))
 	if err != nil {
@@ -162,6 +181,8 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	ecdsaSecret.Data = map[string][]byte{
 		"token": []byte(ecdsaToken),
 	}
+
+	checkJSONWebSignatureHasKeyID(t, ecdsaToken, ecdsaKeyID)
 
 	// Generate signer with same keys as RSA signer but different issuer
 	badIssuerGenerator, err := serviceaccount.JWTTokenGenerator("foo", getPrivateKey(rsaPrivateKey))
@@ -328,6 +349,17 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			t.Errorf("%s: Expected groups=%v, got %v", k, tc.ExpectedGroups, resp.User.GetGroups())
 			continue
 		}
+	}
+}
+
+func checkJSONWebSignatureHasKeyID(t *testing.T, jwsString string, expectedKeyID string) {
+	jws, err := jose.ParseSigned(jwsString)
+	if err != nil {
+		t.Fatalf("Error checking for key ID: couldn't parse token: %v", err)
+	}
+
+	if jws.Signatures[0].Header.KeyID != expectedKeyID {
+		t.Errorf("Token %q has the wrong KeyID (got %q, want %q)", jwsString, jws.Signatures[0].Header.KeyID, expectedKeyID)
 	}
 }
 

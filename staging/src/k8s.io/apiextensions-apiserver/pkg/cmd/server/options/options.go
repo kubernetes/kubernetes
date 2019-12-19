@@ -24,6 +24,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -33,7 +34,7 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/apiserver/pkg/util/webhook"
-	"k8s.io/client-go/listers/core/v1"
+	corev1 "k8s.io/client-go/listers/core/v1"
 )
 
 const defaultEtcdPathPrefix = "/registry/apiextensions.kubernetes.io"
@@ -52,7 +53,7 @@ func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomRes
 	o := &CustomResourceDefinitionsServerOptions{
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
-			apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion),
+			apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion),
 			genericoptions.NewProcessInfo("apiextensions-apiserver", "kube-system"),
 		),
 		APIEnablement: genericoptions.NewAPIEnablementOptions(),
@@ -126,7 +127,7 @@ func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregi
 }
 
 type serviceResolver struct {
-	services v1.ServiceLister
+	services corev1.ServiceLister
 }
 
 func (r *serviceResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {

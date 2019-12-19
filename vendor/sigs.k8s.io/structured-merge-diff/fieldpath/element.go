@@ -35,7 +35,7 @@ type PathElement struct {
 	// Key selects the list element which has fields matching those given.
 	// The containing object must be an associative list with map typed
 	// elements.
-	Key *value.Map
+	Key *value.FieldList
 
 	// Value selects the list element with the given value. The containing
 	// object must be an associative list with a primitive typed element
@@ -62,7 +62,7 @@ func (e PathElement) Less(rhs PathElement) bool {
 		if rhs.Key == nil {
 			return true
 		}
-		return e.Key.Less(rhs.Key)
+		return e.Key.Less(*rhs.Key)
 	} else if rhs.Key != nil {
 		return false
 	}
@@ -101,13 +101,11 @@ func (e PathElement) String() string {
 	case e.FieldName != nil:
 		return "." + *e.FieldName
 	case e.Key != nil:
-		strs := make([]string, len(e.Key.Items))
-		for i, k := range e.Key.Items {
+		strs := make([]string, len(*e.Key))
+		for i, k := range *e.Key {
 			strs[i] = fmt.Sprintf("%v=%v", k.Name, k.Value)
 		}
-		// The order must be canonical, since we use the string value
-		// in a set structure.
-		sort.Strings(strs)
+		// Keys are supposed to be sorted.
 		return "[" + strings.Join(strs, ",") + "]"
 	case e.Value != nil:
 		return fmt.Sprintf("[=%v]", e.Value)
@@ -123,24 +121,31 @@ func (e PathElement) String() string {
 // names (type must be string) with values (type must be value.Value). If these
 // conditions are not met, KeyByFields will panic--it's intended for static
 // construction and shouldn't have user-produced values passed to it.
-func KeyByFields(nameValues ...interface{}) []value.Field {
+func KeyByFields(nameValues ...interface{}) *value.FieldList {
 	if len(nameValues)%2 != 0 {
 		panic("must have a value for every name")
 	}
-	out := []value.Field{}
+	out := value.FieldList{}
 	for i := 0; i < len(nameValues)-1; i += 2 {
 		out = append(out, value.Field{
 			Name:  nameValues[i].(string),
 			Value: nameValues[i+1].(value.Value),
 		})
 	}
-	return out
+	out.Sort()
+	return &out
 }
 
 // PathElementSet is a set of path elements.
 // TODO: serialize as a list.
 type PathElementSet struct {
 	members sortedPathElements
+}
+
+func MakePathElementSet(size int) PathElementSet {
+	return PathElementSet{
+		members: make(sortedPathElements, 0, size),
+	}
 }
 
 type sortedPathElements []PathElement

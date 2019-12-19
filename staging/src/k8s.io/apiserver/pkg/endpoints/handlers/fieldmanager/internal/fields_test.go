@@ -29,17 +29,11 @@ import (
 
 // TestFieldsRoundTrip tests that a fields trie can be round tripped as a path set
 func TestFieldsRoundTrip(t *testing.T) {
-	tests := []metav1.Fields{
+	tests := []metav1.FieldsV1{
 		{
-			Map: map[string]metav1.Fields{
-				"f:metadata": {
-					Map: map[string]metav1.Fields{
-						".":      newFields(),
-						"f:name": newFields(),
-					},
-				},
-			},
+			Raw: []byte(`{"f:metadata":{"f:name":{},".":{}}}`),
 		},
+		EmptyFields,
 	}
 
 	for _, test := range tests {
@@ -60,21 +54,14 @@ func TestFieldsRoundTrip(t *testing.T) {
 // TestFieldsToSetError tests that errors are picked up by FieldsToSet
 func TestFieldsToSetError(t *testing.T) {
 	tests := []struct {
-		fields    metav1.Fields
+		fields    metav1.FieldsV1
 		errString string
 	}{
 		{
-			fields: metav1.Fields{
-				Map: map[string]metav1.Fields{
-					"k:{invalid json}": {
-						Map: map[string]metav1.Fields{
-							".":      newFields(),
-							"f:name": newFields(),
-						},
-					},
-				},
+			fields: metav1.FieldsV1{
+				Raw: []byte(`{"k:{invalid json}":{"f:name":{},".":{}}}`),
 			},
-			errString: "invalid character",
+			errString: "ReadObjectCB",
 		},
 	}
 
@@ -97,7 +84,7 @@ func TestSetToFieldsError(t *testing.T) {
 	}{
 		{
 			set:       *fieldpath.NewSet(invalidPath),
-			errString: "Invalid type of path element",
+			errString: "invalid PathElement",
 		},
 	}
 

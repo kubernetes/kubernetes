@@ -47,6 +47,10 @@ type Config struct {
 	// Impersonate is the config that this Config will impersonate using
 	Impersonate ImpersonationConfig
 
+	// DisableCompression bypasses automatic GZip compression requests to the
+	// server.
+	DisableCompression bool
+
 	// Transport may be used for custom HTTP behavior. This attribute may
 	// not be specified with the TLS client certificate options. Use
 	// WrapTransport for most client level operations.
@@ -121,6 +125,12 @@ type TLSConfig struct {
 	CAData   []byte // Bytes of the PEM-encoded server trusted root certificates. Supercedes CAFile.
 	CertData []byte // Bytes of the PEM-encoded client certificate. Supercedes CertFile.
 	KeyData  []byte // Bytes of the PEM-encoded client key. Supercedes KeyFile.
+
+	// NextProtos is a list of supported application level protocols, in order of preference.
+	// Used to populate tls.Config.NextProtos.
+	// To indicate to the server http/1.1 is preferred over http/2, set to ["http/1.1", "h2"] (though the server is free to ignore that preference).
+	// To use only http/1.1, set to ["http/1.1"].
+	NextProtos []string
 
 	GetCert func() (*tls.Certificate, error) // Callback that returns a TLS client certificate. CertData, CertFile, KeyData and KeyFile supercede this field.
 }

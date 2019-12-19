@@ -27,6 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -79,13 +82,15 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 		volumesPerPod = GetAndExpectIntEnvVar(VCPScaleVolumesPerPod)
 
 		numberOfInstances = GetAndExpectIntEnvVar(VCPScaleInstances)
-		gomega.Expect(numberOfInstances > 5).NotTo(gomega.BeTrue(), "Maximum allowed instances are 5")
-		gomega.Expect(numberOfInstances > volumeCount).NotTo(gomega.BeTrue(), "Number of instances should be less than the total volume count")
+		framework.ExpectNotEqual(numberOfInstances > 5, true, "Maximum allowed instances are 5")
+		framework.ExpectNotEqual(numberOfInstances > volumeCount, true, "Number of instances should be less than the total volume count")
 
 		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)
 		datastoreName = GetAndExpectStringEnvVar(StorageClassDatastoreName)
 
-		nodes = framework.GetReadySchedulableNodesOrDie(client)
+		var err error
+		nodes, err = e2enode.GetReadySchedulableNodes(client)
+		framework.ExpectNoError(err)
 		if len(nodes.Items) < 2 {
 			framework.Skipf("Requires at least %d nodes (not %d)", 2, len(nodes.Items))
 		}
@@ -129,7 +134,7 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 			case storageclass4:
 				scParams[Datastore] = datastoreName
 			}
-			sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(scname, scParams, nil))
+			sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(scname, scParams, nil, ""))
 			gomega.Expect(sc).NotTo(gomega.BeNil(), "Storage class is empty")
 			framework.ExpectNoError(err, "Failed to create storage class")
 			defer client.StorageV1().StorageClasses().Delete(scname, nil)
@@ -152,10 +157,11 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 			}
 		}
 		podList, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
+		framework.ExpectNoError(err, "Failed to list pods")
 		for _, pod := range podList.Items {
 			pvcClaimList = append(pvcClaimList, getClaimsForPod(&pod, volumesPerPod)...)
 			ginkgo.By("Deleting pod")
-			err = framework.DeletePodWithWait(f, client, &pod)
+			err = e2epod.DeletePodWithWait(client, &pod)
 			framework.ExpectNoError(err)
 		}
 		ginkgo.By("Waiting for volumes to be detached from the node")
@@ -163,7 +169,7 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 		framework.ExpectNoError(err)
 
 		for _, pvcClaim := range pvcClaimList {
-			err = framework.DeletePersistentVolumeClaim(client, pvcClaim, namespace)
+			err = e2epv.DeletePersistentVolumeClaim(client, pvcClaim, namespace)
 			framework.ExpectNoError(err)
 		}
 	})
@@ -192,19 +198,19 @@ func VolumeCreateAndAttach(client clientset.Interface, namespace string, sc []*s
 		pvclaims := make([]*v1.PersistentVolumeClaim, volumesPerPod)
 		for i := 0; i < volumesPerPod; i++ {
 			ginkgo.By("Creating PVC using the Storage Class")
-			pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", sc[index%len(sc)]))
+			pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", sc[index%len(sc)]))
 			framework.ExpectNoError(err)
 			pvclaims[i] = pvclaim
 		}
 
 		ginkgo.By("Waiting for claim to be in bound phase")
-		persistentvolumes, err := framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
+		persistentvolumes, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating pod to attach PV to the node")
 		nodeSelector := nodeSelectorList[nodeSelectorIndex%len(nodeSelectorList)]
 		// Create pod to attach Volume to Node
-		pod, err := framework.CreatePod(client, namespace, map[string]string{nodeSelector.labelKey: nodeSelector.labelValue}, pvclaims, false, "")
+		pod, err := e2epod.CreatePod(client, namespace, map[string]string{nodeSelector.labelKey: nodeSelector.labelValue}, pvclaims, false, "")
 		framework.ExpectNoError(err)
 
 		for _, pv := range persistentvolumes {

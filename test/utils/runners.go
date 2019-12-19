@@ -107,28 +107,31 @@ type RunObjectConfig interface {
 	GetReplicas() int
 	GetLabelValue(string) (string, bool)
 	GetGroupResource() schema.GroupResource
+	GetGroupVersionResource() schema.GroupVersionResource
 }
 
 type RCConfig struct {
-	Affinity          *v1.Affinity
-	Client            clientset.Interface
-	ScalesGetter      scaleclient.ScalesGetter
-	Image             string
-	Command           []string
-	Name              string
-	Namespace         string
-	PollInterval      time.Duration
-	Timeout           time.Duration
-	PodStatusFile     *os.File
-	Replicas          int
-	CpuRequest        int64 // millicores
-	CpuLimit          int64 // millicores
-	MemRequest        int64 // bytes
-	MemLimit          int64 // bytes
-	GpuLimit          int64 // count
-	ReadinessProbe    *v1.Probe
-	DNSPolicy         *v1.DNSPolicy
-	PriorityClassName string
+	Affinity                      *v1.Affinity
+	Client                        clientset.Interface
+	ScalesGetter                  scaleclient.ScalesGetter
+	Image                         string
+	Command                       []string
+	Name                          string
+	Namespace                     string
+	PollInterval                  time.Duration
+	Timeout                       time.Duration
+	PodStatusFile                 *os.File
+	Replicas                      int
+	CpuRequest                    int64 // millicores
+	CpuLimit                      int64 // millicores
+	MemRequest                    int64 // bytes
+	MemLimit                      int64 // bytes
+	GpuLimit                      int64 // count
+	ReadinessProbe                *v1.Probe
+	DNSPolicy                     *v1.DNSPolicy
+	PriorityClassName             string
+	TerminationGracePeriodSeconds *int64
+	Lifecycle                     *v1.Lifecycle
 
 	// Env vars, set the same for every pod.
 	Env map[string]string
@@ -158,6 +161,9 @@ type RCConfig struct {
 	// Maximum allowable container failures. If exceeded, RunRC returns an error.
 	// Defaults to replicas*0.1 if unspecified.
 	MaxContainerFailures *int
+	// Maximum allowed pod deletions count. If exceeded, RunRC returns an error.
+	// Defaults to 0.
+	MaxAllowedPodDeletions int
 
 	// If set to false starting RC will print progress, otherwise only errors will be printed.
 	Silent bool
@@ -298,6 +304,10 @@ func (config *DeploymentConfig) GetGroupResource() schema.GroupResource {
 	return extensionsinternal.Resource("deployments")
 }
 
+func (config *DeploymentConfig) GetGroupVersionResource() schema.GroupVersionResource {
+	return extensionsinternal.SchemeGroupVersion.WithResource("deployments")
+}
+
 func (config *DeploymentConfig) create() error {
 	deployment := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -316,13 +326,15 @@ func (config *DeploymentConfig) create() error {
 					Annotations: config.Annotations,
 				},
 				Spec: v1.PodSpec{
-					Affinity: config.Affinity,
+					Affinity:                      config.Affinity,
+					TerminationGracePeriodSeconds: config.getTerminationGracePeriodSeconds(nil),
 					Containers: []v1.Container{
 						{
-							Name:    config.Name,
-							Image:   config.Image,
-							Command: config.Command,
-							Ports:   []v1.ContainerPort{{ContainerPort: 80}},
+							Name:      config.Name,
+							Image:     config.Image,
+							Command:   config.Command,
+							Ports:     []v1.ContainerPort{{ContainerPort: 80}},
+							Lifecycle: config.Lifecycle,
 						},
 					},
 				},
@@ -374,6 +386,10 @@ func (config *ReplicaSetConfig) GetGroupResource() schema.GroupResource {
 	return extensionsinternal.Resource("replicasets")
 }
 
+func (config *ReplicaSetConfig) GetGroupVersionResource() schema.GroupVersionResource {
+	return extensionsinternal.SchemeGroupVersion.WithResource("replicasets")
+}
+
 func (config *ReplicaSetConfig) create() error {
 	rs := &apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -392,13 +408,15 @@ func (config *ReplicaSetConfig) create() error {
 					Annotations: config.Annotations,
 				},
 				Spec: v1.PodSpec{
-					Affinity: config.Affinity,
+					Affinity:                      config.Affinity,
+					TerminationGracePeriodSeconds: config.getTerminationGracePeriodSeconds(nil),
 					Containers: []v1.Container{
 						{
-							Name:    config.Name,
-							Image:   config.Image,
-							Command: config.Command,
-							Ports:   []v1.ContainerPort{{ContainerPort: 80}},
+							Name:      config.Name,
+							Image:     config.Image,
+							Command:   config.Command,
+							Ports:     []v1.ContainerPort{{ContainerPort: 80}},
+							Lifecycle: config.Lifecycle,
 						},
 					},
 				},
@@ -446,6 +464,10 @@ func (config *JobConfig) GetGroupResource() schema.GroupResource {
 	return batchinternal.Resource("jobs")
 }
 
+func (config *JobConfig) GetGroupVersionResource() schema.GroupVersionResource {
+	return batchinternal.SchemeGroupVersion.WithResource("jobs")
+}
+
 func (config *JobConfig) create() error {
 	job := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -460,12 +482,14 @@ func (config *JobConfig) create() error {
 					Annotations: config.Annotations,
 				},
 				Spec: v1.PodSpec{
-					Affinity: config.Affinity,
+					Affinity:                      config.Affinity,
+					TerminationGracePeriodSeconds: config.getTerminationGracePeriodSeconds(nil),
 					Containers: []v1.Container{
 						{
-							Name:    config.Name,
-							Image:   config.Image,
-							Command: config.Command,
+							Name:      config.Name,
+							Image:     config.Image,
+							Command:   config.Command,
+							Lifecycle: config.Lifecycle,
 						},
 					},
 					RestartPolicy: v1.RestartPolicyOnFailure,
@@ -522,6 +546,10 @@ func (config *RCConfig) GetGroupResource() schema.GroupResource {
 	return api.Resource("replicationcontrollers")
 }
 
+func (config *RCConfig) GetGroupVersionResource() schema.GroupVersionResource {
+	return api.SchemeGroupVersion.WithResource("replicationcontrollers")
+}
+
 func (config *RCConfig) GetClient() clientset.Interface {
 	return config.Client
 }
@@ -576,12 +604,13 @@ func (config *RCConfig) create() error {
 							Command:        config.Command,
 							Ports:          []v1.ContainerPort{{ContainerPort: 80}},
 							ReadinessProbe: config.ReadinessProbe,
+							Lifecycle:      config.Lifecycle,
 						},
 					},
 					DNSPolicy:                     *config.DNSPolicy,
 					NodeSelector:                  config.NodeSelector,
 					Tolerations:                   config.Tolerations,
-					TerminationGracePeriodSeconds: &one,
+					TerminationGracePeriodSeconds: config.getTerminationGracePeriodSeconds(&one),
 					PriorityClassName:             config.PriorityClassName,
 				},
 			},
@@ -657,6 +686,9 @@ func (config *RCConfig) applyTo(template *v1.PodTemplateSpec) {
 	}
 	if config.GpuLimit > 0 {
 		template.Spec.Containers[0].Resources.Limits["nvidia.com/gpu"] = *resource.NewQuantity(config.GpuLimit, resource.DecimalSI)
+	}
+	if config.Lifecycle != nil {
+		template.Spec.Containers[0].Lifecycle = config.Lifecycle
 	}
 	if len(config.Volumes) > 0 {
 		template.Spec.Volumes = config.Volumes
@@ -766,6 +798,7 @@ func (config *RCConfig) start() error {
 	oldPods := make([]*v1.Pod, 0)
 	oldRunning := 0
 	lastChange := time.Now()
+	podDeletionsCount := 0
 	for oldRunning != config.Replicas {
 		time.Sleep(interval)
 
@@ -796,9 +829,10 @@ func (config *RCConfig) start() error {
 
 		diff := Diff(oldPods, pods)
 		deletedPods := diff.DeletedPods()
-		if len(deletedPods) != 0 {
-			// There are some pods that have disappeared.
-			err := fmt.Errorf("%d pods disappeared for %s: %v", len(deletedPods), config.Name, strings.Join(deletedPods, ", "))
+		podDeletionsCount += len(deletedPods)
+		if podDeletionsCount > config.MaxAllowedPodDeletions {
+			// Number of pods which disappeared is over threshold
+			err := fmt.Errorf("%d pods disappeared for %s: %v", podDeletionsCount, config.Name, strings.Join(deletedPods, ", "))
 			config.RCConfigLog(err.Error())
 			config.RCConfigLog(diff.String(sets.NewString()))
 			return err
@@ -1520,6 +1554,13 @@ func attachConfigMaps(template *v1.PodTemplateSpec, configMapNames []string) {
 	template.Spec.Containers[0].VolumeMounts = mounts
 }
 
+func (config *RCConfig) getTerminationGracePeriodSeconds(defaultGrace *int64) *int64 {
+	if config.TerminationGracePeriodSeconds == nil || *config.TerminationGracePeriodSeconds < 0 {
+		return defaultGrace
+	}
+	return config.TerminationGracePeriodSeconds
+}
+
 func attachServiceAccountTokenProjection(template *v1.PodTemplateSpec, name string) {
 	template.Spec.Containers[0].VolumeMounts = append(template.Spec.Containers[0].VolumeMounts,
 		v1.VolumeMount{
@@ -1653,7 +1694,7 @@ func (config *DaemonConfig) Run() error {
 		return running == len(nodes.Items), nil
 	})
 	if err != nil {
-		config.LogFunc("Timed out while waiting for DaemonsSet %v/%v to be running.", config.Namespace, config.Name)
+		config.LogFunc("Timed out while waiting for DaemonSet %v/%v to be running.", config.Namespace, config.Name)
 	} else {
 		config.LogFunc("Created Daemon %v/%v", config.Namespace, config.Name)
 	}

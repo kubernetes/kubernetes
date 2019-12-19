@@ -31,16 +31,15 @@ go_library(
         "rawconn_msg.go",
         "rawconn_nommsg.go",
         "rawconn_nomsg.go",
-        "rawconn_stub.go",
-        "reflect.go",
         "socket.go",
         "sys.go",
         "sys_bsd.go",
         "sys_bsdvar.go",
+        "sys_const_unix.go",
         "sys_darwin.go",
         "sys_dragonfly.go",
         "sys_go1_11_darwin.go",
-        "sys_go1_12_darwin.go",
+        "sys_linkname.go",
         "sys_linux.go",
         "sys_linux_386.go",
         "sys_linux_386.s",
@@ -89,10 +88,42 @@ go_library(
         "zsys_openbsd_arm.go",
         "zsys_solaris_amd64.go",
     ],
-    cgo = True,
     importmap = "k8s.io/kubernetes/vendor/golang.org/x/net/internal/socket",
     importpath = "golang.org/x/net/internal/socket",
     visibility = ["//vendor/golang.org/x/net:__subpackages__"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/golang.org/x/sys/windows:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

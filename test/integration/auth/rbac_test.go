@@ -23,12 +23,12 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
+	gopath "path"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
-	api "k8s.io/api/core/v1"
 	rbacapi "k8s.io/api/rbac/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,7 +49,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
@@ -97,12 +96,28 @@ func (getter *testRESTOptionsGetter) GetRESTOptions(resource schema.GroupResourc
 	return generic.RESTOptions{StorageConfig: storageConfig, Decorator: generic.UndecoratedStorage, ResourcePrefix: resource.Resource}, nil
 }
 
-func newRBACAuthorizer(config *master.Config) authorizer.Authorizer {
+func newRBACAuthorizer(t *testing.T, config *master.Config) authorizer.Authorizer {
 	optsGetter := &testRESTOptionsGetter{config}
-	roleRegistry := role.AuthorizerAdapter{Registry: role.NewRegistry(rolestore.NewREST(optsGetter))}
-	roleBindingRegistry := rolebinding.AuthorizerAdapter{Registry: rolebinding.NewRegistry(rolebindingstore.NewREST(optsGetter))}
-	clusterRoleRegistry := clusterrole.AuthorizerAdapter{Registry: clusterrole.NewRegistry(clusterrolestore.NewREST(optsGetter))}
-	clusterRoleBindingRegistry := clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterrolebindingstore.NewREST(optsGetter))}
+	roleRest, err := rolestore.NewREST(optsGetter)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
+	roleRegistry := role.AuthorizerAdapter{Registry: role.NewRegistry(roleRest)}
+	rolebindingRest, err := rolebindingstore.NewREST(optsGetter)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
+	roleBindingRegistry := rolebinding.AuthorizerAdapter{Registry: rolebinding.NewRegistry(rolebindingRest)}
+	clusterroleRest, err := clusterrolestore.NewREST(optsGetter)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
+	clusterRoleRegistry := clusterrole.AuthorizerAdapter{Registry: clusterrole.NewRegistry(clusterroleRest)}
+	clusterrolebindingRest, err := clusterrolebindingstore.NewREST(optsGetter)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
+	clusterRoleBindingRegistry := clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterrolebindingRest)}
 	return rbac.New(roleRegistry, roleBindingRegistry, clusterRoleRegistry, clusterRoleBindingRegistry)
 }
 
@@ -177,12 +192,9 @@ func (s statusCode) String() string {
 
 // Declare a set of raw objects to use.
 var (
-	// Make a role binding with the version enabled in testapi.Rbac
-	// This assumes testapi is using rbac.authorization.k8s.io/v1beta1 or rbac.authorization.k8s.io/v1, which are identical in structure.
-	// TODO: rework or remove testapi usage to allow writing integration tests that don't depend on envvars
 	writeJobsRoleBinding = `
 {
-  "apiVersion": "` + testapi.Rbac.GroupVersion().String() + `",
+  "apiVersion": "rbac.authorization.k8s.io/v1",
   "kind": "RoleBinding",
   "metadata": {
     "name": "pi"%s
@@ -244,7 +256,7 @@ var (
 `
 	podNamespace = `
 {
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "kind": "Namespace",
   "metadata": {
 	"name": "pod-namespace"%s
@@ -253,7 +265,7 @@ var (
 `
 	jobNamespace = `
 {
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "kind": "Namespace",
   "metadata": {
 	"name": "job-namespace"%s
@@ -262,7 +274,7 @@ var (
 `
 	forbiddenNamespace = `
 {
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "kind": "Namespace",
   "metadata": {
 	"name": "forbidden-namespace"%s
@@ -271,7 +283,7 @@ var (
 `
 	limitRangeNamespace = `
 {
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "kind": "Namespace",
   "metadata": {
 	"name": "limitrange-namespace"%s
@@ -515,7 +527,7 @@ func TestRBAC(t *testing.T) {
 	for i, tc := range tests {
 		// Create an API Server.
 		masterConfig := framework.NewIntegrationTestMasterConfig()
-		masterConfig.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(masterConfig)
+		masterConfig.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, masterConfig)
 		masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
 			superUser:                          {Name: "admin", Groups: []string{"system:masters"}},
 			"any-rolebinding-writer":           {Name: "any-rolebinding-writer"},
@@ -544,12 +556,21 @@ func TestRBAC(t *testing.T) {
 		previousResourceVersion := make(map[string]float64)
 
 		for j, r := range tc.requests {
-			testGroup, ok := testapi.Groups[r.apiGroup]
-			if !ok {
-				t.Errorf("case %d %d: unknown api group %q, %s", i, j, r.apiGroup, r)
-				continue
+			path := "/"
+			if r.apiGroup == "" {
+				path = gopath.Join(path, "api/v1")
+			} else {
+				path = gopath.Join(path, "apis", r.apiGroup, "v1")
 			}
-			path := testGroup.ResourcePath(r.resource, r.namespace, r.name)
+			if r.namespace != "" {
+				path = gopath.Join(path, "namespaces", r.namespace)
+			}
+			if r.resource != "" {
+				path = gopath.Join(path, r.resource)
+			}
+			if r.name != "" {
+				path = gopath.Join(path, r.name)
+			}
 
 			var body io.Reader
 			if r.body != "" {
@@ -629,14 +650,14 @@ func TestBootstrapping(t *testing.T) {
 	superUser := "admin/system:masters"
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(masterConfig)
+	masterConfig.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, masterConfig)
 	masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
 		superUser: {Name: "admin", Groups: []string{"system:masters"}},
 	}))
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
 
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL})
 
 	watcher, err := clientset.RbacV1().ClusterRoles().Watch(metav1.ListOptions{ResourceVersion: "0"})
 	if err != nil {
@@ -690,13 +711,13 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 	superUser := "admin/system:masters"
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(masterConfig)
+	masterConfig.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, masterConfig)
 	masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
 		superUser: {Name: "admin", Groups: []string{"system:masters"}},
 	}))
 	_, s, tearDownFn := framework.RunAMaster(masterConfig)
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL})
 
 	// Modify the default RBAC discovery ClusterRoleBidnings to look more like the defaults that
 	// existed prior to v1.14, but with user modifications.
@@ -734,7 +755,7 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 	// `system:discovery`, and respect auto-reconciliation annotations.
 	_, s, tearDownFn = framework.RunAMaster(masterConfig)
 
-	client = clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
+	client = clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL})
 
 	newDiscRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get("system:discovery", metav1.GetOptions{})
 	if err != nil {

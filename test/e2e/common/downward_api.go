@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -72,7 +73,7 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 		expectations := []string{
 			fmt.Sprintf("POD_NAME=%v", podName),
 			fmt.Sprintf("POD_NAMESPACE=%v", f.Namespace.Name),
-			fmt.Sprintf("POD_IP=%v|%v", framework.RegexIPv4, framework.RegexIPv6),
+			fmt.Sprintf("POD_IP=%v|%v", e2enetwork.RegexIPv4, e2enetwork.RegexIPv6),
 		}
 
 		testDownwardAPI(f, podName, env, expectations)
@@ -98,10 +99,60 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 		}
 
 		expectations := []string{
-			fmt.Sprintf("HOST_IP=%v|%v", framework.RegexIPv4, framework.RegexIPv6),
+			fmt.Sprintf("HOST_IP=%v|%v", e2enetwork.RegexIPv4, e2enetwork.RegexIPv6),
 		}
 
 		testDownwardAPI(f, podName, env, expectations)
+	})
+
+	ginkgo.It("should provide host IP and pod IP as an env var if pod uses host network [LinuxOnly]", func() {
+		podName := "downward-api-" + string(uuid.NewUUID())
+		env := []v1.EnvVar{
+			{
+				Name: "HOST_IP",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.hostIP",
+					},
+				},
+			},
+			{
+				Name: "POD_IP",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.podIP",
+					},
+				},
+			},
+		}
+
+		expectations := []string{
+			fmt.Sprintf("OK"),
+		}
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   podName,
+				Labels: map[string]string{"name": podName},
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:    "dapi-container",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"sh", "-c", `[[ "${HOST_IP:?}" == "${POD_IP:?}" ]] && echo 'OK' || echo "HOST_IP: '${HOST_IP}' != POD_IP: '${POD_IP}'"`},
+						Env:     env,
+					},
+				},
+				HostNetwork:   true,
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+		}
+
+		testDownwardAPIUsingPod(f, pod, env, expectations)
+
 	})
 
 	/*

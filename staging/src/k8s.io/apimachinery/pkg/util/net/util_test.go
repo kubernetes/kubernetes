@@ -18,6 +18,9 @@ package net
 
 import (
 	"net"
+	"net/url"
+	"os"
+	"syscall"
 	"testing"
 )
 
@@ -63,6 +66,31 @@ func TestIPNetEqual(t *testing.T) {
 	for _, tc := range testCases {
 		if tc.expect != IPNetEqual(tc.ipnet1, tc.ipnet2) {
 			t.Errorf("Expect equality of %s and %s be to %v", tc.ipnet1.String(), tc.ipnet2.String(), tc.expect)
+		}
+	}
+}
+
+func TestIsConnectionRefused(t *testing.T) {
+	testCases := []struct {
+		err    error
+		expect bool
+	}{
+		{
+			&url.Error{Err: &net.OpError{Err: syscall.ECONNRESET}},
+			false,
+		},
+		{
+			&url.Error{Err: &net.OpError{Err: syscall.ECONNREFUSED}},
+			true,
+		},
+		{&url.Error{Err: &net.OpError{Err: &os.SyscallError{Err: syscall.ECONNREFUSED}}},
+			true,
+		},
+	}
+
+	for _, tc := range testCases {
+		if result := IsConnectionRefused(tc.err); result != tc.expect {
+			t.Errorf("Expect to be %v, but actual is %v", tc.expect, result)
 		}
 	}
 }

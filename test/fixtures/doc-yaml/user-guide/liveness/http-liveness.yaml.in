@@ -7,8 +7,8 @@ metadata:
 spec:
   containers:
   - args:
-    - /server
-    image: {{.LivenessImage}}
+    - liveness
+    image: {{.AgnhostImage}}
     livenessProbe:
       httpGet:
         path: /healthz

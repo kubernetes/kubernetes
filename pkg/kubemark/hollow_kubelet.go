@@ -17,7 +17,11 @@ limitations under the License.
 package kubemark
 
 import (
+	"fmt"
 	"time"
+
+	"k8s.io/klog"
+	"k8s.io/utils/mount"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -30,21 +34,62 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/cephfs"
+	"k8s.io/kubernetes/pkg/volume/configmap"
+	"k8s.io/kubernetes/pkg/volume/csi"
+	"k8s.io/kubernetes/pkg/volume/downwardapi"
 	"k8s.io/kubernetes/pkg/volume/emptydir"
+	"k8s.io/kubernetes/pkg/volume/fc"
+	"k8s.io/kubernetes/pkg/volume/flocker"
+	"k8s.io/kubernetes/pkg/volume/git_repo"
+	"k8s.io/kubernetes/pkg/volume/glusterfs"
+	"k8s.io/kubernetes/pkg/volume/hostpath"
+	"k8s.io/kubernetes/pkg/volume/iscsi"
+	"k8s.io/kubernetes/pkg/volume/local"
+	"k8s.io/kubernetes/pkg/volume/nfs"
+	"k8s.io/kubernetes/pkg/volume/portworx"
 	"k8s.io/kubernetes/pkg/volume/projected"
+	"k8s.io/kubernetes/pkg/volume/quobyte"
+	"k8s.io/kubernetes/pkg/volume/rbd"
+	"k8s.io/kubernetes/pkg/volume/scaleio"
 	"k8s.io/kubernetes/pkg/volume/secret"
+	"k8s.io/kubernetes/pkg/volume/storageos"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/test/utils"
-
-	"k8s.io/klog"
 )
 
 type HollowKubelet struct {
 	KubeletFlags         *options.KubeletFlags
 	KubeletConfiguration *kubeletconfig.KubeletConfiguration
 	KubeletDeps          *kubelet.Dependencies
+}
+
+func volumePlugins() []volume.VolumePlugin {
+	allPlugins := []volume.VolumePlugin{}
+	allPlugins = append(allPlugins, emptydir.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, git_repo.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, hostpath.ProbeVolumePlugins(volume.VolumeConfig{})...)
+	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(volume.VolumeConfig{})...)
+	allPlugins = append(allPlugins, secret.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, quobyte.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, cephfs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, downwardapi.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, flocker.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, configmap.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, projected.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
+	return allPlugins
 }
 
 func NewHollowKubelet(
@@ -55,12 +100,6 @@ func NewHollowKubelet(
 	cadvisorInterface cadvisor.Interface,
 	dockerClientConfig *dockershim.ClientConfig,
 	containerManager cm.ContainerManager) *HollowKubelet {
-	// -----------------
-	// Injected objects
-	// -----------------
-	volumePlugins := emptydir.ProbeVolumePlugins()
-	volumePlugins = append(volumePlugins, secret.ProbeVolumePlugins()...)
-	volumePlugins = append(volumePlugins, projected.ProbeVolumePlugins()...)
 	d := &kubelet.Dependencies{
 		KubeClient:         client,
 		HeartbeatClient:    heartbeatClient,
@@ -69,12 +108,12 @@ func NewHollowKubelet(
 		Cloud:              nil,
 		OSInterface:        &containertest.FakeOS{},
 		ContainerManager:   containerManager,
-		VolumePlugins:      volumePlugins,
+		VolumePlugins:      volumePlugins(),
 		TLSOptions:         nil,
 		OOMAdjuster:        oom.NewFakeOOMAdjuster(),
-		Mounter:            mount.New("" /* default mount path */),
+		Mounter:            &mount.FakeMounter{},
 		Subpather:          &subpath.FakeSubpath{},
-		HostUtil:           &mount.FakeHostUtil{},
+		HostUtil:           hostutil.NewFakeHostUtil(nil),
 	}
 
 	return &HollowKubelet{
@@ -95,15 +134,19 @@ func (hk *HollowKubelet) Run() {
 	select {}
 }
 
+// HollowKubletOptions contains settable parameters for hollow kubelet.
+type HollowKubletOptions struct {
+	NodeName            string
+	KubeletPort         int
+	KubeletReadOnlyPort int
+	MaxPods             int
+	PodsPerCore         int
+	NodeLabels          map[string]string
+}
+
 // Builds a KubeletConfiguration for the HollowKubelet, ensuring that the
 // usual defaults are applied for fields we do not override.
-func GetHollowKubeletConfig(
-	nodeName string,
-	kubeletPort int,
-	kubeletReadOnlyPort int,
-	maxPods int,
-	podsPerCore int) (*options.KubeletFlags, *kubeletconfig.KubeletConfiguration) {
-
+func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *kubeletconfig.KubeletConfiguration) {
 	testRootDir := utils.MakeTempDirOrDie("hollow-kubelet.", "")
 	podFilePath := utils.MakeTempDirOrDie("static-pods", testRootDir)
 	klog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
@@ -112,12 +155,14 @@ func GetHollowKubeletConfig(
 	f := options.NewKubeletFlags()
 	f.EnableServer = true
 	f.RootDirectory = testRootDir
-	f.HostnameOverride = nodeName
+	f.HostnameOverride = opt.NodeName
 	f.MinimumGCAge = metav1.Duration{Duration: 1 * time.Minute}
 	f.MaxContainerCount = 100
 	f.MaxPerPodContainerCount = 2
+	f.NodeLabels = opt.NodeLabels
 	f.RegisterNode = true
 	f.RegisterSchedulable = true
+	f.ProviderID = fmt.Sprintf("kubemark://%v", opt.NodeName)
 
 	// Config struct
 	c, err := options.NewKubeletConfiguration()
@@ -127,17 +172,17 @@ func GetHollowKubeletConfig(
 
 	c.StaticPodURL = ""
 	c.Address = "0.0.0.0" /* bind address */
-	c.Port = int32(kubeletPort)
-	c.ReadOnlyPort = int32(kubeletReadOnlyPort)
+	c.Port = int32(opt.KubeletPort)
+	c.ReadOnlyPort = int32(opt.KubeletReadOnlyPort)
 	c.StaticPodPath = podFilePath
 	c.FileCheckFrequency.Duration = 20 * time.Second
 	c.HTTPCheckFrequency.Duration = 20 * time.Second
 	c.NodeStatusUpdateFrequency.Duration = 10 * time.Second
-	c.NodeStatusReportFrequency.Duration = time.Minute
+	c.NodeStatusReportFrequency.Duration = 5 * time.Minute
 	c.SyncFrequency.Duration = 10 * time.Second
 	c.EvictionPressureTransitionPeriod.Duration = 5 * time.Minute
-	c.MaxPods = int32(maxPods)
-	c.PodsPerCore = int32(podsPerCore)
+	c.MaxPods = int32(opt.MaxPods)
+	c.PodsPerCore = int32(opt.PodsPerCore)
 	c.ClusterDNS = []string{}
 	c.ImageGCHighThresholdPercent = 90
 	c.ImageGCLowThresholdPercent = 80

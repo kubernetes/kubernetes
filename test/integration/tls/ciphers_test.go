@@ -64,6 +64,7 @@ func runTestAPICiphers(t *testing.T, testID int, kubePort int, clientCiphers []u
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
+			MaxVersion:         tls.VersionTLS12, // Limit to TLS1.2 to allow cipher configuration
 			InsecureSkipVerify: true,
 			CipherSuites:       clientCiphers,
 		},

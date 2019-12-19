@@ -26,10 +26,10 @@ import (
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
+	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -134,7 +134,7 @@ func (plugin *flexVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error)
 		return "", err
 	}
 
-	klog.Warning(logPrefix(plugin), "GetVolumeName is not supported yet. Defaulting to PV or volume name: ", name)
+	klog.V(4).Infof(logPrefix(plugin), "GetVolumeName is not supported yet. Defaulting to PV or volume name: ", name)
 
 	return name, nil
 }
@@ -146,10 +146,6 @@ func (plugin *flexVolumePlugin) CanSupport(spec *volume.Spec) bool {
 		return false
 	}
 	return sourceDriver == plugin.driverName
-}
-
-func (plugin *flexVolumePlugin) IsMigratedToCSI() bool {
-	return false
 }
 
 // RequiresRemount is part of the volume.VolumePlugin interface.

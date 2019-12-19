@@ -38,9 +38,10 @@ type FsInfo struct {
 type Node struct {
 	Id int `json:"node_id"`
 	// Per-node memory
-	Memory uint64  `json:"memory"`
-	Cores  []Core  `json:"cores"`
-	Caches []Cache `json:"caches"`
+	Memory    uint64          `json:"memory"`
+	HugePages []HugePagesInfo `json:"hugepages"`
+	Cores     []Core          `json:"cores"`
+	Caches    []Cache         `json:"caches"`
 }
 
 type Core struct {

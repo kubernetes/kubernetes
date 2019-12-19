@@ -21,6 +21,6 @@ import (
 )
 
 // ApplyFeatureGates applies algorithm by feature gates.
-func ApplyFeatureGates() {
-	defaults.ApplyFeatureGates()
+func ApplyFeatureGates() func() {
+	return defaults.ApplyFeatureGates()
 }

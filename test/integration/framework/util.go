@@ -26,13 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	// When these values are updated, also update cmd/kubelet/app/options/container_runtime.go
-	// A copy of these values exist in test/utils/image/manifest.go
-	currentPodInfraContainerImageName    = "k8s.gcr.io/pause"
-	currentPodInfraContainerImageVersion = "3.1"
-)
-
 // CreateTestingNamespace creates a namespace for testing.
 func CreateTestingNamespace(baseName string, apiserver *httptest.Server, t *testing.T) *v1.Namespace {
 	// TODO: Create a namespace with a given basename.

@@ -106,5 +106,5 @@ kubectl get flunder my-first-flunder
 
 #outputs
 # NAME               KIND
-# my-first-flunder   Flunder.v1alpha1.wardle.k8s.io
+# my-first-flunder   Flunder.v1alpha1.wardle.example.com
 ```

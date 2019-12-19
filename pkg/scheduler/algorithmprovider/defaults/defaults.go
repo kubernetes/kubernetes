@@ -23,9 +23,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
 const (
@@ -47,67 +48,56 @@ func defaultPredicates() sets.String {
 		predicates.MatchInterPodAffinityPred,
 		predicates.NoDiskConflictPred,
 		predicates.GeneralPred,
-		predicates.CheckNodeMemoryPressurePred,
-		predicates.CheckNodeDiskPressurePred,
-		predicates.CheckNodePIDPressurePred,
-		predicates.CheckNodeConditionPred,
 		predicates.PodToleratesNodeTaintsPred,
 		predicates.CheckVolumeBindingPred,
+		predicates.CheckNodeUnschedulablePred,
 	)
 }
 
 // ApplyFeatureGates applies algorithm by feature gates.
-func ApplyFeatureGates() {
-	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
-		// Remove "CheckNodeCondition", "CheckNodeMemoryPressure", "CheckNodePIDPressure"
-		// and "CheckNodeDiskPressure" predicates
-		factory.RemoveFitPredicate(predicates.CheckNodeConditionPred)
-		factory.RemoveFitPredicate(predicates.CheckNodeMemoryPressurePred)
-		factory.RemoveFitPredicate(predicates.CheckNodeDiskPressurePred)
-		factory.RemoveFitPredicate(predicates.CheckNodePIDPressurePred)
-		// Remove key "CheckNodeCondition", "CheckNodeMemoryPressure", "CheckNodePIDPressure" and "CheckNodeDiskPressure"
-		// from ALL algorithm provider
-		// The key will be removed from all providers which in algorithmProviderMap[]
-		// if you just want remove specific provider, call func RemovePredicateKeyFromAlgoProvider()
-		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodeConditionPred)
-		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodeMemoryPressurePred)
-		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodeDiskPressurePred)
-		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodePIDPressurePred)
+// The returned function is used to restore the state of registered predicates/priorities
+// when this function is called, and should be called in tests which may modify the value
+// of a feature gate temporarily.
+// TODO(Huang-Wei): refactor this function to have a clean way to disable/enable plugins.
+func ApplyFeatureGates() (restore func()) {
+	snapshot := scheduler.RegisteredPredicatesAndPrioritiesSnapshot()
 
-		// Fit is determined based on whether a pod can tolerate all of the node's taints
-		factory.RegisterMandatoryFitPredicate(predicates.PodToleratesNodeTaintsPred, predicates.PodToleratesNodeTaints)
-		// Fit is determined based on whether a pod can tolerate unschedulable of node
-		factory.RegisterMandatoryFitPredicate(predicates.CheckNodeUnschedulablePred, predicates.CheckNodeUnschedulablePredicate)
-		// Insert Key "PodToleratesNodeTaints" and "CheckNodeUnschedulable" To All Algorithm Provider
-		// The key will insert to all providers which in algorithmProviderMap[]
-		// if you just want insert to specific provider, call func InsertPredicateKeyToAlgoProvider()
-		factory.InsertPredicateKeyToAlgorithmProviderMap(predicates.PodToleratesNodeTaintsPred)
-		factory.InsertPredicateKeyToAlgorithmProviderMap(predicates.CheckNodeUnschedulablePred)
-
-		klog.Infof("TaintNodesByCondition is enabled, PodToleratesNodeTaints predicate is mandatory")
-	}
-
-	// Only register EvenPodsSpreadPredicate if the feature is enabled
+	// Only register EvenPodsSpread predicate & priority if the feature is enabled
 	if utilfeature.DefaultFeatureGate.Enabled(features.EvenPodsSpread) {
-		factory.InsertPredicateKeyToAlgorithmProviderMap(predicates.EvenPodsSpreadPred)
-		factory.RegisterFitPredicate(predicates.EvenPodsSpreadPred, predicates.EvenPodsSpreadPredicate)
+		klog.Infof("Registering EvenPodsSpread predicate and priority function")
+		// register predicate
+		scheduler.InsertPredicateKeyToAlgorithmProviderMap(predicates.EvenPodsSpreadPred)
+		scheduler.RegisterFitPredicate(predicates.EvenPodsSpreadPred, predicates.EvenPodsSpreadPredicate)
+		// register priority
+		scheduler.InsertPriorityKeyToAlgorithmProviderMap(priorities.EvenPodsSpreadPriority)
+		scheduler.RegisterPriorityMapReduceFunction(
+			priorities.EvenPodsSpreadPriority,
+			priorities.CalculateEvenPodsSpreadPriorityMap,
+			priorities.CalculateEvenPodsSpreadPriorityReduce,
+			1,
+		)
 	}
 
 	// Prioritizes nodes that satisfy pod's resource limits
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
 		klog.Infof("Registering resourcelimits priority function")
-		factory.RegisterPriorityMapReduceFunction(priorities.ResourceLimitsPriority, priorities.ResourceLimitsPriorityMap, nil, 1)
+		scheduler.RegisterPriorityMapReduceFunction(priorities.ResourceLimitsPriority, priorities.ResourceLimitsPriorityMap, nil, 1)
 		// Register the priority function to specific provider too.
-		factory.InsertPriorityKeyToAlgorithmProviderMap(factory.RegisterPriorityMapReduceFunction(priorities.ResourceLimitsPriority, priorities.ResourceLimitsPriorityMap, nil, 1))
+		scheduler.InsertPriorityKeyToAlgorithmProviderMap(scheduler.RegisterPriorityMapReduceFunction(priorities.ResourceLimitsPriority, priorities.ResourceLimitsPriorityMap, nil, 1))
 	}
+
+	restore = func() {
+		scheduler.ApplyPredicatesAndPriorities(snapshot)
+	}
+	return
 }
 
 func registerAlgorithmProvider(predSet, priSet sets.String) {
 	// Registers algorithm providers. By default we use 'DefaultProvider', but user can specify one to be used
 	// by specifying flag.
-	factory.RegisterAlgorithmProvider(factory.DefaultProvider, predSet, priSet)
+	scheduler.RegisterAlgorithmProvider(schedulerapi.SchedulerDefaultProviderName, predSet, priSet)
 	// Cluster autoscaler friendly scheduling algorithm.
-	factory.RegisterAlgorithmProvider(ClusterAutoscalerProvider, predSet,
+	scheduler.RegisterAlgorithmProvider(ClusterAutoscalerProvider, predSet,
 		copyAndReplace(priSet, priorities.LeastRequestedPriority, priorities.MostRequestedPriority))
 }
 

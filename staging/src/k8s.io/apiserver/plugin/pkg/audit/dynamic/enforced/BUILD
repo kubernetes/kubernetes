@@ -19,6 +19,7 @@ go_test(
     srcs = ["enforced_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//staging/src/k8s.io/api/authentication/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/audit/policy:go_default_library",

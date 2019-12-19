@@ -7,8 +7,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//test/e2e/framework/kubelet:go_default_library",
-        "//test/e2e/framework/log:go_default_library",
-        "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/perftype:go_default_library",
     ],
 )

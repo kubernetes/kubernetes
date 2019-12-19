@@ -14,7 +14,6 @@ spec:
       labels:
         k8s-app: sample-device-plugin
       annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-node-critical
       tolerations:

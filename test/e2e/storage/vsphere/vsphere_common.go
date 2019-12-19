@@ -57,12 +57,14 @@ const (
 const (
 	VCPZoneVsanDatastore1      = "VCP_ZONE_VSANDATASTORE1"
 	VCPZoneVsanDatastore2      = "VCP_ZONE_VSANDATASTORE2"
+	VCPZoneLocalDatastore      = "VCP_ZONE_LOCALDATASTORE"
 	VCPZoneCompatPolicyName    = "VCP_ZONE_COMPATPOLICY_NAME"
 	VCPZoneNonCompatPolicyName = "VCP_ZONE_NONCOMPATPOLICY_NAME"
 	VCPZoneA                   = "VCP_ZONE_A"
 	VCPZoneB                   = "VCP_ZONE_B"
 	VCPZoneC                   = "VCP_ZONE_C"
 	VCPZoneD                   = "VCP_ZONE_D"
+	VCPInvalidZone             = "VCP_INVALID_ZONE"
 )
 
 func GetAndExpectStringEnvVar(varName string) string {

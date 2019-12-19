@@ -19,13 +19,13 @@
 package naming
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
 	"strconv"
 	"time"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/grpclog"
 )
 
@@ -37,6 +37,9 @@ const (
 var (
 	errMissingAddr  = errors.New("missing address")
 	errWatcherClose = errors.New("watcher has been closed")
+
+	lookupHost = net.DefaultResolver.LookupHost
+	lookupSRV  = net.DefaultResolver.LookupSRV
 )
 
 // NewDNSResolverWithFreq creates a DNS Resolver that can resolve DNS names, and
@@ -73,8 +76,8 @@ func formatIP(addr string) (addrIP string, ok bool) {
 
 // parseTarget takes the user input target string, returns formatted host and port info.
 // If target doesn't specify a port, set the port to be the defaultPort.
-// If target is in IPv6 format and host-name is enclosed in sqarue brackets, brackets
-// are strippd when setting the host.
+// If target is in IPv6 format and host-name is enclosed in square brackets, brackets
+// are stripped when setting the host.
 // examples:
 // target: "www.google.com" returns host: "www.google.com", port: "443"
 // target: "ipv4-host:80" returns host: "ipv4-host", port: "80"
@@ -218,7 +221,7 @@ func (w *dnsWatcher) lookupSRV() map[string]*Update {
 	for _, s := range srvs {
 		lbAddrs, err := lookupHost(w.ctx, s.Target)
 		if err != nil {
-			grpclog.Warningf("grpc: failed load banlacer address dns lookup due to %v.\n", err)
+			grpclog.Warningf("grpc: failed load balancer address dns lookup due to %v.\n", err)
 			continue
 		}
 		for _, a := range lbAddrs {

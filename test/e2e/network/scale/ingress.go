@@ -23,7 +23,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -118,7 +118,7 @@ func (f *IngressScaleFramework) PrepareScaleTest() error {
 		Cloud:  f.CloudConfig,
 	}
 	if err := f.GCEController.Init(); err != nil {
-		return fmt.Errorf("Failed to initialize GCE controller: %v", err)
+		return fmt.Errorf("failed to initialize GCE controller: %v", err)
 	}
 
 	f.ScaleTestSvcs = []*v1.Service{}
@@ -135,7 +135,7 @@ func (f *IngressScaleFramework) CleanupScaleTest() []error {
 	for _, ing := range f.ScaleTestIngs {
 		if ing != nil {
 			if err := f.Clientset.NetworkingV1beta1().Ingresses(ing.Namespace).Delete(ing.Name, nil); err != nil {
-				errs = append(errs, fmt.Errorf("Error while deleting ingress %s/%s: %v", ing.Namespace, ing.Name, err))
+				errs = append(errs, fmt.Errorf("error while deleting ingress %s/%s: %v", ing.Namespace, ing.Name, err))
 			}
 		}
 	}
@@ -143,14 +143,14 @@ func (f *IngressScaleFramework) CleanupScaleTest() []error {
 	for _, svc := range f.ScaleTestSvcs {
 		if svc != nil {
 			if err := f.Clientset.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil); err != nil {
-				errs = append(errs, fmt.Errorf("Error while deleting service %s/%s: %v", svc.Namespace, svc.Name, err))
+				errs = append(errs, fmt.Errorf("error while deleting service %s/%s: %v", svc.Namespace, svc.Name, err))
 			}
 		}
 	}
 	if f.ScaleTestDeploy != nil {
 		f.Logger.Infof("Cleaning up deployment %s...", f.ScaleTestDeploy.Name)
 		if err := f.Clientset.AppsV1().Deployments(f.ScaleTestDeploy.Namespace).Delete(f.ScaleTestDeploy.Name, nil); err != nil {
-			errs = append(errs, fmt.Errorf("Error while delting deployment %s/%s: %v", f.ScaleTestDeploy.Namespace, f.ScaleTestDeploy.Name, err))
+			errs = append(errs, fmt.Errorf("error while delting deployment %s/%s: %v", f.ScaleTestDeploy.Namespace, f.ScaleTestDeploy.Name, err))
 		}
 	}
 
@@ -170,7 +170,7 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 	f.Logger.Infof("Creating deployment %s...", testDeploy.Name)
 	testDeploy, err := f.Jig.Client.AppsV1().Deployments(f.Namespace).Create(testDeploy)
 	if err != nil {
-		errs = append(errs, fmt.Errorf("Failed to create deployment %s: %v", testDeploy.Name, err))
+		errs = append(errs, fmt.Errorf("failed to create deployment %s: %v", testDeploy.Name, err))
 		return errs
 	}
 	f.ScaleTestDeploy = testDeploy
@@ -178,7 +178,7 @@ func (f *IngressScaleFramework) RunScaleTest() []error {
 	if f.EnableTLS {
 		f.Logger.Infof("Ensuring TLS secret %s...", scaleTestSecretName)
 		if err := f.Jig.PrepareTLSSecret(f.Namespace, scaleTestSecretName, scaleTestHostname); err != nil {
-			errs = append(errs, fmt.Errorf("Failed to prepare TLS secret %s: %v", scaleTestSecretName, err))
+			errs = append(errs, fmt.Errorf("failed to prepare TLS secret %s: %v", scaleTestSecretName, err))
 			return errs
 		}
 	}

@@ -225,3 +225,70 @@ func TestGetKubeDNSVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestGetKubernetesServiceCIDR(t *testing.T) {
+	var tests = []struct {
+		svcSubnetList string
+		isDualStack   bool
+		expected      string
+		expectedError bool
+		name          string
+	}{
+		{
+			svcSubnetList: "192.168.10.0/24",
+			isDualStack:   false,
+			expected:      "192.168.10.0/24",
+			expectedError: false,
+			name:          "valid: valid IPv4 range from single-stack",
+		},
+		{
+			svcSubnetList: "fd03::/112",
+			isDualStack:   false,
+			expected:      "fd03::/112",
+			expectedError: false,
+			name:          "valid: valid IPv6 range from single-stack",
+		},
+		{
+			svcSubnetList: "192.168.10.0/24,fd03::/112",
+			isDualStack:   true,
+			expected:      "192.168.10.0/24",
+			expectedError: false,
+			name:          "valid: valid <IPv4,IPv6> ranges from dual-stack",
+		},
+		{
+			svcSubnetList: "fd03::/112,192.168.10.0/24",
+			isDualStack:   true,
+			expected:      "fd03::/112",
+			expectedError: false,
+			name:          "valid: valid <IPv6,IPv4> ranges from dual-stack",
+		},
+		{
+			svcSubnetList: "192.168.10.0/24,fd03:x::/112",
+			isDualStack:   true,
+			expected:      "",
+			expectedError: true,
+			name:          "invalid: failed to parse subnet range for dual-stack",
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.name, func(t *testing.T) {
+			actual, actualError := GetKubernetesServiceCIDR(rt.svcSubnetList, rt.isDualStack)
+			if rt.expectedError {
+				if actualError == nil {
+					t.Errorf("failed GetKubernetesServiceCIDR:\n\texpected error, but got no error")
+				}
+			} else if !rt.expectedError && actualError != nil {
+				t.Errorf("failed GetKubernetesServiceCIDR:\n\texpected no error, but got: %v", actualError)
+			} else {
+				if actual.String() != rt.expected {
+					t.Errorf(
+						"failed GetKubernetesServiceCIDR:\n\texpected: %s\n\t  actual: %s",
+						rt.expected,
+						actual.String(),
+					)
+				}
+			}
+		})
+	}
+}

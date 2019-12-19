@@ -31,12 +31,84 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
+
+// DriverDefinition needs to be filled in via a .yaml or .json
+// file. Its methods then implement the TestDriver interface, using
+// nothing but the information in this struct.
+type driverDefinition struct {
+	// DriverInfo is the static information that the storage testsuite
+	// expects from a test driver. See test/e2e/storage/testsuites/testdriver.go
+	// for details. The only field with a non-zero default is the list of
+	// supported file systems (SupportedFsType): it is set so that tests using
+	// the default file system are enabled.
+	DriverInfo testsuites.DriverInfo
+
+	// StorageClass must be set to enable dynamic provisioning tests.
+	// The default is to not run those tests.
+	StorageClass struct {
+		// FromName set to true enables the usage of a storage
+		// class with DriverInfo.Name as provisioner and no
+		// parameters.
+		FromName bool
+
+		// FromFile is used only when FromName is false.  It
+		// loads a storage class from the given .yaml or .json
+		// file. File names are resolved by the
+		// framework.testfiles package, which typically means
+		// that they can be absolute or relative to the test
+		// suite's --repo-root parameter.
+		//
+		// This can be used when the storage class is meant to have
+		// additional parameters.
+		FromFile string
+	}
+
+	// SnapshotClass must be set to enable snapshotting tests.
+	// The default is to not run those tests.
+	SnapshotClass struct {
+		// FromName set to true enables the usage of a
+		// snapshotter class with DriverInfo.Name as provisioner.
+		FromName bool
+
+		// TODO (?): load from file
+	}
+
+	// InlineVolumes defines one or more volumes for use as inline
+	// ephemeral volumes. At least one such volume has to be
+	// defined to enable testing of inline ephemeral volumes.  If
+	// a test needs more volumes than defined, some of the defined
+	// volumes will be used multiple times.
+	//
+	// DriverInfo.Name is used as name of the driver in the inline volume.
+	InlineVolumes []struct {
+		// Attributes are passed as NodePublishVolumeReq.volume_context.
+		// Can be empty.
+		Attributes map[string]string
+		// Shared defines whether the resulting volume is
+		// shared between different pods (i.e.  changes made
+		// in one pod are visible in another)
+		Shared bool
+		// ReadOnly must be set to true if the driver does not
+		// support mounting as read/write.
+		ReadOnly bool
+	}
+
+	// SupportedSizeRange defines the desired size of dynamically
+	// provisioned volumes.
+	SupportedSizeRange volume.SizeRange
+
+	// ClientNodeName selects a specific node for scheduling test pods.
+	// Can be left empty. Most drivers should not need this and instead
+	// use topology to ensure that pods land on the right node(s).
+	ClientNodeName string
+}
 
 // List of testSuites to be executed for each external driver.
 var csiTestSuites = []func() testsuites.TestSuite{
@@ -49,6 +121,8 @@ var csiTestSuites = []func() testsuites.TestSuite{
 	testsuites.InitVolumeModeTestSuite,
 	testsuites.InitVolumesTestSuite,
 	testsuites.InitVolumeExpandTestSuite,
+	testsuites.InitDisruptiveTestSuite,
+	testsuites.InitVolumeLimitsTestSuite,
 }
 
 func init() {
@@ -109,7 +183,9 @@ func loadDriverDefinition(filename string) (*driverDefinition, error) {
 				"", // Default fsType
 			),
 		},
-		ClaimSize: "5Gi",
+		SupportedSizeRange: volume.SizeRange{
+			Min: "5Gi",
+		},
 	}
 	// TODO: strict checking of the file content once https://github.com/kubernetes/kubernetes/pull/71589
 	// or something similar is merged.
@@ -137,66 +213,6 @@ var _ testsuites.EphemeralTestDriver = &driverDefinition{}
 // an implementation.
 var _ runtime.Object = &driverDefinition{}
 
-// DriverDefinition needs to be filled in via a .yaml or .json
-// file. It's methods then implement the TestDriver interface, using
-// nothing but the information in this struct.
-type driverDefinition struct {
-	// DriverInfo is the static information that the storage testsuite
-	// expects from a test driver. See test/e2e/storage/testsuites/testdriver.go
-	// for details. The only field with a non-zero default is the list of
-	// supported file systems (SupportedFsType): it is set so that tests using
-	// the default file system are enabled.
-	DriverInfo testsuites.DriverInfo
-
-	// StorageClass must be set to enable dynamic provisioning tests.
-	// The default is to not run those tests.
-	StorageClass struct {
-		// FromName set to true enables the usage of a storage
-		// class with DriverInfo.Name as provisioner and no
-		// parameters.
-		FromName bool
-
-		// FromFile is used only when FromName is false.  It
-		// loads a storage class from the given .yaml or .json
-		// file. File names are resolved by the
-		// framework.testfiles package, which typically means
-		// that they can be absolute or relative to the test
-		// suite's --repo-root parameter.
-		//
-		// This can be used when the storage class is meant to have
-		// additional parameters.
-		FromFile string
-	}
-
-	// SnapshotClass must be set to enable snapshotting tests.
-	// The default is to not run those tests.
-	SnapshotClass struct {
-		// FromName set to true enables the usage of a
-		// snapshotter class with DriverInfo.Name as provisioner.
-		FromName bool
-
-		// TODO (?): load from file
-	}
-
-	// InlineVolumeAttributes defines one or more set of attributes for
-	// use as inline ephemeral volumes. At least one set of attributes
-	// has to be defined to enable testing of inline ephemeral volumes.
-	// If a test needs more volumes than defined, some of the defined
-	// volumes will be used multiple times.
-	//
-	// DriverInfo.Name is used as name of the driver in the inline volume.
-	InlineVolumeAttributes []map[string]string
-
-	// ClaimSize defines the desired size of dynamically
-	// provisioned volumes. Default is "5GiB".
-	ClaimSize string
-
-	// ClientNodeName selects a specific node for scheduling test pods.
-	// Can be left empty. Most drivers should not need this and instead
-	// use topology to ensure that pods land on the right node(s).
-	ClientNodeName string
-}
-
 func (d *driverDefinition) DeepCopyObject() runtime.Object {
 	return nil
 }
@@ -220,7 +236,7 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern testpatterns.TestPattern)
 			supported = true
 		}
 	case testpatterns.CSIInlineVolume:
-		supported = len(d.InlineVolumeAttributes) != 0
+		supported = len(d.InlineVolumes) != 0
 	}
 	if !supported {
 		framework.Skipf("Driver %q does not support volume type %q - skipping", d.DriverInfo.Name, pattern.VolType)
@@ -255,15 +271,15 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(config *testsuites.Pe
 		return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 	}
 
-	items, err := f.LoadFromManifests(d.StorageClass.FromFile)
+	items, err := utils.LoadFromManifests(d.StorageClass.FromFile)
 	framework.ExpectNoError(err, "load storage class from %s", d.StorageClass.FromFile)
 	framework.ExpectEqual(len(items), 1, "exactly one item from %s", d.StorageClass.FromFile)
 
-	err = f.PatchItems(items...)
+	err = utils.PatchItems(f, items...)
 	framework.ExpectNoError(err, "patch items")
 
 	sc, ok := items[0].(*storagev1.StorageClass)
-	gomega.Expect(ok).To(gomega.BeTrue(), "storage class from %s", d.StorageClass.FromFile)
+	framework.ExpectEqual(ok, true, "storage class from %s", d.StorageClass.FromFile)
 	// Ensure that we can load more than once as required for
 	// GetDynamicProvisionStorageClass by adding a random suffix.
 	sc.Name = names.SimpleNameGenerator.GenerateName(sc.Name + "-")
@@ -289,15 +305,12 @@ func (d *driverDefinition) GetSnapshotClass(config *testsuites.PerTestConfig) *u
 	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
 }
 
-func (d *driverDefinition) GetClaimSize() string {
-	return d.ClaimSize
-}
-
-func (d *driverDefinition) GetVolumeAttributes(config *testsuites.PerTestConfig, volumeNumber int) map[string]string {
-	if len(d.InlineVolumeAttributes) == 0 {
+func (d *driverDefinition) GetVolume(config *testsuites.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {
+	if len(d.InlineVolumes) == 0 {
 		framework.Skipf("%s does not have any InlineVolumeAttributes defined", d.DriverInfo.Name)
 	}
-	return d.InlineVolumeAttributes[volumeNumber%len(d.InlineVolumeAttributes)]
+	volume := d.InlineVolumes[volumeNumber%len(d.InlineVolumes)]
+	return volume.Attributes, volume.Shared, volume.ReadOnly
 }
 
 func (d *driverDefinition) GetCSIDriverName(config *testsuites.PerTestConfig) string {

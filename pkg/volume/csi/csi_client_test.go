@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 type fakeCsiDriverClient struct {
@@ -156,6 +157,9 @@ func (c *fakeCsiDriverClient) NodePublishVolume(
 	}
 
 	_, err := c.nodeClient.NodePublishVolume(ctx, req)
+	if err != nil && !isFinalError(err) {
+		return volumetypes.NewUncertainProgressError(err.Error())
+	}
 	return err
 }
 
@@ -201,6 +205,9 @@ func (c *fakeCsiDriverClient) NodeStageVolume(ctx context.Context,
 	}
 
 	_, err := c.nodeClient.NodeStageVolume(ctx, req)
+	if err != nil && !isFinalError(err) {
+		return volumetypes.NewUncertainProgressError(err.Error())
+	}
 	return err
 }
 

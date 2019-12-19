@@ -82,20 +82,13 @@ func (b *scStateUpdateBuffer) get() <-chan *scStateUpdate {
 	return b.c
 }
 
-// resolverUpdate contains the new resolved addresses or error if there's
-// any.
-type resolverUpdate struct {
-	addrs []resolver.Address
-	err   error
-}
-
 // ccBalancerWrapper is a wrapper on top of cc for balancers.
 // It implements balancer.ClientConn interface.
 type ccBalancerWrapper struct {
 	cc               *ClientConn
 	balancer         balancer.Balancer
 	stateChangeQueue *scStateUpdateBuffer
-	resolverUpdateCh chan *resolverUpdate
+	ccUpdateCh       chan *balancer.ClientConnState
 	done             chan struct{}
 
 	mu       sync.Mutex
@@ -106,7 +99,7 @@ func newCCBalancerWrapper(cc *ClientConn, b balancer.Builder, bopts balancer.Bui
 	ccb := &ccBalancerWrapper{
 		cc:               cc,
 		stateChangeQueue: newSCStateUpdateBuffer(),
-		resolverUpdateCh: make(chan *resolverUpdate, 1),
+		ccUpdateCh:       make(chan *balancer.ClientConnState, 1),
 		done:             make(chan struct{}),
 		subConns:         make(map[*acBalancerWrapper]struct{}),
 	}
@@ -128,15 +121,23 @@ func (ccb *ccBalancerWrapper) watcher() {
 				return
 			default:
 			}
-			ccb.balancer.HandleSubConnStateChange(t.sc, t.state)
-		case t := <-ccb.resolverUpdateCh:
+			if ub, ok := ccb.balancer.(balancer.V2Balancer); ok {
+				ub.UpdateSubConnState(t.sc, balancer.SubConnState{ConnectivityState: t.state})
+			} else {
+				ccb.balancer.HandleSubConnStateChange(t.sc, t.state)
+			}
+		case s := <-ccb.ccUpdateCh:
 			select {
 			case <-ccb.done:
 				ccb.balancer.Close()
 				return
 			default:
 			}
-			ccb.balancer.HandleResolvedAddrs(t.addrs, t.err)
+			if ub, ok := ccb.balancer.(balancer.V2Balancer); ok {
+				ub.UpdateClientConnState(*s)
+			} else {
+				ccb.balancer.HandleResolvedAddrs(s.ResolverState.Addresses, nil)
+			}
 		case <-ccb.done:
 		}
 
@@ -150,9 +151,11 @@ func (ccb *ccBalancerWrapper) watcher() {
 			for acbw := range scs {
 				ccb.cc.removeAddrConn(acbw.getAddrConn(), errConnDrain)
 			}
+			ccb.UpdateBalancerState(connectivity.Connecting, nil)
 			return
 		default:
 		}
+		ccb.cc.firstResolveEvent.Fire()
 	}
 }
 
@@ -177,15 +180,24 @@ func (ccb *ccBalancerWrapper) handleSubConnStateChange(sc balancer.SubConn, s co
 	})
 }
 
-func (ccb *ccBalancerWrapper) handleResolvedAddrs(addrs []resolver.Address, err error) {
+func (ccb *ccBalancerWrapper) updateClientConnState(ccs *balancer.ClientConnState) {
+	if ccb.cc.curBalancerName != grpclbName {
+		// Filter any grpclb addresses since we don't have the grpclb balancer.
+		s := &ccs.ResolverState
+		for i := 0; i < len(s.Addresses); {
+			if s.Addresses[i].Type == resolver.GRPCLB {
+				copy(s.Addresses[i:], s.Addresses[i+1:])
+				s.Addresses = s.Addresses[:len(s.Addresses)-1]
+				continue
+			}
+			i++
+		}
+	}
 	select {
-	case <-ccb.resolverUpdateCh:
+	case <-ccb.ccUpdateCh:
 	default:
 	}
-	ccb.resolverUpdateCh <- &resolverUpdate{
-		addrs: addrs,
-		err:   err,
-	}
+	ccb.ccUpdateCh <- ccs
 }
 
 func (ccb *ccBalancerWrapper) NewSubConn(addrs []resolver.Address, opts balancer.NewSubConnOptions) (balancer.SubConn, error) {
@@ -197,7 +209,7 @@ func (ccb *ccBalancerWrapper) NewSubConn(addrs []resolver.Address, opts balancer
 	if ccb.subConns == nil {
 		return nil, fmt.Errorf("grpc: ClientConn balancer wrapper was closed")
 	}
-	ac, err := ccb.cc.newAddrConn(addrs)
+	ac, err := ccb.cc.newAddrConn(addrs, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -229,8 +241,13 @@ func (ccb *ccBalancerWrapper) UpdateBalancerState(s connectivity.State, p balanc
 	if ccb.subConns == nil {
 		return
 	}
-	ccb.cc.csMgr.updateState(s)
+	// Update picker before updating state.  Even though the ordering here does
+	// not matter, it can lead to multiple calls of Pick in the common start-up
+	// case where we wait for ready and then perform an RPC.  If the picker is
+	// updated later, we could call the "connecting" picker when the state is
+	// updated, and then call the "ready" picker after the picker gets updated.
 	ccb.cc.blockingpicker.updatePicker(p)
+	ccb.cc.csMgr.updateState(s)
 }
 
 func (ccb *ccBalancerWrapper) ResolveNow(o resolver.ResolveNowOption) {
@@ -257,6 +274,7 @@ func (acbw *acBalancerWrapper) UpdateAddresses(addrs []resolver.Address) {
 	}
 	if !acbw.ac.tryUpdateAddrs(addrs) {
 		cc := acbw.ac.cc
+		opts := acbw.ac.scopts
 		acbw.ac.mu.Lock()
 		// Set old ac.acbw to nil so the Shutdown state update will be ignored
 		// by balancer.
@@ -272,7 +290,7 @@ func (acbw *acBalancerWrapper) UpdateAddresses(addrs []resolver.Address) {
 			return
 		}
 
-		ac, err := cc.newAddrConn(addrs)
+		ac, err := cc.newAddrConn(addrs, opts)
 		if err != nil {
 			grpclog.Warningf("acBalancerWrapper: UpdateAddresses: failed to newAddrConn: %v", err)
 			return

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
@@ -47,7 +47,7 @@ func GetKubemarkMasterComponentsResourceUsage() map[string]*KubemarkResourceUsag
 	// Get kubernetes component resource usage
 	sshResult, err := getMasterUsageByPrefix("kube")
 	if err != nil {
-		e2elog.Logf("Error when trying to SSH to master machine. Skipping probe. %v", err)
+		Logf("Error when trying to SSH to master machine. Skipping probe. %v", err)
 		return nil
 	}
 	scanner := bufio.NewScanner(strings.NewReader(sshResult))
@@ -65,7 +65,7 @@ func GetKubemarkMasterComponentsResourceUsage() map[string]*KubemarkResourceUsag
 	// Get etcd resource usage
 	sshResult, err = getMasterUsageByPrefix("bin/etcd")
 	if err != nil {
-		e2elog.Logf("Error when trying to SSH to master machine. Skipping probe")
+		Logf("Error when trying to SSH to master machine. Skipping probe")
 		return nil
 	}
 	scanner = bufio.NewScanner(strings.NewReader(sshResult))

@@ -136,7 +136,7 @@ func (u *unmarshalInfo) unmarshal(m pointer, b []byte) error {
 		u.computeUnmarshalInfo()
 	}
 	if u.isMessageSet {
-		return UnmarshalMessageSet(b, m.offset(u.extensions).toExtensions())
+		return unmarshalMessageSet(b, m.offset(u.extensions).toExtensions())
 	}
 	var reqMask uint64 // bitmask of required fields we've seen.
 	var errLater error
@@ -362,46 +362,48 @@ func (u *unmarshalInfo) computeUnmarshalInfo() {
 	}
 
 	// Find any types associated with oneof fields.
-	// TODO: XXX_OneofFuncs returns more info than we need.  Get rid of some of it?
-	fn := reflect.Zero(reflect.PtrTo(t)).MethodByName("XXX_OneofFuncs")
-	if fn.IsValid() {
-		res := fn.Call(nil)[3] // last return value from XXX_OneofFuncs: []interface{}
-		for i := res.Len() - 1; i >= 0; i-- {
-			v := res.Index(i)                             // interface{}
-			tptr := reflect.ValueOf(v.Interface()).Type() // *Msg_X
-			typ := tptr.Elem()                            // Msg_X
+	var oneofImplementers []interface{}
+	switch m := reflect.Zero(reflect.PtrTo(t)).Interface().(type) {
+	case oneofFuncsIface:
+		_, _, _, oneofImplementers = m.XXX_OneofFuncs()
+	case oneofWrappersIface:
+		oneofImplementers = m.XXX_OneofWrappers()
+	}
+	for _, v := range oneofImplementers {
+		tptr := reflect.TypeOf(v) // *Msg_X
+		typ := tptr.Elem()        // Msg_X
 
-			f := typ.Field(0) // oneof implementers have one field
-			baseUnmarshal := fieldUnmarshaler(&f)
-			tags := strings.Split(f.Tag.Get("protobuf"), ",")
-			fieldNum, err := strconv.Atoi(tags[1])
-			if err != nil {
-				panic("protobuf tag field not an integer: " + tags[1])
-			}
-			var name string
-			for _, tag := range tags {
-				if strings.HasPrefix(tag, "name=") {
-					name = strings.TrimPrefix(tag, "name=")
-					break
-				}
-			}
-
-			// Find the oneof field that this struct implements.
-			// Might take O(n^2) to process all of the oneofs, but who cares.
-			for _, of := range oneofFields {
-				if tptr.Implements(of.ityp) {
-					// We have found the corresponding interface for this struct.
-					// That lets us know where this struct should be stored
-					// when we encounter it during unmarshaling.
-					unmarshal := makeUnmarshalOneof(typ, of.ityp, baseUnmarshal)
-					u.setTag(fieldNum, of.field, unmarshal, 0, name)
-				}
+		f := typ.Field(0) // oneof implementers have one field
+		baseUnmarshal := fieldUnmarshaler(&f)
+		tags := strings.Split(f.Tag.Get("protobuf"), ",")
+		fieldNum, err := strconv.Atoi(tags[1])
+		if err != nil {
+			panic("protobuf tag field not an integer: " + tags[1])
+		}
+		var name string
+		for _, tag := range tags {
+			if strings.HasPrefix(tag, "name=") {
+				name = strings.TrimPrefix(tag, "name=")
+				break
 			}
 		}
+
+		// Find the oneof field that this struct implements.
+		// Might take O(n^2) to process all of the oneofs, but who cares.
+		for _, of := range oneofFields {
+			if tptr.Implements(of.ityp) {
+				// We have found the corresponding interface for this struct.
+				// That lets us know where this struct should be stored
+				// when we encounter it during unmarshaling.
+				unmarshal := makeUnmarshalOneof(typ, of.ityp, baseUnmarshal)
+				u.setTag(fieldNum, of.field, unmarshal, 0, name)
+			}
+		}
+
 	}
 
 	// Get extension ranges, if any.
-	fn = reflect.Zero(reflect.PtrTo(t)).MethodByName("ExtensionRangeArray")
+	fn := reflect.Zero(reflect.PtrTo(t)).MethodByName("ExtensionRangeArray")
 	if fn.IsValid() {
 		if !u.extensions.IsValid() && !u.oldExtensions.IsValid() {
 			panic("a message with extensions, but no extensions field in " + t.Name())
@@ -1948,7 +1950,7 @@ func encodeVarint(b []byte, x uint64) []byte {
 // If there is an error, it returns 0,0.
 func decodeVarint(b []byte) (uint64, int) {
 	var x, y uint64
-	if len(b) <= 0 {
+	if len(b) == 0 {
 		goto bad
 	}
 	x = uint64(b[0])

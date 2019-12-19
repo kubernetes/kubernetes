@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -108,7 +110,7 @@ func getProjectAndZone() (string, string, error) {
 }
 
 func (g *Cloud) raiseFirewallChangeNeededEvent(svc *v1.Service, cmd string) {
-	msg := fmt.Sprintf("Firewall change required by network admin: `%v`", cmd)
+	msg := fmt.Sprintf("Firewall change required by security admin: `%v`", cmd)
 	if g.eventRecorder != nil && svc != nil {
 		g.eventRecorder.Event(svc, v1.EventTypeNormal, "LoadBalancerManualChange", msg)
 	}

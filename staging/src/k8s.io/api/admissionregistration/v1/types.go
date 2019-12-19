@@ -117,7 +117,7 @@ const (
 // ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
 type ValidatingWebhookConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// Webhooks is a list of webhooks and the affected resources and operations.
@@ -133,7 +133,7 @@ type ValidatingWebhookConfiguration struct {
 type ValidatingWebhookConfigurationList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// List of ValidatingWebhookConfiguration.
@@ -147,7 +147,7 @@ type ValidatingWebhookConfigurationList struct {
 // MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
 type MutatingWebhookConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// Webhooks is a list of webhooks and the affected resources and operations.
@@ -163,7 +163,7 @@ type MutatingWebhookConfiguration struct {
 type MutatingWebhookConfigurationList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// List of MutatingWebhookConfiguration.
@@ -273,8 +273,8 @@ type ValidatingWebhook struct {
 	// +optional
 	ObjectSelector *metav1.LabelSelector `json:"objectSelector,omitempty" protobuf:"bytes,10,opt,name=objectSelector"`
 
-	// SideEffects states whether this webhookk has side effects.
-	// Acceptable values are: Unknown, None, Some, NoneOnDryRun
+	// SideEffects states whether this webhook has side effects.
+	// Acceptable values are: None, NoneOnDryRun (webhooks created via v1beta1 may also specify Some or Unknown).
 	// Webhooks with side effects MUST implement a reconciliation system, since a request may be
 	// rejected by a future step in the admission change and the side effects therefore need to be undone.
 	// Requests with the dryRun attribute will be auto-rejected if they match a webhook with
@@ -402,8 +402,8 @@ type MutatingWebhook struct {
 	// +optional
 	ObjectSelector *metav1.LabelSelector `json:"objectSelector,omitempty" protobuf:"bytes,11,opt,name=objectSelector"`
 
-	// SideEffects states whether this webhookk has side effects.
-	// Acceptable values are: Unknown, None, Some, NoneOnDryRun
+	// SideEffects states whether this webhook has side effects.
+	// Acceptable values are: None, NoneOnDryRun (webhooks created via v1beta1 may also specify Some or Unknown).
 	// Webhooks with side effects MUST implement a reconciliation system, since a request may be
 	// rejected by a future step in the admission change and the side effects therefore need to be undone.
 	// Requests with the dryRun attribute will be auto-rejected if they match a webhook with

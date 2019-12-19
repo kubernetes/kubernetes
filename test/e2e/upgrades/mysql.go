@@ -26,13 +26,11 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
@@ -62,8 +60,8 @@ func (MySQLUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 }
 
 func mysqlKubectlCreate(ns, file string) {
-	input := string(testfiles.ReadOrDie(filepath.Join(mysqlManifestPath, file), ginkgo.Fail))
-	framework.RunKubectlOrDieInput(input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
+	input := string(testfiles.ReadOrDie(filepath.Join(mysqlManifestPath, file)))
+	framework.RunKubectlOrDieInput(ns, input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
 }
 
 func (t *MySQLUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName string) string {
@@ -100,13 +98,13 @@ func (t *MySQLUpgradeTest) Setup(f *framework.Framework) {
 			return false, nil
 		}
 		if _, err := t.countNames(); err != nil {
-			e2elog.Logf("Service endpoint is up but isn't responding")
+			framework.Logf("Service endpoint is up but isn't responding")
 			return false, nil
 		}
 		return true, nil
 	})
 	framework.ExpectNoError(err)
-	e2elog.Logf("Service endpoint is up")
+	framework.Logf("Service endpoint is up")
 
 	ginkgo.By("Adding 2 names to the database")
 	err = t.addName(strconv.Itoa(t.nextWrite))
@@ -128,7 +126,7 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 	go wait.Until(func() {
 		_, err := t.countNames()
 		if err != nil {
-			e2elog.Logf("Error while trying to read data: %v", err)
+			framework.Logf("Error while trying to read data: %v", err)
 			readFailure++
 		} else {
 			readSuccess++
@@ -138,7 +136,7 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 	wait.Until(func() {
 		err := t.addName(strconv.Itoa(t.nextWrite))
 		if err != nil {
-			e2elog.Logf("Error while trying to write data: %v", err)
+			framework.Logf("Error while trying to write data: %v", err)
 			writeFailure++
 		} else {
 			writeSuccess++
@@ -146,10 +144,10 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 	}, framework.Poll, done)
 
 	t.successfulWrites = writeSuccess
-	e2elog.Logf("Successful reads: %d", readSuccess)
-	e2elog.Logf("Successful writes: %d", writeSuccess)
-	e2elog.Logf("Failed reads: %d", readFailure)
-	e2elog.Logf("Failed writes: %d", writeFailure)
+	framework.Logf("Successful reads: %d", readSuccess)
+	framework.Logf("Successful writes: %d", writeSuccess)
+	framework.Logf("Failed reads: %d", readFailure)
+	framework.Logf("Failed writes: %d", writeFailure)
 
 	// TODO: Not sure what the ratio defining a successful test run should be. At time of writing the
 	// test, failures only seem to happen when a race condition occurs (read/write starts, doesn't
@@ -158,10 +156,10 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 	readRatio := float64(readSuccess) / float64(readSuccess+readFailure)
 	writeRatio := float64(writeSuccess) / float64(writeSuccess+writeFailure)
 	if readRatio < 0.75 {
-		e2elog.Failf("Too many failures reading data. Success ratio: %f", readRatio)
+		framework.Failf("Too many failures reading data. Success ratio: %f", readRatio)
 	}
 	if writeRatio < 0.75 {
-		e2elog.Failf("Too many failures writing data. Success ratio: %f", writeRatio)
+		framework.Failf("Too many failures writing data. Success ratio: %f", writeRatio)
 	}
 }
 
@@ -169,7 +167,7 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 func (t *MySQLUpgradeTest) Teardown(f *framework.Framework) {
 	count, err := t.countNames()
 	framework.ExpectNoError(err)
-	gomega.Expect(count >= t.successfulWrites).To(gomega.BeTrue())
+	framework.ExpectEqual(count >= t.successfulWrites, true)
 }
 
 // addName adds a new value to the db.

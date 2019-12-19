@@ -8,6 +8,7 @@ go_library(
         "core.go",
         "prop.go",
         "tables10.0.0.go",
+        "tables11.0.0.go",
         "tables9.0.0.go",
         "trieval.go",
     ],

@@ -33,8 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/endpoints"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -161,11 +161,11 @@ var _ = SIGDescribe("Proxy", func() {
 				Labels:      labels,
 				CreatedPods: &pods,
 			}
-			err = framework.RunRC(cfg)
+			err = e2erc.RunRC(cfg)
 			framework.ExpectNoError(err)
-			defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, cfg.Name)
+			defer e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, cfg.Name)
 
-			err = endpoints.WaitForEndpoint(f.ClientSet, f.Namespace.Name, service.Name)
+			err = waitForEndpoint(f.ClientSet, f.Namespace.Name, service.Name)
 			framework.ExpectNoError(err)
 
 			// table constructors
@@ -212,7 +212,7 @@ var _ = SIGDescribe("Proxy", func() {
 				errs = append(errs, s)
 			}
 			d := time.Since(start)
-			e2elog.Logf("setup took %v, starting test cases", d)
+			framework.Logf("setup took %v, starting test cases", d)
 			numberTestCases := len(expectations)
 			totalAttempts := numberTestCases * proxyAttempts
 			ginkgo.By(fmt.Sprintf("running %v cases, %v attempts per case, %v total attempts", numberTestCases, proxyAttempts, totalAttempts))
@@ -251,12 +251,12 @@ var _ = SIGDescribe("Proxy", func() {
 			if len(errs) != 0 {
 				body, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).GetLogs(pods[0].Name, &v1.PodLogOptions{}).Do().Raw()
 				if err != nil {
-					e2elog.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
+					framework.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
 				} else {
-					e2elog.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
+					framework.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
 				}
 
-				e2elog.Failf(strings.Join(errs, "\n"))
+				framework.Failf(strings.Join(errs, "\n"))
 			}
 		})
 	})
@@ -273,9 +273,9 @@ func doProxy(f *framework.Framework, path string, i int) (body []byte, statusCod
 	body, err = f.ClientSet.CoreV1().RESTClient().Get().AbsPath(path).Do().StatusCode(&statusCode).Raw()
 	d = time.Since(start)
 	if len(body) > 0 {
-		e2elog.Logf("(%v) %v: %s (%v; %v)", i, path, truncate(body, maxDisplayBodyLen), statusCode, d)
+		framework.Logf("(%v) %v: %s (%v; %v)", i, path, truncate(body, maxDisplayBodyLen), statusCode, d)
 	} else {
-		e2elog.Logf("%v: %s (%v; %v)", path, "no body", statusCode, d)
+		framework.Logf("%v: %s (%v; %v)", path, "no body", statusCode, d)
 	}
 	return
 }
@@ -289,25 +289,18 @@ func truncate(b []byte, maxLen int) []byte {
 	return b2
 }
 
-func pickNode(cs clientset.Interface) (string, error) {
-	// TODO: investigate why it doesn't work on master Node.
-	nodes := framework.GetReadySchedulableNodesOrDie(cs)
-	if len(nodes.Items) == 0 {
-		return "", fmt.Errorf("no nodes exist, can't test node proxy")
-	}
-	return nodes.Items[0].Name, nil
-}
-
 func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
-	node, err := pickNode(f.ClientSet)
+	// TODO: investigate why it doesn't work on master Node.
+	node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
 	framework.ExpectNoError(err)
+
 	// TODO: Change it to test whether all requests succeeded when requests
 	// not reaching Kubelet issue is debugged.
 	serviceUnavailableErrors := 0
 	for i := 0; i < proxyAttempts; i++ {
-		_, status, d, err := doProxy(f, prefix+node+nodeDest, i)
+		_, status, d, err := doProxy(f, prefix+node.Name+nodeDest, i)
 		if status == http.StatusServiceUnavailable {
-			e2elog.Logf("ginkgo.Failed proxying node logs due to service unavailable: %v", err)
+			framework.Logf("ginkgo.Failed proxying node logs due to service unavailable: %v", err)
 			time.Sleep(time.Second)
 			serviceUnavailableErrors++
 		} else {
@@ -317,8 +310,28 @@ func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 		}
 	}
 	if serviceUnavailableErrors > 0 {
-		e2elog.Logf("error: %d requests to proxy node logs failed", serviceUnavailableErrors)
+		framework.Logf("error: %d requests to proxy node logs failed", serviceUnavailableErrors)
 	}
 	maxFailures := int(math.Floor(0.1 * float64(proxyAttempts)))
 	gomega.Expect(serviceUnavailableErrors).To(gomega.BeNumerically("<", maxFailures))
+}
+
+// waitForEndpoint waits for the specified endpoint to be ready.
+func waitForEndpoint(c clientset.Interface, ns, name string) error {
+	// registerTimeout is how long to wait for an endpoint to be registered.
+	registerTimeout := time.Minute
+	for t := time.Now(); time.Since(t) < registerTimeout; time.Sleep(framework.Poll) {
+		endpoint, err := c.CoreV1().Endpoints(ns).Get(name, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			framework.Logf("Endpoint %s/%s is not ready yet", ns, name)
+			continue
+		}
+		framework.ExpectNoError(err, "Failed to get endpoints for %s/%s", ns, name)
+		if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
+			framework.Logf("Endpoint %s/%s is not ready yet", ns, name)
+			continue
+		}
+		return nil
+	}
+	return fmt.Errorf("failed to get endpoints for %s/%s", ns, name)
 }

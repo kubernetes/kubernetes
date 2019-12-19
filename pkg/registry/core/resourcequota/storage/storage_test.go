@@ -42,7 +42,10 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer)
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "resourcequotas",
 	}
-	resourceQuotaStorage, statusStorage := NewREST(restOptions)
+	resourceQuotaStorage, statusStorage, err := NewREST(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 	return resourceQuotaStorage, statusStorage, server
 }
 

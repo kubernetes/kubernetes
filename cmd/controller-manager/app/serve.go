@@ -17,7 +17,6 @@ limitations under the License.
 package app
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
 	goruntime "runtime"
 
@@ -29,6 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/configz"
 )
@@ -46,13 +46,14 @@ func BuildHandlerChain(apiHandler http.Handler, authorizationInfo *apiserver.Aut
 		handler = genericapifilters.WithAuthentication(handler, authenticationInfo.Authenticator, failedHandler, nil)
 	}
 	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
+	handler = genericapifilters.WithCacheControl(handler)
 	handler = genericfilters.WithPanicRecovery(handler)
 
 	return handler
 }
 
 // NewBaseHandler takes in CompletedConfig and returns a handler.
-func NewBaseHandler(c *componentbaseconfig.DebuggingConfiguration, checks ...healthz.HealthzChecker) *mux.PathRecorderMux {
+func NewBaseHandler(c *componentbaseconfig.DebuggingConfiguration, checks ...healthz.HealthChecker) *mux.PathRecorderMux {
 	mux := mux.NewPathRecorderMux("controller-manager")
 	healthz.InstallHandler(mux, checks...)
 	if c.EnableProfiling {
@@ -62,7 +63,8 @@ func NewBaseHandler(c *componentbaseconfig.DebuggingConfiguration, checks ...hea
 		}
 	}
 	configz.InstallHandler(mux)
-	mux.Handle("/metrics", prometheus.Handler())
+	//lint:ignore SA1019 See the Metrics Stability Migration KEP
+	mux.Handle("/metrics", legacyregistry.Handler())
 
 	return mux
 }

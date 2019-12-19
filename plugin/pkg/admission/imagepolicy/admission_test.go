@@ -17,6 +17,7 @@ limitations under the License.
 package imagepolicy
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -488,7 +489,7 @@ func TestTLSConfig(t *testing.T) {
 			// Allow all and see if we get an error.
 			service.Allow()
 
-			err = wh.Validate(attr, nil)
+			err = wh.Validate(context.TODO(), attr, nil)
 			if tt.wantAllowed {
 				if err != nil {
 					t.Errorf("expected successful admission")
@@ -510,7 +511,7 @@ func TestTLSConfig(t *testing.T) {
 			}
 
 			service.Deny()
-			if err := wh.Validate(attr, nil); err == nil {
+			if err := wh.Validate(context.TODO(), attr, nil); err == nil {
 				t.Errorf("%s: incorrectly admitted with DenyAll policy", tt.test)
 			}
 		})
@@ -527,7 +528,7 @@ type webhookCacheTestCase struct {
 func testWebhookCacheCases(t *testing.T, serv *mockService, wh *Plugin, attr admission.Attributes, tests []webhookCacheTestCase) {
 	for _, test := range tests {
 		serv.statusCode = test.statusCode
-		err := wh.Validate(attr, nil)
+		err := wh.Validate(context.TODO(), attr, nil)
 		authorized := err == nil
 
 		if test.expectedErr && err == nil {
@@ -760,7 +761,7 @@ func TestContainerCombinations(t *testing.T) {
 
 			attr := admission.NewAttributesRecord(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, &user.DefaultInfo{})
 
-			err = wh.Validate(attr, nil)
+			err = wh.Validate(context.TODO(), attr, nil)
 			if tt.wantAllowed {
 				if err != nil {
 					t.Errorf("expected successful admission: %s", tt.test)
@@ -856,7 +857,7 @@ func TestDefaultAllow(t *testing.T) {
 			annotations := make(map[string]string)
 			attr = &fakeAttributes{attr, annotations}
 
-			err = wh.Validate(attr, nil)
+			err = wh.Validate(context.TODO(), attr, nil)
 			if tt.wantAllowed {
 				if err != nil {
 					t.Errorf("expected successful admission")
@@ -964,7 +965,7 @@ func TestAnnotationFiltering(t *testing.T) {
 
 			attr := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, &user.DefaultInfo{})
 
-			err = wh.Validate(attr, nil)
+			err = wh.Validate(context.TODO(), attr, nil)
 			if err != nil {
 				t.Errorf("expected successful admission")
 			}
@@ -983,6 +984,7 @@ func TestReturnedAnnotationAdd(t *testing.T) {
 		pod                 *api.Pod
 		verifierAnnotations map[string]string
 		expectedAnnotations map[string]string
+		wantErr             bool
 	}{
 		{
 			test: "Add valid response annotations",
@@ -1028,6 +1030,7 @@ func TestReturnedAnnotationAdd(t *testing.T) {
 			expectedAnnotations: map[string]string{
 				"imagepolicywebhook.image-policy.k8s.io/foo-test": "false",
 			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -1056,7 +1059,15 @@ func TestReturnedAnnotationAdd(t *testing.T) {
 			annotations := make(map[string]string)
 			attr = &fakeAttributes{attr, annotations}
 
-			err = wh.Validate(attr, nil)
+			err = wh.Validate(context.TODO(), attr, nil)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("%s: expected error making admission request: %v", tt.test, err)
+				}
+			} else if err != nil {
+				t.Errorf("%s: failed to admit: %v", tt.test, err)
+			}
+
 			if !reflect.DeepEqual(annotations, tt.expectedAnnotations) {
 				t.Errorf("got audit annotations: %v; want: %v", annotations, tt.expectedAnnotations)
 			}

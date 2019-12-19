@@ -24,6 +24,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -108,6 +110,9 @@ type ContainerManager interface {
 	// ShouldResetExtendedResourceCapacity returns whether or not the extended resources should be zeroed,
 	// due to node recreation.
 	ShouldResetExtendedResourceCapacity() bool
+
+	// GetTopologyPodAdmitHandler returns an instance of the TopologyManager for Pod Admission
+	GetTopologyPodAdmitHandler() topologymanager.Manager
 }
 
 type NodeConfig struct {
@@ -127,11 +132,13 @@ type NodeConfig struct {
 	ExperimentalPodPidsLimit              int64
 	EnforceCPULimits                      bool
 	CPUCFSQuotaPeriod                     time.Duration
+	ExperimentalTopologyManagerPolicy     string
 }
 
 type NodeAllocatableConfig struct {
 	KubeReservedCgroupName   string
 	SystemReservedCgroupName string
+	ReservedSystemCPUs       cpuset.CPUSet
 	EnforceNodeAllocatable   sets.String
 	KubeReserved             v1.ResourceList
 	SystemReserved           v1.ResourceList

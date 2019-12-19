@@ -17,7 +17,12 @@ limitations under the License.
 package runtimeclass
 
 import (
+	"context"
+	"strconv"
+	"testing"
+
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/node/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,13 +33,11 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
-	"strconv"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func validPod(name string, numContainers int, resources core.ResourceRequirements, setOverhead bool) *core.Pod {
+func newOverheadValidPod(name string, numContainers int, resources core.ResourceRequirements, setOverhead bool) *core.Pod {
 	pod := &core.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test"},
 		Spec:       core.PodSpec{},
@@ -57,6 +60,16 @@ func validPod(name string, numContainers int, resources core.ResourceRequirement
 	return pod
 }
 
+func newSchedulingValidPod(name string, nodeSelector map[string]string, tolerations []core.Toleration) *core.Pod {
+	return &core.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test"},
+		Spec: core.PodSpec{
+			NodeSelector: nodeSelector,
+			Tolerations:  tolerations,
+		},
+	}
+}
+
 func getGuaranteedRequirements() core.ResourceRequirements {
 	resources := core.ResourceList{
 		core.ResourceName(core.ResourceCPU):    resource.MustParse("1"),
@@ -67,7 +80,6 @@ func getGuaranteedRequirements() core.ResourceRequirements {
 }
 
 func TestSetOverhead(t *testing.T) {
-
 	tests := []struct {
 		name         string
 		runtimeClass *v1beta1.RuntimeClass
@@ -87,9 +99,9 @@ func TestSetOverhead(t *testing.T) {
 					},
 				},
 			},
-			pod:         validPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, false),
+			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, false),
 			expectError: false,
-			expectedPod: validPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, true),
+			expectedPod: newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, true),
 		},
 		{
 			name: "overhead, guaranteed pod",
@@ -103,9 +115,9 @@ func TestSetOverhead(t *testing.T) {
 					},
 				},
 			},
-			pod:         validPod("guaranteed", 1, getGuaranteedRequirements(), false),
+			pod:         newOverheadValidPod("guaranteed", 1, getGuaranteedRequirements(), false),
 			expectError: false,
-			expectedPod: validPod("guaranteed", 1, core.ResourceRequirements{}, true),
+			expectedPod: newOverheadValidPod("guaranteed", 1, core.ResourceRequirements{}, true),
 		},
 		{
 			name: "overhead, pod with differing overhead already set",
@@ -119,7 +131,7 @@ func TestSetOverhead(t *testing.T) {
 					},
 				},
 			},
-			pod:         validPod("empty-requiremennts-overhead", 1, core.ResourceRequirements{}, true),
+			pod:         newOverheadValidPod("empty-requiremennts-overhead", 1, core.ResourceRequirements{}, true),
 			expectError: true,
 			expectedPod: nil,
 		},
@@ -135,7 +147,7 @@ func TestSetOverhead(t *testing.T) {
 					},
 				},
 			},
-			pod:         validPod("empty-requiremennts-overhead", 1, core.ResourceRequirements{}, true),
+			pod:         newOverheadValidPod("empty-requiremennts-overhead", 1, core.ResourceRequirements{}, true),
 			expectError: false,
 			expectedPod: nil,
 		},
@@ -155,6 +167,151 @@ func TestSetOverhead(t *testing.T) {
 		})
 	}
 }
+
+func TestSetScheduling(t *testing.T) {
+	tests := []struct {
+		name         string
+		runtimeClass *v1beta1.RuntimeClass
+		pod          *core.Pod
+		expectError  bool
+		expectedPod  *core.Pod
+	}{
+		{
+			name: "scheduling, nil scheduling",
+			runtimeClass: &v1beta1.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Handler:    "bar",
+				Scheduling: nil,
+			},
+			pod:         newSchedulingValidPod("pod-with-conflict-node-selector", map[string]string{"foo": "bar"}, []core.Toleration{}),
+			expectError: false,
+			expectedPod: newSchedulingValidPod("pod-with-conflict-node-selector", map[string]string{"foo": "bar"}, []core.Toleration{}),
+		},
+		{
+			name: "scheduling, conflict node selector",
+			runtimeClass: &v1beta1.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Handler:    "bar",
+				Scheduling: &v1beta1.Scheduling{
+					NodeSelector: map[string]string{
+						"foo": "conflict",
+					},
+				},
+			},
+			pod:         newSchedulingValidPod("pod-with-conflict-node-selector", map[string]string{"foo": "bar"}, []core.Toleration{}),
+			expectError: true,
+		},
+		{
+			name: "scheduling, nil node selector",
+			runtimeClass: &v1beta1.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Handler:    "bar",
+				Scheduling: &v1beta1.Scheduling{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+				},
+			},
+			pod:         newSchedulingValidPod("pod-with-conflict-node-selector", nil, nil),
+			expectError: false,
+			expectedPod: newSchedulingValidPod("pod-with-conflict-node-selector", map[string]string{"foo": "bar"}, nil),
+		},
+		{
+			name: "scheduling, node selector with the same key value",
+			runtimeClass: &v1beta1.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Handler:    "bar",
+				Scheduling: &v1beta1.Scheduling{
+					NodeSelector: map[string]string{
+						"foo": "bar",
+					},
+				},
+			},
+			pod:         newSchedulingValidPod("pod-with-same-key-value-node-selector", map[string]string{"foo": "bar"}, nil),
+			expectError: false,
+			expectedPod: newSchedulingValidPod("pod-with-same-key-value-node-selector", map[string]string{"foo": "bar"}, nil),
+		},
+		{
+			name: "scheduling, node selector with different key value",
+			runtimeClass: &v1beta1.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Handler:    "bar",
+				Scheduling: &v1beta1.Scheduling{
+					NodeSelector: map[string]string{
+						"foo":  "bar",
+						"fizz": "buzz",
+					},
+				},
+			},
+			pod:         newSchedulingValidPod("pod-with-different-key-value-node-selector", map[string]string{"foo": "bar"}, nil),
+			expectError: false,
+			expectedPod: newSchedulingValidPod("pod-with-different-key-value-node-selector", map[string]string{"foo": "bar", "fizz": "buzz"}, nil),
+		},
+		{
+			name: "scheduling, multiple tolerations",
+			runtimeClass: &v1beta1.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Handler:    "bar",
+				Scheduling: &v1beta1.Scheduling{
+					Tolerations: []v1.Toleration{
+						{
+							Key:      "foo",
+							Operator: v1.TolerationOpEqual,
+							Value:    "bar",
+							Effect:   v1.TaintEffectNoSchedule,
+						},
+						{
+							Key:      "fizz",
+							Operator: v1.TolerationOpEqual,
+							Value:    "buzz",
+							Effect:   v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+			pod: newSchedulingValidPod("pod-with-tolerations", map[string]string{"foo": "bar"},
+				[]core.Toleration{
+					{
+						Key:      "foo",
+						Operator: core.TolerationOpEqual,
+						Value:    "bar",
+						Effect:   core.TaintEffectNoSchedule,
+					},
+				}),
+			expectError: false,
+			expectedPod: newSchedulingValidPod("pod-with-tolerations", map[string]string{"foo": "bar"},
+				[]core.Toleration{
+					{
+						Key:      "foo",
+						Operator: core.TolerationOpEqual,
+						Value:    "bar",
+						Effect:   core.TaintEffectNoSchedule,
+					},
+					{
+						Key:      "fizz",
+						Operator: core.TolerationOpEqual,
+						Value:    "buzz",
+						Effect:   core.TaintEffectNoSchedule,
+					},
+				}),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			attrs := admission.NewAttributesRecord(tc.pod, nil, core.Kind("Pod").WithVersion("version"), tc.pod.Namespace, tc.pod.Name, core.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, &user.DefaultInfo{})
+
+			errs := setScheduling(attrs, tc.pod, tc.runtimeClass)
+			if tc.expectError {
+				assert.NotEmpty(t, errs)
+			} else {
+				assert.Equal(t, tc.expectedPod, tc.pod)
+				assert.Empty(t, errs)
+			}
+		})
+	}
+}
+
 func NewObjectInterfacesForTest() admission.ObjectInterfaces {
 	scheme := runtime.NewScheme()
 	corev1.AddToScheme(scheme)
@@ -176,7 +333,7 @@ func TestValidate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Handler:    "bar",
 			},
-			pod:         validPod("no-resource-req-no-overhead", 1, getGuaranteedRequirements(), true),
+			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, getGuaranteedRequirements(), true),
 			expectError: true,
 		},
 		{
@@ -191,7 +348,7 @@ func TestValidate(t *testing.T) {
 					},
 				},
 			},
-			pod:         validPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, true),
+			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, true),
 			expectError: true,
 		},
 		{
@@ -206,7 +363,7 @@ func TestValidate(t *testing.T) {
 					},
 				},
 			},
-			pod:         validPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, false),
+			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, false),
 			expectError: false,
 		},
 	}
@@ -217,7 +374,7 @@ func TestValidate(t *testing.T) {
 
 			attrs := admission.NewAttributesRecord(tc.pod, nil, core.Kind("Pod").WithVersion("version"), tc.pod.Namespace, tc.pod.Name, core.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, &user.DefaultInfo{})
 
-			errs := rt.Validate(attrs, o)
+			errs := rt.Validate(context.TODO(), attrs, o)
 			if tc.expectError {
 				assert.NotEmpty(t, errs)
 			} else {
@@ -228,8 +385,6 @@ func TestValidate(t *testing.T) {
 }
 
 func TestValidateOverhead(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
-
 	tests := []struct {
 		name         string
 		runtimeClass *v1beta1.RuntimeClass
@@ -248,7 +403,7 @@ func TestValidateOverhead(t *testing.T) {
 					},
 				},
 			},
-			pod:         validPod("no-requirements", 1, core.ResourceRequirements{}, false),
+			pod:         newOverheadValidPod("no-requirements", 1, core.ResourceRequirements{}, false),
 			expectError: true,
 		},
 		{
@@ -257,13 +412,13 @@ func TestValidateOverhead(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Handler:    "bar",
 			},
-			pod:         validPod("no-resource-req-no-overhead", 1, getGuaranteedRequirements(), true),
+			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, getGuaranteedRequirements(), true),
 			expectError: true,
 		},
 		{
 			name:         "No RunntimeClass, Overhead set in pod",
 			runtimeClass: nil,
-			pod:          validPod("no-resource-req-no-overhead", 1, getGuaranteedRequirements(), true),
+			pod:          newOverheadValidPod("no-resource-req-no-overhead", 1, getGuaranteedRequirements(), true),
 			expectError:  true,
 		},
 		{
@@ -278,7 +433,7 @@ func TestValidateOverhead(t *testing.T) {
 					},
 				},
 			},
-			pod:         validPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, true),
+			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, true),
 			expectError: true,
 		},
 		{
@@ -293,14 +448,13 @@ func TestValidateOverhead(t *testing.T) {
 					},
 				},
 			},
-			pod:         validPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, true),
+			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, true),
 			expectError: false,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-
 			attrs := admission.NewAttributesRecord(tc.pod, nil, core.Kind("Pod").WithVersion("version"), tc.pod.Namespace, tc.pod.Name, core.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, &user.DefaultInfo{})
 
 			errs := validateOverhead(attrs, tc.pod, tc.runtimeClass)

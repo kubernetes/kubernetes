@@ -77,6 +77,10 @@ type APIGroupInfo struct {
 	NegotiatedSerializer runtime.NegotiatedSerializer
 	// ParameterCodec performs conversions for query parameters passed to API calls
 	ParameterCodec runtime.ParameterCodec
+
+	// StaticOpenAPISpec is the spec derived from the definitions of all resources installed together.
+	// It is set during InstallAPIGroups, InstallAPIGroup, and InstallLegacyAPIGroup.
+	StaticOpenAPISpec *spec.Swagger
 }
 
 // GenericAPIServer contains state for a Kubernetes cluster api server.
@@ -146,14 +150,19 @@ type GenericAPIServer struct {
 	preShutdownHooksCalled bool
 
 	// healthz checks
-	healthzLock                sync.Mutex
-	healthzChecks              []healthz.HealthzChecker
-	healthzChecksInstalled     bool
-	readyzLock                 sync.Mutex
-	readyzChecks               []healthz.HealthzChecker
-	readyzChecksInstalled      bool
-	maxStartupSequenceDuration time.Duration
-	healthzClock               clock.Clock
+	healthzLock            sync.Mutex
+	healthzChecks          []healthz.HealthChecker
+	healthzChecksInstalled bool
+	// livez checks
+	livezLock            sync.Mutex
+	livezChecks          []healthz.HealthChecker
+	livezChecksInstalled bool
+	// readyz checks
+	readyzLock            sync.Mutex
+	readyzChecks          []healthz.HealthChecker
+	readyzChecksInstalled bool
+	livezGracePeriod      time.Duration
+	livezClock            clock.Clock
 	// the readiness stop channel is used to signal that the apiserver has initiated a shutdown sequence, this
 	// will cause readyz to return unhealthy.
 	readinessStopCh chan struct{}
@@ -203,7 +212,7 @@ type DelegationTarget interface {
 	PreShutdownHooks() map[string]preShutdownHookEntry
 
 	// HealthzChecks returns the healthz checks that need to be combined
-	HealthzChecks() []healthz.HealthzChecker
+	HealthzChecks() []healthz.HealthChecker
 
 	// ListedPaths returns the paths for supporting an index
 	ListedPaths() []string
@@ -225,7 +234,7 @@ func (s *GenericAPIServer) PostStartHooks() map[string]postStartHookEntry {
 func (s *GenericAPIServer) PreShutdownHooks() map[string]preShutdownHookEntry {
 	return s.preShutdownHooks
 }
-func (s *GenericAPIServer) HealthzChecks() []healthz.HealthzChecker {
+func (s *GenericAPIServer) HealthzChecks() []healthz.HealthChecker {
 	return s.healthzChecks
 }
 func (s *GenericAPIServer) ListedPaths() []string {
@@ -252,8 +261,8 @@ func (s emptyDelegate) PostStartHooks() map[string]postStartHookEntry {
 func (s emptyDelegate) PreShutdownHooks() map[string]preShutdownHookEntry {
 	return map[string]preShutdownHookEntry{}
 }
-func (s emptyDelegate) HealthzChecks() []healthz.HealthzChecker {
-	return []healthz.HealthzChecker{}
+func (s emptyDelegate) HealthzChecks() []healthz.HealthChecker {
+	return []healthz.HealthChecker{}
 }
 func (s emptyDelegate) ListedPaths() []string {
 	return []string{}
@@ -281,7 +290,12 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	}
 
 	s.installHealthz()
-	s.installReadyz(s.readinessStopCh)
+	s.installLivez()
+	err := s.addReadyzShutdownCheck(s.readinessStopCh)
+	if err != nil {
+		klog.Errorf("Failed to install readyz shutdown check %s", err)
+	}
+	s.installReadyz()
 
 	// Register audit backend preShutdownHook.
 	if s.AuditBackend != nil {
@@ -551,6 +565,9 @@ func (s *GenericAPIServer) getOpenAPIModels(apiPrefix string, apiGroupInfos ...*
 	openAPISpec, err := openapibuilder.BuildOpenAPIDefinitionsForResources(s.openAPIConfig, resourceNames...)
 	if err != nil {
 		return nil, err
+	}
+	for _, apiGroupInfo := range apiGroupInfos {
+		apiGroupInfo.StaticOpenAPISpec = openAPISpec
 	}
 	return utilopenapi.ToProtoModels(openAPISpec)
 }

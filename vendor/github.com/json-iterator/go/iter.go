@@ -74,6 +74,7 @@ type Iterator struct {
 	buf              []byte
 	head             int
 	tail             int
+	depth            int
 	captureStartedAt int
 	captured         []byte
 	Error            error
@@ -88,6 +89,7 @@ func NewIterator(cfg API) *Iterator {
 		buf:    nil,
 		head:   0,
 		tail:   0,
+		depth:  0,
 	}
 }
 
@@ -99,6 +101,7 @@ func Parse(cfg API, reader io.Reader, bufSize int) *Iterator {
 		buf:    make([]byte, bufSize),
 		head:   0,
 		tail:   0,
+		depth:  0,
 	}
 }
 
@@ -110,6 +113,7 @@ func ParseBytes(cfg API, input []byte) *Iterator {
 		buf:    input,
 		head:   0,
 		tail:   len(input),
+		depth:  0,
 	}
 }
 
@@ -128,6 +132,7 @@ func (iter *Iterator) Reset(reader io.Reader) *Iterator {
 	iter.reader = reader
 	iter.head = 0
 	iter.tail = 0
+	iter.depth = 0
 	return iter
 }
 
@@ -137,6 +142,7 @@ func (iter *Iterator) ResetBytes(input []byte) *Iterator {
 	iter.buf = input
 	iter.head = 0
 	iter.tail = len(input)
+	iter.depth = 0
 	return iter
 }
 
@@ -319,4 +325,25 @@ func (iter *Iterator) Read() interface{} {
 		iter.ReportError("Read", fmt.Sprintf("unexpected value type: %v", valueType))
 		return nil
 	}
+}
+
+// limit maximum depth of nesting, as allowed by https://tools.ietf.org/html/rfc7159#section-9
+const maxDepth = 10000
+
+func (iter *Iterator) incrementDepth() (success bool) {
+	iter.depth++
+	if iter.depth <= maxDepth {
+		return true
+	}
+	iter.ReportError("incrementDepth", "exceeded max depth")
+	return false
+}
+
+func (iter *Iterator) decrementDepth() (success bool) {
+	iter.depth--
+	if iter.depth >= 0 {
+		return true
+	}
+	iter.ReportError("decrementDepth", "unexpected negative nesting")
+	return false
 }

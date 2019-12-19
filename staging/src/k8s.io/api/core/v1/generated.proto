@@ -161,7 +161,7 @@ message AzureFileVolumeSource {
 // Deprecated in 1.7, please use the bindings subresource of pods instead.
 message Binding {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -275,7 +275,7 @@ message Capabilities {
 // Cephfs volumes do not support ownership management or SELinux relabeling.
 message CephFSPersistentVolumeSource {
   // Required: Monitors is a collection of Ceph monitors
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   repeated string monitors = 1;
 
   // Optional: Used as the mounted root, rather than the full Ceph tree, default is /
@@ -283,23 +283,23 @@ message CephFSPersistentVolumeSource {
   optional string path = 2;
 
   // Optional: User is the rados user name, default is admin
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +optional
   optional string user = 3;
 
   // Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +optional
   optional string secretFile = 4;
 
   // Optional: SecretRef is reference to the authentication secret for User, default is empty.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +optional
   optional SecretReference secretRef = 5;
 
   // Optional: Defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +optional
   optional bool readOnly = 6;
 }
@@ -308,7 +308,7 @@ message CephFSPersistentVolumeSource {
 // Cephfs volumes do not support ownership management or SELinux relabeling.
 message CephFSVolumeSource {
   // Required: Monitors is a collection of Ceph monitors
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   repeated string monitors = 1;
 
   // Optional: Used as the mounted root, rather than the full Ceph tree, default is /
@@ -316,23 +316,23 @@ message CephFSVolumeSource {
   optional string path = 2;
 
   // Optional: User is the rados user name, default is admin
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +optional
   optional string user = 3;
 
   // Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +optional
   optional string secretFile = 4;
 
   // Optional: SecretRef is reference to the authentication secret for User, default is empty.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +optional
   optional LocalObjectReference secretRef = 5;
 
   // Optional: Defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
   // +optional
   optional bool readOnly = 6;
 }
@@ -342,20 +342,20 @@ message CephFSVolumeSource {
 // The volume must also be in the same region as the kubelet.
 // Cinder volumes support ownership management and SELinux relabeling.
 message CinderPersistentVolumeSource {
-  // volume id used to identify the volume in cinder
-  // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+  // volume id used to identify the volume in cinder.
+  // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
   optional string volumeID = 1;
 
   // Filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
-  // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+  // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
   // +optional
   optional string fsType = 2;
 
   // Optional: Defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
-  // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+  // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
   // +optional
   optional bool readOnly = 3;
 
@@ -370,20 +370,20 @@ message CinderPersistentVolumeSource {
 // The volume must also be in the same region as the kubelet.
 // Cinder volumes support ownership management and SELinux relabeling.
 message CinderVolumeSource {
-  // volume id used to identify the volume in cinder
-  // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+  // volume id used to identify the volume in cinder.
+  // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
   optional string volumeID = 1;
 
   // Filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
-  // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+  // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
   // +optional
   optional string fsType = 2;
 
   // Optional: Defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
-  // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+  // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
   // +optional
   optional bool readOnly = 3;
 
@@ -426,7 +426,7 @@ message ComponentCondition {
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
 message ComponentStatus {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -440,7 +440,7 @@ message ComponentStatus {
 // Status of all the conditions for the component as a list of ComponentStatus objects.
 message ComponentStatusList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -451,7 +451,7 @@ message ComponentStatusList {
 // ConfigMap holds configuration data for pods to consume.
 message ConfigMap {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -503,7 +503,7 @@ message ConfigMapKeySelector {
 
 // ConfigMapList is a resource containing a list of ConfigMap objects.
 message ConfigMapList {
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -700,6 +700,17 @@ message Container {
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
   // +optional
   optional Probe readinessProbe = 11;
+
+  // StartupProbe indicates that the Pod has successfully initialized.
+  // If specified, no other probes are executed until this completes successfully.
+  // If this probe fails, the Pod will be restarted, just as if the livenessProbe failed.
+  // This can be used to provide different probe parameters at the beginning of a Pod's lifecycle,
+  // when it might take a long time to load data or warm a cache, than during steady-state operation.
+  // This cannot be updated.
+  // This is an alpha feature enabled by the StartupProbe feature flag.
+  // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+  // +optional
+  optional Probe startupProbe = 22;
 
   // Actions that the management system should take in response to container lifecycle events.
   // Cannot be updated.
@@ -901,6 +912,13 @@ message ContainerStatus {
   // Container's ID in the format 'docker://<container_id>'.
   // +optional
   optional string containerID = 8;
+
+  // Specifies whether the container has passed its startup probe.
+  // Initialized as false, becomes true after startupProbe is considered successful.
+  // Resets to false when the container is restarted, or if kubelet loses state temporarily.
+  // Is always true when no startupProbe is defined.
+  // +optional
+  optional bool started = 9;
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -1001,7 +1019,8 @@ message EndpointAddress {
 
 // EndpointPort is a tuple that describes a single port.
 message EndpointPort {
-  // The name of this port (corresponds to ServicePort.Name).
+  // The name of this port.  This must match the 'name' field in the
+  // corresponding ServicePort.
   // Must be a DNS_LABEL.
   // Optional only if one port is defined.
   // +optional
@@ -1058,7 +1077,7 @@ message EndpointSubset {
 //  ]
 message Endpoints {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -1076,7 +1095,7 @@ message Endpoints {
 // EndpointsList is a list of endpoints.
 message EndpointsList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -1123,7 +1142,7 @@ message EnvVar {
 // EnvVarSource represents a source for the value of an EnvVar.
 message EnvVarSource {
   // Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations,
-  // spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP.
+  // spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
   // +optional
   optional ObjectFieldSelector fieldRef = 1;
 
@@ -1141,16 +1160,20 @@ message EnvVarSource {
   optional SecretKeySelector secretKeyRef = 4;
 }
 
-// An EphemeralContainer is a special type of container which doesn't come with any resource
-// or scheduling guarantees but can be added to a pod that has already been created. They are
-// intended for user-initiated activities such as troubleshooting a running pod.
-// Ephemeral containers will not be restarted when they exit, and they will be killed if the
-// pod is removed or restarted. If an ephemeral container causes a pod to exceed its resource
+// An EphemeralContainer is a container that may be added temporarily to an existing pod for
+// user-initiated activities such as debugging. Ephemeral containers have no resource or
+// scheduling guarantees, and they will not be restarted when they exit or when a pod is
+// removed or restarted. If an ephemeral container causes a pod to exceed its resource
 // allocation, the pod may be evicted.
-// Ephemeral containers are added via a pod's ephemeralcontainers subresource and will appear
-// in the pod spec once added. No fields in EphemeralContainer may be changed once added.
+// Ephemeral containers may not be added by directly updating the pod spec. They must be added
+// via the pod's ephemeralcontainers subresource, and they will appear in the pod spec
+// once added.
 // This is an alpha feature enabled by the EphemeralContainers feature flag.
 message EphemeralContainer {
+  // Ephemeral containers have all of the fields of Container, plus additional fields
+  // specific to ephemeral containers. Fields in common with Container are in the
+  // following inlined struct so than an EphemeralContainer may easily be converted
+  // to a Container.
   optional EphemeralContainerCommon ephemeralContainerCommon = 1;
 
   // If set, the name of the container from PodSpec that this ephemeral container targets.
@@ -1161,6 +1184,10 @@ message EphemeralContainer {
   optional string targetContainerName = 2;
 }
 
+// EphemeralContainerCommon is a copy of all fields in Container to be inlined in
+// EphemeralContainer. This separate type allows easy conversion from EphemeralContainer
+// to Container and allows separate documentation for the fields of EphemeralContainer.
+// When a new field is added to Container it must be added here as well.
 message EphemeralContainerCommon {
   // Name of the ephemeral container specified as a DNS_LABEL.
   // This name must be unique among all containers, init containers and ephemeral containers.
@@ -1245,6 +1272,10 @@ message EphemeralContainerCommon {
   // +optional
   optional Probe readinessProbe = 11;
 
+  // Probes are not allowed for ephemeral containers.
+  // +optional
+  optional Probe startupProbe = 22;
+
   // Lifecycle is not allowed for ephemeral containers.
   // +optional
   optional Lifecycle lifecycle = 12;
@@ -1303,12 +1334,14 @@ message EphemeralContainerCommon {
   optional bool tty = 18;
 }
 
-// A list of ephemeral containers used in API operations
+// A list of ephemeral containers used with the Pod ephemeralcontainers subresource.
 message EphemeralContainers {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // The new set of ephemeral containers to use for a pod.
+  // A list of ephemeral containers associated with this pod. New ephemeral containers
+  // may be appended to this list, but existing ephemeral containers may not be removed
+  // or modified.
   // +patchMergeKey=name
   // +patchStrategy=merge
   repeated EphemeralContainer ephemeralContainers = 2;
@@ -1317,7 +1350,7 @@ message EphemeralContainers {
 // Event is a report of an event somewhere in the cluster.
 message Event {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The object that this event is about.
@@ -1382,7 +1415,7 @@ message Event {
 // EventList is a list of events.
 message EventList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -1591,22 +1624,22 @@ message GitRepoVolumeSource {
 // Glusterfs volumes do not support ownership management or SELinux relabeling.
 message GlusterfsPersistentVolumeSource {
   // EndpointsName is the endpoint name that details Glusterfs topology.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+  // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
   optional string endpoints = 1;
 
   // Path is the Glusterfs volume path.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+  // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
   optional string path = 2;
 
   // ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions.
   // Defaults to false.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+  // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
   // +optional
   optional bool readOnly = 3;
 
   // EndpointsNamespace is the namespace that contains Glusterfs endpoint.
   // If this field is empty, the EndpointNamespace defaults to the same namespace as the bound PVC.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+  // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
   // +optional
   optional string endpointsNamespace = 4;
 }
@@ -1615,16 +1648,16 @@ message GlusterfsPersistentVolumeSource {
 // Glusterfs volumes do not support ownership management or SELinux relabeling.
 message GlusterfsVolumeSource {
   // EndpointsName is the endpoint name that details Glusterfs topology.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+  // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
   optional string endpoints = 1;
 
   // Path is the Glusterfs volume path.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+  // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
   optional string path = 2;
 
   // ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions.
   // Defaults to false.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
+  // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
   // +optional
   optional bool readOnly = 3;
 }
@@ -1851,7 +1884,7 @@ message Lifecycle {
   optional Handler postStart = 1;
 
   // PreStop is called immediately before a container is terminated due to an
-  // API request or management event such as liveness probe failure,
+  // API request or management event such as liveness/startup probe failure,
   // preemption, resource contention, etc. The handler is not called if the
   // container crashes or exits. The reason for termination is passed to the
   // handler. The Pod's termination grace period countdown begins before the
@@ -1867,12 +1900,12 @@ message Lifecycle {
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.
 message LimitRange {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the limits enforced.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional LimitRangeSpec spec = 2;
 }
@@ -1907,7 +1940,7 @@ message LimitRangeItem {
 // LimitRangeList is a list of LimitRange items.
 message LimitRangeList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -1925,7 +1958,7 @@ message LimitRangeSpec {
 // List holds a list of objects, which may not be known by the server.
 message List {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -2002,25 +2035,43 @@ message NFSVolumeSource {
 // Use of multiple namespaces is optional.
 message Namespace {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the behavior of the Namespace.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional NamespaceSpec spec = 2;
 
   // Status describes the current status of a Namespace.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional NamespaceStatus status = 3;
+}
+
+// NamespaceCondition contains details about state of namespace.
+message NamespaceCondition {
+  // Type of namespace controller condition.
+  optional string type = 1;
+
+  // Status of the condition, one of True, False, Unknown.
+  optional string status = 2;
+
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
+
+  // +optional
+  optional string reason = 5;
+
+  // +optional
+  optional string message = 6;
 }
 
 // NamespaceList is a list of Namespaces.
 message NamespaceList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -2043,25 +2094,31 @@ message NamespaceStatus {
   // More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/
   // +optional
   optional string phase = 1;
+
+  // Represents the latest available observations of a namespace's current state.
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  repeated NamespaceCondition conditions = 2;
 }
 
 // Node is a worker node in Kubernetes.
 // Each node will have a unique identifier in the cache (i.e. in etcd).
 message Node {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the behavior of a node.
-  // https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional NodeSpec spec = 2;
 
   // Most recently observed status of the node.
   // Populated by the system.
   // Read-only.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional NodeStatus status = 3;
 }
@@ -2189,7 +2246,7 @@ message NodeDaemonEndpoints {
 // NodeList is the whole list of all Nodes which have been registered with master.
 message NodeList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -2401,7 +2458,7 @@ message ObjectFieldSelector {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 message ObjectReference {
   // Kind of the referent.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional string kind = 1;
 
@@ -2425,7 +2482,7 @@ message ObjectReference {
   optional string apiVersion = 5;
 
   // Specific resourceVersion to which this reference is made, if any.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
   // +optional
   optional string resourceVersion = 6;
 
@@ -2446,7 +2503,7 @@ message ObjectReference {
 // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes
 message PersistentVolume {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -2467,7 +2524,7 @@ message PersistentVolume {
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
 message PersistentVolumeClaim {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -2511,7 +2568,7 @@ message PersistentVolumeClaimCondition {
 // PersistentVolumeClaimList is a list of PersistentVolumeClaim items.
 message PersistentVolumeClaimList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -2605,7 +2662,7 @@ message PersistentVolumeClaimVolumeSource {
 // PersistentVolumeList is a list of PersistentVolume items.
 message PersistentVolumeList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -2639,7 +2696,7 @@ message PersistentVolumeSource {
 
   // Glusterfs represents a Glusterfs volume that is attached to a host and
   // exposed to the pod. Provisioned by an admin.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md
+  // More info: https://examples.k8s.io/volumes/glusterfs/README.md
   // +optional
   optional GlusterfsPersistentVolumeSource glusterfs = 4;
 
@@ -2649,7 +2706,7 @@ message PersistentVolumeSource {
   optional NFSVolumeSource nfs = 5;
 
   // RBD represents a Rados Block Device mount on the host that shares a pod's lifetime.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md
+  // More info: https://examples.k8s.io/volumes/rbd/README.md
   // +optional
   optional RBDPersistentVolumeSource rbd = 6;
 
@@ -2658,8 +2715,8 @@ message PersistentVolumeSource {
   // +optional
   optional ISCSIPersistentVolumeSource iscsi = 7;
 
-  // Cinder represents a cinder volume attached and mounted on kubelets host machine
-  // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+  // Cinder represents a cinder volume attached and mounted on kubelets host machine.
+  // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
   // +optional
   optional CinderPersistentVolumeSource cinder = 8;
 
@@ -2712,7 +2769,7 @@ message PersistentVolumeSource {
   optional LocalVolumeSource local = 20;
 
   // StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
+  // More info: https://examples.k8s.io/volumes/storageos/README.md
   // +optional
   optional StorageOSPersistentVolumeSource storageos = 21;
 
@@ -2806,12 +2863,12 @@ message PhotonPersistentDiskVolumeSource {
 // by clients and scheduled onto hosts.
 message Pod {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the pod.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional PodSpec spec = 2;
 
@@ -2819,7 +2876,7 @@ message Pod {
   // This data may not be up to date.
   // Populated by the system.
   // Read-only.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional PodStatus status = 3;
 }
@@ -3036,12 +3093,12 @@ message PodIP {
 // PodList is a list of Pods.
 message PodList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of pods.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md
   repeated Pod items = 2;
 }
 
@@ -3088,6 +3145,15 @@ message PodLogOptions {
   // slightly more or slightly less than the specified limit.
   // +optional
   optional int64 limitBytes = 8;
+
+  // insecureSkipTLSVerifyBackend indicates that the apiserver should not confirm the validity of the
+  // serving certificate of the backend it is connecting to.  This will make the HTTPS connection between the apiserver
+  // and the backend insecure. This means the apiserver cannot verify the log data it is receiving came from the real
+  // kubelet.  If the kubelet is configured to verify the apiserver's TLS credentials, it does not mean the
+  // connection to the real kubelet is vulnerable to a man in the middle attack (e.g. an attacker could not intercept
+  // the actual log data coming from the real kubelet).
+  // +optional
+  optional bool insecureSkipTLSVerifyBackend = 9;
 }
 
 // PodPortForwardOptions is the query options to a Pod's port forward call
@@ -3205,7 +3271,7 @@ message PodSpec {
   // init container fails, the pod is considered to have failed and is handled according
   // to its restartPolicy. The name for an init container or normal container must be
   // unique among all containers.
-  // Init containers may not have Lifecycle actions, Readiness probes, or Liveness probes.
+  // Init containers may not have Lifecycle actions, Readiness probes, Liveness probes, or Startup probes.
   // The resourceRequirements of an init container are taken into account during scheduling
   // by finding the highest request/limit for each resource type, and then using the max of
   // of that value or the sum of the normal containers. Limits are applied to init containers
@@ -3225,12 +3291,10 @@ message PodSpec {
   // +patchStrategy=merge
   repeated Container containers = 2;
 
-  // EphemeralContainers is the list of ephemeral containers that run in this pod. Ephemeral containers
-  // are added to an existing pod as a result of a user-initiated action such as troubleshooting.
-  // This list is read-only in the pod spec. It may not be specified in a create or modified in an
-  // update of a pod or pod template.
-  // To add an ephemeral container use the pod's ephemeralcontainers subresource, which allows update
-  // using the EphemeralContainers kind.
+  // List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing
+  // pod to perform user-initiated actions such as debugging. This list cannot be specified when
+  // creating a pod, and it cannot be modified by updating the pod spec. In order to add an
+  // ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource.
   // This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.
   // +optional
   // +patchMergeKey=name
@@ -3320,7 +3384,6 @@ message PodSpec {
   // in the same pod, and the first process in each container will not be assigned PID 1.
   // HostPID and ShareProcessNamespace cannot both be set.
   // Optional: Default to false.
-  // This field is beta-level and may be disabled with the PodShareProcessNamespace feature.
   // +k8s:conversion-gen=false
   // +optional
   optional bool shareProcessNamespace = 27;
@@ -3537,8 +3600,8 @@ message PodStatus {
   // +optional
   optional string qosClass = 9;
 
-  // Status for any ephemeral containers that running in this pod.
-  // This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.
+  // Status for any ephemeral containers that have run in this pod.
+  // This field is alpha-level and is only populated by servers that enable the EphemeralContainers feature.
   // +optional
   repeated ContainerStatus ephemeralContainerStatuses = 13;
 }
@@ -3546,7 +3609,7 @@ message PodStatus {
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
 message PodStatusResult {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -3554,7 +3617,7 @@ message PodStatusResult {
   // This data may not be up to date.
   // Populated by the system.
   // Read-only.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional PodStatus status = 2;
 }
@@ -3562,12 +3625,12 @@ message PodStatusResult {
 // PodTemplate describes a template for creating copies of a predefined pod.
 message PodTemplate {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Template defines the pods that will be created from this pod template.
-  // https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional PodTemplateSpec template = 2;
 }
@@ -3575,7 +3638,7 @@ message PodTemplate {
 // PodTemplateList is a list of PodTemplates.
 message PodTemplateList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -3586,12 +3649,12 @@ message PodTemplateList {
 // PodTemplateSpec describes the data a pod should have when created from a template
 message PodTemplateSpec {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the pod.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional PodSpec spec = 2;
 }
@@ -3671,7 +3734,7 @@ message Probe {
   optional int32 periodSeconds = 4;
 
   // Minimum consecutive successes for the probe to be considered successful after having failed.
-  // Defaults to 1. Must be 1 for liveness. Minimum value is 1.
+  // Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
   // +optional
   optional int32 successThreshold = 5;
 
@@ -3731,11 +3794,11 @@ message QuobyteVolumeSource {
 // RBD volumes support ownership management and SELinux relabeling.
 message RBDPersistentVolumeSource {
   // A collection of Ceph monitors.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   repeated string monitors = 1;
 
   // The rados image name.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   optional string image = 2;
 
   // Filesystem type of the volume that you want to mount.
@@ -3748,32 +3811,32 @@ message RBDPersistentVolumeSource {
 
   // The rados pool name.
   // Default is rbd.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
   optional string pool = 4;
 
   // The rados user name.
   // Default is admin.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
   optional string user = 5;
 
   // Keyring is the path to key ring for RBDUser.
   // Default is /etc/ceph/keyring.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
   optional string keyring = 6;
 
   // SecretRef is name of the authentication secret for RBDUser. If provided
   // overrides keyring.
   // Default is nil.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
   optional SecretReference secretRef = 7;
 
   // ReadOnly here will force the ReadOnly setting in VolumeMounts.
   // Defaults to false.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
   optional bool readOnly = 8;
 }
@@ -3782,11 +3845,11 @@ message RBDPersistentVolumeSource {
 // RBD volumes support ownership management and SELinux relabeling.
 message RBDVolumeSource {
   // A collection of Ceph monitors.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   repeated string monitors = 1;
 
   // The rados image name.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   optional string image = 2;
 
   // Filesystem type of the volume that you want to mount.
@@ -3799,32 +3862,32 @@ message RBDVolumeSource {
 
   // The rados pool name.
   // Default is rbd.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
   optional string pool = 4;
 
   // The rados user name.
   // Default is admin.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
   optional string user = 5;
 
   // Keyring is the path to key ring for RBDUser.
   // Default is /etc/ceph/keyring.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
   optional string keyring = 6;
 
   // SecretRef is name of the authentication secret for RBDUser. If provided
   // overrides keyring.
   // Default is nil.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
   optional LocalObjectReference secretRef = 7;
 
   // ReadOnly here will force the ReadOnly setting in VolumeMounts.
   // Defaults to false.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
   optional bool readOnly = 8;
 }
@@ -3832,7 +3895,7 @@ message RBDVolumeSource {
 // RangeAllocation is not a public type.
 message RangeAllocation {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -3847,12 +3910,12 @@ message RangeAllocation {
 message ReplicationController {
   // If the Labels of a ReplicationController are empty, they are defaulted to
   // be the same as the Pod(s) that the replication controller manages.
-  // Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the specification of the desired behavior of the replication controller.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional ReplicationControllerSpec spec = 2;
 
@@ -3860,7 +3923,7 @@ message ReplicationController {
   // This data may be out of date by some window of time.
   // Populated by the system.
   // Read-only.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional ReplicationControllerStatus status = 3;
 }
@@ -3889,7 +3952,7 @@ message ReplicationControllerCondition {
 // ReplicationControllerList is a collection of replication controllers.
 message ReplicationControllerList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -3975,17 +4038,17 @@ message ResourceFieldSelector {
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
 message ResourceQuota {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the desired quota.
-  // https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional ResourceQuotaSpec spec = 2;
 
   // Status defines the actual enforced quota and its current usage.
-  // https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional ResourceQuotaStatus status = 3;
 }
@@ -3993,7 +4056,7 @@ message ResourceQuota {
 // ResourceQuotaList is a list of ResourceQuota items.
 message ResourceQuotaList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -4189,7 +4252,7 @@ message ScopedResourceSelectorRequirement {
 // the Data field must be less than MaxSecretSize bytes.
 message Secret {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -4243,7 +4306,7 @@ message SecretKeySelector {
 // SecretList is a list of Secret.
 message SecretList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -4407,19 +4470,19 @@ message SerializedReference {
 // will answer requests sent through the proxy.
 message Service {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the behavior of a service.
-  // https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional ServiceSpec spec = 2;
 
   // Most recently observed status of the service.
   // Populated by the system.
   // Read-only.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional ServiceStatus status = 3;
 }
@@ -4430,7 +4493,7 @@ message Service {
 // * a set of secrets
 message ServiceAccount {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -4457,7 +4520,7 @@ message ServiceAccount {
 // ServiceAccountList is a list of ServiceAccount objects
 message ServiceAccountList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -4495,7 +4558,7 @@ message ServiceAccountTokenProjection {
 // ServiceList holds a list of services.
 message ServiceList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -4506,8 +4569,9 @@ message ServiceList {
 // ServicePort contains information on service's port.
 message ServicePort {
   // The name of this port within the service. This must be a DNS_LABEL.
-  // All ports within a ServiceSpec must have unique names. This maps to
-  // the 'Name' field in EndpointPort objects.
+  // All ports within a ServiceSpec must have unique names. When considering
+  // the endpoints for a Service, this must match the 'name' field in the
+  // EndpointPort.
   // Optional if only one ServicePort is defined on this service.
   // +optional
   optional string name = 1;
@@ -4667,6 +4731,31 @@ message ServiceSpec {
   // sessionAffinityConfig contains the configurations of session affinity.
   // +optional
   optional SessionAffinityConfig sessionAffinityConfig = 14;
+
+  // ipFamily specifies whether this Service has a preference for a particular IP family (e.g. IPv4 vs.
+  // IPv6).  If a specific IP family is requested, the clusterIP field will be allocated from that family, if it is
+  // available in the cluster.  If no IP family is requested, the cluster's primary IP family will be used.
+  // Other IP fields (loadBalancerIP, loadBalancerSourceRanges, externalIPs) and controllers which
+  // allocate external load-balancers should use the same IP family.  Endpoints for this Service will be of
+  // this family.  This field is immutable after creation. Assigning a ServiceIPFamily not available in the
+  // cluster (e.g. IPv6 in IPv4 only cluster) is an error condition and will fail during clusterIP assignment.
+  // +optional
+  optional string ipFamily = 15;
+
+  // topologyKeys is a preference-order list of topology keys which
+  // implementations of services should use to preferentially sort endpoints
+  // when accessing this Service, it can not be used at the same time as
+  // externalTrafficPolicy=Local.
+  // Topology keys must be valid label keys and at most 16 keys may be specified.
+  // Endpoints are chosen based on the first topology key with available backends.
+  // If this field is specified and all entries have no backends that match
+  // the topology of the client, the service has no backends for that client
+  // and connections should fail.
+  // The special value "*" may be used to mean "any topology". This catch-all
+  // value, if used, only makes sense as the last value in the list.
+  // If this is not specified or empty, no topology constraints will be applied.
+  // +optional
+  repeated string topologyKeys = 16;
 }
 
 // ServiceStatus represents the current status of a service.
@@ -4966,7 +5055,6 @@ message VolumeMount {
   // Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment.
   // Defaults to "" (volume's root).
   // SubPathExpr and SubPath are mutually exclusive.
-  // This field is beta in 1.15.
   // +optional
   optional string subPathExpr = 6;
 }
@@ -5046,12 +5134,12 @@ message VolumeSource {
 
   // ISCSI represents an ISCSI Disk resource that is attached to a
   // kubelet's host machine and then exposed to the pod.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md
+  // More info: https://examples.k8s.io/volumes/iscsi/README.md
   // +optional
   optional ISCSIVolumeSource iscsi = 8;
 
   // Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md
+  // More info: https://examples.k8s.io/volumes/glusterfs/README.md
   // +optional
   optional GlusterfsVolumeSource glusterfs = 9;
 
@@ -5062,7 +5150,7 @@ message VolumeSource {
   optional PersistentVolumeClaimVolumeSource persistentVolumeClaim = 10;
 
   // RBD represents a Rados Block Device mount on the host that shares a pod's lifetime.
-  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md
+  // More info: https://examples.k8s.io/volumes/rbd/README.md
   // +optional
   optional RBDVolumeSource rbd = 11;
 
@@ -5071,8 +5159,8 @@ message VolumeSource {
   // +optional
   optional FlexVolumeSource flexVolume = 12;
 
-  // Cinder represents a cinder volume attached and mounted on kubelets host machine
-  // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+  // Cinder represents a cinder volume attached and mounted on kubelets host machine.
+  // More info: https://examples.k8s.io/mysql-cinder-pd/README.md
   // +optional
   optional CinderVolumeSource cinder = 13;
 
@@ -5183,7 +5271,7 @@ message WindowsSecurityContextOptions {
   // Defaults to the user specified in image metadata if unspecified.
   // May also be set in PodSecurityContext. If set in both SecurityContext and
   // PodSecurityContext, the value specified in SecurityContext takes precedence.
-  // This field is alpha-level and it is only honored by servers that enable the WindowsRunAsUserName feature flag.
+  // This field is beta-level and may be disabled with the WindowsRunAsUserName feature flag.
   // +optional
   optional string runAsUserName = 3;
 }

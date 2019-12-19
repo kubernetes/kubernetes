@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -22,7 +24,7 @@ import (
 	"os"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
@@ -71,7 +73,7 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 	}
 
 	if az.UseInstanceMetadata {
-		metadata, err := az.metadata.GetMetadata()
+		metadata, err := az.metadata.GetMetadata(cacheReadTypeUnsafe)
 		if err != nil {
 			return nil, err
 		}
@@ -257,7 +259,7 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 	}
 
 	if az.UseInstanceMetadata {
-		metadata, err := az.metadata.GetMetadata()
+		metadata, err := az.metadata.GetMetadata(cacheReadTypeUnsafe)
 		if err != nil {
 			return "", err
 		}
@@ -281,12 +283,13 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 			return "", fmt.Errorf("no credentials provided for Azure cloud provider")
 		}
 
-		// Get resource group name.
+		// Get resource group name and subscription ID.
 		resourceGroup := strings.ToLower(metadata.Compute.ResourceGroup)
+		subscriptionID := strings.ToLower(metadata.Compute.SubscriptionID)
 
 		// Compose instanceID based on nodeName for standard instance.
-		if az.VMType == vmTypeStandard {
-			return az.getStandardMachineID(resourceGroup, nodeName), nil
+		if metadata.Compute.VMScaleSetName == "" {
+			return az.getStandardMachineID(subscriptionID, resourceGroup, nodeName), nil
 		}
 
 		// Get scale set name and instanceID from vmName for vmss.
@@ -294,12 +297,12 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 		if err != nil {
 			if err == ErrorNotVmssInstance {
 				// Compose machineID for standard Node.
-				return az.getStandardMachineID(resourceGroup, nodeName), nil
+				return az.getStandardMachineID(subscriptionID, resourceGroup, nodeName), nil
 			}
 			return "", err
 		}
 		// Compose instanceID based on ssName and instanceID for vmss instance.
-		return az.getVmssMachineID(resourceGroup, ssName, instanceID), nil
+		return az.getVmssMachineID(subscriptionID, resourceGroup, ssName, instanceID), nil
 	}
 
 	return az.vmSet.GetInstanceIDByNodeName(nodeName)
@@ -343,7 +346,7 @@ func (az *Cloud) InstanceType(ctx context.Context, name types.NodeName) (string,
 	}
 
 	if az.UseInstanceMetadata {
-		metadata, err := az.metadata.GetMetadata()
+		metadata, err := az.metadata.GetMetadata(cacheReadTypeUnsafe)
 		if err != nil {
 			return "", err
 		}

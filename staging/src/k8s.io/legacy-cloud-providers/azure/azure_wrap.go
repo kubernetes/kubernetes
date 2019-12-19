@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -23,19 +25,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
 	"github.com/Azure/go-autorest/autorest"
+
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
 )
 
 var (
-	vmCacheTTL  = time.Minute
-	lbCacheTTL  = 2 * time.Minute
-	nsgCacheTTL = 2 * time.Minute
-	rtCacheTTL  = 2 * time.Minute
+	vmCacheTTLDefaultInSeconds           = 60
+	loadBalancerCacheTTLDefaultInSeconds = 120
+	nsgCacheTTLDefaultInSeconds          = 120
+	routeTableCacheTTLDefaultInSeconds   = 120
 
 	azureNodeProviderIDRE    = regexp.MustCompile(`^azure:///subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Compute/(?:.*)`)
 	azureResourceGroupNameRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/(?:.*)`)
@@ -87,9 +90,9 @@ func ignoreStatusForbiddenFromError(err error) error {
 /// getVirtualMachine calls 'VirtualMachinesClient.Get' with a timed cache
 /// The service side has throttling control that delays responses if there're multiple requests onto certain vm
 /// resource request in short period.
-func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualMachine, err error) {
+func (az *Cloud) getVirtualMachine(nodeName types.NodeName, crt cacheReadType) (vm compute.VirtualMachine, err error) {
 	vmName := string(nodeName)
-	cachedVM, err := az.vmCache.Get(vmName)
+	cachedVM, err := az.vmCache.Get(vmName, crt)
 	if err != nil {
 		return vm, err
 	}
@@ -101,8 +104,8 @@ func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualM
 	return *(cachedVM.(*compute.VirtualMachine)), nil
 }
 
-func (az *Cloud) getRouteTable() (routeTable network.RouteTable, exists bool, err error) {
-	cachedRt, err := az.rtCache.Get(az.RouteTableName)
+func (az *Cloud) getRouteTable(crt cacheReadType) (routeTable network.RouteTable, exists bool, err error) {
+	cachedRt, err := az.rtCache.Get(az.RouteTableName, crt)
 	if err != nil {
 		return routeTable, false, err
 	}
@@ -165,8 +168,8 @@ func (az *Cloud) getSubnet(virtualNetworkName string, subnetName string) (subnet
 	return subnet, exists, err
 }
 
-func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exists bool, err error) {
-	cachedLB, err := az.lbCache.Get(name)
+func (az *Cloud) getAzureLoadBalancer(name string, crt cacheReadType) (lb network.LoadBalancer, exists bool, err error) {
+	cachedLB, err := az.lbCache.Get(name, crt)
 	if err != nil {
 		return lb, false, err
 	}
@@ -178,12 +181,12 @@ func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exi
 	return *(cachedLB.(*network.LoadBalancer)), true, nil
 }
 
-func (az *Cloud) getSecurityGroup() (nsg network.SecurityGroup, err error) {
+func (az *Cloud) getSecurityGroup(crt cacheReadType) (nsg network.SecurityGroup, err error) {
 	if az.SecurityGroupName == "" {
 		return nsg, fmt.Errorf("securityGroupName is not configured")
 	}
 
-	securityGroup, err := az.nsgCache.Get(az.SecurityGroupName)
+	securityGroup, err := az.nsgCache.Get(az.SecurityGroupName, crt)
 	if err != nil {
 		return nsg, err
 	}
@@ -225,7 +228,10 @@ func (az *Cloud) newVMCache() (*timedCache, error) {
 		return &vm, nil
 	}
 
-	return newTimedcache(vmCacheTTL, getter)
+	if az.VMCacheTTLInSeconds == 0 {
+		az.VMCacheTTLInSeconds = vmCacheTTLDefaultInSeconds
+	}
+	return newTimedcache(time.Duration(az.VMCacheTTLInSeconds)*time.Second, getter)
 }
 
 func (az *Cloud) newLBCache() (*timedCache, error) {
@@ -233,7 +239,7 @@ func (az *Cloud) newLBCache() (*timedCache, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		lb, err := az.LoadBalancerClient.Get(ctx, az.ResourceGroup, key, "")
+		lb, err := az.LoadBalancerClient.Get(ctx, az.getLoadBalancerResourceGroup(), key, "")
 		exists, message, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
@@ -247,7 +253,10 @@ func (az *Cloud) newLBCache() (*timedCache, error) {
 		return &lb, nil
 	}
 
-	return newTimedcache(lbCacheTTL, getter)
+	if az.LoadBalancerCacheTTLInSeconds == 0 {
+		az.LoadBalancerCacheTTLInSeconds = loadBalancerCacheTTLDefaultInSeconds
+	}
+	return newTimedcache(time.Duration(az.LoadBalancerCacheTTLInSeconds)*time.Second, getter)
 }
 
 func (az *Cloud) newNSGCache() (*timedCache, error) {
@@ -268,7 +277,10 @@ func (az *Cloud) newNSGCache() (*timedCache, error) {
 		return &nsg, nil
 	}
 
-	return newTimedcache(nsgCacheTTL, getter)
+	if az.NsgCacheTTLInSeconds == 0 {
+		az.NsgCacheTTLInSeconds = nsgCacheTTLDefaultInSeconds
+	}
+	return newTimedcache(time.Duration(az.NsgCacheTTLInSeconds)*time.Second, getter)
 }
 
 func (az *Cloud) newRouteTableCache() (*timedCache, error) {
@@ -289,7 +301,10 @@ func (az *Cloud) newRouteTableCache() (*timedCache, error) {
 		return &rt, nil
 	}
 
-	return newTimedcache(rtCacheTTL, getter)
+	if az.RouteTableCacheTTLInSeconds == 0 {
+		az.RouteTableCacheTTLInSeconds = routeTableCacheTTLDefaultInSeconds
+	}
+	return newTimedcache(time.Duration(az.RouteTableCacheTTLInSeconds)*time.Second, getter)
 }
 
 func (az *Cloud) useStandardLoadBalancer() bool {
@@ -347,7 +362,7 @@ func isBackendPoolOnSameLB(newBackendPoolID string, existingBackendPools []strin
 	}
 
 	newLBName := matches[1]
-	newLBNameTrimmed := strings.TrimRight(newLBName, InternalLoadBalancerNameSuffix)
+	newLBNameTrimmed := strings.TrimSuffix(newLBName, InternalLoadBalancerNameSuffix)
 	for _, backendPool := range existingBackendPools {
 		matches := backendPoolIDRE.FindStringSubmatch(backendPool)
 		if len(matches) != 2 {
@@ -355,7 +370,7 @@ func isBackendPoolOnSameLB(newBackendPoolID string, existingBackendPools []strin
 		}
 
 		lbName := matches[1]
-		if !strings.EqualFold(strings.TrimRight(lbName, InternalLoadBalancerNameSuffix), newLBNameTrimmed) {
+		if !strings.EqualFold(strings.TrimSuffix(lbName, InternalLoadBalancerNameSuffix), newLBNameTrimmed) {
 			return false, lbName, nil
 		}
 	}

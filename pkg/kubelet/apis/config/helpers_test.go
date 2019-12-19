@@ -79,6 +79,8 @@ func allPrimitiveFieldPaths(t *testing.T, tp reflect.Type, path *field.Path) set
 	return paths
 }
 
+//lint:file-ignore U1000 Ignore dummy types, used by tests.
+
 // dummy helper types
 type foo struct {
 	foo int
@@ -210,6 +212,7 @@ var (
 		"ReadOnlyPort",
 		"RegistryBurst",
 		"RegistryPullQPS",
+		"ReservedSystemCPUs",
 		"RuntimeRequestTimeout.Duration",
 		"SerializeImagePulls",
 		"StreamingConnectionIdleTimeout.Duration",

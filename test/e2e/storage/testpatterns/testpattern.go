@@ -17,7 +17,7 @@ limitations under the License.
 package testpatterns
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 )
@@ -76,6 +76,11 @@ var (
 		Name:    "Inline-volume (default fs)",
 		VolType: InlineVolume,
 	}
+	// DefaultFsEphemeralVolume is TestPattern for "Ephemeral-volume (default fs)"
+	DefaultFsEphemeralVolume = TestPattern{
+		Name:    "Ephemeral-volume (default fs)",
+		VolType: CSIInlineVolume,
+	}
 	// DefaultFsPreprovisionedPV is TestPattern for "Pre-provisioned PV (default fs)"
 	DefaultFsPreprovisionedPV = TestPattern{
 		Name:    "Pre-provisioned PV (default fs)",
@@ -92,6 +97,12 @@ var (
 	// Ext3InlineVolume is TestPattern for "Inline-volume (ext3)"
 	Ext3InlineVolume = TestPattern{
 		Name:    "Inline-volume (ext3)",
+		VolType: InlineVolume,
+		FsType:  "ext3",
+	}
+	// Ext3EphemeralVolume is TestPattern for "Ephemeral-volume (ext3)"
+	Ext3EphemeralVolume = TestPattern{
+		Name:    "Ephemeral-volume (ext3)",
 		VolType: InlineVolume,
 		FsType:  "ext3",
 	}
@@ -116,6 +127,12 @@ var (
 		VolType: InlineVolume,
 		FsType:  "ext4",
 	}
+	// Ext4EphemeralVolume is TestPattern for "Ephemeral-volume (ext4)"
+	Ext4EphemeralVolume = TestPattern{
+		Name:    "Ephemeral-volume (ext4)",
+		VolType: CSIInlineVolume,
+		FsType:  "ext4",
+	}
 	// Ext4PreprovisionedPV is TestPattern for "Pre-provisioned PV (ext4)"
 	Ext4PreprovisionedPV = TestPattern{
 		Name:    "Pre-provisioned PV (ext4)",
@@ -135,6 +152,13 @@ var (
 	XfsInlineVolume = TestPattern{
 		Name:       "Inline-volume (xfs)",
 		VolType:    InlineVolume,
+		FsType:     "xfs",
+		FeatureTag: "[Slow]",
+	}
+	// XfsEphemeralVolume is TestPattern for "Ephemeral-volume (xfs)"
+	XfsEphemeralVolume = TestPattern{
+		Name:       "Ephemeral-volume (xfs)",
+		VolType:    CSIInlineVolume,
 		FsType:     "xfs",
 		FeatureTag: "[Slow]",
 	}
@@ -159,6 +183,13 @@ var (
 	NtfsInlineVolume = TestPattern{
 		Name:       "Inline-volume (ntfs)",
 		VolType:    InlineVolume,
+		FsType:     "ntfs",
+		FeatureTag: "[sig-windows]",
+	}
+	// NtfsEphemeralVolume is TestPattern for "Ephemeral-volume (ntfs)"
+	NtfsEphemeralVolume = TestPattern{
+		Name:       "Ephemeral-volume (ntfs)",
+		VolType:    CSIInlineVolume,
 		FsType:     "ntfs",
 		FeatureTag: "[sig-windows]",
 	}
@@ -221,7 +252,6 @@ var (
 	DefaultFsDynamicPVAllowExpansion = TestPattern{
 		Name:           "Dynamic PV (default fs)(allowExpansion)",
 		VolType:        DynamicPV,
-		BindingMode:    storagev1.VolumeBindingWaitForFirstConsumer,
 		AllowExpansion: true,
 	}
 	// BlockVolModeDynamicPVAllowExpansion is TestPattern for "Dynamic PV (block volmode)(allowExpansion)"
@@ -229,7 +259,31 @@ var (
 		Name:           "Dynamic PV (block volmode)(allowExpansion)",
 		VolType:        DynamicPV,
 		VolMode:        v1.PersistentVolumeBlock,
-		BindingMode:    storagev1.VolumeBindingWaitForFirstConsumer,
 		AllowExpansion: true,
 	}
+
+	// Definitions for topology tests
+
+	// TopologyImmediate is TestPattern for immediate binding
+	TopologyImmediate = TestPattern{
+		Name:        "Dynamic PV (immediate binding)",
+		VolType:     DynamicPV,
+		BindingMode: storagev1.VolumeBindingImmediate,
+	}
+
+	// TopologyDelayed is TestPattern for delayed binding
+	TopologyDelayed = TestPattern{
+		Name:        "Dynamic PV (delayed binding)",
+		VolType:     DynamicPV,
+		BindingMode: storagev1.VolumeBindingWaitForFirstConsumer,
+	}
 )
+
+// NewVolTypeMap creates a map with the given TestVolTypes enabled
+func NewVolTypeMap(types ...TestVolType) map[TestVolType]bool {
+	m := map[TestVolType]bool{}
+	for _, t := range types {
+		m[t] = true
+	}
+	return m
+}

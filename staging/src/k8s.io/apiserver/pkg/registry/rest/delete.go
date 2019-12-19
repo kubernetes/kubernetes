@@ -150,7 +150,7 @@ func AdmissionToValidateObjectDeleteFunc(admit admission.Interface, staticAttrib
 	mutating := isMutatingAdmission && mutatingAdmission.Handles(staticAttributes.GetOperation())
 	validating := isValidatingAdmission && validatingAdmission.Handles(staticAttributes.GetOperation())
 
-	return func(old runtime.Object) error {
+	return func(ctx context.Context, old runtime.Object) error {
 		if !mutating && !validating {
 			return nil
 		}
@@ -169,12 +169,12 @@ func AdmissionToValidateObjectDeleteFunc(admit admission.Interface, staticAttrib
 			staticAttributes.GetUserInfo(),
 		)
 		if mutating {
-			if err := mutatingAdmission.Admit(finalAttributes, objInterfaces); err != nil {
+			if err := mutatingAdmission.Admit(ctx, finalAttributes, objInterfaces); err != nil {
 				return err
 			}
 		}
 		if validating {
-			if err := validatingAdmission.Validate(finalAttributes, objInterfaces); err != nil {
+			if err := validatingAdmission.Validate(ctx, finalAttributes, objInterfaces); err != nil {
 				return err
 			}
 		}

@@ -27,7 +27,7 @@ import (
 	capi "k8s.io/api/certificates/v1beta1"
 	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
-	k8s_certificates_v1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/controller/certificates"
 )
 
@@ -49,6 +49,7 @@ func NewCSRApprovingController(client clientset.Interface, csrInformer certifica
 		recognizers: recognizers(),
 	}
 	return certificates.NewCertificateController(
+		"csrapproving",
 		client,
 		csrInformer,
 		approver.handle,
@@ -78,7 +79,7 @@ func (a *sarApprover) handle(csr *capi.CertificateSigningRequest) error {
 	if approved, denied := certificates.GetCertApprovalCondition(&csr.Status); approved || denied {
 		return nil
 	}
-	x509cr, err := k8s_certificates_v1beta1.ParseCSR(csr)
+	x509cr, err := capihelper.ParseCSR(csr)
 	if err != nil {
 		return fmt.Errorf("unable to parse csr %q: %v", csr.Name, err)
 	}
@@ -172,7 +173,7 @@ func isNodeClientCert(csr *capi.CertificateSigningRequest, x509cr *x509.Certific
 	if !reflect.DeepEqual([]string{"system:nodes"}, x509cr.Subject.Organization) {
 		return false
 	}
-	if (len(x509cr.DNSNames) > 0) || (len(x509cr.EmailAddresses) > 0) || (len(x509cr.IPAddresses) > 0) {
+	if len(x509cr.DNSNames) > 0 || len(x509cr.EmailAddresses) > 0 || len(x509cr.IPAddresses) > 0 || len(x509cr.URIs) > 0 {
 		return false
 	}
 	if !hasExactUsages(csr, kubeletClientUsages) {

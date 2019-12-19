@@ -78,7 +78,7 @@ func TestGCMKeyRotation(t *testing.T) {
 	}
 
 	// verify changing the context fails storage
-	from, stale, err = p.TransformFromStorage(out, value.DefaultContext([]byte("incorrect_context")))
+	_, _, err = p.TransformFromStorage(out, value.DefaultContext([]byte("incorrect_context")))
 	if err == nil {
 		t.Fatalf("expected unauthenticated data")
 	}
@@ -130,7 +130,7 @@ func TestCBCKeyRotation(t *testing.T) {
 	}
 
 	// verify changing the context fails storage
-	from, stale, err = p.TransformFromStorage(out, value.DefaultContext([]byte("incorrect_context")))
+	_, _, err = p.TransformFromStorage(out, value.DefaultContext([]byte("incorrect_context")))
 	if err != nil {
 		t.Fatalf("CBC mode does not support authentication: %v", err)
 	}

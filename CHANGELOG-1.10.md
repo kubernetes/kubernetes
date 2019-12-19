@@ -1054,7 +1054,7 @@ filename | sha256 hash
     * kubeadm upgrade now supports external etcd setups
     * kubeadm upgrade can now rollback and restore etcd after an upgrade failure
 * Update version of Istio addon from 0.5.1 to 0.6.0. ([#61911](https://github.com/kubernetes/kubernetes/pull/61911), [@ostromart](https://github.com/ostromart))
-    * See https://istio.io/about/notes/0.6.html for full Isto release notes.
+    * See https://istio.io/news/releases/0.x/announcing-0.6/ for full Isto release notes.
 * removed unsafe double RLock in cpumanager ([#62464](https://github.com/kubernetes/kubernetes/pull/62464), [@choury](https://github.com/choury))
 * Fix in vSphere Cloud Provider to handle upgrades from kubernetes version less than v1.9.4 to v1.9.4 and above. ([#62919](https://github.com/kubernetes/kubernetes/pull/62919), [@abrarshivani](https://github.com/abrarshivani))
 * Remove METADATA_AGENT_VERSION configuration option. ([#63000](https://github.com/kubernetes/kubernetes/pull/63000), [@kawych](https://github.com/kawych))
@@ -1919,7 +1919,7 @@ And point to the file using the --config flag, as in
 * Makes the kube-dns addon optional so that users can deploy their own DNS solution. ([#57113](https://github.com/kubernetes/kubernetes/pull/57113), [@wwwtyro](https://github.com/wwwtyro))
 
 * `kubectl port-forward` now supports specifying a service to port forward to, as in `kubectl port-forward svc/myservice 8443:443`. Additional support has also been added for looking up targetPort for a service, as well as enabling using svc/name to select a pod. ([#59809](https://github.com/kubernetes/kubernetes/pull/59809), [@phsiao](https://github.com/phsiao))
-* [Make NodePort IP addres](https://github.com/kubernetes/website/pull/7631/files)[ses configurabl](https://github.com/kubernetes/website/pull/7631/files)[e](https://github.com/kubernetes/website/pull/7631/files). ([#58052](https://github.com/kubernetes/kubernetes/pull/58052), [@m1093782566](https://github.com/m1093782566))
+* [Make NodePort IP address](https://github.com/kubernetes/website/pull/7631/files)[ses configurabl](https://github.com/kubernetes/website/pull/7631/files)[e](https://github.com/kubernetes/website/pull/7631/files). ([#58052](https://github.com/kubernetes/kubernetes/pull/58052), [@m1093782566](https://github.com/m1093782566))
 
 * Fixed the issue in kube-proxy iptables/ipvs mode to properly handle incorrect IP version. ([#56880](https://github.com/kubernetes/kubernetes/pull/56880), [@MrHohn](https://github.com/MrHohn))
 * Kubeadm: CoreDNS supports migration of the kube-dns configuration to CoreDNS configuration when upgrading the service discovery from kube-dns to CoreDNS as part of Beta.  ([#58828](https://github.com/kubernetes/kubernetes/pull/58828), [@rajansandeep](https://github.com/rajansandeep))
@@ -2227,7 +2227,7 @@ parameters:
 
 ## External Dependencies
 * The supported etcd server version is 3.1.12, as compared to 3.1.10 in v1.9 ([#60998](https://github.com/kubernetes/kubernetes/pull/60998))
-* The validated docker versions are the same as for v1.9: 1.11.2 to 1.13.1 and 17.03.x ([ref](https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/system/docker_validator_test.go))
+* The validated docker versions are the same as for v1.9: 1.11.2 to 1.13.1 and 17.03.x ([ref](https://github.com/kubernetes/kubernetes/blob/release-1.10/test/e2e_node/system/docker_validator_test.go))
 * The Go version is go1.9.3, as compared to go1.9.2 in v1.9. ([#59012](https://github.com/kubernetes/kubernetes/pull/59012))
 * The minimum supported go is the same as for v1.9: go1.9.1. ([#55301](https://github.com/kubernetes/kubernetes/pull/55301))
 * CNI is the same as v1.9: v0.6.0 ([#51250](https://github.com/kubernetes/kubernetes/pull/51250))
@@ -3022,7 +3022,7 @@ filename | sha256 hash
 * Improve scheduler performance of MatchInterPodAffinity predicate. ([#57476](https://github.com/kubernetes/kubernetes/pull/57476), [@misterikkit](https://github.com/misterikkit))
 * Improve scheduler performance of MatchInterPodAffinity predicate. ([#57477](https://github.com/kubernetes/kubernetes/pull/57477), [@misterikkit](https://github.com/misterikkit))
 * Improve scheduler performance of MatchInterPodAffinity predicate. ([#57478](https://github.com/kubernetes/kubernetes/pull/57478), [@misterikkit](https://github.com/misterikkit))
-* Allow use resource ID to specify public IP address in azure_loadbalancer ([#53557](https://github.com/kubernetes/kubernetes/pull/53557), [@yolo3301](https://github.com/yolo3301))
+* Allow use resource ID to specify public IP address in azure_loadbalancer ([#53557](https://github.com/kubernetes/kubernetes/pull/53557), [@yolocs](https://github.com/yolocs))
 * Fixes a bug where if an error was returned that was not an `autorest.DetailedError` we would return `"not found", nil` which caused nodes to go to `NotReady` state. ([#57484](https://github.com/kubernetes/kubernetes/pull/57484), [@brendandburns](https://github.com/brendandburns))
 * Add the path '/version/' to the `system:discovery` cluster role. ([#57368](https://github.com/kubernetes/kubernetes/pull/57368), [@brendandburns](https://github.com/brendandburns))
 * Fixes issue creating docker secrets with kubectl 1.9 for accessing docker private registries. ([#57463](https://github.com/kubernetes/kubernetes/pull/57463), [@dims](https://github.com/dims))

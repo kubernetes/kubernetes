@@ -24,6 +24,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -101,7 +102,7 @@ func (cm *containerManagerStub) UpdatePluginResources(*schedulernodeinfo.NodeInf
 }
 
 func (cm *containerManagerStub) InternalContainerLifecycle() InternalContainerLifecycle {
-	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager()}
+	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), topologymanager.NewFakeManager()}
 }
 
 func (cm *containerManagerStub) GetPodCgroupRoot() string {
@@ -114,6 +115,10 @@ func (cm *containerManagerStub) GetDevices(_, _ string) []*podresourcesapi.Conta
 
 func (cm *containerManagerStub) ShouldResetExtendedResourceCapacity() bool {
 	return cm.shouldResetExtendedResourceCapacity
+}
+
+func (cm *containerManagerStub) GetTopologyPodAdmitHandler() topologymanager.Manager {
+	return nil
 }
 
 func NewStubContainerManager() ContainerManager {

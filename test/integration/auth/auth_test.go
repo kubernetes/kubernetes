@@ -22,6 +22,7 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -46,8 +47,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
-	"k8s.io/client-go/tools/clientcmd/api/v1"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -85,7 +85,7 @@ func getTestWebhookTokenAuth(serverURL string) (authenticator.Request, error) {
 	if err := json.NewEncoder(kubecfgFile).Encode(config); err != nil {
 		return nil, err
 	}
-	webhookTokenAuth, err := webhook.New(kubecfgFile.Name(), nil)
+	webhookTokenAuth, err := webhook.New(kubecfgFile.Name(), "v1beta1", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -93,26 +93,45 @@ func getTestWebhookTokenAuth(serverURL string) (authenticator.Request, error) {
 }
 
 func path(resource, namespace, name string) string {
-	return testapi.Default.ResourcePath(resource, namespace, name)
+	return pathWithPrefix("", resource, namespace, name)
 }
 
 func pathWithPrefix(prefix, resource, namespace, name string) string {
-	return testapi.Default.ResourcePathWithPrefix(prefix, resource, namespace, name)
+	path := "/api/v1"
+	if prefix != "" {
+		path = path + "/" + prefix
+	}
+	if namespace != "" {
+		path = path + "/namespaces/" + namespace
+	}
+	// Resource names are lower case.
+	resource = strings.ToLower(resource)
+	if resource != "" {
+		path = path + "/" + resource
+	}
+	if name != "" {
+		path = path + "/" + name
+	}
+	return path
 }
 
 func pathWithSubResource(resource, namespace, name, subresource string) string {
-	return testapi.Default.SubResourcePath(resource, namespace, name, subresource)
+	path := pathWithPrefix("", resource, namespace, name)
+	if subresource != "" {
+		path = path + "/" + subresource
+	}
+	return path
 }
 
 func timeoutPath(resource, namespace, name string) string {
-	return addTimeoutFlag(testapi.Default.ResourcePath(resource, namespace, name))
+	return addTimeoutFlag(path(resource, namespace, name))
 }
 
 // Bodies for requests used in subsequent tests.
 var aPod = `
 {
   "kind": "Pod",
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a",
     "creationTimestamp": null%s
@@ -130,7 +149,7 @@ var aPod = `
 var aRC = `
 {
   "kind": "ReplicationController",
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a",
     "labels": {
@@ -163,7 +182,7 @@ var aRC = `
 var aService = `
 {
   "kind": "Service",
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a",
     "labels": {
@@ -187,7 +206,7 @@ var aService = `
 var aNode = `
 {
   "kind": "Node",
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a"%s
   },
@@ -201,7 +220,7 @@ func aEvent(namespace string) string {
 	return `
 {
   "kind": "Event",
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a"%s
   },
@@ -218,7 +237,7 @@ func aEvent(namespace string) string {
 var aBinding = `
 {
   "kind": "Binding",
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a"%s
   },
@@ -241,7 +260,7 @@ var emptyEndpoints = `
 var aEndpoints = `
 {
   "kind": "Endpoints",
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "metadata": {
     "name": "a"%s
   },
@@ -266,7 +285,7 @@ var aEndpoints = `
 var deleteNow = `
 {
   "kind": "DeleteOptions",
-  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
+  "apiVersion": "v1",
   "gracePeriodSeconds": 0%s
 }
 `
@@ -539,7 +558,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 // TODO(etune): remove this test once a more comprehensive built-in authorizer is implemented.
 type allowAliceAuthorizer struct{}
 
-func (allowAliceAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
+func (allowAliceAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 	if a.GetUser() != nil && a.GetUser().GetName() == "alice" {
 		return authorizer.DecisionAllow, "", nil
 	}
@@ -705,7 +724,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 type impersonateAuthorizer struct{}
 
 // alice can't act as anyone and bob can't do anything but act-as someone
-func (impersonateAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
+func (impersonateAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 	// alice can impersonate service accounts and do other actions
 	if a.GetUser() != nil && a.GetUser().GetName() == "alice" && a.GetVerb() == "impersonate" && a.GetResource() == "serviceaccounts" {
 		return authorizer.DecisionAllow, "", nil
@@ -864,7 +883,7 @@ type trackingAuthorizer struct {
 	requestAttributes []authorizer.Attributes
 }
 
-func (a *trackingAuthorizer) Authorize(attributes authorizer.Attributes) (authorizer.Decision, string, error) {
+func (a *trackingAuthorizer) Authorize(ctx context.Context, attributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	a.requestAttributes = append(a.requestAttributes, attributes)
 	return authorizer.DecisionAllow, "", nil
 }

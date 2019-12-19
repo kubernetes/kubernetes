@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "doc.go",
         "elements.go",
+        "equals.go",
         "schemaschema.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/structured-merge-diff/schema",

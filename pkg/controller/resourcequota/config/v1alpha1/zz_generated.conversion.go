@@ -45,16 +45,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.ResourceQuotaControllerConfiguration)(nil), (*config.ResourceQuotaControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_ResourceQuotaControllerConfiguration_To_config_ResourceQuotaControllerConfiguration(a.(*v1alpha1.ResourceQuotaControllerConfiguration), b.(*config.ResourceQuotaControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.ResourceQuotaControllerConfiguration)(nil), (*v1alpha1.ResourceQuotaControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_ResourceQuotaControllerConfiguration_To_v1alpha1_ResourceQuotaControllerConfiguration(a.(*config.ResourceQuotaControllerConfiguration), b.(*v1alpha1.ResourceQuotaControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*config.ResourceQuotaControllerConfiguration)(nil), (*v1alpha1.ResourceQuotaControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_ResourceQuotaControllerConfiguration_To_v1alpha1_ResourceQuotaControllerConfiguration(a.(*config.ResourceQuotaControllerConfiguration), b.(*v1alpha1.ResourceQuotaControllerConfiguration), scope)
 	}); err != nil {

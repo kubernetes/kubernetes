@@ -52,7 +52,7 @@ func (s *DryRunnableStorage) Delete(ctx context.Context, key string, out runtime
 		if err := preconditions.Check(key, out); err != nil {
 			return err
 		}
-		return deleteValidation(out)
+		return deleteValidation(ctx, out)
 	}
 	return s.Storage.Delete(ctx, key, out, preconditions, deleteValidation)
 }
@@ -90,6 +90,9 @@ func (s *DryRunnableStorage) GuaranteedUpdate(
 			return err
 		}
 		rev, err := s.Versioner().ObjectResourceVersion(ptrToType)
+		if err != nil {
+			return err
+		}
 		out, _, err := tryUpdate(ptrToType, storage.ResponseMeta{ResourceVersion: rev})
 		if err != nil {
 			return err

@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -21,10 +23,13 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"net"
-	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
+	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,11 +38,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/legacy-cloud-providers/azure/auth"
-
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
-	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/stretchr/testify/assert"
 )
 
 var testClusterName = "testCluster"
@@ -59,6 +59,13 @@ func TestParseConfig(t *testing.T) {
 		"CloudProviderRateLimitBucketWrite": 1,
 		"cloudProviderRateLimitQPS": 1,
 		"CloudProviderRateLimitQPSWrite": 1,
+		"availabilitySetNodesCacheTTLInSeconds": 100,
+		"vmssCacheTTLInSeconds": 100,
+		"vmssVirtualMachinesCacheTTLInSeconds": 100,
+		"vmCacheTTLInSeconds": 100,
+		"loadBalancerCacheTTLInSeconds": 100,
+		"nsgCacheTTLInSeconds": 100,
+		"routeTableCacheTTLInSeconds": 100,
 		"location": "location",
 		"maximumLoadBalancerRuleCount": 1,
 		"primaryAvailabilitySetName": "primaryAvailabilitySetName",
@@ -87,29 +94,36 @@ func TestParseConfig(t *testing.T) {
 			TenantID:                    "tenantId",
 			UseManagedIdentityExtension: true,
 		},
-		CloudProviderBackoff:              true,
-		CloudProviderBackoffDuration:      1,
-		CloudProviderBackoffExponent:      1,
-		CloudProviderBackoffJitter:        1,
-		CloudProviderBackoffRetries:       1,
-		CloudProviderRateLimit:            true,
-		CloudProviderRateLimitBucket:      1,
-		CloudProviderRateLimitBucketWrite: 1,
-		CloudProviderRateLimitQPS:         1,
-		CloudProviderRateLimitQPSWrite:    1,
-		Location:                          "location",
-		MaximumLoadBalancerRuleCount:      1,
-		PrimaryAvailabilitySetName:        "primaryAvailabilitySetName",
-		PrimaryScaleSetName:               "primaryScaleSetName",
-		ResourceGroup:                     "resourcegroup",
-		RouteTableName:                    "routeTableName",
-		RouteTableResourceGroup:           "routeTableResourceGroup",
-		SecurityGroupName:                 "securityGroupName",
-		SubnetName:                        "subnetName",
-		UseInstanceMetadata:               true,
-		VMType:                            "standard",
-		VnetName:                          "vnetName",
-		VnetResourceGroup:                 "vnetResourceGroup",
+		CloudProviderBackoff:                  true,
+		CloudProviderBackoffDuration:          1,
+		CloudProviderBackoffExponent:          1,
+		CloudProviderBackoffJitter:            1,
+		CloudProviderBackoffRetries:           1,
+		CloudProviderRateLimit:                true,
+		CloudProviderRateLimitBucket:          1,
+		CloudProviderRateLimitBucketWrite:     1,
+		CloudProviderRateLimitQPS:             1,
+		CloudProviderRateLimitQPSWrite:        1,
+		AvailabilitySetNodesCacheTTLInSeconds: 100,
+		VmssCacheTTLInSeconds:                 100,
+		VmssVirtualMachinesCacheTTLInSeconds:  100,
+		VMCacheTTLInSeconds:                   100,
+		LoadBalancerCacheTTLInSeconds:         100,
+		NsgCacheTTLInSeconds:                  100,
+		RouteTableCacheTTLInSeconds:           100,
+		Location:                              "location",
+		MaximumLoadBalancerRuleCount:          1,
+		PrimaryAvailabilitySetName:            "primaryAvailabilitySetName",
+		PrimaryScaleSetName:                   "primaryScaleSetName",
+		ResourceGroup:                         "resourcegroup",
+		RouteTableName:                        "routeTableName",
+		RouteTableResourceGroup:               "routeTableResourceGroup",
+		SecurityGroupName:                     "securityGroupName",
+		SubnetName:                            "subnetName",
+		UseInstanceMetadata:                   true,
+		VMType:                                "standard",
+		VnetName:                              "vnetName",
+		VnetResourceGroup:                     "vnetResourceGroup",
 	}
 
 	buffer := bytes.NewBufferString(azureConfig)
@@ -484,13 +498,13 @@ func TestReconcileSecurityGroupFromAnyDestinationAddressPrefixToLoadBalancerIP(t
 	az := getTestCloud()
 	svc1 := getTestService("serviceea", v1.ProtocolTCP, nil, 80)
 	svc1.Spec.LoadBalancerIP = "192.168.0.0"
-	sg := getTestSecurityGroup(az)
+	getTestSecurityGroup(az)
 	// Simulate a pre-Kubernetes 1.8 NSG, where we do not specify the destination address prefix
-	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(""), true)
+	_, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(""), true)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
-	sg, err = az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -501,7 +515,7 @@ func TestReconcileSecurityGroupDynamicLoadBalancerIP(t *testing.T) {
 	az := getTestCloud()
 	svc1 := getTestService("servicea", v1.ProtocolTCP, nil, 80)
 	svc1.Spec.LoadBalancerIP = ""
-	sg := getTestSecurityGroup(az)
+	getTestSecurityGroup(az)
 	dynamicallyAssignedIP := "192.168.0.0"
 	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(dynamicallyAssignedIP), true)
 	if err != nil {
@@ -603,12 +617,12 @@ func TestReconcileLoadBalancerRemoveService(t *testing.T) {
 	clusterResources := getClusterResources(az, 1, 1)
 	svc := getTestService("servicea", v1.ProtocolTCP, nil, 80, 443)
 
-	lb, err := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true /* wantLb */)
+	_, err := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
 
-	lb, err = az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, false /* wantLb */)
+	lb, err := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, false /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -653,13 +667,13 @@ func TestReconcileLoadBalancerRemovesPort(t *testing.T) {
 	clusterResources := getClusterResources(az, 1, 1)
 
 	svc := getTestService("servicea", v1.ProtocolTCP, nil, 80, 443)
-	lb, err := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true /* wantLb */)
+	_, err := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
 
 	svcUpdated := getTestService("servicea", v1.ProtocolTCP, nil, 80)
-	lb, err = az.reconcileLoadBalancer(testClusterName, &svcUpdated, clusterResources.nodes, true /* wantLb */)
+	lb, err := az.reconcileLoadBalancer(testClusterName, &svcUpdated, clusterResources.nodes, true /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -674,12 +688,12 @@ func TestReconcileLoadBalancerMultipleServices(t *testing.T) {
 	svc1 := getTestService("servicea", v1.ProtocolTCP, nil, 80, 443)
 	svc2 := getTestService("serviceb", v1.ProtocolTCP, nil, 80)
 
-	updatedLoadBalancer, err := az.reconcileLoadBalancer(testClusterName, &svc1, clusterResources.nodes, true /* wantLb */)
+	_, err := az.reconcileLoadBalancer(testClusterName, &svc1, clusterResources.nodes, true /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
 
-	updatedLoadBalancer, err = az.reconcileLoadBalancer(testClusterName, &svc2, clusterResources.nodes, true /* wantLb */)
+	updatedLoadBalancer, err := az.reconcileLoadBalancer(testClusterName, &svc2, clusterResources.nodes, true /* wantLb */)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -711,7 +725,7 @@ func TestServiceDefaultsToNoSessionPersistence(t *testing.T) {
 		t.Error(err)
 	}
 
-	if lbRule.LoadDistribution != network.Default {
+	if lbRule.LoadDistribution != network.LoadDistributionDefault {
 		t.Errorf("Expected LB rule to have default load distribution but was %s", lbRule.LoadDistribution)
 	}
 }
@@ -734,7 +748,7 @@ func TestServiceRespectsNoSessionAffinity(t *testing.T) {
 		t.Error(err)
 	}
 
-	if lbRule.LoadDistribution != network.Default {
+	if lbRule.LoadDistribution != network.LoadDistributionDefault {
 		t.Errorf("Expected LB rule to have default load distribution but was %s", lbRule.LoadDistribution)
 	}
 }
@@ -757,7 +771,7 @@ func TestServiceRespectsClientIPSessionAffinity(t *testing.T) {
 		t.Error(err)
 	}
 
-	if lbRule.LoadDistribution != network.SourceIP {
+	if lbRule.LoadDistribution != network.LoadDistributionSourceIP {
 		t.Errorf("Expected LB rule to have SourceIP load distribution but was %s", lbRule.LoadDistribution)
 	}
 }
@@ -822,7 +836,7 @@ func TestReconcileSecurityGroupRemoveServiceRemovesPort(t *testing.T) {
 	svc := getTestService("servicea", v1.ProtocolTCP, nil, 80, 443)
 	clusterResources := getClusterResources(az, 1, 1)
 
-	sg := getTestSecurityGroup(az, svc)
+	getTestSecurityGroup(az, svc)
 	svcUpdated := getTestService("servicea", v1.ProtocolTCP, nil, 80)
 	lb, _ := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true)
 	lbStatus, _ := az.getServiceLoadBalancerStatus(&svc, lb)
@@ -844,7 +858,7 @@ func TestReconcileSecurityWithSourceRanges(t *testing.T) {
 	}
 	clusterResources := getClusterResources(az, 1, 1)
 
-	sg := getTestSecurityGroup(az, svc)
+	getTestSecurityGroup(az, svc)
 	lb, _ := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true)
 	lbStatus, _ := az.getServiceLoadBalancerStatus(&svc, lb)
 
@@ -1109,9 +1123,7 @@ func getClusterResources(az *Cloud, vmCount int, availabilitySetCount int) (clus
 
 		vmCtx, vmCancel := getContextWithCancel()
 		defer vmCancel()
-		_, err := az.VirtualMachinesClient.CreateOrUpdate(vmCtx, az.Config.ResourceGroup, vmName, newVM, "")
-		if err != nil {
-		}
+		az.VirtualMachinesClient.CreateOrUpdate(vmCtx, az.Config.ResourceGroup, vmName, newVM, "")
 		// add to kubernetes
 		newNode := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1240,14 +1252,14 @@ func validateLoadBalancer(t *testing.T, loadBalancer *network.LoadBalancer, serv
 		if len(svc.Spec.Ports) > 0 {
 			expectedFrontendIPCount++
 			expectedFrontendIP := ExpectedFrontendIPInfo{
-				Name:   az.getFrontendIPConfigName(&svc, subnet(&svc)),
+				Name:   az.getFrontendIPConfigName(&svc),
 				Subnet: subnet(&svc),
 			}
 			expectedFrontendIPs = append(expectedFrontendIPs, expectedFrontendIP)
 		}
 		for _, wantedRule := range svc.Spec.Ports {
 			expectedRuleCount++
-			wantedRuleName := az.getLoadBalancerRuleName(&svc, wantedRule.Protocol, wantedRule.Port, subnet(&svc))
+			wantedRuleName := az.getLoadBalancerRuleName(&svc, wantedRule.Protocol, wantedRule.Port)
 			foundRule := false
 			for _, actualRule := range *loadBalancer.LoadBalancingRules {
 				if strings.EqualFold(*actualRule.Name, wantedRuleName) &&
@@ -1574,7 +1586,14 @@ func TestNewCloudFromJSON(t *testing.T) {
 		"cloudProviderBackoff": true,
 		"cloudProviderRatelimit": true,
 		"cloudProviderRateLimitQPS": 0.5,
-		"cloudProviderRateLimitBucket": 5
+		"cloudProviderRateLimitBucket": 5,
+		"availabilitySetNodesCacheTTLInSeconds": 100,
+		"vmssCacheTTLInSeconds": 100,
+		"vmssVirtualMachinesCacheTTLInSeconds": 100,
+		"vmCacheTTLInSeconds": 100,
+		"loadBalancerCacheTTLInSeconds": 100,
+		"nsgCacheTTLInSeconds": 100,
+		"routeTableCacheTTLInSeconds": 100,
 	}`
 	validateConfig(t, config)
 }
@@ -1624,6 +1643,13 @@ cloudProviderBackoffJitter: 1.0
 cloudProviderRatelimit: true
 cloudProviderRateLimitQPS: 0.5
 cloudProviderRateLimitBucket: 5
+availabilitySetNodesCacheTTLInSeconds: 100
+vmssCacheTTLInSeconds: 100
+vmssVirtualMachinesCacheTTLInSeconds: 100
+vmCacheTTLInSeconds: 100
+loadBalancerCacheTTLInSeconds: 100
+nsgCacheTTLInSeconds: 100
+routeTableCacheTTLInSeconds: 100
 `
 	validateConfig(t, config)
 }
@@ -1697,17 +1723,34 @@ func validateConfig(t *testing.T, config string) {
 	if azureCloud.CloudProviderRateLimitBucket != 5 {
 		t.Errorf("got incorrect value for CloudProviderRateLimitBucket")
 	}
+	if azureCloud.AvailabilitySetNodesCacheTTLInSeconds != 100 {
+		t.Errorf("got incorrect value for availabilitySetNodesCacheTTLInSeconds")
+	}
+	if azureCloud.VmssCacheTTLInSeconds != 100 {
+		t.Errorf("got incorrect value for vmssCacheTTLInSeconds")
+	}
+	if azureCloud.VmssVirtualMachinesCacheTTLInSeconds != 100 {
+		t.Errorf("got incorrect value for vmssVirtualMachinesCacheTTLInSeconds")
+	}
+	if azureCloud.VMCacheTTLInSeconds != 100 {
+		t.Errorf("got incorrect value for vmCacheTTLInSeconds")
+	}
+	if azureCloud.LoadBalancerCacheTTLInSeconds != 100 {
+		t.Errorf("got incorrect value for loadBalancerCacheTTLInSeconds")
+	}
+	if azureCloud.NsgCacheTTLInSeconds != 100 {
+		t.Errorf("got incorrect value for nsgCacheTTLInSeconds")
+	}
+	if azureCloud.RouteTableCacheTTLInSeconds != 100 {
+		t.Errorf("got incorrect value for routeTableCacheTTLInSeconds")
+	}
 }
 
 func getCloudFromConfig(t *testing.T, config string) *Cloud {
 	configReader := strings.NewReader(config)
-	cloud, err := NewCloud(configReader)
+	azureCloud, err := NewCloudWithoutFeatureGates(configReader)
 	if err != nil {
 		t.Error(err)
-	}
-	azureCloud, ok := cloud.(*Cloud)
-	if !ok {
-		t.Error("NewCloud returned incorrect type")
 	}
 	return azureCloud
 }
@@ -1723,70 +1766,6 @@ func validateEmptyConfig(t *testing.T, config string) {
 	// rate limits should be disabled by default if not explicitly enabled in config
 	if azureCloud.CloudProviderRateLimit != false {
 		t.Errorf("got incorrect value for CloudProviderRateLimit")
-	}
-}
-
-func TestGetZone(t *testing.T) {
-	cloud := &Cloud{
-		Config: Config{
-			Location:            "eastus",
-			UseInstanceMetadata: true,
-		},
-	}
-	testcases := []struct {
-		name        string
-		zone        string
-		faultDomain string
-		expected    string
-	}{
-		{
-			name:     "GetZone should get real zone if only node's zone is set",
-			zone:     "1",
-			expected: "eastus-1",
-		},
-		{
-			name:        "GetZone should get real zone if both node's zone and FD are set",
-			zone:        "1",
-			faultDomain: "99",
-			expected:    "eastus-1",
-		},
-		{
-			name:        "GetZone should get faultDomain if node's zone isn't set",
-			faultDomain: "99",
-			expected:    "99",
-		},
-	}
-
-	for _, test := range testcases {
-		listener, err := net.Listen("tcp", "127.0.0.1:0")
-		if err != nil {
-			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
-		}
-
-		mux := http.NewServeMux()
-		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, fmt.Sprintf(`{"compute":{"zone":"%s", "platformFaultDomain":"%s"}}`, test.zone, test.faultDomain))
-		}))
-		go func() {
-			http.Serve(listener, mux)
-		}()
-		defer listener.Close()
-
-		cloud.metadata, err = NewInstanceMetadataService("http://" + listener.Addr().String() + "/")
-		if err != nil {
-			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
-		}
-
-		zone, err := cloud.GetZone(context.Background())
-		if err != nil {
-			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
-		}
-		if zone.FailureDomain != test.expected {
-			t.Errorf("Test [%s] unexpected zone: %s, expected %q", test.name, zone.FailureDomain, test.expected)
-		}
-		if zone.Region != cloud.Location {
-			t.Errorf("Test [%s] unexpected region: %s, expected: %s", test.name, zone.Region, cloud.Location)
-		}
 	}
 }
 
@@ -1877,7 +1856,7 @@ func TestIfServiceSpecifiesSharedRuleAndRuleDoesNotExistItIsCreated(t *testing.T
 	svc.Spec.LoadBalancerIP = "192.168.77.88"
 	svc.Annotations[ServiceAnnotationSharedSecurityRule] = "true"
 
-	sg := getTestSecurityGroup(az)
+	getTestSecurityGroup(az)
 
 	sg, err := az.reconcileSecurityGroup(testClusterName, &svc, to.StringPtr(svc.Spec.LoadBalancerIP), true)
 	if err != nil {
@@ -1976,14 +1955,14 @@ func TestIfServicesSpecifySharedRuleButDifferentPortsThenSeparateRulesAreCreated
 	expectedRuleName1 := "shared-TCP-4444-Internet"
 	expectedRuleName2 := "shared-TCP-8888-Internet"
 
-	sg := getTestSecurityGroup(az)
+	getTestSecurityGroup(az)
 
-	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
+	_, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc1: %q", err)
 	}
 
-	sg, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc2: %q", err)
 	}
@@ -2045,14 +2024,14 @@ func TestIfServicesSpecifySharedRuleButDifferentProtocolsThenSeparateRulesAreCre
 	expectedRuleName1 := "shared-TCP-4444-Internet"
 	expectedRuleName2 := "shared-UDP-4444-Internet"
 
-	sg := getTestSecurityGroup(az)
+	getTestSecurityGroup(az)
 
-	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
+	_, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc1: %q", err)
 	}
 
-	sg, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc2: %q", err)
 	}
@@ -2114,14 +2093,14 @@ func TestIfServicesSpecifySharedRuleButDifferentSourceAddressesThenSeparateRules
 	expectedRuleName1 := "shared-TCP-80-192.168.12.0_24"
 	expectedRuleName2 := "shared-TCP-80-192.168.34.0_24"
 
-	sg := getTestSecurityGroup(az)
+	getTestSecurityGroup(az)
 
-	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
+	_, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc1: %q", err)
 	}
 
-	sg, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc2: %q", err)
 	}
@@ -2187,19 +2166,19 @@ func TestIfServicesSpecifySharedRuleButSomeAreOnDifferentPortsThenRulesAreSepara
 	expectedRuleName13 := "shared-TCP-4444-Internet"
 	expectedRuleName2 := "shared-TCP-8888-Internet"
 
-	sg := getTestSecurityGroup(az)
+	getTestSecurityGroup(az)
 
-	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
+	_, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc1: %q", err)
 	}
 
-	sg, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
+	_, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc2: %q", err)
 	}
 
-	sg, err = az.reconcileSecurityGroup(testClusterName, &svc3, to.StringPtr(svc3.Spec.LoadBalancerIP), true)
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc3, to.StringPtr(svc3.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc3: %q", err)
 	}
@@ -2282,14 +2261,14 @@ func TestIfServiceSpecifiesSharedRuleAndServiceIsDeletedThenTheServicesPortAndAd
 
 	expectedRuleName := "shared-TCP-80-Internet"
 
-	sg := getTestSecurityGroup(az)
+	getTestSecurityGroup(az)
 
-	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
+	_, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc1: %q", err)
 	}
 
-	sg, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc2: %q", err)
 	}
@@ -2342,19 +2321,19 @@ func TestIfSomeServicesShareARuleAndOneIsDeletedItIsRemovedFromTheRightRule(t *t
 	expectedRuleName13 := "shared-TCP-4444-Internet"
 	expectedRuleName2 := "shared-TCP-8888-Internet"
 
-	sg := getTestSecurityGroup(az)
+	getTestSecurityGroup(az)
 
-	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
+	_, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc1: %q", err)
 	}
 
-	sg, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
+	_, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc2: %q", err)
 	}
 
-	sg, err = az.reconcileSecurityGroup(testClusterName, &svc3, to.StringPtr(svc3.Spec.LoadBalancerIP), true)
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc3, to.StringPtr(svc3.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc3: %q", err)
 	}
@@ -2449,26 +2428,26 @@ func TestIfServiceSpecifiesSharedRuleAndLastServiceIsDeletedThenRuleIsDeleted(t 
 	expectedRuleName13 := "shared-TCP-4444-Internet"
 	expectedRuleName2 := "shared-TCP-8888-Internet"
 
-	sg := getTestSecurityGroup(az)
+	getTestSecurityGroup(az)
 
-	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
+	_, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc1: %q", err)
 	}
 
-	sg, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
+	_, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc2: %q", err)
 	}
 
-	sg, err = az.reconcileSecurityGroup(testClusterName, &svc3, to.StringPtr(svc3.Spec.LoadBalancerIP), true)
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc3, to.StringPtr(svc3.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc3: %q", err)
 	}
 
 	validateSecurityGroup(t, sg, svc1, svc2, svc3)
 
-	sg, err = az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), false)
+	_, err = az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), false)
 	if err != nil {
 		t.Errorf("Unexpected error removing svc1: %q", err)
 	}
@@ -2539,29 +2518,29 @@ func TestCanCombineSharedAndPrivateRulesInSameGroup(t *testing.T) {
 	expectedRuleName4 := az.getSecurityRuleName(&svc4, v1.ServicePort{Port: 4444, Protocol: v1.ProtocolTCP}, "Internet")
 	expectedRuleName5 := az.getSecurityRuleName(&svc5, v1.ServicePort{Port: 8888, Protocol: v1.ProtocolTCP}, "Internet")
 
-	sg := getTestSecurityGroup(az)
+	getTestSecurityGroup(az)
 
-	sg, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
+	_, err := az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc1: %q", err)
 	}
 
-	sg, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
+	_, err = az.reconcileSecurityGroup(testClusterName, &svc2, to.StringPtr(svc2.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc2: %q", err)
 	}
 
-	sg, err = az.reconcileSecurityGroup(testClusterName, &svc3, to.StringPtr(svc3.Spec.LoadBalancerIP), true)
+	_, err = az.reconcileSecurityGroup(testClusterName, &svc3, to.StringPtr(svc3.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc3: %q", err)
 	}
 
-	sg, err = az.reconcileSecurityGroup(testClusterName, &svc4, to.StringPtr(svc4.Spec.LoadBalancerIP), true)
+	_, err = az.reconcileSecurityGroup(testClusterName, &svc4, to.StringPtr(svc4.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc4: %q", err)
 	}
 
-	sg, err = az.reconcileSecurityGroup(testClusterName, &svc5, to.StringPtr(svc5.Spec.LoadBalancerIP), true)
+	sg, err := az.reconcileSecurityGroup(testClusterName, &svc5, to.StringPtr(svc5.Spec.LoadBalancerIP), true)
 	if err != nil {
 		t.Errorf("Unexpected error adding svc4: %q", err)
 	}
@@ -2652,7 +2631,7 @@ func TestCanCombineSharedAndPrivateRulesInSameGroup(t *testing.T) {
 		}
 	}
 
-	sg, err = az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), false)
+	_, err = az.reconcileSecurityGroup(testClusterName, &svc1, to.StringPtr(svc1.Spec.LoadBalancerIP), false)
 	if err != nil {
 		t.Errorf("Unexpected error removing svc1: %q", err)
 	}

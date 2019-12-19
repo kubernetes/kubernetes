@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -78,9 +78,9 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 		namespace = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
 
-		nodes := framework.GetReadySchedulableNodesOrDie(client)
+		nodes, err := e2enode.GetReadySchedulableNodes(client)
+		framework.ExpectNoError(err)
 		numNodes := len(nodes.Items)
-		gomega.Expect(numNodes).NotTo(gomega.BeZero(), "No nodes are available for testing volume access through vpxd restart")
 
 		vcNodesMap = make(map[string][]node)
 		for i := 0; i < numNodes; i++ {
@@ -99,6 +99,8 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 	})
 
 	ginkgo.It("verify volume remains attached through vpxd restart", func() {
+		framework.SkipUnlessSSHKeyPresent()
+
 		for vcHost, nodes := range vcNodesMap {
 			var (
 				volumePaths  []string
@@ -107,7 +109,7 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 				pods         []*v1.Pod
 			)
 
-			e2elog.Logf("Testing for nodes on vCenter host: %s", vcHost)
+			framework.Logf("Testing for nodes on vCenter host: %s", vcHost)
 
 			for i, node := range nodes {
 				ginkgo.By(fmt.Sprintf("Creating test vsphere volume %d", i))
@@ -162,7 +164,7 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 				volumePath := volumePaths[i]
 
 				ginkgo.By(fmt.Sprintf("Deleting pod on node %s", nodeName))
-				err = framework.DeletePodWithWait(f, client, pod)
+				err = e2epod.DeletePodWithWait(client, pod)
 				framework.ExpectNoError(err)
 
 				ginkgo.By(fmt.Sprintf("Waiting for volume %s to be detached from node %s", volumePath, nodeName))

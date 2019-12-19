@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/validation/path"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -342,7 +341,7 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 	// at this point we have a fully formed object.  It is time to call the validators that the apiserver
 	// handling chain wants to enforce.
 	if createValidation != nil {
-		if err := createValidation(obj.DeepCopyObject()); err != nil {
+		if err := createValidation(ctx, obj.DeepCopyObject()); err != nil {
 			return nil, err
 		}
 	}
@@ -504,7 +503,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			// at this point we have a fully formed object.  It is time to call the validators that the apiserver
 			// handling chain wants to enforce.
 			if createValidation != nil {
-				if err := createValidation(obj.DeepCopyObject()); err != nil {
+				if err := createValidation(ctx, obj.DeepCopyObject()); err != nil {
 					return nil, nil, err
 				}
 			}
@@ -546,7 +545,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		// at this point we have a fully formed object.  It is time to call the validators that the apiserver
 		// handling chain wants to enforce.
 		if updateValidation != nil {
-			if err := updateValidation(obj.DeepCopyObject(), existing.DeepCopyObject()); err != nil {
+			if err := updateValidation(ctx, obj.DeepCopyObject(), existing.DeepCopyObject()); err != nil {
 				return nil, nil, err
 			}
 		}
@@ -812,7 +811,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 		false, /* ignoreNotFound */
 		&preconditions,
 		storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
-			if err := deleteValidation(existing); err != nil {
+			if err := deleteValidation(ctx, existing); err != nil {
 				return nil, err
 			}
 			graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options)
@@ -930,6 +929,15 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 	// TODO: remove the check, because we support no-op updates now.
 	if graceful || pendingFinalizers || shouldUpdateFinalizers {
 		err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletionAndFinalizers(ctx, name, key, options, preconditions, deleteValidation, obj)
+		// Update the preconditions.ResourceVersion if set since we updated the object.
+		if err == nil && deleteImmediately && preconditions.ResourceVersion != nil {
+			accessor, err = meta.Accessor(out)
+			if err != nil {
+				return out, false, kubeerr.NewInternalError(err)
+			}
+			resourceVersion := accessor.GetResourceVersion()
+			preconditions.ResourceVersion = &resourceVersion
+		}
 	}
 
 	// !deleteImmediately covers all cases where err != nil. We keep both to be future-proof.
@@ -1353,7 +1361,7 @@ func (e *Store) startObservingCount(period time.Duration) func() {
 	return func() { close(stopCh) }
 }
 
-func (e *Store) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+func (e *Store) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	if e.TableConvertor != nil {
 		return e.TableConvertor.ConvertToTable(ctx, object, tableOptions)
 	}

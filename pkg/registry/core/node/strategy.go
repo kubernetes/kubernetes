@@ -225,7 +225,8 @@ func MatchNode(label labels.Selector, field fields.Selector) pkgstorage.Selectio
 	}
 }
 
-func NodeNameTriggerFunc(obj runtime.Object) string {
+// NameTriggerFunc returns value metadata.namespace of given object.
+func NameTriggerFunc(obj runtime.Object) string {
 	return obj.(*api.Node).ObjectMeta.Name
 }
 

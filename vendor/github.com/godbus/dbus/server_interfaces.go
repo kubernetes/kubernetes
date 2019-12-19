@@ -87,3 +87,13 @@ type SignalHandler interface {
 type DBusError interface {
 	DBusError() (string, []interface{})
 }
+
+// SerialGenerator is responsible for serials generation.
+//
+// Different approaches for the serial generation can be used,
+// maintaining a map guarded with a mutex (the standard way) or
+// simply increment an atomic counter.
+type SerialGenerator interface {
+	GetSerial() uint32
+	RetireSerial(serial uint32)
+}

@@ -46,8 +46,10 @@ export IFS=$'\n'
 # with a leading underscore. We'll need to support both scenarios for all_packages.
 all_packages=()
 while IFS='' read -r line; do all_packages+=("$line"); done < <(go list -e ./... | grep -vE "/(third_party|vendor|staging/src/k8s.io/client-go/pkg|generated|clientset_generated)" | sed -e 's|^k8s.io/kubernetes/||' -e "s|^_\(${KUBE_ROOT}/\)\{0,1\}||")
+# The regex below removes any "#" character and anything behind it and including any
+# whitespace before it. Then it removes empty lines.
 failing_packages=()
-while IFS='' read -r line; do failing_packages+=("$line"); done < <(cat "$failure_file")
+while IFS='' read -r line; do failing_packages+=("$line"); done < <(sed -e 's/[[:blank:]]*#.*//' -e '/^$/d' "$failure_file")
 unset IFS
 errors=()
 not_failing=()

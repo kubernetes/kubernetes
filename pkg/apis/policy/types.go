@@ -47,8 +47,8 @@ type PodDisruptionBudgetSpec struct {
 // PodDisruptionBudgetStatus represents information about the status of a
 // PodDisruptionBudget. Status may trail the actual state of a system.
 type PodDisruptionBudgetStatus struct {
-	// Most recent generation observed when updating this PDB status. PodDisruptionsAllowed and other
-	// status informatio is valid only if observedGeneration equals to PDB's object generation.
+	// Most recent generation observed when updating this PDB status. DisruptionsAllowed and other
+	// status information is valid only if observedGeneration equals to PDB's object generation.
 	// +optional
 	ObservedGeneration int64
 
@@ -67,7 +67,7 @@ type PodDisruptionBudgetStatus struct {
 	DisruptedPods map[string]metav1.Time
 
 	// Number of pod disruptions that are currently allowed.
-	PodDisruptionsAllowed int32
+	DisruptionsAllowed int32
 
 	// current number of healthy pods
 	CurrentHealthy int32
@@ -275,7 +275,8 @@ var AllowAllCapabilities api.Capability = "*"
 // FSType gives strong typing to different file systems that are used by volumes.
 type FSType string
 
-var (
+// Exported FSTypes.
+const (
 	AzureFile             FSType = "azureFile"
 	Flocker               FSType = "flocker"
 	FlexVolume            FSType = "flexVolume"
