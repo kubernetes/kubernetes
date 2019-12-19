@@ -17,6 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
@@ -27,6 +28,36 @@ type Policy interface {
 	// Returns a merged TopologyHint based on input from hint providers
 	// and a Pod Admit Handler Response based on hints and policy type
 	Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult)
+}
+
+// Merge a TopologyHints permutation to a single hint by performing a bitwise-AND
+// of their affinity masks. The hint shall be preferred if all hits in the permutation
+// are preferred.
+func mergePermutation(numaNodes []int, permutation []TopologyHint) TopologyHint {
+	// Get the NUMANodeAffinity from each hint in the permutation and see if any
+	// of them encode unpreferred allocations.
+	defaultAffinity, _ := bitmask.NewBitMask(numaNodes...)
+	preferred := true
+	var numaAffinities []bitmask.BitMask
+	for _, hint := range permutation {
+		// Only consider hints that have an actual NUMANodeAffinity set.
+		if hint.NUMANodeAffinity == nil {
+			numaAffinities = append(numaAffinities, defaultAffinity)
+		} else {
+			numaAffinities = append(numaAffinities, hint.NUMANodeAffinity)
+		}
+
+		if !hint.Preferred {
+			preferred = false
+		}
+	}
+
+	// Merge the affinities using a bitwise-and operation.
+	mergedAffinity, _ := bitmask.NewBitMask(numaNodes...)
+	mergedAffinity.And(numaAffinities...)
+	// Build a mergedHint from the merged affinity mask, indicating if an
+	// preferred allocation was used to generate the affinity mask or not.
+	return TopologyHint{mergedAffinity, preferred}
 }
 
 // Iterate over all permutations of hints in 'allProviderHints [][]TopologyHint'.

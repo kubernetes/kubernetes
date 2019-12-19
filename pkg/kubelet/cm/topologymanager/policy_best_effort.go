@@ -53,36 +53,6 @@ func (p *bestEffortPolicy) Merge(providersHints []map[string][]TopologyHint) (To
 	return hint, admit
 }
 
-// Merge a TopologyHints permutation to a single hint by performing a bitwise-AND
-// of their affinity masks. The hint shall be preferred if all hits in the permutation
-// are preferred.
-func (p *bestEffortPolicy) mergePermutation(permutation []TopologyHint) TopologyHint {
-	// Get the NUMANodeAffinity from each hint in the permutation and see if any
-	// of them encode unpreferred allocations.
-	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
-	preferred := true
-	var numaAffinities []bitmask.BitMask
-	for _, hint := range permutation {
-		// Only consider hints that have an actual NUMANodeAffinity set.
-		if hint.NUMANodeAffinity == nil {
-			numaAffinities = append(numaAffinities, defaultAffinity)
-		} else {
-			numaAffinities = append(numaAffinities, hint.NUMANodeAffinity)
-		}
-
-		if !hint.Preferred {
-			preferred = false
-		}
-	}
-
-	// Merge the affinities using a bitwise-and operation.
-	mergedAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
-	mergedAffinity.And(numaAffinities...)
-	// Build a mergedHint from the merged affinity mask, indicating if an
-	// preferred allocation was used to generate the affinity mask or not.
-	return TopologyHint{mergedAffinity, preferred}
-}
-
 // Merge the hints from all hint providers to find the best one.
 func (p *bestEffortPolicy) mergeProvidersHints(providersHints []map[string][]TopologyHint) TopologyHint {
 	// Set the default affinity as an any-numa affinity containing the list
@@ -128,7 +98,7 @@ func (p *bestEffortPolicy) mergeProvidersHints(providersHints []map[string][]Top
 	iterateAllProviderTopologyHints(allProviderHints, func(permutation []TopologyHint) {
 		// Get the NUMANodeAffinity from each hint in the permutation and see if any
 		// of them encode unpreferred allocations.
-		mergedHint := p.mergePermutation(permutation)
+		mergedHint := mergePermutation(p.numaNodes, permutation)
 
 		// Only consider mergedHints that result in a NUMANodeAffinity > 0 to
 		// replace the current bestHint.
