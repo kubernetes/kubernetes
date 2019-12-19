@@ -37,7 +37,7 @@ var (
 		&metrics.CounterOpts{
 			Namespace:      "authentication",
 			Subsystem:      "token_cache",
-			Name:           "request_count",
+			Name:           "request_total",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"status"},
@@ -46,7 +46,7 @@ var (
 		&metrics.GaugeOpts{
 			Namespace:      "authentication",
 			Subsystem:      "token_cache",
-			Name:           "fetch_count",
+			Name:           "fetch_total",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"status"},
