@@ -1,6 +1,6 @@
 {
-	"kind": "Deployment",
-	"apiVersion": "apps/v1",
+	"kind": "ReplicationController",
+	"apiVersion": "v1",
 	"metadata": {
 		"name": "heapster-v1.3.0",
 		"labels": {
@@ -11,9 +11,8 @@
 	"spec": {
 		"replicas": 1,
 		"selector": {
-			"matchLabels":
-				"k8s-app": "heapster",
-				"version": "v1.3.0"
+			"k8s-app": "heapster",
+			"version": "v1.3.0"
 		},
 		"template": {
 			"metadata": {
