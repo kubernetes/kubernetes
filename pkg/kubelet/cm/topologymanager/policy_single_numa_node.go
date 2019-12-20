@@ -18,7 +18,6 @@ package topologymanager
 
 import (
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
@@ -122,11 +121,10 @@ func (p *singleNumaNodePolicy) mergeProvidersHints(providersHints []map[string][
 		}
 	}
 
-	// Set the bestHint to return from this function as an any-NUMANode
-	// affinity with an unpreferred allocation. This will only be returned if
-	// no better hint can be found when merging hints from each hint provider.
-	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
-	bestHint := TopologyHint{defaultAffinity, false}
+	// Set the bestHint to return from this function as {nil false}.
+	// This will only be returned if no better hint can be found when
+	// merging hints from each hint provider.
+	bestHint := TopologyHint{}
 	iterateAllProviderTopologyHints(allResourcesHints, func(permutation []TopologyHint) {
 		mergedHint := mergePermutation(p.numaNodes, permutation)
 		// Only consider mergedHints that result in a NUMANodeAffinity == 1 to
@@ -135,12 +133,19 @@ func (p *singleNumaNodePolicy) mergeProvidersHints(providersHints []map[string][
 			return
 		}
 
-		// If the current defaultHint is the same size as the new mergedHint,
-		// do not update defaultHint
-		if mergedHint.NUMANodeAffinity.Count() == bestHint.NUMANodeAffinity.Count() {
+		// If the current bestHint NUMANodeAffinity is nil, update bestHint
+		// to the current mergedHint.
+		if bestHint.NUMANodeAffinity == nil {
+			bestHint = mergedHint
 			return
 		}
-		// In all other cases, update defaultHint to the current mergedHint
+
+		// Only consider mergedHints that have a narrower NUMANodeAffinity
+		// than the NUMANodeAffinity in the current bestHint.
+		if !mergedHint.NUMANodeAffinity.IsNarrowerThan(bestHint.NUMANodeAffinity) {
+			return
+		}
+		// In all other cases, update bestHint to the current mergedHint
 		bestHint = mergedHint
 	})
 	return bestHint
