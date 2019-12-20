@@ -46,20 +46,14 @@ const (
 	// Binding - binding operation label value
 	Binding = "binding"
 	// E2eScheduling - e2e scheduling operation label value
-
-	StartLatencyKey = "start_latency"
-	InitLatencyKey  = "init_latency"
-	HasLeaderKey    = "has_leader"
-	ReadyTimeKey    = "ready_time"
 )
 
-
+// Variables used by some metrics
 var (
 	CurrentHostName string
 	BeginRunTime    time.Time
 	BeginInitTime   time.Time
 )
-
 
 // All the histogram based metrics have 1ms as size for the smallest bucket.
 var (
@@ -317,7 +311,7 @@ var (
 	ReadyTime = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem: SchedulerSubsystem,
-			Name:      ReadyTimeKey,
+			Name:      "ready_time",
 			Help:      "Ready time for leader-scheduler to work.",
 		}, []string{"hostname"},
 	)
@@ -325,15 +319,15 @@ var (
 	StartLatency = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem: SchedulerSubsystem,
-			Name:      StartLatencyKey,
+			Name:      "start_latency",
 			Help:      "Latency in microseconds for leader-scheduler to be ready after init.",
-		},[]string{"hostname"},
+		}, []string{"hostname"},
 	)
 
 	InitLatency = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem: SchedulerSubsystem,
-			Name:      InitLatencyKey,
+			Name:      "init_latency",
 			Help:      "Latency in microseconds for scheduler to be pod cache populated.",
 		}, []string{"hostname"},
 	)
@@ -341,7 +335,7 @@ var (
 	HasLeader = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem: SchedulerSubsystem,
-			Name:      HasLeaderKey,
+			Name:      "has_leader",
 			Help:      "Whether or not leader-scheduler exists.1 is existence, 0 is not.",
 		}, []string{"hostname"},
 	)

@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"os"
 	goruntime "runtime"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -253,17 +252,23 @@ func Run(ctx context.Context, cc schedulerserverconfig.CompletedConfig, outOfTre
 	// Wait for all caches to sync before scheduling.
 	cc.InformerFactory.WaitForCacheSync(ctx.Done())
 
-	metrics.CurrentHostName = strings.Split(cc.LeaderElection.Lock.Identity(), "_")[0]
-	initLatencyMap := map[string]string{"hostname": metrics.CurrentHostName}
-	metrics.InitLatency.With(initLatencyMap).Set(metrics.SinceInMicroseconds(metrics.BeginInitTime))
-
+	hostname, err := os.Hostname()
+	if err != nil {
+		klog.Warning("Some metrics for scheduler are abandoned\n")
+	}
+	metrics.CurrentHostName = hostname
+	if metrics.CurrentHostName != "" {
+		metrics.InitLatency.With(map[string]string{"hostname": metrics.CurrentHostName}).Set(metrics.SinceInMicroseconds(metrics.BeginInitTime))
+	}
 	// If leader election is enabled, runCommand via LeaderElector until done and exit.
 	if cc.LeaderElection != nil {
 		cc.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
 			OnStartedLeading: sched.Run,
 			OnStoppedLeading: func() {
 				klog.Fatalf("leaderelection lost")
-				metrics.HasLeader.With(map[string]string{"hostname": metrics.CurrentHostName}).Set(0)
+				if metrics.CurrentHostName != "" {
+					metrics.HasLeader.With(map[string]string{"hostname": metrics.CurrentHostName}).Set(0)
+				}
 			},
 		}
 		leaderElector, err := leaderelection.NewLeaderElector(*cc.LeaderElection)
