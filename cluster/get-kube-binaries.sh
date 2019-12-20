@@ -131,16 +131,18 @@ function md5sum_file() {
   if which md5 >/dev/null 2>&1; then
     md5 -q "$1"
   else
-    md5sum "$1" | awk '{ print $1 }'
+    tmp=$(md5sum "$1")
+    echo ${tmp%%[[:blank:]]*}
   fi
 }
 
 function sha1sum_file() {
   if which sha1sum >/dev/null 2>&1; then
-    sha1sum "$1" | awk '{ print $1 }'
+    tmp=$(sha1sum "$1")
   else
-    shasum -a1 "$1" | awk '{ print $1 }'
+    tmp=$(shasum -a1 "$1")
   fi
+  echo ${tmp%%[[:blank:]]*}
 }
 
 # Get default service account credentials of the VM.
