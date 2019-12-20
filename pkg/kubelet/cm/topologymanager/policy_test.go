@@ -90,35 +90,6 @@ func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 			},
 		},
 		{
-			name: "Two providers, 1 hint each, no common mask",
-			hp: []HintProvider{
-				&mockHintProvider{
-					map[string][]TopologyHint{
-						"resource1": {
-							{
-								NUMANodeAffinity: NewTestBitMask(0),
-								Preferred:        true,
-							},
-						},
-					},
-				},
-				&mockHintProvider{
-					map[string][]TopologyHint{
-						"resource2": {
-							{
-								NUMANodeAffinity: NewTestBitMask(1),
-								Preferred:        true,
-							},
-						},
-					},
-				},
-			},
-			expected: TopologyHint{
-				NUMANodeAffinity: NewTestBitMask(numaNodes...),
-				Preferred:        false,
-			},
-		},
-		{
 			name: "Two providers, 1 no hints, 1 single hint preferred 1/2",
 			hp: []HintProvider{
 				&mockHintProvider{},
@@ -431,6 +402,35 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 			},
 		},
 		{
+			name: "Two providers, 1 hint each, no common mask",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0),
+								Preferred:        true,
+							},
+						},
+					},
+				},
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								NUMANodeAffinity: NewTestBitMask(1),
+								Preferred:        true,
+							},
+						},
+					},
+				},
+			},
+			expected: TopologyHint{
+				NUMANodeAffinity: NewTestBitMask(numaNodes...),
+				Preferred:        false,
+			},
+		},
+		{
 			name: "Two providers, 1 hint each, 1 wider mask, both preferred 1/2",
 			hp: []HintProvider{
 				&mockHintProvider{
@@ -731,6 +731,35 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 			expected: TopologyHint{
 				NUMANodeAffinity: NewTestBitMask(0),
 				Preferred:        true,
+			},
+		},
+		{
+			name: "Two providers, 1 hint each, no common mask",
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0),
+								Preferred:        true,
+							},
+						},
+					},
+				},
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource2": {
+							{
+								NUMANodeAffinity: NewTestBitMask(1),
+								Preferred:        true,
+							},
+						},
+					},
+				},
+			},
+			expected: TopologyHint{
+				NUMANodeAffinity: nil,
+				Preferred:        false,
 			},
 		},
 		{
