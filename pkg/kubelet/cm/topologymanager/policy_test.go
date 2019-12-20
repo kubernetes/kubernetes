@@ -17,6 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
+	"reflect"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -862,11 +863,8 @@ func testPolicyMerge(policy Policy, tcases []policyMergeTestCase, t *testing.T) 
 		}
 
 		actual, _ := policy.Merge(providersHints)
-		if !actual.NUMANodeAffinity.IsEqual(tc.expected.NUMANodeAffinity) {
-			t.Errorf("%v: Expected NUMANodeAffinity in result to be %v, got %v", tc.name, tc.expected.NUMANodeAffinity, actual.NUMANodeAffinity)
-		}
-		if actual.Preferred != tc.expected.Preferred {
-			t.Errorf("%v: Expected Affinity preference in result to be %v, got %v", tc.name, tc.expected.Preferred, actual.Preferred)
+		if !reflect.DeepEqual(actual, tc.expected) {
+			t.Errorf("%v: Expected Topology Hint to be %v, got %v:", tc.name, tc.expected, actual)
 		}
 	}
 }
