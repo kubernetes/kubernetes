@@ -203,6 +203,13 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 
 	if s.Listener == nil {
 		var err error
+		// BindAddress takes precedence over BindNetwork
+		if s.BindAddress.To16() != nil {
+			s.BindNetwork = "tcp6"
+			if s.BindAddress.To4() != nil {
+				s.BindNetwork = "tcp4"
+			}
+		}
 		addr := net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort))
 		s.Listener, s.BindPort, err = CreateListener(s.BindNetwork, addr)
 		if err != nil {

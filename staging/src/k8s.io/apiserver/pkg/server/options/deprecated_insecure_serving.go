@@ -112,6 +112,13 @@ func (s *DeprecatedInsecureServingOptions) ApplyTo(c **server.DeprecatedInsecure
 		if s.ListenFunc != nil {
 			listen = s.ListenFunc
 		}
+		// BindAddress takes precedence over BindNetwork
+		if s.BindAddress.To16() != nil {
+			s.BindNetwork = "tcp6"
+			if s.BindAddress.To4() != nil {
+				s.BindNetwork = "tcp4"
+			}
+		}
 		addr := net.JoinHostPort(s.BindAddress.String(), fmt.Sprintf("%d", s.BindPort))
 		s.Listener, s.BindPort, err = listen(s.BindNetwork, addr)
 		if err != nil {
