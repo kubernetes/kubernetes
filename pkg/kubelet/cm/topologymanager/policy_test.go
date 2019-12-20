@@ -31,20 +31,6 @@ type policyMergeTestCase struct {
 func commonPolicyMergeTestCases(numaNodes []int) []policyMergeTestCase {
 	return []policyMergeTestCase{
 		{
-			name: "HintProvider returns empty non-nil map[string][]TopologyHint from provider",
-			hp: []HintProvider{
-				&mockHintProvider{
-					map[string][]TopologyHint{
-						"resource": {},
-					},
-				},
-			},
-			expected: TopologyHint{
-				NUMANodeAffinity: NewTestBitMask(numaNodes...),
-				Preferred:        false,
-			},
-		},
-		{
 			name: "Single TopologyHint with Preferred as true and NUMANodeAffinity as nil",
 			hp: []HintProvider{
 				&mockHintProvider{
@@ -521,6 +507,19 @@ func (p *bestEffortPolicy) mergeTestCases(numaNodes []int) []policyMergeTestCase
 			},
 		},
 		{
+			name: "HintProvider returns empty non-nil map[string][]TopologyHint from provider", hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource": {},
+					},
+				},
+			},
+			expected: TopologyHint{
+				NUMANodeAffinity: NewTestBitMask(numaNodes...),
+				Preferred:        false,
+			},
+		},
+		{
 			name: "Two providers, 1 hint each, 1 wider mask, both preferred 1/2",
 			hp: []HintProvider{
 				&mockHintProvider{
@@ -615,6 +614,19 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 			expected: TopologyHint{
 				NUMANodeAffinity: nil,
 				Preferred:        true,
+			},
+		},
+		{
+			name: "HintProvider returns empty non-nil map[string][]TopologyHint from provider", hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource": {},
+					},
+				},
+			},
+			expected: TopologyHint{
+				NUMANodeAffinity: nil,
+				Preferred:        false,
 			},
 		},
 		{
