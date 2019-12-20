@@ -352,6 +352,7 @@ func requestNodeCertificate(client certificatesv1beta1.CertificateSigningRequest
 	ctx, cancel := context.WithTimeout(context.Background(), 3600*time.Second)
 	defer cancel()
 
+	klog.V(2).Infof("Waiting for client certificate to be issued")
 	return csr.WaitForCertificate(ctx, client, req)
 }
 
