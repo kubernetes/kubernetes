@@ -1,5 +1,5 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: ReplicationController
 metadata:
   name: hollow-node
   labels:
@@ -8,8 +8,7 @@ metadata:
 spec:
   replicas: {{numreplicas}}
   selector:
-    matchLabels:
-      name: hollow-node
+    name: hollow-node
   template:
     metadata:
       labels:
