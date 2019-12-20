@@ -897,7 +897,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 				FindErr: findErr,
 			},
 			eventReason: "FailedScheduling",
-			expectError: fmt.Errorf("error while running %q filter plugin for pod %q: %v", volumebinding.Name, "foo", findErr),
+			expectError: fmt.Errorf("running %q filter plugin for pod %q: %v", volumebinding.Name, "foo", findErr),
 		},
 		{
 			name: "assume error",
