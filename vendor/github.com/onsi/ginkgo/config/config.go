@@ -20,7 +20,7 @@ import (
 	"fmt"
 )
 
-const VERSION = "1.10.1"
+const VERSION = "1.11.0"
 
 type GinkgoConfigType struct {
 	RandomSeed         int64
@@ -53,6 +53,7 @@ type DefaultReporterConfigType struct {
 	Verbose           bool
 	FullTrace         bool
 	ReportPassed      bool
+	ReportFile        string
 }
 
 var DefaultReporterConfig = DefaultReporterConfigType{}
@@ -100,6 +101,8 @@ func Flags(flagSet *flag.FlagSet, prefix string, includeParallelFlags bool) {
 	flagSet.BoolVar(&(DefaultReporterConfig.Succinct), prefix+"succinct", false, "If set, default reporter prints out a very succinct report")
 	flagSet.BoolVar(&(DefaultReporterConfig.FullTrace), prefix+"trace", false, "If set, default reporter prints out the full stack trace when a failure occurs")
 	flagSet.BoolVar(&(DefaultReporterConfig.ReportPassed), prefix+"reportPassed", false, "If set, default reporter prints out captured output of passed tests.")
+	flagSet.StringVar(&(DefaultReporterConfig.ReportFile), prefix+"reportFile", "", "Override the default reporter output file path.")
+
 }
 
 func BuildFlagArgs(prefix string, ginkgo GinkgoConfigType, reporter DefaultReporterConfigType) []string {
@@ -200,6 +203,10 @@ func BuildFlagArgs(prefix string, ginkgo GinkgoConfigType, reporter DefaultRepor
 
 	if reporter.ReportPassed {
 		result = append(result, fmt.Sprintf("--%sreportPassed", prefix))
+	}
+
+	if reporter.ReportFile != "" {
+		result = append(result, fmt.Sprintf("--%sreportFile=%s", prefix, reporter.ReportFile))
 	}
 
 	return result

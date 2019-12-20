@@ -12,7 +12,7 @@ SuiteSummary represents the a summary of the test suite and is passed to both
 Reporter.SpecSuiteWillBegin
 Reporter.SpecSuiteDidEnd
 
-this is unfortunate as these two methods should receive different objects.  When running in parallel
+this is unfortunate as these two methods should receive different objects. When running in parallel
 each node does not deterministically know how many specs it will end up running.
 
 Unfortunately making such a change would break backward compatibility.
