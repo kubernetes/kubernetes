@@ -38,11 +38,11 @@ import (
 )
 
 const (
-	// kubeControllerManagerAddressArg represents the address argument of the kube-controller-manager configuration.
-	kubeControllerManagerAddressArg = "address"
+	// kubeControllerManagerBindAddressArg represents the bind-address argument of the kube-controller-manager configuration.
+	kubeControllerManagerBindAddressArg = "bind-address"
 
-	// kubeSchedulerAddressArg represents the address argument of the kube-scheduler configuration.
-	kubeSchedulerAddressArg = "address"
+	// kubeSchedulerBindAddressArg represents the bind-address argument of the kube-scheduler configuration.
+	kubeSchedulerBindAddressArg = "bind-address"
 )
 
 // ComponentPod returns a Pod object from the container and volume specifications
@@ -252,7 +252,7 @@ func GetAPIServerProbeAddress(endpoint *kubeadmapi.APIEndpoint) string {
 
 // GetControllerManagerProbeAddress returns the kubernetes controller manager probe address
 func GetControllerManagerProbeAddress(cfg *kubeadmapi.ClusterConfiguration) string {
-	if addr, exists := cfg.ControllerManager.ExtraArgs[kubeControllerManagerAddressArg]; exists {
+	if addr, exists := cfg.ControllerManager.ExtraArgs[kubeControllerManagerBindAddressArg]; exists {
 		return addr
 	}
 	return "127.0.0.1"
@@ -260,7 +260,7 @@ func GetControllerManagerProbeAddress(cfg *kubeadmapi.ClusterConfiguration) stri
 
 // GetSchedulerProbeAddress returns the kubernetes scheduler probe address
 func GetSchedulerProbeAddress(cfg *kubeadmapi.ClusterConfiguration) string {
-	if addr, exists := cfg.Scheduler.ExtraArgs[kubeSchedulerAddressArg]; exists {
+	if addr, exists := cfg.Scheduler.ExtraArgs[kubeSchedulerBindAddressArg]; exists {
 		return addr
 	}
 	return "127.0.0.1"

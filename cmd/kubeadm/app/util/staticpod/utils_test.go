@@ -104,7 +104,7 @@ func TestGetControllerManagerProbeAddress(t *testing.T) {
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{
-						kubeControllerManagerAddressArg: "10.10.10.10",
+						kubeControllerManagerBindAddressArg: "10.10.10.10",
 					},
 				},
 			},
@@ -115,7 +115,7 @@ func TestGetControllerManagerProbeAddress(t *testing.T) {
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{
-						kubeControllerManagerAddressArg: "2001:abcd:bcda::1",
+						kubeControllerManagerBindAddressArg: "2001:abcd:bcda::1",
 					},
 				},
 			},
