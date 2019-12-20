@@ -109,8 +109,10 @@ var _ = SIGDescribe("Pods Extended", func() {
 
 			ginkgo.By("verifying the kubelet observed the termination notice")
 
+			// allow up to 2x the grace period (which applies to process termination)
+			// for the kubelet to complete removal of the pod from the API
 			start := time.Now()
-			err = wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
+			err = wait.Poll(time.Second*5, time.Second*30*2, func() (bool, error) {
 				podList, err := e2ekubelet.GetKubeletPods(f.ClientSet, pod.Spec.NodeName)
 				if err != nil {
 					framework.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
