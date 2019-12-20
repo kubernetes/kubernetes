@@ -74,6 +74,17 @@ const (
 	managedByAzureLabel        = "kubernetes.azure.com/managed"
 )
 
+const (
+	// PreConfiguredBackendPoolLoadBalancerTypesNone means that the load balancers are not pre-configured
+	PreConfiguredBackendPoolLoadBalancerTypesNone = ""
+	// PreConfiguredBackendPoolLoadBalancerTypesInteral means that the `internal` load balancers are pre-configured
+	PreConfiguredBackendPoolLoadBalancerTypesInteral = "internal"
+	// PreConfiguredBackendPoolLoadBalancerTypesExternal means that the `external` load balancers are pre-configured
+	PreConfiguredBackendPoolLoadBalancerTypesExternal = "external"
+	// PreConfiguredBackendPoolLoadBalancerTypesAll means that all load balancers are pre-configured
+	PreConfiguredBackendPoolLoadBalancerTypesAll = "all"
+)
+
 var (
 	// Master nodes are not added to standard load balancer by default.
 	defaultExcludeMasterFromStandardLB = true
@@ -174,6 +185,13 @@ type Config struct {
 	// LoadBalancerResourceGroup determines the specific resource group of the load balancer user want to use, working
 	// with LoadBalancerName
 	LoadBalancerResourceGroup string `json:"loadBalancerResourceGroup,omitempty" yaml:"loadBalancerResourceGroup,omitempty"`
+	// PreConfiguredBackendPoolLoadBalancerTypes determines whether the LoadBalancer BackendPool has been preconfigured.
+	// Candidate values are:
+	//   "": exactly with today (not pre-configured for any LBs)
+	//   "internal": for internal LoadBalancer
+	//   "external": for external LoadBalancer
+	//   "all": for both internal and external LoadBalancer
+	PreConfiguredBackendPoolLoadBalancerTypes string `json:"preConfiguredBackendPoolLoadBalancerTypes,omitempty" yaml:"preConfiguredBackendPoolLoadBalancerTypes,omitempty"`
 
 	// AvailabilitySetNodesCacheTTLInSeconds sets the Cache TTL for availabilitySetNodesCache
 	// if not set, will use default value

@@ -1421,6 +1421,7 @@ func TestReconcileLoadBalancer(t *testing.T) {
 		desc                string
 		service             v1.Service
 		loadBalancerSku     string
+		preConfigLBType     string
 		disableOutboundSnat *bool
 		wantLb              bool
 		existingLB          network.LoadBalancer
@@ -1452,6 +1453,16 @@ func TestReconcileLoadBalancer(t *testing.T) {
 			loadBalancerSku: "basic",
 			service:         service3,
 			existingLB:      modifiedLb1,
+			wantLb:          true,
+			expectedLB:      expectedLb1,
+			expectedError:   nil,
+		},
+		{
+			desc:            "reconcileLoadBalancer shall not raise an error",
+			loadBalancerSku: "basic",
+			service:         service3,
+			existingLB:      modifiedLb1,
+			preConfigLBType: "external",
 			wantLb:          true,
 			expectedLB:      expectedLb1,
 			expectedError:   nil,
@@ -1500,6 +1511,9 @@ func TestReconcileLoadBalancer(t *testing.T) {
 		az := getTestCloud()
 		az.Config.LoadBalancerSku = test.loadBalancerSku
 		az.DisableOutboundSNAT = test.disableOutboundSnat
+		if test.preConfigLBType != "" {
+			az.Config.PreConfiguredBackendPoolLoadBalancerTypes = test.preConfigLBType
+		}
 
 		clusterResources := getClusterResources(az, 3, 3)
 		test.service.Spec.LoadBalancerIP = "1.2.3.4"
@@ -2062,5 +2076,77 @@ func TestShouldUpdateLoadBalancer(t *testing.T) {
 		}
 		shouldUpdateLoadBalancer := az.shouldUpdateLoadBalancer(testClusterName, &service)
 		assert.Equal(t, test.expectedOutput, shouldUpdateLoadBalancer, "TestCase[%d]: %s", i, test.desc)
+	}
+}
+
+func TestIsBackendPoolPreConfigured(t *testing.T) {
+	testCases := []struct {
+		desc                                      string
+		preConfiguredBackendPoolLoadBalancerTypes string
+		isInternalService                         bool
+		expectedOutput                            bool
+	}{
+		{
+			desc: "should return true when preConfiguredBackendPoolLoadBalancerTypes is both for any case",
+			preConfiguredBackendPoolLoadBalancerTypes: "all",
+			isInternalService:                         true,
+			expectedOutput:                            true,
+		},
+		{
+			desc: "should return true when preConfiguredBackendPoolLoadBalancerTypes is both for any case",
+			preConfiguredBackendPoolLoadBalancerTypes: "all",
+			isInternalService:                         false,
+			expectedOutput:                            true,
+		},
+		{
+			desc: "should return true when preConfiguredBackendPoolLoadBalancerTypes is external when creating external lb",
+			preConfiguredBackendPoolLoadBalancerTypes: "external",
+			isInternalService:                         false,
+			expectedOutput:                            true,
+		},
+		{
+			desc: "should return false when preConfiguredBackendPoolLoadBalancerTypes is external when creating internal lb",
+			preConfiguredBackendPoolLoadBalancerTypes: "external",
+			isInternalService:                         true,
+			expectedOutput:                            false,
+		},
+		{
+			desc: "should return false when preConfiguredBackendPoolLoadBalancerTypes is internal when creating external lb",
+			preConfiguredBackendPoolLoadBalancerTypes: "internal",
+			isInternalService:                         false,
+			expectedOutput:                            false,
+		},
+		{
+			desc: "should return true when preConfiguredBackendPoolLoadBalancerTypes is internal when creating internal lb",
+			preConfiguredBackendPoolLoadBalancerTypes: "internal",
+			isInternalService:                         true,
+			expectedOutput:                            true,
+		},
+		{
+			desc: "should return false when preConfiguredBackendPoolLoadBalancerTypes is empty for any case",
+			preConfiguredBackendPoolLoadBalancerTypes: "",
+			isInternalService:                         true,
+			expectedOutput:                            false,
+		},
+		{
+			desc: "should return false when preConfiguredBackendPoolLoadBalancerTypes is empty for any case",
+			preConfiguredBackendPoolLoadBalancerTypes: "",
+			isInternalService:                         false,
+			expectedOutput:                            false,
+		},
+	}
+
+	for i, test := range testCases {
+		az := getTestCloud()
+		az.Config.PreConfiguredBackendPoolLoadBalancerTypes = test.preConfiguredBackendPoolLoadBalancerTypes
+		var service v1.Service
+		if test.isInternalService {
+			service = getInternalTestService("test", 80)
+		} else {
+			service = getTestService("test", v1.ProtocolTCP, nil, 80)
+		}
+
+		isPreConfigured := az.isBackendPoolPreConfigured(&service)
+		assert.Equal(t, test.expectedOutput, isPreConfigured, "TestCase[%d]: %s", i, test.desc)
 	}
 }
