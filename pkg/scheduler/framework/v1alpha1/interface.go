@@ -122,6 +122,11 @@ func (s *Status) Reasons() []string {
 	return s.reasons
 }
 
+// AppendReason appends given reason to the Status.
+func (s *Status) AppendReason(reason string) {
+	s.reasons = append(s.reasons, reason)
+}
+
 // IsSuccess returns true if and only if "Status" is nil or Code is "Success".
 func (s *Status) IsSuccess() bool {
 	return s.Code() == Success
