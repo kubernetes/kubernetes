@@ -2,7 +2,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["interpod_affinity.go"],
+    srcs = [
+        "filtering.go",
+        "plugin.go",
+        "scoring.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity",
     visibility = ["//visibility:public"],
     deps = [
@@ -25,7 +29,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["interpod_affinity_test.go"],
+    srcs = [
+        "filtering_test.go",
+        "scoring_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/scheduler/algorithm/predicates:go_default_library",

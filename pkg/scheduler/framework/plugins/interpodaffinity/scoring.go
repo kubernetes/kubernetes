@@ -19,153 +19,19 @@ package interpodaffinity
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-// InterPodAffinity is a plugin that checks inter pod affinity
-type InterPodAffinity struct {
-	sharedLister          schedulerlisters.SharedLister
-	podAffinityChecker    *predicates.PodAffinityChecker
-	hardPodAffinityWeight int32
-	sync.Mutex
-}
-
-// Args holds the args that are used to configure the plugin.
-type Args struct {
-	HardPodAffinityWeight int32 `json:"hardPodAffinityWeight,omitempty"`
-}
-
-var _ framework.PreFilterPlugin = &InterPodAffinity{}
-var _ framework.FilterPlugin = &InterPodAffinity{}
-var _ framework.PostFilterPlugin = &InterPodAffinity{}
-var _ framework.ScorePlugin = &InterPodAffinity{}
-
-const (
-	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "InterPodAffinity"
-
-	// preFilterStateKey is the key in CycleState to InterPodAffinity pre-computed data for Filtering.
-	// Using the name of the plugin will likely help us avoid collisions with other plugins.
-	preFilterStateKey = "PreFilter" + Name
-
-	// postFilterStateKey is the key in CycleState to InterPodAffinity pre-computed data for Scoring.
-	postFilterStateKey = "PostFilter" + Name
-)
-
-// preFilterState computed at PreFilter and used at Filter.
-type preFilterState struct {
-	meta *predicates.PodAffinityMetadata
-}
-
-// Clone the prefilter state.
-func (s *preFilterState) Clone() framework.StateData {
-	copy := &preFilterState{
-		meta: s.meta.Clone(),
-	}
-	return copy
-}
-
-// Name returns name of the plugin. It is used in logs, etc.
-func (pl *InterPodAffinity) Name() string {
-	return Name
-}
-
-// PreFilter invoked at the prefilter extension point.
-func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
-	var meta *predicates.PodAffinityMetadata
-	var allNodes []*nodeinfo.NodeInfo
-	var havePodsWithAffinityNodes []*nodeinfo.NodeInfo
-	var err error
-	if allNodes, err = pl.sharedLister.NodeInfos().List(); err != nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("failed to list NodeInfos: %v", err))
-	}
-	if havePodsWithAffinityNodes, err = pl.sharedLister.NodeInfos().HavePodsWithAffinityList(); err != nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("failed to list NodeInfos with pods with affinity: %v", err))
-	}
-	if meta, err = predicates.GetPodAffinityMetadata(pod, allNodes, havePodsWithAffinityNodes); err != nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("Error calculating podAffinityMetadata: %v", err))
-	}
-
-	s := &preFilterState{
-		meta: meta,
-	}
-	cycleState.Write(preFilterStateKey, s)
-	return nil
-}
-
-// PreFilterExtensions returns prefilter extensions, pod add and remove.
-func (pl *InterPodAffinity) PreFilterExtensions() framework.PreFilterExtensions {
-	return pl
-}
-
-// AddPod from pre-computed data in cycleState.
-func (pl *InterPodAffinity) AddPod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
-	meta, err := getPodAffinityMetadata(cycleState)
-	if err != nil {
-		return framework.NewStatus(framework.Error, err.Error())
-	}
-	meta.UpdateWithPod(podToAdd, podToSchedule, nodeInfo.Node(), 1)
-	return nil
-}
-
-// RemovePod from pre-computed data in cycleState.
-func (pl *InterPodAffinity) RemovePod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
-	meta, err := getPodAffinityMetadata(cycleState)
-	if err != nil {
-		return framework.NewStatus(framework.Error, err.Error())
-	}
-	meta.UpdateWithPod(podToRemove, podToSchedule, nodeInfo.Node(), -1)
-	return nil
-}
-
-func getPodAffinityMetadata(cycleState *framework.CycleState) (*predicates.PodAffinityMetadata, error) {
-	c, err := cycleState.Read(preFilterStateKey)
-	if err != nil {
-		// The metadata wasn't pre-computed in prefilter. We ignore the error for now since
-		// Filter is able to handle that by computing it again.
-		klog.V(5).Infof("Error reading %q from cycleState: %v", preFilterStateKey, err)
-		return nil, nil
-	}
-
-	s, ok := c.(*preFilterState)
-	if !ok {
-		return nil, fmt.Errorf("%+v  convert to interpodaffinity.state error", c)
-	}
-	return s.meta, nil
-}
-
-// Filter invoked at the filter extension point.
-func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
-	meta, err := getPodAffinityMetadata(cycleState)
-	if err != nil {
-		return framework.NewStatus(framework.Error, err.Error())
-	}
-	_, reasons, err := pl.podAffinityChecker.InterPodAffinityMatches(pod, meta, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
-}
-
-// A "processed" representation of v1.WeightedAffinityTerm.
-type weightedAffinityTerm struct {
-	namespaces  sets.String
-	selector    labels.Selector
-	weight      int32
-	topologyKey string
-}
+// postFilterStateKey is the key in CycleState to InterPodAffinity pre-computed data for Scoring.
+const postFilterStateKey = "PostFilter" + Name
 
 // postFilterState computed at PostFilter and used at Score.
 type postFilterState struct {
@@ -180,29 +46,35 @@ func (s *postFilterState) Clone() framework.StateData {
 	return s
 }
 
+// A "processed" representation of v1.WeightedAffinityTerm.
+type weightedAffinityTerm struct {
+	affinityTerm
+	weight int32
+}
+
 func newWeightedAffinityTerm(pod *v1.Pod, term *v1.PodAffinityTerm, weight int32) (*weightedAffinityTerm, error) {
 	namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, term)
 	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 	if err != nil {
 		return nil, err
 	}
-	return &weightedAffinityTerm{namespaces: namespaces, selector: selector, topologyKey: term.TopologyKey, weight: weight}, nil
+	return &weightedAffinityTerm{affinityTerm: affinityTerm{namespaces: namespaces, selector: selector, topologyKey: term.TopologyKey}, weight: weight}, nil
 }
 
-func getProcessedTerms(pod *v1.Pod, terms []v1.WeightedPodAffinityTerm) ([]*weightedAffinityTerm, error) {
-	if terms == nil {
+func getWeightedAffinityTerms(pod *v1.Pod, v1Terms []v1.WeightedPodAffinityTerm) ([]*weightedAffinityTerm, error) {
+	if v1Terms == nil {
 		return nil, nil
 	}
 
-	var processedTerms []*weightedAffinityTerm
-	for i := range terms {
-		p, err := newWeightedAffinityTerm(pod, &terms[i].PodAffinityTerm, terms[i].Weight)
+	var terms []*weightedAffinityTerm
+	for i := range v1Terms {
+		p, err := newWeightedAffinityTerm(pod, &v1Terms[i].PodAffinityTerm, v1Terms[i].Weight)
 		if err != nil {
 			return nil, err
 		}
-		processedTerms = append(processedTerms, p)
+		terms = append(terms, p)
 	}
-	return processedTerms, nil
+	return terms, nil
 }
 
 func (pl *InterPodAffinity) processTerm(
@@ -274,7 +146,7 @@ func (pl *InterPodAffinity) processExistingPod(state *postFilterState, existingP
 		// For every soft pod affinity term of <existingPod>, if <pod> matches the term,
 		// increment <p.counts> for every node in the cluster with the same <term.TopologyKey>
 		// value as that of <existingPod>'s node by the term's weight.
-		terms, err := getProcessedTerms(existingPod, existingPodAffinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+		terms, err := getWeightedAffinityTerms(existingPod, existingPodAffinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
 		if err != nil {
 			klog.Error(err)
 			return nil
@@ -286,7 +158,7 @@ func (pl *InterPodAffinity) processExistingPod(state *postFilterState, existingP
 		// For every soft pod anti-affinity term of <existingPod>, if <pod> matches the term,
 		// decrement <pm.counts> for every node in the cluster with the same <term.TopologyKey>
 		// value as that of <existingPod>'s node by the term's weight.
-		terms, err := getProcessedTerms(existingPod, existingPodAffinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+		terms, err := getWeightedAffinityTerms(existingPod, existingPodAffinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
 		if err != nil {
 			return err
 		}
@@ -332,13 +204,13 @@ func (pl *InterPodAffinity) PostFilter(
 	var affinityTerms []*weightedAffinityTerm
 	var antiAffinityTerms []*weightedAffinityTerm
 	if hasAffinityConstraints {
-		if affinityTerms, err = getProcessedTerms(pod, affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution); err != nil {
+		if affinityTerms, err = getWeightedAffinityTerms(pod, affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution); err != nil {
 			klog.Error(err)
 			return nil
 		}
 	}
 	if hasAntiAffinityConstraints {
-		if antiAffinityTerms, err = getProcessedTerms(pod, affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution); err != nil {
+		if antiAffinityTerms, err = getWeightedAffinityTerms(pod, affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution); err != nil {
 			klog.Error(err)
 			return nil
 		}
@@ -457,22 +329,4 @@ func (pl *InterPodAffinity) NormalizeScore(ctx context.Context, cycleState *fram
 // ScoreExtensions of the Score plugin.
 func (pl *InterPodAffinity) ScoreExtensions() framework.ScoreExtensions {
 	return pl
-}
-
-// New initializes a new plugin and returns it.
-func New(plArgs *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin, error) {
-	if h.SnapshotSharedLister() == nil {
-		return nil, fmt.Errorf("SnapshotSharedlister is nil")
-	}
-
-	args := &Args{}
-	if err := framework.DecodeInto(plArgs, args); err != nil {
-		return nil, err
-	}
-
-	return &InterPodAffinity{
-		sharedLister:          h.SnapshotSharedLister(),
-		podAffinityChecker:    predicates.NewPodAffinityChecker(h.SnapshotSharedLister()),
-		hardPodAffinityWeight: args.HardPodAffinityWeight,
-	}, nil
 }
