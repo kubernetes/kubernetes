@@ -30,6 +30,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 )
 
@@ -214,16 +215,15 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 	}
 
 	tests := []struct {
-		newPod                *v1.Pod
-		existingPods          []*v1.Pod
-		filterName            string
-		maxVols               int
-		driverNames           []string
-		fits                  bool
-		test                  string
-		migrationEnabled      bool
-		limitSource           string
-		expectedFailureReason *PredicateFailureError
+		newPod           *v1.Pod
+		existingPods     []*v1.Pod
+		filterName       string
+		maxVols          int
+		driverNames      []string
+		fits             bool
+		test             string
+		migrationEnabled bool
+		limitSource      string
 	}{
 		{
 			newPod:       csiEBSOneVolPod,
@@ -447,22 +447,19 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, false)()
 			}
 
-			expectedFailureReasons := []PredicateFailureReason{ErrMaxVolumeCountExceeded}
-			if test.expectedFailureReason != nil {
-				expectedFailureReasons = []PredicateFailureReason{test.expectedFailureReason}
-			}
+			expectedStatus := framework.NewStatus(framework.Unschedulable, ErrMaxVolumeCountExceeded.GetReason())
 
 			pred := NewCSIMaxVolumeLimitPredicate(getFakeCSINodeLister(csiNode),
 				getFakeCSIPVLister(test.filterName, test.driverNames...),
 				getFakeCSIPVCLister(test.filterName, "csi-sc", test.driverNames...),
 				getFakeCSIStorageClassLister("csi-sc", test.driverNames[0]))
 
-			fits, reasons, err := pred(test.newPod, nil, node)
+			fits, gotStatus, err := pred(test.newPod, node)
 			if err != nil {
 				t.Errorf("Using allocatable [%s]%s: unexpected error: %v", test.filterName, test.test, err)
 			}
-			if !fits && !reflect.DeepEqual(expectedFailureReasons, reasons) {
-				t.Errorf("Using allocatable [%s]%s: unexpected failure reasons: %v, want: %v", test.filterName, test.test, reasons, expectedFailureReasons)
+			if !fits && !reflect.DeepEqual(expectedStatus, gotStatus) {
+				t.Errorf("Using allocatable [%s]%s: unexpected status: %v, want: %v", test.filterName, test.test, gotStatus, expectedStatus)
 			}
 			if fits != test.fits {
 				t.Errorf("Using allocatable [%s]%s: expected %v, got %v", test.filterName, test.test, test.fits, fits)

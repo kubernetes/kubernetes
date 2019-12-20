@@ -155,8 +155,11 @@ func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState *framework.Cy
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
 	}
-	_, reasons, err := pl.podAffinityChecker.InterPodAffinityMatches(pod, meta, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
+	_, status, err := pl.podAffinityChecker.InterPodAffinityMatches(pod, meta, nodeInfo)
+	if s := migration.ErrorToFrameworkStatus(err); s != nil {
+		return s
+	}
+	return status
 }
 
 // A "processed" representation of v1.WeightedAffinityTerm.

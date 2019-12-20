@@ -156,7 +156,7 @@ func TestSingleZone(t *testing.T) {
 			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				predicate: predicates.NewVolumeZonePredicate(pvLister, pvcLister, nil),
+				filterFn: predicates.NewVolumeZonePredicate(pvLister, pvcLister, nil),
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.Pod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
@@ -241,7 +241,7 @@ func TestMultiZone(t *testing.T) {
 			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				predicate: predicates.NewVolumeZonePredicate(pvLister, pvcLister, nil),
+				filterFn: predicates.NewVolumeZonePredicate(pvLister, pvcLister, nil),
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.Pod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
@@ -348,7 +348,7 @@ func TestWithBinding(t *testing.T) {
 			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				predicate: predicates.NewVolumeZonePredicate(pvLister, pvcLister, scLister),
+				filterFn: predicates.NewVolumeZonePredicate(pvLister, pvcLister, scLister),
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.Pod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {

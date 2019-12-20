@@ -29,7 +29,7 @@ import (
 
 // CinderLimits is a plugin that checks node volume limits.
 type CinderLimits struct {
-	predicate predicates.FitPredicate
+	filterFn predicates.FilterFn
 }
 
 var _ framework.FilterPlugin = &CinderLimits{}
@@ -45,8 +45,11 @@ func (pl *CinderLimits) Name() string {
 // Filter invoked at the filter extension point.
 func (pl *CinderLimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	// metadata is not needed
-	_, reasons, err := pl.predicate(pod, nil, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
+	_, status, err := pl.filterFn(pod, nodeInfo)
+	if s := migration.ErrorToFrameworkStatus(err); s != nil {
+		return s
+	}
+	return status
 }
 
 // NewCinder returns function that initializes a new plugin and returns it.
@@ -56,6 +59,6 @@ func NewCinder(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 	return &CinderLimits{
-		predicate: predicates.NewMaxPDVolumeCountPredicate(predicates.CinderVolumeFilterType, getCSINodeListerIfEnabled(informerFactory), scLister, pvLister, pvcLister),
+		filterFn: predicates.NewMaxPDVolumeCountPredicate(predicates.CinderVolumeFilterType, getCSINodeListerIfEnabled(informerFactory), scLister, pvLister, pvcLister),
 	}, nil
 }

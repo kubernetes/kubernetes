@@ -29,7 +29,7 @@ import (
 
 // CSILimits is a plugin that checks node volume limits.
 type CSILimits struct {
-	predicate predicates.FitPredicate
+	filterFn predicates.FilterFn
 }
 
 var _ framework.FilterPlugin = &CSILimits{}
@@ -45,8 +45,11 @@ func (pl *CSILimits) Name() string {
 // Filter invoked at the filter extension point.
 func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	// metadata is not needed
-	_, reasons, err := pl.predicate(pod, nil, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
+	_, status, err := pl.filterFn(pod, nodeInfo)
+	if s := migration.ErrorToFrameworkStatus(err); s != nil {
+		return s
+	}
+	return status
 }
 
 // NewCSI initializes a new plugin and returns it.
@@ -57,6 +60,6 @@ func NewCSI(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plu
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 
 	return &CSILimits{
-		predicate: predicates.NewCSIMaxVolumeLimitPredicate(getCSINodeListerIfEnabled(informerFactory), pvLister, pvcLister, scLister),
+		filterFn: predicates.NewCSIMaxVolumeLimitPredicate(getCSINodeListerIfEnabled(informerFactory), pvLister, pvcLister, scLister),
 	}, nil
 }

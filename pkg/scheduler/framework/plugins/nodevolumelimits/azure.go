@@ -29,7 +29,7 @@ import (
 
 // AzureDiskLimits is a plugin that checks node volume limits.
 type AzureDiskLimits struct {
-	predicate predicates.FitPredicate
+	filterFn predicates.FilterFn
 }
 
 var _ framework.FilterPlugin = &AzureDiskLimits{}
@@ -45,8 +45,11 @@ func (pl *AzureDiskLimits) Name() string {
 // Filter invoked at the filter extension point.
 func (pl *AzureDiskLimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	// metadata is not needed
-	_, reasons, err := pl.predicate(pod, nil, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
+	_, status, err := pl.filterFn(pod, nodeInfo)
+	if s := migration.ErrorToFrameworkStatus(err); s != nil {
+		return s
+	}
+	return status
 }
 
 // NewAzureDisk returns function that initializes a new plugin and returns it.
@@ -57,6 +60,6 @@ func NewAzureDisk(_ *runtime.Unknown, handle framework.FrameworkHandle) (framewo
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 
 	return &AzureDiskLimits{
-		predicate: predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, getCSINodeListerIfEnabled(informerFactory), scLister, pvLister, pvcLister),
+		filterFn: predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, getCSINodeListerIfEnabled(informerFactory), scLister, pvLister, pvcLister),
 	}, nil
 }

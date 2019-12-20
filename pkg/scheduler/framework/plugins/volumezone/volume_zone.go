@@ -29,7 +29,7 @@ import (
 
 // VolumeZone is a plugin that checks volume zone.
 type VolumeZone struct {
-	predicate predicates.FitPredicate
+	filterFn predicates.FilterFn
 }
 
 var _ framework.FilterPlugin = &VolumeZone{}
@@ -44,9 +44,11 @@ func (pl *VolumeZone) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
-	// metadata is not needed
-	_, reasons, err := pl.predicate(pod, nil, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
+	_, status, err := pl.filterFn(pod, nodeInfo)
+	if s := migration.ErrorToFrameworkStatus(err); err != nil {
+		return s
+	}
+	return status
 }
 
 // New initializes a new plugin and returns it.
@@ -56,6 +58,6 @@ func New(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 	return &VolumeZone{
-		predicate: predicates.NewVolumeZonePredicate(pvLister, pvcLister, scLister),
+		filterFn: predicates.NewVolumeZonePredicate(pvLister, pvcLister, scLister),
 	}, nil
 }

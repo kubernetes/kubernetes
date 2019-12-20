@@ -284,7 +284,7 @@ func (pl *ServiceAffinity) Filter(ctx context.Context, cycleState *framework.Cyc
 		return nil
 	}
 
-	return migration.PredicateResultToFrameworkStatus([]predicates.PredicateFailureReason{predicates.ErrServiceAffinityViolated}, nil)
+	return framework.NewStatus(framework.Unschedulable, "node(s) didn't match service affinity")
 }
 
 // Score invoked at the Score extension point.

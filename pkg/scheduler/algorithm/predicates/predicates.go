@@ -24,6 +24,8 @@ import (
 	"strconv"
 
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -149,7 +151,12 @@ func Ordering() []string {
 
 // FitPredicate is a function that indicates if a pod fits into an existing node.
 // The failure information is given by the error.
+// DEPRECATED
 type FitPredicate func(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error)
+
+// FilterFn is a function that indicates if a pod fits into an existing node.
+// The failure information is given by the error.
+type FilterFn func(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, *framework.Status, error)
 
 func isVolumeConflict(volume v1.Volume, pod *v1.Pod) bool {
 	// fast path if there is no conflict checking targets.
@@ -207,11 +214,11 @@ func isVolumeConflict(volume v1.Volume, pod *v1.Pod) bool {
 // - Ceph RBD forbids if any two pods share at least same monitor, and match pool and image, and the image is read-only
 // - ISCSI forbids if any two pods share at least same IQN and ISCSI volume is read-only
 // TODO: migrate this into some per-volume specific code?
-func NoDiskConflict(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+func NoDiskConflict(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, *framework.Status, error) {
 	for _, v := range pod.Spec.Volumes {
 		for _, ev := range nodeInfo.Pods() {
 			if isVolumeConflict(v, ev) {
-				return false, []PredicateFailureReason{ErrDiskConflict}, nil
+				return false, framework.NewStatus(framework.Unschedulable, ErrDiskConflict.GetReason()), nil
 			}
 		}
 	}
@@ -256,7 +263,7 @@ type VolumeFilter struct {
 // types, counts the number of unique volumes, and rejects the new pod if it would place the total count over
 // the maximum.
 func NewMaxPDVolumeCountPredicate(filterName string, csiNodeLister storagelisters.CSINodeLister, scLister storagelisters.StorageClassLister,
-	pvLister corelisters.PersistentVolumeLister, pvcLister corelisters.PersistentVolumeClaimLister) FitPredicate {
+	pvLister corelisters.PersistentVolumeLister, pvcLister corelisters.PersistentVolumeClaimLister) FilterFn {
 	var filter VolumeFilter
 	var volumeLimitKey v1.ResourceName
 
@@ -416,7 +423,7 @@ func (c *MaxPDVolumeCountChecker) matchProvisioner(pvc *v1.PersistentVolumeClaim
 	return c.filter.MatchProvisioner(storageClass)
 }
 
-func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, *framework.Status, error) {
 	// If a pod doesn't have any volume attached to it, the predicate will always be true.
 	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
 	if len(pod.Spec.Volumes) == 0 {
@@ -482,7 +489,7 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta Metadata, nodeInfo
 
 	if numExistingVolumes+numNewVolumes > maxAttachLimit {
 		// violates MaxEBSVolumeCount or MaxGCEPDVolumeCount
-		return false, []PredicateFailureReason{ErrMaxVolumeCountExceeded}, nil
+		return false, framework.NewStatus(framework.Unschedulable, ErrMaxVolumeCountExceeded.GetReason()), nil
 	}
 	if nodeInfo != nil && nodeInfo.TransientInfo != nil && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) {
 		nodeInfo.TransientInfo.TransientLock.Lock()
@@ -627,16 +634,16 @@ type VolumeZoneChecker struct {
 // determining the zone of a volume during scheduling, and that is likely to
 // require calling out to the cloud provider.  It seems that we are moving away
 // from inline volume declarations anyway.
-func NewVolumeZonePredicate(pvLister corelisters.PersistentVolumeLister, pvcLister corelisters.PersistentVolumeClaimLister, scLister storagelisters.StorageClassLister) FitPredicate {
+func NewVolumeZonePredicate(pvLister corelisters.PersistentVolumeLister, pvcLister corelisters.PersistentVolumeClaimLister, scLister storagelisters.StorageClassLister) FilterFn {
 	c := &VolumeZoneChecker{
 		pvLister:  pvLister,
 		pvcLister: pvcLister,
 		scLister:  scLister,
 	}
-	return c.predicate
+	return c.filter
 }
 
-func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+func (c *VolumeZoneChecker) filter(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, *framework.Status, error) {
 	// If a pod doesn't have any volume attached to it, the predicate will always be true.
 	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
 	if len(pod.Spec.Volumes) == 0 {
@@ -729,7 +736,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta Metadata, nodeInfo *sche
 
 			if !volumeVSet.Has(nodeV) {
 				klog.V(10).Infof("Won't schedule pod %q onto node %q due to volume %q (mismatch on %q)", pod.Name, node.Name, pvName, k)
-				return false, []PredicateFailureReason{ErrVolumeZoneConflict}, nil
+				return false, framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrVolumeZoneConflict.GetReason()), nil
 			}
 		}
 	}
@@ -790,13 +797,13 @@ func podName(pod *v1.Pod) string {
 // PodFitsResources is a wrapper around PodFitsResourcesPredicate that implements FitPredicate interface.
 // TODO(#85822): remove this function once predicate registration logic is deleted.
 func PodFitsResources(pod *v1.Pod, _ Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
-	return PodFitsResourcesPredicate(pod, nil, nil, nodeInfo)
+	return podFitsResources(pod, nil, nil, nodeInfo)
 }
 
-// PodFitsResourcesPredicate checks if a node has sufficient resources, such as cpu, memory, gpu, opaque int resources etc to run a pod.
+// podFitsResources checks if a node has sufficient resources, such as cpu, memory, gpu, opaque int resources etc to run a pod.
 // First return value indicates whether a node has sufficient resources to run a pod while the second return value indicates the
 // predicate failure reasons if the node has insufficient resources to run the pod
-func PodFitsResourcesPredicate(pod *v1.Pod, podRequest *schedulernodeinfo.Resource, ignoredExtendedResources sets.String, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+func podFitsResources(pod *v1.Pod, podRequest *schedulernodeinfo.Resource, ignoredExtendedResources sets.String, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
@@ -853,6 +860,12 @@ func PodFitsResourcesPredicate(pod *v1.Pod, podRequest *schedulernodeinfo.Resour
 			podName(pod), node.Name, len(nodeInfo.Pods()), allowedPodNumber)
 	}
 	return len(predicateFails) == 0, predicateFails, nil
+}
+
+// PodFitsResourcesPredicate calls podFitsResources() and migrate the 'PredicateFailureReason' slice to 'Status'.
+func PodFitsResourcesPredicate(pod *v1.Pod, podRequest *schedulernodeinfo.Resource, ignoredExtendedResources sets.String, nodeInfo *schedulernodeinfo.NodeInfo) (bool, *framework.Status, error) {
+	fit, failureReasons, err := podFitsResources(pod, podRequest, ignoredExtendedResources, nodeInfo)
+	return fit, predicateResultToFrameworkStatus(failureReasons, err), nil
 }
 
 // nodeMatchesNodeSelectorTerms checks if a node's labels satisfy a list of node selector terms,
@@ -924,6 +937,12 @@ func PodMatchNodeSelector(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinf
 	return false, []PredicateFailureReason{ErrNodeSelectorNotMatch}, nil
 }
 
+// PodMatchNodeSelectorFilter calls PodMatchNodeSelector(), and and migrate the 'PredicateFailureReason' slice to 'Status'.
+func PodMatchNodeSelectorFilter(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, *framework.Status, error) {
+	fit, failureReasons, err := PodMatchNodeSelector(pod, nil, nodeInfo)
+	return fit, predicateResultToFrameworkStatus(failureReasons, err), nil
+}
+
 // PodFitsHost checks if a pod spec node name matches the current node.
 func PodFitsHost(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
 	if len(pod.Spec.NodeName) == 0 {
@@ -939,15 +958,21 @@ func PodFitsHost(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInf
 	return false, []PredicateFailureReason{ErrPodNotMatchHostName}, nil
 }
 
+// PodFitsHostFilter calls PodFitsHost() and migrate the 'PredicateFailureReason' slice to 'Status'.
+func PodFitsHostFilter(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, *framework.Status, error) {
+	fit, failureReasons, err := PodFitsHost(pod, nil, nodeInfo)
+	return fit, predicateResultToFrameworkStatus(failureReasons, err), nil
+}
+
 // PodFitsHostPorts is a wrapper around PodFitsHostPortsPredicate. This is needed until
 // we are able to get rid of the FitPredicate function signature.
 // TODO(#85822): remove this function once predicate registration logic is deleted.
 func PodFitsHostPorts(pod *v1.Pod, _ Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
-	return PodFitsHostPortsPredicate(pod, nil, nodeInfo)
+	return podFitsHostPorts(pod, nil, nodeInfo)
 }
 
-// PodFitsHostPortsPredicate checks if a node has free ports for the requested pod ports.
-func PodFitsHostPortsPredicate(pod *v1.Pod, meta []*v1.ContainerPort, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+// podFitsHostPorts checks if a node has free ports for the requested pod ports.
+func podFitsHostPorts(pod *v1.Pod, meta []*v1.ContainerPort, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
 	wantPorts := meta
 	if wantPorts == nil {
 		// Fallback to computing it.
@@ -965,6 +990,12 @@ func PodFitsHostPortsPredicate(pod *v1.Pod, meta []*v1.ContainerPort, nodeInfo *
 	}
 
 	return true, nil, nil
+}
+
+// PodFitsHostPortsPredicate checks if a node has free ports for the requested pod ports.
+func PodFitsHostPortsPredicate(pod *v1.Pod, meta []*v1.ContainerPort, nodeInfo *schedulernodeinfo.NodeInfo) (bool, *framework.Status, error) {
+	fit, failureReasons, err := podFitsHostPorts(pod, meta, nodeInfo)
+	return fit, predicateResultToFrameworkStatus(failureReasons, err), nil
 }
 
 // haveOverlap searches two arrays and returns true if they have at least one common element; returns false otherwise.
@@ -1017,6 +1048,14 @@ func NewPodAffinityChecker(sharedLister schedulerlisters.SharedLister) *PodAffin
 	}
 }
 
+// NewLegacyPredicate works as a temporary placeholder for legacy FitPredicate registration.
+// TODO(Huang-Wei): remove this along with legacy FitPredicate registration
+func NewLegacyPredicate() FitPredicate {
+	return func(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+		return false, nil, fmt.Errorf("this function should never be called")
+	}
+}
+
 // NewPodAffinityPredicate creates a PodAffinityChecker.
 func NewPodAffinityPredicate(nodeInfoLister schedulerlisters.NodeInfoLister, podLister schedulerlisters.PodLister) FitPredicate {
 	return func(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
@@ -1027,15 +1066,14 @@ func NewPodAffinityPredicate(nodeInfoLister schedulerlisters.NodeInfoLister, pod
 // InterPodAffinityMatches checks if a pod can be scheduled on the specified node with pod affinity/anti-affinity configuration.
 // First return value indicates whether a pod can be scheduled on the specified node while the second return value indicates the
 // predicate failure reasons if the pod cannot be scheduled on the specified node.
-func (c *PodAffinityChecker) InterPodAffinityMatches(pod *v1.Pod, meta *PodAffinityMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+func (c *PodAffinityChecker) InterPodAffinityMatches(pod *v1.Pod, meta *PodAffinityMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, *framework.Status, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
 	}
 
-	if failedPredicates, error := c.satisfiesExistingPodsAntiAffinity(pod, meta, nodeInfo); failedPredicates != nil {
-		failedPredicates := append([]PredicateFailureReason{ErrPodAffinityNotMatch}, failedPredicates)
-		return false, failedPredicates, error
+	if failReason, error := c.satisfiesExistingPodsAntiAffinity(pod, meta, nodeInfo); failReason != "" {
+		return false, framework.NewStatus(framework.Unschedulable, ErrPodAffinityNotMatch.GetReason(), failReason), error
 	}
 
 	// Now check if <pod> requirements will be satisfied on this node.
@@ -1043,9 +1081,12 @@ func (c *PodAffinityChecker) InterPodAffinityMatches(pod *v1.Pod, meta *PodAffin
 	if affinity == nil || (affinity.PodAffinity == nil && affinity.PodAntiAffinity == nil) {
 		return true, nil, nil
 	}
-	if failedPredicates, error := c.satisfiesPodsAffinityAntiAffinity(pod, meta, nodeInfo, affinity); failedPredicates != nil {
-		failedPredicates := append([]PredicateFailureReason{ErrPodAffinityNotMatch}, failedPredicates)
-		return false, failedPredicates, error
+	if failReason, error := c.satisfiesPodsAffinityAntiAffinity(pod, meta, nodeInfo, affinity); failReason != "" {
+		code := framework.Unschedulable
+		if failReason == ErrPodAffinityRulesNotMatch.GetReason() {
+			code = framework.UnschedulableAndUnresolvable
+		}
+		return false, framework.NewStatus(code, ErrPodAffinityNotMatch.GetReason(), failReason), error
 	}
 
 	if klog.V(10) {
@@ -1163,10 +1204,10 @@ func (c *PodAffinityChecker) getMatchingAntiAffinityTopologyPairsOfPods(pod *v1.
 
 // Checks if scheduling the pod onto this node would break any anti-affinity
 // terms indicated by the existing pods.
-func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta *PodAffinityMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (PredicateFailureReason, error) {
+func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta *PodAffinityMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (string, error) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return ErrExistingPodsAntiAffinityRulesNotMatch, fmt.Errorf("node not found")
+		return ErrExistingPodsAntiAffinityRulesNotMatch.GetReason(), fmt.Errorf("node not found")
 	}
 	var topologyMap topologyToMatchedTermCount
 	if meta != nil {
@@ -1178,12 +1219,12 @@ func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta
 		if err != nil {
 			errMessage := fmt.Sprintf("Failed to get all pods: %v", err)
 			klog.Error(errMessage)
-			return ErrExistingPodsAntiAffinityRulesNotMatch, errors.New(errMessage)
+			return ErrExistingPodsAntiAffinityRulesNotMatch.GetReason(), errors.New(errMessage)
 		}
 		if topologyMap, err = c.getMatchingAntiAffinityTopologyPairsOfPods(pod, filteredPods); err != nil {
 			errMessage := fmt.Sprintf("Failed to get all terms that match pod %s: %v", podName(pod), err)
 			klog.Error(errMessage)
-			return ErrExistingPodsAntiAffinityRulesNotMatch, errors.New(errMessage)
+			return ErrExistingPodsAntiAffinityRulesNotMatch.GetReason(), errors.New(errMessage)
 		}
 	}
 
@@ -1192,7 +1233,7 @@ func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta
 	for topologyKey, topologyValue := range node.Labels {
 		if topologyMap[topologyPair{key: topologyKey, value: topologyValue}] > 0 {
 			klog.V(10).Infof("Cannot schedule pod %+v onto node %v", podName(pod), node.Name)
-			return ErrExistingPodsAntiAffinityRulesNotMatch, nil
+			return ErrExistingPodsAntiAffinityRulesNotMatch.GetReason(), nil
 		}
 	}
 	if klog.V(10) {
@@ -1201,7 +1242,7 @@ func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta
 		klog.Infof("Schedule Pod %+v on Node %+v is allowed, existing pods anti-affinity terms satisfied.",
 			podName(pod), node.Name)
 	}
-	return nil, nil
+	return "", nil
 }
 
 //  nodeMatchesAllTopologyTerms checks whether "nodeInfo" matches
@@ -1239,10 +1280,10 @@ func (c *PodAffinityChecker) nodeMatchesAnyTopologyTerm(pod *v1.Pod, topologyPai
 // satisfiesPodsAffinityAntiAffinity checks if scheduling the pod onto this node would break any term of this pod.
 func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 	predicateMeta *PodAffinityMetadata, nodeInfo *schedulernodeinfo.NodeInfo,
-	affinity *v1.Affinity) (PredicateFailureReason, error) {
+	affinity *v1.Affinity) (string, error) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return ErrPodAffinityRulesNotMatch, fmt.Errorf("node not found")
+		return ErrPodAffinityRulesNotMatch.GetReason(), fmt.Errorf("node not found")
 	}
 	if predicateMeta != nil {
 		// Check all affinity terms.
@@ -1257,7 +1298,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 				if len(topologyToMatchedAffinityTerms) != 0 || !targetPodMatchesAffinityOfPod(pod, pod) {
 					klog.V(10).Infof("Cannot schedule pod %+v onto node %v, because of PodAffinity",
 						podName(pod), node.Name)
-					return ErrPodAffinityRulesNotMatch, nil
+					return ErrPodAffinityRulesNotMatch.GetReason(), nil
 				}
 			}
 		}
@@ -1269,13 +1310,13 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 			if matchExists {
 				klog.V(10).Infof("Cannot schedule pod %+v onto node %v, because of PodAntiAffinity",
 					podName(pod), node.Name)
-				return ErrPodAntiAffinityRulesNotMatch, nil
+				return ErrPodAntiAffinityRulesNotMatch.GetReason(), nil
 			}
 		}
 	} else { // We don't have precomputed metadata. We have to follow a slow path to check affinity terms.
 		filteredPods, err := c.podLister.FilteredList(nodeInfo.Filter, labels.Everything())
 		if err != nil {
-			return ErrPodAffinityRulesNotMatch, err
+			return ErrPodAffinityRulesNotMatch.GetReason(), err
 		}
 
 		affinityTerms := GetPodAffinityTerms(affinity.PodAffinity)
@@ -1288,7 +1329,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 				if err != nil {
 					errMessage := fmt.Sprintf("Cannot schedule pod %s onto node %s, because of PodAffinity: %v", podName(pod), node.Name, err)
 					klog.Error(errMessage)
-					return ErrPodAffinityRulesNotMatch, errors.New(errMessage)
+					return ErrPodAffinityRulesNotMatch.GetReason(), errors.New(errMessage)
 				}
 				if termsSelectorMatch {
 					termsSelectorMatchFound = true
@@ -1304,7 +1345,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 				if err != nil || antiAffTermsMatch {
 					klog.V(10).Infof("Cannot schedule pod %+v onto node %v, because of PodAntiAffinityTerm, err: %v",
 						podName(pod), node.Name, err)
-					return ErrPodAntiAffinityRulesNotMatch, nil
+					return ErrPodAntiAffinityRulesNotMatch.GetReason(), nil
 				}
 			}
 		}
@@ -1318,13 +1359,13 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 			if termsSelectorMatchFound {
 				klog.V(10).Infof("Cannot schedule pod %+v onto node %v, because of PodAffinity",
 					podName(pod), node.Name)
-				return ErrPodAffinityRulesNotMatch, nil
+				return ErrPodAffinityRulesNotMatch.GetReason(), nil
 			}
 			// Check if pod matches its own affinity properties (namespace and label selector).
 			if !targetPodMatchesAffinityOfPod(pod, pod) {
 				klog.V(10).Infof("Cannot schedule pod %+v onto node %v, because of PodAffinity",
 					podName(pod), node.Name)
-				return ErrPodAffinityRulesNotMatch, nil
+				return ErrPodAffinityRulesNotMatch.GetReason(), nil
 			}
 		}
 	}
@@ -1335,13 +1376,13 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 		klog.Infof("Schedule Pod %+v on Node %+v is allowed, pod affinity/anti-affinity constraints satisfied.",
 			podName(pod), node.Name)
 	}
-	return nil, nil
+	return "", nil
 }
 
 // CheckNodeUnschedulablePredicate checks if a pod can be scheduled on a node with Unschedulable spec.
-func CheckNodeUnschedulablePredicate(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+func CheckNodeUnschedulablePredicate(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, *framework.Status, error) {
 	if nodeInfo == nil || nodeInfo.Node() == nil {
-		return false, []PredicateFailureReason{ErrNodeUnknownCondition}, nil
+		return false, framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrNodeUnknownCondition.GetReason()), nil
 	}
 
 	// If pod tolerate unschedulable taint, it's also tolerate `node.Spec.Unschedulable`.
@@ -1352,7 +1393,7 @@ func CheckNodeUnschedulablePredicate(pod *v1.Pod, meta Metadata, nodeInfo *sched
 
 	// TODO (k82cn): deprecates `node.Spec.Unschedulable` in 1.13.
 	if nodeInfo.Node().Spec.Unschedulable && !podToleratesUnschedulable {
-		return false, []PredicateFailureReason{ErrNodeUnschedulable}, nil
+		return false, framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrNodeUnschedulable.GetReason()), nil
 	}
 
 	return true, nil, nil
@@ -1368,6 +1409,12 @@ func PodToleratesNodeTaints(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodei
 		// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
 		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
 	})
+}
+
+// PodToleratesNodeTaintsFilter calls PodToleratesNodeTaints() and migrate the 'PredicateFailureReason' slice to 'Status'.
+func PodToleratesNodeTaintsFilter(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, *framework.Status, error) {
+	fit, failureReasons, err := PodToleratesNodeTaints(pod, nil, nodeInfo)
+	return fit, predicateResultToFrameworkStatus(failureReasons, err), nil
 }
 
 // PodToleratesNodeNoExecuteTaints checks if a pod tolerations can tolerate the node's NoExecute taints.
@@ -1405,11 +1452,11 @@ type VolumeBindingChecker struct {
 //
 // The predicate returns true if all bound PVCs have compatible PVs with the node, and if all unbound
 // PVCs can be matched with an available and node-compatible PV.
-func NewVolumeBindingPredicate(binder *volumebinder.VolumeBinder) FitPredicate {
+func NewVolumeBindingPredicate(binder *volumebinder.VolumeBinder) FilterFn {
 	c := &VolumeBindingChecker{
 		binder: binder,
 	}
-	return c.predicate
+	return c.filter
 }
 
 func podHasPVCs(pod *v1.Pod) bool {
@@ -1421,7 +1468,7 @@ func podHasPVCs(pod *v1.Pod) bool {
 	return false
 }
 
-func (c *VolumeBindingChecker) predicate(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+func (c *VolumeBindingChecker) filter(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, *framework.Status, error) {
 	// If pod does not request any PVC, we don't need to do anything.
 	if !podHasPVCs(pod) {
 		return true, nil, nil
@@ -1437,19 +1484,19 @@ func (c *VolumeBindingChecker) predicate(pod *v1.Pod, meta Metadata, nodeInfo *s
 		return false, nil, err
 	}
 
-	failReasons := []PredicateFailureReason{}
+	var failReasons []string
 	if !boundSatisfied {
 		klog.V(5).Infof("Bound PVs not satisfied for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
-		failReasons = append(failReasons, ErrVolumeNodeConflict)
+		failReasons = append(failReasons, ErrVolumeNodeConflict.GetReason())
 	}
 
 	if !unboundSatisfied {
 		klog.V(5).Infof("Couldn't find matching PVs for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
-		failReasons = append(failReasons, ErrVolumeBindConflict)
+		failReasons = append(failReasons, ErrVolumeBindConflict.GetReason())
 	}
 
 	if len(failReasons) > 0 {
-		return false, failReasons, nil
+		return false, framework.NewStatus(framework.UnschedulableAndUnresolvable, failReasons...), nil
 	}
 
 	// All volumes bound or matching PVs found for all unbound PVCs
@@ -1465,7 +1512,7 @@ func EvenPodsSpreadPredicate(pod *v1.Pod, meta Metadata, nodeInfo *schedulernode
 
 // PodTopologySpreadPredicate checks if a pod can be scheduled on a node which satisfies
 // its topologySpreadConstraints.
-func PodTopologySpreadPredicate(pod *v1.Pod, meta *PodTopologySpreadMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+func PodTopologySpreadPredicate(pod *v1.Pod, meta *PodTopologySpreadMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, *framework.Status, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
@@ -1488,7 +1535,7 @@ func PodTopologySpreadPredicate(pod *v1.Pod, meta *PodTopologySpreadMetadata, no
 		tpVal, ok := node.Labels[c.topologyKey]
 		if !ok {
 			klog.V(5).Infof("node '%s' doesn't have required label '%s'", node.Name, tpKey)
-			return false, []PredicateFailureReason{ErrTopologySpreadConstraintsNotMatch}, nil
+			return false, framework.NewStatus(framework.Unschedulable, ErrTopologySpreadConstraintsNotMatch.GetReason()), nil
 		}
 
 		selfMatchNum := int32(0)
@@ -1510,9 +1557,35 @@ func PodTopologySpreadPredicate(pod *v1.Pod, meta *PodTopologySpreadMetadata, no
 		skew := matchNum + selfMatchNum - minMatchNum
 		if skew > c.maxSkew {
 			klog.V(5).Infof("node '%s' failed spreadConstraint[%s]: matchNum(%d) + selfMatchNum(%d) - minMatchNum(%d) > maxSkew(%d)", node.Name, tpKey, matchNum, selfMatchNum, minMatchNum, c.maxSkew)
-			return false, []PredicateFailureReason{ErrTopologySpreadConstraintsNotMatch}, nil
+			return false, framework.NewStatus(framework.Unschedulable, ErrTopologySpreadConstraintsNotMatch.GetReason()), nil
 		}
 	}
 
 	return true, nil, nil
+}
+
+// predicateResultToFrameworkStatus converts a predicate result (PredicateFailureReason + error)
+// to a framework status.
+// DEPRECATED
+// TODO(Huang-Wei): remove this.
+func predicateResultToFrameworkStatus(reasons []PredicateFailureReason, err error) *framework.Status {
+	if s := migration.ErrorToFrameworkStatus(err); s != nil {
+		return s
+	}
+
+	if len(reasons) == 0 {
+		return nil
+	}
+
+	code := framework.Unschedulable
+	if UnresolvablePredicateExists(reasons) {
+		code = framework.UnschedulableAndUnresolvable
+	}
+
+	// We will keep all failure reasons.
+	var failureReasons []string
+	for _, reason := range reasons {
+		failureReasons = append(failureReasons, reason.GetReason())
+	}
+	return framework.NewStatus(code, failureReasons...)
 }

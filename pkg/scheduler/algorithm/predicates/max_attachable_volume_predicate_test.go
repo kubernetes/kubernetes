@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -842,7 +843,7 @@ func TestVolumeCountConflicts(t *testing.T) {
 		},
 	}
 
-	expectedFailureReasons := []PredicateFailureReason{ErrMaxVolumeCountExceeded}
+	expectedStatus := framework.NewStatus(framework.Unschedulable, ErrMaxVolumeCountExceeded.GetReason())
 
 	// running attachable predicate tests with feature gate and limit present on nodes
 	for _, test := range tests {
@@ -852,12 +853,12 @@ func TestVolumeCountConflicts(t *testing.T) {
 			getFakeStorageClassLister(test.filterName),
 			getFakePVLister(test.filterName),
 			getFakePVCLister(test.filterName))
-		fits, reasons, err := pred(test.newPod, nil, node)
+		fits, gotStatus, err := pred(test.newPod, node)
 		if err != nil {
 			t.Errorf("Using allocatable [%s]%s: unexpected error: %v", test.filterName, test.test, err)
 		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("Using allocatable [%s]%s: unexpected failure reasons: %v, want: %v", test.filterName, test.test, reasons, expectedFailureReasons)
+		if !fits && !reflect.DeepEqual(gotStatus, expectedStatus) {
+			t.Errorf("Using allocatable [%s]%s: unexpected status: %v, want: %v", test.filterName, test.test, gotStatus, expectedStatus)
 		}
 		if fits != test.fits {
 			t.Errorf("Using allocatable [%s]%s: expected %v, got %v", test.filterName, test.test, test.fits, fits)

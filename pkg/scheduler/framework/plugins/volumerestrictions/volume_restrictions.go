@@ -43,8 +43,11 @@ func (pl *VolumeRestrictions) Name() string {
 // Filter invoked at the filter extension point.
 func (pl *VolumeRestrictions) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	// metadata is not needed for NoDiskConflict
-	_, reasons, err := predicates.NoDiskConflict(pod, nil, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
+	_, status, err := predicates.NoDiskConflict(pod, nodeInfo)
+	if s := migration.ErrorToFrameworkStatus(err); s != nil {
+		return s
+	}
+	return status
 }
 
 // New initializes a new plugin and returns it.

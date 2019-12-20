@@ -140,8 +140,11 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
 	}
-	_, reasons, err := predicates.PodTopologySpreadPredicate(pod, meta, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
+	_, status, err := predicates.PodTopologySpreadPredicate(pod, meta, nodeInfo)
+	if s := migration.ErrorToFrameworkStatus(err); s != nil {
+		return s
+	}
+	return status
 }
 
 // Score invoked at the Score extension point.

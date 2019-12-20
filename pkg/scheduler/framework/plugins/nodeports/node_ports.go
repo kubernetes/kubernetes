@@ -96,8 +96,11 @@ func (pl *NodePorts) Filter(ctx context.Context, cycleState *framework.CycleStat
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
 	}
-	_, reasons, err := predicates.PodFitsHostPortsPredicate(pod, state, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
+	_, status, err := predicates.PodFitsHostPortsPredicate(pod, state, nodeInfo)
+	if s := migration.ErrorToFrameworkStatus(err); s != nil {
+		return s
+	}
+	return status
 }
 
 // New initializes a new plugin and returns it.

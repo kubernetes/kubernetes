@@ -27,6 +27,7 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -55,7 +56,7 @@ type CSIMaxVolumeLimitChecker struct {
 
 // NewCSIMaxVolumeLimitPredicate returns a predicate for counting CSI volumes
 func NewCSIMaxVolumeLimitPredicate(
-	csiNodeLister storagelisters.CSINodeLister, pvLister corelisters.PersistentVolumeLister, pvcLister corelisters.PersistentVolumeClaimLister, scLister storagelisters.StorageClassLister) FitPredicate {
+	csiNodeLister storagelisters.CSINodeLister, pvLister corelisters.PersistentVolumeLister, pvcLister corelisters.PersistentVolumeClaimLister, scLister storagelisters.StorageClassLister) FilterFn {
 	c := &CSIMaxVolumeLimitChecker{
 		csiNodeLister:        csiNodeLister,
 		pvLister:             pvLister,
@@ -84,7 +85,7 @@ func getVolumeLimits(nodeInfo *schedulernodeinfo.NodeInfo, csiNode *storagev1.CS
 }
 
 func (c *CSIMaxVolumeLimitChecker) attachableLimitPredicate(
-	pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+	pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, *framework.Status, error) {
 	// If the new pod doesn't have any volume attached to it, the predicate will always be true
 	if len(pod.Spec.Volumes) == 0 {
 		return true, nil, nil
@@ -144,7 +145,7 @@ func (c *CSIMaxVolumeLimitChecker) attachableLimitPredicate(
 		if ok {
 			currentVolumeCount := attachedVolumeCount[volumeLimitKey]
 			if currentVolumeCount+count > int(maxVolumeLimit) {
-				return false, []PredicateFailureReason{ErrMaxVolumeCountExceeded}, nil
+				return false, framework.NewStatus(framework.Unschedulable, ErrMaxVolumeCountExceeded.GetReason()), nil
 			}
 		}
 	}

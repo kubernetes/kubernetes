@@ -48,8 +48,11 @@ func (pl *TaintToleration) Name() string {
 // Filter invoked at the filter extension point.
 func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	// Note that PodToleratesNodeTaints doesn't use predicate metadata, hence passing nil here.
-	_, reasons, err := predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
+	_, status, err := predicates.PodToleratesNodeTaintsFilter(pod, nodeInfo)
+	if s := migration.ErrorToFrameworkStatus(err); s != nil {
+		return s
+	}
+	return status
 }
 
 // Score invoked at the Score extension point.

@@ -460,7 +460,7 @@ func TestCSILimits(t *testing.T) {
 			}
 
 			p := &CSILimits{
-				predicate: predicates.NewCSIMaxVolumeLimitPredicate(getFakeCSINodeLister(csiNode), getFakeCSIPVLister(test.filterName, test.driverNames...), getFakeCSIPVCLister(test.filterName, "csi-sc", test.driverNames...), getFakeCSIStorageClassLister("csi-sc", test.driverNames[0])),
+				filterFn: predicates.NewCSIMaxVolumeLimitPredicate(getFakeCSINodeLister(csiNode), getFakeCSIPVLister(test.filterName, test.driverNames...), getFakeCSIPVCLister(test.filterName, "csi-sc", test.driverNames...), getFakeCSIStorageClassLister("csi-sc", test.driverNames[0])),
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {

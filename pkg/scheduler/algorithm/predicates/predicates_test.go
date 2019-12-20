@@ -17,6 +17,7 @@ limitations under the License.
 package predicates
 
 import (
+	"errors"
 	"os"
 	"reflect"
 	"strconv"
@@ -33,6 +34,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -386,7 +388,7 @@ func TestPodFitsResources(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
-			fits, reasons, err := PodFitsResourcesPredicate(test.pod, GetResourceRequest(test.pod), test.ignoredExtendedResources, test.nodeInfo)
+			fits, reasons, err := podFitsResources(test.pod, GetResourceRequest(test.pod), test.ignoredExtendedResources, test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -443,7 +445,7 @@ func TestPodFitsResources(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 1, 0, 0, 0)}}
 			test.nodeInfo.SetNode(&node)
-			fits, reasons, err := PodFitsResourcesPredicate(test.pod, GetResourceRequest(test.pod), nil, test.nodeInfo)
+			fits, reasons, err := podFitsResources(test.pod, GetResourceRequest(test.pod), nil, test.nodeInfo)
 
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -504,7 +506,7 @@ func TestPodFitsResources(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
-			fits, reasons, err := PodFitsResourcesPredicate(test.pod, GetResourceRequest(test.pod), nil, test.nodeInfo)
+			fits, reasons, err := podFitsResources(test.pod, GetResourceRequest(test.pod), nil, test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -755,16 +757,16 @@ func TestGCEDiskConflicts(t *testing.T) {
 		{&v1.Pod{Spec: volState}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state"},
 		{&v1.Pod{Spec: volState2}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state"},
 	}
-	expectedFailureReasons := []PredicateFailureReason{ErrDiskConflict}
+	expectedStatus := framework.NewStatus(framework.Unschedulable, ErrDiskConflict.GetReason())
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ok, reasons, err := NoDiskConflict(test.pod, nil, test.nodeInfo)
+			ok, gotStatus, err := NoDiskConflict(test.pod, test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if !ok && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-				t.Errorf("unexpected failure reasons: %v, want: %v", reasons, expectedFailureReasons)
+			if !ok && !reflect.DeepEqual(gotStatus, expectedStatus) {
+				t.Errorf("unexpected status: %v, want: %v", gotStatus, expectedStatus)
 			}
 			if test.isOk && !ok {
 				t.Errorf("expected ok, got none.  %v %s", test.pod, test.nodeInfo)
@@ -810,16 +812,16 @@ func TestAWSDiskConflicts(t *testing.T) {
 		{&v1.Pod{Spec: volState}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state"},
 		{&v1.Pod{Spec: volState2}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state"},
 	}
-	expectedFailureReasons := []PredicateFailureReason{ErrDiskConflict}
+	expectedStatus := framework.NewStatus(framework.Unschedulable, ErrDiskConflict.GetReason())
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ok, reasons, err := NoDiskConflict(test.pod, nil, test.nodeInfo)
+			ok, gotStatus, err := NoDiskConflict(test.pod, test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if !ok && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-				t.Errorf("unexpected failure reasons: %v, want: %v", reasons, expectedFailureReasons)
+			if !ok && !reflect.DeepEqual(gotStatus, expectedStatus) {
+				t.Errorf("unexpected status: %v, want: %v", gotStatus, expectedStatus)
 			}
 			if test.isOk && !ok {
 				t.Errorf("expected ok, got none.  %v %s", test.pod, test.nodeInfo)
@@ -871,16 +873,16 @@ func TestRBDDiskConflicts(t *testing.T) {
 		{&v1.Pod{Spec: volState}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state"},
 		{&v1.Pod{Spec: volState2}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state"},
 	}
-	expectedFailureReasons := []PredicateFailureReason{ErrDiskConflict}
+	expectedStatus := framework.NewStatus(framework.Unschedulable, ErrDiskConflict.GetReason())
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ok, reasons, err := NoDiskConflict(test.pod, nil, test.nodeInfo)
+			ok, gotStatus, err := NoDiskConflict(test.pod, test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if !ok && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-				t.Errorf("unexpected failure reasons: %v, want: %v", reasons, expectedFailureReasons)
+			if !ok && !reflect.DeepEqual(gotStatus, expectedStatus) {
+				t.Errorf("unexpected status: %v, want: %v", gotStatus, expectedStatus)
 			}
 			if test.isOk && !ok {
 				t.Errorf("expected ok, got none.  %v %s", test.pod, test.nodeInfo)
@@ -932,16 +934,16 @@ func TestISCSIDiskConflicts(t *testing.T) {
 		{&v1.Pod{Spec: volState}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state"},
 		{&v1.Pod{Spec: volState2}, schedulernodeinfo.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state"},
 	}
-	expectedFailureReasons := []PredicateFailureReason{ErrDiskConflict}
+	expectedStatus := framework.NewStatus(framework.Unschedulable, ErrDiskConflict.GetReason())
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ok, reasons, err := NoDiskConflict(test.pod, nil, test.nodeInfo)
+			ok, gotStatus, err := NoDiskConflict(test.pod, test.nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if !ok && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-				t.Errorf("unexpected failure reasons: %v, want: %v", reasons, expectedFailureReasons)
+			if !ok && !reflect.DeepEqual(gotStatus, expectedStatus) {
+				t.Errorf("unexpected status: %v, want: %v", gotStatus, expectedStatus)
 			}
 			if test.isOk && !ok {
 				t.Errorf("expected ok, got none.  %v %s", test.pod, test.nodeInfo)
@@ -1934,18 +1936,18 @@ func TestPodToleratesTaints(t *testing.T) {
 				"but the effect of taint on node is PreferNochedule. Pod can be scheduled onto the node",
 		},
 	}
-	expectedFailureReasons := []PredicateFailureReason{ErrTaintsTolerationsNotMatch}
+	expectedStatus := framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrTaintsTolerationsNotMatch.GetReason())
 
 	for _, test := range podTolerateTaintsTests {
 		t.Run(test.name, func(t *testing.T) {
 			nodeInfo := schedulernodeinfo.NewNodeInfo()
 			nodeInfo.SetNode(&test.node)
-			fits, reasons, err := PodToleratesNodeTaints(test.pod, nil, nodeInfo)
+			fits, gotStatus, err := PodToleratesNodeTaintsFilter(test.pod, nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-				t.Errorf("unexpected failure reason: %v, want: %v", reasons, expectedFailureReasons)
+			if !fits && !reflect.DeepEqual(gotStatus, expectedStatus) {
+				t.Errorf("unexpected status: %v, want: %v", gotStatus, expectedStatus)
 			}
 			if fits != test.fits {
 				t.Errorf("expected: %v got %v", test.fits, fits)
@@ -2079,7 +2081,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 		},
 	}
 
-	expectedFailureReasons := []PredicateFailureReason{ErrVolumeZoneConflict}
+	expectedStatus := framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrVolumeZoneConflict.GetReason())
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -2087,12 +2089,12 @@ func TestVolumeZonePredicate(t *testing.T) {
 			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
 
-			fits, reasons, err := fit(test.Pod, nil, node)
+			fits, gotStatus, err := fit(test.Pod, node)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-				t.Errorf("unexpected failure reasons: %v, want: %v", reasons, expectedFailureReasons)
+			if !fits && !reflect.DeepEqual(gotStatus, expectedStatus) {
+				t.Errorf("unexpected status: %v, want: %v", gotStatus, expectedStatus)
 			}
 			if fits != test.Fits {
 				t.Errorf("expected %v got %v", test.Fits, fits)
@@ -2173,7 +2175,7 @@ func TestVolumeZonePredicateMultiZone(t *testing.T) {
 		},
 	}
 
-	expectedFailureReasons := []PredicateFailureReason{ErrVolumeZoneConflict}
+	expectedStatus := framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrVolumeZoneConflict.GetReason())
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -2181,12 +2183,12 @@ func TestVolumeZonePredicateMultiZone(t *testing.T) {
 			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
 
-			fits, reasons, err := fit(test.Pod, nil, node)
+			fits, gotStatus, err := fit(test.Pod, node)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-				t.Errorf("unexpected failure reasons: %v, want: %v", reasons, expectedFailureReasons)
+			if !fits && !reflect.DeepEqual(gotStatus, expectedStatus) {
+				t.Errorf("unexpected status: %v, want: %v", gotStatus, expectedStatus)
 			}
 			if fits != test.Fits {
 				t.Errorf("expected %v got %v", test.Fits, fits)
@@ -2297,7 +2299,7 @@ func TestVolumeZonePredicateWithVolumeBinding(t *testing.T) {
 			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
 
-			fits, _, err := fit(test.Pod, nil, node)
+			fits, _, err := fit(test.Pod, node)
 			if !test.ExpectFailure && err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -2404,7 +2406,7 @@ func TestCheckNodeUnschedulablePredicate(t *testing.T) {
 	for _, test := range testCases {
 		nodeInfo := schedulernodeinfo.NewNodeInfo()
 		nodeInfo.SetNode(test.node)
-		fit, _, err := CheckNodeUnschedulablePredicate(test.pod, nil, nodeInfo)
+		fit, _, err := CheckNodeUnschedulablePredicate(test.pod, nodeInfo)
 		if err != nil {
 			t.Fatalf("Failed to check node unschedulable: %v", err)
 		}
@@ -2412,5 +2414,47 @@ func TestCheckNodeUnschedulablePredicate(t *testing.T) {
 		if fit != test.fit {
 			t.Errorf("Unexpected fit: expected %v, got %v", test.fit, fit)
 		}
+	}
+}
+
+func TestPredicateResultToFrameworkStatus(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        error
+		reasons    []PredicateFailureReason
+		wantStatus *framework.Status
+	}{
+		{
+			name: "Success",
+		},
+		{
+			name:       "Error",
+			err:        errors.New("Failed with error"),
+			wantStatus: framework.NewStatus(framework.Error, "Failed with error"),
+		},
+		{
+			name:       "Error with reason",
+			err:        errors.New("Failed with error"),
+			reasons:    []PredicateFailureReason{ErrDiskConflict},
+			wantStatus: framework.NewStatus(framework.Error, "Failed with error"),
+		},
+		{
+			name:       "Unschedulable",
+			reasons:    []PredicateFailureReason{ErrExistingPodsAntiAffinityRulesNotMatch},
+			wantStatus: framework.NewStatus(framework.Unschedulable, ErrExistingPodsAntiAffinityRulesNotMatch.GetReason()),
+		},
+		{
+			name:       "Unschedulable and Unresolvable",
+			reasons:    []PredicateFailureReason{ErrDiskConflict, ErrNodeSelectorNotMatch},
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrDiskConflict.GetReason(), ErrNodeSelectorNotMatch.GetReason()),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotStatus := predicateResultToFrameworkStatus(tt.reasons, tt.err)
+			if !reflect.DeepEqual(tt.wantStatus, gotStatus) {
+				t.Errorf("Got status %v, want %v", gotStatus, tt.wantStatus)
+			}
+		})
 	}
 }

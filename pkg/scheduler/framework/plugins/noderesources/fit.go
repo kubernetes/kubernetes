@@ -106,8 +106,11 @@ func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod 
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
 	}
-	_, reasons, err := predicates.PodFitsResourcesPredicate(pod, r, f.ignoredResources, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
+	_, status, err := predicates.PodFitsResourcesPredicate(pod, r, f.ignoredResources, nodeInfo)
+	if s := migration.ErrorToFrameworkStatus(err); s != nil {
+		return s
+	}
+	return status
 }
 
 // NewFit initializes a new plugin and returns it.

@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -115,7 +114,7 @@ func (pl *NodeLabel) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 		return nil
 	}
 
-	return migration.PredicateResultToFrameworkStatus([]predicates.PredicateFailureReason{predicates.ErrNodeLabelPresenceViolated}, nil)
+	return framework.NewStatus(framework.UnschedulableAndUnresolvable, predicates.ErrNodeLabelPresenceViolated.GetReason())
 }
 
 // Score invoked at the score extension point.

@@ -29,7 +29,7 @@ import (
 
 // VolumeBinding is a plugin that binds pod volumes in scheduling.
 type VolumeBinding struct {
-	predicate predicates.FitPredicate
+	filterFn predicates.FilterFn
 }
 
 var _ framework.FilterPlugin = &VolumeBinding{}
@@ -44,13 +44,16 @@ func (pl *VolumeBinding) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
-	_, reasons, err := pl.predicate(pod, nil, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
+	_, status, err := pl.filterFn(pod, nodeInfo)
+	if s := migration.ErrorToFrameworkStatus(err); s != nil {
+		return s
+	}
+	return status
 }
 
 // NewFromVolumeBinder initializes a new plugin with volume binder and returns it.
 func NewFromVolumeBinder(volumeBinder *volumebinder.VolumeBinder) framework.Plugin {
 	return &VolumeBinding{
-		predicate: predicates.NewVolumeBindingPredicate(volumeBinder),
+		filterFn: predicates.NewVolumeBindingPredicate(volumeBinder),
 	}
 }

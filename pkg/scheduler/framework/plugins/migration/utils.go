@@ -18,7 +18,6 @@ package migration
 
 import (
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -26,30 +25,6 @@ const (
 	// PrioritiesStateKey is the key in CycleState to PrioritiesStateData
 	PrioritiesStateKey = "priorities"
 )
-
-// PredicateResultToFrameworkStatus converts a predicate result (PredicateFailureReason + error)
-// to a framework status.
-func PredicateResultToFrameworkStatus(reasons []predicates.PredicateFailureReason, err error) *framework.Status {
-	if s := ErrorToFrameworkStatus(err); s != nil {
-		return s
-	}
-
-	if len(reasons) == 0 {
-		return nil
-	}
-
-	code := framework.Unschedulable
-	if predicates.UnresolvablePredicateExists(reasons) {
-		code = framework.UnschedulableAndUnresolvable
-	}
-
-	// We will keep all failure reasons.
-	var failureReasons []string
-	for _, reason := range reasons {
-		failureReasons = append(failureReasons, reason.GetReason())
-	}
-	return framework.NewStatus(code, failureReasons...)
-}
 
 // ErrorToFrameworkStatus converts an error to a framework status.
 func ErrorToFrameworkStatus(err error) *framework.Status {

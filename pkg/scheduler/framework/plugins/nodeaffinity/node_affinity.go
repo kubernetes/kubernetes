@@ -47,8 +47,11 @@ func (pl *NodeAffinity) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *NodeAffinity) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
-	_, reasons, err := predicates.PodMatchNodeSelector(pod, nil, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
+	_, status, err := predicates.PodMatchNodeSelectorFilter(pod, nodeInfo)
+	if s := migration.ErrorToFrameworkStatus(err); s != nil {
+		return s
+	}
+	return status
 }
 
 // Score invoked at the Score extension point.

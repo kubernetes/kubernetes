@@ -82,6 +82,7 @@ var (
 	ErrFakePredicate = NewPredicateFailureError("FakePredicateError", "Nodes failed the fake predicate")
 )
 
+// TODO(Huang-Wei): remove this.
 var unresolvablePredicateFailureErrors = map[PredicateFailureReason]struct{}{
 	ErrNodeSelectorNotMatch:      {},
 	ErrPodAffinityRulesNotMatch:  {},
@@ -104,6 +105,7 @@ var unresolvablePredicateFailureErrors = map[PredicateFailureReason]struct{}{
 }
 
 // UnresolvablePredicateExists checks if there is at least one unresolvable predicate failure reason.
+// DEPRECATED
 func UnresolvablePredicateExists(reasons []PredicateFailureReason) bool {
 	for _, r := range reasons {
 		if _, ok := unresolvablePredicateFailureErrors[r]; ok {
