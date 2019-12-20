@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"path/filepath"
 	"reflect"
@@ -31,6 +32,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/merge"
 	"sigs.k8s.io/structured-merge-diff/typed"
@@ -48,6 +51,30 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+
+	// Initialize install packages
+	_ "k8s.io/kubernetes/pkg/apis/admission/install"
+	_ "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
+	_ "k8s.io/kubernetes/pkg/apis/apps/install"
+	_ "k8s.io/kubernetes/pkg/apis/auditregistration/install"
+	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
+	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
+	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
+	_ "k8s.io/kubernetes/pkg/apis/batch/install"
+	_ "k8s.io/kubernetes/pkg/apis/certificates/install"
+	_ "k8s.io/kubernetes/pkg/apis/coordination/install"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	_ "k8s.io/kubernetes/pkg/apis/discovery/install"
+	_ "k8s.io/kubernetes/pkg/apis/events/install"
+	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
+	_ "k8s.io/kubernetes/pkg/apis/networking/install"
+	_ "k8s.io/kubernetes/pkg/apis/node/install"
+	_ "k8s.io/kubernetes/pkg/apis/policy/install"
+	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
+	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
+	_ "k8s.io/kubernetes/pkg/apis/settings/install"
+	_ "k8s.io/kubernetes/pkg/apis/storage/install"
 )
 
 var fakeSchema = prototesting.Fake{
@@ -802,6 +829,8 @@ func TestApplySuccessWithNoManagedFields(t *testing.T) {
 }
 
 func TestValueFormats(t *testing.T) {
+	apifuzzer := fuzzer.FuzzerFor(apitesting.FuzzerFuncs, rand.NewSource(100), legacyscheme.Codecs)
+
 	toRaw := func(v value.Value) map[string]interface{} {
 		raw := map[string]interface{}{}
 		js, err := value.ToJSON(v)
@@ -815,27 +844,40 @@ func TestValueFormats(t *testing.T) {
 		return raw
 	}
 
-	for i := 0; i < 1000; i++ {
-		t.Run(fmt.Sprintf("run %d", i), func(t *testing.T) {
-			native := &appsv1.Deployment{}
-			fuzzer.ValueFuzz(native)
+	// for _, version := range []schema.GroupVersion{{Group: "", Version: runtime.APIVersionInternal}, {Group: "", Version: "v1"}} {
+	// 			f := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(rand.Int63()), legacyscheme.Codecs)
 
-			nativeData, err := yaml.Marshal(native)
-			if err != nil {
-				t.Fatalf("Failed to serialize nativeData: %v", err)
-			}
+	t.Logf("AllKnownTypesSize: %d", len(legacyscheme.Scheme.AllKnownTypes()))
+	for gvk, typ := range legacyscheme.Scheme.AllKnownTypes() {
+		if gvk.Version == runtime.APIVersionInternal {
+			// internal versions are not serialized to protobuf
+			continue
+		}
 
-			var v interface{}
-			if err := yaml.Unmarshal(nativeData, &v); err != nil {
-				t.Fatalf("error decoding YAML: %v", err)
-			}
+		native := reflect.New(typ).Interface()
+		t.Run(gvk.String(), func(t *testing.T) {
+			for i := 0; i < 10; i++ {
+				t.Run(fmt.Sprintf("fuzz-%d", i), func(t *testing.T) {
+					apifuzzer.Fuzz(native)
 
-			raw1 := toRaw(value.MustReflect(native))
-			raw2 := toRaw(value.NewValueInterface(v))
+					nativeData, err := yaml.Marshal(native)
+					if err != nil {
+						t.Fatalf("Failed to serialize nativeData: %v", err)
+					}
 
-			// TODO: Use value.Equals once it has been fixed
-			if !reflect.DeepEqual(raw1, raw2) {
-				t.Errorf("Expected reflection and unstructured values to match, but got:\n%s\n!=\n%s\ndiff:\n%s", raw1, raw2, cmp.Diff(raw1, raw2))
+					var v interface{}
+					if err := yaml.Unmarshal(nativeData, &v); err != nil {
+						t.Fatalf("error decoding YAML: %v", err)
+					}
+
+					raw1 := toRaw(value.MustReflect(native))
+					raw2 := toRaw(value.NewValueInterface(v))
+
+					// TODO: Use value.Equals once it has been fixed
+					if !reflect.DeepEqual(raw1, raw2) {
+						t.Errorf("Expected reflection and unstructured values to match, but got:\n%s\n!=\n%s\ndiff:\n%s", raw1, raw2, cmp.Diff(raw1, raw2))
+					}
+				})
 			}
 		})
 	}

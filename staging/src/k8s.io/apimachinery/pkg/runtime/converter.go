@@ -29,7 +29,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"sigs.k8s.io/structured-merge-diff/value"
+	//"sigs.k8s.io/structured-merge-diff/value"
 
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -210,18 +210,18 @@ func fromUnstructured(sv, dv reflect.Value) error {
 	}
 
 	// Check if the object has a custom JSON marshaller/unmarshaller.
-	if converter, ok := value.CustomTypeConverters[dv.Type()]; ok {
-		//klog.Infof("Converter.FromString: %v", dv.Type())
-
-		if dv.Kind() != reflect.Ptr {
-			v := converter.FromString(sv.String())
-			dv.Set(v)
-		}
-
-		return nil
-	} else {
-		//klog.Infof("no Converter.FromString: %v", dv.Type())
-	}
+	// if converter, ok := value.CustomTypeConverters[dv.Type()]; ok {
+	// 	//klog.Infof("Converter.FromString: %v", dv.Type())
+	//
+	// 	if dv.Kind() != reflect.Ptr {
+	// 		v := converter.FromString(sv.String())
+	// 		dv.Set(v)
+	// 	}
+	//
+	// 	return nil
+	// } else {
+	// 	//klog.Infof("no Converter.FromString: %v", dv.Type())
+	// }
 
 	if reflect.PtrTo(dt).Implements(unmarshalerType) {
 		data, err := json.Marshal(sv.Interface())
@@ -520,15 +520,15 @@ func getMarshaler(v reflect.Value) (encodingjson.Marshaler, bool) {
 }
 
 func toUnstructured(sv, dv reflect.Value) error {
-	if sv.IsValid() {
-		if converter, ok := value.CustomTypeConverters[sv.Type()]; ok {
-			if sv.Kind() != reflect.Ptr {
-				// klog.Infof("Converter.ToString: %v", sv.Type())
-				dv.Set(reflect.ValueOf(converter.ToString(sv)))
-				return nil
-			}
-		}
-	}
+	// if sv.IsValid() {
+	// 	if converter, ok := value.CustomTypeConverters[sv.Type()]; ok {
+	// 		if sv.Kind() != reflect.Ptr {
+	// 			// klog.Infof("Converter.ToString: %v", sv.Type())
+	// 			dv.Set(reflect.ValueOf(converter.ToString(sv)))
+	// 			return nil
+	// 		}
+	// 	}
+	// }
 
 	// Check if the object has a custom JSON marshaller/unmarshaller.
 	if marshaler, ok := getMarshaler(sv); ok {
