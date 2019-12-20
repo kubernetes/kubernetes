@@ -816,7 +816,7 @@ func (p *singleNumaNodePolicy) mergeTestCases(numaNodes []int) []policyMergeTest
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestBitMask(0),
+				NUMANodeAffinity: nil,
 				Preferred:        false,
 			},
 		},
