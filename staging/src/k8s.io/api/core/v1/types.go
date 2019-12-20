@@ -2203,7 +2203,7 @@ type Container struct {
 	// This can be used to provide different probe parameters at the beginning of a Pod's lifecycle,
 	// when it might take a long time to load data or warm a cache, than during steady-state operation.
 	// This cannot be updated.
-	// This is an alpha feature enabled by the StartupProbe feature flag.
+	// This is a beta feature enabled by the StartupProbe feature flag.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
 	// +optional
 	StartupProbe *Probe `json:"startupProbe,omitempty" protobuf:"bytes,22,opt,name=startupProbe"`

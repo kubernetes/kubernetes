@@ -525,6 +525,7 @@ const (
 
 	// owner: @matthyx
 	// alpha: v1.16
+	// beta: v1.18
 	//
 	// Enables the startupProbe in kubelet worker.
 	StartupProbe featuregate.Feature = "StartupProbe"
@@ -629,7 +630,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	IPv6DualStack:                                  {Default: false, PreRelease: featuregate.Alpha},
 	EndpointSlice:                                  {Default: false, PreRelease: featuregate.Beta},
 	EvenPodsSpread:                                 {Default: false, PreRelease: featuregate.Alpha},
-	StartupProbe:                                   {Default: false, PreRelease: featuregate.Alpha},
+	StartupProbe:                                   {Default: true, PreRelease: featuregate.Beta},
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.Beta},
 	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},
