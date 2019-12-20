@@ -244,7 +244,7 @@ func GetAPIServerProbeAddress(endpoint *kubeadmapi.APIEndpoint) string {
 	// probes do not support the Downward API we cannot dynamically set the advertise address to
 	// the node's IP. The only option then is to use localhost.
 	if endpoint != nil && endpoint.AdvertiseAddress != "" {
-		return endpoint.AdvertiseAddress
+		return getProbeAddress(endpoint.AdvertiseAddress)
 	}
 
 	return "127.0.0.1"
@@ -253,7 +253,7 @@ func GetAPIServerProbeAddress(endpoint *kubeadmapi.APIEndpoint) string {
 // GetControllerManagerProbeAddress returns the kubernetes controller manager probe address
 func GetControllerManagerProbeAddress(cfg *kubeadmapi.ClusterConfiguration) string {
 	if addr, exists := cfg.ControllerManager.ExtraArgs[kubeControllerManagerBindAddressArg]; exists {
-		return addr
+		return getProbeAddress(addr)
 	}
 	return "127.0.0.1"
 }
@@ -261,7 +261,7 @@ func GetControllerManagerProbeAddress(cfg *kubeadmapi.ClusterConfiguration) stri
 // GetSchedulerProbeAddress returns the kubernetes scheduler probe address
 func GetSchedulerProbeAddress(cfg *kubeadmapi.ClusterConfiguration) string {
 	if addr, exists := cfg.Scheduler.ExtraArgs[kubeSchedulerBindAddressArg]; exists {
-		return addr
+		return getProbeAddress(addr)
 	}
 	return "127.0.0.1"
 }
@@ -320,4 +320,17 @@ func ManifestFilesAreEqual(path1, path2 string) (bool, error) {
 	}
 
 	return bytes.Equal(content1, content2), nil
+}
+
+// getProbeAddress returns a valid probe address.
+// Kubeadm uses the bind-address to configure the probe address. It's common to use the
+// unspecified address "0.0.0.0" or "::" as bind-address when we want to listen in all interfaces,
+// however this address can't be used as probe #86504.
+// If the address is an unspecified address getProbeAddress returns empty,
+// that means that kubelet will use the PodIP as probe address.
+func getProbeAddress(addr string) string {
+	if addr == "0.0.0.0" || addr == "::" {
+		return ""
+	}
+	return addr
 }
