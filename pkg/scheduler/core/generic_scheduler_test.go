@@ -387,9 +387,8 @@ func TestGenericScheduler(t *testing.T) {
 			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 			name:  "test 1",
 			wErr: &FitError{
-				Pod:              &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
-				NumAllNodes:      2,
-				FailedPredicates: FailedPredicateMap{},
+				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+				NumAllNodes: 2,
 				FilteredNodesStatuses: framework.NodeToStatusMap{
 					"machine1": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrFakePredicate.GetReason()),
 					"machine2": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrFakePredicate.GetReason()),
@@ -461,9 +460,8 @@ func TestGenericScheduler(t *testing.T) {
 			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 			name:  "test 7",
 			wErr: &FitError{
-				Pod:              &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
-				NumAllNodes:      3,
-				FailedPredicates: FailedPredicateMap{},
+				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+				NumAllNodes: 3,
 				FilteredNodesStatuses: framework.NodeToStatusMap{
 					"3": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrFakePredicate.GetReason()),
 					"2": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrFakePredicate.GetReason()),
@@ -492,9 +490,8 @@ func TestGenericScheduler(t *testing.T) {
 			nodes: []string{"1", "2"},
 			name:  "test 8",
 			wErr: &FitError{
-				Pod:              &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
-				NumAllNodes:      2,
-				FailedPredicates: FailedPredicateMap{},
+				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+				NumAllNodes: 2,
 				FilteredNodesStatuses: framework.NodeToStatusMap{
 					"1": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrFakePredicate.GetReason()),
 					"2": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrFakePredicate.GetReason()),
@@ -707,9 +704,8 @@ func TestGenericScheduler(t *testing.T) {
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
 			expectedHosts: nil,
 			wErr: &FitError{
-				Pod:              &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
-				NumAllNodes:      1,
-				FailedPredicates: FailedPredicateMap{},
+				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+				NumAllNodes: 1,
 				FilteredNodesStatuses: framework.NodeToStatusMap{
 					"3": framework.NewStatus(framework.Unschedulable, "injecting failure for pod test-filter"),
 				},
@@ -728,9 +724,8 @@ func TestGenericScheduler(t *testing.T) {
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
 			expectedHosts: nil,
 			wErr: &FitError{
-				Pod:              &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
-				NumAllNodes:      1,
-				FailedPredicates: FailedPredicateMap{},
+				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+				NumAllNodes: 1,
 				FilteredNodesStatuses: framework.NodeToStatusMap{
 					"3": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injecting failure for pod test-filter"),
 				},
@@ -852,7 +847,7 @@ func TestFindFitAllError(t *testing.T) {
 		st.RegisterFilterPlugin("MatchFilter", NewMatchFilterPlugin),
 	)
 
-	_, _, nodeToStatusMap, err := scheduler.findNodesThatFit(context.Background(), framework.NewCycleState(), &v1.Pod{})
+	_, nodeToStatusMap, err := scheduler.findNodesThatFit(context.Background(), framework.NewCycleState(), &v1.Pod{})
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -886,7 +881,7 @@ func TestFindFitSomeError(t *testing.T) {
 	)
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
-	_, _, nodeToStatusMap, err := scheduler.findNodesThatFit(context.Background(), framework.NewCycleState(), pod)
+	_, nodeToStatusMap, err := scheduler.findNodesThatFit(context.Background(), framework.NewCycleState(), pod)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -969,7 +964,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 		cache.UpdateNodeInfoSnapshot(scheduler.nodeInfoSnapshot)
 		queue.UpdateNominatedPodForNode(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("nominated")}, Spec: v1.PodSpec{Priority: &midPriority}}, "1")
 
-		_, _, _, err := scheduler.findNodesThatFit(context.Background(), framework.NewCycleState(), test.pod)
+		_, _, err := scheduler.findNodesThatFit(context.Background(), framework.NewCycleState(), test.pod)
 
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -1003,10 +998,10 @@ func TestHumanReadableFitError(t *testing.T) {
 	err := &FitError{
 		Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 		NumAllNodes: 3,
-		FailedPredicates: FailedPredicateMap{
-			"1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeUnderMemoryPressure},
-			"2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
-			"3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
+		FilteredNodesStatuses: framework.NodeToStatusMap{
+			"1": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrNodeUnderMemoryPressure.GetReason()),
+			"2": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrNodeUnderDiskPressure.GetReason()),
+			"3": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrNodeUnderDiskPressure.GetReason()),
 		},
 	}
 	if strings.Contains(err.Error(), "0/3 nodes are available") {
@@ -1884,94 +1879,91 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		failedPredMap FailedPredicateMap
 		nodesStatuses framework.NodeToStatusMap
 		expected      map[string]bool // set of expected node names. Value is ignored.
 	}{
 		{
 			name: "No node should be attempted",
-			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeSelectorNotMatch},
-				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
-				"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrTaintsTolerationsNotMatch},
-				"machine4": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeLabelPresenceViolated},
+			nodesStatuses: framework.NodeToStatusMap{
+				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeSelectorNotMatch.GetReason()),
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrPodNotMatchHostName.GetReason()),
+				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrTaintsTolerationsNotMatch.GetReason()),
+				"machine4": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeLabelPresenceViolated.GetReason()),
 			},
 			expected: map[string]bool{},
 		},
 		{
 			name: "ErrPodAffinityNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod affinity or anti-affinity",
-			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
-				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
-				"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeUnschedulable},
+			nodesStatuses: framework.NodeToStatusMap{
+				"machine1": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrPodAffinityNotMatch.GetReason()),
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrPodNotMatchHostName.GetReason()),
+				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeUnschedulable.GetReason()),
 			},
 			expected: map[string]bool{"machine1": true, "machine4": true},
 		},
 		{
 			name: "pod with both pod affinity and anti-affinity should be tried",
-			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
-				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
+			nodesStatuses: framework.NodeToStatusMap{
+				"machine1": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrPodAffinityNotMatch.GetReason()),
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrPodNotMatchHostName.GetReason()),
 			},
 			expected: map[string]bool{"machine1": true, "machine3": true, "machine4": true},
 		},
 		{
 			name: "ErrPodAffinityRulesNotMatch should not be tried as it indicates that the pod is unschedulable due to inter-pod affinity, but ErrPodAffinityNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod affinity or anti-affinity",
-			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodAffinityRulesNotMatch},
-				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
+			nodesStatuses: framework.NodeToStatusMap{
+				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrPodAffinityRulesNotMatch.GetReason()),
+				"machine2": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrPodAffinityNotMatch.GetReason()),
 			},
 			expected: map[string]bool{"machine2": true, "machine3": true, "machine4": true},
 		},
 		{
 			name: "Mix of failed predicates works fine",
-			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeSelectorNotMatch, algorithmpredicates.ErrNodeUnderDiskPressure, algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300)},
-				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName, algorithmpredicates.ErrDiskConflict},
-				"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400)},
-				"machine4": []algorithmpredicates.PredicateFailureReason{},
+			nodesStatuses: framework.NodeToStatusMap{
+				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeUnderDiskPressure.GetReason()),
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrDiskConflict.GetReason()),
+				"machine3": framework.NewStatus(framework.Unschedulable, algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400).GetReason()),
 			},
 			expected: map[string]bool{"machine3": true, "machine4": true},
 		},
 		{
 			name: "Node condition errors should be considered unresolvable",
-			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
-				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeUnderPIDPressure},
-				"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeUnderMemoryPressure},
+			nodesStatuses: framework.NodeToStatusMap{
+				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeUnderDiskPressure.GetReason()),
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeUnderPIDPressure.GetReason()),
+				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeUnderMemoryPressure.GetReason()),
 			},
 			expected: map[string]bool{"machine4": true},
 		},
 		{
 			name: "Node condition errors and ErrNodeUnknownCondition should be considered unresolvable",
-			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeNotReady},
-				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeNetworkUnavailable},
-				"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrNodeUnknownCondition},
+			nodesStatuses: framework.NodeToStatusMap{
+				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeNotReady.GetReason()),
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeNetworkUnavailable.GetReason()),
+				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeUnknownCondition.GetReason()),
 			},
 			expected: map[string]bool{"machine4": true},
 		},
 		{
 			name: "ErrVolume... errors should not be tried as it indicates that the pod is unschedulable due to no matching volumes for pod on node",
-			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrVolumeZoneConflict},
-				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrVolumeNodeConflict},
-				"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrVolumeBindConflict},
+			nodesStatuses: framework.NodeToStatusMap{
+				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrVolumeZoneConflict.GetReason()),
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrVolumeNodeConflict.GetReason()),
+				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrVolumeBindConflict.GetReason()),
 			},
 			expected: map[string]bool{"machine4": true},
 		},
 		{
 			name: "ErrTopologySpreadConstraintsNotMatch should be tried as it indicates that the pod is unschedulable due to topology spread constraints",
-			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrTopologySpreadConstraintsNotMatch},
-				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
-				"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrTopologySpreadConstraintsNotMatch},
+			nodesStatuses: framework.NodeToStatusMap{
+				"machine1": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrTopologySpreadConstraintsNotMatch.GetReason()),
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrPodNotMatchHostName.GetReason()),
+				"machine3": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrTopologySpreadConstraintsNotMatch.GetReason()),
 			},
 			expected: map[string]bool{"machine1": true, "machine3": true, "machine4": true},
 		},
 		{
-			name:          "UnschedulableAndUnresolvable status should be skipped but Unschedulable should be tried",
-			failedPredMap: FailedPredicateMap{},
+			name: "UnschedulableAndUnresolvable status should be skipped but Unschedulable should be tried",
 			nodesStatuses: framework.NodeToStatusMap{
 				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
 				"machine3": framework.NewStatus(framework.Unschedulable, ""),
@@ -1979,28 +1971,11 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			},
 			expected: map[string]bool{"machine1": true, "machine3": true},
 		},
-		{
-			name: "Failed predicates and statuses should be evaluated",
-			failedPredMap: FailedPredicateMap{
-				"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
-				"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodAffinityNotMatch},
-				"machine3": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
-				"machine4": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrPodNotMatchHostName},
-			},
-			nodesStatuses: framework.NodeToStatusMap{
-				"machine1": framework.NewStatus(framework.Unschedulable, ""),
-				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
-				"machine3": framework.NewStatus(framework.Unschedulable, ""),
-				"machine4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
-			},
-			expected: map[string]bool{"machine1": true},
-		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fitErr := FitError{
-				FailedPredicates:      test.failedPredMap,
 				FilteredNodesStatuses: test.nodesStatuses,
 			}
 			nodes := nodesWherePreemptionMightHelp(nodeinfosnapshot.CreateNodeInfoMap(nil, makeNodeList(nodeNames)), &fitErr)
@@ -2494,7 +2469,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 
 	// Iterating over all nodes more than twice
 	for i := 0; i < 2*(numAllNodes/nodesToFind+1); i++ {
-		nodesThatFit, _, _, err := g.findNodesThatFit(context.Background(), framework.NewCycleState(), &v1.Pod{})
+		nodesThatFit, _, err := g.findNodesThatFit(context.Background(), framework.NewCycleState(), &v1.Pod{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

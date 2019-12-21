@@ -143,10 +143,6 @@ func podWithResources(id, desiredHost string, limits v1.ResourceList, requests v
 	return pod
 }
 
-func PredicateOne(pod *v1.Pod, meta predicates.Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
-	return true, nil, nil
-}
-
 func PriorityOne(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
 	return framework.NodeScore{}, nil
 }
@@ -186,7 +182,6 @@ func TestSchedulerCreation(t *testing.T) {
 	testSource := "testProvider"
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")})
 
-	RegisterFitPredicate("PredicateOne", PredicateOne)
 	RegisterPriorityMapReduceFunction("PriorityOne", PriorityOne, nil, 1)
 	RegisterAlgorithmProvider(testSource, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
 
@@ -447,9 +442,8 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	select {
 	case err := <-errChan:
 		expectErr := &core.FitError{
-			Pod:              secondPod,
-			NumAllNodes:      1,
-			FailedPredicates: core.FailedPredicateMap{},
+			Pod:         secondPod,
+			NumAllNodes: 1,
 			FilteredNodesStatuses: framework.NodeToStatusMap{
 				node.Name: framework.NewStatus(
 					framework.Unschedulable,
@@ -659,7 +653,6 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 		expectErr := &core.FitError{
 			Pod:                   podWithTooBigResourceRequests,
 			NumAllNodes:           len(nodes),
-			FailedPredicates:      core.FailedPredicateMap{},
 			FilteredNodesStatuses: failedNodeStatues,
 		}
 		if len(fmt.Sprint(expectErr)) > 150 {

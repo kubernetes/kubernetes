@@ -66,15 +66,10 @@ const (
 	minFeasibleNodesPercentageToFind = 5
 )
 
-// FailedPredicateMap declares a map[string][]algorithm.PredicateFailureReason type.
-type FailedPredicateMap map[string][]predicates.PredicateFailureReason
-
 // FitError describes a fit error of a pod.
 type FitError struct {
-	Pod         *v1.Pod
-	NumAllNodes int
-	// TODO(Huang-Wei): remove 'FailedPredicates'
-	FailedPredicates      FailedPredicateMap
+	Pod                   *v1.Pod
+	NumAllNodes           int
 	FilteredNodesStatuses framework.NodeToStatusMap
 }
 
@@ -89,12 +84,6 @@ const (
 // Error returns detailed information of why the pod failed to fit on each node
 func (f *FitError) Error() string {
 	reasons := make(map[string]int)
-	for _, predicates := range f.FailedPredicates {
-		for _, pred := range predicates {
-			reasons[pred.GetReason()]++
-		}
-	}
-
 	for _, status := range f.FilteredNodesStatuses {
 		for _, reason := range status.Reasons() {
 			reasons[reason]++
@@ -102,7 +91,7 @@ func (f *FitError) Error() string {
 	}
 
 	sortReasonsHistogram := func() []string {
-		reasonStrings := []string{}
+		var reasonStrings []string
 		for k, v := range reasons {
 			reasonStrings = append(reasonStrings, fmt.Sprintf("%v %v", v, k))
 		}
@@ -209,7 +198,7 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 	trace.Step("Running prefilter plugins done")
 
 	startPredicateEvalTime := time.Now()
-	filteredNodes, failedPredicateMap, filteredNodesStatuses, err := g.findNodesThatFit(ctx, state, pod)
+	filteredNodes, filteredNodesStatuses, err := g.findNodesThatFit(ctx, state, pod)
 	if err != nil {
 		return result, err
 	}
@@ -225,7 +214,6 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 		return result, &FitError{
 			Pod:                   pod,
 			NumAllNodes:           len(g.nodeInfoSnapshot.NodeInfoList),
-			FailedPredicates:      failedPredicateMap,
 			FilteredNodesStatuses: filteredNodesStatuses,
 		}
 	}
@@ -242,7 +230,7 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 		metrics.DeprecatedSchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPriorityEvalTime))
 		return ScheduleResult{
 			SuggestedHost:  filteredNodes[0].Name,
-			EvaluatedNodes: 1 + len(failedPredicateMap) + len(filteredNodesStatuses),
+			EvaluatedNodes: 1 + len(filteredNodesStatuses),
 			FeasibleNodes:  1,
 		}, nil
 	}
@@ -263,7 +251,7 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 
 	return ScheduleResult{
 		SuggestedHost:  host,
-		EvaluatedNodes: len(filteredNodes) + len(failedPredicateMap) + len(filteredNodesStatuses),
+		EvaluatedNodes: len(filteredNodes) + len(filteredNodesStatuses),
 		FeasibleNodes:  len(filteredNodes),
 	}, err
 }
@@ -470,10 +458,8 @@ func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes i
 
 // Filters the nodes to find the ones that fit based on the given predicate functions
 // Each node is passed through the predicate functions to determine if it is a fit
-// TODO(Huang-Wei): remove 'FailedPredicateMap' from the return parameters.
-func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, FailedPredicateMap, framework.NodeToStatusMap, error) {
+func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, framework.NodeToStatusMap, error) {
 	var filtered []*v1.Node
-	failedPredicateMap := FailedPredicateMap{}
 	filteredNodesStatuses := framework.NodeToStatusMap{}
 
 	if !g.framework.HasFilterPlugins() {
@@ -496,7 +482,7 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 			// We check the nodes starting from where we left off in the previous scheduling cycle,
 			// this is to make sure all nodes have the same chance of being examined across pods.
 			nodeInfo := g.nodeInfoSnapshot.NodeInfoList[(g.nextStartNodeIndex+i)%allNodes]
-			fits, _, status, err := g.podFitsOnNode(ctx, state, pod, nodeInfo)
+			fits, status, err := g.podFitsOnNode(ctx, state, pod, nodeInfo)
 			if err != nil {
 				errCh.SendErrorWithCancel(err, cancel)
 				return
@@ -521,12 +507,12 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 		// Stops searching for more nodes once the configured number of feasible nodes
 		// are found.
 		workqueue.ParallelizeUntil(ctx, 16, allNodes, checkNode)
-		processedNodes := int(filteredLen) + len(filteredNodesStatuses) + len(failedPredicateMap)
+		processedNodes := int(filteredLen) + len(filteredNodesStatuses)
 		g.nextStartNodeIndex = (g.nextStartNodeIndex + processedNodes) % allNodes
 
 		filtered = filtered[:filteredLen]
 		if err := errCh.ReceiveError(); err != nil {
-			return []*v1.Node{}, FailedPredicateMap{}, framework.NodeToStatusMap{}, err
+			return []*v1.Node{}, framework.NodeToStatusMap{}, err
 		}
 	}
 
@@ -543,15 +529,15 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 					continue
 				}
 
-				return []*v1.Node{}, FailedPredicateMap{}, framework.NodeToStatusMap{}, err
+				return []*v1.Node{}, framework.NodeToStatusMap{}, err
 			}
 
-			// TODO(Huang-Wei): refactor this to fill 'filteredNodesStatuses' instead of 'failedPredicateMap'.
 			for failedNodeName, failedMsg := range failedMap {
-				if _, found := failedPredicateMap[failedNodeName]; !found {
-					failedPredicateMap[failedNodeName] = []predicates.PredicateFailureReason{}
+				if _, found := filteredNodesStatuses[failedNodeName]; !found {
+					filteredNodesStatuses[failedNodeName] = framework.NewStatus(framework.Unschedulable, failedMsg)
+				} else {
+					filteredNodesStatuses[failedNodeName].AppendReason(failedMsg)
 				}
-				failedPredicateMap[failedNodeName] = append(failedPredicateMap[failedNodeName], predicates.NewPredicateFailureError(extender.Name(), failedMsg))
 			}
 			filtered = filteredList
 			if len(filtered) == 0 {
@@ -559,7 +545,7 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 			}
 		}
 	}
-	return filtered, failedPredicateMap, filteredNodesStatuses, nil
+	return filtered, filteredNodesStatuses, nil
 }
 
 // addNominatedPods adds pods with equal or greater priority which are nominated
@@ -606,8 +592,7 @@ func (g *genericScheduler) podFitsOnNode(
 	state *framework.CycleState,
 	pod *v1.Pod,
 	info *schedulernodeinfo.NodeInfo,
-) (bool, []predicates.PredicateFailureReason, *framework.Status, error) {
-	var failedPredicates []predicates.PredicateFailureReason
+) (bool, *framework.Status, error) {
 	var status *framework.Status
 
 	podsAdded := false
@@ -636,19 +621,19 @@ func (g *genericScheduler) podFitsOnNode(
 			var err error
 			podsAdded, stateToUse, nodeInfoToUse, err = g.addNominatedPods(ctx, pod, state, info)
 			if err != nil {
-				return false, []predicates.PredicateFailureReason{}, nil, err
+				return false, nil, err
 			}
-		} else if !podsAdded || len(failedPredicates) != 0 || !status.IsSuccess() {
+		} else if !podsAdded || !status.IsSuccess() {
 			break
 		}
 
 		status = g.framework.RunFilterPlugins(ctx, stateToUse, pod, nodeInfoToUse)
 		if !status.IsSuccess() && !status.IsUnschedulable() {
-			return false, failedPredicates, status, status.AsError()
+			return false, status, status.AsError()
 		}
 	}
 
-	return len(failedPredicates) == 0 && status.IsSuccess(), failedPredicates, status, nil
+	return status.IsSuccess(), status, nil
 }
 
 // prioritizeNodes prioritizes the nodes by running the score plugins,
@@ -1011,7 +996,7 @@ func (g *genericScheduler) selectVictimsOnNode(
 	// inter-pod affinity to one or more victims, but we have decided not to
 	// support this case for performance reasons. Having affinity to lower
 	// priority pods is not a recommended configuration anyway.
-	if fits, _, _, err := g.podFitsOnNode(ctx, state, pod, nodeInfo); !fits {
+	if fits, _, err := g.podFitsOnNode(ctx, state, pod, nodeInfo); !fits {
 		if err != nil {
 			klog.Warningf("Encountered error while selecting victims on node %v: %v", nodeInfo.Node().Name, err)
 		}
@@ -1029,7 +1014,7 @@ func (g *genericScheduler) selectVictimsOnNode(
 		if err := addPod(p); err != nil {
 			return false, err
 		}
-		fits, _, _, _ := g.podFitsOnNode(ctx, state, pod, nodeInfo)
+		fits, _, _ := g.podFitsOnNode(ctx, state, pod, nodeInfo)
 		if !fits {
 			if err := removePod(p); err != nil {
 				return false, err
@@ -1060,22 +1045,15 @@ func (g *genericScheduler) selectVictimsOnNode(
 // nodesWherePreemptionMightHelp returns a list of nodes with failed predicates
 // that may be satisfied by removing pods from the node.
 func nodesWherePreemptionMightHelp(nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, fitErr *FitError) []*v1.Node {
-	potentialNodes := []*v1.Node{}
+	var potentialNodes []*v1.Node
 	for name, node := range nodeNameToInfo {
+		// We reply on the status by each plugin - 'Unschedulable' or 'UnschedulableAndUnresolvable'
+		// to determine whether preemption may help or not on the node.
 		if fitErr.FilteredNodesStatuses[name].Code() == framework.UnschedulableAndUnresolvable {
 			continue
 		}
-		failedPredicates := fitErr.FailedPredicates[name]
-
-		// If we assume that scheduler looks at all nodes and populates the failedPredicateMap
-		// (which is the case today), the !found case should never happen, but we'd prefer
-		// to rely less on such assumptions in the code when checking does not impose
-		// significant overhead.
-		// Also, we currently assume all failures returned by extender as resolvable.
-		if !predicates.UnresolvablePredicateExists(failedPredicates) {
-			klog.V(3).Infof("Node %v is a potential node for preemption.", name)
-			potentialNodes = append(potentialNodes, node.Node())
-		}
+		klog.V(3).Infof("Node %v is a potential node for preemption.", name)
+		potentialNodes = append(potentialNodes, node.Node())
 	}
 	return potentialNodes
 }
