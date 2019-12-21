@@ -233,9 +233,8 @@ type StatefulSetHistoryViewer struct {
 
 // ViewHistory returns a list of the revision history of a statefulset
 // TODO: this should be a describer
-// TODO: needs to implement detailed revision view
 func (h *StatefulSetHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
-	_, history, err := statefulSetHistory(h.c.AppsV1(), namespace, name)
+	sts, history, err := statefulSetHistory(h.c.AppsV1(), namespace, name)
 	if err != nil {
 		return "", err
 	}
@@ -243,9 +242,26 @@ func (h *StatefulSetHistoryViewer) ViewHistory(namespace, name string, revision 
 	if len(history) <= 0 {
 		return "No rollout history found.", nil
 	}
-	revisions := make([]int64, 0, len(history))
-	for _, revision := range history {
-		revisions = append(revisions, revision.Revision)
+
+	historyInfo := make(map[int64]*appsv1.ControllerRevision)
+	for _, h := range history {
+		historyInfo[h.Revision] = h
+	}
+	if revision != 0 {
+		value, ok := historyInfo[revision]
+		if !ok {
+			return "", fmt.Errorf("unable to find the specified revision")
+		}
+		sts, err := applyStatefulSetHistory(sts, value)
+		if err != nil {
+			return "", fmt.Errorf("error unmarshelling sts: %w", err)
+		}
+		return printTemplate(&sts.Spec.Template)
+	}
+
+	revisions := make([]int64, 0, len(historyInfo))
+	for revision := range historyInfo {
+		revisions = append(revisions, revision)
 	}
 	sliceutil.SortInts64(revisions)
 
@@ -358,6 +374,24 @@ func applyDaemonSetHistory(ds *appsv1.DaemonSet, history *appsv1.ControllerRevis
 		return nil, err
 	}
 	result := &appsv1.DaemonSet{}
+	err = json.Unmarshal(patched, result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// applyStatefulSetHistory returns a specific revision of StatefulSet by applying the given history to a copy of the given StatefulSet
+func applyStatefulSetHistory(sts *appsv1.StatefulSet, history *appsv1.ControllerRevision) (*appsv1.StatefulSet, error) {
+	stsBytes, err := json.Marshal(sts)
+	if err != nil {
+		return nil, err
+	}
+	patched, err := strategicpatch.StrategicMergePatch(stsBytes, history.Data.Raw, sts)
+	if err != nil {
+		return nil, err
+	}
+	result := &appsv1.StatefulSet{}
 	err = json.Unmarshal(patched, result)
 	if err != nil {
 		return nil, err

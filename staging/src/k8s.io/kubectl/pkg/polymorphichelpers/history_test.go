@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -71,21 +72,25 @@ func TestViewHistory(t *testing.T) {
 			},
 			Spec: appsv1.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.ObjectMeta.Labels}, Replicas: &replicas, Template: podStub},
 		}
-
-		ssStub1 = &appsv1.ControllerRevision{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:            "moons",
-				Namespace:       "default",
-				Labels:          map[string]string{"foo": "bar"},
-				OwnerReferences: []metav1.OwnerReference{{"apps/v1", "StatefulSet", "moons", "1993", &trueVar, nil}},
-			},
-			TypeMeta: metav1.TypeMeta{Kind: "StatefulSet", APIVersion: "apps/v1"},
-			Revision: 1,
-		}
 	)
+	stsRawData, err := json.Marshal(ssStub)
+	if err != nil {
+		t.Fatalf("error creating sts raw data: %v", err)
+	}
+	ssStub1 := &appsv1.ControllerRevision{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "moons",
+			Namespace:       "default",
+			Labels:          map[string]string{"foo": "bar"},
+			OwnerReferences: []metav1.OwnerReference{{"apps/v1", "StatefulSet", "moons", "1993", &trueVar, nil}},
+		},
+		Data:     runtime.RawExtension{Raw: stsRawData},
+		TypeMeta: metav1.TypeMeta{Kind: "StatefulSet", APIVersion: "apps/v1"},
+		Revision: 1,
+	}
 
 	fakeClientSet := fake.NewSimpleClientset(ssStub)
-	_, err := fakeClientSet.AppsV1().ControllerRevisions("default").Create(context.TODO(), ssStub1, metav1.CreateOptions{})
+	_, err = fakeClientSet.AppsV1().ControllerRevisions("default").Create(context.TODO(), ssStub1, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("create controllerRevisions error %v occurred ", err)
 	}
@@ -94,19 +99,43 @@ func TestViewHistory(t *testing.T) {
 		fakeClientSet,
 	}
 
-	result, err := sts.ViewHistory("default", "moons", 1)
-	if err != nil {
-		t.Fatalf("error getting ViewHistory for a StatefulSets moons: %v", err)
-	}
+	t.Run("should show revisions list if the revision is not specified", func(t *testing.T) {
+		result, err := sts.ViewHistory("default", "moons", 0)
+		if err != nil {
+			t.Fatalf("error getting ViewHistory for a StatefulSets moons: %v", err)
+		}
 
-	expected := `REVISION
+		expected := `REVISION
 1
 `
 
-	if result != expected {
-		t.Fatalf("unexpected output  (%v was expected but got %v)", expected, result)
-	}
+		if result != expected {
+			t.Fatalf("unexpected output  (%v was expected but got %v)", expected, result)
+		}
+	})
 
+	t.Run("should describe the revision if revision is specified", func(t *testing.T) {
+		result, err := sts.ViewHistory("default", "moons", 1)
+		if err != nil {
+			t.Fatalf("error getting ViewHistory for a StatefulSets moons: %v", err)
+		}
+
+		expected := `Pod Template:
+  Labels:	foo=bar
+  Containers:
+   test:
+    Image:	nginx
+    Port:	<none>
+    Host Port:	<none>
+    Environment:	<none>
+    Mounts:	<none>
+  Volumes:	<none>
+`
+
+		if result != expected {
+			t.Fatalf("unexpected output  (%v was expected but got %v)", expected, result)
+		}
+	})
 }
 
 func TestApplyDaemonSetHistory(t *testing.T) {
