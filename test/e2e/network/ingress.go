@@ -350,6 +350,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				scale, err := f.ClientSet.AppsV1().Deployments(ns).GetScale(name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				if scale.Spec.Replicas != int32(num) {
+					scale.ResourceVersion = "" // indicate the scale update should be unconditional
 					scale.Spec.Replicas = int32(num)
 					_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(name, scale)
 					framework.ExpectNoError(err)
@@ -400,6 +401,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			ginkgo.By(fmt.Sprintf("Scale backend replicas to %d", replicas))
 			scale, err := f.ClientSet.AppsV1().Deployments(ns).GetScale(name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
+			scale.ResourceVersion = "" // indicate the scale update should be unconditional
 			scale.Spec.Replicas = int32(replicas)
 			_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(name, scale)
 			framework.ExpectNoError(err)
@@ -448,6 +450,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				scale, err := f.ClientSet.AppsV1().Deployments(ns).GetScale(name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				if scale.Spec.Replicas != int32(num) {
+					scale.ResourceVersion = "" // indicate the scale update should be unconditional
 					scale.Spec.Replicas = int32(num)
 					_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(name, scale)
 					framework.ExpectNoError(err)
