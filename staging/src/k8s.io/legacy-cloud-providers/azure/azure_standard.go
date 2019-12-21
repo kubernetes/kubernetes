@@ -94,31 +94,31 @@ func (az *Cloud) getAvailabilitySetID(resourceGroup, availabilitySetName string)
 }
 
 // returns the full identifier of a loadbalancer frontendipconfiguration.
-func (az *Cloud) getFrontendIPConfigID(lbName, fipConfigName string) string {
+func (az *Cloud) getFrontendIPConfigID(lbName, rgName, fipConfigName string) string {
 	return fmt.Sprintf(
 		frontendIPConfigIDTemplate,
 		az.SubscriptionID,
-		az.ResourceGroup,
+		rgName,
 		lbName,
 		fipConfigName)
 }
 
 // returns the full identifier of a loadbalancer backendpool.
-func (az *Cloud) getBackendPoolID(lbName, backendPoolName string) string {
+func (az *Cloud) getBackendPoolID(lbName, rgName, backendPoolName string) string {
 	return fmt.Sprintf(
 		backendPoolIDTemplate,
 		az.SubscriptionID,
-		az.ResourceGroup,
+		rgName,
 		lbName,
 		backendPoolName)
 }
 
 // returns the full identifier of a loadbalancer probe.
-func (az *Cloud) getLoadBalancerProbeID(lbName, lbRuleName string) string {
+func (az *Cloud) getLoadBalancerProbeID(lbName, rgName, lbRuleName string) string {
 	return fmt.Sprintf(
 		loadBalancerProbeIDTemplate,
 		az.SubscriptionID,
-		az.ResourceGroup,
+		rgName,
 		lbName,
 		lbRuleName)
 }

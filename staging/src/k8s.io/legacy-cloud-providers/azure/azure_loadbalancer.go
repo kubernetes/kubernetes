@@ -693,11 +693,12 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 		return nil, err
 	}
 	lbName := *lb.Name
-	klog.V(2).Infof("reconcileLoadBalancer for service(%s): lb(%s) wantLb(%t) resolved load balancer name", serviceName, lbName, wantLb)
+	lbResourceGroup := az.getLoadBalancerResourceGroup()
+	klog.V(2).Infof("reconcileLoadBalancer for service(%s): lb(%s/%s) wantLb(%t) resolved load balancer name", serviceName, lbResourceGroup, lbName, wantLb)
 	lbFrontendIPConfigName := az.getFrontendIPConfigName(service)
-	lbFrontendIPConfigID := az.getFrontendIPConfigID(lbName, lbFrontendIPConfigName)
+	lbFrontendIPConfigID := az.getFrontendIPConfigID(lbName, lbResourceGroup, lbFrontendIPConfigName)
 	lbBackendPoolName := getBackendPoolName(az.ipv6DualStackEnabled, clusterName, service)
-	lbBackendPoolID := az.getBackendPoolID(lbName, lbBackendPoolName)
+	lbBackendPoolID := az.getBackendPoolID(lbName, lbResourceGroup, lbBackendPoolName)
 
 	lbIdleTimeout, err := getIdleTimeout(service)
 	if wantLb && err != nil {
@@ -1111,7 +1112,7 @@ func (az *Cloud) reconcileLoadBalancerRule(
 			// However, when externalTrafficPolicy is Local, Kubernetes HTTP health check would be used for probing.
 			if servicehelpers.NeedsHealthCheck(service) || (protocol != v1.ProtocolUDP && protocol != v1.ProtocolSCTP) {
 				expectedRule.Probe = &network.SubResource{
-					ID: to.StringPtr(az.getLoadBalancerProbeID(lbName, lbRuleName)),
+					ID: to.StringPtr(az.getLoadBalancerProbeID(lbName, az.getLoadBalancerResourceGroup(), lbRuleName)),
 				}
 			}
 
