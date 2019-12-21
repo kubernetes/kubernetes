@@ -112,7 +112,7 @@ func init() {
 	scheduler.RegisterFitPredicateFactory(
 		predicates.MatchInterPodAffinityPred,
 		func(args scheduler.AlgorithmFactoryArgs) predicates.FitPredicate {
-			return predicates.NewPodAffinityPredicate(args.SharedLister.NodeInfos(), args.SharedLister.Pods())
+			return nil
 		},
 	)
 
