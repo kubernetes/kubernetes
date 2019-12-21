@@ -34,7 +34,7 @@ const (
 	mandatoryFieldErrFmt     = "%s is a mandatory field for a %s"
 	base64EncodingErr        = "secrets must be base64 encoded"
 	zeroOrNegativeErrFmt     = "%s should be a positive value"
-	negativeValueErrFmt      = "%s can't be negative"
+	nonZeroErrFmt            = "%s should be a positive value, or negative to disable"
 	encryptionConfigNilErr   = "EncryptionConfiguration can't be nil"
 )
 
@@ -184,8 +184,8 @@ func validateKMSConfiguration(c *config.KMSConfiguration, fieldPath *field.Path)
 
 func validateKMSCacheSize(c *config.KMSConfiguration, fieldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if *c.CacheSize <= 0 {
-		allErrs = append(allErrs, field.Invalid(fieldPath, *c.CacheSize, fmt.Sprintf(zeroOrNegativeErrFmt, "cachesize")))
+	if *c.CacheSize == 0 {
+		allErrs = append(allErrs, field.Invalid(fieldPath, *c.CacheSize, fmt.Sprintf(nonZeroErrFmt, "cachesize")))
 	}
 
 	return allErrs
