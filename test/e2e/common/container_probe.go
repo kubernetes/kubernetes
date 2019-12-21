@@ -158,6 +158,16 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
 	})
 
+	framework.ConformanceIt("should be restarted with a /healthz http liveness probe using 0.0.0.0 as probe host", func() {
+		livenessProbe := &v1.Probe{
+			Handler:             httpGetHandler("/healthz", 8080),
+			InitialDelaySeconds: 15,
+			FailureThreshold:    1,
+		}
+		livenessProbe.HTTPGet.Host = "0.0.0.0"
+		pod := livenessPodSpec(nil, livenessProbe)
+		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
+	})
 	/*
 		Release : v1.15
 		Testname: Pod liveness probe, using tcp socket, no restart
@@ -173,6 +183,16 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
 	})
 
+	ginkgo.It("should *not* be restarted with a tcp:8080 liveness probe and probe host 0.0.0.0", func() {
+		livenessProbe := &v1.Probe{
+			Handler:             tcpSocketHandler(8080),
+			InitialDelaySeconds: 15,
+			FailureThreshold:    1,
+		}
+		livenessProbe.TCPSocket.Host = "0.0.0.0"
+		pod := livenessPodSpec(nil, livenessProbe)
+		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
+	})
 	/*
 		Release : v1.9
 		Testname: Pod liveness probe, using http endpoint, multiple restarts (slow)
@@ -204,6 +224,17 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
 	})
 
+	framework.ConformanceIt("should *not* be restarted with a /healthz http liveness probe and using 0.0.0.0 for probe host", func() {
+		livenessProbe := &v1.Probe{
+			Handler:             httpGetHandler("/", 80),
+			InitialDelaySeconds: 15,
+			TimeoutSeconds:      5,
+			FailureThreshold:    5, // to accommodate nodes which are slow in bringing up containers.
+		}
+		livenessProbe.HTTPGet.Host = "0.0.0.0"
+		pod := testWebServerPodSpec(nil, livenessProbe, "test-webserver", 80)
+		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
+	})
 	/*
 		Release : v1.9
 		Testname: Pod liveness probe, docker exec, restart

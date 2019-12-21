@@ -166,7 +166,7 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 	if p.HTTPGet != nil {
 		scheme := strings.ToLower(string(p.HTTPGet.Scheme))
 		host := p.HTTPGet.Host
-		if host == "" {
+		if host == "" || host == "0.0.0.0" || host == "::" {
 			host = status.PodIP
 		}
 		port, err := extractPort(p.HTTPGet.Port, container)
@@ -193,7 +193,7 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 			return probe.Unknown, "", err
 		}
 		host := p.TCPSocket.Host
-		if host == "" {
+		if host == "" || host == "0.0.0.0" || host == "::" {
 			host = status.PodIP
 		}
 		klog.V(4).Infof("TCP-Probe Host: %v, Port: %v, Timeout: %v", host, port, timeout)
