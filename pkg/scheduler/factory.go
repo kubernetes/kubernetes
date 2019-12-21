@@ -86,9 +86,6 @@ type Configurator struct {
 	// Handles volume binding decisions
 	volumeBinder *volumebinder.VolumeBinder
 
-	// Always check all predicates even if the middle of one predicate fails.
-	alwaysCheckAllPredicates bool
-
 	// Disable pod preemption or not.
 	disablePreemption bool
 
@@ -204,11 +201,6 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	if policy.HardPodAffinitySymmetricWeight != 0 {
 		c.hardPodAffinitySymmetricWeight = policy.HardPodAffinitySymmetricWeight
 	}
-	// When AlwaysCheckAllPredicates is set to true, scheduler checks all the configured
-	// predicates even after one or more of them fails.
-	if policy.AlwaysCheckAllPredicates {
-		c.alwaysCheckAllPredicates = policy.AlwaysCheckAllPredicates
-	}
 
 	return c.CreateFromKeys(predicateKeys, priorityKeys, extenders)
 }
@@ -289,7 +281,6 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		c.volumeBinder,
 		c.informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
 		GetPodDisruptionBudgetLister(c.informerFactory),
-		c.alwaysCheckAllPredicates,
 		c.disablePreemption,
 		c.percentageOfNodesToScore,
 		c.enableNonPreempting,
