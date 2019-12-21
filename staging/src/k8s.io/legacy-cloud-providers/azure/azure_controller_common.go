@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -46,6 +47,14 @@ const (
 	errLeaseIDMissing    = "LeaseIdMissing"
 	errContainerNotFound = "ContainerNotFound"
 	errDiskBlobNotFound  = "DiskBlobNotFound"
+	sourceSnapshot       = "snapshot"
+	sourceVolume         = "volume"
+
+	// see https://docs.microsoft.com/en-us/rest/api/compute/disks/createorupdate#create-a-managed-disk-by-copying-a-snapshot.
+	diskSnapshotPath = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/snapshots/%s"
+
+	// see https://docs.microsoft.com/en-us/rest/api/compute/disks/createorupdate#create-a-managed-disk-from-an-existing-managed-disk-in-the-same-or-different-subscription.
+	managedDiskPath = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/%s"
 )
 
 var defaultBackOff = kwait.Backoff{
@@ -54,6 +63,11 @@ var defaultBackOff = kwait.Backoff{
 	Factor:   1.5,
 	Jitter:   0.0,
 }
+
+var (
+	managedDiskPathRE  = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Compute/disks/(.+)`)
+	diskSnapshotPathRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Compute/snapshots/(.+)`)
+)
 
 type controllerCommon struct {
 	subscriptionID        string
@@ -311,4 +325,40 @@ func filterDetachingDisks(unfilteredDisks []compute.DataDisk) []compute.DataDisk
 		}
 	}
 	return filteredDisks
+}
+
+func getValidCreationData(subscriptionID, resourceGroup, sourceResourceID, sourceType string) (compute.CreationData, error) {
+	if sourceResourceID == "" {
+		return compute.CreationData{
+			CreateOption: compute.Empty,
+		}, nil
+	}
+
+	switch sourceType {
+	case sourceSnapshot:
+		if match := diskSnapshotPathRE.FindString(sourceResourceID); match == "" {
+			sourceResourceID = fmt.Sprintf(diskSnapshotPath, subscriptionID, resourceGroup, sourceResourceID)
+		}
+
+	case sourceVolume:
+		if match := managedDiskPathRE.FindString(sourceResourceID); match == "" {
+			sourceResourceID = fmt.Sprintf(managedDiskPath, subscriptionID, resourceGroup, sourceResourceID)
+		}
+	default:
+		return compute.CreationData{
+			CreateOption: compute.Empty,
+		}, nil
+	}
+
+	splits := strings.Split(sourceResourceID, "/")
+	if len(splits) > 9 {
+		if sourceType == sourceSnapshot {
+			return compute.CreationData{}, fmt.Errorf("sourceResourceID(%s) is invalid, correct format: %s", sourceResourceID, diskSnapshotPathRE)
+		}
+		return compute.CreationData{}, fmt.Errorf("sourceResourceID(%s) is invalid, correct format: %s", sourceResourceID, managedDiskPathRE)
+	}
+	return compute.CreationData{
+		CreateOption:     compute.Copy,
+		SourceResourceID: &sourceResourceID,
+	}, nil
 }
