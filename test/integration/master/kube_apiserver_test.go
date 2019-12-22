@@ -33,6 +33,7 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/client-go/kubernetes"
@@ -484,4 +485,112 @@ func TestReconcilerMasterLeaseMultiMoreMasters(t *testing.T) {
 
 func TestReconcilerMasterLeaseMultiCombined(t *testing.T) {
 	testReconcilersMasterLease(t, 3, 3)
+}
+
+func TestMultiMasterNodePortAllocation(t *testing.T) {
+	var kubeAPIServers []*kubeapiservertesting.TestServer
+	var clientAPIServers []*kubernetes.Clientset
+	etcd := framework.SharedEtcd()
+
+	instanceOptions := &kubeapiservertesting.TestServerInstanceOptions{
+		DisableStorageCleanup: true,
+	}
+
+	// cleanup the registry storage
+	defer registry.CleanupStorage()
+
+	// create 2 api servers and 2 clients
+	for i := 0; i < 2; i++ {
+		// start master count api server
+		t.Logf("starting api server: %d", i)
+		server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
+			"--advertise-address", fmt.Sprintf("10.0.1.%v", i+1),
+		}, etcd)
+		kubeAPIServers = append(kubeAPIServers, server)
+
+		// verify kube API servers have registered and create a client
+		if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
+			client, err := kubernetes.NewForConfig(kubeAPIServers[i].ClientConfig)
+			if err != nil {
+				t.Logf("create client error: %v", err)
+				return false, nil
+			}
+			clientAPIServers = append(clientAPIServers, client)
+			endpoints, err := client.CoreV1().Endpoints("default").Get("kubernetes", metav1.GetOptions{})
+			if err != nil {
+				t.Logf("error fetching endpoints: %v", err)
+				return false, nil
+			}
+			return verifyEndpointsWithIPs(kubeAPIServers, getEndpointIPs(endpoints)), nil
+		}); err != nil {
+			t.Fatalf("did not find only lease endpoints: %v", err)
+		}
+	}
+
+	svc := func(i int) *corev1.Service {
+		return &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"foo": "bar"},
+				Name:   fmt.Sprintf("svc-%v", i),
+			},
+			Spec: corev1.ServiceSpec{
+				Type:     corev1.ServiceTypeNodePort,
+				Selector: map[string]string{"foo": "bar"},
+				Ports: []corev1.ServicePort{
+					{
+						Port:       442,
+						TargetPort: intstr.IntOrString{IntVal: 442},
+						NodePort:   int32(30080 + i),
+						Protocol:   "TCP",
+					},
+				},
+			},
+		}
+	}
+	// add additional nodePort services to increase the number of allocated ports
+	for i := 0; i < 50; i++ {
+		if _, err := clientAPIServers[0].CoreV1().Services(metav1.NamespaceDefault).Create(svc(i)); err != nil {
+			t.Error(err)
+		}
+	}
+
+	serviceObject := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{"foo": "bar"},
+			Name:   "test-node-port",
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "nodeport-test",
+					Port:       443,
+					TargetPort: intstr.IntOrString{IntVal: 443},
+					NodePort:   32080,
+					Protocol:   "TCP",
+				},
+			},
+			Type:     "NodePort",
+			Selector: map[string]string{"foo": "bar"},
+		},
+	}
+
+	// create and delete the same nodePortservice using different APIservers
+	// to check that API servers are using the same port allocation bitmap
+	for i := 0; i < 2; i++ {
+		// Create the service using the first API server
+		_, err := clientAPIServers[0].CoreV1().Services(metav1.NamespaceDefault).Create(serviceObject)
+		if err != nil {
+			t.Fatalf("unable to create service: %v", err)
+		}
+		// Delete the service using the second API server
+		if err := clientAPIServers[1].CoreV1().Services(metav1.NamespaceDefault).Delete(serviceObject.ObjectMeta.Name, nil); err != nil {
+			t.Fatalf("got unexpected error: %v", err)
+		}
+	}
+
+	// shutdown the api serveers
+	for _, server := range kubeAPIServers {
+		server.TearDownFn()
+	}
+
 }

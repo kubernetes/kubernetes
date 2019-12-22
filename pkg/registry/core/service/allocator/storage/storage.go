@@ -80,17 +80,12 @@ func NewEtcd(alloc allocator.Snapshottable, baseKey string, resource schema.Grou
 	}, nil
 }
 
-// Allocate attempts to allocate the item locally and then in etcd.
+// Allocate attempts to allocate the item in etcd.
 func (e *Etcd) Allocate(offset int) (bool, error) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
-	ok, err := e.alloc.Allocate(offset)
-	if !ok || err != nil {
-		return ok, err
-	}
-
-	err = e.tryUpdate(func() error {
+	err := e.tryUpdate(func() error {
 		ok, err := e.alloc.Allocate(offset)
 		if err != nil {
 			return err
@@ -140,14 +135,10 @@ func (e *Etcd) AllocateNext() (int, bool, error) {
 	return offset, ok, err
 }
 
-// Release attempts to release the provided item locally and then in etcd.
+// Release attempts to release the provided item in etcd.
 func (e *Etcd) Release(item int) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
-
-	if err := e.alloc.Release(item); err != nil {
-		return err
-	}
 
 	return e.tryUpdate(func() error {
 		return e.alloc.Release(item)
