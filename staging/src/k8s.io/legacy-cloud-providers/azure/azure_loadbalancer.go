@@ -154,11 +154,13 @@ func (az *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, ser
 
 	lb, err := az.reconcileLoadBalancer(clusterName, service, nodes, true /* wantLb */)
 	if err != nil {
+		klog.Errorf("reconcileLoadBalancer(%s) failed: %v", serviceName, err)
 		return nil, err
 	}
 
 	lbStatus, err := az.getServiceLoadBalancerStatus(service, lb)
 	if err != nil {
+		klog.Errorf("getServiceLoadBalancerStatus(%s) failed: %v", serviceName, err)
 		return nil, err
 	}
 
@@ -168,17 +170,20 @@ func (az *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, ser
 	}
 	klog.V(2).Infof("EnsureLoadBalancer: reconciling security group for service %q with IP %q, wantLb = true", serviceName, logSafe(serviceIP))
 	if _, err := az.reconcileSecurityGroup(clusterName, service, serviceIP, true /* wantLb */); err != nil {
+		klog.Errorf("reconcileSecurityGroup(%s) failed: %#v", serviceName, err)
 		return nil, err
 	}
 
 	updateService := updateServiceLoadBalancerIP(service, to.String(serviceIP))
 	flippedService := flipServiceInternalAnnotation(updateService)
 	if _, err := az.reconcileLoadBalancer(clusterName, flippedService, nil, false /* wantLb */); err != nil {
+		klog.Errorf("reconcileLoadBalancer(%s) failed: %#v", serviceName, err)
 		return nil, err
 	}
 
 	// lb is not reused here because the ETAG may be changed in above operations, hence reconcilePublicIP() would get lb again from cache.
 	if _, err := az.reconcilePublicIP(clusterName, updateService, to.String(lb.Name), true /* wantLb */); err != nil {
+		klog.Errorf("reconcilePublicIP(%s) failed: %#v", serviceName, err)
 		return nil, err
 	}
 
@@ -206,42 +211,22 @@ func (az *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName stri
 	serviceName := getServiceName(service)
 	klog.V(5).Infof("Delete service (%s): START clusterName=%q", serviceName, clusterName)
 
-	ignoreErrors := func(err error) error {
-		if ignoreStatusNotFoundFromError(err) == nil {
-			klog.V(5).Infof("EnsureLoadBalancerDeleted: ignoring StatusNotFound error because the resource doesn't exist (%v)", err)
-			return nil
-		}
-
-		if ignoreStatusForbiddenFromError(err) == nil {
-			klog.V(5).Infof("EnsureLoadBalancerDeleted: ignoring StatusForbidden error (%v). This may be caused by wrong configuration via service annotations", err)
-			return nil
-		}
-
-		return err
-	}
-
 	serviceIPToCleanup, err := az.findServiceIPAddress(ctx, clusterName, service, isInternal)
-	if ignoreErrors(err) != nil {
+	if err != nil {
 		return err
 	}
 
 	klog.V(2).Infof("EnsureLoadBalancerDeleted: reconciling security group for service %q with IP %q, wantLb = false", serviceName, serviceIPToCleanup)
 	if _, err := az.reconcileSecurityGroup(clusterName, service, &serviceIPToCleanup, false /* wantLb */); err != nil {
-		if ignoreErrors(err) != nil {
-			return err
-		}
+		return err
 	}
 
 	if _, err := az.reconcileLoadBalancer(clusterName, service, nil, false /* wantLb */); err != nil {
-		if ignoreErrors(err) != nil {
-			return err
-		}
+		return err
 	}
 
 	if _, err := az.reconcilePublicIP(clusterName, service, "", false /* wantLb */); err != nil {
-		if ignoreErrors(err) != nil {
-			return err
-		}
+		return err
 	}
 
 	klog.V(2).Infof("Delete service (%s): FINISH", serviceName)
@@ -592,9 +577,9 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	pip, err = az.PublicIPAddressesClient.Get(ctx, pipResourceGroup, *pip.Name, "")
-	if err != nil {
-		return nil, err
+	pip, rerr := az.PublicIPAddressesClient.Get(ctx, pipResourceGroup, *pip.Name, "")
+	if rerr != nil {
+		return nil, rerr.Error()
 	}
 	return &pip, nil
 }
@@ -1610,9 +1595,7 @@ func (az *Cloud) safeDeletePublicIP(service *v1.Service, pipResourceGroup string
 	klog.V(10).Infof("DeletePublicIP(%s, %q): start", pipResourceGroup, pipName)
 	err := az.DeletePublicIP(service, pipResourceGroup, pipName)
 	if err != nil {
-		if err = ignoreStatusNotFoundFromError(err); err != nil {
-			return err
-		}
+		return err
 	}
 	klog.V(10).Infof("DeletePublicIP(%s, %q): end", pipResourceGroup, pipName)
 

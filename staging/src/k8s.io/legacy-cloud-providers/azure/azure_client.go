@@ -488,11 +488,11 @@ func (az *azLoadBalancersClient) Delete(ctx context.Context, resourceGroupName s
 
 	future, err := az.client.Delete(ctx, resourceGroupName, loadBalancerName)
 	if err != nil {
-		return retry.GetStatusNotFoundAndIgnoredForbiddenError(future.Response(), mc.Observe(err))
+		return retry.GetStatusNotFoundAndForbiddenIgnoredError(future.Response(), mc.Observe(err))
 	}
 
 	err = future.WaitForCompletionRef(ctx, az.client.Client)
-	return retry.GetStatusNotFoundAndIgnoredForbiddenError(future.Response(), mc.Observe(err))
+	return retry.GetStatusNotFoundAndForbiddenIgnoredError(future.Response(), mc.Observe(err))
 }
 
 func (az *azLoadBalancersClient) Get(ctx context.Context, resourceGroupName string, loadBalancerName string, expand string) (result network.LoadBalancer, rerr *retry.Error) {
@@ -614,11 +614,11 @@ func (az *azPublicIPAddressesClient) Delete(ctx context.Context, resourceGroupNa
 
 	future, err := az.client.Delete(ctx, resourceGroupName, publicIPAddressName)
 	if err != nil {
-		return retry.GetStatusNotFoundAndIgnoredForbiddenError(future.Response(), mc.Observe(err))
+		return retry.GetStatusNotFoundAndForbiddenIgnoredError(future.Response(), mc.Observe(err))
 	}
 
 	err = future.WaitForCompletionRef(ctx, az.client.Client)
-	return retry.GetStatusNotFoundAndIgnoredForbiddenError(future.Response(), mc.Observe(err))
+	return retry.GetStatusNotFoundAndForbiddenIgnoredError(future.Response(), mc.Observe(err))
 }
 
 func (az *azPublicIPAddressesClient) Get(ctx context.Context, resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, rerr *retry.Error) {
@@ -758,11 +758,11 @@ func (az *azSubnetsClient) Delete(ctx context.Context, resourceGroupName string,
 
 	future, err := az.client.Delete(ctx, resourceGroupName, virtualNetworkName, subnetName)
 	if err != nil {
-		return retry.GetStatusNotFoundAndIgnoredForbiddenError(future.Response(), mc.Observe(err))
+		return retry.GetStatusNotFoundAndForbiddenIgnoredError(future.Response(), mc.Observe(err))
 	}
 
 	err = future.WaitForCompletionRef(ctx, az.client.Client)
-	return retry.GetStatusNotFoundAndIgnoredForbiddenError(future.Response(), mc.Observe(err))
+	return retry.GetStatusNotFoundAndForbiddenIgnoredError(future.Response(), mc.Observe(err))
 }
 
 func (az *azSubnetsClient) Get(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, expand string) (result network.Subnet, rerr *retry.Error) {
@@ -915,11 +915,11 @@ func (az *azSecurityGroupsClient) Delete(ctx context.Context, resourceGroupName 
 
 	future, err := az.client.Delete(ctx, resourceGroupName, networkSecurityGroupName)
 	if err != nil {
-		return retry.GetStatusNotFoundAndIgnoredForbiddenError(future.Response(), mc.Observe(err))
+		return retry.GetStatusNotFoundAndForbiddenIgnoredError(future.Response(), mc.Observe(err))
 	}
 
 	err = future.WaitForCompletionRef(ctx, az.client.Client)
-	return retry.GetStatusNotFoundAndIgnoredForbiddenError(future.Response(), mc.Observe(err))
+	return retry.GetStatusNotFoundAndForbiddenIgnoredError(future.Response(), mc.Observe(err))
 }
 
 func (az *azSecurityGroupsClient) Get(ctx context.Context, resourceGroupName string, networkSecurityGroupName string, expand string) (result network.SecurityGroup, rerr *retry.Error) {
@@ -1281,11 +1281,11 @@ func (az *azRoutesClient) Delete(ctx context.Context, resourceGroupName string, 
 
 	future, err := az.client.Delete(ctx, resourceGroupName, routeTableName, routeName)
 	if err != nil {
-		return retry.GetStatusNotFoundAndIgnoredForbiddenError(future.Response(), mc.Observe(err))
+		return retry.GetStatusNotFoundAndForbiddenIgnoredError(future.Response(), mc.Observe(err))
 	}
 
 	err = future.WaitForCompletionRef(ctx, az.client.Client)
-	return retry.GetStatusNotFoundAndIgnoredForbiddenError(future.Response(), mc.Observe(err))
+	return retry.GetStatusNotFoundAndForbiddenIgnoredError(future.Response(), mc.Observe(err))
 }
 
 // azRouteTablesClient implements RouteTablesClient.
@@ -1461,7 +1461,7 @@ func (az *azStorageAccountClient) Delete(ctx context.Context, resourceGroupName 
 
 	result, err := az.client.Delete(ctx, resourceGroupName, accountName)
 	mc.Observe(err)
-	return retry.GetStatusNotFoundAndIgnoredForbiddenError(result.Response, err)
+	return retry.GetStatusNotFoundAndForbiddenIgnoredError(result.Response, err)
 }
 
 func (az *azStorageAccountClient) ListKeys(ctx context.Context, resourceGroupName string, accountName string) (result storage.AccountListKeysResult, rerr *retry.Error) {
@@ -1589,10 +1589,10 @@ func (az *azDisksClient) Delete(ctx context.Context, resourceGroupName string, d
 
 	future, err := az.client.Delete(ctx, resourceGroupName, diskName)
 	if err != nil {
-		return retry.GetStatusNotFoundAndIgnoredForbiddenError(future.Response(), mc.Observe(err))
+		return retry.GetStatusNotFoundAndForbiddenIgnoredError(future.Response(), mc.Observe(err))
 	}
 	err = future.WaitForCompletionRef(ctx, az.client.Client)
-	return retry.GetStatusNotFoundAndIgnoredForbiddenError(future.Response(), mc.Observe(err))
+	return retry.GetStatusNotFoundAndForbiddenIgnoredError(future.Response(), mc.Observe(err))
 }
 
 func (az *azDisksClient) Get(ctx context.Context, resourceGroupName string, diskName string) (result compute.Disk, rerr *retry.Error) {

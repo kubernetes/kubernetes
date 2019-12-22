@@ -707,9 +707,9 @@ func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName stri
 
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	nic, err := as.InterfacesClient.Get(ctx, nicResourceGroup, nicName, "")
-	if err != nil {
-		return network.Interface{}, err
+	nic, rerr := as.InterfacesClient.Get(ctx, nicResourceGroup, nicName, "")
+	if rerr != nil {
+		return network.Interface{}, rerr.Error()
 	}
 
 	return nic, nil

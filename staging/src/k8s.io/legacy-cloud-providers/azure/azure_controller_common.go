@@ -34,6 +34,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	volerr "k8s.io/cloud-provider/volume/errors"
 	"k8s.io/klog"
+	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
 const (
@@ -122,9 +123,9 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		disk, err := c.cloud.DisksClient.Get(ctx, resourceGroup, diskName)
-		if err != nil {
-			return -1, err
+		disk, rerr := c.cloud.DisksClient.Get(ctx, resourceGroup, diskName)
+		if rerr != nil {
+			return -1, rerr.Error()
 		}
 
 		if disk.ManagedBy != nil {
@@ -193,19 +194,24 @@ func (c *controllerCommon) DetachDisk(diskName, diskURI string, nodeName types.N
 	// make the lock here as small as possible
 	c.vmLockMap.LockEntry(strings.ToLower(string(nodeName)))
 	c.diskAttachDetachMap.Store(strings.ToLower(diskURI), "detaching")
-	resp, err := vmset.DetachDisk(diskName, diskURI, nodeName)
+	err = vmset.DetachDisk(diskName, diskURI, nodeName)
 	c.diskAttachDetachMap.Delete(strings.ToLower(diskURI))
 	c.vmLockMap.UnlockEntry(strings.ToLower(string(nodeName)))
 
-	if c.cloud.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
+	if err != nil && retry.IsErrorRetriable(err) && c.cloud.CloudProviderBackoff {
 		klog.V(2).Infof("azureDisk - update backing off: detach disk(%s, %s), err: %v", diskName, diskURI, err)
 		retryErr := kwait.ExponentialBackoff(c.cloud.RequestBackoff(), func() (bool, error) {
 			c.vmLockMap.LockEntry(strings.ToLower(string(nodeName)))
 			c.diskAttachDetachMap.Store(strings.ToLower(diskURI), "detaching")
-			resp, err := vmset.DetachDisk(diskName, diskURI, nodeName)
+			err := vmset.DetachDisk(diskName, diskURI, nodeName)
 			c.diskAttachDetachMap.Delete(strings.ToLower(diskURI))
 			c.vmLockMap.UnlockEntry(strings.ToLower(string(nodeName)))
-			return c.cloud.processHTTPRetryResponse(nil, "", resp, err)
+
+			retriable := false
+			if err != nil && retry.IsErrorRetriable(err) {
+				retriable = true
+			}
+			return !retriable, err
 		})
 		if retryErr != nil {
 			err = retryErr
@@ -214,11 +220,11 @@ func (c *controllerCommon) DetachDisk(diskName, diskURI string, nodeName types.N
 	}
 	if err != nil {
 		klog.Errorf("azureDisk - detach disk(%s, %s) failed, err: %v", diskName, diskURI, err)
-	} else {
-		klog.V(2).Infof("azureDisk - detach disk(%s, %s) succeeded", diskName, diskURI)
+		return err
 	}
 
-	return err
+	klog.V(2).Infof("azureDisk - detach disk(%s, %s) succeeded", diskName, diskURI)
+	return nil
 }
 
 // getNodeDataDisks invokes vmSet interfaces to get data disks for the node.

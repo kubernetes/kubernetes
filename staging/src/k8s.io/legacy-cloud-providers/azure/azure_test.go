@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -37,6 +38,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/legacy-cloud-providers/azure/auth"
+	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
 var testClusterName = "testCluster"
@@ -795,7 +797,11 @@ func TestReconcileSecurityGroupEtagMismatch(t *testing.T) {
 	newSG, err := az.reconcileSecurityGroup(testClusterName, &svc1, &lbStatus.Ingress[0].IP, true /* wantLb */)
 	assert.Nil(t, newSG)
 	assert.NotNil(t, err)
-	assert.Equal(t, err, errPreconditionFailedEtagMismatch)
+	expectedError := &retry.Error{
+		HTTPStatusCode: http.StatusPreconditionFailed,
+		RawError:       errPreconditionFailedEtagMismatch,
+	}
+	assert.Equal(t, err, expectedError.Error())
 }
 
 func TestReconcilePublicIPWithNewService(t *testing.T) {
@@ -1747,7 +1753,7 @@ func addTestSubnet(t *testing.T, az *Cloud, svc *v1.Service) {
 
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	_, err := az.SubnetsClient.CreateOrUpdate(ctx, az.VnetResourceGroup, az.VnetName, subName,
+	err := az.SubnetsClient.CreateOrUpdate(ctx, az.VnetResourceGroup, az.VnetName, subName,
 		network.Subnet{
 			ID:   &subnetID,
 			Name: &subName,

@@ -287,9 +287,9 @@ func (c *BlobDiskController) getStorageAccountKey(SAName string) (string, error)
 
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	listKeysResult, err := c.common.cloud.StorageAccountClient.ListKeys(ctx, c.common.resourceGroup, SAName)
-	if err != nil {
-		return "", err
+	listKeysResult, rerr := c.common.cloud.StorageAccountClient.ListKeys(ctx, c.common.resourceGroup, SAName)
+	if rerr != nil {
+		return "", rerr.Error()
 	}
 	if listKeysResult.Keys == nil {
 		return "", fmt.Errorf("azureDisk - empty listKeysResult in storage account:%s keys", SAName)
@@ -443,9 +443,9 @@ func (c *BlobDiskController) getDiskCount(SAName string) (int, error) {
 func (c *BlobDiskController) getAllStorageAccounts() (map[string]*storageAccountState, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	accountListResult, err := c.common.cloud.StorageAccountClient.ListByResourceGroup(ctx, c.common.resourceGroup)
-	if err != nil {
-		return nil, err
+	accountListResult, rerr := c.common.cloud.StorageAccountClient.ListByResourceGroup(ctx, c.common.resourceGroup)
+	if rerr != nil {
+		return nil, rerr.Error()
 	}
 	if accountListResult.Value == nil {
 		return nil, fmt.Errorf("azureDisk - empty accountListResult")
@@ -502,9 +502,9 @@ func (c *BlobDiskController) createStorageAccount(storageAccountName string, sto
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		_, err := c.common.cloud.StorageAccountClient.Create(ctx, c.common.resourceGroup, storageAccountName, cp)
+		err := c.common.cloud.StorageAccountClient.Create(ctx, c.common.resourceGroup, storageAccountName, cp)
 		if err != nil {
-			return fmt.Errorf(fmt.Sprintf("Create Storage Account: %s, error: %s", storageAccountName, err))
+			return fmt.Errorf(fmt.Sprintf("Create Storage Account: %s, error: %v", storageAccountName, err))
 		}
 
 		newAccountState := &storageAccountState{
@@ -599,9 +599,9 @@ func (c *BlobDiskController) findSANameForDisk(storageAccountType storage.SkuNam
 func (c *BlobDiskController) getStorageAccountState(storageAccountName string) (bool, storage.ProvisioningState, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	account, err := c.common.cloud.StorageAccountClient.GetProperties(ctx, c.common.resourceGroup, storageAccountName)
-	if err != nil {
-		return false, "", err
+	account, rerr := c.common.cloud.StorageAccountClient.GetProperties(ctx, c.common.resourceGroup, storageAccountName)
+	if rerr != nil {
+		return false, "", rerr.Error()
 	}
 	return true, account.AccountProperties.ProvisioningState, nil
 }

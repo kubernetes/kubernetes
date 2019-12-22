@@ -54,7 +54,7 @@ func TestStandardAttachDisk(t *testing.T) {
 
 		err := vmSet.AttachDisk(true, "",
 			"uri", test.nodeName, 0, compute.CachingTypesReadOnly, "")
-		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
+		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s, err: %v", i, test.desc, err)
 	}
 }
 
@@ -89,7 +89,7 @@ func TestStandardDetachDisk(t *testing.T) {
 		vmSet := testCloud.vmSet
 		setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 
-		_, err := vmSet.DetachDisk(test.diskName, "", test.nodeName)
+		err := vmSet.DetachDisk(test.diskName, "", test.nodeName)
 		assert.Equal(t, test.expectedError, err != nil, "TestCase[%d]: %s", i, test.desc)
 	}
 }

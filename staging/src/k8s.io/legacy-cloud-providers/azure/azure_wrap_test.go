@@ -19,25 +19,23 @@ limitations under the License.
 package azure
 
 import (
-	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
 
-	"github.com/Azure/go-autorest/autorest"
 	"github.com/stretchr/testify/assert"
-
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
 func TestExtractNotFound(t *testing.T) {
-	notFound := autorest.DetailedError{StatusCode: http.StatusNotFound}
-	otherHTTP := autorest.DetailedError{StatusCode: http.StatusForbidden}
-	otherErr := fmt.Errorf("other error")
+	notFound := &retry.Error{HTTPStatusCode: http.StatusNotFound}
+	otherHTTP := &retry.Error{HTTPStatusCode: http.StatusForbidden}
+	otherErr := &retry.Error{HTTPStatusCode: http.StatusTooManyRequests}
 
 	tests := []struct {
-		err         error
-		expectedErr error
+		err         *retry.Error
+		expectedErr *retry.Error
 		exists      bool
 	}{
 		{nil, nil, true},
@@ -47,7 +45,7 @@ func TestExtractNotFound(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		exists, _, err := checkResourceExistsFromError(test.err)
+		exists, err := checkResourceExistsFromError(test.err)
 		if test.exists != exists {
 			t.Errorf("expected: %v, saw: %v", test.exists, exists)
 		}
