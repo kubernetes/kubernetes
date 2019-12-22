@@ -176,9 +176,9 @@ func TestCNIPlugin(t *testing.T) {
 	fakeCmds := []fakeexec.FakeCommandAction{
 		func(cmd string, args ...string) exec.Cmd {
 			return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{
-				CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-					func() ([]byte, error) {
-						return []byte(podIPOutput), nil
+				CombinedOutputScript: []fakeexec.FakeAction{
+					func() ([]byte, []byte, error) {
+						return []byte(podIPOutput), nil, nil
 					},
 				},
 			}, cmd, args...)
