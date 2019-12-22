@@ -671,11 +671,6 @@ func restoreEnv(e map[string]string) {
 }
 
 func TestKubeletVersionCheck(t *testing.T) {
-	// TODO: Re-enable this test
-	// fakeexec.FakeCmd supports only combined output.
-	// Hence .Output() returns a "not supported" error and we cannot use it for the test ATM.
-	t.Skip()
-
 	cases := []struct {
 		kubeletVersion string
 		k8sVersion     string
@@ -694,7 +689,7 @@ func TestKubeletVersionCheck(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.kubeletVersion, func(t *testing.T) {
 			fcmd := fakeexec.FakeCmd{
-				CombinedOutputScript: []fakeexec.FakeAction{
+				OutputScript: []fakeexec.FakeAction{
 					func() ([]byte, []byte, error) { return []byte("Kubernetes " + tc.kubeletVersion), nil, nil },
 				},
 			}
