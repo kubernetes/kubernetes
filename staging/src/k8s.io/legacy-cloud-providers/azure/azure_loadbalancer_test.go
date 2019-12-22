@@ -1446,16 +1446,16 @@ func TestReconcileLoadBalancer(t *testing.T) {
 	}
 
 	testCases := []struct {
-		desc                string
-		service             v1.Service
-		loadBalancerSku     string
-		preConfigLBType     string
+		desc                      string
+		service                   v1.Service
+		loadBalancerSku           string
+		preConfigLBType           string
 		loadBalancerResourceGroup string
-		disableOutboundSnat *bool
-		wantLb              bool
-		existingLB          network.LoadBalancer
-		expectedLB          network.LoadBalancer
-		expectedError       error
+		disableOutboundSnat       *bool
+		wantLb                    bool
+		existingLB                network.LoadBalancer
+		expectedLB                network.LoadBalancer
+		expectedError             error
 	}{
 		{
 			desc: "reconcileLoadBalancer shall return the lb deeply equal to the existingLB if there's no " +
@@ -1535,14 +1535,14 @@ func TestReconcileLoadBalancer(t *testing.T) {
 			expectedError:   nil,
 		},
 		{
-			desc: "reconcileLoadBalancer in other resource group",
-			loadBalancerSku: "standard",
+			desc:                      "reconcileLoadBalancer in other resource group",
+			loadBalancerSku:           "standard",
 			loadBalancerResourceGroup: "anotherRG",
-			service: service8,
-			existingLB: lb8,
-			wantLb: true,
-			expectedLB: expectedLB8,
-			expectedError: nil,
+			service:                   service8,
+			existingLB:                lb8,
+			wantLb:                    true,
+			expectedLB:                expectedLB8,
+			expectedError:             nil,
 		},
 	}
 
