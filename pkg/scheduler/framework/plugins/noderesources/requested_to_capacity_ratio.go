@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package requestedtocapacityratio
+package noderesources
 
 import (
 	"context"
@@ -27,18 +27,18 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
-// Name of this plugin.
-const Name = "RequestedToCapacityRatio"
+// RequestedToCapacityRatioName is the name of this plugin.
+const RequestedToCapacityRatioName = "RequestedToCapacityRatio"
 
-// Args holds the args that are used to configure the plugin.
-type Args struct {
+// RequestedToCapacityRatioArgs holds the args that are used to configure the plugin.
+type RequestedToCapacityRatioArgs struct {
 	FunctionShape       priorities.FunctionShape
 	ResourceToWeightMap priorities.ResourceToWeightMap
 }
 
-// New initializes a new plugin and returns it.
-func New(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
-	args := &Args{}
+// NewRequestedToCapacityRatio initializes a new plugin and returns it.
+func NewRequestedToCapacityRatio(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
+	args := &RequestedToCapacityRatioArgs{}
 	if err := framework.DecodeInto(plArgs, args); err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ var _ framework.ScorePlugin = &RequestedToCapacityRatio{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *RequestedToCapacityRatio) Name() string {
-	return Name
+	return RequestedToCapacityRatioName
 }
 
 // Score invoked at the score extension point.

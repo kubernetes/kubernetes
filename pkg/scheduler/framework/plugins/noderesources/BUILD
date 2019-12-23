@@ -7,6 +7,7 @@ go_library(
         "fit.go",
         "least_allocated.go",
         "most_allocated.go",
+        "requested_to_capacity_ratio.go",
         "test_util.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources",
@@ -47,6 +48,7 @@ go_test(
         "fit_test.go",
         "least_allocated_test.go",
         "most_allocated_test.go",
+        "requested_to_capacity_ratio_test.go",
     ],
     embed = [":go_default_library"],
     deps = [

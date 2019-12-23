@@ -31,7 +31,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/requestedtocapacityratio"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
@@ -402,7 +402,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, configPr
 			}
 		} else if policy.Argument.RequestedToCapacityRatioArguments != nil {
 			scoringFunctionShape, resources := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(policy.Argument.RequestedToCapacityRatioArguments)
-			configProducerArgs.RequestedToCapacityRatioArgs = &requestedtocapacityratio.Args{
+			configProducerArgs.RequestedToCapacityRatioArgs = &noderesources.RequestedToCapacityRatioArgs{
 				FunctionShape:       scoringFunctionShape,
 				ResourceToWeightMap: resources,
 			}
@@ -414,7 +414,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, configPr
 				Weight: policy.Weight,
 			}
 			// We do not allow specifying the name for custom plugins, see #83472
-			name = requestedtocapacityratio.Name
+			name = noderesources.RequestedToCapacityRatioName
 		}
 	} else if existingPcf, ok := priorityFunctionMap[name]; ok {
 		klog.V(2).Infof("Priority type %s already registered, reusing.", name)

@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/requestedtocapacityratio"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
@@ -73,17 +72,17 @@ func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 		volumebinding.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 			return volumebinding.NewFromVolumeBinder(args.VolumeBinder), nil
 		},
-		volumerestrictions.Name:        volumerestrictions.New,
-		volumezone.Name:                volumezone.New,
-		nodevolumelimits.CSIName:       nodevolumelimits.NewCSI,
-		nodevolumelimits.EBSName:       nodevolumelimits.NewEBS,
-		nodevolumelimits.GCEPDName:     nodevolumelimits.NewGCEPD,
-		nodevolumelimits.AzureDiskName: nodevolumelimits.NewAzureDisk,
-		nodevolumelimits.CinderName:    nodevolumelimits.NewCinder,
-		interpodaffinity.Name:          interpodaffinity.New,
-		nodelabel.Name:                 nodelabel.New,
-		requestedtocapacityratio.Name:  requestedtocapacityratio.New,
-		serviceaffinity.Name:           serviceaffinity.New,
+		volumerestrictions.Name:                    volumerestrictions.New,
+		volumezone.Name:                            volumezone.New,
+		nodevolumelimits.CSIName:                   nodevolumelimits.NewCSI,
+		nodevolumelimits.EBSName:                   nodevolumelimits.NewEBS,
+		nodevolumelimits.GCEPDName:                 nodevolumelimits.NewGCEPD,
+		nodevolumelimits.AzureDiskName:             nodevolumelimits.NewAzureDisk,
+		nodevolumelimits.CinderName:                nodevolumelimits.NewCinder,
+		interpodaffinity.Name:                      interpodaffinity.New,
+		nodelabel.Name:                             nodelabel.New,
+		noderesources.RequestedToCapacityRatioName: noderesources.NewRequestedToCapacityRatio,
+		serviceaffinity.Name:                       serviceaffinity.New,
 	}
 }
 
@@ -96,7 +95,7 @@ type ConfigProducerArgs struct {
 	// NodeLabelArgs is the args for the NodeLabel plugin.
 	NodeLabelArgs *nodelabel.Args
 	// RequestedToCapacityRatioArgs is the args for the RequestedToCapacityRatio plugin.
-	RequestedToCapacityRatioArgs *requestedtocapacityratio.Args
+	RequestedToCapacityRatioArgs *noderesources.RequestedToCapacityRatioArgs
 	// ServiceAffinityArgs is the args for the ServiceAffinity plugin.
 	ServiceAffinityArgs *serviceaffinity.Args
 	// NodeResourcesFitArgs is the args for the NodeResources fit filter.
@@ -286,10 +285,10 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 			plugins.Score = appendToPluginSet(plugins.Score, podtopologyspread.Name, &args.Weight)
 			return
 		})
-	registry.RegisterPriority(requestedtocapacityratio.Name,
+	registry.RegisterPriority(noderesources.RequestedToCapacityRatioName,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
-			plugins.Score = appendToPluginSet(plugins.Score, requestedtocapacityratio.Name, &args.Weight)
-			pluginConfig = append(pluginConfig, makePluginConfig(requestedtocapacityratio.Name, args.RequestedToCapacityRatioArgs))
+			plugins.Score = appendToPluginSet(plugins.Score, noderesources.RequestedToCapacityRatioName, &args.Weight)
+			pluginConfig = append(pluginConfig, makePluginConfig(noderesources.RequestedToCapacityRatioName, args.RequestedToCapacityRatioArgs))
 			return
 		})
 
