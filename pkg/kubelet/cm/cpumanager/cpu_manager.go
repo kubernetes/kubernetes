@@ -353,13 +353,13 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 		allContainers := pod.Spec.InitContainers
 		allContainers = append(allContainers, pod.Spec.Containers...)
 		status, ok := m.podStatusProvider.GetPodStatus(pod.UID)
-		for _, container := range allContainers {
-			if !ok {
-				klog.Warningf("[cpumanager] reconcileState: skipping pod; status not found (pod: %s)", pod.Name)
-				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
-				break
-			}
+		if !ok {
+			klog.Warningf("[cpumanager] reconcileState: skipping pod; status not found (pod: %s)", pod.Name)
+			failure = append(failure, reconciledContainer{pod.Name, "", ""})
+			continue
+		}
 
+		for _, container := range allContainers {
 			containerID, err := findContainerIDByName(&status, container.Name)
 			if err != nil {
 				klog.Warningf("[cpumanager] reconcileState: skipping container; ID not found in status (pod: %s, container: %s, error: %v)", pod.Name, container.Name, err)

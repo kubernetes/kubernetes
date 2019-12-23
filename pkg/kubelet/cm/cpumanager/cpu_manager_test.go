@@ -752,7 +752,7 @@ func TestReconcileState(t *testing.T) {
 			expectFailedContainerName:    "",
 		},
 		{
-			description: "cpu manager reconclie - pod status not found",
+			description: "cpu manager reconcile - pod status not found",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -774,7 +774,7 @@ func TestReconcileState(t *testing.T) {
 			stDefaultCPUSet:              cpuset.NewCPUSet(),
 			updateErr:                    nil,
 			expectSucceededContainerName: "",
-			expectFailedContainerName:    "fakeContainerName",
+			expectFailedContainerName:    "",
 		},
 		{
 			description: "cpu manager reconclie - container id not found",
