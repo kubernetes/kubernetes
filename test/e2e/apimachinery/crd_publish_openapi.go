@@ -27,6 +27,7 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/onsi/ginkgo"
+	"k8s.io/klog"
 	"k8s.io/utils/pointer"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
@@ -561,6 +562,7 @@ func waitForDefinition(c k8sclientset.Interface, name string, schema []byte) err
 		return err
 	}
 
+	start := time.Now()
 	err := waitForOpenAPISchema(c, func(spec *spec.Swagger) (bool, string) {
 		d, ok := spec.SwaggerProps.Definitions[name]
 		if !ok {
@@ -576,8 +578,10 @@ func waitForDefinition(c k8sclientset.Interface, name string, schema []byte) err
 		return true, ""
 	})
 	if err != nil {
+		klog.Errorf("--- time elapsed: %v", time.Since(start))
 		return fmt.Errorf("failed to wait for definition %q to be served with the right OpenAPI schema: %v", name, err)
 	}
+	klog.Errorf("--- time elapsed: %v", time.Since(start))
 	return nil
 }
 
@@ -602,6 +606,7 @@ func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bo
 	etag := ""
 	var etagSpec *spec.Swagger
 	if err := wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, mustSucceedMultipleTimes(waitSuccessThreshold, func() (bool, error) {
+		klog.Errorf("----- checking")
 		// download spec with etag support
 		spec := &spec.Swagger{}
 		req, err := http.NewRequest("GET", url.String(), nil)
@@ -632,6 +637,9 @@ func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bo
 
 		var ok bool
 		ok, lastMsg = pred(spec)
+		if ok {
+			klog.Errorf("----- succeeded")
+		}
 		return ok, nil
 	})); err != nil {
 		return fmt.Errorf("failed to wait for OpenAPI spec validating condition: %v; lastMsg: %s", err, lastMsg)
