@@ -279,11 +279,7 @@ func (expc *expandController) syncHandler(key string) error {
 	if err != nil || volumePlugin == nil {
 		msg := fmt.Errorf("didn't find a plugin capable of expanding the volume; " +
 			"waiting for an external controller to process this PVC")
-		eventType := v1.EventTypeNormal
-		if err != nil {
-			eventType = v1.EventTypeWarning
-		}
-		expc.recorder.Event(pvc, eventType, events.ExternalExpanding, fmt.Sprintf("Ignoring the PVC: %v.", msg))
+		expc.recorder.Event(pvc, v1.EventTypeNormal, events.ExternalExpanding, fmt.Sprintf("Ignoring the PVC: %v.", msg))
 		klog.Infof("Ignoring the PVC %q (uid: %q) : %v.", util.GetPersistentVolumeClaimQualifiedName(pvc), pvc.UID, msg)
 		// If we are expecting that an external plugin will handle resizing this volume then
 		// is no point in requeuing this PVC.
