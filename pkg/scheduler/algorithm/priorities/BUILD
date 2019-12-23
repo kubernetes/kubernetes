@@ -11,7 +11,6 @@ go_library(
     srcs = [
         "balanced_resource_allocation.go",
         "even_pods_spread.go",
-        "image_locality.go",
         "least_requested.go",
         "metadata.go",
         "most_requested.go",
@@ -37,7 +36,6 @@ go_library(
         "//pkg/scheduler/listers:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/util/node:go_default_library",
-        "//pkg/util/parsers:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -55,7 +53,6 @@ go_test(
     srcs = [
         "balanced_resource_allocation_test.go",
         "even_pods_spread_test.go",
-        "image_locality_test.go",
         "least_requested_test.go",
         "metadata_test.go",
         "most_requested_test.go",
@@ -78,7 +75,6 @@ go_test(
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/scheduler/nodeinfo/snapshot:go_default_library",
         "//pkg/scheduler/testing:go_default_library",
-        "//pkg/util/parsers:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
