@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/utils/integer"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -385,7 +384,7 @@ func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool,
 				allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "expected at least one IP from each family (v4 or v6) for dual-stack networking"))
 			}
 			for _, s := range subnets {
-				numAddresses := integer.Int64Min(utilnet.RangeSize(s), 1<<16)
+				numAddresses := utilnet.RangeSize(s)
 				if numAddresses < minAddrs {
 					allErrs = append(allErrs, field.Invalid(fldPath, s, "subnet is too small"))
 				}
@@ -397,7 +396,7 @@ func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool,
 			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "couldn't parse subnet"))
 			return allErrs
 		}
-		numAddresses := integer.Int64Min(utilnet.RangeSize(svcSubnet), 1<<16)
+		numAddresses := utilnet.RangeSize(svcSubnet)
 		if numAddresses < minAddrs {
 			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "subnet is too small"))
 		}
