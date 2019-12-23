@@ -89,5 +89,5 @@ func init() {
 	scheduler.RegisterPriorityMapReduceFunction(priorities.TaintTolerationPriority, priorities.ComputeTaintTolerationPriorityMap, priorities.ComputeTaintTolerationPriorityReduce, 1)
 
 	// ImageLocalityPriority prioritizes nodes that have images requested by the pod present.
-	scheduler.RegisterPriorityMapReduceFunction(priorities.ImageLocalityPriority, priorities.ImageLocalityPriorityMap, nil, 1)
+	scheduler.RegisterPriorityMapReduceFunction(priorities.ImageLocalityPriority, nil, nil, 1)
 }
