@@ -71,7 +71,6 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/auth"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/convert"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/cp"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -545,7 +544,6 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 				patch.NewCmdPatch(f, ioStreams),
 				replace.NewCmdReplace(f, ioStreams),
 				wait.NewCmdWait(f, ioStreams),
-				convert.NewCmdConvert(f, ioStreams),
 				kustomize.NewCmdKustomize(ioStreams),
 			},
 		},

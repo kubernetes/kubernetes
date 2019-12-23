@@ -10,7 +10,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubectl/cmd/auth:go_default_library",
-        "//pkg/kubectl/cmd/convert:go_default_library",
         "//pkg/kubectl/cmd/cp:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
@@ -84,7 +83,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/kubectl/cmd/auth:all-srcs",
-        "//pkg/kubectl/cmd/convert:all-srcs",
         "//pkg/kubectl/cmd/cp:all-srcs",
         "//pkg/kubectl/cmd/plugin/testdata:all-srcs",
     ],
