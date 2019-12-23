@@ -133,7 +133,7 @@ func init() {
 	scheduler.RegisterFitPredicateFactory(
 		predicates.CheckVolumeBindingPred,
 		func(args scheduler.AlgorithmFactoryArgs) predicates.FitPredicate {
-			return predicates.NewVolumeBindingPredicate(args.VolumeBinder)
+			return nil
 		},
 	)
 }

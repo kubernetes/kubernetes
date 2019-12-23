@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -1049,74 +1048,6 @@ func podToleratesNodeTaints(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo, f
 		return true, nil, nil
 	}
 	return false, []PredicateFailureReason{ErrTaintsTolerationsNotMatch}, nil
-}
-
-// VolumeBindingChecker contains information to check a volume binding.
-type VolumeBindingChecker struct {
-	binder *volumebinder.VolumeBinder
-}
-
-// NewVolumeBindingPredicate evaluates if a pod can fit due to the volumes it requests,
-// for both bound and unbound PVCs.
-//
-// For PVCs that are bound, then it checks that the corresponding PV's node affinity is
-// satisfied by the given node.
-//
-// For PVCs that are unbound, it tries to find available PVs that can satisfy the PVC requirements
-// and that the PV node affinity is satisfied by the given node.
-//
-// The predicate returns true if all bound PVCs have compatible PVs with the node, and if all unbound
-// PVCs can be matched with an available and node-compatible PV.
-func NewVolumeBindingPredicate(binder *volumebinder.VolumeBinder) FitPredicate {
-	c := &VolumeBindingChecker{
-		binder: binder,
-	}
-	return c.predicate
-}
-
-func podHasPVCs(pod *v1.Pod) bool {
-	for _, vol := range pod.Spec.Volumes {
-		if vol.PersistentVolumeClaim != nil {
-			return true
-		}
-	}
-	return false
-}
-
-func (c *VolumeBindingChecker) predicate(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
-	// If pod does not request any PVC, we don't need to do anything.
-	if !podHasPVCs(pod) {
-		return true, nil, nil
-	}
-
-	node := nodeInfo.Node()
-	if node == nil {
-		return false, nil, fmt.Errorf("node not found")
-	}
-
-	unboundSatisfied, boundSatisfied, err := c.binder.Binder.FindPodVolumes(pod, node)
-	if err != nil {
-		return false, nil, err
-	}
-
-	failReasons := []PredicateFailureReason{}
-	if !boundSatisfied {
-		klog.V(5).Infof("Bound PVs not satisfied for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
-		failReasons = append(failReasons, ErrVolumeNodeConflict)
-	}
-
-	if !unboundSatisfied {
-		klog.V(5).Infof("Couldn't find matching PVs for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
-		failReasons = append(failReasons, ErrVolumeBindConflict)
-	}
-
-	if len(failReasons) > 0 {
-		return false, failReasons, nil
-	}
-
-	// All volumes bound or matching PVs found for all unbound PVCs
-	klog.V(5).Infof("All PVCs found matches for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
-	return true, nil, nil
 }
 
 // EvenPodsSpreadPredicate is the legacy function using old path of metadata.
