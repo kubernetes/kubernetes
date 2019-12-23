@@ -370,27 +370,18 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 			return
 		}
 		pod := rawPodInfo.(*framework.PodInfo).Pod
-		boTime, found := p.podBackoff.GetBackoffTime(nsNameForPod(pod))
-		if !found {
-			klog.Errorf("Unable to find backoff value for pod %v in backoff queue", nsNameForPod(pod))
-			p.podBackoffQ.Pop()
+		if !p.isPodBackingOff(pod) {
+			_, err := p.podBackoffQ.Pop()
+			if err != nil {
+				klog.Errorf("Unable to pop pod %v from backoff queue despite backoff completion.", nsNameForPod(pod))
+				return
+			}
 			p.activeQ.Add(rawPodInfo)
 			metrics.SchedulerQueueIncomingPods.WithLabelValues("active", BackoffComplete).Inc()
 			defer p.cond.Broadcast()
-			continue
-		}
-
-		if boTime.After(p.clock.Now()) {
+		} else {
 			return
 		}
-		_, err := p.podBackoffQ.Pop()
-		if err != nil {
-			klog.Errorf("Unable to pop pod %v from backoff queue despite backoff completion.", nsNameForPod(pod))
-			return
-		}
-		p.activeQ.Add(rawPodInfo)
-		metrics.SchedulerQueueIncomingPods.WithLabelValues("active", BackoffComplete).Inc()
-		defer p.cond.Broadcast()
 	}
 }
 
