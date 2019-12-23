@@ -58,7 +58,7 @@ import (
 func ProbeVolumePlugins(featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
 	allPlugins := []volume.VolumePlugin{}
 
-	// The list of plugins to probe is decided by the kubelet binary, not
+	// The list of plugins to probe is decided by the Kubelet binary, not
 	// by dynamic linking or other "magic".  Plugins will be analyzed and
 	// initialized later.
 	//

@@ -122,14 +122,14 @@ func NewKubeletCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: componentKubelet,
-		Long: `The kubelet is the primary "node agent" that runs on each
+		Long: `The Kubelet is the primary "node agent" that runs on each
 node. It can register the node with the apiserver using one of: the hostname; a flag to
 override the hostname; or specific logic for a cloud provider.
 
-The kubelet works in terms of a PodSpec. A PodSpec is a YAML or JSON object
-that describes a pod. The kubelet takes a set of PodSpecs that are provided through
+The Kubelet works in terms of a PodSpec. A PodSpec is a YAML or JSON object
+that describes a pod. The Kubelet takes a set of PodSpecs that are provided through
 various mechanisms (primarily through the apiserver) and ensures that the containers
-described in those PodSpecs are running and healthy. The kubelet doesn't manage
+described in those PodSpecs are running and healthy. The Kubelet doesn't manage
 containers which were not created by Kubernetes.
 
 Other than from an PodSpec from the apiserver, there are three ways that a container
@@ -142,11 +142,11 @@ via a flag.
 HTTP endpoint: HTTP endpoint passed as a parameter on the command line. This endpoint
 is checked every 20 seconds (also configurable with a flag).
 
-HTTP server: The kubelet can also listen for HTTP and respond to a simple API
+HTTP server: The Kubelet can also listen for HTTP and respond to a simple API
 (underspec'd currently) to submit a new manifest.`,
 		// The Kubelet has special flag parsing requirements to enforce flag precedence rules,
 		// so we do all our parsing manually in Run, below.
-		// DisableFlagParsing=true provides the full set of flags passed to the kubelet in the
+		// DisableFlagParsing=true provides the full set of flags passed to the Kubelet in the
 		// `args` arg to Run, without Cobra's interference.
 		DisableFlagParsing: true,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -253,7 +253,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				klog.Fatal(err)
 			}
 
-			// add the kubelet config controller to kubeletDeps
+			// add the Kubelet config controller to kubeletDeps
 			kubeletDeps.KubeletConfigController = kubeletConfigController
 
 			// set up stopCh here in order to be reused by kubelet and docker shim
@@ -761,7 +761,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate f
 		return err
 	}
 
-	// If the kubelet config controller is available, and dynamic config is enabled, start the config and status sync loops
+	// If the Kubelet config controller is available, and dynamic config is enabled, start the config and status sync loops
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && len(s.DynamicConfigDir.Value()) > 0 &&
 		kubeDeps.KubeletConfigController != nil && !standaloneMode && !s.RunOnce {
 		if err := kubeDeps.KubeletConfigController.StartSync(kubeDeps.KubeClient, kubeDeps.EventClient, string(nodeName)); err != nil {
@@ -797,7 +797,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate f
 	return nil
 }
 
-// buildKubeletClientConfig constructs the appropriate client config for the kubelet depending on whether
+// buildKubeletClientConfig constructs the appropriate client config for the Kubelet depending on whether
 // bootstrapping is enabled or client certificate rotation is enabled.
 func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName) (*restclient.Config, func(), error) {
 	if s.RotateCertificates && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletClientCertificate) {
@@ -908,7 +908,7 @@ func buildClientCertificateManager(certConfig, clientConfig *restclient.Config, 
 		nodeName,
 
 		// this preserves backwards compatibility with kubeadm which passes
-		// a high powered certificate to the kubelet as --kubeconfig and expects
+		// a high powered certificate to the Kubelet as --kubeconfig and expects
 		// it to be rotated out immediately
 		clientConfig.CertData,
 		clientConfig.KeyData,
@@ -1121,7 +1121,7 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 		k.Run(podCfg.Updates())
 	}, 0, wait.NeverStop)
 
-	// start the kubelet server
+	// start the Kubelet server
 	if enableServer {
 		go k.ListenAndServe(net.ParseIP(kubeCfg.Address), uint(kubeCfg.Port), kubeDeps.TLSOptions, kubeDeps.Auth, enableCAdvisorJSONEndpoints, kubeCfg.EnableDebuggingHandlers, kubeCfg.EnableContentionProfiling)
 
