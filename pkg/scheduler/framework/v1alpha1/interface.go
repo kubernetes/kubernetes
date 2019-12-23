@@ -384,12 +384,10 @@ type Framework interface {
 	RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod) *Status
 
 	// RunFilterPlugins runs the set of configured filter plugins for pod on
-	// the given node. It returns directly if any of the filter plugins
-	// return any status other than "Success". Note that for the node being
-	// evaluated, the passed nodeInfo reference could be different from the
-	// one in NodeInfoSnapshot map (e.g., pods considered to be running on
-	// the node could be different). For example, during preemption, we may
-	// pass a copy of the original nodeInfo object that has some pods
+	// the given node. Note that for the node being evaluated, the passed nodeInfo
+	// reference could be different from the one in NodeInfoSnapshot map (e.g., pods
+	// considered to be running on the node could be different). For example, during
+	// preemption, we may pass a copy of the original nodeInfo object that has some pods
 	// removed from it to evaluate the possibility of preempting them to
 	// schedule the target pod.
 	RunFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status

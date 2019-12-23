@@ -89,6 +89,9 @@ type Configurator struct {
 	// Disable pod preemption or not.
 	disablePreemption bool
 
+	// Always check all predicates even if the middle of one predicate fails.
+	alwaysCheckAllPredicates bool
+
 	// percentageOfNodesToScore specifies percentage of all nodes to score in each scheduling cycle.
 	percentageOfNodesToScore int32
 
@@ -202,6 +205,11 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Scheduler,
 		c.hardPodAffinitySymmetricWeight = policy.HardPodAffinitySymmetricWeight
 	}
 
+	// When AlwaysCheckAllPredicates is set to true, scheduler checks all the configured
+	// predicates even after one or more of them fails.
+	if policy.AlwaysCheckAllPredicates {
+		c.alwaysCheckAllPredicates = policy.AlwaysCheckAllPredicates
+	}
 	return c.CreateFromKeys(predicateKeys, priorityKeys, extenders)
 }
 
@@ -250,6 +258,7 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		framework.WithClientSet(c.client),
 		framework.WithInformerFactory(c.informerFactory),
 		framework.WithSnapshotSharedLister(c.nodeInfoSnapshot),
+		framework.WithRunAllFilters(c.alwaysCheckAllPredicates),
 	)
 	if err != nil {
 		klog.Fatalf("error initializing the scheduling framework: %v", err)
