@@ -45,6 +45,8 @@ var (
 	azureResourceGroupNameRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/(?:.*)`)
 )
 
+const vmKey = "vmKey"
+
 // checkExistsFromError inspects an error and returns a true if err is nil,
 // false if error is an autorest.Error with StatusCode=404 and will return the
 // error back if error is another status code or another type of error.
@@ -91,24 +93,44 @@ func ignoreStatusForbiddenFromError(err error) error {
 /// getVirtualMachine calls 'VirtualMachinesClient.Get' with a timed cache
 /// The service side has throttling control that delays responses if there're multiple requests onto certain vm
 /// resource request in short period.
-func (az *Cloud) getVirtualMachine(nodeName types.NodeName, crt cacheReadType) (vm compute.VirtualMachine, err error) {
+func (az *Cloud) getVirtualMachine(nodeName types.NodeName, crt cacheReadType) (compute.VirtualMachine, error) {
 	vmName := string(nodeName)
-	cachedVM, err := az.vmCache.Get(vmName, crt)
+	getter := func(vmName string) (*compute.VirtualMachine, error) {
+		cachedVM, err := az.vmCache.Get(vmKey, crt)
+		if err != nil {
+			return nil, err
+		}
+
+		virtualMachines := cachedVM.(*sync.Map)
+		if vm, ok := virtualMachines.Load(vmName); ok {
+			result := vm.(*vmEntry)
+			return result.vm, nil
+		}
+
+		return nil, nil
+	}
+
+	vm, err := getter(vmName)
 	if err != nil {
-		return vm, err
+		return compute.VirtualMachine{}, err
 	}
 
-	if cachedVM == nil {
-		return vm, cloudprovider.InstanceNotFound
+	if vm != nil {
+		return *vm, nil
 	}
 
-	virtualMachines := cachedVM.(*sync.Map)
-	if vm, ok := virtualMachines.Load(vmName); ok {
-		result := vm.(*vmEntry)
-		return *(result.vm), nil
+	klog.V(3).Infof("Couldn't find VM with name %s, refreshing the cache", vmName)
+	az.vmCache.Delete(vmKey)
+
+	vm, err = getter(vmName)
+	if err != nil {
+		return compute.VirtualMachine{}, err
 	}
 
-	return compute.VirtualMachine{}, nil
+	if vm == nil {
+		return compute.VirtualMachine{}, cloudprovider.InstanceNotFound
+	}
+	return *vm, nil
 }
 
 func (az *Cloud) getRouteTable(crt cacheReadType) (routeTable network.RouteTable, exists bool, err error) {
