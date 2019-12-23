@@ -1447,6 +1447,9 @@ func printEvent(obj *api.Event, options printers.GenerateOptions) ([]metav1beta1
 
 	firstTimestamp := translateTimestampSince(obj.FirstTimestamp)
 	lastTimestamp := translateTimestampSince(obj.LastTimestamp)
+	if obj.LastTimestamp.IsZero() {
+		lastTimestamp = firstTimestamp
+	}
 
 	var target string
 	if len(obj.InvolvedObject.Name) > 0 {
