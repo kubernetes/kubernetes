@@ -184,6 +184,12 @@ func newAzVirtualMachinesClient(config *azClientConfig) *azVirtualMachinesClient
 	}
 	configureUserAgent(&virtualMachinesClient.Client)
 
+	klog.V(2).Infof("Azure VirtualMachinesClient (read ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPS,
+		config.rateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).Infof("Azure VirtualMachinesClient (write ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
 	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
 	return &azVirtualMachinesClient{
 		rateLimiterReader: rateLimiterReader,
@@ -307,6 +313,12 @@ func newAzInterfacesClient(config *azClientConfig) *azInterfacesClient {
 	}
 	configureUserAgent(&interfacesClient.Client)
 
+	klog.V(2).Infof("Azure InterfacesClient (read ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPS,
+		config.rateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).Infof("Azure InterfacesClient (write ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
 	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
 	return &azInterfacesClient{
 		rateLimiterReader: rateLimiterReader,
@@ -392,6 +404,12 @@ func newAzLoadBalancersClient(config *azClientConfig) *azLoadBalancersClient {
 	}
 	configureUserAgent(&loadBalancerClient.Client)
 
+	klog.V(2).Infof("Azure LoadBalancersClient (read ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPS,
+		config.rateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).Infof("Azure LoadBalancersClient (write ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
 	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
 	return &azLoadBalancersClient{
 		rateLimiterReader: rateLimiterReader,
@@ -545,6 +563,12 @@ func newAzPublicIPAddressesClient(config *azClientConfig) *azPublicIPAddressesCl
 	}
 	configureUserAgent(&publicIPAddressClient.Client)
 
+	klog.V(2).Infof("Azure PublicIPAddressesClient (read ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPS,
+		config.rateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).Infof("Azure PublicIPAddressesClient (write ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
 	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
 	return &azPublicIPAddressesClient{
 		rateLimiterReader: rateLimiterReader,
@@ -683,6 +707,12 @@ func newAzSubnetsClient(config *azClientConfig) *azSubnetsClient {
 	}
 	configureUserAgent(&subnetsClient.Client)
 
+	klog.V(2).Infof("Azure SubnetsClient (read ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPS,
+		config.rateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).Infof("Azure SubnetsClient (write ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
 	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
 	return &azSubnetsClient{
 		client:            subnetsClient,
@@ -803,6 +833,12 @@ func newAzSecurityGroupsClient(config *azClientConfig) *azSecurityGroupsClient {
 	}
 	configureUserAgent(&securityGroupsClient.Client)
 
+	klog.V(2).Infof("Azure SecurityGroupsClient (read ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPS,
+		config.rateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).Infof("Azure SecurityGroupsClient (write ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
 	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
 	return &azSecurityGroupsClient{
 		client:            securityGroupsClient,
@@ -955,6 +991,12 @@ func newAzVirtualMachineScaleSetsClient(config *azClientConfig) *azVirtualMachin
 	}
 	configureUserAgent(&virtualMachineScaleSetsClient.Client)
 
+	klog.V(2).Infof("Azure VirtualMachineScaleSetsClient (read ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPS,
+		config.rateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).Infof("Azure VirtualMachineScaleSetsClient (write ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
 	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
 	return &azVirtualMachineScaleSetsClient{
 		client:            virtualMachineScaleSetsClient,
@@ -1053,6 +1095,12 @@ func newAzVirtualMachineScaleSetVMsClient(config *azClientConfig) *azVirtualMach
 	}
 	configureUserAgent(&virtualMachineScaleSetVMsClient.Client)
 
+	klog.V(2).Infof("Azure VirtualMachineScaleSetVMsClient (read ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPS,
+		config.rateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).Infof("Azure VirtualMachineScaleSetVMsClient (write ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
 	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
 	return &azVirtualMachineScaleSetVMsClient{
 		client:            virtualMachineScaleSetVMsClient,
@@ -1150,6 +1198,12 @@ func newAzRoutesClient(config *azClientConfig) *azRoutesClient {
 	}
 	configureUserAgent(&routesClient.Client)
 
+	klog.V(2).Infof("Azure RoutesClient (read ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPS,
+		config.rateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).Infof("Azure RoutesClient (write ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
 	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
 	return &azRoutesClient{
 		client:            routesClient,
@@ -1257,6 +1311,12 @@ func newAzRouteTablesClient(config *azClientConfig) *azRouteTablesClient {
 	}
 	configureUserAgent(&routeTablesClient.Client)
 
+	klog.V(2).Infof("Azure RouteTablesClient (read ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPS,
+		config.rateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).Infof("Azure RouteTablesClient (write ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
 	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
 	return &azRouteTablesClient{
 		client:            routeTablesClient,
@@ -1355,6 +1415,12 @@ func newAzStorageAccountClient(config *azClientConfig) *azStorageAccountClient {
 	}
 	configureUserAgent(&storageAccountClient.Client)
 
+	klog.V(2).Infof("Azure StorageAccountClient (read ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPS,
+		config.rateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).Infof("Azure StorageAccountClient (write ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
 	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
 	return &azStorageAccountClient{
 		client:            storageAccountClient,
@@ -1476,6 +1542,12 @@ func newAzDisksClient(config *azClientConfig) *azDisksClient {
 	}
 	configureUserAgent(&disksClient.Client)
 
+	klog.V(2).Infof("Azure DisksClient (read ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPS,
+		config.rateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).Infof("Azure DisksClient (write ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
 	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
 	return &azDisksClient{
 		client:            disksClient,
@@ -1578,6 +1650,12 @@ func newAzVirtualMachineSizesClient(config *azClientConfig) *azVirtualMachineSiz
 	}
 	configureUserAgent(&VirtualMachineSizesClient.Client)
 
+	klog.V(2).Infof("Azure VirtualMachineSizesClient (read ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPS,
+		config.rateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).Infof("Azure VirtualMachineSizesClient (write ops) using rate limit config: QPS=%g, bucket=%d",
+		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
 	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
 	return &azVirtualMachineSizesClient{
 		rateLimiterReader: rateLimiterReader,
