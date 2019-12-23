@@ -9,8 +9,15 @@ go_library(
         "//pkg/scheduler/algorithm/priorities:go_default_library",
         "//pkg/scheduler/framework/plugins/migration:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
+        "//pkg/scheduler/listers:go_default_library",
+        "//pkg/scheduler/nodeinfo:go_default_library",
+        "//pkg/util/node:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/client-go/listers/apps/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
