@@ -143,6 +143,8 @@ func Convert_v1_ReplicationControllerStatus_To_apps_ReplicaSetStatus(in *v1.Repl
 }
 
 func Convert_apps_ReplicaSet_To_v1_ReplicationController(in *apps.ReplicaSet, out *v1.ReplicationController, s conversion.Scope) error {
+	out.APIVersion = "v1"
+	out.Kind = "ReplicationController"
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apps_ReplicaSetSpec_To_v1_ReplicationControllerSpec(&in.Spec, &out.Spec, s); err != nil {
 		fieldErr, ok := err.(*field.Error)

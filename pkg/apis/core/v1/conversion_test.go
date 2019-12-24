@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
@@ -241,6 +243,10 @@ func TestReplicationControllerConversion(t *testing.T) {
 	// If we start with a RC, we should always have round-trip fidelity.
 	inputs := []*v1.ReplicationController{
 		{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "v1",
+				Kind:       "ReplicationController",
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "name",
 				Namespace: "namespace",
@@ -287,6 +293,8 @@ func TestReplicationControllerConversion(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		rc := &v1.ReplicationController{}
 		apiObjectFuzzer.Fuzz(rc)
+		rc.APIVersion = "v1"
+		rc.Kind = "ReplicationController"
 		// Sometimes the fuzzer decides to leave Spec.Template nil.
 		// We can't support that because Spec.Template is not a pointer in RS,
 		// so it will round-trip as non-nil but empty.
@@ -323,7 +331,7 @@ func TestReplicationControllerConversion(t *testing.T) {
 		if !apiequality.Semantic.DeepEqual(in, out) {
 			instr, _ := json.MarshalIndent(in, "", "  ")
 			outstr, _ := json.MarshalIndent(out, "", "  ")
-			t.Errorf("RC-RS conversion round-trip failed:\nin:\n%s\nout:\n%s", instr, outstr)
+			t.Errorf("RC-RS conversion round-trip failed:\n%s", cmp.Diff(string(instr), string(outstr)))
 		}
 	}
 }

@@ -19,6 +19,7 @@ package roundtrip
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"reflect"
 	"strings"
@@ -132,20 +133,19 @@ func RoundTripTypes(t *testing.T, scheme *runtime.Scheme, codecFactory runtimese
 
 func roundTripTypes(t *testing.T, scheme *runtime.Scheme, codecFactory runtimeserializer.CodecFactory, fuzzer *fuzz.Fuzzer, nonRoundTrippableTypes map[schema.GroupVersionKind]bool, skipProtobuf bool) {
 	for _, group := range groupsFromScheme(scheme) {
-		t.Logf("starting group %q", group)
-		internalVersion := schema.GroupVersion{Group: group, Version: runtime.APIVersionInternal}
-		internalKindToGoType := scheme.KnownTypes(internalVersion)
+		t.Run(group, func(t *testing.T) {
+			internalVersion := schema.GroupVersion{Group: group, Version: runtime.APIVersionInternal}
+			internalKindToGoType := scheme.KnownTypes(internalVersion)
 
-		for kind := range internalKindToGoType {
-			if globalNonRoundTrippableTypes.Has(kind) {
-				continue
+			for kind := range internalKindToGoType {
+				if globalNonRoundTrippableTypes.Has(kind) {
+					continue
+				}
+
+				internalGVK := internalVersion.WithKind(kind)
+				roundTripSpecificKind(t, internalGVK, scheme, codecFactory, fuzzer, nonRoundTrippableTypes, skipProtobuf)
 			}
-
-			internalGVK := internalVersion.WithKind(kind)
-			roundTripSpecificKind(t, internalGVK, scheme, codecFactory, fuzzer, nonRoundTrippableTypes, skipProtobuf)
-		}
-
-		t.Logf("finished group %q", group)
+		})
 	}
 }
 
@@ -240,7 +240,7 @@ func roundTripToAllExternalVersions(t *testing.T, scheme *runtime.Scheme, codecF
 
 	// find all potential serializations in the scheme.
 	// TODO fix this up to handle kinds that cross registered with different names.
-	for externalGVK, externalGoType := range scheme.AllKnownTypes() {
+	for externalGVK := range scheme.AllKnownTypes() {
 		if externalGVK.Version == runtime.APIVersionInternal {
 			continue
 		}
@@ -248,19 +248,38 @@ func roundTripToAllExternalVersions(t *testing.T, scheme *runtime.Scheme, codecF
 			continue
 		}
 		if nonRoundTrippableTypes[externalGVK] {
-			t.Logf("\tskipping  %v %v", externalGVK, externalGoType)
+			// t.Logf("\tskipping  %v %v", externalGVK, externalGoType)
 			continue
 		}
-		t.Logf("\tround tripping to %v %v", externalGVK, externalGoType)
+		t.Run(fmt.Sprintf("to_%s_%s_%s", externalGVK.Group, externalGVK.Version, externalGVK.Kind), func(t *testing.T) {
+			// t.Logf("\tround tripping to %v %v", externalGVK, externalGoType)
 
-		roundTrip(t, scheme, apitesting.TestCodec(codecFactory, externalGVK.GroupVersion()), object)
+			roundTrip(t, scheme, apitesting.TestCodec(codecFactory, externalGVK.GroupVersion()), object)
 
-		// TODO remove this hack after we're past the intermediate steps
-		if !skipProtobuf && externalGVK.Group != "kubeadm.k8s.io" {
-			s := protobuf.NewSerializer(scheme, scheme)
-			protobufCodec := codecFactory.CodecForVersions(s, s, externalGVK.GroupVersion(), nil)
-			roundTrip(t, scheme, protobufCodec, object)
-		}
+			if externalObject, err := scheme.New(externalGVK); err != nil {
+				t.Error(err)
+			} else if err := scheme.Convert(object, externalObject, nil); err != nil {
+				t.Error(err)
+			} else if actualGVK := externalObject.GetObjectKind().GroupVersionKind(); actualGVK != externalGVK {
+				t.Errorf("expected\n\t%#v\ngot\n\t%#v", externalGVK, actualGVK)
+			} else if strings.HasSuffix(externalGVK.Kind, "List") && externalGVK.Kind != "List" {
+				listlessGVK := externalGVK
+				listlessGVK.Kind = strings.TrimSuffix(listlessGVK.Kind, "List")
+				apimeta.EachListItem(externalObject, func(externalItem runtime.Object) error {
+					if actualGVK := externalItem.GetObjectKind().GroupVersionKind(); actualGVK != listlessGVK {
+						t.Errorf("expected\n\t%#v\ngot\n\t%#v", listlessGVK, actualGVK)
+					}
+					return nil
+				})
+			}
+
+			// TODO remove this hack after we're past the intermediate steps
+			if !skipProtobuf && externalGVK.Group != "kubeadm.k8s.io" {
+				s := protobuf.NewSerializer(scheme, scheme)
+				protobufCodec := codecFactory.CodecForVersions(s, s, externalGVK.GroupVersion(), nil)
+				roundTrip(t, scheme, protobufCodec, object)
+			}
+		})
 	}
 }
 

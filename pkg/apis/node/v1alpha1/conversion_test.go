@@ -58,6 +58,7 @@ func TestRuntimeClassConversion(t *testing.T) {
 				},
 			},
 			external: &v1alpha1.RuntimeClass{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "node.k8s.io/v1alpha1", Kind: "RuntimeClass"},
 				ObjectMeta: metav1.ObjectMeta{Name: name},
 				Spec: v1alpha1.RuntimeClassSpec{
 					RuntimeHandler: handler,
@@ -84,6 +85,7 @@ func TestRuntimeClassConversion(t *testing.T) {
 				Overhead:   &node.Overhead{},
 			},
 			external: &v1alpha1.RuntimeClass{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "node.k8s.io/v1alpha1", Kind: "RuntimeClass"},
 				ObjectMeta: metav1.ObjectMeta{Name: name},
 				Spec: v1alpha1.RuntimeClassSpec{
 					RuntimeHandler: handler,
@@ -98,6 +100,7 @@ func TestRuntimeClassConversion(t *testing.T) {
 				Scheduling: &node.Scheduling{},
 			},
 			external: &v1alpha1.RuntimeClass{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "node.k8s.io/v1alpha1", Kind: "RuntimeClass"},
 				ObjectMeta: metav1.ObjectMeta{Name: name},
 				Spec: v1alpha1.RuntimeClassSpec{
 					RuntimeHandler: handler,
@@ -111,6 +114,7 @@ func TestRuntimeClassConversion(t *testing.T) {
 				Handler:    handler,
 			},
 			external: &v1alpha1.RuntimeClass{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "node.k8s.io/v1alpha1", Kind: "RuntimeClass"},
 				ObjectMeta: metav1.ObjectMeta{Name: name},
 				Spec: v1alpha1.RuntimeClassSpec{
 					RuntimeHandler: handler,

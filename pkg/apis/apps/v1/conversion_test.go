@@ -279,6 +279,7 @@ func TestV1DeploymentConversion(t *testing.T) {
 				},
 			},
 			deployment2: &appsv1.Deployment{
+				TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{appsv1.DeprecatedRollbackTo: "2"},
 				},
@@ -304,6 +305,7 @@ func TestV1DeploymentConversion(t *testing.T) {
 				},
 			},
 			deployment2: &appsv1.Deployment{
+				TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: replica,
 					Template: v1.PodTemplateSpec{
