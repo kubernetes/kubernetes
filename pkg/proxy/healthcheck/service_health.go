@@ -163,7 +163,7 @@ func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	} else {
 		resp.WriteHeader(http.StatusOK)
 	}
-	fmt.Fprintf(resp, strings.Trim(dedent.Dedent(fmt.Sprintf(`
+	fmt.Fprint(resp, strings.Trim(dedent.Dedent(fmt.Sprintf(`
 		{
 			"service": {
 				"namespace": %q,
