@@ -320,4 +320,3 @@ func (o *SecretTLSOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 func (o *SecretTLSOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }
-

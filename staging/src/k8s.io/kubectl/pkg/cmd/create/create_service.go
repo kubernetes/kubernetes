@@ -340,4 +340,3 @@ func (o *ServiceExternalNameOpts) Complete(f cmdutil.Factory, cmd *cobra.Command
 func (o *ServiceExternalNameOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }
-

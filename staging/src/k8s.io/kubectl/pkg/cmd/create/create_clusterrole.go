@@ -208,4 +208,3 @@ func (c *ClusterRoleOptions) RunCreateRole() error {
 
 	return c.PrintObj(clusterRole)
 }
-

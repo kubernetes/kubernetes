@@ -246,4 +246,3 @@ func (o *JobOptions) createJobFromCronJob(cronJob *batchv1beta1.CronJob) *batchv
 		Spec: cronJob.Spec.JobTemplate.Spec,
 	}
 }
-

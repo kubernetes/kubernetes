@@ -511,4 +511,3 @@ func TestClusterRoleValidate(t *testing.T) {
 		})
 	}
 }
-

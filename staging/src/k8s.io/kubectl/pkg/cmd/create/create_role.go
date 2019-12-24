@@ -400,4 +400,3 @@ func generateResourcePolicyRules(mapper meta.RESTMapper, verbs []string, resourc
 
 	return rules, nil
 }
-
