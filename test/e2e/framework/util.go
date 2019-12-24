@@ -1714,22 +1714,6 @@ func RunCmdEnv(env []string, command string, args ...string) (string, string, er
 	return stdout, stderr, nil
 }
 
-// retryCmd runs cmd using args and retries it for up to SingleCallTimeout if
-// it returns an error. It returns stdout and stderr.
-func retryCmd(command string, args ...string) (string, string, error) {
-	var err error
-	stdout, stderr := "", ""
-	wait.Poll(Poll, SingleCallTimeout, func() (bool, error) {
-		stdout, stderr, err = RunCmd(command, args...)
-		if err != nil {
-			Logf("Got %v", err)
-			return false, nil
-		}
-		return true, nil
-	})
-	return stdout, stderr, err
-}
-
 // E2ETestNodePreparer implements testutils.TestNodePreparer interface, which is used
 // to create/modify Nodes before running a test.
 type E2ETestNodePreparer struct {
