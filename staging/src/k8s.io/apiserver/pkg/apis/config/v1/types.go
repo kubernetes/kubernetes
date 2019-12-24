@@ -26,7 +26,7 @@ import (
 
 // EncryptionConfiguration stores the complete configuration for encryption providers.
 type EncryptionConfiguration struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 	// resources is a list containing resources, and their corresponding encryption providers.
 	Resources []ResourceConfiguration `json:"resources"`
 }
