@@ -315,6 +315,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
+					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -388,6 +389,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
+					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -472,6 +474,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
+					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -567,6 +570,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
+					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -664,6 +668,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
+					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -764,6 +769,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
+					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -876,6 +882,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
+					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -991,6 +998,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
+					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -1106,6 +1114,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
+					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -1225,6 +1234,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
+					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
