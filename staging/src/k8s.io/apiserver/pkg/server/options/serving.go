@@ -147,9 +147,9 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 
 	desc := "The port on which to serve HTTPS with authentication and authorization."
 	if s.Required {
-		desc += "It cannot be switched off with 0."
+		desc += " It cannot be switched off with 0."
 	} else {
-		desc += "If 0, don't serve HTTPS at all."
+		desc += " If 0, don't serve HTTPS at all."
 	}
 	fs.IntVar(&s.BindPort, "secure-port", s.BindPort, desc)
 
