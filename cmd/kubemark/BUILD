@@ -19,6 +19,7 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/kubelet/cadvisor/testing:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
+        "//pkg/kubelet/remote:go_default_library",
         "//pkg/kubelet/remote/fake:go_default_library",
         "//pkg/kubemark:go_default_library",
         "//pkg/master/ports:go_default_library",

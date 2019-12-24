@@ -25,6 +25,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/kubelet"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	fakeremote "k8s.io/kubernetes/pkg/kubelet/remote/fake"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
@@ -98,13 +98,14 @@ func NewHollowKubelet(
 	client *clientset.Clientset,
 	heartbeatClient *clientset.Clientset,
 	cadvisorInterface cadvisor.Interface,
-	remoteRuntime *fakeremote.RemoteRuntime,
+	imageService internalapi.ImageManagerService,
+	runtimeService internalapi.RuntimeService,
 	containerManager cm.ContainerManager) *HollowKubelet {
 	d := &kubelet.Dependencies{
 		KubeClient:           client,
 		HeartbeatClient:      heartbeatClient,
-		RemoteRuntimeService: remoteRuntime.RuntimeService,
-		RemoteImageService:   remoteRuntime.ImageService,
+		RemoteRuntimeService: runtimeService,
+		RemoteImageService:   imageService,
 		CAdvisorInterface:    cadvisorInterface,
 		Cloud:                nil,
 		OSInterface:          &containertest.FakeOS{},
