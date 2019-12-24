@@ -25,7 +25,9 @@ import (
 // Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass must override the automatic
 // conversion since we unnested the spec struct after v1alpha1
 func Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass(in *v1alpha1.RuntimeClass, out *node.RuntimeClass, s conversion.Scope) error {
-	out.ObjectMeta = in.ObjectMeta
+	if err := autoConvert_v1alpha1_RuntimeClass_To_node_RuntimeClass(in, out, s); err != nil {
+		return err
+	}
 	out.Handler = in.Spec.RuntimeHandler
 
 	if in.Spec.Overhead != nil {
@@ -46,7 +48,9 @@ func Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass(in *v1alpha1.RuntimeClas
 // Convert_node_RuntimeClass_To_v1alpha1_RuntimeClass must override the automatic
 // conversion since we unnested the spec struct after v1alpha1
 func Convert_node_RuntimeClass_To_v1alpha1_RuntimeClass(in *node.RuntimeClass, out *v1alpha1.RuntimeClass, s conversion.Scope) error {
-	out.ObjectMeta = in.ObjectMeta
+	if err := autoConvert_node_RuntimeClass_To_v1alpha1_RuntimeClass(in, out, s); err != nil {
+		return err
+	}
 	out.Spec.RuntimeHandler = in.Handler
 
 	if in.Overhead != nil {
