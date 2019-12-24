@@ -148,6 +148,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				},
 				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
+					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
@@ -227,6 +228,7 @@ kind: Policy
 				},
 				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
+					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
