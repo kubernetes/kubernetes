@@ -47,6 +47,7 @@ filegroup(
         ":package-srcs",
         "//pkg/scheduler/framework/plugins/defaultpodtopologyspread:all-srcs",
         "//pkg/scheduler/framework/plugins/examples:all-srcs",
+        "//pkg/scheduler/framework/plugins/helper:all-srcs",
         "//pkg/scheduler/framework/plugins/imagelocality:all-srcs",
         "//pkg/scheduler/framework/plugins/interpodaffinity:all-srcs",
         "//pkg/scheduler/framework/plugins/migration:all-srcs",
