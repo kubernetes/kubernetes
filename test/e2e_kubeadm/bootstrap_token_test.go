@@ -68,7 +68,6 @@ var _ = Describe("bootstrap token", func() {
 			rbacv1.GroupKind, bootstrapTokensGroup,
 			bootstrapTokensAllowPostCSRClusterRoleName,
 		)
-		//TODO: check if possible to verify "allowed to post CSR" using subject asses review as well
 	})
 
 	ginkgo.It("should be allowed to auto approve CSR for kubelet certificates on joining nodes", func() {
@@ -77,6 +76,5 @@ var _ = Describe("bootstrap token", func() {
 			rbacv1.GroupKind, bootstrapTokensGroup,
 			bootstrapTokensCSRAutoApprovalClusterRoleName,
 		)
-		//TODO: check if possible to verify "allowed to auto approve CSR" using subject asses review as well
 	})
 })
