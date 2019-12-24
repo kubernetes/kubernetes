@@ -487,7 +487,7 @@ func (util *RBDUtil) DetachDisk(plugin *rbdPlugin, deviceMountPath string, devic
 	// rbd unmap
 	output, err := exec.Command(rbdCmd, "unmap", device).CombinedOutput()
 	if err != nil {
-		return rbdErrors(err, fmt.Errorf("rbd: failed to unmap device %s, error %v, rbd output: %v", device, err, output))
+		return rbdErrors(err, fmt.Errorf("rbd: failed to unmap device %s, error %v, rbd output: %s", device, err, string(output)))
 	}
 	klog.V(3).Infof("rbd: successfully unmap device %s", device)
 
