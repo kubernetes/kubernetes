@@ -196,7 +196,7 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 		"Identifiers of the API. The service account token authenticator will validate that "+
 		"tokens used against the API are bound to at least one of these audiences. If the "+
 		"--service-account-issuer flag is configured and this flag is not, this field "+
-		"defaults to a single element list containing the issuer URL .")
+		"defaults to a single element list containing the issuer URL.")
 
 	if s.Anonymous != nil {
 		fs.BoolVar(&s.Anonymous.Allow, "anonymous-auth", s.Anonymous.Allow, ""+
