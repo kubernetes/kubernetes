@@ -187,7 +187,6 @@ pkg/registry/rbac/rolebinding
 pkg/registry/rbac/rolebinding/policybased
 pkg/registry/rbac/validation
 pkg/registry/registrytest
-pkg/registry/scheduling/rest
 pkg/registry/settings/rest
 pkg/registry/storage/rest
 pkg/registry/storage/storageclass

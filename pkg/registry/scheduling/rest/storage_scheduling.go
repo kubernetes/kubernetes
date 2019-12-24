@@ -39,35 +39,39 @@ import (
 	priorityclassstore "k8s.io/kubernetes/pkg/registry/scheduling/priorityclass/storage"
 )
 
+// PostStartHookName is the name of post start hook.
 const PostStartHookName = "scheduling/bootstrap-system-priority-classes"
 
+// RESTStorageProvider is Storage of REST requests.
 type RESTStorageProvider struct{}
 
 var _ genericapiserver.PostStartHookProvider = RESTStorageProvider{}
 
+// NewRESTStorage returns an APIGroupInfo object that work against apiservice.
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(scheduling.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 
 	if apiResourceConfigSource.VersionEnabled(schedulingapiv1alpha1.SchemeGroupVersion) {
-		if storage, err := p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		storage, err := p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter)
+		if err != nil {
 			return genericapiserver.APIGroupInfo{}, false, err
-		} else {
-			apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1alpha1.SchemeGroupVersion.Version] = storage
 		}
+		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1alpha1.SchemeGroupVersion.Version] = storage
 	}
 	if apiResourceConfigSource.VersionEnabled(schedulingapiv1beta1.SchemeGroupVersion) {
-		if storage, err := p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		storage, err := p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
+		if err != nil {
 			return genericapiserver.APIGroupInfo{}, false, err
-		} else {
-			apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1beta1.SchemeGroupVersion.Version] = storage
 		}
+		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1beta1.SchemeGroupVersion.Version] = storage
+
 	}
 	if apiResourceConfigSource.VersionEnabled(schedulingapiv1.SchemeGroupVersion) {
-		if storage, err := p.v1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		storage, err := p.v1Storage(apiResourceConfigSource, restOptionsGetter)
+		if err != nil {
 			return genericapiserver.APIGroupInfo{}, false, err
-		} else {
-			apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1.SchemeGroupVersion.Version] = storage
 		}
+		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1.SchemeGroupVersion.Version] = storage
 	}
 	return apiGroupInfo, true, nil
 }
@@ -75,42 +79,42 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
 	// priorityclasses
-	if priorityClassStorage, err := priorityclassstore.NewREST(restOptionsGetter); err != nil {
+	priorityClassStorage, err := priorityclassstore.NewREST(restOptionsGetter)
+	if err != nil {
 		return nil, err
-	} else {
-		storage["priorityclasses"] = priorityClassStorage
 	}
+	storage["priorityclasses"] = priorityClassStorage
 	return storage, nil
 }
 
 func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
 	// priorityclasses
-	if priorityClassStorage, err := priorityclassstore.NewREST(restOptionsGetter); err != nil {
+	priorityClassStorage, err := priorityclassstore.NewREST(restOptionsGetter)
+	if err != nil {
 		return nil, err
-	} else {
-		storage["priorityclasses"] = priorityClassStorage
 	}
-
+	storage["priorityclasses"] = priorityClassStorage
 	return storage, nil
 }
 
 func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
 	// priorityclasses
-	if priorityClassStorage, err := priorityclassstore.NewREST(restOptionsGetter); err != nil {
+	priorityClassStorage, err := priorityclassstore.NewREST(restOptionsGetter)
+	if err != nil {
 		return nil, err
-	} else {
-		storage["priorityclasses"] = priorityClassStorage
 	}
-
+	storage["priorityclasses"] = priorityClassStorage
 	return storage, nil
 }
 
+// PostStartHook returns Post Start Hook name and result of adding system priority classes.
 func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
 	return PostStartHookName, AddSystemPriorityClasses(), nil
 }
 
+// AddSystemPriorityClasses returns the result of adding system priority classes.
 func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 	return func(hookContext genericapiserver.PostStartHookContext) error {
 		// Adding system priority classes is important. If they fail to add, many critical system
@@ -129,9 +133,8 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 						_, err := schedClientSet.PriorityClasses().Create(pc)
 						if err != nil && !apierrors.IsAlreadyExists(err) {
 							return false, err
-						} else {
-							klog.Infof("created PriorityClass %s with value %v", pc.Name, pc.Value)
 						}
+						klog.Infof("created PriorityClass %s with value %v", pc.Name, pc.Value)
 					} else {
 						// Unable to get the priority class for reasons other than "not found".
 						klog.Warningf("unable to get PriorityClass %v: %v. Retrying...", pc.Name, err)
@@ -150,6 +153,7 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 	}
 }
 
+// GroupName returns the scheduling group name.
 func (p RESTStorageProvider) GroupName() string {
 	return scheduling.GroupName
 }
