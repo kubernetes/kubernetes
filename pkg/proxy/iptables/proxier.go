@@ -869,7 +869,7 @@ func (proxier *Proxier) syncProxyRules() {
 		masqRule = append(masqRule, "--random-fully")
 		klog.V(3).Info("Using `--random-fully` in the MASQUERADE rule for iptables")
 	} else {
-		klog.V(2).Info("Not using `--random-fully` in the MASQUERADE rule for iptables because the local version of iptables does not support it")
+		klog.V(3).Info("Not using `--random-fully` in the MASQUERADE rule for iptables because the local version of iptables does not support it")
 	}
 	writeLine(proxier.natRules, masqRule...)
 
