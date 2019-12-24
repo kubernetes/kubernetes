@@ -162,6 +162,7 @@ func kubeDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 	if err := createKubeDNSAddon(dnsDeploymentBytes, dnsServiceBytes, client); err != nil {
 		return err
 	}
+	fmt.Println("[addons] WARNING: kube-dns is deprecated and will not be supported in a future version")
 	fmt.Println("[addons] Applied essential addon: kube-dns")
 	return nil
 }
