@@ -4601,6 +4601,8 @@ type ServiceProxyOptions struct {
 	Path string
 }
 
+// +k8s:conversion-gen:set-api-version-kind=false
+
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ObjectReference struct {

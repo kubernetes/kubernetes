@@ -280,6 +280,8 @@ type GroupResources struct {
 	ResourceNames []string `json:"resourceNames,omitempty" protobuf:"bytes,3,rep,name=resourceNames"`
 }
 
+// +k8s:conversion-gen:set-api-version-kind=false
+
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 type ObjectReference struct {
 	// +optional

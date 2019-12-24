@@ -60,6 +60,8 @@ type ScaleStatus struct {
 	Selector string
 }
 
+// +k8s:conversion-gen:set-api-version-kind=false
+
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 type CrossVersionObjectReference struct {
 	// Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"

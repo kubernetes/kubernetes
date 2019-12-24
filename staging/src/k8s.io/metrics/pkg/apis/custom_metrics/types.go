@@ -94,6 +94,8 @@ type MetricListOptions struct {
 // There is no need to keep it an exact copy. Each repo can define its own
 // internal objects.
 
+// +k8s:conversion-gen:set-api-version-kind=false
+
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 type ObjectReference struct {
 	Kind            string

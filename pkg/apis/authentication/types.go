@@ -147,6 +147,8 @@ type TokenRequestStatus struct {
 	ExpirationTimestamp metav1.Time
 }
 
+// +k8s:conversion-gen:set-api-version-kind=false
+
 // BoundObjectReference is a reference to an object that a token is bound to.
 type BoundObjectReference struct {
 	// Kind of the referent. Valid kinds are 'Pod' and 'Secret'.

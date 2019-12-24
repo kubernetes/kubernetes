@@ -5346,6 +5346,8 @@ type ServiceProxyOptions struct {
 	Path string `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
 }
 
+// +k8s:conversion-gen:set-api-version-kind=false
+
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 // ---
 // New uses of this type are discouraged because of difficulty describing its usage when embedded in APIs.
