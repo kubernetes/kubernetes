@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
-	"k8s.io/kubernetes/test/e2e/framework/replicaset"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -494,7 +493,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 			RCConfig: rcConfig,
 		}
 		ginkgo.By(fmt.Sprintf("creating replicaset %s in namespace %s", rsConfig.Name, rsConfig.Namespace))
-		framework.ExpectNoError(replicaset.RunReplicaSet(rsConfig))
+		framework.ExpectNoError(runReplicaSet(rsConfig))
 	default:
 		framework.Failf(invalidKind)
 	}
@@ -563,4 +562,12 @@ func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, ma
 // DeleteHorizontalPodAutoscaler delete the horizontalPodAutoscaler for consuming resources.
 func DeleteHorizontalPodAutoscaler(rc *ResourceConsumer, autoscalerName string) {
 	rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Delete(autoscalerName, nil)
+}
+
+// runReplicaSet launches (and verifies correctness) of a replicaset.
+func runReplicaSet(config testutils.ReplicaSetConfig) error {
+	ginkgo.By(fmt.Sprintf("creating replicaset %s in namespace %s", config.Name, config.Namespace))
+	config.NodeDumpFunc = framework.DumpNodeDebugInfo
+	config.ContainerDumpFunc = e2ekubectl.LogFailedContainers
+	return testutils.RunReplicaSet(config)
 }
