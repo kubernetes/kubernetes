@@ -1056,16 +1056,6 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 						ds, metav1.NewControllerRef(ds, controllerKind))
 				}
 
-				if err != nil && errors.IsTimeout(err) {
-					// Pod is created but its initialization has timed out.
-					// If the initialization is successful eventually, the
-					// controller will observe the creation via the informer.
-					// If the initialization fails, or if the pod keeps
-					// uninitialized for a long time, the informer will not
-					// receive any update, and the controller will create a new
-					// pod when the expectation expires.
-					return
-				}
 				if err != nil {
 					klog.V(2).Infof("Failed creation, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
 					dsc.expectations.CreationObserved(dsKey)
