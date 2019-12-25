@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This sciprt checks cording style for go language files in each
+# This script checks coding style for go language files in each
 # Kubernetes package by golint.
 # Usage: hack/verify-golint.sh
 
