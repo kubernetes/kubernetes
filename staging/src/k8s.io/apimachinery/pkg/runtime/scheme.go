@@ -599,49 +599,49 @@ func (s *Scheme) SetVersionPriority(versions ...schema.GroupVersion) error {
 
 // PrioritizedVersionsForGroup returns versions for a single group in priority order
 func (s *Scheme) PrioritizedVersionsForGroup(group string) []schema.GroupVersion {
-	ret := []schema.GroupVersion{}
+	ordinal := 0
+	gvs := make(map[schema.GroupVersion]int)
 	for _, version := range s.versionPriority[group] {
-		ret = append(ret, schema.GroupVersion{Group: group, Version: version})
+		gvs[schema.GroupVersion{Group: group, Version: version}] = ordinal
+		ordinal++
 	}
 	for _, observedVersion := range s.observedVersions {
 		if observedVersion.Group != group {
 			continue
 		}
-		found := false
-		for _, existing := range ret {
-			if existing == observedVersion {
-				found = true
-				break
-			}
-		}
-		if !found {
-			ret = append(ret, observedVersion)
+		if _, ok := gvs[observedVersion]; !ok {
+			gvs[observedVersion] = ordinal
+			ordinal++
 		}
 	}
 
+	ret := make([]schema.GroupVersion, len(gvs), len(gvs))
+	for ver, order := range gvs {
+		ret[order] = ver
+	}
 	return ret
 }
 
 // PrioritizedVersionsAllGroups returns all known versions in their priority order.  Groups are random, but
 // versions for a single group are prioritized
 func (s *Scheme) PrioritizedVersionsAllGroups() []schema.GroupVersion {
-	ret := []schema.GroupVersion{}
+	ordinal := 0
+	gvs := make(map[schema.GroupVersion]int)
 	for group, versions := range s.versionPriority {
 		for _, version := range versions {
-			ret = append(ret, schema.GroupVersion{Group: group, Version: version})
+			gvs[schema.GroupVersion{Group: group, Version: version}] = ordinal
+			ordinal++
 		}
 	}
 	for _, observedVersion := range s.observedVersions {
-		found := false
-		for _, existing := range ret {
-			if existing == observedVersion {
-				found = true
-				break
-			}
+		if _, ok := gvs[observedVersion]; !ok {
+			gvs[observedVersion] = ordinal
+			ordinal++
 		}
-		if !found {
-			ret = append(ret, observedVersion)
-		}
+	}
+	ret := make([]schema.GroupVersion, len(gvs), len(gvs))
+	for ver, order := range gvs {
+		ret[order] = ver
 	}
 	return ret
 }
