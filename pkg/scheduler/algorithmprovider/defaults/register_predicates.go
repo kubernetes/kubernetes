@@ -117,7 +117,12 @@ func init() {
 	)
 
 	// Fit is determined by non-conflicting disk volumes.
-	scheduler.RegisterFitPredicate(predicates.NoDiskConflictPred, predicates.NoDiskConflict)
+	scheduler.RegisterFitPredicateFactory(
+		predicates.NoDiskConflictPred,
+		func(args scheduler.AlgorithmFactoryArgs) predicates.FitPredicate {
+			return nil
+		},
+	)
 
 	// GeneralPredicates are the predicates that are enforced by all Kubernetes components
 	// (e.g. kubelet and all schedulers)
