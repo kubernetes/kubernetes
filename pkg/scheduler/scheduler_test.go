@@ -56,7 +56,6 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -143,10 +142,6 @@ func podWithResources(id, desiredHost string, limits v1.ResourceList, requests v
 	return pod
 }
 
-func PriorityOne(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
-	return framework.NodeScore{}, nil
-}
-
 type mockScheduler struct {
 	result core.ScheduleResult
 	err    error
@@ -179,11 +174,7 @@ func TestSchedulerCreation(t *testing.T) {
 	client := clientsetfake.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-	testSource := "testProvider"
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")})
-
-	RegisterPriorityMapReduceFunction("PriorityOne", PriorityOne, nil, 1)
-	RegisterAlgorithmProvider(testSource, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -192,7 +183,6 @@ func TestSchedulerCreation(t *testing.T) {
 		NewPodInformer(client, 0),
 		eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
 		stopCh,
-		WithAlgorithmSource(schedulerapi.SchedulerAlgorithmSource{Provider: &testSource}),
 		WithPodInitialBackoffSeconds(1),
 		WithPodMaxBackoffSeconds(10),
 	)
@@ -217,7 +207,6 @@ func TestSchedulerCreation(t *testing.T) {
 		NewPodInformer(client, 0),
 		eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
 		stopCh,
-		WithAlgorithmSource(schedulerapi.SchedulerAlgorithmSource{Provider: &testSource}),
 		WithPodInitialBackoffSeconds(1),
 		WithPodMaxBackoffSeconds(10),
 		WithFrameworkOutOfTreeRegistry(registryFake),

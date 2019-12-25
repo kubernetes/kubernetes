@@ -197,6 +197,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	}
 
 	pluginsMap := make(map[string]Plugin)
+	var totalPriority int64
 	for name, factory := range r {
 		// initialize only needed plugins.
 		if _, ok := pg[name]; !ok {
@@ -215,6 +216,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		if f.pluginNameToWeightMap[name] == 0 {
 			f.pluginNameToWeightMap[name] = 1
 		}
+		// Checks totalPriority against MaxTotalScore to avoid overflow
+		if int64(f.pluginNameToWeightMap[name])*MaxNodeScore > MaxTotalScore-totalPriority {
+			return nil, fmt.Errorf("total score of Score plugins could overflow")
+		}
+		totalPriority += int64(f.pluginNameToWeightMap[name]) * MaxNodeScore
 	}
 
 	for _, e := range f.getExtensionPoints(plugins) {
