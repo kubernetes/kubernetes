@@ -29,17 +29,20 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
-// exclude those used by azure as resource and OS root in /dev/disk/azure
+// exclude those used by azure as resource and OS root in /dev/disk/azure, /dev/disk/azure/scsi0
+// "/dev/disk/azure/scsi0" dir is populated in Standard_DC4s/DC2s on Ubuntu 18.04
 func listAzureDiskPath(io ioHandler) []string {
-	azureDiskPath := "/dev/disk/azure/"
 	var azureDiskList []string
-	if dirs, err := io.ReadDir(azureDiskPath); err == nil {
-		for _, f := range dirs {
-			name := f.Name()
-			diskPath := azureDiskPath + name
-			if link, linkErr := io.Readlink(diskPath); linkErr == nil {
-				sd := link[(libstrings.LastIndex(link, "/") + 1):]
-				azureDiskList = append(azureDiskList, sd)
+	azureResourcePaths := []string{"/dev/disk/azure/", "/dev/disk/azure/scsi0/"}
+	for _, azureDiskPath := range azureResourcePaths {
+		if dirs, err := io.ReadDir(azureDiskPath); err == nil {
+			for _, f := range dirs {
+				name := f.Name()
+				diskPath := filepath.Join(azureDiskPath, name)
+				if link, linkErr := io.Readlink(diskPath); linkErr == nil {
+					sd := link[(libstrings.LastIndex(link, "/") + 1):]
+					azureDiskList = append(azureDiskList, sd)
+				}
 			}
 		}
 	}
