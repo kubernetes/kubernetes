@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package requestedtocapacityratio
+package noderesources
 
 import (
 	"context"
@@ -23,7 +23,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
@@ -68,7 +67,7 @@ func TestRequestedToCapacityRatio(t *testing.T) {
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.scheduledPods, test.nodes))
 			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 			args := &runtime.Unknown{Raw: []byte(`{"FunctionShape" : [{"Utilization" : 0, "Score" : 100}, {"Utilization" : 100, "Score" : 0}], "ResourceToWeightMap" : {"memory" : 1, "cpu" : 1}}`)}
-			p, _ := New(args, fh)
+			p, _ := NewRequestedToCapacityRatio(args, fh)
 
 			var gotPriorities framework.NodeScoreList
 			for _, n := range test.nodes {
@@ -83,22 +82,6 @@ func TestRequestedToCapacityRatio(t *testing.T) {
 				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedPriorities, gotPriorities)
 			}
 		})
-	}
-}
-
-func makeNode(name string, milliCPU, memory int64) *v1.Node {
-	return &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Status: v1.NodeStatus{
-			Capacity: v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
-			},
-			Allocatable: v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
-			},
-		},
 	}
 }
 
