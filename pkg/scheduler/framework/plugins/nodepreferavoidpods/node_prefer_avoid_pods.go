@@ -21,9 +21,9 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -50,9 +50,35 @@ func (pl *NodePreferAvoidPods) Score(ctx context.Context, state *framework.Cycle
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
 	}
 
-	meta := migration.PriorityMetadata(state)
-	s, err := priorities.CalculateNodePreferAvoidPodsPriorityMap(pod, meta, nodeInfo)
-	return s.Score, migration.ErrorToFrameworkStatus(err)
+	node := nodeInfo.Node()
+	if node == nil {
+		return 0, framework.NewStatus(framework.Error, "node not found")
+	}
+
+	controllerRef := metav1.GetControllerOf(pod)
+	if controllerRef != nil {
+		// Ignore pods that are owned by other controller than ReplicationController
+		// or ReplicaSet.
+		if controllerRef.Kind != "ReplicationController" && controllerRef.Kind != "ReplicaSet" {
+			controllerRef = nil
+		}
+	}
+	if controllerRef == nil {
+		return framework.MaxNodeScore, nil
+	}
+
+	avoids, err := v1helper.GetAvoidPodsFromNodeAnnotations(node.Annotations)
+	if err != nil {
+		// If we cannot get annotation, assume it's schedulable there.
+		return framework.MaxNodeScore, nil
+	}
+	for i := range avoids.PreferAvoidPods {
+		avoid := &avoids.PreferAvoidPods[i]
+		if avoid.PodSignature.PodController.Kind == controllerRef.Kind && avoid.PodSignature.PodController.UID == controllerRef.UID {
+			return 0, nil
+		}
+	}
+	return framework.MaxNodeScore, nil
 }
 
 // ScoreExtensions of the Score plugin.
