@@ -16,6 +16,9 @@
 
 # GoFmt apparently is changing @ head...
 
+# This script runs `gofmt` to golang source codes
+# Usage: hack/update-gofmt.sh
+
 set -o errexit
 set -o nounset
 set -o pipefail
