@@ -35,11 +35,6 @@ func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, 
 	return testutils.UpdateDeploymentWithRetries(c, namespace, name, applyUpdate, framework.Logf, poll, pollShortTimeout)
 }
 
-// CheckDeploymentRevisionAndImage checks if the input deployment's and its new replica set's revision and image are as expected.
-func CheckDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName, revision, image string) error {
-	return testutils.CheckDeploymentRevisionAndImage(c, ns, deploymentName, revision, image)
-}
-
 // NewDeployment returns a deployment spec with the specified argument.
 func NewDeployment(deploymentName string, replicas int32, podLabels map[string]string, imageName, image string, strategyType appsv1.DeploymentStrategyType) *appsv1.Deployment {
 	zero := int64(0)

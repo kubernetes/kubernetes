@@ -460,7 +460,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	err = e2edeploy.WaitForDeploymentUpdatedReplicasGTE(c, ns, deploymentName, deploymentReplicas, deployment.Generation)
 	// Check if it's updated to revision 1 correctly
 	framework.Logf("Check revision of new replica set for deployment %q", deploymentName)
-	err = e2edeploy.CheckDeploymentRevisionAndImage(c, ns, deploymentName, "1", deploymentImage)
+	err = checkDeploymentRevisionAndImage(c, ns, deploymentName, "1", deploymentImage)
 	framework.ExpectNoError(err)
 
 	framework.Logf("Ensure that both replica sets have 1 created replica")
@@ -1121,4 +1121,9 @@ func waitForReplicaSetTargetSpecReplicas(c clientset.Interface, replicaSet *apps
 		err = fmt.Errorf("replicaset %q never had desired number of .spec.replicas", replicaSet.Name)
 	}
 	return err
+}
+
+// checkDeploymentRevisionAndImage checks if the input deployment's and its new replica set's revision and image are as expected.
+func checkDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName, revision, image string) error {
+	return testutil.CheckDeploymentRevisionAndImage(c, ns, deploymentName, revision, image)
 }
