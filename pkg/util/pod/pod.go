@@ -20,15 +20,16 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
 // PatchPodStatus patches pod status.
-func PatchPodStatus(c clientset.Interface, namespace, name string, oldPodStatus, newPodStatus v1.PodStatus) (*v1.Pod, []byte, error) {
-	patchBytes, err := preparePatchBytesforPodStatus(namespace, name, oldPodStatus, newPodStatus)
+func PatchPodStatus(c clientset.Interface, namespace, name string, uid types.UID, oldPodStatus, newPodStatus v1.PodStatus) (*v1.Pod, []byte, error) {
+	patchBytes, err := preparePatchBytesforPodStatus(namespace, name, uid, oldPodStatus, newPodStatus)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -40,7 +41,7 @@ func PatchPodStatus(c clientset.Interface, namespace, name string, oldPodStatus,
 	return updatedPod, patchBytes, nil
 }
 
-func preparePatchBytesforPodStatus(namespace, name string, oldPodStatus, newPodStatus v1.PodStatus) ([]byte, error) {
+func preparePatchBytesforPodStatus(namespace, name string, uid types.UID, oldPodStatus, newPodStatus v1.PodStatus) ([]byte, error) {
 	oldData, err := json.Marshal(v1.Pod{
 		Status: oldPodStatus,
 	})
@@ -49,7 +50,8 @@ func preparePatchBytesforPodStatus(namespace, name string, oldPodStatus, newPodS
 	}
 
 	newData, err := json.Marshal(v1.Pod{
-		Status: newPodStatus,
+		ObjectMeta: metav1.ObjectMeta{UID: uid}, // only put the uid in the new object to ensure it appears in the patch as a precondition
+		Status:     newPodStatus,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to Marshal newData for pod %q/%q: %v", namespace, name, err)
