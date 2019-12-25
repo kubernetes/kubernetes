@@ -83,7 +83,7 @@ func init() {
 	scheduler.RegisterPriorityMapReduceFunction(priorities.NodePreferAvoidPodsPriority, priorities.CalculateNodePreferAvoidPodsPriorityMap, nil, 10000)
 
 	// Prioritizes nodes that have labels matching NodeAffinity
-	scheduler.RegisterPriorityMapReduceFunction(priorities.NodeAffinityPriority, priorities.CalculateNodeAffinityPriorityMap, priorities.CalculateNodeAffinityPriorityReduce, 1)
+	scheduler.RegisterPriorityMapReduceFunction(priorities.NodeAffinityPriority, nil, nil, 1)
 
 	// Prioritizes nodes that marked with taint which pod can tolerate.
 	scheduler.RegisterPriorityMapReduceFunction(priorities.TaintTolerationPriority, nil, nil, 1)
