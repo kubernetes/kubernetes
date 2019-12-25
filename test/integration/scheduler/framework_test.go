@@ -483,7 +483,7 @@ func TestPreFilterPlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "prefilter-plugin", nil), 2,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkDefaultRegistry(registry))
+		scheduler.WithFrameworkInTreeRegistry(registry))
 	defer cleanupTest(t, context)
 
 	tests := []struct {
@@ -554,7 +554,7 @@ func TestScorePlugin(t *testing.T) {
 
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "score-plugin", nil), 10,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkDefaultRegistry(registry))
+		scheduler.WithFrameworkInTreeRegistry(registry))
 	defer cleanupTest(t, context)
 
 	for i, fail := range []bool{false, true} {
@@ -612,7 +612,7 @@ func TestNormalizeScorePlugin(t *testing.T) {
 	}
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "score-plugin", nil), 10,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkDefaultRegistry(registry))
+		scheduler.WithFrameworkInTreeRegistry(registry))
 
 	defer cleanupTest(t, context)
 
@@ -657,7 +657,7 @@ func TestReservePlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "reserve-plugin", nil), 2,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkDefaultRegistry(registry))
+		scheduler.WithFrameworkInTreeRegistry(registry))
 	defer cleanupTest(t, context)
 
 	for _, fail := range []bool{false, true} {
@@ -709,7 +709,7 @@ func TestPrebindPlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "prebind-plugin", nil), 2,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkDefaultRegistry(registry))
+		scheduler.WithFrameworkInTreeRegistry(registry))
 	defer cleanupTest(t, context)
 
 	tests := []struct {
@@ -792,7 +792,7 @@ func TestUnreservePlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "unreserve-plugin", nil), 2,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkDefaultRegistry(registry))
+		scheduler.WithFrameworkInTreeRegistry(registry))
 	defer cleanupTest(t, context)
 
 	tests := []struct {
@@ -882,7 +882,7 @@ func TestBindPlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t, testContext, false, nil, time.Second,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkDefaultRegistry(registry),
+		scheduler.WithFrameworkInTreeRegistry(registry),
 		scheduler.WithFrameworkConfigProducerRegistry(nil))
 	defer cleanupTest(t, context)
 
@@ -1043,7 +1043,7 @@ func TestPostBindPlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "postbind-plugin", nil), 2,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkDefaultRegistry(registry))
+		scheduler.WithFrameworkInTreeRegistry(registry))
 	defer cleanupTest(t, context)
 
 	tests := []struct {
@@ -1099,7 +1099,7 @@ func TestPermitPlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "permit-plugin", nil), 2,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkDefaultRegistry(registry))
+		scheduler.WithFrameworkInTreeRegistry(registry))
 	defer cleanupTest(t, context)
 
 	tests := []struct {
@@ -1187,7 +1187,7 @@ func TestMultiplePermitPlugins(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "multi-permit-plugin", nil), 2,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkDefaultRegistry(registry))
+		scheduler.WithFrameworkInTreeRegistry(registry))
 	defer cleanupTest(t, context)
 
 	// Both permit plugins will return Wait for permitting
@@ -1242,7 +1242,7 @@ func TestPermitPluginsCancelled(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "permit-plugins", nil), 2,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkDefaultRegistry(registry))
+		scheduler.WithFrameworkInTreeRegistry(registry))
 	defer cleanupTest(t, context)
 
 	// Both permit plugins will return Wait for permitting
@@ -1283,7 +1283,7 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "permit-plugin", nil), 2,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkDefaultRegistry(registry))
+		scheduler.WithFrameworkInTreeRegistry(registry))
 	defer cleanupTest(t, context)
 
 	tests := []struct {
@@ -1364,7 +1364,7 @@ func TestFilterPlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "filter-plugin", nil), 2,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkDefaultRegistry(registry))
+		scheduler.WithFrameworkInTreeRegistry(registry))
 	defer cleanupTest(t, context)
 
 	for _, fail := range []bool{false, true} {
@@ -1415,7 +1415,7 @@ func TestPostFilterPlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "post-filter-plugin", nil), 2,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkDefaultRegistry(registry))
+		scheduler.WithFrameworkInTreeRegistry(registry))
 	defer cleanupTest(t, context)
 
 	for _, fail := range []bool{false, true} {
@@ -1460,7 +1460,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "preempt-with-permit-plugin", nil), 0,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkDefaultRegistry(registry))
+		scheduler.WithFrameworkInTreeRegistry(registry))
 	defer cleanupTest(t, context)
 
 	// Add one node.

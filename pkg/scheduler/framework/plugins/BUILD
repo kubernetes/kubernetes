@@ -2,7 +2,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["default_registry.go"],
+    srcs = ["registry.go"],
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins",
     visibility = ["//visibility:public"],
     deps = [
@@ -72,7 +72,7 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["default_registry_test.go"],
+    srcs = ["registry_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/scheduler/apis/config:go_default_library",

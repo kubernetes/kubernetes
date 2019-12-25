@@ -141,9 +141,9 @@ type schedulerOptions struct {
 	bindTimeoutSeconds             int64
 	podInitialBackoffSeconds       int64
 	podMaxBackoffSeconds           int64
-	// Default registry contains all in-tree plugins
-	frameworkDefaultRegistry framework.Registry
-	// This registry contains out of tree plugins to be merged with default registry.
+	// Contains all in-tree plugins.
+	frameworkInTreeRegistry framework.Registry
+	// This registry contains out of tree plugins to be merged with the in-tree registry.
 	frameworkOutOfTreeRegistry      framework.Registry
 	frameworkConfigProducerRegistry *frameworkplugins.ConfigProducerRegistry
 	frameworkPlugins                *schedulerapi.Plugins
@@ -195,10 +195,10 @@ func WithBindTimeoutSeconds(bindTimeoutSeconds int64) Option {
 	}
 }
 
-// WithFrameworkDefaultRegistry sets the framework's default registry. This is only used in integration tests.
-func WithFrameworkDefaultRegistry(registry framework.Registry) Option {
+// WithFrameworkInTreeRegistry sets the framework's in-tree registry. This is only used in integration tests.
+func WithFrameworkInTreeRegistry(registry framework.Registry) Option {
 	return func(o *schedulerOptions) {
-		o.frameworkDefaultRegistry = registry
+		o.frameworkInTreeRegistry = registry
 	}
 }
 
@@ -256,7 +256,7 @@ var defaultSchedulerOptions = schedulerOptions{
 	bindTimeoutSeconds:              BindTimeoutSeconds,
 	podInitialBackoffSeconds:        int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
 	podMaxBackoffSeconds:            int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
-	frameworkConfigProducerRegistry: frameworkplugins.NewDefaultConfigProducerRegistry(),
+	frameworkConfigProducerRegistry: frameworkplugins.NewConfigProducerRegistry(),
 	// The plugins and pluginConfig options are currently nil because we currently don't have
 	// "default" plugins. All plugins that we run through the framework currently come from two
 	// sources: 1) specified in component config, in which case those two options should be
@@ -297,9 +297,9 @@ func New(client clientset.Interface,
 		time.Duration(options.bindTimeoutSeconds)*time.Second,
 	)
 
-	registry := options.frameworkDefaultRegistry
+	registry := options.frameworkInTreeRegistry
 	if registry == nil {
-		registry = frameworkplugins.NewDefaultRegistry(&frameworkplugins.RegistryArgs{
+		registry = frameworkplugins.NewInTreeRegistry(&frameworkplugins.RegistryArgs{
 			VolumeBinder: volumeBinder,
 		})
 	}

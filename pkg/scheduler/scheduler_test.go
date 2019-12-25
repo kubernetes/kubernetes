@@ -203,7 +203,7 @@ func TestSchedulerCreation(t *testing.T) {
 
 	// Test case for when a plugin name in frameworkOutOfTreeRegistry already exist in defaultRegistry.
 	fakeFrameworkPluginName := ""
-	for name := range frameworkplugins.NewDefaultRegistry(&frameworkplugins.RegistryArgs{}) {
+	for name := range frameworkplugins.NewInTreeRegistry(&frameworkplugins.RegistryArgs{}) {
 		fakeFrameworkPluginName = name
 		break
 	}

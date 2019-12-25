@@ -52,10 +52,10 @@ type RegistryArgs struct {
 	VolumeBinder *volumebinder.VolumeBinder
 }
 
-// NewDefaultRegistry builds the default registry with all the in-tree plugins.
-// This is the registry that Kubernetes default scheduler uses. A scheduler that runs out of tree
-// plugins can register additional plugins through the WithFrameworkOutOfTreeRegistry option.
-func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
+// NewInTreeRegistry builds the registry with all the in-tree plugins.
+// A scheduler that runs out of tree plugins can register additional plugins
+// through the WithFrameworkOutOfTreeRegistry option.
+func NewInTreeRegistry(args *RegistryArgs) framework.Registry {
 	return framework.Registry{
 		defaultpodtopologyspread.Name:        defaultpodtopologyspread.New,
 		imagelocality.Name:                   imagelocality.New,
@@ -115,8 +115,8 @@ type ConfigProducerRegistry struct {
 	PriorityToConfigProducer  map[string]ConfigProducer
 }
 
-// NewDefaultConfigProducerRegistry creates a new producer registry.
-func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
+// NewConfigProducerRegistry creates a new producer registry.
+func NewConfigProducerRegistry() *ConfigProducerRegistry {
 	registry := &ConfigProducerRegistry{
 		PredicateToConfigProducer: make(map[string]ConfigProducer),
 		PriorityToConfigProducer:  make(map[string]ConfigProducer),
