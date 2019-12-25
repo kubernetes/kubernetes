@@ -29,6 +29,7 @@ import (
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/onsi/ginkgo"
@@ -97,12 +98,10 @@ var _ = SIGDescribe("Job", func() {
 	framework.ConformanceIt("should run a job to completion when tasks sometimes fail and are locally restarted", func() {
 		ginkgo.By("Creating a job")
 		// One failure, then a success, local restarts.
-		// We can't use the random failure approach used by the
-		// non-local test below, because kubelet will throttle
-		// frequently failing containers in a given pod, ramping
-		// up to 5 minutes between restarts, making test timeouts
-		// due to successive failures too likely with a reasonable
-		// test timeout.
+		// We can't use the random failure approach, because kubelet will
+		// throttle frequently failing containers in a given pod, ramping
+		// up to 5 minutes between restarts, making test timeout due to
+		// successive failures too likely with a reasonable test timeout.
 		job := jobutil.NewTestJob("failOnce", "fail-once-local", v1.RestartPolicyOnFailure, parallelism, completions, nil, backoffLimit)
 		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
@@ -114,18 +113,20 @@ var _ = SIGDescribe("Job", func() {
 
 	// Pods sometimes fail, but eventually succeed, after pod restarts
 	ginkgo.It("should run a job to completion when tasks sometimes fail and are not locally restarted", func() {
+		// One failure, then a success, no local restarts.
+		// We can't use the random failure approach, because JobController
+		// will throttle frequently failing Pods of a given Job, ramping
+		// up to 6 minutes between restarts, making test timeout due to
+		// successive failures.
+		// Instead, we force the Job's Pods to be scheduled to a single Node
+		// and use a hostPath volume to persist data across new Pods.
+		ginkgo.By("Looking for a node to schedule job pod")
+		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
+
 		ginkgo.By("Creating a job")
-		// 50% chance of container success, local restarts.
-		// Can't use the failOnce approach because that relies
-		// on an emptyDir, which is not preserved across new pods.
-		// Worst case analysis: 15 failures, each taking 1 minute to
-		// run due to some slowness, 1 in 2^15 chance of happening,
-		// causing test flake.  Should be very rare.
-		// With the introduction of backoff limit and high failure rate this
-		// is hitting its timeout, the 3 is a reasonable that should make this
-		// test less flaky, for now.
-		job := jobutil.NewTestJob("randomlySucceedOrFail", "rand-non-local", v1.RestartPolicyNever, parallelism, 3, nil, 999)
-		job, err := jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		job := jobutil.NewTestJobOnNode("failOnce", "fail-once-non-local", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit, node.Name)
+		job, err = jobutil.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
