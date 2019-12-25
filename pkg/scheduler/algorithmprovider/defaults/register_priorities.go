@@ -80,7 +80,7 @@ func init() {
 
 	// Set this weight large enough to override all other priority functions.
 	// TODO: Figure out a better way to do this, maybe at same time as fixing #24720.
-	scheduler.RegisterPriorityMapReduceFunction(priorities.NodePreferAvoidPodsPriority, priorities.CalculateNodePreferAvoidPodsPriorityMap, nil, 10000)
+	scheduler.RegisterPriorityMapReduceFunction(priorities.NodePreferAvoidPodsPriority, nil, nil, 10000)
 
 	// Prioritizes nodes that have labels matching NodeAffinity
 	scheduler.RegisterPriorityMapReduceFunction(priorities.NodeAffinityPriority, nil, nil, 1)

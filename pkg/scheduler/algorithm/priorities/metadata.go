@@ -58,7 +58,6 @@ func NewMetadataFactory(
 type priorityMetadata struct {
 	podLimits               *schedulernodeinfo.Resource
 	podSelector             labels.Selector
-	controllerRef           *metav1.OwnerReference
 	podFirstServiceSelector labels.Selector
 	podTopologySpreadMap    *podTopologySpreadMap
 }
@@ -87,7 +86,6 @@ func (pmf *MetadataFactory) PriorityMetadata(
 	return &priorityMetadata{
 		podLimits:               getResourceLimits(pod),
 		podSelector:             getSelector(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister, pmf.statefulSetLister),
-		controllerRef:           metav1.GetControllerOf(pod),
 		podFirstServiceSelector: getFirstServiceSelector(pod, pmf.serviceLister),
 		podTopologySpreadMap:    tpSpreadMap,
 	}
