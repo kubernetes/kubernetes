@@ -24,6 +24,7 @@ import (
 )
 
 const (
+	//UnsupportedReason means Docker API version before 1.24 does not support sysctls
 	UnsupportedReason = "SysctlUnsupported"
 	// CRI uses semver-compatible API version, while docker does not
 	// (e.g., 1.24). Append the version with a ".0".
@@ -34,16 +35,17 @@ const (
 
 // TODO: The admission logic in this file is runtime-dependent. It should be
 // changed to be generic and CRI-compatible.
+// RuntimeAdmitHandler returns lifecycle.PodAdmitResult
 
-type runtimeAdmitHandler struct {
+type RuntimeAdmitHandler struct {
 	result lifecycle.PodAdmitResult
 }
 
-var _ lifecycle.PodAdmitHandler = &runtimeAdmitHandler{}
+var _ lifecycle.PodAdmitHandler = &RuntimeAdmitHandler{}
 
-// NewRuntimeAdmitHandler returns a sysctlRuntimeAdmitHandler which checks whether
+// newRuntimeAdmitHandler returns a sysctlRuntimeAdmitHandler which checks whether
 // the given runtime support sysctls.
-func NewRuntimeAdmitHandler(runtime container.Runtime) (*runtimeAdmitHandler, error) {
+func newRuntimeAdmitHandler(runtime container.Runtime) (*RuntimeAdmitHandler, error) {
 	switch runtime.Type() {
 	case dockerTypeName:
 		v, err := runtime.APIVersion()

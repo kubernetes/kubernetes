@@ -26,22 +26,24 @@ import (
 )
 
 const (
+	//AnnotationInvalidReason is the reason for the invalidation of all system calls given in the security context of pod.
 	AnnotationInvalidReason = "InvalidSysctlAnnotation"
-	ForbiddenReason         = "SysctlForbidden"
+	//ForbiddenReason is the reason for the forbidden reason  of all system calls given in the security context of pod.
+	ForbiddenReason = "SysctlForbidden"
 )
 
-// patternWhitelist takes a list of sysctls or sysctl patterns (ending in *) and
+// PatternWhitelist takes a list of sysctls or sysctl patterns (ending in *) and
 // checks validity via a sysctl and prefix map, rejecting those which are not known
 // to be namespaced.
-type patternWhitelist struct {
+type PatternWhitelist struct {
 	sysctls  map[string]Namespace
 	prefixes map[string]Namespace
 }
 
-var _ lifecycle.PodAdmitHandler = &patternWhitelist{}
+var _ lifecycle.PodAdmitHandler = &PatternWhitelist{}
 
-// NewWhitelist creates a new Whitelist from a list of sysctls and sysctl pattern (ending in *).
-func NewWhitelist(patterns []string) (*patternWhitelist, error) {
+// newWhitelist creates a new Whitelist from a list of sysctls and sysctl pattern (ending in *).
+func newWhitelist(patterns []string) (*PatternWhitelist, error) {
 	w := &patternWhitelist{
 		sysctls:  map[string]Namespace{},
 		prefixes: map[string]Namespace{},
