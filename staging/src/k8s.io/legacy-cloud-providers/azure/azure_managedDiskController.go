@@ -168,9 +168,9 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	_, err = c.common.cloud.DisksClient.CreateOrUpdate(ctx, options.ResourceGroup, options.DiskName, model)
-	if err != nil {
-		return "", err
+	rerr := c.common.cloud.DisksClient.CreateOrUpdate(ctx, options.ResourceGroup, options.DiskName, model)
+	if rerr != nil {
+		return "", rerr.Error()
 	}
 
 	diskID := ""
@@ -214,9 +214,9 @@ func (c *ManagedDiskController) DeleteManagedDisk(diskURI string) error {
 		return fmt.Errorf("failed to delete disk(%s) since it's in attaching or detaching state", diskURI)
 	}
 
-	_, err = c.common.cloud.DisksClient.Delete(ctx, resourceGroup, diskName)
-	if err != nil {
-		return err
+	rerr := c.common.cloud.DisksClient.Delete(ctx, resourceGroup, diskName)
+	if rerr != nil {
+		return rerr.Error()
 	}
 	// We don't need poll here, k8s will immediately stop referencing the disk
 	// the disk will be eventually deleted - cleanly - by ARM
@@ -231,16 +231,16 @@ func (c *ManagedDiskController) GetDisk(resourceGroup, diskName string) (string,
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	result, err := c.common.cloud.DisksClient.Get(ctx, resourceGroup, diskName)
-	if err != nil {
-		return "", "", err
+	result, rerr := c.common.cloud.DisksClient.Get(ctx, resourceGroup, diskName)
+	if rerr != nil {
+		return "", "", rerr.Error()
 	}
 
 	if result.DiskProperties != nil && (*result.DiskProperties).ProvisioningState != nil {
 		return *(*result.DiskProperties).ProvisioningState, *result.ID, nil
 	}
 
-	return "", "", err
+	return "", "", nil
 }
 
 // ResizeDisk Expand the disk to new size
@@ -254,9 +254,9 @@ func (c *ManagedDiskController) ResizeDisk(diskURI string, oldSize resource.Quan
 		return oldSize, err
 	}
 
-	result, err := c.common.cloud.DisksClient.Get(ctx, resourceGroup, diskName)
-	if err != nil {
-		return oldSize, err
+	result, rerr := c.common.cloud.DisksClient.Get(ctx, resourceGroup, diskName)
+	if rerr != nil {
+		return oldSize, rerr.Error()
 	}
 
 	if result.DiskProperties == nil || result.DiskProperties.DiskSizeGB == nil {
@@ -277,8 +277,8 @@ func (c *ManagedDiskController) ResizeDisk(diskURI string, oldSize resource.Quan
 
 	ctx, cancel = getContextWithCancel()
 	defer cancel()
-	if _, err := c.common.cloud.DisksClient.CreateOrUpdate(ctx, resourceGroup, diskName, result); err != nil {
-		return oldSize, err
+	if rerr := c.common.cloud.DisksClient.CreateOrUpdate(ctx, resourceGroup, diskName, result); rerr != nil {
+		return oldSize, rerr.Error()
 	}
 
 	klog.V(2).Infof("azureDisk - resize disk(%s) with new size(%d) completed", diskName, requestGiB)
@@ -325,10 +325,10 @@ func (c *Cloud) GetAzureDiskLabels(diskURI string) (map[string]string, error) {
 	// Get information of the disk.
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	disk, err := c.DisksClient.Get(ctx, resourceGroup, diskName)
-	if err != nil {
-		klog.Errorf("Failed to get information for AzureDisk %q: %v", diskName, err)
-		return nil, err
+	disk, rerr := c.DisksClient.Get(ctx, resourceGroup, diskName)
+	if rerr != nil {
+		klog.Errorf("Failed to get information for AzureDisk %q: %v", diskName, rerr)
+		return nil, rerr.Error()
 	}
 
 	// Check whether availability zone is specified.

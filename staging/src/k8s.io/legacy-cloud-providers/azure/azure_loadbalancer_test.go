@@ -393,8 +393,8 @@ func TestEnsureLoadBalancerDeleted(t *testing.T) {
 		} else {
 			assert.Nil(t, err, "TestCase[%d]: %s", i, c.desc)
 			assert.NotNil(t, lbStatus, "TestCase[%d]: %s", i, c.desc)
-			result, err := az.LoadBalancerClient.List(context.TODO(), az.Config.ResourceGroup)
-			assert.Nil(t, err, "TestCase[%d]: %s", i, c.desc)
+			result, rerr := az.LoadBalancerClient.List(context.TODO(), az.Config.ResourceGroup)
+			assert.Nil(t, rerr, "TestCase[%d]: %s", i, c.desc)
 			assert.Equal(t, len(result), 1, "TestCase[%d]: %s", i, c.desc)
 			assert.Equal(t, len(*result[0].LoadBalancingRules), 1, "TestCase[%d]: %s", i, c.desc)
 		}
@@ -402,8 +402,8 @@ func TestEnsureLoadBalancerDeleted(t *testing.T) {
 		// finally, delete it.
 		err = az.EnsureLoadBalancerDeleted(context.TODO(), testClusterName, &c.service)
 		assert.Nil(t, err, "TestCase[%d]: %s", i, c.desc)
-		result, err := az.LoadBalancerClient.List(context.Background(), az.Config.ResourceGroup)
-		assert.Nil(t, err, "TestCase[%d]: %s", i, c.desc)
+		result, rerr := az.LoadBalancerClient.List(context.Background(), az.Config.ResourceGroup)
+		assert.Nil(t, rerr, "TestCase[%d]: %s", i, c.desc)
 		assert.Equal(t, len(result), 0, "TestCase[%d]: %s", i, c.desc)
 	}
 }
@@ -697,7 +697,7 @@ func TestGetServiceLoadBalancer(t *testing.T) {
 		clusterResources := getClusterResources(az, 3, 3)
 
 		for _, existingLB := range test.existingLBs {
-			_, err := az.LoadBalancerClient.CreateOrUpdate(context.TODO(), "rg", *existingLB.Name, existingLB, "")
+			err := az.LoadBalancerClient.CreateOrUpdate(context.TODO(), "rg", *existingLB.Name, existingLB, "")
 			if err != nil {
 				t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
 			}
@@ -904,22 +904,22 @@ func TestIsFrontendIPChanged(t *testing.T) {
 
 	for i, test := range testCases {
 		az := getTestCloud()
-		_, err := az.SubnetsClient.CreateOrUpdate(context.TODO(), "rg", "vnet", "testSubnet", test.exsistingSubnet)
+		err := az.SubnetsClient.CreateOrUpdate(context.TODO(), "rg", "vnet", "testSubnet", test.exsistingSubnet)
 		if err != nil {
 			t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
 		}
 		for _, existingPIP := range test.exsistingPIPs {
-			_, err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", "pipName", existingPIP)
+			err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", "pipName", existingPIP)
 			if err != nil {
 				t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
 			}
 		}
 		test.service.Spec.LoadBalancerIP = test.loadBalancerIP
 		test.service.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = test.annotations
-		flag, err := az.isFrontendIPChanged("testCluster", test.config,
+		flag, rerr := az.isFrontendIPChanged("testCluster", test.config,
 			&test.service, test.lbFrontendIPConfigName)
 		assert.Equal(t, test.expectedFlag, flag, "TestCase[%d]: %s", i, test.desc)
-		assert.Equal(t, test.expectedError, err != nil, "TestCase[%d]: %s", i, test.desc)
+		assert.Equal(t, test.expectedError, rerr != nil, "TestCase[%d]: %s", i, test.desc)
 	}
 }
 
@@ -964,7 +964,7 @@ func TestDeterminePublicIPName(t *testing.T) {
 		service := getTestService("test1", v1.ProtocolTCP, nil, 80)
 		service.Spec.LoadBalancerIP = test.loadBalancerIP
 		for _, existingPIP := range test.exsistingPIPs {
-			_, err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", "test", existingPIP)
+			err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", "test", existingPIP)
 			if err != nil {
 				t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
 			}
@@ -1558,7 +1558,7 @@ func TestReconcileLoadBalancer(t *testing.T) {
 		clusterResources := getClusterResources(az, 3, 3)
 		test.service.Spec.LoadBalancerIP = "1.2.3.4"
 
-		_, err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", "pipName", network.PublicIPAddress{
+		err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", "pipName", network.PublicIPAddress{
 			Name: to.StringPtr("pipName"),
 			PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
 				IPAddress: to.StringPtr("1.2.3.4"),
@@ -1568,13 +1568,13 @@ func TestReconcileLoadBalancer(t *testing.T) {
 			t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
 		}
 
-		_, err = az.LoadBalancerClient.CreateOrUpdate(context.TODO(), az.getLoadBalancerResourceGroup(), "lb1", test.existingLB, "")
+		err = az.LoadBalancerClient.CreateOrUpdate(context.TODO(), az.getLoadBalancerResourceGroup(), "lb1", test.existingLB, "")
 		if err != nil {
 			t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
 		}
 
-		lb, err := az.reconcileLoadBalancer("testCluster", &test.service, clusterResources.nodes, test.wantLb)
-		assert.Equal(t, test.expectedError, err, "TestCase[%d]: %s", i, test.desc)
+		lb, rerr := az.reconcileLoadBalancer("testCluster", &test.service, clusterResources.nodes, test.wantLb)
+		assert.Equal(t, test.expectedError, rerr, "TestCase[%d]: %s", i, test.desc)
 
 		if test.expectedError == nil {
 			assert.Equal(t, &test.expectedLB, lb, "TestCase[%d]: %s", i, test.desc)
@@ -1806,7 +1806,7 @@ func TestReconcileSecurityGroup(t *testing.T) {
 	for i, test := range testCases {
 		az := getTestCloud()
 		for name, sg := range test.existingSgs {
-			_, err := az.SecurityGroupsClient.CreateOrUpdate(context.TODO(), "rg", name, sg, "")
+			err := az.SecurityGroupsClient.CreateOrUpdate(context.TODO(), "rg", name, sg, "")
 			if err != nil {
 				t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
 			}
@@ -1853,7 +1853,7 @@ func TestSafeDeletePublicIP(t *testing.T) {
 
 	for i, test := range testCases {
 		az := getTestCloud()
-		_, err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", "pip1", network.PublicIPAddress{
+		err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", "pip1", network.PublicIPAddress{
 			Name: to.StringPtr("pip1"),
 			PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
 				IPConfiguration: &network.IPConfiguration{
@@ -1865,10 +1865,10 @@ func TestSafeDeletePublicIP(t *testing.T) {
 			t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
 		}
 		service := getTestService("test1", v1.ProtocolTCP, nil, 80)
-		err = az.safeDeletePublicIP(&service, "rg", test.pip, test.lb)
+		rerr := az.safeDeletePublicIP(&service, "rg", test.pip, test.lb)
 		assert.Equal(t, 0, len(*test.lb.FrontendIPConfigurations), "TestCase[%d]: %s", i, test.desc)
 		assert.Equal(t, 0, len(*test.lb.LoadBalancingRules), "TestCase[%d]: %s", i, test.desc)
-		assert.Equal(t, test.expectedError, err != nil, "TestCase[%d]: %s", i, test.desc)
+		assert.Equal(t, test.expectedError, rerr != nil, "TestCase[%d]: %s", i, test.desc)
 	}
 }
 
@@ -1975,7 +1975,7 @@ func TestReconcilePublicIP(t *testing.T) {
 		service := getTestService("test1", v1.ProtocolTCP, nil, 80)
 		service.Annotations = test.annotations
 		for _, pip := range test.existingPIPs {
-			_, err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", to.String(pip.Name), pip)
+			err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", to.String(pip.Name), pip)
 			if err != nil {
 				t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
 			}
@@ -2041,7 +2041,7 @@ func TestEnsurePublicIPExists(t *testing.T) {
 		az := getTestCloud()
 		service := getTestService("test1", v1.ProtocolTCP, nil, 80)
 		for _, pip := range test.existingPIPs {
-			_, err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", to.String(pip.Name), pip)
+			err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", to.String(pip.Name), pip)
 			if err != nil {
 				t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
 			}
@@ -2093,7 +2093,7 @@ func TestShouldUpdateLoadBalancer(t *testing.T) {
 		az := getTestCloud()
 		service := getTestService("test1", v1.ProtocolTCP, nil, 80)
 		if test.lbHasDeletionTimestamp {
-			service.ObjectMeta.DeletionTimestamp = &metav1.Time{time.Now()}
+			service.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 		}
 		if test.existsLb {
 			lb := network.LoadBalancer{
@@ -2109,7 +2109,7 @@ func TestShouldUpdateLoadBalancer(t *testing.T) {
 					},
 				},
 			}
-			_, err := az.LoadBalancerClient.CreateOrUpdate(context.TODO(), "rg", *lb.Name, lb, "")
+			err := az.LoadBalancerClient.CreateOrUpdate(context.TODO(), "rg", *lb.Name, lb, "")
 			if err != nil {
 				t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
 			}

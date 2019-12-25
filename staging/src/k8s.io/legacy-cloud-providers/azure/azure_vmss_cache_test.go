@@ -78,15 +78,15 @@ func TestVMSSVMCache(t *testing.T) {
 	assert.NoError(t, err)
 
 	// validate getting VMSS VM via cache.
-	virtualMachines, err := ss.VirtualMachineScaleSetVMsClient.List(
+	virtualMachines, rerr := ss.VirtualMachineScaleSetVMsClient.List(
 		context.Background(), "rg", "vmss", "", "", "")
-	assert.NoError(t, err)
+	assert.Nil(t, rerr)
 	assert.Equal(t, 3, len(virtualMachines))
 	for i := range virtualMachines {
 		vm := virtualMachines[i]
 		vmName := to.String(vm.OsProfile.ComputerName)
 		ssName, instanceID, realVM, err := ss.getVmssVM(vmName, cacheReadTypeDefault)
-		assert.NoError(t, err)
+		assert.Nil(t, err)
 		assert.Equal(t, "vmss", ssName)
 		assert.Equal(t, to.String(vm.InstanceID), instanceID)
 		assert.Equal(t, &vm, realVM)

@@ -126,7 +126,7 @@ func TestCommonDetachDisk(t *testing.T) {
 		setTestVirtualMachines(testCloud, test.vmList, false)
 
 		err := common.DetachDisk(test.diskName, diskURI, test.nodeName)
-		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
+		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s, err: %v", i, test.desc, err)
 	}
 }
 

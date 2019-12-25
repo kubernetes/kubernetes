@@ -66,10 +66,10 @@ func (ss *scaleSet) newVMSSCache() (*timedCache, error) {
 		}
 
 		for _, resourceGroup := range allResourceGroups.List() {
-			allScaleSets, err := ss.VirtualMachineScaleSetsClient.List(context.Background(), resourceGroup)
-			if err != nil {
-				klog.Errorf("VirtualMachineScaleSetsClient.List failed: %v", err)
-				return nil, err
+			allScaleSets, rerr := ss.VirtualMachineScaleSetsClient.List(context.Background(), resourceGroup)
+			if rerr != nil {
+				klog.Errorf("VirtualMachineScaleSetsClient.List failed: %v", rerr)
+				return nil, rerr.Error()
 			}
 
 			for _, scaleSet := range allScaleSets {

@@ -36,7 +36,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
-
 	utilnet "k8s.io/utils/net"
 )
 
@@ -418,23 +417,22 @@ func (ss *scaleSet) GetIPByNodeName(nodeName string) (string, string, error) {
 	return internalIP, publicIP, nil
 }
 
-func (ss *scaleSet) getVMSSPublicIPAddress(resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string, publicIPAddressName string) (pip network.PublicIPAddress, exists bool, err error) {
-	var realErr error
-	var message string
+func (ss *scaleSet) getVMSSPublicIPAddress(resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string, publicIPAddressName string) (network.PublicIPAddress, bool, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	pip, err = ss.PublicIPAddressesClient.GetVirtualMachineScaleSetPublicIPAddress(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, IPConfigurationName, publicIPAddressName, "")
-	exists, message, realErr = checkResourceExistsFromError(err)
-	if realErr != nil {
-		return pip, false, realErr
+
+	pip, err := ss.PublicIPAddressesClient.GetVirtualMachineScaleSetPublicIPAddress(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, IPConfigurationName, publicIPAddressName, "")
+	exists, rerr := checkResourceExistsFromError(err)
+	if rerr != nil {
+		return pip, false, rerr.Error()
 	}
 
 	if !exists {
-		klog.V(2).Infof("Public IP %q not found with message: %q", publicIPAddressName, message)
+		klog.V(2).Infof("Public IP %q not found", publicIPAddressName)
 		return pip, false, nil
 	}
 
-	return pip, exists, err
+	return pip, exists, nil
 }
 
 // returns a list of private ips assigned to node
@@ -525,14 +523,13 @@ func extractResourceGroupByProviderID(providerID string) (string, error) {
 
 // listScaleSets lists all scale sets.
 func (ss *scaleSet) listScaleSets(resourceGroup string) ([]string, error) {
-	var err error
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	allScaleSets, err := ss.VirtualMachineScaleSetsClient.List(ctx, resourceGroup)
-	if err != nil {
-		klog.Errorf("VirtualMachineScaleSetsClient.List failed: %v", err)
-		return nil, err
+	allScaleSets, rerr := ss.VirtualMachineScaleSetsClient.List(ctx, resourceGroup)
+	if rerr != nil {
+		klog.Errorf("VirtualMachineScaleSetsClient.List failed: %v", rerr)
+		return nil, rerr.Error()
 	}
 
 	ssNames := make([]string, 0)
@@ -551,14 +548,13 @@ func (ss *scaleSet) listScaleSets(resourceGroup string) ([]string, error) {
 
 // listScaleSetVMs lists VMs belonging to the specified scale set.
 func (ss *scaleSet) listScaleSetVMs(scaleSetName, resourceGroup string) ([]compute.VirtualMachineScaleSetVM, error) {
-	var err error
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	allVMs, err := ss.VirtualMachineScaleSetVMsClient.List(ctx, resourceGroup, scaleSetName, "", "", string(compute.InstanceView))
-	if err != nil {
-		klog.Errorf("VirtualMachineScaleSetVMsClient.List failed: %v", err)
-		return nil, err
+	allVMs, rerr := ss.VirtualMachineScaleSetVMsClient.List(ctx, resourceGroup, scaleSetName, "", "", string(compute.InstanceView))
+	if rerr != nil {
+		klog.Errorf("VirtualMachineScaleSetVMsClient.List failed: %v", rerr)
+		return nil, rerr.Error()
 	}
 
 	return allVMs, nil
@@ -695,9 +691,9 @@ func (ss *scaleSet) GetPrimaryInterface(nodeName string) (network.Interface, err
 
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	nic, err := ss.InterfacesClient.GetVirtualMachineScaleSetNetworkInterface(ctx, resourceGroup, ssName, instanceID, nicName, "")
-	if err != nil {
-		exists, _, realErr := checkResourceExistsFromError(err)
+	nic, rerr := ss.InterfacesClient.GetVirtualMachineScaleSetNetworkInterface(ctx, resourceGroup, ssName, instanceID, nicName, "")
+	if rerr != nil {
+		exists, realErr := checkResourceExistsFromError(rerr)
 		if realErr != nil {
 			klog.Errorf("error: ss.GetPrimaryInterface(%s), ss.GetVirtualMachineScaleSetNetworkInterface.Get(%s, %s, %s), err=%v", nodeName, resourceGroup, ssName, nicName, realErr)
 			return network.Interface{}, err
@@ -900,17 +896,17 @@ func (ss *scaleSet) EnsureHostInPool(service *v1.Service, nodeName types.NodeNam
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 	klog.V(2).Infof("EnsureHostInPool begins to update vmssVM(%s) with new backendPoolID %s", vmName, backendPoolID)
-	resp, err := ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM, "network_update")
-	if ss.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
+	rerr := ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM, "network_update")
+	if rerr != nil && rerr.Retriable && ss.CloudProviderBackoff {
 		klog.V(2).Infof("EnsureHostInPool update backing off vmssVM(%s) with new backendPoolID %s, err: %v", vmName, backendPoolID, err)
 		retryErr := ss.UpdateVmssVMWithRetry(nodeResourceGroup, ssName, instanceID, newVM, "network_update")
 		if retryErr != nil {
-			err = retryErr
 			klog.Errorf("EnsureHostInPool update abort backoff vmssVM(%s) with new backendPoolID %s, err: %v", vmName, backendPoolID, err)
 		}
+		return retryErr
 	}
 
-	return err
+	return rerr.Error()
 }
 
 func getVmssAndResourceGroupNameByVMProviderID(providerID string) (string, string, error) {
@@ -1031,18 +1027,17 @@ func (ss *scaleSet) ensureVMSSInPool(service *v1.Service, nodes []*v1.Node, back
 		defer cancel()
 
 		klog.V(2).Infof("ensureVMSSInPool begins to update vmss(%s) with new backendPoolID %s", vmssName, backendPoolID)
-		resp, err := ss.VirtualMachineScaleSetsClient.CreateOrUpdate(ctx, ss.ResourceGroup, vmssName, newVMSS)
-
-		if ss.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
+		rerr := ss.VirtualMachineScaleSetsClient.CreateOrUpdate(ctx, ss.ResourceGroup, vmssName, newVMSS)
+		if rerr != nil && rerr.Retriable && ss.CloudProviderBackoff {
 			klog.V(2).Infof("ensureVMSSInPool update backing off vmss(%s) with new backendPoolID %s, err: %v", vmssName, backendPoolID, err)
 			retryErr := ss.CreateOrUpdateVmssWithRetry(ss.ResourceGroup, vmssName, newVMSS)
 			if retryErr != nil {
-				err = retryErr
 				klog.Errorf("ensureVMSSInPool update abort backoff vmssVM(%s) with new backendPoolID %s, err: %v", vmssName, backendPoolID, err)
+				return retryErr
 			}
 		}
-		if err != nil {
-			return err
+		if rerr != nil {
+			return rerr.Error()
 		}
 	}
 	return nil
@@ -1177,8 +1172,8 @@ func (ss *scaleSet) ensureBackendPoolDeletedFromNode(service *v1.Service, nodeNa
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 	klog.V(2).Infof("ensureBackendPoolDeletedFromNode begins to update vmssVM(%s) with backendPoolID %s", nodeName, backendPoolID)
-	resp, err := ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM, "network_update")
-	if ss.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
+	rerr := ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM, "network_update")
+	if rerr != nil && rerr.Retriable && ss.CloudProviderBackoff {
 		klog.V(2).Infof("ensureBackendPoolDeletedFromNode update backing off vmssVM(%s) with backendPoolID %s, err: %v", nodeName, backendPoolID, err)
 		retryErr := ss.UpdateVmssVMWithRetry(nodeResourceGroup, ssName, instanceID, newVM, "network_update")
 		if retryErr != nil {
@@ -1186,12 +1181,12 @@ func (ss *scaleSet) ensureBackendPoolDeletedFromNode(service *v1.Service, nodeNa
 			klog.Errorf("ensureBackendPoolDeletedFromNode update abort backoff vmssVM(%s) with backendPoolID %s, err: %v", nodeName, backendPoolID, err)
 		}
 	}
-	if err != nil {
+	if rerr != nil {
 		klog.Errorf("ensureBackendPoolDeletedFromNode failed to update vmssVM(%s) with backendPoolID %s: %v", nodeName, backendPoolID, err)
 	} else {
 		klog.V(2).Infof("ensureBackendPoolDeletedFromNode update vmssVM(%s) with backendPoolID %s succeeded", nodeName, backendPoolID)
 	}
-	return err
+	return rerr.Error()
 }
 
 // getNodeNameByIPConfigurationID gets the node name by IP configuration ID.
@@ -1314,17 +1309,17 @@ func (ss *scaleSet) ensureBackendPoolDeletedFromVMSS(service *v1.Service, backen
 		defer cancel()
 
 		klog.V(2).Infof("ensureBackendPoolDeletedFromVMSS begins to update vmss(%s) with backendPoolID %s", vmssName, backendPoolID)
-		resp, err := ss.VirtualMachineScaleSetsClient.CreateOrUpdate(ctx, ss.ResourceGroup, vmssName, newVMSS)
-		if ss.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
+		rerr := ss.VirtualMachineScaleSetsClient.CreateOrUpdate(ctx, ss.ResourceGroup, vmssName, newVMSS)
+		if rerr != nil && rerr.Retriable && ss.CloudProviderBackoff {
 			klog.V(2).Infof("ensureBackendPoolDeletedFromVMSS update backing off vmss(%s) with backendPoolID %s, err: %v", vmssName, backendPoolID, err)
 			retryErr := ss.CreateOrUpdateVmssWithRetry(ss.ResourceGroup, vmssName, newVMSS)
 			if retryErr != nil {
-				err = retryErr
-				klog.Errorf("ensureBackendPoolDeletedFromVMSS update abort backoff vmssVM(%s) with backendPoolID %s, err: %v", vmssName, backendPoolID, err)
+				klog.Errorf("ensureBackendPoolDeletedFromVMSS update abort backoff vmssVM(%s) with backendPoolID %s, err: %v", vmssName, backendPoolID, retryErr)
+				return retryErr
 			}
 		}
-		if err != nil {
-			return err
+		if rerr != nil {
+			return rerr.Error()
 		}
 	}
 

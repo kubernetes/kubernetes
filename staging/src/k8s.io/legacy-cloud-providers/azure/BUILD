@@ -68,6 +68,7 @@ go_library(
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/auth:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/retry:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage:go_default_library",
@@ -86,7 +87,6 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "azure_backoff_test.go",
         "azure_cache_test.go",
         "azure_config_test.go",
         "azure_controller_common_test.go",
@@ -118,10 +118,10 @@ go_test(
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/cloud-provider/service/helpers:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/auth:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/retry:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage:go_default_library",
-        "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
@@ -141,6 +141,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/auth:all-srcs",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/retry:all-srcs",
     ],
     tags = ["automanaged"],
 )
