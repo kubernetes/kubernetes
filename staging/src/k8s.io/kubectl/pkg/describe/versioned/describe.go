@@ -3027,7 +3027,6 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings descr
 			klog.Errorf("Unable to construct reference to '%#v': %v", node, err)
 		} else {
 			// TODO: We haven't decided the namespace for Node object yet.
-			ref.UID = types.UID(ref.Name)
 			events, _ = d.CoreV1().Events("").Search(scheme.Scheme, ref)
 		}
 	}
