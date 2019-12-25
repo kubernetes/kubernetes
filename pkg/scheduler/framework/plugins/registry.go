@@ -70,6 +70,7 @@ func NewInTreeRegistry(args *RegistryArgs) framework.Registry {
 		noderesources.MostAllocatedName:            noderesources.NewMostAllocated,
 		noderesources.LeastAllocatedName:           noderesources.NewLeastAllocated,
 		noderesources.RequestedToCapacityRatioName: noderesources.NewRequestedToCapacityRatio,
+		noderesources.ResourceLimitsName:           noderesources.NewResourceLimits,
 		volumebinding.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 			return volumebinding.NewFromVolumeBinder(args.VolumeBinder), nil
 		},
@@ -303,6 +304,12 @@ func NewConfigProducerRegistry() *ConfigProducerRegistry {
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, serviceaffinity.Name, &args.Weight)
 			pluginConfig = append(pluginConfig, makePluginConfig(serviceaffinity.Name, args.ServiceAffinityArgs))
+			return
+		})
+	registry.RegisterPriority(priorities.ResourceLimitsPriority,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.PostFilter = appendToPluginSet(plugins.PostFilter, noderesources.ResourceLimitsName, nil)
+			plugins.Score = appendToPluginSet(plugins.Score, noderesources.ResourceLimitsName, &args.Weight)
 			return
 		})
 	return registry

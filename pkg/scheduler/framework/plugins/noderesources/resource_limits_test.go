@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package priorities
+package noderesources
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -26,7 +27,7 @@ import (
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
-func TestResourceLimitsPriority(t *testing.T) {
+func TestResourceLimits(t *testing.T) {
 	noResources := v1.PodSpec{
 		Containers: []v1.Container{},
 	}
@@ -139,23 +140,20 @@ func TestResourceLimitsPriority(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(nil, test.nodes))
-			metadata := &priorityMetadata{
-				podLimits: getResourceLimits(test.pod),
+			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
+			p := &ResourceLimits{handle: fh}
+			state := framework.NewCycleState()
+			status := p.PostFilter(context.Background(), state, test.pod, test.nodes, nil)
+			if !status.IsSuccess() {
+				t.Errorf("unexpected error: %v", status)
 			}
-
-			for _, hasMeta := range []bool{true, false} {
-				meta := metadata
-				if !hasMeta {
-					meta = nil
-				}
-
-				list, err := runMapReducePriority(ResourceLimitsPriorityMap, nil, meta, test.pod, snapshot, test.nodes)
-
+			for i := range test.nodes {
+				hostResult, err := p.Score(context.Background(), state, test.pod, test.nodes[i].Name)
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
-				if !reflect.DeepEqual(test.expectedList, list) {
-					t.Errorf("hasMeta %#v expected %#v, got %#v", hasMeta, test.expectedList, list)
+				if !reflect.DeepEqual(test.expectedList[i].Score, hostResult) {
+					t.Errorf("expected %#v, got %#v", test.expectedList[i].Score, hostResult)
 				}
 			}
 		})

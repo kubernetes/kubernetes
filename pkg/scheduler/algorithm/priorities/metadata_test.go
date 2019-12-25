@@ -35,16 +35,6 @@ func TestPriorityMetadata(t *testing.T) {
 	nonZeroReqs.MilliCPU = priorityutil.DefaultMilliCPURequest
 	nonZeroReqs.Memory = priorityutil.DefaultMemoryRequest
 
-	specifiedReqs := &schedulernodeinfo.Resource{}
-	specifiedReqs.MilliCPU = 200
-	specifiedReqs.Memory = 2000
-
-	nonPodLimits := &schedulernodeinfo.Resource{}
-
-	specifiedPodLimits := &schedulernodeinfo.Resource{}
-	specifiedPodLimits.MilliCPU = 200
-	specifiedPodLimits.Memory = 2000
-
 	tolerations := []v1.Toleration{{
 		Key:      "foo",
 		Operator: v1.TolerationOpEqual,
@@ -138,7 +128,6 @@ func TestPriorityMetadata(t *testing.T) {
 		{
 			pod: podWithTolerationsAndAffinity,
 			expected: &priorityMetadata{
-				podLimits:   nonPodLimits,
 				podSelector: labels.NewSelector(),
 			},
 			name: "Produce a priorityMetadata with default requests",
@@ -146,7 +135,6 @@ func TestPriorityMetadata(t *testing.T) {
 		{
 			pod: podWithTolerationsAndRequests,
 			expected: &priorityMetadata{
-				podLimits:   nonPodLimits,
 				podSelector: labels.NewSelector(),
 			},
 			name: "Produce a priorityMetadata with tolerations and requests",
@@ -154,7 +142,6 @@ func TestPriorityMetadata(t *testing.T) {
 		{
 			pod: podWithAffinityAndRequests,
 			expected: &priorityMetadata{
-				podLimits:   specifiedPodLimits,
 				podSelector: labels.NewSelector(),
 			},
 			name: "Produce a priorityMetadata with affinity and requests",
