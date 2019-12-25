@@ -81,9 +81,9 @@ func ApplyFeatureGates() (restore func()) {
 	// Prioritizes nodes that satisfy pod's resource limits
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
 		klog.Infof("Registering resourcelimits priority function")
-		scheduler.RegisterPriorityMapReduceFunction(priorities.ResourceLimitsPriority, priorities.ResourceLimitsPriorityMap, nil, 1)
+		scheduler.RegisterPriorityMapReduceFunction(priorities.ResourceLimitsPriority, nil, nil, 1)
 		// Register the priority function to specific provider too.
-		scheduler.InsertPriorityKeyToAlgorithmProviderMap(scheduler.RegisterPriorityMapReduceFunction(priorities.ResourceLimitsPriority, priorities.ResourceLimitsPriorityMap, nil, 1))
+		scheduler.InsertPriorityKeyToAlgorithmProviderMap(scheduler.RegisterPriorityMapReduceFunction(priorities.ResourceLimitsPriority, nil, nil, 1))
 	}
 
 	restore = func() {

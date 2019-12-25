@@ -1292,6 +1292,32 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "enable alpha feature ResourceLimitsPriorityFunction",
+			JSON: `{
+		  "kind": "Policy",
+		  "apiVersion": "v1",
+		  "predicates": [],
+		  "priorities": [
+			{"name": "ResourceLimitsPriority",   "weight": 2}
+		  ]
+		}`,
+			featureGates: map[featuregate.Feature]bool{
+				features.ResourceLimitsPriorityFunction: true,
+			},
+			wantPlugins: map[string][]config.Plugin{
+				"PostFilterPlugin": {
+					{Name: "NodeResourceLimits"},
+				},
+				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
+					{Name: "TaintToleration"},
+				},
+				"ScorePlugin": {
+					{Name: "NodeResourceLimits", Weight: 2},
+				},
+			},
+		},
 	}
 	registeredPredicates := sets.NewString(scheduler.ListRegisteredFitPredicates()...)
 	seenPredicates := sets.NewString()
@@ -1329,6 +1355,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		"RequestedToCapacityRatio":        "RequestedToCapacityRatioPriority",
 		"NodeLabel":                       "TestLabelPreference",
 		"ServiceAffinity":                 "TestServiceAntiAffinity",
+		"ResourceLimitsPriority":          "NodeResourceLimits",
 	}
 
 	for _, tc := range testcases {

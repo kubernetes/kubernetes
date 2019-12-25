@@ -56,7 +56,6 @@ func NewMetadataFactory(
 
 // priorityMetadata is a type that is passed as metadata for priority functions
 type priorityMetadata struct {
-	podLimits               *schedulernodeinfo.Resource
 	podSelector             labels.Selector
 	podFirstServiceSelector labels.Selector
 	podTopologySpreadMap    *podTopologySpreadMap
@@ -84,7 +83,6 @@ func (pmf *MetadataFactory) PriorityMetadata(
 		return nil
 	}
 	return &priorityMetadata{
-		podLimits:               getResourceLimits(pod),
 		podSelector:             getSelector(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister, pmf.statefulSetLister),
 		podFirstServiceSelector: getFirstServiceSelector(pod, pmf.serviceLister),
 		podTopologySpreadMap:    tpSpreadMap,
