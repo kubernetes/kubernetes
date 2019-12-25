@@ -22,9 +22,9 @@ import (
 	node "k8s.io/kubernetes/pkg/apis/node"
 )
 
-// Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass must override the automatic
+// Convertv1alpha1RuntimeClassTonodeRuntimeClass must override the automatic
 // conversion since we unnested the spec struct after v1alpha1
-func Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass(in *v1alpha1.RuntimeClass, out *node.RuntimeClass, s conversion.Scope) error {
+func Convertv1alpha1RuntimeClassTonodeRuntimeClass(in *v1alpha1.RuntimeClass, out *node.RuntimeClass, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Handler = in.Spec.RuntimeHandler
 
@@ -43,9 +43,9 @@ func Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass(in *v1alpha1.RuntimeClas
 	return nil
 }
 
-// Convert_node_RuntimeClass_To_v1alpha1_RuntimeClass must override the automatic
+// ConvertnodeRuntimeClassTov1alpha1RuntimeClass must override the automatic
 // conversion since we unnested the spec struct after v1alpha1
-func Convert_node_RuntimeClass_To_v1alpha1_RuntimeClass(in *node.RuntimeClass, out *v1alpha1.RuntimeClass, s conversion.Scope) error {
+func ConvertnodeRuntimeClassTov1alpha1RuntimeClass(in *node.RuntimeClass, out *v1alpha1.RuntimeClass, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Spec.RuntimeHandler = in.Handler
 
