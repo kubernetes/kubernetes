@@ -1134,3 +1134,10 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 	nodeInfo.SetNode(node)
 	return nodeInfo, csiNode
 }
+
+func getFakeCSINodeLister(csiNode *storagev1.CSINode) fakelisters.CSINodeLister {
+	if csiNode != nil {
+		return fakelisters.CSINodeLister(*csiNode)
+	}
+	return fakelisters.CSINodeLister{}
+}
