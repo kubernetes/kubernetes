@@ -641,9 +641,9 @@ Features for this release were tracked via the use of the [kubernetes/features](
 - **Cluster Ops**
   - [alpha] Added ability to create/remove clusters w/highly available (replicated) masters on GCE using kube-up/kube-down scripts. ([docs](http://kubernetes.io/docs/admin/ha-master-gce/)) ([kubernetes/features#48](https://github.com/kubernetes/enhancements/issues/48))
 - **Federation**
-  - [alpha] Support for ConfigMaps in federation. ([docs](http://kubernetes.io/docs/user-guide/federation/configmap/)) ([kubernetes/features#105](https://github.com/kubernetes/enhancements/issues/105))
-  - [alpha] Alpha level support for DaemonSets in federation. ([docs](http://kubernetes.io/docs/user-guide/federation/daemonsets/)) ([kubernetes/features#101](https://github.com/kubernetes/enhancements/issues/101))
-  - [alpha] Alpha level support for Deployments in federation. ([docs](http://kubernetes.io/docs/user-guide/federation/deployment/)) ([kubernetes/features#100](https://github.com/kubernetes/enhancements/issues/100))
+  - [alpha] Support for ConfigMaps in federation. ([docs](https://kubernetes.io/docs/tasks/federation/administer-federation/configmap/)) ([kubernetes/features#105](https://github.com/kubernetes/enhancements/issues/105))
+  - [alpha] Alpha level support for DaemonSets in federation. ([docs](https://kubernetes.io/docs/tasks/federation/administer-federation/daemonset/)) ([kubernetes/features#101](https://github.com/kubernetes/enhancements/issues/101))
+  - [alpha] Alpha level support for Deployments in federation. ([docs](https://kubernetes.io/docs/tasks/federation/administer-federation/deployment/)) ([kubernetes/features#100](https://github.com/kubernetes/enhancements/issues/100))
   - [alpha] Cluster federation: Added support for DeleteOptions.OrphanDependents for federation resources. ([docs](http://kubernetes.io/docs/user-guide/federation/#cascading-deletion)) ([kubernetes/features#99](https://github.com/kubernetes/enhancements/issues/99))
   - [alpha] Introducing `kubefed`, a new command line tool to simplify federation control plane. ([docs](http://kubernetes.io/docs/admin/federation/kubefed/)) ([kubernetes/features#97](https://github.com/kubernetes/enhancements/issues/97))
 - **Network**
