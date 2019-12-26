@@ -97,14 +97,3 @@ func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 	}
 	return job
 }
-
-// FinishTime returns finish time of the specified job.
-func FinishTime(finishedJob *batchv1.Job) metav1.Time {
-	var finishTime metav1.Time
-	for _, c := range finishedJob.Status.Conditions {
-		if (c.Type == batchv1.JobComplete || c.Type == batchv1.JobFailed) && c.Status == v1.ConditionTrue {
-			return c.LastTransitionTime
-		}
-	}
-	return finishTime
-}
