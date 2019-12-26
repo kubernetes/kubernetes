@@ -1761,20 +1761,22 @@ func sortScalars(s []interface{}) []interface{} {
 }
 
 func deduplicateScalars(s []interface{}) []interface{} {
-	// Clever algorithm to deduplicate.
-	length := len(s) - 1
-	for i := 0; i < length; i++ {
-		for j := i + 1; j <= length; j++ {
-			if s[i] == s[j] {
-				s[j] = s[length]
-				s = s[0:length]
-				length--
-				j--
-			}
-		}
+	m := make(map[interface{}]bool)
+	for _, item := range s {
+		m[item] = true
 	}
-
-	return s
+	l := len(m)
+	if l == len(s) {
+		// there is no duplicate
+		return s
+	}
+	deduped := make([]interface{}, l, l)
+	idx := 0
+	for item := range m {
+		deduped[idx] = item
+		idx++
+	}
+	return deduped
 }
 
 type SortableSliceOfScalars struct {
