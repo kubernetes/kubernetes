@@ -94,12 +94,6 @@ func GetIngressPoint(ing *v1.LoadBalancerIngress) string {
 	return host
 }
 
-// EnableAndDisableInternalLB returns two functions for enabling and disabling the internal load balancer
-// setting for the supported cloud providers (currently GCE/GKE and Azure) and empty functions for others.
-func EnableAndDisableInternalLB() (enable func(svc *v1.Service), disable func(svc *v1.Service)) {
-	return framework.TestContext.CloudConfig.Provider.EnableAndDisableInternalLB()
-}
-
 // GetServiceLoadBalancerCreationTimeout returns a timeout value for creating a load balancer of a service.
 func GetServiceLoadBalancerCreationTimeout(cs clientset.Interface) time.Duration {
 	nodes, err := e2enode.GetReadySchedulableNodes(cs)
