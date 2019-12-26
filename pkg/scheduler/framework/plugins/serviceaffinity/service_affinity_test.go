@@ -391,13 +391,13 @@ func TestServiceAffinityScore(t *testing.T) {
 			nodes := makeLabeledNodeList(test.nodes)
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
 			serviceLister := fakelisters.ServiceLister(test.services)
-			priorityMapFunction, priorityReduceFunction := priorities.NewServiceAntiAffinityPriority(snapshot.Pods(), serviceLister, test.labels)
 
 			p := &ServiceAffinity{
-				sharedLister:           snapshot,
-				serviceLister:          serviceLister,
-				priorityMapFunction:    priorityMapFunction,
-				priorityReduceFunction: priorityReduceFunction,
+				sharedLister:  snapshot,
+				serviceLister: serviceLister,
+				args: Args{
+					AntiAffinityLabelsPreference: test.labels,
+				},
 			}
 			metaDataProducer := priorities.NewMetadataFactory(
 				fakelisters.ServiceLister(test.services),
