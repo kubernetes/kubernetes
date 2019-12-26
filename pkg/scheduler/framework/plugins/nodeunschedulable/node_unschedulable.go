@@ -21,8 +21,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -44,8 +44,19 @@ func (pl *NodeUnschedulable) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *NodeUnschedulable) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
-	_, reasons, err := predicates.CheckNodeUnschedulablePredicate(pod, nil, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
+	if nodeInfo == nil || nodeInfo.Node() == nil {
+		return framework.NewStatus(framework.UnschedulableAndUnresolvable, predicates.ErrNodeUnknownCondition.GetReason())
+	}
+	// If pod tolerate unschedulable taint, it's also tolerate `node.Spec.Unschedulable`.
+	podToleratesUnschedulable := v1helper.TolerationsTolerateTaint(pod.Spec.Tolerations, &v1.Taint{
+		Key:    v1.TaintNodeUnschedulable,
+		Effect: v1.TaintEffectNoSchedule,
+	})
+	// TODO (k82cn): deprecates `node.Spec.Unschedulable` in 1.13.
+	if nodeInfo.Node().Spec.Unschedulable && !podToleratesUnschedulable {
+		return framework.NewStatus(framework.UnschedulableAndUnresolvable, predicates.ErrNodeUnschedulable.GetReason())
+	}
+	return nil
 }
 
 // New initializes a new plugin and returns it.
