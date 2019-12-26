@@ -64,10 +64,10 @@ func CreatePKIAssets(cfg *kubeadmapi.InitConfiguration) error {
 	return CreateServiceAccountKeyAndPublicKeyFiles(cfg.CertificatesDir)
 }
 
-// CreateServiceAccountKeyAndPublicKeyFiles create a new public/private key files for signing service account users.
-// If the sa public/private key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
+// CreateServiceAccountKeyAndPublicKeyFiles creates new public/private key files for signing service account users.
+// If the sa public/private key files already exist in the target folder, they are used only if evaluated equals; otherwise an error is returned.
 func CreateServiceAccountKeyAndPublicKeyFiles(certsDir string) error {
-	klog.V(1).Infoln("creating a new public/private key files for signing service account users")
+	klog.V(1).Infoln("creating new public/private key files for signing service account users")
 	_, err := keyutil.PrivateKeyFromFile(filepath.Join(certsDir, kubeadmconstants.ServiceAccountPrivateKeyName))
 	if err == nil {
 		// kubeadm doesn't validate the existing certificate key more than this;
