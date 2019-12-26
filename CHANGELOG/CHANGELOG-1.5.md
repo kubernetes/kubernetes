@@ -655,7 +655,7 @@ Features for this release were tracked via the use of the [kubernetes/features](
   - [alpha] Introducing the v1alpha1 CRI API to allow pluggable container runtimes; an experimental docker-CRI integration is ready for testing and feedback. ([docs](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/container-runtime-interface.md)) ([kubernetes/features#54](https://github.com/kubernetes/enhancements/issues/54))
   - [alpha] Kubelet launches container in a per pod cgroup hierarchy based on quality of service tier ([kubernetes/features#126](https://github.com/kubernetes/enhancements/issues/126))
   - [beta] Kubelet integrates with memcg notification API to detect when a hard eviction threshold is crossed ([kubernetes/features#125](https://github.com/kubernetes/enhancements/issues/125))
-  - [beta] Introducing the beta version containerized node conformance test gcr.io/google_containers/node-test:0.2 for users to verify node setup. ([docs](http://kubernetes.io/docs/admin/node-conformance/)) ([kubernetes/features#84](https://github.com/kubernetes/enhancements/issues/84))
+  - [beta] Introducing the beta version containerized node conformance test gcr.io/google_containers/node-test:0.2 for users to verify node setup. ([docs](https://kubernetes.io/docs/setup/best-practices/node-conformance/)) ([kubernetes/features#84](https://github.com/kubernetes/enhancements/issues/84))
 - **Scheduling**
   - [alpha] Added support for accounting opaque integer resources. ([docs](http://kubernetes.io/docs/user-guide/compute-resources/#opaque-integer-resources-alpha-feature)) ([kubernetes/features#76](https://github.com/kubernetes/enhancements/issues/76))
   - [beta] PodDisruptionBudget has been promoted to beta, can be used to safely drain nodes while respecting application SLO's ([docs](http://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/)) ([kubernetes/features#85](https://github.com/kubernetes/enhancements/issues/85))
@@ -1165,7 +1165,7 @@ binary | sha256 hash
 
 ### Experimental Features
 
-* `kubeadm` (alpha) provides an easy way to securely bootstrap Kubernetes on Linux, see http://kubernetes.io/docs/kubeadm/ ([#33262](https://github.com/kubernetes/kubernetes/pull/33262), [@errordeveloper](https://github.com/errordeveloper))
+* `kubeadm` (alpha) provides an easy way to securely bootstrap Kubernetes on Linux, see https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/ ([#33262](https://github.com/kubernetes/kubernetes/pull/33262), [@errordeveloper](https://github.com/errordeveloper))
 * Alpha JWS Discovery API for locating an apiserver securely ([#32203](https://github.com/kubernetes/kubernetes/pull/32203), [@dgoodwin](https://github.com/dgoodwin))
 
 ### Action Required
