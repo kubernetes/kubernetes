@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/scheduler"
+	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -43,7 +44,7 @@ func TestCompatibility(t *testing.T) {
 		},
 		{
 			name:     "ClusterAutoscalerProvider",
-			provider: ClusterAutoscalerProvider,
+			provider: defaults.ClusterAutoscalerProvider,
 		},
 	}
 	for _, tc := range testcases {

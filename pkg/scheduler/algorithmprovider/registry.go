@@ -23,6 +23,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
@@ -40,9 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
 )
-
-// ClusterAutoscalerProvider defines the default autoscaler provider
-const ClusterAutoscalerProvider = "ClusterAutoscalerProvider"
 
 // Config the configuration of an algorithm provider.
 type Config struct {
@@ -63,7 +61,7 @@ func NewRegistry(hardPodAffinityWeight int64) Registry {
 
 	return Registry{
 		schedulerapi.SchedulerDefaultProviderName: defaultConfig,
-		ClusterAutoscalerProvider:                 caConfig,
+		defaults.ClusterAutoscalerProvider:        caConfig,
 	}
 }
 
