@@ -63,7 +63,7 @@ const (
 func NewController(podInformer coreinformers.PodInformer,
 	serviceInformer coreinformers.ServiceInformer,
 	nodeInformer coreinformers.NodeInformer,
-	esInformer discoveryinformers.EndpointSliceInformer,
+	endpointSliceInformer discoveryinformers.EndpointSliceInformer,
 	maxEndpointsPerSlice int32,
 	client clientset.Interface,
 ) *Controller {
@@ -105,8 +105,15 @@ func NewController(podInformer coreinformers.PodInformer,
 	c.nodeLister = nodeInformer.Lister()
 	c.nodesSynced = nodeInformer.Informer().HasSynced
 
-	c.endpointSliceLister = esInformer.Lister()
-	c.endpointSlicesSynced = esInformer.Informer().HasSynced
+	endpointSliceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    c.onEndpointSliceAdd,
+		UpdateFunc: c.onEndpointSliceUpdate,
+		DeleteFunc: c.onEndpointSliceDelete,
+	})
+
+	c.endpointSliceLister = endpointSliceInformer.Lister()
+	c.endpointSlicesSynced = endpointSliceInformer.Informer().HasSynced
+	c.endpointSliceTracker = newEndpointSliceTracker()
 
 	c.maxEndpointsPerSlice = maxEndpointsPerSlice
 
@@ -114,6 +121,7 @@ func NewController(podInformer coreinformers.PodInformer,
 		client:               c.client,
 		nodeLister:           c.nodeLister,
 		maxEndpointsPerSlice: c.maxEndpointsPerSlice,
+		endpointSliceTracker: c.endpointSliceTracker,
 		metricsCache:         endpointslicemetrics.NewCache(maxEndpointsPerSlice),
 	}
 	c.triggerTimeTracker = endpointutil.NewTriggerTimeTracker()
@@ -152,6 +160,10 @@ type Controller struct {
 	// endpointSlicesSynced returns true if the endpoint slice shared informer has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	endpointSlicesSynced cache.InformerSynced
+	// endpointSliceTracker tracks the list of EndpointSlices and associated
+	// resource versions expected for each Service. It can help determine if a
+	// cached EndpointSlice is out of date.
+	endpointSliceTracker *endpointSliceTracker
 
 	// nodeLister is able to list/get nodes and is populated by the
 	// shared informer passed to NewController
@@ -340,6 +352,57 @@ func (c *Controller) onServiceDelete(obj interface{}) {
 	}
 
 	c.serviceSelectorCache.Delete(key)
+	c.queue.Add(key)
+}
+
+// onEndpointSliceAdd queues a sync for the relevant Service for a sync if the
+// EndpointSlice resource version does not match the expected version in the
+// endpointSliceTracker.
+func (c *Controller) onEndpointSliceAdd(obj interface{}) {
+	endpointSlice := obj.(*discovery.EndpointSlice)
+	if endpointSlice == nil {
+		utilruntime.HandleError(fmt.Errorf("Invalid EndpointSlice provided to onEndpointSliceAdd()"))
+		return
+	}
+	if managedByController(endpointSlice) && c.endpointSliceTracker.Stale(endpointSlice) {
+		c.queueServiceForEndpointSlice(endpointSlice)
+	}
+}
+
+// onEndpointSliceUpdate queues a sync for the relevant Service for a sync if
+// the EndpointSlice resource version does not match the expected version in the
+// endpointSliceTracker or the managed-by value of the EndpointSlice has changed
+// from or to this controller.
+func (c *Controller) onEndpointSliceUpdate(prevObj, obj interface{}) {
+	prevEndpointSlice := obj.(*discovery.EndpointSlice)
+	endpointSlice := obj.(*discovery.EndpointSlice)
+	if endpointSlice == nil || prevEndpointSlice == nil {
+		utilruntime.HandleError(fmt.Errorf("Invalid EndpointSlice provided to onEndpointSliceUpdate()"))
+		return
+	}
+	if managedByChanged(prevEndpointSlice, endpointSlice) || (managedByController(endpointSlice) && c.endpointSliceTracker.Stale(endpointSlice)) {
+		c.queueServiceForEndpointSlice(endpointSlice)
+	}
+}
+
+// onEndpointSliceDelete queues a sync for the relevant Service for a sync if the
+// EndpointSlice resource version does not match the expected version in the
+// endpointSliceTracker.
+func (c *Controller) onEndpointSliceDelete(obj interface{}) {
+	endpointSlice := getEndpointSliceFromDeleteAction(obj)
+	if endpointSlice != nil && managedByController(endpointSlice) && c.endpointSliceTracker.Has(endpointSlice) {
+		c.queueServiceForEndpointSlice(endpointSlice)
+	}
+}
+
+// queueServiceForEndpointSlice attempts to queue the corresponding Service for
+// the provided EndpointSlice.
+func (c *Controller) queueServiceForEndpointSlice(endpointSlice *discovery.EndpointSlice) {
+	key, err := serviceControllerKey(endpointSlice)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for EndpointSlice %+v: %v", endpointSlice, err))
+		return
+	}
 	c.queue.Add(key)
 }
 

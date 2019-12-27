@@ -40,6 +40,7 @@ type reconciler struct {
 	client               clientset.Interface
 	nodeLister           corelisters.NodeLister
 	maxEndpointsPerSlice int32
+	endpointSliceTracker *endpointSliceTracker
 	metricsCache         *metrics.Cache
 }
 
@@ -212,6 +213,7 @@ func (r *reconciler) finalize(
 			}
 			errs = append(errs, fmt.Errorf("Error creating EndpointSlice for Service %s/%s: %v", service.Namespace, service.Name, err))
 		} else {
+			r.endpointSliceTracker.Update(endpointSlice)
 			metrics.EndpointSliceChanges.WithLabelValues("create").Inc()
 		}
 	}
@@ -222,6 +224,7 @@ func (r *reconciler) finalize(
 		if err != nil {
 			errs = append(errs, fmt.Errorf("Error updating %s EndpointSlice for Service %s/%s: %v", endpointSlice.Name, service.Namespace, service.Name, err))
 		} else {
+			r.endpointSliceTracker.Update(endpointSlice)
 			metrics.EndpointSliceChanges.WithLabelValues("update").Inc()
 		}
 	}
@@ -231,6 +234,7 @@ func (r *reconciler) finalize(
 		if err != nil {
 			errs = append(errs, fmt.Errorf("Error deleting %s EndpointSlice for Service %s/%s: %v", endpointSlice.Name, service.Namespace, service.Name, err))
 		} else {
+			r.endpointSliceTracker.Delete(endpointSlice)
 			metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
 		}
 	}
