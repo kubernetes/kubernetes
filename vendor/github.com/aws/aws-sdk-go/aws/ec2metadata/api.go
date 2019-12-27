@@ -24,8 +24,9 @@ func (c *EC2Metadata) GetMetadata(p string) (string, error) {
 
 	output := &metadataOutput{}
 	req := c.NewRequest(op, nil, output)
+	err := req.Send()
 
-	return output.Content, req.Send()
+	return output.Content, err
 }
 
 // GetUserData returns the userdata that was configured for the service. If
@@ -45,8 +46,9 @@ func (c *EC2Metadata) GetUserData() (string, error) {
 			r.Error = awserr.New("NotFoundError", "user-data not found", r.Error)
 		}
 	})
+	err := req.Send()
 
-	return output.Content, req.Send()
+	return output.Content, err
 }
 
 // GetDynamicData uses the path provided to request information from the EC2
@@ -61,8 +63,9 @@ func (c *EC2Metadata) GetDynamicData(p string) (string, error) {
 
 	output := &metadataOutput{}
 	req := c.NewRequest(op, nil, output)
+	err := req.Send()
 
-	return output.Content, req.Send()
+	return output.Content, err
 }
 
 // GetInstanceIdentityDocument retrieves an identity document describing an
@@ -79,7 +82,7 @@ func (c *EC2Metadata) GetInstanceIdentityDocument() (EC2InstanceIdentityDocument
 	doc := EC2InstanceIdentityDocument{}
 	if err := json.NewDecoder(strings.NewReader(resp)).Decode(&doc); err != nil {
 		return EC2InstanceIdentityDocument{},
-			awserr.New("SerializationError",
+			awserr.New(request.ErrCodeSerialization,
 				"failed to decode EC2 instance identity document", err)
 	}
 
@@ -98,7 +101,7 @@ func (c *EC2Metadata) IAMInfo() (EC2IAMInfo, error) {
 	info := EC2IAMInfo{}
 	if err := json.NewDecoder(strings.NewReader(resp)).Decode(&info); err != nil {
 		return EC2IAMInfo{},
-			awserr.New("SerializationError",
+			awserr.New(request.ErrCodeSerialization,
 				"failed to decode EC2 IAM info", err)
 	}
 
@@ -149,18 +152,19 @@ type EC2IAMInfo struct {
 // An EC2InstanceIdentityDocument provides the shape for unmarshaling
 // an instance identity document
 type EC2InstanceIdentityDocument struct {
-	DevpayProductCodes []string  `json:"devpayProductCodes"`
-	AvailabilityZone   string    `json:"availabilityZone"`
-	PrivateIP          string    `json:"privateIp"`
-	Version            string    `json:"version"`
-	Region             string    `json:"region"`
-	InstanceID         string    `json:"instanceId"`
-	BillingProducts    []string  `json:"billingProducts"`
-	InstanceType       string    `json:"instanceType"`
-	AccountID          string    `json:"accountId"`
-	PendingTime        time.Time `json:"pendingTime"`
-	ImageID            string    `json:"imageId"`
-	KernelID           string    `json:"kernelId"`
-	RamdiskID          string    `json:"ramdiskId"`
-	Architecture       string    `json:"architecture"`
+	DevpayProductCodes      []string  `json:"devpayProductCodes"`
+	MarketplaceProductCodes []string  `json:"marketplaceProductCodes"`
+	AvailabilityZone        string    `json:"availabilityZone"`
+	PrivateIP               string    `json:"privateIp"`
+	Version                 string    `json:"version"`
+	Region                  string    `json:"region"`
+	InstanceID              string    `json:"instanceId"`
+	BillingProducts         []string  `json:"billingProducts"`
+	InstanceType            string    `json:"instanceType"`
+	AccountID               string    `json:"accountId"`
+	PendingTime             time.Time `json:"pendingTime"`
+	ImageID                 string    `json:"imageId"`
+	KernelID                string    `json:"kernelId"`
+	RamdiskID               string    `json:"ramdiskId"`
+	Architecture            string    `json:"architecture"`
 }

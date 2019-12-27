@@ -14,12 +14,12 @@ import (
 // struct and override the specific methods. For example, to override only
 // the MaxRetries method:
 //
-//		type retryer struct {
-//      client.DefaultRetryer
-//    }
+//   type retryer struct {
+//       client.DefaultRetryer
+//   }
 //
-//    // This implementation always has 100 max retries
-//    func (d retryer) MaxRetries() int { return 100 }
+//   // This implementation always has 100 max retries
+//   func (d retryer) MaxRetries() int { return 100 }
 type DefaultRetryer struct {
 	NumMaxRetries int
 }
@@ -33,25 +33,28 @@ func (d DefaultRetryer) MaxRetries() int {
 // RetryRules returns the delay duration before retrying this request again
 func (d DefaultRetryer) RetryRules(r *request.Request) time.Duration {
 	// Set the upper limit of delay in retrying at ~five minutes
-	minTime := 30
-	throttle := d.shouldThrottle(r)
-	if throttle {
-		if delay, ok := getRetryDelay(r); ok {
-			return delay
+	var minTime int64 = 30
+	var initialDelay time.Duration
+
+	isThrottle := r.IsErrorThrottle()
+	if isThrottle {
+		if delay, ok := getRetryAfterDelay(r); ok {
+			initialDelay = delay
 		}
 
 		minTime = 500
 	}
 
 	retryCount := r.RetryCount
-	if throttle && retryCount > 8 {
+	if isThrottle && retryCount > 8 {
 		retryCount = 8
-	} else if retryCount > 13 {
-		retryCount = 13
+	} else if retryCount > 12 {
+		retryCount = 12
 	}
 
-	delay := (1 << uint(retryCount)) * (sdkrand.SeededRand.Intn(minTime) + minTime)
-	return time.Duration(delay) * time.Millisecond
+	delay := (1 << uint(retryCount)) * (sdkrand.SeededRand.Int63n(minTime) + minTime)
+	return (time.Duration(delay) * time.Millisecond) + initialDelay
+
 }
 
 // ShouldRetry returns true if the request should be retried.
@@ -65,26 +68,13 @@ func (d DefaultRetryer) ShouldRetry(r *request.Request) bool {
 	if r.HTTPResponse.StatusCode >= 500 && r.HTTPResponse.StatusCode != 501 {
 		return true
 	}
-	return r.IsErrorRetryable() || d.shouldThrottle(r)
-}
 
-// ShouldThrottle returns true if the request should be throttled.
-func (d DefaultRetryer) shouldThrottle(r *request.Request) bool {
-	switch r.HTTPResponse.StatusCode {
-	case 429:
-	case 502:
-	case 503:
-	case 504:
-	default:
-		return r.IsErrorThrottle()
-	}
-
-	return true
+	return r.IsErrorRetryable() || r.IsErrorThrottle()
 }
 
 // This will look in the Retry-After header, RFC 7231, for how long
 // it will wait before attempting another request
-func getRetryDelay(r *request.Request) (time.Duration, bool) {
+func getRetryAfterDelay(r *request.Request) (time.Duration, bool) {
 	if !canUseRetryAfterHeader(r) {
 		return 0, false
 	}

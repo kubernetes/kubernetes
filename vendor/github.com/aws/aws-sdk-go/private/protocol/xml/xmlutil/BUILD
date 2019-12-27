@@ -10,7 +10,10 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil",
     importpath = "github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/aws/aws-sdk-go/private/protocol:go_default_library"],
+    deps = [
+        "//vendor/github.com/aws/aws-sdk-go/aws/awserr:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/private/protocol:go_default_library",
+    ],
 )
 
 filegroup(

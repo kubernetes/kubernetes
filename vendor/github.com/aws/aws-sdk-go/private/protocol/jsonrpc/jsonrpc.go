@@ -6,8 +6,6 @@ package jsonrpc
 //go:generate go run -tags codegen ../../../models/protocol_tests/generate.go ../../../models/protocol_tests/output/json.json unmarshal_test.go
 
 import (
-	"encoding/json"
-	"io"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -37,7 +35,7 @@ func Build(req *request.Request) {
 	if req.ParamsFilled() {
 		buf, err = jsonutil.BuildJSON(req.Params)
 		if err != nil {
-			req.Error = awserr.New("SerializationError", "failed encoding JSON RPC request", err)
+			req.Error = awserr.New(request.ErrCodeSerialization, "failed encoding JSON RPC request", err)
 			return
 		}
 	} else {
@@ -52,9 +50,12 @@ func Build(req *request.Request) {
 		target := req.ClientInfo.TargetPrefix + "." + req.Operation.Name
 		req.HTTPRequest.Header.Add("X-Amz-Target", target)
 	}
-	if req.ClientInfo.JSONVersion != "" {
+
+	// Only set the content type if one is not already specified and an
+	// JSONVersion is specified.
+	if ct, v := req.HTTPRequest.Header.Get("Content-Type"), req.ClientInfo.JSONVersion; len(ct) == 0 && len(v) != 0 {
 		jsonVersion := req.ClientInfo.JSONVersion
-		req.HTTPRequest.Header.Add("Content-Type", "application/x-amz-json-"+jsonVersion)
+		req.HTTPRequest.Header.Set("Content-Type", "application/x-amz-json-"+jsonVersion)
 	}
 }
 
@@ -65,7 +66,7 @@ func Unmarshal(req *request.Request) {
 		err := jsonutil.UnmarshalJSON(req.Data, req.HTTPResponse.Body)
 		if err != nil {
 			req.Error = awserr.NewRequestFailure(
-				awserr.New("SerializationError", "failed decoding JSON RPC response", err),
+				awserr.New(request.ErrCodeSerialization, "failed decoding JSON RPC response", err),
 				req.HTTPResponse.StatusCode,
 				req.RequestID,
 			)
@@ -84,17 +85,11 @@ func UnmarshalError(req *request.Request) {
 	defer req.HTTPResponse.Body.Close()
 
 	var jsonErr jsonErrorResponse
-	err := json.NewDecoder(req.HTTPResponse.Body).Decode(&jsonErr)
-	if err == io.EOF {
+	err := jsonutil.UnmarshalJSONError(&jsonErr, req.HTTPResponse.Body)
+	if err != nil {
 		req.Error = awserr.NewRequestFailure(
-			awserr.New("SerializationError", req.HTTPResponse.Status, nil),
-			req.HTTPResponse.StatusCode,
-			req.RequestID,
-		)
-		return
-	} else if err != nil {
-		req.Error = awserr.NewRequestFailure(
-			awserr.New("SerializationError", "failed decoding JSON RPC error response", err),
+			awserr.New(request.ErrCodeSerialization,
+				"failed to unmarshal error message", err),
 			req.HTTPResponse.StatusCode,
 			req.RequestID,
 		)

@@ -3,6 +3,7 @@
 package ecr
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -473,7 +474,7 @@ func (c *ECR) CreateRepositoryRequest(input *CreateRepositoryInput) (req *reques
 //   * ErrCodeLimitExceededException "LimitExceededException"
 //   The operation did not succeed because it would have exceeded a service limit
 //   for your account. For more information, see Amazon ECR Default Service Limits
-//   (http://docs.aws.amazon.com/AmazonECR/latest/userguide/service_limits.html)
+//   (https://docs.aws.amazon.com/AmazonECR/latest/userguide/service_limits.html)
 //   in the Amazon Elastic Container Registry User Guide.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/ecr-2015-09-21/CreateRepository
@@ -884,7 +885,7 @@ func (c *ECR) DescribeImagesWithContext(ctx aws.Context, input *DescribeImagesIn
 //    // Example iterating over at most 3 pages of a DescribeImages operation.
 //    pageNum := 0
 //    err := client.DescribeImagesPages(params,
-//        func(page *DescribeImagesOutput, lastPage bool) bool {
+//        func(page *ecr.DescribeImagesOutput, lastPage bool) bool {
 //            pageNum++
 //            fmt.Println(page)
 //            return pageNum <= 3
@@ -1027,7 +1028,7 @@ func (c *ECR) DescribeRepositoriesWithContext(ctx aws.Context, input *DescribeRe
 //    // Example iterating over at most 3 pages of a DescribeRepositories operation.
 //    pageNum := 0
 //    err := client.DescribeRepositoriesPages(params,
-//        func(page *DescribeRepositoriesOutput, lastPage bool) bool {
+//        func(page *ecr.DescribeRepositoriesOutput, lastPage bool) bool {
 //            pageNum++
 //            fmt.Println(page)
 //            return pageNum <= 3
@@ -1728,7 +1729,7 @@ func (c *ECR) ListImagesWithContext(ctx aws.Context, input *ListImagesInput, opt
 //    // Example iterating over at most 3 pages of a ListImages operation.
 //    pageNum := 0
 //    err := client.ListImagesPages(params,
-//        func(page *ListImagesOutput, lastPage bool) bool {
+//        func(page *ecr.ListImagesOutput, lastPage bool) bool {
 //            pageNum++
 //            fmt.Println(page)
 //            return pageNum <= 3
@@ -1934,8 +1935,12 @@ func (c *ECR) PutImageRequest(input *PutImageInput) (req *request.Request, outpu
 //   * ErrCodeLimitExceededException "LimitExceededException"
 //   The operation did not succeed because it would have exceeded a service limit
 //   for your account. For more information, see Amazon ECR Default Service Limits
-//   (http://docs.aws.amazon.com/AmazonECR/latest/userguide/service_limits.html)
+//   (https://docs.aws.amazon.com/AmazonECR/latest/userguide/service_limits.html)
 //   in the Amazon Elastic Container Registry User Guide.
+//
+//   * ErrCodeImageTagAlreadyExistsException "ImageTagAlreadyExistsException"
+//   The specified image is tagged with a tag that already exists. The repository
+//   is configured for tag immutability.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/ecr-2015-09-21/PutImage
 func (c *ECR) PutImage(input *PutImageInput) (*PutImageOutput, error) {
@@ -1954,6 +1959,93 @@ func (c *ECR) PutImage(input *PutImageInput) (*PutImageOutput, error) {
 // for more information on using Contexts.
 func (c *ECR) PutImageWithContext(ctx aws.Context, input *PutImageInput, opts ...request.Option) (*PutImageOutput, error) {
 	req, out := c.PutImageRequest(input)
+	req.SetContext(ctx)
+	req.ApplyOptions(opts...)
+	return out, req.Send()
+}
+
+const opPutImageTagMutability = "PutImageTagMutability"
+
+// PutImageTagMutabilityRequest generates a "aws/request.Request" representing the
+// client's request for the PutImageTagMutability operation. The "output" return
+// value will be populated with the request's response once the request completes
+// successfully.
+//
+// Use "Send" method on the returned Request to send the API call to the service.
+// the "output" return value is not valid until after Send returns without error.
+//
+// See PutImageTagMutability for more information on using the PutImageTagMutability
+// API call, and error handling.
+//
+// This method is useful when you want to inject custom logic or configuration
+// into the SDK's request lifecycle. Such as custom headers, or retry logic.
+//
+//
+//    // Example sending a request using the PutImageTagMutabilityRequest method.
+//    req, resp := client.PutImageTagMutabilityRequest(params)
+//
+//    err := req.Send()
+//    if err == nil { // resp is now filled
+//        fmt.Println(resp)
+//    }
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/ecr-2015-09-21/PutImageTagMutability
+func (c *ECR) PutImageTagMutabilityRequest(input *PutImageTagMutabilityInput) (req *request.Request, output *PutImageTagMutabilityOutput) {
+	op := &request.Operation{
+		Name:       opPutImageTagMutability,
+		HTTPMethod: "POST",
+		HTTPPath:   "/",
+	}
+
+	if input == nil {
+		input = &PutImageTagMutabilityInput{}
+	}
+
+	output = &PutImageTagMutabilityOutput{}
+	req = c.newRequest(op, input, output)
+	return
+}
+
+// PutImageTagMutability API operation for Amazon EC2 Container Registry.
+//
+// Updates the image tag mutability settings for a repository.
+//
+// Returns awserr.Error for service API and SDK errors. Use runtime type assertions
+// with awserr.Error's Code and Message methods to get detailed information about
+// the error.
+//
+// See the AWS API reference guide for Amazon EC2 Container Registry's
+// API operation PutImageTagMutability for usage and error information.
+//
+// Returned Error Codes:
+//   * ErrCodeServerException "ServerException"
+//   These errors are usually caused by a server-side issue.
+//
+//   * ErrCodeInvalidParameterException "InvalidParameterException"
+//   The specified parameter is invalid. Review the available parameters for the
+//   API request.
+//
+//   * ErrCodeRepositoryNotFoundException "RepositoryNotFoundException"
+//   The specified repository could not be found. Check the spelling of the specified
+//   repository and ensure that you are performing operations on the correct registry.
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/ecr-2015-09-21/PutImageTagMutability
+func (c *ECR) PutImageTagMutability(input *PutImageTagMutabilityInput) (*PutImageTagMutabilityOutput, error) {
+	req, out := c.PutImageTagMutabilityRequest(input)
+	return out, req.Send()
+}
+
+// PutImageTagMutabilityWithContext is the same as PutImageTagMutability with the addition of
+// the ability to pass a context and additional request options.
+//
+// See PutImageTagMutability for details on how to use this API operation.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *ECR) PutImageTagMutabilityWithContext(ctx aws.Context, input *PutImageTagMutabilityInput, opts ...request.Option) (*PutImageTagMutabilityOutput, error) {
+	req, out := c.PutImageTagMutabilityRequest(input)
 	req.SetContext(ctx)
 	req.ApplyOptions(opts...)
 	return out, req.Send()
@@ -2004,7 +2096,7 @@ func (c *ECR) PutLifecyclePolicyRequest(input *PutLifecyclePolicyInput) (req *re
 // PutLifecyclePolicy API operation for Amazon EC2 Container Registry.
 //
 // Creates or updates a lifecycle policy. For information about lifecycle policy
-// syntax, see Lifecycle Policy Template (http://docs.aws.amazon.com/AmazonECR/latest/userguide/LifecyclePolicies.html).
+// syntax, see Lifecycle Policy Template (https://docs.aws.amazon.com/AmazonECR/latest/userguide/LifecyclePolicies.html).
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -2092,6 +2184,8 @@ func (c *ECR) SetRepositoryPolicyRequest(input *SetRepositoryPolicyInput) (req *
 // SetRepositoryPolicy API operation for Amazon EC2 Container Registry.
 //
 // Applies a repository policy on a specified repository to control access permissions.
+// For more information, see Amazon ECR Repository Policies (https://docs.aws.amazon.com/AmazonECR/latest/userguide/RepositoryPolicies.html)
+// in the Amazon Elastic Container Registry User Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -2504,7 +2598,7 @@ func (c *ECR) UploadLayerPartRequest(input *UploadLayerPartInput) (req *request.
 //   * ErrCodeLimitExceededException "LimitExceededException"
 //   The operation did not succeed because it would have exceeded a service limit
 //   for your account. For more information, see Amazon ECR Default Service Limits
-//   (http://docs.aws.amazon.com/AmazonECR/latest/userguide/service_limits.html)
+//   (https://docs.aws.amazon.com/AmazonECR/latest/userguide/service_limits.html)
 //   in the Amazon Elastic Container Registry User Guide.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/ecr-2015-09-21/UploadLayerPart
@@ -2723,6 +2817,16 @@ func (s *BatchDeleteImageInput) Validate() error {
 	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
 		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
 	}
+	if s.ImageIds != nil {
+		for i, v := range s.ImageIds {
+			if v == nil {
+				continue
+			}
+			if err := v.Validate(); err != nil {
+				invalidParams.AddNested(fmt.Sprintf("%s[%v]", "ImageIds", i), err.(request.ErrInvalidParams))
+			}
+		}
+	}
 
 	if invalidParams.Len() > 0 {
 		return invalidParams
@@ -2832,6 +2936,16 @@ func (s *BatchGetImageInput) Validate() error {
 	}
 	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
 		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
+	}
+	if s.ImageIds != nil {
+		for i, v := range s.ImageIds {
+			if v == nil {
+				continue
+			}
+			if err := v.Validate(); err != nil {
+				invalidParams.AddNested(fmt.Sprintf("%s[%v]", "ImageIds", i), err.(request.ErrInvalidParams))
+			}
+		}
 	}
 
 	if invalidParams.Len() > 0 {
@@ -3032,6 +3146,12 @@ func (s *CompleteLayerUploadOutput) SetUploadId(v string) *CompleteLayerUploadOu
 type CreateRepositoryInput struct {
 	_ struct{} `type:"structure"`
 
+	// The tag mutability setting for the repository. If this parameter is omitted,
+	// the default setting of MUTABLE will be used which will allow image tags to
+	// be overwritten. If IMMUTABLE is specified, all image tags within the repository
+	// will be immutable which will prevent them from being overwritten.
+	ImageTagMutability *string `locationName:"imageTagMutability" type:"string" enum:"ImageTagMutability"`
+
 	// The name to use for the repository. The repository name may be specified
 	// on its own (such as nginx-web-app) or it can be prepended with a namespace
 	// to group the repository into a category (such as project-a/nginx-web-app).
@@ -3039,6 +3159,10 @@ type CreateRepositoryInput struct {
 	// RepositoryName is a required field
 	RepositoryName *string `locationName:"repositoryName" min:"2" type:"string" required:"true"`
 
+	// The metadata that you apply to the repository to help you categorize and
+	// organize them. Each tag consists of a key and an optional value, both of
+	// which you define. Tag keys can have a maximum character length of 128 characters,
+	// and tag values can have a maximum length of 256 characters.
 	Tags []*Tag `locationName:"tags" type:"list"`
 }
 
@@ -3066,6 +3190,12 @@ func (s *CreateRepositoryInput) Validate() error {
 		return invalidParams
 	}
 	return nil
+}
+
+// SetImageTagMutability sets the ImageTagMutability field's value.
+func (s *CreateRepositoryInput) SetImageTagMutability(v string) *CreateRepositoryInput {
+	s.ImageTagMutability = &v
+	return s
 }
 
 // SetRepositoryName sets the RepositoryName field's value.
@@ -3437,7 +3567,7 @@ type DescribeImagesInput struct {
 	// registry is assumed.
 	RegistryId *string `locationName:"registryId" type:"string"`
 
-	// A list of repositories to describe.
+	// The repository that contains the images to describe.
 	//
 	// RepositoryName is a required field
 	RepositoryName *string `locationName:"repositoryName" min:"2" type:"string" required:"true"`
@@ -3467,6 +3597,16 @@ func (s *DescribeImagesInput) Validate() error {
 	}
 	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
 		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
+	}
+	if s.ImageIds != nil {
+		for i, v := range s.ImageIds {
+			if v == nil {
+				continue
+			}
+			if err := v.Validate(); err != nil {
+				invalidParams.AddNested(fmt.Sprintf("%s[%v]", "ImageIds", i), err.(request.ErrInvalidParams))
+			}
+		}
 	}
 
 	if invalidParams.Len() > 0 {
@@ -3936,22 +4076,21 @@ type GetLifecyclePolicyPreviewInput struct {
 	ImageIds []*ImageIdentifier `locationName:"imageIds" min:"1" type:"list"`
 
 	// The maximum number of repository results returned by GetLifecyclePolicyPreviewRequest
-	// in  paginated output. When this parameter is used, GetLifecyclePolicyPreviewRequest
-	// only returns  maxResults results in a single page along with a nextToken
-	// response element. The remaining results of the initial request can be seen
-	// by sending  another GetLifecyclePolicyPreviewRequest request with the returned
-	// nextToken  value. This value can be between 1 and 1000. If this  parameter
-	// is not used, then GetLifecyclePolicyPreviewRequest returns up to  100 results
-	// and a nextToken value, if  applicable. This option cannot be used when you
-	// specify images with imageIds.
+	// in paginated output. When this parameter is used, GetLifecyclePolicyPreviewRequest
+	// only returns maxResults results in a single page along with a nextToken response
+	// element. The remaining results of the initial request can be seen by sending
+	// another GetLifecyclePolicyPreviewRequest request with the returned nextToken
+	// value. This value can be between 1 and 1000. If this parameter is not used,
+	// then GetLifecyclePolicyPreviewRequest returns up to 100 results and a nextToken
+	// value, if applicable. This option cannot be used when you specify images
+	// with imageIds.
 	MaxResults *int64 `locationName:"maxResults" min:"1" type:"integer"`
 
-	// The nextToken value returned from a previous paginated  GetLifecyclePolicyPreviewRequest
-	// request where maxResults was used and the  results exceeded the value of
-	// that parameter. Pagination continues from the end of the  previous results
-	// that returned the nextToken value. This value is  null when there are no
-	// more results to return. This option cannot be used when you specify images
-	// with imageIds.
+	// The nextToken value returned from a previous paginated GetLifecyclePolicyPreviewRequest
+	// request where maxResults was used and the results exceeded the value of that
+	// parameter. Pagination continues from the end of the previous results that
+	// returned the nextToken value. This value is null when there are no more results
+	// to return. This option cannot be used when you specify images with imageIds.
 	NextToken *string `locationName:"nextToken" type:"string"`
 
 	// The AWS account ID associated with the registry that contains the repository.
@@ -3988,6 +4127,16 @@ func (s *GetLifecyclePolicyPreviewInput) Validate() error {
 	}
 	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
 		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
+	}
+	if s.ImageIds != nil {
+		for i, v := range s.ImageIds {
+			if v == nil {
+				continue
+			}
+			if err := v.Validate(); err != nil {
+				invalidParams.AddNested(fmt.Sprintf("%s[%v]", "ImageIds", i), err.(request.ErrInvalidParams))
+			}
+		}
 	}
 
 	if invalidParams.Len() > 0 {
@@ -4380,7 +4529,7 @@ type ImageIdentifier struct {
 	ImageDigest *string `locationName:"imageDigest" type:"string"`
 
 	// The tag used for the image.
-	ImageTag *string `locationName:"imageTag" type:"string"`
+	ImageTag *string `locationName:"imageTag" min:"1" type:"string"`
 }
 
 // String returns the string representation
@@ -4391,6 +4540,19 @@ func (s ImageIdentifier) String() string {
 // GoString returns the string representation
 func (s ImageIdentifier) GoString() string {
 	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *ImageIdentifier) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "ImageIdentifier"}
+	if s.ImageTag != nil && len(*s.ImageTag) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ImageTag", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
 }
 
 // SetImageDigest sets the ImageDigest field's value.
@@ -4943,7 +5105,7 @@ type PutImageInput struct {
 
 	// The tag to associate with the image. This parameter is required for images
 	// that use the Docker Image Manifest V2 Schema 2 or OCI formats.
-	ImageTag *string `locationName:"imageTag" type:"string"`
+	ImageTag *string `locationName:"imageTag" min:"1" type:"string"`
 
 	// The AWS account ID associated with the registry that contains the repository
 	// in which to put the image. If you do not specify a registry, the default
@@ -4971,6 +5133,9 @@ func (s *PutImageInput) Validate() error {
 	invalidParams := request.ErrInvalidParams{Context: "PutImageInput"}
 	if s.ImageManifest == nil {
 		invalidParams.Add(request.NewErrParamRequired("ImageManifest"))
+	}
+	if s.ImageTag != nil && len(*s.ImageTag) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("ImageTag", 1))
 	}
 	if s.RepositoryName == nil {
 		invalidParams.Add(request.NewErrParamRequired("RepositoryName"))
@@ -5032,6 +5197,115 @@ func (s *PutImageOutput) SetImage(v *Image) *PutImageOutput {
 	return s
 }
 
+type PutImageTagMutabilityInput struct {
+	_ struct{} `type:"structure"`
+
+	// The tag mutability setting for the repository. If MUTABLE is specified, image
+	// tags can be overwritten. If IMMUTABLE is specified, all image tags within
+	// the repository will be immutable which will prevent them from being overwritten.
+	//
+	// ImageTagMutability is a required field
+	ImageTagMutability *string `locationName:"imageTagMutability" type:"string" required:"true" enum:"ImageTagMutability"`
+
+	// The AWS account ID associated with the registry that contains the repository
+	// in which to update the image tag mutability settings. If you do not specify
+	// a registry, the default registry is assumed.
+	RegistryId *string `locationName:"registryId" type:"string"`
+
+	// The name of the repository in which to update the image tag mutability settings.
+	//
+	// RepositoryName is a required field
+	RepositoryName *string `locationName:"repositoryName" min:"2" type:"string" required:"true"`
+}
+
+// String returns the string representation
+func (s PutImageTagMutabilityInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s PutImageTagMutabilityInput) GoString() string {
+	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *PutImageTagMutabilityInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "PutImageTagMutabilityInput"}
+	if s.ImageTagMutability == nil {
+		invalidParams.Add(request.NewErrParamRequired("ImageTagMutability"))
+	}
+	if s.RepositoryName == nil {
+		invalidParams.Add(request.NewErrParamRequired("RepositoryName"))
+	}
+	if s.RepositoryName != nil && len(*s.RepositoryName) < 2 {
+		invalidParams.Add(request.NewErrParamMinLen("RepositoryName", 2))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
+// SetImageTagMutability sets the ImageTagMutability field's value.
+func (s *PutImageTagMutabilityInput) SetImageTagMutability(v string) *PutImageTagMutabilityInput {
+	s.ImageTagMutability = &v
+	return s
+}
+
+// SetRegistryId sets the RegistryId field's value.
+func (s *PutImageTagMutabilityInput) SetRegistryId(v string) *PutImageTagMutabilityInput {
+	s.RegistryId = &v
+	return s
+}
+
+// SetRepositoryName sets the RepositoryName field's value.
+func (s *PutImageTagMutabilityInput) SetRepositoryName(v string) *PutImageTagMutabilityInput {
+	s.RepositoryName = &v
+	return s
+}
+
+type PutImageTagMutabilityOutput struct {
+	_ struct{} `type:"structure"`
+
+	// The image tag mutability setting for the repository.
+	ImageTagMutability *string `locationName:"imageTagMutability" type:"string" enum:"ImageTagMutability"`
+
+	// The registry ID associated with the request.
+	RegistryId *string `locationName:"registryId" type:"string"`
+
+	// The repository name associated with the request.
+	RepositoryName *string `locationName:"repositoryName" min:"2" type:"string"`
+}
+
+// String returns the string representation
+func (s PutImageTagMutabilityOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s PutImageTagMutabilityOutput) GoString() string {
+	return s.String()
+}
+
+// SetImageTagMutability sets the ImageTagMutability field's value.
+func (s *PutImageTagMutabilityOutput) SetImageTagMutability(v string) *PutImageTagMutabilityOutput {
+	s.ImageTagMutability = &v
+	return s
+}
+
+// SetRegistryId sets the RegistryId field's value.
+func (s *PutImageTagMutabilityOutput) SetRegistryId(v string) *PutImageTagMutabilityOutput {
+	s.RegistryId = &v
+	return s
+}
+
+// SetRepositoryName sets the RepositoryName field's value.
+func (s *PutImageTagMutabilityOutput) SetRepositoryName(v string) *PutImageTagMutabilityOutput {
+	s.RepositoryName = &v
+	return s
+}
+
 type PutLifecyclePolicyInput struct {
 	_ struct{} `type:"structure"`
 
@@ -5041,7 +5315,7 @@ type PutLifecyclePolicyInput struct {
 	LifecyclePolicyText *string `locationName:"lifecyclePolicyText" min:"100" type:"string" required:"true"`
 
 	// The AWS account ID associated with the registry that contains the repository.
-	// If you do  not specify a registry, the default registry is assumed.
+	// If you do not specify a registry, the default registry is assumed.
 	RegistryId *string `locationName:"registryId" type:"string"`
 
 	// The name of the repository to receive the policy.
@@ -5148,6 +5422,9 @@ type Repository struct {
 	// The date and time, in JavaScript date format, when the repository was created.
 	CreatedAt *time.Time `locationName:"createdAt" type:"timestamp"`
 
+	// The tag mutability setting for the repository.
+	ImageTagMutability *string `locationName:"imageTagMutability" type:"string" enum:"ImageTagMutability"`
+
 	// The AWS account ID associated with the registry that contains the repository.
 	RegistryId *string `locationName:"registryId" type:"string"`
 
@@ -5178,6 +5455,12 @@ func (s Repository) GoString() string {
 // SetCreatedAt sets the CreatedAt field's value.
 func (s *Repository) SetCreatedAt(v time.Time) *Repository {
 	s.CreatedAt = &v
+	return s
+}
+
+// SetImageTagMutability sets the ImageTagMutability field's value.
+func (s *Repository) SetImageTagMutability(v string) *Repository {
+	s.ImageTagMutability = &v
 	return s
 }
 
@@ -5213,7 +5496,9 @@ type SetRepositoryPolicyInput struct {
 	// operation. This is intended to prevent accidental repository lock outs.
 	Force *bool `locationName:"force" type:"boolean"`
 
-	// The JSON repository policy text to apply to the repository.
+	// The JSON repository policy text to apply to the repository. For more information,
+	// see Amazon ECR Repository Policy Examples (https://docs.aws.amazon.com/AmazonECR/latest/userguide/RepositoryPolicyExamples.html)
+	// in the Amazon Elastic Container Registry User Guide.
 	//
 	// PolicyText is a required field
 	PolicyText *string `locationName:"policyText" type:"string" required:"true"`
@@ -5790,6 +6075,14 @@ const (
 
 	// ImageFailureCodeMissingDigestAndTag is a ImageFailureCode enum value
 	ImageFailureCodeMissingDigestAndTag = "MissingDigestAndTag"
+)
+
+const (
+	// ImageTagMutabilityMutable is a ImageTagMutability enum value
+	ImageTagMutabilityMutable = "MUTABLE"
+
+	// ImageTagMutabilityImmutable is a ImageTagMutability enum value
+	ImageTagMutabilityImmutable = "IMMUTABLE"
 )
 
 const (

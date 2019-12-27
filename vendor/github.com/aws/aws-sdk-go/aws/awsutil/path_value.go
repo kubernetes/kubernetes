@@ -185,13 +185,12 @@ func ValuesAtPath(i interface{}, path string) ([]interface{}, error) {
 // SetValueAtPath sets a value at the case insensitive lexical path inside
 // of a structure.
 func SetValueAtPath(i interface{}, path string, v interface{}) {
-	if rvals := rValuesAtPath(i, path, true, false, v == nil); rvals != nil {
-		for _, rval := range rvals {
-			if rval.Kind() == reflect.Ptr && rval.IsNil() {
-				continue
-			}
-			setValue(rval, v)
+	rvals := rValuesAtPath(i, path, true, false, v == nil)
+	for _, rval := range rvals {
+		if rval.Kind() == reflect.Ptr && rval.IsNil() {
+			continue
 		}
+		setValue(rval, v)
 	}
 }
 

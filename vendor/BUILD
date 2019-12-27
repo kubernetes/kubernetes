@@ -35,6 +35,7 @@ filegroup(
         "//vendor/github.com/aws/aws-sdk-go/aws:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/internal/ini:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/internal/sdkio:all-srcs",
+        "//vendor/github.com/aws/aws-sdk-go/internal/sdkmath:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/internal/sdkrand:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/internal/sdkuri:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/internal/shareddefaults:all-srcs",

@@ -67,7 +67,7 @@ const (
 	// STS is not activated in the requested region for the account that is being
 	// asked to generate credentials. The account administrator must use the IAM
 	// console to activate STS in that region. For more information, see Activating
-	// and Deactivating AWS STS in an AWS Region (http://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_enable-regions.html)
+	// and Deactivating AWS STS in an AWS Region (https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_enable-regions.html)
 	// in the IAM User Guide.
 	ErrCodeRegionDisabledException = "RegionDisabledException"
 )

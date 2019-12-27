@@ -20,7 +20,7 @@ type RequestRetryer interface{}
 // A Config provides service configuration for service clients. By default,
 // all clients will use the defaults.DefaultConfig structure.
 //
-//     // Create Session with MaxRetry configuration to be shared by multiple
+//     // Create Session with MaxRetries configuration to be shared by multiple
 //     // service clients.
 //     sess := session.Must(session.NewSession(&aws.Config{
 //         MaxRetries: aws.Int(3),
@@ -251,7 +251,7 @@ type Config struct {
 // NewConfig returns a new Config pointer that can be chained with builder
 // methods to set multiple configuration values inline without using pointers.
 //
-//     // Create Session with MaxRetry configuration to be shared by multiple
+//     // Create Session with MaxRetries configuration to be shared by multiple
 //     // service clients.
 //     sess := session.Must(session.NewSession(aws.NewConfig().
 //         WithMaxRetries(3),

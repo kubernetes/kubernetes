@@ -20,7 +20,7 @@ const (
 	// associated with a different AWS CloudHSM cluster.
 	//
 	// Clusters that share a backup history have the same cluster certificate. To
-	// view the cluster certificate of a cluster, use the DescribeClusters (http://docs.aws.amazon.com/cloudhsm/latest/APIReference/API_DescribeClusters.html)
+	// view the cluster certificate of a cluster, use the DescribeClusters (https://docs.aws.amazon.com/cloudhsm/latest/APIReference/API_DescribeClusters.html)
 	// operation.
 	ErrCodeCloudHsmClusterInUseException = "CloudHsmClusterInUseException"
 
@@ -28,21 +28,35 @@ const (
 	// "CloudHsmClusterInvalidConfigurationException".
 	//
 	// The request was rejected because the associated AWS CloudHSM cluster did
-	// not meet the configuration requirements for a custom key store. The cluster
-	// must be configured with private subnets in at least two different Availability
-	// Zones in the Region. Also, it must contain at least as many HSMs as the operation
-	// requires.
+	// not meet the configuration requirements for a custom key store.
 	//
-	// For the CreateCustomKeyStore, UpdateCustomKeyStore, and CreateKey operations,
-	// the AWS CloudHSM cluster must have at least two active HSMs, each in a different
-	// Availability Zone. For the ConnectCustomKeyStore operation, the AWS CloudHSM
-	// must contain at least one active HSM.
+	//    * The cluster must be configured with private subnets in at least two
+	//    different Availability Zones in the Region.
 	//
-	// For information about creating a private subnet for a AWS CloudHSM cluster,
-	// see Create a Private Subnet (http://docs.aws.amazon.com/cloudhsm/latest/userguide/create-subnets.html)
-	// in the AWS CloudHSM User Guide. To add HSMs, use the AWS CloudHSM CreateHsm
-	// (http://docs.aws.amazon.com/cloudhsm/latest/APIReference/API_CreateHsm.html)
-	// operation.
+	//    * The security group for the cluster (https://docs.aws.amazon.com/cloudhsm/latest/userguide/configure-sg.html)
+	//    (cloudhsm-cluster-<cluster-id>-sg) must include inbound rules and outbound
+	//    rules that allow TCP traffic on ports 2223-2225. The Source in the inbound
+	//    rules and the Destination in the outbound rules must match the security
+	//    group ID. These rules are set by default when you create the cluster.
+	//    Do not delete or change them. To get information about a particular security
+	//    group, use the DescribeSecurityGroups (https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeSecurityGroups.html)
+	//    operation.
+	//
+	//    * The cluster must contain at least as many HSMs as the operation requires.
+	//    To add HSMs, use the AWS CloudHSM CreateHsm (https://docs.aws.amazon.com/cloudhsm/latest/APIReference/API_CreateHsm.html)
+	//    operation. For the CreateCustomKeyStore, UpdateCustomKeyStore, and CreateKey
+	//    operations, the AWS CloudHSM cluster must have at least two active HSMs,
+	//    each in a different Availability Zone. For the ConnectCustomKeyStore operation,
+	//    the AWS CloudHSM must contain at least one active HSM.
+	//
+	// For information about the requirements for an AWS CloudHSM cluster that is
+	// associated with a custom key store, see Assemble the Prerequisites (https://docs.aws.amazon.com/kms/latest/developerguide/create-keystore.html#before-keystore)
+	// in the AWS Key Management Service Developer Guide. For information about
+	// creating a private subnet for an AWS CloudHSM cluster, see Create a Private
+	// Subnet (https://docs.aws.amazon.com/cloudhsm/latest/userguide/create-subnets.html)
+	// in the AWS CloudHSM User Guide. For information about cluster security groups,
+	// see Configure a Default Security Group (https://docs.aws.amazon.com/cloudhsm/latest/userguide/configure-sg.html)
+	// in the AWS CloudHSM User Guide .
 	ErrCodeCloudHsmClusterInvalidConfigurationException = "CloudHsmClusterInvalidConfigurationException"
 
 	// ErrCodeCloudHsmClusterNotActiveException for service response error code
@@ -51,7 +65,7 @@ const (
 	// The request was rejected because the AWS CloudHSM cluster that is associated
 	// with the custom key store is not active. Initialize and activate the cluster
 	// and try the command again. For detailed instructions, see Getting Started
-	// (http://docs.aws.amazon.com/cloudhsm/latest/userguide/getting-started.html)
+	// (https://docs.aws.amazon.com/cloudhsm/latest/userguide/getting-started.html)
 	// in the AWS CloudHSM User Guide.
 	ErrCodeCloudHsmClusterNotActiveException = "CloudHsmClusterNotActiveException"
 
@@ -76,7 +90,7 @@ const (
 	// cluster.
 	//
 	// Clusters that share a backup history have the same cluster certificate. To
-	// view the cluster certificate of a cluster, use the DescribeClusters (http://docs.aws.amazon.com/cloudhsm/latest/APIReference/API_DescribeClusters.html)
+	// view the cluster certificate of a cluster, use the DescribeClusters (https://docs.aws.amazon.com/cloudhsm/latest/APIReference/API_DescribeClusters.html)
 	// operation.
 	ErrCodeCloudHsmClusterNotRelatedException = "CloudHsmClusterNotRelatedException"
 
@@ -161,7 +175,7 @@ const (
 	// The request was rejected because the trust anchor certificate in the request
 	// is not the trust anchor certificate for the specified AWS CloudHSM cluster.
 	//
-	// When you initialize the cluster (http://docs.aws.amazon.com/cloudhsm/latest/userguide/initialize-cluster.html#sign-csr),
+	// When you initialize the cluster (https://docs.aws.amazon.com/cloudhsm/latest/userguide/initialize-cluster.html#sign-csr),
 	// you create the trust anchor certificate and save it in the customerCA.crt
 	// file.
 	ErrCodeIncorrectTrustAnchorException = "IncorrectTrustAnchorException"
@@ -182,7 +196,8 @@ const (
 	// ErrCodeInvalidArnException for service response error code
 	// "InvalidArnException".
 	//
-	// The request was rejected because a specified ARN was not valid.
+	// The request was rejected because a specified ARN, or an ARN in a key policy,
+	// is not valid.
 	ErrCodeInvalidArnException = "InvalidArnException"
 
 	// ErrCodeInvalidCiphertextException for service response error code
@@ -232,7 +247,7 @@ const (
 	// valid for this request.
 	//
 	// For more information about how key state affects the use of a CMK, see How
-	// Key State Affects Use of a Customer Master Key (http://docs.aws.amazon.com/kms/latest/developerguide/key-state.html)
+	// Key State Affects Use of a Customer Master Key (https://docs.aws.amazon.com/kms/latest/developerguide/key-state.html)
 	// in the AWS Key Management Service Developer Guide.
 	ErrCodeInvalidStateException = "KMSInvalidStateException"
 
@@ -247,7 +262,7 @@ const (
 	// "LimitExceededException".
 	//
 	// The request was rejected because a limit was exceeded. For more information,
-	// see Limits (http://docs.aws.amazon.com/kms/latest/developerguide/limits.html)
+	// see Limits (https://docs.aws.amazon.com/kms/latest/developerguide/limits.html)
 	// in the AWS Key Management Service Developer Guide.
 	ErrCodeLimitExceededException = "LimitExceededException"
 

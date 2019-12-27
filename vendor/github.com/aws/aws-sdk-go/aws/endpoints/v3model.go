@@ -54,8 +54,9 @@ type partition struct {
 
 func (p partition) Partition() Partition {
 	return Partition{
-		id: p.ID,
-		p:  &p,
+		dnsSuffix: p.DNSSuffix,
+		id:        p.ID,
+		p:         &p,
 	}
 }
 

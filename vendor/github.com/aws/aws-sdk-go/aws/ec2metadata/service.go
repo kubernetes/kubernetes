@@ -92,6 +92,9 @@ func NewClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegio
 		svc.Handlers.Send.SwapNamed(request.NamedHandler{
 			Name: corehandlers.SendHandler.Name,
 			Fn: func(r *request.Request) {
+				r.HTTPResponse = &http.Response{
+					Header: http.Header{},
+				}
 				r.Error = awserr.New(
 					request.CanceledErrorCode,
 					"EC2 IMDS access disabled via "+disableServiceEnvVar+" env var",
@@ -120,7 +123,7 @@ func unmarshalHandler(r *request.Request) {
 	defer r.HTTPResponse.Body.Close()
 	b := &bytes.Buffer{}
 	if _, err := io.Copy(b, r.HTTPResponse.Body); err != nil {
-		r.Error = awserr.New("SerializationError", "unable to unmarshal EC2 metadata respose", err)
+		r.Error = awserr.New(request.ErrCodeSerialization, "unable to unmarshal EC2 metadata response", err)
 		return
 	}
 
@@ -133,7 +136,7 @@ func unmarshalError(r *request.Request) {
 	defer r.HTTPResponse.Body.Close()
 	b := &bytes.Buffer{}
 	if _, err := io.Copy(b, r.HTTPResponse.Body); err != nil {
-		r.Error = awserr.New("SerializationError", "unable to unmarshal EC2 metadata error respose", err)
+		r.Error = awserr.New(request.ErrCodeSerialization, "unable to unmarshal EC2 metadata error response", err)
 		return
 	}
 
