@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"sync"
 
-	k8serr "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -209,10 +209,10 @@ func (e *Etcd) CreateOrUpdate(snapshot *api.RangeAllocation) error {
 			switch {
 			case len(snapshot.ResourceVersion) != 0 && len(existing.ResourceVersion) != 0:
 				if snapshot.ResourceVersion != existing.ResourceVersion {
-					return nil, k8serr.NewConflict(e.resource, "", fmt.Errorf("the provided resource version does not match"))
+					return nil, apierrors.NewConflict(e.resource, "", fmt.Errorf("the provided resource version does not match"))
 				}
 			case len(existing.ResourceVersion) != 0:
-				return nil, k8serr.NewConflict(e.resource, "", fmt.Errorf("another caller has already initialized the resource"))
+				return nil, apierrors.NewConflict(e.resource, "", fmt.Errorf("another caller has already initialized the resource"))
 			}
 			last = snapshot.ResourceVersion
 			return snapshot, nil

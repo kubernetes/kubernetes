@@ -22,7 +22,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -246,7 +246,7 @@ func deletePVCAfterBind(c clientset.Interface, ns string, pvc *v1.PersistentVolu
 	ginkgo.By("delete pvc")
 	framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
 	_, err = c.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
-	if !apierrs.IsNotFound(err) {
+	if !apierrors.IsNotFound(err) {
 		framework.ExpectNoError(err)
 	}
 }

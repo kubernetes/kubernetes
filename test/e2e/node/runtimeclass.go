@@ -21,7 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeclasstest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -55,7 +55,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 		}
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		framework.ExpectError(err, "should be forbidden")
-		framework.ExpectEqual(apierrs.IsForbidden(err), true, "should be forbidden error")
+		framework.ExpectEqual(apierrors.IsForbidden(err), true, "should be forbidden error")
 	})
 
 	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling [NodeFeature:RuntimeHandler] [Disruptive] ", func() {

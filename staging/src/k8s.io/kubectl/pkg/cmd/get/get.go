@@ -27,7 +27,7 @@ import (
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
-	kapierrors "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -483,7 +483,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		Do()
 
 	if o.IgnoreNotFound {
-		r.IgnoreErrors(kapierrors.IsNotFound)
+		r.IgnoreErrors(apierrors.IsNotFound)
 	}
 	if err := r.Err(); err != nil {
 		return err

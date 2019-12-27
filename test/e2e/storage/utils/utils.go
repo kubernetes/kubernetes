@@ -30,7 +30,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -581,7 +581,7 @@ func PrivilegedTestPSPClusterRoleBinding(client clientset.Interface,
 		roleBindingClient.Delete(binding.GetName(), &metav1.DeleteOptions{})
 		err := wait.Poll(2*time.Second, 2*time.Minute, func() (bool, error) {
 			_, err := roleBindingClient.Get(binding.GetName(), metav1.GetOptions{})
-			return apierrs.IsNotFound(err), nil
+			return apierrors.IsNotFound(err), nil
 		})
 		framework.ExpectNoError(err, "Timed out waiting for deletion: %v", err)
 

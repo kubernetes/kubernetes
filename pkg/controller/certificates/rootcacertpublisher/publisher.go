@@ -22,7 +22,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -177,7 +177,7 @@ func (c *Publisher) syncNamespace(ns string) error {
 
 	cm, err := c.cmLister.ConfigMaps(ns).Get(RootCACertConfigMapName)
 	switch {
-	case apierrs.IsNotFound(err):
+	case apierrors.IsNotFound(err):
 		_, err := c.client.CoreV1().ConfigMaps(ns).Create(&v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: RootCACertConfigMapName,

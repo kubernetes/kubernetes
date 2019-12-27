@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -78,7 +78,7 @@ func createNodes(apiURL string, config *Config) error {
 	for i := 0; i < config.NumNodes; i++ {
 		var err error
 		for j := 0; j < maxCreateRetries; j++ {
-			if _, err = clientSet.CoreV1().Nodes().Create(baseNodeTemplate); err != nil && errors.IsServerTimeout(err) {
+			if _, err = clientSet.CoreV1().Nodes().Create(baseNodeTemplate); err != nil && apierrors.IsServerTimeout(err) {
 				klog.Infof("Server timeout creating nodes, retrying after %v", retryDelay)
 				time.Sleep(retryDelay)
 				continue

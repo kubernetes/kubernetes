@@ -30,11 +30,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	apierrors "k8s.io/apimachinery/pkg/util/errors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
@@ -317,7 +316,7 @@ func (r *VolumeResource) CleanupResource() error {
 			cleanUpErrs = append(cleanUpErrs, errors.Wrap(err, "Failed to delete Volume"))
 		}
 	}
-	return apierrors.NewAggregate(cleanUpErrs)
+	return utilerrors.NewAggregate(cleanUpErrs)
 }
 
 func createPVCPV(
@@ -409,7 +408,7 @@ func isDelayedBinding(sc *storagev1.StorageClass) bool {
 // deleteStorageClass deletes the passed in StorageClass and catches errors other than "Not Found"
 func deleteStorageClass(cs clientset.Interface, className string) error {
 	err := cs.StorageV1().StorageClasses().Delete(className, nil)
-	if err != nil && !apierrs.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 	return nil

@@ -23,7 +23,7 @@ import (
 	g "github.com/onsi/ginkgo"
 	o "github.com/onsi/gomega"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
@@ -63,16 +63,16 @@ var _ = SIGDescribe("client-go should negotiate", func() {
 			case watch.Added, watch.Modified:
 				// this is allowed
 			case watch.Error:
-				err := errors.FromObject(evt.Object)
-				// In Kubernetes 1.17 and earlier, the api server returns both apierrs.StatusReasonExpired and
-				// apierrs.StatusReasonGone for HTTP 410 (Gone) status code responses. In 1.18 the kube server is more consistent
-				// and always returns apierrs.StatusReasonExpired. For backward compatibility we can only remove the apierrs.IsGone
+				err := apierrors.FromObject(evt.Object)
+				// In Kubernetes 1.17 and earlier, the api server returns both apierrors.StatusReasonExpired and
+				// apierrors.StatusReasonGone for HTTP 410 (Gone) status code responses. In 1.18 the kube server is more consistent
+				// and always returns apierrors.StatusReasonExpired. For backward compatibility we can only remove the apierrs.IsGone
 				// check when we fully drop support for Kubernetes 1.17 servers from reflectors.
-				if errors.IsGone(err) || errors.IsResourceExpired(err) {
+				if apierrors.IsGone(err) || apierrors.IsResourceExpired(err) {
 					// this is allowed, since the kubernetes object could be very old
 					break
 				}
-				if errors.IsUnexpectedObjectError(err) {
+				if apierrors.IsUnexpectedObjectError(err) {
 					g.Fail(fmt.Sprintf("unexpected object, wanted v1.Status: %#v", evt.Object))
 				}
 				g.Fail(fmt.Sprintf("unexpected error: %#v", evt.Object))

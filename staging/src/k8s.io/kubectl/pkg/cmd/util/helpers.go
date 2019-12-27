@@ -29,7 +29,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -60,10 +60,10 @@ type debugError interface {
 // source is the filename or URL to the template file(*.json or *.yaml), or stdin to use to handle the resource.
 func AddSourceToErr(verb string, source string, err error) error {
 	if source != "" {
-		if statusError, ok := err.(kerrors.APIStatus); ok {
+		if statusError, ok := err.(apierrors.APIStatus); ok {
 			status := statusError.Status()
 			status.Message = fmt.Sprintf("error when %s %q: %v", verb, source, status.Message)
-			return &kerrors.StatusError{ErrStatus: status}
+			return &apierrors.StatusError{ErrStatus: status}
 		}
 		return fmt.Errorf("error when %s %q: %v", verb, source, err)
 	}
@@ -129,8 +129,8 @@ func checkErr(err error, handleErr func(string, int)) {
 	switch {
 	case err == ErrExit:
 		handleErr("", DefaultErrorExitCode)
-	case kerrors.IsInvalid(err):
-		details := err.(*kerrors.StatusError).Status().Details
+	case apierrors.IsInvalid(err):
+		details := err.(*apierrors.StatusError).Status().Details
 		s := "The request is invalid"
 		if details == nil {
 			handleErr(s, DefaultErrorExitCode)
@@ -202,7 +202,7 @@ func StandardErrorMessage(err error) (string, bool) {
 	if debugErr, ok := err.(debugError); ok {
 		klog.V(4).Infof(debugErr.DebugError())
 	}
-	status, isStatus := err.(kerrors.APIStatus)
+	status, isStatus := err.(apierrors.APIStatus)
 	switch {
 	case isStatus:
 		switch s := status.Status(); {
@@ -213,7 +213,7 @@ func StandardErrorMessage(err error) (string, bool) {
 		default:
 			return fmt.Sprintf("Error from server: %s", err.Error()), true
 		}
-	case kerrors.IsUnexpectedObjectError(err):
+	case apierrors.IsUnexpectedObjectError(err):
 		return fmt.Sprintf("Server returned an unexpected response: %s", err.Error()), true
 	}
 	switch t := err.(type) {
@@ -259,7 +259,7 @@ func MultilineError(prefix string, err error) string {
 // Returns true if a case exists to handle the error type, or false otherwise.
 func PrintErrorWithCauses(err error, errOut io.Writer) bool {
 	switch t := err.(type) {
-	case *kerrors.StatusError:
+	case *apierrors.StatusError:
 		errorDetails := t.Status().Details
 		if errorDetails != nil {
 			fmt.Fprintf(errOut, "error: %s %q is invalid\n\n", errorDetails.Kind, errorDetails.Name)

@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -111,7 +111,7 @@ func CreatePrivilegedPSPBinding(kubeClient clientset.Interface, namespace string
 	privilegedPSPOnce.Do(func() {
 		_, err := kubeClient.PolicyV1beta1().PodSecurityPolicies().Get(
 			podSecurityPolicyPrivileged, metav1.GetOptions{})
-		if !apierrs.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			// Privileged PSP was already created.
 			ExpectNoError(err, "Failed to get PodSecurityPolicy %s", podSecurityPolicyPrivileged)
 			return
@@ -119,7 +119,7 @@ func CreatePrivilegedPSPBinding(kubeClient clientset.Interface, namespace string
 
 		psp := privilegedPSP(podSecurityPolicyPrivileged)
 		_, err = kubeClient.PolicyV1beta1().PodSecurityPolicies().Create(psp)
-		if !apierrs.IsAlreadyExists(err) {
+		if !apierrors.IsAlreadyExists(err) {
 			ExpectNoError(err, "Failed to create PSP %s", podSecurityPolicyPrivileged)
 		}
 
@@ -134,7 +134,7 @@ func CreatePrivilegedPSPBinding(kubeClient clientset.Interface, namespace string
 					Verbs:         []string{"use"},
 				}},
 			})
-			if !apierrs.IsAlreadyExists(err) {
+			if !apierrors.IsAlreadyExists(err) {
 				ExpectNoError(err, "Failed to create PSP role")
 			}
 		}

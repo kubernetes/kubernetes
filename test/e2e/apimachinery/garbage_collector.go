@@ -28,7 +28,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionstestserver "k8s.io/apiextensions-apiserver/test/integration/fixtures"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -667,7 +667,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 				framework.Logf("")
 				return false, nil
 			}
-			if errors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
 			return false, err
@@ -769,7 +769,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 				framework.Logf("")
 				return false, nil
 			}
-			if errors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
 			return false, err
@@ -882,7 +882,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		definition := apiextensionstestserver.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
 		defer func() {
 			err = apiextensionstestserver.DeleteV1CustomResourceDefinition(definition, apiExtensionClient)
-			if err != nil && !errors.IsNotFound(err) {
+			if err != nil && !apierrors.IsNotFound(err) {
 				framework.Failf("failed to delete CustomResourceDefinition: %v", err)
 			}
 		}()
@@ -951,7 +951,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		// Ensure the dependent is deleted.
 		if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
 			_, err := resourceClient.Get(dependentName, metav1.GetOptions{})
-			return errors.IsNotFound(err), nil
+			return apierrors.IsNotFound(err), nil
 		}); err != nil {
 			framework.Logf("owner: %#v", persistedOwner)
 			framework.Logf("dependent: %#v", persistedDependent)
@@ -963,7 +963,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err == nil {
 			framework.Failf("expected owner resource %q to be deleted", ownerName)
 		} else {
-			if !errors.IsNotFound(err) {
+			if !apierrors.IsNotFound(err) {
 				framework.Failf("unexpected error getting owner resource %q: %v", ownerName, err)
 			}
 		}
@@ -985,7 +985,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		definition := apiextensionstestserver.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
 		defer func() {
 			err = apiextensionstestserver.DeleteV1CustomResourceDefinition(definition, apiExtensionClient)
-			if err != nil && !errors.IsNotFound(err) {
+			if err != nil && !apierrors.IsNotFound(err) {
 				framework.Failf("failed to delete CustomResourceDefinition: %v", err)
 			}
 		}()
@@ -1056,7 +1056,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			if err == nil {
 				return false, nil
 			}
-			if err != nil && !errors.IsNotFound(err) {
+			if err != nil && !apierrors.IsNotFound(err) {
 				return false, fmt.Errorf("failed to get owner: %v", err)
 			}
 			return true, nil

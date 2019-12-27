@@ -25,7 +25,7 @@ import (
 	"strings"
 	"sync"
 
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
@@ -332,10 +332,10 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 
 func transformErrorToEvent(err error) *watch.Event {
 	err = interpretWatchError(err)
-	if _, ok := err.(apierrs.APIStatus); !ok {
-		err = apierrs.NewInternalError(err)
+	if _, ok := err.(apierrors.APIStatus); !ok {
+		err = apierrors.NewInternalError(err)
 	}
-	status := err.(apierrs.APIStatus).Status()
+	status := err.(apierrors.APIStatus).Status()
 	return &watch.Event{
 		Type:   watch.Error,
 		Object: &status,

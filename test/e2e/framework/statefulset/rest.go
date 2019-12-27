@@ -24,7 +24,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -256,7 +256,7 @@ func update(c clientset.Interface, ns, name string, update func(ss *appsv1.State
 		if err == nil {
 			return ss
 		}
-		if !apierrs.IsConflict(err) && !apierrs.IsServerTimeout(err) {
+		if !apierrors.IsConflict(err) && !apierrors.IsServerTimeout(err) {
 			e2efwk.Failf("failed to update statefulset %q: %v", name, err)
 		}
 	}

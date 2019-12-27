@@ -30,7 +30,7 @@ import (
 
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1beta1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
@@ -304,7 +304,7 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 
 	csiDriver, err := c.plugin.csiDriverLister.Get(string(c.driverName))
 	if err != nil {
-		if apierrs.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			klog.V(4).Infof(log("CSIDriver %q not found, not adding pod information", c.driverName))
 			return nil, nil
 		}

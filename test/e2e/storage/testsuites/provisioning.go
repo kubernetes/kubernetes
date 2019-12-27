@@ -25,7 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -247,7 +247,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 		_, err = client.StorageV1().StorageClasses().Create(class)
 		// The "should provision storage with snapshot data source" test already has created the class.
 		// TODO: make class creation optional and remove the IsAlreadyExists exception
-		framework.ExpectEqual(err == nil || apierrs.IsAlreadyExists(err), true)
+		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 		class, err = client.StorageV1().StorageClasses().Get(class.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
@@ -263,7 +263,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 		framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
 		// typically this claim has already been deleted
 		err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
-		if err != nil && !apierrs.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
 		}
 	}()
@@ -670,13 +670,13 @@ func prepareSnapshotDataSourceForProvisioning(
 	cleanupFunc := func() {
 		framework.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
 		err = dynamicClient.Resource(snapshotGVR).Namespace(updatedClaim.Namespace).Delete(snapshot.GetName(), nil)
-		if err != nil && !apierrs.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			framework.Failf("Error deleting snapshot %q. Error: %v", snapshot.GetName(), err)
 		}
 
 		framework.Logf("deleting initClaim %q/%q", updatedClaim.Namespace, updatedClaim.Name)
 		err = client.CoreV1().PersistentVolumeClaims(updatedClaim.Namespace).Delete(updatedClaim.Name, nil)
-		if err != nil && !apierrs.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			framework.Failf("Error deleting initClaim %q. Error: %v", updatedClaim.Name, err)
 		}
 
@@ -718,7 +718,7 @@ func preparePVCDataSourceForProvisioning(
 	cleanupFunc := func() {
 		framework.Logf("deleting source PVC %q/%q", sourcePVC.Namespace, sourcePVC.Name)
 		err = client.CoreV1().PersistentVolumeClaims(sourcePVC.Namespace).Delete(sourcePVC.Name, nil)
-		if err != nil && !apierrs.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			framework.Failf("Error deleting source PVC %q. Error: %v", sourcePVC.Name, err)
 		}
 	}

@@ -30,7 +30,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -739,7 +739,7 @@ func createAuthReaderRoleBinding(f *framework.Framework, namespace string) {
 			},
 		},
 	})
-	if err != nil && errors.IsAlreadyExists(err) {
+	if err != nil && apierrors.IsAlreadyExists(err) {
 		framework.Logf("role binding %s already exists", roleBindingName)
 	} else {
 		framework.ExpectNoError(err, "creating role binding %s:webhook to access configMap", namespace)
@@ -1120,7 +1120,7 @@ func testWebhook(f *framework.Framework) {
 		framework.Failf("expect error %q, got %q", "deadline", err.Error())
 	}
 	// ensure the pod was not actually created
-	if _, err := client.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{}); !errors.IsNotFound(err) {
+	if _, err := client.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{}); !apierrors.IsNotFound(err) {
 		framework.Failf("expect notfound error looking for rejected pod, got %v", err)
 	}
 
@@ -1296,7 +1296,7 @@ func testFailClosedWebhook(f *framework.Framework) {
 	}
 	_, err = client.CoreV1().ConfigMaps(failNamespaceName).Create(configmap)
 	framework.ExpectError(err, "create configmap in namespace: %s should be unconditionally rejected by the webhook", failNamespaceName)
-	if !errors.IsInternalError(err) {
+	if !apierrors.IsInternalError(err) {
 		framework.Failf("expect an internal error, got %#v", err)
 	}
 }
@@ -1661,7 +1661,7 @@ func updateConfigMap(c clientset.Interface, ns, name string, update updateConfig
 			return true, nil
 		}
 		// Only retry update on conflict
-		if !errors.IsConflict(err) {
+		if !apierrors.IsConflict(err) {
 			return false, err
 		}
 		return false, nil
@@ -1683,7 +1683,7 @@ func updateCustomResource(c dynamic.ResourceInterface, ns, name string, update u
 			return true, nil
 		}
 		// Only retry update on conflict
-		if !errors.IsConflict(err) {
+		if !apierrors.IsConflict(err) {
 			return false, err
 		}
 		return false, nil

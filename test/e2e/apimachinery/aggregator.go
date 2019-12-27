@@ -28,7 +28,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	unstructuredv1 "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -367,7 +367,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 		request.SetHeader("Accept", "application/json")
 		_, err := request.DoRaw()
 		if err != nil {
-			status, ok := err.(*apierrs.StatusError)
+			status, ok := err.(*apierrors.StatusError)
 			if !ok {
 				return false, err
 			}

@@ -23,7 +23,7 @@ import (
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -143,7 +143,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 			framework.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
 			// typically this claim has already been deleted
 			err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, nil)
-			if err != nil && !apierrs.IsNotFound(err) {
+			if err != nil && !apierrors.IsNotFound(err) {
 				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
 			}
 		}()
@@ -182,7 +182,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 			framework.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
 			// typically this snapshot has already been deleted
 			err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Delete(snapshot.GetName(), nil)
-			if err != nil && !apierrs.IsNotFound(err) {
+			if err != nil && !apierrors.IsNotFound(err) {
 				framework.Failf("Error deleting snapshot %q. Error: %v", pvc.Name, err)
 			}
 		}()

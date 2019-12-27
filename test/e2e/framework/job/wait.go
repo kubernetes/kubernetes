@@ -21,7 +21,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -91,7 +91,7 @@ func WaitForJobFailure(c clientset.Interface, ns, jobName string, timeout time.D
 func WaitForJobGone(c clientset.Interface, ns, jobName string, timeout time.Duration) error {
 	return wait.Poll(framework.Poll, timeout, func() (bool, error) {
 		_, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		return false, err

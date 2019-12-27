@@ -28,7 +28,7 @@ import (
 	policy "k8s.io/api/policy/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -638,14 +638,14 @@ func expect(t *testing.T, f func() error, wantErr func(error) bool) (timeout boo
 
 func expectForbidden(t *testing.T, f func() error) {
 	t.Helper()
-	if ok, err := expect(t, f, errors.IsForbidden); !ok {
+	if ok, err := expect(t, f, apierrors.IsForbidden); !ok {
 		t.Errorf("Expected forbidden error, got %v", err)
 	}
 }
 
 func expectNotFound(t *testing.T, f func() error) {
 	t.Helper()
-	if ok, err := expect(t, f, errors.IsNotFound); !ok {
+	if ok, err := expect(t, f, apierrors.IsNotFound); !ok {
 		t.Errorf("Expected notfound error, got %v", err)
 	}
 }
