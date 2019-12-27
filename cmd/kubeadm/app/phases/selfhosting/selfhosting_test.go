@@ -26,7 +26,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 const (
@@ -503,7 +503,7 @@ func TestBuildDaemonSet(t *testing.T) {
 			}
 
 			ds := BuildDaemonSet(rt.component, podSpec, GetDefaultMutators())
-			dsBytes, err := util.MarshalToYaml(ds, apps.SchemeGroupVersion)
+			dsBytes, err := kubeadmutil.MarshalToYaml(ds, apps.SchemeGroupVersion)
 			if err != nil {
 				t.Fatalf("failed to marshal daemonset to YAML: %v", err)
 			}

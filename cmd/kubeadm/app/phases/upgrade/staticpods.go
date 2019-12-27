@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
@@ -276,7 +276,7 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 	// Backing up etcd data store
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.Local.DataDir
-	if err := util.CopyDir(runningEtcdDir, backupEtcdDir); err != nil {
+	if err := kubeadmutil.CopyDir(runningEtcdDir, backupEtcdDir); err != nil {
 		return true, errors.Wrap(err, "failed to back up etcd data")
 	}
 
@@ -522,7 +522,7 @@ func rollbackEtcdData(cfg *kubeadmapi.InitConfiguration, pathMgr StaticPodPathMa
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.Local.DataDir
 
-	if err := util.CopyDir(backupEtcdDir, runningEtcdDir); err != nil {
+	if err := kubeadmutil.CopyDir(backupEtcdDir, runningEtcdDir); err != nil {
 		// Let the user know there we're problems, but we tried to reçover
 		return errors.Wrapf(err, "couldn't recover etcd database with error, the location of etcd backup: %s ", backupEtcdDir)
 	}
