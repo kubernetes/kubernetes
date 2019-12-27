@@ -56,9 +56,8 @@ func NewMetadataFactory(
 
 // priorityMetadata is a type that is passed as metadata for priority functions
 type priorityMetadata struct {
-	podSelector             labels.Selector
-	podFirstServiceSelector labels.Selector
-	podTopologySpreadMap    *podTopologySpreadMap
+	podSelector          labels.Selector
+	podTopologySpreadMap *podTopologySpreadMap
 }
 
 // PriorityMetadata is a MetadataProducer.  Node info can be nil.
@@ -83,18 +82,9 @@ func (pmf *MetadataFactory) PriorityMetadata(
 		return nil
 	}
 	return &priorityMetadata{
-		podSelector:             getSelector(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister, pmf.statefulSetLister),
-		podFirstServiceSelector: getFirstServiceSelector(pod, pmf.serviceLister),
-		podTopologySpreadMap:    tpSpreadMap,
+		podSelector:          getSelector(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister, pmf.statefulSetLister),
+		podTopologySpreadMap: tpSpreadMap,
 	}
-}
-
-// getFirstServiceSelector returns one selector of services the given pod.
-func getFirstServiceSelector(pod *v1.Pod, sl corelisters.ServiceLister) (firstServiceSelector labels.Selector) {
-	if services, err := schedulerlisters.GetPodServices(sl, pod); err == nil && len(services) > 0 {
-		return labels.SelectorFromSet(services[0].Spec.Selector)
-	}
-	return nil
 }
 
 // getSelector returns a selector for the services, RCs, RSs, and SSs matching the given pod.
