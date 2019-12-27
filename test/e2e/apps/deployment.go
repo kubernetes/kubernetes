@@ -28,7 +28,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -185,14 +184,6 @@ func failureTrap(c clientset.Interface, ns string) {
 func intOrStrP(num int) *intstr.IntOrString {
 	intstr := intstr.FromInt(num)
 	return &intstr
-}
-
-func newDeploymentRollback(name string, annotations map[string]string, revision int64) *extensionsv1beta1.DeploymentRollback {
-	return &extensionsv1beta1.DeploymentRollback{
-		Name:               name,
-		UpdatedAnnotations: annotations,
-		RollbackTo:         extensionsv1beta1.RollbackConfig{Revision: revision},
-	}
 }
 
 func stopDeployment(c clientset.Interface, ns, deploymentName string) {
