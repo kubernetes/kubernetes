@@ -2173,7 +2173,7 @@ var _ = SIGDescribe("Services", func() {
 		_, err := jig.Run(nil)
 		framework.ExpectNoError(err)
 
-		enableILB, disableILB := e2eservice.EnableAndDisableInternalLB()
+		enableILB, disableILB := enableAndDisableInternalLB()
 
 		isInternalEndpoint := func(lbIngress *v1.LoadBalancerIngress) bool {
 			ingressEndpoint := e2eservice.GetIngressPoint(lbIngress)
@@ -3242,4 +3242,10 @@ func proxyMode(f *framework.Framework) (string, error) {
 	}
 	framework.Logf("proxyMode: %s", stdout)
 	return stdout, nil
+}
+
+// enableAndDisableInternalLB returns two functions for enabling and disabling the internal load balancer
+// setting for the supported cloud providers (currently GCE/GKE and Azure) and empty functions for others.
+func enableAndDisableInternalLB() (enable func(svc *v1.Service), disable func(svc *v1.Service)) {
+	return framework.TestContext.CloudConfig.Provider.EnableAndDisableInternalLB()
 }
