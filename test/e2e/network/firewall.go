@@ -206,8 +206,8 @@ var _ = SIGDescribe("Firewall rule", func() {
 		}
 
 		ginkgo.By("Checking well known ports on master and nodes are not exposed externally")
-		nodeAddrs := e2enode.FirstAddress(nodes, v1.NodeExternalIP)
-		if len(nodeAddrs) == 0 {
+		nodeAddr := e2enode.FirstAddress(nodes, v1.NodeExternalIP)
+		if nodeAddr == "" {
 			framework.Failf("did not find any node addresses")
 		}
 
@@ -216,9 +216,9 @@ var _ = SIGDescribe("Firewall rule", func() {
 			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureKubeControllerManagerPort, firewallTestTCPTimeout)
 			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureSchedulerPort, firewallTestTCPTimeout)
 		}
-		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletPort, firewallTestTCPTimeout)
-		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletReadOnlyPort, firewallTestTCPTimeout)
-		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.ProxyStatusPort, firewallTestTCPTimeout)
+		assertNotReachableHTTPTimeout(nodeAddr, ports.KubeletPort, firewallTestTCPTimeout)
+		assertNotReachableHTTPTimeout(nodeAddr, ports.KubeletReadOnlyPort, firewallTestTCPTimeout)
+		assertNotReachableHTTPTimeout(nodeAddr, ports.ProxyStatusPort, firewallTestTCPTimeout)
 	})
 })
 
