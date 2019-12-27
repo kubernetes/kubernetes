@@ -21,6 +21,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -56,7 +57,7 @@ func (r *ReplicaSetUpgradeTest) Setup(f *framework.Framework) {
 	nginxImage := imageutils.GetE2EImage(imageutils.Nginx)
 
 	ginkgo.By(fmt.Sprintf("Creating replicaset %s in namespace %s", rsName, ns))
-	replicaSet := replicaset.NewReplicaSet(rsName, ns, 1, map[string]string{"test": "upgrade"}, "nginx", nginxImage)
+	replicaSet := newReplicaSet(rsName, ns, 1, map[string]string{"test": "upgrade"}, "nginx", nginxImage)
 	rs, err := c.AppsV1().ReplicaSets(ns).Create(replicaSet)
 	framework.ExpectNoError(err)
 
@@ -101,4 +102,38 @@ func (r *ReplicaSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 // Teardown cleans up any remaining resources.
 func (r *ReplicaSetUpgradeTest) Teardown(f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
+}
+
+// newReplicaSet returns a new ReplicaSet.
+func newReplicaSet(name, namespace string, replicas int32, podLabels map[string]string, imageName, image string) *appsv1.ReplicaSet {
+	return &appsv1.ReplicaSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ReplicaSet",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+		Spec: appsv1.ReplicaSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: podLabels,
+			},
+			Replicas: &replicas,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: podLabels,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:            imageName,
+							Image:           image,
+							SecurityContext: &v1.SecurityContext{},
+						},
+					},
+				},
+			},
+		},
+	}
 }
