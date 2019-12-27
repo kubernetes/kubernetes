@@ -15,6 +15,7 @@ go_library(
         "//pkg/client/leaderelectionconfig:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//pkg/scheduler:go_default_library",
+        "//pkg/scheduler/algorithmprovider:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/apis/config/scheme:go_default_library",
         "//pkg/scheduler/apis/config/v1alpha1:go_default_library",

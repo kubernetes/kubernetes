@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -215,14 +214,11 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 // Test configures a scheduler from a policy that does not specify any
 // predicate/priority.
 // The predicate/priority from DefaultProvider will be used.
-// TODO(Huang-Wei): refactor (or remove) this test along with eliminating 'RegisterFitPredicate()'.
 func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
-
-	RegisterAlgorithmProvider(schedulerapi.SchedulerDefaultProviderName, sets.NewString("PodFitsResources"), sets.NewString("NodeAffinityPriority"))
 
 	configData := []byte(`{
 		"kind" : "Policy",
@@ -435,55 +431,9 @@ func testBind(binding *v1.Binding, t *testing.T) {
 	}
 }
 
-func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
-	client := fake.NewSimpleClientset()
-	// factory of "default-scheduler"
-	stopCh := make(chan struct{})
-	factory := newConfigFactory(client, -1, stopCh)
-	defer close(stopCh)
-	_, err := factory.Create()
-	if err == nil {
-		t.Errorf("expected err: invalid hardPodAffinitySymmetricWeight, got nothing")
-	}
-}
-
-func TestInvalidFactoryArgs(t *testing.T) {
-	client := fake.NewSimpleClientset()
-
-	testCases := []struct {
-		name                           string
-		hardPodAffinitySymmetricWeight int32
-		expectErr                      string
-	}{
-		{
-			name:                           "symmetric weight below range",
-			hardPodAffinitySymmetricWeight: -1,
-			expectErr:                      "invalid hardPodAffinitySymmetricWeight: -1, must be in the range [0-100]",
-		},
-		{
-			name:                           "symmetric weight above range",
-			hardPodAffinitySymmetricWeight: 101,
-			expectErr:                      "invalid hardPodAffinitySymmetricWeight: 101, must be in the range [0-100]",
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			stopCh := make(chan struct{})
-			factory := newConfigFactory(client, test.hardPodAffinitySymmetricWeight, stopCh)
-			defer close(stopCh)
-			_, err := factory.Create()
-			if err == nil {
-				t.Errorf("expected err: %s, got nothing", test.expectErr)
-			}
-		})
-	}
-
-}
-
 func newConfigFactoryWithFrameworkRegistry(
 	client clientset.Interface, hardPodAffinitySymmetricWeight int32, stopCh <-chan struct{},
-	registry framework.Registry, pluginConfigProducerRegistry *frameworkplugins.ConfigProducerRegistry) *Configurator {
+	registry framework.Registry) *Configurator {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	snapshot := nodeinfosnapshot.NewEmptySnapshot()
 	return &Configurator{
@@ -501,21 +451,14 @@ func newConfigFactoryWithFrameworkRegistry(
 		registry:                       registry,
 		plugins:                        nil,
 		pluginConfig:                   []schedulerapi.PluginConfig{},
-		pluginConfigProducerRegistry:   pluginConfigProducerRegistry,
 		nodeInfoSnapshot:               snapshot,
-		algorithmFactoryArgs: AlgorithmFactoryArgs{
-			SharedLister:                   snapshot,
-			InformerFactory:                informerFactory,
-			HardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
-		},
-		configProducerArgs: &frameworkplugins.ConfigProducerArgs{},
 	}
 }
 
 func newConfigFactory(
 	client clientset.Interface, hardPodAffinitySymmetricWeight int32, stopCh <-chan struct{}) *Configurator {
 	return newConfigFactoryWithFrameworkRegistry(client, hardPodAffinitySymmetricWeight, stopCh,
-		frameworkplugins.NewInTreeRegistry(&frameworkplugins.RegistryArgs{}), frameworkplugins.NewConfigProducerRegistry())
+		frameworkplugins.NewInTreeRegistry(&frameworkplugins.RegistryArgs{}))
 }
 
 type fakeExtender struct {

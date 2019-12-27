@@ -3,7 +3,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
-        "algorithm_factory.go",
         "eventhandlers.go",
         "factory.go",
         "scheduler.go",
@@ -16,20 +15,18 @@ go_library(
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/algorithm/priorities:go_default_library",
+        "//pkg/scheduler/algorithmprovider:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/apis/config/scheme:go_default_library",
         "//pkg/scheduler/apis/config/validation:go_default_library",
         "//pkg/scheduler/core:go_default_library",
         "//pkg/scheduler/framework/plugins:go_default_library",
         "//pkg/scheduler/framework/plugins/interpodaffinity:go_default_library",
-        "//pkg/scheduler/framework/plugins/nodelabel:go_default_library",
         "//pkg/scheduler/framework/plugins/noderesources:go_default_library",
-        "//pkg/scheduler/framework/plugins/serviceaffinity:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/cache/debugger:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
-        "//pkg/scheduler/listers:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
         "//pkg/scheduler/nodeinfo/snapshot:go_default_library",
         "//pkg/scheduler/volumebinder:go_default_library",
@@ -59,7 +56,6 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "algorithm_factory_test.go",
         "eventhandlers_test.go",
         "factory_test.go",
         "scheduler_test.go",
@@ -110,7 +106,6 @@ go_test(
         "//staging/src/k8s.io/client-go/testing:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/events:go_default_library",
-        "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
 

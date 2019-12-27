@@ -24,8 +24,6 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/klog"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,6 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -123,7 +122,7 @@ type Scheduler struct {
 	scheduledPodsHasSynced func() bool
 
 	// The final configuration of the framework.
-	Plugins      schedulerapi.Plugins
+	Plugins      *schedulerapi.Plugins
 	PluginConfig []schedulerapi.PluginConfig
 }
 
@@ -144,10 +143,9 @@ type schedulerOptions struct {
 	// Contains all in-tree plugins.
 	frameworkInTreeRegistry framework.Registry
 	// This registry contains out of tree plugins to be merged with the in-tree registry.
-	frameworkOutOfTreeRegistry      framework.Registry
-	frameworkConfigProducerRegistry *frameworkplugins.ConfigProducerRegistry
-	frameworkPlugins                *schedulerapi.Plugins
-	frameworkPluginConfig           []schedulerapi.PluginConfig
+	frameworkOutOfTreeRegistry framework.Registry
+	frameworkPlugins           *schedulerapi.Plugins
+	frameworkPluginConfig      []schedulerapi.PluginConfig
 }
 
 // Option configures a Scheduler
@@ -210,13 +208,6 @@ func WithFrameworkOutOfTreeRegistry(registry framework.Registry) Option {
 	}
 }
 
-// WithFrameworkConfigProducerRegistry sets the framework plugin producer registry.
-func WithFrameworkConfigProducerRegistry(registry *frameworkplugins.ConfigProducerRegistry) Option {
-	return func(o *schedulerOptions) {
-		o.frameworkConfigProducerRegistry = registry
-	}
-}
-
 // WithFrameworkPlugins sets the plugins that the framework should be configured with.
 func WithFrameworkPlugins(plugins *schedulerapi.Plugins) Option {
 	return func(o *schedulerOptions) {
@@ -250,22 +241,14 @@ var defaultSchedulerOptions = schedulerOptions{
 	schedulerAlgorithmSource: schedulerapi.SchedulerAlgorithmSource{
 		Provider: defaultAlgorithmSourceProviderName(),
 	},
-	hardPodAffinitySymmetricWeight:  v1.DefaultHardPodAffinitySymmetricWeight,
-	disablePreemption:               false,
-	percentageOfNodesToScore:        schedulerapi.DefaultPercentageOfNodesToScore,
-	bindTimeoutSeconds:              BindTimeoutSeconds,
-	podInitialBackoffSeconds:        int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
-	podMaxBackoffSeconds:            int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
-	frameworkConfigProducerRegistry: frameworkplugins.NewConfigProducerRegistry(),
-	// The plugins and pluginConfig options are currently nil because we currently don't have
-	// "default" plugins. All plugins that we run through the framework currently come from two
-	// sources: 1) specified in component config, in which case those two options should be
-	// set using their corresponding With* functions, 2) predicate/priority-mapped plugins, which
-	// pluginConfigProducerRegistry contains a mapping for and produces their configurations.
-	// TODO(ahg-g) Once predicates and priorities are migrated to natively run as plugins, the
-	// below two parameters will be populated accordingly.
-	frameworkPlugins:      nil,
-	frameworkPluginConfig: nil,
+	hardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+	disablePreemption:              false,
+	percentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
+	bindTimeoutSeconds:             BindTimeoutSeconds,
+	podInitialBackoffSeconds:       int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
+	podMaxBackoffSeconds:           int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
+	frameworkPlugins:               nil,
+	frameworkPluginConfig:          nil,
 }
 
 // New returns a Scheduler
@@ -326,15 +309,7 @@ func New(client clientset.Interface,
 		registry:                       registry,
 		plugins:                        options.frameworkPlugins,
 		pluginConfig:                   options.frameworkPluginConfig,
-		pluginConfigProducerRegistry:   options.frameworkConfigProducerRegistry,
 		nodeInfoSnapshot:               snapshot,
-		algorithmFactoryArgs: AlgorithmFactoryArgs{
-			SharedLister:                   snapshot,
-			InformerFactory:                informerFactory,
-			VolumeBinder:                   volumeBinder,
-			HardPodAffinitySymmetricWeight: options.hardPodAffinitySymmetricWeight,
-		},
-		configProducerArgs: &frameworkplugins.ConfigProducerArgs{},
 	}
 
 	var sched *Scheduler
