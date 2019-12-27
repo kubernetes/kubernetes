@@ -59,18 +59,15 @@ type PodNode struct {
 }
 
 // FirstAddress returns the first address of the given type of each node.
-// TODO: Use return type string instead of []string
-func FirstAddress(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string {
-	hosts := []string{}
+func FirstAddress(nodelist *v1.NodeList, addrType v1.NodeAddressType) string {
 	for _, n := range nodelist.Items {
 		for _, addr := range n.Status.Addresses {
 			if addr.Type == addrType && addr.Address != "" {
-				hosts = append(hosts, addr.Address)
-				break
+				return addr.Address
 			}
 		}
 	}
-	return hosts
+	return ""
 }
 
 // TODO: better to change to a easy read name

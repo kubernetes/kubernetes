@@ -129,7 +129,7 @@ type NetworkingTestConfig struct {
 	// spanning over all endpointPods.
 	SessionAffinityService *v1.Service
 	// ExternalAddrs is a list of external IPs of nodes in the cluster.
-	ExternalAddrs []string
+	ExternalAddr string
 	// Nodes is a list of nodes in the cluster.
 	Nodes []v1.Node
 	// MaxTries is the number of retries tolerated for tests run against
@@ -617,7 +617,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	framework.ExpectNoError(framework.WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList, err := e2enode.GetReadySchedulableNodes(config.f.ClientSet)
 	framework.ExpectNoError(err)
-	config.ExternalAddrs = e2enode.FirstAddress(nodeList, v1.NodeExternalIP)
+	config.ExternalAddr = e2enode.FirstAddress(nodeList, v1.NodeExternalIP)
 
 	framework.SkipUnlessNodeCountIsAtLeast(2)
 	config.Nodes = nodeList.Items
@@ -637,11 +637,10 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 		}
 	}
 	config.ClusterIP = config.NodePortService.Spec.ClusterIP
-	if len(config.ExternalAddrs) != 0 {
-		config.NodeIP = config.ExternalAddrs[0]
+	if config.ExternalAddr != "" {
+		config.NodeIP = config.ExternalAddr
 	} else {
-		internalAddrs := e2enode.FirstAddress(nodeList, v1.NodeInternalIP)
-		config.NodeIP = internalAddrs[0]
+		config.NodeIP = e2enode.FirstAddress(nodeList, v1.NodeInternalIP)
 	}
 }
 
