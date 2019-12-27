@@ -79,7 +79,7 @@ APISERVER_PID=$!
 if ! kube::util::wait_for_url "${API_HOST}:${API_PORT}/healthz" "apiserver: "; then
   kube::log::error "Here are the last 10 lines from kube-apiserver (${API_LOGFILE})"
   kube::log::error "=== BEGIN OF LOG ==="
-  tail -10 "${API_LOGFILE}" || :
+  tail -10 "${API_LOGFILE}" >&2 || :
   kube::log::error "=== END OF LOG ==="
   exit 1
 fi
