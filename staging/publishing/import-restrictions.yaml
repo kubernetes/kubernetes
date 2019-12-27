@@ -16,7 +16,6 @@
   # Main goal: pkg/apis should be as self-contained as possible.
   - k8s.io/kubernetes/pkg/apis/apps
   - k8s.io/kubernetes/pkg/api/legacyscheme
-  - k8s.io/kubernetes/pkg/api/testapi
   - k8s.io/api/apps/v1
   ignoredSubTrees:
   - "./pkg/apis/core/validation"
