@@ -17,7 +17,6 @@ limitations under the License.
 package predicates
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -836,58 +835,4 @@ func podToleratesNodeTaints(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo, f
 // DEPRECATED
 func EvenPodsSpreadPredicate(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
 	return false, nil, fmt.Errorf("this function should never be called")
-}
-
-// PodTopologySpreadPredicate checks if a pod can be scheduled on a node which satisfies
-// its topologySpreadConstraints.
-func PodTopologySpreadPredicate(pod *v1.Pod, meta *PodTopologySpreadMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
-	node := nodeInfo.Node()
-	if node == nil {
-		return false, nil, fmt.Errorf("node not found")
-	}
-
-	// nil meta is illegal.
-	if meta == nil {
-		// TODO(autoscaler): get it implemented.
-		return false, nil, errors.New("metadata not pre-computed for PodTopologySpreadPredicate")
-	}
-
-	// However, "empty" meta is legit which tolerates every toSchedule Pod.
-	if len(meta.tpPairToMatchNum) == 0 || len(meta.constraints) == 0 {
-		return true, nil, nil
-	}
-
-	podLabelSet := labels.Set(pod.Labels)
-	for _, c := range meta.constraints {
-		tpKey := c.topologyKey
-		tpVal, ok := node.Labels[c.topologyKey]
-		if !ok {
-			klog.V(5).Infof("node '%s' doesn't have required label '%s'", node.Name, tpKey)
-			return false, []PredicateFailureReason{ErrTopologySpreadConstraintsNotMatch}, nil
-		}
-
-		selfMatchNum := int32(0)
-		if c.selector.Matches(podLabelSet) {
-			selfMatchNum = 1
-		}
-
-		pair := topologyPair{key: tpKey, value: tpVal}
-		paths, ok := meta.tpKeyToCriticalPaths[tpKey]
-		if !ok {
-			// error which should not happen
-			klog.Errorf("internal error: get paths from key %q of %#v", tpKey, meta.tpKeyToCriticalPaths)
-			continue
-		}
-		// judging criteria:
-		// 'existing matching num' + 'if self-match (1 or 0)' - 'global min matching num' <= 'maxSkew'
-		minMatchNum := paths[0].matchNum
-		matchNum := meta.tpPairToMatchNum[pair]
-		skew := matchNum + selfMatchNum - minMatchNum
-		if skew > c.maxSkew {
-			klog.V(5).Infof("node '%s' failed spreadConstraint[%s]: matchNum(%d) + selfMatchNum(%d) - minMatchNum(%d) > maxSkew(%d)", node.Name, tpKey, matchNum, selfMatchNum, minMatchNum, c.maxSkew)
-			return false, []PredicateFailureReason{ErrTopologySpreadConstraintsNotMatch}, nil
-		}
-	}
-
-	return true, nil, nil
 }

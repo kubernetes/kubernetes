@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,20 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package predicates
+package podtopologyspread
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
+var (
+	hardSpread = v1.DoNotSchedule
+	softSpread = v1.ScheduleAnyway
+)
+
+func TestCalPreFilterState(t *testing.T) {
 	fooSelector := st.MakeLabelSelector().Exists("foo").Obj()
 	barSelector := st.MakeLabelSelector().Exists("bar").Obj()
 	tests := []struct {
@@ -35,7 +42,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 		pod          *v1.Pod
 		nodes        []*v1.Node
 		existingPods []*v1.Pod
-		want         *PodTopologySpreadMetadata
+		want         *preFilterState
 	}{
 		{
 			name: "clean cluster with one spreadConstraint",
@@ -48,7 +55,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{
 					{
 						maxSkew:     5,
@@ -83,7 +90,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 			},
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{
 					{
 						maxSkew:     1,
@@ -120,7 +127,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 			},
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{
 					{
 						maxSkew:     1,
@@ -156,7 +163,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakePod().Name("p-y1").Namespace("ns2").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 			},
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{
 					{
 						maxSkew:     1,
@@ -194,7 +201,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Obj(),
 			},
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{
 					{
 						maxSkew:     1,
@@ -243,7 +250,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Obj(),
 			},
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{
 					{
 						maxSkew:     1,
@@ -284,7 +291,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakePod().Name("p-a").Node("node-a").Label("foo", "").Obj(),
 				st.MakePod().Name("p-b").Node("node-b").Label("bar", "").Obj(),
 			},
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{
 					{
 						maxSkew:     1,
@@ -330,7 +337,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Label("bar", "").Obj(),
 			},
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{
 					{
 						maxSkew:     1,
@@ -378,7 +385,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Obj(),
 			},
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{
 					{
 						maxSkew:     1,
@@ -409,16 +416,16 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, tt.nodes))
 			l, _ := s.NodeInfos().List()
-			got, _ := GetPodTopologySpreadMetadata(tt.pod, l)
+			got, _ := calPreFilterState(tt.pod, l)
 			got.sortCriticalPaths()
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getEvenPodsSpreadMetadata() = %#v, want %#v", *got, *tt.want)
+				t.Errorf("calPreFilterState() = %#v, want %#v", *got, *tt.want)
 			}
 		})
 	}
 }
 
-func TestPodSpreadCache_addPod(t *testing.T) {
+func TestPreFilterStateAddPod(t *testing.T) {
 	nodeConstraint := topologySpreadConstraint{
 		maxSkew:     1,
 		topologyKey: "node",
@@ -433,7 +440,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 		existingPods []*v1.Pod
 		nodeIdx      int // denotes which node 'addedPod' belongs to
 		nodes        []*v1.Node
-		want         *PodTopologySpreadMetadata
+		want         *preFilterState
 	}{
 		{
 			name: "node a and b both impact current min match",
@@ -447,7 +454,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 			},
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{nodeConstraint},
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"node": {{"node-b", 0}, {"node-a", 1}},
@@ -472,7 +479,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 			},
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{nodeConstraint},
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"node": {{"node-a", 1}, {"node-b", 1}},
@@ -497,7 +504,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 			},
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{nodeConstraint},
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"node": {{"node-a", 0}, {"node-b", 1}},
@@ -522,7 +529,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 			},
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{nodeConstraint},
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"node": {{"node-a", 0}, {"node-b", 2}},
@@ -546,7 +553,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{zoneConstraint, nodeConstraint},
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone2", 0}, {"zone1", 1}},
@@ -575,7 +582,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{zoneConstraint, nodeConstraint},
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 1}, {"zone2", 1}},
@@ -607,7 +614,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{zoneConstraint, nodeConstraint},
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone2", 1}, {"zone1", 3}},
@@ -640,7 +647,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{
 					zoneConstraint,
 					{
@@ -680,7 +687,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{
 					zoneConstraint,
 					{
@@ -707,17 +714,17 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, tt.nodes))
 			l, _ := s.NodeInfos().List()
-			podTopologySpreadMeta, _ := GetPodTopologySpreadMetadata(tt.preemptor, l)
-			podTopologySpreadMeta.AddPod(tt.addedPod, tt.preemptor, tt.nodes[tt.nodeIdx])
-			podTopologySpreadMeta.sortCriticalPaths()
-			if !reflect.DeepEqual(podTopologySpreadMeta, tt.want) {
-				t.Errorf("podTopologySpreadMeta#addPod() = %v, want %v", podTopologySpreadMeta, tt.want)
+			state, _ := calPreFilterState(tt.preemptor, l)
+			state.updateWithPod(tt.addedPod, tt.preemptor, tt.nodes[tt.nodeIdx], 1)
+			state.sortCriticalPaths()
+			if !reflect.DeepEqual(state, tt.want) {
+				t.Errorf("preFilterState#AddPod() = %v, want %v", state, tt.want)
 			}
 		})
 	}
 }
 
-func TestPodSpreadCache_removePod(t *testing.T) {
+func TestPreFilterStateRemovePod(t *testing.T) {
 	nodeConstraint := topologySpreadConstraint{
 		maxSkew:     1,
 		topologyKey: "node",
@@ -733,7 +740,7 @@ func TestPodSpreadCache_removePod(t *testing.T) {
 		deletedPodIdx int     // need to reuse *Pod of existingPods[i]
 		deletedPod    *v1.Pod // this field is used only when deletedPodIdx is -1
 		nodeIdx       int     // denotes which node "deletedPod" belongs to
-		want          *PodTopologySpreadMetadata
+		want          *preFilterState
 	}{
 		{
 			// A high priority pod may not be scheduled due to node taints or resource shortage.
@@ -754,7 +761,7 @@ func TestPodSpreadCache_removePod(t *testing.T) {
 			},
 			deletedPodIdx: 0, // remove pod "p-a1"
 			nodeIdx:       0, // node-a
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{zoneConstraint},
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 1}, {"zone2", 1}},
@@ -784,7 +791,7 @@ func TestPodSpreadCache_removePod(t *testing.T) {
 			},
 			deletedPodIdx: 0, // remove pod "p-a1"
 			nodeIdx:       0, // node-a
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{zoneConstraint},
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 1}, {"zone2", 2}},
@@ -815,7 +822,7 @@ func TestPodSpreadCache_removePod(t *testing.T) {
 			},
 			deletedPodIdx: 0, // remove pod "p-a0"
 			nodeIdx:       0, // node-a
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{zoneConstraint},
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 2}, {"zone2", 2}},
@@ -846,7 +853,7 @@ func TestPodSpreadCache_removePod(t *testing.T) {
 			deletedPodIdx: -1,
 			deletedPod:    st.MakePod().Name("p-a0").Node("node-a").Label("bar", "").Obj(),
 			nodeIdx:       0, // node-a
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{zoneConstraint},
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 2}, {"zone2", 2}},
@@ -877,7 +884,7 @@ func TestPodSpreadCache_removePod(t *testing.T) {
 			},
 			deletedPodIdx: 3, // remove pod "p-x1"
 			nodeIdx:       2, // node-x
-			want: &PodTopologySpreadMetadata{
+			want: &preFilterState{
 				constraints: []topologySpreadConstraint{zoneConstraint, nodeConstraint},
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone2", 1}, {"zone1", 3}},
@@ -897,7 +904,7 @@ func TestPodSpreadCache_removePod(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, tt.nodes))
 			l, _ := s.NodeInfos().List()
-			podTopologySpreadMeta, _ := GetPodTopologySpreadMetadata(tt.preemptor, l)
+			state, _ := calPreFilterState(tt.preemptor, l)
 
 			var deletedPod *v1.Pod
 			if tt.deletedPodIdx < len(tt.existingPods) && tt.deletedPodIdx >= 0 {
@@ -905,16 +912,16 @@ func TestPodSpreadCache_removePod(t *testing.T) {
 			} else {
 				deletedPod = tt.deletedPod
 			}
-			podTopologySpreadMeta.RemovePod(deletedPod, tt.preemptor, tt.nodes[tt.nodeIdx])
-			podTopologySpreadMeta.sortCriticalPaths()
-			if !reflect.DeepEqual(podTopologySpreadMeta, tt.want) {
-				t.Errorf("podTopologySpreadMeta#removePod() = %v, want %v", podTopologySpreadMeta, tt.want)
+			state.updateWithPod(deletedPod, tt.preemptor, tt.nodes[tt.nodeIdx], -1)
+			state.sortCriticalPaths()
+			if !reflect.DeepEqual(state, tt.want) {
+				t.Errorf("preFilterState#RemovePod() = %v, want %v", state, tt.want)
 			}
 		})
 	}
 }
 
-func BenchmarkTestGetTPMapMatchingSpreadConstraints(b *testing.B) {
+func BenchmarkTestCalPreFilterState(b *testing.B) {
 	tests := []struct {
 		name             string
 		pod              *v1.Pod
@@ -958,20 +965,15 @@ func BenchmarkTestGetTPMapMatchingSpreadConstraints(b *testing.B) {
 			l, _ := s.NodeInfos().List()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				GetPodTopologySpreadMetadata(tt.pod, l)
+				calPreFilterState(tt.pod, l)
 			}
 		})
 	}
 }
 
-var (
-	hardSpread = v1.DoNotSchedule
-	softSpread = v1.ScheduleAnyway
-)
-
 // sortCriticalPaths is only served for testing purpose.
-func (m *PodTopologySpreadMetadata) sortCriticalPaths() {
-	for _, paths := range m.tpKeyToCriticalPaths {
+func (s *preFilterState) sortCriticalPaths() {
+	for _, paths := range s.tpKeyToCriticalPaths {
 		// If two paths both hold minimum matching number, and topologyValue is unordered.
 		if paths[0].matchNum == paths[1].matchNum && paths[0].topologyValue > paths[1].topologyValue {
 			// Swap topologyValue to make them sorted alphabetically.
@@ -987,4 +989,460 @@ func mustConvertLabelSelectorAsSelector(t *testing.T, ls *metav1.LabelSelector) 
 		t.Fatal(err)
 	}
 	return s
+}
+
+func TestSingleConstraint(t *testing.T) {
+	tests := []struct {
+		name         string
+		pod          *v1.Pod
+		nodes        []*v1.Node
+		existingPods []*v1.Pod
+		fits         map[string]bool
+	}{
+		{
+			name: "no existing pods",
+			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
+				1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(),
+			).Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": true,
+				"node-b": true,
+				"node-x": true,
+				"node-y": true,
+			},
+		},
+		{
+			name: "no existing pods, incoming pod doesn't match itself",
+			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
+				1, "zone", hardSpread, st.MakeLabelSelector().Exists("bar").Obj(),
+			).Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": true,
+				"node-b": true,
+				"node-x": true,
+				"node-y": true,
+			},
+		},
+		{
+			name: "existing pods with mis-matched namespace doesn't count",
+			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
+				1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(),
+			).Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Namespace("ns1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Namespace("ns2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": true,
+				"node-b": true,
+				"node-x": false,
+				"node-y": false,
+			},
+		},
+		{
+			name: "pods spread across zones as 3/3, all nodes fit",
+			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
+				1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(),
+			).Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": true,
+				"node-b": true,
+				"node-x": true,
+				"node-y": true,
+			},
+		},
+		{
+			// TODO(Huang-Wei): maybe document this to remind users that typos on node labels
+			// can cause unexpected behavior
+			name: "pods spread across zones as 1/2 due to absence of label 'zone' on node-b",
+			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
+				1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(),
+			).Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zon", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": true,
+				"node-b": false,
+				"node-x": false,
+				"node-y": false,
+			},
+		},
+		{
+			name: "pods spread across nodes as 2/1/0/3, only node-x fits",
+			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
+				1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(),
+			).Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": false,
+				"node-b": false,
+				"node-x": true,
+				"node-y": false,
+			},
+		},
+		{
+			name: "pods spread across nodes as 2/1/0/3, maxSkew is 2, node-b and node-x fit",
+			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
+				2, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(),
+			).Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": false,
+				"node-b": true,
+				"node-x": true,
+				"node-y": false,
+			},
+		},
+		{
+			// not a desired case, but it can happen
+			// TODO(Huang-Wei): document this "pod-not-match-itself" case
+			// in this case, placement of the new pod doesn't change pod distribution of the cluster
+			// as the incoming pod doesn't have label "foo"
+			name: "pods spread across nodes as 2/1/0/3, but pod doesn't match itself",
+			pod: st.MakePod().Name("p").Label("bar", "").SpreadConstraint(
+				1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(),
+			).Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": false,
+				"node-b": true,
+				"node-x": true,
+				"node-y": false,
+			},
+		},
+		{
+			// only node-a and node-y are considered, so pods spread as 2/~1~/~0~/3
+			// ps: '~num~' is a markdown symbol to denote a crossline through 'num'
+			// but in this unit test, we don't run NodeAffinityPredicate, so node-b and node-x are
+			// still expected to be fits;
+			// the fact that node-a fits can prove the underlying logic works
+			name: "incoming pod has nodeAffinity, pods spread as 2/~1~/~0~/3, hence node-a fits",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				NodeAffinityIn("node", []string{"node-a", "node-y"}).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": true,
+				"node-b": true, // in real case, it's false
+				"node-x": true, // in real case, it's false
+				"node-y": false,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, tt.nodes))
+			p := &PodTopologySpread{sharedLister: snapshot}
+			state := framework.NewCycleState()
+			preFilterStatus := p.PreFilter(context.Background(), state, tt.pod)
+			if !preFilterStatus.IsSuccess() {
+				t.Errorf("preFilter failed with status: %v", preFilterStatus)
+			}
+
+			for _, node := range tt.nodes {
+				nodeInfo, _ := snapshot.NodeInfos().Get(node.Name)
+				status := p.Filter(context.Background(), state, tt.pod, nodeInfo)
+				if status.IsSuccess() != tt.fits[node.Name] {
+					t.Errorf("[%s]: expected %v got %v", node.Name, tt.fits[node.Name], status.IsSuccess())
+				}
+			}
+		})
+	}
+}
+
+func TestMultipleConstraints(t *testing.T) {
+	tests := []struct {
+		name         string
+		pod          *v1.Pod
+		nodes        []*v1.Node
+		existingPods []*v1.Pod
+		fits         map[string]bool
+	}{
+		{
+			// 1. to fulfil "zone" constraint, incoming pod can be placed on any zone (hence any node)
+			// 2. to fulfil "node" constraint, incoming pod can be placed on node-x
+			// intersection of (1) and (2) returns node-x
+			name: "two constraints on zone and node, spreads = [3/3, 2/1/0/3]",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": false,
+				"node-b": false,
+				"node-x": true,
+				"node-y": false,
+			},
+		},
+		{
+			// 1. to fulfil "zone" constraint, incoming pod can be placed on zone1 (node-a or node-b)
+			// 2. to fulfil "node" constraint, incoming pod can be placed on node-x
+			// intersection of (1) and (2) returns no node
+			name: "two constraints on zone and node, spreads = [3/4, 2/1/0/4]",
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": false,
+				"node-b": false,
+				"node-x": false,
+				"node-y": false,
+			},
+		},
+		{
+			// 1. to fulfil "zone" constraint, incoming pod can be placed on zone2 (node-x or node-y)
+			// 2. to fulfil "node" constraint, incoming pod can be placed on node-b or node-x
+			// intersection of (1) and (2) returns node-x
+			name: "constraints hold different labelSelectors, spreads = [1/0, 1/0/0/1]",
+			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("bar", "").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": false,
+				"node-b": false,
+				"node-x": true,
+				"node-y": false,
+			},
+		},
+		{
+			// 1. to fulfil "zone" constraint, incoming pod can be placed on zone2 (node-x or node-y)
+			// 2. to fulfil "node" constraint, incoming pod can be placed on node-a or node-b
+			// intersection of (1) and (2) returns no node
+			name: "constraints hold different labelSelectors, spreads = [1/0, 0/0/1/1]",
+			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-x1").Node("node-x").Label("bar", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("bar", "").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": false,
+				"node-b": false,
+				"node-x": false,
+				"node-y": false,
+			},
+		},
+		{
+			// 1. to fulfil "zone" constraint, incoming pod can be placed on zone1 (node-a or node-b)
+			// 2. to fulfil "node" constraint, incoming pod can be placed on node-b or node-x
+			// intersection of (1) and (2) returns node-b
+			name: "constraints hold different labelSelectors, spreads = [2/3, 1/0/0/1]",
+			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Label("bar", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Label("bar", "").Obj(),
+				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": false,
+				"node-b": true,
+				"node-x": false,
+				"node-y": false,
+			},
+		},
+		{
+			// 1. pod doesn't match itself on "zone" constraint, so it can be put onto any zone
+			// 2. to fulfil "node" constraint, incoming pod can be placed on node-a or node-b
+			// intersection of (1) and (2) returns node-a and node-b
+			name: "constraints hold different labelSelectors but pod doesn't match itself on 'zone' constraint",
+			pod: st.MakePod().Name("p").Label("bar", "").
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-x1").Node("node-x").Label("bar", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("bar", "").Obj(),
+			},
+			fits: map[string]bool{
+				"node-a": true,
+				"node-b": true,
+				"node-x": false,
+				"node-y": false,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(tt.existingPods, tt.nodes))
+			p := &PodTopologySpread{sharedLister: snapshot}
+			state := framework.NewCycleState()
+			preFilterStatus := p.PreFilter(context.Background(), state, tt.pod)
+			if !preFilterStatus.IsSuccess() {
+				t.Errorf("preFilter failed with status: %v", preFilterStatus)
+			}
+
+			for _, node := range tt.nodes {
+				nodeInfo, _ := snapshot.NodeInfos().Get(node.Name)
+				status := p.Filter(context.Background(), state, tt.pod, nodeInfo)
+				if status.IsSuccess() != tt.fits[node.Name] {
+					t.Errorf("[%s]: expected %v got %v", node.Name, tt.fits[node.Name], status.IsSuccess())
+				}
+			}
+		})
+	}
 }
