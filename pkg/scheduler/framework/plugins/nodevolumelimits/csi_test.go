@@ -52,13 +52,13 @@ const (
 // getVolumeLimitKey returns a ResourceName by filter type
 func getVolumeLimitKey(filterType string) v1.ResourceName {
 	switch filterType {
-	case predicates.EBSVolumeFilterType:
+	case ebsVolumeFilterType:
 		return v1.ResourceName(volumeutil.EBSVolumeLimitKey)
-	case predicates.GCEPDVolumeFilterType:
+	case gcePDVolumeFilterType:
 		return v1.ResourceName(volumeutil.GCEVolumeLimitKey)
-	case predicates.AzureDiskVolumeFilterType:
+	case azureDiskVolumeFilterType:
 		return v1.ResourceName(volumeutil.AzureVolumeLimitKey)
-	case predicates.CinderVolumeFilterType:
+	case cinderVolumeFilterType:
 		return v1.ResourceName(volumeutil.CinderVolumeLimitKey)
 	default:
 		return v1.ResourceName(volumeutil.GetCSIAttachLimitKey(filterType))

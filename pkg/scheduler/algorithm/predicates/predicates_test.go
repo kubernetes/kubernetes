@@ -17,7 +17,6 @@ limitations under the License.
 package predicates
 
 import (
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -1717,46 +1716,5 @@ func TestPodToleratesTaints(t *testing.T) {
 				t.Errorf("expected: %v got %v", test.fits, fits)
 			}
 		})
-	}
-}
-
-func TestGetMaxVols(t *testing.T) {
-	previousValue := os.Getenv(KubeMaxPDVols)
-
-	tests := []struct {
-		rawMaxVols string
-		expected   int
-		name       string
-	}{
-		{
-			rawMaxVols: "invalid",
-			expected:   -1,
-			name:       "Unable to parse maximum PD volumes value, using default value",
-		},
-		{
-			rawMaxVols: "-2",
-			expected:   -1,
-			name:       "Maximum PD volumes must be a positive value, using default value",
-		},
-		{
-			rawMaxVols: "40",
-			expected:   40,
-			name:       "Parse maximum PD volumes value from env",
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			os.Setenv(KubeMaxPDVols, test.rawMaxVols)
-			result := getMaxVolLimitFromEnv()
-			if result != test.expected {
-				t.Errorf("expected %v got %v", test.expected, result)
-			}
-		})
-	}
-
-	os.Unsetenv(KubeMaxPDVols)
-	if previousValue != "" {
-		os.Setenv(KubeMaxPDVols, previousValue)
 	}
 }
