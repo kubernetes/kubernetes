@@ -293,13 +293,26 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 	return pv
 }
 
+// getBoundPV returns a PV details.
+func getBoundPV(client clientset.Interface, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
+	// Get new copy of the claim
+	claim, err := client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the bound PV
+	pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
+	return pv, err
+}
+
 // checkProvisioning verifies that the claim is bound and has the correct properities
 func (t StorageClassTest) checkProvisioning(client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storagev1.StorageClass) *v1.PersistentVolume {
 	err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("checking the claim")
-	pv, err := e2epv.GetBoundPV(client, claim)
+	pv, err := getBoundPV(client, claim)
 	framework.ExpectNoError(err)
 
 	// Check sizes
@@ -372,7 +385,7 @@ func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.Persistent
 	pod = nil // Don't stop twice.
 
 	// Get a new copy of the PV
-	volume, err := e2epv.GetBoundPV(client, claim)
+	volume, err := getBoundPV(client, claim)
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("checking the created volume has the correct mount options, is readable and retains data on the same node %q", actualNodeName))

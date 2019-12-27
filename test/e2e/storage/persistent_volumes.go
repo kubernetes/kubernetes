@@ -280,7 +280,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			// (and test) succeed.
 			ginkgo.It("should test that a PV becomes Available and is clean after the PVC is deleted.", func() {
 				ginkgo.By("Writing to the volume.")
-				pod := e2epv.MakeWritePod(ns, pvc)
+				pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')")
 				pod, err = c.CoreV1().Pods(ns).Create(pod)
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(c, pod.Name, ns))
