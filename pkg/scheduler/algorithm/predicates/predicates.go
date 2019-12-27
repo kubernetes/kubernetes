@@ -780,26 +780,6 @@ func GeneralPredicates(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.N
 	return len(predicateFails) == 0, predicateFails, nil
 }
 
-// CheckNodeUnschedulablePredicate checks if a pod can be scheduled on a node with Unschedulable spec.
-func CheckNodeUnschedulablePredicate(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
-	if nodeInfo == nil || nodeInfo.Node() == nil {
-		return false, []PredicateFailureReason{ErrNodeUnknownCondition}, nil
-	}
-
-	// If pod tolerate unschedulable taint, it's also tolerate `node.Spec.Unschedulable`.
-	podToleratesUnschedulable := v1helper.TolerationsTolerateTaint(pod.Spec.Tolerations, &v1.Taint{
-		Key:    v1.TaintNodeUnschedulable,
-		Effect: v1.TaintEffectNoSchedule,
-	})
-
-	// TODO (k82cn): deprecates `node.Spec.Unschedulable` in 1.13.
-	if nodeInfo.Node().Spec.Unschedulable && !podToleratesUnschedulable {
-		return false, []PredicateFailureReason{ErrNodeUnschedulable}, nil
-	}
-
-	return true, nil, nil
-}
-
 // PodToleratesNodeTaints checks if a pod tolerations can tolerate the node taints.
 func PodToleratesNodeTaints(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
 	if nodeInfo == nil || nodeInfo.Node() == nil {
