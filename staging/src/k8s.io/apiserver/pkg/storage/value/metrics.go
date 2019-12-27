@@ -65,18 +65,6 @@ var (
 		[]string{"transformation_type", "transformer_prefix", "status"},
 	)
 
-	deprecatedTransformerFailuresTotal = metrics.NewCounterVec(
-		&metrics.CounterOpts{
-			Namespace:         namespace,
-			Subsystem:         subsystem,
-			Name:              "transformation_failures_total",
-			Help:              "Total number of failed transformation operations.",
-			StabilityLevel:    metrics.ALPHA,
-			DeprecatedVersion: "1.15.0",
-		},
-		[]string{"transformation_type"},
-	)
-
 	envelopeTransformationCacheMissTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Namespace:      namespace,
@@ -115,7 +103,6 @@ func RegisterMetrics() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(transformerLatencies)
 		legacyregistry.MustRegister(transformerOperationsTotal)
-		legacyregistry.MustRegister(deprecatedTransformerFailuresTotal)
 		legacyregistry.MustRegister(envelopeTransformationCacheMissTotal)
 		legacyregistry.MustRegister(dataKeyGenerationLatencies)
 		legacyregistry.MustRegister(dataKeyGenerationFailuresTotal)
@@ -130,8 +117,6 @@ func RecordTransformation(transformationType, transformerPrefix string, start ti
 	switch {
 	case err == nil:
 		transformerLatencies.WithLabelValues(transformationType).Observe(sinceInSeconds(start))
-	default:
-		deprecatedTransformerFailuresTotal.WithLabelValues(transformationType).Inc()
 	}
 }
 
