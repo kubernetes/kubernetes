@@ -27,9 +27,11 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	csitrans "k8s.io/csi-translation-lib"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
@@ -460,7 +462,12 @@ func TestCSILimits(t *testing.T) {
 			}
 
 			p := &CSILimits{
-				predicate: predicates.NewCSIMaxVolumeLimitPredicate(getFakeCSINodeLister(csiNode), getFakeCSIPVLister(test.filterName, test.driverNames...), getFakeCSIPVCLister(test.filterName, "csi-sc", test.driverNames...), getFakeCSIStorageClassLister("csi-sc", test.driverNames[0])),
+				csiNodeLister:        getFakeCSINodeLister(csiNode),
+				pvLister:             getFakeCSIPVLister(test.filterName, test.driverNames...),
+				pvcLister:            getFakeCSIPVCLister(test.filterName, "csi-sc", test.driverNames...),
+				scLister:             getFakeCSIStorageClassLister("csi-sc", test.driverNames[0]),
+				randomVolumeIDPrefix: rand.String(32),
+				translator:           csitrans.New(),
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {

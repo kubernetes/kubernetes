@@ -9,7 +9,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "csi_volume_predicate.go",
         "error.go",
         "metadata.go",
         "predicates.go",
@@ -34,7 +33,6 @@ go_library(
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/listers/storage/v1:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
-        "//staging/src/k8s.io/csi-translation-lib:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib/plugins:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
@@ -43,7 +41,6 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "csi_volume_predicate_test.go",
         "max_attachable_volume_predicate_test.go",
         "metadata_test.go",
         "predicates_test.go",
