@@ -29,9 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	"k8s.io/client-go/util/retry"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -138,55 +140,76 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 		return &metav1.Status{
 			Status: metav1.StatusSuccess}, nil
 	}
-	var rtStatus *metav1.Status
 	var pdbName string
+	var rtStatus *metav1.Status
 	err = func() error {
 		pdbs, err := r.getPodDisruptionBudgets(ctx, pod)
 		if err != nil {
 			return err
 		}
 
-		if len(pdbs) > 1 {
-			rtStatus = &metav1.Status{
-				Status:  metav1.StatusFailure,
-				Message: "This pod has more than one PodDisruptionBudget, which the eviction subresource does not support.",
-				Code:    500,
-			}
-			return nil
-		}
 		if len(pdbs) == 0 {
 			return nil
 		}
 
-		pdb := &pdbs[0]
-		pdbName = pdb.Name
-		refresh := false
-		err = retry.RetryOnConflict(EvictionsRetry, func() error {
-			if refresh {
-				pdb, err = r.podDisruptionBudgetClient.PodDisruptionBudgets(pod.Namespace).Get(pdbName, metav1.GetOptions{})
+		start := metav1.Time{Time: time.Now()}
+		multiPDB := utilfeature.DefaultFeatureGate.Enabled(features.DrainWithMultiPDB)
+		var dryRunRange []bool
+		if multiPDB {
+			dryRunRange = []bool{true, false}
+		} else {
+			if len(pdbs) > 1 {
+				rtStatus = &metav1.Status{
+					Status:  metav1.StatusFailure,
+					Message: "This pod has more than one PodDisruptionBudget, which the eviction subresource does not support.",
+					Code:    500,
+				}
+				return nil
+			}
+			dryRunRange = []bool{dryrun.IsDryRun(deletionOptions.DryRun)}
+		}
+		for _, withDryRun := range dryRunRange {
+			for i := range pdbs {
+				refresh := false
+				err = retry.RetryOnConflict(EvictionsRetry, func() error {
+					pdbName = pdbs[i].Name
+					var pdb *policyv1beta1.PodDisruptionBudget
+					if refresh {
+						pdb, err = r.podDisruptionBudgetClient.PodDisruptionBudgets(pod.Namespace).Get(pdbName, metav1.GetOptions{})
+						if err != nil {
+							return err
+						}
+					} else {
+						pdb = &pdbs[i]
+					}
+					// Try to verify-and-decrement
+
+					// If it was false already, or if it becomes false during the course of our retries,
+					// raise an error marked as a 429.
+					if err = r.checkAndDecrement(pod.Namespace, pod.Name, *pdb, withDryRun, &start); err != nil {
+						refresh = true
+						return err
+					}
+					return nil
+				})
 				if err != nil {
 					return err
 				}
 			}
-			// Try to verify-and-decrement
-
-			// If it was false already, or if it becomes false during the course of our retries,
-			// raise an error marked as a 429.
-			if err = r.checkAndDecrement(pod.Namespace, pod.Name, *pdb, dryrun.IsDryRun(deletionOptions.DryRun)); err != nil {
-				refresh = true
-				return err
+			// if dry-run is intended, we are done
+			if dryrun.IsDryRun(deletionOptions.DryRun) {
+				return nil
 			}
-			return nil
-		})
+		}
 		return err
 	}()
 	if err == wait.ErrWaitTimeout {
 		err = errors.NewTimeoutError(fmt.Sprintf("couldn't update PodDisruptionBudget %q due to conflicts", pdbName), 10)
 	}
+
 	if err != nil {
 		return nil, err
 	}
-
 	if rtStatus != nil {
 		return rtStatus, nil
 	}
@@ -204,7 +227,7 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 }
 
 // checkAndDecrement checks if the provided PodDisruptionBudget allows any disruption.
-func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb policyv1beta1.PodDisruptionBudget, dryRun bool) error {
+func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb policyv1beta1.PodDisruptionBudget, dryRun bool, start *metav1.Time) error {
 	if pdb.Status.ObservedGeneration < pdb.Generation {
 		// TODO(mml): Add a Retry-After header.  Once there are time-based
 		// budgets, we can sometimes compute a sensible suggested value.  But
@@ -226,14 +249,16 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 		return err
 	}
 
-	pdb.Status.DisruptionsAllowed--
+	if pdb.Status.DisruptedPods == nil {
+		pdb.Status.DisruptedPods = make(map[string]metav1.Time)
+	}
+	if ts, ok := pdb.Status.DisruptedPods[podName]; !ok || ts.Before(start) {
+		pdb.Status.DisruptionsAllowed--
+	}
+
 	// If this is a dry-run, we don't need to go any further than that.
 	if dryRun == true {
 		return nil
-	}
-
-	if pdb.Status.DisruptedPods == nil {
-		pdb.Status.DisruptedPods = make(map[string]metav1.Time)
 	}
 
 	// Eviction handler needs to inform the PDB controller that it is about to delete a pod
@@ -246,6 +271,14 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 	}
 
 	return nil
+}
+
+func (r *EvictionREST) getDisruptionsAllowed(namespace string, pdbName string) (int32, error) {
+	finalPDB, err := r.podDisruptionBudgetClient.PodDisruptionBudgets(namespace).Get(pdbName, metav1.GetOptions{})
+	if err != nil {
+		return 0, err
+	}
+	return finalPDB.Status.DisruptionsAllowed, nil
 }
 
 // getPodDisruptionBudgets returns any PDBs that match the pod or err if there's an error.

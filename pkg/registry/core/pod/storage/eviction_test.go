@@ -28,11 +28,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -70,6 +73,81 @@ func TestEviction(t *testing.T) {
 			expectDeleted: true,
 		},
 		{
+			name: "matching pdbs with two disruptions allowed",
+			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
+			},
+				&policyv1beta1.PodDisruptionBudget{
+					ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "default"},
+					Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+					Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
+				}},
+			eviction:      &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectDeleted: true,
+		},
+		{
+			name: "matching pdbs with one disruption allowed and one non-matching disruption",
+			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
+			},
+				&policyv1beta1.PodDisruptionBudget{
+					ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "default"},
+					Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"b": "true"}}},
+					Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
+				}},
+			eviction:      &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectDeleted: true,
+		},
+		{
+			name: "matching pdbs with one disruption allowed and one disruption disallowed",
+			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
+			},
+				&policyv1beta1.PodDisruptionBudget{
+					ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "default"},
+					Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+					Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+				}},
+			eviction:    &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError: true,
+		},
+		{
+			name: "matching pdbs with one disruption disallowed and one disruption allowed",
+			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+			},
+				&policyv1beta1.PodDisruptionBudget{
+					ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "default"},
+					Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+					Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
+				}},
+			eviction:    &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError: true,
+		},
+		{
+			name: "matching pdbs with two disruptions disallowed",
+			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+			},
+				&policyv1beta1.PodDisruptionBudget{
+					ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "default"},
+					Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+					Status:     policyv1beta1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+				}},
+			eviction:    &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError: true,
+		},
+		{
 			name: "non-matching pdbs",
 			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
@@ -91,67 +169,83 @@ func TestEviction(t *testing.T) {
 			expectError:  true,
 		},
 	}
+	for _, enabled := range []bool{true, false} {
+		for _, tc := range testcases {
+			t.Run(tc.name, func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DrainWithMultiPDB, enabled)()
+				testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
+				storage, _, _, server := newStorage(t)
+				defer server.Terminate(t)
+				defer storage.Store.DestroyFunc()
 
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
-			storage, _, _, server := newStorage(t)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
+				pod := validNewPod()
+				pod.Labels = map[string]string{"a": "true"}
+				pod.Spec.NodeName = "foo"
 
-			pod := validNewPod()
-			pod.Labels = map[string]string{"a": "true"}
-			pod.Spec.NodeName = "foo"
+				if _, err := storage.Create(testContext, pod, nil, &metav1.CreateOptions{}); err != nil {
+					t.Error(err)
+				}
 
-			if _, err := storage.Create(testContext, pod, nil, &metav1.CreateOptions{}); err != nil {
-				t.Error(err)
-			}
+				client := fake.NewSimpleClientset(tc.pdbs...)
+				evictionRest := newEvictionStorage(storage.Store, client.PolicyV1beta1())
 
-			client := fake.NewSimpleClientset(tc.pdbs...)
-			evictionRest := newEvictionStorage(storage.Store, client.PolicyV1beta1())
-
-			name := pod.Name
-			if tc.badNameInURL {
-				name += "bad-name"
-			}
-			_, err := evictionRest.Create(testContext, name, tc.eviction, nil, &metav1.CreateOptions{})
-			if (err != nil) != tc.expectError {
-				t.Errorf("expected error=%v, got %v", tc.expectError, err)
-				return
-			}
-			if tc.badNameInURL {
-				if err == nil {
-					t.Error("expected error here, but got nil")
+				name := pod.Name
+				if tc.badNameInURL {
+					name += "bad-name"
+				}
+				_, err := evictionRest.Create(testContext, name, tc.eviction, nil, &metav1.CreateOptions{})
+				if len(tc.pdbs) == 1 && (err != nil) != tc.expectError {
+					t.Errorf("expected error=%v, got %v", tc.expectError, err)
 					return
 				}
-				if err.Error() != "name in URL does not match name in Eviction object" {
-					t.Errorf("got unexpected error: %v", err)
+				if tc.badNameInURL {
+					if err == nil {
+						t.Error("expected error here, but got nil")
+						return
+					}
+					if err.Error() != "name in URL does not match name in Eviction object" {
+						t.Errorf("got unexpected error: %v", err)
+					}
 				}
-			}
-			if tc.expectError {
-				return
-			}
-
-			existingPod, err := storage.Get(testContext, pod.Name, &metav1.GetOptions{})
-			if tc.expectDeleted {
-				if !apierrors.IsNotFound(err) {
-					t.Errorf("expected to be deleted, lookup returned %#v", existingPod)
+				if tc.expectError {
+					return
 				}
-				return
-			} else if apierrors.IsNotFound(err) {
-				t.Errorf("expected graceful deletion, got %v", err)
-				return
-			}
 
-			if err != nil {
-				t.Errorf("%#v", err)
-				return
-			}
+				for _, obj := range tc.pdbs {
+					pdb := obj.(*policyv1beta1.PodDisruptionBudget)
+					disruptionsAllowed, err := evictionRest.getDisruptionsAllowed(pdb.Namespace, pdb.Name)
+					if err != nil {
+						t.Errorf("%#v", err)
+					}
+					if disruptionsAllowed < 0 {
+						t.Errorf("DisruptionsAllowed becomes negative for %s.%s in %s", pdb.Namespace, pdb.Name, tc.name)
+					}
+					if !tc.expectDeleted && disruptionsAllowed == 0 {
+						t.Errorf("DisruptionsAllowed should not be 0 for %s.%s in %s", pdb.Namespace, pdb.Name, tc.name)
+					}
+				}
+				existingPod, err := storage.Get(testContext, pod.Name, &metav1.GetOptions{})
+				if (len(tc.pdbs) == 1 || enabled) && tc.expectDeleted {
+					if !apierrors.IsNotFound(err) {
+						t.Errorf("expected to be deleted, lookup returned %#v", existingPod)
+					}
+					return
+				}
+				if !tc.expectDeleted && apierrors.IsNotFound(err) {
+					t.Errorf("expected graceful deletion, got %v", err)
+					return
+				}
 
-			if existingPod.(*api.Pod).DeletionTimestamp == nil {
-				t.Errorf("expected gracefully deleted pod with deletionTimestamp set, got %#v", existingPod)
-			}
-		})
+				if err != nil && !apierrors.IsNotFound(err) {
+					t.Errorf("%#v", err)
+					return
+				}
+
+				if (len(tc.pdbs) == 1 || enabled) && existingPod.(*api.Pod).DeletionTimestamp == nil {
+					t.Errorf("expected gracefully deleted pod with deletionTimestamp set, got %#v", existingPod)
+				}
+			})
+		}
 	}
 }
 

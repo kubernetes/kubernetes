@@ -140,6 +140,10 @@ const (
 	//
 	// Deprecates and removes SelfLink from ObjectMeta and ListMeta.
 	RemoveSelfLink featuregate.Feature = "RemoveSelfLink"
+
+	// alpha: v1.18
+	// Allows to drain node with pod that has more than one Pod Disruption Budget
+	DrainWithMultiPDB featuregate.Feature = "DrainWithMultiPDB"
 )
 
 func init() {
@@ -165,4 +169,5 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WatchBookmark:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	APIPriorityAndFairness:  {Default: false, PreRelease: featuregate.Alpha},
 	RemoveSelfLink:          {Default: false, PreRelease: featuregate.Alpha},
+	DrainWithMultiPDB:       {Default: false, PreRelease: featuregate.Alpha},
 }
