@@ -91,6 +91,8 @@ func CanUseIPTablesProxier(kcompat KernelCompatTester) (bool, error) {
 	return true, nil
 }
 
+var _ KernelCompatTester = LinuxKernelCompatTester{}
+
 // LinuxKernelCompatTester is the Linux implementation of KernelCompatTester
 type LinuxKernelCompatTester struct{}
 

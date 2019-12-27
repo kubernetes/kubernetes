@@ -97,6 +97,8 @@ func (*NoopEndpointSliceHandler) OnEndpointSliceDelete(endpointSlice *discovery.
 // OnEndpointSlicesSynced is a noop handler for EndpointSlice syncs.
 func (*NoopEndpointSliceHandler) OnEndpointSlicesSynced() {}
 
+var _ EndpointSliceHandler = &NoopEndpointSliceHandler{}
+
 // EndpointsConfig tracks a set of endpoints configurations.
 type EndpointsConfig struct {
 	listerSynced  cache.InformerSynced
@@ -402,6 +404,8 @@ func (*NoopNodeHandler) OnNodeDelete(node *v1.Node) {}
 
 // OnNodeSynced is a noop handler for Node syncs.
 func (*NoopNodeHandler) OnNodeSynced() {}
+
+var _ NodeHandler = &NoopNodeHandler{}
 
 // NodeConfig tracks a set of node configurations.
 // It accepts "set", "add" and "remove" operations of node via channels, and invokes registered handlers on change.

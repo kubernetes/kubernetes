@@ -44,6 +44,8 @@ type ProxierHealthUpdater interface {
 	Updated()
 }
 
+var _ ProxierHealthUpdater = &ProxierHealthServer{}
+
 // ProxierHealthServer returns 200 "OK" by default. It verifies that the delay between
 // QueuedUpdate() calls and Updated() calls never exceeds healthTimeout.
 type ProxierHealthServer struct {
