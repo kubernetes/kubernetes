@@ -105,7 +105,6 @@ func TestTotals(t *testing.T) {
 			tt.prefix.TransformToStorage([]byte("value"), nil)
 			tt.prefix.TransformFromStorage([]byte("k8s:enc:kms:v1:value"), nil)
 			defer transformerOperationsTotal.Reset()
-			defer deprecatedTransformerFailuresTotal.Reset()
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
 				t.Fatal(err)
 			}
