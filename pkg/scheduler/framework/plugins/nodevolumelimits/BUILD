@@ -3,12 +3,8 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
-        "azure.go",
-        "cinder.go",
         "csi.go",
-        "csinode_helper.go",
-        "ebs.go",
-        "gce.go",
+        "non_csi.go",
         "utils.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits",
@@ -17,7 +13,6 @@ go_library(
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
-        "//pkg/scheduler/framework/plugins/migration:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/volume/util:go_default_library",
@@ -39,11 +34,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "azure_test.go",
-        "cinder_test.go",
         "csi_test.go",
-        "ebs_test.go",
-        "gce_test.go",
+        "non_csi_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
