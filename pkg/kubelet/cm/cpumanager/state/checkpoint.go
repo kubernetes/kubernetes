@@ -18,9 +18,14 @@ package state
 
 import (
 	"encoding/json"
+	"hash/fnv"
+	"strings"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 )
 
 // CPUManagerCheckpoint struct is used to store cpu/pod assignments in a checkpoint
@@ -95,11 +100,27 @@ func (cp *CPUManagerCheckpointV1) VerifyChecksum() error {
 		// accept empty checksum for compatibility with old file backend
 		return nil
 	}
+
+	printer := spew.ConfigState{
+		Indent:         " ",
+		SortKeys:       true,
+		DisableMethods: true,
+		SpewKeys:       true,
+	}
+
 	ck := cp.Checksum
 	cp.Checksum = 0
-	err := ck.Verify(cp)
+	object := printer.Sprintf("%#v", cp)
+	object = strings.Replace(object, "CPUManagerCheckpointV1", "CPUManagerCheckpoint", 1)
 	cp.Checksum = ck
-	return err
+
+	hash := fnv.New32a()
+	printer.Fprintf(hash, "%v", object)
+	if cp.Checksum != checksum.Checksum(hash.Sum32()) {
+		return errors.ErrCorruptCheckpoint
+	}
+
+	return nil
 }
 
 // VerifyChecksum verifies that current checksum of checkpoint is valid in v2 format
