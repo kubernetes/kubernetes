@@ -155,6 +155,20 @@ func TestCheckpointStateRestore(t *testing.T) {
 			&stateMemory{},
 		},
 		{
+			"Restore checkpoint from checkpoint with v1 checksum",
+			`{
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"checksum": 1694838852
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				defaultCPUSet: cpuset.NewCPUSet(1, 2, 3),
+			},
+		},
+		{
 			"Restore checkpoint with migration",
 			`{
 				"policyName": "none",
@@ -163,7 +177,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 					"containerID1": "4-6",
 					"containerID2": "1-3"
 				},
-				"checksum": 2832947348
+				"checksum": 3680390589
 			}`,
 			"none",
 			func() containermap.ContainerMap {
