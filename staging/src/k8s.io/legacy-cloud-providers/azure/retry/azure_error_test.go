@@ -54,7 +54,7 @@ func TestGetError(t *testing.T) {
 		{
 			code: http.StatusBadRequest,
 			expected: &Error{
-				Retriable:      true,
+				Retriable:      false,
 				HTTPStatusCode: http.StatusBadRequest,
 				RawError:       fmt.Errorf("HTTP response: 400"),
 			},
@@ -136,7 +136,7 @@ func TestGetStatusNotFoundAndForbiddenIgnoredError(t *testing.T) {
 		{
 			code: http.StatusBadRequest,
 			expected: &Error{
-				Retriable:      true,
+				Retriable:      false,
 				HTTPStatusCode: http.StatusBadRequest,
 				RawError:       fmt.Errorf("HTTP response: 400"),
 			},
@@ -191,7 +191,7 @@ func TestShouldRetryHTTPRequest(t *testing.T) {
 	}{
 		{
 			code:     http.StatusBadRequest,
-			expected: true,
+			expected: false,
 		},
 		{
 			code:     http.StatusInternalServerError,

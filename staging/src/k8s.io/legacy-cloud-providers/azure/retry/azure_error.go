@@ -125,8 +125,9 @@ func getHTTPStatusCode(resp *http.Response) int {
 // shouldRetryHTTPRequest determines if the request is retriable.
 func shouldRetryHTTPRequest(resp *http.Response, err error) bool {
 	if resp != nil {
-		// HTTP 412 (StatusPreconditionFailed) means etag mismatch, hence we shouldn't retry.
-		if resp.StatusCode == http.StatusPreconditionFailed {
+		// HTTP 412 (StatusPreconditionFailed) means etag mismatch
+		// HTTP 400 (BadRequest) means the request cannot be accepted, hence we shouldn't retry.
+		if resp.StatusCode == http.StatusPreconditionFailed || resp.StatusCode == http.StatusBadRequest {
 			return false
 		}
 
