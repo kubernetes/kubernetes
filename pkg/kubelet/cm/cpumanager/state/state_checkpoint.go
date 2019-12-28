@@ -18,6 +18,7 @@ package state
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"sync"
 
@@ -54,10 +55,21 @@ func NewCheckpointState(stateDir, checkpointName, policyName string, initialCont
 	}
 
 	if err := stateCheckpoint.restoreState(); err != nil {
-		//lint:ignore ST1005 user-facing error message
-		return nil, fmt.Errorf("could not restore state from checkpoint: %v\n"+
-			"Please drain this node and delete the CPU manager checkpoint file %q before restarting Kubelet.",
-			err, path.Join(stateDir, checkpointName))
+		klog.Errorf("could not restore state from checkpoint: %v", err)
+		checkpointFile := path.Join(stateDir, checkpointName)
+		corruptpath := checkpointFile + ".corrupt"
+		if err := os.Rename(checkpointFile, corruptpath); err != nil {
+			klog.Warningf("cannot move %s : %v", checkpointFile, err)
+			if err := os.Remove(checkpointFile); err != nil {
+				//lint:ignore ST1005 user-facing error message
+				return nil, fmt.Errorf("could not delete checkpoint: %v\n"+
+					"Please drain this node and delete the CPU manager checkpoint file %q before restarting Kubelet.",
+					err, checkpointFile)
+			}
+			klog.Infof("deleted %s", checkpointFile)
+		} else {
+			klog.Infof("moved %s to %s", checkpointFile, corruptpath)
+		}
 	}
 
 	return stateCheckpoint, nil
