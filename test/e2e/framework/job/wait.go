@@ -19,7 +19,6 @@ package job
 import (
 	"time"
 
-	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -69,24 +68,6 @@ func WaitForJobFinish(c clientset.Interface, ns, jobName string) error {
 	})
 }
 
-// WaitForJobFailure uses c to wait for up to timeout for the Job named jobName in namespace ns to fail.
-func WaitForJobFailure(c clientset.Interface, ns, jobName string, timeout time.Duration, reason string) error {
-	return wait.Poll(framework.Poll, timeout, func() (bool, error) {
-		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		for _, c := range curr.Status.Conditions {
-			if c.Type == batchv1.JobFailed && c.Status == v1.ConditionTrue {
-				if reason == "" || reason == c.Reason {
-					return true, nil
-				}
-			}
-		}
-		return false, nil
-	})
-}
-
 // WaitForJobGone uses c to wait for up to timeout for the Job named jobName in namespace ns to be removed.
 func WaitForJobGone(c clientset.Interface, ns, jobName string, timeout time.Duration) error {
 	return wait.Poll(framework.Poll, timeout, func() (bool, error) {
@@ -107,17 +88,5 @@ func WaitForAllJobPodsGone(c clientset.Interface, ns, jobName string) error {
 			return false, err
 		}
 		return len(pods.Items) == 0, nil
-	})
-}
-
-// WaitForJobDeleting uses c to wait for the Job jobName in namespace ns to have
-// a non-nil deletionTimestamp (i.e. being deleted).
-func WaitForJobDeleting(c clientset.Interface, ns, jobName string) error {
-	return wait.PollImmediate(framework.Poll, JobTimeout, func() (bool, error) {
-		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		return curr.ObjectMeta.DeletionTimestamp != nil, nil
 	})
 }
