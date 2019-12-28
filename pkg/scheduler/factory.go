@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -111,38 +112,12 @@ type Configurator struct {
 	nodeInfoSnapshot *nodeinfosnapshot.Snapshot
 }
 
-// Create creates a scheduler with the default algorithm provider.
-func (c *Configurator) Create() (*Scheduler, error) {
-	return c.CreateFromProvider(schedulerapi.SchedulerDefaultProviderName)
-}
-
-// CreateFromProvider creates a scheduler from the name of a registered algorithm provider.
-func (c *Configurator) CreateFromProvider(providerName string) (*Scheduler, error) {
-	klog.V(2).Infof("Creating scheduler from algorithm provider '%v'", providerName)
-	r := algorithmprovider.NewRegistry(int64(c.hardPodAffinitySymmetricWeight))
-	provider, exist := r[providerName]
-	if !exist {
-		return nil, fmt.Errorf("algorithm provider %q is not registered", providerName)
-	}
-
-	// Combine the provided plugins with the ones from component config.
-	// TODO(#86162): address disabled plugins.
-	var plugins schedulerapi.Plugins
-	plugins.Append(provider.FrameworkPlugins)
-	plugins.Append(c.plugins)
-	var pluginConfig []schedulerapi.PluginConfig
-	pluginConfig = append(pluginConfig, provider.FrameworkPluginConfig...)
-	pluginConfig = append(pluginConfig, c.pluginConfig...)
-
-	return c.CreateFromPlugins(&plugins, pluginConfig, []algorithm.SchedulerExtender{})
-}
-
-// CreateFromPlugins creates a scheduler from a set of registered plugins.
-func (c *Configurator) CreateFromPlugins(plugins *schedulerapi.Plugins, pluginConfig []schedulerapi.PluginConfig, extenders []algorithm.SchedulerExtender) (*Scheduler, error) {
+// create a scheduler from a set of registered plugins.
+func (c *Configurator) create(extenders []algorithm.SchedulerExtender) (*Scheduler, error) {
 	framework, err := framework.NewFramework(
 		c.registry,
-		plugins,
-		pluginConfig,
+		c.plugins,
+		c.pluginConfig,
 		framework.WithClientSet(c.client),
 		framework.WithInformerFactory(c.informerFactory),
 		framework.WithSnapshotSharedLister(c.nodeInfoSnapshot),
@@ -198,13 +173,34 @@ func (c *Configurator) CreateFromPlugins(plugins *schedulerapi.Plugins, pluginCo
 		StopEverything:  c.StopEverything,
 		VolumeBinder:    c.volumeBinder,
 		SchedulingQueue: podQueue,
-		Plugins:         plugins,
-		PluginConfig:    pluginConfig,
 	}, nil
 }
 
+// createFromProvider creates a scheduler from the name of a registered algorithm provider.
+func (c *Configurator) createFromProvider(providerName string) (*Scheduler, error) {
+	klog.V(2).Infof("Creating scheduler from algorithm provider '%v'", providerName)
+	r := algorithmprovider.NewRegistry(int64(c.hardPodAffinitySymmetricWeight))
+	provider, exist := r[providerName]
+	if !exist {
+		return nil, fmt.Errorf("algorithm provider %q is not registered", providerName)
+	}
+
+	// Combine the provided plugins with the ones from component config.
+	// TODO(#86789): address disabled plugins.
+	var plugins schedulerapi.Plugins
+	plugins.Append(provider.FrameworkPlugins)
+	plugins.Append(c.plugins)
+	c.plugins = &plugins
+	var pluginConfig []schedulerapi.PluginConfig
+	pluginConfig = append(pluginConfig, provider.FrameworkPluginConfig...)
+	pluginConfig = append(pluginConfig, c.pluginConfig...)
+	c.pluginConfig = pluginConfig
+
+	return c.create([]algorithm.SchedulerExtender{})
+}
+
 // CreateFromConfig creates a scheduler from the configuration file
-func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Scheduler, error) {
+func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler, error) {
 	lr := plugins.NewLegacyRegistry()
 	args := &plugins.ConfigProducerArgs{}
 
@@ -222,13 +218,13 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	} else {
 		for _, predicate := range policy.Predicates {
 			klog.V(2).Infof("Registering predicate: %s", predicate.Name)
-			predicateKeys.Insert(lr.RegisterCustomPredicate(predicate, args))
+			predicateKeys.Insert(lr.ProcessPredicatePolicy(predicate, args))
 		}
 	}
 
-	priorityKeys := sets.NewString()
+	priorityKeys := make(map[string]int64)
 	if policy.Priorities == nil {
-		klog.V(2).Infof("Using priorities from algorithm provider '%v'", schedulerapi.SchedulerDefaultProviderName)
+		klog.V(2).Infof("Using default priorities")
 		priorityKeys = lr.DefaultPriorities
 	} else {
 		for _, priority := range policy.Priorities {
@@ -237,7 +233,7 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Scheduler,
 				continue
 			}
 			klog.V(2).Infof("Registering priority: %s", priority.Name)
-			priorityKeys.Insert(lr.RegisterCustomPriority(priority, args))
+			priorityKeys[lr.ProcessPriorityPolicy(priority, args)] = priority.Weight
 		}
 	}
 
@@ -305,33 +301,43 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	plugins.Append(pluginsForPredicates)
 	plugins.Append(pluginsForPriorities)
 	plugins.Append(c.plugins)
+	c.plugins = &plugins
+
 	var pluginConfig []schedulerapi.PluginConfig
 	pluginConfig = append(pluginConfig, pluginConfigForPredicates...)
 	pluginConfig = append(pluginConfig, pluginConfigForPriorities...)
 	pluginConfig = append(pluginConfig, c.pluginConfig...)
+	c.pluginConfig = pluginConfig
 
-	return c.CreateFromPlugins(&plugins, pluginConfig, extenders)
+	return c.create(extenders)
 }
 
 // getPriorityConfigs
 // getPriorityConfigs returns priorities configuration: ones that will run as priorities and ones that will run
 // as framework plugins. Specifically, a priority will run as a framework plugin if a plugin config producer was
 // registered for that priority.
-func getPriorityConfigs(keys sets.String, lr *plugins.LegacyRegistry, args *plugins.ConfigProducerArgs) (*schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
+func getPriorityConfigs(keys map[string]int64, lr *plugins.LegacyRegistry, args *plugins.ConfigProducerArgs) (*schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
 	var plugins schedulerapi.Plugins
 	var pluginConfig []schedulerapi.PluginConfig
-	for _, p := range keys.List() {
-		weight, exist := lr.Priorities[p]
+
+	// Sort the keys so that it is easier for unit tests to do compare.
+	var sortedKeys []string
+	for k := range keys {
+		sortedKeys = append(sortedKeys, k)
+	}
+	sort.Strings(sortedKeys)
+
+	for _, priority := range sortedKeys {
+		weight := keys[priority]
+		producer, exist := lr.PriorityToConfigProducer[priority]
 		if !exist {
-			return nil, nil, fmt.Errorf("priority key %q is not registered", p)
+			return nil, nil, fmt.Errorf("no config producer registered for %q", priority)
 		}
-		if producer, exist := lr.ConfigProducerRegistry.PriorityToConfigProducer[p]; exist {
-			a := *args
-			a.Weight = int32(weight)
-			pl, pc := producer(a)
-			plugins.Append(&pl)
-			pluginConfig = append(pluginConfig, pc...)
-		}
+		a := *args
+		a.Weight = int32(weight)
+		pl, plc := producer(a)
+		plugins.Append(&pl)
+		pluginConfig = append(pluginConfig, plc...)
 	}
 	return &plugins, pluginConfig, nil
 }
@@ -343,11 +349,6 @@ func getPriorityConfigs(keys sets.String, lr *plugins.LegacyRegistry, args *plug
 // are added to the Plugins list according to the order specified in predicates.Ordering().
 func getPredicateConfigs(keys sets.String, lr *plugins.LegacyRegistry, args *plugins.ConfigProducerArgs) (*schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
 	allPredicates := keys.Union(lr.MandatoryPredicates)
-	if allPredicates.Has("PodFitsPorts") {
-		// For compatibility reasons, "PodFitsPorts" as a key is still supported.
-		allPredicates.Delete("PodFitsPorts")
-		allPredicates.Insert(predicates.PodFitsHostPortsPred)
-	}
 
 	// Create the framework plugin configurations, and place them in the order
 	// that the corresponding predicates were supposed to run.
@@ -356,26 +357,26 @@ func getPredicateConfigs(keys sets.String, lr *plugins.LegacyRegistry, args *plu
 
 	for _, predicateKey := range predicates.Ordering() {
 		if allPredicates.Has(predicateKey) {
-			producer, exist := lr.ConfigProducerRegistry.PredicateToConfigProducer[predicateKey]
+			producer, exist := lr.PredicateToConfigProducer[predicateKey]
 			if !exist {
 				return nil, nil, fmt.Errorf("no framework config producer registered for %q", predicateKey)
 			}
-			p, pc := producer(*args)
-			plugins.Append(&p)
-			pluginConfig = append(pluginConfig, pc...)
+			pl, plc := producer(*args)
+			plugins.Append(&pl)
+			pluginConfig = append(pluginConfig, plc...)
 			allPredicates.Delete(predicateKey)
 		}
 	}
 
 	// Third, add the rest in no specific order.
 	for predicateKey := range allPredicates {
-		producer, exist := lr.ConfigProducerRegistry.PredicateToConfigProducer[predicateKey]
+		producer, exist := lr.PredicateToConfigProducer[predicateKey]
 		if !exist {
 			return nil, nil, fmt.Errorf("no framework config producer registered for %q", predicateKey)
 		}
-		p, pc := producer(*args)
-		plugins.Append(&p)
-		pluginConfig = append(pluginConfig, pc...)
+		pl, plc := producer(*args)
+		plugins.Append(&pl)
+		pluginConfig = append(pluginConfig, plc...)
 	}
 
 	return &plugins, pluginConfig, nil

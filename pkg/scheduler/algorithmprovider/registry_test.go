@@ -109,71 +109,142 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 
 func TestApplyFeatureGates(t *testing.T) {
 	hardPodAffinityWeight := int64(1)
-	wantConfig := &Config{
-		FrameworkPlugins: &schedulerapi.Plugins{
-			PreFilter: &schedulerapi.PluginSet{
-				Enabled: []schedulerapi.Plugin{
-					{Name: noderesources.FitName},
-					{Name: nodeports.Name},
-					{Name: interpodaffinity.Name},
-					{Name: podtopologyspread.Name},
+	tests := []struct {
+		name            string
+		featuresEnabled bool
+		wantConfig      *Config
+	}{
+		{
+			name:            "Feature gates disabled",
+			featuresEnabled: false,
+			wantConfig: &Config{
+				FrameworkPlugins: &schedulerapi.Plugins{
+					PreFilter: &schedulerapi.PluginSet{
+						Enabled: []schedulerapi.Plugin{
+							{Name: noderesources.FitName},
+							{Name: nodeports.Name},
+							{Name: interpodaffinity.Name},
+						},
+					},
+					Filter: &schedulerapi.PluginSet{
+						Enabled: []schedulerapi.Plugin{
+							{Name: nodeunschedulable.Name},
+							{Name: noderesources.FitName},
+							{Name: nodename.Name},
+							{Name: nodeports.Name},
+							{Name: nodeaffinity.Name},
+							{Name: volumerestrictions.Name},
+							{Name: tainttoleration.Name},
+							{Name: nodevolumelimits.EBSName},
+							{Name: nodevolumelimits.GCEPDName},
+							{Name: nodevolumelimits.CSIName},
+							{Name: nodevolumelimits.AzureDiskName},
+							{Name: volumebinding.Name},
+							{Name: volumezone.Name},
+							{Name: interpodaffinity.Name},
+						},
+					},
+					PostFilter: &schedulerapi.PluginSet{
+						Enabled: []schedulerapi.Plugin{
+							{Name: interpodaffinity.Name},
+							{Name: tainttoleration.Name},
+						},
+					},
+					Score: &schedulerapi.PluginSet{
+						Enabled: []schedulerapi.Plugin{
+							{Name: noderesources.BalancedAllocationName, Weight: 1},
+							{Name: imagelocality.Name, Weight: 1},
+							{Name: interpodaffinity.Name, Weight: 1},
+							{Name: noderesources.LeastAllocatedName, Weight: 1},
+							{Name: nodeaffinity.Name, Weight: 1},
+							{Name: nodepreferavoidpods.Name, Weight: 10000},
+							{Name: defaultpodtopologyspread.Name, Weight: 1},
+							{Name: tainttoleration.Name, Weight: 1},
+						},
+					},
 				},
-			},
-			Filter: &schedulerapi.PluginSet{
-				Enabled: []schedulerapi.Plugin{
-					{Name: nodeunschedulable.Name},
-					{Name: noderesources.FitName},
-					{Name: nodename.Name},
-					{Name: nodeports.Name},
-					{Name: nodeaffinity.Name},
-					{Name: volumerestrictions.Name},
-					{Name: tainttoleration.Name},
-					{Name: nodevolumelimits.EBSName},
-					{Name: nodevolumelimits.GCEPDName},
-					{Name: nodevolumelimits.CSIName},
-					{Name: nodevolumelimits.AzureDiskName},
-					{Name: volumebinding.Name},
-					{Name: volumezone.Name},
-					{Name: interpodaffinity.Name},
-					{Name: podtopologyspread.Name},
-				},
-			},
-			PostFilter: &schedulerapi.PluginSet{
-				Enabled: []schedulerapi.Plugin{
-					{Name: interpodaffinity.Name},
-					{Name: tainttoleration.Name},
-					{Name: podtopologyspread.Name},
-				},
-			},
-			Score: &schedulerapi.PluginSet{
-				Enabled: []schedulerapi.Plugin{
-					{Name: noderesources.BalancedAllocationName, Weight: 1},
-					{Name: imagelocality.Name, Weight: 1},
-					{Name: interpodaffinity.Name, Weight: 1},
-					{Name: noderesources.LeastAllocatedName, Weight: 1},
-					{Name: nodeaffinity.Name, Weight: 1},
-					{Name: nodepreferavoidpods.Name, Weight: 10000},
-					{Name: defaultpodtopologyspread.Name, Weight: 1},
-					{Name: tainttoleration.Name, Weight: 1},
-					{Name: podtopologyspread.Name, Weight: 1},
-					{Name: noderesources.ResourceLimitsName, Weight: 1},
+				FrameworkPluginConfig: []schedulerapi.PluginConfig{
+					{
+						Name: interpodaffinity.Name,
+						Args: runtime.Unknown{Raw: []byte(fmt.Sprintf(`{"hardPodAffinityWeight":%d}`, hardPodAffinityWeight))},
+					},
 				},
 			},
 		},
-		FrameworkPluginConfig: []schedulerapi.PluginConfig{
-			{
-				Name: interpodaffinity.Name,
-				Args: runtime.Unknown{Raw: []byte(fmt.Sprintf(`{"hardPodAffinityWeight":%d}`, hardPodAffinityWeight))},
+		{
+			name:            "Feature gates enabled",
+			featuresEnabled: true,
+			wantConfig: &Config{
+				FrameworkPlugins: &schedulerapi.Plugins{
+					PreFilter: &schedulerapi.PluginSet{
+						Enabled: []schedulerapi.Plugin{
+							{Name: noderesources.FitName},
+							{Name: nodeports.Name},
+							{Name: interpodaffinity.Name},
+							{Name: podtopologyspread.Name},
+						},
+					},
+					Filter: &schedulerapi.PluginSet{
+						Enabled: []schedulerapi.Plugin{
+							{Name: nodeunschedulable.Name},
+							{Name: noderesources.FitName},
+							{Name: nodename.Name},
+							{Name: nodeports.Name},
+							{Name: nodeaffinity.Name},
+							{Name: volumerestrictions.Name},
+							{Name: tainttoleration.Name},
+							{Name: nodevolumelimits.EBSName},
+							{Name: nodevolumelimits.GCEPDName},
+							{Name: nodevolumelimits.CSIName},
+							{Name: nodevolumelimits.AzureDiskName},
+							{Name: volumebinding.Name},
+							{Name: volumezone.Name},
+							{Name: interpodaffinity.Name},
+							{Name: podtopologyspread.Name},
+						},
+					},
+					PostFilter: &schedulerapi.PluginSet{
+						Enabled: []schedulerapi.Plugin{
+							{Name: interpodaffinity.Name},
+							{Name: tainttoleration.Name},
+							{Name: podtopologyspread.Name},
+						},
+					},
+					Score: &schedulerapi.PluginSet{
+						Enabled: []schedulerapi.Plugin{
+							{Name: noderesources.BalancedAllocationName, Weight: 1},
+							{Name: imagelocality.Name, Weight: 1},
+							{Name: interpodaffinity.Name, Weight: 1},
+							{Name: noderesources.LeastAllocatedName, Weight: 1},
+							{Name: nodeaffinity.Name, Weight: 1},
+							{Name: nodepreferavoidpods.Name, Weight: 10000},
+							{Name: defaultpodtopologyspread.Name, Weight: 1},
+							{Name: tainttoleration.Name, Weight: 1},
+							{Name: podtopologyspread.Name, Weight: 1},
+							{Name: noderesources.ResourceLimitsName, Weight: 1},
+						},
+					},
+				},
+				FrameworkPluginConfig: []schedulerapi.PluginConfig{
+					{
+						Name: interpodaffinity.Name,
+						Args: runtime.Unknown{Raw: []byte(fmt.Sprintf(`{"hardPodAffinityWeight":%d}`, hardPodAffinityWeight))},
+					},
+				},
 			},
 		},
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceLimitsPriorityFunction, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EvenPodsSpread, true)()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceLimitsPriorityFunction, test.featuresEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EvenPodsSpread, test.featuresEnabled)()
 
-	r := NewRegistry(hardPodAffinityWeight)
-	gotConfig := r[schedulerapi.SchedulerDefaultProviderName]
-	if diff := cmp.Diff(wantConfig, gotConfig); diff != "" {
-		t.Errorf("unexpected config diff (-want, +got): %s", diff)
+			r := NewRegistry(hardPodAffinityWeight)
+			gotConfig := r[schedulerapi.SchedulerDefaultProviderName]
+			if diff := cmp.Diff(test.wantConfig, gotConfig); diff != "" {
+				t.Errorf("unexpected config diff (-want, +got): %s", diff)
+			}
+		})
 	}
 }

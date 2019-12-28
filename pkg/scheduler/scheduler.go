@@ -120,10 +120,6 @@ type Scheduler struct {
 	SchedulingQueue internalqueue.SchedulingQueue
 
 	scheduledPodsHasSynced func() bool
-
-	// The final configuration of the framework.
-	Plugins      *schedulerapi.Plugins
-	PluginConfig []schedulerapi.PluginConfig
 }
 
 // Cache returns the cache in scheduler for test to check the data in scheduler.
@@ -140,12 +136,11 @@ type schedulerOptions struct {
 	bindTimeoutSeconds             int64
 	podInitialBackoffSeconds       int64
 	podMaxBackoffSeconds           int64
-	// Contains all in-tree plugins.
-	frameworkInTreeRegistry framework.Registry
-	// This registry contains out of tree plugins to be merged with the in-tree registry.
+	// Contains out-of-tree plugins to be merged with the in-tree registry.
 	frameworkOutOfTreeRegistry framework.Registry
-	frameworkPlugins           *schedulerapi.Plugins
-	frameworkPluginConfig      []schedulerapi.PluginConfig
+	// Plugins and PluginConfig set from ComponentConfig.
+	frameworkPlugins      *schedulerapi.Plugins
+	frameworkPluginConfig []schedulerapi.PluginConfig
 }
 
 // Option configures a Scheduler
@@ -190,13 +185,6 @@ func WithPercentageOfNodesToScore(percentageOfNodesToScore int32) Option {
 func WithBindTimeoutSeconds(bindTimeoutSeconds int64) Option {
 	return func(o *schedulerOptions) {
 		o.bindTimeoutSeconds = bindTimeoutSeconds
-	}
-}
-
-// WithFrameworkInTreeRegistry sets the framework's in-tree registry. This is only used in integration tests.
-func WithFrameworkInTreeRegistry(registry framework.Registry) Option {
-	return func(o *schedulerOptions) {
-		o.frameworkInTreeRegistry = registry
 	}
 }
 
@@ -247,8 +235,6 @@ var defaultSchedulerOptions = schedulerOptions{
 	bindTimeoutSeconds:             BindTimeoutSeconds,
 	podInitialBackoffSeconds:       int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
 	podMaxBackoffSeconds:           int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
-	frameworkPlugins:               nil,
-	frameworkPluginConfig:          nil,
 }
 
 // New returns a Scheduler
@@ -280,12 +266,9 @@ func New(client clientset.Interface,
 		time.Duration(options.bindTimeoutSeconds)*time.Second,
 	)
 
-	registry := options.frameworkInTreeRegistry
-	if registry == nil {
-		registry = frameworkplugins.NewInTreeRegistry(&frameworkplugins.RegistryArgs{
-			VolumeBinder: volumeBinder,
-		})
-	}
+	registry := frameworkplugins.NewInTreeRegistry(&frameworkplugins.RegistryArgs{
+		VolumeBinder: volumeBinder,
+	})
 	if err := registry.Merge(options.frameworkOutOfTreeRegistry); err != nil {
 		return nil, err
 	}
@@ -317,7 +300,7 @@ func New(client clientset.Interface,
 	switch {
 	case source.Provider != nil:
 		// Create the config from a named algorithm provider.
-		sc, err := configurator.CreateFromProvider(*source.Provider)
+		sc, err := configurator.createFromProvider(*source.Provider)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler using provider %q: %v", *source.Provider, err)
 		}
@@ -335,7 +318,7 @@ func New(client clientset.Interface,
 				return nil, err
 			}
 		}
-		sc, err := configurator.CreateFromConfig(*policy)
+		sc, err := configurator.createFromConfig(*policy)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler from policy: %v", err)
 		}

@@ -28,7 +28,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -879,8 +878,6 @@ func TestInterPodAffinity(t *testing.T) {
 // TestEvenPodsSpreadPredicate verifies that EvenPodsSpread predicate functions well.
 func TestEvenPodsSpreadPredicate(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EvenPodsSpread, true)()
-	// Apply feature gates to enable EvenPodsSpread
-	defer algorithmprovider.ApplyFeatureGates()()
 
 	context := initTest(t, "eps-predicate")
 	cs := context.clientSet

@@ -64,7 +64,7 @@ func TestCreate(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
-	factory.Create()
+	factory.createFromProvider(schedulerapi.SchedulerDefaultProviderName)
 }
 
 // Test configures a scheduler from a policies defined in a file
@@ -101,9 +101,9 @@ func TestCreateFromConfig(t *testing.T) {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 
-	sched, err := factory.CreateFromConfig(policy)
+	sched, err := factory.createFromConfig(policy)
 	if err != nil {
-		t.Fatalf("CreateFromConfig failed: %v", err)
+		t.Fatalf("createFromConfig failed: %v", err)
 	}
 	hpa := factory.hardPodAffinitySymmetricWeight
 	if hpa != v1.DefaultHardPodAffinitySymmetricWeight {
@@ -112,13 +112,13 @@ func TestCreateFromConfig(t *testing.T) {
 
 	// Verify that node label predicate/priority are converted to framework plugins.
 	wantArgs := `{"Name":"NodeLabel","Args":{"presentLabels":["zone"],"absentLabels":["foo"],"presentLabelsPreference":["l1"],"absentLabelsPreference":["l2"]}}`
-	verifyPluginConvertion(t, nodelabel.Name, []string{"FilterPlugin", "ScorePlugin"}, sched, 6, wantArgs)
+	verifyPluginConvertion(t, nodelabel.Name, []string{"FilterPlugin", "ScorePlugin"}, sched, factory, 6, wantArgs)
 	// Verify that service affinity custom predicate/priority is converted to framework plugin.
 	wantArgs = `{"Name":"ServiceAffinity","Args":{"labels":["zone","foo"],"antiAffinityLabelsPreference":["rack","zone"]}}`
-	verifyPluginConvertion(t, serviceaffinity.Name, []string{"FilterPlugin", "ScorePlugin"}, sched, 6, wantArgs)
+	verifyPluginConvertion(t, serviceaffinity.Name, []string{"FilterPlugin", "ScorePlugin"}, sched, factory, 6, wantArgs)
 }
 
-func verifyPluginConvertion(t *testing.T, name string, extentionPoints []string, sched *Scheduler, wantWeight int32, wantArgs string) {
+func verifyPluginConvertion(t *testing.T, name string, extentionPoints []string, sched *Scheduler, configurator *Configurator, wantWeight int32, wantArgs string) {
 	for _, extensionPoint := range extentionPoints {
 		plugin, ok := findPlugin(name, extensionPoint, sched)
 		if !ok {
@@ -130,7 +130,7 @@ func verifyPluginConvertion(t *testing.T, name string, extentionPoints []string,
 			}
 		}
 		// Verify that the policy config is converted to plugin config.
-		pluginConfig := findPluginConfig(name, sched)
+		pluginConfig := findPluginConfig(name, configurator)
 		encoding, err := json.Marshal(pluginConfig)
 		if err != nil {
 			t.Errorf("Failed to marshal %+v: %v", pluginConfig, err)
@@ -150,8 +150,8 @@ func findPlugin(name, extensionPoint string, sched *Scheduler) (schedulerapi.Plu
 	return schedulerapi.Plugin{}, false
 }
 
-func findPluginConfig(name string, sched *Scheduler) schedulerapi.PluginConfig {
-	for _, c := range sched.PluginConfig {
+func findPluginConfig(name string, configurator *Configurator) schedulerapi.PluginConfig {
+	for _, c := range configurator.pluginConfig {
 		if c.Name == name {
 			return c
 		}
@@ -187,7 +187,7 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configData, &policy); err != nil {
 		t.Errorf("Invalid configuration: %v", err)
 	}
-	factory.CreateFromConfig(policy)
+	factory.createFromConfig(policy)
 	hpa := factory.hardPodAffinitySymmetricWeight
 	if hpa != 10 {
 		t.Errorf("Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", 10, hpa)
@@ -208,7 +208,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 
-	factory.CreateFromConfig(policy)
+	factory.createFromConfig(policy)
 }
 
 // Test configures a scheduler from a policy that does not specify any
@@ -229,22 +229,13 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 		t.Fatalf("Invalid configuration: %v", err)
 	}
 
-	c, err := factory.CreateFromConfig(policy)
+	sched, err := factory.createFromConfig(policy)
 	if err != nil {
 		t.Fatalf("Failed to create scheduler from configuration: %v", err)
 	}
-	if !foundPlugin(c.Plugins.Filter.Enabled, "NodeResourcesFit") {
+	if _, exist := findPlugin("NodeResourcesFit", "FilterPlugin", sched); !exist {
 		t.Errorf("Expected plugin NodeResourcesFit")
 	}
-}
-
-func foundPlugin(plugins []schedulerapi.Plugin, name string) bool {
-	for _, plugin := range plugins {
-		if plugin.Name == name {
-			return true
-		}
-	}
-	return false
 }
 
 func TestDefaultErrorFunc(t *testing.T) {

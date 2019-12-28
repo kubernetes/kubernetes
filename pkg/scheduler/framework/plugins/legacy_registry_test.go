@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -81,22 +81,22 @@ func produceConfig(keys []string, producersMap map[string]ConfigProducer, args C
 	var plugins config.Plugins
 	var pluginConfig []config.PluginConfig
 	for _, k := range keys {
-		producer, exist := producersMap[k]
+		p, exist := producersMap[k]
 		if !exist {
 			return nil, nil, fmt.Errorf("finding key %q", k)
 		}
-		p, pc := producer(args)
-		plugins.Append(&p)
-		pluginConfig = append(pluginConfig, pc...)
+		pl, plc := p(args)
+		plugins.Append(&pl)
+		pluginConfig = append(pluginConfig, plc...)
 	}
 	return &plugins, pluginConfig, nil
 }
 
 func TestRegisterConfigProducers(t *testing.T) {
-	registry := newConfigProducerRegistry()
+	registry := NewLegacyRegistry()
 	testPredicateName1 := "testPredicate1"
 	testFilterName1 := "testFilter1"
-	registry.RegisterPredicate(testPredicateName1,
+	registry.registerPredicateConfigProducer(testPredicateName1,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, testFilterName1, nil)
 			return
@@ -104,7 +104,7 @@ func TestRegisterConfigProducers(t *testing.T) {
 
 	testPredicateName2 := "testPredicate2"
 	testFilterName2 := "testFilter2"
-	registry.RegisterPredicate(testPredicateName2,
+	registry.registerPredicateConfigProducer(testPredicateName2,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, testFilterName2, nil)
 			return
@@ -112,7 +112,7 @@ func TestRegisterConfigProducers(t *testing.T) {
 
 	testPriorityName1 := "testPriority1"
 	testScoreName1 := "testScore1"
-	registry.RegisterPriority(testPriorityName1,
+	registry.registerPriorityConfigProducer(testPriorityName1,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, testScoreName1, &args.Weight)
 			return
@@ -120,7 +120,7 @@ func TestRegisterConfigProducers(t *testing.T) {
 
 	testPriorityName2 := "testPriority2"
 	testScoreName2 := "testScore2"
-	registry.RegisterPriority(testPriorityName2,
+	registry.registerPriorityConfigProducer(testPriorityName2,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, testScoreName2, &args.Weight)
 			return
