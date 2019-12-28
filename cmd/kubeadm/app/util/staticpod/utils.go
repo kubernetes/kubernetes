@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/kustomize"
 )
 
@@ -148,7 +148,7 @@ func GetExtraParameters(overrides map[string]string, defaults map[string]string)
 // KustomizeStaticPod applies patches defined in kustomizeDir to a static Pod manifest
 func KustomizeStaticPod(pod *v1.Pod, kustomizeDir string) (*v1.Pod, error) {
 	// marshal the pod manifest into yaml
-	serialized, err := util.MarshalToYaml(pod, v1.SchemeGroupVersion)
+	serialized, err := kubeadmutil.MarshalToYaml(pod, v1.SchemeGroupVersion)
 	if err != nil {
 		return pod, errors.Wrapf(err, "failed to marshal manifest to YAML")
 	}
@@ -164,7 +164,7 @@ func KustomizeStaticPod(pod *v1.Pod, kustomizeDir string) (*v1.Pod, error) {
 	}
 
 	// unmarshal kustomized yaml back into a pod manifest
-	obj, err := util.UnmarshalFromYaml(kustomized, v1.SchemeGroupVersion)
+	obj, err := kubeadmutil.UnmarshalFromYaml(kustomized, v1.SchemeGroupVersion)
 	if err != nil {
 		return pod, errors.Wrap(err, "failed to unmarshal kustomize manifest from YAML")
 	}
@@ -186,7 +186,7 @@ func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
 	}
 
 	// writes the pod to disk
-	serialized, err := util.MarshalToYaml(&pod, v1.SchemeGroupVersion)
+	serialized, err := kubeadmutil.MarshalToYaml(&pod, v1.SchemeGroupVersion)
 	if err != nil {
 		return errors.Wrapf(err, "failed to marshal manifest for %q to YAML", componentName)
 	}
@@ -207,7 +207,7 @@ func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
 		return &v1.Pod{}, errors.Wrapf(err, "failed to read manifest for %q", manifestPath)
 	}
 
-	obj, err := util.UnmarshalFromYaml(buf, v1.SchemeGroupVersion)
+	obj, err := kubeadmutil.UnmarshalFromYaml(buf, v1.SchemeGroupVersion)
 	if err != nil {
 		return &v1.Pod{}, errors.Errorf("failed to unmarshal manifest for %q from YAML: %v", manifestPath, err)
 	}
@@ -298,7 +298,7 @@ func GetEtcdProbeEndpoint(cfg *kubeadmapi.Etcd, isIPv6 bool) (string, int, v1.UR
 		port := kubeadmconstants.EtcdMetricsPort
 		portStr := parsedURL.Port()
 		if len(portStr) != 0 {
-			p, err := util.ParsePort(portStr)
+			p, err := kubeadmutil.ParsePort(portStr)
 			if err == nil {
 				port = p
 			}
