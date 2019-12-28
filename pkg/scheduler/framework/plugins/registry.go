@@ -284,6 +284,7 @@ func NewConfigProducerRegistry() *ConfigProducerRegistry {
 		})
 	registry.RegisterPriority(priorities.EvenPodsSpreadPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.PostFilter = appendToPluginSet(plugins.PostFilter, podtopologyspread.Name, nil)
 			plugins.Score = appendToPluginSet(plugins.Score, podtopologyspread.Name, &args.Weight)
 			return
 		})
