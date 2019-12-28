@@ -28,11 +28,17 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 )
 
-// CPUManagerCheckpoint struct is used to store cpu/pod assignments in a checkpoint
-type CPUManagerCheckpoint = CPUManagerCheckpointV2
-
 var _ checkpointmanager.Checkpoint = &CPUManagerCheckpointV1{}
 var _ checkpointmanager.Checkpoint = &CPUManagerCheckpointV2{}
+var _ checkpointmanager.Checkpoint = &CPUManagerCheckpoint{}
+
+// CPUManagerCheckpoint struct is used to store cpu/pod assignments in a checkpoint in v2 format
+type CPUManagerCheckpoint struct {
+	PolicyName    string                       `json:"policyName"`
+	DefaultCPUSet string                       `json:"defaultCpuSet"`
+	Entries       map[string]map[string]string `json:"entries,omitempty"`
+	Checksum      checksum.Checksum            `json:"checksum"`
+}
 
 // CPUManagerCheckpointV1 struct is used to store cpu/pod assignments in a checkpoint in v1 format
 type CPUManagerCheckpointV1 struct {
@@ -43,12 +49,7 @@ type CPUManagerCheckpointV1 struct {
 }
 
 // CPUManagerCheckpointV2 struct is used to store cpu/pod assignments in a checkpoint in v2 format
-type CPUManagerCheckpointV2 struct {
-	PolicyName    string                       `json:"policyName"`
-	DefaultCPUSet string                       `json:"defaultCpuSet"`
-	Entries       map[string]map[string]string `json:"entries,omitempty"`
-	Checksum      checksum.Checksum            `json:"checksum"`
-}
+type CPUManagerCheckpointV2 = CPUManagerCheckpoint
 
 // NewCPUManagerCheckpoint returns an instance of Checkpoint
 func NewCPUManagerCheckpoint() *CPUManagerCheckpoint {
