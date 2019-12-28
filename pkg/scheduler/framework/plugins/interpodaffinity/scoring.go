@@ -256,7 +256,7 @@ func (pl *InterPodAffinity) PostFilter(
 func getPostFilterState(cycleState *framework.CycleState) (*postFilterState, error) {
 	c, err := cycleState.Read(postFilterStateKey)
 	if err != nil {
-		return nil, fmt.Errorf("Error reading %q from cycleState: %v", preFilterStateKey, err)
+		return nil, fmt.Errorf("Error reading %q from cycleState: %v", postFilterStateKey, err)
 	}
 
 	s, ok := c.(*postFilterState)
