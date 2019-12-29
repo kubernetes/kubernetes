@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -96,8 +95,7 @@ func New(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin
 	}, nil
 }
 
-//Migration Code
-
+// SelectorSpread contains information to calculate selector spread priority.
 type SelectorSpread struct {
 	serviceLister     corelisters.ServiceLister
 	controllerLister  corelisters.ReplicationControllerLister
@@ -150,7 +148,7 @@ func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{
 
 // countMatchingPods counts pods based on namespace and matching all selectors
 func countMatchingPods(namespace string, selector labels.Selector, nodeInfo *schedulernodeinfo.NodeInfo) int {
-	if nodeInfo.Pods() == nil || len(nodeInfo.Pods()) == 0 || selector.Empty() {
+	if len(nodeInfo.Pods()) == 0 || selector.Empty() {
 		return 0
 	}
 	count := 0
@@ -225,11 +223,6 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 			}
 		}
 		result[i].Score = int64(fScore)
-		if klog.V(10) {
-			klog.Infof(
-				"%v -> %v: SelectorSpreadPriority, Score: (%d)", pod.Name, result[i].Name, int64(fScore),
-			)
-		}
 	}
 	return nil
 }
