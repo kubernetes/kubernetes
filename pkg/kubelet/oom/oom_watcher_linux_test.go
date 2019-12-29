@@ -19,19 +19,26 @@ package oom
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
+
+	"github.com/google/cadvisor/utils/oomparser"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestBasic verifies that the OOMWatch works without error.
 func TestBasic(t *testing.T) {
 	fakeRecorder := &record.FakeRecorder{}
 	node := &v1.ObjectReference{}
-	oomWatcher := NewWatcher(fakeRecorder)
-	assert.NoError(t, oomWatcher.Start(node))
 
-	// TODO: Improve this test once cadvisor exports events.EventChannel as an interface
-	// and thereby allow using a mock version of cadvisor.
+	// TODO: Substitute this `oomStreamer` out for a fake, and then write
+	// more comprehensive unit tests of the actual behavior.
+	oomStreamer, err := oomparser.New()
+	assert.NoError(t, err)
+
+	oomWatcher := &realWatcher{
+		recorder:    fakeRecorder,
+		oomStreamer: oomStreamer,
+	}
+	assert.NoError(t, oomWatcher.Start(node))
 }
