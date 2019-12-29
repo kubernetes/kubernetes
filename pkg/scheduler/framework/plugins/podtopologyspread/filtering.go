@@ -23,7 +23,6 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
@@ -124,20 +123,6 @@ func (paths *criticalPaths) update(tpVal string, num int32) {
 	}
 }
 
-type topologyPair struct {
-	key   string
-	value string
-}
-
-// topologySpreadConstraint is an internal version for a hard (DoNotSchedule
-// unsatisfiable constraint action) v1.TopologySpreadConstraint and where the
-// selector is parsed.
-type topologySpreadConstraint struct {
-	maxSkew     int32
-	topologyKey string
-	selector    labels.Selector
-}
-
 func (s *preFilterState) updateWithPod(updatedPod, preemptorPod *v1.Pod, node *v1.Node, delta int32) {
 	if s == nil || updatedPod.Namespace != preemptorPod.Namespace || node == nil {
 		return
@@ -158,16 +143,6 @@ func (s *preFilterState) updateWithPod(updatedPod, preemptorPod *v1.Pod, node *v
 
 		s.tpKeyToCriticalPaths[k].update(v, s.tpPairToMatchNum[pair])
 	}
-}
-
-// nodeLabelsMatchSpreadConstraints checks if ALL topology keys in spread constraints are present in node labels.
-func nodeLabelsMatchSpreadConstraints(nodeLabels map[string]string, constraints []topologySpreadConstraint) bool {
-	for _, c := range constraints {
-		if _, ok := nodeLabels[c.topologyKey]; !ok {
-			return false
-		}
-	}
-	return true
 }
 
 // PreFilter invoked at the prefilter extension point.
@@ -216,11 +191,11 @@ func (pl *PodTopologySpread) RemovePod(ctx context.Context, cycleState *framewor
 	return nil
 }
 
-// getPreFilterState fetches a pre-computed preFilterState
+// getPreFilterState fetches a pre-computed preFilterState.
 func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error) {
 	c, err := cycleState.Read(preFilterStateKey)
 	if err != nil {
-		// The metadata wasn't pre-computed in prefilter. We ignore the error for now since
+		// The preFilterState wasn't pre-computed in prefilter. We ignore the error for now since
 		// we are able to handle that by computing it again (e.g. in Filter()).
 		klog.V(5).Infof("Error reading %q from cycleState: %v", preFilterStateKey, err)
 		return nil, nil
@@ -228,7 +203,7 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 
 	s, ok := c.(*preFilterState)
 	if !ok {
-		return nil, fmt.Errorf("%+v convert to podtopologyspread.state error", c)
+		return nil, fmt.Errorf("%+v convert to podtopologyspread.preFilterState error", c)
 	}
 	return s, nil
 }
@@ -237,7 +212,7 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 func calPreFilterState(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeInfo) (*preFilterState, error) {
 	// We have feature gating in APIServer to strip the spec
 	// so don't need to re-check feature gate, just check length of constraints.
-	constraints, err := filterHardTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints)
+	constraints, err := filterTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, v1.DoNotSchedule)
 	if err != nil {
 		return nil, err
 	}
@@ -306,24 +281,6 @@ func calPreFilterState(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeInfo) (*pr
 	return &s, nil
 }
 
-func filterHardTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint) ([]topologySpreadConstraint, error) {
-	var result []topologySpreadConstraint
-	for _, c := range constraints {
-		if c.WhenUnsatisfiable == v1.DoNotSchedule {
-			selector, err := metav1.LabelSelectorAsSelector(c.LabelSelector)
-			if err != nil {
-				return nil, err
-			}
-			result = append(result, topologySpreadConstraint{
-				maxSkew:     c.MaxSkew,
-				topologyKey: c.TopologyKey,
-				selector:    selector,
-			})
-		}
-	}
-	return result, nil
-}
-
 // Filter invoked at the filter extension point.
 func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()
@@ -341,7 +298,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		return framework.NewStatus(framework.Error, "preFilterState not pre-computed for PodTopologySpread Plugin")
 	}
 
-	// However, "empty" meta is legit which tolerates every toSchedule Pod.
+	// However, "empty" preFilterState is legit which tolerates every toSchedule Pod.
 	if len(s.tpPairToMatchNum) == 0 || len(s.constraints) == 0 {
 		return nil
 	}

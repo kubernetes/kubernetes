@@ -1272,6 +1272,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration"},
 					{Name: "PodTopologySpread"},
 				},
+				"PostFilterPlugin": {
+					{Name: "PodTopologySpread"},
+				},
 				"ScorePlugin": {
 					{Name: "PodTopologySpread", Weight: 2},
 				},

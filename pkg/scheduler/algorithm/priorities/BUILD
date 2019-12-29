@@ -10,7 +10,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "balanced_resource_allocation.go",
-        "even_pods_spread.go",
         "least_requested.go",
         "metadata.go",
         "most_requested.go",
@@ -26,7 +25,6 @@ go_library(
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/listers:go_default_library",
@@ -39,7 +37,6 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/listers/apps/v1:go_default_library",
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
-        "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
@@ -48,7 +45,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "balanced_resource_allocation_test.go",
-        "even_pods_spread_test.go",
         "least_requested_test.go",
         "metadata_test.go",
         "most_requested_test.go",
