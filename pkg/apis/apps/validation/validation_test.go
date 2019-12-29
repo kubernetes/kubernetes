@@ -61,14 +61,14 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 	}
 
-	invalidTime := int64(60)
+	invalidTime := int64(0)
 	invalidPodTemplate2 := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{"foo": "bar"},
 			},
 			Spec: api.PodSpec{
-				RestartPolicy:         api.RestartPolicyOnFailure,
+				RestartPolicy:         api.RestartPolicyAlways,
 				DNSPolicy:             api.DNSClusterFirst,
 				ActiveDeadlineSeconds: &invalidTime,
 			},
