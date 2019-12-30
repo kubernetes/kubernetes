@@ -62,6 +62,12 @@ build() {
       os_name=$(echo "$os_arch" | cut -d "/" -f 1)
       arch=$(echo "$os_arch" | cut -d "/" -f 2)
       os_version=$(echo "$os_arch" | cut -d "/" -f 3)
+
+      # currently, GCE does not have Hyper-V support, which means that the same node cannot be used to build
+      # multiple versions of Windows images. Which is why we have $REMOTE_DOCKER_URL_$os_version URLs configured.
+      # TODO(claudiub): once Hyper-V support has been added to GCE, revert this to just $REMOTE_DOCKER_URL.
+      remote_docker_url_name="REMOTE_DOCKER_URL_$os_version"
+      REMOTE_DOCKER_URL=$(eval echo "\${${remote_docker_url_name}:-}")
     elif [[ $os_arch =~ .*/.* ]]; then
       os_name=$(echo "$os_arch" | cut -d "/" -f 1)
       arch=$(echo "$os_arch" | cut -d "/" -f 2)
@@ -127,10 +133,14 @@ build() {
     elif [[ -n "${REMOTE_DOCKER_URL:-}" ]]; then
       # NOTE(claudiub): We're using a remote Windows node to build the Windows Docker images.
       # The node requires TLS authentication, and thus it is expected that the
-      # ca.pem, cert.pem, key.pem files can be found in the ~/.docker folder.
-      docker --tlsverify -H "${REMOTE_DOCKER_URL}" build --isolation=hyperv --pull -t "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}-${os_version}" --build-arg BASEIMAGE="${BASEIMAGE}" -f $dockerfile_name .
+      # ca.pem, cert.pem, key.pem files can be found in the ${HOME}/.docker-${os_version} folder.
+      # TODO(claudiub): add "build --isolation=hyperv" once GCE introduces Hyper-V support.
+      docker --tlsverify --tlscacert "${HOME}/.docker-${os_version}/ca.pem" \
+        --tlscert "${HOME}/.docker-${os_version}/cert.pem" --tlskey "${HOME}/.docker-${os_version}/key.pem" \
+        -H "${REMOTE_DOCKER_URL}" build --pull -t "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}-${os_version}" \
+        --build-arg BASEIMAGE="${BASEIMAGE}" -f $dockerfile_name .
     else
-      echo "Cannot build the image '${image}' for ${os_arch}. REMOTE_DOCKER_URL should be set, containing the URL to a Windows docker daemon."
+      echo "Cannot build the image '${image}' for ${os_arch}. REMOTE_DOCKER_URL_$os_version should be set, containing the URL to a Windows docker daemon."
     fi
     popd
   done
@@ -153,12 +163,6 @@ push() {
   TAG=$(<"${image}"/VERSION)
   if [[ -f ${image}/BASEIMAGE ]]; then
     os_archs=$(listOsArchs "$image")
-    # NOTE(claudiub): if the REMOTE_DOCKER_URL var is not set, or it is an empty string, we must skip
-    # pushing the Windows image and including it into the manifest list.
-    if test -z "${REMOTE_DOCKER_URL:-}" && printf "%s\n" "$os_archs" | grep -q '^windows'; then
-      echo "Skipping pushing the image '${image}' for Windows. REMOTE_DOCKER_URL should be set, containing the URL to a Windows docker daemon."
-      os_archs=$(printf "%s\n" "$os_archs" | grep -v "^windows")
-    fi
   else
     # prepend linux/ to the QEMUARCHS items.
     os_archs=$(printf 'linux/%s\n' "${!QEMUARCHS[*]}")
@@ -170,6 +174,12 @@ push() {
       os_name=$(echo "$os_arch" | cut -d "/" -f 1)
       arch=$(echo "$os_arch" | cut -d "/" -f 2)
       os_version=$(echo "$os_arch" | cut -d "/" -f 3)
+
+      # currently, GCE does not have Hyper-V support, which means that the same node cannot be used to build
+      # multiple versions of Windows images. Which is why we have $REMOTE_DOCKER_URL_$os_version URLs configured.
+      # TODO(claudiub): once Hyper-V support has been added to GCE, revert this to just $REMOTE_DOCKER_URL.
+      remote_docker_url_name="REMOTE_DOCKER_URL_$os_version"
+      REMOTE_DOCKER_URL=$(eval echo "\${${remote_docker_url_name}:-}")
     elif [[ $os_arch =~ .*/.* ]]; then
       os_name=$(echo "$os_arch" | cut -d "/" -f 1)
       arch=$(echo "$os_arch" | cut -d "/" -f 2)
@@ -180,11 +190,22 @@ push() {
 
     if [[ "$os_name" = "linux" ]]; then
       docker push "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}"
-    else
+    elif [[ -n "${REMOTE_DOCKER_URL:-}" ]]; then
       # NOTE(claudiub): We're pushing the image we built on the remote Windows node.
-      docker --tlsverify -H "${REMOTE_DOCKER_URL}" push "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}-${os_version}"
+      docker --tlsverify --tlscacert "${HOME}/.docker-${os_version}/ca.pem" \
+        --tlscert "${HOME}/.docker-${os_version}/cert.pem" --tlskey "${HOME}/.docker-${os_version}/key.pem" \
+        -H "${REMOTE_DOCKER_URL}" push "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}-${os_version}"
+    else
+      echo "Cannot push the image '${image}' for ${os_arch}. REMOTE_DOCKER_URL_${os_version} should be set, containing the URL to a Windows docker daemon."
     fi
   done
+
+  # NOTE(claudiub): if the REMOTE_DOCKER_URL var is not set, or it is an empty string, we mustn't include
+  # Windows images into the manifest list.
+  if test -z "${REMOTE_DOCKER_URL:-}" && printf "%s\n" "$os_archs" | grep -q '^windows'; then
+    echo "Skipping pushing the image '${image}' for Windows. REMOTE_DOCKER_URL_\${os_version} should be set, containing the URL to a Windows docker daemon."
+    os_archs=$(printf "%s\n" "$os_archs" | grep -v "^windows")
+  fi
 
   kube::util::ensure-gnu-sed
 
