@@ -45,6 +45,8 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
 	"k8s.io/legacy-cloud-providers/azure/auth"
+	azclients "k8s.io/legacy-cloud-providers/azure/clients"
+	"k8s.io/legacy-cloud-providers/azure/retry"
 	"sigs.k8s.io/yaml"
 )
 
@@ -448,13 +450,23 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 	}
 
 	// Initialize Azure clients.
-	azClientConfig := &azClientConfig{
-		subscriptionID:                 config.SubscriptionID,
-		resourceManagerEndpoint:        env.ResourceManagerEndpoint,
-		servicePrincipalToken:          servicePrincipalToken,
+	azClientConfig := &azclients.ClientConfig{
+		Location:                       config.Location,
+		SubscriptionID:                 config.SubscriptionID,
+		ResourceManagerEndpoint:        env.ResourceManagerEndpoint,
+		ServicePrincipalToken:          servicePrincipalToken,
 		CloudProviderBackoffRetries:    config.CloudProviderBackoffRetries,
 		CloudProviderBackoffDuration:   config.CloudProviderBackoffDuration,
 		ShouldOmitCloudProviderBackoff: config.shouldOmitCloudProviderBackoff(),
+		Backoff:                        &retry.Backoff{Steps: 1},
+	}
+	if config.CloudProviderBackoff {
+		azClientConfig.Backoff = &retry.Backoff{
+			Steps:    config.CloudProviderBackoffRetries,
+			Factor:   config.CloudProviderBackoffExponent,
+			Duration: time.Duration(config.CloudProviderBackoffDuration) * time.Second,
+			Jitter:   config.CloudProviderBackoffJitter,
+		}
 	}
 	az.DisksClient = newAzDisksClient(azClientConfig.WithRateLimiter(config.DiskRateLimit))
 	az.SnapshotsClient = newSnapshotsClient(azClientConfig.WithRateLimiter(config.SnapshotRateLimit))

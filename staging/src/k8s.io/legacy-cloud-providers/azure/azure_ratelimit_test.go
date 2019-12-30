@@ -24,6 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/legacy-cloud-providers/azure/auth"
+	azclients "k8s.io/legacy-cloud-providers/azure/clients"
 )
 
 var (
@@ -78,7 +79,7 @@ var (
 		vmType: "standard"
 	}`
 
-	testDefaultRateLimitConfig = RateLimitConfig{
+	testDefaultRateLimitConfig = azclients.RateLimitConfig{
 		CloudProviderRateLimit:            true,
 		CloudProviderRateLimitBucket:      1,
 		CloudProviderRateLimitBucketWrite: 1,
@@ -106,10 +107,10 @@ func TestParseConfig(t *testing.T) {
 		CloudProviderBackoffRetries:  1,
 		CloudProviderRateLimitConfig: CloudProviderRateLimitConfig{
 			RateLimitConfig: testDefaultRateLimitConfig,
-			LoadBalancerRateLimit: &RateLimitConfig{
+			LoadBalancerRateLimit: &azclients.RateLimitConfig{
 				CloudProviderRateLimit: false,
 			},
-			VirtualMachineScaleSetRateLimit: &RateLimitConfig{
+			VirtualMachineScaleSetRateLimit: &azclients.RateLimitConfig{
 				CloudProviderRateLimit:            true,
 				CloudProviderRateLimitBucket:      2,
 				CloudProviderRateLimitBucketWrite: 2,
@@ -149,10 +150,10 @@ func TestInitializeCloudProviderRateLimitConfig(t *testing.T) {
 	assert.NoError(t, err)
 
 	InitializeCloudProviderRateLimitConfig(&config.CloudProviderRateLimitConfig)
-	assert.Equal(t, config.LoadBalancerRateLimit, &RateLimitConfig{
+	assert.Equal(t, config.LoadBalancerRateLimit, &azclients.RateLimitConfig{
 		CloudProviderRateLimit: false,
 	})
-	assert.Equal(t, config.VirtualMachineScaleSetRateLimit, &RateLimitConfig{
+	assert.Equal(t, config.VirtualMachineScaleSetRateLimit, &azclients.RateLimitConfig{
 		CloudProviderRateLimit:            true,
 		CloudProviderRateLimitBucket:      2,
 		CloudProviderRateLimitBucketWrite: 2,

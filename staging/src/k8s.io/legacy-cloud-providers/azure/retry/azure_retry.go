@@ -24,8 +24,12 @@ import (
 	"time"
 
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/mocks"
 	"k8s.io/klog"
 )
+
+// Ensure package autorest/mocks is imported and vendored.
+var _ autorest.Sender = mocks.NewSender()
 
 // Backoff holds parameters applied to a Backoff function.
 type Backoff struct {
