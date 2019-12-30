@@ -18,8 +18,10 @@ package resource
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/golang/protobuf/jsonpb"
 	"math/big"
 	"strconv"
 	"strings"
@@ -648,6 +650,46 @@ func (q *Quantity) UnmarshalJSON(value []byte) error {
 	}
 
 	parsed, err := ParseQuantity(strings.TrimSpace(string(value)))
+	if err != nil {
+		return err
+	}
+
+	// This copy is safe because parsed will not be referred to again.
+	*q = parsed
+	return nil
+}
+
+// MarshalJSONPB implements the jsonpb.Marshaler interface.
+func (q *Quantity) MarshalJSONPB(m *jsonpb.Marshaler) ([]byte, error) {
+	var marshaled = make(map[string]string, 1)
+	marshaled["string"] = q.String()
+	return json.Marshal(marshaled)
+}
+
+// UnmarshalJSONPB implements the jsonpb.Unmarshaler interface.
+func (q *Quantity) UnmarshalJSONPB(u *jsonpb.Unmarshaler, value []byte) error {
+	// Value is serialized like "{"string":"10Gi"}"
+	l := len(value)
+	if l == 4 && bytes.Equal(value, []byte("null")) {
+		q.d.Dec = nil
+		q.i = int64Amount{}
+		return nil
+	}
+	if l >= 2 && value[0] == '"' && value[l-1] == '"' {
+		value = value[1 : l-1]
+	}
+
+	var m map[string]string
+	err := json.Unmarshal(value, &m)
+	if err != nil {
+		return err
+	}
+	quantity, ok := m["string"]
+	if !ok {
+		return errors.New("missing string key in quantity")
+	}
+
+	parsed, err := ParseQuantity(strings.TrimSpace(quantity))
 	if err != nil {
 		return err
 	}
