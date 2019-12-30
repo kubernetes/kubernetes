@@ -55,7 +55,7 @@ var RESTScopeRoot = &restScope{
 // TODO: Only accept plural for some operations for increased control?
 // (`get pod bar` vs `get pods bar`)
 type DefaultRESTMapper struct {
-	defaultGroupVersions []schema.GroupVersion
+	defaultGroupVersions map[schema.GroupVersion]int
 
 	resourceToKind       map[schema.GroupVersionResource]schema.GroupVersionKind
 	kindToPluralResource map[schema.GroupVersionKind]schema.GroupVersionResource
@@ -83,11 +83,15 @@ func NewDefaultRESTMapper(defaultGroupVersions []schema.GroupVersion) *DefaultRE
 	pluralToSingular := make(map[schema.GroupVersionResource]schema.GroupVersionResource)
 	// TODO: verify name mappings work correctly when versions differ
 
+	groupVersions := make(map[schema.GroupVersion]int)
+	for i, gv := range defaultGroupVersions {
+		groupVersions[gv] = i
+	}
 	return &DefaultRESTMapper{
 		resourceToKind:       resourceToKind,
 		kindToPluralResource: kindToPluralResource,
 		kindToScope:          kindToScope,
-		defaultGroupVersions: defaultGroupVersions,
+		defaultGroupVersions: groupVersions,
 		singularToPlural:     singularToPlural,
 		pluralToSingular:     pluralToSingular,
 	}
@@ -366,7 +370,7 @@ func (m *DefaultRESTMapper) KindFor(resource schema.GroupVersionResource) (schem
 
 type kindByPreferredGroupVersion struct {
 	list      []schema.GroupVersionKind
-	sortOrder []schema.GroupVersion
+	sortOrder map[schema.GroupVersion]int
 }
 
 func (o kindByPreferredGroupVersion) Len() int      { return len(o.list) }
@@ -386,25 +390,21 @@ func (o kindByPreferredGroupVersion) Less(i, j int) bool {
 	lhsIndex := -1
 	rhsIndex := -1
 
-	for i := range o.sortOrder {
-		if o.sortOrder[i] == lhs.GroupVersion() {
-			lhsIndex = i
-		}
-		if o.sortOrder[i] == rhs.GroupVersion() {
-			rhsIndex = i
-		}
-	}
-
-	if rhsIndex == -1 {
+	if idx, ok := o.sortOrder[rhs.GroupVersion()]; ok {
+		rhsIndex = idx
+	} else {
 		return true
 	}
 
+	if idx, ok := o.sortOrder[lhs.GroupVersion()]; ok {
+		lhsIndex = idx
+	}
 	return lhsIndex < rhsIndex
 }
 
 type resourceByPreferredGroupVersion struct {
 	list      []schema.GroupVersionResource
-	sortOrder []schema.GroupVersion
+	sortOrder map[schema.GroupVersion]int
 }
 
 func (o resourceByPreferredGroupVersion) Len() int      { return len(o.list) }
@@ -424,17 +424,13 @@ func (o resourceByPreferredGroupVersion) Less(i, j int) bool {
 	lhsIndex := -1
 	rhsIndex := -1
 
-	for i := range o.sortOrder {
-		if o.sortOrder[i] == lhs.GroupVersion() {
-			lhsIndex = i
-		}
-		if o.sortOrder[i] == rhs.GroupVersion() {
-			rhsIndex = i
-		}
-	}
-
-	if rhsIndex == -1 {
+	if idx, ok := o.sortOrder[rhs.GroupVersion()]; ok {
+		rhsIndex = idx
+	} else {
 		return true
+	}
+	if idx, ok := o.sortOrder[lhs.GroupVersion()]; ok {
+		lhsIndex = idx
 	}
 
 	return lhsIndex < rhsIndex
@@ -479,7 +475,7 @@ func (m *DefaultRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string
 	}
 	// Use the default preferred versions
 	if !hadVersion && len(potentialGVK) == 0 {
-		for _, gv := range m.defaultGroupVersions {
+		for gv := range m.defaultGroupVersions {
 			if gv.Group != gk.Group {
 				continue
 			}
