@@ -22,6 +22,7 @@ cd $GOPATH/src
 mkdir -p k8s.io
 cd k8s.io
 git clone https://github.com/kubernetes/sample-apiserver.git
+cd sample-apiserver
 ```
 
 ## Build the binary
@@ -30,7 +31,7 @@ Next we will want to create a new binary to both test we can build the server an
 
 From the root of this repo, where ```main.go``` is located, run the following command:
 ```
-export GOOS=linux; go build .
+GOOS=linux go build .
 ```
 if everything went well, you should have a binary called ```sample-apiserver``` present in your current directory.
 
@@ -46,7 +47,7 @@ docker build -t <YOUR_DOCKERHUB_USER>/kube-sample-apiserver:latest ./artifacts/s
 docker push <YOUR_DOCKERHUB_USER>/kube-sample-apiserver
 ```
 
-## Modify the replication controller
+## Modify the deployment
 
 You need to modify the [artifacts/example/deployment.yaml](/artifacts/example/deployment.yaml) file to change the ```imagePullPolicy``` to ```Always``` or ```IfNotPresent```.
 
@@ -82,7 +83,7 @@ kubectl create -f artifacts/example/auth-reader.yaml -n kube-system
 kubectl create -f artifacts/example/rbac.yaml
 kubectl create -f artifacts/example/rbac-bind.yaml
 
-# create the service and replication controller
+# create the service and deployment
 kubectl create -f artifacts/example/deployment.yaml -n wardle
 kubectl create -f artifacts/example/service.yaml -n wardle
 
