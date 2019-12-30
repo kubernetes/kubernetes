@@ -48,9 +48,10 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/utils/integer"
 )
@@ -622,7 +623,7 @@ func (dsc *DaemonSetsController) addNode(obj interface{}) {
 	}
 	node := obj.(*v1.Node)
 	for _, ds := range dsList {
-		_, shouldSchedule, _, err := dsc.nodeShouldRunDaemonPod(node, ds)
+		shouldSchedule, _, err := dsc.nodeShouldRunDaemonPod(node, ds)
 		if err != nil {
 			continue
 		}
@@ -684,11 +685,11 @@ func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 	}
 	// TODO: it'd be nice to pass a hint with these enqueues, so that each ds would only examine the added node (unless it has other work to do, too).
 	for _, ds := range dsList {
-		_, oldShouldSchedule, oldShouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(oldNode, ds)
+		oldShouldSchedule, oldShouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(oldNode, ds)
 		if err != nil {
 			continue
 		}
-		_, currentShouldSchedule, currentShouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(curNode, ds)
+		currentShouldSchedule, currentShouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(curNode, ds)
 		if err != nil {
 			continue
 		}
@@ -788,7 +789,7 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 	ds *apps.DaemonSet,
 ) (nodesNeedingDaemonPods, podsToDelete []string, err error) {
 
-	_, shouldSchedule, shouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(node, ds)
+	shouldSchedule, shouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(node, ds)
 	if err != nil {
 		return
 	}
@@ -1053,7 +1054,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *apps.DaemonSet, nodeL
 
 	var desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable int
 	for _, node := range nodeList {
-		wantToRun, _, _, err := dsc.nodeShouldRunDaemonPod(node, ds)
+		wantToRun, _, err := dsc.nodeShouldRunDaemonPod(node, ds)
 		if err != nil {
 			return err
 		}
@@ -1192,102 +1193,53 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	return dsc.updateDaemonSetStatus(ds, nodeList, hash, true)
 }
 
-func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *apps.DaemonSet) ([]predicates.PredicateFailureReason, *schedulernodeinfo.NodeInfo, error) {
-	objects, err := dsc.podNodeIndex.ByIndex("nodeName", node.Name)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	nodeInfo := schedulernodeinfo.NewNodeInfo()
-	nodeInfo.SetNode(node)
-
-	for _, obj := range objects {
-		// Ignore pods that belong to the daemonset when taking into account whether a daemonset should bind to a node.
-		pod, ok := obj.(*v1.Pod)
-		if !ok {
-			continue
-		}
-		if metav1.IsControlledBy(pod, ds) {
-			continue
-		}
-		nodeInfo.AddPod(pod)
-	}
-
-	_, reasons, err := Predicates(newPod, nodeInfo)
-	return reasons, nodeInfo, err
-}
-
 // nodeShouldRunDaemonPod checks a set of preconditions against a (node,daemonset) and returns a
 // summary. Returned booleans are:
-// * wantToRun:
-//     Returns true when a user would expect a pod to run on this node and ignores conditions
-//     such as DiskPressure or insufficient resource that would cause a daemonset pod not to schedule.
-//     This is primarily used to populate daemonset status.
 // * shouldSchedule:
 //     Returns true when a daemonset should be scheduled to a node if a daemonset pod is not already
 //     running on that node.
 // * shouldContinueRunning:
 //     Returns true when a daemonset should continue running on a node if a daemonset pod is already
 //     running on that node.
-func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *apps.DaemonSet) (wantToRun, shouldSchedule, shouldContinueRunning bool, err error) {
-	newPod := NewPod(ds, node.Name)
+func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *apps.DaemonSet) (bool, bool, error) {
+	pod := NewPod(ds, node.Name)
 
-	// Because these bools require an && of all their required conditions, we start
-	// with all bools set to true and set a bool to false if a condition is not met.
-	// A bool should probably not be set to true after this line.
-	wantToRun, shouldSchedule, shouldContinueRunning = true, true, true
 	// If the daemon set specifies a node name, check that it matches with node.Name.
 	if !(ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == node.Name) {
-		return false, false, false, nil
+		return false, false, nil
 	}
 
-	reasons, nodeInfo, err := dsc.simulate(newPod, node, ds)
+	nodeInfo := schedulernodeinfo.NewNodeInfo()
+	nodeInfo.SetNode(node)
+	taints, err := nodeInfo.Taints()
 	if err != nil {
-		klog.Warningf("DaemonSet Predicates failed on node %s for ds '%s/%s' due to unexpected error: %v", node.Name, ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, err)
-		return false, false, false, err
+		klog.Warningf("failed to get node %q taints: %v", node.Name, err)
+		return false, false, err
 	}
 
-	// TODO(k82cn): When 'ScheduleDaemonSetPods' upgrade to beta or GA, remove unnecessary check on failure reason,
-	//              e.g. InsufficientResourceError; and simplify "wantToRun, shouldSchedule, shouldContinueRunning"
-	//              into one result, e.g. selectedNode.
-	for _, r := range reasons {
-		klog.V(4).Infof("DaemonSet Predicates failed on node %s for ds '%s/%s' for reason: %v", node.Name, ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, r.GetReason())
-		switch reason := r.(type) {
-		case *predicates.PredicateFailureError:
-			// we try to partition predicates into two partitions here: intentional on the part of the operator and not.
-			switch reason {
-			// intentional
-			case
-				predicates.ErrNodeSelectorNotMatch,
-				predicates.ErrPodNotMatchHostName,
-				predicates.ErrNodeLabelPresenceViolated,
-				// this one is probably intentional since it's a workaround for not having
-				// pod hard anti affinity.
-				predicates.ErrPodNotFitsHostPorts:
-				return false, false, false, nil
-			case predicates.ErrTaintsTolerationsNotMatch:
-				// DaemonSet is expected to respect taints and tolerations
-				fitsNoExecute, _, err := predicates.PodToleratesNodeNoExecuteTaints(newPod, nil, nodeInfo)
-				if err != nil {
-					return false, false, false, err
-				}
-				if !fitsNoExecute {
-					return false, false, false, nil
-				}
-				wantToRun, shouldSchedule = false, false
-			// unexpected
-			case
-				predicates.ErrPodAffinityNotMatch,
-				predicates.ErrServiceAffinityViolated:
-				klog.Warningf("unexpected predicate failure reason: %s", reason.GetReason())
-				return false, false, false, fmt.Errorf("unexpected reason: DaemonSet Predicates should not return reason %s", reason.GetReason())
-			default:
-				klog.V(4).Infof("unknown predicate failure reason: %s", reason.GetReason())
-				wantToRun, shouldSchedule, shouldContinueRunning = false, false, false
-				dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.GetReason())
-			}
-		}
+	fitsNodeName, fitsNodeAffinity, fitsTaints := PodFitsNode(pod, node, taints)
+	if !fitsNodeName || !fitsNodeAffinity {
+		return false, false, nil
 	}
+
+	if !fitsTaints {
+		fitsNoExecuteTaint := v1helper.TolerationsTolerateTaintsWithFilter(pod.Spec.Tolerations, taints, func(t *v1.Taint) bool {
+			return t.Effect == v1.TaintEffectNoExecute
+		})
+
+		return false, fitsNoExecuteTaint, nil
+	}
+
+	return true, true, nil
+}
+
+// PodFitsNode Checks if a DaemonSet's pod can be scheduled on a node.
+func PodFitsNode(pod *v1.Pod, node *v1.Node, taints []v1.Taint) (fitsNodeName, fitsNodeAffinity, fitsTaints bool) {
+	fitsNodeName = len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName == node.Name
+	fitsNodeAffinity = pluginhelper.PodMatchesNodeSelectorAndAffinityTerms(pod, node)
+	fitsTaints = v1helper.TolerationsTolerateTaintsWithFilter(pod.Spec.Tolerations, taints, func(t *v1.Taint) bool {
+		return t.Effect == v1.TaintEffectNoExecute || t.Effect == v1.TaintEffectNoSchedule
+	})
 	return
 }
 
@@ -1301,55 +1253,6 @@ func NewPod(ds *apps.DaemonSet, nodeName string) *v1.Pod {
 	util.AddOrUpdateDaemonPodTolerations(&newPod.Spec)
 
 	return newPod
-}
-
-// checkNodeFitness runs a set of predicates that select candidate nodes for the DaemonSet;
-// the predicates include:
-//   - PodFitsHost: checks pod's NodeName against node
-//   - PodMatchNodeSelector: checks pod's NodeSelector and NodeAffinity against node
-//   - PodToleratesNodeTaints: exclude tainted node unless pod has specific toleration
-func checkNodeFitness(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
-	var predicateFails []predicates.PredicateFailureReason
-	fit, reasons, err := predicates.PodFitsHost(pod, nil, nodeInfo)
-	if err != nil {
-		return false, predicateFails, err
-	}
-	if !fit {
-		predicateFails = append(predicateFails, reasons...)
-	}
-
-	fit, reasons, err = predicates.PodMatchNodeSelector(pod, nil, nodeInfo)
-	if err != nil {
-		return false, predicateFails, err
-	}
-	if !fit {
-		predicateFails = append(predicateFails, reasons...)
-	}
-
-	fit, reasons, err = predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
-	if err != nil {
-		return false, predicateFails, err
-	}
-	if !fit {
-		predicateFails = append(predicateFails, reasons...)
-	}
-	return len(predicateFails) == 0, predicateFails, nil
-}
-
-// Predicates checks if a DaemonSet's pod can be scheduled on a node using GeneralPredicates
-// and PodToleratesNodeTaints predicate
-func Predicates(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
-	var predicateFails []predicates.PredicateFailureReason
-
-	fit, reasons, err := checkNodeFitness(pod, nodeInfo)
-	if err != nil {
-		return false, predicateFails, err
-	}
-	if !fit {
-		predicateFails = append(predicateFails, reasons...)
-	}
-
-	return len(predicateFails) == 0, predicateFails, nil
 }
 
 type podByCreationTimestampAndPhase []*v1.Pod

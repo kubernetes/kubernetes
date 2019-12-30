@@ -2,10 +2,17 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["normalize_score.go"],
+    srcs = [
+        "node_affinity.go",
+        "normalize_score.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper",
     visibility = ["//visibility:public"],
-    deps = ["//pkg/scheduler/framework/v1alpha1:go_default_library"],
+    deps = [
+        "//pkg/scheduler/algorithm/predicates:go_default_library",
+        "//pkg/scheduler/framework/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+    ],
 )
 
 go_test(
