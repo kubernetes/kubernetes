@@ -256,6 +256,7 @@ func fieldInfoFromField(structType reflect.Type, field int) *fieldInfo {
 		for i := range items {
 			if items[i] == "omitempty" {
 				info.omitempty = true
+				break
 			}
 		}
 	}
