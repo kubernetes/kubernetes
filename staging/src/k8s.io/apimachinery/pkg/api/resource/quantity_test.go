@@ -18,6 +18,7 @@ package resource
 
 import (
 	"encoding/json"
+	"github.com/golang/protobuf/jsonpb"
 	"math/rand"
 	"strings"
 	"testing"
@@ -878,6 +879,32 @@ func TestJSONWhitespace(t *testing.T) {
 		}
 		if q.String() != test.expect {
 			t.Errorf("unexpected string: %q", q.String())
+		}
+	}
+}
+
+func TestJSONPB(t *testing.T) {
+	var jsonPbMarshaler = jsonpb.Marshaler{}
+	var jsonPbUnmarshaler = &jsonpb.Unmarshaler{
+		AllowUnknownFields: true,
+	}
+
+	for i := 0; i < 500; i++ {
+		q := &Quantity{}
+		fuzzer.Fuzz(q)
+		b, err := jsonPbMarshaler.MarshalToString(q)
+		if err != nil {
+			t.Errorf("error encoding %v: %v", q, err)
+			continue
+		}
+		q2 := &Quantity{}
+		err = jsonPbUnmarshaler.Unmarshal(strings.NewReader(b), q2)
+		if err != nil {
+			t.Logf("%d: %s", i, b)
+			t.Errorf("%v: error decoding %v: %v", q, b, err)
+		}
+		if q2.Cmp(*q) != 0 {
+			t.Errorf("Expected equal: %v, %v (json was '%v')", q, q2, b)
 		}
 	}
 }
