@@ -102,9 +102,6 @@ type EventRecorder interface {
 	// Eventf is just like Event, but with Sprintf for the message field.
 	Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{})
 
-	// PastEventf is just like Eventf, but with an option to specify the event's 'timestamp' field.
-	PastEventf(object runtime.Object, timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{})
-
 	// AnnotatedEventf is just like eventf, but with annotations attached
 	AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{})
 }
@@ -341,10 +338,6 @@ func (recorder *recorderImpl) Event(object runtime.Object, eventtype, reason, me
 
 func (recorder *recorderImpl) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
 	recorder.Event(object, eventtype, reason, fmt.Sprintf(messageFmt, args...))
-}
-
-func (recorder *recorderImpl) PastEventf(object runtime.Object, timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{}) {
-	recorder.generateEvent(object, nil, timestamp, eventtype, reason, fmt.Sprintf(messageFmt, args...))
 }
 
 func (recorder *recorderImpl) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
