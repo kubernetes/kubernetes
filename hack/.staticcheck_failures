@@ -58,14 +58,6 @@ test/e2e/apps
 test/e2e/autoscaling
 test/e2e/instrumentation/logging/stackdriver
 test/e2e/instrumentation/monitoring
-test/images/agnhost/dns
-test/images/agnhost/inclusterclient
-test/images/agnhost/net/nat
-test/images/agnhost/netexec
-test/images/agnhost/pause
-test/images/agnhost/serve-hostname
-test/images/agnhost/webhook
-test/images/pets/peer-finder
 test/integration/auth
 test/integration/client
 test/integration/deployment
