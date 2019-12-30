@@ -17,11 +17,9 @@ limitations under the License.
 package auth
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
-	"github.com/onsi/ginkgo"
 	"github.com/pkg/errors"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -30,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1authorization "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	v1rbac "k8s.io/client-go/kubernetes/typed/rbac/v1"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 const (
@@ -152,37 +151,16 @@ func IsRBACEnabled(crGetter v1rbac.ClusterRolesGetter) bool {
 	isRBACEnabledOnce.Do(func() {
 		crs, err := crGetter.ClusterRoles().List(metav1.ListOptions{})
 		if err != nil {
-			logf("Error listing ClusterRoles; assuming RBAC is disabled: %v", err)
+			e2elog.Logf("Error listing ClusterRoles; assuming RBAC is disabled: %v", err)
 			isRBACEnabled = false
 		} else if crs == nil || len(crs.Items) == 0 {
-			logf("No ClusterRoles found; assuming RBAC is disabled.")
+			e2elog.Logf("No ClusterRoles found; assuming RBAC is disabled.")
 			isRBACEnabled = false
 		} else {
-			logf("Found ClusterRoles; assuming RBAC is enabled.")
+			e2elog.Logf("Found ClusterRoles; assuming RBAC is enabled.")
 			isRBACEnabled = true
 		}
 	})
 
 	return isRBACEnabled
-}
-
-// logf logs INFO lines to the GinkgoWriter.
-// TODO: Log functions like these should be put into their own package,
-// see: https://github.com/kubernetes/kubernetes/issues/76728
-func logf(format string, args ...interface{}) {
-	log("INFO", format, args...)
-}
-
-// log prints formatted log messages to the global GinkgoWriter.
-// TODO: Log functions like these should be put into their own package,
-// see: https://github.com/kubernetes/kubernetes/issues/76728
-func log(level string, format string, args ...interface{}) {
-	fmt.Fprintf(ginkgo.GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
-}
-
-// nowStamp returns the current time formatted for placement in the logs (time.StampMilli).
-// TODO: If only used for logging, this should be put into a logging package,
-// see: https://github.com/kubernetes/kubernetes/issues/76728
-func nowStamp() string {
-	return time.Now().Format(time.StampMilli)
 }
