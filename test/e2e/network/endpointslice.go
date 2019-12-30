@@ -22,7 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -383,7 +383,7 @@ func hasMatchingEndpointSlices(cs clientset.Interface, ns, svcName string, numEn
 func hasMatchingEndpoints(cs clientset.Interface, ns, svcName string, numIPs, numSubsets int) (*v1.Endpoints, bool) {
 	endpoints, err := cs.CoreV1().Endpoints(ns).Get(svcName, metav1.GetOptions{})
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			framework.Logf("Endpoints for %s/%s Service not found", ns, svcName)
 			return nil, false
 		}
