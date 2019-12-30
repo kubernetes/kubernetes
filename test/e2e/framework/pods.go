@@ -208,23 +208,6 @@ func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 	)).To(gomega.Succeed(), "wait for pod %q to success", name)
 }
 
-// WaitForFailure waits for pod to fail.
-func (c *PodClient) WaitForFailure(name string, timeout time.Duration) {
-	f := c.f
-	gomega.Expect(e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
-		func(pod *v1.Pod) (bool, error) {
-			switch pod.Status.Phase {
-			case v1.PodFailed:
-				return true, nil
-			case v1.PodSucceeded:
-				return true, fmt.Errorf("pod %q successed with reason: %q, message: %q", name, pod.Status.Reason, pod.Status.Message)
-			default:
-				return false, nil
-			}
-		},
-	)).To(gomega.Succeed(), "wait for pod %q to fail", name)
-}
-
 // WaitForFinish waits for pod to finish running, regardless of success or failure.
 func (c *PodClient) WaitForFinish(name string, timeout time.Duration) {
 	f := c.f
