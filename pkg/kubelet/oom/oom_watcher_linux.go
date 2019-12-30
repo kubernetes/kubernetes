@@ -58,7 +58,10 @@ func NewWatcher(recorder record.EventRecorder) (Watcher, error) {
 	return watcher, nil
 }
 
-const systemOOMEvent = "SystemOOM"
+const (
+	systemOOMEvent           = "SystemOOM"
+	recordEventContainerName = "/"
+)
 
 // Start watches for system oom's and records an event for every system oom encountered.
 func (ow *realWatcher) Start(ref *v1.ObjectReference) error {
@@ -69,7 +72,7 @@ func (ow *realWatcher) Start(ref *v1.ObjectReference) error {
 		defer runtime.HandleCrash()
 
 		for event := range outStream {
-			if event.ContainerName == "/" {
+			if event.ContainerName == recordEventContainerName {
 				klog.V(1).Infof("Got sys oom event: %v", event)
 				eventMsg := "System OOM encountered"
 				if event.ProcessName != "" && event.Pid != 0 {
