@@ -425,8 +425,45 @@ func TestReflectorWatchListPageSize(t *testing.T) {
 		},
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	// Set resource version to test pagination also for not consistent reads.
+	r.setLastSyncResourceVersion("10")
 	// Set the reflector to paginate the list request in 4 item chunks.
 	r.WatchListPageSize = 4
+	r.ListAndWatch(stopCh)
+
+	results := s.List()
+	if len(results) != 10 {
+		t.Errorf("Expected 10 results, got %d", len(results))
+	}
+}
+
+func TestReflectorNotPaginatingNotConsistentReads(t *testing.T) {
+	stopCh := make(chan struct{})
+	s := NewStore(MetaNamespaceKeyFunc)
+
+	lw := &testLW{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			// Stop once the reflector begins watching since we're only interested in the list.
+			close(stopCh)
+			fw := watch.NewFake()
+			return fw, nil
+		},
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			if options.ResourceVersion != "10" {
+				t.Fatalf("Expected ResourceVersion: \"10\", got: %s", options.ResourceVersion)
+			}
+			if options.Limit != 0 {
+				t.Fatalf("Expected list Limit of 0 but got %d", options.Limit)
+			}
+			pods := make([]v1.Pod, 10)
+			for i := 0; i < 10; i++ {
+				pods[i] = v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod-%d", i), ResourceVersion: fmt.Sprintf("%d", i)}}
+			}
+			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}, Items: pods}, nil
+		},
+	}
+	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r.setLastSyncResourceVersion("10")
 	r.ListAndWatch(stopCh)
 
 	results := s.List()
