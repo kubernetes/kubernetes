@@ -184,10 +184,13 @@ func podRunningAndReady(c clientset.Interface, podName, namespace string) wait.C
 		}
 		switch pod.Status.Phase {
 		case v1.PodFailed, v1.PodSucceeded:
+			e2elog.Logf("The status of Pod %s is %s which is unexpected", podName, pod.Status.Phase)
 			return false, conditions.ErrPodCompleted
 		case v1.PodRunning:
+			e2elog.Logf("The status of Pod %s is %s (Ready = %v)", podName, pod.Status.Phase, podutil.IsPodReady(pod))
 			return podutil.IsPodReady(pod), nil
 		}
+		e2elog.Logf("The status of Pod %s is %s, waiting for it to be Running (with Ready = true)", podName, pod.Status.Phase)
 		return false, nil
 	}
 }
