@@ -395,6 +395,7 @@ func TestPreemption(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		t.Logf("================ Running test: %v\n", test.description)
 		filter.Tokens = test.initTokens
 		filter.Unresolvable = test.unresolvable
 		pods := make([]*v1.Pod, len(test.existingPods))
@@ -586,6 +587,7 @@ func TestPodPriorityResolution(t *testing.T) {
 
 	pods := make([]*v1.Pod, 0, len(tests))
 	for _, test := range tests {
+		t.Logf("================ Running test: %v\n", test.Name)
 		t.Run(test.Name, func(t *testing.T) {
 			pod, err := runPausePod(cs, test.Pod)
 			if err != nil {
