@@ -28,10 +28,10 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/adal"
 
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog"
+	azclients "k8s.io/legacy-cloud-providers/azure/clients"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
@@ -145,24 +145,6 @@ type VirtualMachineSizesClient interface {
 	List(ctx context.Context, location string) (result compute.VirtualMachineSizeListResult, rerr *retry.Error)
 }
 
-// azClientConfig contains all essential information to create an Azure client.
-type azClientConfig struct {
-	subscriptionID          string
-	resourceManagerEndpoint string
-	servicePrincipalToken   *adal.ServicePrincipalToken
-	rateLimitConfig         *RateLimitConfig
-
-	CloudProviderBackoffRetries    int
-	CloudProviderBackoffDuration   int
-	ShouldOmitCloudProviderBackoff bool
-}
-
-// WithRateLimiter returns azClientConfig with rateLimitConfig set.
-func (cfg *azClientConfig) WithRateLimiter(rl *RateLimitConfig) *azClientConfig {
-	cfg.rateLimitConfig = rl
-	return cfg
-}
-
 // azVirtualMachinesClient implements VirtualMachinesClient.
 type azVirtualMachinesClient struct {
 	client            compute.VirtualMachinesClient
@@ -174,10 +156,10 @@ func getContextWithCancel() (context.Context, context.CancelFunc) {
 	return context.WithCancel(context.Background())
 }
 
-func newAzVirtualMachinesClient(config *azClientConfig) *azVirtualMachinesClient {
-	virtualMachinesClient := compute.NewVirtualMachinesClient(config.subscriptionID)
-	virtualMachinesClient.BaseURI = config.resourceManagerEndpoint
-	virtualMachinesClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
+func newAzVirtualMachinesClient(config *azclients.ClientConfig) *azVirtualMachinesClient {
+	virtualMachinesClient := compute.NewVirtualMachinesClient(config.SubscriptionID)
+	virtualMachinesClient.BaseURI = config.ResourceManagerEndpoint
+	virtualMachinesClient.Authorizer = autorest.NewBearerAuthorizer(config.ServicePrincipalToken)
 	virtualMachinesClient.PollingDelay = 5 * time.Second
 	if config.ShouldOmitCloudProviderBackoff {
 		virtualMachinesClient.RetryAttempts = config.CloudProviderBackoffRetries
@@ -186,12 +168,12 @@ func newAzVirtualMachinesClient(config *azClientConfig) *azVirtualMachinesClient
 	configureUserAgent(&virtualMachinesClient.Client)
 
 	klog.V(2).Infof("Azure VirtualMachinesClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPS,
-		config.rateLimitConfig.CloudProviderRateLimitBucket)
+		config.RateLimitConfig.CloudProviderRateLimitQPS,
+		config.RateLimitConfig.CloudProviderRateLimitBucket)
 	klog.V(2).Infof("Azure VirtualMachinesClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
-		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
-	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
+		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
+	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 	return &azVirtualMachinesClient{
 		rateLimiterReader: rateLimiterReader,
 		rateLimiterWriter: rateLimiterWriter,
@@ -302,10 +284,10 @@ type azInterfacesClient struct {
 	rateLimiterWriter flowcontrol.RateLimiter
 }
 
-func newAzInterfacesClient(config *azClientConfig) *azInterfacesClient {
-	interfacesClient := network.NewInterfacesClient(config.subscriptionID)
-	interfacesClient.BaseURI = config.resourceManagerEndpoint
-	interfacesClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
+func newAzInterfacesClient(config *azclients.ClientConfig) *azInterfacesClient {
+	interfacesClient := network.NewInterfacesClient(config.SubscriptionID)
+	interfacesClient.BaseURI = config.ResourceManagerEndpoint
+	interfacesClient.Authorizer = autorest.NewBearerAuthorizer(config.ServicePrincipalToken)
 	interfacesClient.PollingDelay = 5 * time.Second
 	if config.ShouldOmitCloudProviderBackoff {
 		interfacesClient.RetryAttempts = config.CloudProviderBackoffRetries
@@ -314,12 +296,12 @@ func newAzInterfacesClient(config *azClientConfig) *azInterfacesClient {
 	configureUserAgent(&interfacesClient.Client)
 
 	klog.V(2).Infof("Azure InterfacesClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPS,
-		config.rateLimitConfig.CloudProviderRateLimitBucket)
+		config.RateLimitConfig.CloudProviderRateLimitQPS,
+		config.RateLimitConfig.CloudProviderRateLimitBucket)
 	klog.V(2).Infof("Azure InterfacesClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
-		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
-	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
+		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
+	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 	return &azInterfacesClient{
 		rateLimiterReader: rateLimiterReader,
 		rateLimiterWriter: rateLimiterWriter,
@@ -394,10 +376,10 @@ type azLoadBalancersClient struct {
 	rateLimiterWriter flowcontrol.RateLimiter
 }
 
-func newAzLoadBalancersClient(config *azClientConfig) *azLoadBalancersClient {
-	loadBalancerClient := network.NewLoadBalancersClient(config.subscriptionID)
-	loadBalancerClient.BaseURI = config.resourceManagerEndpoint
-	loadBalancerClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
+func newAzLoadBalancersClient(config *azclients.ClientConfig) *azLoadBalancersClient {
+	loadBalancerClient := network.NewLoadBalancersClient(config.SubscriptionID)
+	loadBalancerClient.BaseURI = config.ResourceManagerEndpoint
+	loadBalancerClient.Authorizer = autorest.NewBearerAuthorizer(config.ServicePrincipalToken)
 	loadBalancerClient.PollingDelay = 5 * time.Second
 	if config.ShouldOmitCloudProviderBackoff {
 		loadBalancerClient.RetryAttempts = config.CloudProviderBackoffRetries
@@ -406,12 +388,12 @@ func newAzLoadBalancersClient(config *azClientConfig) *azLoadBalancersClient {
 	configureUserAgent(&loadBalancerClient.Client)
 
 	klog.V(2).Infof("Azure LoadBalancersClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPS,
-		config.rateLimitConfig.CloudProviderRateLimitBucket)
+		config.RateLimitConfig.CloudProviderRateLimitQPS,
+		config.RateLimitConfig.CloudProviderRateLimitBucket)
 	klog.V(2).Infof("Azure LoadBalancersClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
-		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
-	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
+		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
+	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 	return &azLoadBalancersClient{
 		rateLimiterReader: rateLimiterReader,
 		rateLimiterWriter: rateLimiterWriter,
@@ -552,10 +534,10 @@ type azPublicIPAddressesClient struct {
 	rateLimiterWriter flowcontrol.RateLimiter
 }
 
-func newAzPublicIPAddressesClient(config *azClientConfig) *azPublicIPAddressesClient {
-	publicIPAddressClient := network.NewPublicIPAddressesClient(config.subscriptionID)
-	publicIPAddressClient.BaseURI = config.resourceManagerEndpoint
-	publicIPAddressClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
+func newAzPublicIPAddressesClient(config *azclients.ClientConfig) *azPublicIPAddressesClient {
+	publicIPAddressClient := network.NewPublicIPAddressesClient(config.SubscriptionID)
+	publicIPAddressClient.BaseURI = config.ResourceManagerEndpoint
+	publicIPAddressClient.Authorizer = autorest.NewBearerAuthorizer(config.ServicePrincipalToken)
 	publicIPAddressClient.PollingDelay = 5 * time.Second
 	if config.ShouldOmitCloudProviderBackoff {
 		publicIPAddressClient.RetryAttempts = config.CloudProviderBackoffRetries
@@ -564,12 +546,12 @@ func newAzPublicIPAddressesClient(config *azClientConfig) *azPublicIPAddressesCl
 	configureUserAgent(&publicIPAddressClient.Client)
 
 	klog.V(2).Infof("Azure PublicIPAddressesClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPS,
-		config.rateLimitConfig.CloudProviderRateLimitBucket)
+		config.RateLimitConfig.CloudProviderRateLimitQPS,
+		config.RateLimitConfig.CloudProviderRateLimitBucket)
 	klog.V(2).Infof("Azure PublicIPAddressesClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
-		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
-	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
+		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
+	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 	return &azPublicIPAddressesClient{
 		rateLimiterReader: rateLimiterReader,
 		rateLimiterWriter: rateLimiterWriter,
@@ -696,10 +678,10 @@ type azSubnetsClient struct {
 	rateLimiterWriter flowcontrol.RateLimiter
 }
 
-func newAzSubnetsClient(config *azClientConfig) *azSubnetsClient {
-	subnetsClient := network.NewSubnetsClient(config.subscriptionID)
-	subnetsClient.BaseURI = config.resourceManagerEndpoint
-	subnetsClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
+func newAzSubnetsClient(config *azclients.ClientConfig) *azSubnetsClient {
+	subnetsClient := network.NewSubnetsClient(config.SubscriptionID)
+	subnetsClient.BaseURI = config.ResourceManagerEndpoint
+	subnetsClient.Authorizer = autorest.NewBearerAuthorizer(config.ServicePrincipalToken)
 	subnetsClient.PollingDelay = 5 * time.Second
 	if config.ShouldOmitCloudProviderBackoff {
 		subnetsClient.RetryAttempts = config.CloudProviderBackoffRetries
@@ -708,12 +690,12 @@ func newAzSubnetsClient(config *azClientConfig) *azSubnetsClient {
 	configureUserAgent(&subnetsClient.Client)
 
 	klog.V(2).Infof("Azure SubnetsClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPS,
-		config.rateLimitConfig.CloudProviderRateLimitBucket)
+		config.RateLimitConfig.CloudProviderRateLimitQPS,
+		config.RateLimitConfig.CloudProviderRateLimitBucket)
 	klog.V(2).Infof("Azure SubnetsClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
-		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
-	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
+		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
+	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 	return &azSubnetsClient{
 		client:            subnetsClient,
 		rateLimiterReader: rateLimiterReader,
@@ -821,10 +803,10 @@ type azSecurityGroupsClient struct {
 	rateLimiterWriter flowcontrol.RateLimiter
 }
 
-func newAzSecurityGroupsClient(config *azClientConfig) *azSecurityGroupsClient {
-	securityGroupsClient := network.NewSecurityGroupsClient(config.subscriptionID)
-	securityGroupsClient.BaseURI = config.resourceManagerEndpoint
-	securityGroupsClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
+func newAzSecurityGroupsClient(config *azclients.ClientConfig) *azSecurityGroupsClient {
+	securityGroupsClient := network.NewSecurityGroupsClient(config.SubscriptionID)
+	securityGroupsClient.BaseURI = config.ResourceManagerEndpoint
+	securityGroupsClient.Authorizer = autorest.NewBearerAuthorizer(config.ServicePrincipalToken)
 	securityGroupsClient.PollingDelay = 5 * time.Second
 	if config.ShouldOmitCloudProviderBackoff {
 		securityGroupsClient.RetryAttempts = config.CloudProviderBackoffRetries
@@ -833,12 +815,12 @@ func newAzSecurityGroupsClient(config *azClientConfig) *azSecurityGroupsClient {
 	configureUserAgent(&securityGroupsClient.Client)
 
 	klog.V(2).Infof("Azure SecurityGroupsClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPS,
-		config.rateLimitConfig.CloudProviderRateLimitBucket)
+		config.RateLimitConfig.CloudProviderRateLimitQPS,
+		config.RateLimitConfig.CloudProviderRateLimitBucket)
 	klog.V(2).Infof("Azure SecurityGroupsClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
-		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
-	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
+		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
+	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 	return &azSecurityGroupsClient{
 		client:            securityGroupsClient,
 		rateLimiterReader: rateLimiterReader,
@@ -978,10 +960,10 @@ type azVirtualMachineScaleSetsClient struct {
 	rateLimiterWriter flowcontrol.RateLimiter
 }
 
-func newAzVirtualMachineScaleSetsClient(config *azClientConfig) *azVirtualMachineScaleSetsClient {
-	virtualMachineScaleSetsClient := compute.NewVirtualMachineScaleSetsClient(config.subscriptionID)
-	virtualMachineScaleSetsClient.BaseURI = config.resourceManagerEndpoint
-	virtualMachineScaleSetsClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
+func newAzVirtualMachineScaleSetsClient(config *azclients.ClientConfig) *azVirtualMachineScaleSetsClient {
+	virtualMachineScaleSetsClient := compute.NewVirtualMachineScaleSetsClient(config.SubscriptionID)
+	virtualMachineScaleSetsClient.BaseURI = config.ResourceManagerEndpoint
+	virtualMachineScaleSetsClient.Authorizer = autorest.NewBearerAuthorizer(config.ServicePrincipalToken)
 	virtualMachineScaleSetsClient.PollingDelay = 5 * time.Second
 	if config.ShouldOmitCloudProviderBackoff {
 		virtualMachineScaleSetsClient.RetryAttempts = config.CloudProviderBackoffRetries
@@ -990,12 +972,12 @@ func newAzVirtualMachineScaleSetsClient(config *azClientConfig) *azVirtualMachin
 	configureUserAgent(&virtualMachineScaleSetsClient.Client)
 
 	klog.V(2).Infof("Azure VirtualMachineScaleSetsClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPS,
-		config.rateLimitConfig.CloudProviderRateLimitBucket)
+		config.RateLimitConfig.CloudProviderRateLimitQPS,
+		config.RateLimitConfig.CloudProviderRateLimitBucket)
 	klog.V(2).Infof("Azure VirtualMachineScaleSetsClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
-		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
-	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
+		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
+	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 	return &azVirtualMachineScaleSetsClient{
 		client:            virtualMachineScaleSetsClient,
 		rateLimiterReader: rateLimiterReader,
@@ -1082,10 +1064,10 @@ type azVirtualMachineScaleSetVMsClient struct {
 	rateLimiterWriter flowcontrol.RateLimiter
 }
 
-func newAzVirtualMachineScaleSetVMsClient(config *azClientConfig) *azVirtualMachineScaleSetVMsClient {
-	virtualMachineScaleSetVMsClient := compute.NewVirtualMachineScaleSetVMsClient(config.subscriptionID)
-	virtualMachineScaleSetVMsClient.BaseURI = config.resourceManagerEndpoint
-	virtualMachineScaleSetVMsClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
+func newAzVirtualMachineScaleSetVMsClient(config *azclients.ClientConfig) *azVirtualMachineScaleSetVMsClient {
+	virtualMachineScaleSetVMsClient := compute.NewVirtualMachineScaleSetVMsClient(config.SubscriptionID)
+	virtualMachineScaleSetVMsClient.BaseURI = config.ResourceManagerEndpoint
+	virtualMachineScaleSetVMsClient.Authorizer = autorest.NewBearerAuthorizer(config.ServicePrincipalToken)
 	virtualMachineScaleSetVMsClient.PollingDelay = 5 * time.Second
 	if config.ShouldOmitCloudProviderBackoff {
 		virtualMachineScaleSetVMsClient.RetryAttempts = config.CloudProviderBackoffRetries
@@ -1094,12 +1076,12 @@ func newAzVirtualMachineScaleSetVMsClient(config *azClientConfig) *azVirtualMach
 	configureUserAgent(&virtualMachineScaleSetVMsClient.Client)
 
 	klog.V(2).Infof("Azure VirtualMachineScaleSetVMsClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPS,
-		config.rateLimitConfig.CloudProviderRateLimitBucket)
+		config.RateLimitConfig.CloudProviderRateLimitQPS,
+		config.RateLimitConfig.CloudProviderRateLimitBucket)
 	klog.V(2).Infof("Azure VirtualMachineScaleSetVMsClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
-		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
-	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
+		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
+	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 	return &azVirtualMachineScaleSetVMsClient{
 		client:            virtualMachineScaleSetVMsClient,
 		rateLimiterReader: rateLimiterReader,
@@ -1185,10 +1167,10 @@ type azRoutesClient struct {
 	rateLimiterWriter flowcontrol.RateLimiter
 }
 
-func newAzRoutesClient(config *azClientConfig) *azRoutesClient {
-	routesClient := network.NewRoutesClient(config.subscriptionID)
-	routesClient.BaseURI = config.resourceManagerEndpoint
-	routesClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
+func newAzRoutesClient(config *azclients.ClientConfig) *azRoutesClient {
+	routesClient := network.NewRoutesClient(config.SubscriptionID)
+	routesClient.BaseURI = config.ResourceManagerEndpoint
+	routesClient.Authorizer = autorest.NewBearerAuthorizer(config.ServicePrincipalToken)
 	routesClient.PollingDelay = 5 * time.Second
 	if config.ShouldOmitCloudProviderBackoff {
 		routesClient.RetryAttempts = config.CloudProviderBackoffRetries
@@ -1197,12 +1179,12 @@ func newAzRoutesClient(config *azClientConfig) *azRoutesClient {
 	configureUserAgent(&routesClient.Client)
 
 	klog.V(2).Infof("Azure RoutesClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPS,
-		config.rateLimitConfig.CloudProviderRateLimitBucket)
+		config.RateLimitConfig.CloudProviderRateLimitQPS,
+		config.RateLimitConfig.CloudProviderRateLimitBucket)
 	klog.V(2).Infof("Azure RoutesClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
-		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
-	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
+		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
+	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 	return &azRoutesClient{
 		client:            routesClient,
 		rateLimiterReader: rateLimiterReader,
@@ -1295,10 +1277,10 @@ type azRouteTablesClient struct {
 	rateLimiterWriter flowcontrol.RateLimiter
 }
 
-func newAzRouteTablesClient(config *azClientConfig) *azRouteTablesClient {
-	routeTablesClient := network.NewRouteTablesClient(config.subscriptionID)
-	routeTablesClient.BaseURI = config.resourceManagerEndpoint
-	routeTablesClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
+func newAzRouteTablesClient(config *azclients.ClientConfig) *azRouteTablesClient {
+	routeTablesClient := network.NewRouteTablesClient(config.SubscriptionID)
+	routeTablesClient.BaseURI = config.ResourceManagerEndpoint
+	routeTablesClient.Authorizer = autorest.NewBearerAuthorizer(config.ServicePrincipalToken)
 	routeTablesClient.PollingDelay = 5 * time.Second
 	if config.ShouldOmitCloudProviderBackoff {
 		routeTablesClient.RetryAttempts = config.CloudProviderBackoffRetries
@@ -1307,12 +1289,12 @@ func newAzRouteTablesClient(config *azClientConfig) *azRouteTablesClient {
 	configureUserAgent(&routeTablesClient.Client)
 
 	klog.V(2).Infof("Azure RouteTablesClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPS,
-		config.rateLimitConfig.CloudProviderRateLimitBucket)
+		config.RateLimitConfig.CloudProviderRateLimitQPS,
+		config.RateLimitConfig.CloudProviderRateLimitBucket)
 	klog.V(2).Infof("Azure RouteTablesClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
-		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
-	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
+		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
+	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 	return &azRouteTablesClient{
 		client:            routeTablesClient,
 		rateLimiterReader: rateLimiterReader,
@@ -1400,9 +1382,9 @@ type azStorageAccountClient struct {
 	rateLimiterWriter flowcontrol.RateLimiter
 }
 
-func newAzStorageAccountClient(config *azClientConfig) *azStorageAccountClient {
-	storageAccountClient := storage.NewAccountsClientWithBaseURI(config.resourceManagerEndpoint, config.subscriptionID)
-	storageAccountClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
+func newAzStorageAccountClient(config *azclients.ClientConfig) *azStorageAccountClient {
+	storageAccountClient := storage.NewAccountsClientWithBaseURI(config.ResourceManagerEndpoint, config.SubscriptionID)
+	storageAccountClient.Authorizer = autorest.NewBearerAuthorizer(config.ServicePrincipalToken)
 	storageAccountClient.PollingDelay = 5 * time.Second
 	if config.ShouldOmitCloudProviderBackoff {
 		storageAccountClient.RetryAttempts = config.CloudProviderBackoffRetries
@@ -1411,12 +1393,12 @@ func newAzStorageAccountClient(config *azClientConfig) *azStorageAccountClient {
 	configureUserAgent(&storageAccountClient.Client)
 
 	klog.V(2).Infof("Azure StorageAccountClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPS,
-		config.rateLimitConfig.CloudProviderRateLimitBucket)
+		config.RateLimitConfig.CloudProviderRateLimitQPS,
+		config.RateLimitConfig.CloudProviderRateLimitBucket)
 	klog.V(2).Infof("Azure StorageAccountClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
-		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
-	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
+		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
+	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 	return &azStorageAccountClient{
 		client:            storageAccountClient,
 		rateLimiterReader: rateLimiterReader,
@@ -1528,9 +1510,9 @@ type azDisksClient struct {
 	rateLimiterWriter flowcontrol.RateLimiter
 }
 
-func newAzDisksClient(config *azClientConfig) *azDisksClient {
-	disksClient := compute.NewDisksClientWithBaseURI(config.resourceManagerEndpoint, config.subscriptionID)
-	disksClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
+func newAzDisksClient(config *azclients.ClientConfig) *azDisksClient {
+	disksClient := compute.NewDisksClientWithBaseURI(config.ResourceManagerEndpoint, config.SubscriptionID)
+	disksClient.Authorizer = autorest.NewBearerAuthorizer(config.ServicePrincipalToken)
 	disksClient.PollingDelay = 5 * time.Second
 	if config.ShouldOmitCloudProviderBackoff {
 		disksClient.RetryAttempts = config.CloudProviderBackoffRetries
@@ -1539,12 +1521,12 @@ func newAzDisksClient(config *azClientConfig) *azDisksClient {
 	configureUserAgent(&disksClient.Client)
 
 	klog.V(2).Infof("Azure DisksClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPS,
-		config.rateLimitConfig.CloudProviderRateLimitBucket)
+		config.RateLimitConfig.CloudProviderRateLimitQPS,
+		config.RateLimitConfig.CloudProviderRateLimitBucket)
 	klog.V(2).Infof("Azure DisksClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
-		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
-	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
+		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
+	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 	return &azDisksClient{
 		client:            disksClient,
 		rateLimiterReader: rateLimiterReader,
@@ -1615,9 +1597,9 @@ func (az *azDisksClient) Get(ctx context.Context, resourceGroupName string, disk
 }
 
 // TODO(feiskyer): refactor compute.SnapshotsClient to Interface.
-func newSnapshotsClient(config *azClientConfig) *compute.SnapshotsClient {
-	snapshotsClient := compute.NewSnapshotsClientWithBaseURI(config.resourceManagerEndpoint, config.subscriptionID)
-	snapshotsClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
+func newSnapshotsClient(config *azclients.ClientConfig) *compute.SnapshotsClient {
+	snapshotsClient := compute.NewSnapshotsClientWithBaseURI(config.ResourceManagerEndpoint, config.SubscriptionID)
+	snapshotsClient.Authorizer = autorest.NewBearerAuthorizer(config.ServicePrincipalToken)
 	snapshotsClient.PollingDelay = 5 * time.Second
 	if config.ShouldOmitCloudProviderBackoff {
 		snapshotsClient.RetryAttempts = config.CloudProviderBackoffRetries
@@ -1634,10 +1616,10 @@ type azVirtualMachineSizesClient struct {
 	rateLimiterWriter flowcontrol.RateLimiter
 }
 
-func newAzVirtualMachineSizesClient(config *azClientConfig) *azVirtualMachineSizesClient {
-	VirtualMachineSizesClient := compute.NewVirtualMachineSizesClient(config.subscriptionID)
-	VirtualMachineSizesClient.BaseURI = config.resourceManagerEndpoint
-	VirtualMachineSizesClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
+func newAzVirtualMachineSizesClient(config *azclients.ClientConfig) *azVirtualMachineSizesClient {
+	VirtualMachineSizesClient := compute.NewVirtualMachineSizesClient(config.SubscriptionID)
+	VirtualMachineSizesClient.BaseURI = config.ResourceManagerEndpoint
+	VirtualMachineSizesClient.Authorizer = autorest.NewBearerAuthorizer(config.ServicePrincipalToken)
 	VirtualMachineSizesClient.PollingDelay = 5 * time.Second
 	if config.ShouldOmitCloudProviderBackoff {
 		VirtualMachineSizesClient.RetryAttempts = config.CloudProviderBackoffRetries
@@ -1646,12 +1628,12 @@ func newAzVirtualMachineSizesClient(config *azClientConfig) *azVirtualMachineSiz
 	configureUserAgent(&VirtualMachineSizesClient.Client)
 
 	klog.V(2).Infof("Azure VirtualMachineSizesClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPS,
-		config.rateLimitConfig.CloudProviderRateLimitBucket)
+		config.RateLimitConfig.CloudProviderRateLimitQPS,
+		config.RateLimitConfig.CloudProviderRateLimitBucket)
 	klog.V(2).Infof("Azure VirtualMachineSizesClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.rateLimitConfig.CloudProviderRateLimitQPSWrite,
-		config.rateLimitConfig.CloudProviderRateLimitBucketWrite)
-	rateLimiterReader, rateLimiterWriter := NewRateLimiter(config.rateLimitConfig)
+		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
+	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 	return &azVirtualMachineSizesClient{
 		rateLimiterReader: rateLimiterReader,
 		rateLimiterWriter: rateLimiterWriter,

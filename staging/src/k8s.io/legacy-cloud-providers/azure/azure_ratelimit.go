@@ -19,42 +19,28 @@ limitations under the License.
 package azure
 
 import (
-	"k8s.io/client-go/util/flowcontrol"
+	azclients "k8s.io/legacy-cloud-providers/azure/clients"
 )
-
-// RateLimitConfig indicates the rate limit config options.
-type RateLimitConfig struct {
-	// Enable rate limiting
-	CloudProviderRateLimit bool `json:"cloudProviderRateLimit,omitempty" yaml:"cloudProviderRateLimit,omitempty"`
-	// Rate limit QPS (Read)
-	CloudProviderRateLimitQPS float32 `json:"cloudProviderRateLimitQPS,omitempty" yaml:"cloudProviderRateLimitQPS,omitempty"`
-	// Rate limit Bucket Size
-	CloudProviderRateLimitBucket int `json:"cloudProviderRateLimitBucket,omitempty" yaml:"cloudProviderRateLimitBucket,omitempty"`
-	// Rate limit QPS (Write)
-	CloudProviderRateLimitQPSWrite float32 `json:"cloudProviderRateLimitQPSWrite,omitempty" yaml:"cloudProviderRateLimitQPSWrite,omitempty"`
-	// Rate limit Bucket Size
-	CloudProviderRateLimitBucketWrite int `json:"cloudProviderRateLimitBucketWrite,omitempty" yaml:"cloudProviderRateLimitBucketWrite,omitempty"`
-}
 
 // CloudProviderRateLimitConfig indicates the rate limit config for each clients.
 type CloudProviderRateLimitConfig struct {
 	// The default rate limit config options.
-	RateLimitConfig
+	azclients.RateLimitConfig
 
 	// Rate limit config for each clients. Values would override default settings above.
-	RouteRateLimit                  *RateLimitConfig `json:"routeRateLimit,omitempty" yaml:"routeRateLimit,omitempty"`
-	SubnetsRateLimit                *RateLimitConfig `json:"subnetsRateLimit,omitempty" yaml:"subnetsRateLimit,omitempty"`
-	InterfaceRateLimit              *RateLimitConfig `json:"interfaceRateLimit,omitempty" yaml:"interfaceRateLimit,omitempty"`
-	RouteTableRateLimit             *RateLimitConfig `json:"routeTableRateLimit,omitempty" yaml:"routeTableRateLimit,omitempty"`
-	LoadBalancerRateLimit           *RateLimitConfig `json:"loadBalancerRateLimit,omitempty" yaml:"loadBalancerRateLimit,omitempty"`
-	PublicIPAddressRateLimit        *RateLimitConfig `json:"publicIPAddressRateLimit,omitempty" yaml:"publicIPAddressRateLimit,omitempty"`
-	SecurityGroupRateLimit          *RateLimitConfig `json:"securityGroupRateLimit,omitempty" yaml:"securityGroupRateLimit,omitempty"`
-	VirtualMachineRateLimit         *RateLimitConfig `json:"virtualMachineRateLimit,omitempty" yaml:"virtualMachineRateLimit,omitempty"`
-	StorageAccountRateLimit         *RateLimitConfig `json:"storageAccountRateLimit,omitempty" yaml:"storageAccountRateLimit,omitempty"`
-	DiskRateLimit                   *RateLimitConfig `json:"diskRateLimit,omitempty" yaml:"diskRateLimit,omitempty"`
-	SnapshotRateLimit               *RateLimitConfig `json:"snapshotRateLimit,omitempty" yaml:"snapshotRateLimit,omitempty"`
-	VirtualMachineScaleSetRateLimit *RateLimitConfig `json:"virtualMachineScaleSetRateLimit,omitempty" yaml:"virtualMachineScaleSetRateLimit,omitempty"`
-	VirtualMachineSizeRateLimit     *RateLimitConfig `json:"virtualMachineSizesRateLimit,omitempty" yaml:"virtualMachineSizesRateLimit,omitempty"`
+	RouteRateLimit                  *azclients.RateLimitConfig `json:"routeRateLimit,omitempty" yaml:"routeRateLimit,omitempty"`
+	SubnetsRateLimit                *azclients.RateLimitConfig `json:"subnetsRateLimit,omitempty" yaml:"subnetsRateLimit,omitempty"`
+	InterfaceRateLimit              *azclients.RateLimitConfig `json:"interfaceRateLimit,omitempty" yaml:"interfaceRateLimit,omitempty"`
+	RouteTableRateLimit             *azclients.RateLimitConfig `json:"routeTableRateLimit,omitempty" yaml:"routeTableRateLimit,omitempty"`
+	LoadBalancerRateLimit           *azclients.RateLimitConfig `json:"loadBalancerRateLimit,omitempty" yaml:"loadBalancerRateLimit,omitempty"`
+	PublicIPAddressRateLimit        *azclients.RateLimitConfig `json:"publicIPAddressRateLimit,omitempty" yaml:"publicIPAddressRateLimit,omitempty"`
+	SecurityGroupRateLimit          *azclients.RateLimitConfig `json:"securityGroupRateLimit,omitempty" yaml:"securityGroupRateLimit,omitempty"`
+	VirtualMachineRateLimit         *azclients.RateLimitConfig `json:"virtualMachineRateLimit,omitempty" yaml:"virtualMachineRateLimit,omitempty"`
+	StorageAccountRateLimit         *azclients.RateLimitConfig `json:"storageAccountRateLimit,omitempty" yaml:"storageAccountRateLimit,omitempty"`
+	DiskRateLimit                   *azclients.RateLimitConfig `json:"diskRateLimit,omitempty" yaml:"diskRateLimit,omitempty"`
+	SnapshotRateLimit               *azclients.RateLimitConfig `json:"snapshotRateLimit,omitempty" yaml:"snapshotRateLimit,omitempty"`
+	VirtualMachineScaleSetRateLimit *azclients.RateLimitConfig `json:"virtualMachineScaleSetRateLimit,omitempty" yaml:"virtualMachineScaleSetRateLimit,omitempty"`
+	VirtualMachineSizeRateLimit     *azclients.RateLimitConfig `json:"virtualMachineSizesRateLimit,omitempty" yaml:"virtualMachineSizesRateLimit,omitempty"`
 }
 
 // InitializeCloudProviderRateLimitConfig initializes rate limit configs.
@@ -94,7 +80,7 @@ func InitializeCloudProviderRateLimitConfig(config *CloudProviderRateLimitConfig
 }
 
 // overrideDefaultRateLimitConfig overrides the default CloudProviderRateLimitConfig.
-func overrideDefaultRateLimitConfig(defaults, config *RateLimitConfig) *RateLimitConfig {
+func overrideDefaultRateLimitConfig(defaults, config *azclients.RateLimitConfig) *azclients.RateLimitConfig {
 	// If config not set, apply defaults.
 	if config == nil {
 		return defaults
@@ -102,7 +88,7 @@ func overrideDefaultRateLimitConfig(defaults, config *RateLimitConfig) *RateLimi
 
 	// Remain disabled if it's set explicitly.
 	if !config.CloudProviderRateLimit {
-		return &RateLimitConfig{CloudProviderRateLimit: false}
+		return &azclients.RateLimitConfig{CloudProviderRateLimit: false}
 	}
 
 	// Apply default values.
@@ -120,27 +106,4 @@ func overrideDefaultRateLimitConfig(defaults, config *RateLimitConfig) *RateLimi
 	}
 
 	return config
-}
-
-// RateLimitEnabled returns true if CloudProviderRateLimit is set to true.
-func RateLimitEnabled(config *RateLimitConfig) bool {
-	return config != nil && config.CloudProviderRateLimit
-}
-
-// NewRateLimiter creates new read and write flowcontrol.RateLimiter from RateLimitConfig.
-func NewRateLimiter(config *RateLimitConfig) (flowcontrol.RateLimiter, flowcontrol.RateLimiter) {
-	readLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
-	writeLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
-
-	if config != nil && config.CloudProviderRateLimit {
-		readLimiter = flowcontrol.NewTokenBucketRateLimiter(
-			config.CloudProviderRateLimitQPS,
-			config.CloudProviderRateLimitBucket)
-
-		writeLimiter = flowcontrol.NewTokenBucketRateLimiter(
-			config.CloudProviderRateLimitQPSWrite,
-			config.CloudProviderRateLimitBucketWrite)
-	}
-
-	return readLimiter, writeLimiter
 }
