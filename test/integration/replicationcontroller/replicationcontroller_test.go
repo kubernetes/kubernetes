@@ -130,18 +130,6 @@ func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replication.
 	return s, closeFn, rm, informers, clientSet
 }
 
-func rmSimpleSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, clientset.Interface) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
-
-	config := restclient.Config{Host: s.URL}
-	clientSet, err := clientset.NewForConfig(&config)
-	if err != nil {
-		t.Fatalf("Error in create clientset: %v", err)
-	}
-	return s, closeFn, clientSet
-}
-
 // Run RC controller and informers
 func runControllerAndInformers(t *testing.T, rm *replication.ReplicationManager, informers informers.SharedInformerFactory, podNum int) chan struct{} {
 	stopCh := make(chan struct{})
