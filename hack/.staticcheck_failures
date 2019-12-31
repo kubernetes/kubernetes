@@ -41,9 +41,7 @@ pkg/volume/fc
 pkg/volume/flexvolume
 pkg/volume/flocker
 pkg/volume/hostpath
-pkg/volume/iscsi
 pkg/volume/local
-pkg/volume/portworx
 pkg/volume/quobyte
 pkg/volume/rbd
 pkg/volume/scaleio
