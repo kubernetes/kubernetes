@@ -40,10 +40,11 @@ type ClientConfig struct {
 	ShouldOmitCloudProviderBackoff bool
 }
 
-// WithRateLimiter returns ClientConfig with rateLimitConfig set.
+// WithRateLimiter returns a new ClientConfig with rateLimitConfig set.
 func (cfg *ClientConfig) WithRateLimiter(rl *RateLimitConfig) *ClientConfig {
-	cfg.RateLimitConfig = rl
-	return cfg
+	newClientConfig := *cfg
+	newClientConfig.RateLimitConfig = rl
+	return &newClientConfig
 }
 
 // RateLimitConfig indicates the rate limit config options.
