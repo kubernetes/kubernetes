@@ -51,6 +51,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -62,6 +63,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	vspheretest "k8s.io/kubernetes/test/e2e/storage/vsphere"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+)
+
+const (
+	// Template for iSCSI IQN.
+	iSCSIIQNTemplate = "iqn.2003-01.io.k8s:e2e.%s"
 )
 
 // NFS
@@ -207,7 +213,7 @@ func (n *nfsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 }
 
 func (v *nfsVolume) DeleteVolume() {
-	volume.CleanUpVolumeServer(v.f, v.serverPod)
+	cleanUpVolumeServer(v.f, v.serverPod)
 }
 
 // Gluster
@@ -430,7 +436,7 @@ func (i *iSCSIDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	c, serverPod, serverIP, iqn := volume.NewISCSIServer(cs, ns.Name)
+	c, serverPod, serverIP, iqn := newISCSIServer(cs, ns.Name)
 	config.ServerConfig = &c
 	config.ClientNodeName = c.ClientNodeName
 	return &iSCSIVolume{
@@ -441,8 +447,71 @@ func (i *iSCSIDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 	}
 }
 
+// newISCSIServer is an iSCSI-specific wrapper for CreateStorageServer.
+func newISCSIServer(cs clientset.Interface, namespace string) (config volume.TestConfig, pod *v1.Pod, ip, iqn string) {
+	// Generate cluster-wide unique IQN
+	iqn = fmt.Sprintf(iSCSIIQNTemplate, namespace)
+	config = volume.TestConfig{
+		Namespace:   namespace,
+		Prefix:      "iscsi",
+		ServerImage: imageutils.GetE2EImage(imageutils.VolumeISCSIServer),
+		ServerArgs:  []string{iqn},
+		ServerVolumes: map[string]string{
+			// iSCSI container needs to insert modules from the host
+			"/lib/modules": "/lib/modules",
+			// iSCSI container needs to configure kernel
+			"/sys/kernel": "/sys/kernel",
+			// iSCSI source "block devices" must be available on the host
+			"/srv/iscsi": "/srv/iscsi",
+		},
+		ServerReadyMessage: "iscsi target started",
+		ServerHostNetwork:  true,
+	}
+	pod, ip = volume.CreateStorageServer(cs, config)
+	// Make sure the client runs on the same node as server so we don't need to open any firewalls.
+	config.ClientNodeName = pod.Spec.NodeName
+	return config, pod, ip, iqn
+}
+
+// newRBDServer is a CephRBD-specific wrapper for CreateStorageServer.
+func newRBDServer(cs clientset.Interface, namespace string) (config volume.TestConfig, pod *v1.Pod, secret *v1.Secret, ip string) {
+	config = volume.TestConfig{
+		Namespace:   namespace,
+		Prefix:      "rbd",
+		ServerImage: imageutils.GetE2EImage(imageutils.VolumeRBDServer),
+		ServerPorts: []int{6789},
+		ServerVolumes: map[string]string{
+			"/lib/modules": "/lib/modules",
+		},
+		ServerReadyMessage: "Ceph is ready",
+	}
+	pod, ip = volume.CreateStorageServer(cs, config)
+	// create secrets for the server
+	secret = &v1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: config.Prefix + "-secret",
+		},
+		Data: map[string][]byte{
+			// from test/images/volumes-tester/rbd/keyring
+			"key": []byte("AQDRrKNVbEevChAAEmRC+pW/KBVHxa0w/POILA=="),
+		},
+		Type: "kubernetes.io/rbd",
+	}
+
+	secret, err := cs.CoreV1().Secrets(config.Namespace).Create(secret)
+	if err != nil {
+		framework.Failf("Failed to create secrets for Ceph RBD: %v", err)
+	}
+
+	return config, pod, secret, ip
+}
+
 func (v *iSCSIVolume) DeleteVolume() {
-	volume.CleanUpVolumeServer(v.f, v.serverPod)
+	cleanUpVolumeServer(v.f, v.serverPod)
 }
 
 // Ceph RBD
@@ -559,7 +628,7 @@ func (r *rbdDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	c, serverPod, secret, serverIP := volume.NewRBDServer(cs, ns.Name)
+	c, serverPod, secret, serverIP := newRBDServer(cs, ns.Name)
 	config.ServerConfig = &c
 	return &rbdVolume{
 		serverPod: serverPod,
@@ -570,7 +639,7 @@ func (r *rbdDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 }
 
 func (v *rbdVolume) DeleteVolume() {
-	volume.CleanUpVolumeServerWithSecret(v.f, v.serverPod, v.secret)
+	cleanUpVolumeServerWithSecret(v.f, v.serverPod, v.secret)
 }
 
 // Ceph
@@ -669,7 +738,7 @@ func (c *cephFSDriver) CreateVolume(config *testsuites.PerTestConfig, volType te
 	cs := f.ClientSet
 	ns := f.Namespace
 
-	cfg, serverPod, secret, serverIP := volume.NewRBDServer(cs, ns.Name)
+	cfg, serverPod, secret, serverIP := newRBDServer(cs, ns.Name)
 	config.ServerConfig = &cfg
 	return &cephVolume{
 		serverPod: serverPod,
@@ -680,7 +749,7 @@ func (c *cephFSDriver) CreateVolume(config *testsuites.PerTestConfig, volType te
 }
 
 func (v *cephVolume) DeleteVolume() {
-	volume.CleanUpVolumeServerWithSecret(v.f, v.serverPod, v.secret)
+	cleanUpVolumeServerWithSecret(v.f, v.serverPod, v.secret)
 }
 
 // Hostpath
@@ -1837,4 +1906,29 @@ func (l *localDriver) GetPersistentVolumeSource(readOnly bool, fsType string, vo
 			FSType: &fsType,
 		},
 	}, l.nodeAffinityForNode(lv.ltr.Node)
+}
+
+// cleanUpVolumeServer is a wrapper of cleanup function for volume server without secret created by specific CreateStorageServer function.
+func cleanUpVolumeServer(f *framework.Framework, serverPod *v1.Pod) {
+	cleanUpVolumeServerWithSecret(f, serverPod, nil)
+}
+
+// cleanUpVolumeServerWithSecret is a wrapper of cleanup function for volume server with secret created by specific CreateStorageServer function.
+func cleanUpVolumeServerWithSecret(f *framework.Framework, serverPod *v1.Pod, secret *v1.Secret) {
+	cs := f.ClientSet
+	ns := f.Namespace
+
+	if secret != nil {
+		framework.Logf("Deleting server secret %q...", secret.Name)
+		err := cs.CoreV1().Secrets(ns.Name).Delete(secret.Name, &metav1.DeleteOptions{})
+		if err != nil {
+			framework.Logf("Delete secret failed: %v", err)
+		}
+	}
+
+	framework.Logf("Deleting server pod %q...", serverPod.Name)
+	err := e2epod.DeletePodWithWait(cs, serverPod)
+	if err != nil {
+		framework.Logf("Server pod delete failed: %v", err)
+	}
 }
