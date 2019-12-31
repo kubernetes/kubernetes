@@ -2238,7 +2238,8 @@ func (kl *Kubelet) ListenAndServePodResources() {
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
 func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID string) {
-	// Handles container resource immediately.
+	// Handles container resource immediately, otherwise there will be a race condition,
+	// see https://github.com/kubernetes/kubernetes/issues/79159.
 	if err := kl.containerManager.GetInternalContainerLifecycle().PostStopContainer(exitedContainerID); err != nil {
 		klog.Errorf("Failed to post stop container %s: %v", exitedContainerID, err)
 	}
