@@ -14,11 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package priorities
+package noderesources
 
 import (
-	"fmt"
-
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
@@ -29,37 +27,35 @@ import (
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
-// ResourceAllocationPriority contains information to calculate resource allocation priority.
-type ResourceAllocationPriority struct {
-	Name                string
-	scorer              func(requested, allocable ResourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64
-	resourceToWeightMap ResourceToWeightMap
-}
-
 // ResourceToWeightMap contains resource name and weight.
 type ResourceToWeightMap map[v1.ResourceName]int64
-
-// ResourceToValueMap contains resource name and score.
-type ResourceToValueMap map[v1.ResourceName]int64
 
 // DefaultRequestedRatioResources is used to set default requestToWeight map for CPU and memory
 var DefaultRequestedRatioResources = ResourceToWeightMap{v1.ResourceMemory: 1, v1.ResourceCPU: 1}
 
-// PriorityMap priorities nodes according to the resource allocations on the node.
-// It will use `scorer` function to calculate the score.
-func (r *ResourceAllocationPriority) PriorityMap(
+// resourceAllocationScorer contains information to calculate resource allocation score.
+type resourceAllocationScorer struct {
+	Name                string
+	scorer              func(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64
+	resourceToWeightMap ResourceToWeightMap
+}
+
+// resourceToValueMap contains resource name and score.
+type resourceToValueMap map[v1.ResourceName]int64
+
+// score will use `scorer` function to calculate the score.
+func (r *resourceAllocationScorer) score(
 	pod *v1.Pod,
-	meta interface{},
-	nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
+	nodeInfo *schedulernodeinfo.NodeInfo) (int64, *framework.Status) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return framework.NodeScore{}, fmt.Errorf("node not found")
+		return 0, framework.NewStatus(framework.Error, "node not found")
 	}
 	if r.resourceToWeightMap == nil {
-		return framework.NodeScore{}, fmt.Errorf("resources not found")
+		return 0, framework.NewStatus(framework.Error, "resources not found")
 	}
-	requested := make(ResourceToValueMap, len(r.resourceToWeightMap))
-	allocatable := make(ResourceToValueMap, len(r.resourceToWeightMap))
+	requested := make(resourceToValueMap, len(r.resourceToWeightMap))
+	allocatable := make(resourceToValueMap, len(r.resourceToWeightMap))
 	for resource := range r.resourceToWeightMap {
 		allocatable[resource], requested[resource] = calculateResourceAllocatableRequest(nodeInfo, pod, resource)
 	}
@@ -90,10 +86,7 @@ func (r *ResourceAllocationPriority) PriorityMap(
 		}
 	}
 
-	return framework.NodeScore{
-		Name:  node.Name,
-		Score: score,
-	}, nil
+	return score, nil
 }
 
 // calculateResourceAllocatableRequest returns resources Allocatable and Requested values
