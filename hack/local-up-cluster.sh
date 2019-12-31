@@ -133,11 +133,6 @@ if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
     fi
 fi
 
-# warn if users are running with swap allowed
-if [ "${FAIL_SWAP_ON}" == "false" ]; then
-    echo "WARNING : The kubelet is configured to not fail even if swap is enabled; production deployments should disable swap."
-fi
-
 if [ "$(id -u)" != "0" ]; then
     echo "WARNING : This script MAY be run as root for docker socket / iptables functionality; if failures occur, retry as root." 2>&1
 fi
@@ -788,6 +783,11 @@ function start_kubelet {
       ${KUBELET_FLAGS}
     )
 
+    # warn if users are running with swap allowed
+    if [ "${FAIL_SWAP_ON}" == "false" ]; then
+        echo "WARNING : The kubelet is configured to not fail even if swap is enabled; production deployments should disable swap."
+    fi
+    
     if [[ "${REUSE_CERTS}" != true ]]; then
         generate_kubelet_certs
     fi
