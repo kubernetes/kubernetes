@@ -22,14 +22,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // LeastAllocated is a score plugin that favors nodes with fewer allocation requested resources based on requested resources.
 type LeastAllocated struct {
 	handle framework.FrameworkHandle
+	resourceAllocationScorer
 }
 
 var _ = framework.ScorePlugin(&LeastAllocated{})
@@ -49,9 +48,13 @@ func (la *LeastAllocated) Score(ctx context.Context, state *framework.CycleState
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
 	}
 
-	// LeastRequestedPriorityMap does not use priority metadata, hence we pass nil here
-	s, err := priorities.LeastRequestedPriorityMap(pod, nil, nodeInfo)
-	return s.Score, migration.ErrorToFrameworkStatus(err)
+	// la.score favors nodes with fewer requested resources.
+	// It calculates the percentage of memory and CPU requested by pods scheduled on the node, and
+	// prioritizes based on the minimum of the average of the fraction of requested to capacity.
+	//
+	// Details:
+	// (cpu((capacity-sum(requested))*10/capacity) + memory((capacity-sum(requested))*10/capacity))/2
+	return la.score(pod, nodeInfo)
 }
 
 // ScoreExtensions of the Score plugin.
@@ -61,5 +64,36 @@ func (la *LeastAllocated) ScoreExtensions() framework.ScoreExtensions {
 
 // NewLeastAllocated initializes a new plugin and returns it.
 func NewLeastAllocated(_ *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin, error) {
-	return &LeastAllocated{handle: h}, nil
+	return &LeastAllocated{
+		handle: h,
+		resourceAllocationScorer: resourceAllocationScorer{
+			LeastAllocatedName,
+			leastResourceScorer,
+			DefaultRequestedRatioResources,
+		},
+	}, nil
+}
+
+func leastResourceScorer(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
+	var nodeScore, weightSum int64
+	for resource, weight := range DefaultRequestedRatioResources {
+		resourceScore := leastRequestedScore(requested[resource], allocable[resource])
+		nodeScore += resourceScore * weight
+		weightSum += weight
+	}
+	return nodeScore / weightSum
+}
+
+// The unused capacity is calculated on a scale of 0-10
+// 0 being the lowest priority and 10 being the highest.
+// The more unused resources the higher the score is.
+func leastRequestedScore(requested, capacity int64) int64 {
+	if capacity == 0 {
+		return 0
+	}
+	if requested > capacity {
+		return 0
+	}
+
+	return ((capacity - requested) * int64(framework.MaxNodeScore)) / capacity
 }

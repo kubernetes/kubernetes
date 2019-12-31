@@ -343,11 +343,11 @@ func RegisterCustomPriority(policy schedulerapi.PriorityPolicy, configProducerAr
 	return RegisterPriority(priority, weight)
 }
 
-func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *schedulerapi.RequestedToCapacityRatioArguments) (priorities.FunctionShape, priorities.ResourceToWeightMap) {
+func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *schedulerapi.RequestedToCapacityRatioArguments) (noderesources.FunctionShape, noderesources.ResourceToWeightMap) {
 	n := len(arguments.Shape)
-	points := make([]priorities.FunctionShapePoint, 0, n)
+	points := make([]noderesources.FunctionShapePoint, 0, n)
 	for _, point := range arguments.Shape {
-		points = append(points, priorities.FunctionShapePoint{
+		points = append(points, noderesources.FunctionShapePoint{
 			Utilization: int64(point.Utilization),
 			// MaxCustomPriorityScore may diverge from the max score used in the scheduler and defined by MaxNodeScore,
 			// therefore we need to scale the score returned by requested to capacity ratio to the score range
@@ -355,13 +355,13 @@ func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *s
 			Score: int64(point.Score) * (framework.MaxNodeScore / schedulerapi.MaxCustomPriorityScore),
 		})
 	}
-	shape, err := priorities.NewFunctionShape(points)
+	shape, err := noderesources.NewFunctionShape(points)
 	if err != nil {
 		klog.Fatalf("invalid RequestedToCapacityRatioPriority arguments: %s", err.Error())
 	}
-	resourceToWeightMap := make(priorities.ResourceToWeightMap, 0)
+	resourceToWeightMap := make(noderesources.ResourceToWeightMap, 0)
 	if len(arguments.Resources) == 0 {
-		resourceToWeightMap = priorities.DefaultRequestedRatioResources
+		resourceToWeightMap = noderesources.DefaultRequestedRatioResources
 		return shape, resourceToWeightMap
 	}
 	for _, resource := range arguments.Resources {
