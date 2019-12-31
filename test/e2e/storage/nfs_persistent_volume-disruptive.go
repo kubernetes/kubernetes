@@ -150,7 +150,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			framework.SkipUnlessSSHKeyPresent()
 
 			ginkgo.By("Initializing first PD with PVPVC binding")
-			pvSource1, diskName1 = volume.CreateGCEVolume()
+			pvSource1, diskName1 = createGCEVolume()
 			framework.ExpectNoError(err)
 			pvConfig1 = e2epv.PersistentVolumeConfig{
 				NamePrefix: "gce-",
@@ -163,7 +163,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, ns, pv1, pvc1))
 
 			ginkgo.By("Initializing second PD with PVPVC binding")
-			pvSource2, diskName2 = volume.CreateGCEVolume()
+			pvSource2, diskName2 = createGCEVolume()
 			framework.ExpectNoError(err)
 			pvConfig2 = e2epv.PersistentVolumeConfig{
 				NamePrefix: "gce-",
@@ -273,6 +273,19 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		}
 	})
 })
+
+// createGCEVolume creates PersistentVolumeSource for GCEVolume.
+func createGCEVolume() (*v1.PersistentVolumeSource, string) {
+	diskName, err := e2epv.CreatePDWithRetry()
+	framework.ExpectNoError(err)
+	return &v1.PersistentVolumeSource{
+		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+			PDName:   diskName,
+			FSType:   "ext3",
+			ReadOnly: false,
+		},
+	}, diskName
+}
 
 // initTestCase initializes spec resources (pv, pvc, and pod) and returns pointers to be consumed
 // by the test.
