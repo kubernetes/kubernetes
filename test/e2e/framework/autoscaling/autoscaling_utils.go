@@ -364,11 +364,6 @@ func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int, duration time.D
 	framework.ExpectNoErrorWithOffset(1, err, "timeout waiting %v for %d replicas", duration, desiredReplicas)
 }
 
-// EnsureDesiredReplicas ensure the replicas to desired number
-func (rc *ResourceConsumer) EnsureDesiredReplicas(desiredReplicas int, duration time.Duration, hpaName string) {
-	rc.EnsureDesiredReplicasInRange(desiredReplicas, desiredReplicas, duration, hpaName)
-}
-
 // EnsureDesiredReplicasInRange ensure the replicas is in a desired range
 func (rc *ResourceConsumer) EnsureDesiredReplicasInRange(minDesiredReplicas, maxDesiredReplicas int, duration time.Duration, hpaName string) {
 	interval := 10 * time.Second
