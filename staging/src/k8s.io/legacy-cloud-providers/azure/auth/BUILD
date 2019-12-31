@@ -8,7 +8,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["azure_auth.go"],
+    srcs = [
+        "azure_auth.go",
+        "doc.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/azure/auth",
     importpath = "k8s.io/legacy-cloud-providers/azure/auth",
     visibility = ["//visibility:public"],

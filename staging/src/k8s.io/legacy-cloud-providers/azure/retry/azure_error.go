@@ -19,13 +19,20 @@ limitations under the License.
 package retry
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"k8s.io/klog"
+)
+
+const (
+	// RetryAfterHeaderKey is the retry-after header key in ARM responses.
+	RetryAfterHeaderKey = "Retry-After"
 )
 
 var (
@@ -57,6 +64,15 @@ func (err *Error) Error() error {
 		err.Retriable, err.RetryAfter.String(), err.HTTPStatusCode, err.RawError)
 }
 
+// IsThrottled returns true the if the request is being throttled.
+func (err *Error) IsThrottled() bool {
+	if err == nil {
+		return false
+	}
+
+	return err.HTTPStatusCode == http.StatusTooManyRequests || err.RetryAfter.After(now())
+}
+
 // NewError creates a new Error.
 func NewError(retriable bool, err error) *Error {
 	return &Error{
@@ -71,6 +87,20 @@ func GetRetriableError(err error) *Error {
 		Retriable: true,
 		RawError:  err,
 	}
+}
+
+// GetRateLimitError creates a new error for rate limiting.
+func GetRateLimitError(isWrite bool, opName string) *Error {
+	opType := "read"
+	if isWrite {
+		opType = "write"
+	}
+	return GetRetriableError(fmt.Errorf("azure cloud provider rate limited(%s) for operation %q", opType, opName))
+}
+
+// GetThrottlingError creates a new error for throttling.
+func GetThrottlingError(operation, reason string) *Error {
+	return GetRetriableError(fmt.Errorf("azure cloud provider throttled for operation %s with reason %q", operation, reason))
 }
 
 // GetError gets a new Error based on resp and error.
@@ -88,12 +118,8 @@ func GetError(resp *http.Response, err error) *Error {
 	if retryAfterDuration := getRetryAfter(resp); retryAfterDuration != 0 {
 		retryAfter = now().Add(retryAfterDuration)
 	}
-	rawError := err
-	if err == nil && resp != nil {
-		rawError = fmt.Errorf("HTTP response: %v", resp.StatusCode)
-	}
 	return &Error{
-		RawError:       rawError,
+		RawError:       getRawError(resp, err),
 		RetryAfter:     retryAfter,
 		Retriable:      shouldRetryHTTPRequest(resp, err),
 		HTTPStatusCode: getHTTPStatusCode(resp),
@@ -112,6 +138,27 @@ func isSuccessHTTPResponse(resp *http.Response) bool {
 	}
 
 	return false
+}
+
+func getRawError(resp *http.Response, err error) error {
+	if err != nil {
+		return err
+	}
+
+	if resp == nil || resp.Body == nil {
+		return fmt.Errorf("empty HTTP response")
+	}
+
+	// return the http status if unabled to get response body.
+	defer resp.Body.Close()
+	respBody, _ := ioutil.ReadAll(resp.Body)
+	resp.Body = ioutil.NopCloser(bytes.NewReader(respBody))
+	if len(respBody) == 0 {
+		return fmt.Errorf("HTTP status code (%d)", resp.StatusCode)
+	}
+
+	// return the raw response body.
+	return fmt.Errorf("%s", string(respBody))
 }
 
 func getHTTPStatusCode(resp *http.Response) int {
@@ -151,7 +198,7 @@ func getRetryAfter(resp *http.Response) time.Duration {
 		return 0
 	}
 
-	ra := resp.Header.Get("Retry-After")
+	ra := resp.Header.Get(RetryAfterHeaderKey)
 	if ra == "" {
 		return 0
 	}

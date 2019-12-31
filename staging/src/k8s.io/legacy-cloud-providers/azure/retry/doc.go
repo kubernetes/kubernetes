@@ -16,6 +16,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package azure is an implementation of CloudProvider Interface, LoadBalancer
-// and Instances for Azure.
-package azure // import "k8s.io/legacy-cloud-providers/azure"
+// Package retry defines a general library to handle errors and retries for various
+// Azure clients.
+package retry // import "k8s.io/legacy-cloud-providers/azure/retry"
