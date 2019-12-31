@@ -60,8 +60,15 @@ func (err *Error) Error() error {
 		return nil
 	}
 
-	return fmt.Errorf("Retriable: %v, RetryAfter: %s, HTTPStatusCode: %d, RawError: %v",
-		err.Retriable, err.RetryAfter.String(), err.HTTPStatusCode, err.RawError)
+	// Convert time to seconds for better logging.
+	retryAfterSeconds := 0
+	curTime := now()
+	if err.RetryAfter.After(curTime) {
+		retryAfterSeconds = int(err.RetryAfter.Sub(curTime) / time.Second)
+	}
+
+	return fmt.Errorf("Retriable: %v, RetryAfter: %ds, HTTPStatusCode: %d, RawError: %v",
+		err.Retriable, retryAfterSeconds, err.HTTPStatusCode, err.RawError)
 }
 
 // IsThrottled returns true the if the request is being throttled.
@@ -99,8 +106,13 @@ func GetRateLimitError(isWrite bool, opName string) *Error {
 }
 
 // GetThrottlingError creates a new error for throttling.
-func GetThrottlingError(operation, reason string) *Error {
-	return GetRetriableError(fmt.Errorf("azure cloud provider throttled for operation %s with reason %q", operation, reason))
+func GetThrottlingError(operation, reason string, retryAfter time.Time) *Error {
+	rawError := fmt.Errorf("azure cloud provider throttled for operation %s with reason %q", operation, reason)
+	return &Error{
+		Retriable:  true,
+		RawError:   rawError,
+		RetryAfter: retryAfter,
+	}
 }
 
 // GetError gets a new Error based on resp and error.
