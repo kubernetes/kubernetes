@@ -666,11 +666,10 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 
 			select {
 			case <-stopCh:
-				break
+				return
 			default:
 				continue
 			}
-
 		}
 	}()
 

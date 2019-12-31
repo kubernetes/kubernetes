@@ -115,7 +115,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	}
 
 	// Create service account
-	serviceAccount, err := c.CoreV1().ServiceAccounts(ns).Create(&v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: name}})
+	_, err = c.CoreV1().ServiceAccounts(ns).Create(&v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: name}})
 	if err != nil {
 		t.Fatalf("Service Account not created: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	}
 
 	// Trigger creation of a new referenced token
-	serviceAccount, err = c.CoreV1().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
+	serviceAccount, err := c.CoreV1().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

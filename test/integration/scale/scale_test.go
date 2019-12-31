@@ -35,11 +35,6 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-type subresourceTest struct {
-	resource schema.GroupVersionResource
-	kind     schema.GroupVersionKind
-}
-
 func makeGVR(group, version, resource string) schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: group, Version: version, Resource: resource}
 }
@@ -58,7 +53,7 @@ func TestScaleSubresources(t *testing.T) {
 	})
 	defer tearDown()
 
-	resourceLists, err := clientSet.Discovery().ServerResources()
+	_, resourceLists, err := clientSet.Discovery().ServerGroupsAndResources()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,10 +200,6 @@ var (
 		Spec:       appsv1.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: podStub.Labels}, Replicas: &replicas, Template: podStub},
 	}
 )
-
-func setup(t *testing.T) (client kubernetes.Interface, tearDown func()) {
-	return setupWithOptions(t, nil, nil)
-}
 
 func setupWithOptions(t *testing.T, instanceOptions *apitesting.TestServerInstanceOptions, flags []string) (client kubernetes.Interface, tearDown func()) {
 	result := apitesting.StartTestServerOrDie(t, instanceOptions, flags, framework.SharedEtcd())
