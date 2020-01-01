@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -190,6 +191,21 @@ func (cm *containerManagerImpl) getNodeAllocatableAbsoluteImpl(capacity v1.Resou
 		}
 		result[k] = value
 	}
+
+	// for every huge page reservation, we need to remove it from allocatable memory
+	for k, v := range result {
+		if v1helper.IsHugePageResourceName(k) {
+			allocatableMemory := result[v1.ResourceMemory]
+			value := v.DeepCopy()
+			allocatableMemory.Sub(value)
+			if allocatableMemory.Sign() < 0 {
+				// Negative Allocatable resources don't make sense.
+				allocatableMemory.Set(0)
+			}
+			result[v1.ResourceMemory] = allocatableMemory
+		}
+	}
+
 	return result
 }
 
