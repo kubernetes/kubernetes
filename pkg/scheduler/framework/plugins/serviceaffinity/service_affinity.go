@@ -113,14 +113,14 @@ func (pl *ServiceAffinity) createPreFilterState(pod *v1.Pod) (*preFilterState, e
 	if err != nil {
 		return nil, fmt.Errorf("listing pod services: %v", err.Error())
 	}
-	selector := predicates.CreateSelectorFromLabels(pod.Labels)
+	selector := createSelectorFromLabels(pod.Labels)
 	allMatches, err := pl.sharedLister.Pods().List(selector)
 	if err != nil {
 		return nil, fmt.Errorf("listing pods: %v", err.Error())
 	}
 
 	// consider only the pods that belong to the same namespace
-	matchingPodList := predicates.FilterPodsByNamespace(allMatches, pod.Namespace)
+	matchingPodList := filterPodsByNamespace(allMatches, pod.Namespace)
 
 	return &preFilterState{
 		matchingPodList:     matchingPodList,
@@ -157,7 +157,7 @@ func (pl *ServiceAffinity) AddPod(ctx context.Context, cycleState *framework.Cyc
 		return nil
 	}
 
-	selector := predicates.CreateSelectorFromLabels(podToSchedule.Labels)
+	selector := createSelectorFromLabels(podToSchedule.Labels)
 	if selector.Matches(labels.Set(podToAdd.Labels)) {
 		s.matchingPodList = append(s.matchingPodList, podToAdd)
 	}
@@ -258,7 +258,7 @@ func (pl *ServiceAffinity) Filter(ctx context.Context, cycleState *framework.Cyc
 	pods, services := s.matchingPodList, s.matchingPodServices
 	filteredPods := nodeInfo.FilterOutPods(pods)
 	// check if the pod being scheduled has the affinity labels specified in its NodeSelector
-	affinityLabels := predicates.FindLabelsInSet(pl.args.AffinityLabels, labels.Set(pod.Spec.NodeSelector))
+	affinityLabels := findLabelsInSet(pl.args.AffinityLabels, labels.Set(pod.Spec.NodeSelector))
 	// Step 1: If we don't have all constraints, introspect nodes to find the missing constraints.
 	if len(pl.args.AffinityLabels) > len(affinityLabels) {
 		if len(services) > 0 {
@@ -267,12 +267,12 @@ func (pl *ServiceAffinity) Filter(ctx context.Context, cycleState *framework.Cyc
 				if err != nil {
 					return framework.NewStatus(framework.Error, "node not found")
 				}
-				predicates.AddUnsetLabelsToMap(affinityLabels, pl.args.AffinityLabels, labels.Set(nodeWithAffinityLabels.Node().Labels))
+				addUnsetLabelsToMap(affinityLabels, pl.args.AffinityLabels, labels.Set(nodeWithAffinityLabels.Node().Labels))
 			}
 		}
 	}
 	// Step 2: Finally complete the affinity predicate based on whatever set of predicates we were able to find.
-	if predicates.CreateSelectorFromLabels(affinityLabels).Matches(labels.Set(node.Labels)) {
+	if createSelectorFromLabels(affinityLabels).Matches(labels.Set(node.Labels)) {
 		return nil
 	}
 
@@ -389,4 +389,48 @@ func (pl *ServiceAffinity) updateNodeScoresForLabel(sharedLister schedulerlister
 // ScoreExtensions of the Score plugin.
 func (pl *ServiceAffinity) ScoreExtensions() framework.ScoreExtensions {
 	return pl
+}
+
+// addUnsetLabelsToMap backfills missing values with values we find in a map.
+func addUnsetLabelsToMap(aL map[string]string, labelsToAdd []string, labelSet labels.Set) {
+	for _, l := range labelsToAdd {
+		// if the label is already there, dont overwrite it.
+		if _, exists := aL[l]; exists {
+			continue
+		}
+		// otherwise, backfill this label.
+		if labelSet.Has(l) {
+			aL[l] = labelSet.Get(l)
+		}
+	}
+}
+
+// createSelectorFromLabels is used to define a selector that corresponds to the keys in a map.
+func createSelectorFromLabels(aL map[string]string) labels.Selector {
+	if len(aL) == 0 {
+		return labels.Everything()
+	}
+	return labels.Set(aL).AsSelector()
+}
+
+// filterPodsByNamespace filters pods outside a namespace from the given list.
+func filterPodsByNamespace(pods []*v1.Pod, ns string) []*v1.Pod {
+	filtered := []*v1.Pod{}
+	for _, nsPod := range pods {
+		if nsPod.Namespace == ns {
+			filtered = append(filtered, nsPod)
+		}
+	}
+	return filtered
+}
+
+// findLabelsInSet gets as many key/value pairs as possible out of a label set.
+func findLabelsInSet(labelsToKeep []string, selector labels.Set) map[string]string {
+	aL := make(map[string]string)
+	for _, l := range labelsToKeep {
+		if selector.Has(l) {
+			aL[l] = selector.Get(l)
+		}
+	}
+	return aL
 }
