@@ -304,6 +304,5 @@ func (q *RateLimitedTimedQueue) SwapLimiter(newQPS float32) {
 			newLimiter.TryAccept()
 		}
 	}
-	q.limiter.Stop()
 	q.limiter = newLimiter
 }

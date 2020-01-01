@@ -146,12 +146,6 @@ func TestNeverFake(t *testing.T) {
 	if finished {
 		t.Error("Accept should block forever in NeverFake.")
 	}
-
-	rl.Stop()
-	wg.Wait()
-	if !finished {
-		t.Error("Stop should make Accept unblock in NeverFake.")
-	}
 }
 
 func TestWait(t *testing.T) {

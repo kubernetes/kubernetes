@@ -31,8 +31,6 @@ type RateLimiter interface {
 	TryAccept() bool
 	// Accept returns once a token becomes available.
 	Accept()
-	// Stop stops the rate limiter, subsequent calls to CanAccept will return false
-	Stop()
 	// QPS returns QPS of this rate limiter
 	QPS() float32
 	// Wait returns nil if a token is taken before the Context is done.
@@ -95,9 +93,6 @@ func (t *tokenBucketRateLimiter) Accept() {
 	t.clock.Sleep(t.limiter.ReserveN(now, 1).DelayFrom(now))
 }
 
-func (t *tokenBucketRateLimiter) Stop() {
-}
-
 func (t *tokenBucketRateLimiter) QPS() float32 {
 	return t.qps
 }
@@ -115,8 +110,6 @@ func NewFakeAlwaysRateLimiter() RateLimiter {
 func (t *fakeAlwaysRateLimiter) TryAccept() bool {
 	return true
 }
-
-func (t *fakeAlwaysRateLimiter) Stop() {}
 
 func (t *fakeAlwaysRateLimiter) Accept() {}
 
@@ -140,10 +133,6 @@ func NewFakeNeverRateLimiter() RateLimiter {
 
 func (t *fakeNeverRateLimiter) TryAccept() bool {
 	return false
-}
-
-func (t *fakeNeverRateLimiter) Stop() {
-	t.wg.Done()
 }
 
 func (t *fakeNeverRateLimiter) Accept() {

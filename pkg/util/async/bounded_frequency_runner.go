@@ -49,7 +49,6 @@ type BoundedFrequencyRunner struct {
 // designed so that flowcontrol.RateLimiter satisfies
 type rateLimiter interface {
 	TryAccept() bool
-	Stop()
 }
 
 type nullLimiter struct{}
@@ -57,8 +56,6 @@ type nullLimiter struct{}
 func (nullLimiter) TryAccept() bool {
 	return true
 }
-
-func (nullLimiter) Stop() {}
 
 var _ rateLimiter = nullLimiter{}
 
@@ -257,7 +254,6 @@ func (bfr *BoundedFrequencyRunner) RetryAfter(interval time.Duration) {
 func (bfr *BoundedFrequencyRunner) stop() {
 	bfr.mu.Lock()
 	defer bfr.mu.Unlock()
-	bfr.limiter.Stop()
 	bfr.timer.Stop()
 }
 
