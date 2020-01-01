@@ -22,6 +22,7 @@ TASK=$1
 WHAT=$2
 
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+source "${KUBE_ROOT}/hack/lib/logging.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 # Mapping of go ARCH to actual architectures shipped part of multiarch/qemu-user-static project
@@ -166,8 +167,7 @@ if [[ "${WHAT}" == "all-conformance" ]]; then
   # Discussed during Conformance Office Hours Meeting (2019.12.17):
   # https://docs.google.com/document/d/1W31nXh9RYAb_VaYkwuPLd1hFxuRX3iU0DmaQ4lkCsX8/edit#heading=h.l87lu17xm9bh
   # echoserver image not included: https://github.com/kubernetes/kubernetes/issues/84158
-  conformance_images=("agnhost" "dnsutils" "jessie-dnsutils" "kitten" "mounttest" "mounttest-user"\
-    "nautilus" "nonewprivs" "resource-consumer" "resource-consumer-controller" "sample-apiserver" "test-webserver")
+  conformance_images=("agnhost" "jessie-dnsutils" "kitten" "nautilus" "nonewprivs" "resource-consumer" "sample-apiserver")
   for image in "${conformance_images[@]}"; do
     eval "${TASK}" "${image}"
   done
