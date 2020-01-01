@@ -698,7 +698,10 @@ function kube::util::ensure_dockerized {
 #  SED: The name of the gnu-sed binary
 #
 function kube::util::ensure-gnu-sed {
-  if LANG=C sed --help 2>&1 | grep -q GNU; then
+  # NOTE: the echo below is a workaround to ensure sed is executed before the grep.
+  # see: https://github.com/kubernetes/kubernetes/issues/87251
+  sed_help="$(LANG=C sed --help 2>&1)"
+  if echo "${sed_help}" | grep -q "GNU\|BusyBox"; then
     SED="sed"
   elif command -v gsed &>/dev/null; then
     SED="gsed"
