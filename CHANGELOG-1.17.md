@@ -134,6 +134,7 @@ The Kubernetes in-tree storage plugin to Container Storage Interface (CSI) migra
 - volumeDevices mapping ignored when container is privileged
 - The `Should recreate evicted statefulset` conformance [test]( https://github.com/kubernetes/kubernetes/blob/master/test/e2e/apps/statefulset.go) fails because `Pod ss-0 expected to be re-created at least once`. This was caused by the `Predicate PodFitsHostPorts failed` scheduling error. The root cause was a host port conflict for port `21017`. This port was in-use as an ephemeral port by another application running on the node. This will be looked at for the 1.18 release.
 - client-go discovery clients constructed using `NewDiscoveryClientForConfig` or `NewDiscoveryClientForConfigOrDie` default to rate limits that cause normal discovery request patterns to take several seconds. This is fixed in https://issue.k8s.io/86168 and will be resolved in v1.17.1. As a workaround, the `Burst` value can be adjusted higher in the rest.Config passed into `NewDiscoveryClientForConfig` or `NewDiscoveryClientForConfigOrDie`.
+- the IP allocator in v1.17.0 can return errors such as `the cluster IP <ip> for service <service-name> is not within the service CIDR <cidr>; please recreate` in the logs of the kube-apiserver. The cause is incorrect CIDR calculations if the service CIDR (`--service-cluster-ip-range`) is set to bits lower than `/16`. This is fixed in http://issue.k8s.io/86534 and will be resolved in v1.17.1.
 
 ## Urgent Upgrade Notes
 ### (No, really, you MUST read this before you upgrade)
@@ -152,7 +153,7 @@ Prior to 1.17 and for existing nodes created by `kubeadm init` where kubelet cli
 - All nodes need to be drained before upgrading Kubernetes cluster, because paths used for block volumes are changed in this release, so on-line upgrade of nodes aren't allowed. ([#74026](https://github.com/kubernetes/kubernetes/pull/74026), [@mkimuram](https://github.com/mkimuram))
 
 #### Windows
-- The Windows containers RunAsUsername feature is now beta. 
+- The Windows containers RunAsUsername feature is now beta.
 - Windows worker nodes in a Kubernetes cluster now support Windows Server version 1903 in addition to the existing support for Windows Server 2019
 - The RuntimeClass scheduler can now simplify steering Linux or Windows pods to appropriate nodes
 - All Windows nodes now get the new label `node.kubernetes.io/windows-build` that reflects the Windows major, minor, and build number that are needed to match compatibility between Windows containers and Windows worker nodes.
@@ -213,7 +214,7 @@ Prior to 1.17 and for existing nodes created by `kubeadm init` where kubelet cli
  `http_requests_total, http_response_size_bytes`
  `http_response_size_bytes_sum`
  `http_response_size_bytes_count`
- due to removal from the prometheus client library. Prometheus http request meta-metrics are now generated from [`promhttp.InstrumentMetricHandler`](https://godoc.org/github.com/prometheus/client_golang/prometheus/promhttp&#35;InstrumentMetricHandler) instead. 
+ due to removal from the prometheus client library. Prometheus http request meta-metrics are now generated from [`promhttp.InstrumentMetricHandler`](https://godoc.org/github.com/prometheus/client_golang/prometheus/promhttp&#35;InstrumentMetricHandler) instead.
 - Following metrics from kube-controller-manager are now marked as with the ALPHA stability level:
   `storage_count_attachable_volumes_in_use`
   `attachdetach_controller_total_volumes`
@@ -417,15 +418,15 @@ Renamed FeatureGate RequestManagement to APIPriorityAndFairness.  This feature g
 - Remove prometheus cluster monitoring addon from kube-up ([#83442](https://github.com/kubernetes/kubernetes/pull/83442), [@serathius](https://github.com/serathius))
 - SourcesReady provides the readiness of kubelet configuration sources such as apiserver update readiness. ([#81344](https://github.com/kubernetes/kubernetes/pull/81344), [@zouyee](https://github.com/zouyee))
 - This PR sets the --cluster-dns flag value to kube-dns service IP whether or not NodeLocal DNSCache is enabled. NodeLocal DNSCache will listen on both the link-local as well as the service IP. ([#84383](https://github.com/kubernetes/kubernetes/pull/84383), [@prameshj](https://github.com/prameshj))
-- kube-dns add-on: 
-  - All containers are now being executed under more restrictive privileges. 
-  - Most of the containers now run as non-root user and has the root filesystem set as read-only. 
-  - The remaining container running as root only has the minimum Linux capabilities it requires to run. 
+- kube-dns add-on:
+  - All containers are now being executed under more restrictive privileges.
+  - Most of the containers now run as non-root user and has the root filesystem set as read-only.
+  - The remaining container running as root only has the minimum Linux capabilities it requires to run.
   - Privilege escalation has been disabled for all containers. ([#82347](https://github.com/kubernetes/kubernetes/pull/82347), [@pjbgf](https://github.com/pjbgf))
 - Kubernetes no longer monitors firewalld. On systems using firewalld for firewall
   maintenance, kube-proxy will take slightly longer to recover from disruptive
   firewalld operations that delete kube-proxy's iptables rules.
-  
+
   As a side effect of these changes, kube-proxy's
   `sync_proxy_rules_last_timestamp_seconds` metric no longer behaves the
   way it used to; now it will only change when services or endpoints actually
@@ -485,7 +486,7 @@ Renamed FeatureGate RequestManagement to APIPriorityAndFairness.  This feature g
 - Limit the body length of exec readiness/liveness probes. remote CRIs and Docker shim read a max of 16MB output of which the exec probe itself inspects 10kb. ([#82514](https://github.com/kubernetes/kubernetes/pull/82514), [@dims](https://github.com/dims))
 - Kubelet: Added kubelet serving certificate metric `server_rotation_seconds` which is a histogram reporting the age of a just rotated serving certificate in seconds. ([#84534](https://github.com/kubernetes/kubernetes/pull/84534), [@sambdavidson](https://github.com/sambdavidson))
 - Reduce default NodeStatusReportFrequency to 5 minutes. With this change, periodic node status updates will be send every 5m if node status doesn't change (otherwise they are still send with 10s).
-  
+
   Bump NodeProblemDetector version to v0.8.0 to reduce forced NodeStatus updates frequency to 5 minutes. ([#84007](https://github.com/kubernetes/kubernetes/pull/84007), [@wojtek-t](https://github.com/wojtek-t))
 - The topology manager aligns resources for pods of all QoS classes with respect to NUMA locality, not just Guaranteed QoS pods. ([#83492](https://github.com/kubernetes/kubernetes/pull/83492), [@ConnorDoyle](https://github.com/ConnorDoyle))
 - Fix a bug that a node Lease object may have been created without OwnerReference. ([#84998](https://github.com/kubernetes/kubernetes/pull/84998), [@wojtek-t](https://github.com/wojtek-t))
@@ -1069,7 +1070,7 @@ filename | sha512 hash
     * pv_collector_unbound_pvc_count
 * Deprecate the beta labels for zones ("failure-domain.beta.kubernetes.io/zone") and  ([#81431](https://github.com/kubernetes/kubernetes/pull/81431), [@andrewsykim](https://github.com/andrewsykim))
     * regions ("failure-domain.beta.kubernetes.io/region") in favor of their GA equivalents:
-    * "topology.kubernetes.io/zone" and "topology.kubernetes.io/region". 
+    * "topology.kubernetes.io/zone" and "topology.kubernetes.io/region".
     * The beta labels "failure-domain.beta.kubernetes.io/zone" and "failure-domain.beta.kubernetes.io/region" will be removed in v1.21
 * kube-apiserver: fixed a bug that could cause a goroutine leak if the apiserver encountered an encoding error serving a watch to a websocket watcher ([#84693](https://github.com/kubernetes/kubernetes/pull/84693), [@tedyu](https://github.com/tedyu))
 * EndpointSlice hostname is now set in the same conditions Endpoints hostname is. ([#84207](https://github.com/kubernetes/kubernetes/pull/84207), [@robscott](https://github.com/robscott))
@@ -1483,9 +1484,9 @@ filename | sha512 hash
 * Resolves regression generating informers for packages whose names contain `.` characters ([#82410](https://github.com/kubernetes/kubernetes/pull/82410), [@nikhita](https://github.com/nikhita))
 * Added metrics 'authentication_latency_seconds' that can be used to understand the latency of authentication. ([#82409](https://github.com/kubernetes/kubernetes/pull/82409), [@RainbowMango](https://github.com/RainbowMango))
 * kube-dns add-on:  ([#82347](https://github.com/kubernetes/kubernetes/pull/82347), [@pjbgf](https://github.com/pjbgf))
-    * - All containers are now being executed under more restrictive privileges. 
-    * - Most of the containers now run as non-root user and has the root filesystem set as read-only. 
-    * - The remaining container running as root only has the minimum Linux capabilities it requires to run. 
+    * - All containers are now being executed under more restrictive privileges.
+    * - Most of the containers now run as non-root user and has the root filesystem set as read-only.
+    * - The remaining container running as root only has the minimum Linux capabilities it requires to run.
     * - Privilege escalation has been disabled for all containers.
 * k8s dockerconfigjson secrets are now compatible with docker config desktop authentication credentials files ([#82148](https://github.com/kubernetes/kubernetes/pull/82148), [@bbourbie](https://github.com/bbourbie))
 * Use ipv4 in wincat port forward. ([#83036](https://github.com/kubernetes/kubernetes/pull/83036), [@liyanhui1228](https://github.com/liyanhui1228))
