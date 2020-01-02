@@ -1842,6 +1842,7 @@ k8s.io/legacy-cloud-providers/azure/clients
 k8s.io/legacy-cloud-providers/azure/clients/armclient
 k8s.io/legacy-cloud-providers/azure/clients/vmssclient
 k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient
+k8s.io/legacy-cloud-providers/azure/metrics
 k8s.io/legacy-cloud-providers/azure/retry
 k8s.io/legacy-cloud-providers/gce
 k8s.io/legacy-cloud-providers/openstack
