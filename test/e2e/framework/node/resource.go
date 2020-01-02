@@ -156,7 +156,6 @@ func IsConditionUnset(node *v1.Node, conditionType v1.NodeConditionType) bool {
 
 // Filter filters nodes in NodeList in place, removing nodes that do not
 // satisfy the given condition
-// TODO: consider merging with pkg/client/cache.NodeLister
 func Filter(nodeList *v1.NodeList, fn func(node v1.Node) bool) {
 	var l []v1.Node
 
@@ -336,7 +335,6 @@ func GetPublicIps(c clientset.Interface) ([]string, error) {
 // 2) Needs to be ready.
 // If EITHER 1 or 2 is not true, most tests will want to ignore the node entirely.
 // If there are no nodes that are both ready and schedulable, this will return an error.
-// TODO: remove references in framework/util.go.
 func GetReadySchedulableNodes(c clientset.Interface) (nodes *v1.NodeList, err error) {
 	nodes, err = checkWaitListSchedulableNodes(c)
 	if err != nil {
