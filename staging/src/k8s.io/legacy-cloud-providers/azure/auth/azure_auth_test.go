@@ -106,7 +106,7 @@ func TestGetServicePrincipalToken(t *testing.T) {
 	assert.Equal(t, token, spt)
 }
 
-func TestParseAzureEngironment(t *testing.T) {
+func TestParseAzureEnvironment(t *testing.T) {
 	cases := []struct {
 		cloudName               string
 		resourceManagerEndpoint string

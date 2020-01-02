@@ -63,7 +63,7 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 			compute.DataDisk{
 				Name:         &diskName,
 				Lun:          &lun,
-				Caching:      compute.CachingTypes(cachingMode),
+				Caching:      cachingMode,
 				CreateOption: "attach",
 				ManagedDisk:  managedDisk,
 			})
@@ -75,7 +75,7 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 					URI: &diskURI,
 				},
 				Lun:          &lun,
-				Caching:      compute.CachingTypes(cachingMode),
+				Caching:      cachingMode,
 				CreateOption: "attach",
 			})
 	}
