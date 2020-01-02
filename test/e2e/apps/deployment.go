@@ -50,9 +50,10 @@ import (
 )
 
 const (
-	poll          = 2 * time.Second
-	dRetryPeriod  = 2 * time.Second
-	dRetryTimeout = 5 * time.Minute
+	poll            = 2 * time.Second
+	pollLongTimeout = 5 * time.Minute
+	dRetryPeriod    = 2 * time.Second
+	dRetryTimeout   = 5 * time.Minute
 )
 
 var (
@@ -448,7 +449,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	framework.ExpectNoError(err)
 	framework.Logf("Make sure deployment %q performs scaling operations", deploymentName)
 	// Make sure the deployment starts to scale up and down replica sets by checking if its updated replicas >= 1
-	err = e2edeploy.WaitForDeploymentUpdatedReplicasGTE(c, ns, deploymentName, deploymentReplicas, deployment.Generation)
+	err = waitForDeploymentUpdatedReplicasGTE(c, ns, deploymentName, deploymentReplicas, deployment.Generation)
 	// Check if it's updated to revision 1 correctly
 	framework.Logf("Check revision of new replica set for deployment %q", deploymentName)
 	err = checkDeploymentRevisionAndImage(c, ns, deploymentName, "1", deploymentImage)
@@ -473,7 +474,7 @@ func testRolloverDeployment(f *framework.Framework) {
 
 	// Use observedGeneration to determine if the controller noticed the pod template update.
 	framework.Logf("Wait deployment %q to be observed by the deployment controller", deploymentName)
-	err = e2edeploy.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
+	err = waitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
 	framework.ExpectNoError(err)
 
 	// Wait for it to be updated to revision 2
@@ -482,7 +483,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	framework.Logf("Make sure deployment %q is complete", deploymentName)
-	err = e2edeploy.WaitForDeploymentCompleteAndCheckRolling(c, deployment)
+	err = waitForDeploymentCompleteAndCheckRolling(c, deployment)
 	framework.ExpectNoError(err)
 
 	framework.Logf("Ensure that both old replica sets have no replicas")
@@ -623,7 +624,7 @@ func testIterativeDeployments(f *framework.Framework) {
 	}
 
 	framework.Logf("Waiting for deployment %q to be observed by the controller", deploymentName)
-	err = e2edeploy.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
+	err = waitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
 	framework.ExpectNoError(err)
 
 	framework.Logf("Waiting for deployment %q status", deploymentName)
@@ -631,7 +632,7 @@ func testIterativeDeployments(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	framework.Logf("Checking deployment %q for a complete condition", deploymentName)
-	err = e2edeploy.WaitForDeploymentWithCondition(c, ns, deploymentName, deploymentutil.NewRSAvailableReason, appsv1.DeploymentProgressing)
+	err = waitForDeploymentWithCondition(c, ns, deploymentName, deploymentutil.NewRSAvailableReason, appsv1.DeploymentProgressing)
 	framework.ExpectNoError(err)
 }
 
@@ -710,7 +711,7 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	framework.Logf("Waiting for observed generation %d", deployment.Generation)
-	err = e2edeploy.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
+	err = waitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
 	framework.ExpectNoError(err)
 
 	// Verify that the required pods have come up.
@@ -734,7 +735,7 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	framework.Logf("Waiting for observed generation %d", deployment.Generation)
-	err = e2edeploy.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
+	err = waitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
 	framework.ExpectNoError(err)
 
 	// Checking state of first rollout's replicaset.
@@ -943,11 +944,11 @@ func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f *framework.Framew
 		framework.ExpectNoError(err)
 
 		framework.Logf("Waiting for observed generation %d", deployment.Generation)
-		err = e2edeploy.WaitForObservedDeployment(c, ns, name, deployment.Generation)
+		err = waitForObservedDeployment(c, ns, name, deployment.Generation)
 		framework.ExpectNoError(err)
 
 		framework.Logf("Make sure deployment %q is complete", name)
-		err = e2edeploy.WaitForDeploymentCompleteAndCheckRolling(c, deployment)
+		err = waitForDeploymentCompleteAndCheckRolling(c, deployment)
 		framework.ExpectNoError(err)
 	}
 
@@ -1117,4 +1118,25 @@ func waitForReplicaSetTargetSpecReplicas(c clientset.Interface, replicaSet *apps
 // checkDeploymentRevisionAndImage checks if the input deployment's and its new replica set's revision and image are as expected.
 func checkDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName, revision, image string) error {
 	return testutil.CheckDeploymentRevisionAndImage(c, ns, deploymentName, revision, image)
+}
+
+// waitForObservedDeployment waits for the specified deployment generation.
+func waitForObservedDeployment(c clientset.Interface, ns, deploymentName string, desiredGeneration int64) error {
+	return testutil.WaitForObservedDeployment(c, ns, deploymentName, desiredGeneration)
+}
+
+// waitForDeploymentWithCondition waits for the specified deployment condition.
+func waitForDeploymentWithCondition(c clientset.Interface, ns, deploymentName, reason string, condType appsv1.DeploymentConditionType) error {
+	return testutil.WaitForDeploymentWithCondition(c, ns, deploymentName, reason, condType, framework.Logf, poll, pollLongTimeout)
+}
+
+// waitForDeploymentCompleteAndCheckRolling waits for the deployment to complete, and check rolling update strategy isn't broken at any times.
+// Rolling update strategy should not be broken during a rolling update.
+func waitForDeploymentCompleteAndCheckRolling(c clientset.Interface, d *appsv1.Deployment) error {
+	return testutil.WaitForDeploymentCompleteAndCheckRolling(c, d, framework.Logf, poll, pollLongTimeout)
+}
+
+// waitForDeploymentUpdatedReplicasGTE waits for given deployment to be observed by the controller and has at least a number of updatedReplicas
+func waitForDeploymentUpdatedReplicasGTE(c clientset.Interface, ns, deploymentName string, minUpdatedReplicas int32, desiredGeneration int64) error {
+	return testutil.WaitForDeploymentUpdatedReplicasGTE(c, ns, deploymentName, minUpdatedReplicas, desiredGeneration, poll, pollLongTimeout)
 }
