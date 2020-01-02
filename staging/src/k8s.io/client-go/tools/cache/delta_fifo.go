@@ -26,7 +26,7 @@ import (
 	"k8s.io/klog"
 )
 
-// NewDeltaFIFO returns a Store which can be used process changes to items.
+// NewDeltaFIFO returns a Queue which can be used to process changes to items.
 //
 // keyFunc is used to figure out what key an object should have. (It's
 // exposed in the returned DeltaFIFO's KeyOf() method, with bonus features.)
@@ -67,7 +67,9 @@ func NewDeltaFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter) *DeltaFIFO {
 	return f
 }
 
-// DeltaFIFO is like FIFO, but allows you to process deletes.
+// DeltaFIFO is like FIFO, but allows the PopProcessFunc to process
+// deletes.  The accumulator associated with a given object's key is a
+// slice of Delta values for that object.
 //
 // DeltaFIFO is a producer-consumer queue, where a Reflector is
 // intended to be the producer, and the consumer is whatever calls
@@ -77,22 +79,25 @@ func NewDeltaFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter) *DeltaFIFO {
 //  * You want to process every object change (delta) at most once.
 //  * When you process an object, you want to see everything
 //    that's happened to it since you last processed it.
-//  * You want to process the deletion of objects.
+//  * You want to process the deletion of some of the objects.
 //  * You might want to periodically reprocess objects.
 //
 // DeltaFIFO's Pop(), Get(), and GetByKey() methods return
 // interface{} to satisfy the Store/Queue interfaces, but it
 // will always return an object of type Deltas.
 //
+// A DeltaFIFO's knownObjects KeyListerGetter provides get/list access
+// to a set of "known objects" that is used for two purposes.  One is
+// to conditionalize delete operations: it is only for a known object
+// that a Delete Delta is recorded (this applies to both Delete and
+// Replace).  The deleted object will be included in the
+// DeleteFinalStateUnknown markers, and those objects could be stale.
+// The other purpose is in the Resync operation, which adds a Sync
+// Delta for every known object.
+//
 // A note on threading: If you call Pop() in parallel from multiple
 // threads, you could end up with multiple threads processing slightly
 // different versions of the same object.
-//
-// A note on the KeyLister used by the DeltaFIFO: It's main purpose is
-// to list keys that are "known", for the purpose of figuring out which
-// items have been deleted when Replace() or Delete() are called. The deleted
-// object will be included in the DeleteFinalStateUnknown markers. These objects
-// could be stale.
 type DeltaFIFO struct {
 	// lock/cond protects access to 'items' and 'queue'.
 	lock sync.RWMutex
@@ -187,7 +192,7 @@ func (f *DeltaFIFO) Update(obj interface{}) error {
 
 // Delete is just like Add, but makes an Deleted Delta. If the item does not
 // already exist, it will be ignored. (It may have already been deleted by a
-// Replace (re-list), for example.
+// Replace (re-list), for example.)
 func (f *DeltaFIFO) Delete(obj interface{}) error {
 	id, err := f.KeyOf(obj)
 	if err != nil {
@@ -313,6 +318,9 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 		f.items[id] = newDeltas
 		f.cond.Broadcast()
 	} else {
+		// This never happens, because dedupDeltas never returns an empty list
+		// when given a non-empty list (as it is here).
+		// But if somehow it ever does return an empty list, then
 		// We need to remove this from our map (extra items in the queue are
 		// ignored if they are not in the map).
 		delete(f.items, id)
