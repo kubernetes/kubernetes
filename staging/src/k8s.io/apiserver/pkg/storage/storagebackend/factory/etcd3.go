@@ -31,6 +31,7 @@ import (
 	"go.etcd.io/etcd/pkg/transport"
 	"google.golang.org/grpc"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/egressselector"
@@ -206,7 +207,7 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 	}, nil
 }
 
-func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
+func newETCD3Storage(c storagebackend.Config, newFunc func() runtime.Object) (storage.Interface, DestroyFunc, error) {
 	stopCompactor, err := startCompactorOnce(c.Transport, c.CompactionInterval)
 	if err != nil {
 		return nil, nil, err
@@ -232,5 +233,5 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 	if transformer == nil {
 		transformer = value.IdentityTransformer
 	}
-	return etcd3.New(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
+	return etcd3.New(client, c.Codec, newFunc, c.Prefix, transformer, c.Paging), destroyFunc, nil
 }

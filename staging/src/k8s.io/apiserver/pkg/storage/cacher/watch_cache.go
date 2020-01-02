@@ -305,6 +305,10 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utilt
 	if trace != nil {
 		trace.Step("watchCache locked acquired")
 	}
+
+	// FIXME: Make use of bookmark events, which aren't propagated here,
+	// currently just cacher.reflector RV is updated.
+
 	for w.resourceVersion < resourceVersion {
 		if w.clock.Since(startTime) >= blockTimeout {
 			// Request that the client retry after 'resourceVersionTooHighRetrySeconds' seconds.
