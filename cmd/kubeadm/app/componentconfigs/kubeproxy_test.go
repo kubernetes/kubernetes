@@ -77,12 +77,16 @@ var kubeProxyMarshalCases = []struct {
 			  scheduler: ""
 			  strictARP: false
 			  syncPeriod: 0s
+			  tcpFinTimeout: 0s
+			  tcpTimeout: 0s
+			  udpTimeout: 0s
 			kind: KubeProxyConfiguration
 			metricsBindAddress: ""
 			mode: ""
 			nodePortAddresses: null
 			oomScoreAdj: null
 			portRange: ""
+			showHiddenMetricsForVersion: ""
 			udpIdleTimeout: 0s
 			winkernel:
 			  enableDSR: false
@@ -128,12 +132,16 @@ var kubeProxyMarshalCases = []struct {
 			  scheduler: ""
 			  strictARP: false
 			  syncPeriod: 0s
+			  tcpFinTimeout: 0s
+			  tcpTimeout: 0s
+			  udpTimeout: 0s
 			kind: KubeProxyConfiguration
 			metricsBindAddress: ""
 			mode: ""
 			nodePortAddresses: null
 			oomScoreAdj: null
 			portRange: ""
+			showHiddenMetricsForVersion: ""
 			udpIdleTimeout: 0s
 			winkernel:
 			  enableDSR: false

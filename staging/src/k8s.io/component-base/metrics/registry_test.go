@@ -31,7 +31,6 @@ import (
 
 var (
 	v115         = semver.MustParse("1.15.0")
-	v114         = semver.MustParse("1.14.0")
 	alphaCounter = NewCounter(
 		&CounterOpts{
 			Namespace:      "some_namespace",
@@ -100,7 +99,6 @@ func TestRegister(t *testing.T) {
 	var tests = []struct {
 		desc                    string
 		metrics                 []*Counter
-		registryVersion         *semver.Version
 		expectedErrors          []error
 		expectedIsCreatedValues []bool
 		expectedIsDeprecated    []bool
@@ -109,7 +107,6 @@ func TestRegister(t *testing.T) {
 		{
 			desc:                    "test alpha metric",
 			metrics:                 []*Counter{alphaCounter},
-			registryVersion:         &v115,
 			expectedErrors:          []error{nil},
 			expectedIsCreatedValues: []bool{true},
 			expectedIsDeprecated:    []bool{false},
@@ -118,7 +115,6 @@ func TestRegister(t *testing.T) {
 		{
 			desc:                    "test registering same metric multiple times",
 			metrics:                 []*Counter{alphaCounter, alphaCounter},
-			registryVersion:         &v115,
 			expectedErrors:          []error{nil, prometheus.AlreadyRegisteredError{}},
 			expectedIsCreatedValues: []bool{true, true},
 			expectedIsDeprecated:    []bool{false, false},
@@ -127,7 +123,6 @@ func TestRegister(t *testing.T) {
 		{
 			desc:                    "test alpha deprecated metric",
 			metrics:                 []*Counter{alphaDeprecatedCounter},
-			registryVersion:         &v115,
 			expectedErrors:          []error{nil},
 			expectedIsCreatedValues: []bool{true},
 			expectedIsDeprecated:    []bool{true},
@@ -136,7 +131,6 @@ func TestRegister(t *testing.T) {
 		{
 			desc:                    "test alpha hidden metric",
 			metrics:                 []*Counter{alphaHiddenCounter},
-			registryVersion:         &v115,
 			expectedErrors:          []error{nil},
 			expectedIsCreatedValues: []bool{false},
 			expectedIsDeprecated:    []bool{true},
@@ -153,7 +147,7 @@ func TestRegister(t *testing.T) {
 			})
 			for i, m := range test.metrics {
 				err := registry.Register(m)
-				if err != test.expectedErrors[i] && err.Error() != test.expectedErrors[i].Error() {
+				if err != nil && err.Error() != test.expectedErrors[i].Error() {
 					t.Errorf("Got unexpected error %v, wanted %v", err, test.expectedErrors[i])
 				}
 				if m.IsCreated() != test.expectedIsCreatedValues[i] {
@@ -240,6 +234,7 @@ func TestShowHiddenMetric(t *testing.T) {
 	registry.MustRegister(alphaHiddenCounter)
 
 	ms, err := registry.Gather()
+	assert.Nil(t, err, "Gather failed %v", err)
 	assert.Equalf(t, expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
 
 	showHidden.Store(true)
@@ -257,9 +252,8 @@ func TestShowHiddenMetric(t *testing.T) {
 	expectedMetricCount = 1
 
 	ms, err = registry.Gather()
-	assert.Equalf(t, expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
 	assert.Nil(t, err, "Gather failed %v", err)
-
+	assert.Equalf(t, expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
 }
 
 func TestValidateShowHiddenMetricsVersion(t *testing.T) {

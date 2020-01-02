@@ -65,8 +65,9 @@ func (openrc OpenRCInitSystem) ServiceIsEnabled(service string) bool {
 // ServiceIsActive ensures the service is running, or attempting to run. (crash looping in the case of kubelet)
 func (openrc OpenRCInitSystem) ServiceIsActive(service string) bool {
 	args := []string{service, "status"}
-	outBytes, _ := exec.Command("rc-service", args...).Output()
-	return !strings.Contains(string(outBytes), "stopped")
+	outBytes, _ := exec.Command("rc-service", args...).CombinedOutput()
+	outStr := string(outBytes)
+	return !strings.Contains(outStr, "stopped") && !strings.Contains(outStr, "does not exist")
 }
 
 // EnableCommand return a string describing how to enable a service

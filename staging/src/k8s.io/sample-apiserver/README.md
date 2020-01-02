@@ -119,7 +119,7 @@ docker push MYPREFIX/kube-sample-apiserver:MYTAG
 
 ### Deploy into a Kubernetes Cluster
 
-Edit `artifacts/example/rc.yaml`, updating the pod template's image
+Edit `artifacts/example/deployment.yaml`, updating the pod template's image
 reference to match what you pushed and setting the `imagePullPolicy`
 to something suitable.  Then call:
 

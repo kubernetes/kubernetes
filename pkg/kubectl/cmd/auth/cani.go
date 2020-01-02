@@ -76,7 +76,7 @@ var (
 		kubectl auth can-i create pods --all-namespaces
 
 		# Check to see if I can list deployments in my current namespace
-		kubectl auth can-i list deployments.extensions
+		kubectl auth can-i list deployments.apps
 
 		# Check to see if I can do everything in my current namespace ("*" means all)
 		kubectl auth can-i '*' '*'

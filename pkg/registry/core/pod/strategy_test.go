@@ -320,6 +320,7 @@ func (g mockPodGetter) Get(context.Context, string, *metav1.GetOptions) (runtime
 
 func TestCheckLogLocation(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
+	fakePodName := "test"
 	tcs := []struct {
 		name              string
 		in                *api.Pod
@@ -330,6 +331,7 @@ func TestCheckLogLocation(t *testing.T) {
 		{
 			name: "simple",
 			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{Name: "mycontainer"},
@@ -345,6 +347,7 @@ func TestCheckLogLocation(t *testing.T) {
 		{
 			name: "insecure",
 			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{Name: "mycontainer"},
@@ -362,8 +365,9 @@ func TestCheckLogLocation(t *testing.T) {
 		{
 			name: "missing container",
 			in: &api.Pod{
-				Spec:   api.PodSpec{},
-				Status: api.PodStatus{},
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
+				Spec:       api.PodSpec{},
+				Status:     api.PodStatus{},
 			},
 			opts:              &api.PodLogOptions{},
 			expectedErr:       errors.NewBadRequest("a container name must be specified for pod test"),
@@ -372,6 +376,7 @@ func TestCheckLogLocation(t *testing.T) {
 		{
 			name: "choice of two containers",
 			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{Name: "container1"},
@@ -387,6 +392,7 @@ func TestCheckLogLocation(t *testing.T) {
 		{
 			name: "initcontainers",
 			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{Name: "container1"},
@@ -405,6 +411,7 @@ func TestCheckLogLocation(t *testing.T) {
 		{
 			name: "bad container",
 			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{Name: "container1"},
@@ -422,6 +429,7 @@ func TestCheckLogLocation(t *testing.T) {
 		{
 			name: "good with two containers",
 			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{Name: "container1"},
@@ -446,7 +454,7 @@ func TestCheckLogLocation(t *testing.T) {
 				InsecureSkipTLSVerifyTransport: fakeInsecureRoundTripper,
 			}}
 
-			_, actualTransport, err := LogLocation(getter, connectionGetter, ctx, "test", tc.opts)
+			_, actualTransport, err := LogLocation(getter, connectionGetter, ctx, fakePodName, tc.opts)
 			if !reflect.DeepEqual(err, tc.expectedErr) {
 				t.Errorf("expected %v, got %v", tc.expectedErr, err)
 			}

@@ -23,7 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -83,19 +83,15 @@ func (c *PodClient) Create(pod *v1.Pod) *v1.Pod {
 	return p
 }
 
-// CreateSyncInNamespace creates a new pod according to the framework specifications in the given namespace, and waits for it to start.
-func (c *PodClient) CreateSyncInNamespace(pod *v1.Pod, namespace string) *v1.Pod {
+// CreateSync creates a new pod according to the framework specifications, and wait for it to start.
+func (c *PodClient) CreateSync(pod *v1.Pod) *v1.Pod {
+	namespace := c.f.Namespace.Name
 	p := c.Create(pod)
 	ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(c.f.ClientSet, p.Name, namespace))
 	// Get the newest pod after it becomes running, some status may change after pod created, such as pod ip.
 	p, err := c.Get(p.Name, metav1.GetOptions{})
 	ExpectNoError(err)
 	return p
-}
-
-// CreateSync creates a new pod according to the framework specifications, and wait for it to start.
-func (c *PodClient) CreateSync(pod *v1.Pod) *v1.Pod {
-	return c.CreateSyncInNamespace(pod, c.f.Namespace.Name)
 }
 
 // CreateBatch create a batch of pods. All pods are created before waiting.
@@ -115,7 +111,7 @@ func (c *PodClient) CreateBatch(pods []*v1.Pod) []*v1.Pod {
 }
 
 // Update updates the pod object. It retries if there is a conflict, throw out error if
-// there is any other errors. name is the pod name, updateFn is the function updating the
+// there is any other apierrors. name is the pod name, updateFn is the function updating the
 // pod object.
 func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 	ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
@@ -129,7 +125,7 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 			Logf("Successfully updated pod %q", name)
 			return true, nil
 		}
-		if errors.IsConflict(err) {
+		if apierrors.IsConflict(err) {
 			Logf("Conflicting update to pod %q, re-get and re-update: %v", name, err)
 			return false, nil
 		}
@@ -140,14 +136,9 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 // DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't
 // disappear before the timeout, it will fail the test.
 func (c *PodClient) DeleteSync(name string, options *metav1.DeleteOptions, timeout time.Duration) {
-	c.DeleteSyncInNamespace(name, c.f.Namespace.Name, options, timeout)
-}
-
-// DeleteSyncInNamespace deletes the pod from the namespace and wait for the pod to disappear for `timeout`. If the pod doesn't
-// disappear before the timeout, it will fail the test.
-func (c *PodClient) DeleteSyncInNamespace(name string, namespace string, options *metav1.DeleteOptions, timeout time.Duration) {
+	namespace := c.f.Namespace.Name
 	err := c.Delete(name, options)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		Failf("Failed to delete pod %q: %v", name, err)
 	}
 	gomega.Expect(e2epod.WaitForPodToDisappear(c.f.ClientSet, namespace, name, labels.Everything(),
@@ -206,23 +197,6 @@ func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 			}
 		},
 	)).To(gomega.Succeed(), "wait for pod %q to success", name)
-}
-
-// WaitForFailure waits for pod to fail.
-func (c *PodClient) WaitForFailure(name string, timeout time.Duration) {
-	f := c.f
-	gomega.Expect(e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
-		func(pod *v1.Pod) (bool, error) {
-			switch pod.Status.Phase {
-			case v1.PodFailed:
-				return true, nil
-			case v1.PodSucceeded:
-				return true, fmt.Errorf("pod %q successed with reason: %q, message: %q", name, pod.Status.Reason, pod.Status.Message)
-			default:
-				return false, nil
-			}
-		},
-	)).To(gomega.Succeed(), "wait for pod %q to fail", name)
 }
 
 // WaitForFinish waits for pod to finish running, regardless of success or failure.

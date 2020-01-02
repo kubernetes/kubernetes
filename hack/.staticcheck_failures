@@ -1,7 +1,5 @@
 cluster/images/etcd-version-monitor
 cluster/images/etcd/migrate
-cmd/kube-proxy/app
-cmd/linkcheck
 pkg/controller/daemon
 pkg/controller/deployment
 pkg/controller/disruption
@@ -19,11 +17,6 @@ pkg/kubelet/pluginmanager/operationexecutor
 pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/remote
 pkg/probe/http
-pkg/proxy/healthcheck
-pkg/proxy/iptables
-pkg/proxy/userspace
-pkg/proxy/winkernel
-pkg/proxy/winuserspace
 pkg/registry/autoscaling/horizontalpodautoscaler/storage
 pkg/registry/core/namespace/storage
 pkg/registry/core/persistentvolumeclaim/storage
@@ -65,14 +58,6 @@ test/e2e/apps
 test/e2e/autoscaling
 test/e2e/instrumentation/logging/stackdriver
 test/e2e/instrumentation/monitoring
-test/images/agnhost/dns
-test/images/agnhost/inclusterclient
-test/images/agnhost/net/nat
-test/images/agnhost/netexec
-test/images/agnhost/pause
-test/images/agnhost/serve-hostname
-test/images/agnhost/webhook
-test/images/pets/peer-finder
 test/integration/auth
 test/integration/client
 test/integration/deployment
@@ -82,13 +67,8 @@ test/integration/examples
 test/integration/framework
 test/integration/garbagecollector
 test/integration/master
-test/integration/replicationcontroller
-test/integration/scale
 test/integration/scheduler_perf
-test/integration/serviceaccount
-test/integration/serving
 test/integration/ttlcontroller
-test/integration/volume
 vendor/k8s.io/apimachinery/pkg/api/meta
 vendor/k8s.io/apimachinery/pkg/api/resource
 vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
@@ -145,7 +125,6 @@ vendor/k8s.io/client-go/restmapper
 vendor/k8s.io/client-go/tools/leaderelection
 vendor/k8s.io/client-go/transport
 vendor/k8s.io/component-base/metrics
-vendor/k8s.io/kubectl/pkg/cmd/annotate
 vendor/k8s.io/kubectl/pkg/cmd/certificates
 vendor/k8s.io/kubectl/pkg/cmd/config
 vendor/k8s.io/kubectl/pkg/cmd/edit

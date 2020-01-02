@@ -20,7 +20,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -73,7 +73,7 @@ func UpdateService(c clientset.Interface, namespace, serviceName string, update 
 
 		service, err = c.CoreV1().Services(namespace).Update(service)
 
-		if !errors.IsConflict(err) && !errors.IsServerTimeout(err) {
+		if !apierrors.IsConflict(err) && !apierrors.IsServerTimeout(err) {
 			return service, err
 		}
 	}
@@ -92,12 +92,6 @@ func GetIngressPoint(ing *v1.LoadBalancerIngress) string {
 		host = ing.Hostname
 	}
 	return host
-}
-
-// EnableAndDisableInternalLB returns two functions for enabling and disabling the internal load balancer
-// setting for the supported cloud providers (currently GCE/GKE and Azure) and empty functions for others.
-func EnableAndDisableInternalLB() (enable func(svc *v1.Service), disable func(svc *v1.Service)) {
-	return framework.TestContext.CloudConfig.Provider.EnableAndDisableInternalLB()
 }
 
 // GetServiceLoadBalancerCreationTimeout returns a timeout value for creating a load balancer of a service.

@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+load("//build:build_defs.bzl", "go_proto_checkedin_test")
+
+# gazelle:exclude build.gen.pb.go
+
+# build.proto is copied from Bazel 0.22.0
+# https://github.com/bazelbuild/bazel/tree/0.22.0/src/main/protobuf
+
+go_proto_checkedin_test(
+    src = "build.gen.pb.go",
+)
+
+proto_library(
+    name = "blaze_query_proto",
+    srcs = ["build.proto"],
+    visibility = ["//visibility:public"],
+)
+
+go_proto_library(
+    name = "go_default_library",
+    importpath = "github.com/bazelbuild/buildtools/build_proto",
+    proto = ":blaze_query_proto",
+    visibility = ["//visibility:public"],
+)

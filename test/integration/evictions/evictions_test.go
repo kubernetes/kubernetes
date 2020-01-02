@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/api/policy/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -114,9 +114,9 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 			err := wait.PollImmediate(5*time.Second, 60*time.Second, func() (bool, error) {
 				e := clientSet.PolicyV1beta1().Evictions(ns.Name).Evict(eviction)
 				switch {
-				case errors.IsTooManyRequests(e):
+				case apierrors.IsTooManyRequests(e):
 					return false, nil
-				case errors.IsConflict(e):
+				case apierrors.IsConflict(e):
 					return false, fmt.Errorf("Unexpected Conflict (409) error caused by failing to handle concurrent PDB updates: %v", e)
 				case e == nil:
 					return true, nil
@@ -132,7 +132,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 
 			_, err = clientSet.CoreV1().Pods(ns.Name).Get(podName, metav1.GetOptions{})
 			switch {
-			case errors.IsNotFound(err):
+			case apierrors.IsNotFound(err):
 				atomic.AddUint32(&numberPodsEvicted, 1)
 				// pod was evicted and deleted so return from goroutine immediately
 				return
@@ -222,9 +222,9 @@ func TestTerminalPodEviction(t *testing.T) {
 	err = wait.PollImmediate(5*time.Second, 60*time.Second, func() (bool, error) {
 		e := clientSet.PolicyV1beta1().Evictions(ns.Name).Evict(eviction)
 		switch {
-		case errors.IsTooManyRequests(e):
+		case apierrors.IsTooManyRequests(e):
 			return false, nil
-		case errors.IsConflict(e):
+		case apierrors.IsConflict(e):
 			return false, fmt.Errorf("Unexpected Conflict (409) error caused by failing to handle concurrent PDB updates: %v", e)
 		case e == nil:
 			return true, nil

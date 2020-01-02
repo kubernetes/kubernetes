@@ -27,7 +27,7 @@ import (
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -446,7 +446,7 @@ func (j *TestJig) UpdateService(update func(*v1.Service)) (*v1.Service, error) {
 		if err == nil {
 			return j.sanityCheckService(result, service.Spec.Type)
 		}
-		if !errors.IsConflict(err) && !errors.IsServerTimeout(err) {
+		if !apierrors.IsConflict(err) && !apierrors.IsServerTimeout(err) {
 			return nil, fmt.Errorf("failed to update Service %q: %v", j.Name, err)
 		}
 	}
@@ -680,6 +680,7 @@ func (j *TestJig) Scale(replicas int) error {
 		return fmt.Errorf("failed to get scale for RC %q: %v", rc, err)
 	}
 
+	scale.ResourceVersion = "" // indicate the scale update should be unconditional
 	scale.Spec.Replicas = int32(replicas)
 	_, err = j.Client.CoreV1().ReplicationControllers(j.Namespace).UpdateScale(rc, scale)
 	if err != nil {

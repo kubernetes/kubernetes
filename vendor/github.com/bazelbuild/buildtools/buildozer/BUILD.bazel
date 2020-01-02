@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "github.com/bazelbuild/buildtools/buildozer",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//build:go_default_library",
+        "//edit:go_default_library",
+        "//tables:go_default_library",
+    ],
+    x_defs = {
+        "main.buildVersion": "{STABLE_buildVersion}",
+        "main.buildScmRevision": "{STABLE_buildScmRevision}",
+    },
+)
+
+go_binary(
+    name = "buildozer",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)

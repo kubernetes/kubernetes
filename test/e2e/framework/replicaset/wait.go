@@ -19,23 +19,12 @@ package replicaset
 import (
 	"fmt"
 
-	"github.com/onsi/ginkgo"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
-	testutils "k8s.io/kubernetes/test/utils"
 )
-
-// RunReplicaSet launches (and verifies correctness) of a replicaset.
-func RunReplicaSet(config testutils.ReplicaSetConfig) error {
-	ginkgo.By(fmt.Sprintf("creating replicaset %s in namespace %s", config.Name, config.Namespace))
-	config.NodeDumpFunc = framework.DumpNodeDebugInfo
-	config.ContainerDumpFunc = e2ekubectl.LogFailedContainers
-	return testutils.RunReplicaSet(config)
-}
 
 // WaitForReadyReplicaSet waits until the replicaset has all of its replicas ready.
 func WaitForReadyReplicaSet(c clientset.Interface, ns, name string) error {

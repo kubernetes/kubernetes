@@ -22,9 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/klog"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // MetadataFactory is a factory to produce PriorityMetadata.
@@ -56,15 +54,7 @@ func NewMetadataFactory(
 
 // priorityMetadata is a type that is passed as metadata for priority functions
 type priorityMetadata struct {
-	podLimits               *schedulernodeinfo.Resource
-	podTolerations          []v1.Toleration
-	affinity                *v1.Affinity
-	podSelector             labels.Selector
-	controllerRef           *metav1.OwnerReference
-	podFirstServiceSelector labels.Selector
-	totalNumNodes           int
-	podTopologySpreadMap    *podTopologySpreadMap
-	topologyScore           topologyPairToScore
+	podSelector labels.Selector
 }
 
 // PriorityMetadata is a MetadataProducer.  Node info can be nil.
@@ -77,38 +67,9 @@ func (pmf *MetadataFactory) PriorityMetadata(
 	if pod == nil {
 		return nil
 	}
-	totalNumNodes := 0
-	var allNodes []*schedulernodeinfo.NodeInfo
-	if sharedLister != nil {
-		if l, err := sharedLister.NodeInfos().List(); err == nil {
-			totalNumNodes = len(l)
-			allNodes = l
-		}
-	}
-	tpSpreadMap, err := buildPodTopologySpreadMap(pod, filteredNodes, allNodes)
-	if err != nil {
-		klog.Errorf("Error building podTopologySpreadMap: %v", err)
-		return nil
-	}
 	return &priorityMetadata{
-		podLimits:               getResourceLimits(pod),
-		podTolerations:          getAllTolerationPreferNoSchedule(pod.Spec.Tolerations),
-		affinity:                pod.Spec.Affinity,
-		podSelector:             getSelector(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister, pmf.statefulSetLister),
-		controllerRef:           metav1.GetControllerOf(pod),
-		podFirstServiceSelector: getFirstServiceSelector(pod, pmf.serviceLister),
-		totalNumNodes:           totalNumNodes,
-		podTopologySpreadMap:    tpSpreadMap,
-		topologyScore:           buildTopologyPairToScore(pod, sharedLister, filteredNodes, pmf.hardPodAffinityWeight),
+		podSelector: getSelector(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister, pmf.statefulSetLister),
 	}
-}
-
-// getFirstServiceSelector returns one selector of services the given pod.
-func getFirstServiceSelector(pod *v1.Pod, sl corelisters.ServiceLister) (firstServiceSelector labels.Selector) {
-	if services, err := schedulerlisters.GetPodServices(sl, pod); err == nil && len(services) > 0 {
-		return labels.SelectorFromSet(services[0].Spec.Selector)
-	}
-	return nil
 }
 
 // getSelector returns a selector for the services, RCs, RSs, and SSs matching the given pod.

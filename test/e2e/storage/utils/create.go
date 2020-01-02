@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/pkg/errors"
 
@@ -28,14 +29,13 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
@@ -155,7 +155,7 @@ func CreateItems(f *framework.Framework, items ...interface{}) (func(), error) {
 		// command line flags, because they would also start to apply
 		// to non-namespaced items.
 		for _, destructor := range destructors {
-			if err := destructor(); err != nil && !apierrs.IsNotFound(err) {
+			if err := destructor(); err != nil && !apierrors.IsNotFound(err) {
 				framework.Logf("deleting failed: %s", err)
 			}
 		}
@@ -360,18 +360,18 @@ func patchItemRecursively(f *framework.Framework, item interface{}) error {
 		PatchNamespace(f, &item.ObjectMeta.Namespace)
 	case *appsv1.StatefulSet:
 		PatchNamespace(f, &item.ObjectMeta.Namespace)
-		if err := e2epod.PatchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
+		if err := patchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
 			return err
 		}
-		if err := e2epod.PatchContainerImages(item.Spec.Template.Spec.InitContainers); err != nil {
+		if err := patchContainerImages(item.Spec.Template.Spec.InitContainers); err != nil {
 			return err
 		}
 	case *appsv1.DaemonSet:
 		PatchNamespace(f, &item.ObjectMeta.Namespace)
-		if err := e2epod.PatchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
+		if err := patchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
 			return err
 		}
-		if err := e2epod.PatchContainerImages(item.Spec.Template.Spec.InitContainers); err != nil {
+		if err := patchContainerImages(item.Spec.Template.Spec.InitContainers); err != nil {
 			return err
 		}
 	default:
@@ -623,4 +623,18 @@ func PrettyPrint(item interface{}) string {
 		return string(data)
 	}
 	return fmt.Sprintf("%+v", item)
+}
+
+// patchContainerImages replaces the specified Container Registry with a custom
+// one provided via the KUBE_TEST_REPO_LIST env variable
+func patchContainerImages(containers []v1.Container) error {
+	var err error
+	for _, c := range containers {
+		c.Image, err = imageutils.ReplaceRegistryInImageURL(c.Image)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

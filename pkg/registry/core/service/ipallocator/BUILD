@@ -13,8 +13,6 @@ go_library(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/registry/core/service/allocator:go_default_library",
-        "//vendor/k8s.io/utils/integer:go_default_library",
-        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 

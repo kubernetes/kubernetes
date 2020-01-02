@@ -2,7 +2,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["default_registry.go"],
+    srcs = ["registry.go"],
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins",
     visibility = ["//visibility:public"],
     deps = [
@@ -21,7 +21,6 @@ go_library(
         "//pkg/scheduler/framework/plugins/nodeunschedulable:go_default_library",
         "//pkg/scheduler/framework/plugins/nodevolumelimits:go_default_library",
         "//pkg/scheduler/framework/plugins/podtopologyspread:go_default_library",
-        "//pkg/scheduler/framework/plugins/requestedtocapacityratio:go_default_library",
         "//pkg/scheduler/framework/plugins/serviceaffinity:go_default_library",
         "//pkg/scheduler/framework/plugins/tainttoleration:go_default_library",
         "//pkg/scheduler/framework/plugins/volumebinding:go_default_library",
@@ -47,6 +46,7 @@ filegroup(
         ":package-srcs",
         "//pkg/scheduler/framework/plugins/defaultpodtopologyspread:all-srcs",
         "//pkg/scheduler/framework/plugins/examples:all-srcs",
+        "//pkg/scheduler/framework/plugins/helper:all-srcs",
         "//pkg/scheduler/framework/plugins/imagelocality:all-srcs",
         "//pkg/scheduler/framework/plugins/interpodaffinity:all-srcs",
         "//pkg/scheduler/framework/plugins/migration:all-srcs",
@@ -59,7 +59,6 @@ filegroup(
         "//pkg/scheduler/framework/plugins/nodeunschedulable:all-srcs",
         "//pkg/scheduler/framework/plugins/nodevolumelimits:all-srcs",
         "//pkg/scheduler/framework/plugins/podtopologyspread:all-srcs",
-        "//pkg/scheduler/framework/plugins/requestedtocapacityratio:all-srcs",
         "//pkg/scheduler/framework/plugins/serviceaffinity:all-srcs",
         "//pkg/scheduler/framework/plugins/tainttoleration:all-srcs",
         "//pkg/scheduler/framework/plugins/volumebinding:all-srcs",
@@ -72,7 +71,7 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["default_registry_test.go"],
+    srcs = ["registry_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/scheduler/apis/config:go_default_library",

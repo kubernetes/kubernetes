@@ -165,17 +165,16 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	// PLEGDiscardEvents is a Histogram that tracks the duration (in seconds) it takes for discarding events in the Kubelet's
-	// Pod Lifecycle Event Generator (PLEG).
-	PLEGDiscardEvents = metrics.NewCounterVec(
+	// PLEGDiscardEvents is a Counter that tracks the number of discarding events in the Kubelet's Pod Lifecycle Event Generator (PLEG).
+	PLEGDiscardEvents = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           PLEGDiscardEventsKey,
 			Help:           "The number of discard events in PLEG.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{},
 	)
+
 	// PLEGRelistInterval is a Histogram that tracks the intervals (in seconds) between relisting in the Kubelet's
 	// Pod Lifecycle Event Generator (PLEG).
 	PLEGRelistInterval = metrics.NewHistogram(

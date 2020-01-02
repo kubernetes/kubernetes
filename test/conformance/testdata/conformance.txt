@@ -1,4 +1,4 @@
-test/e2e/apimachinery/aggregator.go: "Should be able to support the 1.10 Sample API Server using the current Aggregator"
+test/e2e/apimachinery/aggregator.go: "Should be able to support the 1.17 Sample API Server using the current Aggregator"
 test/e2e/apimachinery/crd_conversion_webhook.go: "should be able to convert from CR v1 to CR v2"
 test/e2e/apimachinery/crd_conversion_webhook.go: "should be able to convert a non homogeneous list of CRs"
 test/e2e/apimachinery/crd_publish_openapi.go: "works for CRD with validation schema"

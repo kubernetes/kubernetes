@@ -1,0 +1,55 @@
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])
+
+load(
+    "@io_bazel_rules_go//go:def.bzl",
+    "go_binary",
+    "go_library",
+    "go_test",
+)
+
+go_binary(
+    name = "kazel",
+    embed = [":go_default_library"],
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "config.go",
+        "diff.go",
+        "generator.go",
+        "kazel.go",
+        "sourcerer.go",
+    ],
+    importpath = "k8s.io/repo-infra/cmd/kazel",
+    deps = [
+        "@com_github_bazelbuild_buildtools//build:go_default_library",
+        "@io_k8s_klog//:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "generator_test.go",
+        "kazel_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = ["@com_github_bazelbuild_buildtools//build:go_default_library"],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
+)

@@ -25,7 +25,7 @@ import (
 	"github.com/google/uuid"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -86,7 +86,7 @@ func TestPatchConflicts(t *testing.T) {
 				Do().
 				Get()
 
-			if errors.IsConflict(err) {
+			if apierrors.IsConflict(err) {
 				t.Logf("tolerated conflict error patching %s: %v", "secrets", err)
 				return
 			}

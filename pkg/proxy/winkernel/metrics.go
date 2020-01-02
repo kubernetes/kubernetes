@@ -18,7 +18,6 @@ package winkernel
 
 import (
 	"sync"
-	"time"
 
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -68,14 +67,4 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(DeprecatedSyncProxyRulesLatency)
 		legacyregistry.MustRegister(SyncProxyRulesLastTimestamp)
 	})
-}
-
-// Gets the time since the specified start in microseconds.
-func sinceInMicroseconds(start time.Time) float64 {
-	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
-}
-
-// Gets the time since the specified start in seconds.
-func sinceInSeconds(start time.Time) float64 {
-	return time.Since(start).Seconds()
 }

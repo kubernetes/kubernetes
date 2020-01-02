@@ -26,7 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -283,7 +283,7 @@ func waitForReflection(t *testing.T, nodeLister corelisters.NodeLister, key stri
 		switch {
 		case err == nil && passFunc(n):
 			return true, nil
-		case errors.IsNotFound(err):
+		case apierrors.IsNotFound(err):
 			nodes = append(nodes, nil)
 		case err != nil:
 			t.Errorf("Unexpected error: %v", err)
@@ -557,7 +557,7 @@ func runPodWithContainers(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) 
 func podDeleted(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
 		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		if pod.DeletionTimestamp != nil {
@@ -737,7 +737,7 @@ func getPod(cs clientset.Interface, podName string, podNamespace string) (*v1.Po
 func cleanupPods(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
 	for _, p := range pods {
 		err := cs.CoreV1().Pods(p.Namespace).Delete(p.Name, metav1.NewDeleteOptions(0))
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			t.Errorf("error while deleting pod %v/%v: %v", p.Namespace, p.Name, err)
 		}
 	}

@@ -28,7 +28,7 @@ import (
 	_ "github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -84,7 +84,7 @@ func addOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods
 		node.Annotations[v1.PreferAvoidPodsAnnotationKey] = string(taintsData)
 		_, err = c.CoreV1().Nodes().Update(node)
 		if err != nil {
-			if !apierrs.IsConflict(err) {
+			if !apierrors.IsConflict(err) {
 				framework.ExpectNoError(err)
 			} else {
 				framework.Logf("Conflict when trying to add/update avoidPods %v to %v with error %v", avoidPods, nodeName, err)
@@ -113,7 +113,7 @@ func removeAvoidPodsOffNode(c clientset.Interface, nodeName string) {
 		delete(node.Annotations, v1.PreferAvoidPodsAnnotationKey)
 		_, err = c.CoreV1().Nodes().Update(node)
 		if err != nil {
-			if !apierrs.IsConflict(err) {
+			if !apierrors.IsConflict(err) {
 				framework.ExpectNoError(err)
 			} else {
 				framework.Logf("Conflict when trying to remove avoidPods to %v", nodeName)

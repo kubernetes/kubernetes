@@ -41,7 +41,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -522,7 +522,7 @@ func (j *TestJig) Update(update func(ing *networkingv1beta1.Ingress)) {
 			framework.DescribeIng(j.Ingress.Namespace)
 			return
 		}
-		if !apierrs.IsConflict(err) && !apierrs.IsServerTimeout(err) {
+		if !apierrors.IsConflict(err) && !apierrors.IsServerTimeout(err) {
 			framework.Failf("failed to update ingress %s/%s: %v", ns, name, err)
 		}
 	}

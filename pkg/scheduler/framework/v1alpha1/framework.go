@@ -78,6 +78,10 @@ type framework struct {
 	informerFactory informers.SharedInformerFactory
 
 	metricsRecorder *metricsRecorder
+
+	// Indicates that RunFilterPlugins should accumulate all failed statuses and not return
+	// after the first failure.
+	runAllFilters bool
 }
 
 // extensionPoint encapsulates desired and applied set of plugins at a specific extension
@@ -112,6 +116,7 @@ type frameworkOptions struct {
 	informerFactory      informers.SharedInformerFactory
 	snapshotSharedLister schedulerlisters.SharedLister
 	metricsRecorder      *metricsRecorder
+	runAllFilters        bool
 }
 
 // Option for the framework.
@@ -135,6 +140,14 @@ func WithInformerFactory(informerFactory informers.SharedInformerFactory) Option
 func WithSnapshotSharedLister(snapshotSharedLister schedulerlisters.SharedLister) Option {
 	return func(o *frameworkOptions) {
 		o.snapshotSharedLister = snapshotSharedLister
+	}
+}
+
+// WithRunAllFilters sets the runAllFilters flag, which means RunFilterPlugins accumulates
+// all failure Statuses.
+func WithRunAllFilters(runAllFilters bool) Option {
+	return func(o *frameworkOptions) {
+		o.runAllFilters = runAllFilters
 	}
 }
 
@@ -166,6 +179,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		clientSet:             options.clientSet,
 		informerFactory:       options.informerFactory,
 		metricsRecorder:       options.metricsRecorder,
+		runAllFilters:         options.runAllFilters,
 	}
 	if plugins == nil {
 		return f, nil
@@ -183,6 +197,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	}
 
 	pluginsMap := make(map[string]Plugin)
+	var totalPriority int64
 	for name, factory := range r {
 		// initialize only needed plugins.
 		if _, ok := pg[name]; !ok {
@@ -201,6 +216,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		if f.pluginNameToWeightMap[name] == 0 {
 			f.pluginNameToWeightMap[name] = 1
 		}
+		// Checks totalPriority against MaxTotalScore to avoid overflow
+		if int64(f.pluginNameToWeightMap[name])*MaxNodeScore > MaxTotalScore-totalPriority {
+			return nil, fmt.Errorf("total score of Score plugins could overflow")
+		}
+		totalPriority += int64(f.pluginNameToWeightMap[name]) * MaxNodeScore
 	}
 
 	for _, e := range f.getExtensionPoints(plugins) {
@@ -395,27 +415,37 @@ func (f *framework) RunFilterPlugins(
 	state *CycleState,
 	pod *v1.Pod,
 	nodeInfo *schedulernodeinfo.NodeInfo,
-) (status *Status) {
+) (finalStatus *Status) {
 	if state.ShouldRecordFrameworkMetrics() {
 		startTime := time.Now()
 		defer func() {
-			f.metricsRecorder.observeExtensionPointDurationAsync(filter, status, metrics.SinceInSeconds(startTime))
+			f.metricsRecorder.observeExtensionPointDurationAsync(filter, finalStatus, metrics.SinceInSeconds(startTime))
 		}()
 	}
 	for _, pl := range f.filterPlugins {
-		status = f.runFilterPlugin(ctx, pl, state, pod, nodeInfo)
-		if !status.IsSuccess() {
-			if !status.IsUnschedulable() {
-				errMsg := fmt.Sprintf("error while running %q filter plugin for pod %q: %v",
-					pl.Name(), pod.Name, status.Message())
-				klog.Error(errMsg)
-				return NewStatus(Error, errMsg)
+		pluginStatus := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo)
+		if !pluginStatus.IsSuccess() {
+			if !pluginStatus.IsUnschedulable() {
+				// Filter plugins are not supposed to return any status other than
+				// Success or Unschedulable.
+				return NewStatus(Error, fmt.Sprintf("running %q filter plugin for pod %q: %v", pl.Name(), pod.Name, pluginStatus.Message()))
 			}
-			return status
+			if !f.runAllFilters {
+				// Exit early if we don't need to run all filters.
+				return pluginStatus
+			}
+			// We need to continue and run all filters.
+			if finalStatus.IsSuccess() {
+				// This is the first failed plugin.
+				finalStatus = pluginStatus
+				continue
+			}
+			// We get here only if more than one Filter return unschedulable and runAllFilters is true.
+			finalStatus.reasons = append(finalStatus.reasons, pluginStatus.reasons...)
 		}
 	}
 
-	return nil
+	return finalStatus
 }
 
 func (f *framework) runFilterPlugin(ctx context.Context, pl FilterPlugin, state *CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {

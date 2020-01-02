@@ -22,7 +22,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -31,7 +31,6 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 const (
@@ -186,7 +185,7 @@ func DeletePersistentVolume(c clientset.Interface, pvName string) error {
 	if c != nil && len(pvName) > 0 {
 		framework.Logf("Deleting PersistentVolume %q", pvName)
 		err := c.CoreV1().PersistentVolumes().Delete(pvName, nil)
-		if err != nil && !apierrs.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return fmt.Errorf("PV Delete API error: %v", err)
 		}
 	}
@@ -198,7 +197,7 @@ func DeletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns strin
 	if c != nil && len(pvcName) > 0 {
 		framework.Logf("Deleting PersistentVolumeClaim %q", pvcName)
 		err := c.CoreV1().PersistentVolumeClaims(ns).Delete(pvcName, nil)
-		if err != nil && !apierrs.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return fmt.Errorf("PVC Delete API error: %v", err)
 		}
 	}
@@ -275,10 +274,10 @@ func DeletePVCandValidatePVGroup(c clientset.Interface, ns string, pvols PVMap, 
 				if err = DeletePVCandValidatePV(c, ns, pvc, pv, expectPVPhase); err != nil {
 					return err
 				}
-			} else if !apierrs.IsNotFound(err) {
+			} else if !apierrors.IsNotFound(err) {
 				return fmt.Errorf("PVC Get API error: %v", err)
 			}
-			// delete pvckey from map even if apierrs.IsNotFound above is true and thus the
+			// delete pvckey from map even if apierrors.IsNotFound above is true and thus the
 			// claim was not actually deleted here
 			delete(claims, pvcKey)
 			deletedPVCs++
@@ -678,12 +677,6 @@ func deletePD(pdName string) error {
 	return framework.TestContext.CloudConfig.Provider.DeletePD(pdName)
 }
 
-// MakeWritePod returns a pod definition based on the namespace. The pod references the PVC's
-// name.
-func MakeWritePod(ns string, pvc *v1.PersistentVolumeClaim) *v1.Pod {
-	return e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')")
-}
-
 // WaitForPVClaimBoundPhase waits until all pvcs phase set to bound
 func WaitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.PersistentVolumeClaim, timeout time.Duration) ([]*v1.PersistentVolume, error) {
 	persistentvolumes := make([]*v1.PersistentVolume, len(pvclaims))
@@ -774,19 +767,6 @@ func CreatePVSource(zone string) (*v1.PersistentVolumeSource, error) {
 // DeletePVSource deletes a PV source.
 func DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
 	return framework.TestContext.CloudConfig.Provider.DeletePVSource(pvSource)
-}
-
-// GetBoundPV returns a PV details.
-func GetBoundPV(client clientset.Interface, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
-	// Get new copy of the claim
-	claim, err := client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the bound PV
-	pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
-	return pv, err
 }
 
 // GetDefaultStorageClassName returns default storageClass or return error

@@ -72,7 +72,7 @@ var (
 )
 
 func newWalkFunc(invalidLink *bool, client *http.Client) filepath.WalkFunc {
-	return func(filePath string, info os.FileInfo, err error) error {
+	return func(filePath string, info os.FileInfo, initErr error) error {
 		hasSuffix := false
 		for _, suffix := range *fileSuffix {
 			hasSuffix = hasSuffix || strings.HasSuffix(info.Name(), suffix)

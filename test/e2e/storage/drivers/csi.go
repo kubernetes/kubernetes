@@ -44,7 +44,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -492,7 +492,7 @@ func waitForCSIDriverRegistrationOnNode(nodeName string, driverName string, cs c
 
 	return wait.PollImmediate(10*time.Second, csiNodeRegisterTimeout, func() (bool, error) {
 		csiNode, err := cs.StorageV1().CSINodes().Get(nodeName, metav1.GetOptions{})
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
 		for _, driver := range csiNode.Spec.Drivers {

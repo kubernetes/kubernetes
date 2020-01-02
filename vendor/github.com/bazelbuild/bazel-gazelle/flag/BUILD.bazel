@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["flag.go"],
+    importpath = "github.com/bazelbuild/bazel-gazelle/flag",
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "all_files",
+    testonly = True,
+    srcs = [
+        "BUILD.bazel",
+        "flag.go",
+    ],
+    visibility = ["//visibility:public"],
+)

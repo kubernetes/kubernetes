@@ -34,7 +34,6 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
@@ -586,7 +585,6 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				cache,
 				queue,
 				nil,
-				predicates.EmptyMetadataProducer,
 				priorities.EmptyMetadataProducer,
 				emptySnapshot,
 				fwk,
@@ -594,7 +592,6 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				nil,
 				informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
 				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
-				false,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				false)

@@ -19,6 +19,7 @@ package common
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -191,7 +192,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			))
 
 			if readOnlyRootFilesystem {
-				podClient.WaitForFailure(podName, framework.PodStartTimeout)
+				waitForFailure(f, podName, framework.PodStartTimeout)
 			} else {
 				podClient.WaitForSuccess(podName, framework.PodStartTimeout)
 			}
@@ -366,3 +367,19 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		})
 	})
 })
+
+// waitForFailure waits for pod to fail.
+func waitForFailure(f *framework.Framework, name string, timeout time.Duration) {
+	gomega.Expect(e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
+		func(pod *v1.Pod) (bool, error) {
+			switch pod.Status.Phase {
+			case v1.PodFailed:
+				return true, nil
+			case v1.PodSucceeded:
+				return true, fmt.Errorf("pod %q successed with reason: %q, message: %q", name, pod.Status.Reason, pod.Status.Message)
+			default:
+				return false, nil
+			}
+		},
+	)).To(gomega.Succeed(), "wait for pod %q to fail", name)
+}

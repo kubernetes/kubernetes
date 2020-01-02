@@ -56,7 +56,6 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -143,23 +142,11 @@ func podWithResources(id, desiredHost string, limits v1.ResourceList, requests v
 	return pod
 }
 
-func PredicateOne(pod *v1.Pod, meta predicates.Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
-	return true, nil, nil
-}
-
-func PriorityOne(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
-	return framework.NodeScore{}, nil
-}
-
 type mockScheduler struct {
 	result core.ScheduleResult
 	err    error
 }
 
-func (es mockScheduler) PredicateMetadataProducer() predicates.MetadataProducer {
-	return nil
-
-}
 func (es mockScheduler) Schedule(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (core.ScheduleResult, error) {
 	return es.result, es.err
 }
@@ -187,12 +174,7 @@ func TestSchedulerCreation(t *testing.T) {
 	client := clientsetfake.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-	testSource := "testProvider"
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")})
-
-	RegisterFitPredicate("PredicateOne", PredicateOne)
-	RegisterPriorityMapReduceFunction("PriorityOne", PriorityOne, nil, 1)
-	RegisterAlgorithmProvider(testSource, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -201,7 +183,6 @@ func TestSchedulerCreation(t *testing.T) {
 		NewPodInformer(client, 0),
 		eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
 		stopCh,
-		WithAlgorithmSource(schedulerapi.SchedulerAlgorithmSource{Provider: &testSource}),
 		WithPodInitialBackoffSeconds(1),
 		WithPodMaxBackoffSeconds(10),
 	)
@@ -212,7 +193,7 @@ func TestSchedulerCreation(t *testing.T) {
 
 	// Test case for when a plugin name in frameworkOutOfTreeRegistry already exist in defaultRegistry.
 	fakeFrameworkPluginName := ""
-	for name := range frameworkplugins.NewDefaultRegistry(&frameworkplugins.RegistryArgs{}) {
+	for name := range frameworkplugins.NewInTreeRegistry(&frameworkplugins.RegistryArgs{}) {
 		fakeFrameworkPluginName = name
 		break
 	}
@@ -226,7 +207,6 @@ func TestSchedulerCreation(t *testing.T) {
 		NewPodInformer(client, 0),
 		eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
 		stopCh,
-		WithAlgorithmSource(schedulerapi.SchedulerAlgorithmSource{Provider: &testSource}),
 		WithPodInitialBackoffSeconds(1),
 		WithPodMaxBackoffSeconds(10),
 		WithFrameworkOutOfTreeRegistry(registryFake),
@@ -310,6 +290,12 @@ func TestScheduler(t *testing.T) {
 				},
 				AssumeFunc: func(pod *v1.Pod) {
 					gotAssumedPod = pod
+				},
+				IsAssumedPodFunc: func(pod *v1.Pod) bool {
+					if pod == nil || gotAssumedPod == nil {
+						return false
+					}
+					return pod.UID == gotAssumedPod.UID
 				},
 			}
 
@@ -451,9 +437,8 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	select {
 	case err := <-errChan:
 		expectErr := &core.FitError{
-			Pod:              secondPod,
-			NumAllNodes:      1,
-			FailedPredicates: core.FailedPredicateMap{},
+			Pod:         secondPod,
+			NumAllNodes: 1,
 			FilteredNodesStatuses: framework.NodeToStatusMap{
 				node.Name: framework.NewStatus(
 					framework.Unschedulable,
@@ -663,7 +648,6 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 		expectErr := &core.FitError{
 			Pod:                   podWithTooBigResourceRequests,
 			NumAllNodes:           len(nodes),
-			FailedPredicates:      core.FailedPredicateMap{},
 			FilteredNodesStatuses: failedNodeStatues,
 		}
 		if len(fmt.Sprint(expectErr)) > 150 {
@@ -691,7 +675,6 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		scache,
 		internalqueue.NewSchedulingQueue(nil),
 		nil,
-		predicates.EmptyMetadataProducer,
 		priorities.EmptyMetadataProducer,
 		nodeinfosnapshot.NewEmptySnapshot(),
 		fwk,
@@ -699,7 +682,6 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		nil,
 		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
-		false,
 		false,
 		schedulerapi.DefaultPercentageOfNodesToScore,
 		false,
@@ -749,7 +731,6 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		scache,
 		queue,
 		nil,
-		predicates.EmptyMetadataProducer,
 		priorities.EmptyMetadataProducer,
 		nodeinfosnapshot.NewEmptySnapshot(),
 		fwk,
@@ -757,7 +738,6 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		nil,
 		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
-		false,
 		false,
 		schedulerapi.DefaultPercentageOfNodesToScore,
 		false,
@@ -905,7 +885,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 				FindErr: findErr,
 			},
 			eventReason: "FailedScheduling",
-			expectError: fmt.Errorf("error while running %q filter plugin for pod %q: %v", volumebinding.Name, "foo", findErr),
+			expectError: fmt.Errorf("running %q filter plugin for pod %q: %v", volumebinding.Name, "foo", findErr),
 		},
 		{
 			name: "assume error",

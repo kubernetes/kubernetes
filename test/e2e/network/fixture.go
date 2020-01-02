@@ -18,7 +18,7 @@ package network
 
 import (
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -118,7 +118,7 @@ func (t *TestFixture) Cleanup() []error {
 			// First, resize the RC to 0.
 			old, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Get(rcName, metav1.GetOptions{})
 			if err != nil {
-				if errors.IsNotFound(err) {
+				if apierrors.IsNotFound(err) {
 					return nil
 				}
 				return err
@@ -126,7 +126,7 @@ func (t *TestFixture) Cleanup() []error {
 			x := int32(0)
 			old.Spec.Replicas = &x
 			if _, err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Update(old); err != nil {
-				if errors.IsNotFound(err) {
+				if apierrors.IsNotFound(err) {
 					return nil
 				}
 				return err
@@ -139,7 +139,7 @@ func (t *TestFixture) Cleanup() []error {
 		// TODO(mikedanese): Wait.
 		// Then, delete the RC altogether.
 		if err := t.Client.CoreV1().ReplicationControllers(t.Namespace).Delete(rcName, nil); err != nil {
-			if !errors.IsNotFound(err) {
+			if !apierrors.IsNotFound(err) {
 				errs = append(errs, err)
 			}
 		}
@@ -149,7 +149,7 @@ func (t *TestFixture) Cleanup() []error {
 		ginkgo.By("deleting service " + serviceName + " in namespace " + t.Namespace)
 		err := t.Client.CoreV1().Services(t.Namespace).Delete(serviceName, nil)
 		if err != nil {
-			if !errors.IsNotFound(err) {
+			if !apierrors.IsNotFound(err) {
 				errs = append(errs, err)
 			}
 		}

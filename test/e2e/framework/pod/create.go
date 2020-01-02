@@ -24,7 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -32,40 +31,6 @@ var (
 	// BusyBoxImage is the image URI of BusyBox.
 	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 )
-
-// CreateWaitAndDeletePod creates the test pod, wait for (hopefully) success, and then delete the pod.
-// Note: need named return value so that the err assignment in the defer sets the returned error.
-//       Has been shown to be necessary using Go 1.7.
-func CreateWaitAndDeletePod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, command string) (err error) {
-	e2elog.Logf("Creating nfs test pod")
-	pod := MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, command)
-	runPod, err := c.CoreV1().Pods(ns).Create(pod)
-	if err != nil {
-		return fmt.Errorf("pod Create API error: %v", err)
-	}
-	defer func() {
-		delErr := DeletePodWithWait(c, runPod)
-		if err == nil { // don't override previous err value
-			err = delErr // assign to returned err, can be nil
-		}
-	}()
-
-	err = testPodSuccessOrFail(c, ns, runPod)
-	if err != nil {
-		return fmt.Errorf("pod %q did not exit with Success: %v", runPod.Name, err)
-	}
-	return // note: named return value
-}
-
-// testPodSuccessOrFail tests whether the pod's exit code is zero.
-func testPodSuccessOrFail(c clientset.Interface, ns string, pod *v1.Pod) error {
-	e2elog.Logf("Pod should terminate with exitcode 0 (success)")
-	if err := WaitForPodSuccessInNamespace(c, pod.Name, ns); err != nil {
-		return fmt.Errorf("pod %q failed to reach Success: %v", pod.Name, err)
-	}
-	e2elog.Logf("Pod %v succeeded ", pod.Name)
-	return nil
-}
 
 // CreateUnschedulablePod with given claims based on node selector
 func CreateUnschedulablePod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {

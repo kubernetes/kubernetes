@@ -91,8 +91,6 @@ type Proxier struct {
 	serviceMap     map[ServicePortPortalName]*serviceInfo
 	syncPeriod     time.Duration
 	udpIdleTimeout time.Duration
-	portMapMutex   sync.Mutex
-	portMap        map[portMapKey]*portMapValue
 	numProxyLoops  int32 // use atomic ops to access this; mostly for testing
 	netsh          netsh.Interface
 	hostIP         net.IP
@@ -100,26 +98,6 @@ type Proxier struct {
 
 // assert Proxier is a proxy.Provider
 var _ proxy.Provider = &Proxier{}
-
-// A key for the portMap.  The ip has to be a string because slices can't be map
-// keys.
-type portMapKey struct {
-	ip       string
-	port     int
-	protocol v1.Protocol
-}
-
-func (k *portMapKey) String() string {
-	return fmt.Sprintf("%s/%s", net.JoinHostPort(k.ip, strconv.Itoa(k.port)), k.protocol)
-}
-
-// A value for the portMap
-type portMapValue struct {
-	owner  ServicePortPortalName
-	socket interface {
-		Close() error
-	}
-}
 
 var (
 	// ErrProxyOnLocalhost is returned by NewProxier if the user requests a proxier on
@@ -154,7 +132,6 @@ func createProxier(loadBalancer LoadBalancer, listenIP net.IP, netsh netsh.Inter
 	return &Proxier{
 		loadBalancer:   loadBalancer,
 		serviceMap:     make(map[ServicePortPortalName]*serviceInfo),
-		portMap:        make(map[portMapKey]*portMapValue),
 		syncPeriod:     syncPeriod,
 		udpIdleTimeout: udpIdleTimeout,
 		netsh:          netsh,

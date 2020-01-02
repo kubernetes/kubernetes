@@ -27,9 +27,11 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	csitrans "k8s.io/csi-translation-lib"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
@@ -50,13 +52,13 @@ const (
 // getVolumeLimitKey returns a ResourceName by filter type
 func getVolumeLimitKey(filterType string) v1.ResourceName {
 	switch filterType {
-	case predicates.EBSVolumeFilterType:
+	case ebsVolumeFilterType:
 		return v1.ResourceName(volumeutil.EBSVolumeLimitKey)
-	case predicates.GCEPDVolumeFilterType:
+	case gcePDVolumeFilterType:
 		return v1.ResourceName(volumeutil.GCEVolumeLimitKey)
-	case predicates.AzureDiskVolumeFilterType:
+	case azureDiskVolumeFilterType:
 		return v1.ResourceName(volumeutil.AzureVolumeLimitKey)
-	case predicates.CinderVolumeFilterType:
+	case cinderVolumeFilterType:
 		return v1.ResourceName(volumeutil.CinderVolumeLimitKey)
 	default:
 		return v1.ResourceName(volumeutil.GetCSIAttachLimitKey(filterType))
@@ -460,7 +462,12 @@ func TestCSILimits(t *testing.T) {
 			}
 
 			p := &CSILimits{
-				predicate: predicates.NewCSIMaxVolumeLimitPredicate(getFakeCSINodeLister(csiNode), getFakeCSIPVLister(test.filterName, test.driverNames...), getFakeCSIPVCLister(test.filterName, "csi-sc", test.driverNames...), getFakeCSIStorageClassLister("csi-sc", test.driverNames[0])),
+				csiNodeLister:        getFakeCSINodeLister(csiNode),
+				pvLister:             getFakeCSIPVLister(test.filterName, test.driverNames...),
+				pvcLister:            getFakeCSIPVCLister(test.filterName, "csi-sc", test.driverNames...),
+				scLister:             getFakeCSIStorageClassLister("csi-sc", test.driverNames[0]),
+				randomVolumeIDPrefix: rand.String(32),
+				translator:           csitrans.New(),
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {

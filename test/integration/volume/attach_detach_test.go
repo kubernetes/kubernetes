@@ -132,8 +132,6 @@ func fakePodWithPVC(name, pvcName, namespace string) (*v1.Pod, *v1.PersistentVol
 	return fakePod, fakePVC
 }
 
-type podCountFunc func(int) bool
-
 var defaultTimerConfig = attachdetach.TimerConfig{
 	ReconcilerLoopPeriod:                              100 * time.Millisecond,
 	ReconcilerMaxWaitForUnmountDuration:               6 * time.Second,

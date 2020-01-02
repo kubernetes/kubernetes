@@ -22,14 +22,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // MostAllocated is a score plugin that favors nodes with high allocation based on requested resources.
 type MostAllocated struct {
 	handle framework.FrameworkHandle
+	resourceAllocationScorer
 }
 
 var _ = framework.ScorePlugin(&MostAllocated{})
@@ -45,13 +44,15 @@ func (ma *MostAllocated) Name() string {
 // Score invoked at the Score extension point.
 func (ma *MostAllocated) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	nodeInfo, err := ma.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
-	if err != nil {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
+	if err != nil || nodeInfo.Node() == nil {
+		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v, node is nil: %v", nodeName, err, nodeInfo.Node() == nil))
 	}
 
-	// MostRequestedPriorityMap does not use priority metadata, hence we pass nil here
-	s, err := priorities.MostRequestedPriorityMap(pod, nil, nodeInfo)
-	return s.Score, migration.ErrorToFrameworkStatus(err)
+	// ma.score favors nodes with most requested resources.
+	// It calculates the percentage of memory and CPU requested by pods scheduled on the node, and prioritizes
+	// based on the maximum of the average of the fraction of requested to capacity.
+	// Details: (cpu(10 * sum(requested) / capacity) + memory(10 * sum(requested) / capacity)) / 2
+	return ma.score(pod, nodeInfo)
 }
 
 // ScoreExtensions of the Score plugin.
@@ -61,5 +62,41 @@ func (ma *MostAllocated) ScoreExtensions() framework.ScoreExtensions {
 
 // NewMostAllocated initializes a new plugin and returns it.
 func NewMostAllocated(_ *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin, error) {
-	return &MostAllocated{handle: h}, nil
+	return &MostAllocated{
+		handle: h,
+		resourceAllocationScorer: resourceAllocationScorer{
+			MostAllocatedName,
+			mostResourceScorer,
+			DefaultRequestedRatioResources,
+		},
+	}, nil
+}
+
+func mostResourceScorer(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
+	var nodeScore, weightSum int64
+	for resource, weight := range DefaultRequestedRatioResources {
+		resourceScore := mostRequestedScore(requested[resource], allocable[resource])
+		nodeScore += resourceScore * weight
+		weightSum += weight
+	}
+	return (nodeScore / weightSum)
+
+}
+
+// The used capacity is calculated on a scale of 0-10
+// 0 being the lowest priority and 10 being the highest.
+// The more resources are used the higher the score is. This function
+// is almost a reversed version of least_requested_priority.calculateUnusedScore
+// (10 - calculateUnusedScore). The main difference is in rounding. It was added to
+// keep the final formula clean and not to modify the widely used (by users
+// in their default scheduling policies) calculateUsedScore.
+func mostRequestedScore(requested, capacity int64) int64 {
+	if capacity == 0 {
+		return 0
+	}
+	if requested > capacity {
+		return 0
+	}
+
+	return (requested * framework.MaxNodeScore) / capacity
 }

@@ -21,7 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
@@ -32,7 +32,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -86,11 +85,11 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 			})
 
 			_, err = f.ClientSet.SchedulingV1().PriorityClasses().Create(systemCriticalPriority)
-			gomega.Expect(err == nil || errors.IsAlreadyExists(err)).To(gomega.BeTrue(), "failed to create PriorityClasses with an error: %v", err)
+			framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true, "failed to create PriorityClasses with an error: %v", err)
 
 			// Create pods, starting with non-critical so that the critical preempts the other pods.
 			f.PodClient().CreateBatch([]*v1.Pod{nonCriticalBestEffort, nonCriticalBurstable, nonCriticalGuaranteed})
-			f.PodClientNS(kubeapi.NamespaceSystem).CreateSyncInNamespace(criticalPod, kubeapi.NamespaceSystem)
+			f.PodClientNS(kubeapi.NamespaceSystem).CreateSync(criticalPod)
 
 			// Check that non-critical pods other than the besteffort have been evicted
 			updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
@@ -108,7 +107,7 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 			f.PodClient().DeleteSync(guaranteedPodName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 			f.PodClient().DeleteSync(burstablePodName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 			f.PodClient().DeleteSync(bestEffortPodName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClientNS(kubeapi.NamespaceSystem).DeleteSyncInNamespace(criticalPodName, kubeapi.NamespaceSystem, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			f.PodClientNS(kubeapi.NamespaceSystem).DeleteSync(criticalPodName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(systemCriticalPriorityName, &metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 			// Log Events
@@ -157,9 +156,9 @@ func getTestPod(critical bool, name string, resources v1.ResourceRequirements) *
 		pod.Spec.PriorityClassName = systemCriticalPriorityName
 		pod.Spec.Priority = &value
 
-		gomega.Expect(kubelettypes.IsCriticalPod(pod)).To(gomega.BeTrue(), "pod should be a critical pod")
+		framework.ExpectEqual(kubelettypes.IsCriticalPod(pod), true, "pod should be a critical pod")
 	} else {
-		gomega.Expect(kubelettypes.IsCriticalPod(pod)).To(gomega.BeFalse(), "pod should not be a critical pod")
+		framework.ExpectEqual(kubelettypes.IsCriticalPod(pod), false, "pod should not be a critical pod")
 	}
 	return pod
 }

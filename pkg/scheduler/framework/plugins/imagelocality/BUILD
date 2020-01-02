@@ -6,9 +6,9 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/scheduler/algorithm/priorities:go_default_library",
-        "//pkg/scheduler/framework/plugins/migration:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
+        "//pkg/scheduler/nodeinfo:go_default_library",
+        "//pkg/util/parsers:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
     ],
@@ -19,15 +19,11 @@ go_test(
     srcs = ["image_locality_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/scheduler/algorithm/priorities:go_default_library",
-        "//pkg/scheduler/framework/plugins/migration:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/nodeinfo/snapshot:go_default_library",
         "//pkg/util/parsers:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/client-go/informers:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
     ],
 )
 

@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -62,7 +62,7 @@ func WaitForPodToDisappear(podClient coreclient.PodInterface, podName string, in
 		if err == nil {
 			return false, nil
 		}
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		return false, err

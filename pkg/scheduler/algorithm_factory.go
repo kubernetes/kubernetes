@@ -31,7 +31,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/requestedtocapacityratio"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
@@ -51,200 +51,160 @@ type AlgorithmFactoryArgs struct {
 // PriorityMetadataProducerFactory produces MetadataProducer from the given args.
 type PriorityMetadataProducerFactory func(AlgorithmFactoryArgs) priorities.MetadataProducer
 
-// PredicateMetadataProducerFactory produces MetadataProducer from the given args.
-type PredicateMetadataProducerFactory func(AlgorithmFactoryArgs) predicates.MetadataProducer
-
-// FitPredicateFactory produces a FitPredicate from the given args.
-type FitPredicateFactory func(AlgorithmFactoryArgs) predicates.FitPredicate
-
-// PriorityFunctionFactory produces map & reduce priority functions
-// from a given args.
-type PriorityFunctionFactory func(AlgorithmFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction)
-
-// PriorityConfigFactory produces a PriorityConfig from the given function and weight
-type PriorityConfigFactory struct {
-	MapReduceFunction PriorityFunctionFactory
-	Weight            int64
-}
-
 var (
-	schedulerFactoryMutex sync.RWMutex
+	algorithmRegistry = &AlgorithmRegistry{
+		// predicate keys supported for backward compatibility with v1.Policy.
+		predicateKeys: sets.NewString(
+			"PodFitsPorts", // This exists for compatibility reasons.
+			predicates.PodFitsHostPortsPred,
+			predicates.PodFitsResourcesPred,
+			predicates.HostNamePred,
+			predicates.MatchNodeSelectorPred,
+			predicates.NoVolumeZoneConflictPred,
+			predicates.MaxEBSVolumeCountPred,
+			predicates.MaxGCEPDVolumeCountPred,
+			predicates.MaxAzureDiskVolumeCountPred,
+			predicates.MaxCSIVolumeCountPred,
+			predicates.MaxCinderVolumeCountPred,
+			predicates.MatchInterPodAffinityPred,
+			predicates.NoDiskConflictPred,
+			predicates.GeneralPred,
+			predicates.PodToleratesNodeTaintsPred,
+			predicates.CheckNodeUnschedulablePred,
+			predicates.CheckVolumeBindingPred,
+		),
 
-	// maps that hold registered algorithm types
-	// TODO(Huang-Wei): remove this.
-	fitPredicateMap        = make(map[string]FitPredicateFactory)
-	mandatoryFitPredicates = sets.NewString()
-	priorityFunctionMap    = make(map[string]PriorityConfigFactory)
-	algorithmProviderMap   = make(map[string]AlgorithmProviderConfig)
+		// priority keys to weights, this exist for backward compatibility with v1.Policy.
+		priorityKeys: map[string]int64{
+			priorities.LeastRequestedPriority:      1,
+			priorities.BalancedResourceAllocation:  1,
+			priorities.MostRequestedPriority:       1,
+			priorities.ImageLocalityPriority:       1,
+			priorities.NodeAffinityPriority:        1,
+			priorities.SelectorSpreadPriority:      1,
+			priorities.ServiceSpreadingPriority:    1,
+			priorities.TaintTolerationPriority:     1,
+			priorities.InterPodAffinityPriority:    1,
+			priorities.NodePreferAvoidPodsPriority: 10000,
+		},
 
+		// MandatoryPredicates the set of keys for predicates that the scheduler will
+		// be configured with all the time.
+		mandatoryPredicateKeys: sets.NewString(
+			predicates.PodToleratesNodeTaintsPred,
+			predicates.CheckNodeUnschedulablePred,
+		),
+
+		algorithmProviders: make(map[string]AlgorithmProviderConfig),
+	}
 	// Registered metadata producers
-	priorityMetadataProducerFactory  PriorityMetadataProducerFactory
-	predicateMetadataProducerFactory PredicateMetadataProducerFactory
+	priorityMetadataProducerFactory PriorityMetadataProducerFactory
+
+	schedulerFactoryMutex sync.RWMutex
 )
 
 // AlgorithmProviderConfig is used to store the configuration of algorithm providers.
 type AlgorithmProviderConfig struct {
-	FitPredicateKeys     sets.String
-	PriorityFunctionKeys sets.String
+	PredicateKeys sets.String
+	PriorityKeys  sets.String
 }
 
-// Snapshot is used to store current state of registered predicates and priorities.
-type Snapshot struct {
-	fitPredicateMap        map[string]FitPredicateFactory
-	mandatoryFitPredicates sets.String
-	priorityFunctionMap    map[string]PriorityConfigFactory
-	algorithmProviderMap   map[string]AlgorithmProviderConfig
+// AlgorithmRegistry is used to store current state of registered predicates and priorities.
+type AlgorithmRegistry struct {
+	predicateKeys          sets.String
+	priorityKeys           map[string]int64
+	mandatoryPredicateKeys sets.String
+	algorithmProviders     map[string]AlgorithmProviderConfig
 }
 
 // RegisteredPredicatesAndPrioritiesSnapshot returns a snapshot of current registered predicates and priorities.
-func RegisteredPredicatesAndPrioritiesSnapshot() *Snapshot {
+func RegisteredPredicatesAndPrioritiesSnapshot() *AlgorithmRegistry {
 	schedulerFactoryMutex.RLock()
 	defer schedulerFactoryMutex.RUnlock()
 
-	copy := Snapshot{
-		fitPredicateMap:        make(map[string]FitPredicateFactory),
-		mandatoryFitPredicates: sets.NewString(),
-		priorityFunctionMap:    make(map[string]PriorityConfigFactory),
-		algorithmProviderMap:   make(map[string]AlgorithmProviderConfig),
+	copy := AlgorithmRegistry{
+		predicateKeys:          sets.NewString(),
+		mandatoryPredicateKeys: sets.NewString(),
+		priorityKeys:           make(map[string]int64),
+		algorithmProviders:     make(map[string]AlgorithmProviderConfig),
 	}
-	for k, v := range fitPredicateMap {
-		copy.fitPredicateMap[k] = v
+	for k := range algorithmRegistry.predicateKeys {
+		copy.predicateKeys.Insert(k)
 	}
-	for k := range mandatoryFitPredicates {
-		copy.mandatoryFitPredicates[k] = struct{}{}
+	for k := range algorithmRegistry.mandatoryPredicateKeys {
+		copy.mandatoryPredicateKeys.Insert(k)
 	}
-	for k, v := range priorityFunctionMap {
-		copy.priorityFunctionMap[k] = v
+	for k, v := range algorithmRegistry.priorityKeys {
+		copy.priorityKeys[k] = v
 	}
-	for provider, config := range algorithmProviderMap {
+	for provider, config := range algorithmRegistry.algorithmProviders {
 		copyPredKeys, copyPrioKeys := sets.NewString(), sets.NewString()
-		for k := range config.FitPredicateKeys {
-			copyPredKeys[k] = struct{}{}
+		for k := range config.PredicateKeys {
+			copyPredKeys.Insert(k)
 		}
-		for k := range config.PriorityFunctionKeys {
-			copyPrioKeys[k] = struct{}{}
+		for k := range config.PriorityKeys {
+			copyPrioKeys.Insert(k)
 		}
-		copy.algorithmProviderMap[provider] = AlgorithmProviderConfig{
-			FitPredicateKeys:     copyPredKeys,
-			PriorityFunctionKeys: copyPrioKeys,
+		copy.algorithmProviders[provider] = AlgorithmProviderConfig{
+			PredicateKeys: copyPredKeys,
+			PriorityKeys:  copyPrioKeys,
 		}
 	}
 	return &copy
 }
 
 // ApplyPredicatesAndPriorities sets state of predicates and priorities to `s`.
-func ApplyPredicatesAndPriorities(s *Snapshot) {
+func ApplyPredicatesAndPriorities(s *AlgorithmRegistry) {
 	schedulerFactoryMutex.Lock()
-	fitPredicateMap = s.fitPredicateMap
-	mandatoryFitPredicates = s.mandatoryFitPredicates
-	priorityFunctionMap = s.priorityFunctionMap
-	algorithmProviderMap = s.algorithmProviderMap
+	algorithmRegistry = s
 	schedulerFactoryMutex.Unlock()
 }
 
-// RegisterFitPredicate registers a fit predicate with the algorithm
+// RegisterPredicate registers a fit predicate with the algorithm
 // registry. Returns the name with which the predicate was registered.
 // TODO(Huang-Wei): remove this.
-func RegisterFitPredicate(name string, predicate predicates.FitPredicate) string {
-	return RegisterFitPredicateFactory(name, func(AlgorithmFactoryArgs) predicates.FitPredicate { return predicate })
-}
-
-// RemoveFitPredicate removes a fit predicate from factory.
-func RemoveFitPredicate(name string) {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
-
-	validateAlgorithmNameOrDie(name)
-	delete(fitPredicateMap, name)
-	mandatoryFitPredicates.Delete(name)
-}
-
-// RemovePredicateKeyFromAlgoProvider removes a fit predicate key from algorithmProvider.
-func RemovePredicateKeyFromAlgoProvider(providerName, key string) error {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
-
-	validateAlgorithmNameOrDie(providerName)
-	provider, ok := algorithmProviderMap[providerName]
-	if !ok {
-		return fmt.Errorf("provider %v is not registered", providerName)
-	}
-	provider.FitPredicateKeys.Delete(key)
-	return nil
-}
-
-// RemovePredicateKeyFromAlgorithmProviderMap removes a fit predicate key from all algorithmProviders which in algorithmProviderMap.
-func RemovePredicateKeyFromAlgorithmProviderMap(key string) {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
-
-	for _, provider := range algorithmProviderMap {
-		provider.FitPredicateKeys.Delete(key)
-	}
-}
-
-// InsertPredicateKeyToAlgoProvider insert a fit predicate key to algorithmProvider.
-func InsertPredicateKeyToAlgoProvider(providerName, key string) error {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
-
-	validateAlgorithmNameOrDie(providerName)
-	provider, ok := algorithmProviderMap[providerName]
-	if !ok {
-		return fmt.Errorf("provider %v is not registered", providerName)
-	}
-	provider.FitPredicateKeys.Insert(key)
-	return nil
-}
-
-// InsertPredicateKeyToAlgorithmProviderMap insert a fit predicate key to all algorithmProviders which in algorithmProviderMap.
-func InsertPredicateKeyToAlgorithmProviderMap(key string) {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
-
-	for _, provider := range algorithmProviderMap {
-		provider.FitPredicateKeys.Insert(key)
-	}
-}
-
-// InsertPriorityKeyToAlgorithmProviderMap inserts a priority function to all algorithmProviders which are in algorithmProviderMap.
-func InsertPriorityKeyToAlgorithmProviderMap(key string) {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
-
-	for _, provider := range algorithmProviderMap {
-		provider.PriorityFunctionKeys.Insert(key)
-	}
-}
-
-// RegisterMandatoryFitPredicate registers a fit predicate with the algorithm registry, the predicate is used by
-// kubelet, DaemonSet; it is always included in configuration. Returns the name with which the predicate was
-// registered.
-func RegisterMandatoryFitPredicate(name string, predicate predicates.FitPredicate) string {
+func RegisterPredicate(name string) string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	validateAlgorithmNameOrDie(name)
-	fitPredicateMap[name] = func(AlgorithmFactoryArgs) predicates.FitPredicate { return predicate }
-	mandatoryFitPredicates.Insert(name)
+	algorithmRegistry.predicateKeys.Insert(name)
 	return name
 }
 
-// RegisterFitPredicateFactory registers a fit predicate factory with the
-// algorithm registry. Returns the name with which the predicate was registered.
-func RegisterFitPredicateFactory(name string, predicateFactory FitPredicateFactory) string {
+// RegisterMandatoryPredicate registers a mandatory predicate.
+func RegisterMandatoryPredicate(name string) string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	validateAlgorithmNameOrDie(name)
-	fitPredicateMap[name] = predicateFactory
+	algorithmRegistry.predicateKeys.Insert(name)
+	algorithmRegistry.mandatoryPredicateKeys.Insert(name)
 	return name
 }
 
-// RegisterCustomFitPredicate registers a custom fit predicate with the algorithm registry.
+// AddPredicateToAlgorithmProviders adds a predicate key to all algorithm providers.
+func AddPredicateToAlgorithmProviders(key string) {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
+
+	for _, provider := range algorithmRegistry.algorithmProviders {
+		provider.PredicateKeys.Insert(key)
+	}
+}
+
+// AddPriorityToAlgorithmProviders adds a priority key to all algorithm providers.
+func AddPriorityToAlgorithmProviders(key string) {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
+	for _, provider := range algorithmRegistry.algorithmProviders {
+		provider.PriorityKeys.Insert(key)
+	}
+}
+
+// RegisterCustomPredicate registers a custom fit predicate with the algorithm registry.
 // Returns the name, with which the predicate was registered.
-func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy, pluginArgs *plugins.ConfigProducerArgs) string {
-	var predicateFactory FitPredicateFactory
+func RegisterCustomPredicate(policy schedulerapi.PredicatePolicy, pluginArgs *plugins.ConfigProducerArgs) string {
 	var ok bool
-	policyName := policy.Name
+	var predicate string
 
 	validatePredicateOrDie(policy)
 
@@ -254,7 +214,7 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy, pluginArgs 
 			// We use the ServiceAffinity predicate name for all ServiceAffinity custom predicates.
 			// It may get called multiple times but we essentially only register one instance of ServiceAffinity predicate.
 			// This name is then used to find the registered plugin and run the plugin instead of the predicate.
-			policyName = predicates.CheckServiceAffinityPred
+			predicate = predicates.CheckServiceAffinityPred
 
 			// map LabelsPresence policy to ConfigProducerArgs that's used to configure the ServiceAffinity plugin.
 			if pluginArgs.ServiceAffinityArgs == nil {
@@ -262,24 +222,11 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy, pluginArgs 
 			}
 
 			pluginArgs.ServiceAffinityArgs.AffinityLabels = append(pluginArgs.ServiceAffinityArgs.AffinityLabels, policy.Argument.ServiceAffinity.Labels...)
-
-			predicateFactory = func(args AlgorithmFactoryArgs) predicates.FitPredicate {
-				predicate, precomputationFunction := predicates.NewServiceAffinityPredicate(
-					args.SharedLister.NodeInfos(),
-					args.SharedLister.Pods(),
-					args.InformerFactory.Core().V1().Services().Lister(),
-					pluginArgs.ServiceAffinityArgs.AffinityLabels,
-				)
-
-				// Once we generate the predicate we should also Register the Precomputation
-				predicates.RegisterPredicateMetadataProducer(policyName, precomputationFunction)
-				return predicate
-			}
 		} else if policy.Argument.LabelsPresence != nil {
 			// We use the CheckNodeLabelPresencePred predicate name for all kNodeLabel custom predicates.
 			// It may get called multiple times but we essentially only register one instance of NodeLabel predicate.
 			// This name is then used to find the registered plugin and run the plugin instead of the predicate.
-			policyName = predicates.CheckNodeLabelPresencePred
+			predicate = predicates.CheckNodeLabelPresencePred
 
 			// Map LabelPresence policy to ConfigProducerArgs that's used to configure the NodeLabel plugin.
 			if pluginArgs.NodeLabelArgs == nil {
@@ -290,32 +237,18 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy, pluginArgs 
 			} else {
 				pluginArgs.NodeLabelArgs.AbsentLabels = append(pluginArgs.NodeLabelArgs.AbsentLabels, policy.Argument.LabelsPresence.Labels...)
 			}
-			predicateFactory = func(_ AlgorithmFactoryArgs) predicates.FitPredicate {
-				return predicates.NewNodeLabelPredicate(
-					pluginArgs.NodeLabelArgs.PresentLabels,
-					pluginArgs.NodeLabelArgs.AbsentLabels,
-				)
-			}
 		}
-	} else if predicateFactory, ok = fitPredicateMap[policyName]; ok {
+	} else if _, ok = algorithmRegistry.predicateKeys[policy.Name]; ok {
 		// checking to see if a pre-defined predicate is requested
-		klog.V(2).Infof("Predicate type %s already registered, reusing.", policyName)
-		return policyName
+		klog.V(2).Infof("Predicate type %s already registered, reusing.", policy.Name)
+		return policy.Name
 	}
 
-	if predicateFactory == nil {
-		klog.Fatalf("Invalid configuration: Predicate type not found for %s", policyName)
+	if len(predicate) == 0 {
+		klog.Fatalf("Invalid configuration: Predicate type not found for %s", policy.Name)
 	}
 
-	return RegisterFitPredicateFactory(policyName, predicateFactory)
-}
-
-// IsFitPredicateRegistered is useful for testing providers.
-func IsFitPredicateRegistered(name string) bool {
-	schedulerFactoryMutex.RLock()
-	defer schedulerFactoryMutex.RUnlock()
-	_, ok := fitPredicateMap[name]
-	return ok
+	return predicate
 }
 
 // RegisterPriorityMetadataProducerFactory registers a PriorityMetadataProducerFactory.
@@ -325,42 +258,21 @@ func RegisterPriorityMetadataProducerFactory(f PriorityMetadataProducerFactory) 
 	priorityMetadataProducerFactory = f
 }
 
-// RegisterPredicateMetadataProducerFactory registers a MetadataProducer.
-func RegisterPredicateMetadataProducerFactory(f PredicateMetadataProducerFactory) {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
-	predicateMetadataProducerFactory = f
-}
-
-// RegisterPriorityMapReduceFunction registers a priority function with the algorithm registry. Returns the name,
+// RegisterPriority registers a priority function with the algorithm registry. Returns the name,
 // with which the function was registered.
-func RegisterPriorityMapReduceFunction(
-	name string,
-	mapFunction priorities.PriorityMapFunction,
-	reduceFunction priorities.PriorityReduceFunction,
-	weight int) string {
-	return RegisterPriorityConfigFactory(name, PriorityConfigFactory{
-		MapReduceFunction: func(AlgorithmFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
-			return mapFunction, reduceFunction
-		},
-		Weight: int64(weight),
-	})
-}
-
-// RegisterPriorityConfigFactory registers a priority config factory with its name.
-func RegisterPriorityConfigFactory(name string, pcf PriorityConfigFactory) string {
+func RegisterPriority(name string, weight int64) string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	validateAlgorithmNameOrDie(name)
-	priorityFunctionMap[name] = pcf
+	algorithmRegistry.priorityKeys[name] = weight
 	return name
 }
 
-// RegisterCustomPriorityFunction registers a custom priority function with the algorithm registry.
+// RegisterCustomPriority registers a custom priority with the algorithm registry.
 // Returns the name, with which the priority function was registered.
-func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, configProducerArgs *plugins.ConfigProducerArgs) string {
-	var pcf *PriorityConfigFactory
-	name := policy.Name
+func RegisterCustomPriority(policy schedulerapi.PriorityPolicy, configProducerArgs *plugins.ConfigProducerArgs) string {
+	var priority string
+	var weight int64
 
 	validatePriorityOrDie(policy)
 
@@ -371,36 +283,26 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, configPr
 			// It may get called multiple times but we essentially only register one instance of
 			// ServiceAffinity priority.
 			// This name is then used to find the registered plugin and run the plugin instead of the priority.
-			name = serviceaffinity.Name
+			priority = serviceaffinity.Name
 
 			if configProducerArgs.ServiceAffinityArgs == nil {
 				configProducerArgs.ServiceAffinityArgs = &serviceaffinity.Args{}
 			}
 			configProducerArgs.ServiceAffinityArgs.AntiAffinityLabelsPreference = append(configProducerArgs.ServiceAffinityArgs.AntiAffinityLabelsPreference, policy.Argument.ServiceAntiAffinity.Label)
 
-			weight := policy.Weight
+			weight = policy.Weight
 			schedulerFactoryMutex.RLock()
-			if existing, ok := priorityFunctionMap[name]; ok {
+			if existingWeight, ok := algorithmRegistry.priorityKeys[priority]; ok {
 				// If there are n ServiceAffinity priorities in the policy, the weight for the corresponding
 				// score plugin is n*(weight of each priority).
-				weight += existing.Weight
+				weight += existingWeight
 			}
 			schedulerFactoryMutex.RUnlock()
-			pcf = &PriorityConfigFactory{
-				MapReduceFunction: func(args AlgorithmFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
-					return priorities.NewServiceAntiAffinityPriority(
-						args.SharedLister.Pods(),
-						args.InformerFactory.Core().V1().Services().Lister(),
-						configProducerArgs.ServiceAffinityArgs.AntiAffinityLabelsPreference,
-					)
-				},
-				Weight: weight,
-			}
 		} else if policy.Argument.LabelPreference != nil {
 			// We use the NodeLabel plugin name for all NodeLabel custom priorities.
 			// It may get called multiple times but we essentially only register one instance of NodeLabel priority.
 			// This name is then used to find the registered plugin and run the plugin instead of the priority.
-			name = nodelabel.Name
+			priority = nodelabel.Name
 			if configProducerArgs.NodeLabelArgs == nil {
 				configProducerArgs.NodeLabelArgs = &nodelabel.Args{}
 			}
@@ -409,60 +311,43 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, configPr
 			} else {
 				configProducerArgs.NodeLabelArgs.AbsentLabelsPreference = append(configProducerArgs.NodeLabelArgs.AbsentLabelsPreference, policy.Argument.LabelPreference.Label)
 			}
-			weight := policy.Weight
+			weight = policy.Weight
 			schedulerFactoryMutex.RLock()
-			if existing, ok := priorityFunctionMap[name]; ok {
+			if existingWeight, ok := algorithmRegistry.priorityKeys[priority]; ok {
 				// If there are n NodeLabel priority configured in the policy, the weight for the corresponding
 				// priority is n*(weight of each priority in policy).
-				weight += existing.Weight
+				weight += existingWeight
 			}
 			schedulerFactoryMutex.RUnlock()
-			pcf = &PriorityConfigFactory{
-				MapReduceFunction: func(_ AlgorithmFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
-					return priorities.NewNodeLabelPriority(
-						configProducerArgs.NodeLabelArgs.PresentLabelsPreference,
-						configProducerArgs.NodeLabelArgs.AbsentLabelsPreference,
-					)
-				},
-				Weight: weight,
-			}
 		} else if policy.Argument.RequestedToCapacityRatioArguments != nil {
 			scoringFunctionShape, resources := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(policy.Argument.RequestedToCapacityRatioArguments)
-			configProducerArgs.RequestedToCapacityRatioArgs = &requestedtocapacityratio.Args{
+			configProducerArgs.RequestedToCapacityRatioArgs = &noderesources.RequestedToCapacityRatioArgs{
 				FunctionShape:       scoringFunctionShape,
 				ResourceToWeightMap: resources,
 			}
-			pcf = &PriorityConfigFactory{
-				MapReduceFunction: func(args AlgorithmFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
-					p := priorities.RequestedToCapacityRatioResourceAllocationPriority(scoringFunctionShape, resources)
-					return p.PriorityMap, nil
-				},
-				Weight: policy.Weight,
-			}
 			// We do not allow specifying the name for custom plugins, see #83472
-			name = requestedtocapacityratio.Name
+			priority = noderesources.RequestedToCapacityRatioName
+			weight = policy.Weight
 		}
-	} else if existingPcf, ok := priorityFunctionMap[name]; ok {
-		klog.V(2).Infof("Priority type %s already registered, reusing.", name)
+	} else if _, ok := algorithmRegistry.priorityKeys[policy.Name]; ok {
+		klog.V(2).Infof("Priority type %s already registered, reusing.", policy.Name)
 		// set/update the weight based on the policy
-		pcf = &PriorityConfigFactory{
-			MapReduceFunction: existingPcf.MapReduceFunction,
-			Weight:            policy.Weight,
-		}
+		priority = policy.Name
+		weight = policy.Weight
 	}
 
-	if pcf == nil {
-		klog.Fatalf("Invalid configuration: Priority type not found for %s", name)
+	if len(priority) == 0 {
+		klog.Fatalf("Invalid configuration: Priority type not found for %s", policy.Name)
 	}
 
-	return RegisterPriorityConfigFactory(name, *pcf)
+	return RegisterPriority(priority, weight)
 }
 
-func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *schedulerapi.RequestedToCapacityRatioArguments) (priorities.FunctionShape, priorities.ResourceToWeightMap) {
+func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *schedulerapi.RequestedToCapacityRatioArguments) (noderesources.FunctionShape, noderesources.ResourceToWeightMap) {
 	n := len(arguments.Shape)
-	points := make([]priorities.FunctionShapePoint, 0, n)
+	points := make([]noderesources.FunctionShapePoint, 0, n)
 	for _, point := range arguments.Shape {
-		points = append(points, priorities.FunctionShapePoint{
+		points = append(points, noderesources.FunctionShapePoint{
 			Utilization: int64(point.Utilization),
 			// MaxCustomPriorityScore may diverge from the max score used in the scheduler and defined by MaxNodeScore,
 			// therefore we need to scale the score returned by requested to capacity ratio to the score range
@@ -470,13 +355,13 @@ func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *s
 			Score: int64(point.Score) * (framework.MaxNodeScore / schedulerapi.MaxCustomPriorityScore),
 		})
 	}
-	shape, err := priorities.NewFunctionShape(points)
+	shape, err := noderesources.NewFunctionShape(points)
 	if err != nil {
 		klog.Fatalf("invalid RequestedToCapacityRatioPriority arguments: %s", err.Error())
 	}
-	resourceToWeightMap := make(priorities.ResourceToWeightMap, 0)
+	resourceToWeightMap := make(noderesources.ResourceToWeightMap, 0)
 	if len(arguments.Resources) == 0 {
-		resourceToWeightMap = priorities.DefaultRequestedRatioResources
+		resourceToWeightMap = noderesources.DefaultRequestedRatioResources
 		return shape, resourceToWeightMap
 	}
 	for _, resource := range arguments.Resources {
@@ -488,22 +373,14 @@ func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *s
 	return shape, resourceToWeightMap
 }
 
-// IsPriorityFunctionRegistered is useful for testing providers.
-func IsPriorityFunctionRegistered(name string) bool {
-	schedulerFactoryMutex.RLock()
-	defer schedulerFactoryMutex.RUnlock()
-	_, ok := priorityFunctionMap[name]
-	return ok
-}
-
 // RegisterAlgorithmProvider registers a new algorithm provider with the algorithm registry.
 func RegisterAlgorithmProvider(name string, predicateKeys, priorityKeys sets.String) string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	validateAlgorithmNameOrDie(name)
-	algorithmProviderMap[name] = AlgorithmProviderConfig{
-		FitPredicateKeys:     predicateKeys,
-		PriorityFunctionKeys: priorityKeys,
+	algorithmRegistry.algorithmProviders[name] = AlgorithmProviderConfig{
+		PredicateKeys: predicateKeys,
+		PriorityKeys:  priorityKeys,
 	}
 	return name
 }
@@ -513,35 +390,12 @@ func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
 	schedulerFactoryMutex.RLock()
 	defer schedulerFactoryMutex.RUnlock()
 
-	provider, ok := algorithmProviderMap[name]
+	provider, ok := algorithmRegistry.algorithmProviders[name]
 	if !ok {
 		return nil, fmt.Errorf("provider %q is not registered", name)
 	}
 
 	return &provider, nil
-}
-
-func getFitPredicateFunctions(names sets.String, args AlgorithmFactoryArgs) (map[string]predicates.FitPredicate, error) {
-	schedulerFactoryMutex.RLock()
-	defer schedulerFactoryMutex.RUnlock()
-
-	fitPredicates := map[string]predicates.FitPredicate{}
-	for _, name := range names.List() {
-		factory, ok := fitPredicateMap[name]
-		if !ok {
-			return nil, fmt.Errorf("invalid predicate name %q specified - no corresponding function found", name)
-		}
-		fitPredicates[name] = factory(args)
-	}
-
-	// Always include mandatory fit predicates.
-	for name := range mandatoryFitPredicates {
-		if factory, found := fitPredicateMap[name]; found {
-			fitPredicates[name] = factory(args)
-		}
-	}
-
-	return fitPredicates, nil
 }
 
 func getPriorityMetadataProducer(args AlgorithmFactoryArgs) (priorities.MetadataProducer, error) {
@@ -552,53 +406,6 @@ func getPriorityMetadataProducer(args AlgorithmFactoryArgs) (priorities.Metadata
 		return priorities.EmptyMetadataProducer, nil
 	}
 	return priorityMetadataProducerFactory(args), nil
-}
-
-func getPredicateMetadataProducer(args AlgorithmFactoryArgs) (predicates.MetadataProducer, error) {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
-
-	if predicateMetadataProducerFactory == nil {
-		return predicates.EmptyMetadataProducer, nil
-	}
-	return predicateMetadataProducerFactory(args), nil
-}
-
-func getPriorityFunctionConfigs(names sets.String, args AlgorithmFactoryArgs) ([]priorities.PriorityConfig, error) {
-	schedulerFactoryMutex.RLock()
-	defer schedulerFactoryMutex.RUnlock()
-
-	var configs []priorities.PriorityConfig
-	for _, name := range names.List() {
-		factory, ok := priorityFunctionMap[name]
-		if !ok {
-			return nil, fmt.Errorf("invalid priority name %s specified - no corresponding function found", name)
-		}
-		mapFunction, reduceFunction := factory.MapReduceFunction(args)
-		configs = append(configs, priorities.PriorityConfig{
-			Name:   name,
-			Map:    mapFunction,
-			Reduce: reduceFunction,
-			Weight: factory.Weight,
-		})
-	}
-	if err := validateSelectedConfigs(configs); err != nil {
-		return nil, err
-	}
-	return configs, nil
-}
-
-// validateSelectedConfigs validates the config weights to avoid the overflow.
-func validateSelectedConfigs(configs []priorities.PriorityConfig) error {
-	var totalPriority int64
-	for _, config := range configs {
-		// Checks totalPriority against MaxTotalScore to avoid overflow
-		if config.Weight*framework.MaxNodeScore > framework.MaxTotalScore-totalPriority {
-			return fmt.Errorf("total priority of priority functions has overflown")
-		}
-		totalPriority += config.Weight * framework.MaxNodeScore
-	}
-	return nil
 }
 
 var validName = regexp.MustCompile("^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])$")
@@ -642,34 +449,10 @@ func validatePriorityOrDie(priority schedulerapi.PriorityPolicy) {
 	}
 }
 
-// ListRegisteredFitPredicates returns the registered fit predicates.
-func ListRegisteredFitPredicates() []string {
-	schedulerFactoryMutex.RLock()
-	defer schedulerFactoryMutex.RUnlock()
-
-	var names []string
-	for name := range fitPredicateMap {
-		names = append(names, name)
-	}
-	return names
-}
-
-// ListRegisteredPriorityFunctions returns the registered priority functions.
-func ListRegisteredPriorityFunctions() []string {
-	schedulerFactoryMutex.RLock()
-	defer schedulerFactoryMutex.RUnlock()
-
-	var names []string
-	for name := range priorityFunctionMap {
-		names = append(names, name)
-	}
-	return names
-}
-
 // ListAlgorithmProviders is called when listing all available algorithm providers in `kube-scheduler --help`
 func ListAlgorithmProviders() string {
 	var availableAlgorithmProviders []string
-	for name := range algorithmProviderMap {
+	for name := range algorithmRegistry.algorithmProviders {
 		availableAlgorithmProviders = append(availableAlgorithmProviders, name)
 	}
 	sort.Strings(availableAlgorithmProviders)

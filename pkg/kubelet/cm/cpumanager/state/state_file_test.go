@@ -27,6 +27,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
@@ -70,17 +71,19 @@ func stderrCapture(t *testing.T, f func() State) (bytes.Buffer, State) {
 
 func TestFileStateTryRestore(t *testing.T) {
 	testCases := []struct {
-		description      string
-		stateFileContent string
-		policyName       string
-		expErr           string
-		expPanic         bool
-		expectedState    *stateMemory
+		description       string
+		stateFileContent  string
+		policyName        string
+		initialContainers containermap.ContainerMap
+		expErr            string
+		expPanic          bool
+		expectedState     *stateMemory
 	}{
 		{
 			"Invalid JSON - one byte file",
 			"\n",
 			"none",
+			containermap.ContainerMap{},
 			"[cpumanager] state file: unable to restore state from disk (unexpected end of JSON input)",
 			true,
 			&stateMemory{},
@@ -89,6 +92,7 @@ func TestFileStateTryRestore(t *testing.T) {
 			"Invalid JSON - invalid content",
 			"{",
 			"none",
+			containermap.ContainerMap{},
 			"[cpumanager] state file: unable to restore state from disk (unexpected end of JSON input)",
 			true,
 			&stateMemory{},
@@ -97,6 +101,7 @@ func TestFileStateTryRestore(t *testing.T) {
 			"Try restore defaultCPUSet only",
 			`{"policyName": "none", "defaultCpuSet": "4-6"}`,
 			"none",
+			containermap.ContainerMap{},
 			"",
 			false,
 			&stateMemory{
@@ -108,6 +113,7 @@ func TestFileStateTryRestore(t *testing.T) {
 			"Try restore defaultCPUSet only - invalid name",
 			`{"policyName": "none", "defaultCpuSet" "4-6"}`,
 			"none",
+			containermap.ContainerMap{},
 			`[cpumanager] state file: unable to restore state from disk (invalid character '"' after object key)`,
 			true,
 			&stateMemory{},
@@ -117,17 +123,22 @@ func TestFileStateTryRestore(t *testing.T) {
 			`{
 				"policyName": "none",
 				"entries": {
-					"container1": "4-6",
-					"container2": "1-3"
+					"pod": {
+						"container1": "4-6",
+						"container2": "1-3"
+					}
 				}
 			}`,
 			"none",
+			containermap.ContainerMap{},
 			"",
 			false,
 			&stateMemory{
 				assignments: ContainerCPUAssignments{
-					"container1": cpuset.NewCPUSet(4, 5, 6),
-					"container2": cpuset.NewCPUSet(1, 2, 3),
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.NewCPUSet(4, 5, 6),
+						"container2": cpuset.NewCPUSet(1, 2, 3),
+					},
 				},
 				defaultCPUSet: cpuset.NewCPUSet(),
 			},
@@ -140,6 +151,7 @@ func TestFileStateTryRestore(t *testing.T) {
 				"entries": {}
 			}`,
 			"B",
+			containermap.ContainerMap{},
 			`[cpumanager] state file: unable to restore state from disk (policy configured "B" != policy from state file "A")`,
 			true,
 			&stateMemory{},
@@ -148,6 +160,7 @@ func TestFileStateTryRestore(t *testing.T) {
 			"Try restore invalid assignments",
 			`{"entries": }`,
 			"none",
+			containermap.ContainerMap{},
 			"[cpumanager] state file: unable to restore state from disk (invalid character '}' looking for beginning of value)",
 			true,
 			&stateMemory{},
@@ -158,17 +171,22 @@ func TestFileStateTryRestore(t *testing.T) {
 				"policyName": "none",
 				"defaultCpuSet": "23-24",
 				"entries": {
-					"container1": "4-6",
-					"container2": "1-3"
+					"pod": {
+						"container1": "4-6",
+						"container2": "1-3"
+					}
 				}
 			}`,
 			"none",
+			containermap.ContainerMap{},
 			"",
 			false,
 			&stateMemory{
 				assignments: ContainerCPUAssignments{
-					"container1": cpuset.NewCPUSet(4, 5, 6),
-					"container2": cpuset.NewCPUSet(1, 2, 3),
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.NewCPUSet(4, 5, 6),
+						"container2": cpuset.NewCPUSet(1, 2, 3),
+					},
 				},
 				defaultCPUSet: cpuset.NewCPUSet(23, 24),
 			},
@@ -180,6 +198,7 @@ func TestFileStateTryRestore(t *testing.T) {
 				"defaultCpuSet": "2-sd"
 			}`,
 			"none",
+			containermap.ContainerMap{},
 			`[cpumanager] state file: unable to restore state from disk (strconv.Atoi: parsing "sd": invalid syntax)`,
 			true,
 			&stateMemory{},
@@ -190,11 +209,14 @@ func TestFileStateTryRestore(t *testing.T) {
 				"policyName": "none",
 				"defaultCpuSet": "23-24",
 				"entries": {
-					"container1": "p-6",
-					"container2": "1-3"
+					"pod": {
+						"container1": "p-6",
+						"container2": "1-3"
+					}
 				}
 			}`,
 			"none",
+			containermap.ContainerMap{},
 			`[cpumanager] state file: unable to restore state from disk (strconv.Atoi: parsing "p": invalid syntax)`,
 			true,
 			&stateMemory{},
@@ -203,11 +225,41 @@ func TestFileStateTryRestore(t *testing.T) {
 			"tryRestoreState creates empty state file",
 			"",
 			"none",
+			containermap.ContainerMap{},
 			"",
 			false,
 			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
 				defaultCPUSet: cpuset.NewCPUSet(),
+			},
+		},
+		{
+			"Try restore with migration",
+			`{
+				"policyName": "none",
+				"defaultCpuSet": "23-24",
+				"entries": {
+					"containerID1": "4-6",
+					"containerID2": "1-3"
+				}
+			}`,
+			"none",
+			func() containermap.ContainerMap {
+				cm := containermap.NewContainerMap()
+				cm.Add("pod", "container1", "containerID1")
+				cm.Add("pod", "container2", "containerID2")
+				return cm
+			}(),
+			"",
+			false,
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.NewCPUSet(4, 5, 6),
+						"container2": cpuset.NewCPUSet(1, 2, 3),
+					},
+				},
+				defaultCPUSet: cpuset.NewCPUSet(23, 24),
 			},
 		},
 	}
@@ -239,7 +291,7 @@ func TestFileStateTryRestore(t *testing.T) {
 			defer os.Remove(sfilePath.Name())
 
 			logData, fileState := stderrCapture(t, func() State {
-				return NewFileState(sfilePath.Name(), tc.policyName)
+				return NewFileState(sfilePath.Name(), tc.policyName, tc.initialContainers)
 			})
 
 			if tc.expErr != "" {
@@ -284,7 +336,7 @@ func TestFileStateTryRestorePanic(t *testing.T) {
 				}
 			}
 		}()
-		NewFileState(sfilePath, "static")
+		NewFileState(sfilePath, "static", nil)
 	})
 }
 
@@ -315,8 +367,10 @@ func TestUpdateStateFile(t *testing.T) {
 			"",
 			&stateMemory{
 				assignments: ContainerCPUAssignments{
-					"container1": cpuset.NewCPUSet(4, 5, 6),
-					"container2": cpuset.NewCPUSet(1, 2, 3),
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.NewCPUSet(4, 5, 6),
+						"container2": cpuset.NewCPUSet(1, 2, 3),
+					},
 				},
 				defaultCPUSet: cpuset.NewCPUSet(),
 			},
@@ -363,7 +417,7 @@ func TestUpdateStateFile(t *testing.T) {
 					return
 				}
 			}
-			newFileState := NewFileState(sfilePath.Name(), "static")
+			newFileState := NewFileState(sfilePath.Name(), "static", nil)
 			AssertStateEqual(t, newFileState, tc.expectedState)
 		})
 	}
@@ -373,35 +427,43 @@ func TestHelpersStateFile(t *testing.T) {
 	testCases := []struct {
 		description   string
 		defaultCPUset cpuset.CPUSet
-		containers    map[string]cpuset.CPUSet
+		assignments   map[string]map[string]cpuset.CPUSet
 	}{
 		{
 			description:   "one container",
 			defaultCPUset: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8),
-			containers: map[string]cpuset.CPUSet{
-				"c1": cpuset.NewCPUSet(0, 1),
+			assignments: map[string]map[string]cpuset.CPUSet{
+				"pod": {
+					"c1": cpuset.NewCPUSet(0, 1),
+				},
 			},
 		},
 		{
 			description:   "two containers",
 			defaultCPUset: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8),
-			containers: map[string]cpuset.CPUSet{
-				"c1": cpuset.NewCPUSet(0, 1),
-				"c2": cpuset.NewCPUSet(2, 3, 4, 5),
+			assignments: map[string]map[string]cpuset.CPUSet{
+				"pod": {
+					"c1": cpuset.NewCPUSet(0, 1),
+					"c2": cpuset.NewCPUSet(2, 3, 4, 5),
+				},
 			},
 		},
 		{
 			description:   "container with more cpus than is possible",
 			defaultCPUset: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8),
-			containers: map[string]cpuset.CPUSet{
-				"c1": cpuset.NewCPUSet(0, 10),
+			assignments: map[string]map[string]cpuset.CPUSet{
+				"pod": {
+					"c1": cpuset.NewCPUSet(0, 10),
+				},
 			},
 		},
 		{
 			description:   "container without assigned cpus",
 			defaultCPUset: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8),
-			containers: map[string]cpuset.CPUSet{
-				"c1": cpuset.NewCPUSet(),
+			assignments: map[string]map[string]cpuset.CPUSet{
+				"pod": {
+					"c1": cpuset.NewCPUSet(),
+				},
 			},
 		},
 	}
@@ -414,19 +476,21 @@ func TestHelpersStateFile(t *testing.T) {
 				t.Errorf("cannot create temporary test file: %q", err.Error())
 			}
 
-			state := NewFileState(sfFile.Name(), "static")
+			state := NewFileState(sfFile.Name(), "static", nil)
 			state.SetDefaultCPUSet(tc.defaultCPUset)
 
-			for containerName, containerCPUs := range tc.containers {
-				state.SetCPUSet(containerName, containerCPUs)
-				if cpus, _ := state.GetCPUSet(containerName); !cpus.Equals(containerCPUs) {
-					t.Errorf("state is inconsistent. Wants = %q Have = %q", containerCPUs, cpus)
-				}
-				state.Delete(containerName)
-				if cpus := state.GetCPUSetOrDefault(containerName); !cpus.Equals(tc.defaultCPUset) {
-					t.Error("deleted container still existing in state")
-				}
+			for podUID := range tc.assignments {
+				for containerName, containerCPUs := range tc.assignments[podUID] {
+					state.SetCPUSet(podUID, containerName, containerCPUs)
+					if cpus, _ := state.GetCPUSet(podUID, containerName); !cpus.Equals(containerCPUs) {
+						t.Errorf("state is inconsistent. Wants = %q Have = %q", containerCPUs, cpus)
+					}
+					state.Delete(podUID, containerName)
+					if cpus := state.GetCPUSetOrDefault(podUID, containerName); !cpus.Equals(tc.defaultCPUset) {
+						t.Error("deleted container still existing in state")
+					}
 
+				}
 			}
 
 		})
@@ -437,15 +501,17 @@ func TestClearStateStateFile(t *testing.T) {
 	testCases := []struct {
 		description   string
 		defaultCPUset cpuset.CPUSet
-		containers    map[string]cpuset.CPUSet
+		assignments   map[string]map[string]cpuset.CPUSet
 	}{
 		{
 			description:   "valid file",
 			defaultCPUset: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8),
-			containers: map[string]cpuset.CPUSet{
-				"c1": cpuset.NewCPUSet(0, 1),
-				"c2": cpuset.NewCPUSet(2, 3),
-				"c3": cpuset.NewCPUSet(4, 5),
+			assignments: map[string]map[string]cpuset.CPUSet{
+				"pod": {
+					"c1": cpuset.NewCPUSet(0, 1),
+					"c2": cpuset.NewCPUSet(2, 3),
+					"c3": cpuset.NewCPUSet(4, 5),
+				},
 			},
 		},
 	}
@@ -457,19 +523,23 @@ func TestClearStateStateFile(t *testing.T) {
 				t.Errorf("cannot create temporary test file: %q", err.Error())
 			}
 
-			state := NewFileState(sfFile.Name(), "static")
+			state := NewFileState(sfFile.Name(), "static", nil)
 			state.SetDefaultCPUSet(testCase.defaultCPUset)
-			for containerName, containerCPUs := range testCase.containers {
-				state.SetCPUSet(containerName, containerCPUs)
+			for podUID := range testCase.assignments {
+				for containerName, containerCPUs := range testCase.assignments[podUID] {
+					state.SetCPUSet(podUID, containerName, containerCPUs)
+				}
 			}
 
 			state.ClearState()
 			if !cpuset.NewCPUSet().Equals(state.GetDefaultCPUSet()) {
 				t.Error("cleared state shouldn't has got information about available cpuset")
 			}
-			for containerName := range testCase.containers {
-				if !cpuset.NewCPUSet().Equals(state.GetCPUSetOrDefault(containerName)) {
-					t.Error("cleared state shouldn't has got information about containers")
+			for podUID := range testCase.assignments {
+				for containerName := range testCase.assignments[podUID] {
+					if !cpuset.NewCPUSet().Equals(state.GetCPUSetOrDefault(podUID, containerName)) {
+						t.Error("cleared state shouldn't has got information about containers")
+					}
 				}
 			}
 		})

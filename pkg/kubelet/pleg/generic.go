@@ -272,7 +272,7 @@ func (g *GenericPLEG) relist() {
 			select {
 			case g.eventChannel <- events[i]:
 			default:
-				metrics.PLEGDiscardEvents.WithLabelValues().Inc()
+				metrics.PLEGDiscardEvents.Inc()
 				klog.Error("event channel is full, discard this relist() cycle event")
 			}
 		}

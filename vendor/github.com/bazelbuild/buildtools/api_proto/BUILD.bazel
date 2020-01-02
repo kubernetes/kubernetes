@@ -1,0 +1,29 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+load("//build:build_defs.bzl", "go_proto_checkedin_test")
+
+# gazelle:exclude api.gen.pb.go
+
+go_proto_checkedin_test(
+    src = "api.gen.pb.go",
+)
+
+proto_library(
+    name = "api_proto_proto",
+    srcs = ["api.proto"],
+    visibility = ["//visibility:public"],
+)
+
+go_proto_library(
+    name = "api_proto_go_proto",
+    importpath = "github.com/bazelbuild/buildtools/api_proto",
+    proto = ":api_proto_proto",
+    visibility = ["//visibility:public"],
+)
+
+go_library(
+    name = "go_default_library",
+    embed = [":api_proto_go_proto"],
+    importpath = "github.com/bazelbuild/buildtools/api_proto",
+    visibility = ["//visibility:public"],
+)

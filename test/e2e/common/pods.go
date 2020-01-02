@@ -48,7 +48,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var (
+const (
 	buildBackOffDuration = time.Minute
 	syncLoopFrequency    = 10 * time.Second
 	maxBackOffTolerance  = time.Duration(1.3 * float64(kubelet.MaxContainerBackOff))

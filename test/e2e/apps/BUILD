@@ -20,6 +20,7 @@ go_library(
         "replica_set.go",
         "statefulset.go",
         "types.go",
+        "wait.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/apps",
     deps = [
@@ -40,7 +41,6 @@ go_library(
         "//staging/src/k8s.io/api/batch/v1:go_default_library",
         "//staging/src/k8s.io/api/batch/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",

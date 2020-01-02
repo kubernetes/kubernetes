@@ -168,7 +168,7 @@ while true; do sleep 1; done
 			ginkgo.It("should report termination message [LinuxOnly] if TerminationMessagePath is set [NodeConformance]", func() {
 				// Cannot mount files in Windows Containers.
 				// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default
-				// container runtime on Windows, and when the WindowsRunAsUserName feature becomes available by default.
+				// container runtime on Windows.
 				container := v1.Container{
 					Image:                  framework.BusyBoxImage,
 					Command:                []string{"/bin/sh", "-c"},
@@ -192,7 +192,7 @@ while true; do sleep 1; done
 			*/
 			framework.ConformanceIt("should report termination message [LinuxOnly] if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance]", func() {
 				// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default
-				// container runtime on Windows, and when the WindowsRunAsUserName feature becomes available by default.
+				// container runtime on Windows
 				container := v1.Container{
 					Image:                  framework.BusyBoxImage,
 					Command:                []string{"/bin/sh", "-c"},

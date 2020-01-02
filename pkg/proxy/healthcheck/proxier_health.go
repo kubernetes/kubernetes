@@ -52,7 +52,6 @@ type ProxierHealthServer struct {
 	clock       clock.Clock
 
 	addr          string
-	port          int32
 	healthTimeout time.Duration
 	recorder      record.EventRecorder
 	nodeRef       *v1.ObjectReference
@@ -159,5 +158,5 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		lastUpdated = currentTime
 
 	}
-	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q,"currentTime": %q}`, lastUpdated, currentTime))
+	fmt.Fprintf(resp, `{"lastUpdated": %q,"currentTime": %q}`, lastUpdated, currentTime)
 }

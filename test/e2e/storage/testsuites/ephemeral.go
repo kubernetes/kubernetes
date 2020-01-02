@@ -25,7 +25,7 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -370,7 +370,7 @@ func CSIInlineVolumesEnabled(c clientset.Interface, ns string) (bool, error) {
 		// Pod was created, feature supported.
 		StopPod(c, pod)
 		return true, nil
-	case errors.IsInvalid(err):
+	case apierrors.IsInvalid(err):
 		// "Invalid" because it uses a feature that isn't supported.
 		return false, nil
 	default:

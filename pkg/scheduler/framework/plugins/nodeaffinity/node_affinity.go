@@ -21,9 +21,11 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
+	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -58,16 +60,43 @@ func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, 
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
 	}
 
-	meta := migration.PriorityMetadata(state)
-	s, err := priorities.CalculateNodeAffinityPriorityMap(pod, meta, nodeInfo)
-	return s.Score, migration.ErrorToFrameworkStatus(err)
+	node := nodeInfo.Node()
+	if node == nil {
+		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
+	}
+
+	affinity := pod.Spec.Affinity
+
+	var count int64
+	// A nil element of PreferredDuringSchedulingIgnoredDuringExecution matches no objects.
+	// An element of PreferredDuringSchedulingIgnoredDuringExecution that refers to an
+	// empty PreferredSchedulingTerm matches all objects.
+	if affinity != nil && affinity.NodeAffinity != nil && affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		// Match PreferredDuringSchedulingIgnoredDuringExecution term by term.
+		for i := range affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+			preferredSchedulingTerm := &affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[i]
+			if preferredSchedulingTerm.Weight == 0 {
+				continue
+			}
+
+			// TODO: Avoid computing it for all nodes if this becomes a performance problem.
+			nodeSelector, err := v1helper.NodeSelectorRequirementsAsSelector(preferredSchedulingTerm.Preference.MatchExpressions)
+			if err != nil {
+				return 0, framework.NewStatus(framework.Error, err.Error())
+			}
+
+			if nodeSelector.Matches(labels.Set(node.Labels)) {
+				count += int64(preferredSchedulingTerm.Weight)
+			}
+		}
+	}
+
+	return count, nil
 }
 
 // NormalizeScore invoked after scoring all nodes.
 func (pl *NodeAffinity) NormalizeScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
-	// Note that CalculateNodeAffinityPriorityReduce doesn't use priority metadata, hence passing nil here.
-	err := priorities.CalculateNodeAffinityPriorityReduce(pod, nil, pl.handle.SnapshotSharedLister(), scores)
-	return migration.ErrorToFrameworkStatus(err)
+	return pluginhelper.DefaultNormalizeScore(framework.MaxNodeScore, false, scores)
 }
 
 // ScoreExtensions of the Score plugin.

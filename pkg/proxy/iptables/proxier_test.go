@@ -246,7 +246,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 			} else {
 				simErr = fmt.Errorf(tc.simulatedErr)
 			}
-			cmdFunc := func() ([]byte, error) { return []byte(cmdOutput), simErr }
+			cmdFunc := func() ([]byte, []byte, error) { return []byte(cmdOutput), nil, simErr }
 			fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript, cmdFunc)
 			fexec.CommandScript = append(fexec.CommandScript, execFunc)
 		}
@@ -2358,15 +2358,15 @@ COMMIT
 -A KUBE-MARK-MASQ -j MARK --set-xmark 
 -A KUBE-SERVICES -m comment --comment "ns1/svc1: cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-SERVICES -m comment --comment "ns1/svc1: cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 -j KUBE-SVC-AHZNAGK3SCETOS2T
--A KUBE-SVC-AHZNAGK3SCETOS2T -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-PXD6POUVGD2I37UY
--A KUBE-SEP-PXD6POUVGD2I37UY -s 10.0.1.1/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-PXD6POUVGD2I37UY -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
--A KUBE-SVC-AHZNAGK3SCETOS2T -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-SOKZUIT7SCEVIP33
--A KUBE-SEP-SOKZUIT7SCEVIP33 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-SOKZUIT7SCEVIP33 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
--A KUBE-SVC-AHZNAGK3SCETOS2T -j KUBE-SEP-WVE3FAB34S7NZGDJ
--A KUBE-SEP-WVE3FAB34S7NZGDJ -s 10.0.1.3/32 -j KUBE-MARK-MASQ
--A KUBE-SEP-WVE3FAB34S7NZGDJ -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SVC-AHZNAGK3SCETOS2T -m comment --comment ns1/svc1: -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-PXD6POUVGD2I37UY
+-A KUBE-SEP-PXD6POUVGD2I37UY -m comment --comment ns1/svc1: -s 10.0.1.1/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-PXD6POUVGD2I37UY -m comment --comment ns1/svc1: -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
+-A KUBE-SVC-AHZNAGK3SCETOS2T -m comment --comment ns1/svc1: -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-SOKZUIT7SCEVIP33
+-A KUBE-SEP-SOKZUIT7SCEVIP33 -m comment --comment ns1/svc1: -s 10.0.1.2/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-SOKZUIT7SCEVIP33 -m comment --comment ns1/svc1: -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
+-A KUBE-SVC-AHZNAGK3SCETOS2T -m comment --comment ns1/svc1: -j KUBE-SEP-WVE3FAB34S7NZGDJ
+-A KUBE-SEP-WVE3FAB34S7NZGDJ -m comment --comment ns1/svc1: -s 10.0.1.3/32 -j KUBE-MARK-MASQ
+-A KUBE-SEP-WVE3FAB34S7NZGDJ -m comment --comment ns1/svc1: -m tcp -p tcp -j DNAT --to-destination 10.0.1.3:80
 -A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 COMMIT
 `

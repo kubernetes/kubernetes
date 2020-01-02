@@ -36,7 +36,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/group"
@@ -102,7 +102,7 @@ func TestKubernetesService(t *testing.T) {
 	defer closeFn()
 	coreClient := clientset.NewForConfigOrDie(config.GenericConfig.LoopbackClientConfig)
 	err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
-		if _, err := coreClient.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{}); err != nil && errors.IsNotFound(err) {
+		if _, err := coreClient.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{}); err != nil && apierrors.IsNotFound(err) {
 			return false, nil
 		} else if err != nil {
 			return false, err
@@ -682,10 +682,10 @@ func TestServiceAlloc(t *testing.T) {
 	// Wait until the default "kubernetes" service is created.
 	if err = wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
 		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
-		return !errors.IsNotFound(err), nil
+		return !apierrors.IsNotFound(err), nil
 	}); err != nil {
 		t.Fatalf("creating kubernetes service timed out")
 	}
@@ -864,7 +864,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 					n.Status.Conditions = nil
 				}
 				if _, err := c.Nodes().UpdateStatus(n); err != nil {
-					if !errors.IsConflict(err) {
+					if !apierrors.IsConflict(err) {
 						fmt.Printf("[%d] error after %d: %v\n", node, i, err)
 						break
 					}

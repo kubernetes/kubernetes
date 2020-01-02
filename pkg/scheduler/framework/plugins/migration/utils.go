@@ -23,9 +23,6 @@ import (
 )
 
 const (
-	// PredicatesStateKey is the key in CycleState to PredicateStateData
-	PredicatesStateKey = "predicates"
-
 	// PrioritiesStateKey is the key in CycleState to PrioritiesStateData
 	PrioritiesStateKey = "priorities"
 )
@@ -62,26 +59,6 @@ func ErrorToFrameworkStatus(err error) *framework.Status {
 	return nil
 }
 
-// PredicatesStateData is a pointer to Metadata. In the normal case, StateData is supposed to
-// be generated and stored in CycleState by a framework plugin (like a PreFilter pre-computing data for
-// its corresponding Filter). However, during migration, the scheduler will inject a pointer to
-// Metadata into CycleState. This "hack" is necessary because during migration Filters that implement
-// predicates functionality will be calling into the existing predicate functions, and need
-// to pass Metadata.
-type PredicatesStateData struct {
-	Reference interface{}
-}
-
-// Clone is supposed to make a copy of the data, but since this is just a pointer, we are practically
-// just copying the pointer. This is ok because the actual reference to the Metadata
-// copy that is made by generic_scheduler during preemption cycle will be injected again outside
-// the framework.
-func (p *PredicatesStateData) Clone() framework.StateData {
-	return &PredicatesStateData{
-		Reference: p.Reference,
-	}
-}
-
 // PrioritiesStateData is a pointer to PrioritiesMetadata.
 type PrioritiesStateData struct {
 	Reference interface{}
@@ -108,29 +85,4 @@ func PriorityMetadata(state *framework.CycleState) interface{} {
 		klog.Errorf("reading key %q from CycleState, continuing without metadata: %v", PrioritiesStateKey, err)
 	}
 	return meta
-}
-
-// PredicateMetadata returns predicate metadata stored in CycleState.
-func PredicateMetadata(state *framework.CycleState) interface{} {
-	if state == nil {
-		return nil
-	}
-
-	var meta interface{}
-	if s, err := state.Read(PredicatesStateKey); err == nil {
-		meta = s.(*PredicatesStateData).Reference
-	} else {
-		klog.Errorf("reading key %q from CycleState, continuing without metadata: %v", PredicatesStateKey, err)
-	}
-	return meta
-}
-
-// CovertStateRefToPredMeta checks if 'stateRef' is nil, if it is, return nil;
-// otherwise covert it to predicates metadata and return.
-func CovertStateRefToPredMeta(stateRef interface{}) (predicates.Metadata, bool) {
-	if stateRef == nil {
-		return nil, true
-	}
-	meta, ok := stateRef.(predicates.Metadata)
-	return meta, ok
 }

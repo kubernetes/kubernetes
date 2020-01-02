@@ -24,30 +24,39 @@ import (
 	"sync"
 
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
-type stateFileData struct {
+type stateFileDataV1 struct {
 	PolicyName    string            `json:"policyName"`
 	DefaultCPUSet string            `json:"defaultCpuSet"`
 	Entries       map[string]string `json:"entries,omitempty"`
+}
+
+type stateFileDataV2 struct {
+	PolicyName    string                       `json:"policyName"`
+	DefaultCPUSet string                       `json:"defaultCpuSet"`
+	Entries       map[string]map[string]string `json:"entries,omitempty"`
 }
 
 var _ State = &stateFile{}
 
 type stateFile struct {
 	sync.RWMutex
-	stateFilePath string
-	policyName    string
-	cache         State
+	stateFilePath     string
+	policyName        string
+	cache             State
+	initialContainers containermap.ContainerMap
 }
 
 // NewFileState creates new State for keeping track of cpu/pod assignment with file backend
-func NewFileState(filePath string, policyName string) State {
+func NewFileState(filePath string, policyName string, initialContainers containermap.ContainerMap) State {
 	stateFile := &stateFile{
-		stateFilePath: filePath,
-		cache:         NewMemoryState(),
-		policyName:    policyName,
+		stateFilePath:     filePath,
+		cache:             NewMemoryState(),
+		policyName:        policyName,
+		initialContainers: initialContainers,
 	}
 
 	if err := stateFile.tryRestoreState(); err != nil {
@@ -59,6 +68,30 @@ func NewFileState(filePath string, policyName string) State {
 	}
 
 	return stateFile
+}
+
+// migrateV1StateToV2State() converts state from the v1 format to the v2 format
+func (sf *stateFile) migrateV1StateToV2State(src *stateFileDataV1, dst *stateFileDataV2) error {
+	if src.PolicyName != "" {
+		dst.PolicyName = src.PolicyName
+	}
+	if src.DefaultCPUSet != "" {
+		dst.DefaultCPUSet = src.DefaultCPUSet
+	}
+	for containerID, cset := range src.Entries {
+		podUID, containerName, err := sf.initialContainers.GetContainerRef(containerID)
+		if err != nil {
+			return fmt.Errorf("containerID '%v' not found in initial containers list", containerID)
+		}
+		if dst.Entries == nil {
+			dst.Entries = make(map[string]map[string]string)
+		}
+		if _, exists := dst.Entries[podUID]; !exists {
+			dst.Entries[podUID] = make(map[string]string)
+		}
+		dst.Entries[podUID][containerName] = cset
+	}
+	return nil
 }
 
 // tryRestoreState tries to read state file, upon any error,
@@ -90,28 +123,40 @@ func (sf *stateFile) tryRestoreState() error {
 	}
 
 	// File exists; try to read it.
-	var readState stateFileData
+	var readStateV1 stateFileDataV1
+	var readStateV2 stateFileDataV2
 
-	if err = json.Unmarshal(content, &readState); err != nil {
-		klog.Errorf("[cpumanager] state file: could not unmarshal, corrupted state file - \"%s\"", sf.stateFilePath)
-		return err
-	}
-
-	if sf.policyName != readState.PolicyName {
-		return fmt.Errorf("policy configured \"%s\" != policy from state file \"%s\"", sf.policyName, readState.PolicyName)
-	}
-
-	if tmpDefaultCPUSet, err = cpuset.Parse(readState.DefaultCPUSet); err != nil {
-		klog.Errorf("[cpumanager] state file: could not parse state file - [defaultCpuSet:\"%s\"]", readState.DefaultCPUSet)
-		return err
-	}
-
-	for containerID, cpuString := range readState.Entries {
-		if tmpContainerCPUSet, err = cpuset.Parse(cpuString); err != nil {
-			klog.Errorf("[cpumanager] state file: could not parse state file - container id: %s, cpuset: \"%s\"", containerID, cpuString)
+	if err = json.Unmarshal(content, &readStateV1); err != nil {
+		readStateV1 = stateFileDataV1{} // reset it back to 0
+		if err = json.Unmarshal(content, &readStateV2); err != nil {
+			klog.Errorf("[cpumanager] state file: could not unmarshal, corrupted state file - \"%s\"", sf.stateFilePath)
 			return err
 		}
-		tmpAssignments[containerID] = tmpContainerCPUSet
+	}
+
+	if err = sf.migrateV1StateToV2State(&readStateV1, &readStateV2); err != nil {
+		klog.Errorf("[cpumanager] state file: could not migrate v1 state to v2 state  - \"%s\"", sf.stateFilePath)
+		return err
+	}
+
+	if sf.policyName != readStateV2.PolicyName {
+		return fmt.Errorf("policy configured \"%s\" != policy from state file \"%s\"", sf.policyName, readStateV2.PolicyName)
+	}
+
+	if tmpDefaultCPUSet, err = cpuset.Parse(readStateV2.DefaultCPUSet); err != nil {
+		klog.Errorf("[cpumanager] state file: could not parse state file - [defaultCpuSet:\"%s\"]", readStateV2.DefaultCPUSet)
+		return err
+	}
+
+	for pod := range readStateV2.Entries {
+		tmpAssignments[pod] = make(map[string]cpuset.CPUSet)
+		for container, cpuString := range readStateV2.Entries[pod] {
+			if tmpContainerCPUSet, err = cpuset.Parse(cpuString); err != nil {
+				klog.Errorf("[cpumanager] state file: could not parse state file - pod: %s, container: %s, cpuset: \"%s\"", pod, container, cpuString)
+				return err
+			}
+			tmpAssignments[pod][container] = tmpContainerCPUSet
+		}
 	}
 
 	sf.cache.SetDefaultCPUSet(tmpDefaultCPUSet)
@@ -128,14 +173,18 @@ func (sf *stateFile) storeState() {
 	var content []byte
 	var err error
 
-	data := stateFileData{
+	data := stateFileDataV2{
 		PolicyName:    sf.policyName,
 		DefaultCPUSet: sf.cache.GetDefaultCPUSet().String(),
-		Entries:       map[string]string{},
+		Entries:       map[string]map[string]string{},
 	}
 
-	for containerID, cset := range sf.cache.GetCPUAssignments() {
-		data.Entries[containerID] = cset.String()
+	assignments := sf.cache.GetCPUAssignments()
+	for pod := range assignments {
+		data.Entries[pod] = map[string]string{}
+		for container, cset := range assignments[pod] {
+			data.Entries[pod][container] = cset.String()
+		}
 	}
 
 	if content, err = json.Marshal(data); err != nil {
@@ -147,11 +196,11 @@ func (sf *stateFile) storeState() {
 	}
 }
 
-func (sf *stateFile) GetCPUSet(containerID string) (cpuset.CPUSet, bool) {
+func (sf *stateFile) GetCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
 	sf.RLock()
 	defer sf.RUnlock()
 
-	res, ok := sf.cache.GetCPUSet(containerID)
+	res, ok := sf.cache.GetCPUSet(podUID, containerName)
 	return res, ok
 }
 
@@ -162,11 +211,11 @@ func (sf *stateFile) GetDefaultCPUSet() cpuset.CPUSet {
 	return sf.cache.GetDefaultCPUSet()
 }
 
-func (sf *stateFile) GetCPUSetOrDefault(containerID string) cpuset.CPUSet {
+func (sf *stateFile) GetCPUSetOrDefault(podUID string, containerName string) cpuset.CPUSet {
 	sf.RLock()
 	defer sf.RUnlock()
 
-	return sf.cache.GetCPUSetOrDefault(containerID)
+	return sf.cache.GetCPUSetOrDefault(podUID, containerName)
 }
 
 func (sf *stateFile) GetCPUAssignments() ContainerCPUAssignments {
@@ -175,10 +224,10 @@ func (sf *stateFile) GetCPUAssignments() ContainerCPUAssignments {
 	return sf.cache.GetCPUAssignments()
 }
 
-func (sf *stateFile) SetCPUSet(containerID string, cset cpuset.CPUSet) {
+func (sf *stateFile) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet) {
 	sf.Lock()
 	defer sf.Unlock()
-	sf.cache.SetCPUSet(containerID, cset)
+	sf.cache.SetCPUSet(podUID, containerName, cset)
 	sf.storeState()
 }
 
@@ -196,10 +245,10 @@ func (sf *stateFile) SetCPUAssignments(a ContainerCPUAssignments) {
 	sf.storeState()
 }
 
-func (sf *stateFile) Delete(containerID string) {
+func (sf *stateFile) Delete(podUID string, containerName string) {
 	sf.Lock()
 	defer sf.Unlock()
-	sf.cache.Delete(containerID)
+	sf.cache.Delete(podUID, containerName)
 	sf.storeState()
 }
 

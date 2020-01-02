@@ -24,7 +24,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -66,15 +66,6 @@ func GetPodList(c clientset.Interface, ss *appsv1.StatefulSet) *v1.PodList {
 	podList, err := c.CoreV1().Pods(ss.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	e2efwk.ExpectNoError(err)
 	return podList
-}
-
-// DeleteStatefulPodAtIndex deletes the Pod with ordinal index in ss.
-func DeleteStatefulPodAtIndex(c clientset.Interface, index int, ss *appsv1.StatefulSet) {
-	name := getStatefulSetPodNameAtIndex(index, ss)
-	noGrace := int64(0)
-	if err := c.CoreV1().Pods(ss.Namespace).Delete(name, &metav1.DeleteOptions{GracePeriodSeconds: &noGrace}); err != nil {
-		e2efwk.Failf("Failed to delete stateful pod %v for StatefulSet %v/%v: %v", name, ss.Namespace, ss.Name, err)
-	}
 }
 
 // DeleteAllStatefulSets deletes all StatefulSet API Objects in Namespace ns.
@@ -149,29 +140,6 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 	}
 }
 
-// UpdateStatefulSetWithRetries updates statfulset template with retries.
-func UpdateStatefulSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateStatefulSetFunc) (statefulSet *appsv1.StatefulSet, err error) {
-	statefulSets := c.AppsV1().StatefulSets(namespace)
-	var updateErr error
-	pollErr := wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
-		if statefulSet, err = statefulSets.Get(name, metav1.GetOptions{}); err != nil {
-			return false, err
-		}
-		// Apply the update, then attempt to push it to the apiserver.
-		applyUpdate(statefulSet)
-		if statefulSet, err = statefulSets.Update(statefulSet); err == nil {
-			e2efwk.Logf("Updating stateful set %s", name)
-			return true, nil
-		}
-		updateErr = err
-		return false, nil
-	})
-	if pollErr == wait.ErrWaitTimeout {
-		pollErr = fmt.Errorf("couldn't apply the provided updated to stateful set %q: %v", name, updateErr)
-	}
-	return statefulSet, pollErr
-}
-
 // Scale scales ss to count replicas.
 func Scale(c clientset.Interface, ss *appsv1.StatefulSet, count int32) (*appsv1.StatefulSet, error) {
 	name := ss.Name
@@ -216,15 +184,6 @@ func Restart(c clientset.Interface, ss *appsv1.StatefulSet) {
 	// before we scale it back up.
 	WaitForStatusReplicas(c, ss, 0)
 	update(c, ss.Namespace, ss.Name, func(ss *appsv1.StatefulSet) { *(ss.Spec.Replicas) = oldReplicas })
-}
-
-// GetStatefulSet gets the StatefulSet named name in namespace.
-func GetStatefulSet(c clientset.Interface, namespace, name string) *appsv1.StatefulSet {
-	ss, err := c.AppsV1().StatefulSets(namespace).Get(name, metav1.GetOptions{})
-	if err != nil {
-		e2efwk.Failf("Failed to get StatefulSet %s/%s: %v", namespace, name, err)
-	}
-	return ss
 }
 
 // CheckHostname verifies that all Pods in ss have the correct Hostname. If the returned error is not nil than verification failed.
@@ -285,19 +244,6 @@ func ExecInStatefulPods(c clientset.Interface, ss *appsv1.StatefulSet, cmd strin
 	return nil
 }
 
-type updateStatefulSetFunc func(*appsv1.StatefulSet)
-
-// VerifyStatefulPodFunc is a func that examines a StatefulSetPod.
-type VerifyStatefulPodFunc func(*v1.Pod)
-
-// VerifyPodAtIndex applies a visitor pattern to the Pod at index in ss. verify is applied to the Pod to "visit" it.
-func VerifyPodAtIndex(c clientset.Interface, index int, ss *appsv1.StatefulSet, verify VerifyStatefulPodFunc) {
-	name := getStatefulSetPodNameAtIndex(index, ss)
-	pod, err := c.CoreV1().Pods(ss.Namespace).Get(name, metav1.GetOptions{})
-	e2efwk.ExpectNoError(err, fmt.Sprintf("Failed to get stateful pod %s for StatefulSet %s/%s", name, ss.Namespace, ss.Name))
-	verify(pod)
-}
-
 // udpate updates a statefulset, and it is only used within rest.go
 func update(c clientset.Interface, ns, name string, update func(ss *appsv1.StatefulSet)) *appsv1.StatefulSet {
 	for i := 0; i < 3; i++ {
@@ -310,17 +256,10 @@ func update(c clientset.Interface, ns, name string, update func(ss *appsv1.State
 		if err == nil {
 			return ss
 		}
-		if !apierrs.IsConflict(err) && !apierrs.IsServerTimeout(err) {
+		if !apierrors.IsConflict(err) && !apierrors.IsServerTimeout(err) {
 			e2efwk.Failf("failed to update statefulset %q: %v", name, err)
 		}
 	}
 	e2efwk.Failf("too many retries draining statefulset %q", name)
 	return nil
-}
-
-// getStatefulSetPodNameAtIndex gets formated pod name given index.
-func getStatefulSetPodNameAtIndex(index int, ss *appsv1.StatefulSet) string {
-	// TODO: we won't use "-index" as the name strategy forever,
-	// pull the name out from an identity mapper.
-	return fmt.Sprintf("%v-%v", ss.Name, index)
 }

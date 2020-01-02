@@ -20,9 +20,14 @@ import (
 	"path/filepath"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+
 	"regexp"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -30,7 +35,6 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletpodresourcesv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	dputil "k8s.io/kubernetes/test/e2e/framework/deviceplugin"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
@@ -39,9 +43,21 @@ import (
 )
 
 const (
+	// sampleResourceName is the name of the example resource which is used in the e2e test
+	sampleResourceName = "example.com/resource"
+	// sampleDevicePluginDSYAML is the path of the daemonset template of the sample device plugin. // TODO: Parametrize it by making it a feature in TestFramework.
+	sampleDevicePluginDSYAML = "test/e2e/testing-manifests/sample-device-plugin.yaml"
+	// sampleDevicePluginName is the name of the device plugin pod
+	sampleDevicePluginName = "sample-device-plugin"
+
 	// fake resource name
 	resourceName            = "example.com/resource"
 	envVarNamePluginSockDir = "PLUGIN_SOCK_DIR"
+)
+
+var (
+	appsScheme = runtime.NewScheme()
+	appsCodecs = serializer.NewCodecFactory(appsScheme)
 )
 
 // Serial because the test restarts Kubelet
@@ -49,6 +65,42 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFe
 	f := framework.NewDefaultFramework("device-plugin-errors")
 	testDevicePlugin(f, "/var/lib/kubelet/plugins_registry")
 })
+
+// numberOfSampleResources returns the number of resources advertised by a node.
+func numberOfSampleResources(node *v1.Node) int64 {
+	val, ok := node.Status.Capacity[sampleResourceName]
+
+	if !ok {
+		return 0
+	}
+
+	return val.Value()
+}
+
+// getSampleDevicePluginPod returns the Device Plugin pod for sample resources in e2e tests.
+func getSampleDevicePluginPod() *v1.Pod {
+	ds := readDaemonSetV1OrDie(testfiles.ReadOrDie(sampleDevicePluginDSYAML))
+	p := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      sampleDevicePluginName,
+			Namespace: metav1.NamespaceSystem,
+		},
+
+		Spec: ds.Spec.Template.Spec,
+	}
+
+	return p
+}
+
+// readDaemonSetV1OrDie reads daemonset object from bytes. Panics on error.
+func readDaemonSetV1OrDie(objBytes []byte) *appsv1.DaemonSet {
+	appsv1.AddToScheme(appsScheme)
+	requiredObj, err := runtime.Decode(appsCodecs.UniversalDecoder(appsv1.SchemeGroupVersion), objBytes)
+	if err != nil {
+		panic(err)
+	}
+	return requiredObj.(*appsv1.DaemonSet)
+}
 
 func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 	pluginSockDir = filepath.Join(pluginSockDir) + "/"
@@ -63,7 +115,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 		ginkgo.It("Verifies the Kubelet device plugin functionality.", func() {
 			ginkgo.By("Wait for node is ready to start with")
 			e2enode.WaitForNodeToBeReady(f.ClientSet, framework.TestContext.NodeName, 5*time.Minute)
-			dp := dputil.GetSampleDevicePluginPod()
+			dp := getSampleDevicePluginPod()
 			for i := range dp.Spec.Containers[0].Env {
 				if dp.Spec.Containers[0].Env[i].Name == envVarNamePluginSockDir {
 					dp.Spec.Containers[0].Env[i].Value = pluginSockDir
@@ -77,7 +129,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Waiting for devices to become available on the local node")
 			gomega.Eventually(func() bool {
-				return dputil.NumberOfSampleResources(getLocalNode(f)) > 0
+				return numberOfSampleResources(getLocalNode(f)) > 0
 			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
 			framework.Logf("Successfully created device plugin pod")
 

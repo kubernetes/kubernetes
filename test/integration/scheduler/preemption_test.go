@@ -125,9 +125,12 @@ func TestPreemption(t *testing.T) {
 	// Initialize scheduler with a filter plugin.
 	var filter tokenFilter
 	registry := make(framework.Registry)
-	registry.Register(filterPluginName, func(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
+	err := registry.Register(filterPluginName, func(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
 		return &filter, nil
 	})
+	if err != nil {
+		t.Fatalf("Error registering a filter: %v", err)
+	}
 	plugins := &schedulerconfig.Plugins{
 		Filter: &schedulerconfig.PluginSet{
 			Enabled: []schedulerconfig.Plugin{
@@ -392,6 +395,7 @@ func TestPreemption(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		t.Logf("================ Running test: %v\n", test.description)
 		filter.Tokens = test.initTokens
 		filter.Unresolvable = test.unresolvable
 		pods := make([]*v1.Pod, len(test.existingPods))
@@ -583,6 +587,7 @@ func TestPodPriorityResolution(t *testing.T) {
 
 	pods := make([]*v1.Pod, 0, len(tests))
 	for _, test := range tests {
+		t.Logf("================ Running test: %v\n", test.Name)
 		t.Run(test.Name, func(t *testing.T) {
 			pod, err := runPausePod(cs, test.Pod)
 			if err != nil {

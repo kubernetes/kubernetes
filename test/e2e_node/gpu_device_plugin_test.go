@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/gpu"
@@ -32,6 +33,34 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/prometheus/common/model"
 )
+
+// numberOfNVIDIAGPUs returns the number of GPUs advertised by a node
+// This is based on the Device Plugin system and expected to run on a COS based node
+// After the NVIDIA drivers were installed
+// TODO make this generic and not linked to COS only
+func numberOfNVIDIAGPUs(node *v1.Node) int64 {
+	val, ok := node.Status.Capacity[gpu.NVIDIAGPUResourceName]
+	if !ok {
+		return 0
+	}
+	return val.Value()
+}
+
+// NVIDIADevicePlugin returns the official Google Device Plugin pod for NVIDIA GPU in GKE
+func NVIDIADevicePlugin() *v1.Pod {
+	ds, err := framework.DsFromManifest(gpu.GPUDevicePluginDSYAML)
+	framework.ExpectNoError(err)
+	p := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "device-plugin-nvidia-gpu-" + string(uuid.NewUUID()),
+			Namespace: metav1.NamespaceSystem,
+		},
+		Spec: ds.Spec.Template.Spec,
+	}
+	// Remove node affinity
+	p.Spec.Affinity = nil
+	return p
+}
 
 // Serial because the test restarts Kubelet
 var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin][NodeFeature:GPUDevicePlugin][Serial] [Disruptive]", func() {
@@ -47,15 +76,15 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			}
 
 			ginkgo.By("Creating the Google Device Plugin pod for NVIDIA GPU in GKE")
-			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(gpu.NVIDIADevicePlugin())
+			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(NVIDIADevicePlugin())
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting for GPUs to become available on the local node")
 			gomega.Eventually(func() bool {
-				return gpu.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
+				return numberOfNVIDIAGPUs(getLocalNode(f)) > 0
 			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
 
-			if gpu.NumberOfNVIDIAGPUs(getLocalNode(f)) < 2 {
+			if numberOfNVIDIAGPUs(getLocalNode(f)) < 2 {
 				ginkgo.Skip("Not enough GPUs to execute this test (at least two needed)")
 			}
 		})
@@ -95,7 +124,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			restartKubelet()
 			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
 			gomega.Eventually(func() bool {
-				return gpu.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
+				return numberOfNVIDIAGPUs(getLocalNode(f)) > 0
 			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
 			p2 := f.PodClient().CreateSync(makeBusyboxPod(gpu.NVIDIAGPUResourceName, podRECMD))
 
@@ -110,7 +139,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			gomega.Eventually(func() bool {
 				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				return gpu.NumberOfNVIDIAGPUs(node) <= 0
+				return numberOfNVIDIAGPUs(node) <= 0
 			}, 10*time.Minute, framework.Poll).Should(gomega.BeTrue())
 			ginkgo.By("Checking that scheduled pods can continue to run even after we delete device plugin.")
 			ensurePodContainerRestart(f, p1.Name, p1.Name)

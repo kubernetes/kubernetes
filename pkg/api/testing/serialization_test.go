@@ -170,7 +170,7 @@ var nonRoundTrippableTypes = sets.NewString(
 var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions", "GetOptions", "CreateOptions", "UpdateOptions", "PatchOptions"}
 
 // TestCommonKindsRegistered verifies that all group/versions registered with
-// the testapi package have the common kinds.
+// the legacyscheme package have the common kinds.
 func TestCommonKindsRegistered(t *testing.T) {
 	gvs := map[schema.GroupVersion]bool{}
 	for gvk := range legacyscheme.Scheme.AllKnownTypes() {
@@ -213,7 +213,7 @@ func TestCommonKindsRegistered(t *testing.T) {
 }
 
 // TestRoundTripTypes applies the round-trip test to all round-trippable Kinds
-// in all of the API groups registered for test in the testapi package.
+// in all of the API groups registered for test in the legacyscheme package.
 func TestRoundTripTypes(t *testing.T) {
 	seed := rand.Int63()
 	fuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs)

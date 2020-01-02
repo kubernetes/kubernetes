@@ -469,6 +469,14 @@ func TestValidateKubeConfig(t *testing.T) {
 	configWithAnotherClusterCa := setupdKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
 	configWithAnotherServerURL := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://4.3.2.1:4321", "test-cluster", "myOrg1")
 
+	// create a valid config but with whitespace around the CA PEM.
+	// validateKubeConfig() should tollerate that.
+	configWhitespace := config.DeepCopy()
+	configWhitespaceCtx := configWhitespace.Contexts[configWhitespace.CurrentContext]
+	configWhitespaceCA := string(configWhitespace.Clusters[configWhitespaceCtx.Cluster].CertificateAuthorityData)
+	configWhitespaceCA = "\n" + configWhitespaceCA + "\n"
+	configWhitespace.Clusters[configWhitespaceCtx.Cluster].CertificateAuthorityData = []byte(configWhitespaceCA)
+
 	tests := map[string]struct {
 		existingKubeConfig *clientcmdapi.Config
 		kubeConfig         *clientcmdapi.Config
@@ -490,6 +498,11 @@ func TestValidateKubeConfig(t *testing.T) {
 		},
 		"kubeconfig exist and is valid": {
 			existingKubeConfig: config,
+			kubeConfig:         config,
+			expectedError:      false,
+		},
+		"kubeconfig exist and is valid even if its CA contains whitespace": {
+			existingKubeConfig: configWhitespace,
 			kubeConfig:         config,
 			expectedError:      false,
 		},

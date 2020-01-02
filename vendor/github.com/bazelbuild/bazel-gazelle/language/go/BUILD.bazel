@@ -1,0 +1,132 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load(":def.bzl", "std_package_list")
+
+# gazelle:exclude testdata
+
+# TODO(jayconrod): test that the checked-in static file matches the generated
+# file. The generated code is checked in so that Gazelle can still be built
+# with "go get".
+std_package_list(
+    name = "std_package_list",
+    out = "std_package_list.go",
+)
+
+genrule(
+    name = "known_proto_imports",
+    srcs = ["//language/proto:proto.csv"],
+    outs = ["known_proto_imports.go"],
+    cmd = "$(location //language/proto/gen:gen_known_imports) -proto_csv $< -known_imports $@ -package golang -var knownProtoImports -key 0 -value 3",
+    tools = ["//language/proto/gen:gen_known_imports"],
+)
+
+genrule(
+    name = "known_go_imports",
+    srcs = ["//language/proto:proto.csv"],
+    outs = ["known_go_imports.go"],
+    cmd = "$(location //language/proto/gen:gen_known_imports) -proto_csv $< -known_imports $@ -package golang -var knownGoProtoImports -key 2 -value 3",
+    tools = ["//language/proto/gen:gen_known_imports"],
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "config.go",
+        "constants.go",
+        "dep.go",
+        "fileinfo.go",
+        "fix.go",
+        "generate.go",
+        "godep.go",
+        "kinds.go",
+        "known_go_imports.go",
+        "known_proto_imports.go",
+        "lang.go",
+        "modules.go",
+        "package.go",
+        "resolve.go",
+        "std_package_list.go",
+        "update.go",
+    ],
+    importpath = "github.com/bazelbuild/bazel-gazelle/language/go",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//config:go_default_library",
+        "//flag:go_default_library",
+        "//label:go_default_library",
+        "//language:go_default_library",
+        "//language/proto:go_default_library",
+        "//pathtools:go_default_library",
+        "//repo:go_default_library",
+        "//resolve:go_default_library",
+        "//rule:go_default_library",
+        "@com_github_bazelbuild_buildtools//build:go_default_library",
+        "@com_github_pelletier_go_toml//:go_default_library",
+        "@org_golang_x_sync//errgroup:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "config_test.go",
+        "fileinfo_go_test.go",
+        "fileinfo_test.go",
+        "fix_test.go",
+        "generate_test.go",
+        "resolve_test.go",
+        "stubs_test.go",
+        "update_import_test.go",
+    ],
+    data = glob(["testdata/**"]),
+    embed = [":go_default_library"],
+    deps = [
+        "//config:go_default_library",
+        "//label:go_default_library",
+        "//language:go_default_library",
+        "//language/proto:go_default_library",
+        "//merger:go_default_library",
+        "//pathtools:go_default_library",
+        "//repo:go_default_library",
+        "//resolve:go_default_library",
+        "//rule:go_default_library",
+        "//testtools:go_default_library",
+        "//walk:go_default_library",
+        "@com_github_bazelbuild_buildtools//build:go_default_library",
+        "@org_golang_x_tools//go/vcs:go_default_library",
+    ],
+)
+
+filegroup(
+    name = "all_files",
+    testonly = True,
+    srcs = [
+        "BUILD.bazel",
+        "config.go",
+        "config_test.go",
+        "constants.go",
+        "def.bzl",
+        "dep.go",
+        "fileinfo.go",
+        "fileinfo_go_test.go",
+        "fileinfo_test.go",
+        "fix.go",
+        "fix_test.go",
+        "generate.go",
+        "generate_test.go",
+        "godep.go",
+        "kinds.go",
+        "known_go_imports.go",
+        "known_proto_imports.go",
+        "lang.go",
+        "modules.go",
+        "package.go",
+        "resolve.go",
+        "resolve_test.go",
+        "std_package_list.go",
+        "stubs_test.go",
+        "update.go",
+        "update_import_test.go",
+        "//language/go/gen_std_package_list:all_files",
+    ],
+    visibility = ["//visibility:public"],
+)

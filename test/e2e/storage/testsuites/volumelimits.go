@@ -26,7 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -246,7 +246,7 @@ func cleanupTest(cs clientset.Interface, ns string, runningPodName, unschedulabl
 			if err == nil {
 				existing++
 			} else {
-				if errors.IsNotFound(err) {
+				if apierrors.IsNotFound(err) {
 					pvNames.Delete(pvName)
 				} else {
 					framework.Logf("Failed to get PV %s: %s", pvName, err)

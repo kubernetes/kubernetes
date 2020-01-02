@@ -21,9 +21,9 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -60,8 +60,8 @@ func validateNoConflict(presentLabels []string, absentLabels []string) error {
 
 // New initializes a new plugin and returns it.
 func New(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
-	args := &Args{}
-	if err := framework.DecodeInto(plArgs, args); err != nil {
+	args := Args{}
+	if err := framework.DecodeInto(plArgs, &args); err != nil {
 		return nil, err
 	}
 	if err := validateNoConflict(args.PresentLabels, args.AbsentLabels); err != nil {
@@ -70,20 +70,16 @@ func New(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.P
 	if err := validateNoConflict(args.PresentLabelsPreference, args.AbsentLabelsPreference); err != nil {
 		return nil, err
 	}
-	// Note that the reduce function is always nil therefore it's ignored.
-	prioritize, _ := priorities.NewNodeLabelPriority(args.PresentLabelsPreference, args.AbsentLabelsPreference)
 	return &NodeLabel{
-		handle:     handle,
-		predicate:  predicates.NewNodeLabelPredicate(args.PresentLabels, args.AbsentLabels),
-		prioritize: prioritize,
+		handle: handle,
+		Args:   args,
 	}, nil
 }
 
 // NodeLabel checks whether a pod can fit based on the node labels which match a filter that it requests.
 type NodeLabel struct {
-	handle     framework.FrameworkHandle
-	predicate  predicates.FitPredicate
-	prioritize priorities.PriorityMapFunction
+	handle framework.FrameworkHandle
+	Args
 }
 
 var _ framework.FilterPlugin = &NodeLabel{}
@@ -95,21 +91,59 @@ func (pl *NodeLabel) Name() string {
 }
 
 // Filter invoked at the filter extension point.
+// It checks whether all of the specified labels exists on a node or not, regardless of their value
+//
+// Consider the cases where the nodes are placed in regions/zones/racks and these are identified by labels
+// In some cases, it is required that only nodes that are part of ANY of the defined regions/zones/racks be selected
+//
+// Alternately, eliminating nodes that have a certain label, regardless of value, is also useful
+// A node may have a label with "retiring" as key and the date as the value
+// and it may be desirable to avoid scheduling new pods on this node.
 func (pl *NodeLabel) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
-	// Note that NodeLabelPredicate doesn't use predicate metadata, hence passing nil here.
-	_, reasons, err := pl.predicate(pod, nil, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
+	node := nodeInfo.Node()
+	if node == nil {
+		return framework.NewStatus(framework.Error, "node not found")
+	}
+	nodeLabels := labels.Set(node.Labels)
+	check := func(labels []string, presence bool) bool {
+		for _, label := range labels {
+			exists := nodeLabels.Has(label)
+			if (exists && !presence) || (!exists && presence) {
+				return false
+			}
+		}
+		return true
+	}
+	if check(pl.PresentLabels, true) && check(pl.AbsentLabels, false) {
+		return nil
+	}
+
+	return migration.PredicateResultToFrameworkStatus([]predicates.PredicateFailureReason{predicates.ErrNodeLabelPresenceViolated}, nil)
 }
 
 // Score invoked at the score extension point.
 func (pl *NodeLabel) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
-	if err != nil {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
+	if err != nil || nodeInfo.Node() == nil {
+		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v, node is nil: %v", nodeName, err, nodeInfo.Node() == nil))
 	}
-	// Note that node label priority function doesn't use metadata, hence passing nil here.
-	s, err := pl.prioritize(pod, nil, nodeInfo)
-	return s.Score, migration.ErrorToFrameworkStatus(err)
+
+	node := nodeInfo.Node()
+	score := int64(0)
+	for _, label := range pl.PresentLabelsPreference {
+		if labels.Set(node.Labels).Has(label) {
+			score += framework.MaxNodeScore
+		}
+	}
+	for _, label := range pl.AbsentLabelsPreference {
+		if !labels.Set(node.Labels).Has(label) {
+			score += framework.MaxNodeScore
+		}
+	}
+	// Take average score for each label to ensure the score doesn't exceed MaxNodeScore.
+	score /= int64(len(pl.PresentLabelsPreference) + len(pl.AbsentLabelsPreference))
+
+	return score, nil
 }
 
 // ScoreExtensions of the Score plugin.

@@ -215,7 +215,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 
 		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
 		for _, status := range endPod.Status.InitContainerStatuses {
-			gomega.Expect(status.Ready).To(gomega.BeTrue())
+			framework.ExpectEqual(status.Ready, true)
 			gomega.Expect(status.State.Terminated).NotTo(gomega.BeNil())
 			gomega.Expect(status.State.Terminated.ExitCode).To(gomega.BeZero())
 		}
@@ -285,7 +285,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 
 		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
 		for _, status := range endPod.Status.InitContainerStatuses {
-			gomega.Expect(status.Ready).To(gomega.BeTrue())
+			framework.ExpectEqual(status.Ready, true)
 			gomega.Expect(status.State.Terminated).NotTo(gomega.BeNil())
 			gomega.Expect(status.State.Terminated.ExitCode).To(gomega.BeZero())
 		}

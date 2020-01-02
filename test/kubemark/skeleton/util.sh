@@ -26,6 +26,10 @@ function authenticate-docker {
 
 # This function should create kubemark master and write kubeconfig to
 # "${RESOURCE_DIRECTORY}/kubeconfig.kubemark".
+# If a cluster uses private master IP, create-kubemark-master might also write
+# a second kubeconfig to "${RESOURCE_DIRECTORY}/kubeconfig-internal.kubemark".
+# The difference between these two kubeconfigs is that the internal one uses
+# private master IP, which might be better suited for setting up hollow nodes.
 function create-kubemark-master {
   echo "Creating cluster..."
 }

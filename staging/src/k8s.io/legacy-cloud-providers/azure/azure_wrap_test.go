@@ -20,13 +20,11 @@ package azure
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
-	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/stretchr/testify/assert"
 
@@ -34,16 +32,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/legacy-cloud-providers/azure/auth"
+	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
 func TestExtractNotFound(t *testing.T) {
-	notFound := autorest.DetailedError{StatusCode: http.StatusNotFound}
-	otherHTTP := autorest.DetailedError{StatusCode: http.StatusForbidden}
-	otherErr := fmt.Errorf("other error")
+	notFound := &retry.Error{HTTPStatusCode: http.StatusNotFound}
+	otherHTTP := &retry.Error{HTTPStatusCode: http.StatusForbidden}
+	otherErr := &retry.Error{HTTPStatusCode: http.StatusTooManyRequests}
 
 	tests := []struct {
-		err         error
-		expectedErr error
+		err         *retry.Error
+		expectedErr *retry.Error
 		exists      bool
 	}{
 		{nil, nil, true},
@@ -53,7 +52,7 @@ func TestExtractNotFound(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		exists, _, err := checkResourceExistsFromError(test.err)
+		exists, err := checkResourceExistsFromError(test.err)
 		if test.exists != exists {
 			t.Errorf("expected: %v, saw: %v", test.exists, exists)
 		}
@@ -298,7 +297,8 @@ func TestVMCache(t *testing.T) {
 	// validate getting VM via cache.
 	virtualMachines, err := az.VirtualMachinesClient.List(
 		context.Background(), "rg")
-	assert.NoError(t, err)
+
+	assert.Equal(t, err, nil)
 	assert.Equal(t, 3, len(virtualMachines))
 	for i := range virtualMachines {
 		vm := virtualMachines[i]
@@ -326,7 +326,7 @@ func getTestCloudForVMCache(vmList []string) (az *Cloud) {
 			RouteTableName:               "rt",
 			PrimaryAvailabilitySetName:   "as",
 			MaximumLoadBalancerRuleCount: 250,
-			VMType:                       vmTypeStandard,
+			VMType: vmTypeStandard,
 		},
 		nodeZones:          map[string]sets.String{},
 		nodeResourceGroups: map[string]string{},

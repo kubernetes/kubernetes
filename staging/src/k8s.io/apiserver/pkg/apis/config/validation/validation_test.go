@@ -331,15 +331,13 @@ func TestKMSProviderCacheSize(t *testing.T) {
 			desc: "invalid zero cache size",
 			in:   &config.KMSConfiguration{CacheSize: &zeroCacheSize},
 			want: field.ErrorList{
-				field.Invalid(cacheField, int32(0), fmt.Sprintf(zeroOrNegativeErrFmt, "cachesize")),
+				field.Invalid(cacheField, int32(0), fmt.Sprintf(nonZeroErrFmt, "cachesize")),
 			},
 		},
 		{
-			desc: "negative caches size",
+			desc: "valid negative caches size",
 			in:   &config.KMSConfiguration{CacheSize: &negativeCacheSize},
-			want: field.ErrorList{
-				field.Invalid(cacheField, negativeCacheSize, fmt.Sprintf(zeroOrNegativeErrFmt, "cachesize")),
-			},
+			want: field.ErrorList{},
 		},
 	}
 

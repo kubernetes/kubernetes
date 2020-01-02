@@ -26,11 +26,6 @@ import (
 )
 
 func TestGetKubeletVersion(t *testing.T) {
-	// TODO: Re-enable this test
-	// fakeexec.FakeCmd supports only combined output.
-	// Hence .Output() returns a "not supported" error and we cannot use it for the test ATM.
-	t.Skip()
-
 	cases := []struct {
 		output   string
 		expected string
@@ -47,8 +42,8 @@ func TestGetKubeletVersion(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.output, func(t *testing.T) {
 			fcmd := fakeexec.FakeCmd{
-				CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-					func() ([]byte, error) { return []byte(tc.output), tc.err },
+				OutputScript: []fakeexec.FakeAction{
+					func() ([]byte, []byte, error) { return []byte(tc.output), nil, tc.err },
 				},
 			}
 			fexec := &fakeexec.FakeExec{

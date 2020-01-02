@@ -66,24 +66,19 @@ func ApplyFeatureGates() (restore func()) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.EvenPodsSpread) {
 		klog.Infof("Registering EvenPodsSpread predicate and priority function")
 		// register predicate
-		scheduler.InsertPredicateKeyToAlgorithmProviderMap(predicates.EvenPodsSpreadPred)
-		scheduler.RegisterFitPredicate(predicates.EvenPodsSpreadPred, predicates.EvenPodsSpreadPredicate)
+		scheduler.AddPredicateToAlgorithmProviders(predicates.EvenPodsSpreadPred)
+		scheduler.RegisterPredicate(predicates.EvenPodsSpreadPred)
 		// register priority
-		scheduler.InsertPriorityKeyToAlgorithmProviderMap(priorities.EvenPodsSpreadPriority)
-		scheduler.RegisterPriorityMapReduceFunction(
-			priorities.EvenPodsSpreadPriority,
-			priorities.CalculateEvenPodsSpreadPriorityMap,
-			priorities.CalculateEvenPodsSpreadPriorityReduce,
-			1,
-		)
+		scheduler.AddPriorityToAlgorithmProviders(priorities.EvenPodsSpreadPriority)
+		scheduler.RegisterPriority(priorities.EvenPodsSpreadPriority, 1)
 	}
 
 	// Prioritizes nodes that satisfy pod's resource limits
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
 		klog.Infof("Registering resourcelimits priority function")
-		scheduler.RegisterPriorityMapReduceFunction(priorities.ResourceLimitsPriority, priorities.ResourceLimitsPriorityMap, nil, 1)
+		scheduler.RegisterPriority(priorities.ResourceLimitsPriority, 1)
 		// Register the priority function to specific provider too.
-		scheduler.InsertPriorityKeyToAlgorithmProviderMap(scheduler.RegisterPriorityMapReduceFunction(priorities.ResourceLimitsPriority, priorities.ResourceLimitsPriorityMap, nil, 1))
+		scheduler.AddPriorityToAlgorithmProviders(priorities.ResourceLimitsPriority)
 	}
 
 	restore = func() {

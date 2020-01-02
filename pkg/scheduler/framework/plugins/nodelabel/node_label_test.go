@@ -244,3 +244,33 @@ func TestNodeLabelScore(t *testing.T) {
 		})
 	}
 }
+
+func TestNodeLabelFilterWithoutNode(t *testing.T) {
+	var pod *v1.Pod
+	t.Run("node does not exist", func(t *testing.T) {
+		nodeInfo := schedulernodeinfo.NewNodeInfo()
+		p, err := New(nil, nil)
+		if err != nil {
+			t.Fatalf("Failed to create plugin: %v", err)
+		}
+		status := p.(framework.FilterPlugin).Filter(context.TODO(), nil, pod, nodeInfo)
+		if status.Code() != framework.Error {
+			t.Errorf("Status mismatch. got: %v, want: %v", status.Code(), framework.Error)
+		}
+	})
+}
+
+func TestNodeLabelScoreWithoutNode(t *testing.T) {
+	t.Run("node does not exist", func(t *testing.T) {
+		fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(nodeinfosnapshot.NewEmptySnapshot()))
+		p, err := New(nil, fh)
+		if err != nil {
+			t.Fatalf("Failed to create plugin: %+v", err)
+		}
+		_, status := p.(framework.ScorePlugin).Score(context.Background(), nil, nil, "")
+		if status.Code() != framework.Error {
+			t.Errorf("Status mismatch. got: %v, want: %v", status.Code(), framework.Error)
+		}
+	})
+
+}

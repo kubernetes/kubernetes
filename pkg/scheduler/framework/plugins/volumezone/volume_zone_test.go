@@ -156,7 +156,9 @@ func TestSingleZone(t *testing.T) {
 			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				predicate: predicates.NewVolumeZonePredicate(pvLister, pvcLister, nil),
+				pvLister,
+				pvcLister,
+				nil,
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.Pod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
@@ -241,7 +243,9 @@ func TestMultiZone(t *testing.T) {
 			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				predicate: predicates.NewVolumeZonePredicate(pvLister, pvcLister, nil),
+				pvLister,
+				pvcLister,
+				nil,
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.Pod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
@@ -317,16 +321,18 @@ func TestWithBinding(t *testing.T) {
 			Node: testNode,
 		},
 		{
-			name:       "unbound volume empty storage class",
-			Pod:        createPodWithVolume("pod_1", "vol_1", "PVC_EmptySC"),
-			Node:       testNode,
-			wantStatus: framework.NewStatus(framework.Error, "PersistentVolumeClaim was not found: \"PVC_EmptySC\""),
+			name: "unbound volume empty storage class",
+			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_EmptySC"),
+			Node: testNode,
+			wantStatus: framework.NewStatus(framework.Error,
+				"PersistentVolumeClaim had no pv name and storageClass name"),
 		},
 		{
-			name:       "unbound volume no storage class",
-			Pod:        createPodWithVolume("pod_1", "vol_1", "PVC_NoSC"),
-			Node:       testNode,
-			wantStatus: framework.NewStatus(framework.Error, "PersistentVolumeClaim was not found: \"PVC_NoSC\""),
+			name: "unbound volume no storage class",
+			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_NoSC"),
+			Node: testNode,
+			wantStatus: framework.NewStatus(framework.Error,
+				"StorageClass \"Class_0\" claimed by PersistentVolumeClaim \"PVC_NoSC\" not found"),
 		},
 		{
 			name:       "unbound volume immediate binding mode",
@@ -346,7 +352,9 @@ func TestWithBinding(t *testing.T) {
 			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				predicate: predicates.NewVolumeZonePredicate(pvLister, pvcLister, scLister),
+				pvLister,
+				pvcLister,
+				scLister,
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.Pod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {

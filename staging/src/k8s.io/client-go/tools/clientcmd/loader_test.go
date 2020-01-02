@@ -80,6 +80,32 @@ var (
 	}
 )
 
+func TestNilOutMap(t *testing.T) {
+	var fakeKubeconfigData = `apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority-data: UEhPTlkK
+    server: https://1.1.1.1
+  name: production
+contexts:
+- context:
+    cluster: production
+    user: production
+  name: production
+current-context: production
+users:
+- name: production
+  user:
+    auth-provider:
+      name: gcp`
+
+	_, _, err := clientcmdlatest.Codec.Decode([]byte(fakeKubeconfigData), nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestNonExistentCommandLineFile(t *testing.T) {
 	loadingRules := ClientConfigLoadingRules{
 		ExplicitPath: "bogus_file",

@@ -19,6 +19,7 @@ package ipvs
 import (
 	"net"
 	"strconv"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/version"
 )
@@ -45,6 +46,8 @@ type Interface interface {
 	DeleteRealServer(*VirtualServer, *RealServer) error
 	// UpdateRealServer updates the specified real server from the specified virtual server.
 	UpdateRealServer(*VirtualServer, *RealServer) error
+	// ConfigureTimeouts is the equivalent to running "ipvsadm --set" to configure tcp, tcpfin and udp timeouts
+	ConfigureTimeouts(time.Duration, time.Duration, time.Duration) error
 }
 
 // VirtualServer is an user-oriented definition of an IPVS virtual server in its entirety.

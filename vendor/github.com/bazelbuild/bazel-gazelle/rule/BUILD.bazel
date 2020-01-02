@@ -1,0 +1,53 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "directives.go",
+        "expr.go",
+        "merge.go",
+        "platform.go",
+        "platform_strings.go",
+        "rule.go",
+        "sort_labels.go",
+        "types.go",
+        "value.go",
+    ],
+    importpath = "github.com/bazelbuild/bazel-gazelle/rule",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//label:go_default_library",
+        "@com_github_bazelbuild_buildtools//build:go_default_library",
+        "@com_github_bazelbuild_buildtools//tables:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "directives_test.go",
+        "rule_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = ["@com_github_bazelbuild_buildtools//build:go_default_library"],
+)
+
+filegroup(
+    name = "all_files",
+    testonly = True,
+    srcs = [
+        "BUILD.bazel",
+        "directives.go",
+        "directives_test.go",
+        "expr.go",
+        "merge.go",
+        "platform.go",
+        "platform_strings.go",
+        "rule.go",
+        "rule_test.go",
+        "sort_labels.go",
+        "types.go",
+        "value.go",
+    ],
+    visibility = ["//visibility:public"],
+)

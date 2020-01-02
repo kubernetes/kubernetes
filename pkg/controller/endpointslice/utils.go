@@ -26,6 +26,8 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -236,6 +238,27 @@ func getSliceToFill(endpointSlices []*discovery.EndpointSlice, numEndpoints, max
 	return closestSlice
 }
 
+// getEndpointSliceFromDeleteAction parses an EndpointSlice from a delete action.
+func getEndpointSliceFromDeleteAction(obj interface{}) *discovery.EndpointSlice {
+	if endpointSlice, ok := obj.(*discovery.EndpointSlice); ok {
+		// Enqueue all the services that the pod used to be a member of.
+		// This is the same thing we do when we add a pod.
+		return endpointSlice
+	}
+	// If we reached here it means the pod was deleted but its final state is unrecorded.
+	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+		return nil
+	}
+	endpointSlice, ok := tombstone.Obj.(*discovery.EndpointSlice)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a EndpointSlice: %#v", obj))
+		return nil
+	}
+	return endpointSlice
+}
+
 // addTriggerTimeAnnotation adds a triggerTime annotation to an EndpointSlice
 func addTriggerTimeAnnotation(endpointSlice *discovery.EndpointSlice, triggerTime time.Time) {
 	if endpointSlice.Annotations == nil {
@@ -247,6 +270,19 @@ func addTriggerTimeAnnotation(endpointSlice *discovery.EndpointSlice, triggerTim
 	} else { // No new trigger time, clear the annotation.
 		delete(endpointSlice.Annotations, corev1.EndpointsLastChangeTriggerTime)
 	}
+}
+
+// serviceControllerKey returns a controller key for a Service but derived from
+// an EndpointSlice.
+func serviceControllerKey(endpointSlice *discovery.EndpointSlice) (string, error) {
+	if endpointSlice == nil {
+		return "", fmt.Errorf("nil EndpointSlice passed to serviceControllerKey()")
+	}
+	serviceName, ok := endpointSlice.Labels[discovery.LabelServiceName]
+	if !ok || serviceName == "" {
+		return "", fmt.Errorf("EndpointSlice missing %s label", discovery.LabelServiceName)
+	}
+	return fmt.Sprintf("%s/%s", endpointSlice.Namespace, serviceName), nil
 }
 
 // endpointSliceEndpointLen helps sort endpoint slices by the number of

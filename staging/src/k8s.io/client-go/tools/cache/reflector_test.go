@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -520,7 +520,7 @@ func TestReflectorExpiredExactResourceVersion(t *testing.T) {
 				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}, Items: pods[0:4]}, nil
 			case "10":
 				// When watch cache is disabled, if the exact ResourceVersion requested is not available, a "Expired" error is returned.
-				return nil, apierrs.NewResourceExpired("The resourceVersion for the provided watch is too old.")
+				return nil, apierrors.NewResourceExpired("The resourceVersion for the provided watch is too old.")
 			case "":
 				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "11"}, Items: pods[0:8]}, nil
 			default:
@@ -584,7 +584,7 @@ func TestReflectorFullListIfExpired(t *testing.T) {
 				return &v1.PodList{ListMeta: metav1.ListMeta{Continue: "C1", ResourceVersion: "11"}, Items: pods[0:4]}, nil
 			// second page of the above list
 			case rvContinueLimit("", "C1", 4):
-				return nil, apierrs.NewResourceExpired("The resourceVersion for the provided watch is too old.")
+				return nil, apierrors.NewResourceExpired("The resourceVersion for the provided watch is too old.")
 			// rv=10 unlimited list
 			case rvContinueLimit("10", "", 0):
 				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "11"}, Items: pods[0:8]}, nil

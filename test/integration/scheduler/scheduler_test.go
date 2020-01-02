@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -39,11 +38,8 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -52,22 +48,6 @@ type nodeMutationFunc func(t *testing.T, n *v1.Node, nodeLister corelisters.Node
 type nodeStateManager struct {
 	makeSchedulable   nodeMutationFunc
 	makeUnSchedulable nodeMutationFunc
-}
-
-func PredicateOne(pod *v1.Pod, meta predicates.Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
-	return true, nil, nil
-}
-
-func PredicateTwo(pod *v1.Pod, meta predicates.Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
-	return true, nil, nil
-}
-
-func PriorityOne(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerframework.NodeScore, error) {
-	return schedulerframework.NodeScore{}, nil
-}
-
-func PriorityTwo(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerframework.NodeScore, error) {
-	return schedulerframework.NodeScore{}, nil
 }
 
 // TestSchedulerCreationFromConfigMap verifies that scheduler can be created
@@ -84,38 +64,32 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	defer clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
-	// Pre-register some predicate and priority functions
-	scheduler.RegisterFitPredicate("PredicateOne", PredicateOne)
-	scheduler.RegisterFitPredicate("PredicateTwo", PredicateTwo)
-	scheduler.RegisterPriorityMapReduceFunction("PriorityOne", PriorityOne, nil, 1)
-	scheduler.RegisterPriorityMapReduceFunction("PriorityTwo", PriorityTwo, nil, 1)
-
 	for i, test := range []struct {
-		policy             string
-		expectedPredicates sets.String
-		expectedPlugins    map[string][]kubeschedulerconfig.Plugin
+		policy          string
+		expectedPlugins map[string][]kubeschedulerconfig.Plugin
 	}{
 		{
 			policy: `{
 				"kind" : "Policy",
 				"apiVersion" : "v1",
 				"predicates" : [
-					{"name" : "PredicateOne"},
-					{"name" : "PredicateTwo"}
+					{"name" : "PodFitsResources"}
 				],
 				"priorities" : [
-					{"name" : "PriorityOne", "weight" : 1},
-					{"name" : "PriorityTwo", "weight" : 5}
+					{"name" : "ImageLocalityPriority", "weight" : 1}
 				]
 			}`,
-			expectedPredicates: sets.NewString(
-				"PredicateOne",
-				"PredicateTwo",
-			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"PreFilterPlugin": {
+					{Name: "NodeResourcesFit"},
+				},
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
+					{Name: "NodeResourcesFit"},
 					{Name: "TaintToleration"},
+				},
+				"ScorePlugin": {
+					{Name: "ImageLocality", Weight: 1},
 				},
 			},
 		},
@@ -126,6 +100,8 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 			}`,
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodeResourcesFit"},
+					{Name: "NodePorts"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -143,6 +119,10 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
+				},
+				"PostFilterPlugin": {
+					{Name: "InterPodAffinity"},
+					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
@@ -163,7 +143,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"predicates" : [],
 				"priorities" : []
 			}`,
-			expectedPredicates: sets.NewString(),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -175,22 +154,22 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 			policy: `apiVersion: v1
 kind: Policy
 predicates:
-- name: PredicateOne
-- name: PredicateTwo
+- name: PodFitsResources
 priorities:
-- name: PriorityOne
+- name: ImageLocalityPriority
   weight: 1
-- name: PriorityTwo
-  weight: 5
 `,
-			expectedPredicates: sets.NewString(
-				"PredicateOne",
-				"PredicateTwo",
-			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"PreFilterPlugin": {
+					{Name: "NodeResourcesFit"},
+				},
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
+					{Name: "NodeResourcesFit"},
 					{Name: "TaintToleration"},
+				},
+				"ScorePlugin": {
+					{Name: "ImageLocality", Weight: 1},
 				},
 			},
 		},
@@ -200,6 +179,8 @@ kind: Policy
 `,
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"PreFilterPlugin": {
+					{Name: "NodeResourcesFit"},
+					{Name: "NodePorts"},
 					{Name: "InterPodAffinity"},
 				},
 				"FilterPlugin": {
@@ -217,6 +198,10 @@ kind: Policy
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
+				},
+				"PostFilterPlugin": {
+					{Name: "InterPodAffinity"},
+					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
@@ -236,7 +221,6 @@ kind: Policy
 predicates: []
 priorities: []
 `,
-			expectedPredicates: sets.NewString(),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -279,20 +263,12 @@ priorities: []
 			scheduler.WithBindTimeoutSeconds(defaultBindTimeout),
 		)
 		if err != nil {
-			t.Fatalf("couldn't make scheduler config: %v", err)
+			t.Fatalf("couldn't make scheduler config for test %d: %v", i, err)
 		}
 
-		// Verify that the config is applied correctly.
-		schedPredicates := sets.NewString()
-		for k := range sched.Algorithm.Predicates() {
-			schedPredicates.Insert(k)
-		}
-		if !schedPredicates.Equal(test.expectedPredicates) {
-			t.Errorf("Expected predicates %v, got %v", test.expectedPredicates, schedPredicates)
-		}
 		schedPlugins := sched.Framework.ListPlugins()
 		if diff := cmp.Diff(test.expectedPlugins, schedPlugins); diff != "" {
-			t.Errorf("unexpected predicates diff (-want, +got): %s", diff)
+			t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
 		}
 	}
 }

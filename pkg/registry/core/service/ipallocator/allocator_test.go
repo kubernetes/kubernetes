@@ -66,7 +66,6 @@ func TestAllocate(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Logf("base: %v", r.base.Bytes())
-		t.Logf("max: %v", r.max)
 		if f := r.Free(); f != tc.free {
 			t.Errorf("Test %s unexpected free %d", tc.name, f)
 		}
@@ -212,6 +211,51 @@ func TestAllocateSmall(t *testing.T) {
 	}
 
 	t.Logf("allocated: %v", found)
+}
+
+func TestRangeSize(t *testing.T) {
+	testCases := []struct {
+		name  string
+		cidr  string
+		addrs int64
+	}{
+		{
+			name:  "supported IPv4 cidr",
+			cidr:  "192.168.1.0/24",
+			addrs: 256,
+		},
+		{
+			name:  "supported large IPv4 cidr",
+			cidr:  "10.96.0.0/12",
+			addrs: 1048576,
+		},
+		{
+			name:  "unsupported IPv4 cidr",
+			cidr:  "192.168.1.0/1",
+			addrs: 0,
+		},
+		{
+			name:  "supported IPv6 cidr",
+			cidr:  "2001:db8::/48",
+			addrs: 65536,
+		},
+		{
+			name:  "unsupported IPv6 mask",
+			cidr:  "2001:db8::/1",
+			addrs: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		_, cidr, err := net.ParseCIDR(tc.cidr)
+		if err != nil {
+			t.Errorf("failed to parse cidr for test %s, unexpected error: '%s'", tc.name, err)
+		}
+		if size := RangeSize(cidr); size != tc.addrs {
+			t.Errorf("test %s failed. %s should have a range size of %d, got %d",
+				tc.name, tc.cidr, tc.addrs, size)
+		}
+	}
 }
 
 func TestForEach(t *testing.T) {
