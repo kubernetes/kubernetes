@@ -168,21 +168,21 @@ type SharedIndexInformer interface {
 }
 
 // NewSharedInformer creates a new instance for the listwatcher.
-func NewSharedInformer(lw ListerWatcher, objType runtime.Object, resyncPeriod time.Duration) SharedInformer {
-	return NewSharedIndexInformer(lw, objType, resyncPeriod, Indexers{})
+func NewSharedInformer(lw ListerWatcher, objOfWatchedType runtime.Object, resyncPeriod time.Duration) SharedInformer {
+	return NewSharedIndexInformer(lw, objOfWatchedType, resyncPeriod, Indexers{})
 }
 
 // NewSharedIndexInformer creates a new instance for the listwatcher.
-func NewSharedIndexInformer(lw ListerWatcher, objType runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers Indexers) SharedIndexInformer {
+func NewSharedIndexInformer(lw ListerWatcher, objOfWatchedType runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers Indexers) SharedIndexInformer {
 	realClock := &clock.RealClock{}
 	sharedIndexInformer := &sharedIndexInformer{
 		processor:                       &sharedProcessor{clock: realClock},
 		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
 		listerWatcher:                   lw,
-		objectType:                      objType,
+		objectType:                      objOfWatchedType,
 		resyncCheckPeriod:               defaultEventHandlerResyncPeriod,
 		defaultEventHandlerResyncPeriod: defaultEventHandlerResyncPeriod,
-		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", objType)),
+		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", objOfWatchedType)),
 		clock:                           realClock,
 	}
 	return sharedIndexInformer
@@ -244,7 +244,6 @@ type sharedIndexInformer struct {
 	processor             *sharedProcessor
 	cacheMutationDetector MutationDetector
 
-	// This block is tracked to handle late initialization of the controller
 	listerWatcher ListerWatcher
 	objectType    runtime.Object
 
