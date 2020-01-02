@@ -1750,8 +1750,24 @@ func (ss SortableSliceOfMaps) Swap(i, j int) {
 }
 
 func deduplicateAndSortScalars(s []interface{}) []interface{} {
-	s = deduplicateScalars(s)
-	return sortScalars(s)
+	s = sortScalars(s)
+	return deduplicateSortedScalars(s)
+}
+
+// the passed in slice is sorted
+func deduplicateSortedScalars(s []interface{}) []interface{} {
+	length := len(s)
+	lastIdx := 0
+	for i := 1; i < length; i++ {
+		if s[lastIdx] != s[i] {
+			lastIdx++
+			s[lastIdx] = s[i]
+		}
+	}
+	if lastIdx < length-1 {
+		s = s[0 : lastIdx+1]
+	}
+	return s
 }
 
 func sortScalars(s []interface{}) []interface{} {

@@ -6066,6 +6066,100 @@ func TestStrategicMergePatch(t *testing.T) {
 	}
 }
 
+func sortJson(t *testing.B, j []byte, description string, schema LookupPatchMeta) []byte {
+	if j == nil {
+		return nil
+	}
+	r, err := sortMergeListsByName(j, schema)
+	if err != nil {
+		t.Errorf("using %s error: %s\n in test case: %s\ncannot sort object:\n%s\n", getSchemaType(schema), err, description, j)
+		return nil
+	}
+
+	return r
+}
+
+func testObjectToJSON(t *testing.B, o map[string]interface{}) []byte {
+	if o == nil {
+		return nil
+	}
+
+	j, err := toJSON(o)
+	if err != nil {
+		t.Error(err)
+	}
+	return j
+}
+
+func threeWayCaseToJSONOrFail(t *testing.B, c StrategicMergePatchTestCase, schema LookupPatchMeta) ([]byte, []byte, []byte, []byte, []byte) {
+	return sortJson(t, testObjectToJSON(t, c.Original), c.Description, schema),
+		sortJson(t, testObjectToJSON(t, c.Modified), c.Description, schema),
+		sortJson(t, testObjectToJSON(t, c.Current), c.Description, schema),
+		sortJson(t, testObjectToJSON(t, c.ThreeWay), c.Description, schema),
+		sortJson(t, testObjectToJSON(t, c.Result), c.Description, schema)
+}
+
+func benchmarkThreeWayPatch(t *testing.B, c StrategicMergePatchTestCase, schema LookupPatchMeta) {
+	original, modified, current, _, _ := threeWayCaseToJSONOrFail(t, c, schema)
+	_, err := CreateThreeWayMergePatch(original, modified, current, schema, false)
+	if err != nil {
+		if !mergepatch.IsConflict(err) {
+			t.Errorf("using %s error: %s\nin test case: %s\ncannot create three way patch:\n%s\n",
+				getSchemaType(schema), err, c.Description, mergepatch.ToYAMLOrError(c.StrategicMergePatchTestCaseData))
+			return
+		}
+
+		if !strings.Contains(c.Description, "conflict") {
+			t.Errorf("using %s unexpected conflict: %s\nin test case: %s\ncannot create three way patch:\n%s\n",
+				getSchemaType(schema), err, c.Description, mergepatch.ToYAMLOrError(c.StrategicMergePatchTestCaseData))
+			return
+		}
+
+		if len(c.Result) > 0 {
+			_, err := CreateThreeWayMergePatch(original, modified, current, schema, true)
+			if err != nil {
+				t.Errorf("using %s error: %s\nin test case: %s\ncannot force three way patch application:\n%s\n",
+					getSchemaType(schema), err, c.Description, mergepatch.ToYAMLOrError(c.StrategicMergePatchTestCaseData))
+				return
+			}
+		}
+		return
+	}
+
+	if strings.Contains(c.Description, "conflict") || len(c.Result) < 1 {
+		t.Errorf("using %s error in test case: %s\nexpected conflict did not occur:\n%s\n",
+			getSchemaType(schema), c.Description, mergepatch.ToYAMLOrError(c.StrategicMergePatchTestCaseData))
+		return
+	}
+}
+
+func BenchmarkStrategicMergePatch(t *testing.B) {
+	t.ReportAllocs()
+	t.ResetTimer()
+	for n := 1; n <= t.N; n++ {
+		mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
+			Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
+		}
+		schemas := []LookupPatchMeta{
+			mergeItemStructSchema,
+			mergeItemOpenapiSchema,
+		}
+
+		tc := StrategicMergePatchTestCases{}
+		err := yaml.Unmarshal(createStrategicMergePatchTestCaseData, &tc)
+		if err != nil {
+			t.Errorf("can't unmarshal test cases: %s\n", err)
+			return
+		}
+
+		for _, schema := range schemas {
+			for _, c := range tc.TestCases {
+				benchmarkThreeWayPatch(t, c, schema)
+			}
+		}
+	}
+}
+
 func testStrategicMergePatchWithCustomArgumentsUsingStruct(t *testing.T, description, original, patch string, dataStruct interface{}, expected error) {
 	schema, actual := NewPatchMetaFromStruct(dataStruct)
 	// If actual is not nil, check error. If errors match, return.
