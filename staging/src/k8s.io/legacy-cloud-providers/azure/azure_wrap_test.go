@@ -326,7 +326,7 @@ func getTestCloudForVMCache(vmList []string) (az *Cloud) {
 			RouteTableName:               "rt",
 			PrimaryAvailabilitySetName:   "as",
 			MaximumLoadBalancerRuleCount: 250,
-			VMType: vmTypeStandard,
+			VMType:                       vmTypeStandard,
 		},
 		nodeZones:          map[string]sets.String{},
 		nodeResourceGroups: map[string]string{},
