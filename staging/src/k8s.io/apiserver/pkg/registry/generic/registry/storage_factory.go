@@ -41,7 +41,7 @@ func StorageWithCacher(capacity int) generic.StorageDecorator {
 		getAttrsFunc storage.AttrFunc,
 		triggerFuncs storage.IndexerFuncs) (storage.Interface, factory.DestroyFunc, error) {
 
-		s, d, err := generic.NewRawStorage(storageConfig)
+		s, d, err := factory.Create(*storageConfig, newFunc)
 		if err != nil {
 			return s, d, err
 		}

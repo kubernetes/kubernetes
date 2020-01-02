@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
 
 	"go.etcd.io/etcd/clientv3"
@@ -68,6 +69,7 @@ func TestOnlySetFatalOnDecodeError(b bool) {
 type watcher struct {
 	client      *clientv3.Client
 	codec       runtime.Codec
+	newFunc     func() runtime.Object
 	versioner   storage.Versioner
 	transformer value.Transformer
 }
@@ -86,10 +88,11 @@ type watchChan struct {
 	errChan           chan error
 }
 
-func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner storage.Versioner, transformer value.Transformer) *watcher {
+func newWatcher(client *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, versioner storage.Versioner, transformer value.Transformer) *watcher {
 	return &watcher{
 		client:      client,
 		codec:       codec,
+		newFunc:     newFunc,
 		versioner:   versioner,
 		transformer: transformer,
 	}
@@ -211,7 +214,11 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 			return
 		}
 	}
-	opts := []clientv3.OpOption{clientv3.WithRev(wc.initialRev + 1), clientv3.WithPrevKV()}
+	opts := []clientv3.OpOption{
+		clientv3.WithRev(wc.initialRev + 1),
+		clientv3.WithPrevKV(),
+		clientv3.WithProgressNotify(),
+	}
 	if wc.recursive {
 		opts = append(opts, clientv3.WithPrefix())
 	}
@@ -223,6 +230,11 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 			logWatchChannelErr(err)
 			wc.sendError(err)
 			return
+		}
+		if wres.IsProgressNotify() {
+			wc.sendEvent(progressNotifyEvent(wres.Header.GetRevision()))
+			metrics.RecordEtcdBookmark(wc.key)
+			continue
 		}
 		for _, e := range wres.Events {
 			parsedEvent, err := parseEvent(e)
@@ -292,6 +304,19 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 	}
 
 	switch {
+	case e.isProgressNotify:
+		if !wc.internalPred.AllowWatchBookmarks || wc.watcher.newFunc == nil {
+			return nil
+		}
+		object := wc.watcher.newFunc()
+		if err := wc.watcher.versioner.UpdateObject(object, uint64(e.rev)); err != nil {
+			klog.Errorf("failed to update object version: %v", err)
+			return
+		}
+		res = &watch.Event{
+			Type:   watch.Bookmark,
+			Object: object,
+		}
 	case e.isDeleted:
 		if !wc.filter(oldObj) {
 			return nil
@@ -371,6 +396,10 @@ func (wc *watchChan) sendEvent(e *event) {
 }
 
 func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtime.Object, err error) {
+	if e.isProgressNotify {
+		return nil, nil, nil
+	}
+
 	if !e.isDeleted {
 		data, _, err := wc.watcher.transformer.TransformFromStorage(e.value, authenticatedDataString(e.key))
 		if err != nil {

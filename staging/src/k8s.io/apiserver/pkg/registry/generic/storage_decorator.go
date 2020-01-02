@@ -51,5 +51,5 @@ func UndecoratedStorage(
 // two layer of same storage interface.
 // TODO: Once cacher is enabled on all registries (event registry is special), we will remove this method.
 func NewRawStorage(config *storagebackend.Config) (storage.Interface, factory.DestroyFunc, error) {
-	return factory.Create(*config)
+	return factory.Create(*config, nil)
 }
