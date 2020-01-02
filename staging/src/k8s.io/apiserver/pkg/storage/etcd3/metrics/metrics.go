@@ -59,6 +59,16 @@ var (
 		},
 		[]string{"operation", "type"},
 	)
+
+	// FIXME:
+	etcdBookmarkCount = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Name:           "etcd_bookmarks",
+			Help:           "Number of etcd bookmarks split by resource.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -69,6 +79,7 @@ func Register() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(etcdRequestLatency)
 		legacyregistry.MustRegister(objectCounts)
+		legacyregistry.MustRegister(etcdBookmarkCount)
 
 		// TODO(danielqsj): Remove the following metrics, they are deprecated
 		legacyregistry.MustRegister(deprecatedEtcdRequestLatenciesSummary)
@@ -84,6 +95,11 @@ func UpdateObjectCount(resourcePrefix string, count int64) {
 func RecordEtcdRequestLatency(verb, resource string, startTime time.Time) {
 	etcdRequestLatency.WithLabelValues(verb, resource).Observe(sinceInSeconds(startTime))
 	deprecatedEtcdRequestLatenciesSummary.WithLabelValues(verb, resource).Observe(sinceInMicroseconds(startTime))
+}
+
+// RecordEtcdBookmark updates the etcd_bookmarks metric.
+func RecordEtcdBookmark(resourcePrefix string) {
+	etcdBookmarkCount.WithLabelValues(resourcePrefix).Inc()
 }
 
 // Reset resets the etcd_request_duration_seconds metric.
