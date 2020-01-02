@@ -56,9 +56,8 @@ make quick-release
 
 ### 2. Create a Kubernetes cluster
 
-You can create a regular Kubernetes cluster or an end-to-end test cluster.
-End-to-end test clusters support running the Kubernetes e2e tests and enable
-some debugging features such as SSH access on the Windows nodes.
+You can create a regular Kubernetes cluster or an end-to-end test cluster.<br />
+Only end-to-end test clusters support running the Kubernetes e2e tests (as both [e2e cluster creation](https://github.com/kubernetes/kubernetes/blob/b632eaddbaad9dc1430d214d506b72750bbb9f69/hack/e2e-internal/e2e-up.sh#L24) and [e2e test scripts](https://github.com/kubernetes/kubernetes/blob/b632eaddbaad9dc1430d214d506b72750bbb9f69/hack/ginkgo-e2e.sh#L42) are setup based on `cluster/gce/config-test.sh`), also enables some debugging features such as SSH access on the Windows nodes. 
 
 Please make sure you set the environment variables properly following the
 instructions in the previous section.
@@ -78,9 +77,9 @@ export KUBERNETES_NODE_PLATFORM=windows
 export LOGGING_STACKDRIVER_RESOURCE_TYPES=new
 ```
 
-Now bring up a cluster using kube-up script:
+Now bring up a cluster using one of the following two methods:
 
-#### 2. Create a regular Kubernetes cluster
+#### 2a. Create a regular Kubernetes cluster
 
 ```
 # Invoke kube-up.sh with these environment variables:
@@ -94,6 +93,22 @@ To teardown the cluster run:
 ```
 PROJECT=${CLOUDSDK_CORE_PROJECT} KUBERNETES_SKIP_CONFIRM=y ./cluster/kube-down.sh
 ```
+
+#### 2b. Create a Kubernetes end-to-end (E2E) test cluster	
+If you have built your own release binaries following step 1, run the following	
+command:	
+```	
+PROJECT=${CLOUDSDK_CORE_PROJECT} ./hack/e2e-internal/e2e-up.sh	
+```	
+
+If any e2e cluster exists already, this command will prompt you whether tears down and creates a new	one. To teardown existing e2e cluster only, run the command:
+```	
+PROJECT=${CLOUDSDK_CORE_PROJECT} ./hack/e2e-internal/e2e-down.sh	
+```	
+
+No matter what type of cluster you chose to create, the result should be a	
+Kubernetes cluster with one Linux master node, `NUM_NODES` Linux worker nodes	
+and `NUM_WINDOWS_NODES` Windows worker nodes.	
 
 ## Validating the cluster
 
