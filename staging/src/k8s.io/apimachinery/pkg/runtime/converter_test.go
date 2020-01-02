@@ -23,11 +23,18 @@ package runtime_test
 import (
 	encodingjson "encoding/json"
 	"fmt"
+	"math/rand"
 	"reflect"
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
+
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,6 +43,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	// Initialize install packages
+	_ "k8s.io/kubernetes/pkg/api/testing"
 )
 
 var simpleEquality = conversion.EqualitiesOrDie(
@@ -592,6 +602,52 @@ func TestCustomToUnstructuredTopLevel(t *testing.T) {
 			result, err := runtime.NewTestUnstructuredConverter(simpleEquality).ToUnstructured(obj)
 			require.NoError(t, err)
 			assert.Equal(t, expected, result)
+		})
+	}
+}
+
+func TestConvertFuzz(t *testing.T) {
+	apifuzzer := fuzzer.FuzzerFor(apitesting.FuzzerFuncs, rand.NewSource(100), legacyscheme.Codecs)
+	for gvk, typ := range legacyscheme.Scheme.AllKnownTypes() {
+		if gvk.Version == runtime.APIVersionInternal {
+			// skip internal versions
+			continue
+		}
+
+		converter := runtime.DefaultUnstructuredConverter
+
+		orig := reflect.New(typ).Interface()
+		rt := reflect.New(typ).Interface()
+		t.Run(gvk.String(), func(t *testing.T) {
+			for i := 0; i < 10; i++ {
+				t.Run(fmt.Sprintf("fuzz-%d", i), func(t *testing.T) {
+					apifuzzer.Fuzz(orig)
+
+					u1, err := converter.ToUnstructured(orig)
+					if err != nil {
+						t.Fatalf("failed to convert to unstructured: %v", err)
+					}
+
+					err = converter.FromUnstructured(u1, rt)
+					if err != nil {
+						t.Fatalf("failed to convert from unstructured: %v", err)
+					}
+
+					// TODO: improve equality checking of runtime.RawExtension and enable this check
+					// if !equality.Semantic.DeepEqual(orig, rt) {
+					// 	t.Errorf("Expected kubernetes type round tripped through unstructured to be unchanged, but got:\n%s\n!=\n%s\ndiff:\n%s", orig, rt, cmp.Diff(orig, rt))
+					// }
+
+					u2, err := converter.ToUnstructured(orig)
+					if err != nil {
+						t.Fatalf("failed to convert to unstructured: %v", err)
+					}
+
+					if !equality.Semantic.DeepEqual(u1, u2) {
+						t.Errorf("Expected unstructured object round tripped through kubernetes type to be unchanged, but got:\n%s\n!=\n%s\ndiff:\n%s", u1, u2, cmp.Diff(u1, u2))
+					}
+				})
+			}
 		})
 	}
 }

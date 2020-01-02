@@ -21,6 +21,10 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/api/testing:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/apitesting/fuzzer:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
@@ -30,6 +34,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],
