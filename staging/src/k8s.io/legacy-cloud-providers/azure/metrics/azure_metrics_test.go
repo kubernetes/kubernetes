@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package azure
+package metrics
 
 import (
 	"testing"
@@ -25,12 +25,12 @@ import (
 )
 
 func TestAzureMetricLabelCardinality(t *testing.T) {
-	mc := newMetricContext("test", "create", "resource_group", "subscription_id", "source")
+	mc := NewMetricContext("test", "create", "resource_group", "subscription_id", "source")
 	assert.Len(t, mc.attributes, len(metricLabels), "cardinalities of labels and values must match")
 }
 
 func TestAzureMetricLabelPrefix(t *testing.T) {
-	mc := newMetricContext("prefix", "request", "resource_group", "subscription_id", "source")
+	mc := NewMetricContext("prefix", "request", "resource_group", "subscription_id", "source")
 	found := false
 	for _, attribute := range mc.attributes {
 		if attribute == "prefix_request" {
