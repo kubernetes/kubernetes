@@ -33,13 +33,13 @@ import (
 	"k8s.io/klog"
 	azclients "k8s.io/legacy-cloud-providers/azure/clients"
 	"k8s.io/legacy-cloud-providers/azure/clients/armclient"
+	"k8s.io/legacy-cloud-providers/azure/metrics"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
 var _ Interface = &Client{}
 
 // Client implements VMSS client Interface.
-// TODO(feiskyer): export prometheus metrics for each API call.
 type Client struct {
 	armClient      armclient.Interface
 	subscriptionID string
@@ -79,18 +79,23 @@ func New(config *azclients.ClientConfig) *Client {
 
 // Get gets a VirtualMachineScaleSetVM.
 func (c *Client) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, expand compute.InstanceViewTypes) (compute.VirtualMachineScaleSetVM, *retry.Error) {
+	mc := metrics.NewMetricContext("vmssvm", "get", resourceGroupName, c.subscriptionID, "")
+
 	// Report errors if the client is rate limited.
 	if !c.rateLimiterReader.TryAccept() {
+		mc.RateLimitedCount()
 		return compute.VirtualMachineScaleSetVM{}, retry.GetRateLimitError(false, "VMSSVMGet")
 	}
 
 	// Report errors if the client is throttled.
 	if c.RetryAfterReader.After(time.Now()) {
+		mc.ThrottledCount()
 		rerr := retry.GetThrottlingError("VMSSVMGet", "client throttled", c.RetryAfterReader)
 		return compute.VirtualMachineScaleSetVM{}, rerr
 	}
 
 	result, rerr := c.getVMSSVM(ctx, resourceGroupName, VMScaleSetName, instanceID, expand)
+	mc.Observe(rerr.Error())
 	if rerr != nil {
 		if rerr.IsThrottled() {
 			// Update RetryAfterReader so that no more requests would be sent until RetryAfter expires.
@@ -137,18 +142,23 @@ func (c *Client) getVMSSVM(ctx context.Context, resourceGroupName string, VMScal
 
 // List gets a list of VirtualMachineScaleSetVMs in the virtualMachineScaleSet.
 func (c *Client) List(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, expand string) ([]compute.VirtualMachineScaleSetVM, *retry.Error) {
+	mc := metrics.NewMetricContext("vmssvm", "list", resourceGroupName, c.subscriptionID, "")
+
 	// Report errors if the client is rate limited.
 	if !c.rateLimiterReader.TryAccept() {
+		mc.RateLimitedCount()
 		return nil, retry.GetRateLimitError(false, "VMSSVMList")
 	}
 
 	// Report errors if the client is throttled.
 	if c.RetryAfterReader.After(time.Now()) {
+		mc.ThrottledCount()
 		rerr := retry.GetThrottlingError("VMSSVMList", "client throttled", c.RetryAfterReader)
 		return nil, rerr
 	}
 
 	result, rerr := c.listVMSSVM(ctx, resourceGroupName, virtualMachineScaleSetName, expand)
+	mc.Observe(rerr.Error())
 	if rerr != nil {
 		if rerr.IsThrottled() {
 			// Update RetryAfterReader so that no more requests would be sent until RetryAfter expires.
@@ -200,18 +210,23 @@ func (c *Client) listVMSSVM(ctx context.Context, resourceGroupName string, virtu
 
 // Update updates a VirtualMachineScaleSetVM.
 func (c *Client) Update(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, parameters compute.VirtualMachineScaleSetVM, source string) *retry.Error {
+	mc := metrics.NewMetricContext("vmssvm", "update", resourceGroupName, c.subscriptionID, source)
+
 	// Report errors if the client is rate limited.
 	if !c.rateLimiterWriter.TryAccept() {
+		mc.RateLimitedCount()
 		return retry.GetRateLimitError(true, "VMSSVMUpdate")
 	}
 
 	// Report errors if the client is throttled.
 	if c.RetryAfterWriter.After(time.Now()) {
+		mc.ThrottledCount()
 		rerr := retry.GetThrottlingError("VMSSVMUpdate", "client throttled", c.RetryAfterWriter)
 		return rerr
 	}
 
 	rerr := c.updateVMSSVM(ctx, resourceGroupName, VMScaleSetName, instanceID, parameters)
+	mc.Observe(rerr.Error())
 	if rerr != nil {
 		if rerr.IsThrottled() {
 			// Update RetryAfterReader so that no more requests would be sent until RetryAfter expires.

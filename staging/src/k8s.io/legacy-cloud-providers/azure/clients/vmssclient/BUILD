@@ -14,6 +14,7 @@ go_library(
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/armclient:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/metrics:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/retry:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
