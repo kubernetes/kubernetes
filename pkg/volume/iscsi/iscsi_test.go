@@ -496,7 +496,7 @@ func TestGetISCSICHAP(t *testing.T) {
 		},
 	}
 	for _, testcase := range tests {
-		resultDiscoveryCHAP, _ := getISCSIDiscoveryCHAPInfo(testcase.spec)
+		resultDiscoveryCHAP, err := getISCSIDiscoveryCHAPInfo(testcase.spec)
 		resultSessionCHAP, err := getISCSISessionCHAPInfo(testcase.spec)
 		switch testcase.name {
 		case "no volume":
