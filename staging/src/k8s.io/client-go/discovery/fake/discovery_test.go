@@ -17,11 +17,14 @@ limitations under the License.
 package fake_test
 
 import (
+	"errors"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/version"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
+	kubetesting "k8s.io/client-go/testing"
 )
 
 func TestFakingServerVersion(t *testing.T) {
@@ -42,5 +45,22 @@ func TestFakingServerVersion(t *testing.T) {
 	}
 	if sv.GitCommit != testGitCommit {
 		t.Fatalf("unexpected faked discovery return value: %q", sv.GitCommit)
+	}
+}
+
+func TestGetErrorFromServerVersion(t *testing.T) {
+	expErr := errors.New("error override")
+	client := fakeclientset.NewSimpleClientset()
+	reactor := func(action kubetesting.Action) (handled bool, ret runtime.Object, err error) {
+		return true, nil, expErr
+	}
+	client.PrependReactor("get", "version", reactor)
+
+	_, err := client.Discovery().ServerVersion()
+	if err == nil {
+		t.Fatal("we expect an error but get nil")
+	}
+	if err.Error() != expErr.Error() {
+		t.Fatal("error message is different")
 	}
 }

@@ -19,7 +19,7 @@ package fake
 import (
 	"fmt"
 
-	"github.com/googleapis/gnostic/OpenAPIv2"
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -134,11 +134,15 @@ func (c *FakeDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
 }
 
 // ServerVersion retrieves and parses the server's version.
+// TODO: version.Info need to be mocked. We can not get a version.Info from Fake.Invokes which returns a runtime.object
 func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 	action := testing.ActionImpl{}
 	action.Verb = "get"
 	action.Resource = schema.GroupVersionResource{Resource: "version"}
-	c.Invokes(action, nil)
+	_, err := c.Invokes(action, nil)
+	if err != nil {
+		return nil, err
+	}
 
 	if c.FakedServerVersion != nil {
 		return c.FakedServerVersion, nil
