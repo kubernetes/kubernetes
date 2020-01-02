@@ -358,6 +358,8 @@ func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, err
 		if err != nil {
 			return nil, true, fmt.Errorf("failed to probe volume plugins when starting volume expand controller: %v", err)
 		}
+
+		prober := GetDynamicPluginProber(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
 		csiTranslator := csitrans.New()
 		expandController, expandControllerErr := expand.NewExpandController(
 			ctx.ClientBuilder.ClientOrDie("expand-controller"),
@@ -366,6 +368,7 @@ func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, err
 			ctx.InformerFactory.Storage().V1().StorageClasses(),
 			ctx.Cloud,
 			plugins,
+			prober,
 			csiTranslator,
 			csimigration.NewPluginManager(csiTranslator))
 
