@@ -55,7 +55,6 @@ import (
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
-	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -145,10 +144,6 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options, regist
 
 	// Get the completed config
 	cc := c.Complete()
-
-	// Apply algorithms based on feature gates.
-	// TODO: make configurable?
-	algorithmprovider.ApplyFeatureGates()
 
 	// Configz registration.
 	if cz, err := configz.New("componentconfig"); err == nil {

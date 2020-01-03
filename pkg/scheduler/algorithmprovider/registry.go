@@ -173,9 +173,3 @@ func applyFeatureGates(config *Config) {
 		config.FrameworkPlugins.Score.Enabled = append(config.FrameworkPlugins.Score.Enabled, s)
 	}
 }
-
-// ApplyFeatureGates applies algorithm by feature gates.
-// TODO(ahg-g): DEPRECATED, remove.
-func ApplyFeatureGates() func() {
-	return func() {}
-}
