@@ -101,6 +101,7 @@ spec:
           - --container=metrics-server
           - --poll-period=30000
           - --estimator=exponential
+          - --scale-down-delay=24h
           # Specifies the smallest cluster (defined in number of nodes)
           # resources will be scaled to.
           - --minClusterSize={{ metrics_server_min_cluster_size }}
