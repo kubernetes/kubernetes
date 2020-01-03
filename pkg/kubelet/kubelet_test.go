@@ -248,7 +248,7 @@ func newTestKubeletWithImageList(
 	volumeStatsAggPeriod := time.Second * 10
 	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(kubelet, volumeStatsAggPeriod)
 
-	kubelet.StatsProvider = stats.NewCadvisorStatsProvider(
+	kubelet.Provider = stats.NewCadvisorStatsProvider(
 		kubelet.cadvisor,
 		kubelet.resourceAnalyzer,
 		kubelet.podManager,
@@ -259,7 +259,7 @@ func newTestKubeletWithImageList(
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	imageGCManager, err := images.NewImageGCManager(fakeRuntime, kubelet.StatsProvider, fakeRecorder, fakeNodeRef, fakeImageGCPolicy, "")
+	imageGCManager, err := images.NewImageGCManager(fakeRuntime, kubelet.Provider, fakeRecorder, fakeNodeRef, fakeImageGCPolicy, "")
 	assert.NoError(t, err)
 	kubelet.imageManager = &fakeImageGCManager{
 		fakeImageService: fakeRuntime,

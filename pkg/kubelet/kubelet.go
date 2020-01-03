@@ -707,7 +707,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.runtimeCache = runtimeCache
 
 	if cadvisor.UsingLegacyCadvisorStats(containerRuntime, remoteRuntimeEndpoint) {
-		klet.StatsProvider = stats.NewCadvisorStatsProvider(
+		klet.Provider = stats.NewCadvisorStatsProvider(
 			klet.cadvisor,
 			klet.resourceAnalyzer,
 			klet.podManager,
@@ -715,7 +715,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			klet.containerRuntime,
 			klet.statusManager)
 	} else {
-		klet.StatsProvider = stats.NewCRIStatsProvider(
+		klet.Provider = stats.NewCRIStatsProvider(
 			klet.cadvisor,
 			klet.resourceAnalyzer,
 			klet.podManager,
@@ -742,7 +742,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.containerDeletor = newPodContainerDeletor(klet.containerRuntime, integer.IntMax(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
 
 	// setup imageManager
-	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, kubeDeps.Recorder, nodeRef, imageGCPolicy, crOptions.PodSandboxImage)
+	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.Provider, kubeDeps.Recorder, nodeRef, imageGCPolicy, crOptions.PodSandboxImage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
@@ -1209,7 +1209,7 @@ type Kubelet struct {
 	dockerLegacyService dockershim.DockerLegacyService
 
 	// StatsProvider provides the node and the container stats.
-	*stats.StatsProvider
+	*stats.Provider
 
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
@@ -1321,7 +1321,7 @@ func (kl *Kubelet) initializeModules() error {
 	metrics.Register(
 		kl.runtimeCache,
 		collectors.NewVolumeStatsCollector(kl),
-		collectors.NewLogMetricsCollector(kl.StatsProvider.ListPodStats),
+		collectors.NewLogMetricsCollector(kl.Provider.ListPodStats),
 	)
 	metrics.SetNodeName(kl.nodeName)
 	servermetrics.Register()
@@ -1367,7 +1367,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 
 	// trigger on-demand stats collection once so that we have capacity information for ephemeral storage.
 	// ignore any errors, since if stats collection is not successful, the container manager will fail to start below.
-	kl.StatsProvider.GetCgroupStats("/", true)
+	kl.Provider.GetCgroupStats("/", true)
 	// Start container manager.
 	node, err := kl.getNodeAnyWay()
 	if err != nil {
@@ -1380,7 +1380,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		klog.Fatalf("Failed to start ContainerManager %v", err)
 	}
 	// eviction manager must start after cadvisor because it needs to know if the container runtime has a dedicated imagefs
-	kl.evictionManager.Start(kl.StatsProvider, kl.GetActivePods, kl.podResourcesAreReclaimed, evictionMonitoringPeriod)
+	kl.evictionManager.Start(kl.Provider, kl.GetActivePods, kl.podResourcesAreReclaimed, evictionMonitoringPeriod)
 
 	// container log manager must start after container runtime is up to retrieve information from container runtime
 	// and inform container to reopen log file after log rotation.
