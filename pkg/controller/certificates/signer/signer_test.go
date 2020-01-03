@@ -38,8 +38,13 @@ func TestSigner(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create signer: %v", err)
 	}
-	s.ca.Now = clock.Now
-	s.ca.Backdate = 0
+	currCA, err := s.caProvider.currentCA()
+	if err != nil {
+		t.Fatal(err)
+	}
+	currCA.Now = clock.Now
+	currCA.Backdate = 0
+	s.caProvider.caValue.Store(currCA)
 
 	csrb, err := ioutil.ReadFile("./testdata/kubelet.csr")
 	if err != nil {

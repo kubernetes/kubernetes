@@ -30,6 +30,11 @@ var serialNumberLimit = new(big.Int).Lsh(big.NewInt(1), 128)
 // CertificateAuthority implements a certificate authority that supports policy
 // based signing. It's used by the signing controller.
 type CertificateAuthority struct {
+	// RawCert is an optional field to determine if signing cert/key pairs have changed
+	RawCert []byte
+	// RawKey is an optional field to determine if signing cert/key pairs have changed
+	RawKey []byte
+
 	Certificate *x509.Certificate
 	PrivateKey  crypto.Signer
 	Backdate    time.Duration
