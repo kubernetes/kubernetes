@@ -179,7 +179,7 @@ func TestAtomicPut(t *testing.T) {
 					tmpRC.Spec.Selector[l] = v
 					tmpRC.Spec.Template.Labels[l] = v
 				}
-				tmpRC, err = rcs.Update(tmpRC)
+				_, err = rcs.Update(tmpRC)
 				if err != nil {
 					if apierrors.IsConflict(err) {
 						// This is what we expect.
@@ -226,7 +226,7 @@ func TestPatch(t *testing.T) {
 		},
 	}
 	pods := c.CoreV1().Pods("default")
-	pod, err := pods.Create(&podBody)
+	_, err := pods.Create(&podBody)
 	if err != nil {
 		t.Fatalf("Failed creating patchpods: %v", err)
 	}
@@ -285,7 +285,7 @@ func TestPatch(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed updating patchpod with patch type %s: %v", k, err)
 		}
-		pod, err = pods.Get(name, metav1.GetOptions{})
+		pod, err := pods.Get(name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed getting patchpod: %v", err)
 		}

@@ -59,9 +59,7 @@ test/e2e/autoscaling
 test/e2e/instrumentation/logging/stackdriver
 test/e2e/instrumentation/monitoring
 test/integration/auth
-test/integration/client
 test/integration/deployment
-test/integration/disruption
 test/integration/etcd
 test/integration/examples
 test/integration/framework

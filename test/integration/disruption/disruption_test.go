@@ -163,6 +163,9 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 	waitPDBStable(t, clientSet, 4, nsName, pdb.Name)
 
 	newPdb, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(nsName).Get(pdb.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Error getting PodDisruptionBudget: %v", err)
+	}
 
 	if expected, found := int32(replicas), newPdb.Status.ExpectedPods; expected != found {
 		t.Errorf("Expected %d, but found %d", expected, found)
