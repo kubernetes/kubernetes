@@ -93,7 +93,7 @@ func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service,
 // From cluster/gce/config-test.sh, master name is set up using below format:
 // MASTER_NAME="${INSTANCE_PREFIX}-master"
 func GetInstancePrefix(masterName string) (string, error) {
-	if !strings.HasSuffix(masterName, "-master") {
+	if !strings.Contains(masterName, "master") {
 		return "", fmt.Errorf("unexpected master name format: %v", masterName)
 	}
 	return masterName[:len(masterName)-7], nil
