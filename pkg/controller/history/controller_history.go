@@ -304,7 +304,7 @@ type objectMetaForPatch struct {
 func (rh *realHistory) AdoptControllerRevision(parent metav1.Object, parentKind schema.GroupVersionKind, revision *apps.ControllerRevision) (*apps.ControllerRevision, error) {
 	blockOwnerDeletion := true
 	isController := true
-	// Return an error if the parent does not own the revision
+	// Return an error if the revision is not orphan
 	if owner := metav1.GetControllerOfNoCopy(revision); owner != nil {
 		return nil, fmt.Errorf("attempt to adopt revision owned by %v", owner)
 	}
