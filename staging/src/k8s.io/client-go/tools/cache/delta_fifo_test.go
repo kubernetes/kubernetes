@@ -346,7 +346,7 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 	f.Add(mkFifoObj("baz", 10))
 	f.Replace([]interface{}{mkFifoObj("foo", 5)}, "0")
 
-	expectedList := []Deltas{
+	expectedList = []Deltas{
 		{{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoObj("baz", 10)}}},
 		{{Sync, mkFifoObj("foo", 5)}},
 		// Since "bar" didn't have a delete event and wasn't in the Replace list
@@ -369,7 +369,7 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 	f.Add(mkFifoObj("baz", 10))
 	f.Replace([]interface{}{mkFifoObj("foo", 5)}, "0")
 
-	expectedList := []Deltas{
+	expectedList = []Deltas{
 		{{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoObj("baz", 10)}}},
 		{{Sync, mkFifoObj("foo", 5)}},
 	}
