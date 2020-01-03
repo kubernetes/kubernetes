@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -65,7 +64,7 @@ func TestCreate(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
-	factory.Create()
+	factory.createFromProvider(schedulerapi.SchedulerDefaultProviderName)
 }
 
 // Test configures a scheduler from a policies defined in a file
@@ -102,9 +101,9 @@ func TestCreateFromConfig(t *testing.T) {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 
-	sched, err := factory.CreateFromConfig(policy)
+	sched, err := factory.createFromConfig(policy)
 	if err != nil {
-		t.Fatalf("CreateFromConfig failed: %v", err)
+		t.Fatalf("createFromConfig failed: %v", err)
 	}
 	hpa := factory.hardPodAffinitySymmetricWeight
 	if hpa != v1.DefaultHardPodAffinitySymmetricWeight {
@@ -113,13 +112,13 @@ func TestCreateFromConfig(t *testing.T) {
 
 	// Verify that node label predicate/priority are converted to framework plugins.
 	wantArgs := `{"Name":"NodeLabel","Args":{"presentLabels":["zone"],"absentLabels":["foo"],"presentLabelsPreference":["l1"],"absentLabelsPreference":["l2"]}}`
-	verifyPluginConvertion(t, nodelabel.Name, []string{"FilterPlugin", "ScorePlugin"}, sched, 6, wantArgs)
+	verifyPluginConvertion(t, nodelabel.Name, []string{"FilterPlugin", "ScorePlugin"}, sched, factory, 6, wantArgs)
 	// Verify that service affinity custom predicate/priority is converted to framework plugin.
 	wantArgs = `{"Name":"ServiceAffinity","Args":{"labels":["zone","foo"],"antiAffinityLabelsPreference":["rack","zone"]}}`
-	verifyPluginConvertion(t, serviceaffinity.Name, []string{"FilterPlugin", "ScorePlugin"}, sched, 6, wantArgs)
+	verifyPluginConvertion(t, serviceaffinity.Name, []string{"FilterPlugin", "ScorePlugin"}, sched, factory, 6, wantArgs)
 }
 
-func verifyPluginConvertion(t *testing.T, name string, extentionPoints []string, sched *Scheduler, wantWeight int32, wantArgs string) {
+func verifyPluginConvertion(t *testing.T, name string, extentionPoints []string, sched *Scheduler, configurator *Configurator, wantWeight int32, wantArgs string) {
 	for _, extensionPoint := range extentionPoints {
 		plugin, ok := findPlugin(name, extensionPoint, sched)
 		if !ok {
@@ -131,7 +130,7 @@ func verifyPluginConvertion(t *testing.T, name string, extentionPoints []string,
 			}
 		}
 		// Verify that the policy config is converted to plugin config.
-		pluginConfig := findPluginConfig(name, sched)
+		pluginConfig := findPluginConfig(name, configurator)
 		encoding, err := json.Marshal(pluginConfig)
 		if err != nil {
 			t.Errorf("Failed to marshal %+v: %v", pluginConfig, err)
@@ -151,8 +150,8 @@ func findPlugin(name, extensionPoint string, sched *Scheduler) (schedulerapi.Plu
 	return schedulerapi.Plugin{}, false
 }
 
-func findPluginConfig(name string, sched *Scheduler) schedulerapi.PluginConfig {
-	for _, c := range sched.PluginConfig {
+func findPluginConfig(name string, configurator *Configurator) schedulerapi.PluginConfig {
+	for _, c := range configurator.pluginConfig {
 		if c.Name == name {
 			return c
 		}
@@ -188,7 +187,7 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configData, &policy); err != nil {
 		t.Errorf("Invalid configuration: %v", err)
 	}
-	factory.CreateFromConfig(policy)
+	factory.createFromConfig(policy)
 	hpa := factory.hardPodAffinitySymmetricWeight
 	if hpa != 10 {
 		t.Errorf("Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", 10, hpa)
@@ -209,20 +208,17 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 
-	factory.CreateFromConfig(policy)
+	factory.createFromConfig(policy)
 }
 
 // Test configures a scheduler from a policy that does not specify any
 // predicate/priority.
 // The predicate/priority from DefaultProvider will be used.
-// TODO(Huang-Wei): refactor (or remove) this test along with eliminating 'RegisterFitPredicate()'.
 func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
-
-	RegisterAlgorithmProvider(schedulerapi.SchedulerDefaultProviderName, sets.NewString("PodFitsResources"), sets.NewString("NodeAffinityPriority"))
 
 	configData := []byte(`{
 		"kind" : "Policy",
@@ -233,22 +229,13 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 		t.Fatalf("Invalid configuration: %v", err)
 	}
 
-	c, err := factory.CreateFromConfig(policy)
+	sched, err := factory.createFromConfig(policy)
 	if err != nil {
 		t.Fatalf("Failed to create scheduler from configuration: %v", err)
 	}
-	if !foundPlugin(c.Plugins.Filter.Enabled, "NodeResourcesFit") {
+	if _, exist := findPlugin("NodeResourcesFit", "FilterPlugin", sched); !exist {
 		t.Errorf("Expected plugin NodeResourcesFit")
 	}
-}
-
-func foundPlugin(plugins []schedulerapi.Plugin, name string) bool {
-	for _, plugin := range plugins {
-		if plugin.Name == name {
-			return true
-		}
-	}
-	return false
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
@@ -435,55 +422,9 @@ func testBind(binding *v1.Binding, t *testing.T) {
 	}
 }
 
-func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
-	client := fake.NewSimpleClientset()
-	// factory of "default-scheduler"
-	stopCh := make(chan struct{})
-	factory := newConfigFactory(client, -1, stopCh)
-	defer close(stopCh)
-	_, err := factory.Create()
-	if err == nil {
-		t.Errorf("expected err: invalid hardPodAffinitySymmetricWeight, got nothing")
-	}
-}
-
-func TestInvalidFactoryArgs(t *testing.T) {
-	client := fake.NewSimpleClientset()
-
-	testCases := []struct {
-		name                           string
-		hardPodAffinitySymmetricWeight int32
-		expectErr                      string
-	}{
-		{
-			name:                           "symmetric weight below range",
-			hardPodAffinitySymmetricWeight: -1,
-			expectErr:                      "invalid hardPodAffinitySymmetricWeight: -1, must be in the range [0-100]",
-		},
-		{
-			name:                           "symmetric weight above range",
-			hardPodAffinitySymmetricWeight: 101,
-			expectErr:                      "invalid hardPodAffinitySymmetricWeight: 101, must be in the range [0-100]",
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			stopCh := make(chan struct{})
-			factory := newConfigFactory(client, test.hardPodAffinitySymmetricWeight, stopCh)
-			defer close(stopCh)
-			_, err := factory.Create()
-			if err == nil {
-				t.Errorf("expected err: %s, got nothing", test.expectErr)
-			}
-		})
-	}
-
-}
-
 func newConfigFactoryWithFrameworkRegistry(
 	client clientset.Interface, hardPodAffinitySymmetricWeight int32, stopCh <-chan struct{},
-	registry framework.Registry, pluginConfigProducerRegistry *frameworkplugins.ConfigProducerRegistry) *Configurator {
+	registry framework.Registry) *Configurator {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	snapshot := nodeinfosnapshot.NewEmptySnapshot()
 	return &Configurator{
@@ -501,21 +442,14 @@ func newConfigFactoryWithFrameworkRegistry(
 		registry:                       registry,
 		plugins:                        nil,
 		pluginConfig:                   []schedulerapi.PluginConfig{},
-		pluginConfigProducerRegistry:   pluginConfigProducerRegistry,
 		nodeInfoSnapshot:               snapshot,
-		algorithmFactoryArgs: AlgorithmFactoryArgs{
-			SharedLister:                   snapshot,
-			InformerFactory:                informerFactory,
-			HardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
-		},
-		configProducerArgs: &frameworkplugins.ConfigProducerArgs{},
 	}
 }
 
 func newConfigFactory(
 	client clientset.Interface, hardPodAffinitySymmetricWeight int32, stopCh <-chan struct{}) *Configurator {
 	return newConfigFactoryWithFrameworkRegistry(client, hardPodAffinitySymmetricWeight, stopCh,
-		frameworkplugins.NewInTreeRegistry(&frameworkplugins.RegistryArgs{}), frameworkplugins.NewConfigProducerRegistry())
+		frameworkplugins.NewInTreeRegistry(&frameworkplugins.RegistryArgs{}))
 }
 
 type fakeExtender struct {

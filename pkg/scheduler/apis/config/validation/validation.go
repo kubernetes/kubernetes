@@ -108,6 +108,10 @@ func ValidatePolicy(policy config.Policy) error {
 	if binders > 1 {
 		validationErrors = append(validationErrors, fmt.Errorf("Only one extender can implement bind, found %v", binders))
 	}
+
+	if policy.HardPodAffinitySymmetricWeight < 0 || policy.HardPodAffinitySymmetricWeight > 100 {
+		validationErrors = append(validationErrors, field.Invalid(field.NewPath("hardPodAffinitySymmetricWeight"), policy.HardPodAffinitySymmetricWeight, "not in valid range [0-100]"))
+	}
 	return utilerrors.NewAggregate(validationErrors)
 }
 

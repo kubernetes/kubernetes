@@ -27,11 +27,10 @@ import (
 
 // MetadataFactory is a factory to produce PriorityMetadata.
 type MetadataFactory struct {
-	serviceLister         corelisters.ServiceLister
-	controllerLister      corelisters.ReplicationControllerLister
-	replicaSetLister      appslisters.ReplicaSetLister
-	statefulSetLister     appslisters.StatefulSetLister
-	hardPodAffinityWeight int32
+	serviceLister     corelisters.ServiceLister
+	controllerLister  corelisters.ReplicationControllerLister
+	replicaSetLister  appslisters.ReplicaSetLister
+	statefulSetLister appslisters.StatefulSetLister
 }
 
 // NewMetadataFactory creates a MetadataFactory.
@@ -40,14 +39,12 @@ func NewMetadataFactory(
 	controllerLister corelisters.ReplicationControllerLister,
 	replicaSetLister appslisters.ReplicaSetLister,
 	statefulSetLister appslisters.StatefulSetLister,
-	hardPodAffinityWeight int32,
 ) MetadataProducer {
 	factory := &MetadataFactory{
-		serviceLister:         serviceLister,
-		controllerLister:      controllerLister,
-		replicaSetLister:      replicaSetLister,
-		statefulSetLister:     statefulSetLister,
-		hardPodAffinityWeight: hardPodAffinityWeight,
+		serviceLister:     serviceLister,
+		controllerLister:  controllerLister,
+		replicaSetLister:  replicaSetLister,
+		statefulSetLister: statefulSetLister,
 	}
 	return factory.PriorityMetadata
 }

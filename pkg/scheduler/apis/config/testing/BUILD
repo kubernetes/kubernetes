@@ -11,7 +11,6 @@ go_test(
         "//pkg/features:go_default_library",
         "//pkg/scheduler:go_default_library",
         "//pkg/scheduler/algorithmprovider:go_default_library",
-        "//pkg/scheduler/algorithmprovider/defaults:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/apis/config/scheme:go_default_library",
         "//pkg/scheduler/core:go_default_library",

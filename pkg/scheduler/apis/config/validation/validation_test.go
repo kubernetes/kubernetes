@@ -262,6 +262,20 @@ func TestValidatePolicy(t *testing.T) {
 			},
 			expected: errors.New("ServiceAntiAffinity  priority \"customPriority2\" has a different weight with \"customPriority1\""),
 		},
+		{
+			name: "invalid hardPodAffinitySymmetricWeight, above the range",
+			policy: config.Policy{
+				HardPodAffinitySymmetricWeight: 101,
+			},
+			expected: errors.New("hardPodAffinitySymmetricWeight: Invalid value: 101: not in valid range [0-100]"),
+		},
+		{
+			name: "invalid hardPodAffinitySymmetricWeight, below the range",
+			policy: config.Policy{
+				HardPodAffinitySymmetricWeight: -1,
+			},
+			expected: errors.New("hardPodAffinitySymmetricWeight: Invalid value: -1: not in valid range [0-100]"),
+		},
 	}
 
 	for _, test := range tests {
