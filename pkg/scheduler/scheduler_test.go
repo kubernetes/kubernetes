@@ -674,7 +674,6 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 	algo := core.NewGenericScheduler(
 		scache,
 		internalqueue.NewSchedulingQueue(nil),
-		nil,
 		priorities.EmptyMetadataProducer,
 		nodeinfosnapshot.NewEmptySnapshot(),
 		fwk,
@@ -730,7 +729,6 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 	algo := core.NewGenericScheduler(
 		scache,
 		queue,
-		nil,
 		priorities.EmptyMetadataProducer,
 		nodeinfosnapshot.NewEmptySnapshot(),
 		fwk,

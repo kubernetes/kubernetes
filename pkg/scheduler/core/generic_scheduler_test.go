@@ -782,7 +782,6 @@ func TestGenericScheduler(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				cache,
 				internalqueue.NewSchedulingQueue(nil),
-				nil,
 				priorities.EmptyMetadataProducer,
 				snapshot,
 				fwk,
@@ -827,7 +826,6 @@ func makeScheduler(nodes []*v1.Node, fns ...st.RegisterPluginFunc) *genericSched
 	s := NewGenericScheduler(
 		cache,
 		internalqueue.NewSchedulingQueue(nil),
-		nil,
 		priorities.EmptyMetadataProducer,
 		emptySnapshot,
 		fwk,
@@ -955,7 +953,6 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 		scheduler := NewGenericScheduler(
 			cache,
 			queue,
-			nil,
 			priorities.EmptyMetadataProducer,
 			emptySnapshot,
 			fwk,
@@ -1148,7 +1145,6 @@ func TestZeroRequest(t *testing.T) {
 			}
 
 			scheduler := NewGenericScheduler(
-				nil,
 				nil,
 				nil,
 				metadataProducer,
@@ -1596,7 +1592,6 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				nil,
 				internalqueue.NewSchedulingQueue(nil),
-				nil,
 				priorities.EmptyMetadataProducer,
 				snapshot,
 				fwk,
@@ -2323,7 +2318,6 @@ func TestPreempt(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				cache,
 				internalqueue.NewSchedulingQueue(nil),
-				nil,
 				priorities.EmptyMetadataProducer,
 				snapshot,
 				fwk,

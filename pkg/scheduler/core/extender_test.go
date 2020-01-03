@@ -584,7 +584,6 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				cache,
 				queue,
-				nil,
 				priorities.EmptyMetadataProducer,
 				emptySnapshot,
 				fwk,

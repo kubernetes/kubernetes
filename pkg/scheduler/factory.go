@@ -145,7 +145,6 @@ func (c *Configurator) create(extenders []algorithm.SchedulerExtender) (*Schedul
 	algo := core.NewGenericScheduler(
 		c.schedulerCache,
 		podQueue,
-		nil,
 		priorities.NewMetadataFactory(
 			c.informerFactory.Core().V1().Services().Lister(),
 			c.informerFactory.Core().V1().ReplicationControllers().Lister(),

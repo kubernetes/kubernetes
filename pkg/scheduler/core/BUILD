@@ -11,7 +11,6 @@ go_library(
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/scheduler/algorithm:go_default_library",
-        "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/algorithm/priorities:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/apis/extender/v1:go_default_library",
