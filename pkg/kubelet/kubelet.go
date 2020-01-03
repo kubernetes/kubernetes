@@ -841,7 +841,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) {
 		// add sysctl admission
-		runtimeSupport, err := sysctl.NewRuntimeAdmitHandler(klet.containerRuntime)
+		runtimeSupport, err := sysctl.NewAdmitHandler(klet.containerRuntime)
 		if err != nil {
 			return nil, err
 		}

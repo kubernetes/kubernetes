@@ -35,15 +35,15 @@ const (
 // TODO: The admission logic in this file is runtime-dependent. It should be
 // changed to be generic and CRI-compatible.
 
-type runtimeAdmitHandler struct {
+type AdmitHandler struct {
 	result lifecycle.PodAdmitResult
 }
 
-var _ lifecycle.PodAdmitHandler = &runtimeAdmitHandler{}
+var _ lifecycle.PodAdmitHandler = &AdmitHandler{}
 
 // NewRuntimeAdmitHandler returns a sysctlRuntimeAdmitHandler which checks whether
 // the given runtime support sysctls.
-func NewRuntimeAdmitHandler(runtime container.Runtime) (*runtimeAdmitHandler, error) {
+func NewAdmitHandler(runtime container.Runtime) (*AdmitHandler, error) {
 	switch runtime.Type() {
 	case dockerTypeName:
 		v, err := runtime.APIVersion()
@@ -57,13 +57,13 @@ func NewRuntimeAdmitHandler(runtime container.Runtime) (*runtimeAdmitHandler, er
 			return nil, fmt.Errorf("failed to compare Docker version for sysctl support: %v", err)
 		}
 		if c >= 0 {
-			return &runtimeAdmitHandler{
+			return &AdmitHandler{
 				result: lifecycle.PodAdmitResult{
 					Admit: true,
 				},
 			}, nil
 		}
-		return &runtimeAdmitHandler{
+		return &AdmitHandler{
 			result: lifecycle.PodAdmitResult{
 				Admit:   false,
 				Reason:  UnsupportedReason,
@@ -72,7 +72,7 @@ func NewRuntimeAdmitHandler(runtime container.Runtime) (*runtimeAdmitHandler, er
 		}, nil
 	default:
 		// Return admit for other runtimes.
-		return &runtimeAdmitHandler{
+		return &AdmitHandler{
 			result: lifecycle.PodAdmitResult{
 				Admit: true,
 			},
@@ -81,7 +81,7 @@ func NewRuntimeAdmitHandler(runtime container.Runtime) (*runtimeAdmitHandler, er
 }
 
 // Admit checks whether the runtime supports sysctls.
-func (w *runtimeAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (w *AdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	if attrs.Pod.Spec.SecurityContext != nil {
 
 		if len(attrs.Pod.Spec.SecurityContext.Sysctls) > 0 {
