@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,7 +37,6 @@ import (
 	kubemetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -563,8 +562,8 @@ func extractLatencyMetrics(latencies []e2emetrics.PodLatencyData) e2emetrics.Lat
 // printLatencies outputs latencies to log with readable format.
 func printLatencies(latencies []e2emetrics.PodLatencyData, header string) {
 	metrics := extractLatencyMetrics(latencies)
-	e2elog.Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:])
-	e2elog.Logf("perc50: %v, perc90: %v, perc99: %v", metrics.Perc50, metrics.Perc90, metrics.Perc99)
+	framework.Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:])
+	framework.Logf("perc50: %v, perc90: %v, perc99: %v", metrics.Perc50, metrics.Perc90, metrics.Perc99)
 }
 
 // logAndVerifyLatency verifies that whether pod creation latency satisfies the limit.
