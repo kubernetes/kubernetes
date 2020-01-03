@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: pod-
+spec:
+  containers:
+  - image: k8s.gcr.io/pause:3.1
+    name: pause
+    ports:
+    - containerPort: 80
+    resources:
+      limits:
+        cpu: 100m
+        memory: 500Mi
+      requests:
+        cpu: 100m
+        memory: 500Mi

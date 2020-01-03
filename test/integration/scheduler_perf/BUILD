@@ -30,6 +30,7 @@ go_test(
     srcs = [
         "main_test.go",
         "scheduler_bench_test.go",
+        "scheduler_perf_test.go",
         "scheduler_test.go",
     ],
     embed = [":go_default_library"],
@@ -45,11 +46,13 @@ go_test(
         "//staging/src/k8s.io/client-go/informers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib/plugins:go_default_library",
         "//test/integration/framework:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 
