@@ -88,8 +88,10 @@ function create-kubemark-master {
     REGION=$(grep -o "^[a-z]*-[a-z0-9]*" "${KUBE_TEMP}"/cluster-location.txt)
     MASTER_NAME="${KUBE_GCE_INSTANCE_PREFIX}"-master
 
-    MASTER_INTERNAL_IP=$(gcloud compute addresses describe "${MASTER_NAME}-internal-ip" \
-        --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
+    if [[ ${GCE_PRIVATE_CLUSTER:-} == "true" ]]; then
+      MASTER_INTERNAL_IP=$(gcloud compute addresses describe "${MASTER_NAME}-internal-ip" \
+          --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
+    fi
     MASTER_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
         --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
 
