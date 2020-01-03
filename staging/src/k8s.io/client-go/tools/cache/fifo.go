@@ -44,7 +44,7 @@ func (e ErrRequeue) Error() string {
 	return e.Err.Error()
 }
 
-// Queue extends Store with a collection of keys to "process".
+// Queue extends Store with a collection of Store keys to "process".
 // Every Add, Update, or Delete may put the object's key in that collection.
 // A Queue has a way to derive the corresponding key given an accumulator.
 // A Queue can be accessed concurrently from multiple goroutines.
