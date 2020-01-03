@@ -239,7 +239,8 @@ func initDisruptionController(t *testing.T, context *testContext) *disruption.Di
 		informers.Apps().V1().StatefulSets(),
 		context.clientSet,
 		mapper,
-		scaleClient)
+		scaleClient,
+		context.clientSet.Discovery())
 
 	informers.Start(context.scheduler.StopEverything)
 	informers.WaitForCacheSync(context.scheduler.StopEverything)
