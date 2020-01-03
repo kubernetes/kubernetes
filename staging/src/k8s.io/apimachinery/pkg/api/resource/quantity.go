@@ -95,7 +95,7 @@ type Quantity struct {
 
 	// Change Format at will. See the comment for Canonicalize for
 	// more details.
-	Format
+	Format `protobuf:"bytes,1,opt,name=string"`
 }
 
 // CanonicalValue allows a quantity amount to be converted to a string.
