@@ -37,7 +37,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
@@ -82,9 +81,6 @@ func TestTaintNodeByCondition(t *testing.T) {
 
 	admission.SetExternalKubeClientSet(externalClientset)
 	admission.SetExternalKubeInformerFactory(externalInformers)
-
-	// Apply feature gates to enable TaintNodesByCondition
-	defer algorithmprovider.ApplyFeatureGates()()
 
 	context = initTestScheduler(t, context, false, nil)
 	defer cleanupTest(t, context)
@@ -648,8 +644,6 @@ func TestTaintBasedEvictions(t *testing.T) {
 
 	// Enable TaintBasedEvictions
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintBasedEvictions, true)()
-	// ApplyFeatureGates() is called to ensure TaintNodesByCondition related logic is applied/restored properly.
-	defer algorithmprovider.ApplyFeatureGates()()
 
 	// Build admission chain handler.
 	podTolerations := podtolerationrestriction.NewPodTolerationsPlugin(&pluginapi.Configuration{})

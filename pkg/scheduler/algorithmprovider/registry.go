@@ -18,6 +18,8 @@ package algorithmprovider
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -65,6 +67,17 @@ func NewRegistry(hardPodAffinityWeight int64) Registry {
 		schedulerapi.SchedulerDefaultProviderName: defaultConfig,
 		ClusterAutoscalerProvider:                 caConfig,
 	}
+}
+
+// ListAlgorithmProviders lists registered algorithm providers.
+func ListAlgorithmProviders() string {
+	r := NewRegistry(1)
+	var providers []string
+	for k := range r {
+		providers = append(providers, k)
+	}
+	sort.Strings(providers)
+	return strings.Join(providers, " | ")
 }
 
 func getDefaultConfig(hardPodAffinityWeight int64) *Config {
@@ -148,6 +161,7 @@ func applyFeatureGates(config *Config) {
 		f := schedulerapi.Plugin{Name: podtopologyspread.Name}
 		config.FrameworkPlugins.PreFilter.Enabled = append(config.FrameworkPlugins.PreFilter.Enabled, f)
 		config.FrameworkPlugins.Filter.Enabled = append(config.FrameworkPlugins.Filter.Enabled, f)
+		config.FrameworkPlugins.PostFilter.Enabled = append(config.FrameworkPlugins.PostFilter.Enabled, f)
 		s := schedulerapi.Plugin{Name: podtopologyspread.Name, Weight: 1}
 		config.FrameworkPlugins.Score.Enabled = append(config.FrameworkPlugins.Score.Enabled, s)
 	}
@@ -155,6 +169,13 @@ func applyFeatureGates(config *Config) {
 	// Prioritizes nodes that satisfy pod's resource limits
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
 		klog.Infof("Registering resourcelimits priority function")
-		// TODO(ahg-g): append to config.FrameworkPlugins.Score.Enabled when available.
+		s := schedulerapi.Plugin{Name: noderesources.ResourceLimitsName, Weight: 1}
+		config.FrameworkPlugins.Score.Enabled = append(config.FrameworkPlugins.Score.Enabled, s)
 	}
+}
+
+// ApplyFeatureGates applies algorithm by feature gates.
+// TODO(ahg-g): DEPRECATED, remove.
+func ApplyFeatureGates() func() {
+	return func() {}
 }

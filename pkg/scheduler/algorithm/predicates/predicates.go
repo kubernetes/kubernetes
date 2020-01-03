@@ -396,9 +396,3 @@ func podToleratesNodeTaints(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo, f
 	}
 	return false, []PredicateFailureReason{ErrTaintsTolerationsNotMatch}, nil
 }
-
-// EvenPodsSpreadPredicate is the legacy function using old path of metadata.
-// DEPRECATED
-func EvenPodsSpreadPredicate(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
-	return false, nil, fmt.Errorf("this function should never be called")
-}
