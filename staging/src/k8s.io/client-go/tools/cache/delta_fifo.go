@@ -28,13 +28,13 @@ import (
 
 // NewDeltaFIFO returns a Queue which can be used to process changes to items.
 //
-// keyFunc is used to figure out what key an object should have. (It's
+// keyFunc is used to figure out what key an object should have. (It is
 // exposed in the returned DeltaFIFO's KeyOf() method, with bonus features.)
 //
-// 'keyLister' is expected to return a list of keys that the consumer of
-// this queue "knows about". It is used to decide which items are missing
-// when Replace() is called; 'Deleted' deltas are produced for these items.
-// It may be nil if you don't need to detect all deletions.
+// 'knownObjects' may be supplied to modify the behavior of Delete,
+// Replace, and Resync.  It may be nil if you do not need those
+// modifications.
+//
 // TODO: consider merging keyLister with this object, tracking a list of
 //       "known" keys when Pop() is called. Have to think about how that
 //       affects error retrying.
@@ -72,10 +72,10 @@ func NewDeltaFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter) *DeltaFIFO {
 // acumulator.  The accumulator associated with a given object's key
 // is a Deltas, which is a slice of Delta values for that object.
 // Applying an object to a Deltas means to append a Delta except when
-// the potentially appended Delta is a Delete and the Deltas already
-// ends with a Delete.  In that case the Deltas does not grow,
-// although the terminal Delete will be replaced by the new Delete if
-// the older Delete's object is a DeletedFinalStateUnknown.
+// the potentially appended Delta is a Deleted and the Deltas already
+// ends with a Deleted.  In that case the Deltas does not grow,
+// although the terminal Deleted will be replaced by the new Deleted if
+// the older Deleted's object is a DeletedFinalStateUnknown.
 //
 // DeltaFIFO is a producer-consumer queue, where a Reflector is
 // intended to be the producer, and the consumer is whatever calls
