@@ -17,6 +17,8 @@ limitations under the License.
 package statefulset
 
 import (
+	"bytes"
+	"encoding/json"
 	"sort"
 	"testing"
 
@@ -24,6 +26,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -32,6 +35,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 )
+
+var parentKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
 
 func alwaysReady() bool { return true }
 
@@ -534,6 +539,48 @@ func TestGetPodsForStatefulSetAdopt(t *testing.T) {
 	}
 }
 
+func TestAdoptOrphanRevisions(t *testing.T) {
+	ss1 := newStatefulSetWithLabels(3, "ss1", types.UID("ss1"), map[string]string{"foo": "bar"})
+	ss1.Status.CollisionCount = new(int32)
+	ss1Rev1, err := history.NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ss1Rev1.Namespace = ss1.Namespace
+	ss1.Spec.Template.Annotations = make(map[string]string)
+	ss1.Spec.Template.Annotations["ss1"] = "ss1"
+	ss1Rev2, err := history.NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ss1Rev2.Namespace = ss1.Namespace
+	ss1Rev2.OwnerReferences = []metav1.OwnerReference{}
+
+	ssc, spc := newFakeStatefulSetController(ss1, ss1Rev1, ss1Rev2)
+
+	spc.revisionsIndexer.Add(ss1Rev1)
+	spc.revisionsIndexer.Add(ss1Rev2)
+
+	err = ssc.adoptOrphanRevisions(ss1)
+	if err != nil {
+		t.Errorf("adoptOrphanRevisions() error: %v", err)
+	}
+
+	if revisions, err := ssc.control.ListRevisions(ss1); err != nil {
+		t.Errorf("ListRevisions() error: %v", err)
+	} else {
+		var adopted bool
+		for i := range revisions {
+			if revisions[i].Name == ss1Rev2.Name && metav1.GetControllerOf(revisions[i]) != nil {
+				adopted = true
+			}
+		}
+		if !adopted {
+			t.Error("adoptOrphanRevisions() not adopt orphan revisions")
+		}
+	}
+}
+
 func TestGetPodsForStatefulSetRelease(t *testing.T) {
 	set := newStatefulSet(3)
 	ssc, spc := newFakeStatefulSetController(set)
@@ -575,7 +622,7 @@ func TestGetPodsForStatefulSetRelease(t *testing.T) {
 func newFakeStatefulSetController(initialObjects ...runtime.Object) (*StatefulSetController, *fakeStatefulPodControl) {
 	client := fake.NewSimpleClientset(initialObjects...)
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-	fpc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1().StatefulSets())
+	fpc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1().StatefulSets(), informerFactory.Apps().V1().ControllerRevisions())
 	ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1().StatefulSets())
 	ssc := NewStatefulSetController(
 		informerFactory.Core().V1().Pods(),
@@ -709,4 +756,13 @@ func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetContr
 
 	}
 	return assertMonotonicInvariants(set, spc)
+}
+
+func rawTemplate(template *v1.PodTemplateSpec) runtime.RawExtension {
+	buf := new(bytes.Buffer)
+	enc := json.NewEncoder(buf)
+	if err := enc.Encode(template); err != nil {
+		panic(err)
+	}
+	return runtime.RawExtension{Raw: buf.Bytes()}
 }
