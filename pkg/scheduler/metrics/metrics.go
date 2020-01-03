@@ -127,13 +127,14 @@ var (
 			DeprecatedVersion: "1.14.0",
 		},
 	)
-	SchedulingAlgorithmPredicateEvaluationDuration = metrics.NewHistogram(
+	DeprecatedSchedulingAlgorithmPredicateEvaluationSecondsDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "scheduling_algorithm_predicate_evaluation_seconds",
-			Help:           "Scheduling algorithm predicate evaluation duration in seconds",
-			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         SchedulerSubsystem,
+			Name:              "scheduling_algorithm_predicate_evaluation_seconds",
+			Help:              "Scheduling algorithm predicate evaluation duration in seconds",
+			Buckets:           metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.18.0",
 		},
 	)
 	DeprecatedSchedulingAlgorithmPredicateEvaluationDuration = metrics.NewHistogram(
@@ -146,13 +147,14 @@ var (
 			DeprecatedVersion: "1.14.0",
 		},
 	)
-	SchedulingAlgorithmPriorityEvaluationDuration = metrics.NewHistogram(
+	DeprecatedSchedulingAlgorithmPriorityEvaluationSecondsDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "scheduling_algorithm_priority_evaluation_seconds",
-			Help:           "Scheduling algorithm priority evaluation duration in seconds",
-			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         SchedulerSubsystem,
+			Name:              "scheduling_algorithm_priority_evaluation_seconds",
+			Help:              "Scheduling algorithm priority evaluation duration in seconds",
+			Buckets:           metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.18.0",
 		},
 	)
 	DeprecatedSchedulingAlgorithmPriorityEvaluationDuration = metrics.NewHistogram(
@@ -312,9 +314,9 @@ var (
 		DeprecatedSchedulingAlgorithmLatency,
 		BindingLatency,
 		DeprecatedBindingLatency,
-		SchedulingAlgorithmPredicateEvaluationDuration,
+		DeprecatedSchedulingAlgorithmPredicateEvaluationSecondsDuration,
 		DeprecatedSchedulingAlgorithmPredicateEvaluationDuration,
-		SchedulingAlgorithmPriorityEvaluationDuration,
+		DeprecatedSchedulingAlgorithmPriorityEvaluationSecondsDuration,
 		DeprecatedSchedulingAlgorithmPriorityEvaluationDuration,
 		SchedulingAlgorithmPreemptionEvaluationDuration,
 		DeprecatedSchedulingAlgorithmPreemptionEvaluationDuration,
