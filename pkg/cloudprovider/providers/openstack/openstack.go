@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"k8s.io/apimachinery/pkg/labels"
 	"net"
 	"net/http"
 	"os"
@@ -31,6 +30,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
@@ -42,10 +43,10 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/gcfg.v1"
 
-	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	netutil "k8s.io/apimachinery/pkg/util/net"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	certutil "k8s.io/client-go/util/cert"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
@@ -71,7 +72,7 @@ var ErrMultipleResults = errors.New("multiple results where only one expected")
 // ErrNoAddressFound is used when we cannot find an ip address for the host
 var ErrNoAddressFound = errors.New("no address found for host")
 
-var NodeLister  corelisters.NodeLister
+var NodeLister corelisters.NodeLister
 
 // MyDuration is the encoding.TextUnmarshaler interface for time.Duration
 type MyDuration struct {
@@ -438,7 +439,7 @@ func getServerByName(client *gophercloud.ServiceClient, name types.NodeName) (*s
 	if node == nil {
 		return nil, errors.New(fmt.Sprintf("node with name %s not exist", string(name)))
 	}
-	
+
 	opts := servers.ListOpts{
 		Name: fmt.Sprintf("^%s$", regexp.QuoteMeta(mapNodeNameToServerName(name))),
 	}
