@@ -68,8 +68,14 @@ func NewDeltaFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter) *DeltaFIFO {
 }
 
 // DeltaFIFO is like FIFO, but allows the PopProcessFunc to process
-// deletes.  The accumulator associated with a given object's key is a
-// slice of Delta values for that object.
+// deletes and adds Sync to the ways an object can be applied to an
+// acumulator.  The accumulator associated with a given object's key
+// is a Deltas, which is a slice of Delta values for that object.
+// Applying an object to a Deltas means to append a Delta except when
+// the potentially appended Delta is a Delete and the Deltas already
+// ends with a Delete.  In that case the Deltas does not grow,
+// although the terminal Delete will be replaced by the new Delete if
+// the older Delete's object is a DeletedFinalStateUnknown.
 //
 // DeltaFIFO is a producer-consumer queue, where a Reflector is
 // intended to be the producer, and the consumer is whatever calls
@@ -83,17 +89,14 @@ func NewDeltaFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter) *DeltaFIFO {
 //  * You might want to periodically reprocess objects.
 //
 // DeltaFIFO's Pop(), Get(), and GetByKey() methods return
-// interface{} to satisfy the Store/Queue interfaces, but it
+// interface{} to satisfy the Store/Queue interfaces, but they
 // will always return an object of type Deltas.
 //
-// A DeltaFIFO's knownObjects KeyListerGetter provides get/list access
-// to a set of "known objects" that is used for two purposes.  One is
-// to conditionalize delete operations: it is only for a known object
-// that a Delete Delta is recorded (this applies to both Delete and
-// Replace).  The deleted object will be included in the
-// DeleteFinalStateUnknown markers, and those objects could be stale.
-// The other purpose is in the Resync operation, which adds a Sync
-// Delta for every known object.
+// A DeltaFIFO's knownObjects KeyListerGetter provides the abilities
+// to list Store keys and to get objects by Store key.  The objects in
+// question are called "known objects" and this set of objects
+// modifies the behavior of the Delete, Replace, and Resync methods
+// (each in a different way).
 //
 // A note on threading: If you call Pop() in parallel from multiple
 // threads, you could end up with multiple threads processing slightly
@@ -119,9 +122,8 @@ type DeltaFIFO struct {
 	// insertion and retrieval, and should be deterministic.
 	keyFunc KeyFunc
 
-	// knownObjects list keys that are "known", for the
-	// purpose of figuring out which items have been deleted
-	// when Replace() or Delete() is called.
+	// knownObjects list keys that are "known" --- affecting Delete(),
+	// Replace(), and Resync()
 	knownObjects KeyListerGetter
 
 	// Indication the queue is closed.
@@ -190,9 +192,11 @@ func (f *DeltaFIFO) Update(obj interface{}) error {
 	return f.queueActionLocked(Updated, obj)
 }
 
-// Delete is just like Add, but makes an Deleted Delta. If the item does not
-// already exist, it will be ignored. (It may have already been deleted by a
-// Replace (re-list), for example.)
+// Delete is just like Add, but makes a Deleted Delta. If the given
+// object does not already exist, it will be ignored. (It may have
+// already been deleted by a Replace (re-list), for example.)  In this
+// method `f.knownObjects`, if not nil, provides (via GetByKey)
+// _additional_ objects that are considered to already exist.
 func (f *DeltaFIFO) Delete(obj interface{}) error {
 	id, err := f.KeyOf(obj)
 	if err != nil {
@@ -438,10 +442,15 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	}
 }
 
-// Replace will delete the contents of 'f', using instead the given map.
-// 'f' takes ownership of the map, you should not reference the map again
-// after calling this function. f's queue is reset, too; upon return, it
-// will contain the items in the map, in no particular order.
+// Replace atomically adds the given objects using the Sync type of
+// Delta and does some deletions.  In particular: for every
+// pre-existing key K that is not the key of an object in `list` there
+// is the effect of `Delete(DeletedFinalStateUnknown{K, O})` where O
+// is current object of K.  If `f.knownObjects == nil` then the
+// pre-existing keys are those in `f.items` and the current object of
+// K is the `.Newest()` of the Deltas associated with K.  Otherwise
+// the pre-existing keys are those listed by `f.knownObjects` and the
+// current object of K is what `f.knownObjects.GetByKey(K)` returns.
 func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -515,7 +524,9 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 	return nil
 }
 
-// Resync will send a sync event for each item
+// Resync adds, with a Sync type of Delta, every object listed by
+// `f.knownObjects` whose key is not already queued for processing.
+// If `f.knownObjects` is `nil` then Resync does nothing.
 func (f *DeltaFIFO) Resync() error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
