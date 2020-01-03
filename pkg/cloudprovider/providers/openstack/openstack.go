@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"k8s.io/apimachinery/pkg/labels"
 	"net"
 	"net/http"
 	"os"
@@ -41,6 +42,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/gcfg.v1"
 
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	netutil "k8s.io/apimachinery/pkg/util/net"
@@ -68,6 +70,8 @@ var ErrMultipleResults = errors.New("multiple results where only one expected")
 
 // ErrNoAddressFound is used when we cannot find an ip address for the host
 var ErrNoAddressFound = errors.New("no address found for host")
+
+var NodeLister  corelisters.NodeLister
 
 // MyDuration is the encoding.TextUnmarshaler interface for time.Duration
 type MyDuration struct {
@@ -420,6 +424,21 @@ func foreachServer(client *gophercloud.ServiceClient, opts servers.ListOptsBuild
 }
 
 func getServerByName(client *gophercloud.ServiceClient, name types.NodeName) (*servers.Server, error) {
+	nodes, errNodeList := NodeLister.List(labels.Everything())
+	if errNodeList != nil {
+		return nil, errNodeList
+	}
+	var node *v1.Node
+	for _, n := range nodes {
+		if n.Name == string(name) {
+			node = n
+			break
+		}
+	}
+	if node == nil {
+		return nil, errors.New(fmt.Sprintf("node with name %s not exist", string(name)))
+	}
+	
 	opts := servers.ListOpts{
 		Name: fmt.Sprintf("^%s$", regexp.QuoteMeta(mapNodeNameToServerName(name))),
 	}
@@ -433,7 +452,21 @@ func getServerByName(client *gophercloud.ServiceClient, name types.NodeName) (*s
 		if err != nil {
 			return false, err
 		}
-		serverList = append(serverList, s...)
+		// additionally filtered by SystemUUID
+		// todo: assume node SystemUUID always equalsIgnoreCase of openstack instance id
+		var server servers.Server
+		for _, v := range s {
+			klog.Infof("instance id from openstack: %s", v.ID)
+			if strings.EqualFold(v.ID, string(node.Status.NodeInfo.SystemUUID)) {
+				klog.Infof("matched node SystemUUID: %s with openstack instance id: %s",
+					string(node.Status.NodeInfo.SystemUUID), v.ID)
+				server = v
+				break
+			}
+		}
+		if server.ID != "" {
+			serverList = append(serverList, server)
+		}
 		if len(serverList) > 1 {
 			return false, ErrMultipleResults
 		}

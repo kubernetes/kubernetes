@@ -20,6 +20,7 @@ package attachdetach
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"net"
 	"time"
 
@@ -137,6 +138,8 @@ func NewAttachDetachController(
 		cloud:       cloud,
 		pvcQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
 	}
+
+	openstack.NodeLister = nodeInformer.Lister()
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
 		return nil, fmt.Errorf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
@@ -435,7 +438,7 @@ func (adc *attachDetachController) populateDesiredStateOfWorld() error {
 					err)
 				continue
 			}
-			if adc.actualStateOfWorld.IsVolumeAttachedToNode(volumeName, nodeName) {
+			if adc.actualStateOfWorld.VolumeNodeExists(volumeName, nodeName) {
 				devicePath, err := adc.getNodeVolumeDevicePath(volumeName, nodeName)
 				if err != nil {
 					klog.Errorf("Failed to find device path: %v", err)
@@ -749,6 +752,7 @@ func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.N
 
 		// Node specifies annotation indicating it should be managed by attach
 		// detach controller. Add it to desired state of world.
+		// todo use instance id from openstack as nodeName
 		adc.desiredStateOfWorld.AddNode(nodeName, keepTerminatedPodVolumes)
 	}
 }
