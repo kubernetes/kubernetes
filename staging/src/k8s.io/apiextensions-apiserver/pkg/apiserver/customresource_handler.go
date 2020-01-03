@@ -526,29 +526,21 @@ func (r *crdHandler) removeDeadStorage() {
 	r.customStorageLock.Lock()
 	defer r.customStorageLock.Unlock()
 
-	oldInfos := []*crdInfo{}
 	storageMap := r.customStorage.Load().(crdStorageMap)
 	// Copy because we cannot write to storageMap without a race
-	// as it is used without locking elsewhere
-	storageMap2 := storageMap.clone()
-	for uid, s := range storageMap2 {
-		found := false
-		for _, crd := range allCustomResourceDefinitions {
-			if crd.UID == uid {
-				found = true
-				break
-			}
-		}
-		if !found {
-			klog.V(4).Infof("Removing dead CRD storage for %s/%s", s.spec.Group, s.spec.Names.Kind)
-			oldInfos = append(oldInfos, s)
-			delete(storageMap2, uid)
+	storageMap2 := make(crdStorageMap)
+	for _, crd := range allCustomResourceDefinitions {
+		if _, ok := storageMap[crd.UID]; ok {
+			storageMap2[crd.UID] = storageMap[crd.UID]
 		}
 	}
 	r.customStorage.Store(storageMap2)
 
-	for _, s := range oldInfos {
-		go r.tearDown(s)
+	for uid, crdInfo := range storageMap {
+		if _, ok := storageMap2[uid]; !ok {
+			klog.V(4).Infof("Removing dead CRD storage for %s/%s", crdInfo.spec.Group, crdInfo.spec.Names.Kind)
+			go r.tearDown(crdInfo)
+		}
 	}
 }
 
