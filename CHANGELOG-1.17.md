@@ -142,7 +142,7 @@ The Kubernetes in-tree storage plugin to Container Storage Interface (CSI) migra
 Prior to 1.17 and for existing nodes created by `kubeadm init` where kubelet client certificate rotation is desired, you must modify `/etc/kubernetes/kubelet.conf` to point to the PEM symlink for rotation:
 `client-certificate: /var/lib/kubelet/pki/kubelet-client-current.pem` and `client-key: /var/lib/kubelet/pki/kubelet-client-current.pem`, replacing the embedded client certificate and key. ([#84118](https://github.com/kubernetes/kubernetes/pull/84118), [@neolit123](https://github.com/neolit123))
 #### Network
-- EndpointSlices: If upgrading a cluster with EndpointSlices already enabled, any EndpointSlices that should be managed by the EndpointSlice controller should have a `http://endpointslice.kubernetes.io/managed-by` label set to `endpointslice-controller.k8s.io`.
+- EndpointSlices: If upgrading a cluster with EndpointSlices already enabled, any EndpointSlices that should be managed by the EndpointSlice controller should have a `endpointslice.kubernetes.io/managed-by` label set to `endpointslice-controller.k8s.io`.
 
 #### Scheduling
 
