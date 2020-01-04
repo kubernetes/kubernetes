@@ -58,8 +58,6 @@ import (
 
 var (
 	errPrioritize = fmt.Errorf("priority map encounters an error")
-	// TODO(Huang-Wei): remove 'order' and 'defer SetPredicatesOrderingDuringTest(order)()'.
-	order = []string{"FakeFilter", "FalseFilter", "TrueFilter", "MatchFilter", "NoPodsFilter", interpodaffinity.Name}
 )
 
 type trueFilterPlugin struct{}
@@ -367,8 +365,6 @@ func TestSelectHost(t *testing.T) {
 }
 
 func TestGenericScheduler(t *testing.T) {
-	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
-
 	tests := []struct {
 		name            string
 		registerPlugins []st.RegisterPluginFunc
@@ -837,7 +833,6 @@ func makeScheduler(nodes []*v1.Node, fns ...st.RegisterPluginFunc) *genericSched
 }
 
 func TestFindFitAllError(t *testing.T) {
-	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
 	nodes := makeNodeList([]string{"3", "2", "1"})
 	scheduler := makeScheduler(
 		nodes,
@@ -870,7 +865,6 @@ func TestFindFitAllError(t *testing.T) {
 }
 
 func TestFindFitSomeError(t *testing.T) {
-	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
 	nodes := makeNodeList([]string{"3", "2", "1"})
 	scheduler := makeScheduler(
 		nodes,
@@ -907,8 +901,6 @@ func TestFindFitSomeError(t *testing.T) {
 }
 
 func TestFindFitPredicateCallCounts(t *testing.T) {
-	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
-
 	tests := []struct {
 		name          string
 		pod           *v1.Pod
@@ -1280,8 +1272,6 @@ var startTime20190107 = metav1.Date(2019, 1, 7, 1, 1, 1, 0, time.UTC)
 // TestSelectNodesForPreemption tests selectNodesForPreemption. This test assumes
 // that podsFitsOnNode works correctly and is tested separately.
 func TestSelectNodesForPreemption(t *testing.T) {
-	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
-
 	tests := []struct {
 		name                    string
 		registerPlugins         []st.RegisterPluginFunc
@@ -1291,7 +1281,6 @@ func TestSelectNodesForPreemption(t *testing.T) {
 		filterReturnCode        framework.Code
 		expected                map[string]map[string]bool // Map from node name to a list of pods names which should be preempted.
 		expectedNumFilterCalled int32
-		addAffinityPredicate    bool
 	}{
 		{
 			name: "a pod that does not fit on any machine",
@@ -1437,7 +1426,6 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "e", UID: types.UID("e")}, Spec: v1.PodSpec{Containers: largeContainers, Priority: &highPriority, NodeName: "machine2"}}},
 			expected:                map[string]map[string]bool{"machine1": {"a": true}, "machine2": {}},
 			expectedNumFilterCalled: 4,
-			addAffinityPredicate:    true,
 		},
 		{
 			name: "preemption to resolve even pods spread FitError",
@@ -1635,7 +1623,6 @@ func TestSelectNodesForPreemption(t *testing.T) {
 
 // TestPickOneNodeForPreemption tests pickOneNodeForPreemption.
 func TestPickOneNodeForPreemption(t *testing.T) {
-	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
 	tests := []struct {
 		name                 string
 		registerFilterPlugin st.RegisterPluginFunc
@@ -1986,7 +1973,6 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 }
 
 func TestPreempt(t *testing.T) {
-	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
 	defaultFailedNodeToStatusMap := framework.NodeToStatusMap{
 		"machine1": framework.NewStatus(framework.Unschedulable, algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300).GetReason()),
 		"machine2": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrDiskConflict.GetReason()),
@@ -2445,7 +2431,6 @@ func assignDefaultStartTime(pods []*v1.Pod) {
 }
 
 func TestFairEvaluationForNodes(t *testing.T) {
-	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
 	numAllNodes := 500
 	nodeNames := make([]string, 0, numAllNodes)
 	for i := 0; i < numAllNodes; i++ {
