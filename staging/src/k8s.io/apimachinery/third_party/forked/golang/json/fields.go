@@ -295,10 +295,10 @@ func dominantField(fields []field) (field, bool) {
 	return fields[0], true
 }
 
-var fieldCache struct {
+var fieldCache = &struct {
 	sync.RWMutex
 	m map[reflect.Type][]field
-}
+}{m: make(map[reflect.Type][]field)}
 
 // cachedTypeFields is like typeFields but uses a cache to avoid repeated work.
 func cachedTypeFields(t reflect.Type) []field {
@@ -317,9 +317,6 @@ func cachedTypeFields(t reflect.Type) []field {
 	}
 
 	fieldCache.Lock()
-	if fieldCache.m == nil {
-		fieldCache.m = map[reflect.Type][]field{}
-	}
 	fieldCache.m[t] = f
 	fieldCache.Unlock()
 	return f
