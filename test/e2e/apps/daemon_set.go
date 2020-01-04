@@ -693,7 +693,7 @@ func canScheduleOnNode(node v1.Node, ds *appsv1.DaemonSet) bool {
 		framework.Failf("Can't test DaemonSet predicates for node %s: %v", node.Name, err)
 		return false
 	}
-	fitsNodeName, fitsNodeAffinity, fitsTaints := daemon.PodFitsNode(newPod, &node, taints)
+	fitsNodeName, fitsNodeAffinity, fitsTaints := daemon.Predicates(newPod, &node, taints)
 	return fitsNodeName && fitsNodeAffinity && fitsTaints
 }
 

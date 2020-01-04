@@ -623,11 +623,11 @@ func (dsc *DaemonSetsController) addNode(obj interface{}) {
 	}
 	node := obj.(*v1.Node)
 	for _, ds := range dsList {
-		shouldSchedule, _, err := dsc.nodeShouldRunDaemonPod(node, ds)
+		shouldRun, _, err := dsc.nodeShouldRunDaemonPod(node, ds)
 		if err != nil {
 			continue
 		}
-		if shouldSchedule {
+		if shouldRun {
 			dsc.enqueueDaemonSet(ds)
 		}
 	}
@@ -685,15 +685,15 @@ func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 	}
 	// TODO: it'd be nice to pass a hint with these enqueues, so that each ds would only examine the added node (unless it has other work to do, too).
 	for _, ds := range dsList {
-		oldShouldSchedule, oldShouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(oldNode, ds)
+		oldShouldRun, oldShouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(oldNode, ds)
 		if err != nil {
 			continue
 		}
-		currentShouldSchedule, currentShouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(curNode, ds)
+		currentShouldRun, currentShouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(curNode, ds)
 		if err != nil {
 			continue
 		}
-		if (oldShouldSchedule != currentShouldSchedule) || (oldShouldContinueRunning != currentShouldContinueRunning) {
+		if (oldShouldRun != currentShouldRun) || (oldShouldContinueRunning != currentShouldContinueRunning) {
 			dsc.enqueueDaemonSet(ds)
 		}
 	}
@@ -789,7 +789,7 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 	ds *apps.DaemonSet,
 ) (nodesNeedingDaemonPods, podsToDelete []string, err error) {
 
-	shouldSchedule, shouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(node, ds)
+	shouldRun, shouldContinueRunning, err := dsc.nodeShouldRunDaemonPod(node, ds)
 	if err != nil {
 		return
 	}
@@ -797,7 +797,7 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 	daemonPods, exists := nodeToDaemonPods[node.Name]
 
 	switch {
-	case shouldSchedule && !exists:
+	case shouldRun && !exists:
 		// If daemon pod is supposed to be running on node, but isn't, create daemon pod.
 		nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
 	case shouldContinueRunning:
@@ -1054,14 +1054,14 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *apps.DaemonSet, nodeL
 
 	var desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable int
 	for _, node := range nodeList {
-		wantToRun, _, err := dsc.nodeShouldRunDaemonPod(node, ds)
+		shouldRun, _, err := dsc.nodeShouldRunDaemonPod(node, ds)
 		if err != nil {
 			return err
 		}
 
 		scheduled := len(nodeToDaemonPods[node.Name]) > 0
 
-		if wantToRun {
+		if shouldRun {
 			desiredNumberScheduled++
 			if scheduled {
 				currentNumberScheduled++
@@ -1195,8 +1195,8 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 
 // nodeShouldRunDaemonPod checks a set of preconditions against a (node,daemonset) and returns a
 // summary. Returned booleans are:
-// * shouldSchedule:
-//     Returns true when a daemonset should be scheduled to a node if a daemonset pod is not already
+// * shouldRun:
+//     Returns true when a daemonset should run on the node if a daemonset pod is not already
 //     running on that node.
 // * shouldContinueRunning:
 //     Returns true when a daemonset should continue running on a node if a daemonset pod is already
@@ -1217,24 +1217,24 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *apps.
 		return false, false, err
 	}
 
-	fitsNodeName, fitsNodeAffinity, fitsTaints := PodFitsNode(pod, node, taints)
+	fitsNodeName, fitsNodeAffinity, fitsTaints := Predicates(pod, node, taints)
 	if !fitsNodeName || !fitsNodeAffinity {
 		return false, false, nil
 	}
 
 	if !fitsTaints {
-		fitsNoExecuteTaint := v1helper.TolerationsTolerateTaintsWithFilter(pod.Spec.Tolerations, taints, func(t *v1.Taint) bool {
+		// Scheduled daemon pods should continue running if they tolerate NoExecute taint.
+		shouldContinueRunning := v1helper.TolerationsTolerateTaintsWithFilter(pod.Spec.Tolerations, taints, func(t *v1.Taint) bool {
 			return t.Effect == v1.TaintEffectNoExecute
 		})
-
-		return false, fitsNoExecuteTaint, nil
+		return false, shouldContinueRunning, nil
 	}
 
 	return true, true, nil
 }
 
-// PodFitsNode Checks if a DaemonSet's pod can be scheduled on a node.
-func PodFitsNode(pod *v1.Pod, node *v1.Node, taints []v1.Taint) (fitsNodeName, fitsNodeAffinity, fitsTaints bool) {
+// Predicates checks if a DaemonSet's pod can run on a node.
+func Predicates(pod *v1.Pod, node *v1.Node, taints []v1.Taint) (fitsNodeName, fitsNodeAffinity, fitsTaints bool) {
 	fitsNodeName = len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName == node.Name
 	fitsNodeAffinity = pluginhelper.PodMatchesNodeSelectorAndAffinityTerms(pod, node)
 	fitsTaints = v1helper.TolerationsTolerateTaintsWithFilter(pod.Spec.Tolerations, taints, func(t *v1.Taint) bool {
