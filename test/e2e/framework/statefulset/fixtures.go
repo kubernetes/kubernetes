@@ -29,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	e2efwk "k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -157,17 +157,17 @@ func ResumeNextPod(c clientset.Interface, ss *appsv1.StatefulSet) {
 	resumedPod := ""
 	for _, pod := range podList.Items {
 		if pod.Status.Phase != v1.PodRunning {
-			e2efwk.Failf("Found pod in phase %q, cannot resume", pod.Status.Phase)
+			framework.Failf("Found pod in phase %q, cannot resume", pod.Status.Phase)
 		}
 		if podutil.IsPodReady(&pod) || !hasPauseProbe(&pod) {
 			continue
 		}
 		if resumedPod != "" {
-			e2efwk.Failf("Found multiple paused stateful pods: %v and %v", pod.Name, resumedPod)
+			framework.Failf("Found multiple paused stateful pods: %v and %v", pod.Name, resumedPod)
 		}
-		_, err := e2efwk.RunHostCmdWithRetries(pod.Namespace, pod.Name, "dd if=/dev/zero of=/data/statefulset-continue bs=1 count=1 conv=fsync", StatefulSetPoll, StatefulPodTimeout)
-		e2efwk.ExpectNoError(err)
-		e2efwk.Logf("Resumed pod %v", pod.Name)
+		_, err := framework.RunHostCmdWithRetries(pod.Namespace, pod.Name, "dd if=/dev/zero of=/data/statefulset-continue bs=1 count=1 conv=fsync", StatefulSetPoll, StatefulPodTimeout)
+		framework.ExpectNoError(err)
+		framework.Logf("Resumed pod %v", pod.Name)
 		resumedPod = pod.Name
 	}
 }
