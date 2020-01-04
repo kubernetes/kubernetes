@@ -1539,18 +1539,16 @@ func setDaemonSetCritical(ds *apps.DaemonSet) {
 }
 
 func TestNodeShouldRunDaemonPod(t *testing.T) {
-	var shouldCreate, wantToRun, shouldContinueRunning bool
-	shouldCreate = true
-	wantToRun = true
-	shouldContinueRunning = true
+	shouldRun := true
+	shouldContinueRunning := true
 	cases := []struct {
-		predicateName                                  string
-		podsOnNode                                     []*v1.Pod
-		nodeCondition                                  []v1.NodeCondition
-		nodeUnschedulable                              bool
-		ds                                             *apps.DaemonSet
-		wantToRun, shouldCreate, shouldContinueRunning bool
-		err                                            error
+		predicateName                    string
+		podsOnNode                       []*v1.Pod
+		nodeCondition                    []v1.NodeCondition
+		nodeUnschedulable                bool
+		ds                               *apps.DaemonSet
+		shouldRun, shouldContinueRunning bool
+		err                              error
 	}{
 		{
 			predicateName: "ShouldRunDaemonPod",
@@ -1565,8 +1563,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			wantToRun:             true,
-			shouldCreate:          true,
+			shouldRun:             true,
 			shouldContinueRunning: true,
 		},
 		{
@@ -1582,8 +1579,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			wantToRun:             true,
-			shouldCreate:          shouldCreate,
+			shouldRun:             shouldRun,
 			shouldContinueRunning: true,
 		},
 		{
@@ -1599,8 +1595,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			wantToRun:             false,
-			shouldCreate:          false,
+			shouldRun:             false,
 			shouldContinueRunning: false,
 		},
 		{
@@ -1633,8 +1628,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			wantToRun:             wantToRun,
-			shouldCreate:          shouldCreate,
+			shouldRun:             shouldRun,
 			shouldContinueRunning: shouldContinueRunning,
 		},
 		{
@@ -1662,8 +1656,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			wantToRun:             true,
-			shouldCreate:          shouldCreate, // This is because we don't care about the resource constraints any more and let default scheduler handle it.
+			shouldRun:             shouldRun, // This is because we don't care about the resource constraints any more and let default scheduler handle it.
 			shouldContinueRunning: true,
 		},
 		{
@@ -1691,8 +1684,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			wantToRun:             true,
-			shouldCreate:          true,
+			shouldRun:             true,
 			shouldContinueRunning: true,
 		},
 		{
@@ -1710,8 +1702,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			wantToRun:             false,
-			shouldCreate:          false,
+			shouldRun:             false,
 			shouldContinueRunning: false,
 		},
 		{
@@ -1729,8 +1720,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			wantToRun:             true,
-			shouldCreate:          true,
+			shouldRun:             true,
 			shouldContinueRunning: true,
 		},
 		{
@@ -1764,8 +1754,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			wantToRun:             false,
-			shouldCreate:          false,
+			shouldRun:             false,
 			shouldContinueRunning: false,
 		},
 		{
@@ -1799,8 +1788,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 					},
 				},
 			},
-			wantToRun:             true,
-			shouldCreate:          true,
+			shouldRun:             true,
 			shouldContinueRunning: true,
 		},
 		{
@@ -1817,8 +1805,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 				},
 			},
 			nodeUnschedulable:     true,
-			wantToRun:             true,
-			shouldCreate:          true,
+			shouldRun:             true,
 			shouldContinueRunning: true,
 		},
 	}
@@ -1840,13 +1827,10 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 				manager.podNodeIndex.Add(p)
 			}
 			c.ds.Spec.UpdateStrategy = *strategy
-			wantToRun, shouldRun, shouldContinueRunning, err := manager.nodeShouldRunDaemonPod(node, c.ds)
+			shouldRun, shouldContinueRunning, err := manager.nodeShouldRunDaemonPod(node, c.ds)
 
-			if wantToRun != c.wantToRun {
-				t.Errorf("[%v] strategy: %v, predicateName: %v expected wantToRun: %v, got: %v", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.wantToRun, wantToRun)
-			}
-			if shouldRun != c.shouldCreate {
-				t.Errorf("[%v] strategy: %v, predicateName: %v expected shouldRun: %v, got: %v", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.shouldCreate, shouldRun)
+			if shouldRun != c.shouldRun {
+				t.Errorf("[%v] strategy: %v, predicateName: %v expected shouldRun: %v, got: %v", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.shouldRun, shouldRun)
 			}
 			if shouldContinueRunning != c.shouldContinueRunning {
 				t.Errorf("[%v] strategy: %v, predicateName: %v expected shouldContinueRunning: %v, got: %v", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.shouldContinueRunning, shouldContinueRunning)
