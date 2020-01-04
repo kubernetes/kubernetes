@@ -804,10 +804,11 @@ func TestRenewCertsByComponent(t *testing.T) {
 					t.Fatalf("couldn't create certificate %q: %v", kubeCert.Name, err)
 				}
 
-				cert, err := pkiutil.TryLoadCertFromDisk(tmpDir, kubeCert.BaseName)
+				certs, err := pkiutil.TryLoadCertFromDisk(tmpDir, kubeCert.BaseName)
 				if err != nil {
 					t.Fatalf("couldn't load certificate %q: %v", kubeCert.Name, err)
 				}
+				cert := certs[0]
 				certMaps[kubeCert.Name] = *cert.SerialNumber
 			}
 
@@ -844,11 +845,12 @@ func TestRenewCertsByComponent(t *testing.T) {
 
 			// See if the certificate serial numbers change
 			for _, kubeCert := range test.certsShouldExist {
-				newCert, err := pkiutil.TryLoadCertFromDisk(tmpDir, kubeCert.BaseName)
+				newCerts, err := pkiutil.TryLoadCertFromDisk(tmpDir, kubeCert.BaseName)
 				if err != nil {
 					t.Errorf("couldn't load new certificate %q: %v", kubeCert.Name, err)
 					continue
 				}
+				newCert := newCerts[0]
 				oldSerial := certMaps[kubeCert.Name]
 
 				shouldBeRenewed := true

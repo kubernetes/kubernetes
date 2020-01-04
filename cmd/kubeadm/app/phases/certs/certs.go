@@ -361,14 +361,16 @@ func UsingExternalFrontProxyCA(cfg *kubeadmapi.ClusterConfiguration) (bool, erro
 // validateCACert tries to load a x509 certificate from pkiDir and validates that it is a CA
 func validateCACert(l certKeyLocation) error {
 	// Check CA Cert
-	caCert, err := pkiutil.TryLoadCertFromDisk(l.pkiDir, l.caBaseName)
+	caCerts, err := pkiutil.TryLoadCertFromDisk(l.pkiDir, l.caBaseName)
 	if err != nil {
 		return errors.Wrapf(err, "failure loading certificate for %s", l.uxName)
 	}
 
 	// Check if cert is a CA
-	if !caCert.IsCA {
-		return errors.Errorf("certificate %s is not a CA", l.uxName)
+	for _, caCert := range caCerts {
+		if !caCert.IsCA {
+			return errors.Errorf("certificate %s is not a CA", l.uxName)
+		}
 	}
 	return nil
 }
@@ -391,16 +393,16 @@ func validateCACertAndKey(l certKeyLocation) error {
 // that the cert is signed by a given CA
 func validateSignedCert(l certKeyLocation) error {
 	// Try to load CA
-	caCert, err := pkiutil.TryLoadCertFromDisk(l.pkiDir, l.caBaseName)
+	caCerts, err := pkiutil.TryLoadCertFromDisk(l.pkiDir, l.caBaseName)
 	if err != nil {
 		return errors.Wrapf(err, "failure loading certificate authority for %s", l.uxName)
 	}
 
-	return validateSignedCertWithCA(l, caCert)
+	return validateSignedCertWithCA(l, caCerts)
 }
 
 // validateSignedCertWithCA tries to load a certificate and validate it with the given caCert
-func validateSignedCertWithCA(l certKeyLocation, caCert *x509.Certificate) error {
+func validateSignedCertWithCA(l certKeyLocation, caCerts []*x509.Certificate) error {
 	// Try to load key and signed certificate
 	signedCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(l.pkiDir, l.baseName)
 	if err != nil {
@@ -408,7 +410,7 @@ func validateSignedCertWithCA(l certKeyLocation, caCert *x509.Certificate) error
 	}
 
 	// Check if the cert is signed by the CA
-	if err := signedCert.CheckSignatureFrom(caCert); err != nil {
+	if _, err := pkiutil.CheckSignatureFromCAs(signedCert, caCerts); err != nil {
 		return errors.Wrapf(err, "certificate %s is not signed by corresponding CA", l.uxName)
 	}
 	return nil

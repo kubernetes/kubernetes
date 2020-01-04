@@ -278,6 +278,9 @@ func TestCertOrKeyExist(t *testing.T) {
 	}
 }
 
+// TestTryLoadCertAndKeyFromDisk tests that a corresponding certificate is loaded for a given key.
+// First, it creates two key pairs. Then, it replaces certificate files of both keyparis with a file
+// containing both PEM-encoded certificates. Finally, TryLoadCertAndKeyFromDisk() chooses the correct cert.
 func TestTryLoadCertAndKeyFromDisk(t *testing.T) {
 	tmpdir, err := ioutil.TempDir("", "")
 	if err != nil {
@@ -300,32 +303,83 @@ func TestTryLoadCertAndKeyFromDisk(t *testing.T) {
 		)
 	}
 
+	caCert2, caKey2, err := NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes2"})
+	if err != nil {
+		t.Errorf(
+			"failed to create cert and key with an error: %v",
+			err,
+		)
+	}
+	err = WriteCertAndKey(tmpdir, "bar", caCert2, caKey2)
+	if err != nil {
+		t.Errorf(
+			"failed to write cert and key with an error: %v",
+			err,
+		)
+	}
+
+	// overwrite certificate files with a PEM bundle containing both certs
+	caCerts := []*x509.Certificate{caCert, caCert2}
+	err = certutil.WriteCert(pathForCert(tmpdir, "foo"), EncodeCertsPEM(caCerts))
+	if err != nil {
+		t.Errorf(
+			"failed to write two certs with an error: %v",
+			err,
+		)
+	}
+	err = certutil.WriteCert(pathForCert(tmpdir, "bar"), EncodeCertsPEM(caCerts))
+	if err != nil {
+		t.Errorf(
+			"failed to write two certs with an error: %v",
+			err,
+		)
+	}
+
 	var tests = []struct {
 		desc     string
 		path     string
 		name     string
+		cn       string
 		expected bool
 	}{
 		{
 			desc:     "empty path and name",
 			path:     "",
 			name:     "",
+			cn:       "",
 			expected: false,
 		},
 		{
 			desc:     "valid path and name",
 			path:     tmpdir,
 			name:     "foo",
+			cn:       "kubernetes",
+			expected: true,
+		},
+		{
+			desc:     "valid path and name",
+			path:     tmpdir,
+			name:     "bar",
+			cn:       "kubernetes2",
 			expected: true,
 		},
 	}
 	for _, rt := range tests {
 		t.Run(rt.desc, func(t *testing.T) {
-			_, _, actual := TryLoadCertAndKeyFromDisk(rt.path, rt.name)
+			cert, _, actual := TryLoadCertAndKeyFromDisk(rt.path, rt.name)
 			if (actual == nil) != rt.expected {
 				t.Errorf(
 					"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",
 					rt.expected,
+					(actual == nil),
+				)
+			}
+			if actual == nil && cert.Subject.CommonName != rt.cn {
+				t.Errorf(
+					"failed TryLoadCertAndKeyFromDisk:\n\texpected: %s and %t\n\t  actual: %s and %t",
+					rt.cn,
+					rt.expected,
+					cert.Subject.CommonName,
 					(actual == nil),
 				)
 			}

@@ -17,10 +17,12 @@ limitations under the License.
 package pkiutil
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -217,9 +219,9 @@ func CSROrKeyExist(csrDir, name string) bool {
 	return !(os.IsNotExist(csrErr) && os.IsNotExist(keyErr))
 }
 
-// TryLoadCertAndKeyFromDisk tries to load a cert and a key from the disk and validates that they are valid
+// TryLoadCertAndKeyFromDisk loads a key with the corresponding certificate from disk
 func TryLoadCertAndKeyFromDisk(pkiPath, name string) (*x509.Certificate, crypto.Signer, error) {
-	cert, err := TryLoadCertFromDisk(pkiPath, name)
+	certs, err := TryLoadCertFromDisk(pkiPath, name)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to load certificate")
 	}
@@ -229,11 +231,18 @@ func TryLoadCertAndKeyFromDisk(pkiPath, name string) (*x509.Certificate, crypto.
 		return nil, nil, errors.Wrap(err, "failed to load key")
 	}
 
+	// there could be multiple certificates in one file
+	keyFile := pathForKey(pkiPath, name)
+	cert, err := FindCertForKey(certs, keyFile)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "key file %s has no corresponding public key", keyFile)
+	}
+
 	return cert, key, nil
 }
 
-// TryLoadCertFromDisk tries to load the cert from the disk and validates that it is valid
-func TryLoadCertFromDisk(pkiPath, name string) (*x509.Certificate, error) {
+// TryLoadCertFromDisk tries to load the certs from file and checks validity timeframe
+func TryLoadCertFromDisk(pkiPath, name string) ([]*x509.Certificate, error) {
 	certificatePath := pathForCert(pkiPath, name)
 
 	certs, err := certutil.CertsFromFile(certificatePath)
@@ -241,20 +250,17 @@ func TryLoadCertFromDisk(pkiPath, name string) (*x509.Certificate, error) {
 		return nil, errors.Wrapf(err, "couldn't load the certificate file %s", certificatePath)
 	}
 
-	// We are only putting one certificate in the certificate pem file, so it's safe to just pick the first one
-	// TODO: Support multiple certs here in order to be able to rotate certs
-	cert := certs[0]
-
-	// Check so that the certificate is valid now
 	now := time.Now()
-	if now.Before(cert.NotBefore) {
-		return nil, errors.New("the certificate is not valid yet")
+	for _, cert := range certs {
+		// Check so that the certificate is valid now
+		if now.Before(cert.NotBefore) {
+			return nil, errors.New("the certificate is not valid yet")
+		}
+		if now.After(cert.NotAfter) {
+			return nil, errors.New("the certificate has expired")
+		}
 	}
-	if now.After(cert.NotAfter) {
-		return nil, errors.New("the certificate has expired")
-	}
-
-	return cert, nil
+	return certs, nil
 }
 
 // TryLoadKeyFromDisk tries to load the key from the disk and validates that it is valid
@@ -495,6 +501,32 @@ func CertificateRequestFromFile(file string) (*x509.CertificateRequest, error) {
 	return csr, nil
 }
 
+// CheckSignatureFromCAs finds which CA issued a certificate
+func CheckSignatureFromCAs(cert *x509.Certificate, ca []*x509.Certificate) (*x509.Certificate, error) {
+	for _, caCert := range ca {
+		err := cert.CheckSignatureFrom(caCert)
+		if err == nil {
+			return caCert, nil
+		}
+	}
+	return nil, errors.New("the certificate is not signed by any of the CA certs provided")
+}
+
+// FindCertForKey finds an X.509 certificate matching the provided rsa, ecdsa or ed25519 key
+func FindCertForKey(certs []*x509.Certificate, keyFile string) (*x509.Certificate, error) {
+	keyPEMBlock, err := ioutil.ReadFile(keyFile)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read key file %s", keyFile)
+	}
+	for _, cert := range certs {
+		_, err = tls.X509KeyPair(EncodeCertPEM(cert), keyPEMBlock)
+		if err == nil {
+			return cert, nil
+		}
+	}
+	return nil, errors.New("no matching certificate for the key")
+}
+
 // NewCSR creates a new CSR
 func NewCSR(cfg certutil.Config, key crypto.Signer) (*x509.CertificateRequest, error) {
 	template := &x509.CertificateRequest{
@@ -513,6 +545,19 @@ func NewCSR(cfg certutil.Config, key crypto.Signer) (*x509.CertificateRequest, e
 	}
 
 	return x509.ParseCertificateRequest(csrBytes)
+}
+
+// EncodeCertsPEM returns PEM-endcoded data of certificates slice
+func EncodeCertsPEM(certs []*x509.Certificate) []byte {
+	var pemCerts bytes.Buffer
+	for _, cert := range certs {
+		block := pem.Block{
+			Type:  CertificateBlockType,
+			Bytes: cert.Raw,
+		}
+		pemCerts.Write(pem.EncodeToMemory(&block))
+	}
+	return pemCerts.Bytes()
 }
 
 // EncodeCertPEM returns PEM-endcoded certificate data

@@ -374,7 +374,7 @@ func ValidateKubeconfigsForExternalCA(outDir string, cfg *kubeadmapi.InitConfigu
 		return err
 	}
 
-	validationConfig := kubeconfigutil.CreateBasic(controlPlaneEndpoint, "dummy", "dummy", pkiutil.EncodeCertPEM(caCert))
+	validationConfig := kubeconfigutil.CreateBasic(controlPlaneEndpoint, "dummy", "dummy", pkiutil.EncodeCertsPEM(caCert))
 
 	// validate user provided kubeconfig files
 	for _, kubeConfigFileName := range kubeConfigFileNames {

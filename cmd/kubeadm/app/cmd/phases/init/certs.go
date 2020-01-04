@@ -263,9 +263,9 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 			if err != nil {
 				return errors.Wrapf(err, "couldn't load CA certificate %s", caCert.Name)
 			}
-
-			if err := certData.CheckSignatureFrom(caCertData); err != nil {
-				return errors.Wrapf(err, "[certs] certificate %s not signed by CA certificate %s", cert.BaseName, caCert.BaseName)
+			_, err = pkiutil.CheckSignatureFromCAs(certData, caCertData)
+			if err != nil {
+				return errors.Wrapf(err, "[certs] certificate %s not signed by any CA certificate from %s file", cert.BaseName, caCert.BaseName)
 			}
 
 			fmt.Printf("[certs] Using existing %s certificate and key on disk\n", cert.BaseName)

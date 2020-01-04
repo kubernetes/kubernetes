@@ -116,14 +116,18 @@ func (t CertificateTree) CreateTree(ic *kubeadmapi.InitConfiguration) error {
 
 		var caKey crypto.Signer
 
-		caCert, err := pkiutil.TryLoadCertFromDisk(ic.CertificatesDir, ca.BaseName)
+		var caCert *x509.Certificate
+
+		caCerts, err := pkiutil.TryLoadCertFromDisk(ic.CertificatesDir, ca.BaseName)
 		if err == nil {
-			// Cert exists already, make sure it's valid
-			if !caCert.IsCA {
-				return errors.Errorf("certificate %q is not a CA", ca.Name)
+			// caCert file exists already, make sure it's valid
+			for _, caCert := range caCerts {
+				if !caCert.IsCA {
+					return errors.Errorf("certificate %q is not a CA", ca.Name)
+				}
 			}
 			// Try and load a CA Key
-			caKey, err = pkiutil.TryLoadKeyFromDisk(ic.CertificatesDir, ca.BaseName)
+			caCert, caKey, err = pkiutil.TryLoadCertAndKeyFromDisk(ic.CertificatesDir, ca.BaseName)
 			if err != nil {
 				// If there's no CA key, make sure every certificate exists.
 				for _, leaf := range leaves {
@@ -132,7 +136,8 @@ func (t CertificateTree) CreateTree(ic *kubeadmapi.InitConfiguration) error {
 						baseName: leaf.BaseName,
 						uxName:   leaf.Name,
 					}
-					if err := validateSignedCertWithCA(cl, caCert); err != nil {
+					err := validateSignedCertWithCA(cl, caCerts)
+					if err != nil {
 						return errors.Wrapf(err, "could not load expected certificate %q or validate the existence of key %q for it", leaf.Name, ca.Name)
 					}
 				}
