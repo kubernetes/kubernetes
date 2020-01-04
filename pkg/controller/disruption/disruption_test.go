@@ -87,6 +87,29 @@ func (ps *pdbStates) VerifyPdbStatus(t *testing.T, key string, disruptionsAllowe
 	}
 }
 
+func (ps *pdbStates) VerifyPdbCondition(t *testing.T, key string, conditionType policy.PodDisruptionBudgetConditionType, status v1.ConditionStatus) {
+	pdb := ps.Get(key)
+	for _, c := range pdb.Status.Conditions {
+		if c.Type != conditionType {
+			continue
+		}
+		if got, want := c.Status, status; got != want {
+			t.Errorf("expected condition to have status %s, but got %s", want, got)
+		}
+		return
+	}
+	t.Errorf("expected to find condition %s, but didn't", conditionType)
+}
+
+func (ps *pdbStates) VerifyPdbConditionNotPresent(t *testing.T, key string, conditionType policy.PodDisruptionBudgetConditionType) {
+	pdb := ps.Get(key)
+	for _, c := range pdb.Status.Conditions {
+		if c.Type == conditionType {
+			t.Errorf("didn't expect condition %s to be present, but it was", conditionType)
+		}
+	}
+}
+
 func (ps *pdbStates) VerifyDisruptionAllowed(t *testing.T, key string, disruptionsAllowed int32) {
 	pdb := ps.Get(key)
 	if pdb.Status.DisruptionsAllowed != disruptionsAllowed {
@@ -1164,6 +1187,77 @@ func TestUpdatePDBStatusRetries(t *testing.T) {
 	if expected, actual := int32(0), finalPDB.Status.DisruptionsAllowed; expected != actual {
 		t.Errorf("DisruptionsAllowed should be %d, got %d", expected, actual)
 	}
+}
+
+// Verifies that DisruptionsAllowed is set to 0 and the Failure condition added
+// whenever the reconcile loop fails. Also makes sure that both are cleaned up
+// when a later reconcile loop succeeds.
+func TestFailSafeConditions(t *testing.T) {
+	customResourceUID := uuid.NewUUID()
+	replicas := int32(10)
+	pods := int32(4)
+	maxUnavailable := int32(5)
+
+	dc, ps := newFakeDisruptionController()
+
+	counter := 0
+	dc.scaleClient.AddReactor("get", "customresources", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		defer func() {
+			counter++
+		}()
+
+		if counter == 0 {
+			return true, nil, errors.NewInternalError(fmt.Errorf("testerror"))
+		}
+
+		obj := &autoscalingapi.Scale{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: metav1.NamespaceDefault,
+				UID:       customResourceUID,
+			},
+			Spec: autoscalingapi.ScaleSpec{
+				Replicas: replicas,
+			},
+		}
+		return true, obj, nil
+	})
+
+	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromInt(int(maxUnavailable)))
+	pdb.Status.DisruptionsAllowed = 42
+	add(t, dc.pdbStore, pdb)
+
+	trueVal := true
+	for i := 0; i < int(pods); i++ {
+		pod, _ := newPod(t, fmt.Sprintf("pod-%d", i))
+		pod.SetOwnerReferences([]metav1.OwnerReference{
+			{
+				Kind:       customGVK.Kind,
+				APIVersion: customGVK.GroupVersion().String(),
+				Controller: &trueVal,
+				UID:        customResourceUID,
+			},
+		})
+		add(t, dc.podStore, pod)
+	}
+
+	// Looking up scale will fail on this call, so failsafe should kick in.
+	dc.sync(pdbName)
+	updatedPdb := ps.Get(pdbName)
+	if got, want := updatedPdb.Status.DisruptionsAllowed, int32(0); got != want {
+		t.Errorf("expected DisruptionsAllowed to be %d, but got %d", want, got)
+	}
+	ps.VerifyPdbCondition(t, pdbName, policy.PodDisruptionBudgetFailure, v1.ConditionTrue)
+
+	// Reconcile will succeed on this call, so DisruptionsAllowed should be set to
+	// a non-zero number and the Failure condition should be removed.
+	dc.sync(pdbName)
+	disruptionsAllowed := int32(0)
+	if replicas-pods < maxUnavailable {
+		disruptionsAllowed = maxUnavailable - (replicas - pods)
+	}
+	ps.VerifyPdbStatus(t, pdbName, disruptionsAllowed, pods, replicas-maxUnavailable, replicas, map[string]metav1.Time{})
+
+	ps.VerifyPdbConditionNotPresent(t, pdbName, policy.PodDisruptionBudgetFailure)
 }
 
 // waitForCacheCount blocks until the given cache store has the desired number

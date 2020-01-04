@@ -549,7 +549,7 @@ func (dc *DisruptionController) sync(key string) error {
 	}
 	if err != nil {
 		klog.Errorf("Failed to sync pdb %s/%s: %v", pdb.Namespace, pdb.Name, err)
-		return dc.failSafe(pdb)
+		return dc.failSafe(pdb, err.Error())
 	}
 
 	return nil
@@ -748,9 +748,10 @@ func (dc *DisruptionController) buildDisruptedPodMap(pods []*v1.Pod, pdb *policy
 // implement the  "fail open" part of the design since if we manage to update
 // this field correctly, we will prevent the /evict handler from approving an
 // eviction when it may be unsafe to do so.
-func (dc *DisruptionController) failSafe(pdb *policy.PodDisruptionBudget) error {
+func (dc *DisruptionController) failSafe(pdb *policy.PodDisruptionBudget, message string) error {
 	newPdb := pdb.DeepCopy()
 	newPdb.Status.DisruptionsAllowed = 0
+	setFailureCondition(newPdb, policy.PodDisruptionBudgetFailure, "syncFailed", message)
 	return dc.getUpdater()(newPdb)
 }
 
@@ -771,7 +772,8 @@ func (dc *DisruptionController) updatePdbStatus(pdb *policy.PodDisruptionBudget,
 		pdb.Status.ExpectedPods == expectedCount &&
 		pdb.Status.DisruptionsAllowed == disruptionsAllowed &&
 		apiequality.Semantic.DeepEqual(pdb.Status.DisruptedPods, disruptedPods) &&
-		pdb.Status.ObservedGeneration == pdb.Generation {
+		pdb.Status.ObservedGeneration == pdb.Generation &&
+		!hasCondition(policy.PodDisruptionBudgetFailure, pdb) {
 		return nil
 	}
 
@@ -783,8 +785,9 @@ func (dc *DisruptionController) updatePdbStatus(pdb *policy.PodDisruptionBudget,
 		DisruptionsAllowed: disruptionsAllowed,
 		DisruptedPods:      disruptedPods,
 		ObservedGeneration: pdb.Generation,
+		Conditions:         pdb.Status.Conditions,
 	}
-
+	clearFailureCondition(policy.PodDisruptionBudgetFailure, newPdb)
 	return dc.getUpdater()(newPdb)
 }
 
@@ -793,4 +796,48 @@ func (dc *DisruptionController) writePdbStatus(pdb *policy.PodDisruptionBudget) 
 	// retried in `processNextWorkItem()`.
 	_, err := dc.kubeClient.PolicyV1beta1().PodDisruptionBudgets(pdb.Namespace).UpdateStatus(pdb)
 	return err
+}
+
+func hasCondition(conditionType policy.PodDisruptionBudgetConditionType, pdb *policy.PodDisruptionBudget) bool {
+	for _, c := range pdb.Status.Conditions {
+		if c.Type == conditionType && c.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
+func clearFailureCondition(conditionType policy.PodDisruptionBudgetConditionType, pdb *policy.PodDisruptionBudget) {
+	var newConditions []policy.PodDisruptionBudgetCondition
+	for _, c := range pdb.Status.Conditions {
+		if c.Type != conditionType {
+			newConditions = append(newConditions, c)
+		}
+	}
+	pdb.Status.Conditions = newConditions
+}
+
+func setFailureCondition(pdb *policy.PodDisruptionBudget, condition policy.PodDisruptionBudgetConditionType, reason, message string) {
+	now := metav1.Now()
+	for _, c := range pdb.Status.Conditions {
+		if c.Type == condition {
+			if c.Status != v1.ConditionTrue {
+				c.LastTransitionTime = now
+			}
+			c.Status = v1.ConditionTrue
+			c.LastUpdateTime = now
+			c.Reason = reason
+			c.Message = message
+			return
+		}
+	}
+
+	pdb.Status.Conditions = append(pdb.Status.Conditions, policy.PodDisruptionBudgetCondition{
+		Type:               condition,
+		Status:             v1.ConditionTrue,
+		LastUpdateTime:     now,
+		LastTransitionTime: now,
+		Reason:             reason,
+		Message:            message,
+	})
 }

@@ -77,6 +77,39 @@ type PodDisruptionBudgetStatus struct {
 
 	// total number of pods counted by this disruption budget
 	ExpectedPods int32 `json:"expectedPods" protobuf:"varint,6,opt,name=expectedPods"`
+
+	// Conditions represents the latest available observations of a PDB's current state.
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	Conditions []PodDisruptionBudgetCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,7,rep,name=conditions"`
+}
+
+// PodDisruptionBudgetConditionType defines the type for the values
+// that can be set as type in a PDB condition.
+type PodDisruptionBudgetConditionType string
+
+// The conditions that are valid for a PodDisruptionBudget.
+const (
+	// Failure means that the latest reconcile loop for the resource encountered
+	// a problem that meant it couldn't complete. This caused the failsafe
+	// functionality to kick in so DisruptionsAllowed have been set to 0.
+	PodDisruptionBudgetFailure PodDisruptionBudgetConditionType = "Failure"
+)
+
+// PodDisruptionBudgetCondition describes the state of a PDB at a certain point.
+type PodDisruptionBudgetCondition struct {
+	// Type of PDB condition.
+	Type PodDisruptionBudgetConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=DeploymentConditionType"`
+	// Status of the condition, one of True, False, Unknown.
+	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
+	// The last time this condition was updated.
+	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty" protobuf:"bytes,6,opt,name=lastUpdateTime"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,7,opt,name=lastTransitionTime"`
+	// The reason for the condition's last transition.
+	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
+	// A human readable message indicating details about the transition.
+	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
 }
 
 // +genclient

@@ -275,6 +275,7 @@ API rule violation: list_type_missing,k8s.io/api/node/v1alpha1,RuntimeClassList,
 API rule violation: list_type_missing,k8s.io/api/node/v1beta1,RuntimeClassList,Items
 API rule violation: list_type_missing,k8s.io/api/policy/v1beta1,FSGroupStrategyOptions,Ranges
 API rule violation: list_type_missing,k8s.io/api/policy/v1beta1,PodDisruptionBudgetList,Items
+API rule violation: list_type_missing,k8s.io/api/policy/v1beta1,PodDisruptionBudgetStatus,Conditions
 API rule violation: list_type_missing,k8s.io/api/policy/v1beta1,PodSecurityPolicyList,Items
 API rule violation: list_type_missing,k8s.io/api/policy/v1beta1,PodSecurityPolicySpec,AllowedCSIDrivers
 API rule violation: list_type_missing,k8s.io/api/policy/v1beta1,PodSecurityPolicySpec,AllowedCapabilities

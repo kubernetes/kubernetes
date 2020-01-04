@@ -17,6 +17,7 @@ limitations under the License.
 package policy
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -77,6 +78,39 @@ type PodDisruptionBudgetStatus struct {
 
 	// total number of pods counted by this disruption budget
 	ExpectedPods int32
+
+	// Conditions represents the latest available observations of a PDB's current state.
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	Conditions []PodDisruptionBudgetCondition
+}
+
+// PodDisruptionBudgetConditionType defines the type for the values
+// that can be set as type in a PDB condition.
+type PodDisruptionBudgetConditionType string
+
+// The conditions that are valid for a PodDisruptionBudget.
+const (
+	// Failure means that the latest reconcile loop for the resource encountered
+	// a problem that meant it couldn't complete. This caused the failsafe
+	// functionality to kick in so DisruptionsAllowed have been set to 0.
+	PodDisruptionBudgetFailure PodDisruptionBudgetConditionType = "Failure"
+)
+
+// PodDisruptionBudgetCondition describes the state of a PDB at a certain point.
+type PodDisruptionBudgetCondition struct {
+	// Type of PDB condition.
+	Type PodDisruptionBudgetConditionType
+	// Status of the condition, one of True, False, Unknown.
+	Status v1.ConditionStatus
+	// The last time this condition was updated.
+	LastUpdateTime metav1.Time
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime metav1.Time
+	// The reason for the condition's last transition.
+	Reason string
+	// A human readable message indicating details about the transition.
+	Message string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
