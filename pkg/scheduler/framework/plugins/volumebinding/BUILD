@@ -6,7 +6,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/scheduler/volumebinder:go_default_library",
@@ -34,7 +33,6 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/controller/volume/scheduling:go_default_library",
-        "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/scheduler/volumebinder:go_default_library",

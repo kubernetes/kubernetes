@@ -71,10 +71,6 @@ var (
 	ErrNodeUnschedulable = NewPredicateFailureError("NodeUnschedulable", "node(s) were unschedulable")
 	// ErrNodeUnknownCondition is used for NodeUnknownCondition predicate error.
 	ErrNodeUnknownCondition = NewPredicateFailureError("NodeUnknownCondition", "node(s) had unknown conditions")
-	// ErrVolumeNodeConflict is used for VolumeNodeAffinityConflict predicate error.
-	ErrVolumeNodeConflict = NewPredicateFailureError("VolumeNodeAffinityConflict", "node(s) had volume node affinity conflict")
-	// ErrVolumeBindConflict is used for VolumeBindingNoMatch predicate error.
-	ErrVolumeBindConflict = NewPredicateFailureError("VolumeBindingNoMatch", "node(s) didn't find available persistent volumes to bind")
 	// ErrTopologySpreadConstraintsNotMatch is used for EvenPodsSpread predicate error.
 	ErrTopologySpreadConstraintsNotMatch = NewPredicateFailureError("EvenPodsSpreadNotMatch", "node(s) didn't match pod topology spread constraints")
 	// ErrFakePredicate is used for test only. The fake predicates returning false also returns error
@@ -99,8 +95,6 @@ var unresolvablePredicateFailureErrors = map[PredicateFailureReason]struct{}{
 	ErrNodeUnschedulable:       {},
 	ErrNodeUnknownCondition:    {},
 	ErrVolumeZoneConflict:      {},
-	ErrVolumeNodeConflict:      {},
-	ErrVolumeBindConflict:      {},
 }
 
 // UnresolvablePredicateExists checks if there is at least one unresolvable predicate failure reason.
