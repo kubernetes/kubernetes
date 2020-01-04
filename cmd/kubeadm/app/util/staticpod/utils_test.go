@@ -72,6 +72,20 @@ func TestGetAPIServerProbeAddress(t *testing.T) {
 			},
 			expected: "2001:abcd:bcda::1",
 		},
+		{
+			desc: "filled in 0.0.0.0 AdvertiseAddress endpoint returns empty",
+			endpoint: &kubeadmapi.APIEndpoint{
+				AdvertiseAddress: "0.0.0.0",
+			},
+			expected: "",
+		},
+		{
+			desc: "filled in :: AdvertiseAddress endpoint returns empty",
+			endpoint: &kubeadmapi.APIEndpoint{
+				AdvertiseAddress: "::",
+			},
+			expected: "",
+		},
 	}
 
 	for _, test := range tests {
@@ -104,7 +118,7 @@ func TestGetControllerManagerProbeAddress(t *testing.T) {
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{
-						kubeControllerManagerAddressArg: "10.10.10.10",
+						kubeControllerManagerBindAddressArg: "10.10.10.10",
 					},
 				},
 			},
@@ -115,11 +129,33 @@ func TestGetControllerManagerProbeAddress(t *testing.T) {
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{
-						kubeControllerManagerAddressArg: "2001:abcd:bcda::1",
+						kubeControllerManagerBindAddressArg: "2001:abcd:bcda::1",
 					},
 				},
 			},
 			expected: "2001:abcd:bcda::1",
+		},
+		{
+			desc: "setting controller manager extra address arg to 0.0.0.0 returns empty",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ControllerManager: kubeadmapi.ControlPlaneComponent{
+					ExtraArgs: map[string]string{
+						kubeControllerManagerBindAddressArg: "0.0.0.0",
+					},
+				},
+			},
+			expected: "",
+		},
+		{
+			desc: "setting controller manager extra ipv6 address arg to :: returns empty",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ControllerManager: kubeadmapi.ControlPlaneComponent{
+					ExtraArgs: map[string]string{
+						kubeControllerManagerBindAddressArg: "::",
+					},
+				},
+			},
+			expected: "",
 		},
 	}
 
@@ -133,6 +169,76 @@ func TestGetControllerManagerProbeAddress(t *testing.T) {
 	}
 }
 
+func TestGetSchedulerProbeAddress(t *testing.T) {
+	tests := []struct {
+		desc     string
+		cfg      *kubeadmapi.ClusterConfiguration
+		expected string
+	}{
+		{
+			desc: "no scheduler extra args leads to 127.0.0.1 being used",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Scheduler: kubeadmapi.ControlPlaneComponent{
+					ExtraArgs: map[string]string{},
+				},
+			},
+			expected: "127.0.0.1",
+		},
+		{
+			desc: "setting scheduler extra address arg to something acknowledges it",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Scheduler: kubeadmapi.ControlPlaneComponent{
+					ExtraArgs: map[string]string{
+						kubeSchedulerBindAddressArg: "10.10.10.10",
+					},
+				},
+			},
+			expected: "10.10.10.10",
+		},
+		{
+			desc: "setting scheduler extra ipv6 address arg to something acknowledges it",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Scheduler: kubeadmapi.ControlPlaneComponent{
+					ExtraArgs: map[string]string{
+						kubeSchedulerBindAddressArg: "2001:abcd:bcda::1",
+					},
+				},
+			},
+			expected: "2001:abcd:bcda::1",
+		},
+		{
+			desc: "setting scheduler extra ipv6 address arg to 0.0.0.0 returns empty",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Scheduler: kubeadmapi.ControlPlaneComponent{
+					ExtraArgs: map[string]string{
+						kubeSchedulerBindAddressArg: "0.0.0.0",
+					},
+				},
+			},
+			expected: "",
+		},
+		{
+			desc: "setting scheduler extra ipv6 address arg to :: returns empty",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Scheduler: kubeadmapi.ControlPlaneComponent{
+					ExtraArgs: map[string]string{
+						kubeSchedulerBindAddressArg: "::",
+					},
+				},
+			},
+			expected: "",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			actual := GetSchedulerProbeAddress(test.cfg)
+			if actual != test.expected {
+				t.Errorf("Unexpected result from GetSchedulerProbeAddress:\n\texpected: %s\n\tactual: %s", test.expected, actual)
+			}
+		})
+	}
+}
 func TestGetEtcdProbeEndpoint(t *testing.T) {
 	var tests = []struct {
 		name             string
