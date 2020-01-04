@@ -457,9 +457,9 @@ func getServerByName(client *gophercloud.ServiceClient, name types.NodeName) (*s
 		// todo: assume node SystemUUID always equalsIgnoreCase of openstack instance id
 		var server servers.Server
 		for _, v := range s {
-			klog.Infof("instance id from openstack: %s", v.ID)
+			klog.V(4).Infof("instance id from openstack: %s", v.ID)
 			if strings.EqualFold(v.ID, string(node.Status.NodeInfo.SystemUUID)) {
-				klog.Infof("matched node SystemUUID: %s with openstack instance id: %s",
+				klog.V(4).Infof("matched node SystemUUID: %s with openstack instance id: %s",
 					string(node.Status.NodeInfo.SystemUUID), v.ID)
 				server = v
 				break
