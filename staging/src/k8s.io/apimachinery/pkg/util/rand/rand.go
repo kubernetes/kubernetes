@@ -80,7 +80,7 @@ func Perm(n int) []int {
 const (
 	// We omit vowels from the set of available characters to reduce the chances
 	// of "bad words" being formed.
-	alphanums = "bcdfghjklmnpqrstvwxz2456789"
+	alphanums = "bcdfghjklmnpqrstvwxz1234567890"
 	// No. of bits required to index into alphanums string.
 	alphanumsIdxBits = 5
 	// Mask used to extract last alphanumsIdxBits of an int.
