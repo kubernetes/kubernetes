@@ -58,6 +58,9 @@ const (
 	azureDiskVolumeFilterType = "AzureDisk"
 	// cinderVolumeFilterType defines the filter name for cinderVolumeFilter.
 	cinderVolumeFilterType = "Cinder"
+
+	// ErrReasonMaxVolumeCountExceeded is used for MaxVolumeCount predicate error.
+	ErrReasonMaxVolumeCountExceeded = "node(s) exceed max volume count"
 )
 
 // AzureDiskName is the name of the plugin used in the plugin registry and configurations.
@@ -254,7 +257,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 
 	if numExistingVolumes+numNewVolumes > maxAttachLimit {
 		// violates MaxEBSVolumeCount or MaxGCEPDVolumeCount
-		return framework.NewStatus(framework.Unschedulable, predicates.ErrMaxVolumeCountExceeded.GetReason())
+		return framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded)
 	}
 	if nodeInfo != nil && nodeInfo.TransientInfo != nil && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) {
 		nodeInfo.TransientInfo.TransientLock.Lock()

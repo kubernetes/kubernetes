@@ -421,7 +421,7 @@ func TestCinderLimits(t *testing.T) {
 			filterName:   cinderVolumeFilterType,
 			maxVols:      2,
 			test:         "not fit when node capacity < new pod's Cinder volumes",
-			wantStatus:   framework.NewStatus(framework.Unschedulable, predicates.ErrMaxVolumeCountExceeded.GetReason()),
+			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 	}
 
@@ -661,7 +661,7 @@ func TestEBSLimits(t *testing.T) {
 			driverName:   csilibplugins.AWSEBSInTreePluginName,
 			maxVols:      2,
 			test:         "doesn't fit when node capacity < new pod's EBS volumes",
-			wantStatus:   framework.NewStatus(framework.Unschedulable, predicates.ErrMaxVolumeCountExceeded.GetReason()),
+			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 		{
 			newPod:       splitVolsPod,
@@ -702,7 +702,7 @@ func TestEBSLimits(t *testing.T) {
 			driverName:   csilibplugins.AWSEBSInTreePluginName,
 			maxVols:      3,
 			test:         "existing pods' counts considers PVCs backed by EBS volumes",
-			wantStatus:   framework.NewStatus(framework.Unschedulable, predicates.ErrMaxVolumeCountExceeded.GetReason()),
+			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 		{
 			newPod:       twoVolPod,
@@ -727,7 +727,7 @@ func TestEBSLimits(t *testing.T) {
 			driverName:   csilibplugins.AWSEBSInTreePluginName,
 			maxVols:      1,
 			test:         "missing PVC is not counted towards the PV limit",
-			wantStatus:   framework.NewStatus(framework.Unschedulable, predicates.ErrMaxVolumeCountExceeded.GetReason()),
+			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 		{
 			newPod:       onePVCPod(ebsVolumeFilterType),
@@ -769,7 +769,7 @@ func TestEBSLimits(t *testing.T) {
 			driverName:   csilibplugins.AWSEBSInTreePluginName,
 			maxVols:      2,
 			test:         "pod with missing PV is counted towards the PV limit",
-			wantStatus:   framework.NewStatus(framework.Unschedulable, predicates.ErrMaxVolumeCountExceeded.GetReason()),
+			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 		{
 			newPod:       onePVCPod(ebsVolumeFilterType),
@@ -794,7 +794,7 @@ func TestEBSLimits(t *testing.T) {
 			driverName:   csilibplugins.AWSEBSInTreePluginName,
 			maxVols:      2,
 			test:         "two pods missing different PVs are counted towards the PV limit twice",
-			wantStatus:   framework.NewStatus(framework.Unschedulable, predicates.ErrMaxVolumeCountExceeded.GetReason()),
+			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 		{
 			newPod:       onePVCPod(ebsVolumeFilterType),
@@ -803,7 +803,7 @@ func TestEBSLimits(t *testing.T) {
 			driverName:   csilibplugins.AWSEBSInTreePluginName,
 			maxVols:      2,
 			test:         "pod with unbound PVC is counted towards the PV limit",
-			wantStatus:   framework.NewStatus(framework.Unschedulable, predicates.ErrMaxVolumeCountExceeded.GetReason()),
+			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 		{
 			newPod:       onePVCPod(ebsVolumeFilterType),
@@ -828,7 +828,7 @@ func TestEBSLimits(t *testing.T) {
 			driverName:   csilibplugins.AWSEBSInTreePluginName,
 			maxVols:      2,
 			test:         "two different unbound PVCs are counted towards the PV limit as two volumes",
-			wantStatus:   framework.NewStatus(framework.Unschedulable, predicates.ErrMaxVolumeCountExceeded.GetReason()),
+			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 	}
 
