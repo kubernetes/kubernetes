@@ -41,15 +41,3 @@ func GetJobPods(c clientset.Interface, ns, jobName string) (*v1.PodList, error) 
 func CreateJob(c clientset.Interface, ns string, job *batchv1.Job) (*batchv1.Job, error) {
 	return c.BatchV1().Jobs(ns).Create(job)
 }
-
-// UpdateJob uses c to updated job in namespace ns. If the returned error is nil, the returned Job is valid and has
-// been updated.
-func UpdateJob(c clientset.Interface, ns string, job *batchv1.Job) (*batchv1.Job, error) {
-	return c.BatchV1().Jobs(ns).Update(job)
-}
-
-// DeleteJob uses c to delete the Job named name in namespace ns. If the returned error is nil, the Job has been
-// deleted.
-func DeleteJob(c clientset.Interface, ns, name string) error {
-	return c.BatchV1().Jobs(ns).Delete(name, nil)
-}
