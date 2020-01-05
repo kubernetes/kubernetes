@@ -21,7 +21,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -33,6 +32,11 @@ var _ framework.FilterPlugin = &VolumeRestrictions{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = "VolumeRestrictions"
+
+const (
+	// ErrReasonDiskConflict is used for NoDiskConflict predicate error.
+	ErrReasonDiskConflict = "node(s) had no available disk"
+)
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *VolumeRestrictions) Name() string {
@@ -118,7 +122,7 @@ func (pl *VolumeRestrictions) Filter(ctx context.Context, _ *framework.CycleStat
 	for _, v := range pod.Spec.Volumes {
 		for _, ev := range nodeInfo.Pods() {
 			if isVolumeConflict(v, ev) {
-				return framework.NewStatus(framework.Unschedulable, predicates.ErrDiskConflict.GetReason())
+				return framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
 			}
 		}
 	}

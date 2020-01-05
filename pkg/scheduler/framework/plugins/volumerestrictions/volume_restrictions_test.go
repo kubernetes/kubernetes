@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -50,7 +49,7 @@ func TestGCEDiskConflicts(t *testing.T) {
 			},
 		},
 	}
-	errStatus := framework.NewStatus(framework.Unschedulable, predicates.ErrDiskConflict.GetReason())
+	errStatus := framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
 		pod        *v1.Pod
 		nodeInfo   *schedulernodeinfo.NodeInfo
@@ -98,7 +97,7 @@ func TestAWSDiskConflicts(t *testing.T) {
 			},
 		},
 	}
-	errStatus := framework.NewStatus(framework.Unschedulable, predicates.ErrDiskConflict.GetReason())
+	errStatus := framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
 		pod        *v1.Pod
 		nodeInfo   *schedulernodeinfo.NodeInfo
@@ -152,7 +151,7 @@ func TestRBDDiskConflicts(t *testing.T) {
 			},
 		},
 	}
-	errStatus := framework.NewStatus(framework.Unschedulable, predicates.ErrDiskConflict.GetReason())
+	errStatus := framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
 		pod        *v1.Pod
 		nodeInfo   *schedulernodeinfo.NodeInfo
@@ -206,7 +205,7 @@ func TestISCSIDiskConflicts(t *testing.T) {
 			},
 		},
 	}
-	errStatus := framework.NewStatus(framework.Unschedulable, predicates.ErrDiskConflict.GetReason())
+	errStatus := framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
 		pod        *v1.Pod
 		nodeInfo   *schedulernodeinfo.NodeInfo
