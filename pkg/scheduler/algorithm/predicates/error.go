@@ -49,8 +49,6 @@ var (
 	ErrPodNotMatchHostName = NewPredicateFailureError("HostName", "node(s) didn't match the requested hostname")
 	// ErrPodNotFitsHostPorts is used for PodFitsHostPorts predicate error.
 	ErrPodNotFitsHostPorts = NewPredicateFailureError("PodFitsHostPorts", "node(s) didn't have free ports for the requested pod ports")
-	// ErrNodeLabelPresenceViolated is used for CheckNodeLabelPresence predicate error.
-	ErrNodeLabelPresenceViolated = NewPredicateFailureError("CheckNodeLabelPresence", "node(s) didn't have the requested labels")
 	// ErrServiceAffinityViolated is used for CheckServiceAffinity predicate error.
 	ErrServiceAffinityViolated = NewPredicateFailureError("CheckServiceAffinity", "node(s) didn't match service affinity")
 	// ErrMaxVolumeCountExceeded is used for MaxVolumeCount predicate error.
@@ -81,7 +79,6 @@ var unresolvablePredicateFailureErrors = map[PredicateFailureReason]struct{}{
 	ErrPodAffinityRulesNotMatch:  {},
 	ErrPodNotMatchHostName:       {},
 	ErrTaintsTolerationsNotMatch: {},
-	ErrNodeLabelPresenceViolated: {},
 	// Node conditions won't change when scheduler simulates removal of preemption victims.
 	// So, it is pointless to try nodes that have not been able to host the pod due to node
 	// conditions. These include ErrNodeNotReady, ErrNodeUnderPIDPressure, ErrNodeUnderMemoryPressure, ....
