@@ -469,7 +469,9 @@ func (cache *schedulerCache) AddPod(pod *v1.Pod) error {
 			// The pod was added to a different node than it was assumed to.
 			klog.Warningf("Pod %v was assumed to be on %v but got added to %v", key, pod.Spec.NodeName, currState.pod.Spec.NodeName)
 			// Clean this up.
-			cache.removePod(currState.pod)
+			if err = cache.removePod(currState.pod); err != nil {
+				klog.Errorf("removing pod error: %v", err)
+			}
 			cache.addPod(pod)
 		}
 		delete(cache.assumedPods, key)
