@@ -23,14 +23,7 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
-
-// NodeFieldSelectorKeys is a map that: the keys are node field selector keys; the values are
-// the functions to get the value of the node field.
-var NodeFieldSelectorKeys = map[string]func(*v1.Node) string{
-	api.ObjectNameField: func(n *v1.Node) string { return n.Name },
-}
 
 var _ corelisters.ReplicationControllerLister = &EmptyControllerLister{}
 

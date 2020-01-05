@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -119,7 +119,7 @@ func (pl *PodTopologySpread) PostFilter(
 		}
 		// (1) `node` should satisfy incoming pod's NodeSelector/NodeAffinity
 		// (2) All topologyKeys need to be present in `node`
-		if !predicates.PodMatchesNodeSelectorAndAffinityTerms(pod, node) ||
+		if !pluginhelper.PodMatchesNodeSelectorAndAffinityTerms(pod, node) ||
 			!nodeLabelsMatchSpreadConstraints(node.Labels, state.constraints) {
 			return
 		}
