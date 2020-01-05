@@ -30,8 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
 
-	// import DefaultProvider
-	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
