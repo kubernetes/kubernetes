@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
 
 	v1 "k8s.io/api/core/v1"
@@ -1872,7 +1873,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeSelectorNotMatch.GetReason()),
 				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrPodNotMatchHostName.GetReason()),
 				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrTaintsTolerationsNotMatch.GetReason()),
-				"machine4": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeLabelPresenceViolated.GetReason()),
+				"machine4": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodelabel.ErrReasonPresenceViolated),
 			},
 			expected: map[string]bool{},
 		},
