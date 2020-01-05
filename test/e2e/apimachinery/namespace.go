@@ -30,8 +30,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/apimachinery/pkg/util/uuid"
 
 	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, maxSeconds int) {
@@ -246,4 +249,30 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 	ginkgo.It("should always delete fast (ALL of 100 namespaces in 150 seconds) [Feature:ComprehensiveNamespaceDraining]",
 		func() { extinguish(f, 100, 0, 150) })
 
+	ginkgo.It("should patch a Namespace", func() {
+		ginkgo.By("creating a Namespace")
+		namespaceName := "nspatchtest-" + string(uuid.NewUUID())
+		_, err := f.ClientSet.CoreV1().Namespaces().Create(&v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespaceName,
+			},
+		})
+		framework.ExpectNoError(err, "failed creating Namespace")
+
+		ginkgo.By("patching the Namespace")
+		nspatch := `{"metadata":{"labels":{"testLabel":"testValue"}}}`
+		_, err = f.ClientSet.CoreV1().Namespaces().Patch(namespaceName, types.StrategicMergePatchType, []byte(nspatch))
+		framework.ExpectNoError(err, "failed to patch Namespace")
+
+		ginkgo.By("get the Namespace and ensuring it has the label")
+		namespace, err := f.ClientSet.CoreV1().Namespaces().Get(namespaceName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get Namespace")
+		gomega.Expect(namespace.ObjectMeta.Labels["testLabel"]).To(gomega.Equal("testValue"), "namespace not patched")
+
+		ginkgo.By("deleting the Namespace")
+		err = f.ClientSet.CoreV1().Namespaces().Delete(namespaceName, &metav1.DeleteOptions{})
+		framework.ExpectNoError(err, "failed to delete the test Namespace")
+	})
+
 })
+
