@@ -38,9 +38,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/test/integration/framework"
-
-	// Install "DefaultProvider" algorithprovider
-	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults"
 )
 
 type testContext struct {
