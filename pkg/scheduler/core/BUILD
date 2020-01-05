@@ -57,6 +57,7 @@ go_test(
         "//pkg/scheduler/framework/plugins/interpodaffinity:go_default_library",
         "//pkg/scheduler/framework/plugins/nodelabel:go_default_library",
         "//pkg/scheduler/framework/plugins/noderesources:go_default_library",
+        "//pkg/scheduler/framework/plugins/nodeunschedulable:go_default_library",
         "//pkg/scheduler/framework/plugins/podtopologyspread:go_default_library",
         "//pkg/scheduler/framework/plugins/volumebinding:go_default_library",
         "//pkg/scheduler/framework/plugins/volumerestrictions:go_default_library",
