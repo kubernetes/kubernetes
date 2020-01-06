@@ -131,6 +131,7 @@ func printYAML(fileName string, areaO Area) {
 	f, err := os.Create(fileName + ".yaml")
 	if err != nil {
 		fmt.Printf("ERROR: %s\n", err.Error())
+		os.Exit(1)
 	}
 	defer f.Close()
 	y, err := yaml.Marshal(areaO)
@@ -139,7 +140,11 @@ func printYAML(fileName string, areaO Area) {
 		os.Exit(1)
 	}
 
-	f.WriteString(string(y))
+	_, err = f.WriteString(string(y))
+	if err != nil {
+		fmt.Printf("ERROR: %s\n", err.Error())
+		os.Exit(1)
+	}
 }
 
 func countFields(suites []Suite) {
