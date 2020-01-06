@@ -27,6 +27,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1903,7 +1905,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			name: "Mix of failed predicates works fine",
 			nodesStatuses: framework.NodeToStatusMap{
 				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeUnderDiskPressure.GetReason()),
-				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrDiskConflict.GetReason()),
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumerestrictions.ErrReasonDiskConflict),
 				"machine3": framework.NewStatus(framework.Unschedulable, algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400).GetReason()),
 			},
 			expected: map[string]bool{"machine3": true, "machine4": true},
@@ -1976,7 +1978,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 func TestPreempt(t *testing.T) {
 	defaultFailedNodeToStatusMap := framework.NodeToStatusMap{
 		"machine1": framework.NewStatus(framework.Unschedulable, algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300).GetReason()),
-		"machine2": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrDiskConflict.GetReason()),
+		"machine2": framework.NewStatus(framework.Unschedulable, volumerestrictions.ErrReasonDiskConflict),
 		"machine3": framework.NewStatus(framework.Unschedulable, algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400).GetReason()),
 	}
 	// Prepare 3 node names.

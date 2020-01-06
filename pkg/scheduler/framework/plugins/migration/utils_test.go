@@ -43,7 +43,7 @@ func TestPredicateResultToFrameworkStatus(t *testing.T) {
 		{
 			name:       "Error with reason",
 			err:        errors.New("Failed with error"),
-			reasons:    []predicates.PredicateFailureReason{predicates.ErrDiskConflict},
+			reasons:    []predicates.PredicateFailureReason{predicates.ErrTaintsTolerationsNotMatch},
 			wantStatus: framework.NewStatus(framework.Error, "Failed with error"),
 		},
 		{
@@ -53,8 +53,8 @@ func TestPredicateResultToFrameworkStatus(t *testing.T) {
 		},
 		{
 			name:       "Unschedulable and Unresolvable",
-			reasons:    []predicates.PredicateFailureReason{predicates.ErrDiskConflict, predicates.ErrNodeSelectorNotMatch},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) had no available disk", "node(s) didn't match node selector"),
+			reasons:    []predicates.PredicateFailureReason{predicates.ErrTaintsTolerationsNotMatch, predicates.ErrNodeSelectorNotMatch},
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) had taints that the pod didn't tolerate", "node(s) didn't match node selector"),
 		},
 	}
 	for _, tt := range tests {

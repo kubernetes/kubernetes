@@ -6,7 +6,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -33,7 +32,6 @@ go_test(
     srcs = ["volume_restrictions_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

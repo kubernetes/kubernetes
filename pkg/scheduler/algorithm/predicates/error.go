@@ -31,8 +31,6 @@ var (
 	// it can never be made to pass by removing pods, you need to add the predicate
 	// failure error in nodesWherePreemptionMightHelp() in scheduler/core/generic_scheduler.go
 
-	// ErrDiskConflict is used for NoDiskConflict predicate error.
-	ErrDiskConflict = NewPredicateFailureError("NoDiskConflict", "node(s) had no available disk")
 	// ErrVolumeZoneConflict is used for NoVolumeZoneConflict predicate error.
 	ErrVolumeZoneConflict = NewPredicateFailureError("NoVolumeZoneConflict", "node(s) had no available volume zone")
 	// ErrNodeSelectorNotMatch is used for MatchNodeSelector predicate error.
