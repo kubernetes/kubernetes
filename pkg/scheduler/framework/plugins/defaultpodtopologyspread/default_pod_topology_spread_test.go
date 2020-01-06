@@ -18,6 +18,7 @@ package defaultpodtopologyspread
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -25,10 +26,10 @@ import (
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/informers"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
@@ -370,42 +371,37 @@ func TestDefaultPodTopologySpreadScore(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeNodeList(test.nodes)
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
-			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
-
-			mapFunction, reduceFunction := priorities.NewSelectorSpreadPriority(
-				fakelisters.ServiceLister(test.services),
-				fakelisters.ControllerLister(test.rcs),
-				fakelisters.ReplicaSetLister(test.rss),
-				fakelisters.StatefulSetLister(test.sss),
-			)
-
-			metaDataProducer := priorities.NewMetadataFactory(
-				fakelisters.ServiceLister(test.services),
-				fakelisters.ControllerLister(test.rcs),
-				fakelisters.ReplicaSetLister(test.rss),
-				fakelisters.StatefulSetLister(test.sss),
-			)
-			metaData := metaDataProducer(test.pod, nodes, snapshot)
+			ctx := context.Background()
+			informerFactory, err := populateAndStartInformers(ctx, test.rcs, test.rss, test.services, test.sss)
+			if err != nil {
+				t.Errorf("error creating informerFactory: %+v", err)
+			}
+			fh, err := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot), framework.WithInformerFactory(informerFactory))
+			if err != nil {
+				t.Errorf("error creating new framework handle: %+v", err)
+			}
 
 			state := framework.NewCycleState()
-			state.Write(migration.PrioritiesStateKey, &migration.PrioritiesStateData{Reference: metaData})
 
 			plugin := &DefaultPodTopologySpread{
-				handle:                        fh,
-				calculateSpreadPriorityMap:    mapFunction,
-				calculateSpreadPriorityReduce: reduceFunction,
+				handle: fh,
+			}
+
+			status := plugin.PostFilter(ctx, state, test.pod, nodes, nil)
+			if !status.IsSuccess() {
+				t.Fatalf("unexpected error: %v", status)
 			}
 
 			var gotList framework.NodeScoreList
 			for _, nodeName := range test.nodes {
-				score, status := plugin.Score(context.Background(), state, test.pod, nodeName)
+				score, status := plugin.Score(ctx, state, test.pod, nodeName)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
 				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
 			}
 
-			status := plugin.ScoreExtensions().NormalizeScore(context.Background(), state, test.pod, gotList)
+			status = plugin.ScoreExtensions().NormalizeScore(ctx, state, test.pod, gotList)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
@@ -628,41 +624,37 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeLabeledNodeList(labeledNodes)
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
-			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
-
-			mapFunction, reduceFunction := priorities.NewSelectorSpreadPriority(
-				fakelisters.ServiceLister(test.services),
-				fakelisters.ControllerLister(test.rcs),
-				fakelisters.ReplicaSetLister(test.rss),
-				fakelisters.StatefulSetLister(test.sss),
-			)
-			metaDataProducer := priorities.NewMetadataFactory(
-				fakelisters.ServiceLister(test.services),
-				fakelisters.ControllerLister(test.rcs),
-				fakelisters.ReplicaSetLister(test.rss),
-				fakelisters.StatefulSetLister(test.sss),
-			)
-			metaData := metaDataProducer(test.pod, nodes, snapshot)
+			ctx := context.Background()
+			informerFactory, err := populateAndStartInformers(ctx, test.rcs, test.rss, test.services, test.sss)
+			if err != nil {
+				t.Errorf("error creating informerFactory: %+v", err)
+			}
+			fh, err := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot), framework.WithInformerFactory(informerFactory))
+			if err != nil {
+				t.Errorf("error creating new framework handle: %+v", err)
+			}
 
 			plugin := &DefaultPodTopologySpread{
-				handle:                        fh,
-				calculateSpreadPriorityMap:    mapFunction,
-				calculateSpreadPriorityReduce: reduceFunction,
+				handle: fh,
 			}
 
 			state := framework.NewCycleState()
-			state.Write(migration.PrioritiesStateKey, &migration.PrioritiesStateData{Reference: metaData})
+			status := plugin.PostFilter(ctx, state, test.pod, nodes, nil)
+			if !status.IsSuccess() {
+				t.Fatalf("unexpected error: %v", status)
+			}
+
 			var gotList framework.NodeScoreList
 			for _, n := range nodes {
 				nodeName := n.ObjectMeta.Name
-				score, status := plugin.Score(context.Background(), state, test.pod, nodeName)
+				score, status := plugin.Score(ctx, state, test.pod, nodeName)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
 				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
 			}
 
-			status := plugin.ScoreExtensions().NormalizeScore(context.Background(), state, test.pod, gotList)
+			status = plugin.ScoreExtensions().NormalizeScore(ctx, state, test.pod, gotList)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
@@ -674,6 +666,38 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			}
 		})
 	}
+}
+
+func populateAndStartInformers(ctx context.Context, rcs []*v1.ReplicationController, rss []*apps.ReplicaSet, services []*v1.Service, sss []*apps.StatefulSet) (informers.SharedInformerFactory, error) {
+	objects := make([]runtime.Object, 0, len(rcs)+len(rss)+len(services)+len(sss))
+	for _, rc := range rcs {
+		objects = append(objects, rc.DeepCopyObject())
+	}
+	for _, rs := range rss {
+		objects = append(objects, rs.DeepCopyObject())
+	}
+	for _, service := range services {
+		objects = append(objects, service.DeepCopyObject())
+	}
+	for _, ss := range sss {
+		objects = append(objects, ss.DeepCopyObject())
+	}
+	client := clientsetfake.NewSimpleClientset(objects...)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+	// Because we use an informer factory, we need to make requests for the specific informers we want before calling Start()
+	_ = informerFactory.Core().V1().Services().Lister()
+	_ = informerFactory.Core().V1().ReplicationControllers().Lister()
+	_ = informerFactory.Apps().V1().ReplicaSets().Lister()
+	_ = informerFactory.Apps().V1().StatefulSets().Lister()
+	informerFactory.Start(ctx.Done())
+	caches := informerFactory.WaitForCacheSync(ctx.Done())
+	for _, synced := range caches {
+		if !synced {
+			return nil, fmt.Errorf("error waiting for informer cache sync")
+		}
+	}
+	return informerFactory, nil
 }
 
 func makeLabeledNodeList(nodeMap map[string]map[string]string) []*v1.Node {
