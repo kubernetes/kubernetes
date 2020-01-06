@@ -20,17 +20,21 @@ set -o pipefail
 
 usage="The script automatically cherrypicks a kubernetes patch for an anthos version.
 
-Usage: $(basename $0) [-dhkv] COMMIT_NUMBER ANTHOS_MAJOR_MINOR_VERSION|K8S_MAJOR_MINOR_PATCH_VERSION
+Usage: $(basename $0) [-cdhkrv] COMMIT_NUMBER master|ANTHOS_MAJOR_MINOR_VERSION|[K8S_MAJOR_MINOR_PATCH_VERSION]...
 
 Options:
+  -c  List of emails to CC (comma separated).
   -d  Dry run without actual change pushed.
   -h  Print help message.
   -k  Use Kubernetes major minor patch version instead.
+  -r  List of reviewer emails (comma separated).
   -v  Print verbose output."
 
 
-while getopts 'dhkv' o; do
+while getopts 'c:dhkr:v' o; do
   case "$o" in
+    c) cc="$OPTARG"
+      ;;
     d) echo "Dry run mode, no actual change pushed"
       dryrun="true"
       ;;
@@ -39,6 +43,8 @@ while getopts 'dhkv' o; do
       ;;
     k) echo "Use Kubernetes version"
       use_k8s_version="true"
+      ;;
+    r) reviewers="$OPTARG"
       ;;
     v) echo "Verbose output mode"
       set -o xtrace
@@ -51,6 +57,11 @@ while getopts 'dhkv' o; do
 done
 shift $(($OPTIND-1))
 
+if [[ $# -lt 2 ]]; then
+  echo "Missing arguments!" >&2
+  echo "$usage" >&2
+  exit
+fi
 commit="$1"
 major_minor_pattern="[0-9]+\.[0-9]+"
 major_minor_patch_pattern="[0-9]+\.[0-9]+\.[0-9]+"
@@ -72,22 +83,41 @@ compare_versions() {
   return 1
 }
 
-# run_git runs git and generates git output based on verbose mode.
+# run_git runs git and generates git output based on verbose mode and exit code.
 run_git() {
-  if [[ ${verbose:-"false"} == "true" ]]; then
-    git "$@"
-  else
-    git "$@" &>/dev/null
+  set +o errexit
+  local output
+  local exitcode
+  output=$(git "$@" 2>&1)
+  exitcode=$?
+  if [[ $exitcode -ne 0 ]] || [[ "${verbose:-}" == "true" ]]; then
+    echo "$output"
   fi
+  set -o errexit
+  return $exitcode
 }
 
+if git show --no-patch --format="%P" "$commit" | grep " " &>/dev/null; then
+  echo "$commit is a merge commit! please use the corresponding regular commit instead." >&2
+  exit 1
+fi
+
+if ! git diff-index HEAD --quiet; then
+  echo "Working directory is dirty! Please make the working directory clean." >&2
+  exit 1
+fi
+
+# Creating global resources and cleanup on EXIT.
+starting_branch="$(git symbolic-ref --short HEAD)"
+working_directory="$(mktemp -d)"
+cleanup() {
+  rm -rf "$working_directory"
+  run_git checkout -f "${starting_branch}"
+}
+trap cleanup EXIT
+
 target_branches=()
-if [[ "${use_k8s_version:-false}" == "true" ]]; then
-  if [[ $# -lt 2 ]]; then
-    echo "Missing arguments!" >&2
-    echo "$usage" >&2
-    exit
-  fi
+if [[ "${use_k8s_version:-}" == "true" ]]; then
   shift
   versions=($*)
 
@@ -103,32 +133,33 @@ if [[ "${use_k8s_version:-false}" == "true" ]]; then
   echo "Generated target branches:"
   printf "\t%s\n" "${target_branches[@]}"
 else
-  if [[ $# -ne 2 ]]; then
-    echo "Missing arguments!" >&2
+  if [[ $# -gt 2 ]]; then
+    echo "Too many arguments!" >&2
     echo "$usage" >&2
     exit
   fi
 
   version="$2"
 
-  if [[ ! "$version" =~ ^$major_minor_pattern$ ]];then
-    echo "Anthos version \"$version\" doesn't match pattern \"^$major_minor_pattern$\"" >&2
+  if [[ ! "$version" =~ ^$major_minor_pattern$ ]] && [[ "$version" != "master" ]];then
+    echo "Anthos version \"$version\" is not master and doesn't match pattern \"^$major_minor_pattern$\"" >&2
     echo "$usage" >&2
     exit 1
   fi
 
-  anthos_repo=$(mktemp -d)
-  trap "rm -rf $anthos_repo" EXIT
+  anthos_repo="${working_directory}/anthos_repo"
   run_git clone sso://gke-internal/syllogi/cluster-management "$anthos_repo"
   pushd "$anthos_repo" &>/dev/null
-  anthos_branches=($(git branch -r | grep -oP "(?<=origin/)${anthos_branch_pattern}$"))
-  anthos_branches+=("master")
+  anthos_branches=("master")
+  if [[ "$version" != "master" ]]; then
+    anthos_branches+=($(git branch -r | grep -oP "(?<=origin/)${anthos_branch_pattern}$"))
+  fi
 
   # Collect target Kubernetes branches from corresponding anthos branches.
   output=()
   for b in "${anthos_branches[@]}"; do
     # Skip branches older than the target.
-    if ! compare_versions "$b" "pre-release-$version" && [[ "$b" != "master" ]]; then
+    if [[ "$b" != "master" ]] && ! compare_versions "$b" "pre-release-$version"; then
       continue
     fi
     run_git checkout "origin/$b"
@@ -189,17 +220,38 @@ done
 echo "Branches to cherrypick:"
 printf "\t%s\n" "${branches[@]}"
 
+# Get push options.
+push_options=""
+if [[ -n "${cc:-}" ]]; then
+  IFS=',' read -ra CC <<< "$cc"
+  for i in "${CC[@]}"; do
+    push_options+="-o cc=$i "
+  done
+fi
+
+if [[ -n "${reviewers:-}" ]]; then
+  IFS=',' read -ra REVIEWERS <<< "$reviewers"
+  for i in "${REVIEWERS[@]}"; do
+    push_options+="-o r=$i "
+  done
+fi
+
+# Only add the first 10 characters of the commit hash into the topic.
+push_options+="-o topic=cherrypick-$(git rev-parse --short $commit)"
+
+# Do actual cherrypick.
 run_git fetch origin
-checkout_num=0
 for b in "${branches[@]}"; do
   remote_branch=origin/$b
   echo "Cherrypicking $commit to branch $remote_branch..."
   run_git checkout "$remote_branch"
-  (( checkout_num+=1 ))
   if ! run_git cherry-pick "$commit"; then
     while true; do
-      echo "Please resolve the conflicts in another window (and remember to 'git add / git cherry-pick --continue')"
-      read -p "Proceed? [y/s/n] ('s' skips the cherry-pick, anything but 'y' or 's' aborts the cherry-pick)" reply
+      echo "Please resolve the conflicts in another window (and remember to 'git add / git cherry-pick --continue')
+  * y: continues cherry-pick after conflicts are resolved;
+  * s: skips the cherry-pick, this is usually used when the commit is empty (already exists in the branch);
+  * n (or anything else): aborts the cherry-pick."
+      read -p "Proceed? [y/s/n]" reply
       if [[ "${reply}" =~ ^[sS]$ ]]; then
         run_git cherry-pick --skip
       elif ! [[ "${reply}" =~ ^[yY]$ ]]; then
@@ -217,11 +269,11 @@ for b in "${branches[@]}"; do
     echo "Nothing to push to branch $remote_branch."
     continue
   fi
-  if [[ "${dryrun:-"false"}" != "true" ]]; then
+  if [[ "${dryrun:-}" != "true" ]]; then
     echo "Pushing to branch $remote_branch..."
     # Amend the commit to make sure it has a change ID.
     run_git commit --amend --no-edit
-    run_git push origin "HEAD:refs/for/$b"
+    run_git push origin "HEAD:refs/for/$b" ${push_options}
   else
     echo "Push skipped in dry run mode"
   fi
@@ -230,7 +282,5 @@ for b in "${branches[@]}"; do
   # unnecessary conflict.
   commit=$(git rev-parse HEAD)
 done
-# Checkout back to the initial state
-run_git checkout @{-$checkout_num}
 
 echo "Done!"
