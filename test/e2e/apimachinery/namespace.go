@@ -252,8 +252,8 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 		ginkgo.By("creating a Namespace")
 		namespaceName := "nspatchtest-" + string(uuid.NewUUID())
 		ns, err := f.CreateNamespace(namespaceName, nil)
-		namespaceName = ns.ObjectMeta.Name
 		framework.ExpectNoError(err, "failed creating Namespace")
+		namespaceName = ns.ObjectMeta.Name
 
 		ginkgo.By("patching the Namespace")
 		nspatch := `{"metadata":{"labels":{"testLabel":"testValue"}}}`
