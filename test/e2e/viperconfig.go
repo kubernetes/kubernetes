@@ -14,18 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package viperconfig
+package e2e
 
 import (
 	"flag"
 	"fmt"
-	"github.com/pkg/errors"
 	"path/filepath"
+
+	"github.com/pkg/errors"
 
 	"github.com/spf13/viper"
 )
 
-// ViperizeFlags checks whether a configuration file was specified,
+// viperizeFlags checks whether a configuration file was specified,
 // reads it, and updates the configuration variables in the specified
 // flag set accordingly. Must be called after framework.HandleFlags()
 // and before framework.AfterReadingAllFlags().
@@ -35,7 +36,7 @@ import (
 //
 // Files can be specified with just a base name ("e2e", matches "e2e.json/yaml/..." in
 // the current directory) or with path and suffix.
-func ViperizeFlags(requiredConfig, optionalConfig string, flags *flag.FlagSet) error {
+func viperizeFlags(requiredConfig, optionalConfig string, flags *flag.FlagSet) error {
 	viperConfig := optionalConfig
 	required := false
 	if requiredConfig != "" {

@@ -8,7 +8,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_test(
     name = "go_default_test",
-    srcs = ["e2e_test.go"],
+    srcs = [
+        "e2e_test.go",
+        "viperconfig_test.go",
+    ],
     out = "e2e.test",
     embed = [":go_default_library"],
     tags = ["e2e"],
@@ -22,7 +25,6 @@ go_test(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/config:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
-        "//test/e2e/framework/viperconfig:go_default_library",
         "//test/e2e/generated:go_default_library",
         "//test/e2e/instrumentation:go_default_library",
         "//test/e2e/kubectl:go_default_library",
@@ -37,6 +39,7 @@ go_test(
         "//test/e2e/ui:go_default_library",
         "//test/e2e/windows:go_default_library",
         "//test/utils/image:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],
 )
 
@@ -48,6 +51,7 @@ go_library(
         "gke_local_ssd.go",
         "gke_node_pools.go",
         "suites.go",
+        "viperconfig.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e",
     deps = [
@@ -85,6 +89,8 @@ go_library(
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/github.com/spf13/viper:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
     ],

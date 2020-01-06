@@ -149,7 +149,6 @@ filegroup(
         "//test/e2e/framework/statefulset:all-srcs",
         "//test/e2e/framework/testfiles:all-srcs",
         "//test/e2e/framework/timer:all-srcs",
-        "//test/e2e/framework/viperconfig:all-srcs",
         "//test/e2e/framework/volume:all-srcs",
     ],
     tags = ["automanaged"],

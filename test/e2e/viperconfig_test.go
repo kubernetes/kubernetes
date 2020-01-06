@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package viperconfig
+package e2e
 
 import (
 	"flag"
@@ -62,7 +62,7 @@ uint64: 9123456789012345678
 	}
 	require.NoError(t, tmpfile.Close(), "close temp file")
 
-	require.NoError(t, ViperizeFlags(tmpfile.Name(), "", flags), "read config file")
+	require.NoError(t, viperizeFlags(tmpfile.Name(), "", flags), "read config file")
 	require.Equal(t,
 		Context{false, time.Second, -1.23456789, "pong",
 			-2, -9123456789012345678, 2, 9123456789012345678,
