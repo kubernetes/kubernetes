@@ -496,8 +496,8 @@ func newGrpcConn(addr csiAddr) (*grpc.ClientConn, error) {
 	return grpc.Dial(
 		string(addr),
 		grpc.WithInsecure(),
-		grpc.WithDialer(func(target string, timeout time.Duration) (net.Conn, error) {
-			return net.Dial(network, target)
+		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, network, target)
 		}),
 	)
 }
