@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/spf13/pflag"
 	"net/url"
 	"regexp"
 	"strings"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
+var enableFlag = pflag.Bool("enable-aws-credentials", false, "set true to enable aws credentials provider")
 var ecrPattern = regexp.MustCompile(`^(\d{12})\.dkr\.ecr(\-fips)?\.([a-zA-Z0-9][a-zA-Z0-9-_]*)\.amazonaws\.com(\.cn)?$`)
 
 // init registers a credential provider for each registryURLTemplate and creates
@@ -66,6 +68,10 @@ func newECRProvider(getterFactory tokenGetterFactory) *ecrProvider {
 // Enabled implements DockerConfigProvider.Enabled. Enabled is true if AWS
 // credentials are found.
 func (p *ecrProvider) Enabled() bool {
+	if enableFlag == nil || !*enableFlag {
+		klog.V(2).Info("aws credentials provider is disabled")
+		return false
+	}
 	sess, err := session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 	})

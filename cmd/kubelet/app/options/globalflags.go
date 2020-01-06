@@ -87,6 +87,7 @@ func addCredentialProviderFlags(fs *pflag.FlagSet) {
 	// TODO(#58034): This is not a static file, so it's not quite as straightforward as --google-json-key.
 	// We need to figure out how ACR users can dynamically provide pull credentials before we can deprecate this.
 	pflagRegister(global, local, "azure-container-registry-config")
+	pflagRegister(global, local, "enable-aws-credentials")
 
 	fs.AddFlagSet(local)
 }
