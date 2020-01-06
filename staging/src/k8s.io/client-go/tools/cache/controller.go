@@ -54,18 +54,20 @@ type Config struct {
 	// `"apiVersion"` must also be right.
 	ObjectType runtime.Object
 
-	// FullResyncPeriod is the period at which ShouldResync is invoked.
+	// FullResyncPeriod is the period at which ShouldResync is considered.
 	FullResyncPeriod time.Duration
 
-	// ShouldResync, if specified, is invoked when the controller's reflector determines the next
-	// periodic sync should occur. If this returns true, it means the reflector should proceed with
-	// the resync.
+	// ShouldResync is periodically used by the reflector to determine
+	// whether to Resync the Queue. If ShouldResync is `nil` or
+	// returns true, it means the reflector should proceed with the
+	// resync.
 	ShouldResync ShouldResyncFunc
 
 	// If true, when Process() returns an error, re-enqueue the object.
 	// TODO: add interface to let you inject a delay/backoff or drop
 	//       the object completely if desired. Pass the object in
-	//       question to this interface as a parameter.
+	//       question to this interface as a parameter.  This is probably moot
+	//       now that this functionality appears at a higher level.
 	RetryOnError bool
 }
 
