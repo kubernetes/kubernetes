@@ -421,11 +421,6 @@ func (c *Client) WaitForClusterAvailable(retries int, retryInterval time.Duratio
 	return false, errors.New("timeout waiting for etcd cluster to be available")
 }
 
-// CheckConfigurationIsHA returns true if the given InitConfiguration etcd block appears to be an HA configuration.
-func CheckConfigurationIsHA(cfg *kubeadmapi.Etcd) bool {
-	return cfg.External != nil && len(cfg.External.Endpoints) > 1
-}
-
 // GetClientURL creates an HTTPS URL that uses the configured advertise
 // address and client port for the API controller
 func GetClientURL(localEndpoint *kubeadmapi.APIEndpoint) string {
