@@ -22,60 +22,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 )
-
-func TestBuildScoringFunctionShapeFromRequestedToCapacityRatioArguments(t *testing.T) {
-	arguments := schedulerapi.RequestedToCapacityRatioArguments{
-		Shape: []schedulerapi.UtilizationShapePoint{
-			{Utilization: 10, Score: 1},
-			{Utilization: 30, Score: 5},
-			{Utilization: 70, Score: 2},
-		},
-		Resources: []schedulerapi.ResourceSpec{
-			{Name: string(v1.ResourceCPU)},
-			{Name: string(v1.ResourceMemory)},
-		},
-	}
-	builtShape, resources := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(&arguments)
-	expectedShape, _ := noderesources.NewFunctionShape([]noderesources.FunctionShapePoint{
-		{Utilization: 10, Score: 10},
-		{Utilization: 30, Score: 50},
-		{Utilization: 70, Score: 20},
-	})
-	expectedResources := noderesources.ResourceToWeightMap{
-		v1.ResourceCPU:    1,
-		v1.ResourceMemory: 1,
-	}
-	assert.Equal(t, expectedShape, builtShape)
-	assert.Equal(t, expectedResources, resources)
-}
-
-func TestBuildScoringFunctionShapeFromRequestedToCapacityRatioArgumentsNilResourceToWeightMap(t *testing.T) {
-	arguments := schedulerapi.RequestedToCapacityRatioArguments{
-		Shape: []schedulerapi.UtilizationShapePoint{
-			{Utilization: 10, Score: 1},
-			{Utilization: 30, Score: 5},
-			{Utilization: 70, Score: 2},
-		},
-	}
-	builtShape, resources := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(&arguments)
-	expectedShape, _ := noderesources.NewFunctionShape([]noderesources.FunctionShapePoint{
-		{Utilization: 10, Score: 10},
-		{Utilization: 30, Score: 50},
-		{Utilization: 70, Score: 20},
-	})
-	expectedResources := noderesources.ResourceToWeightMap{
-		v1.ResourceCPU:    1,
-		v1.ResourceMemory: 1,
-	}
-	assert.Equal(t, expectedShape, builtShape)
-	assert.Equal(t, expectedResources, resources)
-}
 
 func produceConfig(keys []string, producersMap map[string]ConfigProducer, args ConfigProducerArgs) (*config.Plugins, []config.PluginConfig, error) {
 	var plugins config.Plugins

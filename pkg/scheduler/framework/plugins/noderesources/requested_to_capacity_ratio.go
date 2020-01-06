@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -36,37 +37,61 @@ const (
 	maxScore                     = framework.MaxNodeScore
 )
 
-// FunctionShape represents shape of scoring function.
-// For safety use NewFunctionShape which performs precondition checks for struct creation.
-type FunctionShape []FunctionShapePoint
-
-// FunctionShapePoint represents single point in scoring function shape.
-type FunctionShapePoint struct {
-	// Utilization is function argument.
-	Utilization int64
-	// Score is function value.
-	Score int64
-}
-
 // RequestedToCapacityRatioArgs holds the args that are used to configure the plugin.
 type RequestedToCapacityRatioArgs struct {
-	FunctionShape       FunctionShape
-	ResourceToWeightMap ResourceToWeightMap
+	config.RequestedToCapacityRatioArguments
+}
+
+type functionShape []functionShapePoint
+
+type functionShapePoint struct {
+	// Utilization is function argument.
+	utilization int64
+	// Score is function value.
+	score int64
 }
 
 // NewRequestedToCapacityRatio initializes a new plugin and returns it.
 func NewRequestedToCapacityRatio(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
-	args := &RequestedToCapacityRatioArgs{}
+	args := &config.RequestedToCapacityRatioArguments{}
 	if err := framework.DecodeInto(plArgs, args); err != nil {
 		return nil, err
+	}
+
+	shape := make([]functionShapePoint, 0, len(args.Shape))
+	for _, point := range args.Shape {
+		shape = append(shape, functionShapePoint{
+			utilization: int64(point.Utilization),
+			// MaxCustomPriorityScore may diverge from the max score used in the scheduler and defined by MaxNodeScore,
+			// therefore we need to scale the score returned by requested to capacity ratio to the score range
+			// used by the scheduler.
+			score: int64(point.Score) * (framework.MaxNodeScore / config.MaxCustomPriorityScore),
+		})
+	}
+
+	if err := validateFunctionShape(shape); err != nil {
+		return nil, err
+	}
+
+	resourceToWeightMap := make(resourceToWeightMap)
+	for _, resource := range args.Resources {
+		resourceToWeightMap[v1.ResourceName(resource.Name)] = resource.Weight
+		if resource.Weight == 0 {
+			// Apply the default weight.
+			resourceToWeightMap[v1.ResourceName(resource.Name)] = 1
+		}
+	}
+	if len(args.Resources) == 0 {
+		// If no resources specified, used the default set.
+		resourceToWeightMap = defaultRequestedRatioResources
 	}
 
 	return &RequestedToCapacityRatio{
 		handle: handle,
 		resourceAllocationScorer: resourceAllocationScorer{
 			RequestedToCapacityRatioName,
-			buildRequestedToCapacityRatioScorerFunction(args.FunctionShape, args.ResourceToWeightMap),
-			args.ResourceToWeightMap,
+			buildRequestedToCapacityRatioScorerFunction(shape, resourceToWeightMap),
+			resourceToWeightMap,
 		},
 	}, nil
 }
@@ -99,44 +124,36 @@ func (pl *RequestedToCapacityRatio) ScoreExtensions() framework.ScoreExtensions 
 	return nil
 }
 
-// NewFunctionShape creates instance of FunctionShape in a safe way performing all
-// necessary sanity checks.
-func NewFunctionShape(points []FunctionShapePoint) (FunctionShape, error) {
-
-	n := len(points)
-
-	if n == 0 {
-		return nil, fmt.Errorf("at least one point must be specified")
+func validateFunctionShape(shape functionShape) error {
+	if len(shape) == 0 {
+		return fmt.Errorf("at least one point must be specified")
 	}
 
-	for i := 1; i < n; i++ {
-		if points[i-1].Utilization >= points[i].Utilization {
-			return nil, fmt.Errorf("utilization values must be sorted. Utilization[%d]==%d >= Utilization[%d]==%d", i-1, points[i-1].Utilization, i, points[i].Utilization)
+	for i := 1; i < len(shape); i++ {
+		if shape[i-1].utilization >= shape[i].utilization {
+			return fmt.Errorf("utilization values must be sorted. Utilization[%d]==%d >= Utilization[%d]==%d", i-1, shape[i-1].utilization, i, shape[i].utilization)
 		}
 	}
 
-	for i, point := range points {
-		if point.Utilization < minUtilization {
-			return nil, fmt.Errorf("utilization values must not be less than %d. Utilization[%d]==%d", minUtilization, i, point.Utilization)
+	for i, point := range shape {
+		if point.utilization < minUtilization {
+			return fmt.Errorf("utilization values must not be less than %d. Utilization[%d]==%d", minUtilization, i, point.utilization)
 		}
-		if point.Utilization > maxUtilization {
-			return nil, fmt.Errorf("utilization values must not be greater than %d. Utilization[%d]==%d", maxUtilization, i, point.Utilization)
+		if point.utilization > maxUtilization {
+			return fmt.Errorf("utilization values must not be greater than %d. Utilization[%d]==%d", maxUtilization, i, point.utilization)
 		}
-		if point.Score < minScore {
-			return nil, fmt.Errorf("score values must not be less than %d. Score[%d]==%d", minScore, i, point.Score)
+		if point.score < minScore {
+			return fmt.Errorf("score values must not be less than %d. Score[%d]==%d", minScore, i, point.score)
 		}
-		if point.Score > maxScore {
-			return nil, fmt.Errorf("score valuses not be greater than %d. Score[%d]==%d", maxScore, i, point.Score)
+		if int64(point.score) > maxScore {
+			return fmt.Errorf("score values not be greater than %d. Score[%d]==%d", maxScore, i, point.score)
 		}
 	}
 
-	// We make defensive copy so we make no assumption if array passed as argument is not changed afterwards
-	pointsCopy := make(FunctionShape, n)
-	copy(pointsCopy, points)
-	return pointsCopy, nil
+	return nil
 }
 
-func validateResourceWeightMap(resourceToWeightMap ResourceToWeightMap) error {
+func validateResourceWeightMap(resourceToWeightMap resourceToWeightMap) error {
 	if len(resourceToWeightMap) == 0 {
 		return fmt.Errorf("resourceToWeightMap cannot be nil")
 	}
@@ -149,7 +166,7 @@ func validateResourceWeightMap(resourceToWeightMap ResourceToWeightMap) error {
 	return nil
 }
 
-func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape FunctionShape, resourceToWeightMap ResourceToWeightMap) func(resourceToValueMap, resourceToValueMap, bool, int, int) int64 {
+func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape functionShape, resourceToWeightMap resourceToWeightMap) func(resourceToValueMap, resourceToValueMap, bool, int, int) int64 {
 	rawScoringFunction := buildBrokenLinearFunction(scoringFunctionShape)
 	err := validateResourceWeightMap(resourceToWeightMap)
 	if err != nil {
@@ -179,25 +196,24 @@ func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape FunctionSh
 }
 
 // Creates a function which is built using linear segments. Segments are defined via shape array.
-// Shape[i].Utilization slice represents points on "utilization" axis where different segments meet.
-// Shape[i].Score represents function values at meeting points.
+// Shape[i].utilization slice represents points on "utilization" axis where different segments meet.
+// Shape[i].score represents function values at meeting points.
 //
 // function f(p) is defined as:
-//   shape[0].Score for p < f[0].Utilization
-//   shape[i].Score for p == shape[i].Utilization
-//   shape[n-1].Score for p > shape[n-1].Utilization
-// and linear between points (p < shape[i].Utilization)
-func buildBrokenLinearFunction(shape FunctionShape) func(int64) int64 {
-	n := len(shape)
+//   shape[0].score for p < f[0].utilization
+//   shape[i].score for p == shape[i].utilization
+//   shape[n-1].score for p > shape[n-1].utilization
+// and linear between points (p < shape[i].utilization)
+func buildBrokenLinearFunction(shape functionShape) func(int64) int64 {
 	return func(p int64) int64 {
-		for i := 0; i < n; i++ {
-			if p <= shape[i].Utilization {
+		for i := 0; i < len(shape); i++ {
+			if p <= int64(shape[i].utilization) {
 				if i == 0 {
-					return shape[0].Score
+					return shape[0].score
 				}
-				return shape[i-1].Score + (shape[i].Score-shape[i-1].Score)*(p-shape[i-1].Utilization)/(shape[i].Utilization-shape[i-1].Utilization)
+				return shape[i-1].score + (shape[i].score-shape[i-1].score)*(p-shape[i-1].utilization)/(shape[i].utilization-shape[i-1].utilization)
 			}
 		}
-		return shape[n-1].Score
+		return shape[len(shape)-1].score
 	}
 }
