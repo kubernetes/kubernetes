@@ -26,14 +26,13 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/apimachinery/pkg/util/uuid"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -252,11 +251,8 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 	ginkgo.It("should patch a Namespace", func() {
 		ginkgo.By("creating a Namespace")
 		namespaceName := "nspatchtest-" + string(uuid.NewUUID())
-		_, err := f.ClientSet.CoreV1().Namespaces().Create(&v1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: namespaceName,
-			},
-		})
+		ns, err := f.CreateNamespace(namespaceName, nil)
+		namespaceName = ns.ObjectMeta.Name
 		framework.ExpectNoError(err, "failed creating Namespace")
 
 		ginkgo.By("patching the Namespace")
@@ -267,12 +263,7 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 		ginkgo.By("get the Namespace and ensuring it has the label")
 		namespace, err := f.ClientSet.CoreV1().Namespaces().Get(namespaceName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get Namespace")
-		gomega.Expect(namespace.ObjectMeta.Labels["testLabel"]).To(gomega.Equal("testValue"), "namespace not patched")
-
-		ginkgo.By("deleting the Namespace")
-		err = f.ClientSet.CoreV1().Namespaces().Delete(namespaceName, &metav1.DeleteOptions{})
-		framework.ExpectNoError(err, "failed to delete the test Namespace")
+		framework.ExpectEqual(namespace.ObjectMeta.Labels["testLabel"], "testValue", "namespace not patched")
 	})
 
 })
-
