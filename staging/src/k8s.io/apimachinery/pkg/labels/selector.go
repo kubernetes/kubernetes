@@ -904,6 +904,20 @@ func SelectorFromValidatedSet(ls Set) Selector {
 	return internalSelector(requirements)
 }
 
+// SelectorFromValidatedSet returns a Selector which will match exactly the given Set.
+// A nil and empty Sets are considered equivalent to Everything().
+// It assumes that Set is already validated and doesn't do any validation.
+func SelectorWithoutSortingFromValidatedSet(ls Set) Selector {
+	if ls == nil || len(ls) == 0 {
+		return internalSelector{}
+	}
+	requirements := make([]Requirement, 0, len(ls))
+	for label, value := range ls {
+		requirements = append(requirements, Requirement{key: label, operator: selection.Equals, strValues: []string{value}})
+	}
+	return internalSelector(requirements)
+}
+
 // ParseToRequirements takes a string representing a selector and returns a list of
 // requirements. This function is suitable for those callers that perform additional
 // processing on selector requirements.

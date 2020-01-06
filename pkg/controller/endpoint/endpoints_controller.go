@@ -383,7 +383,7 @@ func (e *EndpointController) syncService(key string) error {
 	}
 
 	klog.V(5).Infof("About to update endpoints for service %q", key)
-	pods, err := e.podLister.Pods(service.Namespace).List(labels.Set(service.Spec.Selector).AsSelectorPreValidated())
+	pods, err := e.podLister.Pods(service.Namespace).List(labels.Set(service.Spec.Selector).AsUnsortedSelectorPreValidated())
 	if err != nil {
 		// Since we're getting stuff from a local cache, it is
 		// basically impossible to get this error.
