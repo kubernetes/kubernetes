@@ -168,21 +168,21 @@ type SharedIndexInformer interface {
 }
 
 // NewSharedInformer creates a new instance for the listwatcher.
-func NewSharedInformer(lw ListerWatcher, objOfWatchedType runtime.Object, resyncPeriod time.Duration) SharedInformer {
-	return NewSharedIndexInformer(lw, objOfWatchedType, resyncPeriod, Indexers{})
+func NewSharedInformer(lw ListerWatcher, exampleObject runtime.Object, resyncPeriod time.Duration) SharedInformer {
+	return NewSharedIndexInformer(lw, exampleObject, resyncPeriod, Indexers{})
 }
 
 // NewSharedIndexInformer creates a new instance for the listwatcher.
-func NewSharedIndexInformer(lw ListerWatcher, objOfWatchedType runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers Indexers) SharedIndexInformer {
+func NewSharedIndexInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers Indexers) SharedIndexInformer {
 	realClock := &clock.RealClock{}
 	sharedIndexInformer := &sharedIndexInformer{
 		processor:                       &sharedProcessor{clock: realClock},
 		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
 		listerWatcher:                   lw,
-		objectType:                      objOfWatchedType,
+		objectType:                      exampleObject,
 		resyncCheckPeriod:               defaultEventHandlerResyncPeriod,
 		defaultEventHandlerResyncPeriod: defaultEventHandlerResyncPeriod,
-		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", objOfWatchedType)),
+		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", exampleObject)),
 		clock:                           realClock,
 	}
 	return sharedIndexInformer
@@ -245,6 +245,11 @@ type sharedIndexInformer struct {
 	cacheMutationDetector MutationDetector
 
 	listerWatcher ListerWatcher
+
+	// objectType is an example object of the type this informer is
+	// expected to handle.  Only the type needs to be right, except
+	// that when that is `unstructured.Unstructured` the object's
+	// `"apiVersion"` must also be right.
 	objectType    runtime.Object
 
 	// resyncCheckPeriod is how often we want the reflector's resync timer to fire so it can call
@@ -609,9 +614,10 @@ type processorListener struct {
 	// full resync from the shared informer, but modified by two
 	// adjustments.  One is imposing a lower bound,
 	// `minimumResyncPeriod`.  The other is another lower bound, the
-	// sharedProcessor's `resyncCheckPeriod`, that is imposed in
-	// AddEventHandlerWithResyncPeriod invocations made after the
-	// sharedProcessor starts.
+	// sharedProcessor's `resyncCheckPeriod`, that is imposed (a) only
+	// in AddEventHandlerWithResyncPeriod invocations made after the
+	// sharedProcessor starts and (b) only if the informer does
+	// resyncs at all.
 	requestedResyncPeriod time.Duration
 	// resyncPeriod is the threshold that will be used in the logic
 	// for this listener.  This value differs from
