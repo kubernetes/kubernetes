@@ -27,7 +27,7 @@ import (
 var _ = SIGDescribe("ComponentStatuses", func() {
 	f := framework.NewDefaultFramework("componentstatuses")
 
-	ginkgo.It("should read and list ComponentStatuses", func() {
+	ginkgo.It("should read and list ComponentStatuses to ensure health", func() {
 		ginkgo.By("listing all ComponentStatuses")
 		csList, _ := f.ClientSet.CoreV1().ComponentStatuses().List(metav1.ListOptions{})
 		healthyCount := 0
@@ -42,6 +42,21 @@ var _ = SIGDescribe("ComponentStatuses", func() {
 		}
 
 		gomega.Expect(healthyCount).To(gomega.Equal(len(csList.Items)), "Components are not all healthy")
+	})
+
+	ginkgo.It("should ensure select Components exist", func() {
+		requiredComponentsFound := map[string]string{
+			"scheduler": "false",
+			"controller-manager": "false",
+		}
+
+		ginkgo.By("listing all ComponentStatuses")
+		csList, _ := f.ClientSet.CoreV1().ComponentStatuses().List(metav1.ListOptions{})
+		for _, csItem := range csList.Items {
+			if requiredComponentsFound[csItem.ObjectMeta.Name] == "false" {
+				requiredComponentsFound[csItem.ObjectMeta.Name] = "true"
+			}
+		}
 	})
 })
 
