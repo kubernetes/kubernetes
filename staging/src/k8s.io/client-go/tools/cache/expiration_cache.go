@@ -194,9 +194,9 @@ func (c *ExpirationCache) Replace(list []interface{}, resourceVersion string) er
 	return nil
 }
 
-// Resync will touch all objects to put them into the processing queue
+// Resync is a no-op for one of these
 func (c *ExpirationCache) Resync() error {
-	return c.cacheStorage.Resync()
+	return nil
 }
 
 // NewTTLStore creates and returns a ExpirationCache with a TTLPolicy

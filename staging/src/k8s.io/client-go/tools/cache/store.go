@@ -31,8 +31,8 @@ import (
 // are given only the object.
 //
 // In the simplest Store implementations each accumulator is simply
-// the last given object and thus the Store's behavior is simple
-// storage.
+// the last given object, or empty after Delete, and thus the Store's
+// behavior is simple storage.
 //
 // Reflector knows how to watch a server and update a Store.  This
 // package provides a variety of implementations of Store.
@@ -66,9 +66,7 @@ type Store interface {
 
 	// Resync is meaningless in the terms appearing here but has
 	// meaning in some implementations that have non-trivial
-	// additional behavior.  In general the idea is to tee up the
-	// current non-empty accumulators or their keys for
-	// reconsideration (whatever that means).
+	// additional behavior (e.g., DeltaFIFO).
 	Resync() error
 }
 
@@ -131,9 +129,8 @@ func SplitMetaNamespaceKey(key string) (namespace, name string, err error) {
 	return "", "", fmt.Errorf("unexpected key format: %q", key)
 }
 
-// cache responsibilities are limited to:
-//	1. Computing keys for objects via keyFunc
-//  2. Invoking methods of a ThreadSafeStorage interface
+// `*cache` implements Indexer in terms of a ThreadSafeStore and an
+// associated KeyFunc.
 type cache struct {
 	// cacheStorage bears the burden of thread safety for the cache
 	cacheStorage ThreadSafeStore
@@ -247,9 +244,9 @@ func (c *cache) Replace(list []interface{}, resourceVersion string) error {
 	return nil
 }
 
-// Resync touches all items in the store to force processing
+// Resync is meaningless for one of these
 func (c *cache) Resync() error {
-	return c.cacheStorage.Resync()
+	return nil
 }
 
 // NewStore returns a Store implemented simply with a map and a lock.
