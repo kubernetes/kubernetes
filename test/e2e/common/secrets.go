@@ -25,9 +25,9 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
+	"encoding/base64"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	"encoding/base64"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -143,7 +143,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 
 		secretTestName := "test-secret-" + string(uuid.NewUUID())
 
-		 // create a secret in namespace default
+		// create a secret in namespace default
 		_, err := f.ClientSet.CoreV1().Secrets("default").Create(&v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: secretTestName,
@@ -193,10 +193,9 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 		for _, val := range secretsList.Items {
 			if val.ObjectMeta.Name == secretTestName && string(val.Data["key"]) == "value" {
 				foundCreatedSecret = true
-				secretCreatedName = val.ObjectMeta.Name
 			}
 		}
-		gomega.Expect(foundCreatedSecret).To(gomega.BeFalse(), "secret was not deleted sucessfully")
+		gomega.Expect(foundCreatedSecret).To(gomega.BeFalse(), "secret was not deleted successfully")
 	})
 })
 
