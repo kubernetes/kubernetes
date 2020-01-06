@@ -606,9 +606,12 @@ type processorListener struct {
 	pendingNotifications buffer.RingGrowing
 
 	// requestedResyncPeriod is how frequently the listener wants a
-	// full resync from the shared informer, but is bounded below by
-	// `minimumResyncPeriod` and the sharedProcessor's
-	// `resyncCheckPeriod`.
+	// full resync from the shared informer, but modified by two
+	// adjustments.  One is imposing a lower bound,
+	// `minimumResyncPeriod`.  The other is another lower bound, the
+	// sharedProcessor's `resyncCheckPeriod`, that is imposed in
+	// AddEventHandlerWithResyncPeriod invocations made after the
+	// sharedProcessor starts.
 	requestedResyncPeriod time.Duration
 	// resyncPeriod is the threshold that will be used in the logic
 	// for this listener.  This value differs from
