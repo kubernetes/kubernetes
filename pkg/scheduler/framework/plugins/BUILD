@@ -32,7 +32,6 @@ go_library(
         "//pkg/scheduler/framework/plugins/volumezone:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/volumebinder:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
@@ -82,9 +81,6 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/scheduler/apis/config:go_default_library",
-        "//pkg/scheduler/framework/plugins/noderesources:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
-        "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )

@@ -67,8 +67,11 @@ func TestRequestedToCapacityRatio(t *testing.T) {
 			state := framework.NewCycleState()
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.scheduledPods, test.nodes))
 			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
-			args := &runtime.Unknown{Raw: []byte(`{"FunctionShape" : [{"Utilization" : 0, "Score" : 100}, {"Utilization" : 100, "Score" : 0}], "ResourceToWeightMap" : {"memory" : 1, "cpu" : 1}}`)}
-			p, _ := NewRequestedToCapacityRatio(args, fh)
+			args := &runtime.Unknown{Raw: []byte(`{"shape" : [{"utilization" : 0, "score" : 10}, {"utilization" : 100, "score" : 0}], "resources" : [{"name" : "memory", "weight" : 1}, {"name" : "cpu", "weight" : 1}]}`)}
+			p, err := NewRequestedToCapacityRatio(args, fh)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
 			var gotPriorities framework.NodeScoreList
 			for _, n := range test.nodes {
@@ -106,43 +109,43 @@ func makePod(node string, milliCPU, memory int64) *v1.Pod {
 
 func TestCreatingFunctionShapeErrorsIfEmptyPoints(t *testing.T) {
 	var err error
-	_, err = NewFunctionShape([]FunctionShapePoint{})
+	err = validateFunctionShape([]functionShapePoint{})
 	assert.Equal(t, "at least one point must be specified", err.Error())
 }
 
 func TestCreatingResourceNegativeWeight(t *testing.T) {
-	err := validateResourceWeightMap(ResourceToWeightMap{v1.ResourceCPU: -1})
+	err := validateResourceWeightMap(resourceToWeightMap{v1.ResourceCPU: -1})
 	assert.Equal(t, "resource cpu weight -1 must not be less than 1", err.Error())
 }
 
 func TestCreatingResourceDefaultWeight(t *testing.T) {
-	err := validateResourceWeightMap(ResourceToWeightMap{})
+	err := validateResourceWeightMap(resourceToWeightMap{})
 	assert.Equal(t, "resourceToWeightMap cannot be nil", err.Error())
 
 }
 
 func TestCreatingFunctionShapeErrorsIfXIsNotSorted(t *testing.T) {
 	var err error
-	_, err = NewFunctionShape([]FunctionShapePoint{{10, 1}, {15, 2}, {20, 3}, {19, 4}, {25, 5}})
+	err = validateFunctionShape([]functionShapePoint{{10, 1}, {15, 2}, {20, 3}, {19, 4}, {25, 5}})
 	assert.Equal(t, "utilization values must be sorted. Utilization[2]==20 >= Utilization[3]==19", err.Error())
 
-	_, err = NewFunctionShape([]FunctionShapePoint{{10, 1}, {20, 2}, {20, 3}, {22, 4}, {25, 5}})
+	err = validateFunctionShape([]functionShapePoint{{10, 1}, {20, 2}, {20, 3}, {22, 4}, {25, 5}})
 	assert.Equal(t, "utilization values must be sorted. Utilization[1]==20 >= Utilization[2]==20", err.Error())
 }
 
 func TestCreatingFunctionPointNotInAllowedRange(t *testing.T) {
 	var err error
-	_, err = NewFunctionShape([]FunctionShapePoint{{-1, 0}, {100, 100}})
+	err = validateFunctionShape([]functionShapePoint{{-1, 0}, {100, 100}})
 	assert.Equal(t, "utilization values must not be less than 0. Utilization[0]==-1", err.Error())
 
-	_, err = NewFunctionShape([]FunctionShapePoint{{0, 0}, {101, 100}})
+	err = validateFunctionShape([]functionShapePoint{{0, 0}, {101, 100}})
 	assert.Equal(t, "utilization values must not be greater than 100. Utilization[1]==101", err.Error())
 
-	_, err = NewFunctionShape([]FunctionShapePoint{{0, -1}, {100, 100}})
+	err = validateFunctionShape([]functionShapePoint{{0, -1}, {100, 100}})
 	assert.Equal(t, "score values must not be less than 0. Score[0]==-1", err.Error())
 
-	_, err = NewFunctionShape([]FunctionShapePoint{{0, 0}, {100, 101}})
-	assert.Equal(t, "score valuses not be greater than 100. Score[1]==101", err.Error())
+	err = validateFunctionShape([]functionShapePoint{{0, 0}, {100, 101}})
+	assert.Equal(t, "score values not be greater than 100. Score[1]==101", err.Error())
 }
 
 func TestBrokenLinearFunction(t *testing.T) {
@@ -151,13 +154,13 @@ func TestBrokenLinearFunction(t *testing.T) {
 		expected int64
 	}
 	type Test struct {
-		points     []FunctionShapePoint
+		points     []functionShapePoint
 		assertions []Assertion
 	}
 
 	tests := []Test{
 		{
-			points: []FunctionShapePoint{{10, 1}, {90, 9}},
+			points: []functionShapePoint{{10, 1}, {90, 9}},
 			assertions: []Assertion{
 				{p: -10, expected: 1},
 				{p: 0, expected: 1},
@@ -174,7 +177,7 @@ func TestBrokenLinearFunction(t *testing.T) {
 			},
 		},
 		{
-			points: []FunctionShapePoint{{0, 2}, {40, 10}, {100, 0}},
+			points: []functionShapePoint{{0, 2}, {40, 10}, {100, 0}},
 			assertions: []Assertion{
 				{p: -10, expected: 2},
 				{p: 0, expected: 2},
@@ -187,7 +190,7 @@ func TestBrokenLinearFunction(t *testing.T) {
 			},
 		},
 		{
-			points: []FunctionShapePoint{{0, 2}, {40, 2}, {100, 2}},
+			points: []functionShapePoint{{0, 2}, {40, 2}, {100, 2}},
 			assertions: []Assertion{
 				{p: -10, expected: 2},
 				{p: 0, expected: 2},
@@ -202,9 +205,7 @@ func TestBrokenLinearFunction(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		functionShape, err := NewFunctionShape(test.points)
-		assert.Nil(t, err)
-		function := buildBrokenLinearFunction(functionShape)
+		function := buildBrokenLinearFunction(test.points)
 		for _, assertion := range test.assertions {
 			assert.InDelta(t, assertion.expected, function(assertion.p), 0.1, "points=%v, p=%f", test.points, assertion.p)
 		}
@@ -350,8 +351,11 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 			state := framework.NewCycleState()
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
-			args := &runtime.Unknown{Raw: []byte(`{"FunctionShape" : [{"Utilization" : 0, "Score" : 0}, {"Utilization" : 100, "Score" : 10}], "ResourceToWeightMap" : {"intel.com/foo" : 1}}`)}
-			p, _ := NewRequestedToCapacityRatio(args, fh)
+			args := &runtime.Unknown{Raw: []byte(`{"shape" : [{"utilization" : 0, "score" : 0}, {"utilization" : 100, "score" : 1}], "resources" : [{"name" : "intel.com/foo", "weight" : 1}]}`)}
+			p, err := NewRequestedToCapacityRatio(args, fh)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
 			var gotList framework.NodeScoreList
 			for _, n := range test.nodes {
@@ -582,8 +586,11 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			state := framework.NewCycleState()
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
-			args := &runtime.Unknown{Raw: []byte(`{"FunctionShape" : [{"Utilization" : 0, "Score" : 0}, {"Utilization" : 100, "Score" : 10}], "ResourceToWeightMap" : {"intel.com/foo" : 3, "intel.com/bar" : 5}}`)}
-			p, _ := NewRequestedToCapacityRatio(args, fh)
+			args := &runtime.Unknown{Raw: []byte(`{"shape" : [{"utilization" : 0, "score" : 0}, {"utilization" : 100, "score" : 1}], "resources" : [{"name" : "intel.com/foo", "weight" : 3}, {"name" : "intel.com/bar", "weight": 5}]}`)}
+			p, err := NewRequestedToCapacityRatio(args, fh)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
 			var gotList framework.NodeScoreList
 			for _, n := range test.nodes {
