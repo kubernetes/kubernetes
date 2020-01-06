@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
-var enableFlag = pflag.Bool("enable-aws-credentials", false, "set true to enable aws credentials provider")
+var enableFlag = pflag.Bool("enable-aws-credentials", true, "set false to disable aws credentials provider")
 var ecrPattern = regexp.MustCompile(`^(\d{12})\.dkr\.ecr(\-fips)?\.([a-zA-Z0-9][a-zA-Z0-9-_]*)\.amazonaws\.com(\.cn)?$`)
 
 // init registers a credential provider for each registryURLTemplate and creates
