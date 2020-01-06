@@ -52,11 +52,6 @@ func TestHandshake(t *testing.T) {
 		expectedProtocol string
 		expectError      bool
 	}{
-		"no client protocols": {
-			clientProtocols:  []string{},
-			serverProtocols:  []string{"a", "b"},
-			expectedProtocol: "",
-		},
 		"no common protocol": {
 			clientProtocols:  []string{"c"},
 			serverProtocols:  []string{"a", "b"},
