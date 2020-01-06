@@ -611,11 +611,12 @@ type processorListener struct {
 	// `resyncCheckPeriod`.
 	requestedResyncPeriod time.Duration
 	// resyncPeriod is the threshold that will be used in the logic
-	// for this listener.  This value does not differ from
-	// requestedResyncPeriod.  The actual time between resyncs depends
-	// on when the sharedProcessor's `shouldResync` function is
-	// invoked and when the sharedIndexInformer processes `Sync` type
-	// Delta objects.
+	// for this listener.  This value differs from
+	// requestedResyncPeriod only when the sharedIndexInformer does
+	// not do resyncs, in which case the value here is zero.  The
+	// actual time between resyncs depends on when the
+	// sharedProcessor's `shouldResync` function is invoked and when
+	// the sharedIndexInformer processes `Sync` type Delta objects.
 	resyncPeriod time.Duration
 	// nextResync is the earliest time the listener should get a full resync
 	nextResync time.Time
