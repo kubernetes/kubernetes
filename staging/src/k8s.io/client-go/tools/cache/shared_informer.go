@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/buffer"
 
 	"k8s.io/klog"
@@ -648,28 +647,20 @@ func (p *processorListener) run() {
 	// delivering again.
 	stopCh := make(chan struct{})
 	wait.Until(func() {
-		// this gives us a few quick retries before a long pause and then a few more quick retries
-		err := wait.ExponentialBackoff(retry.DefaultRetry, func() (bool, error) {
-			for next := range p.nextCh {
-				switch notification := next.(type) {
-				case updateNotification:
-					p.handler.OnUpdate(notification.oldObj, notification.newObj)
-				case addNotification:
-					p.handler.OnAdd(notification.newObj)
-				case deleteNotification:
-					p.handler.OnDelete(notification.oldObj)
-				default:
-					utilruntime.HandleError(fmt.Errorf("unrecognized notification: %T", next))
-				}
+		for next := range p.nextCh {
+			switch notification := next.(type) {
+			case updateNotification:
+				p.handler.OnUpdate(notification.oldObj, notification.newObj)
+			case addNotification:
+				p.handler.OnAdd(notification.newObj)
+			case deleteNotification:
+				p.handler.OnDelete(notification.oldObj)
+			default:
+				utilruntime.HandleError(fmt.Errorf("unrecognized notification: %T", next))
 			}
-			// the only way to get here is if the p.nextCh is empty and closed
-			return true, nil
-		})
-
-		// the only way to get here is if the p.nextCh is empty and closed
-		if err == nil {
-			close(stopCh)
 		}
+		// the only way to get here is if the p.nextCh is empty and closed
+		close(stopCh)
 	}, 1*time.Minute, stopCh)
 }
 

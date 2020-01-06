@@ -183,73 +183,141 @@ func TestListenerResyncPeriods(t *testing.T) {
 }
 
 func TestResyncCheckPeriod(t *testing.T) {
+	checkResyncCheckPeriod(t, true)
+	checkResyncCheckPeriod(t, false)
+}
+
+func checkResyncCheckPeriod(t *testing.T, doResyncs bool) {
 	// source simulates an apiserver object endpoint.
 	source := fcache.NewFakeControllerSource()
 
-	// create the shared informer and resync every 12 hours
-	informer := NewSharedInformer(source, &v1.Pod{}, 12*time.Hour).(*sharedIndexInformer)
+	// Give it something to report, so that we have a way to wait for
+	// the informer to finish starting up.
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
+
+	// create the shared informer with an appropriate initial resync period
+	informer := NewSharedInformer(source, &v1.Pod{}, zeroDuration(12*time.Hour, !doResyncs)).(*sharedIndexInformer)
 
 	clock := clock.NewFakeClock(time.Now())
 	informer.clock = clock
 	informer.processor.clock = clock
 
 	// listener 1, never resync
-	listener1 := newTestListener("listener1", 0)
+	listener1 := newTestListener("listener1", 0, "pod1")
 	informer.AddEventHandlerWithResyncPeriod(listener1, listener1.resyncPeriod)
-	if e, a := 12*time.Hour, informer.resyncCheckPeriod; e != a {
+	if e, a := zeroDuration(12*time.Hour, !doResyncs), informer.resyncCheckPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := time.Duration(0), informer.processor.listeners[0].resyncPeriod; e != a {
+	if e, a := time.Duration(0), informer.processor.listeners[0].requestedResyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
+	checkResyncPeriods(t, informer.processor, !doResyncs)
 
 	// listener 2, resync every minute
-	listener2 := newTestListener("listener2", 1*time.Minute)
+	listener2 := newTestListener("listener2", 1*time.Minute, "pod1")
 	informer.AddEventHandlerWithResyncPeriod(listener2, listener2.resyncPeriod)
-	if e, a := 1*time.Minute, informer.resyncCheckPeriod; e != a {
+	if e, a := zeroDuration(1*time.Minute, !doResyncs), informer.resyncCheckPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := time.Duration(0), informer.processor.listeners[0].resyncPeriod; e != a {
+	if e, a := time.Duration(0), informer.processor.listeners[0].requestedResyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := 1*time.Minute, informer.processor.listeners[1].resyncPeriod; e != a {
+	if e, a := 1*time.Minute, informer.processor.listeners[1].requestedResyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
+	checkResyncPeriods(t, informer.processor, !doResyncs)
 
 	// listener 3, resync every 55 seconds
-	listener3 := newTestListener("listener3", 55*time.Second)
+	listener3 := newTestListener("listener3", 55*time.Second, "pod1")
 	informer.AddEventHandlerWithResyncPeriod(listener3, listener3.resyncPeriod)
-	if e, a := 55*time.Second, informer.resyncCheckPeriod; e != a {
+	if e, a := zeroDuration(55*time.Second, !doResyncs), informer.resyncCheckPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := time.Duration(0), informer.processor.listeners[0].resyncPeriod; e != a {
+	if e, a := time.Duration(0), informer.processor.listeners[0].requestedResyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := 1*time.Minute, informer.processor.listeners[1].resyncPeriod; e != a {
+	if e, a := 1*time.Minute, informer.processor.listeners[1].requestedResyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := 55*time.Second, informer.processor.listeners[2].resyncPeriod; e != a {
+	if e, a := 55*time.Second, informer.processor.listeners[2].requestedResyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
+	checkResyncPeriods(t, informer.processor, !doResyncs)
 
 	// listener 4, resync every 5 seconds
-	listener4 := newTestListener("listener4", 5*time.Second)
+	listener4 := newTestListener("listener4", 5*time.Second, "pod1")
 	informer.AddEventHandlerWithResyncPeriod(listener4, listener4.resyncPeriod)
-	if e, a := 5*time.Second, informer.resyncCheckPeriod; e != a {
+	if e, a := zeroDuration(5*time.Second, !doResyncs), informer.resyncCheckPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := time.Duration(0), informer.processor.listeners[0].resyncPeriod; e != a {
+	if e, a := time.Duration(0), informer.processor.listeners[0].requestedResyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := 1*time.Minute, informer.processor.listeners[1].resyncPeriod; e != a {
+	if e, a := 1*time.Minute, informer.processor.listeners[1].requestedResyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := 55*time.Second, informer.processor.listeners[2].resyncPeriod; e != a {
+	if e, a := 55*time.Second, informer.processor.listeners[2].requestedResyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := 5*time.Second, informer.processor.listeners[3].resyncPeriod; e != a {
+	if e, a := 5*time.Second, informer.processor.listeners[3].requestedResyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
+	checkResyncPeriods(t, informer.processor, !doResyncs)
+
+	// Now start the informer so we can test that the resyncCheckPeriod shrinks no further
+	stop := make(chan struct{})
+	defer close(stop)
+	go informer.Run(stop)
+
+	// Now wait for the informer to finish starting up
+	if !listener1.ok() {
+		t.Errorf("%s: expected %v, got %v", listener1.name, listener1.expectedItemNames, listener1.receivedItemNames)
+	}
+
+	// listener 5, request resync every 3 seconds, get every 5
+	listener5 := newTestListener("listener5", 3*time.Second, "pod1")
+	informer.AddEventHandlerWithResyncPeriod(listener5, listener5.resyncPeriod)
+	if e, a := zeroDuration(5*time.Second, !doResyncs), informer.resyncCheckPeriod; e != a {
+		t.Errorf("expected %d, got %d", e, a)
+	}
+	if e, a := time.Duration(0), informer.processor.listeners[0].requestedResyncPeriod; e != a {
+		t.Errorf("expected %d, got %d", e, a)
+	}
+	if e, a := 1*time.Minute, informer.processor.listeners[1].requestedResyncPeriod; e != a {
+		t.Errorf("expected %d, got %d", e, a)
+	}
+	if e, a := 55*time.Second, informer.processor.listeners[2].requestedResyncPeriod; e != a {
+		t.Errorf("expected %d, got %d", e, a)
+	}
+	if e, a := 5*time.Second, informer.processor.listeners[3].requestedResyncPeriod; e != a {
+		t.Errorf("expected %d, got %d", e, a)
+	}
+	if e, a := ifElseDuration(doResyncs, 5*time.Second, 3*time.Second), informer.processor.listeners[4].requestedResyncPeriod; e != a {
+		t.Errorf("for doResyncs=%v: expected %d, got %d", doResyncs, e, a)
+	}
+	checkResyncPeriods(t, informer.processor, !doResyncs)
+
+}
+
+func checkResyncPeriods(t *testing.T, p *sharedProcessor, expectZero bool) {
+	for idx, listener := range p.listeners {
+		e := zeroDuration(listener.requestedResyncPeriod, expectZero)
+		a := listener.resyncPeriod
+		if e != a {
+			t.Errorf("for listener %d: expected %d, got %d", idx, e, a)
+		}
+	}
+}
+
+func zeroDuration(dur time.Duration, zeroIt bool) time.Duration {
+	return ifElseDuration(zeroIt, 0, dur)
+}
+
+func ifElseDuration(cond bool, durIf, durElse time.Duration) time.Duration {
+	if cond {
+		return durIf
+	}
+	return durElse
 }
 
 // verify that https://github.com/kubernetes/kubernetes/issues/59822 is fixed
