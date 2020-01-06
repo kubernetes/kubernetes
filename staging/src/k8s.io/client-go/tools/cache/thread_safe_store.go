@@ -23,7 +23,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// ThreadSafeStore is an interface that allows concurrent access to a storage backend.
+// ThreadSafeStore is an interface that allows concurrent indexed
+// access to a storage backend.  It is like Indexer but does not
+// (necessarily) know how to extract the Store key from a given
+// object.
+//
 // TL;DR caveats: you must not modify anything returned by Get or List as it will break
 // the indexing feature in addition to not being thread safe.
 //
@@ -51,6 +55,7 @@ type ThreadSafeStore interface {
 	// AddIndexers adds more indexers to this store.  If you call this after you already have data
 	// in the store, the results are undefined.
 	AddIndexers(newIndexers Indexers) error
+	// Resync is a no-op and is deprecated
 	Resync() error
 }
 
