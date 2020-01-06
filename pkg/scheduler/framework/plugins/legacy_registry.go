@@ -232,6 +232,7 @@ func NewLegacyRegistry() *LegacyRegistry {
 	registry.registerPriorityConfigProducer(priorities.SelectorSpreadPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, defaultpodtopologyspread.Name, &args.Weight)
+			plugins.PostFilter = appendToPluginSet(plugins.PostFilter, defaultpodtopologyspread.Name, nil)
 			return
 		})
 	registry.registerPriorityConfigProducer(priorities.TaintTolerationPriority,

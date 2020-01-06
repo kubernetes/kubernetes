@@ -1115,14 +1115,16 @@ func TestZeroRequest(t *testing.T) {
 
 			registry := framework.Registry{}
 			plugins := &schedulerapi.Plugins{
-				Filter: &schedulerapi.PluginSet{},
-				Score:  &schedulerapi.PluginSet{},
+				Filter:     &schedulerapi.PluginSet{},
+				PostFilter: &schedulerapi.PluginSet{},
+				Score:      &schedulerapi.PluginSet{},
 			}
 			var pluginConfigs []schedulerapi.PluginConfig
 			pluginRegistrations := []st.RegisterPluginFunc{
 				st.RegisterScorePlugin(noderesources.LeastAllocatedName, noderesources.NewLeastAllocated, 1),
 				st.RegisterScorePlugin(noderesources.BalancedAllocationName, noderesources.NewBalancedAllocation, 1),
 				st.RegisterScorePlugin(defaultpodtopologyspread.Name, defaultpodtopologyspread.New, 1),
+				st.RegisterPostFilterPlugin(defaultpodtopologyspread.Name, defaultpodtopologyspread.New),
 			}
 			for _, f := range pluginRegistrations {
 				f(&registry, plugins, pluginConfigs)
@@ -1154,9 +1156,16 @@ func TestZeroRequest(t *testing.T) {
 				false).(*genericScheduler)
 			scheduler.nodeInfoSnapshot = snapshot
 
+			ctx := context.Background()
+			state := framework.NewCycleState()
+			_, filteredNodesStatuses, err := scheduler.findNodesThatFit(ctx, state, test.pod)
+			if err != nil {
+				t.Fatalf("error filtering nodes: %+v", err)
+			}
+			scheduler.framework.RunPostFilterPlugins(ctx, state, test.pod, test.nodes, filteredNodesStatuses)
 			list, err := scheduler.prioritizeNodes(
-				context.Background(),
-				framework.NewCycleState(),
+				ctx,
+				state,
 				test.pod,
 				metadata,
 				test.nodes,
