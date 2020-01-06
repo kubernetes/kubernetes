@@ -21,7 +21,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("ComponentStatuses", func() {
@@ -41,22 +40,25 @@ var _ = SIGDescribe("ComponentStatuses", func() {
 			}
 		}
 
-		gomega.Expect(healthyCount).To(gomega.Equal(len(csList.Items)), "Components are not all healthy")
+		framework.ExpectEqual(healthyCount, len(csList.Items), "Components are not all healthy")
 	})
 
 	ginkgo.It("should ensure select Components exist", func() {
-		requiredComponentsFound := map[string]string{
-			"scheduler": "false",
-			"controller-manager": "false",
+		requiredComponents := map[string]bool{
+			"scheduler": true,
+			"controller-manager": true,
 		}
+		requiredComponentFoundCount := 0
 
 		ginkgo.By("listing all ComponentStatuses")
 		csList, _ := f.ClientSet.CoreV1().ComponentStatuses().List(metav1.ListOptions{})
 		for _, csItem := range csList.Items {
-			if requiredComponentsFound[csItem.ObjectMeta.Name] == "false" {
-				requiredComponentsFound[csItem.ObjectMeta.Name] = "true"
+			if requiredComponents[csItem.ObjectMeta.Name] == true {
+				requiredComponentFoundCount ++
 			}
 		}
+
+		framework.ExpectEqual(requiredComponentFoundCount, len(requiredComponents), "Components are not all healthy")
 	})
 })
 
