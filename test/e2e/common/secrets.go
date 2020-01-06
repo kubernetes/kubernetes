@@ -26,6 +26,9 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
+	"encoding/base64"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
@@ -133,6 +136,67 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 	framework.ConformanceIt("should fail to create secret due to empty secret key", func() {
 		secret, err := createEmptyKeySecretForTest(f)
 		framework.ExpectError(err, "created secret %q with empty key in namespace %q", secret.Name, f.Namespace.Name)
+	})
+
+	ginkgo.It("should patch a secret", func() {
+		ginkgo.By("creating a secret")
+
+		secretTestName := "test-secret-" + string(uuid.NewUUID())
+
+		 // create a secret in namespace default
+		_, err := f.ClientSet.CoreV1().Secrets("default").Create(&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: secretTestName,
+			},
+			Data: map[string][]byte{
+				"key": []byte("value"),
+			},
+			Type: "Opaque",
+		})
+		framework.ExpectNoError(err, "failed to create secret")
+
+		ginkgo.By("listing secrets in all namespaces to ensure that there are more than zero")
+		// list all secrets in namespace default
+		secretsList, err := f.ClientSet.CoreV1().Secrets("").List(metav1.ListOptions{})
+		framework.ExpectNoError(err, "failed to list secrets")
+		gomega.Expect(len(secretsList.Items)).ToNot(gomega.Equal(0), "no secrets found")
+
+		foundCreatedSecret := false
+		var secretCreatedName string
+		for _, val := range secretsList.Items {
+			if val.ObjectMeta.Name == secretTestName && string(val.Data["key"]) == "value" {
+				foundCreatedSecret = true
+				secretCreatedName = val.ObjectMeta.Name
+			}
+		}
+		gomega.Expect(foundCreatedSecret).To(gomega.BeTrue(), "unable to find secret by its value")
+
+		ginkgo.By("patching the secret")
+		// patch the secret
+		secretPatchNewData := base64.StdEncoding.EncodeToString([]byte("value1"))
+		secretPatch := fmt.Sprintf(`{"metadata":{"labels":{"testsecret":"true"}},"data":{"key":"%v"}}`, secretPatchNewData)
+		_, err = f.ClientSet.CoreV1().Secrets("default").Patch(secretCreatedName, types.StrategicMergePatchType, []byte(secretPatch))
+		framework.ExpectNoError(err, "failed to patch secret")
+
+		ginkgo.By("deleting the secret using a LabelSelector")
+		err = f.ClientSet.CoreV1().Secrets("default").DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{
+			LabelSelector: "testsecret=true",
+		})
+		framework.ExpectNoError(err, "failed to delete patched secret")
+
+		ginkgo.By("listing secrets in all namespaces, searching for label name and value in patch")
+		// list all secrets in namespace default
+		secretsList, err = f.ClientSet.CoreV1().Secrets("").List(metav1.ListOptions{})
+		framework.ExpectNoError(err, "failed to list secrets")
+
+		foundCreatedSecret = false
+		for _, val := range secretsList.Items {
+			if val.ObjectMeta.Name == secretTestName && string(val.Data["key"]) == "value" {
+				foundCreatedSecret = true
+				secretCreatedName = val.ObjectMeta.Name
+			}
+		}
+		gomega.Expect(foundCreatedSecret).To(gomega.BeFalse(), "secret was not deleted sucessfully")
 	})
 })
 
