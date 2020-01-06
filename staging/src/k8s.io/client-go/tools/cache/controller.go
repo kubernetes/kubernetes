@@ -26,7 +26,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-// Config contains all the settings for a Controller.
+// This file implements a low-level controller that is used in
+// sharedIndexInformer, which is an implementation of
+// SharedIndexInformer.  Such informers, in turn, are key components
+// in the high level controllers that form the backbone of the
+// Kubernetes control plane.  Look at those for examples, or the
+// example in
+// https://github.com/kubernetes/client-go/tree/master/examples/workqueue
+// .
+
+// Config contains all the settings for one of these low-level controllers.
 type Config struct {
 	// The queue for your objects - has to be a DeltaFIFO due to
 	// assumptions in the implementation. Your Process() function
@@ -36,19 +45,16 @@ type Config struct {
 	// Something that can list and watch your objects.
 	ListerWatcher
 
-	// Something that can process your objects.
+	// Something that can process a popped Deltas.
 	Process ProcessFunc
 
-	// The type of your objects.
+	// ObjectType is an example object of the type this controller is
+	// expected to handle.  Only the type needs to be right, except
+	// that when that is `unstructured.Unstructured` the object's
+	// `"apiVersion"` must also be right.
 	ObjectType runtime.Object
 
-	// Reprocess everything at least this often.
-	// Note that if it takes longer for you to clear the queue than this
-	// period, you will end up processing items in the order determined
-	// by FIFO.Replace(). Currently, this is random. If this is a
-	// problem, we can change that replacement policy to append new
-	// things to the end of the queue instead of replacing the entire
-	// queue.
+	// FullResyncPeriod is the period at which ShouldResync is invoked.
 	FullResyncPeriod time.Duration
 
 	// ShouldResync, if specified, is invoked when the controller's reflector determines the next
@@ -71,7 +77,7 @@ type ShouldResyncFunc func() bool
 // ProcessFunc processes a single object.
 type ProcessFunc func(obj interface{}) error
 
-// Controller is a generic controller framework.
+// `*controller` implements Controller
 type controller struct {
 	config         Config
 	reflector      *Reflector
@@ -79,7 +85,7 @@ type controller struct {
 	clock          clock.Clock
 }
 
-// Controller is a generic controller framework.
+// Controller is a low-level controller used in sharedIndexInformer.
 type Controller interface {
 	Run(stopCh <-chan struct{})
 	HasSynced() bool
@@ -95,7 +101,7 @@ func New(c *Config) Controller {
 	return ctlr
 }
 
-// Run begins processing items, and will continue until a value is sent down stopCh.
+// Run begins processing items, and will continue until a value is sent down stopCh or it is closed.
 // It's an error to call Run more than once.
 // Run blocks; call via go.
 func (c *controller) Run(stopCh <-chan struct{}) {
