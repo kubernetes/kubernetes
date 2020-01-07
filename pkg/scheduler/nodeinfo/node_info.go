@@ -388,6 +388,9 @@ func (n *NodeInfo) AllocatableResource() Resource {
 	if n == nil {
 		return emptyResource
 	}
+	if n.allocatableResource == nil {
+		return emptyResource
+	}
 	return *n.allocatableResource
 }
 
