@@ -90,6 +90,22 @@ var _ recognizer.RecognizingDecoder = &Serializer{}
 
 const serializerIdentifier runtime.Identifier = "protobuf"
 
+func reuseOrMake(size uint64, w io.Writer) []byte {
+	buf, ok := w.(*bytes.Buffer)
+	if !ok {
+		// klog.Infof("reuseOrMake: unsupported type of io.Writer: %T: %v", w, w)
+		// w is most likely *responsewriters.deferredResponseWriter here.
+		// reuseOrMake: unsupported type of io.Writer: *responsewriters.deferredResponseWriter: &{application/vnd.kubernetes.protobuf 200 gzip false 0xc3a766e598 <nil>}
+		return make([]byte, size)
+	}
+
+	buf.Grow(int(size))
+	bytes := buf.Bytes()
+	bytes = bytes[len(bytes) : len(bytes)+int(size)]
+
+	return bytes
+}
+
 // Decode attempts to convert the provided data into a protobuf message, extract the stored schema kind, apply the provided default
 // gvk, and then load that data into an object matching the desired schema kind or the provided into. If into is *runtime.Unknown,
 // the raw data will be extracted and no decoding will be performed. If into is not registered with the typer, then the object will
@@ -176,7 +192,7 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 	switch t := obj.(type) {
 	case *runtime.Unknown:
 		estimatedSize := prefixSize + uint64(t.Size())
-		data := make([]byte, estimatedSize)
+		data := reuseOrMake(estimatedSize, w)
 		i, err := t.MarshalTo(data[prefixSize:])
 		if err != nil {
 			return err
@@ -200,7 +216,7 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 		// the more efficient Size and MarshalToSizedBuffer methods
 		encodedSize := uint64(t.Size())
 		estimatedSize := prefixSize + estimateUnknownSize(&unk, encodedSize)
-		data := make([]byte, estimatedSize)
+		data := reuseOrMake(estimatedSize, w)
 
 		i, err := unk.NestedMarshalTo(data[prefixSize:], t, encodedSize)
 		if err != nil {
@@ -221,7 +237,7 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 		unk.Raw = data
 
 		estimatedSize := prefixSize + uint64(unk.Size())
-		data = make([]byte, estimatedSize)
+		data = reuseOrMake(estimatedSize, w)
 
 		i, err := unk.MarshalTo(data[prefixSize:])
 		if err != nil {
@@ -407,7 +423,7 @@ func (s *RawSerializer) doEncode(obj runtime.Object, w io.Writer) error {
 		// this path performs a single allocation during write but requires the caller to implement
 		// the more efficient Size and MarshalToSizedBuffer methods
 		encodedSize := uint64(t.Size())
-		data := make([]byte, encodedSize)
+		data := reuseOrMake(encodedSize, w)
 
 		n, err := t.MarshalToSizedBuffer(data)
 		if err != nil {
@@ -420,7 +436,7 @@ func (s *RawSerializer) doEncode(obj runtime.Object, w io.Writer) error {
 		// this path performs a single allocation during write but requires the caller to implement
 		// the more efficient Size and MarshalTo methods
 		encodedSize := uint64(t.Size())
-		data := make([]byte, encodedSize)
+		data := reuseOrMake(encodedSize, w)
 
 		n, err := t.MarshalTo(data)
 		if err != nil {
