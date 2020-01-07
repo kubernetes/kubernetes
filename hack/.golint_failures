@@ -134,7 +134,6 @@ pkg/registry/admissionregistration/rest
 pkg/registry/apps/deployment/storage
 pkg/registry/apps/replicaset/storage
 pkg/registry/apps/rest
-pkg/registry/apps/statefulset/storage
 pkg/registry/auditregistration/rest
 pkg/registry/authentication/rest
 pkg/registry/authentication/tokenreview

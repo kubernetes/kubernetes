@@ -46,6 +46,7 @@ type StatefulSetStorage struct {
 	Scale       *ScaleREST
 }
 
+// NewStorage returns a new StatefulSetStorage object.
 func NewStorage(optsGetter generic.RESTOptionsGetter) (StatefulSetStorage, error) {
 	statefulSetRest, statefulSetStatusRest, err := NewREST(optsGetter)
 	if err != nil {
@@ -59,7 +60,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) (StatefulSetStorage, error
 	}, nil
 }
 
-// rest implements a RESTStorage for statefulsets against etcd
+// REST implements a RESTStorage for statefulsets against etcd.
 type REST struct {
 	*genericregistry.Store
 }
@@ -100,6 +101,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New returns a new statefulset object.
 func (r *StatusREST) New() runtime.Object {
 	return &apps.StatefulSet{}
 }
@@ -124,6 +126,7 @@ func (r *REST) ShortNames() []string {
 	return []string{"sts"}
 }
 
+// ScaleREST implements the REST endpoint for scaling a statefulSet.
 type ScaleREST struct {
 	store *genericregistry.Store
 }
@@ -132,6 +135,7 @@ type ScaleREST struct {
 var _ = rest.Patcher(&ScaleREST{})
 var _ = rest.GroupVersionKindProvider(&ScaleREST{})
 
+// GroupVersionKind creates the "scale" kind for the input group version.
 func (r *ScaleREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
 	switch containingGV {
 	case appsv1beta1.SchemeGroupVersion:
@@ -148,6 +152,7 @@ func (r *ScaleREST) New() runtime.Object {
 	return &autoscaling.Scale{}
 }
 
+// Get retrieves the object from the storage.
 func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	obj, err := r.store.Get(ctx, name, options)
 	if err != nil {
@@ -161,6 +166,7 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 	return scale, err
 }
 
+// Update alters the scale subset of an object.
 func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	obj, err := r.store.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
