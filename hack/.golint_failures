@@ -102,7 +102,6 @@ pkg/features
 pkg/kubeapiserver
 pkg/kubeapiserver/options
 pkg/kubectl/cmd/convert
-pkg/kubelet/apis/config
 pkg/kubelet/apis/config/v1beta1
 pkg/kubelet/checkpointmanager/testing/example_checkpoint_formats/v1
 pkg/kubelet/cm
