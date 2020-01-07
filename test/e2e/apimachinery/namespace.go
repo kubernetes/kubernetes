@@ -21,6 +21,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"encoding/json"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -256,7 +257,11 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 		namespaceName = ns.ObjectMeta.Name
 
 		ginkgo.By("patching the Namespace")
-		nspatch := `{"metadata":{"labels":{"testLabel":"testValue"}}}`
+		nspatch, err := json.Marshal(map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"labels": map[string]string{"testLabel":"testValue"},
+			},
+		})
 		_, err = f.ClientSet.CoreV1().Namespaces().Patch(namespaceName, types.StrategicMergePatchType, []byte(nspatch))
 		framework.ExpectNoError(err, "failed to patch Namespace")
 
