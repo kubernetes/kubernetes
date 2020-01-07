@@ -27,17 +27,26 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-// preFilterStateKey is the key in CycleState to InterPodAffinity pre-computed data for Filtering.
-// Using the name of the plugin will likely help us avoid collisions with other plugins.
-const preFilterStateKey = "PreFilter" + Name
+const (
+	// preFilterStateKey is the key in CycleState to InterPodAffinity pre-computed data for Filtering.
+	// Using the name of the plugin will likely help us avoid collisions with other plugins.
+	preFilterStateKey = "PreFilter" + Name
+
+	// ErrReasonExistingAntiAffinityRulesNotMatch is used for ExistingPodsAntiAffinityRulesNotMatch predicate error.
+	ErrReasonExistingAntiAffinityRulesNotMatch = "node(s) didn't satisfy existing pods anti-affinity rules"
+	// ErrReasonAffinityNotMatch is used for MatchInterPodAffinity predicate error.
+	ErrReasonAffinityNotMatch = "node(s) didn't match pod affinity/anti-affinity"
+	// ErrReasonAffinityRulesNotMatch is used for PodAffinityRulesNotMatch predicate error.
+	ErrReasonAffinityRulesNotMatch = "node(s) didn't match pod affinity rules"
+	// ErrReasonAntiAffinityRulesNotMatch is used for PodAntiAffinityRulesNotMatch predicate error.
+	ErrReasonAntiAffinityRulesNotMatch = "node(s) didn't match pod anti-affinity rules"
+)
 
 // preFilterState computed at PreFilter and used at Filter.
 type preFilterState struct {
@@ -530,12 +539,14 @@ func (pl *InterPodAffinity) getMatchingAntiAffinityTopologyPairsOfPods(pod *v1.P
 }
 
 // satisfiesPodsAffinityAntiAffinity checks if scheduling the pod onto this node would break any term of this pod.
+// This function returns two boolean flags. The first boolean flag indicates whether the pod matches affinity rules
+// or not. The second boolean flag indicates if the pod matches anti-affinity rules.
 func (pl *InterPodAffinity) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 	state *preFilterState, nodeInfo *nodeinfo.NodeInfo,
-	affinity *v1.Affinity) (predicates.PredicateFailureReason, error) {
+	affinity *v1.Affinity) (bool, bool, error) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return predicates.ErrPodAffinityRulesNotMatch, fmt.Errorf("node not found")
+		return false, false, fmt.Errorf("node not found")
 	}
 	if state != nil {
 		// Check all affinity terms.
@@ -548,7 +559,7 @@ func (pl *InterPodAffinity) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 				// in the cluster matches the namespace and selector of this pod and the pod matches
 				// its own terms, then we allow the pod to pass the affinity check.
 				if len(topologyToMatchedAffinityTerms) != 0 || !targetPodMatchesAffinityOfPod(pod, pod) {
-					return predicates.ErrPodAffinityRulesNotMatch, nil
+					return false, false, nil
 				}
 			}
 		}
@@ -558,13 +569,13 @@ func (pl *InterPodAffinity) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 		if antiAffinityTerms := schedutil.GetPodAntiAffinityTerms(affinity.PodAntiAffinity); len(antiAffinityTerms) > 0 {
 			matchExists := nodeMatchesAnyTopologyTerm(pod, topologyToMatchedAntiAffinityTerms, nodeInfo, antiAffinityTerms)
 			if matchExists {
-				return predicates.ErrPodAntiAffinityRulesNotMatch, nil
+				return true, false, nil
 			}
 		}
 	} else { // We don't have precomputed preFilterState. We have to follow a slow path to check affinity terms.
 		filteredPods, err := pl.sharedLister.Pods().FilteredList(nodeInfo.Filter, labels.Everything())
 		if err != nil {
-			return predicates.ErrPodAffinityRulesNotMatch, err
+			return false, false, err
 		}
 
 		affinityTerms := schedutil.GetPodAffinityTerms(affinity.PodAffinity)
@@ -575,7 +586,7 @@ func (pl *InterPodAffinity) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 			if !matchFound && len(affinityTerms) > 0 {
 				affTermsMatch, termsSelectorMatch, err := pl.podMatchesPodAffinityTerms(pod, targetPod, nodeInfo, affinityTerms)
 				if err != nil {
-					return predicates.ErrPodAffinityRulesNotMatch, err
+					return false, false, err
 				}
 				if termsSelectorMatch {
 					termsSelectorMatchFound = true
@@ -589,7 +600,7 @@ func (pl *InterPodAffinity) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 			if len(antiAffinityTerms) > 0 {
 				antiAffTermsMatch, _, err := pl.podMatchesPodAffinityTerms(pod, targetPod, nodeInfo, antiAffinityTerms)
 				if err != nil || antiAffTermsMatch {
-					return predicates.ErrPodAntiAffinityRulesNotMatch, err
+					return true, false, err
 				}
 			}
 		}
@@ -601,16 +612,16 @@ func (pl *InterPodAffinity) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 			// in the cluster matches the namespace and selector of this pod and the pod matches
 			// its own terms, then we allow the pod to pass the affinity check.
 			if termsSelectorMatchFound {
-				return predicates.ErrPodAffinityRulesNotMatch, nil
+				return false, false, nil
 			}
 			// Check if pod matches its own affinity terms (namespace and label selector).
 			if !targetPodMatchesAffinityOfPod(pod, pod) {
-				return predicates.ErrPodAffinityRulesNotMatch, nil
+				return false, false, nil
 			}
 		}
 	}
 
-	return nil, nil
+	return true, true, nil
 }
 
 // Filter invoked at the filter extension point.
@@ -622,7 +633,10 @@ func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState *framework.Cy
 	}
 
 	if s, err := pl.satisfiesExistingPodsAntiAffinity(pod, state, nodeInfo); !s || err != nil {
-		return migration.PredicateResultToFrameworkStatus([]predicates.PredicateFailureReason{predicates.ErrPodAffinityNotMatch, predicates.ErrExistingPodsAntiAffinityRulesNotMatch}, err)
+		if err != nil {
+			return framework.NewStatus(framework.Error, err.Error())
+		}
+		return framework.NewStatus(framework.Unschedulable, ErrReasonAffinityNotMatch, ErrReasonExistingAntiAffinityRulesNotMatch)
 	}
 
 	// Now check if <pod> requirements will be satisfied on this node.
@@ -630,8 +644,16 @@ func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState *framework.Cy
 	if affinity == nil || (affinity.PodAffinity == nil && affinity.PodAntiAffinity == nil) {
 		return nil
 	}
-	if status, err := pl.satisfiesPodsAffinityAntiAffinity(pod, state, nodeInfo, affinity); err != nil || status != nil {
-		return migration.PredicateResultToFrameworkStatus([]predicates.PredicateFailureReason{predicates.ErrPodAffinityNotMatch, status}, err)
+	if satisfiesAffinity, satisfiesAntiAffinity, err := pl.satisfiesPodsAffinityAntiAffinity(pod, state, nodeInfo, affinity); err != nil || !satisfiesAffinity || !satisfiesAntiAffinity {
+		if err != nil {
+			return framework.NewStatus(framework.Error, err.Error())
+		}
+
+		if !satisfiesAffinity {
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonAffinityNotMatch, ErrReasonAffinityRulesNotMatch)
+		}
+
+		return framework.NewStatus(framework.Unschedulable, ErrReasonAffinityNotMatch, ErrReasonAntiAffinityRulesNotMatch)
 	}
 
 	return nil

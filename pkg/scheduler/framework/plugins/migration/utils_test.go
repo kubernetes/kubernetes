@@ -43,18 +43,18 @@ func TestPredicateResultToFrameworkStatus(t *testing.T) {
 		{
 			name:       "Error with reason",
 			err:        errors.New("Failed with error"),
-			reasons:    []predicates.PredicateFailureReason{predicates.ErrTaintsTolerationsNotMatch},
+			reasons:    []predicates.PredicateFailureReason{predicates.ErrPodNotFitsHostPorts},
 			wantStatus: framework.NewStatus(framework.Error, "Failed with error"),
 		},
 		{
 			name:       "Unschedulable",
-			reasons:    []predicates.PredicateFailureReason{predicates.ErrExistingPodsAntiAffinityRulesNotMatch},
-			wantStatus: framework.NewStatus(framework.Unschedulable, "node(s) didn't satisfy existing pods anti-affinity rules"),
+			reasons:    []predicates.PredicateFailureReason{predicates.ErrPodNotFitsHostPorts},
+			wantStatus: framework.NewStatus(framework.Unschedulable, "node(s) didn't have free ports for the requested pod ports"),
 		},
 		{
 			name:       "Unschedulable and Unresolvable",
-			reasons:    []predicates.PredicateFailureReason{predicates.ErrTaintsTolerationsNotMatch, predicates.ErrNodeSelectorNotMatch},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) had taints that the pod didn't tolerate", "node(s) didn't match node selector"),
+			reasons:    []predicates.PredicateFailureReason{predicates.ErrPodNotFitsHostPorts, predicates.ErrNodeSelectorNotMatch},
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) didn't have free ports for the requested pod ports", "node(s) didn't match node selector"),
 		},
 	}
 	for _, tt := range tests {
