@@ -144,7 +144,7 @@ type SharedInformer interface {
 	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration)
 	// GetStore returns the informer's local cache as a Store.
 	GetStore() Store
-	// GetController gives back a synthetic interface that "votes" to start the informer
+	// GetController is deprecated, it does nothing useful
 	GetController() Controller
 	// Run starts and runs the shared informer, returning after it stops.
 	// The informer will be stopped when stopCh is closed.
@@ -237,6 +237,19 @@ func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool
 	return true
 }
 
+// `*sharedIndexInformer` implements SharedIndexInformer and has three
+// main components.  One is an indexed local cache, `indexer Indexer`.
+// The second main component is a Controller that pulls
+// objects/notifications using the ListerWatcher and pushes them into
+// a DeltaFIFO --- whose knownObjects is the informer's local cache
+// --- while concurrently Popping Deltas values from that fifo and
+// processing them with `sharedIndexInformer::HandleDeltas`.  Each
+// invocation of HandleDeltas, which is done with the fifo's lock
+// held, processes each Delta in turn.  For each Delta this both
+// updates the local cache and stuffs the relevant notification into
+// the sharedProcessor.  The third main component is that
+// sharedProcessor, which is responsible for relaying those
+// notifications to each of the informer's clients.
 type sharedIndexInformer struct {
 	indexer    Indexer
 	controller Controller
@@ -250,7 +263,7 @@ type sharedIndexInformer struct {
 	// expected to handle.  Only the type needs to be right, except
 	// that when that is `unstructured.Unstructured` the object's
 	// `"apiVersion"` must also be right.
-	objectType    runtime.Object
+	objectType runtime.Object
 
 	// resyncCheckPeriod is how often we want the reflector's resync timer to fire so it can call
 	// shouldResync to check if any of our listeners need a resync.
