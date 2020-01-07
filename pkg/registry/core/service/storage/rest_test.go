@@ -170,11 +170,11 @@ func generateRandomNodePort() int32 {
 	return int32(rand.IntnRange(30001, 30999))
 }
 
-func NewTestREST(t *testing.T, endpoints *api.EndpointsList, dualStack bool) (*REST, *serviceStorage, *etcd3testing.EtcdTestServer) {
-	return NewTestRESTWithPods(t, endpoints, nil, dualStack)
+func NewTestREST(t *testing.T, endpoints *api.EndpointsList, dualStack, singleStackIPv6 bool) (*REST, *serviceStorage, *etcd3testing.EtcdTestServer) {
+	return NewTestRESTWithPods(t, endpoints, nil, dualStack, singleStackIPv6)
 }
 
-func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.PodList, dualStack bool) (*REST, *serviceStorage, *etcd3testing.EtcdTestServer) {
+func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.PodList, dualStack, singleStackIPv6 bool) (*REST, *serviceStorage, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 
 	serviceStorage := &serviceStorage{}
@@ -215,15 +215,28 @@ func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.P
 		}
 	}
 
-	r, err := ipallocator.NewCIDRRange(makeIPNet(t))
-	if err != nil {
-		t.Fatalf("cannot create CIDR Range %v", err)
-	}
+	var r ipallocator.Interface
 	var rSecondary ipallocator.Interface
-	if dualStack {
+
+	switch {
+	case singleStackIPv6:
+		r, err = ipallocator.NewCIDRRange(makeIPNet6(t))
+		if err != nil {
+			t.Fatalf("cannot create CIDR Range %v", err)
+		}
+	case dualStack:
+		r, err = ipallocator.NewCIDRRange(makeIPNet(t))
+		if err != nil {
+			t.Fatalf("cannot create CIDR Range %v", err)
+		}
 		rSecondary, err = ipallocator.NewCIDRRange(makeIPNet6(t))
 		if err != nil {
 			t.Fatalf("cannot create CIDR Range(secondary) %v", err)
+		}
+	default:
+		r, err = ipallocator.NewCIDRRange(makeIPNet(t))
+		if err != nil {
+			t.Fatalf("cannot create CIDR Range %v", err)
 		}
 	}
 
@@ -291,10 +304,12 @@ func TestServiceRegistryCreate(t *testing.T) {
 	ipv6Service := api.IPv6Protocol
 
 	testCases := []struct {
-		svc             *api.Service
-		name            string
-		enableDualStack bool
-		useSecondary    bool
+		svc                   *api.Service
+		name                  string
+		enableSingleStackIPv6 bool
+		enableDualStack       bool
+		useSecondary          bool
+		expectErr             string
 	}{
 		{
 			name:            "Service IPFamily default cluster dualstack:off",
@@ -371,17 +386,44 @@ func TestServiceRegistryCreate(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                  "Service IPFamily:4 dualstack on, single stack ipv6, service CIDR IPv6",
+			enableDualStack:       true,
+			enableSingleStackIPv6: true,
+			useSecondary:          false,
+			svc: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: api.ServiceSpec{
+					Selector:        map[string]string{"bar": "baz"},
+					SessionAffinity: api.ServiceAffinityNone,
+					Type:            api.ServiceTypeClusterIP,
+					IPFamily:        &ipv4Service,
+					Ports: []api.ServicePort{{
+						Port:       6502,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+					}},
+				},
+			},
+			expectErr: "Service \"foo\" is invalid: spec.ipFamily: Invalid value: \"IPv4\": the server does not support allocating cluster IPs for this family",
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
-			storage, registry, server := NewTestREST(t, nil, tc.enableDualStack)
+			storage, registry, server := NewTestREST(t, nil, tc.enableDualStack, tc.enableSingleStackIPv6)
 			defer server.Terminate(t)
 
 			ctx := genericapirequest.NewDefaultContext()
 			createdSvc, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if (len(tc.expectErr) > 0) != (err != nil) {
+				t.Fatalf("unexpected error: %v", err)
+			}
 			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
+				if !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("unexpected error message: %v", err)
+				}
+				return
 			}
 			createdService := createdSvc.(*api.Service)
 			objMeta, err := meta.Accessor(createdService)
@@ -465,7 +507,7 @@ func TestServiceRegistryCreateDryRun(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
-			storage, registry, server := NewTestREST(t, nil, tc.enableDualStack)
+			storage, registry, server := NewTestREST(t, nil, tc.enableDualStack, false)
 			defer server.Terminate(t)
 
 			ctx := genericapirequest.NewDefaultContext()
@@ -490,7 +532,7 @@ func TestServiceRegistryCreateDryRun(t *testing.T) {
 }
 
 func TestDryRunNodePort(t *testing.T) {
-	storage, registry, server := NewTestREST(t, nil, false)
+	storage, registry, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 
 	// Test dry run create request with a node port
@@ -610,7 +652,7 @@ func TestDryRunNodePort(t *testing.T) {
 
 func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 
-	storage, registry, server := NewTestREST(t, nil, false)
+	storage, registry, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 
 	testCases := []struct {
@@ -740,7 +782,7 @@ func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 }
 
 func TestServiceStorageValidatesCreate(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, false)
+	storage, _, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 	failureCases := map[string]api.Service{
 		"empty ID": {
@@ -794,7 +836,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 
 func TestServiceRegistryUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, false)
+	storage, registry, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 
 	obj, err := registry.Create(ctx, &api.Service{
@@ -848,7 +890,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 func TestServiceRegistryUpdateDryRun(t *testing.T) {
 
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, false)
+	storage, registry, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 
 	obj, err := registry.Create(ctx, &api.Service{
@@ -1013,7 +1055,7 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 
 func TestServiceStorageValidatesUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, false)
+	storage, registry, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 	registry.Create(ctx, &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -1066,7 +1108,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 
 func TestServiceRegistryExternalService(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, false)
+	storage, registry, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 	svc := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -1105,7 +1147,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 
 func TestServiceRegistryDelete(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, false)
+	storage, registry, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 	svc := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -1128,7 +1170,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 
 func TestServiceRegistryDeleteDryRun(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, false)
+	storage, registry, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 
 	// Test dry run delete request with cluster ip
@@ -1194,7 +1236,7 @@ func TestServiceRegistryDeleteDryRun(t *testing.T) {
 
 func TestServiceRegistryDeleteExternal(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, false)
+	storage, registry, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 	svc := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -1217,7 +1259,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 
 func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, false)
+	storage, registry, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 
 	// Create non-external load balancer.
@@ -1256,7 +1298,7 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 
 func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, false)
+	storage, registry, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 
 	// Create external load balancer.
@@ -1294,7 +1336,7 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 
 func TestServiceRegistryGet(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, false)
+	storage, registry, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 	registry.Create(ctx, &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -1370,7 +1412,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 			},
 		},
 	}
-	storage, registry, server := NewTestRESTWithPods(t, endpoints, pods, false)
+	storage, registry, server := NewTestRESTWithPods(t, endpoints, pods, false, false)
 	defer server.Terminate(t)
 	for _, name := range []string{"foo", "bad"} {
 		registry.Create(ctx, &api.Service{
@@ -1470,7 +1512,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 
 func TestServiceRegistryList(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, false)
+	storage, registry, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 	registry.Create(ctx, &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: metav1.NamespaceDefault},
@@ -1502,7 +1544,7 @@ func TestServiceRegistryList(t *testing.T) {
 }
 
 func TestServiceRegistryIPAllocation(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, false)
+	storage, _, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 
 	svc1 := &api.Service{
@@ -1585,7 +1627,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 }
 
 func TestServiceRegistryIPReallocation(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, false)
+	storage, _, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 
 	svc1 := &api.Service{
@@ -1641,7 +1683,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 }
 
 func TestServiceRegistryIPUpdate(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, false)
+	storage, _, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 
 	svc := &api.Service{
@@ -1696,7 +1738,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 }
 
 func TestServiceRegistryIPLoadBalancer(t *testing.T) {
-	storage, registry, server := NewTestREST(t, nil, false)
+	storage, registry, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 
 	svc := &api.Service{
@@ -1736,7 +1778,7 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 }
 
 func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, false)
+	storage, _, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 	service := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "not-default"},
@@ -1758,7 +1800,7 @@ func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
 // and type is LoadBalancer.
 func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocation(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, false)
+	storage, registry, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 	svc := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "external-lb-esipp"},
@@ -1798,7 +1840,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortAllocation(t *testing.
 func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *testing.T) {
 	randomNodePort := generateRandomNodePort()
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, false)
+	storage, registry, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 	svc := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "external-lb-esipp"},
@@ -1841,7 +1883,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortUserAllocation(t *test
 // Validate that the service creation fails when the requested port number is -1.
 func TestServiceRegistryExternalTrafficHealthCheckNodePortNegative(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, _, server := NewTestREST(t, nil, false)
+	storage, _, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 	svc := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "external-lb-esipp"},
@@ -1868,7 +1910,7 @@ func TestServiceRegistryExternalTrafficHealthCheckNodePortNegative(t *testing.T)
 // Validate that the health check nodePort is not allocated when ExternalTrafficPolicy is set to Global.
 func TestServiceRegistryExternalTrafficGlobal(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	storage, registry, server := NewTestREST(t, nil, false)
+	storage, registry, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 	svc := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "external-lb-esipp"},
@@ -2024,7 +2066,7 @@ func TestInitClusterIP(t *testing.T) {
 
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, test.enableDualStack)()
 
-			storage, _, server := NewTestREST(t, nil, test.enableDualStack)
+			storage, _, server := NewTestREST(t, nil, test.enableDualStack, false)
 			defer server.Terminate(t)
 
 			whichAlloc := allocGet(storage, test.useSecondaryAlloc)
@@ -2054,7 +2096,7 @@ func TestInitClusterIP(t *testing.T) {
 }
 
 func TestInitNodePorts(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, false)
+	storage, _, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 	nodePortOp := portallocator.StartOperation(storage.serviceNodePorts, false)
 	defer nodePortOp.Finish()
@@ -2236,7 +2278,7 @@ func TestInitNodePorts(t *testing.T) {
 }
 
 func TestUpdateNodePorts(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, false)
+	storage, _, server := NewTestREST(t, nil, false, false)
 	defer server.Terminate(t)
 	nodePortOp := portallocator.StartOperation(storage.serviceNodePorts, false)
 	defer nodePortOp.Finish()
@@ -2611,7 +2653,7 @@ func TestAllocGetters(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
-			storage, _, server := NewTestREST(t, nil, tc.enableDualStack)
+			storage, _, server := NewTestREST(t, nil, tc.enableDualStack, false)
 			defer server.Terminate(t)
 
 			if tc.enableDualStack && storage.secondaryServiceIPs == nil {

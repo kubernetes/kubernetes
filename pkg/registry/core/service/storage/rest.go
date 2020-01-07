@@ -666,6 +666,21 @@ func allocateHealthCheckNodePort(service *api.Service, nodePortOp *portallocator
 func initClusterIP(service *api.Service, allocator ipallocator.Interface) (bool, error) {
 	switch {
 	case service.Spec.ClusterIP == "":
+		// ensure the IP we will allocate is valid within the configured allocator for the cluster
+		allocatorCIDR := allocator.CIDR()
+		allocatorIPFamily := api.IPv4Protocol
+		if netutil.IsIPv6CIDR(&allocatorCIDR) {
+			allocatorIPFamily = api.IPv6Protocol
+		}
+		requestedIPFamily := allocatorIPFamily
+		if service.Spec.IPFamily != nil {
+			requestedIPFamily = *service.Spec.IPFamily
+		}
+		if requestedIPFamily != allocatorIPFamily {
+			el := field.ErrorList{field.Invalid(field.NewPath("spec", "ipFamily"), requestedIPFamily, "the server does not support allocating cluster IPs for this family")}
+			return false, errors.NewInvalid(api.Kind("Service"), service.Name, el)
+		}
+
 		// Allocate next available.
 		ip, err := allocator.AllocateNext()
 		if err != nil {
