@@ -36,19 +36,19 @@ type fsResourceAnalyzerInterface interface {
 
 // fsResourceAnalyzer provides stats about fs resource usage
 type fsResourceAnalyzer struct {
-	statsProvider     Provider
-	calcPeriod        time.Duration
-	cachedVolumeStats atomic.Value
-	startOnce         sync.Once
+	statsMetadataProvider MetadataPovider
+	calcPeriod            time.Duration
+	cachedVolumeStats     atomic.Value
+	startOnce             sync.Once
 }
 
 var _ fsResourceAnalyzerInterface = &fsResourceAnalyzer{}
 
 // newFsResourceAnalyzer returns a new fsResourceAnalyzer implementation
-func newFsResourceAnalyzer(statsProvider Provider, calcVolumePeriod time.Duration) *fsResourceAnalyzer {
+func newFsResourceAnalyzer(statsMetadataProvider MetadataPovider, calcVolumePeriod time.Duration) *fsResourceAnalyzer {
 	r := &fsResourceAnalyzer{
-		statsProvider: statsProvider,
-		calcPeriod:    calcVolumePeriod,
+		statsMetadataProvider: statsMetadataProvider,
+		calcPeriod:            calcVolumePeriod,
 	}
 	r.cachedVolumeStats.Store(make(statCache))
 	return r
@@ -72,9 +72,9 @@ func (s *fsResourceAnalyzer) updateCachedPodVolumeStats() {
 	newCache := make(statCache)
 
 	// Copy existing entries to new map, creating/starting new entries for pods missing from the cache
-	for _, pod := range s.statsProvider.GetPods() {
+	for _, pod := range s.statsMetadataProvider.GetPods() {
 		if value, found := oldCache[pod.GetUID()]; !found {
-			newCache[pod.GetUID()] = newVolumeStatCalculator(s.statsProvider, s.calcPeriod, pod).StartOnce()
+			newCache[pod.GetUID()] = newVolumeStatCalculator(s.statsMetadataProvider, s.calcPeriod, pod).StartOnce()
 		} else {
 			newCache[pod.GetUID()] = value
 		}

@@ -21,7 +21,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -32,13 +32,13 @@ import (
 
 // volumeStatCalculator calculates volume metrics for a given pod periodically in the background and caches the result
 type volumeStatCalculator struct {
-	statsProvider Provider
-	jitterPeriod  time.Duration
-	pod           *v1.Pod
-	stopChannel   chan struct{}
-	startO        sync.Once
-	stopO         sync.Once
-	latest        atomic.Value
+	statsMetadataProvider MetadataPovider
+	jitterPeriod          time.Duration
+	pod                   *v1.Pod
+	stopChannel           chan struct{}
+	startO                sync.Once
+	stopO                 sync.Once
+	latest                atomic.Value
 }
 
 // PodVolumeStats encapsulates the VolumeStats for a pod.
@@ -49,12 +49,12 @@ type PodVolumeStats struct {
 }
 
 // newVolumeStatCalculator creates a new VolumeStatCalculator
-func newVolumeStatCalculator(statsProvider Provider, jitterPeriod time.Duration, pod *v1.Pod) *volumeStatCalculator {
+func newVolumeStatCalculator(statsMetadataProvider MetadataPovider, jitterPeriod time.Duration, pod *v1.Pod) *volumeStatCalculator {
 	return &volumeStatCalculator{
-		statsProvider: statsProvider,
-		jitterPeriod:  jitterPeriod,
-		pod:           pod,
-		stopChannel:   make(chan struct{}),
+		statsMetadataProvider: statsMetadataProvider,
+		jitterPeriod:          jitterPeriod,
+		pod:                   pod,
+		stopChannel:           make(chan struct{}),
 	}
 }
 
@@ -90,7 +90,7 @@ func (s *volumeStatCalculator) GetLatest() (PodVolumeStats, bool) {
 // If the pod references PVCs, the prometheus metrics for those are updated with the result.
 func (s *volumeStatCalculator) calcAndStoreStats() {
 	// Find all Volumes for the Pod
-	volumes, found := s.statsProvider.ListVolumesForPod(s.pod.UID)
+	volumes, found := s.statsMetadataProvider.ListVolumesForPod(s.pod.UID)
 	if !found {
 		return
 	}

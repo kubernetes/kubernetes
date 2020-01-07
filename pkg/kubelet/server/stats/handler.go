@@ -28,7 +28,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
@@ -37,8 +37,27 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
+// MetadataPovider provid basic metadata needed by stats handlers.
+type MetadataPovider interface {
+	// GetPodByName returns the spec of the pod with the name in the specified
+	// namespace.
+	GetPodByName(namespace, name string) (*v1.Pod, bool)
+	// GetNode returns the spec of the local node.
+	GetNode() (*v1.Node, error)
+	// GetNodeConfig returns the configuration of the local node.
+	GetNodeConfig() cm.NodeConfig
+	// ListVolumesForPod returns the stats of the volume used by the pod with
+	// the podUID.
+	ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool)
+	// GetPods returns the specs of all the pods running on this node.
+	GetPods() []*v1.Pod
+}
+
 // Provider hosts methods required by stats handlers.
 type Provider interface {
+	// MetadataPovider provid basic metadata needed by stats handlers.
+	MetadataPovider
+
 	// The following stats are provided by either CRI or cAdvisor.
 	//
 	// ListPodStats returns the stats of all the containers managed by pods.
@@ -75,21 +94,6 @@ type Provider interface {
 	// containerName. If subcontainers is true, this function will return the
 	// information of all the sub-containers as well.
 	GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error)
-
-	// The following information is provided by Kubelet.
-	//
-	// GetPodByName returns the spec of the pod with the name in the specified
-	// namespace.
-	GetPodByName(namespace, name string) (*v1.Pod, bool)
-	// GetNode returns the spec of the local node.
-	GetNode() (*v1.Node, error)
-	// GetNodeConfig returns the configuration of the local node.
-	GetNodeConfig() cm.NodeConfig
-	// ListVolumesForPod returns the stats of the volume used by the pod with
-	// the podUID.
-	ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool)
-	// GetPods returns the specs of all the pods running on this node.
-	GetPods() []*v1.Pod
 
 	// RlimitStats returns the rlimit stats of system.
 	RlimitStats() (*statsapi.RlimitStats, error)
