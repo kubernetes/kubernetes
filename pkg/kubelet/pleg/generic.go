@@ -64,6 +64,9 @@ type GenericPLEG struct {
 	// Pods that failed to have their status retrieved during a relist. These pods will be
 	// retried during the next relisting.
 	podsToReinspect map[types.UID]*kubecontainer.Pod
+	// Pods that network is not ready during a relist. These pods will be retried during
+	// the next relisting.
+	pendingPodSandbox sets.String
 }
 
 // plegContainerState has a one-to-one mapping to the
@@ -110,12 +113,13 @@ type podRecords map[types.UID]*podRecord
 func NewGenericPLEG(runtime kubecontainer.Runtime, channelCapacity int,
 	relistPeriod time.Duration, cache kubecontainer.Cache, clock clock.Clock) PodLifecycleEventGenerator {
 	return &GenericPLEG{
-		relistPeriod: relistPeriod,
-		runtime:      runtime,
-		eventChannel: make(chan *PodLifecycleEvent, channelCapacity),
-		podRecords:   make(podRecords),
-		cache:        cache,
-		clock:        clock,
+		relistPeriod:      relistPeriod,
+		runtime:           runtime,
+		eventChannel:      make(chan *PodLifecycleEvent, channelCapacity),
+		podRecords:        make(podRecords),
+		pendingPodSandbox: sets.NewString(),
+		cache:             cache,
+		clock:             clock,
 	}
 }
 
@@ -219,11 +223,26 @@ func (g *GenericPLEG) relist() {
 		oldPod := g.podRecords.getOld(pid)
 		pod := g.podRecords.getCurrent(pid)
 		// Get all containers in the old and the new pod.
-		allContainers := getContainersFromPods(oldPod, pod)
+		allContainers, allSandboxes := getContainersFromPods(oldPod, pod)
 		for _, container := range allContainers {
 			events := computeEvents(oldPod, pod, &container.ID)
 			for _, e := range events {
 				updateEvents(eventsByPodID, e)
+			}
+		}
+		for _, sandbox := range allSandboxes {
+			events := computeEvents(oldPod, pod, &sandbox.ID)
+			for _, e := range events {
+				updateEvents(eventsByPodID, e)
+
+				// if sandbox is ContainerStarted, add to pendingPodSandbox
+				if g.cacheEnabled() {
+					if e.Type == ContainerStarted {
+						g.pendingPodSandbox.Insert(string(pid))
+					} else {
+						g.pendingPodSandbox.Delete(string(pid))
+					}
+				}
 			}
 		}
 	}
@@ -238,6 +257,11 @@ func (g *GenericPLEG) relist() {
 	for pid, events := range eventsByPodID {
 		pod := g.podRecords.getCurrent(pid)
 		if g.cacheEnabled() {
+			// this pod was in the list to reinspect and we did so because it had events, so remove it
+			// from the list (we don't want the reinspection code below to inspect it a second time in
+			// this relist execution)
+			delete(g.podsToReinspect, pid)
+
 			// updateCache() will inspect the pod and update the cache. If an
 			// error occurs during the inspection, we want PLEG to retry again
 			// in the next relist. To achieve this, we do not update the
@@ -255,11 +279,6 @@ func (g *GenericPLEG) relist() {
 				needsReinspection[pid] = pod
 
 				continue
-			} else {
-				// this pod was in the list to reinspect and we did so because it had events, so remove it
-				// from the list (we don't want the reinspection code below to inspect it a second time in
-				// this relist execution)
-				delete(g.podsToReinspect, pid)
 			}
 		}
 		// Update the internal storage and send out the events.
@@ -279,30 +298,31 @@ func (g *GenericPLEG) relist() {
 	}
 
 	if g.cacheEnabled() {
+		// reinspect any pods that network is not ready during the previous relist
+		klog.V(5).Infof("GenericPLEG: There are %d pods that previously network is not ready", g.pendingPodSandbox.Len())
+
 		// reinspect any pods that failed inspection during the previous relist
-		if len(g.podsToReinspect) > 0 {
-			klog.V(5).Infof("GenericPLEG: Reinspecting pods that previously failed inspection")
-			for pid, pod := range g.podsToReinspect {
-				if err := g.updateCache(pod, pid); err != nil {
-					// Rely on updateCache calling GetPodStatus to log the actual error.
-					klog.V(5).Infof("PLEG: pod %s/%s failed reinspection: %v", pod.Name, pod.Namespace, err)
-					needsReinspection[pid] = pod
-				}
+		klog.V(5).Infof("GenericPLEG: Reinspecting %d pods that previously failed inspection", len(g.podsToReinspect))
+		for pid, pod := range g.podsToReinspect {
+			if err := g.updateCache(pod, pid); err != nil {
+				// Rely on updateCache calling GetPodStatus to log the actual error.
+				klog.V(5).Infof("PLEG: pod %s/%s failed reinspection: %v", pod.Name, pod.Namespace, err)
 			}
 		}
 
 		// Update the cache timestamp.  This needs to happen *after*
 		// all pods have been properly updated in the cache.
 		g.cache.UpdateTime(timestamp)
-	}
 
-	// make sure we retain the list of pods that need reinspecting the next time relist is called
-	g.podsToReinspect = needsReinspection
+		// make sure we retain the list of pods that need reinspecting the next time relist is called
+		g.podsToReinspect = needsReinspection
+	}
 }
 
-func getContainersFromPods(pods ...*kubecontainer.Pod) []*kubecontainer.Container {
+func getContainersFromPods(pods ...*kubecontainer.Pod) ([]*kubecontainer.Container, []*kubecontainer.Container) {
 	cidSet := sets.NewString()
 	var containers []*kubecontainer.Container
+	var sandboxes []*kubecontainer.Container
 	for _, p := range pods {
 		if p == nil {
 			continue
@@ -323,11 +343,10 @@ func getContainersFromPods(pods ...*kubecontainer.Pod) []*kubecontainer.Containe
 				continue
 			}
 			cidSet.Insert(cid)
-			containers = append(containers, c)
+			sandboxes = append(sandboxes, c)
 		}
-
 	}
-	return containers
+	return containers, sandboxes
 }
 
 func computeEvents(oldPod, newPod *kubecontainer.Pod, cid *kubecontainer.ContainerID) []*PodLifecycleEvent {
@@ -401,6 +420,16 @@ func (g *GenericPLEG) updateCache(pod *kubecontainer.Pod, pid types.UID) error {
 		// a pod status after network teardown, but the kubernetes API expects
 		// the completed pod's IP to be available after the pod is dead.
 		status.IPs = g.getPodIPs(pid, status)
+
+		// check if is pending sandbox
+		if g.pendingPodSandbox.Has(string(pid)) {
+			// if pod sandbox already has IP or network mode is NODE, delete from pendingPodSandbox
+			if len(status.IPs) != 0 || isHostNetworkPod(status.SandboxStatuses) {
+				g.pendingPodSandbox.Delete(string(pid))
+			} else {
+				err = fmt.Errorf("Network is not ready")
+			}
+		}
 	}
 
 	g.cache.Set(pod.ID, status, err, timestamp)
@@ -449,6 +478,15 @@ func updateRunningPodAndContainerMetrics(pods []*kubecontainer.Pod) {
 	for key, value := range containerStateCount {
 		metrics.RunningContainerCount.WithLabelValues(key).Set(float64(value))
 	}
+}
+
+func isHostNetworkPod(podSandboxStatuses []*runtimeapi.PodSandboxStatus) bool {
+	for _, podSandboxStatus := range podSandboxStatuses {
+		if podSandboxStatus.GetLinux().GetNamespaces().GetOptions().GetNetwork() == runtimeapi.NamespaceMode_NODE {
+			return true
+		}
+	}
+	return false
 }
 
 func (pr podRecords) getOld(id types.UID) *kubecontainer.Pod {
