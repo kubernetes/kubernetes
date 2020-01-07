@@ -27,7 +27,6 @@ import (
 
 	"encoding/base64"
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -159,7 +158,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 		// list all secrets in namespace default
 		secretsList, err := f.ClientSet.CoreV1().Secrets("").List(metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list secrets")
-		gomega.Expect(len(secretsList.Items)).ToNot(gomega.Equal(0), "no secrets found")
+		framework.ExpectNotEqual(len(secretsList.Items), 0, "no secrets found")
 
 		foundCreatedSecret := false
 		var secretCreatedName string
@@ -169,7 +168,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 				secretCreatedName = val.ObjectMeta.Name
 			}
 		}
-		gomega.Expect(foundCreatedSecret).To(gomega.BeTrue(), "unable to find secret by its value")
+		framework.ExpectEqual(foundCreatedSecret, true, "unable to find secret by its value")
 
 		ginkgo.By("patching the secret")
 		// patch the secret
@@ -195,7 +194,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 				foundCreatedSecret = true
 			}
 		}
-		gomega.Expect(foundCreatedSecret).To(gomega.BeFalse(), "secret was not deleted successfully")
+		framework.ExpectEqual(foundCreatedSecret, false, "secret was not deleted successfully")
 	})
 })
 
