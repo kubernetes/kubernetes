@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"k8s.io/api/core/v1"
@@ -142,10 +143,13 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 
 		secretTestName := "test-secret-" + string(uuid.NewUUID())
 
-		// create a secret in namespace default
-		_, err := f.ClientSet.CoreV1().Secrets("default").Create(&v1.Secret{
+		// create a secret in the test namespace
+		_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(&v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: secretTestName,
+				Labels: map[string]string{
+					"testsecret-constant": "true",
+				},
 			},
 			Data: map[string][]byte{
 				"key": []byte("value"),
@@ -155,8 +159,10 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 		framework.ExpectNoError(err, "failed to create secret")
 
 		ginkgo.By("listing secrets in all namespaces to ensure that there are more than zero")
-		// list all secrets in namespace default
-		secretsList, err := f.ClientSet.CoreV1().Secrets("").List(metav1.ListOptions{})
+		// list all secrets in all namespaces
+		secretsList, err := f.ClientSet.CoreV1().Secrets("").List(metav1.ListOptions{
+			LabelSelector: "testsecret-constant=true",
+		})
 		framework.ExpectNoError(err, "failed to list secrets")
 		framework.ExpectNotEqual(len(secretsList.Items), 0, "no secrets found")
 
@@ -171,26 +177,34 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 		framework.ExpectEqual(foundCreatedSecret, true, "unable to find secret by its value")
 
 		ginkgo.By("patching the secret")
-		// patch the secret
+		// patch the secret in the test namespace
 		secretPatchNewData := base64.StdEncoding.EncodeToString([]byte("value1"))
-		secretPatch := fmt.Sprintf(`{"metadata":{"labels":{"testsecret":"true"}},"data":{"key":"%v"}}`, secretPatchNewData)
-		_, err = f.ClientSet.CoreV1().Secrets("default").Patch(secretCreatedName, types.StrategicMergePatchType, []byte(secretPatch))
+		secretPatch, err := json.Marshal(map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"labels": map[string]string{"testsecret": "true"},
+			},
+			"data": map[string][]byte{"key": []byte(secretPatchNewData)},
+		})
+		framework.ExpectNoError(err, "failed to marshal JSON")
+		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Patch(secretCreatedName, types.StrategicMergePatchType, []byte(secretPatch))
 		framework.ExpectNoError(err, "failed to patch secret")
 
 		ginkgo.By("deleting the secret using a LabelSelector")
-		err = f.ClientSet.CoreV1().Secrets("default").DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{
+		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "testsecret=true",
 		})
 		framework.ExpectNoError(err, "failed to delete patched secret")
 
 		ginkgo.By("listing secrets in all namespaces, searching for label name and value in patch")
-		// list all secrets in namespace default
-		secretsList, err = f.ClientSet.CoreV1().Secrets("").List(metav1.ListOptions{})
+		// list all secrets in all namespaces
+		secretsList, err = f.ClientSet.CoreV1().Secrets("").List(metav1.ListOptions{
+			LabelSelector: "testsecret-constant=true",
+		})
 		framework.ExpectNoError(err, "failed to list secrets")
 
 		foundCreatedSecret = false
 		for _, val := range secretsList.Items {
-			if val.ObjectMeta.Name == secretTestName && string(val.Data["key"]) == "value" {
+			if val.ObjectMeta.Name == secretTestName && val.ObjectMeta.Namespace == f.Namespace.Name {
 				foundCreatedSecret = true
 			}
 		}
