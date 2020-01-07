@@ -68,7 +68,7 @@ type Reflector struct {
 	listerWatcher ListerWatcher
 	// period controls timing between an unsuccessful watch ending and
 	// the beginning of the next list.
-	period       time.Duration
+	period time.Duration
 	// The period at which ShouldResync is invoked
 	resyncPeriod time.Duration
 	// ShouldResync is invoked periodically and whenever it returns `true` the Store's Resync operation is invoked
