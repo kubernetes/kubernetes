@@ -442,15 +442,16 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	}
 }
 
-// Replace atomically adds the given objects using the Sync type of
-// Delta and does some deletions.  In particular: for every
-// pre-existing key K that is not the key of an object in `list` there
-// is the effect of `Delete(DeletedFinalStateUnknown{K, O})` where O
-// is current object of K.  If `f.knownObjects == nil` then the
-// pre-existing keys are those in `f.items` and the current object of
-// K is the `.Newest()` of the Deltas associated with K.  Otherwise
-// the pre-existing keys are those listed by `f.knownObjects` and the
-// current object of K is what `f.knownObjects.GetByKey(K)` returns.
+// Replace atomically does two things: (1) it adds the given objects
+// using the Sync type of Delta and then (2) it does some deletions.
+// In particular: for every pre-existing key K that is not the key of
+// an object in `list` there is the effect of
+// `Delete(DeletedFinalStateUnknown{K, O})` where O is current object
+// of K.  If `f.knownObjects == nil` then the pre-existing keys are
+// those in `f.items` and the current object of K is the `.Newest()`
+// of the Deltas associated with K.  Otherwise the pre-existing keys
+// are those listed by `f.knownObjects` and the current object of K is
+// what `f.knownObjects.GetByKey(K)` returns.
 func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
