@@ -117,6 +117,27 @@ message PodDisruptionBudget {
   optional PodDisruptionBudgetStatus status = 3;
 }
 
+// PodDisruptionBudgetCondition describes the state of a PDB at a certain point.
+message PodDisruptionBudgetCondition {
+  // Type of PDB condition.
+  optional string type = 1;
+
+  // Status of the condition, one of True, False, Unknown.
+  optional string status = 2;
+
+  // The last time this condition was updated.
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 6;
+
+  // Last time the condition transitioned from one status to another.
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 7;
+
+  // The reason for the condition's last transition.
+  optional string reason = 4;
+
+  // A human readable message indicating details about the transition.
+  optional string message = 5;
+}
+
 // PodDisruptionBudgetList is a collection of PodDisruptionBudgets.
 message PodDisruptionBudgetList {
   // +optional
@@ -180,6 +201,11 @@ message PodDisruptionBudgetStatus {
 
   // total number of pods counted by this disruption budget
   optional int32 expectedPods = 6;
+
+  // Conditions represents the latest available observations of a PDB's current state.
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  repeated PodDisruptionBudgetCondition conditions = 7;
 }
 
 // PodSecurityPolicy governs the ability to make requests that affect the Security Context

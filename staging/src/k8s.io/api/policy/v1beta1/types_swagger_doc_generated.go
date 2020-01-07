@@ -105,6 +105,20 @@ func (PodDisruptionBudget) SwaggerDoc() map[string]string {
 	return map_PodDisruptionBudget
 }
 
+var map_PodDisruptionBudgetCondition = map[string]string{
+	"":                   "PodDisruptionBudgetCondition describes the state of a PDB at a certain point.",
+	"type":               "Type of PDB condition.",
+	"status":             "Status of the condition, one of True, False, Unknown.",
+	"lastUpdateTime":     "The last time this condition was updated.",
+	"lastTransitionTime": "Last time the condition transitioned from one status to another.",
+	"reason":             "The reason for the condition's last transition.",
+	"message":            "A human readable message indicating details about the transition.",
+}
+
+func (PodDisruptionBudgetCondition) SwaggerDoc() map[string]string {
+	return map_PodDisruptionBudgetCondition
+}
+
 var map_PodDisruptionBudgetList = map[string]string{
 	"": "PodDisruptionBudgetList is a collection of PodDisruptionBudgets.",
 }
@@ -132,6 +146,7 @@ var map_PodDisruptionBudgetStatus = map[string]string{
 	"currentHealthy":     "current number of healthy pods",
 	"desiredHealthy":     "minimum desired number of healthy pods",
 	"expectedPods":       "total number of pods counted by this disruption budget",
+	"conditions":         "Conditions represents the latest available observations of a PDB's current state.",
 }
 
 func (PodDisruptionBudgetStatus) SwaggerDoc() map[string]string {

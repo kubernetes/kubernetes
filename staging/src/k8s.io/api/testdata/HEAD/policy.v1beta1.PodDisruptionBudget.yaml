@@ -41,6 +41,13 @@ spec:
     matchLabels:
       8---jop9641lg.p-g8c2-k-912e5-c-e63-n-3n/E9.8ThjT9s-j41-0-6p-JFHn7y-74.-0MUORQQ.N2.3: 68._bQw.-dG6c-.6--_x.--0wmZk1_8._3s_-_Bq.m_4
 status:
+  conditions:
+  - lastTransitionTime: "2641-12-26T14:46:27Z"
+    lastUpdateTime: "2197-07-19T07:02:22Z"
+    message: "27"
+    reason: "26"
+    status: ăȲĻ¤Ħʅ芝
+    type: 蓿彭聡A3fƻfʣ繡楙¯ĦE勗E濞
   currentHealthy: -2037845840
   desiredHealthy: -1965578645
   disruptedPods:

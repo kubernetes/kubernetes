@@ -66,6 +66,16 @@
     "disruptionsAllowed": -1942073618,
     "currentHealthy": -2037845840,
     "desiredHealthy": -1965578645,
-    "expectedPods": -347579237
+    "expectedPods": -347579237,
+    "conditions": [
+      {
+        "type": "蓿彭聡A3fƻfʣ繡楙¯ĦE勗E濞",
+        "status": "ăȲĻ¤Ħʅ芝",
+        "lastUpdateTime": "2197-07-19T07:02:22Z",
+        "lastTransitionTime": "2641-12-26T14:46:27Z",
+        "reason": "26",
+        "message": "27"
+      }
+    ]
   }
 }
