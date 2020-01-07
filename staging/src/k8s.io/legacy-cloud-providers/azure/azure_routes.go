@@ -138,7 +138,7 @@ func (az *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint s
 	}
 	if unmanaged {
 		if az.ipv6DualStackEnabled {
-			//TODO (khenidak) add support for unmanaged nodes when the feature reaches  beta
+			//TODO (khenidak) add support for unmanaged nodes when the feature reaches beta
 			return fmt.Errorf("unmanaged nodes are not supported in dual stack mode")
 		}
 		klog.V(2).Infof("CreateRoute: omitting unmanaged node %q", kubeRoute.TargetNode)
@@ -182,6 +182,21 @@ func (az *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint s
 			NextHopType:      network.RouteNextHopTypeVirtualAppliance,
 			NextHopIPAddress: to.StringPtr(targetIP),
 		},
+	}
+
+	actualRoutes, err := az.ListRoutes(ctx, clusterName)
+	if err != nil {
+		klog.V(3).Infof("CreateRoute: creating route: failed(ListRoutes) clusterName= %q instance=%q with error=%v", clusterName, kubeRoute.TargetNode, err)
+		return err
+	}
+
+	for _, actualRoute := range actualRoutes {
+		if strings.EqualFold(actualRoute.Name, kubeRoute.Name) &&
+			strings.EqualFold(string(actualRoute.TargetNode), string(kubeRoute.TargetNode)) &&
+			strings.EqualFold(actualRoute.DestinationCIDR, kubeRoute.DestinationCIDR) {
+			klog.V(2).Infof("CreateRoute: route is already existed and matched, no need to re-create or update")
+			return nil
+		}
 	}
 
 	klog.V(3).Infof("CreateRoute: creating route: instance=%q cidr=%q", kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
