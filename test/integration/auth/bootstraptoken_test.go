@@ -160,11 +160,11 @@ func TestBootstrapTokenAuth(t *testing.T) {
 
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", test.name)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := test.request.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", test.name)

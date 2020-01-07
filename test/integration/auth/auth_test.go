@@ -460,11 +460,11 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		}
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
@@ -541,11 +541,11 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 		}
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusForbidden {
 				t.Logf("case %v", r)
 				t.Errorf("Expected status Forbidden but got status %v", resp.Status)
@@ -610,11 +610,11 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
@@ -662,11 +662,11 @@ func TestBobIsForbidden(t *testing.T) {
 
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			// Expect all of bob's actions to return Forbidden
 			if resp.StatusCode != http.StatusForbidden {
 				t.Logf("case %v", r)
@@ -705,11 +705,11 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			// Expect all of unauthenticated user's request to be "Unauthorized"
 			if resp.StatusCode != http.StatusUnauthorized {
 				t.Logf("case %v", r)
@@ -769,11 +769,11 @@ func TestImpersonateIsForbidden(t *testing.T) {
 
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			// Expect all of bob's actions to return Forbidden
 			if resp.StatusCode != http.StatusForbidden {
 				t.Logf("case %v", r)
@@ -794,11 +794,11 @@ func TestImpersonateIsForbidden(t *testing.T) {
 		req.Header.Set("Impersonate-User", "alice")
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			// Expect all the requests to be allowed, don't care what they actually do
 			if resp.StatusCode == http.StatusForbidden {
 				t.Logf("case %v", r)
@@ -820,11 +820,11 @@ func TestImpersonateIsForbidden(t *testing.T) {
 
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			// Expect all of bob's actions to return Forbidden
 			if resp.StatusCode != http.StatusForbidden {
 				t.Logf("case %v", r)
@@ -845,11 +845,11 @@ func TestImpersonateIsForbidden(t *testing.T) {
 		req.Header.Set("Impersonate-User", serviceaccount.MakeUsername("default", "default"))
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			// Expect all the requests to be allowed, don't care what they actually do
 			if resp.StatusCode == http.StatusForbidden {
 				t.Logf("case %v", r)
@@ -926,11 +926,11 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 
 			found := false
 			for i := currentAuthorizationAttributesIndex; i < len(trackingAuthorizer.requestAttributes); i++ {
@@ -1024,11 +1024,11 @@ func TestNamespaceAuthorization(t *testing.T) {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
@@ -1109,11 +1109,11 @@ func TestKindAuthorization(t *testing.T) {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 		{
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
@@ -1173,11 +1173,11 @@ func TestReadOnlyAuthorization(t *testing.T) {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
@@ -1223,11 +1223,11 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			// Expect all of Bob's actions to return Forbidden
 			if resp.StatusCode != http.StatusForbidden {
 				t.Logf("case %v", r)
