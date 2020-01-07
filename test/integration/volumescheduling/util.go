@@ -31,8 +31,9 @@ import (
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/events"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -134,18 +135,17 @@ func initTestSchedulerWithOptions(
 		context.informerFactory.Core().V1().PersistentVolumeClaims(),
 		context.informerFactory.Core().V1().Services(),
 		context.informerFactory.Storage().V1().StorageClasses(),
-		context.informerFactory.Storage().V1beta1().CSINodes(),
 	)
 
-	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
-		Interface: context.clientSet.EventsV1beta1().Events(""),
-	})
+	eventBroadcaster := record.NewBroadcaster()
+
 	context.schedulerConfig.Recorder = eventBroadcaster.NewRecorder(
 		legacyscheme.Scheme,
-		v1.DefaultSchedulerName,
+		v1.EventSource{Component: v1.DefaultSchedulerName},
 	)
-	stopCh := make(chan struct{})
-	eventBroadcaster.StartRecordingToSink(stopCh)
+	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{
+		Interface: context.clientSet.CoreV1().Events(""),
+	})
 
 	context.informerFactory.Start(context.schedulerConfig.StopEverything)
 	context.informerFactory.WaitForCacheSync(context.schedulerConfig.StopEverything)
@@ -176,7 +176,6 @@ func createConfiguratorArgsWithPodInformer(
 		ServiceInformer:                informerFactory.Core().V1().Services(),
 		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
-		CSINodeInformer:                informerFactory.Storage().V1beta1().CSINodes(),
 		Registry:                       pluginRegistry,
 		Plugins:                        plugins,
 		PluginConfig:                   pluginConfig,
