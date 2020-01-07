@@ -70,7 +70,7 @@ import (
 // The local cache starts out empty, and gets populated and updated
 // during `Run()`.
 //
-// As a simple example, if a collection of objects is henceforeth
+// As a simple example, if a collection of objects is henceforth
 // unchanging, a SharedInformer is created that links to that
 // collection, and that SharedInformer is `Run()` then that
 // SharedInformer's cache eventually holds an exact copy of that
@@ -106,7 +106,16 @@ import (
 // and index updates happen before such a prescribed notification.
 // For a given SharedInformer and client, the notifications are
 // delivered sequentially.  For a given SharedInformer, client, and
-// object ID, the notifications are delivered in order.
+// object ID, the notifications are delivered in order.  Because
+// `ObjectMeta.UID` has no role in identifying objects, it is possible
+// that when (1) object O1 with ID (e.g. namespace and name) X and
+// `ObjectMeta.UID` U1 in the SharedInformer's local cache is deleted
+// and later (2) another object O2 with ID X and ObjectMeta.UID U2 is
+// created the informer's clients are not notified of (1) and (2) but
+// rather are notified only of an update from O1 to O2. Clients that
+// need to detect such cases might do so by comparing the `ObjectMeta.UID`
+// field of the old and the new object in the code that handles update
+// notifications (i.e. `OnUpdate` method of ResourceEventHandler).
 //
 // A client must process each notification promptly; a SharedInformer
 // is not engineered to deal well with a large backlog of
@@ -129,7 +138,7 @@ type SharedInformer interface {
 	AddEventHandler(handler ResourceEventHandler)
 	// AddEventHandlerWithResyncPeriod adds an event handler to the
 	// shared informer using the specified resync period.  The resync
-	// operation consists of delivering to the handler a create
+	// operation consists of delivering to the handler an update
 	// notification for every object in the informer's local cache; it
 	// does not add any interactions with the authoritative storage.
 	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration)
