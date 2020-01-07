@@ -208,6 +208,7 @@ func TestApplyFeatureGates(t *testing.T) {
 							{Name: interpodaffinity.Name},
 							{Name: tainttoleration.Name},
 							{Name: podtopologyspread.Name},
+							{Name: noderesources.ResourceLimitsName},
 						},
 					},
 					Score: &schedulerapi.PluginSet{
