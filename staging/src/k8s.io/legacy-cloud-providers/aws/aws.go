@@ -1490,11 +1490,17 @@ func (c *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.No
 
 		for _, macID := range macIDs {
 			ipPath := path.Join("network/interfaces/macs/", macID, "local-ipv4s")
-			internalIPs, err := c.metadata.GetMetadata(ipPath)
+			v4ips, err := c.metadata.GetMetadata(ipPath)
 			if err != nil {
 				return nil, fmt.Errorf("error querying AWS metadata for %q: %q", ipPath, err)
 			}
-
+			ipPath = path.Join("network/interfaces/macs/", macID, "ipv6s")
+			v6ips, err := c.metadata.GetMetadata(ipPath)
+			if err != nil {
+				klog.V(3).Infof("Error querying IPv6 IPs: %v", err)
+				v6ips = ""
+			}
+			internalIPs := v4ips + "\n" + v6ips
 			for _, internalIP := range strings.Split(internalIPs, "\n") {
 				if internalIP == "" {
 					continue
