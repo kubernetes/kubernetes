@@ -264,6 +264,12 @@ type Dependencies struct {
 	DynamicPluginProber     volume.DynamicPluginProber
 	TLSOptions              *server.TLSOptions
 	KubeletConfigController *kubeletconfig.Controller
+	RemoteRuntimeService    internalapi.RuntimeService
+	RemoteImageService      internalapi.ImageManagerService
+	criHandler              http.Handler
+	dockerLegacyService     dockershim.DockerLegacyService
+	// remove it after cadvisor.UsingLegacyCadvisorStats dropped.
+	useLegacyCadvisorStats bool
 }
 
 // makePodSourceConfig creates a config.PodConfig from the given
@@ -317,16 +323,82 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 	return cfg, nil
 }
 
-func getRuntimeAndImageServices(remoteRuntimeEndpoint string, remoteImageEndpoint string, runtimeRequestTimeout metav1.Duration) (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
-	rs, err := remote.NewRemoteRuntimeService(remoteRuntimeEndpoint, runtimeRequestTimeout.Duration)
-	if err != nil {
-		return nil, nil, err
+// PreInitRuntimeService will init runtime service before RunKubelet.
+func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
+	kubeDeps *Dependencies,
+	crOptions *config.ContainerRuntimeOptions,
+	containerRuntime string,
+	runtimeCgroups string,
+	remoteRuntimeEndpoint string,
+	remoteImageEndpoint string,
+	nonMasqueradeCIDR string) error {
+	if remoteRuntimeEndpoint != "" {
+		// remoteImageEndpoint is same as remoteRuntimeEndpoint if not explicitly specified
+		if remoteImageEndpoint == "" {
+			remoteImageEndpoint = remoteRuntimeEndpoint
+		}
 	}
-	is, err := remote.NewRemoteImageService(remoteImageEndpoint, runtimeRequestTimeout.Duration)
-	if err != nil {
-		return nil, nil, err
+
+	switch containerRuntime {
+	case kubetypes.DockerContainerRuntime:
+		// TODO: These need to become arguments to a standalone docker shim.
+		pluginSettings := dockershim.NetworkPluginSettings{
+			HairpinMode:        kubeletconfiginternal.HairpinMode(kubeCfg.HairpinMode),
+			NonMasqueradeCIDR:  nonMasqueradeCIDR,
+			PluginName:         crOptions.NetworkPluginName,
+			PluginConfDir:      crOptions.CNIConfDir,
+			PluginBinDirString: crOptions.CNIBinDir,
+			PluginCacheDir:     crOptions.CNICacheDir,
+			MTU:                int(crOptions.NetworkPluginMTU),
+		}
+
+		// Create and start the CRI shim running as a grpc server.
+		streamingConfig := getStreamingConfig(kubeCfg, kubeDeps, crOptions)
+		ds, err := dockershim.NewDockerService(kubeDeps.DockerClientConfig, crOptions.PodSandboxImage, streamingConfig,
+			&pluginSettings, runtimeCgroups, kubeCfg.CgroupDriver, crOptions.DockershimRootDirectory, !crOptions.RedirectContainerStreaming)
+		if err != nil {
+			return err
+		}
+		if crOptions.RedirectContainerStreaming {
+			kubeDeps.criHandler = ds
+		}
+
+		// The unix socket for kubelet <-> dockershim communication, dockershim start before runtime service init.
+		klog.V(5).Infof("RemoteRuntimeEndpoint: %q, RemoteImageEndpoint: %q",
+			remoteRuntimeEndpoint,
+			remoteImageEndpoint)
+		klog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
+		dockerServer := dockerremote.NewDockerServer(remoteRuntimeEndpoint, ds)
+		if err := dockerServer.Start(); err != nil {
+			return err
+		}
+
+		// Create dockerLegacyService when the logging driver is not supported.
+		supported, err := ds.IsCRISupportedLogDriver()
+		if err != nil {
+			return err
+		}
+		if !supported {
+			kubeDeps.dockerLegacyService = ds
+		}
+	case kubetypes.RemoteContainerRuntime:
+		// No-op.
+		break
+	default:
+		return fmt.Errorf("unsupported CRI runtime: %q", containerRuntime)
 	}
-	return rs, is, err
+
+	var err error
+	if kubeDeps.RemoteRuntimeService, err = remote.NewRemoteRuntimeService(remoteRuntimeEndpoint, kubeCfg.RuntimeRequestTimeout.Duration); err != nil {
+		return err
+	}
+	if kubeDeps.RemoteImageService, err = remote.NewRemoteImageService(remoteImageEndpoint, kubeCfg.RuntimeRequestTimeout.Duration); err != nil {
+		return err
+	}
+
+	kubeDeps.useLegacyCadvisorStats = cadvisor.UsingLegacyCadvisorStats(containerRuntime, remoteRuntimeEndpoint)
+
+	return nil
 }
 
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
@@ -335,7 +407,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *Dependencies,
 	crOptions *config.ContainerRuntimeOptions,
 	containerRuntime string,
-	runtimeCgroups string,
 	hostnameOverride string,
 	nodeIP string,
 	providerID string,
@@ -345,8 +416,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	registerNode bool,
 	registerWithTaints []api.Taint,
 	allowedUnsafeSysctls []string,
-	remoteRuntimeEndpoint string,
-	remoteImageEndpoint string,
 	experimentalMounterPath string,
 	experimentalKernelMemcgNotification bool,
 	experimentalCheckNodeCapabilitiesBeforeMount bool,
@@ -356,7 +425,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	maxContainerCount int32,
 	masterServiceNamespace string,
 	registerSchedulable bool,
-	nonMasqueradeCIDR string,
 	keepTerminatedPodVolumes bool,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
@@ -599,72 +667,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
 
-	if remoteRuntimeEndpoint != "" {
-		// remoteImageEndpoint is same as remoteRuntimeEndpoint if not explicitly specified
-		if remoteImageEndpoint == "" {
-			remoteImageEndpoint = remoteRuntimeEndpoint
-		}
-	}
-
-	// TODO: These need to become arguments to a standalone docker shim.
-	pluginSettings := dockershim.NetworkPluginSettings{
-		HairpinMode:        kubeletconfiginternal.HairpinMode(kubeCfg.HairpinMode),
-		NonMasqueradeCIDR:  nonMasqueradeCIDR,
-		PluginName:         crOptions.NetworkPluginName,
-		PluginConfDir:      crOptions.CNIConfDir,
-		PluginBinDirString: crOptions.CNIBinDir,
-		PluginCacheDir:     crOptions.CNICacheDir,
-		MTU:                int(crOptions.NetworkPluginMTU),
-	}
-
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration)
 
-	// if left at nil, that means it is unneeded
-	var legacyLogProvider kuberuntime.LegacyLogProvider
-
-	switch containerRuntime {
-	case kubetypes.DockerContainerRuntime:
-		// Create and start the CRI shim running as a grpc server.
-		streamingConfig := getStreamingConfig(kubeCfg, kubeDeps, crOptions)
-		ds, err := dockershim.NewDockerService(kubeDeps.DockerClientConfig, crOptions.PodSandboxImage, streamingConfig,
-			&pluginSettings, runtimeCgroups, kubeCfg.CgroupDriver, crOptions.DockershimRootDirectory, !crOptions.RedirectContainerStreaming)
-		if err != nil {
-			return nil, err
-		}
-		if crOptions.RedirectContainerStreaming {
-			klet.criHandler = ds
-		}
-
-		// The unix socket for kubelet <-> dockershim communication.
-		klog.V(5).Infof("RemoteRuntimeEndpoint: %q, RemoteImageEndpoint: %q",
-			remoteRuntimeEndpoint,
-			remoteImageEndpoint)
-		klog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
-		server := dockerremote.NewDockerServer(remoteRuntimeEndpoint, ds)
-		if err := server.Start(); err != nil {
-			return nil, err
-		}
-
-		// Create dockerLegacyService when the logging driver is not supported.
-		supported, err := ds.IsCRISupportedLogDriver()
-		if err != nil {
-			return nil, err
-		}
-		if !supported {
-			klet.dockerLegacyService = ds
-			legacyLogProvider = ds
-		}
-	case kubetypes.RemoteContainerRuntime:
-		// No-op.
-		break
-	default:
-		return nil, fmt.Errorf("unsupported CRI runtime: %q", containerRuntime)
-	}
-	runtimeService, imageService, err := getRuntimeAndImageServices(remoteRuntimeEndpoint, remoteImageEndpoint, kubeCfg.RuntimeRequestTimeout)
-	if err != nil {
-		return nil, err
-	}
-	klet.runtimeService = runtimeService
+	klet.dockerLegacyService = kubeDeps.dockerLegacyService
+	klet.criHandler = kubeDeps.criHandler
+	klet.runtimeService = kubeDeps.RemoteRuntimeService
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && kubeDeps.KubeClient != nil {
 		klet.runtimeClassManager = runtimeclass.NewManager(kubeDeps.KubeClient)
@@ -687,10 +694,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		int(kubeCfg.RegistryBurst),
 		kubeCfg.CPUCFSQuota,
 		kubeCfg.CPUCFSQuotaPeriod,
-		runtimeService,
-		imageService,
+		kubeDeps.RemoteRuntimeService,
+		kubeDeps.RemoteImageService,
 		kubeDeps.ContainerManager.InternalContainerLifecycle(),
-		legacyLogProvider,
+		kubeDeps.dockerLegacyService,
 		klet.runtimeClassManager,
 	)
 	if err != nil {
@@ -706,7 +713,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	klet.runtimeCache = runtimeCache
 
-	if cadvisor.UsingLegacyCadvisorStats(containerRuntime, remoteRuntimeEndpoint) {
+	if kubeDeps.useLegacyCadvisorStats {
 		klet.StatsProvider = stats.NewCadvisorStatsProvider(
 			klet.cadvisor,
 			klet.resourceAnalyzer,
@@ -720,8 +727,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			klet.resourceAnalyzer,
 			klet.podManager,
 			klet.runtimeCache,
-			runtimeService,
-			imageService,
+			kubeDeps.RemoteRuntimeService,
+			kubeDeps.RemoteImageService,
 			stats.NewLogMetricsService(),
 			kubecontainer.RealOS{})
 	}

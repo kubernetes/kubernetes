@@ -43,8 +43,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
+	"k8s.io/kubernetes/pkg/kubelet/remote"
+	fakeremote "k8s.io/kubernetes/pkg/kubelet/remote/fake"
 	"k8s.io/kubernetes/pkg/kubemark"
 	"k8s.io/kubernetes/pkg/master/ports"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
@@ -195,10 +195,18 @@ func run(config *hollowNodeConfig) {
 		}
 		containerManager := cm.NewStubContainerManager()
 
-		fakeDockerClientConfig := &dockershim.ClientConfig{
-			DockerEndpoint:    libdocker.FakeDockerEndpoint,
-			EnableSleep:       true,
-			WithTraceDisabled: true,
+		endpoint, err := fakeremote.GenerateEndpoint()
+		if err != nil {
+			klog.Fatalf("Failed to generate fake endpoint %v.", err)
+		}
+		fakeRemoteRuntime := fakeremote.NewFakeRemoteRuntime()
+		if err = fakeRemoteRuntime.Start(endpoint); err != nil {
+			klog.Fatalf("Failed to start fake runtime %v.", err)
+		}
+		defer fakeRemoteRuntime.Stop()
+		runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second)
+		if err != nil {
+			klog.Fatalf("Failed to init runtime service %v.", err)
 		}
 
 		hollowKubelet := kubemark.NewHollowKubelet(
@@ -206,7 +214,8 @@ func run(config *hollowNodeConfig) {
 			client,
 			heartbeatClient,
 			cadvisorInterface,
-			fakeDockerClientConfig,
+			fakeRemoteRuntime.ImageService,
+			runtimeService,
 			containerManager,
 		)
 		hollowKubelet.Run()

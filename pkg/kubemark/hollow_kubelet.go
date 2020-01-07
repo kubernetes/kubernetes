@@ -25,6 +25,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/kubelet"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
@@ -98,22 +98,24 @@ func NewHollowKubelet(
 	client *clientset.Clientset,
 	heartbeatClient *clientset.Clientset,
 	cadvisorInterface cadvisor.Interface,
-	dockerClientConfig *dockershim.ClientConfig,
+	imageService internalapi.ImageManagerService,
+	runtimeService internalapi.RuntimeService,
 	containerManager cm.ContainerManager) *HollowKubelet {
 	d := &kubelet.Dependencies{
-		KubeClient:         client,
-		HeartbeatClient:    heartbeatClient,
-		DockerClientConfig: dockerClientConfig,
-		CAdvisorInterface:  cadvisorInterface,
-		Cloud:              nil,
-		OSInterface:        &containertest.FakeOS{},
-		ContainerManager:   containerManager,
-		VolumePlugins:      volumePlugins(),
-		TLSOptions:         nil,
-		OOMAdjuster:        oom.NewFakeOOMAdjuster(),
-		Mounter:            &mount.FakeMounter{},
-		Subpather:          &subpath.FakeSubpath{},
-		HostUtil:           hostutil.NewFakeHostUtil(nil),
+		KubeClient:           client,
+		HeartbeatClient:      heartbeatClient,
+		RemoteRuntimeService: runtimeService,
+		RemoteImageService:   imageService,
+		CAdvisorInterface:    cadvisorInterface,
+		Cloud:                nil,
+		OSInterface:          &containertest.FakeOS{},
+		ContainerManager:     containerManager,
+		VolumePlugins:        volumePlugins(),
+		TLSOptions:           nil,
+		OOMAdjuster:          oom.NewFakeOOMAdjuster(),
+		Mounter:              &mount.FakeMounter{},
+		Subpather:            &subpath.FakeSubpath{},
+		HostUtil:             hostutil.NewFakeHostUtil(nil),
 	}
 
 	return &HollowKubelet{
@@ -160,6 +162,7 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	f.MaxContainerCount = 100
 	f.MaxPerPodContainerCount = 2
 	f.NodeLabels = opt.NodeLabels
+	f.ContainerRuntimeOptions.ContainerRuntime = kubetypes.RemoteContainerRuntime
 	f.RegisterNode = true
 	f.RegisterSchedulable = true
 	f.ProviderID = fmt.Sprintf("kubemark://%v", opt.NodeName)
