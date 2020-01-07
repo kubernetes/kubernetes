@@ -17,11 +17,11 @@ limitations under the License.
 package apimachinery
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
-	"encoding/json"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -259,9 +259,10 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 		ginkgo.By("patching the Namespace")
 		nspatch, err := json.Marshal(map[string]interface{}{
 			"metadata": map[string]interface{}{
-				"labels": map[string]string{"testLabel":"testValue"},
+				"labels": map[string]string{"testLabel": "testValue"},
 			},
 		})
+		framework.ExpectNoError(err, "failed to marshal JSON patch data")
 		_, err = f.ClientSet.CoreV1().Namespaces().Patch(namespaceName, types.StrategicMergePatchType, []byte(nspatch))
 		framework.ExpectNoError(err, "failed to patch Namespace")
 
