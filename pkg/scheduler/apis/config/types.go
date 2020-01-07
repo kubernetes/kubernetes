@@ -21,6 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	componentbaseconfig "k8s.io/component-base/config"
 )
 
@@ -269,4 +270,53 @@ func (p *Plugins) Append(src *Plugins) {
 	p.Bind = appendPluginSet(p.Bind, src.Bind)
 	p.PostBind = appendPluginSet(p.PostBind, src.PostBind)
 	p.Unreserve = appendPluginSet(p.Unreserve, src.Unreserve)
+}
+
+// Apply merges the plugin configuration from custom plugins, handling disabled sets.
+func (p *Plugins) Apply(customPlugins *Plugins) {
+	if customPlugins == nil {
+		return
+	}
+
+	p.QueueSort = mergePluginSets(p.QueueSort, customPlugins.QueueSort)
+	p.PreFilter = mergePluginSets(p.PreFilter, customPlugins.PreFilter)
+	p.Filter = mergePluginSets(p.Filter, customPlugins.Filter)
+	p.PostFilter = mergePluginSets(p.PostFilter, customPlugins.PostFilter)
+	p.Score = mergePluginSets(p.Score, customPlugins.Score)
+	p.Reserve = mergePluginSets(p.Reserve, customPlugins.Reserve)
+	p.Permit = mergePluginSets(p.Permit, customPlugins.Permit)
+	p.PreBind = mergePluginSets(p.PreBind, customPlugins.PreBind)
+	p.Bind = mergePluginSets(p.Bind, customPlugins.Bind)
+	p.PostBind = mergePluginSets(p.PostBind, customPlugins.PostBind)
+	p.Unreserve = mergePluginSets(p.Unreserve, customPlugins.Unreserve)
+}
+
+func mergePluginSets(defaultPluginSet, customPluginSet *PluginSet) *PluginSet {
+	if customPluginSet == nil {
+		customPluginSet = &PluginSet{}
+	}
+
+	if defaultPluginSet == nil {
+		defaultPluginSet = &PluginSet{}
+	}
+
+	disabledPlugins := sets.NewString()
+	for _, disabledPlugin := range customPluginSet.Disabled {
+		disabledPlugins.Insert(disabledPlugin.Name)
+	}
+
+	enabledPlugins := []Plugin{}
+	if !disabledPlugins.Has("*") {
+		for _, defaultEnabledPlugin := range defaultPluginSet.Enabled {
+			if disabledPlugins.Has(defaultEnabledPlugin.Name) {
+				continue
+			}
+
+			enabledPlugins = append(enabledPlugins, defaultEnabledPlugin)
+		}
+	}
+
+	enabledPlugins = append(enabledPlugins, customPluginSet.Enabled...)
+
+	return &PluginSet{Enabled: enabledPlugins}
 }
