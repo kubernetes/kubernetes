@@ -38,8 +38,10 @@ import (
 )
 
 // cadvisorStatsProvider implements the containerStatsProvider interface by
-// getting the container stats from cAdvisor. This is needed by docker and rkt
-// integrations since they do not provide stats from CRI.
+// getting the container stats from cAdvisor. This is needed by
+// integrations which do not provide stats from CRI. See
+// `pkg/kubelet/cadvisor/util.go#UsingLegacyCadvisorStats` for the logic for
+// determining which integrations do not provide stats from CRI.
 type cadvisorStatsProvider struct {
 	// cadvisor is used to get the stats of the cgroup for the containers that
 	// are managed by pods.
