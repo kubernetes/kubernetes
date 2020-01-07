@@ -20,7 +20,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
@@ -73,7 +72,7 @@ func PodMatchesNodeSelectorAndAffinityTerms(pod *v1.Pod, node *v1.Node) bool {
 // nodeMatchesNodeSelectorTerms checks if a node's labels satisfy a list of node selector terms,
 // terms are ORed, and an empty list of terms will match nothing.
 func nodeMatchesNodeSelectorTerms(node *v1.Node, nodeSelectorTerms []v1.NodeSelectorTerm) bool {
-	return v1helper.MatchNodeSelectorTerms(nodeSelectorTerms, labels.Set(node.Labels), fields.Set{
-		api.ObjectNameField: node.Name,
+	return v1helper.MatchNodeSelectorTerms(nodeSelectorTerms, node.Labels, fields.Set{
+		"metadata.name": node.Name,
 	})
 }
