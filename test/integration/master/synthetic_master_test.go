@@ -425,20 +425,6 @@ func autoscalingPath(resource, namespace, name string) string {
 	return path.Join("/apis/autoscaling/v1", namespace, resource, name)
 }
 
-func batchPath(resource, namespace, name string) string {
-	if namespace != "" {
-		namespace = path.Join("namespaces", namespace)
-	}
-	return path.Join("/apis/batch/v1", namespace, resource, name)
-}
-
-func extensionsPath(resource, namespace, name string) string {
-	if namespace != "" {
-		namespace = path.Join("namespaces", namespace)
-	}
-	return path.Join("/apis/extensions/v1beta1", namespace, resource, name)
-}
-
 func appsPath(resource, namespace, name string) string {
 	if namespace != "" {
 		namespace = path.Join("namespaces", namespace)
@@ -471,11 +457,11 @@ func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
 		}
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			b, _ := ioutil.ReadAll(resp.Body)
 			body := string(b)
 			if _, ok := r.expectedStatusCodes[resp.StatusCode]; !ok {
@@ -519,11 +505,11 @@ func TestAppsGroupBackwardCompatibility(t *testing.T) {
 		}
 		func() {
 			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
 			if err != nil {
 				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			defer resp.Body.Close()
 			b, _ := ioutil.ReadAll(resp.Body)
 			body := string(b)
 			if _, ok := r.expectedStatusCodes[resp.StatusCode]; !ok {

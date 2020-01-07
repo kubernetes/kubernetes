@@ -134,6 +134,9 @@ func (e *transformTest) run(unSealSecretFunc unSealSecret, expectedEnvelopePrefi
 
 	// Secrets should be un-enveloped on direct reads from Kube API Server.
 	s, err := e.restClient.CoreV1().Secrets(testNamespace).Get(testSecret, metav1.GetOptions{})
+	if err != nil {
+		e.logger.Errorf("failed to get Secret from %s, err: %v", testNamespace, err)
+	}
 	if secretVal != string(s.Data[secretKey]) {
 		e.logger.Errorf("expected %s from KubeAPI, but got %s", secretVal, string(s.Data[secretKey]))
 	}
