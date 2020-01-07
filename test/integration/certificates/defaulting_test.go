@@ -43,14 +43,14 @@ func TestCSRSignerNameDefaulting(t *testing.T) {
 	}{
 		"defaults to legacy-unknown if not recognised": {
 			csr: capi.CertificateSigningRequestSpec{
-				Request: testCSRPEM,
+				Request: pemWithGroup(""),
 				Usages:  []capi.KeyUsage{capi.UsageKeyEncipherment, capi.UsageDigitalSignature},
 			},
 			expectedSignerName: capi.LegacyUnknownSignerName,
 		},
 		"does not default signerName if an explicit value is provided": {
 			csr: capi.CertificateSigningRequestSpec{
-				Request:    testCSRPEM,
+				Request:    pemWithGroup(""),
 				Usages:     []capi.KeyUsage{capi.UsageKeyEncipherment, capi.UsageDigitalSignature},
 				SignerName: strPtr("example.com/my-custom-signer"),
 			},
