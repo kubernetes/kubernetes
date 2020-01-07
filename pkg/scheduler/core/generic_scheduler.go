@@ -309,10 +309,10 @@ func (g *genericScheduler) Preempt(ctx context.Context, state *framework.CycleSt
 		klog.V(5).Infof("Pod %v/%v is not eligible for more preemption.", pod.Namespace, pod.Name)
 		return nil, nil, nil, nil
 	}
-	if len(g.nodeInfoSnapshot.NodeInfoMap) == 0 {
+	if len(g.nodeInfoSnapshot.NodeInfoList) == 0 {
 		return nil, nil, nil, ErrNoNodesAvailable
 	}
-	potentialNodes := nodesWherePreemptionMightHelp(g.nodeInfoSnapshot.NodeInfoMap, fitError)
+	potentialNodes := nodesWherePreemptionMightHelp(g.nodeInfoSnapshot.NodeInfoList, fitError)
 	if len(potentialNodes) == 0 {
 		klog.V(3).Infof("Preemption will not help schedule pod %v/%v on any node.", pod.Namespace, pod.Name)
 		// In this case, we should clean-up any existing nominated node name of the pod.
@@ -351,13 +351,7 @@ func (g *genericScheduler) Preempt(ctx context.Context, state *framework.CycleSt
 	// nomination updates these pods and moves them to the active queue. It
 	// lets scheduler find another place for them.
 	nominatedPods := g.getLowerPriorityNominatedPods(pod, candidateNode.Name)
-	if nodeInfo, ok := g.nodeInfoSnapshot.NodeInfoMap[candidateNode.Name]; ok {
-		return nodeInfo.Node(), nodeToVictims[candidateNode].Pods, nominatedPods, nil
-	}
-
-	return nil, nil, nil, fmt.Errorf(
-		"preemption failed: the target node %s has been deleted from scheduler cache",
-		candidateNode.Name)
+	return candidateNode, nodeToVictims[candidateNode].Pods, nominatedPods, nil
 }
 
 // processPreemptionWithExtenders processes preemption with extenders
@@ -859,18 +853,14 @@ func (g *genericScheduler) selectNodesForPreemption(
 	ctx context.Context,
 	state *framework.CycleState,
 	pod *v1.Pod,
-	potentialNodes []*v1.Node,
+	potentialNodes []*schedulernodeinfo.NodeInfo,
 	pdbs []*policy.PodDisruptionBudget,
 ) (map[*v1.Node]*extenderv1.Victims, error) {
 	nodeToVictims := map[*v1.Node]*extenderv1.Victims{}
 	var resultLock sync.Mutex
 
 	checkNode := func(i int) {
-		nodeName := potentialNodes[i].Name
-		if g.nodeInfoSnapshot.NodeInfoMap[nodeName] == nil {
-			return
-		}
-		nodeInfoCopy := g.nodeInfoSnapshot.NodeInfoMap[nodeName].Clone()
+		nodeInfoCopy := potentialNodes[i].Clone()
 		stateCopy := state.Clone()
 		pods, numPDBViolations, fits := g.selectVictimsOnNode(ctx, stateCopy, pod, nodeInfoCopy, pdbs)
 		if fits {
@@ -879,7 +869,7 @@ func (g *genericScheduler) selectNodesForPreemption(
 				Pods:             pods,
 				NumPDBViolations: int64(numPDBViolations),
 			}
-			nodeToVictims[potentialNodes[i]] = &victims
+			nodeToVictims[potentialNodes[i].Node()] = &victims
 			resultLock.Unlock()
 		}
 	}
@@ -1033,16 +1023,17 @@ func (g *genericScheduler) selectVictimsOnNode(
 
 // nodesWherePreemptionMightHelp returns a list of nodes with failed predicates
 // that may be satisfied by removing pods from the node.
-func nodesWherePreemptionMightHelp(nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, fitErr *FitError) []*v1.Node {
-	var potentialNodes []*v1.Node
-	for name, node := range nodeNameToInfo {
+func nodesWherePreemptionMightHelp(nodes []*schedulernodeinfo.NodeInfo, fitErr *FitError) []*schedulernodeinfo.NodeInfo {
+	var potentialNodes []*schedulernodeinfo.NodeInfo
+	for _, node := range nodes {
+		name := node.Node().Name
 		// We reply on the status by each plugin - 'Unschedulable' or 'UnschedulableAndUnresolvable'
 		// to determine whether preemption may help or not on the node.
 		if fitErr.FilteredNodesStatuses[name].Code() == framework.UnschedulableAndUnresolvable {
 			continue
 		}
 		klog.V(3).Infof("Node %v is a potential node for preemption.", name)
-		potentialNodes = append(potentialNodes, node.Node())
+		potentialNodes = append(potentialNodes, node)
 	}
 	return potentialNodes
 }

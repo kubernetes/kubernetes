@@ -27,10 +27,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,9 +44,12 @@ import (
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -1599,18 +1598,14 @@ func TestSelectNodesForPreemption(t *testing.T) {
 
 			assignDefaultStartTime(test.pods)
 
-			// newnode simulate a case that a new node is added to the cluster, but nodeNameToInfo
-			// doesn't have it yet.
-			newnode := makeNode("newnode", 1000*5, priorityutil.DefaultMemoryRequest*5)
-			newnode.ObjectMeta.Labels = map[string]string{"hostname": "newnode"}
-			nodes = append(nodes, newnode)
 			state := framework.NewCycleState()
 			// Some tests rely on PreFilter plugin to compute its CycleState.
 			preFilterStatus := fwk.RunPreFilterPlugins(context.Background(), state, test.pod)
 			if !preFilterStatus.IsSuccess() {
 				t.Errorf("Unexpected preFilterStatus: %v", preFilterStatus)
 			}
-			nodeToPods, err := g.selectNodesForPreemption(context.Background(), state, test.pod, nodes, nil)
+			nodeInfos := nodesToNodeInfos(nodes, snapshot)
+			nodeToPods, err := g.selectNodesForPreemption(context.Background(), state, test.pod, nodeInfos, nil)
 			if err != nil {
 				t.Error(err)
 			}
@@ -1839,8 +1834,9 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			}
 			assignDefaultStartTime(test.pods)
 
+			nodeInfos := nodesToNodeInfos(nodes, snapshot)
 			state := framework.NewCycleState()
-			candidateNodes, _ := g.selectNodesForPreemption(context.Background(), state, test.pod, nodes, nil)
+			candidateNodes, _ := g.selectNodesForPreemption(context.Background(), state, test.pod, nodeInfos, nil)
 			node := pickOneNodeForPreemption(candidateNodes)
 			found := false
 			for _, nodeName := range test.expected {
@@ -1964,13 +1960,20 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			fitErr := FitError{
 				FilteredNodesStatuses: test.nodesStatuses,
 			}
-			nodes := nodesWherePreemptionMightHelp(nodeinfosnapshot.CreateNodeInfoMap(nil, makeNodeList(nodeNames)), &fitErr)
+			var nodeInfos []*schedulernodeinfo.NodeInfo
+			for _, n := range makeNodeList(nodeNames) {
+				ni := schedulernodeinfo.NewNodeInfo()
+				ni.SetNode(n)
+				nodeInfos = append(nodeInfos, ni)
+			}
+			nodes := nodesWherePreemptionMightHelp(nodeInfos, &fitErr)
 			if len(test.expected) != len(nodes) {
 				t.Errorf("number of nodes is not the same as expected. exptectd: %d, got: %d. Nodes: %v", len(test.expected), len(nodes), nodes)
 			}
 			for _, node := range nodes {
-				if _, found := test.expected[node.Name]; !found {
-					t.Errorf("node %v is not expected.", node.Name)
+				name := node.Node().Name
+				if _, found := test.expected[name]; !found {
+					t.Errorf("node %v is not expected.", name)
 				}
 			}
 		})
@@ -2463,4 +2466,12 @@ func TestFairEvaluationForNodes(t *testing.T) {
 			t.Errorf("got %d lastProcessedNodeIndex, want %d", g.nextStartNodeIndex, (i+1)*nodesToFind%numAllNodes)
 		}
 	}
+}
+
+func nodesToNodeInfos(nodes []*v1.Node, snapshot *nodeinfosnapshot.Snapshot) []*schedulernodeinfo.NodeInfo {
+	var nodeInfos []*schedulernodeinfo.NodeInfo
+	for _, n := range nodes {
+		nodeInfos = append(nodeInfos, snapshot.NodeInfoMap[n.Name])
+	}
+	return nodeInfos
 }
