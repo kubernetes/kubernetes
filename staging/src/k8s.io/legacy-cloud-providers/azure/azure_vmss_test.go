@@ -111,6 +111,30 @@ func setTestVirtualMachineCloud(ss *Cloud, scaleSetName, zone string, faultDomai
 				InstanceView: &compute.VirtualMachineScaleSetVMInstanceView{
 					PlatformFaultDomain: &faultDomain,
 				},
+				StorageProfile: &compute.StorageProfile{
+					OsDisk: nil,
+					DataDisks: &[]compute.DataDisk{
+						{
+							Lun:          to.Int32Ptr(2),
+							Name:         to.StringPtr("disk-2"),
+							Caching:      "None",
+							CreateOption: "attach",
+							Vhd: &compute.VirtualHardDisk{
+								URI: to.StringPtr("uri"),
+							},
+						},
+						{
+							Lun:          to.Int32Ptr(3),
+							Name:         to.StringPtr("disk-3"),
+							Caching:      "None",
+							CreateOption: "attach",
+							ManagedDisk: &compute.ManagedDiskParameters{
+								ID:                to.StringPtr("uri"),
+								DiskEncryptionSet: &compute.DiskEncryptionSetParameters{ID: to.StringPtr("id")},
+							},
+						},
+					},
+				},
 			},
 			ID:         &ID,
 			InstanceID: &instanceID,
