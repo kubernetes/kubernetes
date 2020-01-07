@@ -738,29 +738,32 @@ func deletionFinalizersForGarbageCollection(ctx context.Context, e *Store, acces
 	}
 	shouldOrphan := shouldOrphanDependents(ctx, e, accessor, options)
 	shouldDeleteDependentInForeground := shouldDeleteDependents(ctx, e, accessor, options)
-	newFinalizers := []string{}
+	newFinalizers := sets.NewString()
 
 	// first remove both finalizers, add them back if needed.
 	for _, f := range accessor.GetFinalizers() {
 		if f == metav1.FinalizerOrphanDependents || f == metav1.FinalizerDeleteDependents {
 			continue
 		}
-		newFinalizers = append(newFinalizers, f)
+		newFinalizers[f] = struct{}{}
 	}
 
 	if shouldOrphan {
-		newFinalizers = append(newFinalizers, metav1.FinalizerOrphanDependents)
+		newFinalizers[metav1.FinalizerOrphanDependents] = struct{}{}
 	}
 	if shouldDeleteDependentInForeground {
-		newFinalizers = append(newFinalizers, metav1.FinalizerDeleteDependents)
+		newFinalizers[metav1.FinalizerDeleteDependents] = struct{}{}
 	}
 
-	oldFinalizerSet := sets.NewString(accessor.GetFinalizers()...)
-	newFinalizersSet := sets.NewString(newFinalizers...)
-	if oldFinalizerSet.Equal(newFinalizersSet) {
-		return false, accessor.GetFinalizers()
+	if len(accessor.GetFinalizers()) != len(newFinalizers) {
+		return true, newFinalizers.List()
 	}
-	return true, newFinalizers
+	for _, oldf := range accessor.GetFinalizers() {
+		if _, ok := newFinalizers[oldf]; !ok {
+			return true, newFinalizers.List()
+		}
+	}
+	return false, accessor.GetFinalizers()
 }
 
 // markAsDeleting sets the obj's DeletionGracePeriodSeconds to 0, and sets the
