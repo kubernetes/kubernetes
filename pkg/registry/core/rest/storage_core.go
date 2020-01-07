@@ -190,11 +190,6 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
 
-	serviceRESTStorage, serviceStatusStorage, err := servicestore.NewGenericREST(restOptionsGetter)
-	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
-	}
-
 	var serviceClusterIPRegistry rangeallocation.RangeRegistry
 	serviceClusterIPRange := c.ServiceIPRange
 	if serviceClusterIPRange.IP == nil {
@@ -258,6 +253,11 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	restStorage.ServiceNodePortAllocator = serviceNodePortRegistry
 
 	controllerStorage, err := controllerstore.NewStorage(restOptionsGetter)
+	if err != nil {
+		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+	}
+
+	serviceRESTStorage, serviceStatusStorage, err := servicestore.NewGenericREST(restOptionsGetter, serviceClusterIPRange, secondaryServiceClusterIPAllocator != nil)
 	if err != nil {
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}

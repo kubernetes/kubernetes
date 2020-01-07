@@ -3951,7 +3951,6 @@ func ValidatePodTemplateUpdate(newPod, oldPod *core.PodTemplate) field.ErrorList
 var supportedSessionAffinityType = sets.NewString(string(core.ServiceAffinityClientIP), string(core.ServiceAffinityNone))
 var supportedServiceType = sets.NewString(string(core.ServiceTypeClusterIP), string(core.ServiceTypeNodePort),
 	string(core.ServiceTypeLoadBalancer), string(core.ServiceTypeExternalName))
-var supportedServiceIPFamily = sets.NewString(string(core.IPv4Protocol), string(core.IPv6Protocol))
 
 // ValidateService tests if required fields/annotations of a Service are valid.
 func ValidateService(service *core.Service, allowAppProtocol bool) field.ErrorList {
@@ -4152,21 +4151,6 @@ func ValidateService(service *core.Service, allowAppProtocol bool) field.ErrorLi
 		}
 	}
 
-	//if an ipfamily provided then it has to be one of the supported values
-	// note:
-	// - we don't validate service.Spec.IPFamily is supported by the cluster
-	// - we don't validate service.Spec.ClusterIP is within a range supported by the cluster
-	// both of these validations are done by the ipallocator
-
-	// if the gate is on this field is required (and defaulted by REST if not provided by user)
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && service.Spec.IPFamily == nil {
-		allErrs = append(allErrs, field.Required(specPath.Child("ipFamily"), ""))
-	}
-
-	if service.Spec.IPFamily != nil && !supportedServiceIPFamily.Has(string(*service.Spec.IPFamily)) {
-		allErrs = append(allErrs, field.NotSupported(specPath.Child("ipFamily"), service.Spec.IPFamily, supportedServiceIPFamily.List()))
-	}
-
 	allErrs = append(allErrs, validateServiceExternalTrafficFieldsValue(service)...)
 	return allErrs
 }
@@ -4275,18 +4259,11 @@ func ValidateServiceCreate(service *core.Service) field.ErrorList {
 func ValidateServiceUpdate(service, oldService *core.Service) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&service.ObjectMeta, &oldService.ObjectMeta, field.NewPath("metadata"))
 
-	// ClusterIP and IPFamily should be immutable for services using it (every type other than ExternalName)
+	// ClusterIP should be immutable for services using it (every type other than ExternalName)
 	// which do not have ClusterIP assigned yet (empty string value)
 	if service.Spec.Type != core.ServiceTypeExternalName {
 		if oldService.Spec.Type != core.ServiceTypeExternalName && oldService.Spec.ClusterIP != "" {
 			allErrs = append(allErrs, ValidateImmutableField(service.Spec.ClusterIP, oldService.Spec.ClusterIP, field.NewPath("spec", "clusterIP"))...)
-		}
-		// notes:
-		// we drop the IPFamily field when the Dualstack gate is off.
-		// once the gate is on, we start assigning default ipfamily according to cluster settings. in other words
-		// though the field is immutable, we allow (onetime) change from nil==> to value
-		if oldService.Spec.IPFamily != nil {
-			allErrs = append(allErrs, ValidateImmutableField(service.Spec.IPFamily, oldService.Spec.IPFamily, field.NewPath("spec", "ipFamily"))...)
 		}
 	}
 
