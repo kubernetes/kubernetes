@@ -551,7 +551,7 @@ func (ss *scaleSet) listScaleSetVMs(scaleSetName, resourceGroup string) ([]compu
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	allVMs, rerr := ss.VirtualMachineScaleSetVMsClient.List(ctx, resourceGroup, scaleSetName, "", "", string(compute.InstanceView))
+	allVMs, rerr := ss.VirtualMachineScaleSetVMsClient.List(ctx, resourceGroup, scaleSetName, string(compute.InstanceView))
 	if rerr != nil {
 		klog.Errorf("VirtualMachineScaleSetVMsClient.List failed: %v", rerr)
 		return nil, rerr.Error()
@@ -897,16 +897,12 @@ func (ss *scaleSet) EnsureHostInPool(service *v1.Service, nodeName types.NodeNam
 	defer cancel()
 	klog.V(2).Infof("EnsureHostInPool begins to update vmssVM(%s) with new backendPoolID %s", vmName, backendPoolID)
 	rerr := ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM, "network_update")
-	if rerr != nil && rerr.Retriable && ss.CloudProviderBackoff {
-		klog.V(2).Infof("EnsureHostInPool update backing off vmssVM(%s) with new backendPoolID %s, err: %v", vmName, backendPoolID, err)
-		retryErr := ss.UpdateVmssVMWithRetry(nodeResourceGroup, ssName, instanceID, newVM, "network_update")
-		if retryErr != nil {
-			klog.Errorf("EnsureHostInPool update abort backoff vmssVM(%s) with new backendPoolID %s, err: %v", vmName, backendPoolID, err)
-		}
-		return retryErr
+	if rerr != nil {
+		klog.Errorf("EnsureHostInPool VirtualMachineScaleSetVMsClient.Update(%s) with new backendPoolID %s, err: %v", vmName, backendPoolID, err)
+		return rerr.Error()
 	}
 
-	return rerr.Error()
+	return nil
 }
 
 func getVmssAndResourceGroupNameByVMProviderID(providerID string) (string, string, error) {
@@ -1022,21 +1018,10 @@ func (ss *scaleSet) ensureVMSSInPool(service *v1.Service, nodes []*v1.Node, back
 			},
 		}
 
-		// Update vmssVM with backoff.
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
-
 		klog.V(2).Infof("ensureVMSSInPool begins to update vmss(%s) with new backendPoolID %s", vmssName, backendPoolID)
-		rerr := ss.VirtualMachineScaleSetsClient.CreateOrUpdate(ctx, ss.ResourceGroup, vmssName, newVMSS)
-		if rerr != nil && rerr.Retriable && ss.CloudProviderBackoff {
-			klog.V(2).Infof("ensureVMSSInPool update backing off vmss(%s) with new backendPoolID %s, err: %v", vmssName, backendPoolID, err)
-			retryErr := ss.CreateOrUpdateVmssWithRetry(ss.ResourceGroup, vmssName, newVMSS)
-			if retryErr != nil {
-				klog.Errorf("ensureVMSSInPool update abort backoff vmssVM(%s) with new backendPoolID %s, err: %v", vmssName, backendPoolID, err)
-				return retryErr
-			}
-		}
+		rerr := ss.CreateOrUpdateVMSS(ss.ResourceGroup, vmssName, newVMSS)
 		if rerr != nil {
+			klog.Errorf("ensureVMSSInPool CreateOrUpdateVMSS(%s) with new backendPoolID %s, err: %v", vmssName, backendPoolID, err)
 			return rerr.Error()
 		}
 	}
@@ -1173,14 +1158,6 @@ func (ss *scaleSet) ensureBackendPoolDeletedFromNode(service *v1.Service, nodeNa
 	defer cancel()
 	klog.V(2).Infof("ensureBackendPoolDeletedFromNode begins to update vmssVM(%s) with backendPoolID %s", nodeName, backendPoolID)
 	rerr := ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM, "network_update")
-	if rerr != nil && rerr.Retriable && ss.CloudProviderBackoff {
-		klog.V(2).Infof("ensureBackendPoolDeletedFromNode update backing off vmssVM(%s) with backendPoolID %s, err: %v", nodeName, backendPoolID, err)
-		retryErr := ss.UpdateVmssVMWithRetry(nodeResourceGroup, ssName, instanceID, newVM, "network_update")
-		if retryErr != nil {
-			err = retryErr
-			klog.Errorf("ensureBackendPoolDeletedFromNode update abort backoff vmssVM(%s) with backendPoolID %s, err: %v", nodeName, backendPoolID, err)
-		}
-	}
 	if rerr != nil {
 		klog.Errorf("ensureBackendPoolDeletedFromNode failed to update vmssVM(%s) with backendPoolID %s: %v", nodeName, backendPoolID, err)
 	} else {
@@ -1304,21 +1281,10 @@ func (ss *scaleSet) ensureBackendPoolDeletedFromVMSS(service *v1.Service, backen
 			},
 		}
 
-		// Update vmssVM with backoff.
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
-
 		klog.V(2).Infof("ensureBackendPoolDeletedFromVMSS begins to update vmss(%s) with backendPoolID %s", vmssName, backendPoolID)
-		rerr := ss.VirtualMachineScaleSetsClient.CreateOrUpdate(ctx, ss.ResourceGroup, vmssName, newVMSS)
-		if rerr != nil && rerr.Retriable && ss.CloudProviderBackoff {
-			klog.V(2).Infof("ensureBackendPoolDeletedFromVMSS update backing off vmss(%s) with backendPoolID %s, err: %v", vmssName, backendPoolID, err)
-			retryErr := ss.CreateOrUpdateVmssWithRetry(ss.ResourceGroup, vmssName, newVMSS)
-			if retryErr != nil {
-				klog.Errorf("ensureBackendPoolDeletedFromVMSS update abort backoff vmssVM(%s) with backendPoolID %s, err: %v", vmssName, backendPoolID, retryErr)
-				return retryErr
-			}
-		}
+		rerr := ss.CreateOrUpdateVMSS(ss.ResourceGroup, vmssName, newVMSS)
 		if rerr != nil {
+			klog.Errorf("ensureBackendPoolDeletedFromVMSS CreateOrUpdateVMSS(%s) with new backendPoolID %s, err: %v", vmssName, backendPoolID, err)
 			return rerr.Error()
 		}
 	}
