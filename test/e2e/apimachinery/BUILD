@@ -11,6 +11,7 @@ go_library(
         "aggregator.go",
         "certs.go",
         "chunking.go",
+        "component_statuses.go",
         "crd_conversion_webhook.go",
         "crd_publish_openapi.go",
         "crd_watch.go",

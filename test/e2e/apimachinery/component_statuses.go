@@ -35,7 +35,7 @@ var _ = SIGDescribe("ComponentStatuses", func() {
 
 			for _, condition := range cs.Conditions {
 				if condition.Type == "Healthy" && condition.Status == "True" {
-					healthyCount ++
+					healthyCount++
 				}
 			}
 		}
@@ -45,7 +45,7 @@ var _ = SIGDescribe("ComponentStatuses", func() {
 
 	ginkgo.It("should ensure select Components exist", func() {
 		requiredComponents := map[string]bool{
-			"scheduler": true,
+			"scheduler":          true,
 			"controller-manager": true,
 		}
 		requiredComponentFoundCount := 0
@@ -54,11 +54,10 @@ var _ = SIGDescribe("ComponentStatuses", func() {
 		csList, _ := f.ClientSet.CoreV1().ComponentStatuses().List(metav1.ListOptions{})
 		for _, csItem := range csList.Items {
 			if requiredComponents[csItem.ObjectMeta.Name] == true {
-				requiredComponentFoundCount ++
+				requiredComponentFoundCount++
 			}
 		}
 
 		framework.ExpectEqual(requiredComponentFoundCount, len(requiredComponents), "Components are not all healthy")
 	})
 })
-
