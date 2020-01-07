@@ -137,7 +137,7 @@ func getTestStorageClasses(client clientset.Interface, policyName, datastoreName
 		case storageclass2:
 			var scVSanParameters map[string]string
 			scVSanParameters = make(map[string]string)
-			scVSanParameters[Policy_HostFailuresToTolerate] = "1"
+			scVSanParameters[PolicyHostFailuresToTolerate] = "1"
 			sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass2, scVSanParameters, nil, ""))
 		case storageclass3:
 			var scSPBMPolicyParameters map[string]string

@@ -297,20 +297,20 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 	})
 
 	ginkgo.It("Verify PVC creation with an invalid VSAN capability along with a compatible zone combination specified in storage class fails", func() {
-		ginkgo.By(fmt.Sprintf("Creating storage class with %s :%s and zone :%s", Policy_HostFailuresToTolerate, HostFailuresToTolerateCapabilityInvalidVal, zoneA))
-		scParameters[Policy_HostFailuresToTolerate] = HostFailuresToTolerateCapabilityInvalidVal
+		ginkgo.By(fmt.Sprintf("Creating storage class with %s :%s and zone :%s", PolicyHostFailuresToTolerate, HostFailuresToTolerateCapabilityInvalidVal, zoneA))
+		scParameters[PolicyHostFailuresToTolerate] = HostFailuresToTolerateCapabilityInvalidVal
 		zones = append(zones, zoneA)
 		err := verifyPVCCreationFails(client, namespace, scParameters, zones, "")
-		errorMsg := "Invalid value for " + Policy_HostFailuresToTolerate + "."
+		errorMsg := "Invalid value for " + PolicyHostFailuresToTolerate + "."
 		if !strings.Contains(err.Error(), errorMsg) {
 			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
 	ginkgo.It("Verify a pod is created and attached to a dynamically created PV, based on a VSAN capability, datastore and compatible zone specified in storage class", func() {
-		ginkgo.By(fmt.Sprintf("Creating storage class with %s :%s, %s :%s, datastore :%s and zone :%s", Policy_ObjectSpaceReservation, ObjectSpaceReservationCapabilityVal, Policy_IopsLimit, IopsLimitCapabilityVal, vsanDatastore1, zoneA))
-		scParameters[Policy_ObjectSpaceReservation] = ObjectSpaceReservationCapabilityVal
-		scParameters[Policy_IopsLimit] = IopsLimitCapabilityVal
+		ginkgo.By(fmt.Sprintf("Creating storage class with %s :%s, %s :%s, datastore :%s and zone :%s", PolicyObjectSpaceReservation, ObjectSpaceReservationCapabilityVal, PolicyIopsLimit, IopsLimitCapabilityVal, vsanDatastore1, zoneA))
+		scParameters[PolicyObjectSpaceReservation] = ObjectSpaceReservationCapabilityVal
+		scParameters[PolicyIopsLimit] = IopsLimitCapabilityVal
 		scParameters[Datastore] = vsanDatastore1
 		zones = append(zones, zoneA)
 		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, zones, "")

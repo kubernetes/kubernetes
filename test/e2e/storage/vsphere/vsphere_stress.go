@@ -92,7 +92,7 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 			case storageclass2:
 				var scVSanParameters map[string]string
 				scVSanParameters = make(map[string]string)
-				scVSanParameters[Policy_HostFailuresToTolerate] = "1"
+				scVSanParameters[PolicyHostFailuresToTolerate] = "1"
 				sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass2, scVSanParameters, nil, ""))
 			case storageclass3:
 				var scSPBMPolicyParameters map[string]string
@@ -115,21 +115,22 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 		var wg sync.WaitGroup
 		wg.Add(instances)
 		for instanceCount := 0; instanceCount < instances; instanceCount++ {
-			instanceId := fmt.Sprintf("Thread:%v", instanceCount+1)
-			go PerformVolumeLifeCycleInParallel(f, client, namespace, instanceId, scArrays[instanceCount%len(scArrays)], iterations, &wg)
+			instanceID := fmt.Sprintf("Thread:%v", instanceCount+1)
+			go PerformVolumeLifeCycleInParallel(f, client, namespace, instanceID, scArrays[instanceCount%len(scArrays)], iterations, &wg)
 		}
 		wg.Wait()
 	})
 
 })
 
-// goroutine to perform volume lifecycle operations in parallel
-func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.Interface, namespace string, instanceId string, sc *storagev1.StorageClass, iterations int, wg *sync.WaitGroup) {
+// PerformVolumeLifeCycleInParallel performs volume lifecycle operations
+// Called as a go routine to perform operations in parallel
+func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.Interface, namespace string, instanceID string, sc *storagev1.StorageClass, iterations int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	defer ginkgo.GinkgoRecover()
 
 	for iterationCount := 0; iterationCount < iterations; iterationCount++ {
-		logPrefix := fmt.Sprintf("Instance: [%v], Iteration: [%v] :", instanceId, iterationCount+1)
+		logPrefix := fmt.Sprintf("Instance: [%v], Iteration: [%v] :", instanceID, iterationCount+1)
 		ginkgo.By(fmt.Sprintf("%v Creating PVC using the Storage Class: %v", logPrefix, sc.Name))
 		pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "1Gi", sc))
 		framework.ExpectNoError(err)
