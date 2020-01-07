@@ -28,7 +28,6 @@ import (
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -42,8 +41,13 @@ type VolumeZone struct {
 
 var _ framework.FilterPlugin = &VolumeZone{}
 
-// Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "VolumeZone"
+const (
+	// Name is the name of the plugin used in the plugin registry and configurations.
+	Name = "VolumeZone"
+
+	// ErrReasonConflict is used for NoVolumeZoneConflict predicate error.
+	ErrReasonConflict = "node(s) had no available volume zone"
+)
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *VolumeZone) Name() string {
@@ -153,7 +157,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 
 			if !volumeVSet.Has(nodeV) {
 				klog.V(10).Infof("Won't schedule pod %q onto node %q due to volume %q (mismatch on %q)", pod.Name, node.Name, pvName, k)
-				return framework.NewStatus(framework.UnschedulableAndUnresolvable, predicates.ErrVolumeZoneConflict.GetReason())
+				return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
 			}
 		}
 	}

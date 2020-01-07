@@ -31,8 +31,6 @@ var (
 	// it can never be made to pass by removing pods, you need to add the predicate
 	// failure error in nodesWherePreemptionMightHelp() in scheduler/core/generic_scheduler.go
 
-	// ErrVolumeZoneConflict is used for NoVolumeZoneConflict predicate error.
-	ErrVolumeZoneConflict = NewPredicateFailureError("NoVolumeZoneConflict", "node(s) had no available volume zone")
 	// ErrNodeSelectorNotMatch is used for MatchNodeSelector predicate error.
 	ErrNodeSelectorNotMatch = NewPredicateFailureError("MatchNodeSelector", "node(s) didn't match node selector")
 	// ErrPodAffinityNotMatch is used for MatchInterPodAffinity predicate error.
@@ -87,7 +85,6 @@ var unresolvablePredicateFailureErrors = map[PredicateFailureReason]struct{}{
 	ErrNodeUnderMemoryPressure: {},
 	ErrNodeUnschedulable:       {},
 	ErrNodeUnknownCondition:    {},
-	ErrVolumeZoneConflict:      {},
 }
 
 // UnresolvablePredicateExists checks if there is at least one unresolvable predicate failure reason.
