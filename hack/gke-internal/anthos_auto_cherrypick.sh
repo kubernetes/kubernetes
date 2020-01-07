@@ -20,18 +20,30 @@ set -o pipefail
 
 usage="The script automatically cherrypicks a kubernetes patch for an anthos version.
 
-Usage: $(basename $0) [-cdhkrv] COMMIT_NUMBER master|ANTHOS_MAJOR_MINOR_VERSION|[K8S_MAJOR_MINOR_PATCH_VERSION]...
+Usage: $(basename $0) [-cdehkrv] COMMIT_ID master|ANTHOS_MAJOR_MINOR_VERSION|[K8S_MAJOR_MINOR_PATCH_VERSION]...
 
 Options:
   -c  List of emails to CC (comma separated).
   -d  Dry run without actual change pushed.
+  -e  Do not skip empty cherrypicks. By default empty cherrypicks are skipped.
   -h  Print help message.
   -k  Use Kubernetes major minor patch version instead.
   -r  List of reviewer emails (comma separated).
-  -v  Print verbose output."
+  -v  Print verbose output.
 
+Example:
+$ $(basename $0) -c ldap1@google.com -r ldap2@google.com f61f2f22ab1e2fc038eb43b37753505fb1f162e7 1.1
+Target branches generated from the anthos repo:
+    pre-release-1.1: release-1.13.7-gke
+    pre-release-1.2: release-1.14.7-gke
+    master: release-1.14.7-gke
+Branches to cherrypick:
+    release-1.17
+    release-1.16
+    release-1.16.4-gke
+    ..."
 
-while getopts 'c:dhkr:v' o; do
+while getopts 'c:dhkr:ev' o; do
   case "$o" in
     c) cc="$OPTARG"
       ;;
@@ -45,6 +57,9 @@ while getopts 'c:dhkr:v' o; do
       use_k8s_version="true"
       ;;
     r) reviewers="$OPTARG"
+      ;;
+    e) echo "Do not skip empty cherrypicks"
+      skip_empty="false"
       ;;
     v) echo "Verbose output mode"
       set -o xtrace
@@ -91,7 +106,7 @@ run_git() {
   output=$(git "$@" 2>&1)
   exitcode=$?
   if [[ $exitcode -ne 0 ]] || [[ "${verbose:-}" == "true" ]]; then
-    echo "$output"
+    echo "$output" >&2
   fi
   set -o errexit
   return $exitcode
@@ -187,7 +202,26 @@ branches=("${oss_branches[@]}" "${gke_branches[@]}")
 IFS=$'\n' branches=($(sort -Vru <<<"${branches[*]}")); unset IFS
 IFS=$'\n' target_branches=($(sort -Vru <<<"${target_branches[*]}")); unset IFS
 
-# Remove all branches lower than the oldest target branch.
+# Remove all branches smaller than the smallest target branch.
+# (The order is based on `sort -V` version sort result)
+# Example:
+# * Target branch: release-1.16.2-gke release-1.17.1-gke
+# * Original branches:
+#     release-1.14.0-gke
+#     release-1.15.0-gke
+#     release-1.16.0-gke
+#     release-1.16.1-gke
+#     release-1.16.2-gke
+#     release-1.17.0-gke
+#     release-1.17.1-gke
+#     release-1.17.2-gke
+#     release-1.18.0-gke
+# * New branches:
+#     release-1.16.2-gke
+#     release-1.17.0-gke
+#     release-1.17.1-gke
+#     release-1.17.2-gke
+#     release-1.18.0-gke
 oldest_target_branch="${target_branches[-1]}"
 new_branches=()
 for b in "${branches[@]}"; do
@@ -198,8 +232,22 @@ done
 b=( "${a[@]}" )
 branches=( "${new_branches[@]}" )
 
-# Remove branches with the same oss patch version, but lower than target
+# Remove branches with the same oss patch version, but smaller than target
 # branches.
+# (The order is based on `sort -V` version sort result)
+# Example:
+# * Target branch: release-1.16.2-gke release-1.17.1-gke
+# * Original branches:
+#     release-1.16.2-gke
+#     release-1.17.0-gke
+#     release-1.17.1-gke
+#     release-1.17.2-gke
+#     release-1.18.0-gke
+# * New branches:
+#     release-1.16.2-gke
+#     release-1.17.1-gke
+#     release-1.17.2-gke
+#     release-1.18.0-gke
 for t in "${target_branches[@]}"; do
   prefix=$(echo "$t" | grep -oP "release-[0-9]+\.[0-9]+\.")
   new_branches=()
@@ -219,6 +267,11 @@ for i in "${!branches[@]}"; do
 done
 echo "Branches to cherrypick:"
 printf "\t%s\n" "${branches[@]}"
+read -p "Proceed? (anything but 'y' aborts the cherry-pick) [y/n]" reply
+if ! [[ "${reply}" =~ ^[yY]$ ]]; then
+  echo "Aborting."
+  exit 1
+fi
 
 # Get push options.
 push_options=""
@@ -246,15 +299,15 @@ for b in "${branches[@]}"; do
   echo "Cherrypicking $commit to branch $remote_branch..."
   run_git checkout "$remote_branch"
   if ! run_git cherry-pick "$commit"; then
+    if git diff "$remote_branch" --exit-code &> /dev/null && [[ "${skip_empty:-}" != "false" ]]; then
+      echo "Empty commit. The commit may already exist in $remote_branch."
+      run_git cherry-pick --skip
+      continue
+    fi
     while true; do
-      echo "Please resolve the conflicts in another window (and remember to 'git add / git cherry-pick --continue')
-  * y: continues cherry-pick after conflicts are resolved;
-  * s: skips the cherry-pick, this is usually used when the commit is empty (already exists in the branch);
-  * n (or anything else): aborts the cherry-pick."
-      read -p "Proceed? [y/s/n]" reply
-      if [[ "${reply}" =~ ^[sS]$ ]]; then
-        run_git cherry-pick --skip
-      elif ! [[ "${reply}" =~ ^[yY]$ ]]; then
+      echo "Please resolve the conflicts in another window (and remember to 'git add / git cherry-pick --continue')"
+      read -p "Proceed (anything but 'y' aborts the cherry-pick)? [y/n] " reply
+      if ! [[ "${reply}" =~ ^[yY]$ ]]; then
         run_git cherry-pick --abort
         echo "Aborting."
         exit 1
@@ -262,7 +315,7 @@ for b in "${branches[@]}"; do
       if ! git status | grep "You are currently cherry-picking commit" &> /dev/null; then
         break
       fi
-      echo "Please finish the onging cherrypick"
+      echo "Please finish the ongoing cherrypick"
     done
   fi
   if git diff "$remote_branch" --exit-code &> /dev/null; then
