@@ -263,12 +263,13 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(config *testsuites.Pe
 		provisioner := d.DriverInfo.Name
 		parameters := map[string]string{}
 		ns := f.Namespace.Name
+		delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 		suffix := provisioner + "-sc"
 		if fsType != "" {
 			parameters["csi.storage.k8s.io/fstype"] = fsType
 		}
 
-		return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+		return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
 	}
 
 	items, err := utils.LoadFromManifests(d.StorageClass.FromFile)
