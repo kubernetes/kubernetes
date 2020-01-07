@@ -53,8 +53,6 @@ var (
 	ErrNodeLabelPresenceViolated = NewPredicateFailureError("CheckNodeLabelPresence", "node(s) didn't have the requested labels")
 	// ErrServiceAffinityViolated is used for CheckServiceAffinity predicate error.
 	ErrServiceAffinityViolated = NewPredicateFailureError("CheckServiceAffinity", "node(s) didn't match service affinity")
-	// ErrMaxVolumeCountExceeded is used for MaxVolumeCount predicate error.
-	ErrMaxVolumeCountExceeded = NewPredicateFailureError("MaxVolumeCount", "node(s) exceed max volume count")
 	// ErrNodeUnderMemoryPressure is used for NodeUnderMemoryPressure predicate error.
 	ErrNodeUnderMemoryPressure = NewPredicateFailureError("NodeUnderMemoryPressure", "node(s) had memory pressure")
 	// ErrNodeUnderDiskPressure is used for NodeUnderDiskPressure predicate error.
