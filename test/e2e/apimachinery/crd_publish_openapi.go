@@ -603,8 +603,8 @@ func waitForDefinitionCleanup(c k8sclientset.Interface, name string) error {
 }
 
 func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bool, string)) error {
-	client := c.CoreV1().RESTClient().(*rest.RESTClient).Client
-	url := c.CoreV1().RESTClient().Get().AbsPath("openapi", "v2").URL()
+	client := c.Discovery().RESTClient().(*rest.RESTClient).Client
+	url := c.Discovery().RESTClient().Get().AbsPath("openapi", "v2").URL()
 	lastMsg := ""
 	etag := ""
 	var etagSpec *spec.Swagger
