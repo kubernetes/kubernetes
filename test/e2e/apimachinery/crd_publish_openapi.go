@@ -587,6 +587,7 @@ func waitForDefinition(c k8sclientset.Interface, name string, schema []byte) err
 
 // waitForDefinitionCleanup waits for given definition to be removed from swagger
 func waitForDefinitionCleanup(c k8sclientset.Interface, name string) error {
+	start := time.Now()
 	err := waitForOpenAPISchema(c, func(spec *spec.Swagger) (bool, string) {
 		if _, ok := spec.SwaggerProps.Definitions[name]; ok {
 			return false, fmt.Sprintf("spec.SwaggerProps.Definitions[\"%s\"] still exists", name)
@@ -594,8 +595,10 @@ func waitForDefinitionCleanup(c k8sclientset.Interface, name string) error {
 		return true, ""
 	})
 	if err != nil {
+		klog.Errorf("--- time elapsed cleanup: %v", time.Since(start))
 		return fmt.Errorf("failed to wait for definition %q not to be served anymore: %v", name, err)
 	}
+	klog.Errorf("--- time elapsed cleanup: %v", time.Since(start))
 	return nil
 }
 
@@ -631,6 +634,7 @@ func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bo
 		} else if err := json.Unmarshal(bs, spec); err != nil {
 			return false, err
 		} else {
+			klog.Errorf("----- spec changed")
 			etag = strings.Trim(resp.Header.Get("ETag"), `"`)
 			etagSpec = spec
 		}
