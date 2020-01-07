@@ -185,11 +185,11 @@ func (c *Configurator) createFromProvider(providerName string) (*Scheduler, erro
 	}
 
 	// Combine the provided plugins with the ones from component config.
-	// TODO(#86789): address disabled plugins.
-	var plugins schedulerapi.Plugins
-	plugins.Append(provider.FrameworkPlugins)
-	plugins.Append(c.plugins)
-	c.plugins = &plugins
+	var defaultPlugins schedulerapi.Plugins
+	defaultPlugins.Append(provider.FrameworkPlugins)
+	defaultPlugins.Apply(c.plugins)
+	c.plugins = &defaultPlugins
+
 	var pluginConfig []schedulerapi.PluginConfig
 	pluginConfig = append(pluginConfig, provider.FrameworkPluginConfig...)
 	pluginConfig = append(pluginConfig, c.pluginConfig...)
@@ -296,11 +296,11 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	}
 	// Combine all framework configurations. If this results in any duplication, framework
 	// instantiation should fail.
-	var plugins schedulerapi.Plugins
-	plugins.Append(pluginsForPredicates)
-	plugins.Append(pluginsForPriorities)
-	plugins.Append(c.plugins)
-	c.plugins = &plugins
+	var defaultPlugins schedulerapi.Plugins
+	defaultPlugins.Append(pluginsForPredicates)
+	defaultPlugins.Append(pluginsForPriorities)
+	defaultPlugins.Apply(c.plugins)
+	c.plugins = &defaultPlugins
 
 	var pluginConfig []schedulerapi.PluginConfig
 	pluginConfig = append(pluginConfig, pluginConfigForPredicates...)
