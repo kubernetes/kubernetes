@@ -69,14 +69,14 @@ func NewLeastAllocated(_ *runtime.Unknown, h framework.FrameworkHandle) (framewo
 		resourceAllocationScorer: resourceAllocationScorer{
 			LeastAllocatedName,
 			leastResourceScorer,
-			DefaultRequestedRatioResources,
+			defaultRequestedRatioResources,
 		},
 	}, nil
 }
 
 func leastResourceScorer(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
 	var nodeScore, weightSum int64
-	for resource, weight := range DefaultRequestedRatioResources {
+	for resource, weight := range defaultRequestedRatioResources {
 		resourceScore := leastRequestedScore(requested[resource], allocable[resource])
 		nodeScore += resourceScore * weight
 		weightSum += weight

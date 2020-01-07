@@ -74,7 +74,7 @@ func NewBalancedAllocation(_ *runtime.Unknown, h framework.FrameworkHandle) (fra
 		resourceAllocationScorer: resourceAllocationScorer{
 			BalancedAllocationName,
 			balancedResourceScorer,
-			DefaultRequestedRatioResources,
+			defaultRequestedRatioResources,
 		},
 	}, nil
 }
