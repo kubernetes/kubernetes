@@ -45,7 +45,7 @@ type cadvisorStatsProvider struct {
 	// are managed by pods.
 	cadvisor cadvisor.Interface
 	// resourceAnalyzer is used to get the volume stats of the pods.
-	resourceAnalyzer stats.ResourceAnalyzer
+	resourceAnalyzer stats.FileSystemResourceAnalyzer
 	// imageService is used to get the stats of the image filesystem.
 	imageService kubecontainer.ImageService
 	// statusProvider is used to get pod metadata
@@ -56,7 +56,7 @@ type cadvisorStatsProvider struct {
 // container stats from cAdvisor.
 func newCadvisorStatsProvider(
 	cadvisor cadvisor.Interface,
-	resourceAnalyzer stats.ResourceAnalyzer,
+	resourceAnalyzer stats.FileSystemResourceAnalyzer,
 	imageService kubecontainer.ImageService,
 	statusProvider status.PodStatusProvider,
 ) containerStatsProvider {

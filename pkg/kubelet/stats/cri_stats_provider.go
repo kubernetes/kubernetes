@@ -60,7 +60,7 @@ type criStatsProvider struct {
 	// filesystem stats.
 	cadvisor cadvisor.Interface
 	// resourceAnalyzer is used to get the volume stats of the pods.
-	resourceAnalyzer stats.ResourceAnalyzer
+	resourceAnalyzer stats.FileSystemResourceAnalyzer
 	// runtimeService is used to get the status and stats of the pods and its
 	// managed containers.
 	runtimeService internalapi.RuntimeService
@@ -80,7 +80,7 @@ type criStatsProvider struct {
 // provides container stats using CRI.
 func newCRIStatsProvider(
 	cadvisor cadvisor.Interface,
-	resourceAnalyzer stats.ResourceAnalyzer,
+	resourceAnalyzer stats.FileSystemResourceAnalyzer,
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
 	logMetricsService LogMetricsService,

@@ -24,7 +24,7 @@ import (
 type ResourceAnalyzer interface {
 	Start()
 
-	fsResourceAnalyzerInterface
+	FileSystemResourceAnalyzer
 	SummaryProvider
 }
 

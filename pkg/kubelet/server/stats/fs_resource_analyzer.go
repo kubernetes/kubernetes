@@ -29,8 +29,8 @@ import (
 
 type statCache map[types.UID]*volumeStatCalculator
 
-// fsResourceAnalyzerInterface is for embedding fs functions into ResourceAnalyzer
-type fsResourceAnalyzerInterface interface {
+// FileSystemResourceAnalyzer is for embedding fs functions into ResourceAnalyzer
+type FileSystemResourceAnalyzer interface {
 	GetPodVolumeStats(uid types.UID) (PodVolumeStats, bool)
 }
 
@@ -42,7 +42,7 @@ type fsResourceAnalyzer struct {
 	startOnce             sync.Once
 }
 
-var _ fsResourceAnalyzerInterface = &fsResourceAnalyzer{}
+var _ FileSystemResourceAnalyzer = &fsResourceAnalyzer{}
 
 // newFsResourceAnalyzer returns a new fsResourceAnalyzer implementation
 func newFsResourceAnalyzer(statsMetadataProvider MetadataPovider, calcVolumePeriod time.Duration) *fsResourceAnalyzer {
