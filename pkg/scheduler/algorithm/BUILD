@@ -1,5 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
@@ -7,19 +5,13 @@ go_library(
     srcs = [
         "doc.go",
         "scheduler_interface.go",
-        "types.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/algorithm",
+    visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/apps:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/scheduler/apis/extender/v1:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
-        "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//staging/src/k8s.io/client-go/listers/apps/v1:go_default_library",
-        "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
     ],
 )
 
@@ -38,4 +30,5 @@ filegroup(
         "//pkg/scheduler/algorithm/priorities:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

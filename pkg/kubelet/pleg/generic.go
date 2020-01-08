@@ -138,6 +138,8 @@ func (g *GenericPLEG) Healthy() (bool, error) {
 	if relistTime.IsZero() {
 		return false, fmt.Errorf("pleg has yet to be successful")
 	}
+	// Expose as metric so you can alert on `time()-pleg_last_seen_seconds > nn`
+	metrics.PLEGLastSeen.Set(float64(relistTime.Unix()))
 	elapsed := g.clock.Since(relistTime)
 	if elapsed > relistThreshold {
 		return false, fmt.Errorf("pleg was last seen active %v ago; threshold is %v", elapsed, relistThreshold)

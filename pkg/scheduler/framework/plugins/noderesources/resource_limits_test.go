@@ -18,7 +18,6 @@ package noderesources
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -100,10 +99,11 @@ func TestResourceLimits(t *testing.T) {
 
 	tests := []struct {
 		// input pod
-		pod          *v1.Pod
-		nodes        []*v1.Node
-		expectedList framework.NodeScoreList
-		name         string
+		pod            *v1.Pod
+		nodes          []*v1.Node
+		expectedList   framework.NodeScoreList
+		name           string
+		skipPostFilter bool
 	}{
 		{
 			pod:          &v1.Pod{Spec: noResources},
@@ -135,6 +135,13 @@ func TestResourceLimits(t *testing.T) {
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}},
 			name:         "node does not advertise its allocatables",
 		},
+		{
+			pod:            &v1.Pod{Spec: cpuAndMemory},
+			nodes:          []*v1.Node{makeNode("machine1", 0, 0)},
+			expectedList:   []framework.NodeScore{{Name: "machine1", Score: 0}},
+			skipPostFilter: true,
+			name:           "postFilter skipped",
+		},
 	}
 
 	for _, test := range tests {
@@ -142,18 +149,25 @@ func TestResourceLimits(t *testing.T) {
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(nil, test.nodes))
 			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 			p := &ResourceLimits{handle: fh}
-			state := framework.NewCycleState()
-			status := p.PostFilter(context.Background(), state, test.pod, test.nodes, nil)
-			if !status.IsSuccess() {
-				t.Errorf("unexpected error: %v", status)
-			}
 			for i := range test.nodes {
-				hostResult, err := p.Score(context.Background(), state, test.pod, test.nodes[i].Name)
-				if err != nil {
+				state := framework.NewCycleState()
+				if !test.skipPostFilter {
+					status := p.PostFilter(context.Background(), state, test.pod, test.nodes, nil)
+					if !status.IsSuccess() {
+						t.Errorf("unexpected error: %v", status)
+					}
+				}
+
+				gotScore, err := p.Score(context.Background(), state, test.pod, test.nodes[i].Name)
+				if test.skipPostFilter {
+					if err == nil {
+						t.Errorf("expected error")
+					}
+				} else if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
-				if !reflect.DeepEqual(test.expectedList[i].Score, hostResult) {
-					t.Errorf("expected %#v, got %#v", test.expectedList[i].Score, hostResult)
+				if test.expectedList[i].Score != gotScore {
+					t.Errorf("gotScore %v, wantScore %v", gotScore, test.expectedList[i].Score)
 				}
 			}
 		})

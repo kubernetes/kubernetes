@@ -143,7 +143,7 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, ""+
 		"The IP address on which to listen for the --secure-port port. The "+
 		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
-		"clients. If blank, all interfaces will be used (0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
+		"clients. If blank or an unspecified address (0.0.0.0 or ::), all interfaces will be used.")
 
 	desc := "The port on which to serve HTTPS with authentication and authorization."
 	if s.Required {
@@ -180,7 +180,9 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(cliflag.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
 		"A pair of x509 certificate and private key file paths, optionally suffixed with a list of "+
 		"domain patterns which are fully qualified domain names, possibly with prefixed wildcard "+
-		"segments. If no domain patterns are provided, the names of the certificate are "+
+		"segments. The domain patterns also allow IP addresses, but IPs should only be used if "+
+		"the apiserver has visibility to the IP address requested by a client. "+
+		"If no domain patterns are provided, the names of the certificate are "+
 		"extracted. Non-wildcard matches trump over wildcard matches, explicit domain patterns "+
 		"trump over extracted names. For multiple key/certificate pairs, use the "+
 		"--tls-sni-cert-key multiple times. "+

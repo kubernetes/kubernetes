@@ -153,22 +153,55 @@ func newProxyServer(
 			return nil, fmt.Errorf("unable to read IPTables MasqueradeBit from config")
 		}
 
-		// TODO this has side effects that should only happen when Run() is invoked.
-		proxier, err = iptables.NewProxier(
-			iptInterface,
-			utilsysctl.New(),
-			execer,
-			config.IPTables.SyncPeriod.Duration,
-			config.IPTables.MinSyncPeriod.Duration,
-			config.IPTables.MasqueradeAll,
-			int(*config.IPTables.MasqueradeBit),
-			config.ClusterCIDR,
-			hostname,
-			nodeIP,
-			recorder,
-			healthzServer,
-			config.NodePortAddresses,
-		)
+		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+			klog.V(0).Info("creating dualStackProxier for iptables.")
+
+			// Create iptables handlers for both families, one is already created
+			// Always ordered as IPv4, IPv6
+			var ipt [2]utiliptables.Interface
+			if iptInterface.IsIpv6() {
+				ipt[1] = iptInterface
+				ipt[0] = utiliptables.New(execer, utiliptables.ProtocolIpv4)
+			} else {
+				ipt[0] = iptInterface
+				ipt[1] = utiliptables.New(execer, utiliptables.ProtocolIpv6)
+			}
+
+			// TODO this has side effects that should only happen when Run() is invoked.
+			proxier, err = iptables.NewDualStackProxier(
+				ipt,
+				utilsysctl.New(),
+				execer,
+				config.IPTables.SyncPeriod.Duration,
+				config.IPTables.MinSyncPeriod.Duration,
+				config.IPTables.MasqueradeAll,
+				int(*config.IPTables.MasqueradeBit),
+				cidrTuple(config.ClusterCIDR),
+				hostname,
+				nodeIPTuple(config.BindAddress),
+				recorder,
+				healthzServer,
+				config.NodePortAddresses,
+			)
+		} else { // Create a single-stack proxier.
+			// TODO this has side effects that should only happen when Run() is invoked.
+			proxier, err = iptables.NewProxier(
+				iptInterface,
+				utilsysctl.New(),
+				execer,
+				config.IPTables.SyncPeriod.Duration,
+				config.IPTables.MinSyncPeriod.Duration,
+				config.IPTables.MasqueradeAll,
+				int(*config.IPTables.MasqueradeBit),
+				config.ClusterCIDR,
+				hostname,
+				nodeIP,
+				recorder,
+				healthzServer,
+				config.NodePortAddresses,
+			)
+		}
+
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
@@ -179,6 +212,7 @@ func newProxyServer(
 			klog.V(0).Info("creating dualStackProxier for ipvs.")
 
 			// Create iptables handlers for both families, one is already created
+			// Always ordered as IPv4, IPv6
 			var ipt [2]utiliptables.Interface
 			if iptInterface.IsIpv6() {
 				ipt[1] = iptInterface

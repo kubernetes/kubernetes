@@ -27,17 +27,17 @@ import (
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
-// ResourceToWeightMap contains resource name and weight.
-type ResourceToWeightMap map[v1.ResourceName]int64
+// resourceToWeightMap contains resource name and weight.
+type resourceToWeightMap map[v1.ResourceName]int64
 
-// DefaultRequestedRatioResources is used to set default requestToWeight map for CPU and memory
-var DefaultRequestedRatioResources = ResourceToWeightMap{v1.ResourceMemory: 1, v1.ResourceCPU: 1}
+// defaultRequestedRatioResources is used to set default requestToWeight map for CPU and memory
+var defaultRequestedRatioResources = resourceToWeightMap{v1.ResourceMemory: 1, v1.ResourceCPU: 1}
 
 // resourceAllocationScorer contains information to calculate resource allocation score.
 type resourceAllocationScorer struct {
 	Name                string
 	scorer              func(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64
-	resourceToWeightMap ResourceToWeightMap
+	resourceToWeightMap resourceToWeightMap
 }
 
 // resourceToValueMap contains resource name and score.

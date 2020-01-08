@@ -27,6 +27,10 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -1869,7 +1874,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeSelectorNotMatch.GetReason()),
 				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrPodNotMatchHostName.GetReason()),
 				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrTaintsTolerationsNotMatch.GetReason()),
-				"machine4": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeLabelPresenceViolated.GetReason()),
+				"machine4": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodelabel.ErrReasonPresenceViolated),
 			},
 			expected: map[string]bool{},
 		},
@@ -1902,7 +1907,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			name: "Mix of failed predicates works fine",
 			nodesStatuses: framework.NodeToStatusMap{
 				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeUnderDiskPressure.GetReason()),
-				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrDiskConflict.GetReason()),
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumerestrictions.ErrReasonDiskConflict),
 				"machine3": framework.NewStatus(framework.Unschedulable, algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400).GetReason()),
 			},
 			expected: map[string]bool{"machine3": true, "machine4": true},
@@ -1928,9 +1933,9 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 		{
 			name: "ErrVolume... errors should not be tried as it indicates that the pod is unschedulable due to no matching volumes for pod on node",
 			nodesStatuses: framework.NodeToStatusMap{
-				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrVolumeZoneConflict.GetReason()),
-				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrVolumeNodeConflict.GetReason()),
-				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrVolumeBindConflict.GetReason()),
+				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumezone.ErrReasonConflict),
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumebinding.ErrReasonNodeConflict),
+				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumebinding.ErrReasonBindConflict),
 			},
 			expected: map[string]bool{"machine4": true},
 		},
@@ -1975,7 +1980,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 func TestPreempt(t *testing.T) {
 	defaultFailedNodeToStatusMap := framework.NodeToStatusMap{
 		"machine1": framework.NewStatus(framework.Unschedulable, algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300).GetReason()),
-		"machine2": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrDiskConflict.GetReason()),
+		"machine2": framework.NewStatus(framework.Unschedulable, volumerestrictions.ErrReasonDiskConflict),
 		"machine3": framework.NewStatus(framework.Unschedulable, algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400).GetReason()),
 	}
 	// Prepare 3 node names.

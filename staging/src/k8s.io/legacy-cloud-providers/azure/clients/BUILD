@@ -25,7 +25,12 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/armclient:all-srcs",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/vmssclient:all-srcs",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

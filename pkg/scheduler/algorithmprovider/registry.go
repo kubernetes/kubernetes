@@ -169,13 +169,9 @@ func applyFeatureGates(config *Config) {
 	// Prioritizes nodes that satisfy pod's resource limits
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
 		klog.Infof("Registering resourcelimits priority function")
-		s := schedulerapi.Plugin{Name: noderesources.ResourceLimitsName, Weight: 1}
+		s := schedulerapi.Plugin{Name: noderesources.ResourceLimitsName}
+		config.FrameworkPlugins.PostFilter.Enabled = append(config.FrameworkPlugins.PostFilter.Enabled, s)
+		s = schedulerapi.Plugin{Name: noderesources.ResourceLimitsName, Weight: 1}
 		config.FrameworkPlugins.Score.Enabled = append(config.FrameworkPlugins.Score.Enabled, s)
 	}
-}
-
-// ApplyFeatureGates applies algorithm by feature gates.
-// TODO(ahg-g): DEPRECATED, remove.
-func ApplyFeatureGates() func() {
-	return func() {}
 }

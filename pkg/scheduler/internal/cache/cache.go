@@ -261,12 +261,12 @@ func (cache *schedulerCache) UpdateNodeInfoSnapshot(nodeSnapshot *nodeinfosnapsh
 		cache.updateNodeInfoSnapshotList(nodeSnapshot, updateAllLists)
 	}
 
-	if len(nodeSnapshot.NodeInfoList) != len(nodeSnapshot.NodeInfoMap) {
-		errMsg := fmt.Sprintf("snapshot state is not consistent, length of NodeInfoList=%v not equal to length of NodeInfoMap=%v "+
-			"length of nodes in cache=%v, length of nodes in tree=%v"+
+	if len(nodeSnapshot.NodeInfoList) != cache.nodeTree.numNodes {
+		errMsg := fmt.Sprintf("snapshot state is not consistent, length of NodeInfoList=%v not equal to length of nodes in tree=%v "+
+			", length of NodeInfoMap=%v, length of nodes in cache=%v"+
 			", trying to recover",
-			len(nodeSnapshot.NodeInfoList), len(nodeSnapshot.NodeInfoMap),
-			len(cache.nodes), cache.nodeTree.numNodes)
+			len(nodeSnapshot.NodeInfoList), cache.nodeTree.numNodes,
+			len(nodeSnapshot.NodeInfoMap), len(cache.nodes))
 		klog.Error(errMsg)
 		// We will try to recover by re-creating the lists for the next scheduling cycle, but still return an
 		// error to surface the problem, the error will likely cause a failure to the current scheduling cycle.
@@ -469,7 +469,9 @@ func (cache *schedulerCache) AddPod(pod *v1.Pod) error {
 			// The pod was added to a different node than it was assumed to.
 			klog.Warningf("Pod %v was assumed to be on %v but got added to %v", key, pod.Spec.NodeName, currState.pod.Spec.NodeName)
 			// Clean this up.
-			cache.removePod(currState.pod)
+			if err = cache.removePod(currState.pod); err != nil {
+				klog.Errorf("removing pod error: %v", err)
+			}
 			cache.addPod(pod)
 		}
 		delete(cache.assumedPods, key)

@@ -21,6 +21,7 @@ package retry
 import (
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Azure/go-autorest/autorest"
@@ -55,6 +56,8 @@ type Backoff struct {
 	// exceed the cap then the duration is set to the cap and the
 	// steps parameter is set to zero.
 	Cap time.Duration
+	// The errors indicate that the request shouldn't do more retrying.
+	NonRetriableErrors []string
 }
 
 // NewBackoff creates a new Backoff.
@@ -66,6 +69,28 @@ func NewBackoff(duration time.Duration, factor float64, jitter float64, steps in
 		Steps:    steps,
 		Cap:      cap,
 	}
+}
+
+// WithNonRetriableErrors returns a new *Backoff with NonRetriableErrors assigned.
+func (b *Backoff) WithNonRetriableErrors(errs []string) *Backoff {
+	newBackoff := *b
+	newBackoff.NonRetriableErrors = errs
+	return &newBackoff
+}
+
+// isNonRetriableError returns true if the Error is one of NonRetriableErrors.
+func (b *Backoff) isNonRetriableError(rerr *Error) bool {
+	if rerr == nil {
+		return false
+	}
+
+	for _, err := range b.NonRetriableErrors {
+		if strings.Contains(rerr.RawError.Error(), err) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Step (1) returns an amount of time to sleep determined by the
@@ -134,8 +159,9 @@ func doBackoffRetry(s autorest.Sender, r *http.Request, backoff *Backoff) (resp 
 		// 1) request succeed
 		// 2) request is not retriable
 		// 3) request has been throttled
-		// 4) request has completed all the retry steps
-		if rerr == nil || !rerr.Retriable || rerr.IsThrottled() || backoff.Steps == 1 {
+		// 4) request contains non-retriable errors
+		// 5) request has completed all the retry steps
+		if rerr == nil || !rerr.Retriable || rerr.IsThrottled() || backoff.isNonRetriableError(rerr) || backoff.Steps == 1 {
 			return resp, rerr.Error()
 		}
 

@@ -69,6 +69,20 @@ func TestBuiltNamedCertificates(t *testing.T) {
 			},
 		},
 		{
+			// ip as cns are ignored
+			certs: []namedtestCertSpec{
+				{
+					testCertSpec: testCertSpec{
+						host:  "1.2.3.4",
+						names: []string{"test.com"},
+					},
+				},
+			},
+			expected: map[string]int{
+				"test.com": 0,
+			},
+		},
+		{
 			// ips are ignored
 			certs: []namedtestCertSpec{
 				{

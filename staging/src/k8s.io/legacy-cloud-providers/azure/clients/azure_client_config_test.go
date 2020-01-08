@@ -28,8 +28,8 @@ import (
 func TestWithRateLimiter(t *testing.T) {
 	config := &ClientConfig{}
 	assert.Nil(t, config.RateLimitConfig)
-	config.WithRateLimiter(&RateLimitConfig{CloudProviderRateLimit: true})
-	assert.Equal(t, &RateLimitConfig{CloudProviderRateLimit: true}, config.RateLimitConfig)
+	c := config.WithRateLimiter(&RateLimitConfig{CloudProviderRateLimit: true})
+	assert.Equal(t, &RateLimitConfig{CloudProviderRateLimit: true}, c.RateLimitConfig)
 	config.WithRateLimiter(nil)
 	assert.Nil(t, config.RateLimitConfig)
 }

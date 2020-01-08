@@ -31,10 +31,6 @@ var (
 	// it can never be made to pass by removing pods, you need to add the predicate
 	// failure error in nodesWherePreemptionMightHelp() in scheduler/core/generic_scheduler.go
 
-	// ErrDiskConflict is used for NoDiskConflict predicate error.
-	ErrDiskConflict = NewPredicateFailureError("NoDiskConflict", "node(s) had no available disk")
-	// ErrVolumeZoneConflict is used for NoVolumeZoneConflict predicate error.
-	ErrVolumeZoneConflict = NewPredicateFailureError("NoVolumeZoneConflict", "node(s) had no available volume zone")
 	// ErrNodeSelectorNotMatch is used for MatchNodeSelector predicate error.
 	ErrNodeSelectorNotMatch = NewPredicateFailureError("MatchNodeSelector", "node(s) didn't match node selector")
 	// ErrPodAffinityNotMatch is used for MatchInterPodAffinity predicate error.
@@ -51,12 +47,8 @@ var (
 	ErrPodNotMatchHostName = NewPredicateFailureError("HostName", "node(s) didn't match the requested hostname")
 	// ErrPodNotFitsHostPorts is used for PodFitsHostPorts predicate error.
 	ErrPodNotFitsHostPorts = NewPredicateFailureError("PodFitsHostPorts", "node(s) didn't have free ports for the requested pod ports")
-	// ErrNodeLabelPresenceViolated is used for CheckNodeLabelPresence predicate error.
-	ErrNodeLabelPresenceViolated = NewPredicateFailureError("CheckNodeLabelPresence", "node(s) didn't have the requested labels")
 	// ErrServiceAffinityViolated is used for CheckServiceAffinity predicate error.
 	ErrServiceAffinityViolated = NewPredicateFailureError("CheckServiceAffinity", "node(s) didn't match service affinity")
-	// ErrMaxVolumeCountExceeded is used for MaxVolumeCount predicate error.
-	ErrMaxVolumeCountExceeded = NewPredicateFailureError("MaxVolumeCount", "node(s) exceed max volume count")
 	// ErrNodeUnderMemoryPressure is used for NodeUnderMemoryPressure predicate error.
 	ErrNodeUnderMemoryPressure = NewPredicateFailureError("NodeUnderMemoryPressure", "node(s) had memory pressure")
 	// ErrNodeUnderDiskPressure is used for NodeUnderDiskPressure predicate error.
@@ -71,10 +63,6 @@ var (
 	ErrNodeUnschedulable = NewPredicateFailureError("NodeUnschedulable", "node(s) were unschedulable")
 	// ErrNodeUnknownCondition is used for NodeUnknownCondition predicate error.
 	ErrNodeUnknownCondition = NewPredicateFailureError("NodeUnknownCondition", "node(s) had unknown conditions")
-	// ErrVolumeNodeConflict is used for VolumeNodeAffinityConflict predicate error.
-	ErrVolumeNodeConflict = NewPredicateFailureError("VolumeNodeAffinityConflict", "node(s) had volume node affinity conflict")
-	// ErrVolumeBindConflict is used for VolumeBindingNoMatch predicate error.
-	ErrVolumeBindConflict = NewPredicateFailureError("VolumeBindingNoMatch", "node(s) didn't find available persistent volumes to bind")
 	// ErrTopologySpreadConstraintsNotMatch is used for EvenPodsSpread predicate error.
 	ErrTopologySpreadConstraintsNotMatch = NewPredicateFailureError("EvenPodsSpreadNotMatch", "node(s) didn't match pod topology spread constraints")
 	// ErrFakePredicate is used for test only. The fake predicates returning false also returns error
@@ -87,7 +75,6 @@ var unresolvablePredicateFailureErrors = map[PredicateFailureReason]struct{}{
 	ErrPodAffinityRulesNotMatch:  {},
 	ErrPodNotMatchHostName:       {},
 	ErrTaintsTolerationsNotMatch: {},
-	ErrNodeLabelPresenceViolated: {},
 	// Node conditions won't change when scheduler simulates removal of preemption victims.
 	// So, it is pointless to try nodes that have not been able to host the pod due to node
 	// conditions. These include ErrNodeNotReady, ErrNodeUnderPIDPressure, ErrNodeUnderMemoryPressure, ....
@@ -98,9 +85,6 @@ var unresolvablePredicateFailureErrors = map[PredicateFailureReason]struct{}{
 	ErrNodeUnderMemoryPressure: {},
 	ErrNodeUnschedulable:       {},
 	ErrNodeUnknownCondition:    {},
-	ErrVolumeZoneConflict:      {},
-	ErrVolumeNodeConflict:      {},
-	ErrVolumeBindConflict:      {},
 }
 
 // UnresolvablePredicateExists checks if there is at least one unresolvable predicate failure reason.

@@ -22,9 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -84,11 +82,10 @@ func (rl *ResourceLimits) PostFilter(
 	return nil
 }
 
-func getPodResource(cycleState *framework.CycleState) (*nodeinfo.Resource, error) {
+func getPodResource(cycleState *framework.CycleState) (*schedulernodeinfo.Resource, error) {
 	c, err := cycleState.Read(postFilterStateKey)
 	if err != nil {
-		klog.V(5).Infof("Error reading %q from cycleState: %v", postFilterStateKey, err)
-		return nil, nil
+		return nil, fmt.Errorf("Error reading %q from cycleState: %v", postFilterStateKey, err)
 	}
 
 	s, ok := c.(*postFilterState)

@@ -137,6 +137,9 @@ func TestCreateRoute(t *testing.T) {
 	if len(fakeTable.Calls) != 1 || fakeTable.Calls[0] != "Get" {
 		t.Errorf("unexpected calls create if not exists, exists: %v", fakeTable.Calls)
 	}
+	if len(fakeRoutes.Calls) != 1 || fakeRoutes.Calls[0] != "CreateOrUpdate" {
+		t.Errorf("unexpected route calls create if not exists, exists: %v", fakeRoutes.Calls)
+	}
 
 	routeName := mapNodeNameToRouteName(false, route.TargetNode, string(route.DestinationCIDR))
 	routeInfo, found := fakeRoutes.FakeStore[cloud.RouteTableName][routeName]
@@ -152,6 +155,24 @@ func TestCreateRoute(t *testing.T) {
 	}
 	if *routeInfo.NextHopIPAddress != nodeIP {
 		t.Errorf("Expected IP address: %s, saw %s", nodeIP, *routeInfo.NextHopIPAddress)
+	}
+
+	// test create again without real creation, clean fakeRoute calls
+	fakeRoutes.Calls = []string{}
+	routeInfo.Name = &routeName
+	route.Name = routeName
+	expectedTable.RouteTablePropertiesFormat = &network.RouteTablePropertiesFormat{
+		Routes: &[]network.Route{routeInfo},
+	}
+	cloud.rtCache.Set(cloud.RouteTableName, &expectedTable)
+
+	err = cloud.CreateRoute(context.TODO(), "cluster", "unused", &route)
+	if err != nil {
+		t.Errorf("unexpected error creating route: %v", err)
+		t.FailNow()
+	}
+	if len(fakeRoutes.Calls) != 0 {
+		t.Errorf("unexpected route calls create if not exists, exists: %v", fakeRoutes.Calls)
 	}
 
 	// test create route for unmanaged nodes.

@@ -37,11 +37,9 @@ go_test(
         "metadata_test.go",
         "selector_spreading_test.go",
         "spreading_perf_test.go",
-        "types_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/listers/fake:go_default_library",

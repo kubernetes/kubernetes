@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -46,7 +45,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // LegacyRegistry is used to store current state of registered predicates and priorities.
@@ -504,47 +502,14 @@ func (lr *LegacyRegistry) ProcessPriorityPolicy(policy config.PriorityPolicy, co
 	}
 
 	if policy.Argument.RequestedToCapacityRatioArguments != nil {
-		scoringFunctionShape, resources := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(policy.Argument.RequestedToCapacityRatioArguments)
 		configProducerArgs.RequestedToCapacityRatioArgs = &noderesources.RequestedToCapacityRatioArgs{
-			FunctionShape:       scoringFunctionShape,
-			ResourceToWeightMap: resources,
+			RequestedToCapacityRatioArguments: *policy.Argument.RequestedToCapacityRatioArguments,
 		}
 		// We do not allow specifying the name for custom plugins, see #83472
 		priorityName = noderesources.RequestedToCapacityRatioName
 	}
 
 	return priorityName
-}
-
-// TODO(ahg-g): move to RequestedToCapacityRatio plugin.
-func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *config.RequestedToCapacityRatioArguments) (noderesources.FunctionShape, noderesources.ResourceToWeightMap) {
-	n := len(arguments.Shape)
-	points := make([]noderesources.FunctionShapePoint, 0, n)
-	for _, point := range arguments.Shape {
-		points = append(points, noderesources.FunctionShapePoint{
-			Utilization: int64(point.Utilization),
-			// MaxCustomPriorityScore may diverge from the max score used in the scheduler and defined by MaxNodeScore,
-			// therefore we need to scale the score returned by requested to capacity ratio to the score range
-			// used by the scheduler.
-			Score: int64(point.Score) * (framework.MaxNodeScore / config.MaxCustomPriorityScore),
-		})
-	}
-	shape, err := noderesources.NewFunctionShape(points)
-	if err != nil {
-		klog.Fatalf("invalid RequestedToCapacityRatioPriority arguments: %s", err.Error())
-	}
-	resourceToWeightMap := make(noderesources.ResourceToWeightMap)
-	if len(arguments.Resources) == 0 {
-		resourceToWeightMap = noderesources.DefaultRequestedRatioResources
-		return shape, resourceToWeightMap
-	}
-	for _, resource := range arguments.Resources {
-		resourceToWeightMap[v1.ResourceName(resource.Name)] = resource.Weight
-		if resource.Weight == 0 {
-			resourceToWeightMap[v1.ResourceName(resource.Name)] = 1
-		}
-	}
-	return shape, resourceToWeightMap
 }
 
 func validatePredicateOrDie(predicate config.PredicatePolicy) {

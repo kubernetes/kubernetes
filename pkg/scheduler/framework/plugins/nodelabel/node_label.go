@@ -23,14 +23,17 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // Name of this plugin.
 const Name = "NodeLabel"
+
+const (
+	// ErrReasonPresenceViolated is used for CheckNodeLabelPresence predicate error.
+	ErrReasonPresenceViolated = "node(s) didn't have the requested labels"
+)
 
 // Args holds the args that are used to configure the plugin.
 type Args struct {
@@ -118,7 +121,7 @@ func (pl *NodeLabel) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 		return nil
 	}
 
-	return migration.PredicateResultToFrameworkStatus([]predicates.PredicateFailureReason{predicates.ErrNodeLabelPresenceViolated}, nil)
+	return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPresenceViolated)
 }
 
 // Score invoked at the score extension point.

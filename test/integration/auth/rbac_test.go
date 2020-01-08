@@ -30,7 +30,6 @@ import (
 	"time"
 
 	rbacapi "k8s.io/api/rbac/v1"
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -76,12 +75,6 @@ func clientsetForToken(user string, config *restclient.Config) (clientset.Interf
 	configCopy := *config
 	configCopy.BearerToken = user
 	return clientset.NewForConfigOrDie(&configCopy), clientset.NewForConfigOrDie(&configCopy)
-}
-
-func crdClientsetForToken(user string, config *restclient.Config) apiextensionsclient.Interface {
-	configCopy := *config
-	configCopy.BearerToken = user
-	return apiextensionsclient.NewForConfigOrDie(&configCopy)
 }
 
 type testRESTOptionsGetter struct {
@@ -723,6 +716,9 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 	// existed prior to v1.14, but with user modifications.
 	t.Logf("Modifying default `system:discovery` ClusterRoleBinding")
 	discRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get("system:discovery", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get `system:discovery` ClusterRoleBinding: %v", err)
+	}
 	discRoleBinding.Annotations["rbac.authorization.kubernetes.io/autoupdate"] = "false"
 	discRoleBinding.Annotations["rbac-discovery-upgrade-test"] = "pass"
 	discRoleBinding.Subjects = []rbacapi.Subject{
@@ -737,6 +733,9 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 	}
 	t.Logf("Modifying default `system:basic-user` ClusterRoleBinding")
 	basicUserRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get("system:basic-user", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get `system:basic-user` ClusterRoleBinding: %v", err)
+	}
 	basicUserRoleBinding.Annotations["rbac.authorization.kubernetes.io/autoupdate"] = "false"
 	basicUserRoleBinding.Annotations["rbac-discovery-upgrade-test"] = "pass"
 	if basicUserRoleBinding, err = client.RbacV1().ClusterRoleBindings().Update(basicUserRoleBinding); err != nil {

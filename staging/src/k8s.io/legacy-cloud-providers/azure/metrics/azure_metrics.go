@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package azure
+package metrics
 
 import (
 	"strings"
@@ -30,6 +30,7 @@ type apiCallMetrics struct {
 	latency          *metrics.HistogramVec
 	errors           *metrics.CounterVec
 	rateLimitedCount *metrics.CounterVec
+	throttledCount   *metrics.CounterVec
 }
 
 var (
@@ -43,22 +44,32 @@ var (
 	apiMetrics = registerAPIMetrics(metricLabels...)
 )
 
-type metricContext struct {
+// MetricContext indicates the context for Azure client metrics.
+type MetricContext struct {
 	start      time.Time
 	attributes []string
 }
 
-func newMetricContext(prefix, request, resourceGroup, subscriptionID, source string) *metricContext {
-	return &metricContext{
+// NewMetricContext creates a new MetricContext.
+func NewMetricContext(prefix, request, resourceGroup, subscriptionID, source string) *MetricContext {
+	return &MetricContext{
 		start:      time.Now(),
 		attributes: []string{prefix + "_" + request, strings.ToLower(resourceGroup), subscriptionID, source},
 	}
 }
-func (mc *metricContext) RateLimitedCount() {
+
+// RateLimitedCount records the metrics for rate limited request count.
+func (mc *MetricContext) RateLimitedCount() {
 	apiMetrics.rateLimitedCount.WithLabelValues(mc.attributes...).Inc()
 }
 
-func (mc *metricContext) Observe(err error) error {
+// ThrottledCount records the metrics for throttled request count.
+func (mc *MetricContext) ThrottledCount() {
+	apiMetrics.throttledCount.WithLabelValues(mc.attributes...).Inc()
+}
+
+// Observe observes the request latency and failed requests.
+func (mc *MetricContext) Observe(err error) error {
 	apiMetrics.latency.WithLabelValues(mc.attributes...).Observe(
 		time.Since(mc.start).Seconds())
 	if err != nil {
@@ -68,6 +79,7 @@ func (mc *metricContext) Observe(err error) error {
 	return err
 }
 
+// registerAPIMetrics registers the API metrics.
 func registerAPIMetrics(attributes ...string) *apiCallMetrics {
 	metrics := &apiCallMetrics{
 		latency: metrics.NewHistogramVec(
@@ -94,11 +106,20 @@ func registerAPIMetrics(attributes ...string) *apiCallMetrics {
 			},
 			attributes,
 		),
+		throttledCount: metrics.NewCounterVec(
+			&metrics.CounterOpts{
+				Name:           "cloudprovider_azure_api_request_throttled_count",
+				Help:           "Number of throttled Azure API calls",
+				StabilityLevel: metrics.ALPHA,
+			},
+			attributes,
+		),
 	}
 
 	legacyregistry.MustRegister(metrics.latency)
 	legacyregistry.MustRegister(metrics.errors)
 	legacyregistry.MustRegister(metrics.rateLimitedCount)
+	legacyregistry.MustRegister(metrics.throttledCount)
 
 	return metrics
 }
