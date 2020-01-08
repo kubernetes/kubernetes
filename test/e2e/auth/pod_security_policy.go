@@ -166,7 +166,7 @@ func testPrivilegedPods(tester func(pod *v1.Pod)) {
 		tester(hostipc)
 	})
 
-	if framework.IsAppArmorSupported() {
+	if isAppArmorSupported() {
 		ginkgo.By("Running a custom AppArmor profile pod", func() {
 			aa := restrictedPod("apparmor")
 			// Every node is expected to have the docker-default profile.
@@ -369,4 +369,9 @@ func restrictedPSP(name string) *policyv1beta1.PodSecurityPolicy {
 
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+// isAppArmorSupported checks whether the AppArmor is supported by the node OS distro.
+func isAppArmorSupported() bool {
+	return framework.NodeOSDistroIs(framework.AppArmorDistros...)
 }
