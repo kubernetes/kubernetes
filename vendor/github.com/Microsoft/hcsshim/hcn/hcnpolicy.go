@@ -1,6 +1,8 @@
 package hcn
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 // EndpointPolicyType are the potential Policies that apply to Endpoints.
 type EndpointPolicyType string
@@ -14,6 +16,7 @@ const (
 	OutBoundNAT   EndpointPolicyType = "OutBoundNAT"
 	SDNRoute      EndpointPolicyType = "SDNRoute"
 	L4Proxy       EndpointPolicyType = "L4Proxy"
+	L4WFPPROXY    EndpointPolicyType = "L4WFPPROXY"
 	PortName      EndpointPolicyType = "PortName"
 	EncapOverhead EndpointPolicyType = "EncapOverhead"
 	// Endpoint and Network have InterfaceConstraint and ProviderAddress
@@ -64,14 +67,18 @@ type SubnetPolicy struct {
 	Settings json.RawMessage  `json:",omitempty"`
 }
 
+// NatFlags are flags for portmappings.
+type NatFlags uint32
+
 /// Endpoint Policy objects
 
 // PortMappingPolicySetting defines Port Mapping (NAT)
 type PortMappingPolicySetting struct {
-	Protocol     uint32 `json:",omitempty"` // EX: TCP = 6, UDP = 17
-	InternalPort uint16 `json:",omitempty"`
-	ExternalPort uint16 `json:",omitempty"`
-	VIP          string `json:",omitempty"`
+	Protocol     uint32   `json:",omitempty"` // EX: TCP = 6, UDP = 17
+	InternalPort uint16   `json:",omitempty"`
+	ExternalPort uint16   `json:",omitempty"`
+	VIP          string   `json:",omitempty"`
+	Flags        NatFlags `json:",omitempty"`
 }
 
 // ActionType associated with ACLs. Value is either Allow or Block.
@@ -120,8 +127,9 @@ type QosPolicySetting struct {
 
 // OutboundNatPolicySetting sets outbound Network Address Translation on an Endpoint.
 type OutboundNatPolicySetting struct {
-	VirtualIP  string   `json:",omitempty"`
-	Exceptions []string `json:",omitempty"`
+	VirtualIP    string   `json:",omitempty"`
+	Exceptions   []string `json:",omitempty"`
+	Destinations []string `json:",omitempty"`
 }
 
 // SDNRoutePolicySetting sets SDN Route on an Endpoint.
@@ -131,14 +139,21 @@ type SDNRoutePolicySetting struct {
 	NeedEncap         bool   `json:",omitempty"`
 }
 
-// L4ProxyPolicySetting sets Layer-4 Proxy on an endpoint.
-type L4ProxyPolicySetting struct {
-	IP            string   `json:",omitempty"`
-	Port          string   `json:",omitempty"`
-	Protocol      uint32   `json:",omitempty"` // EX: TCP = 6, UDP = 17
-	ExceptionList []string `json:",omitempty"`
-	Destination   string   `json:","`
-	OutboundNat   bool     `json:",omitempty"`
+// FiveTuple is nested in L4ProxyPolicySetting for WFP support.
+type FiveTuple struct {
+	Protocols       string `json:",omitempty"`
+	LocalAddresses  string `json:",omitempty"`
+	RemoteAddresses string `json:",omitempty"`
+	LocalPorts      string `json:",omitempty"`
+	RemotePorts     string `json:",omitempty"`
+	Priority        uint16 `json:",omitempty"`
+}
+
+// L4WfpProxyPolicySetting sets Layer-4 Proxy on an endpoint.
+type L4WfpProxyPolicySetting struct {
+	Port        string    `json:",omitempty"`
+	FilterTuple FiveTuple `json:",omitempty"`
+	UserSID     string    `json:",omitempty"`
 }
 
 // PortnameEndpointPolicySetting sets the port name for an endpoint.

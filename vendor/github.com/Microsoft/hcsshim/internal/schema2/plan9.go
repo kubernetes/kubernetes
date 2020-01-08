@@ -10,6 +10,5 @@
 package hcsschema
 
 type Plan9 struct {
-
 	Shares []Plan9Share `json:"Shares,omitempty"`
 }

@@ -10,7 +10,6 @@
 package hcsschema
 
 type Networking struct {
-
 	AllowUnqualifiedDnsQuery bool `json:"AllowUnqualifiedDnsQuery,omitempty"`
 
 	DnsSearchList string `json:"DnsSearchList,omitempty"`

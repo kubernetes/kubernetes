@@ -12,7 +12,7 @@ go_library(
     visibility = ["//vendor/github.com/Microsoft/hcsshim:__subpackages__"],
     deps = [
         "//vendor/github.com/Microsoft/go-winio:go_default_library",
-        "//vendor/github.com/Microsoft/hcsshim/internal/guid:go_default_library",
+        "//vendor/github.com/Microsoft/go-winio/pkg/guid:go_default_library",
     ],
 )
 

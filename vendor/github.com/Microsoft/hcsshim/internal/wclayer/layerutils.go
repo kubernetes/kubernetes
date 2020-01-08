@@ -6,7 +6,7 @@ package wclayer
 import (
 	"syscall"
 
-	"github.com/Microsoft/hcsshim/internal/guid"
+	"github.com/Microsoft/go-winio/pkg/guid"
 	"github.com/sirupsen/logrus"
 )
 

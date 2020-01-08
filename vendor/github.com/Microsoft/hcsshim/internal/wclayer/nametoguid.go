@@ -1,7 +1,7 @@
 package wclayer
 
 import (
-	"github.com/Microsoft/hcsshim/internal/guid"
+	"github.com/Microsoft/go-winio/pkg/guid"
 	"github.com/Microsoft/hcsshim/internal/hcserror"
 	"github.com/sirupsen/logrus"
 )

@@ -2,10 +2,17 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["guid.go"],
-    importmap = "k8s.io/kubernetes/vendor/github.com/Microsoft/hcsshim/internal/guid",
-    importpath = "github.com/Microsoft/hcsshim/internal/guid",
+    srcs = [
+        "exporter.go",
+        "span.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/Microsoft/hcsshim/internal/oc",
+    importpath = "github.com/Microsoft/hcsshim/internal/oc",
     visibility = ["//vendor/github.com/Microsoft/hcsshim:__subpackages__"],
+    deps = [
+        "//vendor/github.com/sirupsen/logrus:go_default_library",
+        "//vendor/go.opencensus.io/trace:go_default_library",
+    ],
 )
 
 filegroup(

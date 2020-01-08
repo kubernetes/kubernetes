@@ -3,7 +3,7 @@ package wclayer
 import (
 	"path/filepath"
 
-	"github.com/Microsoft/hcsshim/internal/guid"
+	"github.com/Microsoft/go-winio/pkg/guid"
 )
 
 // LayerID returns the layer ID of a layer on disk.

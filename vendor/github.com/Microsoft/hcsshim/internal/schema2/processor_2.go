@@ -10,7 +10,6 @@
 package hcsschema
 
 type Processor2 struct {
-
 	Count int32 `json:"Count,omitempty"`
 
 	Limit int32 `json:"Limit,omitempty"`

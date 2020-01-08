@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/Microsoft/hcsshim/internal/schema2"
+	"github.com/Microsoft/go-winio/pkg/guid"
+	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
 )
 
 // ProcessConfig is used as both the input of Container.CreateProcess
@@ -62,7 +63,7 @@ type MappedVirtualDisk struct {
 	CreateInUtilityVM bool   `json:",omitempty"`
 	ReadOnly          bool   `json:",omitempty"`
 	Cache             string `json:",omitempty"` // "" (Unspecified); "Disabled"; "Enabled"; "Private"; "PrivateAllowSharing"
-	AttachOnly        bool   `json:",omitempty:`
+	AttachOnly        bool   `json:",omitempty"`
 }
 
 // AssignedDevice represents a device that has been directly assigned to a container
@@ -133,9 +134,10 @@ type ContainerProperties struct {
 	State                        string
 	Name                         string
 	SystemType                   string
+	RuntimeOSType                string `json:"RuntimeOsType,omitempty"`
 	Owner                        string
 	SiloGUID                     string                              `json:"SiloGuid,omitempty"`
-	RuntimeID                    string                              `json:"RuntimeId,omitempty"`
+	RuntimeID                    guid.GUID                           `json:"RuntimeId,omitempty"`
 	IsRuntimeTemplate            bool                                `json:",omitempty"`
 	RuntimeImagePath             string                              `json:",omitempty"`
 	Stopped                      bool                                `json:",omitempty"`
@@ -214,6 +216,7 @@ type MappedVirtualDiskController struct {
 type GuestDefinedCapabilities struct {
 	NamespaceAddRequestSupported bool `json:",omitempty"`
 	SignalProcessSupported       bool `json:",omitempty"`
+	DumpStacksSupported          bool `json:",omitempty"`
 }
 
 // GuestConnectionInfo is the structure of an iterm return by a GuestConnection call on a utility VM

@@ -10,7 +10,6 @@
 package hcsschema
 
 type RdpConnectionOptions struct {
-
 	AccessSids []string `json:"AccessSids,omitempty"`
 
 	NamedPipe string `json:"NamedPipe,omitempty"`
