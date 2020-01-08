@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
+	"k8s.io/apimachinery/pkg/api/apitesting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -1497,6 +1497,73 @@ func TestStoreDeleteCollectionNotFound(t *testing.T) {
 		if _, err := registry.Get(testContext, podB.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
 			t.Errorf("Unexpected error: %v", err)
 		}
+	}
+}
+
+func TestStoreDeleteCollectionWithValidation(t *testing.T) {
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+
+	podA := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ada"}}
+	podB := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
+	podC := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	podD := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar1"}}
+
+	errMsg := "bar is not valid"
+	invalidateBar := func(ctx context.Context, obj runtime.Object) error {
+		pod := obj.(*example.Pod)
+		if strings.HasPrefix(pod.Name, "bar") {
+			return fmt.Errorf(errMsg)
+		}
+		return nil
+	}
+
+	// Setup
+	if _, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Errorf("Unexpected error for %s: %v", podA.Name, err)
+	}
+	if _, err := registry.Create(testContext, podB, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Errorf("Unexpected error for %s: %v", podB.Name, err)
+	}
+	if _, err := registry.Create(testContext, podC, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Errorf("Unexpected error for %s: %v", podC.Name, err)
+	}
+	if _, err := registry.Create(testContext, podD, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Errorf("Unexpected error for %s: %v", podD.Name, err)
+	}
+
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		_, err := registry.DeleteCollection(testContext, invalidateBar, nil, &metainternalversion.ListOptions{})
+		if err == nil {
+			t.Fatalf("There should be an error")
+		}
+		if !strings.HasSuffix(err.Error(), errMsg) {
+			t.Fatalf("didn't find expected error %v", err)
+		}
+		if !strings.Contains(err.Error(), "2 errors") {
+			t.Fatalf("there should have been 2 errors")
+		}
+	}()
+	wg.Wait()
+
+	if _, err := registry.Get(testContext, podA.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	// podB should have been invalidated during the deletion - it should still exist
+	if _, err := registry.Get(testContext, podB.Name, &metav1.GetOptions{}); errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if _, err := registry.Get(testContext, podC.Name, &metav1.GetOptions{}); !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	// podD should have been invalidated during the deletion - it should still exist
+	if _, err := registry.Get(testContext, podD.Name, &metav1.GetOptions{}); errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
 	}
 }
 

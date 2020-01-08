@@ -1035,24 +1035,37 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 			for index := range toProcess {
 				accessor, err := meta.Accessor(items[index])
 				if err != nil {
-					errs <- err
-					return
+					select {
+					case errs <- err:
+					default:
+					}
+					continue
 				}
 				if _, _, err := e.Delete(ctx, accessor.GetName(), deleteValidation, options); err != nil && !apierrors.IsNotFound(err) {
 					klog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
 					errs <- err
-					return
 				}
 			}
 		}()
 	}
 	wg.Wait()
-	select {
-	case err := <-errs:
-		return nil, err
-	default:
-		return listObj, nil
+	errorsSeen := 0
+	var lastErr error
+aggregating:
+	for {
+		select {
+		case err := <-errs:
+			errorsSeen++
+			lastErr = err
+		default:
+			break aggregating
+		}
 	}
+	close(errs)
+	if errorsSeen > 0 {
+		return nil, fmt.Errorf("there have been %d errors. latest err: %v", errorsSeen, lastErr)
+	}
+	return listObj, nil
 }
 
 // finalizeDelete runs the Store's AfterDelete hook if runHooks is set and
