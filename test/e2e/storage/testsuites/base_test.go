@@ -26,7 +26,7 @@ import (
 // intersection of the intervals (if it exists) and return the minimum of the intersection
 // to be used as the claim size for the test.
 // if value not set, that means there's no minimum or maximum size limitation and we set default size for it.
-// Considerate all corner case as followed：
+// Considerate all corner case as followed:
 // first: A,B is regular value and ? means unspecified
 // second: C,D is regular value and ? means unspecified
 // ----------------------------------------------------------------
