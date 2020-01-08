@@ -274,8 +274,7 @@ func asyncOps(
 				continue
 			}
 			e := expected.Load().([]utils.AuditEvent)
-			evList := []utils.AuditEvent{}
-			evList = append(e, exp...)
+			evList := append(e, exp...)
 			expected.Store(evList)
 		}
 	}
