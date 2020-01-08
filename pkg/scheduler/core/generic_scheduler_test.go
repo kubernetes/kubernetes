@@ -1614,7 +1614,10 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			if !preFilterStatus.IsSuccess() {
 				t.Errorf("Unexpected preFilterStatus: %v", preFilterStatus)
 			}
-			nodeInfos := nodesToNodeInfos(nodes, snapshot)
+			nodeInfos, err := nodesToNodeInfos(nodes, snapshot)
+			if err != nil {
+				t.Fatal(err)
+			}
 			nodeToPods, err := g.selectNodesForPreemption(context.Background(), state, test.pod, nodeInfos, nil)
 			if err != nil {
 				t.Error(err)
@@ -1844,7 +1847,10 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			}
 			assignDefaultStartTime(test.pods)
 
-			nodeInfos := nodesToNodeInfos(nodes, snapshot)
+			nodeInfos, err := nodesToNodeInfos(nodes, snapshot)
+			if err != nil {
+				t.Fatal(err)
+			}
 			state := framework.NewCycleState()
 			candidateNodes, _ := g.selectNodesForPreemption(context.Background(), state, test.pod, nodeInfos, nil)
 			node := pickOneNodeForPreemption(candidateNodes)
@@ -2478,10 +2484,14 @@ func TestFairEvaluationForNodes(t *testing.T) {
 	}
 }
 
-func nodesToNodeInfos(nodes []*v1.Node, snapshot *nodeinfosnapshot.Snapshot) []*schedulernodeinfo.NodeInfo {
+func nodesToNodeInfos(nodes []*v1.Node, snapshot *nodeinfosnapshot.Snapshot) ([]*schedulernodeinfo.NodeInfo, error) {
 	var nodeInfos []*schedulernodeinfo.NodeInfo
 	for _, n := range nodes {
-		nodeInfos = append(nodeInfos, snapshot.NodeInfoMap[n.Name])
+		nodeInfo, err := snapshot.NodeInfos().Get(n.Name)
+		if err != nil {
+			return nil, err
+		}
+		nodeInfos = append(nodeInfos, nodeInfo)
 	}
-	return nodeInfos
+	return nodeInfos, nil
 }
