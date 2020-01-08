@@ -2634,6 +2634,21 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 		e2eservice.WaitForServiceUpdatedWithFinalizer(cs, svc.Namespace, svc.Name, true)
 	})
+
+	ginkgo.It("should find a service from listing all namespaces", func() {
+		ginkgo.By("fetching services")
+		svcs, _ := f.ClientSet.CoreV1().Services("").List(metav1.ListOptions{})
+
+		foundSvc := false
+		for _, svc := range svcs.Items {
+			if svc.ObjectMeta.Name == "kubernetes" && svc.ObjectMeta.Namespace == "default" {
+				foundSvc = true
+				break
+			}
+		}
+
+		framework.ExpectEqual(foundSvc, true, "could not find service 'kubernetes' in service list in all namespaces")
+	})
 })
 
 // TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
