@@ -143,18 +143,6 @@ func (podStrategy) CheckGracefulDelete(ctx context.Context, obj runtime.Object, 
 	return true
 }
 
-type podStrategyWithoutGraceful struct {
-	podStrategy
-}
-
-// CheckGracefulDelete prohibits graceful deletion.
-func (podStrategyWithoutGraceful) CheckGracefulDelete(ctx context.Context, obj runtime.Object, options *metav1.DeleteOptions) bool {
-	return false
-}
-
-// StrategyWithoutGraceful implements the legacy instant delete behavior.
-var StrategyWithoutGraceful = podStrategyWithoutGraceful{Strategy}
-
 type podStatusStrategy struct {
 	podStrategy
 }
