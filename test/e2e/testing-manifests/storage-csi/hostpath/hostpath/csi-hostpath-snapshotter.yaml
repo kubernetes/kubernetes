@@ -30,8 +30,7 @@ spec:
       serviceAccount: csi-snapshotter
       containers:
       - name: csi-snapshotter
-        # TODO: replace with official 2.0.0 release when ready
-        image: quay.io/k8scsi/csi-snapshotter:v2.0.0-rc2
+        image: quay.io/k8scsi/csi-snapshotter:v2.0.0
         args:
         - "--v=5"
         - "--csi-address=$(ADDRESS)"
@@ -43,7 +42,6 @@ spec:
           # non-privileged sidecar containers cannot access unix domain socket
           # created by privileged CSI driver container.
           privileged: true
-        imagePullPolicy: Always
         volumeMounts:
         - name: socket-dir
           mountPath: /csi

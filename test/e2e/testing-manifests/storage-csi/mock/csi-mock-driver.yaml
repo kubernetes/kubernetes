@@ -15,20 +15,18 @@ spec:
       serviceAccountName: csi-mock
       containers:
         - name: csi-provisioner
-          # TODO: replace with official 1.4.0 release when ready
-          image: quay.io/k8scsi/csi-provisioner:v1.4.0-rc1
+          image: quay.io/k8scsi/csi-provisioner:v1.5.0
           args:
             - "--csi-address=$(ADDRESS)"
             - "--connection-timeout=15s"
           env:
             - name: ADDRESS
               value: /csi/csi.sock
-          imagePullPolicy: Always
           volumeMounts:
             - mountPath: /csi
               name: socket-dir
         - name: driver-registrar
-          image: quay.io/k8scsi/csi-node-driver-registrar:v1.1.0
+          image: quay.io/k8scsi/csi-node-driver-registrar:v1.2.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -39,7 +37,6 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
-          imagePullPolicy: Always
           securityContext:
             privileged: true
           volumeMounts:
@@ -62,7 +59,6 @@ spec:
                   fieldPath: spec.nodeName
           securityContext:
             privileged: true
-          imagePullPolicy: IfNotPresent
           volumeMounts:
             - mountPath: /csi
               name: socket-dir

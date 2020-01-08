@@ -40,8 +40,7 @@ spec:
       serviceAccountName: csi-provisioner
       containers:
         - name: csi-provisioner
-          # TODO: replace with official 1.5.0 release when ready
-          image: quay.io/k8scsi/csi-provisioner:v1.5.0-rc1
+          image: quay.io/k8scsi/csi-provisioner:v1.5.0
           args:
             - -v=5
             - --csi-address=/csi/csi.sock
