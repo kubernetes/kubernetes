@@ -550,6 +550,11 @@ func (c *Cloud) ensureTargetGroup(targetGroup *elbv2.TargetGroup, serviceName ty
 		// Account for externalTrafficPolicy = "Local"
 		if mapping.HealthCheckPort != mapping.TrafficPort {
 			input.HealthCheckPort = aws.String(strconv.Itoa(int(mapping.HealthCheckPort)))
+			// Local traffic should have more aggressive health checking by default.
+			// Min allowed by NLB is 10 seconds, and 2 threshold count
+			input.HealthCheckIntervalSeconds = aws.Int64(10)
+			input.HealthyThresholdCount = aws.Int64(2)
+			input.UnhealthyThresholdCount = aws.Int64(2)
 		}
 
 		result, err := c.elbv2.CreateTargetGroup(input)
