@@ -192,11 +192,21 @@ func jsonToYAMLValue(j interface{}) interface{} {
 }
 
 func ToProtoBinary(json map[string]interface{}) ([]byte, error) {
-	document, err := openapi_v2.NewDocument(jsonToYAML(json), compiler.NewContext("$root", nil))
+	start := time.Now()
+	yamlMap := jsonToYAML(json)
+	klog.Errorf("---- jsonToYAML: %v", time.Since(start))
+
+	start = time.Now()
+	document, err := openapi_v2.NewDocument(yamlMap, compiler.NewContext("$root", nil))
+	klog.Errorf("---- NewDocument: %v", time.Since(start))
 	if err != nil {
 		return nil, err
 	}
-	return proto.Marshal(document)
+
+	start = time.Now()
+	pb, err := proto.Marshal(document)
+	klog.Errorf("---- pb marshal: %v", time.Since(start))
+	return pb, err
 }
 
 func toGzip(data []byte) []byte {
