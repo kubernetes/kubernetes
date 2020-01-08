@@ -23,7 +23,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
@@ -261,7 +260,7 @@ func TestTaintTolerationScore(t *testing.T) {
 }
 
 func TestTaintTolerationFilter(t *testing.T) {
-	unschedulable := framework.NewStatus(framework.UnschedulableAndUnresolvable, predicates.ErrTaintsTolerationsNotMatch.GetReason())
+	unschedulable := framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNotMatch)
 	tests := []struct {
 		name       string
 		pod        *v1.Pod

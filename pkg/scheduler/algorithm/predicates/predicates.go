@@ -52,8 +52,6 @@ const (
 	PodToleratesNodeTaintsPred = "PodToleratesNodeTaints"
 	// CheckNodeUnschedulablePred defines the name of predicate CheckNodeUnschedulablePredicate.
 	CheckNodeUnschedulablePred = "CheckNodeUnschedulable"
-	// PodToleratesNodeNoExecuteTaintsPred defines the name of predicate PodToleratesNodeNoExecuteTaints.
-	PodToleratesNodeNoExecuteTaintsPred = "PodToleratesNodeNoExecuteTaints"
 	// CheckNodeLabelPresencePred defines the name of predicate CheckNodeLabelPresence.
 	CheckNodeLabelPresencePred = "CheckNodeLabelPresence"
 	// CheckServiceAffinityPred defines the name of predicate checkServiceAffinity.
@@ -99,7 +97,7 @@ var (
 	predicatesOrdering = []string{CheckNodeUnschedulablePred,
 		GeneralPred, HostNamePred, PodFitsHostPortsPred,
 		MatchNodeSelectorPred, PodFitsResourcesPred, NoDiskConflictPred,
-		PodToleratesNodeTaintsPred, PodToleratesNodeNoExecuteTaintsPred, CheckNodeLabelPresencePred,
+		PodToleratesNodeTaintsPred, CheckNodeLabelPresencePred,
 		CheckServiceAffinityPred, MaxEBSVolumeCountPred, MaxGCEPDVolumeCountPred, MaxCSIVolumeCountPred,
 		MaxAzureDiskVolumeCountPred, MaxCinderVolumeCountPred, CheckVolumeBindingPred, NoVolumeZoneConflictPred,
 		EvenPodsSpreadPred, MatchInterPodAffinityPred}
@@ -302,35 +300,4 @@ func GeneralPredicates(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.N
 	}
 
 	return len(predicateFails) == 0, predicateFails, nil
-}
-
-// PodToleratesNodeTaints checks if a pod tolerations can tolerate the node taints.
-func PodToleratesNodeTaints(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
-	if nodeInfo == nil || nodeInfo.Node() == nil {
-		return false, []PredicateFailureReason{ErrNodeUnknownCondition}, nil
-	}
-
-	return podToleratesNodeTaints(pod, nodeInfo, func(t *v1.Taint) bool {
-		// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
-		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
-	})
-}
-
-// PodToleratesNodeNoExecuteTaints checks if a pod tolerations can tolerate the node's NoExecute taints.
-func PodToleratesNodeNoExecuteTaints(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
-	return podToleratesNodeTaints(pod, nodeInfo, func(t *v1.Taint) bool {
-		return t.Effect == v1.TaintEffectNoExecute
-	})
-}
-
-func podToleratesNodeTaints(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo, filter func(t *v1.Taint) bool) (bool, []PredicateFailureReason, error) {
-	taints, err := nodeInfo.Taints()
-	if err != nil {
-		return false, nil, err
-	}
-
-	if v1helper.TolerationsTolerateTaintsWithFilter(pod.Spec.Tolerations, taints, filter) {
-		return true, nil, nil
-	}
-	return false, []PredicateFailureReason{ErrTaintsTolerationsNotMatch}, nil
 }
