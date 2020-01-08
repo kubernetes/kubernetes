@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks coding style for go language files in each
+# Kubernetes package by golint.
+# Usage: hack/verify-golint.sh
+
 set -o errexit
 set -o nounset
 set -o pipefail
