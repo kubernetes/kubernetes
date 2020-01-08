@@ -357,7 +357,6 @@ func waitForDelete(params waitForDeleteParams) ([]corev1.Pod, error) {
 			default:
 				return false, nil
 			}
-			return false, nil
 		}
 		return true, nil
 	})
