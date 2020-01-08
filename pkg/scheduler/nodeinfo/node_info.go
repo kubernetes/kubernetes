@@ -632,23 +632,6 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 	return nil
 }
 
-// RemoveNode removes the overall information about the node.
-func (n *NodeInfo) RemoveNode(node *v1.Node) error {
-	// We don't remove NodeInfo for because there can still be some pods on this node -
-	// this is because notifications about pods are delivered in a different watch,
-	// and thus can potentially be observed later, even though they happened before
-	// node removal. This is handled correctly in cache.go file.
-	n.node = nil
-	n.allocatableResource = &Resource{}
-	n.taints, n.taintsErr = nil, nil
-	n.memoryPressureCondition = v1.ConditionUnknown
-	n.diskPressureCondition = v1.ConditionUnknown
-	n.pidPressureCondition = v1.ConditionUnknown
-	n.imageStates = make(map[string]*ImageStateSummary)
-	n.generation = nextGeneration()
-	return nil
-}
-
 // FilterOutPods receives a list of pods and filters out those whose node names
 // are equal to the node of this NodeInfo, but are not found in the pods of this NodeInfo.
 //
