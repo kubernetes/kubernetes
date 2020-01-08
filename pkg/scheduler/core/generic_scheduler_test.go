@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
@@ -1869,7 +1870,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			nodesStatuses: framework.NodeToStatusMap{
 				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeSelectorNotMatch.GetReason()),
 				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrPodNotMatchHostName.GetReason()),
-				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrTaintsTolerationsNotMatch.GetReason()),
+				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, tainttoleration.ErrReasonNotMatch),
 				"machine4": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodelabel.ErrReasonPresenceViolated),
 			},
 			expected: map[string]bool{},
