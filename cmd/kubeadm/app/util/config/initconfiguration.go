@@ -270,7 +270,10 @@ func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 			continue
 		}
 
-		fmt.Printf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
+		// If the group is neither a kubeadm core type or of a supported component config group, we dump a warning about it being ignored
+		if !componentconfigs.Scheme.IsGroupRegistered(gvk.Group) {
+			fmt.Printf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
+		}
 	}
 
 	// Enforce that InitConfiguration and/or ClusterConfiguration has to exist among the YAML documents
