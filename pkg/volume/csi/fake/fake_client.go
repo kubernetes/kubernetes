@@ -79,14 +79,15 @@ type CSIVolume struct {
 
 // NodeClient returns CSI node client
 type NodeClient struct {
-	nodePublishedVolumes map[string]CSIVolume
-	nodeStagedVolumes    map[string]CSIVolume
-	stageUnstageSet      bool
-	expansionSet         bool
-	volumeStatsSet       bool
-	nodeGetInfoResp      *csipb.NodeGetInfoResponse
-	nodeVolumeStatsResp  *csipb.NodeGetVolumeStatsResponse
-	nextErr              error
+	nodePublishedVolumes     map[string]CSIVolume
+	nodeStagedVolumes        map[string]CSIVolume
+	stageUnstageSet          bool
+	expansionSet             bool
+	volumeStatsSet           bool
+	nodeGetInfoResp          *csipb.NodeGetInfoResponse
+	nodeVolumeStatsResp      *csipb.NodeGetVolumeStatsResponse
+	FakeNodeExpansionRequest *csipb.NodeExpandVolumeRequest
+	nextErr                  error
 }
 
 // NewNodeClient returns fake node client
@@ -295,6 +296,8 @@ func (f *NodeClient) NodeExpandVolume(ctx context.Context, req *csipb.NodeExpand
 	if req.GetCapacityRange().RequiredBytes <= 0 {
 		return nil, errors.New("required bytes should be greater than 0")
 	}
+
+	f.FakeNodeExpansionRequest = req
 
 	resp := &csipb.NodeExpandVolumeResponse{
 		CapacityBytes: req.GetCapacityRange().RequiredBytes,

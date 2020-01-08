@@ -604,6 +604,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			}
 
 			resizeOptions.DeviceMountPath = deviceMountPath
+			resizeOptions.DeviceStagePath = deviceMountPath
 			resizeOptions.CSIVolumePhase = volume.CSIVolumeStaged
 
 			// NodeExpandVolume will resize the file system if user has requested a resize of
@@ -1505,6 +1506,7 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 					return volumeToMount.GenerateError("NodeExpandVolume.GetDeviceMountPath failed", err)
 				}
 				resizeOptions.DeviceMountPath = dmp
+				resizeOptions.DeviceStagePath = dmp
 				resizeDone, simpleErr, detailedErr = og.doOnlineExpansion(volumeToMount, actualStateOfWorld, resizeOptions)
 				if simpleErr != nil || detailedErr != nil {
 					return simpleErr, detailedErr
