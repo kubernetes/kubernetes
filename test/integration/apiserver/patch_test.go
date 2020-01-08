@@ -107,10 +107,6 @@ func TestPatchConflicts(t *testing.T) {
 			}
 			// make sure the patch directive didn't get lost, and that an entry in the ownerReference list was deleted.
 			found := findOwnerRefByUID(accessor.GetOwnerReferences(), UIDs[i])
-			if err != nil {
-				t.Errorf("%v", err)
-				return
-			}
 			if found {
 				t.Errorf("patch of %s with $patch directive was ineffective, didn't delete the entry in the ownerReference slice: %#v", "secrets", UIDs[i])
 			}
