@@ -30,12 +30,13 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 	"github.com/golang/protobuf/proto"
-	"github.com/googleapis/gnostic/OpenAPIv2"
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 	"github.com/googleapis/gnostic/compiler"
-	"github.com/json-iterator/go"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/munnerz/goautoneg"
 	"gopkg.in/yaml.v2"
 
+	"k8s.io/klog"
 	"k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/common"
 )
@@ -104,19 +105,28 @@ func (o *OpenAPIService) getSwaggerPbGzBytes() ([]byte, string, time.Time) {
 }
 
 func (o *OpenAPIService) UpdateSpec(openapiSpec *spec.Swagger) (err error) {
+	ttlStart := time.Now()
+	start := time.Now()
 	specBytes, err := jsoniter.ConfigCompatibleWithStandardLibrary.Marshal(openapiSpec)
 	if err != nil {
 		return err
 	}
+	klog.Errorf("--- marshal: %v", time.Since(start))
+	start = time.Now()
 	var json map[string]interface{}
 	if err := jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal(specBytes, &json); err != nil {
 		return err
 	}
+	klog.Errorf("--- unmarshal: %v", time.Since(start))
+	start = time.Now()
 	specPb, err := ToProtoBinary(json)
 	if err != nil {
 		return err
 	}
+	klog.Errorf("--- to PB: %v", time.Since(start))
+	start = time.Now()
 	specPbGz := toGzip(specPb)
+	klog.Errorf("--- to gzip: %v", time.Since(start))
 
 	specBytesETag := computeETag(specBytes)
 	specPbETag := computeETag(specPb)
@@ -134,6 +144,7 @@ func (o *OpenAPIService) UpdateSpec(openapiSpec *spec.Swagger) (err error) {
 	o.specPbETag = specPbETag
 	o.specPbGzETag = specPbGzETag
 	o.lastModified = lastModified
+	klog.Errorf("---- total : %v", time.Since(ttlStart))
 
 	return nil
 }

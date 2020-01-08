@@ -202,10 +202,12 @@ func (s *specAggregator) updateOpenAPISpec() error {
 	if s.openAPIVersionedService == nil {
 		return nil
 	}
+	start := time.Now()
 	specToServe, err := s.buildOpenAPISpec()
 	if err != nil {
 		return err
 	}
+	klog.Errorf("--- time elapsed building openapi spec: %v", time.Since(start))
 	return s.openAPIVersionedService.UpdateSpec(specToServe)
 }
 
