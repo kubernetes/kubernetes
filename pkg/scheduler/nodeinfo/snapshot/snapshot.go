@@ -134,7 +134,7 @@ func (s *Snapshot) NodeInfos() schedulerlisters.NodeInfoLister {
 
 // ListNodes returns the list of nodes in the snapshot.
 func (s *Snapshot) ListNodes() []*v1.Node {
-	nodes := make([]*v1.Node, 0, len(s.NodeInfoMap))
+	nodes := make([]*v1.Node, 0, len(s.NodeInfoList))
 	for _, n := range s.NodeInfoList {
 		if n.Node() != nil {
 			nodes = append(nodes, n.Node())
@@ -159,11 +159,11 @@ func (p *podLister) FilteredList(podFilter schedulerlisters.PodFilter, selector 
 	// can avoid expensive array growth without wasting too much memory by
 	// pre-allocating capacity.
 	maxSize := 0
-	for _, n := range p.snapshot.NodeInfoMap {
+	for _, n := range p.snapshot.NodeInfoList {
 		maxSize += len(n.Pods())
 	}
 	pods := make([]*v1.Pod, 0, maxSize)
-	for _, n := range p.snapshot.NodeInfoMap {
+	for _, n := range p.snapshot.NodeInfoList {
 		for _, pod := range n.Pods() {
 			if podFilter(pod) && selector.Matches(labels.Set(pod.Labels)) {
 				pods = append(pods, pod)
@@ -189,7 +189,7 @@ func (n *nodeInfoLister) HavePodsWithAffinityList() ([]*schedulernodeinfo.NodeIn
 
 // Returns the NodeInfo of the given node name.
 func (n *nodeInfoLister) Get(nodeName string) (*schedulernodeinfo.NodeInfo, error) {
-	if v, ok := n.snapshot.NodeInfoMap[nodeName]; ok {
+	if v, ok := n.snapshot.NodeInfoMap[nodeName]; ok && v.Node() != nil {
 		return v, nil
 	}
 	return nil, fmt.Errorf("nodeinfo not found for node name %q", nodeName)
