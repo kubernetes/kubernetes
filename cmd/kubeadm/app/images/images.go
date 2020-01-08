@@ -18,6 +18,7 @@ package images
 
 import (
 	"fmt"
+	"runtime"
 
 	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -32,6 +33,11 @@ func GetGenericImage(prefix, image, tag string) string {
 	return fmt.Sprintf("%s/%s:%s", prefix, image, tag)
 }
 
+// GetGenericArchImage generates and returns an image based on the current runtime arch
+func GetGenericArchImage(prefix, image, tag string) string {
+	return fmt.Sprintf("%s/%s-%s:%s", prefix, image, runtime.GOARCH, tag)
+}
+
 // GetKubernetesImage generates and returns the image for the components managed in the Kubernetes main repository,
 // including the control-plane components and kube-proxy. If specified, the HyperKube image will be used.
 func GetKubernetesImage(image string, cfg *kubeadmapi.ClusterConfiguration) string {
@@ -41,6 +47,9 @@ func GetKubernetesImage(image string, cfg *kubeadmapi.ClusterConfiguration) stri
 	}
 	repoPrefix := cfg.GetControlPlaneImageRepository()
 	kubernetesImageTag := kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion)
+	if cfg.UseArchImage {
+		return GetGenericArchImage(repoPrefix, image, kubernetesImageTag)
+	}
 	return GetGenericImage(repoPrefix, image, kubernetesImageTag)
 }
 
@@ -59,6 +68,9 @@ func GetDNSImage(cfg *kubeadmapi.ClusterConfiguration, imageName string) string 
 	// unless an override is specified
 	if cfg.DNS.ImageTag != "" {
 		dnsImageTag = cfg.DNS.ImageTag
+	}
+	if cfg.UseArchImage {
+		return GetGenericArchImage(dnsImageRepository, imageName, dnsImageTag)
 	}
 	return GetGenericImage(dnsImageRepository, imageName, dnsImageTag)
 }
@@ -83,6 +95,9 @@ func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	// unless an override is specified
 	if cfg.Etcd.Local != nil && cfg.Etcd.Local.ImageTag != "" {
 		etcdImageTag = cfg.Etcd.Local.ImageTag
+	}
+	if cfg.UseArchImage {
+		return GetGenericArchImage(etcdImageRepository, constants.Etcd, etcdImageTag)
 	}
 	return GetGenericImage(etcdImageRepository, constants.Etcd, etcdImageTag)
 }

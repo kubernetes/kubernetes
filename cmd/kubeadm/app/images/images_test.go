@@ -82,6 +82,15 @@ func TestGetKubernetesImage(t *testing.T) {
 				KubernetesVersion: testversion,
 			},
 		},
+		{
+			image:    constants.KubeAPIServer,
+			expected: GetGenericArchImage(gcrPrefix, "kube-apiserver", expected),
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository:   gcrPrefix,
+				KubernetesVersion: testversion,
+				UseArchImage:      true,
+			},
+		},
 	}
 	for _, rt := range tests {
 		actual := GetKubernetesImage(rt.image, rt.cfg)
@@ -250,6 +259,65 @@ func TestGetAllImages(t *testing.T) {
 				},
 			},
 			expect: constants.KubeDNSDnsMasqNannyImageName,
+		},
+		{
+			name: "pause image uses default repository and tag",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository: "test.repo",
+			},
+			expect: GetGenericImage("test.repo", "pause", constants.PauseVersion),
+		},
+		{
+			name: "pause image uses customized repository and tag",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository: "test.repo",
+				PauseImage: &kubeadmapi.ImageMeta{
+					ImageRepository: "test.pause.repo",
+					ImageTag:        "test.pause.tag",
+				},
+			},
+			expect: GetGenericImage("test.pause.repo", "pause", "test.pause.tag"),
+		},
+		{
+			name: "etcd arch image",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository: "test.repo",
+				Etcd: kubeadmapi.Etcd{
+					Local: &kubeadmapi.LocalEtcd{},
+				},
+				UseArchImage: true,
+			},
+			expect: GetGenericArchImage("test.repo", constants.Etcd, constants.DefaultEtcdVersion),
+		},
+		{
+			name: "CoreDNS arch image",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository: "test.repo",
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.CoreDNS,
+				},
+				UseArchImage: true,
+			},
+			expect: GetGenericArchImage("test.repo", constants.CoreDNSImageName, constants.CoreDNSVersion),
+		},
+		{
+			name: "kube-dns arch image",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository: "test.repo",
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.KubeDNS,
+				},
+				UseArchImage: true,
+			},
+			expect: GetGenericArchImage("test.repo", constants.KubeDNSKubeDNSImageName, constants.KubeDNSVersion),
+		},
+		{
+			name: "pause arch image",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository: "test.repo",
+				UseArchImage:    true,
+			},
+			expect: GetGenericArchImage("test.repo", "pause", constants.PauseVersion),
 		},
 	}
 	for _, tc := range testcases {

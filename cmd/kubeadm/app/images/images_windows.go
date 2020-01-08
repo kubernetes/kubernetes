@@ -26,9 +26,22 @@ import (
 
 // GetPauseImage returns the image for the "pause" container
 func GetPauseImage(cfg *kubeadmapi.ClusterConfiguration) string {
-	//If user has configured the cluster to use a different image repository, use that for the Windows pause image.
-	if cfg.ImageRepository != kubeadmapiv1beta2.DefaultImageRepository {
-		return GetGenericImage(cfg.ImageRepository, "pause", constants.PauseVersion)
+	pauseImageRepo := cfg.ImageRepository
+	pauseImageTag := constants.PauseVersion
+	if cfg.PauseImage != nil {
+		if cfg.PauseImage.ImageRepository != "" {
+			pauseImageRepo = cfg.PauseImage.ImageRepository
+		}
+		if cfg.PauseImage.ImageTag != "" {
+			pauseImageTag = cfg.PauseImage.ImageTag
+		}
 	}
-	return GetGenericImage("mcr.microsoft.com/oss/kubernetes", "pause", constants.PauseVersion)
+	if cfg.ImageRepository == kubeadmapiv1beta2.DefaultImageRepository {
+		pauseImageRepo = "mcr.microsoft.com/oss/kubernetes"
+	}
+	//If user has configured the cluster to use a different image repository, use that for the Windows pause image.
+	if cfg.UseArchImage {
+		return GetGenericArchImage(pauseImageRepo, "pause", pauseImageTag)
+	}
+	return GetGenericImage(pauseImageRepo, "pause", pauseImageTag)
 }
