@@ -9,6 +9,7 @@ approvers:
 - rootfs
 reviewers:
 - andyzhangx
+- aramase
 - brendandburns
 - feiskyer
 - jingxu97
@@ -16,5 +17,6 @@ reviewers:
 - msau42
 - karataliu
 - khenidak
+- ritazh
 - rootfs
 - saad-ali
