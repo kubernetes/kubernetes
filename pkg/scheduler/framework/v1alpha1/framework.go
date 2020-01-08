@@ -415,37 +415,36 @@ func (f *framework) RunFilterPlugins(
 	state *CycleState,
 	pod *v1.Pod,
 	nodeInfo *schedulernodeinfo.NodeInfo,
-) (finalStatus *Status) {
+) PluginToStatus {
+	var firstFailedStatus *Status
 	if state.ShouldRecordFrameworkMetrics() {
 		startTime := time.Now()
 		defer func() {
-			f.metricsRecorder.observeExtensionPointDurationAsync(filter, finalStatus, metrics.SinceInSeconds(startTime))
+			f.metricsRecorder.observeExtensionPointDurationAsync(filter, firstFailedStatus, metrics.SinceInSeconds(startTime))
 		}()
 	}
+	statuses := make(PluginToStatus)
 	for _, pl := range f.filterPlugins {
 		pluginStatus := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo)
+		if len(statuses) == 0 {
+			firstFailedStatus = pluginStatus
+		}
 		if !pluginStatus.IsSuccess() {
 			if !pluginStatus.IsUnschedulable() {
 				// Filter plugins are not supposed to return any status other than
 				// Success or Unschedulable.
-				return NewStatus(Error, fmt.Sprintf("running %q filter plugin for pod %q: %v", pl.Name(), pod.Name, pluginStatus.Message()))
+				firstFailedStatus = NewStatus(Error, fmt.Sprintf("running %q filter plugin for pod %q: %v", pl.Name(), pod.Name, pluginStatus.Message()))
+				return map[string]*Status{pl.Name(): firstFailedStatus}
 			}
+			statuses[pl.Name()] = pluginStatus
 			if !f.runAllFilters {
 				// Exit early if we don't need to run all filters.
-				return pluginStatus
+				return statuses
 			}
-			// We need to continue and run all filters.
-			if finalStatus.IsSuccess() {
-				// This is the first failed plugin.
-				finalStatus = pluginStatus
-				continue
-			}
-			// We get here only if more than one Filter return unschedulable and runAllFilters is true.
-			finalStatus.reasons = append(finalStatus.reasons, pluginStatus.reasons...)
 		}
 	}
 
-	return finalStatus
+	return statuses
 }
 
 func (f *framework) runFilterPlugin(ctx context.Context, pl FilterPlugin, state *CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
