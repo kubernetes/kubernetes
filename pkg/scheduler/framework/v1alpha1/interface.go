@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 // NodeScoreList declares a list of nodes and their scores.
@@ -520,4 +521,7 @@ type FrameworkHandle interface {
 	ClientSet() clientset.Interface
 
 	SharedInformerFactory() informers.SharedInformerFactory
+
+	// VolumeBinder returns the volume binder used by scheduler.
+	VolumeBinder() *volumebinder.VolumeBinder
 }
