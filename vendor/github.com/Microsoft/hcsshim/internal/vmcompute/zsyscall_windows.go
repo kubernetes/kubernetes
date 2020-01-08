@@ -1,6 +1,6 @@
 // Code generated mksyscall_windows.exe DO NOT EDIT
 
-package hcs
+package vmcompute
 
 import (
 	"syscall"
@@ -88,7 +88,7 @@ func _hcsEnumerateComputeSystems(query *uint16, computeSystems **uint16, result 
 	return
 }
 
-func hcsCreateComputeSystem(id string, configuration string, identity syscall.Handle, computeSystem *hcsSystem, result **uint16) (hr error) {
+func hcsCreateComputeSystem(id string, configuration string, identity syscall.Handle, computeSystem *HcsSystem, result **uint16) (hr error) {
 	var _p0 *uint16
 	_p0, hr = syscall.UTF16PtrFromString(id)
 	if hr != nil {
@@ -102,7 +102,7 @@ func hcsCreateComputeSystem(id string, configuration string, identity syscall.Ha
 	return _hcsCreateComputeSystem(_p0, _p1, identity, computeSystem, result)
 }
 
-func _hcsCreateComputeSystem(id *uint16, configuration *uint16, identity syscall.Handle, computeSystem *hcsSystem, result **uint16) (hr error) {
+func _hcsCreateComputeSystem(id *uint16, configuration *uint16, identity syscall.Handle, computeSystem *HcsSystem, result **uint16) (hr error) {
 	if hr = procHcsCreateComputeSystem.Find(); hr != nil {
 		return
 	}
@@ -116,7 +116,7 @@ func _hcsCreateComputeSystem(id *uint16, configuration *uint16, identity syscall
 	return
 }
 
-func hcsOpenComputeSystem(id string, computeSystem *hcsSystem, result **uint16) (hr error) {
+func hcsOpenComputeSystem(id string, computeSystem *HcsSystem, result **uint16) (hr error) {
 	var _p0 *uint16
 	_p0, hr = syscall.UTF16PtrFromString(id)
 	if hr != nil {
@@ -125,7 +125,7 @@ func hcsOpenComputeSystem(id string, computeSystem *hcsSystem, result **uint16) 
 	return _hcsOpenComputeSystem(_p0, computeSystem, result)
 }
 
-func _hcsOpenComputeSystem(id *uint16, computeSystem *hcsSystem, result **uint16) (hr error) {
+func _hcsOpenComputeSystem(id *uint16, computeSystem *HcsSystem, result **uint16) (hr error) {
 	if hr = procHcsOpenComputeSystem.Find(); hr != nil {
 		return
 	}
@@ -139,7 +139,7 @@ func _hcsOpenComputeSystem(id *uint16, computeSystem *hcsSystem, result **uint16
 	return
 }
 
-func hcsCloseComputeSystem(computeSystem hcsSystem) (hr error) {
+func hcsCloseComputeSystem(computeSystem HcsSystem) (hr error) {
 	if hr = procHcsCloseComputeSystem.Find(); hr != nil {
 		return
 	}
@@ -153,7 +153,7 @@ func hcsCloseComputeSystem(computeSystem hcsSystem) (hr error) {
 	return
 }
 
-func hcsStartComputeSystem(computeSystem hcsSystem, options string, result **uint16) (hr error) {
+func hcsStartComputeSystem(computeSystem HcsSystem, options string, result **uint16) (hr error) {
 	var _p0 *uint16
 	_p0, hr = syscall.UTF16PtrFromString(options)
 	if hr != nil {
@@ -162,7 +162,7 @@ func hcsStartComputeSystem(computeSystem hcsSystem, options string, result **uin
 	return _hcsStartComputeSystem(computeSystem, _p0, result)
 }
 
-func _hcsStartComputeSystem(computeSystem hcsSystem, options *uint16, result **uint16) (hr error) {
+func _hcsStartComputeSystem(computeSystem HcsSystem, options *uint16, result **uint16) (hr error) {
 	if hr = procHcsStartComputeSystem.Find(); hr != nil {
 		return
 	}
@@ -176,7 +176,7 @@ func _hcsStartComputeSystem(computeSystem hcsSystem, options *uint16, result **u
 	return
 }
 
-func hcsShutdownComputeSystem(computeSystem hcsSystem, options string, result **uint16) (hr error) {
+func hcsShutdownComputeSystem(computeSystem HcsSystem, options string, result **uint16) (hr error) {
 	var _p0 *uint16
 	_p0, hr = syscall.UTF16PtrFromString(options)
 	if hr != nil {
@@ -185,7 +185,7 @@ func hcsShutdownComputeSystem(computeSystem hcsSystem, options string, result **
 	return _hcsShutdownComputeSystem(computeSystem, _p0, result)
 }
 
-func _hcsShutdownComputeSystem(computeSystem hcsSystem, options *uint16, result **uint16) (hr error) {
+func _hcsShutdownComputeSystem(computeSystem HcsSystem, options *uint16, result **uint16) (hr error) {
 	if hr = procHcsShutdownComputeSystem.Find(); hr != nil {
 		return
 	}
@@ -199,7 +199,7 @@ func _hcsShutdownComputeSystem(computeSystem hcsSystem, options *uint16, result 
 	return
 }
 
-func hcsTerminateComputeSystem(computeSystem hcsSystem, options string, result **uint16) (hr error) {
+func hcsTerminateComputeSystem(computeSystem HcsSystem, options string, result **uint16) (hr error) {
 	var _p0 *uint16
 	_p0, hr = syscall.UTF16PtrFromString(options)
 	if hr != nil {
@@ -208,7 +208,7 @@ func hcsTerminateComputeSystem(computeSystem hcsSystem, options string, result *
 	return _hcsTerminateComputeSystem(computeSystem, _p0, result)
 }
 
-func _hcsTerminateComputeSystem(computeSystem hcsSystem, options *uint16, result **uint16) (hr error) {
+func _hcsTerminateComputeSystem(computeSystem HcsSystem, options *uint16, result **uint16) (hr error) {
 	if hr = procHcsTerminateComputeSystem.Find(); hr != nil {
 		return
 	}
@@ -222,7 +222,7 @@ func _hcsTerminateComputeSystem(computeSystem hcsSystem, options *uint16, result
 	return
 }
 
-func hcsPauseComputeSystem(computeSystem hcsSystem, options string, result **uint16) (hr error) {
+func hcsPauseComputeSystem(computeSystem HcsSystem, options string, result **uint16) (hr error) {
 	var _p0 *uint16
 	_p0, hr = syscall.UTF16PtrFromString(options)
 	if hr != nil {
@@ -231,7 +231,7 @@ func hcsPauseComputeSystem(computeSystem hcsSystem, options string, result **uin
 	return _hcsPauseComputeSystem(computeSystem, _p0, result)
 }
 
-func _hcsPauseComputeSystem(computeSystem hcsSystem, options *uint16, result **uint16) (hr error) {
+func _hcsPauseComputeSystem(computeSystem HcsSystem, options *uint16, result **uint16) (hr error) {
 	if hr = procHcsPauseComputeSystem.Find(); hr != nil {
 		return
 	}
@@ -245,7 +245,7 @@ func _hcsPauseComputeSystem(computeSystem hcsSystem, options *uint16, result **u
 	return
 }
 
-func hcsResumeComputeSystem(computeSystem hcsSystem, options string, result **uint16) (hr error) {
+func hcsResumeComputeSystem(computeSystem HcsSystem, options string, result **uint16) (hr error) {
 	var _p0 *uint16
 	_p0, hr = syscall.UTF16PtrFromString(options)
 	if hr != nil {
@@ -254,7 +254,7 @@ func hcsResumeComputeSystem(computeSystem hcsSystem, options string, result **ui
 	return _hcsResumeComputeSystem(computeSystem, _p0, result)
 }
 
-func _hcsResumeComputeSystem(computeSystem hcsSystem, options *uint16, result **uint16) (hr error) {
+func _hcsResumeComputeSystem(computeSystem HcsSystem, options *uint16, result **uint16) (hr error) {
 	if hr = procHcsResumeComputeSystem.Find(); hr != nil {
 		return
 	}
@@ -268,7 +268,7 @@ func _hcsResumeComputeSystem(computeSystem hcsSystem, options *uint16, result **
 	return
 }
 
-func hcsGetComputeSystemProperties(computeSystem hcsSystem, propertyQuery string, properties **uint16, result **uint16) (hr error) {
+func hcsGetComputeSystemProperties(computeSystem HcsSystem, propertyQuery string, properties **uint16, result **uint16) (hr error) {
 	var _p0 *uint16
 	_p0, hr = syscall.UTF16PtrFromString(propertyQuery)
 	if hr != nil {
@@ -277,7 +277,7 @@ func hcsGetComputeSystemProperties(computeSystem hcsSystem, propertyQuery string
 	return _hcsGetComputeSystemProperties(computeSystem, _p0, properties, result)
 }
 
-func _hcsGetComputeSystemProperties(computeSystem hcsSystem, propertyQuery *uint16, properties **uint16, result **uint16) (hr error) {
+func _hcsGetComputeSystemProperties(computeSystem HcsSystem, propertyQuery *uint16, properties **uint16, result **uint16) (hr error) {
 	if hr = procHcsGetComputeSystemProperties.Find(); hr != nil {
 		return
 	}
@@ -291,7 +291,7 @@ func _hcsGetComputeSystemProperties(computeSystem hcsSystem, propertyQuery *uint
 	return
 }
 
-func hcsModifyComputeSystem(computeSystem hcsSystem, configuration string, result **uint16) (hr error) {
+func hcsModifyComputeSystem(computeSystem HcsSystem, configuration string, result **uint16) (hr error) {
 	var _p0 *uint16
 	_p0, hr = syscall.UTF16PtrFromString(configuration)
 	if hr != nil {
@@ -300,7 +300,7 @@ func hcsModifyComputeSystem(computeSystem hcsSystem, configuration string, resul
 	return _hcsModifyComputeSystem(computeSystem, _p0, result)
 }
 
-func _hcsModifyComputeSystem(computeSystem hcsSystem, configuration *uint16, result **uint16) (hr error) {
+func _hcsModifyComputeSystem(computeSystem HcsSystem, configuration *uint16, result **uint16) (hr error) {
 	if hr = procHcsModifyComputeSystem.Find(); hr != nil {
 		return
 	}
@@ -314,7 +314,7 @@ func _hcsModifyComputeSystem(computeSystem hcsSystem, configuration *uint16, res
 	return
 }
 
-func hcsRegisterComputeSystemCallback(computeSystem hcsSystem, callback uintptr, context uintptr, callbackHandle *hcsCallback) (hr error) {
+func hcsRegisterComputeSystemCallback(computeSystem HcsSystem, callback uintptr, context uintptr, callbackHandle *HcsCallback) (hr error) {
 	if hr = procHcsRegisterComputeSystemCallback.Find(); hr != nil {
 		return
 	}
@@ -328,7 +328,7 @@ func hcsRegisterComputeSystemCallback(computeSystem hcsSystem, callback uintptr,
 	return
 }
 
-func hcsUnregisterComputeSystemCallback(callbackHandle hcsCallback) (hr error) {
+func hcsUnregisterComputeSystemCallback(callbackHandle HcsCallback) (hr error) {
 	if hr = procHcsUnregisterComputeSystemCallback.Find(); hr != nil {
 		return
 	}
@@ -342,7 +342,7 @@ func hcsUnregisterComputeSystemCallback(callbackHandle hcsCallback) (hr error) {
 	return
 }
 
-func hcsCreateProcess(computeSystem hcsSystem, processParameters string, processInformation *hcsProcessInformation, process *hcsProcess, result **uint16) (hr error) {
+func hcsCreateProcess(computeSystem HcsSystem, processParameters string, processInformation *HcsProcessInformation, process *HcsProcess, result **uint16) (hr error) {
 	var _p0 *uint16
 	_p0, hr = syscall.UTF16PtrFromString(processParameters)
 	if hr != nil {
@@ -351,7 +351,7 @@ func hcsCreateProcess(computeSystem hcsSystem, processParameters string, process
 	return _hcsCreateProcess(computeSystem, _p0, processInformation, process, result)
 }
 
-func _hcsCreateProcess(computeSystem hcsSystem, processParameters *uint16, processInformation *hcsProcessInformation, process *hcsProcess, result **uint16) (hr error) {
+func _hcsCreateProcess(computeSystem HcsSystem, processParameters *uint16, processInformation *HcsProcessInformation, process *HcsProcess, result **uint16) (hr error) {
 	if hr = procHcsCreateProcess.Find(); hr != nil {
 		return
 	}
@@ -365,7 +365,7 @@ func _hcsCreateProcess(computeSystem hcsSystem, processParameters *uint16, proce
 	return
 }
 
-func hcsOpenProcess(computeSystem hcsSystem, pid uint32, process *hcsProcess, result **uint16) (hr error) {
+func hcsOpenProcess(computeSystem HcsSystem, pid uint32, process *HcsProcess, result **uint16) (hr error) {
 	if hr = procHcsOpenProcess.Find(); hr != nil {
 		return
 	}
@@ -379,7 +379,7 @@ func hcsOpenProcess(computeSystem hcsSystem, pid uint32, process *hcsProcess, re
 	return
 }
 
-func hcsCloseProcess(process hcsProcess) (hr error) {
+func hcsCloseProcess(process HcsProcess) (hr error) {
 	if hr = procHcsCloseProcess.Find(); hr != nil {
 		return
 	}
@@ -393,7 +393,7 @@ func hcsCloseProcess(process hcsProcess) (hr error) {
 	return
 }
 
-func hcsTerminateProcess(process hcsProcess, result **uint16) (hr error) {
+func hcsTerminateProcess(process HcsProcess, result **uint16) (hr error) {
 	if hr = procHcsTerminateProcess.Find(); hr != nil {
 		return
 	}
@@ -407,7 +407,7 @@ func hcsTerminateProcess(process hcsProcess, result **uint16) (hr error) {
 	return
 }
 
-func hcsSignalProcess(process hcsProcess, options string, result **uint16) (hr error) {
+func hcsSignalProcess(process HcsProcess, options string, result **uint16) (hr error) {
 	var _p0 *uint16
 	_p0, hr = syscall.UTF16PtrFromString(options)
 	if hr != nil {
@@ -416,7 +416,7 @@ func hcsSignalProcess(process hcsProcess, options string, result **uint16) (hr e
 	return _hcsSignalProcess(process, _p0, result)
 }
 
-func _hcsSignalProcess(process hcsProcess, options *uint16, result **uint16) (hr error) {
+func _hcsSignalProcess(process HcsProcess, options *uint16, result **uint16) (hr error) {
 	if hr = procHcsSignalProcess.Find(); hr != nil {
 		return
 	}
@@ -430,7 +430,7 @@ func _hcsSignalProcess(process hcsProcess, options *uint16, result **uint16) (hr
 	return
 }
 
-func hcsGetProcessInfo(process hcsProcess, processInformation *hcsProcessInformation, result **uint16) (hr error) {
+func hcsGetProcessInfo(process HcsProcess, processInformation *HcsProcessInformation, result **uint16) (hr error) {
 	if hr = procHcsGetProcessInfo.Find(); hr != nil {
 		return
 	}
@@ -444,7 +444,7 @@ func hcsGetProcessInfo(process hcsProcess, processInformation *hcsProcessInforma
 	return
 }
 
-func hcsGetProcessProperties(process hcsProcess, processProperties **uint16, result **uint16) (hr error) {
+func hcsGetProcessProperties(process HcsProcess, processProperties **uint16, result **uint16) (hr error) {
 	if hr = procHcsGetProcessProperties.Find(); hr != nil {
 		return
 	}
@@ -458,7 +458,7 @@ func hcsGetProcessProperties(process hcsProcess, processProperties **uint16, res
 	return
 }
 
-func hcsModifyProcess(process hcsProcess, settings string, result **uint16) (hr error) {
+func hcsModifyProcess(process HcsProcess, settings string, result **uint16) (hr error) {
 	var _p0 *uint16
 	_p0, hr = syscall.UTF16PtrFromString(settings)
 	if hr != nil {
@@ -467,7 +467,7 @@ func hcsModifyProcess(process hcsProcess, settings string, result **uint16) (hr 
 	return _hcsModifyProcess(process, _p0, result)
 }
 
-func _hcsModifyProcess(process hcsProcess, settings *uint16, result **uint16) (hr error) {
+func _hcsModifyProcess(process HcsProcess, settings *uint16, result **uint16) (hr error) {
 	if hr = procHcsModifyProcess.Find(); hr != nil {
 		return
 	}
@@ -504,7 +504,7 @@ func _hcsGetServiceProperties(propertyQuery *uint16, properties **uint16, result
 	return
 }
 
-func hcsRegisterProcessCallback(process hcsProcess, callback uintptr, context uintptr, callbackHandle *hcsCallback) (hr error) {
+func hcsRegisterProcessCallback(process HcsProcess, callback uintptr, context uintptr, callbackHandle *HcsCallback) (hr error) {
 	if hr = procHcsRegisterProcessCallback.Find(); hr != nil {
 		return
 	}
@@ -518,7 +518,7 @@ func hcsRegisterProcessCallback(process hcsProcess, callback uintptr, context ui
 	return
 }
 
-func hcsUnregisterProcessCallback(callbackHandle hcsCallback) (hr error) {
+func hcsUnregisterProcessCallback(callbackHandle HcsCallback) (hr error) {
 	if hr = procHcsUnregisterProcessCallback.Find(); hr != nil {
 		return
 	}

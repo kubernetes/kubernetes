@@ -22,4 +22,9 @@ type Memory2 struct {
 
 	// EnableDeferredCommit is private in the schema. If regenerated need to add back.
 	EnableDeferredCommit bool `json:"EnableDeferredCommit,omitempty"`
+
+	// EnableColdDiscardHint if enabled, then the memory cold discard hint feature is exposed
+	// to the VM, allowing it to trim non-zeroed pages from the working set (if supported by
+	// the guest operating system).
+	EnableColdDiscardHint bool `json:"EnableColdDiscardHint,omitempty"`
 }

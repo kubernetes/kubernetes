@@ -6,14 +6,10 @@ go_library(
         "callback.go",
         "cgo.go",
         "errors.go",
-        "hcs.go",
-        "log.go",
         "process.go",
         "system.go",
         "utils.go",
         "waithelper.go",
-        "watcher.go",
-        "zsyscall_windows.go",
     ],
     cgo = True,
     importmap = "k8s.io/kubernetes/vendor/github.com/Microsoft/hcsshim/internal/hcs",
@@ -21,17 +17,18 @@ go_library(
     visibility = ["//vendor/github.com/Microsoft/hcsshim:__subpackages__"],
     deps = [
         "//vendor/github.com/Microsoft/go-winio:go_default_library",
+        "//vendor/github.com/Microsoft/hcsshim/internal/cow:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/internal/interop:go_default_library",
+        "//vendor/github.com/Microsoft/hcsshim/internal/log:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/internal/logfields:go_default_library",
+        "//vendor/github.com/Microsoft/hcsshim/internal/oc:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/internal/schema1:go_default_library",
+        "//vendor/github.com/Microsoft/hcsshim/internal/schema2:go_default_library",
         "//vendor/github.com/Microsoft/hcsshim/internal/timeout:go_default_library",
+        "//vendor/github.com/Microsoft/hcsshim/internal/vmcompute:go_default_library",
         "//vendor/github.com/sirupsen/logrus:go_default_library",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:windows": [
-            "//vendor/golang.org/x/sys/windows:go_default_library",
-        ],
-        "//conditions:default": [],
-    }),
+        "//vendor/go.opencensus.io/trace:go_default_library",
+    ],
 )
 
 filegroup(

@@ -8,7 +8,7 @@ environment:
   GOPATH: c:\gopath
   PATH: C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\bin;%GOPATH%\bin;C:\gometalinter-2.0.12-windows-amd64;%PATH%
 
-stack: go 1.12.2
+stack: go 1.13.4
 
 build_script:
   - appveyor DownloadFile https://github.com/alecthomas/gometalinter/releases/download/v2.0.12/gometalinter-2.0.12-windows-amd64.zip

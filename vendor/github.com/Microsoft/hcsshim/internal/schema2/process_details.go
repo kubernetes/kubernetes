@@ -15,7 +15,6 @@ import (
 
 //  Information about a process running in a container
 type ProcessDetails struct {
-
 	ProcessId int32 `json:"ProcessId,omitempty"`
 
 	ImageName string `json:"ImageName,omitempty"`

@@ -10,6 +10,5 @@
 package hcsschema
 
 type SharedMemoryConfiguration struct {
-
 	Regions []SharedMemoryRegion `json:"Regions,omitempty"`
 }

@@ -11,7 +11,6 @@ package hcsschema
 
 //  Status of a process running in a container
 type ProcessStatus struct {
-
 	ProcessId int32 `json:"ProcessId,omitempty"`
 
 	Exited bool `json:"Exited,omitempty"`

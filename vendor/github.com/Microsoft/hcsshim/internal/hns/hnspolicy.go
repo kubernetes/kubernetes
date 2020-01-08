@@ -55,8 +55,9 @@ type PaPolicy struct {
 
 type OutboundNatPolicy struct {
 	Policy
-	VIP        string   `json:"VIP,omitempty"`
-	Exceptions []string `json:"ExceptionList,omitempty"`
+	VIP          string   `json:"VIP,omitempty"`
+	Exceptions   []string `json:"ExceptionList,omitempty"`
+	Destinations []string `json:",omitempty"`
 }
 
 type ActionType string

@@ -55,6 +55,7 @@ go_library(
         "processor_stats.go",
         "properties.go",
         "property_query.go",
+        "property_type.go",
         "rdp_connection_options.go",
         "registry_changes.go",
         "registry_key.go",
@@ -88,6 +89,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/Microsoft/hcsshim/internal/schema2",
     importpath = "github.com/Microsoft/hcsshim/internal/schema2",
     visibility = ["//vendor/github.com/Microsoft/hcsshim:__subpackages__"],
+    deps = ["//vendor/github.com/containerd/cgroups/stats/v1:go_default_library"],
 )
 
 filegroup(

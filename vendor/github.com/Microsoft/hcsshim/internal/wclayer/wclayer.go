@@ -1,6 +1,6 @@
 package wclayer
 
-import "github.com/Microsoft/hcsshim/internal/guid"
+import "github.com/Microsoft/go-winio/pkg/guid"
 
 //go:generate go run ../../mksyscall_windows.go -output zsyscall_windows.go wclayer.go
 
@@ -23,5 +23,10 @@ import "github.com/Microsoft/hcsshim/internal/guid"
 //sys processUtilityImage(path string) (hr error) = vmcompute.ProcessUtilityImage?
 
 //sys grantVmAccess(vmid string, filepath string) (hr error) = vmcompute.GrantVmAccess?
+
+//sys openVirtualDisk(virtualStorageType *virtualStorageType, path string, virtualDiskAccessMask uint32, flags uint32, parameters *openVirtualDiskParameters, handle *syscall.Handle) (err error) [failretval != 0] = virtdisk.OpenVirtualDisk
+//sys attachVirtualDisk(handle syscall.Handle, sd uintptr, flags uint32, providerFlags uint32, params uintptr, overlapped uintptr) (err error) [failretval != 0] = virtdisk.AttachVirtualDisk
+
+//sys getDiskFreeSpaceEx(directoryName string, freeBytesAvailableToCaller *int64, totalNumberOfBytes *int64, totalNumberOfFreeBytes *int64) (err error) = GetDiskFreeSpaceExW
 
 type _guid = guid.GUID
