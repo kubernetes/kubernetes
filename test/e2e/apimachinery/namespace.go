@@ -17,6 +17,7 @@ limitations under the License.
 package apimachinery
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -26,12 +27,14 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, maxSeconds int) {
@@ -245,5 +248,28 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 	// On hold until etcd3; see #7372
 	ginkgo.It("should always delete fast (ALL of 100 namespaces in 150 seconds) [Feature:ComprehensiveNamespaceDraining]",
 		func() { extinguish(f, 100, 0, 150) })
+
+	ginkgo.It("should patch a Namespace", func() {
+		ginkgo.By("creating a Namespace")
+		namespaceName := "nspatchtest-" + string(uuid.NewUUID())
+		ns, err := f.CreateNamespace(namespaceName, nil)
+		framework.ExpectNoError(err, "failed creating Namespace")
+		namespaceName = ns.ObjectMeta.Name
+
+		ginkgo.By("patching the Namespace")
+		nspatch, err := json.Marshal(map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"labels": map[string]string{"testLabel": "testValue"},
+			},
+		})
+		framework.ExpectNoError(err, "failed to marshal JSON patch data")
+		_, err = f.ClientSet.CoreV1().Namespaces().Patch(namespaceName, types.StrategicMergePatchType, []byte(nspatch))
+		framework.ExpectNoError(err, "failed to patch Namespace")
+
+		ginkgo.By("get the Namespace and ensuring it has the label")
+		namespace, err := f.ClientSet.CoreV1().Namespaces().Get(namespaceName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get Namespace")
+		framework.ExpectEqual(namespace.ObjectMeta.Labels["testLabel"], "testValue", "namespace not patched")
+	})
 
 })
