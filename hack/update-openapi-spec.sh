@@ -86,7 +86,7 @@ fi
 
 kube::log::status "Updating " "${OPENAPI_ROOT_DIR}"
 
-curl -w "\n" -fs "${API_HOST}:${API_PORT}/openapi/v2" | jq -S . > "${OPENAPI_ROOT_DIR}/swagger.json"
+curl -w "\n" -fs "${API_HOST}:${API_PORT}/openapi/v2" | jq -S '.info.version="unversioned"' > "${OPENAPI_ROOT_DIR}/swagger.json"
 
 kube::log::status "SUCCESS"
 
