@@ -38,6 +38,15 @@ const (
 	configFile = "config/performance-config.yaml"
 )
 
+var (
+	defaultMetrics = []string{
+		"scheduler_scheduling_algorithm_predicate_evaluation_seconds",
+		"scheduler_scheduling_algorithm_priority_evaluation_seconds",
+		"scheduler_binding_duration_seconds",
+		"scheduler_e2e_scheduling_duration_seconds",
+	}
+)
+
 // testCase configures a test case to run the scheduler performance test. Users should be able to
 // provide this via a YAML file.
 //
@@ -92,6 +101,7 @@ type testParams struct {
 }
 
 func BenchmarkPerfScheduling(b *testing.B) {
+	dataItems := DataItems{Version: "v1"}
 	tests := getSimpleTestCases(configFile)
 
 	for _, test := range tests {
@@ -100,12 +110,15 @@ func BenchmarkPerfScheduling(b *testing.B) {
 			for feature, flag := range test.FeatureGates {
 				defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, feature, flag)()
 			}
-			perfScheduling(test, b)
+			dataItems.DataItems = append(dataItems.DataItems, perfScheduling(test, b)...)
 		})
+	}
+	if err := dataItems2JSONFile(dataItems, b.Name()); err != nil {
+		klog.Fatalf("%v: unable to write measured data: %v", b.Name(), err)
 	}
 }
 
-func perfScheduling(test testCase, b *testing.B) {
+func perfScheduling(test testCase, b *testing.B) []DataItem {
 	var nodeStrategy testutils.PrepareNodeStrategy = &testutils.TrivialNodePrepareStrategy{}
 	if test.Nodes.NodeAllocatableStrategy != nil {
 		nodeStrategy = test.Nodes.NodeAllocatableStrategy
@@ -180,15 +193,45 @@ func perfScheduling(test testCase, b *testing.B) {
 
 	// start benchmark
 	b.ResetTimer()
+
+	// Start measuring throughput
+	stopCh := make(chan struct{})
+	throughputCollector := newThroughputCollector(podInformer)
+	go throughputCollector.run(stopCh)
+
+	// Scheduling the main workload
 	config = testutils.NewTestPodCreatorConfig()
 	config.AddStrategy(testNamespace, test.PodsToSchedule.Num, testPodStrategy)
 	podCreator = testutils.NewTestPodCreator(clientset, config)
 	podCreator.CreatePods()
 
 	<-completedCh
+	close(stopCh)
 
 	// Note: without this line we're taking the overhead of defer() into account.
 	b.StopTimer()
+
+	setNameLabel := func(dataItem *DataItem) DataItem {
+		if dataItem.Labels == nil {
+			dataItem.Labels = map[string]string{}
+		}
+		dataItem.Labels["Name"] = b.Name()
+		return *dataItem
+	}
+
+	dataItems := []DataItem{
+		setNameLabel(throughputCollector.collect()),
+	}
+
+	for _, metric := range defaultMetrics {
+		dataItem := newPrometheusCollector(metric).collect()
+		if dataItem == nil {
+			continue
+		}
+		dataItems = append(dataItems, setNameLabel(dataItem))
+	}
+
+	return dataItems
 }
 
 func getPodStrategy(pc podCase) testutils.TestPodCreateStrategy {
