@@ -18,16 +18,27 @@ package state
 
 import (
 	"encoding/json"
+	"hash/fnv"
+	"strings"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 )
-
-// CPUManagerCheckpoint struct is used to store cpu/pod assignments in a checkpoint
-type CPUManagerCheckpoint = CPUManagerCheckpointV2
 
 var _ checkpointmanager.Checkpoint = &CPUManagerCheckpointV1{}
 var _ checkpointmanager.Checkpoint = &CPUManagerCheckpointV2{}
+var _ checkpointmanager.Checkpoint = &CPUManagerCheckpoint{}
+
+// CPUManagerCheckpoint struct is used to store cpu/pod assignments in a checkpoint in v2 format
+type CPUManagerCheckpoint struct {
+	PolicyName    string                       `json:"policyName"`
+	DefaultCPUSet string                       `json:"defaultCpuSet"`
+	Entries       map[string]map[string]string `json:"entries,omitempty"`
+	Checksum      checksum.Checksum            `json:"checksum"`
+}
 
 // CPUManagerCheckpointV1 struct is used to store cpu/pod assignments in a checkpoint in v1 format
 type CPUManagerCheckpointV1 struct {
@@ -38,12 +49,7 @@ type CPUManagerCheckpointV1 struct {
 }
 
 // CPUManagerCheckpointV2 struct is used to store cpu/pod assignments in a checkpoint in v2 format
-type CPUManagerCheckpointV2 struct {
-	PolicyName    string                       `json:"policyName"`
-	DefaultCPUSet string                       `json:"defaultCpuSet"`
-	Entries       map[string]map[string]string `json:"entries,omitempty"`
-	Checksum      checksum.Checksum            `json:"checksum"`
-}
+type CPUManagerCheckpointV2 = CPUManagerCheckpoint
 
 // NewCPUManagerCheckpoint returns an instance of Checkpoint
 func NewCPUManagerCheckpoint() *CPUManagerCheckpoint {
@@ -95,11 +101,27 @@ func (cp *CPUManagerCheckpointV1) VerifyChecksum() error {
 		// accept empty checksum for compatibility with old file backend
 		return nil
 	}
+
+	printer := spew.ConfigState{
+		Indent:         " ",
+		SortKeys:       true,
+		DisableMethods: true,
+		SpewKeys:       true,
+	}
+
 	ck := cp.Checksum
 	cp.Checksum = 0
-	err := ck.Verify(cp)
+	object := printer.Sprintf("%#v", cp)
+	object = strings.Replace(object, "CPUManagerCheckpointV1", "CPUManagerCheckpoint", 1)
 	cp.Checksum = ck
-	return err
+
+	hash := fnv.New32a()
+	printer.Fprintf(hash, "%v", object)
+	if cp.Checksum != checksum.Checksum(hash.Sum32()) {
+		return errors.ErrCorruptCheckpoint
+	}
+
+	return nil
 }
 
 // VerifyChecksum verifies that current checksum of checkpoint is valid in v2 format
