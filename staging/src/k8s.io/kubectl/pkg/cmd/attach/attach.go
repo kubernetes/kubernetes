@@ -293,7 +293,7 @@ func (o *AttachOptions) Run() error {
 	}
 
 	if o.Stdin && t.Raw && o.Pod.Spec.RestartPolicy == corev1.RestartPolicyAlways {
-		fmt.Fprintf(o.Out, "Session ended, resume using '%s %s -c %s -i -t' command when the pod is running\n", o.CommandName, o.Pod.Name, containerToAttach.Name)
+		fmt.Fprintf(o.Out, "Session ended, resume using '%s -n %s %s -c %s -i -t' command when the pod is running\n", o.CommandName, o.Pod.Namespace, o.Pod.Name, containerToAttach.Name)
 	}
 	return nil
 }
