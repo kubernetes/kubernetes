@@ -40,6 +40,7 @@ import (
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	"k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 const queueMetricMetadata = `
@@ -255,6 +256,10 @@ func (*fakeFramework) SharedInformerFactory() informers.SharedInformerFactory {
 }
 
 func (*fakeFramework) SnapshotSharedLister() schedulerlisters.SharedLister {
+	return nil
+}
+
+func (*fakeFramework) VolumeBinder() *volumebinder.VolumeBinder {
 	return nil
 }
 

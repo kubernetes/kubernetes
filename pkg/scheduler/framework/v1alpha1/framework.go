@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 const (
@@ -76,6 +77,7 @@ type framework struct {
 
 	clientSet       clientset.Interface
 	informerFactory informers.SharedInformerFactory
+	volumeBinder    *volumebinder.VolumeBinder
 
 	metricsRecorder *metricsRecorder
 
@@ -116,6 +118,7 @@ type frameworkOptions struct {
 	informerFactory      informers.SharedInformerFactory
 	snapshotSharedLister schedulerlisters.SharedLister
 	metricsRecorder      *metricsRecorder
+	volumeBinder         *volumebinder.VolumeBinder
 	runAllFilters        bool
 }
 
@@ -158,6 +161,13 @@ func withMetricsRecorder(recorder *metricsRecorder) Option {
 	}
 }
 
+// WithVolumeBinder sets volume binder for the scheduling framework.
+func WithVolumeBinder(binder *volumebinder.VolumeBinder) Option {
+	return func(o *frameworkOptions) {
+		o.volumeBinder = binder
+	}
+}
+
 var defaultFrameworkOptions = frameworkOptions{
 	metricsRecorder: newMetricsRecorder(1000, time.Second),
 }
@@ -178,6 +188,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		waitingPods:           newWaitingPodsMap(),
 		clientSet:             options.clientSet,
 		informerFactory:       options.informerFactory,
+		volumeBinder:          options.volumeBinder,
 		metricsRecorder:       options.metricsRecorder,
 		runAllFilters:         options.runAllFilters,
 	}
@@ -891,6 +902,11 @@ func (f *framework) ClientSet() clientset.Interface {
 // SharedInformerFactory returns a shared informer factory.
 func (f *framework) SharedInformerFactory() informers.SharedInformerFactory {
 	return f.informerFactory
+}
+
+// VolumeBinder returns the volume binder used by scheduler.
+func (f *framework) VolumeBinder() *volumebinder.VolumeBinder {
+	return f.volumeBinder
 }
 
 func (f *framework) pluginsNeeded(plugins *config.Plugins) map[string]config.Plugin {
