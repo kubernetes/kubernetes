@@ -92,7 +92,7 @@ func (s *preFilterState) updateWithPod(updatedPod, pod *v1.Pod, node *v1.Node, m
 	affinity := pod.Spec.Affinity
 	podNodeName := updatedPod.Spec.NodeName
 	if affinity != nil && len(podNodeName) > 0 {
-		if affinity.PodAffinity == nil {
+		if affinity.PodAffinity != nil {
 			affinityTerms, err := getAffinityTerms(pod, schedutil.GetPodAffinityTerms(affinity.PodAffinity))
 			if err != nil {
 				return fmt.Errorf("error in getting affinity terms of Pod %v: %v", pod.Name, err)

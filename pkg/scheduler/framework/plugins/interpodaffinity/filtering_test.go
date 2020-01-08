@@ -1719,12 +1719,14 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		pendingPod   *v1.Pod
-		addedPod     *v1.Pod
-		existingPods []*v1.Pod
-		nodes        []*v1.Node
-		services     []*v1.Service
+		name                 string
+		pendingPod           *v1.Pod
+		addedPod             *v1.Pod
+		existingPods         []*v1.Pod
+		nodes                []*v1.Node
+		services             []*v1.Service
+		expectedAntiAffinity topologyToMatchedTermCount
+		expectedAffinity     topologyToMatchedTermCount
 	}{
 		{
 			name: "no affinity exist",
@@ -1748,11 +1750,18 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: label2}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: label3}},
 			},
+			expectedAntiAffinity: topologyToMatchedTermCount{},
+			expectedAffinity:     topologyToMatchedTermCount{},
 		},
 		{
 			name: "preFilterState anti-affinity terms are updated correctly after adding and removing a pod",
 			pendingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pending", Labels: selector1},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: antiAffinityFooBar,
+					},
+				},
 			},
 			existingPods: []*v1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
@@ -1781,11 +1790,20 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: label2}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: label3}},
 			},
+			expectedAntiAffinity: topologyToMatchedTermCount{
+				{key: "region", value: "r1"}: 2,
+			},
+			expectedAffinity: topologyToMatchedTermCount{},
 		},
 		{
 			name: "preFilterState anti-affinity terms are updated correctly after adding and removing a pod",
 			pendingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pending", Labels: selector1},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: antiAffinityComplex,
+					},
+				},
 			},
 			existingPods: []*v1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
@@ -1815,11 +1833,22 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: label2}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: label3}},
 			},
+			expectedAntiAffinity: topologyToMatchedTermCount{
+				{key: "region", value: "r1"}: 2,
+				{key: "zone", value: "z11"}:  2,
+				{key: "zone", value: "z21"}:  1,
+			},
+			expectedAffinity: topologyToMatchedTermCount{},
 		},
 		{
 			name: "preFilterState matching pod affinity and anti-affinity are updated correctly after adding and removing a pod",
 			pendingPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pending", Labels: selector1},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						PodAffinity: affinityComplex,
+					},
+				},
 			},
 			existingPods: []*v1.Pod{
 				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
@@ -1849,6 +1878,11 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: label1}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: label2}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: label3}},
+			},
+			expectedAntiAffinity: topologyToMatchedTermCount{},
+			expectedAffinity: topologyToMatchedTermCount{
+				{key: "region", value: "r1"}: 2,
+				{key: "zone", value: "z11"}:  2,
 			},
 		},
 	}
@@ -1887,6 +1921,19 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 			// Add test.addedPod to state1 and verify it is equal to allPodsState.
 			if err := ipa.AddPod(context.Background(), cycleState, test.pendingPod, test.addedPod, snapshot.NodeInfoMap[test.addedPod.Spec.NodeName]); err != nil {
 				t.Errorf("error adding pod to meta: %v", err)
+			}
+
+			newState, err := getPreFilterState(cycleState)
+			if err != nil {
+				t.Errorf("failed to get preFilterState from cycleState: %v", err)
+			}
+
+			if !reflect.DeepEqual(newState.topologyToMatchedAntiAffinityTerms, test.expectedAntiAffinity) {
+				t.Errorf("State is not equal, got: %v, want: %v", newState.topologyToMatchedAntiAffinityTerms, test.expectedAntiAffinity)
+			}
+
+			if !reflect.DeepEqual(newState.topologyToMatchedAffinityTerms, test.expectedAffinity) {
+				t.Errorf("State is not equal, got: %v, want: %v", newState.topologyToMatchedAffinityTerms, test.expectedAffinity)
 			}
 
 			if !reflect.DeepEqual(allPodsState, state) {
