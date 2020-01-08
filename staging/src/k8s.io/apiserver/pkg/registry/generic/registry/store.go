@@ -1009,6 +1009,9 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 	if workersNumber < 1 {
 		workersNumber = 1
 	}
+	if workersNumber > len(items) {
+		workersNumber = len(items)
+	}
 	wg := sync.WaitGroup{}
 	toProcess := make(chan int, 2*workersNumber)
 	errs := make(chan error, workersNumber+1)
@@ -1047,12 +1050,22 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 		}()
 	}
 	wg.Wait()
-	select {
-	case err := <-errs:
-		return nil, err
-	default:
-		return listObj, nil
+	errorsSeen := 0
+	var lastErr error
+aggregating:
+	for {
+		select {
+		case err := <-errs:
+			errorsSeen++
+			lastErr = err
+		default:
+			break aggregating
+		}
 	}
+	if errorsSeen > 0 {
+		return nil, fmt.Errorf("there have been %d errors. latest err: %v", errorsSeen, lastErr)
+	}
+	return listObj, nil
 }
 
 // finalizeDelete runs the Store's AfterDelete hook if runHooks is set and
