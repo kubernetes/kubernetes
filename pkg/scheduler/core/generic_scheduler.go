@@ -44,6 +44,7 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	"k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
@@ -305,7 +306,7 @@ func (g *genericScheduler) Preempt(ctx context.Context, state *framework.CycleSt
 	if !ok || fitError == nil {
 		return nil, nil, nil, nil
 	}
-	if !podEligibleToPreemptOthers(pod, g.nodeInfoSnapshot.NodeInfoMap, g.enableNonPreempting) {
+	if !podEligibleToPreemptOthers(pod, g.nodeInfoSnapshot.NodeInfos(), g.enableNonPreempting) {
 		klog.V(5).Infof("Pod %v/%v is not eligible for more preemption.", pod.Namespace, pod.Name)
 		return nil, nil, nil, nil
 	}
@@ -365,7 +366,7 @@ func (g *genericScheduler) processPreemptionWithExtenders(
 				newNodeToVictims, err := extender.ProcessPreemption(
 					pod,
 					nodeToVictims,
-					g.nodeInfoSnapshot.NodeInfoMap,
+					g.nodeInfoSnapshot.NodeInfos(),
 				)
 				if err != nil {
 					if extender.IsIgnorable() {
@@ -504,7 +505,7 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 			if !extender.IsInterested(pod) {
 				continue
 			}
-			filteredList, failedMap, err := extender.Filter(pod, filtered, g.nodeInfoSnapshot.NodeInfoMap)
+			filteredList, failedMap, err := extender.Filter(pod, filtered)
 			if err != nil {
 				if extender.IsIgnorable() {
 					klog.Warningf("Skipping extender %v as it returned error %v and has ignorable flag set",
@@ -1044,14 +1045,14 @@ func nodesWherePreemptionMightHelp(nodes []*schedulernodeinfo.NodeInfo, fitErr *
 // considered for preemption.
 // We look at the node that is nominated for this pod and as long as there are
 // terminating pods on the node, we don't consider this for preempting more pods.
-func podEligibleToPreemptOthers(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, enableNonPreempting bool) bool {
+func podEligibleToPreemptOthers(pod *v1.Pod, nodeInfos listers.NodeInfoLister, enableNonPreempting bool) bool {
 	if enableNonPreempting && pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
 		klog.V(5).Infof("Pod %v/%v is not eligible for preemption because it has a preemptionPolicy of %v", pod.Namespace, pod.Name, v1.PreemptNever)
 		return false
 	}
 	nomNodeName := pod.Status.NominatedNodeName
 	if len(nomNodeName) > 0 {
-		if nodeInfo, found := nodeNameToInfo[nomNodeName]; found {
+		if nodeInfo, _ := nodeInfos.Get(nomNodeName); nodeInfo != nil {
 			podPriority := podutil.GetPodPriority(pod)
 			for _, p := range nodeInfo.Pods() {
 				if p.DeletionTimestamp != nil && podutil.GetPodPriority(p) < podPriority {
