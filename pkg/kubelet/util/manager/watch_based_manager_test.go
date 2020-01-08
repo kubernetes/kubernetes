@@ -19,6 +19,7 @@ package manager
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -166,10 +167,17 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 	}
 
 	// Next registrations shouldn't trigger any new actions.
-	for i := 0; i < 20; i++ {
-		store.AddReference("ns", "name")
-		store.DeleteReference("ns", "name")
+	wg := sync.WaitGroup{}
+	iterations := 20
+	wg.Add(iterations)
+	for i := 0; i < iterations; i++ {
+		go func() {
+			store.AddReference("ns", "name")
+			store.DeleteReference("ns", "name")
+			wg.Done()
+		}()
 	}
+	wg.Wait()
 	actions := fakeClient.Actions()
 	assert.Equal(t, 2, len(actions), "unexpected actions: %#v", actions)
 
