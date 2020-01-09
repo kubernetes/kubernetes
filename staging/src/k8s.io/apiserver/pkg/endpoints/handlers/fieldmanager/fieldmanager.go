@@ -33,6 +33,10 @@ import (
 // TODO(jennybuckley): Determine if this is really the best value. Ideally we wouldn't unnecessarily merge too many entries.
 const DefaultMaxUpdateManagers int = 10
 
+// DefaultTrackOnCreateProbability defines the default probability that the field management of an object
+// starts being tracked from the object's creation, instead of from the first time the object is applied to.
+const DefaultTrackOnCreateProbability float32 = 0.11494204485329620070
+
 // Managed groups a fieldpath.ManagedFields together with the timestamps associated with each operation.
 type Managed interface {
 	// Fields gets the fieldpath.ManagedFields.
@@ -92,7 +96,7 @@ func newDefaultFieldManager(f Manager, objectCreater runtime.ObjectCreater, kind
 	f = NewStripMetaManager(f)
 	f = NewBuildManagerInfoManager(f, kind.GroupVersion())
 	f = NewCapManagersManager(f, DefaultMaxUpdateManagers)
-	f = NewSkipNonAppliedManager(f, objectCreater, kind)
+	f = NewProbabilisticSkipNonAppliedManager(f, objectCreater, kind, DefaultTrackOnCreateProbability)
 	return NewFieldManager(f)
 }
 
