@@ -294,7 +294,7 @@ func (mounter *SafeFormatAndMount) checkAndRepairXfsFilesystem(source string) er
 			klog.Warningf("Filesystem corruption was detected for %s, running xfs_repair to repair", source)
 			out, err := mounter.Exec.Command("xfs_repair", args...).CombinedOutput()
 			if err != nil {
-				return fmt.Errorf("'xfs_repair' found errors on device %s but could not correct them: %s\n", source, out)
+				return NewMountError(HasFilesystemErrors, "'xfs_repair' found errors on device %s but could not correct them: %s\n", source, out)
 			} else {
 				klog.Infof("Device %s has errors which were corrected by xfs_repair.", source)
 				return nil
