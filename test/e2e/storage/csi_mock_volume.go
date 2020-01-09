@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
@@ -356,13 +355,6 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			nodeSelectorKey := fmt.Sprintf("attach-limit-csi-%s", f.Namespace.Name)
 			init(testParameters{nodeSelectorKey: nodeSelectorKey, attachLimit: 2})
 			defer cleanup()
-			nodeName := m.config.ClientNodeName
-			attachKey := v1.ResourceName(volumeutil.GetCSIAttachLimitKey(m.provisioner))
-
-			nodeAttachLimit, err := checkNodeForLimits(nodeName, attachKey, m.cs)
-			framework.ExpectNoError(err, "while fetching node %v", err)
-
-			gomega.Expect(nodeAttachLimit).To(gomega.Equal(2))
 
 			_, _, pod1 := createPod()
 			gomega.Expect(pod1).NotTo(gomega.BeNil(), "while creating first pod")
