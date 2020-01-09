@@ -437,19 +437,18 @@ func (cache *schedulerCache) updatePod(oldPod, newPod *v1.Pod) error {
 }
 
 // Assumes that lock is already acquired.
+// Removes a pod from the cached node info. When a node is removed, some pod
+// deletion events might arrive later. This is not a problem, as the pods in
+// the node are assumed to be removed already.
 func (cache *schedulerCache) removePod(pod *v1.Pod) error {
 	n, ok := cache.nodes[pod.Spec.NodeName]
 	if !ok {
-		return fmt.Errorf("node %v is not found", pod.Spec.NodeName)
+		return nil
 	}
 	if err := n.info.RemovePod(pod); err != nil {
 		return err
 	}
-	if len(n.info.Pods()) == 0 && n.info.Node() == nil {
-		cache.removeNodeInfoFromList(pod.Spec.NodeName)
-	} else {
-		cache.moveNodeInfoToHead(pod.Spec.NodeName)
-	}
+	cache.moveNodeInfoToHead(pod.Spec.NodeName)
 	return nil
 }
 
@@ -563,6 +562,8 @@ func (cache *schedulerCache) IsAssumedPod(pod *v1.Pod) (bool, error) {
 	return b, nil
 }
 
+// GetPod might return a pod for which its node has already been deleted from
+// the main cache. This is useful to properly process pod update events.
 func (cache *schedulerCache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
 	key, err := schedulernodeinfo.GetPodKey(pod)
 	if err != nil {
@@ -617,27 +618,21 @@ func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) error {
 	return n.info.SetNode(newNode)
 }
 
+// RemoveNode removes a node from the cache.
+// Some nodes might still have pods because their deletion events didn't arrive
+// yet. For most intents and purposes, those pods are removed from the cache,
+// having it's source of truth in the cached nodes.
+// However, some information on pods (assumedPods, podStates) persist. These
+// caches will be eventually consistent as pod deletion events arrive.
 func (cache *schedulerCache) RemoveNode(node *v1.Node) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
-	n, ok := cache.nodes[node.Name]
+	_, ok := cache.nodes[node.Name]
 	if !ok {
 		return fmt.Errorf("node %v is not found", node.Name)
 	}
-	if err := n.info.RemoveNode(node); err != nil {
-		return err
-	}
-	// We remove NodeInfo for this node only if there aren't any pods on this node.
-	// We can't do it unconditionally, because notifications about pods are delivered
-	// in a different watch, and thus can potentially be observed later, even though
-	// they happened before node removal.
-	if len(n.info.Pods()) == 0 && n.info.Node() == nil {
-		cache.removeNodeInfoFromList(node.Name)
-	} else {
-		cache.moveNodeInfoToHead(node.Name)
-	}
-
+	cache.removeNodeInfoFromList(node.Name)
 	if err := cache.nodeTree.removeNode(node); err != nil {
 		return err
 	}
@@ -715,7 +710,7 @@ func (cache *schedulerCache) cleanupAssumedPods(now time.Time) {
 	for key := range cache.assumedPods {
 		ps, ok := cache.podStates[key]
 		if !ok {
-			panic("Key found in assumed set but not in podStates. Potentially a logical error.")
+			klog.Fatal("Key found in assumed set but not in podStates. Potentially a logical error.")
 		}
 		if !ps.bindingFinished {
 			klog.V(3).Infof("Couldn't expire cache for pod %v/%v. Binding is still in progress.",
