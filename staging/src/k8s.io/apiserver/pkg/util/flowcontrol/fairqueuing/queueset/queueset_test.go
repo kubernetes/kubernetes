@@ -243,3 +243,48 @@ func TestTimeout(t *testing.T) {
 		{1001001001, 5, 100, time.Second, time.Second},
 	}, time.Second*10, true, false, clk, counter)
 }
+
+func TestContextCancel(t *testing.T) {
+	now := time.Now()
+	clk, counter := clock.NewFakeEventClock(now, 0, nil)
+	qsf := NewQueueSetFactory(clk, counter)
+	qCfg := fq.QueuingConfig{
+		Name:             "TestTimeout",
+		DesiredNumQueues: 11,
+		QueueLengthLimit: 11,
+		HandSize:         1,
+		RequestWaitLimit: 15 * time.Second,
+	}
+	qsc, err := qsf.QualifyQueuingConfig(qCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	qs := qsc.GetQueueSet(fq.DispatchingConfig{ConcurrencyLimit: 1})
+	counter.Add(1) // account for the goroutine running this test
+	ctx1 := context.Background()
+	another1, exec1, cleanup1 := qs.Wait(ctx1, 1, "test", "one")
+	if another1 || !exec1 {
+		t.Errorf("Unexpected: another1=%v, exec1=%v", another1, exec1)
+		return
+	}
+	defer cleanup1()
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	tBefore := time.Now()
+	go func() {
+		time.Sleep(time.Second)
+		cancel2()
+	}()
+	another2, exec2, cleanup2 := qs.Wait(ctx2, 2, "test", "two")
+	tAfter := time.Now()
+	if another2 || exec2 {
+		t.Errorf("Unexpected: another2=%v, exec2=%v", another2, exec2)
+		if exec2 {
+			defer cleanup2()
+		}
+	} else {
+		dt := tAfter.Sub(tBefore)
+		if dt < time.Second || dt > 2*time.Second {
+			t.Errorf("Unexpected: dt=%d", dt)
+		}
+	}
+}
