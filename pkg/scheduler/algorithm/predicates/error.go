@@ -19,7 +19,7 @@ package predicates
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 var (
@@ -37,8 +37,6 @@ var (
 	ErrPodNotMatchHostName = NewPredicateFailureError("HostName", "node(s) didn't match the requested hostname")
 	// ErrPodNotFitsHostPorts is used for PodFitsHostPorts predicate error.
 	ErrPodNotFitsHostPorts = NewPredicateFailureError("PodFitsHostPorts", "node(s) didn't have free ports for the requested pod ports")
-	// ErrServiceAffinityViolated is used for CheckServiceAffinity predicate error.
-	ErrServiceAffinityViolated = NewPredicateFailureError("CheckServiceAffinity", "node(s) didn't match service affinity")
 	// ErrNodeUnderMemoryPressure is used for NodeUnderMemoryPressure predicate error.
 	ErrNodeUnderMemoryPressure = NewPredicateFailureError("NodeUnderMemoryPressure", "node(s) had memory pressure")
 	// ErrNodeUnderDiskPressure is used for NodeUnderDiskPressure predicate error.
