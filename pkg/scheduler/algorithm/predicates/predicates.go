@@ -108,6 +108,10 @@ func Ordering() []string {
 	return predicatesOrdering
 }
 
+// Metadata interface represents anything that can access a predicate metadata.
+// DEPRECATED.
+type Metadata interface{}
+
 // FitPredicate is a function that indicates if a pod fits into an existing node.
 // The failure information is given by the error.
 type FitPredicate func(pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error)
@@ -278,8 +282,10 @@ func PodFitsHostPortsPredicate(pod *v1.Pod, meta []*v1.ContainerPort, nodeInfo *
 	existingPorts := nodeInfo.UsedPorts()
 
 	// try to see whether existingPorts and  wantPorts will conflict or not
-	if portsConflict(existingPorts, wantPorts) {
-		return false, []PredicateFailureReason{ErrPodNotFitsHostPorts}, nil
+	for _, cp := range wantPorts {
+		if existingPorts.CheckConflict(cp.HostIP, string(cp.Protocol), cp.HostPort) {
+			return false, []PredicateFailureReason{ErrPodNotFitsHostPorts}, nil
+		}
 	}
 
 	return true, nil, nil
