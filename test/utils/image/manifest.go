@@ -122,6 +122,7 @@ var (
 	gcrReleaseRegistry      = registry.GcrReleaseRegistry
 	invalidRegistry         = registry.InvalidRegistry
 	sampleRegistry          = registry.SampleRegistry
+	stagingRegistry         = "gcr.io/k8s-staging-e2e-test-images"
 	microsoftRegistry       = registry.MicrosoftRegistry
 
 	imageConfigs, originalImageConfigs = initImageConfigs()
@@ -233,16 +234,16 @@ func initImageConfigs() (map[int]Config, map[int]Config) {
 	configs[EchoServer] = Config{promoterE2eRegistry, "echoserver", "2.3"}
 	configs[Etcd] = Config{gcEtcdRegistry, "etcd", "3.4.13-0"}
 	configs[GlusterDynamicProvisioner] = Config{promoterE2eRegistry, "glusterdynamic-provisioner", "v1.0"}
-	configs[Httpd] = Config{gcHttpdRegistry, "httpd", "2.4.38-alpine"}
-	configs[HttpdNew] = Config{gcHttpdRegistry, "httpd", "2.4.39-alpine"}
+	configs[Httpd] = Config{stagingRegistry, "httpd", "2.4.38-1"}
+	configs[HttpdNew] = Config{stagingRegistry, "httpd", "2.4.39-1"}
 	configs[InvalidRegistryImage] = Config{invalidRegistry, "alpine", "3.1"}
 	configs[IpcUtils] = Config{promoterE2eRegistry, "ipc-utils", "1.2"}
 	configs[JessieDnsutils] = Config{promoterE2eRegistry, "jessie-dnsutils", "1.4"}
 	configs[Kitten] = Config{promoterE2eRegistry, "kitten", "1.4"}
 	configs[Nautilus] = Config{promoterE2eRegistry, "nautilus", "1.4"}
 	configs[NFSProvisioner] = Config{sigStorageRegistry, "nfs-provisioner", "v2.2.2"}
-	configs[Nginx] = Config{promoterE2eRegistry, "nginx", "1.14-alpine"}
-	configs[NginxNew] = Config{promoterE2eRegistry, "nginx", "1.15-alpine"}
+	configs[Nginx] = Config{stagingRegistry, "nginx", "1.14-1"}
+	configs[NginxNew] = Config{stagingRegistry, "nginx", "1.15-1"}
 	configs[NodePerfNpbEp] = Config{promoterE2eRegistry, "node-perf/npb-ep", "1.1"}
 	configs[NodePerfNpbIs] = Config{promoterE2eRegistry, "node-perf/npb-is", "1.1"}
 	configs[NodePerfTfWideDeep] = Config{promoterE2eRegistry, "node-perf/tf-wide-deep", "1.1"}
