@@ -176,7 +176,7 @@ func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan
 
 	// If additional API servers are added, they should be gated.
 	apiExtensionsConfig, err := createAPIExtensionsConfig(*kubeAPIServerConfig.GenericConfig, kubeAPIServerConfig.ExtraConfig.VersionedInformers, pluginInitializer, completedOptions.ServerRunOptions, completedOptions.MasterCount,
-		serviceResolver, webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, kubeAPIServerConfig.GenericConfig.LoopbackClientConfig))
+		serviceResolver, webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, kubeAPIServerConfig.GenericConfig.EgressSelector, kubeAPIServerConfig.GenericConfig.LoopbackClientConfig))
 	if err != nil {
 		return nil, err
 	}
@@ -491,7 +491,7 @@ func buildGenericConfig(
 	}
 	serviceResolver = buildServiceResolver(s.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
 
-	authInfoResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, genericConfig.LoopbackClientConfig)
+	authInfoResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, genericConfig.EgressSelector, genericConfig.LoopbackClientConfig)
 
 	lastErr = s.Audit.ApplyTo(
 		genericConfig,
@@ -507,7 +507,7 @@ func buildGenericConfig(
 		return
 	}
 
-	pluginInitializers, admissionPostStartHook, err = admissionConfig.New(proxyTransport, serviceResolver)
+	pluginInitializers, admissionPostStartHook, err = admissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver)
 	if err != nil {
 		lastErr = fmt.Errorf("failed to create admission plugin initializer: %v", err)
 		return
