@@ -189,6 +189,14 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Patch(secretCreatedName, types.StrategicMergePatchType, []byte(secretPatch))
 		framework.ExpectNoError(err, "failed to patch secret")
 
+		secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(secretCreatedName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get secret")
+
+		secretDecodedstring, err := base64.StdEncoding.DecodeString(string(secret.Data["key"]))
+		framework.ExpectNoError(err, "failed to decode secret from Base64")
+
+		framework.ExpectEqual(string(secretDecodedstring), "value1", "found secret, but the data wasn't updated from the patch")
+
 		ginkgo.By("deleting the secret using a LabelSelector")
 		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{
 			LabelSelector: "testsecret=true",
