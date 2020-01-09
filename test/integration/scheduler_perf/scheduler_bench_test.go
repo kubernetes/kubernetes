@@ -420,9 +420,6 @@ func benchmarkScheduling(numExistingPods, minPods int,
 	nodeStrategies []testutils.CountToStrategy,
 	testPodStrategy testutils.TestPodCreateStrategy,
 	b *testing.B) {
-	if b.N < minPods {
-		b.N = minPods
-	}
 	finalFunc, podInformer, clientset := mustSetupScheduler()
 	defer finalFunc()
 
