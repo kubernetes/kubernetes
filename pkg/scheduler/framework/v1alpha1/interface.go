@@ -155,6 +155,43 @@ func NewStatus(code Code, reasons ...string) *Status {
 	}
 }
 
+// PluginToStatus maps plugin name to status. Currently used to identify which Filter plugin
+// returned which status.
+type PluginToStatus map[string]*Status
+
+// Merge merges the statuses in the map into one. The resulting status code have the following
+// precedence: Error, UnschedulableAndUnresolvable, Unschedulable.
+func (p PluginToStatus) Merge() *Status {
+	if len(p) == 0 {
+		return nil
+	}
+
+	finalStatus := NewStatus(Success)
+	var hasError, hasUnschedulableAndUnresolvable, hasUnschedulable bool
+	for _, s := range p {
+		if s.Code() == Error {
+			hasError = true
+		} else if s.Code() == UnschedulableAndUnresolvable {
+			hasUnschedulableAndUnresolvable = true
+		} else if s.Code() == Unschedulable {
+			hasUnschedulable = true
+		}
+		finalStatus.code = s.Code()
+		for _, r := range s.reasons {
+			finalStatus.AppendReason(r)
+		}
+	}
+
+	if hasError {
+		finalStatus.code = Error
+	} else if hasUnschedulableAndUnresolvable {
+		finalStatus.code = UnschedulableAndUnresolvable
+	} else if hasUnschedulable {
+		finalStatus.code = Unschedulable
+	}
+	return finalStatus
+}
+
 // WaitingPod represents a pod currently waiting in the permit phase.
 type WaitingPod interface {
 	// GetPod returns a reference to the waiting pod.
@@ -390,7 +427,7 @@ type Framework interface {
 	// preemption, we may pass a copy of the original nodeInfo object that has some pods
 	// removed from it to evaluate the possibility of preempting them to
 	// schedule the target pod.
-	RunFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status
+	RunFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) PluginToStatus
 
 	// RunPreFilterExtensionAddPod calls the AddPod interface for the set of configured
 	// PreFilter plugins. It returns directly if any of the plugins return any

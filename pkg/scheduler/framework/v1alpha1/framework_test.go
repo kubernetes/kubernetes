@@ -601,6 +601,7 @@ func TestFilterPlugins(t *testing.T) {
 		name          string
 		plugins       []*TestPlugin
 		wantStatus    *Status
+		wantStatusMap PluginToStatus
 		runAllFilters bool
 	}{
 		{
@@ -611,7 +612,8 @@ func TestFilterPlugins(t *testing.T) {
 					inj:  injectedResult{FilterStatus: int(Success)},
 				},
 			},
-			wantStatus: nil,
+			wantStatus:    nil,
+			wantStatusMap: PluginToStatus{},
 		},
 		{
 			name: "ErrorFilter",
@@ -621,7 +623,8 @@ func TestFilterPlugins(t *testing.T) {
 					inj:  injectedResult{FilterStatus: int(Error)},
 				},
 			},
-			wantStatus: NewStatus(Error, `running "TestPlugin" filter plugin for pod "": injected filter status`),
+			wantStatus:    NewStatus(Error, `running "TestPlugin" filter plugin for pod "": injected filter status`),
+			wantStatusMap: PluginToStatus{"TestPlugin": NewStatus(Error, `running "TestPlugin" filter plugin for pod "": injected filter status`)},
 		},
 		{
 			name: "UnschedulableFilter",
@@ -631,7 +634,8 @@ func TestFilterPlugins(t *testing.T) {
 					inj:  injectedResult{FilterStatus: int(Unschedulable)},
 				},
 			},
-			wantStatus: NewStatus(Unschedulable, "injected filter status"),
+			wantStatus:    NewStatus(Unschedulable, "injected filter status"),
+			wantStatusMap: PluginToStatus{"TestPlugin": NewStatus(Unschedulable, "injected filter status")},
 		},
 		{
 			name: "UnschedulableAndUnresolvableFilter",
@@ -642,7 +646,8 @@ func TestFilterPlugins(t *testing.T) {
 						FilterStatus: int(UnschedulableAndUnresolvable)},
 				},
 			},
-			wantStatus: NewStatus(UnschedulableAndUnresolvable, "injected filter status"),
+			wantStatus:    NewStatus(UnschedulableAndUnresolvable, "injected filter status"),
+			wantStatusMap: PluginToStatus{"TestPlugin": NewStatus(UnschedulableAndUnresolvable, "injected filter status")},
 		},
 		// followings tests cover multiple-plugins scenarios
 		{
@@ -658,7 +663,8 @@ func TestFilterPlugins(t *testing.T) {
 					inj:  injectedResult{FilterStatus: int(Error)},
 				},
 			},
-			wantStatus: NewStatus(Error, `running "TestPlugin1" filter plugin for pod "": injected filter status`),
+			wantStatus:    NewStatus(Error, `running "TestPlugin1" filter plugin for pod "": injected filter status`),
+			wantStatusMap: PluginToStatus{"TestPlugin1": NewStatus(Error, `running "TestPlugin1" filter plugin for pod "": injected filter status`)},
 		},
 		{
 			name: "SuccessAndSuccessFilters",
@@ -673,7 +679,8 @@ func TestFilterPlugins(t *testing.T) {
 					inj:  injectedResult{FilterStatus: int(Success)},
 				},
 			},
-			wantStatus: nil,
+			wantStatus:    nil,
+			wantStatusMap: PluginToStatus{},
 		},
 		{
 			name: "ErrorAndSuccessFilters",
@@ -687,7 +694,8 @@ func TestFilterPlugins(t *testing.T) {
 					inj:  injectedResult{FilterStatus: int(Success)},
 				},
 			},
-			wantStatus: NewStatus(Error, `running "TestPlugin1" filter plugin for pod "": injected filter status`),
+			wantStatus:    NewStatus(Error, `running "TestPlugin1" filter plugin for pod "": injected filter status`),
+			wantStatusMap: PluginToStatus{"TestPlugin1": NewStatus(Error, `running "TestPlugin1" filter plugin for pod "": injected filter status`)},
 		},
 		{
 			name: "SuccessAndErrorFilters",
@@ -702,7 +710,8 @@ func TestFilterPlugins(t *testing.T) {
 					inj:  injectedResult{FilterStatus: int(Error)},
 				},
 			},
-			wantStatus: NewStatus(Error, `running "TestPlugin2" filter plugin for pod "": injected filter status`),
+			wantStatus:    NewStatus(Error, `running "TestPlugin2" filter plugin for pod "": injected filter status`),
+			wantStatusMap: PluginToStatus{"TestPlugin2": NewStatus(Error, `running "TestPlugin2" filter plugin for pod "": injected filter status`)},
 		},
 		{
 			name: "SuccessAndUnschedulableFilters",
@@ -717,7 +726,8 @@ func TestFilterPlugins(t *testing.T) {
 					inj:  injectedResult{FilterStatus: int(Unschedulable)},
 				},
 			},
-			wantStatus: NewStatus(Unschedulable, "injected filter status"),
+			wantStatus:    NewStatus(Unschedulable, "injected filter status"),
+			wantStatusMap: PluginToStatus{"TestPlugin2": NewStatus(Unschedulable, "injected filter status")},
 		},
 		{
 			name: "SuccessFilterWithRunAllFilters",
@@ -729,6 +739,7 @@ func TestFilterPlugins(t *testing.T) {
 			},
 			runAllFilters: true,
 			wantStatus:    nil,
+			wantStatusMap: PluginToStatus{},
 		},
 		{
 			name: "ErrorAndErrorFilters",
@@ -745,6 +756,7 @@ func TestFilterPlugins(t *testing.T) {
 			},
 			runAllFilters: true,
 			wantStatus:    NewStatus(Error, `running "TestPlugin1" filter plugin for pod "": injected filter status`),
+			wantStatusMap: PluginToStatus{"TestPlugin1": NewStatus(Error, `running "TestPlugin1" filter plugin for pod "": injected filter status`)},
 		},
 		{
 			name: "ErrorAndErrorFilters",
@@ -761,6 +773,10 @@ func TestFilterPlugins(t *testing.T) {
 			},
 			runAllFilters: true,
 			wantStatus:    NewStatus(UnschedulableAndUnresolvable, "injected filter status", "injected filter status"),
+			wantStatusMap: PluginToStatus{
+				"TestPlugin1": NewStatus(UnschedulableAndUnresolvable, "injected filter status"),
+				"TestPlugin2": NewStatus(Unschedulable, "injected filter status"),
+			},
 		},
 	}
 
@@ -787,10 +803,15 @@ func TestFilterPlugins(t *testing.T) {
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
-			status := f.RunFilterPlugins(context.TODO(), nil, pod, nil)
-			if !reflect.DeepEqual(status, tt.wantStatus) {
-				t.Errorf("Wrong status code. got: %v, want:%v", status, tt.wantStatus)
+			gotStatusMap := f.RunFilterPlugins(context.TODO(), nil, pod, nil)
+			gotStatus := gotStatusMap.Merge()
+			if !reflect.DeepEqual(gotStatus, tt.wantStatus) {
+				t.Errorf("wrong status code. got: %v, want:%v", gotStatus, tt.wantStatus)
 			}
+			if !reflect.DeepEqual(gotStatusMap, tt.wantStatusMap) {
+				t.Errorf("wrong status map. got: %+v, want: %+v", gotStatusMap, tt.wantStatusMap)
+			}
+
 		})
 	}
 }

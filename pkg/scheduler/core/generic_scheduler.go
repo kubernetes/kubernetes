@@ -610,7 +610,8 @@ func (g *genericScheduler) podFitsOnNode(
 			break
 		}
 
-		status = g.framework.RunFilterPlugins(ctx, stateToUse, pod, nodeInfoToUse)
+		statusMap := g.framework.RunFilterPlugins(ctx, stateToUse, pod, nodeInfoToUse)
+		status = statusMap.Merge()
 		if !status.IsSuccess() && !status.IsUnschedulable() {
 			return false, status, status.AsError()
 		}

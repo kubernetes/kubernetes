@@ -195,7 +195,7 @@ func (*fakeFramework) RunPreFilterPlugins(ctx context.Context, state *framework.
 	return nil
 }
 
-func (*fakeFramework) RunFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+func (*fakeFramework) RunFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) framework.PluginToStatus {
 	return nil
 }
 

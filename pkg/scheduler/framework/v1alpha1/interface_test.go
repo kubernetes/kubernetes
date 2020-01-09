@@ -90,3 +90,33 @@ func assertStatusCode(t *testing.T, code Code, value int) {
 		t.Errorf("Status code %q should have a value of %v but got %v", code.String(), value, int(code))
 	}
 }
+
+func TestPluginToStatusMerge(t *testing.T) {
+	tests := []struct {
+		statusMap PluginToStatus
+		wantCode  Code
+	}{
+		{
+			statusMap: PluginToStatus{"p1": NewStatus(Error), "p2": NewStatus(Unschedulable)},
+			wantCode:  Error,
+		},
+		{
+			statusMap: PluginToStatus{"p1": NewStatus(Success), "p2": NewStatus(Unschedulable)},
+			wantCode:  Unschedulable,
+		},
+		{
+			statusMap: PluginToStatus{"p1": NewStatus(Success), "p2": NewStatus(UnschedulableAndUnresolvable), "p3": NewStatus(Unschedulable)},
+			wantCode:  UnschedulableAndUnresolvable,
+		},
+		{
+			wantCode: Success,
+		},
+	}
+
+	for i, test := range tests {
+		gotStatus := test.statusMap.Merge()
+		if test.wantCode != gotStatus.Code() {
+			t.Errorf("test #%v, wantCode %v, gotCode %v", i, test.wantCode, gotStatus.Code())
+		}
+	}
+}
