@@ -26,9 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -310,7 +308,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		tpVal, ok := node.Labels[c.topologyKey]
 		if !ok {
 			klog.V(5).Infof("node '%s' doesn't have required label '%s'", node.Name, tpKey)
-			return migration.PredicateResultToFrameworkStatus([]predicates.PredicateFailureReason{predicates.ErrTopologySpreadConstraintsNotMatch}, nil)
+			return framework.NewStatus(framework.Unschedulable, ErrReasonConstraintsNotMatch)
 		}
 
 		selfMatchNum := int32(0)
@@ -332,7 +330,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		skew := matchNum + selfMatchNum - minMatchNum
 		if skew > c.maxSkew {
 			klog.V(5).Infof("node '%s' failed spreadConstraint[%s]: matchNum(%d) + selfMatchNum(%d) - minMatchNum(%d) > maxSkew(%d)", node.Name, tpKey, matchNum, selfMatchNum, minMatchNum, c.maxSkew)
-			return migration.PredicateResultToFrameworkStatus([]predicates.PredicateFailureReason{predicates.ErrTopologySpreadConstraintsNotMatch}, nil)
+			return framework.NewStatus(framework.Unschedulable, ErrReasonConstraintsNotMatch)
 		}
 	}
 

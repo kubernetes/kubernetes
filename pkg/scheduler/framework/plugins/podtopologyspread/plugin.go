@@ -24,6 +24,11 @@ import (
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 )
 
+const (
+	// ErrReasonConstraintsNotMatch is used for PodTopologySpread filter error.
+	ErrReasonConstraintsNotMatch = "node(s) didn't match pod topology spread constraints"
+)
+
 // PodTopologySpread is a plugin that ensures pod's topologySpreadConstraints is satisfied.
 type PodTopologySpread struct {
 	sharedLister schedulerlisters.SharedLister

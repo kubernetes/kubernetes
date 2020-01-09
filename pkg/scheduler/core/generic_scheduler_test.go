@@ -1947,9 +1947,9 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 		{
 			name: "ErrTopologySpreadConstraintsNotMatch should be tried as it indicates that the pod is unschedulable due to topology spread constraints",
 			nodesStatuses: framework.NodeToStatusMap{
-				"machine1": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrTopologySpreadConstraintsNotMatch.GetReason()),
+				"machine1": framework.NewStatus(framework.Unschedulable, podtopologyspread.ErrReasonConstraintsNotMatch),
 				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrPodNotMatchHostName.GetReason()),
-				"machine3": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrTopologySpreadConstraintsNotMatch.GetReason()),
+				"machine3": framework.NewStatus(framework.Unschedulable, podtopologyspread.ErrReasonConstraintsNotMatch),
 			},
 			expected: map[string]bool{"machine1": true, "machine3": true, "machine4": true},
 		},
@@ -2116,9 +2116,9 @@ func TestPreempt(t *testing.T) {
 				},
 			},
 			failedNodeToStatusMap: framework.NodeToStatusMap{
-				"node-a": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrTopologySpreadConstraintsNotMatch.GetReason()),
-				"node-b": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrTopologySpreadConstraintsNotMatch.GetReason()),
-				"node-x": framework.NewStatus(framework.Unschedulable, algorithmpredicates.ErrTopologySpreadConstraintsNotMatch.GetReason()),
+				"node-a": framework.NewStatus(framework.Unschedulable, podtopologyspread.ErrReasonConstraintsNotMatch),
+				"node-b": framework.NewStatus(framework.Unschedulable, podtopologyspread.ErrReasonConstraintsNotMatch),
+				"node-x": framework.NewStatus(framework.Unschedulable, podtopologyspread.ErrReasonConstraintsNotMatch),
 			},
 			nodeNames: []string{"node-a/zone1", "node-b/zone1", "node-x/zone2"},
 			registerPlugin: st.RegisterPluginAsExtensions(

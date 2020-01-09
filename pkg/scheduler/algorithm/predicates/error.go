@@ -19,7 +19,7 @@ package predicates
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 var (
@@ -55,8 +55,6 @@ var (
 	ErrNodeUnschedulable = NewPredicateFailureError("NodeUnschedulable", "node(s) were unschedulable")
 	// ErrNodeUnknownCondition is used for NodeUnknownCondition predicate error.
 	ErrNodeUnknownCondition = NewPredicateFailureError("NodeUnknownCondition", "node(s) had unknown conditions")
-	// ErrTopologySpreadConstraintsNotMatch is used for EvenPodsSpread predicate error.
-	ErrTopologySpreadConstraintsNotMatch = NewPredicateFailureError("EvenPodsSpreadNotMatch", "node(s) didn't match pod topology spread constraints")
 	// ErrFakePredicate is used for test only. The fake predicates returning false also returns error
 	// as ErrFakePredicate.
 	ErrFakePredicate = NewPredicateFailureError("FakePredicateError", "Nodes failed the fake predicate")
