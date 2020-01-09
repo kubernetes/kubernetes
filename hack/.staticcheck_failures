@@ -20,9 +20,6 @@ pkg/registry/core/service/ipallocator
 pkg/registry/core/service/portallocator
 pkg/registry/core/service/storage
 pkg/util/coverage
-pkg/util/ipconfig
-pkg/util/iptables
-pkg/util/ipvs/testing
 pkg/util/netsh
 pkg/volume
 pkg/volume/awsebs
