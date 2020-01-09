@@ -34,7 +34,6 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -247,7 +246,6 @@ func TestCSILimits(t *testing.T) {
 		test                  string
 		migrationEnabled      bool
 		limitSource           string
-		expectedFailureReason *predicates.PredicateFailureError
 		wantStatus            *framework.Status
 	}{
 		{

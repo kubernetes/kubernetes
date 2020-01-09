@@ -25,8 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -39,6 +37,9 @@ const (
 	// preFilterStateKey is the key in CycleState to InterPodAffinity pre-computed data.
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.
 	preFilterStateKey = "PreFilter" + Name
+
+	// ErrReasonViolated is used for CheckServiceAffinity predicate error.
+	ErrReasonViolated = "node(s) didn't match service affinity"
 )
 
 // Args holds the args that are used to configure the plugin.
@@ -276,7 +277,7 @@ func (pl *ServiceAffinity) Filter(ctx context.Context, cycleState *framework.Cyc
 		return nil
 	}
 
-	return migration.PredicateResultToFrameworkStatus([]predicates.PredicateFailureReason{predicates.ErrServiceAffinityViolated}, nil)
+	return framework.NewStatus(framework.Unschedulable, ErrReasonViolated)
 }
 
 // Score invoked at the Score extension point.
