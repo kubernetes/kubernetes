@@ -39,7 +39,6 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/features:go_default_library",
-        "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/listers/fake:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
