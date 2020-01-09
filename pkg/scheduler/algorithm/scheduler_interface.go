@@ -19,7 +19,7 @@ package algorithm
 import (
 	"k8s.io/api/core/v1"
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	"k8s.io/kubernetes/pkg/scheduler/listers"
 )
 
 // SchedulerExtender is an interface for external processes to influence scheduling
@@ -32,9 +32,7 @@ type SchedulerExtender interface {
 	// Filter based on extender-implemented predicate functions. The filtered list is
 	// expected to be a subset of the supplied list. failedNodesMap optionally contains
 	// the list of failed nodes and failure reasons.
-	Filter(pod *v1.Pod,
-		nodes []*v1.Node, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
-	) (filteredNodes []*v1.Node, failedNodesMap extenderv1.FailedNodesMap, err error)
+	Filter(pod *v1.Pod, nodes []*v1.Node) (filteredNodes []*v1.Node, failedNodesMap extenderv1.FailedNodesMap, err error)
 
 	// Prioritize based on extender-implemented priority functions. The returned scores & weight
 	// are used to compute the weighted score for an extender. The weighted scores are added to
@@ -62,8 +60,7 @@ type SchedulerExtender interface {
 	ProcessPreemption(
 		pod *v1.Pod,
 		nodeToVictims map[*v1.Node]*extenderv1.Victims,
-		nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
-	) (map[*v1.Node]*extenderv1.Victims, error)
+		nodeInfos listers.NodeInfoLister) (map[*v1.Node]*extenderv1.Victims, error)
 
 	// SupportsPreemption returns if the scheduler extender support preemption or not.
 	SupportsPreemption() bool
