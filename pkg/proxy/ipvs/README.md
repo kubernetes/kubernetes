@@ -38,7 +38,7 @@ Differences between IPVS mode and IPTABLES mode are as follows:
 
 ### When IPVS falls back to IPTABLES
 IPVS proxier will employ IPTABLES in doing packet filtering, SNAT or masquerade.
-Specifically, IPVS proxier will use ipset to store source or destination address of traffics that need DROP or do masquerade, to make sure the number of IPTABLES rules be constant, no metter how many services we have.
+Specifically, IPVS proxier will use ipset to store source or destination address of traffics that need DROP or do masquerade, to make sure the number of IPTABLES rules be constant, no matter how many services we have.
 
 
 Here is the table of ipset sets that IPVS proxier used.
@@ -183,7 +183,7 @@ ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0            match-set KUBE-LOA
 **4. NodePort type service**
 
 For NodePort type service, IPVS proxier will install IPTABLES with match of ipset `KUBE-NODE-PORT-TCP/KUBE-NODE-PORT-UDP`.
-When specified `externalTrafficPolicy=local`,IPVS proxier will create ipset sets `KUBE-NODE-PORT-LOCAL-TC/KUBE-NODE-PORT-LOCAL-UDP`
+When specified `externalTrafficPolicy=local`, IPVS proxier will create ipset sets `KUBE-NODE-PORT-LOCAL-TC/KUBE-NODE-PORT-LOCAL-UDP`
 and install IPTABLES accordingly, which should looks like what is shown below.
 
 Suppose service with TCP type nodePort.
