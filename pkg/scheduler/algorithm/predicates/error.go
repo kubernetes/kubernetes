@@ -33,14 +33,6 @@ var (
 
 	// ErrNodeSelectorNotMatch is used for MatchNodeSelector predicate error.
 	ErrNodeSelectorNotMatch = NewPredicateFailureError("MatchNodeSelector", "node(s) didn't match node selector")
-	// ErrPodAffinityNotMatch is used for MatchInterPodAffinity predicate error.
-	ErrPodAffinityNotMatch = NewPredicateFailureError("MatchInterPodAffinity", "node(s) didn't match pod affinity/anti-affinity")
-	// ErrPodAffinityRulesNotMatch is used for PodAffinityRulesNotMatch predicate error.
-	ErrPodAffinityRulesNotMatch = NewPredicateFailureError("PodAffinityRulesNotMatch", "node(s) didn't match pod affinity rules")
-	// ErrPodAntiAffinityRulesNotMatch is used for PodAntiAffinityRulesNotMatch predicate error.
-	ErrPodAntiAffinityRulesNotMatch = NewPredicateFailureError("PodAntiAffinityRulesNotMatch", "node(s) didn't match pod anti-affinity rules")
-	// ErrExistingPodsAntiAffinityRulesNotMatch is used for ExistingPodsAntiAffinityRulesNotMatch predicate error.
-	ErrExistingPodsAntiAffinityRulesNotMatch = NewPredicateFailureError("ExistingPodsAntiAffinityRulesNotMatch", "node(s) didn't satisfy existing pods anti-affinity rules")
 	// ErrTaintsTolerationsNotMatch is used for PodToleratesNodeTaints predicate error.
 	ErrTaintsTolerationsNotMatch = NewPredicateFailureError("PodToleratesNodeTaints", "node(s) had taints that the pod didn't tolerate")
 	// ErrPodNotMatchHostName is used for HostName predicate error.
@@ -72,7 +64,6 @@ var (
 
 var unresolvablePredicateFailureErrors = map[PredicateFailureReason]struct{}{
 	ErrNodeSelectorNotMatch:      {},
-	ErrPodAffinityRulesNotMatch:  {},
 	ErrPodNotMatchHostName:       {},
 	ErrTaintsTolerationsNotMatch: {},
 	// Node conditions won't change when scheduler simulates removal of preemption victims.
