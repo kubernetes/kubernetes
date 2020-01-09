@@ -49,7 +49,6 @@ const (
 	// CSIPluginName is the name of the in-tree CSI Plugin
 	CSIPluginName = "kubernetes.io/csi"
 
-	csiTimeout      = 2 * time.Minute
 	volNameSep      = "^"
 	volDataFileName = "vol_data.json"
 	fsTypeBlockName = "block"
@@ -58,6 +57,8 @@ const (
 	// TODO: increase to something useful
 	CsiResyncPeriod = time.Minute
 )
+
+var csiTimeout = 2 * time.Minute
 
 type csiPlugin struct {
 	host            volume.VolumeHost

@@ -901,6 +901,10 @@ func TestAttacherVolumesAreAttachedWithInline(t *testing.T) {
 }
 
 func TestAttacherDetach(t *testing.T) {
+	csiTimeout = 3 * time.Second
+	defer func() {
+		csiTimeout = 2 * time.Minute
+	}()
 	nodeName := "fakeNode"
 	testCases := []struct {
 		name         string
