@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -230,11 +231,14 @@ var _ = SIGDescribe("Network", func() {
 			string(jsonBytes))
 		// Run the closewait command in a subroutine so it keeps waiting during postFinTimeoutSeconds
 		// otherwise the pod is deleted and the connection is closed loosing the conntrack entry
-		go func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		go func(ctx context.Context) {
 			defer ginkgo.GinkgoRecover()
-			_, err = framework.RunHostCmd(fr.Namespace.Name, "e2e-net-client", cmd)
-			framework.ExpectNoError(err)
-		}()
+			// swallow the error here because the test will fail if the command fails
+			// but it will report an error during the cleanup of the test
+			framework.RunHostCmd(fr.Namespace.Name, "e2e-net-client", cmd)
+		}(ctx)
 
 		<-time.After(time.Duration(1) * time.Second)
 
