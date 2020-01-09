@@ -1,5 +1,4 @@
 BUILD
-CHANGELOG
 OWNERS
 api.pb.go
 api.proto
