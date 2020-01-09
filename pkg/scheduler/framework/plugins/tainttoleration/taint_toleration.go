@@ -23,9 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
+	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -44,6 +42,8 @@ const (
 	Name = "TaintToleration"
 	// postFilterStateKey is the key in CycleState to InterPodAffinity pre-computed data for Scoring.
 	postFilterStateKey = "PostFilter" + Name
+	// ErrReasonNotMatch is the Filter reason status when not matching.
+	ErrReasonNotMatch = "node(s) had taints that the pod didn't tolerate"
 )
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -53,9 +53,23 @@ func (pl *TaintToleration) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
-	// Note that PodToleratesNodeTaints doesn't use predicate metadata, hence passing nil here.
-	_, reasons, err := predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
+	if nodeInfo == nil || nodeInfo.Node() == nil {
+		return framework.NewStatus(framework.Error, "invalid nodeInfo")
+	}
+
+	taints, err := nodeInfo.Taints()
+	if err != nil {
+		return framework.NewStatus(framework.Error, err.Error())
+	}
+
+	if v1helper.TolerationsTolerateTaintsWithFilter(pod.Spec.Tolerations, taints, func(t *v1.Taint) bool {
+		// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
+		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
+	}) {
+		return nil
+	}
+
+	return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNotMatch)
 }
 
 // postFilterState computed at PostFilter and used at Score.
@@ -140,10 +154,7 @@ func (pl *TaintToleration) Score(ctx context.Context, state *framework.CycleStat
 
 // NormalizeScore invoked after scoring all nodes.
 func (pl *TaintToleration) NormalizeScore(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
-	// Note that ComputeTaintTolerationPriorityReduce doesn't use priority metadata, hence passing nil here.
-	normalizeFun := priorities.NormalizeReduce(framework.MaxNodeScore, true)
-	err := normalizeFun(pod, nil, pl.handle.SnapshotSharedLister(), scores)
-	return migration.ErrorToFrameworkStatus(err)
+	return pluginhelper.DefaultNormalizeScore(framework.MaxNodeScore, true, scores)
 }
 
 // ScoreExtensions of the Score plugin.
