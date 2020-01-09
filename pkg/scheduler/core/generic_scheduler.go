@@ -178,7 +178,7 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 	}
 	trace.Step("Snapshotting scheduler cache and node infos done")
 
-	if len(g.nodeInfoSnapshot.NodeInfoList) == 0 {
+	if g.nodeInfoSnapshot.NumNodes() == 0 {
 		return result, ErrNoNodesAvailable
 	}
 
@@ -205,7 +205,7 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 	if len(filteredNodes) == 0 {
 		return result, &FitError{
 			Pod:                   pod,
-			NumAllNodes:           len(g.nodeInfoSnapshot.NodeInfoList),
+			NumAllNodes:           g.nodeInfoSnapshot.NumNodes(),
 			FilteredNodesStatuses: filteredNodesStatuses,
 		}
 	}
@@ -294,19 +294,20 @@ func (g *genericScheduler) Preempt(ctx context.Context, state *framework.CycleSt
 		klog.V(5).Infof("Pod %v/%v is not eligible for more preemption.", pod.Namespace, pod.Name)
 		return nil, nil, nil, nil
 	}
-	if len(g.nodeInfoSnapshot.NodeInfoList) == 0 {
+	allNodes, err := g.nodeInfoSnapshot.NodeInfos().List()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if len(allNodes) == 0 {
 		return nil, nil, nil, ErrNoNodesAvailable
 	}
-	potentialNodes := nodesWherePreemptionMightHelp(g.nodeInfoSnapshot.NodeInfoList, fitError)
+	potentialNodes := nodesWherePreemptionMightHelp(allNodes, fitError)
 	if len(potentialNodes) == 0 {
 		klog.V(3).Infof("Preemption will not help schedule pod %v/%v on any node.", pod.Namespace, pod.Name)
 		// In this case, we should clean-up any existing nominated node name of the pod.
 		return nil, nil, []*v1.Pod{pod}, nil
 	}
-	var (
-		pdbs []*policy.PodDisruptionBudget
-		err  error
-	)
+	var pdbs []*policy.PodDisruptionBudget
 	if g.pdbLister != nil {
 		pdbs, err = g.pdbLister.List(labels.Everything())
 		if err != nil {
@@ -430,11 +431,17 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 	var filtered []*v1.Node
 	filteredNodesStatuses := framework.NodeToStatusMap{}
 
+	allNodes, err := g.nodeInfoSnapshot.NodeInfos().List()
+	if err != nil {
+		return nil, nil, err
+	}
 	if !g.framework.HasFilterPlugins() {
-		filtered = g.nodeInfoSnapshot.ListNodes()
+		filtered = make([]*v1.Node, len(allNodes))
+		for i, ni := range allNodes {
+			filtered[i] = ni.Node()
+		}
 	} else {
-		allNodes := len(g.nodeInfoSnapshot.NodeInfoList)
-		numNodesToFind := g.numFeasibleNodesToFind(int32(allNodes))
+		numNodesToFind := g.numFeasibleNodesToFind(int32(len(allNodes)))
 
 		// Create filtered list with enough space to avoid growing it
 		// and allow assigning.
@@ -449,7 +456,7 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 		checkNode := func(i int) {
 			// We check the nodes starting from where we left off in the previous scheduling cycle,
 			// this is to make sure all nodes have the same chance of being examined across pods.
-			nodeInfo := g.nodeInfoSnapshot.NodeInfoList[(g.nextStartNodeIndex+i)%allNodes]
+			nodeInfo := allNodes[(g.nextStartNodeIndex+i)%len(allNodes)]
 			fits, status, err := g.podFitsOnNode(ctx, state, pod, nodeInfo)
 			if err != nil {
 				errCh.SendErrorWithCancel(err, cancel)
@@ -474,9 +481,9 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 
 		// Stops searching for more nodes once the configured number of feasible nodes
 		// are found.
-		workqueue.ParallelizeUntil(ctx, 16, allNodes, checkNode)
+		workqueue.ParallelizeUntil(ctx, 16, len(allNodes), checkNode)
 		processedNodes := int(filteredLen) + len(filteredNodesStatuses)
-		g.nextStartNodeIndex = (g.nextStartNodeIndex + processedNodes) % allNodes
+		g.nextStartNodeIndex = (g.nextStartNodeIndex + processedNodes) % len(allNodes)
 
 		filtered = filtered[:filteredLen]
 		if err := errCh.ReceiveError(); err != nil {
@@ -648,7 +655,7 @@ func (g *genericScheduler) prioritizeNodes(
 	if len(g.extenders) != 0 && nodes != nil {
 		var mu sync.Mutex
 		var wg sync.WaitGroup
-		combinedScores := make(map[string]int64, len(g.nodeInfoSnapshot.NodeInfoList))
+		combinedScores := make(map[string]int64, len(nodes))
 		for i := range g.extenders {
 			if !g.extenders[i].IsInterested(pod) {
 				continue
