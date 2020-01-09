@@ -26,7 +26,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	utilpointer "k8s.io/utils/pointer"
@@ -1183,7 +1182,7 @@ func TestGCEPDLimits(t *testing.T) {
 }
 
 func TestGetMaxVols(t *testing.T) {
-	previousValue := os.Getenv(predicates.KubeMaxPDVols)
+	previousValue := os.Getenv(KubeMaxPDVols)
 
 	tests := []struct {
 		rawMaxVols string
@@ -1209,7 +1208,7 @@ func TestGetMaxVols(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			os.Setenv(predicates.KubeMaxPDVols, test.rawMaxVols)
+			os.Setenv(KubeMaxPDVols, test.rawMaxVols)
 			result := getMaxVolLimitFromEnv()
 			if result != test.expected {
 				t.Errorf("expected %v got %v", test.expected, result)
@@ -1217,9 +1216,9 @@ func TestGetMaxVols(t *testing.T) {
 		})
 	}
 
-	os.Unsetenv(predicates.KubeMaxPDVols)
+	os.Unsetenv(KubeMaxPDVols)
 	if previousValue != "" {
-		os.Setenv(predicates.KubeMaxPDVols, previousValue)
+		os.Setenv(KubeMaxPDVols, previousValue)
 	}
 }
 
