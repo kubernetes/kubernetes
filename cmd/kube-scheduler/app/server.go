@@ -330,7 +330,7 @@ func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, s
 	return pathRecorderMux
 }
 
-// WithPlugin creates an Option based on plugin name and factory.
+// WithPlugin creates an Option based on plugin name and factory. This function is used to register out-of-tree plugins.
 func WithPlugin(name string, factory framework.PluginFactory) Option {
 	return func(registry framework.Registry) error {
 		return registry.Register(name, factory)
