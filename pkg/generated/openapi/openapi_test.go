@@ -23,12 +23,13 @@ import (
 
 	"github.com/go-openapi/spec"
 
+	generatedopenapi "k8s.io/apiextensions-apiserver/pkg/generated/openapi"
 	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 func TestOpenAPIRoundtrip(t *testing.T) {
 	dummyRef := func(name string) spec.Ref { return spec.MustCreateRef("#/definitions/dummy") }
-	for name, value := range GetOpenAPIDefinitions(dummyRef) {
+	for name, value := range generatedopenapi.GetOpenAPIDefinitions(dummyRef) {
 		t.Run(name, func(t *testing.T) {
 			data, err := json.Marshal(value.Schema)
 			if err != nil {
