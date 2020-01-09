@@ -59,6 +59,7 @@ go_test(
         "//staging/src/k8s.io/kubectl/pkg/cmd/delete:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/testing:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/generate/versioned:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/i18n:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
