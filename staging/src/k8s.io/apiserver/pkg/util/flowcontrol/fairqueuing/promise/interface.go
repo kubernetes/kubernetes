@@ -16,27 +16,87 @@ limitations under the License.
 
 package promise
 
-// Mutable is a variable that is initially not set and can be set one
-// or more times (unlike a traditional "promise", which can be written
-// only once).
-type Mutable interface {
+// This file defines interfaces for promsies and futures and related
+// things.
 
-	// Set writes a value into this variable and unblocks every
-	// goroutine waiting for this variable to have a value
-	Set(interface{})
-
-	// Get reads the value of this variable.  If this variable is
-	// not set yet then this call blocks until this variable gets a value.
+// Readable represents a variable that is initially not set and later
+// becomes set.  Some instances may be set to multiple values in
+// series.  A Readable for a variable that can only get one value is
+// commonly known as a "future".
+type Readable interface {
+	// Get reads the current value of this variable.  If this variable
+	// is not set yet then this call blocks until this variable gets a
+	// value.
 	Get() interface{}
+
+	// IsSet returns immediately with an indication of whether this
+	// variable has been set.
+	IsSet() bool
 }
 
-// LockingMutable is a Mutable whose implementation is protected by a lock
-type LockingMutable interface {
-	Mutable
-
-	// SetLocked is like Set but the caller must already hold the lock
-	SetLocked(interface{})
+// LockingReadable is a Readable whose implementation is protected by
+// a lock
+type LockingReadable interface {
+	Readable
 
 	// GetLocked is like Get but the caller must already hold the lock
 	GetLocked() interface{}
+
+	// IsSetLocked is like IsSet but the caller must already hold the lock
+	IsSetLocked() bool
+}
+
+// WriteOnceOnly represents a variable that is initially not set and
+// can be set once.
+type WriteOnceOnly interface {
+	// Set normally writes a value into this variable, unblocks every
+	// goroutine waiting for this variable to have a value, and
+	// returns true.  In the unhappy case that this variable is
+	// already set, this method returns false.
+	Set(interface{}) bool
+}
+
+// WriteOnce represents a variable that is initially not set and can
+// be set once and is readable.  This is the common meaning for
+// "promise".
+type WriteOnce interface {
+	Readable
+	WriteOnceOnly
+}
+
+// LockingWriteOnce is a WriteOnce whose implementation is protected
+// by a lock.
+type LockingWriteOnce interface {
+	LockingReadable
+	WriteOnceOnly
+
+	// SetLocked is like Set but the caller must already hold the lock
+	SetLocked(interface{}) bool
+}
+
+// WriteMultipleOnly represents a variable that is initially not set
+// and can be set one or more times (unlike a traditional "promise",
+// which can be written only once).
+type WriteMultipleOnly interface {
+	// Set writes a value into this variable and unblocks every
+	// goroutine waiting for this variable to have a value
+	Set(interface{})
+}
+
+// WriteMultiple represents a variable that is initially not set and
+// can be set one or more times (unlike a traditional "promise", which
+// can be written only once) and is readable.
+type WriteMultiple interface {
+	Readable
+	WriteMultipleOnly
+}
+
+// LockingWriteMultiple is a WriteMultiple whose implementation is
+// protected by a lock.
+type LockingWriteMultiple interface {
+	LockingReadable
+	WriteMultipleOnly
+
+	// SetLocked is like Set but the caller must already hold the lock
+	SetLocked(interface{})
 }
