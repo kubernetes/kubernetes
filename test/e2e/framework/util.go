@@ -557,6 +557,14 @@ func LoadConfig() (config *restclient.Config, err error) {
 		}
 		return nil, err
 	}
+	// In case Host is not set in TestContext, sets it as
+	// CurrentContext Server for k8s API client to connect to.
+	if TestContext.Host == "" && c.Clusters != nil {
+		currentContext, ok := c.Clusters[c.CurrentContext]
+		if ok {
+			TestContext.Host = currentContext.Server
+		}
+	}
 
 	return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: TestContext.Host}}).ClientConfig()
 }
