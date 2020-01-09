@@ -277,7 +277,7 @@ func (az *Cloud) newNSGCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
-		nsg, err := az.SecurityGroupsClient.Get(ctx, az.ResourceGroup, key, "")
+		nsg, err := az.SecurityGroupsClient.Get(ctx, az.SecurityGroupResourceGroup, key, "")
 		exists, rerr := checkResourceExistsFromError(err)
 		if rerr != nil {
 			return nil, rerr.Error()

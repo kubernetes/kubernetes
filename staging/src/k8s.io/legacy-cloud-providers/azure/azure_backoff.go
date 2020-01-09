@@ -187,7 +187,7 @@ func (az *Cloud) CreateOrUpdateSecurityGroup(service *v1.Service, sg network.Sec
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		rerr := az.SecurityGroupsClient.CreateOrUpdate(ctx, az.ResourceGroup, *sg.Name, sg, to.String(sg.Etag))
+		rerr := az.SecurityGroupsClient.CreateOrUpdate(ctx, az.SecurityGroupResourceGroup, *sg.Name, sg, to.String(sg.Etag))
 		klog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%s): end", *sg.Name)
 		if rerr == nil {
 			// Invalidate the cache right after updating
@@ -217,7 +217,7 @@ func (az *Cloud) CreateOrUpdateSGWithRetry(service *v1.Service, sg network.Secur
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		rerr := az.SecurityGroupsClient.CreateOrUpdate(ctx, az.ResourceGroup, *sg.Name, sg, to.String(sg.Etag))
+		rerr := az.SecurityGroupsClient.CreateOrUpdate(ctx, az.SecurityGroupResourceGroup, *sg.Name, sg, to.String(sg.Etag))
 		klog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%s): end", *sg.Name)
 		if rerr == nil {
 			// Invalidate the cache right after updating
