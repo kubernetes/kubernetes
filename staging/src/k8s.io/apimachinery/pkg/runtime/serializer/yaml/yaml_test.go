@@ -75,6 +75,7 @@ metadata:
 name: yaml-bomb
 namespace: default
 `),
+			benchmark: true,
 		},
 		{
 			name:  "arrays of null aliases",
@@ -96,6 +97,7 @@ metadata:
 name: yaml-bomb
 namespace: default
 `),
+			benchmark: true,
 		},
 		{
 			name:  "arrays of zero int aliases",
@@ -117,6 +119,7 @@ metadata:
 name: yaml-bomb
 namespace: default
 `),
+			benchmark: true,
 		},
 		{
 			name:  "arrays of zero float aliases",
@@ -138,6 +141,7 @@ metadata:
 name: yaml-bomb
 namespace: default
 `),
+			benchmark: true,
 		},
 		{
 			name:  "arrays of big float aliases",
@@ -159,6 +163,7 @@ metadata:
 name: yaml-bomb
 namespace: default
 `),
+			benchmark: true,
 		},
 		{
 			name:  "arrays of bool aliases",
@@ -180,6 +185,7 @@ metadata:
 name: yaml-bomb
 namespace: default
 `),
+			benchmark: true,
 		},
 		{
 			name:  "map key aliases",
@@ -201,6 +207,7 @@ metadata:
 name: yaml-bomb
 namespace: default
 `),
+			benchmark: true,
 		},
 		{
 			name:  "map value aliases",
@@ -222,6 +229,7 @@ metadata:
 name: yaml-bomb
 namespace: default
 `),
+			benchmark: true,
 		},
 		{
 			name:  "nested map aliases",
@@ -243,6 +251,7 @@ metadata:
 name: yaml-bomb
 namespace: default
 `),
+			benchmark: true,
 		},
 		{
 			name:  "nested slice aliases",
@@ -264,10 +273,12 @@ metadata:
 name: yaml-bomb
 namespace: default
 `),
+			benchmark: true,
 		},
 		{
-			name: "3MB map without alias",
-			data: []byte(`a: &a [{a}` + strings.Repeat(`,{a}`, 3*1024*1024/4) + `]`),
+			name:      "3MB map without alias",
+			data:      []byte(`a: &a [{a}` + strings.Repeat(`,{a}`, 3*1024*1024/4) + `]`),
+			benchmark: true,
 		},
 		{
 			name:  "3MB map with alias",
@@ -275,6 +286,7 @@ namespace: default
 			data: []byte(`
 a: &a [{a}` + strings.Repeat(`,{a}`, 3*1024*1024/4) + `]
 b: &b [*a]`),
+			benchmark: true,
 		},
 		{
 			name:  "deeply nested slices",
