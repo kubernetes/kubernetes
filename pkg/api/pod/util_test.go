@@ -134,7 +134,7 @@ func TestVisitContainers(t *testing.T) {
 
 	for _, tc := range testCases {
 		gotNames := []string{}
-		VisitContainers(tc.haveSpec, func(c *api.Container) bool {
+		VisitContainers(tc.haveSpec, DefaultContainers, func(c *api.Container, containerType ContainerType) bool {
 			gotNames = append(gotNames, c.Name)
 			if c.SecurityContext != nil {
 				c.SecurityContext = nil

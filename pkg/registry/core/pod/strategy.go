@@ -387,7 +387,7 @@ func LogLocation(
 
 func podHasContainerWithName(pod *api.Pod, containerName string) bool {
 	var hasContainer bool
-	podutil.VisitContainers(&pod.Spec, func(c *api.Container) bool {
+	podutil.VisitContainers(&pod.Spec, podutil.DefaultContainers, func(c *api.Container, containerType podutil.ContainerType) bool {
 		if c.Name == containerName {
 			hasContainer = true
 			return false
