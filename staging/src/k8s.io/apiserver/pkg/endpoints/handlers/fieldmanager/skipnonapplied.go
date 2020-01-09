@@ -51,7 +51,7 @@ func (f *skipNonAppliedManager) Update(liveObj, newObj runtime.Object, managed M
 }
 
 // Apply implements Manager.
-func (f *skipNonAppliedManager) Apply(liveObj runtime.Object, patch []byte, managed Managed, fieldManager string, force bool) (runtime.Object, Managed, error) {
+func (f *skipNonAppliedManager) Apply(liveObj, appliedObj runtime.Object, managed Managed, fieldManager string, force bool) (runtime.Object, Managed, error) {
 	if len(managed.Fields()) == 0 {
 		emptyObj, err := f.objectCreater.New(f.gvk)
 		if err != nil {
@@ -62,5 +62,5 @@ func (f *skipNonAppliedManager) Apply(liveObj runtime.Object, patch []byte, mana
 			return nil, nil, fmt.Errorf("failed to create manager for existing fields: %v", err)
 		}
 	}
-	return f.fieldManager.Apply(liveObj, patch, managed, fieldManager, force)
+	return f.fieldManager.Apply(liveObj, appliedObj, managed, fieldManager, force)
 }
