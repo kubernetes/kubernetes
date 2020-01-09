@@ -26,7 +26,6 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
@@ -45,6 +44,46 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
+)
+
+const (
+	// EqualPriority defines the name of prioritizer function that gives an equal weight of one to all nodes.
+	EqualPriority = "EqualPriority"
+	// MostRequestedPriority defines the name of prioritizer function that gives used nodes higher priority.
+	MostRequestedPriority = "MostRequestedPriority"
+	// RequestedToCapacityRatioPriority defines the name of RequestedToCapacityRatioPriority.
+	RequestedToCapacityRatioPriority = "RequestedToCapacityRatioPriority"
+	// SelectorSpreadPriority defines the name of prioritizer function that spreads pods by minimizing
+	// the number of pods (belonging to the same service or replication controller) on the same node.
+	SelectorSpreadPriority = "SelectorSpreadPriority"
+	// ServiceSpreadingPriority is largely replaced by "SelectorSpreadPriority".
+	ServiceSpreadingPriority = "ServiceSpreadingPriority"
+	// InterPodAffinityPriority defines the name of prioritizer function that decides which pods should or
+	// should not be placed in the same topological domain as some other pods.
+	InterPodAffinityPriority = "InterPodAffinityPriority"
+	// LeastRequestedPriority defines the name of prioritizer function that prioritize nodes by least
+	// requested utilization.
+	LeastRequestedPriority = "LeastRequestedPriority"
+	// BalancedResourceAllocation defines the name of prioritizer function that prioritizes nodes
+	// to help achieve balanced resource usage.
+	BalancedResourceAllocation = "BalancedResourceAllocation"
+	// NodePreferAvoidPodsPriority defines the name of prioritizer function that priorities nodes according to
+	// the node annotation "scheduler.alpha.kubernetes.io/preferAvoidPods".
+	NodePreferAvoidPodsPriority = "NodePreferAvoidPodsPriority"
+	// NodeAffinityPriority defines the name of prioritizer function that prioritizes nodes which have labels
+	// matching NodeAffinity.
+	NodeAffinityPriority = "NodeAffinityPriority"
+	// TaintTolerationPriority defines the name of prioritizer function that prioritizes nodes that marked
+	// with taint which pod can tolerate.
+	TaintTolerationPriority = "TaintTolerationPriority"
+	// ImageLocalityPriority defines the name of prioritizer function that prioritizes nodes that have images
+	// requested by the pod present.
+	ImageLocalityPriority = "ImageLocalityPriority"
+	// ResourceLimitsPriority defines the nodes of prioritizer function ResourceLimitsPriority.
+	ResourceLimitsPriority = "ResourceLimitsPriority"
+	// EvenPodsSpreadPriority defines the name of prioritizer function that prioritizes nodes
+	// which have pods and labels matching the incoming pod's topologySpreadConstraints.
+	EvenPodsSpreadPriority = "EvenPodsSpreadPriority"
 )
 
 // LegacyRegistry is used to store current state of registered predicates and priorities.
@@ -109,14 +148,14 @@ func NewLegacyRegistry() *LegacyRegistry {
 
 		// Used as the default set of predicates if Policy was specified, but priorities was nil.
 		DefaultPriorities: map[string]int64{
-			priorities.SelectorSpreadPriority:      1,
-			priorities.InterPodAffinityPriority:    1,
-			priorities.LeastRequestedPriority:      1,
-			priorities.BalancedResourceAllocation:  1,
-			priorities.NodePreferAvoidPodsPriority: 10000,
-			priorities.NodeAffinityPriority:        1,
-			priorities.TaintTolerationPriority:     1,
-			priorities.ImageLocalityPriority:       1,
+			SelectorSpreadPriority:      1,
+			InterPodAffinityPriority:    1,
+			LeastRequestedPriority:      1,
+			BalancedResourceAllocation:  1,
+			NodePreferAvoidPodsPriority: 10000,
+			NodeAffinityPriority:        1,
+			TaintTolerationPriority:     1,
+			ImageLocalityPriority:       1,
 		},
 
 		PredicateToConfigProducer: make(map[string]ConfigProducer),
@@ -229,51 +268,51 @@ func NewLegacyRegistry() *LegacyRegistry {
 		})
 
 	// Register Priorities.
-	registry.registerPriorityConfigProducer(priorities.SelectorSpreadPriority,
+	registry.registerPriorityConfigProducer(SelectorSpreadPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, defaultpodtopologyspread.Name, &args.Weight)
 			plugins.PostFilter = appendToPluginSet(plugins.PostFilter, defaultpodtopologyspread.Name, nil)
 			return
 		})
-	registry.registerPriorityConfigProducer(priorities.TaintTolerationPriority,
+	registry.registerPriorityConfigProducer(TaintTolerationPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.PostFilter = appendToPluginSet(plugins.PostFilter, tainttoleration.Name, nil)
 			plugins.Score = appendToPluginSet(plugins.Score, tainttoleration.Name, &args.Weight)
 			return
 		})
-	registry.registerPriorityConfigProducer(priorities.NodeAffinityPriority,
+	registry.registerPriorityConfigProducer(NodeAffinityPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, nodeaffinity.Name, &args.Weight)
 			return
 		})
-	registry.registerPriorityConfigProducer(priorities.ImageLocalityPriority,
+	registry.registerPriorityConfigProducer(ImageLocalityPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, imagelocality.Name, &args.Weight)
 			return
 		})
-	registry.registerPriorityConfigProducer(priorities.InterPodAffinityPriority,
+	registry.registerPriorityConfigProducer(InterPodAffinityPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.PostFilter = appendToPluginSet(plugins.PostFilter, interpodaffinity.Name, nil)
 			plugins.Score = appendToPluginSet(plugins.Score, interpodaffinity.Name, &args.Weight)
 			pluginConfig = append(pluginConfig, makePluginConfig(interpodaffinity.Name, args.InterPodAffinityArgs))
 			return
 		})
-	registry.registerPriorityConfigProducer(priorities.NodePreferAvoidPodsPriority,
+	registry.registerPriorityConfigProducer(NodePreferAvoidPodsPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, nodepreferavoidpods.Name, &args.Weight)
 			return
 		})
-	registry.registerPriorityConfigProducer(priorities.MostRequestedPriority,
+	registry.registerPriorityConfigProducer(MostRequestedPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, noderesources.MostAllocatedName, &args.Weight)
 			return
 		})
-	registry.registerPriorityConfigProducer(priorities.BalancedResourceAllocation,
+	registry.registerPriorityConfigProducer(BalancedResourceAllocation,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, noderesources.BalancedAllocationName, &args.Weight)
 			return
 		})
-	registry.registerPriorityConfigProducer(priorities.LeastRequestedPriority,
+	registry.registerPriorityConfigProducer(LeastRequestedPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, noderesources.LeastAllocatedName, &args.Weight)
 			return
@@ -320,26 +359,26 @@ func NewLegacyRegistry() *LegacyRegistry {
 			})
 		registry.DefaultPredicates.Insert(predicates.EvenPodsSpreadPred)
 
-		registry.registerPriorityConfigProducer(priorities.EvenPodsSpreadPriority,
+		registry.registerPriorityConfigProducer(EvenPodsSpreadPriority,
 			func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 				plugins.PostFilter = appendToPluginSet(plugins.PostFilter, podtopologyspread.Name, nil)
 				plugins.Score = appendToPluginSet(plugins.Score, podtopologyspread.Name, &args.Weight)
 				return
 			})
-		registry.DefaultPriorities[priorities.EvenPodsSpreadPriority] = 1
+		registry.DefaultPriorities[EvenPodsSpreadPriority] = 1
 	}
 
 	// Prioritizes nodes that satisfy pod's resource limits
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
 		klog.Infof("Registering resourcelimits priority function")
 
-		registry.registerPriorityConfigProducer(priorities.ResourceLimitsPriority,
+		registry.registerPriorityConfigProducer(ResourceLimitsPriority,
 			func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 				plugins.PostFilter = appendToPluginSet(plugins.PostFilter, noderesources.ResourceLimitsName, nil)
 				plugins.Score = appendToPluginSet(plugins.Score, noderesources.ResourceLimitsName, &args.Weight)
 				return
 			})
-		registry.DefaultPriorities[priorities.ResourceLimitsPriority] = 1
+		registry.DefaultPriorities[ResourceLimitsPriority] = 1
 	}
 
 	return registry
@@ -448,9 +487,9 @@ func (lr *LegacyRegistry) ProcessPriorityPolicy(policy config.PriorityPolicy, co
 	validatePriorityOrDie(policy)
 
 	priorityName := policy.Name
-	if policy.Name == priorities.ServiceSpreadingPriority {
+	if policy.Name == ServiceSpreadingPriority {
 		// For compatibility reasons, "ServiceSpreadingPriority" as a key is still supported.
-		priorityName = priorities.SelectorSpreadPriority
+		priorityName = SelectorSpreadPriority
 	}
 
 	if _, ok := lr.PriorityToConfigProducer[priorityName]; ok {
