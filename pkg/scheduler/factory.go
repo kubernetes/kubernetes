@@ -122,6 +122,7 @@ func (c *Configurator) create(extenders []algorithm.SchedulerExtender) (*Schedul
 		framework.WithInformerFactory(c.informerFactory),
 		framework.WithSnapshotSharedLister(c.nodeInfoSnapshot),
 		framework.WithRunAllFilters(c.alwaysCheckAllPredicates),
+		framework.WithVolumeBinder(c.volumeBinder),
 	)
 	if err != nil {
 		klog.Fatalf("error initializing the scheduling framework: %v", err)
