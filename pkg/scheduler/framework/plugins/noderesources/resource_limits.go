@@ -39,7 +39,7 @@ const (
 	// ResourceLimitsName is the name of the plugin used in the plugin registry and configurations.
 	ResourceLimitsName = "NodeResourceLimits"
 
-	// postFilterStateKey is the key in CycleState to InterPodAffinity pre-computed data.
+	// postFilterStateKey is the key in CycleState to NodeResourceLimits pre-computed data.
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.
 	postFilterStateKey = "PostFilter" + ResourceLimitsName
 )
