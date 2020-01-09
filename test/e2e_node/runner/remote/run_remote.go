@@ -623,8 +623,10 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 	}
 	i.Scheduling = &scheduling
 	i.Metadata = imageConfig.metadata
+	var insertionOperationName string
 	if _, err := computeService.Instances.Get(*project, *zone, i.Name).Do(); err != nil {
 		op, err := computeService.Instances.Insert(*project, *zone, i).Do()
+
 		if err != nil {
 			ret := fmt.Sprintf("could not create instance %s: API error: %v", name, err)
 			if op != nil {
@@ -632,15 +634,37 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 			}
 			return "", fmt.Errorf(ret)
 		} else if op.Error != nil {
-			return "", fmt.Errorf("could not create instance %s: %+v", name, op.Error)
-		}
-	}
+			var errs []string
+			for _, insertErr := range op.Error.Errors {
+				errs = append(errs, fmt.Sprintf("%+v", insertErr))
+			}
+			return "", fmt.Errorf("could not create instance %s: %+v", name, errs)
 
+		}
+		insertionOperationName = op.Name
+	}
 	instanceRunning := false
 	for i := 0; i < 30 && !instanceRunning; i++ {
 		if i > 0 {
 			time.Sleep(time.Second * 20)
 		}
+		var insertionOperation *compute.Operation
+		insertionOperation, err = computeService.ZoneOperations.Get(*project, *zone, insertionOperationName).Do()
+		if err != nil {
+			continue
+		}
+		if strings.ToUpper(insertionOperation.Status) != "DONE" {
+			err = fmt.Errorf("instance insert operation %s not in state DONE, was %s", name, insertionOperation.Status)
+			continue
+		}
+		if insertionOperation.Error != nil {
+			var errs []string
+			for _, insertErr := range insertionOperation.Error.Errors {
+				errs = append(errs, fmt.Sprintf("%+v", insertErr))
+			}
+			return name, fmt.Errorf("could not create instance %s: %+v", name, errs)
+		}
+
 		var instance *compute.Instance
 		instance, err = computeService.Instances.Get(*project, *zone, name).Do()
 		if err != nil {
