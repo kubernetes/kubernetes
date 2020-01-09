@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -45,10 +46,6 @@ import (
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/plugin/pkg/admission/priority"
 	testutils "k8s.io/kubernetes/test/utils"
-
-	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
-
-	"k8s.io/klog"
 )
 
 var lowPriority, mediumPriority, highPriority = int32(100), int32(200), int32(300)

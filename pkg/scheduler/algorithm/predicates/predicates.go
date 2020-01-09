@@ -80,9 +80,6 @@ const (
 	NoVolumeZoneConflictPred = "NoVolumeZoneConflict"
 	// EvenPodsSpreadPred defines the name of predicate EvenPodsSpread.
 	EvenPodsSpreadPred = "EvenPodsSpread"
-
-	// KubeMaxPDVols defines the maximum number of PD Volumes per kubelet.
-	KubeMaxPDVols = "KUBE_MAX_PD_VOLS"
 )
 
 // IMPORTANT NOTE for predicate developers:
