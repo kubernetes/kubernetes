@@ -65,12 +65,12 @@ func (f *stripMetaManager) Update(liveObj, newObj runtime.Object, managed Manage
 
 // Apply implements Manager.
 func (f *stripMetaManager) Apply(liveObj, appliedObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
-	appliedObj, managed, err := f.fieldManager.Apply(liveObj, appliedObj, managed, manager, force)
+	newObj, managed, err := f.fieldManager.Apply(liveObj, appliedObj, managed, manager, force)
 	if err != nil {
 		return nil, nil, err
 	}
 	f.stripFields(managed.Fields(), manager)
-	return appliedObj, managed, nil
+	return newObj, managed, nil
 }
 
 // stripFields removes a predefined set of paths found in typed from managed

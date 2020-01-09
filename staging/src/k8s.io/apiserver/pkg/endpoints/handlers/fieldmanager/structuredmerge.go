@@ -137,15 +137,18 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 // Apply implements Manager.
 func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
 	// Check that the patch object has the same version as the live object
-	if patchObj.GetObjectKind().GroupVersionKind().GroupVersion() != f.groupVersion {
+	if patchVersion := patchObj.GetObjectKind().GroupVersionKind().GroupVersion(); patchVersion != f.groupVersion {
 		return nil, nil,
 			errors.NewBadRequest(
 				fmt.Sprintf("Incorrect version specified in apply patch. "+
 					"Specified patch version: %s, expected: %s",
-					patchObj.GetObjectKind().GroupVersionKind().GroupVersion(), f.groupVersion))
+					patchVersion, f.groupVersion))
 	}
 
 	patchObjMeta, err := meta.Accessor(patchObj)
+	if err != nil {
+		return nil, nil, fmt.Errorf("couldn't get accessor: %v", err)
+	}
 	if patchObjMeta.GetManagedFields() != nil {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("metadata.managedFields must be nil"))
 	}
