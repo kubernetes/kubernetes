@@ -11,10 +11,8 @@ go_library(
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/scheduler/algorithm:go_default_library",
-        "//pkg/scheduler/algorithm/priorities:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/apis/extender/v1:go_default_library",
-        "//pkg/scheduler/framework/plugins/migration:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
@@ -50,7 +48,6 @@ go_test(
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
-        "//pkg/scheduler/algorithm/priorities:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/apis/extender/v1:go_default_library",

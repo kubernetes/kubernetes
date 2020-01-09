@@ -38,7 +38,6 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	algorithmpredicates "k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
@@ -784,7 +783,6 @@ func TestGenericScheduler(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				cache,
 				internalqueue.NewSchedulingQueue(nil),
-				priorities.EmptyMetadataProducer,
 				snapshot,
 				fwk,
 				[]algorithm.SchedulerExtender{},
@@ -828,7 +826,6 @@ func makeScheduler(nodes []*v1.Node, fns ...st.RegisterPluginFunc) *genericSched
 	s := NewGenericScheduler(
 		cache,
 		internalqueue.NewSchedulingQueue(nil),
-		priorities.EmptyMetadataProducer,
 		emptySnapshot,
 		fwk,
 		nil, nil, nil, nil, false,
@@ -951,7 +948,6 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 		scheduler := NewGenericScheduler(
 			cache,
 			queue,
-			priorities.EmptyMetadataProducer,
 			emptySnapshot,
 			fwk,
 			nil, nil, nil, nil, false,
@@ -1107,15 +1103,6 @@ func TestZeroRequest(t *testing.T) {
 
 			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
 
-			metadataProducer := priorities.NewMetadataFactory(
-				informerFactory.Core().V1().Services().Lister(),
-				informerFactory.Core().V1().ReplicationControllers().Lister(),
-				informerFactory.Apps().V1().ReplicaSets().Lister(),
-				informerFactory.Apps().V1().StatefulSets().Lister(),
-			)
-
-			metadata := metadataProducer(test.pod, test.nodes, snapshot)
-
 			registry := framework.Registry{}
 			plugins := &schedulerapi.Plugins{
 				Filter:     &schedulerapi.PluginSet{},
@@ -1147,7 +1134,6 @@ func TestZeroRequest(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				nil,
 				nil,
-				metadataProducer,
 				emptySnapshot,
 				fwk,
 				[]algorithm.SchedulerExtender{},
@@ -1170,7 +1156,6 @@ func TestZeroRequest(t *testing.T) {
 				ctx,
 				state,
 				test.pod,
-				metadata,
 				test.nodes,
 			)
 			if err != nil {
@@ -1595,7 +1580,6 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				nil,
 				internalqueue.NewSchedulingQueue(nil),
-				priorities.EmptyMetadataProducer,
 				snapshot,
 				fwk,
 				[]algorithm.SchedulerExtender{},
@@ -2329,7 +2313,6 @@ func TestPreempt(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				cache,
 				internalqueue.NewSchedulingQueue(nil),
-				priorities.EmptyMetadataProducer,
 				snapshot,
 				fwk,
 				extenders,

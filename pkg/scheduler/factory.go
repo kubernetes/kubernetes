@@ -40,7 +40,6 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -146,12 +145,6 @@ func (c *Configurator) create(extenders []algorithm.SchedulerExtender) (*Schedul
 	algo := core.NewGenericScheduler(
 		c.schedulerCache,
 		podQueue,
-		priorities.NewMetadataFactory(
-			c.informerFactory.Core().V1().Services().Lister(),
-			c.informerFactory.Core().V1().ReplicationControllers().Lister(),
-			c.informerFactory.Apps().V1().ReplicaSets().Lister(),
-			c.informerFactory.Apps().V1().StatefulSets().Lister(),
-		),
 		c.nodeInfoSnapshot,
 		framework,
 		extenders,
@@ -228,7 +221,7 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 		priorityKeys = lr.DefaultPriorities
 	} else {
 		for _, priority := range policy.Priorities {
-			if priority.Name == priorities.EqualPriority {
+			if priority.Name == plugins.EqualPriority {
 				klog.V(2).Infof("Skip registering priority: %s", priority.Name)
 				continue
 			}
