@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/admission"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/client-go/informers"
@@ -214,6 +215,73 @@ func TestAssignsDefaultServiceAccountAndRejectsMissingAPIToken(t *testing.T) {
 	err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil)
 	if err == nil || !errors.IsServerTimeout(err) {
 		t.Errorf("Expected server timeout error for missing API token: %v", err)
+	}
+}
+
+func TestAssignsDefaultServiceAccountAndBoundTokenWithNoSecretTokens(t *testing.T) {
+	ns := "myns"
+
+	admit := NewServiceAccount()
+	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+	admit.SetExternalKubeInformerFactory(informerFactory)
+	admit.MountServiceAccountToken = true
+	admit.RequireAPIToken = true
+	admit.boundServiceAccountTokenVolume = true
+
+	// Add the default service account for the ns into the cache
+	informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      DefaultServiceAccountName,
+			Namespace: ns,
+		},
+	})
+
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{{}},
+		},
+	}
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+	err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil)
+	if err != nil {
+		t.Fatalf("Expected success, got: %v", err)
+	}
+
+	expectedVolumes := []api.Volume{{
+		Name: "cleared",
+		VolumeSource: api.VolumeSource{
+			Projected: &api.ProjectedVolumeSource{
+				Sources: []api.VolumeProjection{
+					{ServiceAccountToken: &api.ServiceAccountTokenProjection{ExpirationSeconds: 3600, Path: "token"}},
+					{ConfigMap: &api.ConfigMapProjection{LocalObjectReference: api.LocalObjectReference{Name: "kube-root-ca.crt"}, Items: []api.KeyToPath{{Key: "ca.crt", Path: "ca.crt"}}}},
+					{DownwardAPI: &api.DownwardAPIProjection{Items: []api.DownwardAPIVolumeFile{{Path: "namespace", FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.namespace"}}}}},
+				},
+			},
+		},
+	}}
+	expectedVolumeMounts := []api.VolumeMount{{
+		Name:      "cleared",
+		ReadOnly:  true,
+		MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+	}}
+
+	// clear generated volume names
+	for i := range pod.Spec.Volumes {
+		if len(pod.Spec.Volumes[i].Name) > 0 {
+			pod.Spec.Volumes[i].Name = "cleared"
+		}
+	}
+	for i := range pod.Spec.Containers[0].VolumeMounts {
+		if len(pod.Spec.Containers[0].VolumeMounts[i].Name) > 0 {
+			pod.Spec.Containers[0].VolumeMounts[i].Name = "cleared"
+		}
+	}
+
+	if !reflect.DeepEqual(expectedVolumes, pod.Spec.Volumes) {
+		t.Errorf("unexpected volumes: %s", diff.ObjectReflectDiff(expectedVolumes, pod.Spec.Volumes))
+	}
+	if !reflect.DeepEqual(expectedVolumeMounts, pod.Spec.Containers[0].VolumeMounts) {
+		t.Errorf("unexpected volumes: %s", diff.ObjectReflectDiff(expectedVolumeMounts, pod.Spec.Containers[0].VolumeMounts))
 	}
 }
 
