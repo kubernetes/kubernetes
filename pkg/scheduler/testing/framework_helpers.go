@@ -35,6 +35,11 @@ func RegisterScorePlugin(pluginName string, pluginNewFunc framework.PluginFactor
 	return RegisterPluginAsExtensions(pluginName, weight, pluginNewFunc, "Score")
 }
 
+// RegisterPostFilterPlugin returns a function to register a Score Plugin to a given registry.
+func RegisterPostFilterPlugin(pluginName string, pluginNewFunc framework.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, 1, pluginNewFunc, "PostFilter")
+}
+
 // RegisterPluginAsExtensions returns a function to register a Plugin as given extensionPoints to a given registry.
 func RegisterPluginAsExtensions(pluginName string, weight int32, pluginNewFunc framework.PluginFactory, extensions ...string) RegisterPluginFunc {
 	return func(reg *framework.Registry, plugins *schedulerapi.Plugins, pluginConfigs []schedulerapi.PluginConfig) {

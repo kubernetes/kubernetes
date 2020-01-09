@@ -122,6 +122,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				},
 				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
+					{Name: "DefaultPodTopologySpread"},
 					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
@@ -201,6 +202,7 @@ kind: Policy
 				},
 				"PostFilterPlugin": {
 					{Name: "InterPodAffinity"},
+					{Name: "DefaultPodTopologySpread"},
 					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {

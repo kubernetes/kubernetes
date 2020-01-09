@@ -111,6 +111,7 @@ func getDefaultConfig(hardPodAffinityWeight int64) *Config {
 			PostFilter: &schedulerapi.PluginSet{
 				Enabled: []schedulerapi.Plugin{
 					{Name: interpodaffinity.Name},
+					{Name: defaultpodtopologyspread.Name},
 					{Name: tainttoleration.Name},
 				},
 			},
