@@ -60,7 +60,10 @@ type QueueSet interface {
 	// executing the request and, once the request finishes execution
 	// or is canceled, call afterExecution().  Otherwise the client
 	// should not execute the request and afterExecution is
-	// irrelevant.
+	// irrelevant.  Canceling the context while the request is waiting
+	// in its queue will cut short that wait and cause a return with
+	// tryAnother and execute both false; later cancellations are the
+	// caller's problem.
 	Wait(ctx context.Context, hashValue uint64, descr1, descr2 interface{}) (tryAnother, execute bool, afterExecution func())
 }
 

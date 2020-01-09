@@ -211,6 +211,11 @@ const (
 func (qs *queueSet) Wait(ctx context.Context, hashValue uint64, descr1, descr2 interface{}) (tryAnother, execute bool, afterExecution func()) {
 	var req *request
 	decision := func() requestDecision {
+		// Decide what to do and update metrics accordingly.  Metrics
+		// about total requests queued and executing are updated on
+		// each way out of this function rather than in lower level
+		// functions because there can be multiple lower level changes
+		// in one invocation here.
 		qs.lockAndSyncTime()
 		defer qs.lock.Unlock()
 		// A call to Wait while the system is quiescing will be rebuffed by
@@ -229,6 +234,7 @@ func (qs *queueSet) Wait(ctx context.Context, hashValue uint64, descr1, descr2 i
 				return decisionReject
 			}
 			req = qs.dispatchSansQueue(descr1, descr2)
+			metrics.UpdateFlowControlRequestsExecuting(qs.config.Name, qs.totRequestsExecuting)
 			return decisionExecute
 		}
 
@@ -240,6 +246,7 @@ func (qs *queueSet) Wait(ctx context.Context, hashValue uint64, descr1, descr2 i
 		// we are at max queue length
 		// 4) If not rejected, create a request and enqueue
 		req = qs.timeoutOldRequestsAndRejectOrEnqueueLocked(hashValue, descr1, descr2)
+		defer metrics.UpdateFlowControlRequestsInQueue(qs.config.Name, qs.totRequestsWaiting)
 		// req == nil means that the request was rejected - no remaining
 		// concurrency shares and at max queue length already
 		if req == nil {
@@ -258,6 +265,7 @@ func (qs *queueSet) Wait(ctx context.Context, hashValue uint64, descr1, descr2 i
 		// fair queuing technique to pick a queue and dispatch a
 		// request from that queue.
 		qs.dispatchAsMuchAsPossibleLocked()
+		defer metrics.UpdateFlowControlRequestsExecuting(qs.config.Name, qs.totRequestsExecuting)
 
 		// ========================================================================
 		// Step 3:
@@ -275,7 +283,7 @@ func (qs *queueSet) Wait(ctx context.Context, hashValue uint64, descr1, descr2 i
 				select {
 				case <-doneCh:
 					klog.V(6).Infof("QS(%s): Context of request %#+v %#+v is Done", qs.config.Name, descr1, descr2)
-					req.decision.Set(decisionCancel)
+					qs.cancelWait(req)
 				}
 				qs.goroutineDoneOrBlocked()
 			}()
@@ -286,40 +294,24 @@ func (qs *queueSet) Wait(ctx context.Context, hashValue uint64, descr1, descr2 i
 		// The final step in Wait is to wait on a decision from
 		// somewhere and then act on it.
 		decisionAny := req.decision.GetLocked()
-		var decision requestDecision
-		switch dec := decisionAny.(type) {
-		case requestDecision:
-			decision = dec
-		default:
+		qs.syncTimeLocked()
+		decision, isDecision := decisionAny.(requestDecision)
+		if !isDecision {
 			klog.Errorf("QS(%s): Impossible decision %#+v (of type %T) for request %#+v %#+v", qs.config.Name, decisionAny, decisionAny, descr1, descr2)
-			decision = decisionExecute
+			decision = decisionExecute // yeah, this is a no-op
 		}
 		switch decision {
 		case decisionReject:
 			klog.V(5).Infof("QS(%s): request %#+v %#+v timed out after being enqueued\n", qs.config.Name, descr1, descr2)
 			metrics.AddReject(qs.config.Name, "time-out")
 		case decisionCancel:
-			qs.syncTimeLocked()
-			// TODO(aaron-prindle) add metrics to these two cases
-			if req.isWaiting {
-				klog.V(5).Infof("QS(%s): Ejecting request %#+v %#+v from its queue", qs.config.Name, descr1, descr2)
-				// remove the request from the queue as it has timed out
-				for i := range req.queue.requests {
-					if req == req.queue.requests[i] {
-						// remove the request
-						req.queue.requests = append(req.queue.requests[:i],
-							req.queue.requests[i+1:]...)
-						break
-					}
-				}
-				// At this point, if the qs is quiescing,
-				// has zero requests executing, and has zero requests enqueued
-				// then a call to the EmptyHandler should be forked.
-				qs.maybeForkEmptyHandlerLocked()
-			} else {
-				klog.V(5).Infof("QS(%s): request %#+v %#+v canceled shortly after dispatch", qs.config.Name, descr1, descr2)
-			}
+			// TODO(aaron-prindle) add metrics for this case
+			klog.V(5).Infof("QS(%s): Ejecting request %#+v %#+v from its queue", qs.config.Name, descr1, descr2)
 		}
+		// At this point, if the qs is quiescing,
+		// has zero requests executing, and has zero requests enqueued
+		// then a call to the EmptyHandler should be forked.
+		qs.maybeForkEmptyHandlerLocked()
 		return decision
 	}()
 	switch decision {
@@ -395,7 +387,7 @@ func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(hashValue uint64,
 
 	// Create a request and enqueue
 	req := &request{
-		decision:    lockingpromise.NewLockingPromise(&qs.lock, qs.counter),
+		decision:    lockingpromise.NewWriteOnce(&qs.lock, qs.counter),
 		arrivalTime: qs.clock.Now(),
 		queue:       queue,
 		descr1:      descr1,
@@ -484,7 +476,6 @@ func (qs *queueSet) enqueueLocked(request *request) {
 	}
 	queue.Enqueue(request)
 	qs.totRequestsWaiting++
-	metrics.UpdateFlowControlRequestsInQueue(qs.config.Name, qs.totRequestsWaiting)
 }
 
 // dispatchAsMuchAsPossibleLocked runs a loop, as long as there
@@ -514,7 +505,6 @@ func (qs *queueSet) dispatchSansQueue(descr1, descr2 interface{}) *request {
 	if klog.V(5) {
 		klog.Infof("QS(%s) at r=%s v=%.9fs: immediate dispatch of request %#+v %#+v, qs will have %d executing", qs.config.Name, now.Format(nsTimeFmt), qs.virtualTime, descr1, descr2, qs.totRequestsExecuting)
 	}
-	metrics.UpdateFlowControlRequestsExecuting(qs.config.Name, qs.totRequestsExecuting)
 	return req
 }
 
@@ -532,7 +522,11 @@ func (qs *queueSet) dispatchLocked() bool {
 		return false
 	}
 	request.startTime = qs.clock.Now()
-	// request dequeued, service has started
+	// At this moment the request leaves its queue and starts
+	// executing.  We do not recognize any interim state between
+	// "queued" and "executing".  While that means "executing"
+	// includes a little overhead from this package, this is not a
+	// problem because other overhead is also included.
 	qs.totRequestsWaiting--
 	qs.totRequestsExecuting++
 	queue.requestsExecuting++
@@ -541,9 +535,31 @@ func (qs *queueSet) dispatchLocked() bool {
 	}
 	// When a request is dequeued for service -> qs.virtualStart += G
 	queue.virtualStart += qs.estimatedServiceTime
-	metrics.UpdateFlowControlRequestsExecuting(qs.config.Name, qs.totRequestsExecuting)
 	request.decision.SetLocked(decisionExecute)
 	return ok
+}
+
+// cancelWait ensures the request is not waiting
+func (qs *queueSet) cancelWait(req *request) {
+	qs.lock.Lock()
+	defer qs.lock.Unlock()
+	if req.decision.IsSetLocked() {
+		// The request has already been removed from the queue
+		// and so we consider its wait to be over.
+		return
+	}
+	req.decision.SetLocked(decisionCancel)
+	queue := req.queue
+	// remove the request from the queue as it has timed out
+	for i := range queue.requests {
+		if req == queue.requests[i] {
+			// remove the request
+			queue.requests = append(queue.requests[:i], queue.requests[i+1:]...)
+			qs.totRequestsWaiting--
+			break
+		}
+	}
+	return
 }
 
 // selectQueueLocked examines the queues in round robin order and
@@ -583,6 +599,8 @@ func (qs *queueSet) finishRequestAndDispatchAsMuchAsPossible(req *request) {
 
 	qs.finishRequestLocked(req)
 	qs.dispatchAsMuchAsPossibleLocked()
+	metrics.UpdateFlowControlRequestsInQueue(qs.config.Name, qs.totRequestsWaiting)
+	metrics.UpdateFlowControlRequestsExecuting(qs.config.Name, qs.totRequestsExecuting)
 }
 
 // finishRequestLocked is a callback that should be used when a
@@ -590,7 +608,6 @@ func (qs *queueSet) finishRequestAndDispatchAsMuchAsPossible(req *request) {
 // callback updates important state in the queueSet
 func (qs *queueSet) finishRequestLocked(r *request) {
 	qs.totRequestsExecuting--
-	metrics.UpdateFlowControlRequestsExecuting(qs.config.Name, qs.totRequestsExecuting)
 
 	if r.queue == nil {
 		if klog.V(6) {
