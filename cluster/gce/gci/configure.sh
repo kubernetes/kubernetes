@@ -292,6 +292,11 @@ function install-exec-auth-plugin {
   local -r plugin_url="${EXEC_AUTH_PLUGIN_URL}"
   local -r plugin_sha1="${EXEC_AUTH_PLUGIN_SHA1}"
 
+  if is-preloaded "gke-exec-auth-plugin" "${plugin_sha1}"; then
+    echo "gke-exec-auth-plugin is preloaded"
+    return
+  fi
+
   echo "Downloading gke-exec-auth-plugin binary"
   download-or-bust "${plugin_sha1}" "${plugin_url}"
   mv "${KUBE_HOME}/gke-exec-auth-plugin" "${KUBE_BIN}/gke-exec-auth-plugin"
