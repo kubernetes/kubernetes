@@ -23,7 +23,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
@@ -261,7 +260,7 @@ func TestTaintTolerationScore(t *testing.T) {
 }
 
 func TestTaintTolerationFilter(t *testing.T) {
-	unschedulable := framework.NewStatus(framework.UnschedulableAndUnresolvable, predicates.ErrTaintsTolerationsNotMatch.GetReason())
+	unschedulable := framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNotMatch)
 	tests := []struct {
 		name       string
 		pod        *v1.Pod
@@ -335,6 +334,209 @@ func TestTaintTolerationFilter(t *testing.T) {
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			}
+		})
+	}
+}
+
+func TestPodToleratesTaints(t *testing.T) {
+	podTolerateTaintsTests := []struct {
+		pod  *v1.Pod
+		node v1.Node
+		fits bool
+		name string
+	}{
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod0",
+				},
+			},
+			node: v1.Node{
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}},
+				},
+			},
+			fits: false,
+			name: "A pod having no tolerations can't be scheduled onto a node with nonempty taints",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod1",
+				},
+				Spec: v1.PodSpec{
+					Containers:  []v1.Container{{Image: "pod1:V1"}},
+					Tolerations: []v1.Toleration{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}},
+				},
+			},
+			node: v1.Node{
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}},
+				},
+			},
+			fits: true,
+			name: "A pod which can be scheduled on a dedicated node assigned to user1 with effect NoSchedule",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod2",
+				},
+				Spec: v1.PodSpec{
+					Containers:  []v1.Container{{Image: "pod2:V1"}},
+					Tolerations: []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}},
+				},
+			},
+			node: v1.Node{
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}},
+				},
+			},
+			fits: false,
+			name: "A pod which can't be scheduled on a dedicated node assigned to user2 with effect NoSchedule",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod2",
+				},
+				Spec: v1.PodSpec{
+					Containers:  []v1.Container{{Image: "pod2:V1"}},
+					Tolerations: []v1.Toleration{{Key: "foo", Operator: "Exists", Effect: "NoSchedule"}},
+				},
+			},
+			node: v1.Node{
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{{Key: "foo", Value: "bar", Effect: "NoSchedule"}},
+				},
+			},
+			fits: true,
+			name: "A pod can be scheduled onto the node, with a toleration uses operator Exists that tolerates the taints on the node",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod2",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Image: "pod2:V1"}},
+					Tolerations: []v1.Toleration{
+						{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"},
+						{Key: "foo", Operator: "Exists", Effect: "NoSchedule"},
+					},
+				},
+			},
+			node: v1.Node{
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{Key: "dedicated", Value: "user2", Effect: "NoSchedule"},
+						{Key: "foo", Value: "bar", Effect: "NoSchedule"},
+					},
+				},
+			},
+			fits: true,
+			name: "A pod has multiple tolerations, node has multiple taints, all the taints are tolerated, pod can be scheduled onto the node",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod2",
+				},
+				Spec: v1.PodSpec{
+					Containers:  []v1.Container{{Image: "pod2:V1"}},
+					Tolerations: []v1.Toleration{{Key: "foo", Operator: "Equal", Value: "bar", Effect: "PreferNoSchedule"}},
+				},
+			},
+			node: v1.Node{
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{Key: "foo", Value: "bar", Effect: "NoSchedule"},
+					},
+				},
+			},
+			fits: false,
+			name: "A pod has a toleration that keys and values match the taint on the node, but (non-empty) effect doesn't match, " +
+				"can't be scheduled onto the node",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod2",
+				},
+				Spec: v1.PodSpec{
+					Containers:  []v1.Container{{Image: "pod2:V1"}},
+					Tolerations: []v1.Toleration{{Key: "foo", Operator: "Equal", Value: "bar"}},
+				},
+			},
+			node: v1.Node{
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{Key: "foo", Value: "bar", Effect: "NoSchedule"},
+					},
+				},
+			},
+			fits: true,
+			name: "The pod has a toleration that keys and values match the taint on the node, the effect of toleration is empty, " +
+				"and the effect of taint is NoSchedule. Pod can be scheduled onto the node",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod2",
+				},
+				Spec: v1.PodSpec{
+					Containers:  []v1.Container{{Image: "pod2:V1"}},
+					Tolerations: []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}},
+				},
+			},
+			node: v1.Node{
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{Key: "dedicated", Value: "user1", Effect: "PreferNoSchedule"},
+					},
+				},
+			},
+			fits: true,
+			name: "The pod has a toleration that key and value don't match the taint on the node, " +
+				"but the effect of taint on node is PreferNochedule. Pod can be scheduled onto the node",
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod2",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Image: "pod2:V1"}},
+				},
+			},
+			node: v1.Node{
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{Key: "dedicated", Value: "user1", Effect: "PreferNoSchedule"},
+					},
+				},
+			},
+			fits: true,
+			name: "The pod has no toleration, " +
+				"but the effect of taint on node is PreferNochedule. Pod can be scheduled onto the node",
+		},
+	}
+	expectedFailureReasons := []string{ErrReasonNotMatch}
+
+	for _, test := range podTolerateTaintsTests {
+		t.Run(test.name, func(t *testing.T) {
+			nodeInfo := schedulernodeinfo.NewNodeInfo()
+			nodeInfo.SetNode(&test.node)
+			fits, reasons, err := PodToleratesNodeTaints(test.pod, nodeInfo)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+				t.Errorf("unexpected failure reason: %v, want: %v", reasons, expectedFailureReasons)
+			}
+			if fits != test.fits {
+				t.Errorf("expected: %v got %v", test.fits, fits)
 			}
 		})
 	}

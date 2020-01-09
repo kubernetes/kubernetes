@@ -33,8 +33,6 @@ var (
 
 	// ErrNodeSelectorNotMatch is used for MatchNodeSelector predicate error.
 	ErrNodeSelectorNotMatch = NewPredicateFailureError("MatchNodeSelector", "node(s) didn't match node selector")
-	// ErrTaintsTolerationsNotMatch is used for PodToleratesNodeTaints predicate error.
-	ErrTaintsTolerationsNotMatch = NewPredicateFailureError("PodToleratesNodeTaints", "node(s) had taints that the pod didn't tolerate")
 	// ErrPodNotMatchHostName is used for HostName predicate error.
 	ErrPodNotMatchHostName = NewPredicateFailureError("HostName", "node(s) didn't match the requested hostname")
 	// ErrPodNotFitsHostPorts is used for PodFitsHostPorts predicate error.
@@ -51,10 +49,6 @@ var (
 	ErrNodeNotReady = NewPredicateFailureError("NodeNotReady", "node(s) were not ready")
 	// ErrNodeNetworkUnavailable is used for NodeNetworkUnavailable predicate error.
 	ErrNodeNetworkUnavailable = NewPredicateFailureError("NodeNetworkUnavailable", "node(s) had unavailable network")
-	// ErrNodeUnschedulable is used for NodeUnschedulable predicate error.
-	ErrNodeUnschedulable = NewPredicateFailureError("NodeUnschedulable", "node(s) were unschedulable")
-	// ErrNodeUnknownCondition is used for NodeUnknownCondition predicate error.
-	ErrNodeUnknownCondition = NewPredicateFailureError("NodeUnknownCondition", "node(s) had unknown conditions")
 	// ErrTopologySpreadConstraintsNotMatch is used for EvenPodsSpread predicate error.
 	ErrTopologySpreadConstraintsNotMatch = NewPredicateFailureError("EvenPodsSpreadNotMatch", "node(s) didn't match pod topology spread constraints")
 	// ErrFakePredicate is used for test only. The fake predicates returning false also returns error
@@ -65,7 +59,6 @@ var (
 var unresolvablePredicateFailureErrors = map[PredicateFailureReason]struct{}{
 	ErrNodeSelectorNotMatch:      {},
 	ErrPodNotMatchHostName:       {},
-	ErrTaintsTolerationsNotMatch: {},
 	// Node conditions won't change when scheduler simulates removal of preemption victims.
 	// So, it is pointless to try nodes that have not been able to host the pod due to node
 	// conditions. These include ErrNodeNotReady, ErrNodeUnderPIDPressure, ErrNodeUnderMemoryPressure, ....
@@ -74,8 +67,6 @@ var unresolvablePredicateFailureErrors = map[PredicateFailureReason]struct{}{
 	ErrNodeUnderDiskPressure:   {},
 	ErrNodeUnderPIDPressure:    {},
 	ErrNodeUnderMemoryPressure: {},
-	ErrNodeUnschedulable:       {},
-	ErrNodeUnknownCondition:    {},
 }
 
 // UnresolvablePredicateExists checks if there is at least one unresolvable predicate failure reason.

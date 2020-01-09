@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -44,6 +43,11 @@ const (
 	Name = "TaintToleration"
 	// postFilterStateKey is the key in CycleState to InterPodAffinity pre-computed data for Scoring.
 	postFilterStateKey = "PostFilter" + Name
+
+	// ErrReasonUnknownCondition is used for NodeUnknownCondition predicate error.
+	ErrReasonUnknownCondition = "node(s) had unknown conditions"
+	// ErrReasonNotMatch is used for PodToleratesNodeTaints predicate error.
+	ErrReasonNotMatch = "node(s) had taints that the pod didn't tolerate"
 )
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -53,8 +57,7 @@ func (pl *TaintToleration) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
-	// Note that PodToleratesNodeTaints doesn't use predicate metadata, hence passing nil here.
-	_, reasons, err := predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
+	_, reasons, err := PodToleratesNodeTaints(pod, nodeInfo)
 	return migration.PredicateResultToFrameworkStatus(reasons, err)
 }
 
@@ -154,4 +157,28 @@ func (pl *TaintToleration) ScoreExtensions() framework.ScoreExtensions {
 // New initializes a new plugin and returns it.
 func New(_ *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin, error) {
 	return &TaintToleration{handle: h}, nil
+}
+
+// PodToleratesNodeTaints checks if pod toleration can tolerate the node taints.
+func PodToleratesNodeTaints(pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) (bool, []string, error) {
+	if nodeInfo == nil || nodeInfo.Node() == nil {
+		return false, []string{ErrReasonUnknownCondition}, nil
+	}
+
+	return podToleratesNodeTaints(pod, nodeInfo, func(t *v1.Taint) bool {
+		// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
+		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
+	})
+}
+
+func podToleratesNodeTaints(pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo, filter func(t *v1.Taint) bool) (bool, []string, error) {
+	taints, err := nodeInfo.Taints()
+	if err != nil {
+		return false, nil, err
+	}
+
+	if v1helper.TolerationsTolerateTaintsWithFilter(pod.Spec.Tolerations, taints, filter) {
+		return true, nil, nil
+	}
+	return false, []string{ErrReasonNotMatch}, nil
 }
