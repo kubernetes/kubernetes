@@ -4,9 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "error.go",
-        "metadata.go",
         "predicates.go",
-        "utils.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/algorithm/predicates",
     visibility = ["//visibility:public"],
@@ -25,10 +23,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "predicates_test.go",
-        "utils_test.go",
-    ],
+    srcs = ["predicates_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
