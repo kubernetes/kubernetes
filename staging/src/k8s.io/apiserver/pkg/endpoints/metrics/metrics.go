@@ -74,16 +74,6 @@ var (
 		// should be all lowercase and separated by underscores.
 		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component", "client", "contentType", "code"},
 	)
-	// TODO(logicalhan): remove this deprecated metrics after fixing the dependencies
-	deprecatedRequestCounter = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Name:              "apiserver_request_count",
-			Help:              "Counter of apiserver requests broken out for each verb, group, version, resource, scope, component, client, and HTTP response contentType and code.",
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
-		},
-		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component", "client", "contentType", "code"},
-	)
 	longRunningRequestGauge = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Name:           "apiserver_longrunning_gauge",
@@ -104,19 +94,6 @@ var (
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component"},
-	)
-	// TODO(wojtek-t): remove this deprecated metrics after fixing the dependencies
-	deprecatedRequestLatenciesSummary = compbasemetrics.NewSummaryVec(
-		&compbasemetrics.SummaryOpts{
-			Name: "apiserver_request_latencies_summary",
-			Help: "Response latency summary in microseconds for each verb, group, version, resource, subresource, scope and component.",
-			// Make the sliding window of 5h.
-			// TODO: The value for this should be based on our SLI definition (medium term).
-			MaxAge:            5 * time.Hour,
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
-		},
-		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
 	responseSizes = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
@@ -186,10 +163,8 @@ var (
 
 	metrics = []resettableCollector{
 		requestCounter,
-		deprecatedRequestCounter,
 		longRunningRequestGauge,
 		requestLatencies,
-		deprecatedRequestLatenciesSummary,
 		responseSizes,
 		DroppedRequests,
 		RegisteredWatchers,
@@ -282,12 +257,9 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 	reportedVerb := cleanVerb(verb, req)
 	dryRun := cleanDryRun(req.URL)
 	client := cleanUserAgent(utilnet.GetHTTPClient(req))
-	elapsedMicroseconds := float64(elapsed / time.Microsecond)
 	elapsedSeconds := elapsed.Seconds()
 	requestCounter.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, client, contentType, codeToString(httpCode)).Inc()
-	deprecatedRequestCounter.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component, client, contentType, codeToString(httpCode)).Inc()
 	requestLatencies.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
-	deprecatedRequestLatenciesSummary.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(elapsedMicroseconds)
 	// We are only interested in response sizes of read requests.
 	if verb == "GET" || verb == "LIST" {
 		responseSizes.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(float64(respSize))
