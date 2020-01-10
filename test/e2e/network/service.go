@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -853,13 +854,13 @@ var _ = SIGDescribe("Services", func() {
 
 	ginkgo.It("should preserve source pod IP for traffic thru service cluster IP [LinuxOnly]", func() {
 		// this test is creating a pod with HostNetwork=true, which is not supported on Windows.
-		framework.SkipIfNodeOSDistroIs("windows")
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		// This behavior is not supported if Kube-proxy is in "userspace" mode.
 		// So we check the kube-proxy mode and skip this test if that's the case.
 		if proxyMode, err := proxyMode(f); err == nil {
 			if proxyMode == "userspace" {
-				framework.Skipf("The test doesn't work with kube-proxy in userspace mode")
+				e2eskipper.Skipf("The test doesn't work with kube-proxy in userspace mode")
 			}
 		} else {
 			framework.Logf("Couldn't detect KubeProxy mode - test failure may be expected: %v", err)
@@ -886,7 +887,7 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 		nodeCounts := len(nodes.Items)
 		if nodeCounts < 2 {
-			framework.Skipf("The test requires at least two ready nodes on %s, but found %v", framework.TestContext.Provider, nodeCounts)
+			e2eskipper.Skipf("The test requires at least two ready nodes on %s, but found %v", framework.TestContext.Provider, nodeCounts)
 		}
 
 		ginkgo.By("Creating a webserver pod to be part of the TCP service which echoes back source ip")
@@ -967,9 +968,9 @@ var _ = SIGDescribe("Services", func() {
 	ginkgo.It("should be able to up and down services", func() {
 		// TODO: use the ServiceTestJig here
 		// this test uses e2essh.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
-		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		// this test does not work if the Node does not support SSH Key
-		framework.SkipUnlessSSHKeyPresent()
+		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, defaultServeHostnameServicePort
@@ -1025,8 +1026,8 @@ var _ = SIGDescribe("Services", func() {
 
 	ginkgo.It("should work after restarting kube-proxy [Disruptive]", func() {
 		// TODO: use the ServiceTestJig here
-		framework.SkipUnlessProviderIs("gce", "gke")
-		framework.SkipUnlessSSHKeyPresent()
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, defaultServeHostnameServicePort
@@ -1070,8 +1071,8 @@ var _ = SIGDescribe("Services", func() {
 
 	ginkgo.It("should work after restarting apiserver [Disruptive]", func() {
 		// TODO: use the ServiceTestJig here
-		framework.SkipUnlessProviderIs("gce", "gke")
-		framework.SkipUnlessSSHKeyPresent()
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, 80
@@ -1150,7 +1151,7 @@ var _ = SIGDescribe("Services", func() {
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 	ginkgo.It("should be able to change the type and ports of a service [Slow] [DisabledForLargeClusters]", func() {
 		// requires cloud load-balancer support
-		framework.SkipUnlessProviderIs("gce", "gke", "aws")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 
 		loadBalancerSupportsUDP := !framework.ProviderIs("aws")
 
@@ -2080,7 +2081,7 @@ var _ = SIGDescribe("Services", func() {
 
 	ginkgo.It("should only allow access from service loadbalancer source ranges [Slow]", func() {
 		// this feature currently supported only on GCE/GKE/AWS
-		framework.SkipUnlessProviderIs("gce", "gke", "aws")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 
 		loadBalancerLagTimeout := e2eservice.LoadBalancerLagTimeoutDefault
 		if framework.ProviderIs("aws") {
@@ -2160,7 +2161,7 @@ var _ = SIGDescribe("Services", func() {
 
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 	ginkgo.It("should be able to create an internal type load balancer [Slow] [DisabledForLargeClusters]", func() {
-		framework.SkipUnlessProviderIs("azure", "gke", "gce")
+		e2eskipper.SkipUnlessProviderIs("azure", "gke", "gce")
 
 		createTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
 		pollInterval := framework.Poll * 10
@@ -2284,8 +2285,8 @@ var _ = SIGDescribe("Services", func() {
 		const gceHcCheckIntervalSeconds = int64(8)
 		// This test is for clusters on GCE.
 		// (It restarts kube-controller-manager, which we don't support on GKE)
-		framework.SkipUnlessProviderIs("gce")
-		framework.SkipUnlessSSHKeyPresent()
+		e2eskipper.SkipUnlessProviderIs("gce")
+		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		clusterID, err := gce.GetClusterID(cs)
 		if err != nil {
@@ -2383,7 +2384,7 @@ var _ = SIGDescribe("Services", func() {
 	// [LinuxOnly]: Windows does not support session affinity.
 	ginkgo.It("should have session affinity work for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters] [LinuxOnly]", func() {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
-		framework.SkipIfProviderIs("aws")
+		e2eskipper.SkipIfProviderIs("aws")
 
 		svc := getServeHostnameService("affinity-lb-esipp")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
@@ -2395,7 +2396,7 @@ var _ = SIGDescribe("Services", func() {
 	// [LinuxOnly]: Windows does not support session affinity.
 	ginkgo.It("should be able to switch session affinity for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters] [LinuxOnly]", func() {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
-		framework.SkipIfProviderIs("aws")
+		e2eskipper.SkipIfProviderIs("aws")
 
 		svc := getServeHostnameService("affinity-lb-esipp-transition")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
@@ -2407,7 +2408,7 @@ var _ = SIGDescribe("Services", func() {
 	// [LinuxOnly]: Windows does not support session affinity.
 	ginkgo.It("should have session affinity work for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters] [LinuxOnly]", func() {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
-		framework.SkipIfProviderIs("aws")
+		e2eskipper.SkipIfProviderIs("aws")
 
 		svc := getServeHostnameService("affinity-lb")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
@@ -2419,7 +2420,7 @@ var _ = SIGDescribe("Services", func() {
 	// [LinuxOnly]: Windows does not support session affinity.
 	ginkgo.It("should be able to switch session affinity for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters] [LinuxOnly]", func() {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
-		framework.SkipIfProviderIs("aws")
+		e2eskipper.SkipIfProviderIs("aws")
 
 		svc := getServeHostnameService("affinity-lb-transition")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
@@ -2429,9 +2430,9 @@ var _ = SIGDescribe("Services", func() {
 
 	ginkgo.It("should implement service.kubernetes.io/service-proxy-name", func() {
 		// this test uses e2essh.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
-		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		// this test does not work if the Node does not support SSH Key
-		framework.SkipUnlessSSHKeyPresent()
+		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, defaultServeHostnameServicePort
@@ -2492,9 +2493,9 @@ var _ = SIGDescribe("Services", func() {
 
 	ginkgo.It("should implement service.kubernetes.io/headless", func() {
 		// this test uses e2essh.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
-		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		// this test does not work if the Node does not support SSH Key
-		framework.SkipUnlessSSHKeyPresent()
+		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, defaultServeHostnameServicePort
@@ -2661,7 +2662,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// requires cloud load-balancer support - this feature currently supported only on GCE/GKE
-		framework.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 
 		cs = f.ClientSet
 		loadBalancerCreateTimeout = e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
