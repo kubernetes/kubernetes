@@ -27,7 +27,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/scheduler/algorithm/predicates:all-srcs",
-        "//pkg/scheduler/algorithm/priorities:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
