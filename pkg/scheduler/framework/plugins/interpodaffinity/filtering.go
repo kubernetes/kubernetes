@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
-	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -154,7 +153,7 @@ func (m topologyToMatchedTermCount) updateWithAffinityTerms(targetPod *v1.Pod, t
 func (m topologyToMatchedTermCount) updateWithAntiAffinityTerms(targetPod *v1.Pod, targetPodNode *v1.Node, antiAffinityTerms []*affinityTerm, value int64) {
 	// Check anti-affinity terms.
 	for _, a := range antiAffinityTerms {
-		if priorityutil.PodMatchesTermsNamespaceAndSelector(targetPod, a.namespaces, a.selector) {
+		if schedutil.PodMatchesTermsNamespaceAndSelector(targetPod, a.namespaces, a.selector) {
 			if topologyValue, ok := targetPodNode.Labels[a.topologyKey]; ok {
 				pair := topologyPair{key: a.topologyKey, value: topologyValue}
 				m[pair] += value
@@ -184,7 +183,7 @@ func getAffinityTerms(pod *v1.Pod, v1Terms []v1.PodAffinityTerm) ([]*affinityTer
 
 	var terms []*affinityTerm
 	for _, term := range v1Terms {
-		namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term)
+		namespaces := schedutil.GetNamespacesFromPodAffinityTerm(pod, &term)
 		selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 		if err != nil {
 			return nil, err
@@ -200,7 +199,7 @@ func podMatchesAllAffinityTerms(pod *v1.Pod, terms []*affinityTerm) bool {
 		return false
 	}
 	for _, term := range terms {
-		if !priorityutil.PodMatchesTermsNamespaceAndSelector(pod, term.namespaces, term.selector) {
+		if !schedutil.PodMatchesTermsNamespaceAndSelector(pod, term.namespaces, term.selector) {
 			return false
 		}
 	}
@@ -487,7 +486,7 @@ func (pl *InterPodAffinity) podMatchesPodAffinityTerms(pod, targetPod *v1.Pod, n
 		if len(term.TopologyKey) == 0 {
 			return false, false, fmt.Errorf("empty topologyKey is not allowed except for PreferredDuringScheduling pod anti-affinity")
 		}
-		if !priorityutil.NodesHaveSameTopologyKey(nodeInfo.Node(), targetPodNodeInfo.Node(), term.TopologyKey) {
+		if !schedutil.NodesHaveSameTopologyKey(nodeInfo.Node(), targetPodNodeInfo.Node(), term.TopologyKey) {
 			return false, true, nil
 		}
 	}
@@ -509,8 +508,8 @@ func getMatchingAntiAffinityTopologyPairsOfPod(newPod *v1.Pod, existingPod *v1.P
 		if err != nil {
 			return nil, err
 		}
-		namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
-		if priorityutil.PodMatchesTermsNamespaceAndSelector(newPod, namespaces, selector) {
+		namespaces := schedutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
+		if schedutil.PodMatchesTermsNamespaceAndSelector(newPod, namespaces, selector) {
 			if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
 				pair := topologyPair{key: term.TopologyKey, value: topologyValue}
 				topologyMap[pair]++
