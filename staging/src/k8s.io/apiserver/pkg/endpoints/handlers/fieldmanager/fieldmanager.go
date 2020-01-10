@@ -35,7 +35,7 @@ const DefaultMaxUpdateManagers int = 10
 
 // DefaultTrackOnCreateProbability defines the default probability that the field management of an object
 // starts being tracked from the object's creation, instead of from the first time the object is applied to.
-const DefaultTrackOnCreateProbability float32 = 0.11494204485329620070
+const DefaultTrackOnCreateProbability float32 = 0.5
 
 // Managed groups a fieldpath.ManagedFields together with the timestamps associated with each operation.
 type Managed interface {
