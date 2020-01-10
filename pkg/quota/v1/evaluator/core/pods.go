@@ -18,14 +18,12 @@ package core
 
 import (
 	"fmt"
-	"strings"
-	"time"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -34,7 +32,7 @@ import (
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	quota "k8s.io/kubernetes/pkg/quota/v1"
+	"k8s.io/kubernetes/pkg/quota/v1"
 	"k8s.io/kubernetes/pkg/quota/v1/generic"
 )
 
@@ -391,11 +389,9 @@ func QuotaV1Pod(pod *corev1.Pod, clock clock.Clock) bool {
 	// if pods are stuck terminating (for example, a node is lost), we do not want
 	// to charge the user for that pod in quota because it could prevent them from
 	// scaling up new pods to service their application.
-	if pod.DeletionTimestamp != nil && pod.DeletionGracePeriodSeconds != nil {
+	if pod.DeletionTimestamp != nil {
 		now := clock.Now()
-		deletionTime := pod.DeletionTimestamp.Time
-		gracePeriod := time.Duration(*pod.DeletionGracePeriodSeconds) * time.Second
-		if now.After(deletionTime.Add(gracePeriod)) {
+		if now.After(pod.DeletionTimestamp.Time) {
 			return false
 		}
 	}
