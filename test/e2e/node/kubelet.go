@@ -33,6 +33,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -415,7 +416,7 @@ var _ = SIGDescribe("kubelet", func() {
 			}
 
 			ginkgo.BeforeEach(func() {
-				framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+				e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 				_, nfsServerPod, nfsIP = volume.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
 			})
 

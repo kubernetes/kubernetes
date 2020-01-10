@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
 	"github.com/onsi/ginkgo"
@@ -34,11 +35,11 @@ var _ = SIGDescribe("SSH", func() {
 
 	ginkgo.BeforeEach(func() {
 		// When adding more providers here, also implement their functionality in e2essh.GetSigner(...).
-		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 
 		// This test SSH's into the node for which it needs the $HOME/.ssh/id_rsa key to be present. So
 		// we should skip if the environment does not have the key (not all CI systems support this use case)
-		framework.SkipUnlessSSHKeyPresent()
+		e2eskipper.SkipUnlessSSHKeyPresent()
 	})
 
 	ginkgo.It("should SSH to all nodes and run commands", func() {
