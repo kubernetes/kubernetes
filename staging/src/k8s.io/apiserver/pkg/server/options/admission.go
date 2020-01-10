@@ -112,7 +112,7 @@ func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo adds the admission chain to the server configuration.
-// In case admission plugin names were not provided by a custer-admin they will be prepared from the recommended/default values.
+// In case admission plugin names were not provided by a cluster-admin they will be prepared from the recommended/default values.
 // In addition the method lazily initializes a generic plugin that is appended to the list of pluginInitializers
 // note this method uses:
 //  genericconfig.Authorizer
