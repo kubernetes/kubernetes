@@ -54,6 +54,7 @@ go_library(
         "//test/e2e/framework/kubectl:go_default_library",
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
+        "//test/e2e/framework/skipper:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
