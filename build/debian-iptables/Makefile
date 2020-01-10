@@ -18,7 +18,7 @@ REGISTRY?="staging-k8s.gcr.io"
 IMAGE=$(REGISTRY)/debian-iptables
 TAG?=v12.0.1
 ARCH?=amd64
-ALL_ARCH = amd64 arm arm64 ppc64le s390x
+ALL_ARCH = amd64 arm arm64 ppc64le s390x mips64le
 TEMP_DIR:=$(shell mktemp -d)
 
 BASEIMAGE?=k8s.gcr.io/debian-base-$(ARCH):v2.0.0
