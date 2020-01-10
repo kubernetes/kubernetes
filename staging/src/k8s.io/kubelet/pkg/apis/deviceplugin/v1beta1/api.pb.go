@@ -1033,7 +1033,7 @@ type DevicePluginClient interface {
 	Allocate(ctx context.Context, in *AllocateRequest, opts ...grpc.CallOption) (*AllocateResponse, error)
 	// PreStartContainer is called, if indicated by Device Plugin during registeration phase,
 	// before each container start. Device plugin can run device specific operations
-	// such as reseting the device before making devices available to the container
+	// such as resetting the device before making devices available to the container
 	PreStartContainer(ctx context.Context, in *PreStartContainerRequest, opts ...grpc.CallOption) (*PreStartContainerResponse, error)
 }
 
@@ -1119,7 +1119,7 @@ type DevicePluginServer interface {
 	Allocate(context.Context, *AllocateRequest) (*AllocateResponse, error)
 	// PreStartContainer is called, if indicated by Device Plugin during registeration phase,
 	// before each container start. Device plugin can run device specific operations
-	// such as reseting the device before making devices available to the container
+	// such as resetting the device before making devices available to the container
 	PreStartContainer(context.Context, *PreStartContainerRequest) (*PreStartContainerResponse, error)
 }
 
