@@ -67,15 +67,18 @@ func NewDeltaFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter) *DeltaFIFO {
 	return f
 }
 
-// DeltaFIFO is like FIFO, but allows the PopProcessFunc to process
-// deletes and adds Sync to the ways an object can be applied to an
-// acumulator.  The accumulator associated with a given object's key
-// is a Deltas, which is a slice of Delta values for that object.
-// Applying an object to a Deltas means to append a Delta except when
-// the potentially appended Delta is a Deleted and the Deltas already
-// ends with a Deleted.  In that case the Deltas does not grow,
-// although the terminal Deleted will be replaced by the new Deleted if
-// the older Deleted's object is a DeletedFinalStateUnknown.
+// DeltaFIFO is like FIFO, but differs in two ways.  One is that the
+// accumulator associated with a given object's key is not that object
+// but rather a Deltas, which is a slice of Delta values for that
+// object.  Applying an object to a Deltas means to append a Delta
+// except when the potentially appended Delta is a Deleted and the
+// Deltas already ends with a Deleted.  In that case the Deltas does
+// not grow, although the terminal Deleted will be replaced by the new
+// Deleted if the older Deleted's object is a
+// DeletedFinalStateUnknown.
+//
+// The other difference is that DeltaFIFO has an additional way that
+// an object can be applied to an accumulator, called Sync.
 //
 // DeltaFIFO is a producer-consumer queue, where a Reflector is
 // intended to be the producer, and the consumer is whatever calls

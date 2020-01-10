@@ -51,7 +51,7 @@ type Config struct {
 	// ObjectType is an example object of the type this controller is
 	// expected to handle.  Only the type needs to be right, except
 	// that when that is `unstructured.Unstructured` the object's
-	// `"apiVersion"` must also be right.
+	// `"apiVersion"` and `"kind"` must also be right.
 	ObjectType runtime.Object
 
 	// FullResyncPeriod is the period at which ShouldResync is considered.
@@ -98,7 +98,7 @@ type Controller interface {
 	// continue until `stopCh` is closed.
 	Run(stopCh <-chan struct{})
 
-	// HasSynced delegates to the Queue
+	// HasSynced delegates to the Config's Queue
 	HasSynced() bool
 
 	// LastSyncResourceVersion delegates to the Reflector when there
