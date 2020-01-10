@@ -31,9 +31,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
-	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 func deepEqualWithoutGeneration(actual *nodeInfoListItem, expected *schedulernodeinfo.NodeInfo) error {
@@ -152,8 +152,8 @@ func TestAssumePodScheduled(t *testing.T) {
 				Memory:   0,
 			},
 			&schedulernodeinfo.Resource{
-				MilliCPU: priorityutil.DefaultMilliCPURequest,
-				Memory:   priorityutil.DefaultMemoryRequest,
+				MilliCPU: schedutil.DefaultMilliCPURequest,
+				Memory:   schedutil.DefaultMemoryRequest,
 			},
 			[]*v1.Pod{testPods[3]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
@@ -779,8 +779,8 @@ func TestEphemeralStorageResource(t *testing.T) {
 					EphemeralStorage: 500,
 				},
 				&schedulernodeinfo.Resource{
-					MilliCPU: priorityutil.DefaultMilliCPURequest,
-					Memory:   priorityutil.DefaultMemoryRequest,
+					MilliCPU: schedutil.DefaultMilliCPURequest,
+					Memory:   schedutil.DefaultMemoryRequest,
 				},
 				[]*v1.Pod{podE},
 				schedulernodeinfo.HostPortInfo{},

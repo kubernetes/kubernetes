@@ -22,9 +22,9 @@ import (
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // resourceToWeightMap contains resource name and weight.
@@ -121,7 +121,7 @@ func calculatePodResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
 	var podRequest int64
 	for i := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[i]
-		value := priorityutil.GetNonzeroRequestForResource(resource, &container.Resources.Requests)
+		value := schedutil.GetNonzeroRequestForResource(resource, &container.Resources.Requests)
 		podRequest += value
 	}
 

@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/v1/pod"
-	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/heap"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -588,12 +587,12 @@ func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod
 		if affinity != nil && affinity.PodAffinity != nil {
 			terms := util.GetPodAffinityTerms(affinity.PodAffinity)
 			for _, term := range terms {
-				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(up, &term)
+				namespaces := util.GetNamespacesFromPodAffinityTerm(up, &term)
 				selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 				if err != nil {
 					klog.Errorf("Error getting label selectors for pod: %v.", up.Name)
 				}
-				if priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
+				if util.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
 					podsToMove = append(podsToMove, pInfo)
 					break
 				}
