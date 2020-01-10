@@ -262,7 +262,7 @@ type sharedIndexInformer struct {
 	// objectType is an example object of the type this informer is
 	// expected to handle.  Only the type needs to be right, except
 	// that when that is `unstructured.Unstructured` the object's
-	// `"apiVersion"` must also be right.
+	// `"apiVersion"` and `"kind"` must also be right.
 	objectType runtime.Object
 
 	// resyncCheckPeriod is how often we want the reflector's resync timer to fire so it can call
@@ -503,11 +503,11 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 }
 
 // sharedProcessor has a collection of processorListener and can
-// distribute a notification object to its listeners.  Each distribute
-// operation is `sync` or not.  The sync distributions go to a subset
-// of the listeners that (a) is recomputed in the occasional calls to
-// shouldResync and (b) every listener is initially put in.  The
-// non-sync distributions go to every listener.
+// distribute a notification object to its listeners.  There are two
+// kinds of distribute operations.  The sync distributions go to a
+// subset of the listeners that (a) is recomputed in the occasional
+// calls to shouldResync and (b) every listener is initially put in.
+// The non-sync distributions go to every listener.
 type sharedProcessor struct {
 	listenersStarted bool
 	listenersLock    sync.RWMutex

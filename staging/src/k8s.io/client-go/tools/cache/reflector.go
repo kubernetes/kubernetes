@@ -57,8 +57,8 @@ type Reflector struct {
 	expectedTypeName string
 	// An example object of the type we expect to place in the store.
 	// Only the type needs to be right, except that when that is
-	// `unstructured.Unstructured` the object's `"apiVersion"` must
-	// also be right.
+	// `unstructured.Unstructured` the object's `"apiVersion"` and
+	// `"kind"` must also be right.
 	expectedType reflect.Type
 	// The GVK of the object we expect to place in the store if unstructured.
 	expectedGVK *schema.GroupVersionKind
