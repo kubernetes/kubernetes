@@ -442,10 +442,12 @@ func (ds *dockerService) UpdateContainerResources(_ context.Context, r *runtimea
 	resources := r.Linux
 	updateConfig := dockercontainer.UpdateConfig{
 		Resources: dockercontainer.Resources{
-			CPUPeriod:  resources.CpuPeriod,
-			CPUQuota:   resources.CpuQuota,
-			CPUShares:  resources.CpuShares,
+			CPUPeriod: resources.CpuPeriod,
+			CPUQuota:  resources.CpuQuota,
+			CPUShares: resources.CpuShares,
+			// Memory and MemorySwap are set to the same value, this prevents containers from using any swap.
 			Memory:     resources.MemoryLimitInBytes,
+			MemorySwap: resources.MemoryLimitInBytes,
 			CpusetCpus: resources.CpusetCpus,
 			CpusetMems: resources.CpusetMems,
 		},
