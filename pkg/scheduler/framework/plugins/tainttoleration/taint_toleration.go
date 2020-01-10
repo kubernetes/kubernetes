@@ -40,7 +40,7 @@ var _ framework.ScorePlugin = &TaintToleration{}
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
 	Name = "TaintToleration"
-	// postFilterStateKey is the key in CycleState to InterPodAffinity pre-computed data for Scoring.
+	// postFilterStateKey is the key in CycleState to TaintToleration pre-computed data for Scoring.
 	postFilterStateKey = "PostFilter" + Name
 	// ErrReasonNotMatch is the Filter reason status when not matching.
 	ErrReasonNotMatch = "node(s) had taints that the pod didn't tolerate"
