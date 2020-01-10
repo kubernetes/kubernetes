@@ -35,6 +35,7 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -44,7 +45,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 	f := framework.NewDefaultFramework("tables")
 
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessServerVersionGTE(serverPrintVersion, f.ClientSet.Discovery())
+		e2eskipper.SkipUnlessServerVersionGTE(serverPrintVersion, f.ClientSet.Discovery())
 	})
 
 	ginkgo.It("should return pod details", func() {

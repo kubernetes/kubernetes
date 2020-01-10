@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// This file will be removed after switching to use subpackage skipper.
+
 package framework
 
 import (

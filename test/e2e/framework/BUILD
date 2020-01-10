@@ -145,6 +145,7 @@ filegroup(
         "//test/e2e/framework/resource:all-srcs",
         "//test/e2e/framework/security:all-srcs",
         "//test/e2e/framework/service:all-srcs",
+        "//test/e2e/framework/skipper:all-srcs",
         "//test/e2e/framework/ssh:all-srcs",
         "//test/e2e/framework/statefulset:all-srcs",
         "//test/e2e/framework/testfiles:all-srcs",

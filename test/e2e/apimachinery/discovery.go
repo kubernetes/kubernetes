@@ -20,6 +20,7 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/utils/crd"
 
 	"github.com/onsi/ginkgo"
@@ -34,7 +35,7 @@ var _ = SIGDescribe("Discovery", func() {
 	ginkgo.BeforeEach(func() {
 		namespaceName = f.Namespace.Name
 
-		framework.SkipUnlessServerVersionGTE(storageVersionServerVersion, f.ClientSet.Discovery())
+		e2eskipper.SkipUnlessServerVersionGTE(storageVersionServerVersion, f.ClientSet.Discovery())
 
 		ginkgo.By("Setting up server cert")
 		setupServerCert(namespaceName, serviceName)
