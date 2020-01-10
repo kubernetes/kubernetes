@@ -47,8 +47,6 @@ var (
 	ErrNodeNotReady = NewPredicateFailureError("NodeNotReady", "node(s) were not ready")
 	// ErrNodeNetworkUnavailable is used for NodeNetworkUnavailable predicate error.
 	ErrNodeNetworkUnavailable = NewPredicateFailureError("NodeNetworkUnavailable", "node(s) had unavailable network")
-	// ErrNodeUnschedulable is used for NodeUnschedulable predicate error.
-	ErrNodeUnschedulable = NewPredicateFailureError("NodeUnschedulable", "node(s) were unschedulable")
 	// ErrNodeUnknownCondition is used for NodeUnknownCondition predicate error.
 	ErrNodeUnknownCondition = NewPredicateFailureError("NodeUnknownCondition", "node(s) had unknown conditions")
 	// ErrFakePredicate is used for test only. The fake predicates returning false also returns error
@@ -67,7 +65,6 @@ var unresolvablePredicateFailureErrors = map[PredicateFailureReason]struct{}{
 	ErrNodeUnderDiskPressure:   {},
 	ErrNodeUnderPIDPressure:    {},
 	ErrNodeUnderMemoryPressure: {},
-	ErrNodeUnschedulable:       {},
 	ErrNodeUnknownCondition:    {},
 }
 

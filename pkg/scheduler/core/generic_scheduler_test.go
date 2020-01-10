@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
@@ -1895,7 +1896,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			nodesStatuses: framework.NodeToStatusMap{
 				"machine1": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAffinityNotMatch),
 				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrPodNotMatchHostName.GetReason()),
-				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeUnschedulable.GetReason()),
+				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnschedulable),
 			},
 			expected: map[string]bool{"machine1": true, "machine4": true},
 		},
@@ -1934,11 +1935,11 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			expected: map[string]bool{"machine4": true},
 		},
 		{
-			name: "Node condition errors and ErrNodeUnknownCondition should be considered unresolvable",
+			name: "Node condition errors should be considered unresolvable",
 			nodesStatuses: framework.NodeToStatusMap{
 				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeNotReady.GetReason()),
 				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeNetworkUnavailable.GetReason()),
-				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeUnknownCondition.GetReason()),
+				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnknownCondition),
 			},
 			expected: map[string]bool{"machine4": true},
 		},
