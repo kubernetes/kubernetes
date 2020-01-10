@@ -11,7 +11,6 @@ go_library(
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
-        "//pkg/scheduler/algorithm/priorities:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultpodtopologyspread:go_default_library",
         "//pkg/scheduler/framework/plugins/imagelocality:go_default_library",

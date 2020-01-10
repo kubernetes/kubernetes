@@ -45,7 +45,6 @@ import (
 	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
@@ -674,7 +673,6 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 	algo := core.NewGenericScheduler(
 		scache,
 		internalqueue.NewSchedulingQueue(nil),
-		priorities.EmptyMetadataProducer,
 		nodeinfosnapshot.NewEmptySnapshot(),
 		fwk,
 		[]algorithm.SchedulerExtender{},
@@ -729,7 +727,6 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 	algo := core.NewGenericScheduler(
 		scache,
 		queue,
-		priorities.EmptyMetadataProducer,
 		nodeinfosnapshot.NewEmptySnapshot(),
 		fwk,
 		[]algorithm.SchedulerExtender{},

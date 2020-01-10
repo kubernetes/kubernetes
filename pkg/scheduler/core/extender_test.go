@@ -34,7 +34,6 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -581,7 +580,6 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				cache,
 				queue,
-				priorities.EmptyMetadataProducer,
 				emptySnapshot,
 				fwk,
 				extenders,
