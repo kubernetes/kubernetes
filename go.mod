@@ -104,7 +104,7 @@ require (
 	github.com/quobyte/api v0.1.2
 	github.com/robfig/cron v1.1.0
 	github.com/seccomp/libseccomp-golang v0.9.1 // indirect
-	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a // indirect
+	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/spf13/afero v1.2.2
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
@@ -440,7 +440,7 @@ replace (
 	github.com/shurcooL/go-goon => github.com/shurcooL/go-goon v0.0.0-20170922171312-37c2f522c041
 	github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.4.2
 	github.com/smartystreets/assertions => github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d
-	github.com/smartystreets/goconvey => github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a
+	github.com/smartystreets/goconvey => github.com/smartystreets/goconvey v1.6.4
 	github.com/soheilhy/cmux => github.com/soheilhy/cmux v0.1.4
 	github.com/sourcegraph/go-diff => github.com/sourcegraph/go-diff v0.5.1
 	github.com/spf13/afero => github.com/spf13/afero v1.2.2
