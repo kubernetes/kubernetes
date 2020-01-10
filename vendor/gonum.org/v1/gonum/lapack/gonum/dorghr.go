@@ -15,8 +15,8 @@ package gonum
 //
 // ilo and ihi must have the same values as in the previous call of Dgehrd. It
 // must hold that
-//  0 <= ilo <= ihi < n,  if n > 0,
-//  ilo = 0, ihi = -1,    if n == 0.
+//  0 <= ilo <= ihi < n  if n > 0,
+//  ilo = 0, ihi = -1    if n == 0.
 //
 // tau contains the scalar factors of the elementary reflectors, as returned by
 // Dgehrd. tau must have length n-1.

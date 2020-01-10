@@ -14,7 +14,7 @@ import (
 //  c = h * c if side == Left
 //  c = c * h if side == right
 // where
-//  h = 1 - tau * v * v^T
+//  h = 1 - tau * v * vᵀ
 // and c is an m * n matrix.
 //
 // work is temporary storage of length at least m if side == Left and at least
@@ -87,15 +87,15 @@ func (impl Implementation) Dlarf(side blas.Side, m, n int, v []float64, incv int
 	bi := blas64.Implementation()
 	if applyleft {
 		// Form H * C
-		// w[0:lastc+1] = c[1:lastv+1, 1:lastc+1]^T * v[1:lastv+1,1]
+		// w[0:lastc+1] = c[1:lastv+1, 1:lastc+1]ᵀ * v[1:lastv+1,1]
 		bi.Dgemv(blas.Trans, lastv+1, lastc+1, 1, c, ldc, v, incv, 0, work, 1)
-		// c[0: lastv, 0: lastc] = c[...] - w[0:lastv, 1] * v[1:lastc, 1]^T
+		// c[0: lastv, 0: lastc] = c[...] - w[0:lastv, 1] * v[1:lastc, 1]ᵀ
 		bi.Dger(lastv+1, lastc+1, -tau, v, incv, work, 1, c, ldc)
 		return
 	}
 	// Form C*H
 	// w[0:lastc+1,1] := c[0:lastc+1,0:lastv+1] * v[0:lastv+1,1]
 	bi.Dgemv(blas.NoTrans, lastc+1, lastv+1, 1, c, ldc, v, incv, 0, work, 1)
-	// c[0:lastc+1,0:lastv+1] = c[...] - w[0:lastc+1,0] * v[0:lastv+1,0]^T
+	// c[0:lastc+1,0:lastv+1] = c[...] - w[0:lastc+1,0] * v[0:lastv+1,0]ᵀ
 	bi.Dger(lastc+1, lastv+1, -tau, work, 1, v, incv, c, ldc)
 }
