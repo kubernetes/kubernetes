@@ -176,6 +176,40 @@ func runHugePagesTests(f *framework.Framework) {
 		f.PodClient().Create(verifyPod)
 		err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err)
+
+		ginkgo.By("running a pod that requests hugepages")
+		hugepageAmount := resource.MustParse("2Mi")
+		pod = f.PodClient().CreateSync(&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod" + string(uuid.NewUUID()),
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyNever,
+				Containers: []v1.Container{
+					{
+						Image: imageutils.GetPauseImageName(),
+						Name:  "container" + string(uuid.NewUUID()),
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceName("cpu"):           resource.MustParse("10m"),
+								v1.ResourceName("memory"):        resource.MustParse("100Mi"),
+								v1.ResourceName("hugepages-2Mi"): hugepageAmount,
+							},
+						},
+					},
+				},
+			},
+		})
+
+		ginkgo.By("checking if the expected hugetlb was assigned")
+		expHugepageRegex := fmt.Sprintf("^%v\n$", hugepageAmount.Value())
+		err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expHugepageRegex)
+		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+			pod.Spec.Containers[0].Name, pod.Name)
+
+		ginkgo.By("by deleting the pods and waiting for container removal")
+		deletePods(f, []string{pod.Name})
+		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
 	})
 }
 
