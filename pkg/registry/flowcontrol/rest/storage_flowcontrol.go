@@ -21,6 +21,7 @@ import (
 	"time"
 
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
+	flowcontrolapisv1alpha1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1alpha1"
 	flowschemastore "k8s.io/kubernetes/pkg/registry/flowcontrol/flowschema/storage"
 	prioritylevelconfigurationstore "k8s.io/kubernetes/pkg/registry/flowcontrol/prioritylevelconfiguration/storage"
 )
@@ -94,20 +96,21 @@ func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStart
 			_ = wait.PollImmediateUntil(
 				retryCreatingSuggestedSettingsInterval,
 				func() (bool, error) {
-					shouldEnsureSuggested, err := shouldEnsureAllPredefined(flowcontrolClientSet)
+					shouldEnsureSuggested, err := lastMandatoryExists(flowcontrolClientSet)
 					if err != nil {
 						klog.Errorf("failed getting exempt flow-schema, will retry later: %v", err)
 						return false, nil
 					}
-					if shouldEnsureSuggested {
-						err := ensure(
-							flowcontrolClientSet,
-							flowcontrolbootstrap.SuggestedFlowSchemas,
-							flowcontrolbootstrap.SuggestedPriorityLevelConfigurations)
-						if err != nil {
-							klog.Errorf("failed ensuring suggested settings, will retry later: %v", err)
-							return false, nil
-						}
+					if !shouldEnsureSuggested {
+						return true, nil
+					}
+					err = ensure(
+						flowcontrolClientSet,
+						flowcontrolbootstrap.SuggestedFlowSchemas,
+						flowcontrolbootstrap.SuggestedPriorityLevelConfigurations)
+					if err != nil {
+						klog.Errorf("failed ensuring suggested settings, will retry later: %v", err)
+						return false, nil
 					}
 					return true, nil
 				},
@@ -124,7 +127,7 @@ func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStart
 						// the full initial set of objects from being created.
 						flowcontrolbootstrap.MandatoryPriorityLevelConfigurations,
 					); err != nil {
-						klog.Errorf("failed creating default flowcontrol settings: %v", err)
+						klog.Errorf("failed creating mandatory flowcontrol settings: %v", err)
 						return false, nil
 					}
 					return false, nil // always retry
@@ -138,7 +141,7 @@ func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStart
 
 // Returns false if there's a "exempt" priority-level existing in the cluster, otherwise returns a true
 // if the "exempt" priority-level is not found.
-func shouldEnsureAllPredefined(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface) (bool, error) {
+func lastMandatoryExists(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface) (bool, error) {
 	if _, err := flowcontrolClientSet.PriorityLevelConfigurations().Get(flowcontrol.PriorityLevelConfigurationNameExempt, metav1.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
 			return true, nil
@@ -175,39 +178,75 @@ func ensure(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface,
 }
 
 func upgrade(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface, flowSchemas []*flowcontrolv1alpha1.FlowSchema, priorityLevels []*flowcontrolv1alpha1.PriorityLevelConfiguration) error {
-	for _, flowSchema := range flowSchemas {
-		_, err := flowcontrolClientSet.FlowSchemas().Get(flowSchema.Name, metav1.GetOptions{})
-		if err != nil {
-			return fmt.Errorf("failed getting FlowSchema %s due to %v, will retry later", flowSchema.Name, err)
+	for _, expectedFlowSchema := range flowSchemas {
+		actualFlowSchema, err := flowcontrolClientSet.FlowSchemas().Get(expectedFlowSchema.Name, metav1.GetOptions{})
+		if err == nil {
+			// TODO(yue9944882): extract existing version from label and compare
+			// TODO(yue9944882): create w/ version string attached
+			identical, err := flowSchemaHasWrongSpec(expectedFlowSchema, actualFlowSchema)
+			if err != nil {
+				return fmt.Errorf("failed checking if mandatory FlowSchema %s is up-to-date due to %v, will retry later", expectedFlowSchema.Name, err)
+			}
+			if !identical {
+				if _, err := flowcontrolClientSet.FlowSchemas().Update(expectedFlowSchema); err != nil {
+					return fmt.Errorf("failed upgrading mandatory FlowSchema %s due to %v, will retry later", expectedFlowSchema.Name, err)
+				}
+			}
+			continue
 		}
-		// TODO(yue9944882): extract existing version from label and compare
-		// TODO(yue9944882): create w/ version string attached
-		_, err = flowcontrolClientSet.FlowSchemas().Create(flowSchema)
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed getting FlowSchema %s due to %v, will retry later", expectedFlowSchema.Name, err)
+		}
+		_, err = flowcontrolClientSet.FlowSchemas().Create(expectedFlowSchema)
 		if apierrors.IsAlreadyExists(err) {
-			klog.V(3).Infof("system preset FlowSchema %s already exists, skipping creating", flowSchema.Name)
+			klog.V(3).Infof("system preset FlowSchema %s already exists, skipping creating", expectedFlowSchema.Name)
 			continue
 		}
 		if err != nil {
-			return fmt.Errorf("cannot create FlowSchema %s due to %v", flowSchema.Name, err)
+			return fmt.Errorf("cannot create FlowSchema %s due to %v", expectedFlowSchema.Name, err)
 		}
-		klog.V(3).Infof("created system preset FlowSchema %s", flowSchema.Name)
+		klog.V(3).Infof("created system preset FlowSchema %s", expectedFlowSchema.Name)
 	}
-	for _, priorityLevelConfiguration := range priorityLevels {
-		_, err := flowcontrolClientSet.FlowSchemas().Get(priorityLevelConfiguration.Name, metav1.GetOptions{})
-		if err != nil {
-			return fmt.Errorf("failed getting PriorityLevelConfiguration %s due to %v, will retry later", priorityLevelConfiguration.Name, err)
+	for _, expectedPriorityLevelConfiguration := range priorityLevels {
+		actualPriorityLevelConfiguration, err := flowcontrolClientSet.PriorityLevelConfigurations().Get(expectedPriorityLevelConfiguration.Name, metav1.GetOptions{})
+		if err == nil {
+			// TODO(yue9944882): extract existing version from label and compare
+			// TODO(yue9944882): create w/ version string attached
+			identical, err := priorityLevelHasWrongSpec(expectedPriorityLevelConfiguration, actualPriorityLevelConfiguration)
+			if err != nil {
+				return fmt.Errorf("failed checking if mandatory PriorityLevelConfiguration %s is up-to-date due to %v, will retry later", expectedPriorityLevelConfiguration.Name, err)
+			}
+			if !identical {
+				if _, err := flowcontrolClientSet.PriorityLevelConfigurations().Update(expectedPriorityLevelConfiguration); err != nil {
+					return fmt.Errorf("failed upgrading mandatory PriorityLevelConfiguration %s due to %v, will retry later", expectedPriorityLevelConfiguration.Name, err)
+				}
+			}
+			continue
 		}
-		// TODO(yue9944882): extract existing version from label and compare
-		// TODO(yue9944882): create w/ version string attached
-		_, err = flowcontrolClientSet.PriorityLevelConfigurations().Create(priorityLevelConfiguration)
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed getting PriorityLevelConfiguration %s due to %v, will retry later", expectedPriorityLevelConfiguration.Name, err)
+		}
+		_, err = flowcontrolClientSet.PriorityLevelConfigurations().Create(expectedPriorityLevelConfiguration)
 		if apierrors.IsAlreadyExists(err) {
-			klog.V(3).Infof("system preset PriorityLevelConfiguration %s already exists, skipping creating", priorityLevelConfiguration.Name)
+			klog.V(3).Infof("system preset PriorityLevelConfiguration %s already exists, skipping creating", expectedPriorityLevelConfiguration.Name)
 			continue
 		}
 		if err != nil {
-			return fmt.Errorf("cannot create PriorityLevelConfiguration %s due to %v", priorityLevelConfiguration.Name, err)
+			return fmt.Errorf("cannot create PriorityLevelConfiguration %s due to %v", expectedPriorityLevelConfiguration.Name, err)
 		}
-		klog.V(3).Infof("created system preset PriorityLevelConfiguration %s", priorityLevelConfiguration.Name)
+		klog.V(3).Infof("created system preset PriorityLevelConfiguration %s", expectedPriorityLevelConfiguration.Name)
 	}
 	return nil
+}
+
+func flowSchemaHasWrongSpec(expected, actual *flowcontrolv1alpha1.FlowSchema) (bool, error) {
+	copiedExpectedFlowSchema := expected.DeepCopy()
+	flowcontrolapisv1alpha1.SetObjectDefaults_FlowSchema(copiedExpectedFlowSchema)
+	return !equality.Semantic.DeepEqual(copiedExpectedFlowSchema.Spec, actual.Spec), nil
+}
+
+func priorityLevelHasWrongSpec(expected, actual *flowcontrolv1alpha1.PriorityLevelConfiguration) (bool, error) {
+	copiedExpectedPriorityLevel := expected.DeepCopy()
+	flowcontrolapisv1alpha1.SetObjectDefaults_PriorityLevelConfiguration(copiedExpectedPriorityLevel)
+	return !equality.Semantic.DeepEqual(copiedExpectedPriorityLevel.Spec, actual.Spec), nil
 }

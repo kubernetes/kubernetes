@@ -554,7 +554,7 @@ func TestFlowSchemaValidation(t *testing.T) {
 					Name: "system-foo",
 				},
 				Spec: flowcontrol.FlowSchemaSpec{
-					MatchingPrecedence: 50000,
+					MatchingPrecedence: 10001,
 					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
 						Name: "system-bar",
 					},
@@ -579,7 +579,7 @@ func TestFlowSchemaValidation(t *testing.T) {
 				},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("matchingPrecedence"), int32(50000), "must not be greater than 10000"),
+				field.Invalid(field.NewPath("spec").Child("matchingPrecedence"), int32(10001), "must not be greater than 10000"),
 			},
 		},
 	}

@@ -63,6 +63,7 @@ var (
 		SuggestedFlowSchemaKubeControllerManager,     // references "workload-high" priority-level
 		SuggestedFlowSchemaKubeScheduler,             // references "workload-high" priority-level
 		SuggestedFlowSchemaKubeSystemServiceAccounts, // references "workload-high" priority-level
+		SuggestedFlowSchemaServiceAccounts,           // references "workload-low" priority-level
 	}
 )
 
@@ -98,7 +99,7 @@ var (
 	MandatoryFlowSchemaExempt = newFlowSchema(
 		"exempt",
 		flowcontrol.PriorityLevelConfigurationNameExempt,
-		0,  // matchingPrecedence
+		1,  // matchingPrecedence
 		"", // distinguisherMethodType
 		flowcontrol.PolicyRulesWithSubjects{
 			Subjects: groups(user.SystemPrivilegedGroup),
@@ -221,7 +222,7 @@ var (
 // Suggested FlowSchema objects
 var (
 	SuggestedFlowSchemaSystemNodes = newFlowSchema(
-		"system-nodes", "system", 1500,
+		"system-nodes", "system", 500,
 		flowcontrol.FlowDistinguisherMethodByUserType,
 		flowcontrol.PolicyRulesWithSubjects{
 			Subjects: groups(user.NodesGroup), // the nodes group
@@ -239,7 +240,7 @@ var (
 		},
 	)
 	SuggestedFlowSchemaSystemLeaderElection = newFlowSchema(
-		"system-leader-election", "leader-election", 2500,
+		"system-leader-election", "leader-election", 100,
 		flowcontrol.FlowDistinguisherMethodByUserType,
 		flowcontrol.PolicyRulesWithSubjects{
 			Subjects: append(
@@ -262,19 +263,19 @@ var (
 		},
 	)
 	SuggestedFlowSchemaWorkloadLeaderElection = newFlowSchema(
-		"workload-leader-election", "leader-election", 2500,
+		"workload-leader-election", "leader-election", 200,
 		flowcontrol.FlowDistinguisherMethodByUserType,
 		flowcontrol.PolicyRulesWithSubjects{
 			Subjects: kubeSystemServiceAccount(flowcontrol.NameAll),
 			ResourceRules: []flowcontrol.ResourcePolicyRule{
 				resourceRule(
-					[]string{flowcontrol.VerbAll},
+					[]string{"get", "create", "update"},
 					[]string{corev1.GroupName},
 					[]string{"endpoints", "configmaps"},
 					[]string{flowcontrol.NamespaceEvery},
 					false),
 				resourceRule(
-					[]string{flowcontrol.VerbAll},
+					[]string{"get", "create", "update"},
 					[]string{coordinationv1.GroupName},
 					[]string{"leases"},
 					[]string{flowcontrol.NamespaceEvery},
@@ -283,7 +284,7 @@ var (
 		},
 	)
 	SuggestedFlowSchemaKubeControllerManager = newFlowSchema(
-		"kube-controller-manager", "workload-high", 3500,
+		"kube-controller-manager", "workload-high", 800,
 		flowcontrol.FlowDistinguisherMethodByNamespaceType,
 		flowcontrol.PolicyRulesWithSubjects{
 			Subjects: users(user.KubeControllerManager),
@@ -301,7 +302,7 @@ var (
 		},
 	)
 	SuggestedFlowSchemaKubeScheduler = newFlowSchema(
-		"kube-scheduler", "workload-high", 3500,
+		"kube-scheduler", "workload-high", 800,
 		flowcontrol.FlowDistinguisherMethodByNamespaceType,
 		flowcontrol.PolicyRulesWithSubjects{
 			Subjects: users(user.KubeScheduler),
@@ -319,7 +320,7 @@ var (
 		},
 	)
 	SuggestedFlowSchemaKubeSystemServiceAccounts = newFlowSchema(
-		"kube-system-service-accounts", "workload-high", 3500,
+		"kube-system-service-accounts", "workload-high", 900,
 		flowcontrol.FlowDistinguisherMethodByNamespaceType,
 		flowcontrol.PolicyRulesWithSubjects{
 			Subjects: kubeSystemServiceAccount(flowcontrol.NameAll),
@@ -337,7 +338,7 @@ var (
 		},
 	)
 	SuggestedFlowSchemaServiceAccounts = newFlowSchema(
-		"service-accounts", "workload-low", 7500,
+		"service-accounts", "workload-low", 9000,
 		flowcontrol.FlowDistinguisherMethodByUserType,
 		flowcontrol.PolicyRulesWithSubjects{
 			Subjects: groups(serviceaccount.AllServiceAccountsGroup),
