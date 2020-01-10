@@ -358,8 +358,7 @@ func TestBlockMapperMapDevice(t *testing.T) {
 func TestBlockMapperMapDeviceNotSupportAttach(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, true)()
-	plug, tmpDir := newTestPlugin(t, nil)
-	defer os.RemoveAll(tmpDir)
+
 	fakeClient := fakeclient.NewSimpleClientset()
 	attachRequired := false
 	fakeDriver := &v1beta1.CSIDriver{
@@ -370,17 +369,23 @@ func TestBlockMapperMapDeviceNotSupportAttach(t *testing.T) {
 			AttachRequired: &attachRequired,
 		},
 	}
-	_, err := plug.host.GetKubeClient().StorageV1beta1().CSIDrivers().Create(fakeDriver)
+	_, err := fakeClient.StorageV1beta1().CSIDrivers().Create(fakeDriver)
 	if err != nil {
 		t.Fatalf("Failed to create a fakeDriver: %v", err)
 	}
+
+	// after the driver is created, create the plugin. newTestPlugin waits for the informer to sync,
+	// such that csiMapper.SetUpDevice below sees the VolumeAttachment object in the lister.
+
+	plug, tmpDir := newTestPlugin(t, fakeClient)
+	defer os.RemoveAll(tmpDir)
 
 	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,
 		fakeClient,
 		nil,
 		"fakeNode",
-		nil,
+		plug.csiDriverLister,
 	)
 	plug.host = host
 	csiMapper, _, _, err := prepareBlockMapperTest(plug, "test-pv", t)
