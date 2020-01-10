@@ -37,21 +37,8 @@ var (
 	ErrPodNotMatchHostName = NewPredicateFailureError("HostName", "node(s) didn't match the requested hostname")
 	// ErrPodNotFitsHostPorts is used for PodFitsHostPorts predicate error.
 	ErrPodNotFitsHostPorts = NewPredicateFailureError("PodFitsHostPorts", "node(s) didn't have free ports for the requested pod ports")
-	// ErrNodeUnderMemoryPressure is used for NodeUnderMemoryPressure predicate error.
-	ErrNodeUnderMemoryPressure = NewPredicateFailureError("NodeUnderMemoryPressure", "node(s) had memory pressure")
-	// ErrNodeUnderDiskPressure is used for NodeUnderDiskPressure predicate error.
-	ErrNodeUnderDiskPressure = NewPredicateFailureError("NodeUnderDiskPressure", "node(s) had disk pressure")
-	// ErrNodeUnderPIDPressure is used for NodeUnderPIDPressure predicate error.
-	ErrNodeUnderPIDPressure = NewPredicateFailureError("NodeUnderPIDPressure", "node(s) had pid pressure")
-	// ErrNodeNotReady is used for NodeNotReady predicate error.
-	ErrNodeNotReady = NewPredicateFailureError("NodeNotReady", "node(s) were not ready")
-	// ErrNodeNetworkUnavailable is used for NodeNetworkUnavailable predicate error.
-	ErrNodeNetworkUnavailable = NewPredicateFailureError("NodeNetworkUnavailable", "node(s) had unavailable network")
 	// ErrNodeUnknownCondition is used for NodeUnknownCondition predicate error.
 	ErrNodeUnknownCondition = NewPredicateFailureError("NodeUnknownCondition", "node(s) had unknown conditions")
-	// ErrFakePredicate is used for test only. The fake predicates returning false also returns error
-	// as ErrFakePredicate.
-	ErrFakePredicate = NewPredicateFailureError("FakePredicateError", "Nodes failed the fake predicate")
 )
 
 var unresolvablePredicateFailureErrors = map[PredicateFailureReason]struct{}{
@@ -59,13 +46,8 @@ var unresolvablePredicateFailureErrors = map[PredicateFailureReason]struct{}{
 	ErrPodNotMatchHostName:  {},
 	// Node conditions won't change when scheduler simulates removal of preemption victims.
 	// So, it is pointless to try nodes that have not been able to host the pod due to node
-	// conditions. These include ErrNodeNotReady, ErrNodeUnderPIDPressure, ErrNodeUnderMemoryPressure, ....
-	ErrNodeNotReady:            {},
-	ErrNodeNetworkUnavailable:  {},
-	ErrNodeUnderDiskPressure:   {},
-	ErrNodeUnderPIDPressure:    {},
-	ErrNodeUnderMemoryPressure: {},
-	ErrNodeUnknownCondition:    {},
+	// conditions.
+	ErrNodeUnknownCondition: {},
 }
 
 // UnresolvablePredicateExists checks if there is at least one unresolvable predicate failure reason.
