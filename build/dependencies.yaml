@@ -32,7 +32,7 @@ dependencies:
 
 
   - name: "golang"
-    version: 1.13.4
+    version: 1.13.5
     refPaths:
     - path: build/build-image/cross/Dockerfile
       match: "golang:"
