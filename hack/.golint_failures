@@ -37,7 +37,6 @@ pkg/apis/flowcontrol/v1alpha1
 pkg/apis/networking/v1
 pkg/apis/node/v1alpha1
 pkg/apis/policy/v1beta1
-pkg/apis/rbac
 pkg/apis/rbac/v1
 pkg/apis/rbac/v1alpha1
 pkg/apis/rbac/v1beta1
