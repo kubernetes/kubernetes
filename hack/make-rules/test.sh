@@ -31,16 +31,6 @@ export KUBE_CACHE_MUTATION_DETECTOR
 KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
 export KUBE_PANIC_WATCH_DECODE_ERROR
 
-# Handle case where OS has sha#sum commands, instead of shasum.
-if which shasum >/dev/null 2>&1; then
-  SHA1SUM="shasum -a1"
-elif which sha1sum >/dev/null 2>&1; then
-  SHA1SUM="sha1sum"
-else
-  echo "Failed to find shasum or sha1sum utility." >&2
-  exit 1
-fi
-
 kube::test::find_dirs() {
   (
     cd "${KUBE_ROOT}"
@@ -182,14 +172,7 @@ junitFilenamePrefix() {
     return
   fi
   mkdir -p "${KUBE_JUNIT_REPORT_DIR}"
-  # This filename isn't parsed by anything, and we must avoid
-  # exceeding 255 character filename limit. KUBE_TEST_API
-  # barely fits there and in coverage mode test names are
-  # appended to generated file names, easily exceeding
-  # 255 chars in length. So let's just use a sha1 hash of it.
-  local KUBE_TEST_API_HASH
-  KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"| ${SHA1SUM} |awk '{print $1}')"
-  echo "${KUBE_JUNIT_REPORT_DIR}/junit_${KUBE_TEST_API_HASH}_$(kube::util::sortable_date)"
+  echo "${KUBE_JUNIT_REPORT_DIR}/junit_$(kube::util::sortable_date)"
 }
 
 verifyAndSuggestPackagePath() {
@@ -274,9 +257,8 @@ runTests() {
   fi
 
   # Create coverage report directories.
-  KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"| ${SHA1SUM} |awk '{print $1}')"
   if [[ -z "${KUBE_COVER_REPORT_DIR}" ]]; then
-    cover_report_dir="/tmp/k8s_coverage/${KUBE_TEST_API_HASH}/$(kube::util::sortable_date)"
+    cover_report_dir="/tmp/k8s_coverage/$(kube::util::sortable_date)"
   else
     cover_report_dir="${KUBE_COVER_REPORT_DIR}"
   fi
