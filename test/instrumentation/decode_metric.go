@@ -27,10 +27,10 @@ import (
 	"k8s.io/component-base/metrics"
 )
 
-func decodeMetricCalls(fs []*ast.CallExpr, metricsImportName, prometheusImportName string) ([]metric, []error) {
+func decodeMetricCalls(fs []*ast.CallExpr, metricsImportName string, variables map[string]ast.Expr) ([]metric, []error) {
 	finder := metricDecoder{
 		kubeMetricsImportName: metricsImportName,
-		prometheusImportName:  prometheusImportName,
+		variables:             variables,
 	}
 	ms := make([]metric, 0, len(fs))
 	errors := []error{}
@@ -47,7 +47,7 @@ func decodeMetricCalls(fs []*ast.CallExpr, metricsImportName, prometheusImportNa
 
 type metricDecoder struct {
 	kubeMetricsImportName string
-	prometheusImportName  string
+	variables             map[string]ast.Expr
 }
 
 func (c *metricDecoder) decodeNewMetricCall(fc *ast.CallExpr) (metric, error) {
@@ -130,10 +130,11 @@ func decodeLabels(expr ast.Expr) ([]string, error) {
 		if !ok {
 			return nil, newDecodeErrorf(bl, errLabels)
 		}
-		if bl.Kind != token.STRING {
-			return nil, newDecodeErrorf(bl, errLabels)
+		value, err := stringValue(bl)
+		if err != nil {
+			return nil, err
 		}
-		labels[i] = strings.Trim(bl.Value, `"`)
+		labels[i] = value
 	}
 	return labels, nil
 }
@@ -160,14 +161,30 @@ func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
 
 		switch key {
 		case "Namespace", "Subsystem", "Name", "Help", "DeprecatedVersion":
-			k, ok := kv.Value.(*ast.BasicLit)
-			if !ok {
+			var value string
+			var err error
+			switch v := kv.Value.(type) {
+			case *ast.BasicLit:
+				value, err = stringValue(v)
+				if err != nil {
+					return m, err
+				}
+			case *ast.Ident:
+				variableExpr, found := c.variables[v.Name]
+				if !found {
+					return m, newDecodeErrorf(expr, errBadVariableAttribute)
+				}
+				bl, ok := variableExpr.(*ast.BasicLit)
+				if !ok {
+					return m, newDecodeErrorf(expr, errNonStringAttribute)
+				}
+				value, err = stringValue(bl)
+				if err != nil {
+					return m, err
+				}
+			default:
 				return m, newDecodeErrorf(expr, errNonStringAttribute)
 			}
-			if k.Kind != token.STRING {
-				return m, newDecodeErrorf(expr, errNonStringAttribute)
-			}
-			value := strings.Trim(k.Value, `"`)
 			switch key {
 			case "Namespace":
 				m.Namespace = value
@@ -200,6 +217,13 @@ func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
 	return m, nil
 }
 
+func stringValue(bl *ast.BasicLit) (string, error) {
+	if bl.Kind != token.STRING {
+		return "", newDecodeErrorf(bl, errNonStringAttribute)
+	}
+	return strings.Trim(bl.Value, `"`), nil
+}
+
 func (c *metricDecoder) decodeBuckets(expr ast.Expr) ([]float64, error) {
 	switch v := expr.(type) {
 	case *ast.CompositeLit:
@@ -207,7 +231,7 @@ func (c *metricDecoder) decodeBuckets(expr ast.Expr) ([]float64, error) {
 	case *ast.SelectorExpr:
 		variableName := v.Sel.String()
 		importName, ok := v.X.(*ast.Ident)
-		if ok && importName.String() == c.prometheusImportName && variableName == "DefBuckets" {
+		if ok && importName.String() == c.kubeMetricsImportName && variableName == "DefBuckets" {
 			return metrics.DefBuckets, nil
 		}
 	case *ast.CallExpr:
@@ -220,7 +244,7 @@ func (c *metricDecoder) decodeBuckets(expr ast.Expr) ([]float64, error) {
 		if !ok {
 			return nil, newDecodeErrorf(v, errBuckets)
 		}
-		if functionImport.String() != c.prometheusImportName {
+		if functionImport.String() != c.kubeMetricsImportName {
 			return nil, newDecodeErrorf(v, errBuckets)
 		}
 		firstArg, secondArg, thirdArg, err := decodeBucketArguments(v)

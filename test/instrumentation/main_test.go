@@ -300,6 +300,85 @@ var _ = custom.NewCounter(
 	)
 `},
 		{
+			testName: "Const",
+			metric: metric{
+				Name:           "metric",
+				StabilityLevel: "STABLE",
+				Type:           counterMetricType,
+			},
+			src: `
+package test
+import "k8s.io/component-base/metrics"
+const name = "metric"
+var _ = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           name,
+			StabilityLevel: metrics.STABLE,
+		},
+	)
+`},
+		{
+			testName: "Variable",
+			metric: metric{
+				Name:           "metric",
+				StabilityLevel: "STABLE",
+				Type:           counterMetricType,
+			},
+			src: `
+package test
+import "k8s.io/component-base/metrics"
+var name = "metric"
+var _ = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           name,
+			StabilityLevel: metrics.STABLE,
+		},
+	)
+`},
+		{
+			testName: "Multiple consts in block",
+			metric: metric{
+				Name:           "metric",
+				StabilityLevel: "STABLE",
+				Type:           counterMetricType,
+			},
+			src: `
+package test
+import "k8s.io/component-base/metrics"
+const (
+ unrelated1 = "unrelated1"
+ name = "metric"
+ unrelated2 = "unrelated2"
+)
+var _ = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           name,
+			StabilityLevel: metrics.STABLE,
+		},
+	)
+`},
+		{
+			testName: "Multiple variables in Block",
+			metric: metric{
+				Name:           "metric",
+				StabilityLevel: "STABLE",
+				Type:           counterMetricType,
+			},
+			src: `
+package test
+import "k8s.io/component-base/metrics"
+var (
+ unrelated1 = "unrelated1"
+ name = "metric"
+ _ = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           name,
+			StabilityLevel: metrics.STABLE,
+		},
+	)
+)
+`},
+		{
 			testName: "Histogram with linear buckets",
 			metric: metric{
 				Name:           "histogram",
@@ -310,12 +389,11 @@ var _ = custom.NewCounter(
 			src: `
 package test
 import "k8s.io/component-base/metrics"
-import "github.com/prometheus/client_golang/prometheus"
 var _ = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Name: "histogram",
 			StabilityLevel: metrics.STABLE,
-			Buckets: prometheus.LinearBuckets(1, 1, 3),
+			Buckets: metrics.LinearBuckets(1, 1, 3),
 		},
 	)
 `},
@@ -330,12 +408,11 @@ var _ = metrics.NewHistogram(
 			src: `
 package test
 import "k8s.io/component-base/metrics"
-import "github.com/prometheus/client_golang/prometheus"
 var _ = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Name: "histogram",
 			StabilityLevel: metrics.STABLE,
-			Buckets: prometheus.ExponentialBuckets(1, 2, 3),
+			Buckets: metrics.ExponentialBuckets(1, 2, 3),
 		},
 	)
 `},
@@ -350,12 +427,11 @@ var _ = metrics.NewHistogram(
 			src: `
 package test
 import "k8s.io/component-base/metrics"
-import "github.com/prometheus/client_golang/prometheus"
 var _ = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Name: "histogram",
 			StabilityLevel: metrics.STABLE,
-			Buckets: prometheus.DefBuckets,
+			Buckets: metrics.DefBuckets,
 		},
 	)
 `},
@@ -397,15 +473,14 @@ var _ = metrics.NewSummary(
 	)
 `},
 		{
-			testName: "Fail on stable metric with attribute set to variable",
-			err:      fmt.Errorf("testdata/metric.go:7:4: Non string attribute it not supported"),
+			testName: "Fail on stable metric with attribute set to unknown variable",
+			err:      fmt.Errorf("testdata/metric.go:6:4: Metric attribute was not correctly set. Please use only global consts in same file"),
 			src: `
 package test
 import "k8s.io/component-base/metrics"
-const name = "metric"
 var _ = metrics.NewCounter(
 		&metrics.CounterOpts{
-			Name:           name,
+			Name:           unknownVariable,
 			StabilityLevel: metrics.STABLE,
 		},
 	)
