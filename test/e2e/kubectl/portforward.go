@@ -321,7 +321,9 @@ func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework)
 	fmt.Fprint(conn, "abc")
 
 	ginkgo.By("Closing the write half of the client's connection")
-	conn.CloseWrite()
+	if err = conn.CloseWrite(); err != nil {
+		framework.Failf("Couldn't close the write half of the client's connection: %v", err)
+	}
 
 	ginkgo.By("Reading data from the local port")
 	fromServer, err := ioutil.ReadAll(conn)
