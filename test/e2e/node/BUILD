@@ -47,6 +47,7 @@ go_library(
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/rc:go_default_library",
         "//test/e2e/framework/security:go_default_library",
+        "//test/e2e/framework/skipper:go_default_library",
         "//test/e2e/framework/ssh:go_default_library",
         "//test/e2e/framework/volume:go_default_library",
         "//test/e2e/perftype:go_default_library",
