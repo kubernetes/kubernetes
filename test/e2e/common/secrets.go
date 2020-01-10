@@ -159,7 +159,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 		framework.ExpectNoError(err, "failed to create secret")
 
 		ginkgo.By("listing secrets in all namespaces to ensure that there are more than zero")
-		// list all secrets in all namespaces
+		// list all secrets in all namespaces to ensure endpoint coverage
 		secretsList, err := f.ClientSet.CoreV1().Secrets("").List(metav1.ListOptions{
 			LabelSelector: "testsecret-constant=true",
 		})
@@ -169,9 +169,10 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 		foundCreatedSecret := false
 		var secretCreatedName string
 		for _, val := range secretsList.Items {
-			if val.ObjectMeta.Name == secretTestName && string(val.Data["key"]) == "value" {
+			if val.ObjectMeta.Name == secretTestName && val.ObjectMeta.Namespace == f.Namespace.Name {
 				foundCreatedSecret = true
 				secretCreatedName = val.ObjectMeta.Name
+				break
 			}
 		}
 		framework.ExpectEqual(foundCreatedSecret, true, "unable to find secret by its value")
@@ -214,6 +215,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 		for _, val := range secretsList.Items {
 			if val.ObjectMeta.Name == secretTestName && val.ObjectMeta.Namespace == f.Namespace.Name {
 				foundCreatedSecret = true
+				break
 			}
 		}
 		framework.ExpectEqual(foundCreatedSecret, false, "secret was not deleted successfully")
