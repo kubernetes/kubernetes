@@ -150,7 +150,7 @@ Prior to 1.17 and for existing nodes created by `kubeadm init` where kubelet cli
 - Kubeadm: when adding extra apiserver authorization-modes, the defaults `Node,RBAC` are no longer prepended in the resulting static Pod manifests and a full override is allowed. ([#82616](https://github.com/kubernetes/kubernetes/pull/82616), [@ghouscht](https://github.com/ghouscht))
 
 #### Storage
-- When CSI is used for block volumes and workers are on-line upgraded (i.e., kubelet is restarted only), masters must be upgraded before workers and each worker must be drained before it can be upgraded. ([#74026](https://github.com/kubernetes/kubernetes/pull/74026), [@mkimuram](https://github.com/mkimuram))
+- A node that uses a CSI raw block volume needs to be drained before kubelet can be upgraded to 1.17. ([#74026](https://github.com/kubernetes/kubernetes/pull/74026), [@mkimuram](https://github.com/mkimuram))
 
 #### Windows
 - The Windows containers RunAsUsername feature is now beta.
