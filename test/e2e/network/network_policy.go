@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"fmt"
@@ -49,7 +50,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// Windows does not support network policies.
-		framework.SkipIfNodeOSDistroIs("windows")
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
 	})
 
 	ginkgo.Context("NetworkPolicy between server and client", func() {

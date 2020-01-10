@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/ingress"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 )
@@ -85,7 +86,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		// Platform specific setup
 		ginkgo.BeforeEach(func() {
-			framework.SkipUnlessProviderIs("gce", "gke")
+			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 			ginkgo.By("Initializing gce controller")
 			gceController = &gce.IngressController{
 				Ns:     ns,
@@ -242,7 +243,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		// Platform specific setup
 		ginkgo.BeforeEach(func() {
-			framework.SkipUnlessProviderIs("gce", "gke")
+			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 			ginkgo.By("Initializing gce controller")
 			gceController = &gce.IngressController{
 				Ns:     ns,
@@ -588,7 +589,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		// Platform specific setup
 		ginkgo.BeforeEach(func() {
-			framework.SkipUnlessProviderIs("gce", "gke")
+			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 			jig.Class = ingress.MulticlusterIngressClassValue
 			jig.PollInterval = 5 * time.Second
 			ginkgo.By("Initializing gce controller")
@@ -716,7 +717,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		var nginxController *ingress.NginxIngressController
 
 		ginkgo.BeforeEach(func() {
-			framework.SkipUnlessProviderIs("gce", "gke")
+			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 			ginkgo.By("Initializing nginx controller")
 			jig.Class = "nginx"
 			nginxController = &ingress.NginxIngressController{Ns: ns, Client: jig.Client}
