@@ -84,7 +84,7 @@ require (
 	github.com/mindprince/gonvml v0.0.0-20190828220739-9ebdce4bb989 // indirect
 	github.com/mistifyio/go-zfs v2.1.1+incompatible // indirect
 	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb // indirect
-	github.com/morikuni/aec v0.0.0-20170113033406-39771216ff4c // indirect
+	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/mrunalp/fileutils v0.0.0-20171103030105-7d4729fb3618 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/mvdan/xurls v1.1.0
@@ -104,7 +104,7 @@ require (
 	github.com/quobyte/api v0.1.2
 	github.com/robfig/cron v1.1.0
 	github.com/seccomp/libseccomp-golang v0.9.1 // indirect
-	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a // indirect
+	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/spf13/afero v1.2.2
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
@@ -394,7 +394,7 @@ replace (
 	github.com/modern-go/concurrent => github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
 	github.com/modern-go/reflect2 => github.com/modern-go/reflect2 v1.0.1
 	github.com/mohae/deepcopy => github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
-	github.com/morikuni/aec => github.com/morikuni/aec v0.0.0-20170113033406-39771216ff4c
+	github.com/morikuni/aec => github.com/morikuni/aec v1.0.0
 	github.com/mozilla/tls-observatory => github.com/mozilla/tls-observatory v0.0.0-20180409132520-8791a200eb40
 	github.com/mrunalp/fileutils => github.com/mrunalp/fileutils v0.0.0-20171103030105-7d4729fb3618
 	github.com/munnerz/goautoneg => github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
@@ -440,7 +440,7 @@ replace (
 	github.com/shurcooL/go-goon => github.com/shurcooL/go-goon v0.0.0-20170922171312-37c2f522c041
 	github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.4.2
 	github.com/smartystreets/assertions => github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d
-	github.com/smartystreets/goconvey => github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a
+	github.com/smartystreets/goconvey => github.com/smartystreets/goconvey v1.6.4
 	github.com/soheilhy/cmux => github.com/soheilhy/cmux v0.1.4
 	github.com/sourcegraph/go-diff => github.com/sourcegraph/go-diff v0.5.1
 	github.com/spf13/afero => github.com/spf13/afero v1.2.2
