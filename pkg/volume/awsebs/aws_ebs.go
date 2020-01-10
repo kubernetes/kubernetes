@@ -481,8 +481,7 @@ func (d *awsElasticBlockStoreDeleter) Delete() error {
 
 type awsElasticBlockStoreProvisioner struct {
 	*awsElasticBlockStore
-	options   volume.VolumeOptions
-	namespace string
+	options volume.VolumeOptions
 }
 
 var _ volume.Provisioner = &awsElasticBlockStoreProvisioner{}
