@@ -662,3 +662,116 @@ func TestPodUpdateEphemeralContainers(t *testing.T) {
 		integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 	}
 }
+
+func TestPodInvalidEphemeralContainers(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
+
+	ns := framework.CreateTestingNamespace("pod-invalid-ephemeral-containers", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+
+	testPod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "fake-name",
+						Image: "fakeimage",
+					},
+				},
+			},
+		}
+	}
+
+	cases := []struct {
+		name      string
+		container []v1.EphemeralContainer
+	}{
+		{
+			name: "add container with probe",
+			container: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+						LivenessProbe:            &v1.Probe{},
+					},
+				},
+			},
+		},
+		{
+			name: "add container with lifecycle hooks",
+			container: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+						Lifecycle:                &v1.Lifecycle{},
+					},
+				},
+			},
+		},
+		{
+			name: "add container with port",
+			container: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+						Ports: []v1.ContainerPort{
+							{
+								ContainerPort: 80,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "add container with security context",
+			container: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+						SecurityContext:          &v1.SecurityContext{},
+					},
+				},
+			},
+		},
+	}
+
+	for i, tc := range cases {
+		pod := testPod(fmt.Sprintf("ephemeral-container-test-%v", i))
+		if err := setUpEphemeralContainers(client.CoreV1().Pods(ns.Name), pod, nil); err != nil {
+			t.Errorf("%v: %v", tc.name, err)
+		}
+
+		ec, err := client.CoreV1().Pods(ns.Name).GetEphemeralContainers(pod.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Errorf("%v: unable to get ephemeral containers: %v", tc.name, err)
+		}
+
+		ec.EphemeralContainers = tc.container
+		if _, err := client.CoreV1().Pods(ns.Name).UpdateEphemeralContainers(pod.Name, ec); err == nil {
+			t.Errorf("%v: unexpected allowed creation to ephemeral containers", tc.name)
+		}
+
+		integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+	}
+}
