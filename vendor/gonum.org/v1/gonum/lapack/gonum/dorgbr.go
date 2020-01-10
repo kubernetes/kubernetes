@@ -6,17 +6,17 @@ package gonum
 
 import "gonum.org/v1/gonum/lapack"
 
-// Dorgbr generates one of the matrices Q or P^T computed by Dgebrd
+// Dorgbr generates one of the matrices Q or Pᵀ computed by Dgebrd
 // computed from the decomposition Dgebrd. See Dgebd2 for the description of
-// Q and P^T.
+// Q and Pᵀ.
 //
 // If vect == lapack.GenerateQ, then a is assumed to have been an m×k matrix and
 // Q is of order m. If m >= k, then Dorgbr returns the first n columns of Q
 // where m >= n >= k. If m < k, then Dorgbr returns Q as an m×m matrix.
 //
 // If vect == lapack.GeneratePT, then A is assumed to have been a k×n matrix, and
-// P^T is of order n. If k < n, then Dorgbr returns the first m rows of P^T,
-// where n >= m >= k. If k >= n, then Dorgbr returns P^T as an n×n matrix.
+// Pᵀ is of order n. If k < n, then Dorgbr returns the first m rows of Pᵀ,
+// where n >= m >= k. If k >= n, then Dorgbr returns Pᵀ as an n×n matrix.
 //
 // Dorgbr is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dorgbr(vect lapack.GenOrtho, m, n, k int, a []float64, lda int, tau, work []float64, lwork int) {
@@ -112,12 +112,12 @@ func (impl Implementation) Dorgbr(vect lapack.GenOrtho, m, n, k int, a []float64
 			}
 		}
 	} else {
-		// Form P^T, determined by a call to Dgebrd to reduce a k×n matrix.
+		// Form Pᵀ, determined by a call to Dgebrd to reduce a k×n matrix.
 		if k < n {
 			impl.Dorglq(m, n, k, a, lda, tau, work, lwork)
 		} else {
 			// Shift the vectors which define the elementary reflectors one
-			// row downward, and set the first row and column of P^T to
+			// row downward, and set the first row and column of Pᵀ to
 			// those of the unit matrix.
 			a[0] = 1
 			for i := 1; i < n; i++ {

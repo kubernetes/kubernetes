@@ -126,7 +126,7 @@ require (
 	golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 	golang.org/x/tools v0.0.0-20190920225731-5eefd052ad72
-	gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485
+	gonum.org/v1/gonum v0.6.2
 	google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
 	google.golang.org/grpc v1.23.1
 	gopkg.in/gcfg.v1 v1.2.0
@@ -194,6 +194,7 @@ replace (
 	github.com/Rican7/retry => github.com/Rican7/retry v0.1.0
 	github.com/StackExchange/wmi => github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6
 	github.com/agnivade/levenshtein => github.com/agnivade/levenshtein v1.0.1
+	github.com/ajstarks/svgo => github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af
 	github.com/alecthomas/template => github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc
 	github.com/alecthomas/units => github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf
 	github.com/andreyvit/diff => github.com/andreyvit/diff v0.0.0-20170406064948-c7f18ee00883
@@ -256,6 +257,7 @@ replace (
 	github.com/fatih/camelcase => github.com/fatih/camelcase v1.0.0
 	github.com/fatih/color => github.com/fatih/color v1.7.0
 	github.com/flynn/go-shlex => github.com/flynn/go-shlex v0.0.0-20150515145356-3f9db97f8568
+	github.com/fogleman/gg => github.com/fogleman/gg v1.2.1-0.20190220221249-0403632d5b90
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.4.7
 	github.com/ghodss/yaml => github.com/ghodss/yaml v1.0.0
 	github.com/gliderlabs/ssh => github.com/gliderlabs/ssh v0.1.1
@@ -291,6 +293,7 @@ replace (
 	github.com/gobwas/glob => github.com/gobwas/glob v0.2.3
 	github.com/godbus/dbus => github.com/godbus/dbus v0.0.0-20181101234600-2ff6f7ffd60f
 	github.com/gogo/protobuf => github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
+	github.com/golang/freetype => github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/golang/glog => github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/mock => github.com/golang/mock v1.2.0
@@ -353,6 +356,7 @@ replace (
 	github.com/jstemmer/go-junit-report => github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
 	github.com/jtolds/gls => github.com/jtolds/gls v4.20.0+incompatible
 	github.com/julienschmidt/httprouter => github.com/julienschmidt/httprouter v1.2.0
+	github.com/jung-kurt/gofpdf => github.com/jung-kurt/gofpdf v1.0.3-0.20190309125859-24315acbbda5
 	github.com/karrick/godirwalk => github.com/karrick/godirwalk v1.7.5
 	github.com/kisielk/errcheck => github.com/kisielk/errcheck v1.2.0
 	github.com/kisielk/gotool => github.com/kisielk/gotool v1.0.0
@@ -497,8 +501,9 @@ replace (
 	golang.org/x/time => golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
 	golang.org/x/xerrors => golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7
-	gonum.org/v1/gonum => gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485
+	gonum.org/v1/gonum => gonum.org/v1/gonum v0.6.2
 	gonum.org/v1/netlib => gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e
+	gonum.org/v1/plot => gonum.org/v1/plot v0.0.0-20190515093506-e2840ee46a6b
 	google.golang.org/api => google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
 	google.golang.org/appengine => google.golang.org/appengine v1.5.0
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20190502173448-54afdca5d873
@@ -562,6 +567,7 @@ replace (
 	mvdan.cc/interfacer => mvdan.cc/interfacer v0.0.0-20180901003855-c20040233aed
 	mvdan.cc/lint => mvdan.cc/lint v0.0.0-20170908181259-adc824a0674b
 	mvdan.cc/unparam => mvdan.cc/unparam v0.0.0-20190209190245-fbb59629db34
+	rsc.io/pdf => rsc.io/pdf v0.1.1
 	sigs.k8s.io/kustomize => sigs.k8s.io/kustomize v2.0.3+incompatible
 	sigs.k8s.io/structured-merge-diff => sigs.k8s.io/structured-merge-diff v1.0.1-0.20191108220359-b1b620dd3f06
 	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.1.0
