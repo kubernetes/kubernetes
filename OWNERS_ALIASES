@@ -448,6 +448,7 @@ aliases:
     - sttts
     - soltysh
   feature-approvers:
+    - andrewsykim     # Cloud Provider
     - bgrant0607      # Architecture
     - brancz          # Instrumentation
     - bsalamat        # Scheduling
