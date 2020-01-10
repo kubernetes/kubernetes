@@ -22,7 +22,7 @@ TAG ?= v1.0.0
 
 TAR_FILE ?= rootfs.tar
 ARCH?=amd64
-ALL_ARCH = amd64 arm arm64 ppc64le s390x
+ALL_ARCH = amd64 arm arm64 ppc64le s390x mips64le
 
 TEMP_DIR:=$(shell mktemp -d)
 QEMUVERSION=v2.9.1
@@ -50,6 +50,10 @@ endif
 ifeq ($(ARCH),s390x)
 	BASEIMAGE?=s390x/debian:stretch
 	QEMUARCH=s390x
+endif
+ifeq ($(ARCH),mips64le)
+        BASEIMAGE?=inspurcloud/debian-debootstrap:mips64el-stretch
+        QEMUARCH=mips64el
 endif
 
 sub-build-%:
