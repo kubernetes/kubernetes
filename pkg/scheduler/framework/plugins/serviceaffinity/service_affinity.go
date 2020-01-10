@@ -38,8 +38,8 @@ const (
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.
 	preFilterStateKey = "PreFilter" + Name
 
-	// ErrServiceAffinityViolated is used for CheckServiceAffinity predicate error.
-	ErrServiceAffinityViolated = "node(s) didn't match service affinity"
+	// ErrReason is used for CheckServiceAffinity predicate error.
+	ErrReason = "node(s) didn't match service affinity"
 )
 
 // Args holds the args that are used to configure the plugin.
@@ -277,7 +277,7 @@ func (pl *ServiceAffinity) Filter(ctx context.Context, cycleState *framework.Cyc
 		return nil
 	}
 
-	return framework.NewStatus(framework.Unschedulable, ErrServiceAffinityViolated)
+	return framework.NewStatus(framework.Unschedulable, ErrReason)
 }
 
 // Score invoked at the Score extension point.
