@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -204,7 +205,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// These tests require SSH
-		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		ns = f.Namespace.Name
 
 		// All the restart tests need an rc and a watch on pods of the rc.
@@ -258,7 +259,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 	ginkgo.It("Controller Manager should not create/delete replicas across restart", func() {
 
 		// Requires master ssh access.
-		framework.SkipUnlessProviderIs("gce", "aws")
+		e2eskipper.SkipUnlessProviderIs("gce", "aws")
 		restarter := NewRestartConfig(
 			framework.GetMasterHost(), "kube-controller", ports.InsecureKubeControllerManagerPort, restartPollInterval, restartTimeout)
 		restarter.restart()
@@ -289,7 +290,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 	ginkgo.It("Scheduler should continue assigning pods to nodes across restart", func() {
 
 		// Requires master ssh access.
-		framework.SkipUnlessProviderIs("gce", "aws")
+		e2eskipper.SkipUnlessProviderIs("gce", "aws")
 		restarter := NewRestartConfig(
 			framework.GetMasterHost(), "kube-scheduler", ports.InsecureSchedulerPort, restartPollInterval, restartTimeout)
 

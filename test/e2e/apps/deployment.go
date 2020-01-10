@@ -45,6 +45,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/replicaset"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutil "k8s.io/kubernetes/test/utils"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -125,7 +126,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testProportionalScalingDeployment(f)
 	})
 	ginkgo.It("should not disrupt a cloud load-balancer's connectivity during rollout", func() {
-		framework.SkipUnlessProviderIs("aws", "azure", "gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("aws", "azure", "gce", "gke")
 		testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f)
 	})
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues

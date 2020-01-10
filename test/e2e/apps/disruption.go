@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -149,7 +150,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		}
 		ginkgo.It(fmt.Sprintf("evictions: %s => %s", c.description, expectation), func() {
 			if c.skipForBigClusters {
-				framework.SkipUnlessNodeCountIsAtMost(bigClusterSize - 1)
+				e2eskipper.SkipUnlessNodeCountIsAtMost(bigClusterSize - 1)
 			}
 			createPodsOrDie(cs, ns, c.podCount)
 			if c.replicaSetSize > 0 {

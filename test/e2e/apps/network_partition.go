@@ -41,6 +41,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -120,7 +121,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 		framework.ExpectNoError(err)
 
 		// TODO(foxish): Re-enable testing on gce after kubernetes#56787 is fixed.
-		framework.SkipUnlessProviderIs("gke", "aws")
+		e2eskipper.SkipUnlessProviderIs("gke", "aws")
 		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
 			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
 		}
@@ -129,8 +130,8 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 	framework.KubeDescribe("Pods", func() {
 		ginkgo.Context("should return to running and ready state after network partition is healed", func() {
 			ginkgo.BeforeEach(func() {
-				framework.SkipUnlessNodeCountIsAtLeast(2)
-				framework.SkipUnlessSSHKeyPresent()
+				e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
+				e2eskipper.SkipUnlessSSHKeyPresent()
 			})
 
 			// What happens in this test:
@@ -239,7 +240,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 	framework.KubeDescribe("[ReplicationController]", func() {
 		ginkgo.It("should recreate pods scheduled on the unreachable node "+
 			"AND allow scheduling of pods on a node after it rejoins the cluster", func() {
-			framework.SkipUnlessSSHKeyPresent()
+			e2eskipper.SkipUnlessSSHKeyPresent()
 
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
@@ -306,7 +307,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 		})
 
 		ginkgo.It("should eagerly create replacement pod during network partition when termination grace is non-zero", func() {
-			framework.SkipUnlessSSHKeyPresent()
+			e2eskipper.SkipUnlessSSHKeyPresent()
 
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
@@ -363,7 +364,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 		ginkgo.BeforeEach(func() {
 			// TODO(foxish): Re-enable testing on gce after kubernetes#56787 is fixed.
-			framework.SkipUnlessProviderIs("gke")
+			e2eskipper.SkipUnlessProviderIs("gke")
 			ginkgo.By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
 			headlessService := e2eservice.CreateServiceSpec(headlessSvcName, "", true, labels)
 			_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
@@ -398,7 +399,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 		})
 
 		ginkgo.It("should not reschedule stateful pods if there is a network partition [Slow] [Disruptive]", func() {
-			framework.SkipUnlessSSHKeyPresent()
+			e2eskipper.SkipUnlessSSHKeyPresent()
 
 			ps := e2esset.NewStatefulSet(psName, ns, headlessSvcName, 3, []v1.VolumeMount{}, []v1.VolumeMount{}, labels)
 			_, err := c.AppsV1().StatefulSets(ns).Create(ps)
@@ -431,7 +432,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 	framework.KubeDescribe("[Job]", func() {
 		ginkgo.It("should create new pods when node is partitioned", func() {
-			framework.SkipUnlessSSHKeyPresent()
+			e2eskipper.SkipUnlessSSHKeyPresent()
 
 			parallelism := int32(2)
 			completions := int32(4)
@@ -479,7 +480,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 	framework.KubeDescribe("Pods", func() {
 		ginkgo.Context("should be evicted from unready Node", func() {
 			ginkgo.BeforeEach(func() {
-				framework.SkipUnlessNodeCountIsAtLeast(2)
+				e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 			})
 
 			// What happens in this test:
@@ -490,7 +491,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// 3. After enough time passess all Pods are evicted from the given Node
 			ginkgo.It("[Feature:TaintEviction] All pods on the unreachable node should be marked as NotReady upon the node turn NotReady "+
 				"AND all pods should be evicted after eviction timeout passes", func() {
-				framework.SkipUnlessSSHKeyPresent()
+				e2eskipper.SkipUnlessSSHKeyPresent()
 				ginkgo.By("choose a node - we will block all network traffic on this node")
 				var podOpts metav1.ListOptions
 				nodes, err := e2enode.GetReadySchedulableNodes(c)
