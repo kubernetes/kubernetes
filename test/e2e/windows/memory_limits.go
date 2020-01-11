@@ -36,6 +36,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -48,7 +49,7 @@ var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// NOTE(vyta): these tests are Windows specific
-		framework.SkipUnlessNodeOSDistroIs("windows")
+		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})
 
 	ginkgo.Context("Allocatable node memory", func() {

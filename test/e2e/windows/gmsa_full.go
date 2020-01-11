@@ -52,6 +52,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -87,7 +88,7 @@ var _ = SIGDescribe("[Feature:Windows] [Feature:WindowsGMSA] GMSA Full [Slow]", 
 			ginkgo.By("finding the worker node that fulfills this test's assumptions")
 			nodes := findPreconfiguredGmsaNodes(f.ClientSet)
 			if len(nodes) != 1 {
-				framework.Skipf("Expected to find exactly one node with the %q label, found %d", gmsaFullNodeLabel, len(nodes))
+				e2eskipper.Skipf("Expected to find exactly one node with the %q label, found %d", gmsaFullNodeLabel, len(nodes))
 			}
 			node := nodes[0]
 

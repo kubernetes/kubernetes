@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 )
@@ -35,7 +36,7 @@ var _ = SIGDescribe("Services", func() {
 
 	ginkgo.BeforeEach(func() {
 		//Only for Windows containers
-		framework.SkipUnlessNodeOSDistroIs("windows")
+		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 		cs = f.ClientSet
 	})
 	ginkgo.It("should be able to create a functioning NodePort service for Windows", func() {
