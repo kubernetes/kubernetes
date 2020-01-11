@@ -37,17 +37,11 @@ var (
 	ErrPodNotMatchHostName = NewPredicateFailureError("HostName", "node(s) didn't match the requested hostname")
 	// ErrPodNotFitsHostPorts is used for PodFitsHostPorts predicate error.
 	ErrPodNotFitsHostPorts = NewPredicateFailureError("PodFitsHostPorts", "node(s) didn't have free ports for the requested pod ports")
-	// ErrNodeUnknownCondition is used for NodeUnknownCondition predicate error.
-	ErrNodeUnknownCondition = NewPredicateFailureError("NodeUnknownCondition", "node(s) had unknown conditions")
 )
 
 var unresolvablePredicateFailureErrors = map[PredicateFailureReason]struct{}{
 	ErrNodeSelectorNotMatch: {},
 	ErrPodNotMatchHostName:  {},
-	// Node conditions won't change when scheduler simulates removal of preemption victims.
-	// So, it is pointless to try nodes that have not been able to host the pod due to node
-	// conditions.
-	ErrNodeUnknownCondition: {},
 }
 
 // UnresolvablePredicateExists checks if there is at least one unresolvable predicate failure reason.
