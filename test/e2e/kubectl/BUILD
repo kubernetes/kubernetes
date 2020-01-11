@@ -46,6 +46,7 @@ go_library(
         "//test/e2e/framework/kubectl:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/service:go_default_library",
+        "//test/e2e/framework/skipper:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/e2e/scheduling:go_default_library",
         "//test/integration/etcd:go_default_library",

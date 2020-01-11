@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 )
@@ -75,10 +76,10 @@ var _ = Describe("networking [setup-networking]", func() {
 		ginkgo.Context("podSubnet", func() {
 			ginkgo.It("should be properly configured if specified in kubeadm-config", func() {
 				if dualStack {
-					framework.Skipf("Skipping because cluster is dual-stack")
+					e2eskipper.Skipf("Skipping because cluster is dual-stack")
 				}
 				if !podSubnetInKubeadmConfig {
-					framework.Skipf("Skipping because podSubnet was not specified in kubeadm-config")
+					e2eskipper.Skipf("Skipping because podSubnet was not specified in kubeadm-config")
 				}
 				cc := getClusterConfiguration(f.ClientSet)
 				if _, ok := cc["networking"]; ok {
@@ -99,10 +100,10 @@ var _ = Describe("networking [setup-networking]", func() {
 		ginkgo.Context("serviceSubnet", func() {
 			ginkgo.It("should be properly configured if specified in kubeadm-config", func() {
 				if dualStack {
-					framework.Skipf("Skipping because cluster is dual-stack")
+					e2eskipper.Skipf("Skipping because cluster is dual-stack")
 				}
 				if !serviceSubnetInKubeadmConfig {
-					framework.Skipf("Skipping because serviceSubnet was not specified in kubeadm-config")
+					e2eskipper.Skipf("Skipping because serviceSubnet was not specified in kubeadm-config")
 				}
 				cc := getClusterConfiguration(f.ClientSet)
 				if _, ok := cc["networking"]; ok {
@@ -124,10 +125,10 @@ var _ = Describe("networking [setup-networking]", func() {
 		ginkgo.Context("podSubnet", func() {
 			ginkgo.It("should be properly configured if specified in kubeadm-config", func() {
 				if !dualStack {
-					framework.Skipf("Skipping because cluster is not dual-stack")
+					e2eskipper.Skipf("Skipping because cluster is not dual-stack")
 				}
 				if !podSubnetInKubeadmConfig {
-					framework.Skipf("Skipping because podSubnet was not specified in kubeadm-config")
+					e2eskipper.Skipf("Skipping because podSubnet was not specified in kubeadm-config")
 				}
 				cc := getClusterConfiguration(f.ClientSet)
 				if _, ok := cc["networking"]; ok {
