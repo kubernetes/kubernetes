@@ -610,7 +610,10 @@ func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) error {
 		}
 		return false, nil
 	})
-	return waitErr
+	if waitErr != nil {
+		return fmt.Errorf("error waiting for pod %s/%s to have max volume condition: %v", pod.Namespace, pod.Name, waitErr)
+	}
+	return nil
 }
 
 func checkCSINodeForLimits(nodeName string, driverName string, cs clientset.Interface) (int32, error) {
@@ -627,7 +630,10 @@ func checkCSINodeForLimits(nodeName string, driverName string, cs clientset.Inte
 		}
 		return false, nil
 	})
-	return attachLimit, waitErr
+	if waitErr != nil {
+		return 0, fmt.Errorf("error waiting for non-zero volume limit of driver %s on node %s: %v", driverName, nodeName, waitErr)
+	}
+	return attachLimit, nil
 }
 
 func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
