@@ -87,7 +87,10 @@ func ValidateFlowSchemaUpdate(old, fs *flowcontrol.FlowSchema) field.ErrorList {
 func ValidateFlowSchemaSpec(spec *flowcontrol.FlowSchemaSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if spec.MatchingPrecedence <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("matchingPrecedence"), spec.MatchingPrecedence, "must be positive value"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("matchingPrecedence"), spec.MatchingPrecedence, "must be a positive value"))
+	}
+	if spec.MatchingPrecedence > flowcontrol.FlowSchemaMaxMatchingPrecedence {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("matchingPrecedence"), spec.MatchingPrecedence, fmt.Sprintf("must not be greater than %v", flowcontrol.FlowSchemaMaxMatchingPrecedence)))
 	}
 	if spec.DistinguisherMethod != nil {
 		if !supportedDistinguisherMethods.Has(string(spec.DistinguisherMethod.Type)) {
