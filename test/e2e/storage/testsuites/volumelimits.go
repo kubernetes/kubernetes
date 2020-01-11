@@ -178,7 +178,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for all PVCs to get Bound")
-		l.pvNames, err = waitForAllPVCsPhase(l.cs, testSlowMultiplier*e2epv.PVBindingTimeout, l.pvcs)
+		l.pvNames, err = waitForAllPVCsBound(l.cs, testSlowMultiplier*e2epv.PVBindingTimeout, l.pvcs)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for the pod Running")
@@ -268,7 +268,8 @@ func cleanupTest(cs clientset.Interface, ns string, runningPodName, unschedulabl
 	return nil
 }
 
-func waitForAllPVCsPhase(cs clientset.Interface, timeout time.Duration, pvcs []*v1.PersistentVolumeClaim) (sets.String, error) {
+// waitForAllPVCsBound waits until the given PVCs are all bound. It then returns the bound PVC names as a set.
+func waitForAllPVCsBound(cs clientset.Interface, timeout time.Duration, pvcs []*v1.PersistentVolumeClaim) (sets.String, error) {
 	pvNames := sets.NewString()
 	err := wait.Poll(5*time.Second, timeout, func() (bool, error) {
 		unbound := 0
@@ -289,7 +290,10 @@ func waitForAllPVCsPhase(cs clientset.Interface, timeout time.Duration, pvcs []*
 		}
 		return true, nil
 	})
-	return pvNames, err
+	if err != nil {
+		return nil, fmt.Errorf("error waiting for all PVCs to be bound: %v", err)
+	}
+	return pvNames, nil
 }
 
 func getNodeLimits(cs clientset.Interface, config *PerTestConfig, nodeName string, driverInfo *DriverInfo) (int, error) {
@@ -327,7 +331,7 @@ func getInTreeNodeLimits(cs clientset.Interface, nodeName string, driverInfo *Dr
 }
 
 func getCSINodeLimits(cs clientset.Interface, config *PerTestConfig, nodeName string, driverInfo *DriverInfo) (int, error) {
-	// Wait in a loop, the driver might just have been installed and kubelet takes a while to publish everything.
+	// Retry with a timeout, the driver might just have been installed and kubelet takes a while to publish everything.
 	var limit int
 	err := wait.PollImmediate(2*time.Second, csiNodeInfoTimeout, func() (bool, error) {
 		csiNode, err := cs.StorageV1().CSINodes().Get(nodeName, metav1.GetOptions{})
@@ -355,5 +359,8 @@ func getCSINodeLimits(cs clientset.Interface, config *PerTestConfig, nodeName st
 		limit = int(*csiDriver.Allocatable.Count)
 		return true, nil
 	})
-	return limit, err
+	if err != nil {
+		return 0, fmt.Errorf("could not get CSINode limit for driver %s: %v", driverInfo.Name, err)
+	}
+	return limit, nil
 }

@@ -130,23 +130,27 @@ func getUniqueVolumeName(pod *v1.Pod, driverName string) string {
 }
 
 func waitForVolumesNotInUse(client clientset.Interface, nodeName, volumeName string) error {
-	return wait.PollImmediate(10*time.Second, 60*time.Second, func() (bool, error) {
+	waitErr := wait.PollImmediate(10*time.Second, 60*time.Second, func() (bool, error) {
 		node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("error fetching node %s with %v", nodeName, err)
 		}
-		volumeInUSe := node.Status.VolumesInUse
-		for _, volume := range volumeInUSe {
+		volumeInUse := node.Status.VolumesInUse
+		for _, volume := range volumeInUse {
 			if string(volume) == volumeName {
 				return false, nil
 			}
 		}
 		return true, nil
 	})
+	if waitErr != nil {
+		return fmt.Errorf("error waiting for volumes to not be in use: %v", waitErr)
+	}
+	return nil
 }
 
 func waitForVolumesAttached(client clientset.Interface, nodeName, volumeName string) error {
-	return wait.PollImmediate(2*time.Second, 2*time.Minute, func() (bool, error) {
+	waitErr := wait.PollImmediate(2*time.Second, 2*time.Minute, func() (bool, error) {
 		node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("error fetching node %s with %v", nodeName, err)
@@ -159,22 +163,30 @@ func waitForVolumesAttached(client clientset.Interface, nodeName, volumeName str
 		}
 		return false, nil
 	})
+	if waitErr != nil {
+		return fmt.Errorf("error waiting for volume %v to attach to node %v: %v", volumeName, nodeName, waitErr)
+	}
+	return nil
 }
 
 func waitForVolumesInUse(client clientset.Interface, nodeName, volumeName string) error {
-	return wait.PollImmediate(10*time.Second, 60*time.Second, func() (bool, error) {
+	waitErr := wait.PollImmediate(10*time.Second, 60*time.Second, func() (bool, error) {
 		node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("error fetching node %s with %v", nodeName, err)
 		}
-		volumeInUSe := node.Status.VolumesInUse
-		for _, volume := range volumeInUSe {
+		volumeInUse := node.Status.VolumesInUse
+		for _, volume := range volumeInUse {
 			if string(volume) == volumeName {
 				return true, nil
 			}
 		}
 		return false, nil
 	})
+	if waitErr != nil {
+		return fmt.Errorf("error waiting for volume %v to be in use on node %v: %v", volumeName, nodeName, waitErr)
+	}
+	return nil
 }
 
 func getFlexVolumePod(volumeSource v1.VolumeSource, nodeName string) *v1.Pod {

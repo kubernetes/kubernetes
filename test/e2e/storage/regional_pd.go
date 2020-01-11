@@ -252,18 +252,17 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	} else {
 		otherZone = cloudZones[0]
 	}
-	err = wait.PollImmediate(framework.Poll, statefulSetReadyTimeout, func() (bool, error) {
-		framework.Logf("checking whether new pod is scheduled in zone %q", otherZone)
-		pod = getPod(c, ns, regionalPDLabels)
-		nodeName = pod.Spec.NodeName
-		node, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	waitErr := wait.PollImmediate(framework.Poll, statefulSetReadyTimeout, func() (bool, error) {
+		framework.Logf("Checking whether new pod is scheduled in zone %q", otherZone)
+		pod := getPod(c, ns, regionalPDLabels)
+		node, err := c.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}
 		newPodZone := node.Labels[v1.LabelZoneFailureDomain]
 		return newPodZone == otherZone, nil
 	})
-	framework.ExpectNoError(err, "Error waiting for pod to be scheduled in a different zone (%q): %v", otherZone, err)
+	framework.ExpectNoError(waitErr, "Error waiting for pod to be scheduled in a different zone (%q): %v", otherZone, err)
 
 	err = waitForStatefulSetReplicasReady(statefulSet.Name, ns, c, 3*time.Second, framework.RestartPodReadyAgainTimeout)
 	if err != nil {

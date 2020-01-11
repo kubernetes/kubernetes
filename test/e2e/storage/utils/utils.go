@@ -583,7 +583,7 @@ func PrivilegedTestPSPClusterRoleBinding(client clientset.Interface,
 			_, err := roleBindingClient.Get(binding.GetName(), metav1.GetOptions{})
 			return apierrors.IsNotFound(err), nil
 		})
-		framework.ExpectNoError(err, "Timed out waiting for deletion: %v", err)
+		framework.ExpectNoError(err, "Timed out waiting for RBAC binding %s deletion: %v", binding.GetName(), err)
 
 		if teardown {
 			continue

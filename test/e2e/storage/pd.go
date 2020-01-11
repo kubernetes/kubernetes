@@ -428,13 +428,13 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					}
 					ginkgo.By("evicting host0Pod")
 					err = wait.PollImmediate(framework.Poll, podEvictTimeout, func() (bool, error) {
-						err = cs.CoreV1().Pods(ns).Evict(evictTarget)
-						if err != nil {
+						if err := cs.CoreV1().Pods(ns).Evict(evictTarget); err != nil {
+							framework.Logf("Failed to evict host0Pod, ignoring error: %v", err)
 							return false, nil
 						}
 						return true, nil
 					})
-					framework.ExpectNoError(err, fmt.Sprintf("failed to evict host0Pod after %v", podEvictTimeout))
+					framework.ExpectNoError(err, "failed to evict host0Pod after %v", podEvictTimeout)
 				}
 
 				ginkgo.By("waiting for pd to detach from host0")

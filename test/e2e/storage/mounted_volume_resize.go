@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -170,6 +171,9 @@ func waitForDeploymentToRecreatePod(client clientset.Interface, deployment *apps
 	var runningPod v1.Pod
 	waitErr := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
 		podList, err := e2edeploy.GetPodsForDeployment(client, deployment)
+		if err != nil {
+			return false, fmt.Errorf("failed to get pods for deployment: %v", err)
+		}
 		for _, pod := range podList.Items {
 			switch pod.Status.Phase {
 			case v1.PodRunning:
@@ -179,7 +183,10 @@ func waitForDeploymentToRecreatePod(client clientset.Interface, deployment *apps
 				return false, conditions.ErrPodCompleted
 			}
 		}
-		return false, err
+		return false, nil
 	})
-	return runningPod, waitErr
+	if waitErr != nil {
+		return runningPod, fmt.Errorf("error waiting for recreated pod: %v", waitErr)
+	}
+	return runningPod, nil
 }

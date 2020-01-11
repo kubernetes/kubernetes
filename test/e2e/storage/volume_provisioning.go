@@ -513,18 +513,10 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 			ginkgo.By(fmt.Sprintf("Checking for residual PersistentVolumes associated with StorageClass %s", class.Name))
 			residualPVs, err = waitForProvisionedVolumesDeleted(c, class.Name)
-			framework.ExpectNoError(err)
 			// Cleanup the test resources before breaking
 			defer deleteProvisionedVolumesAndDisks(c, residualPVs)
+			framework.ExpectNoError(err, "PersistentVolumes were not deleted as expected. %d remain", len(residualPVs))
 
-			// Report indicators of regression
-			if len(residualPVs) > 0 {
-				framework.Logf("Remaining PersistentVolumes:")
-				for i, pv := range residualPVs {
-					framework.Logf("\t%d) %s", i+1, pv.Name)
-				}
-				framework.Failf("Expected 0 PersistentVolumes remaining. Found %d", len(residualPVs))
-			}
 			framework.Logf("0 PersistentVolumes remain.")
 		})
 
@@ -821,7 +813,9 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// ClaimProvisionTimeout in the very same loop.
 			err = wait.Poll(time.Second, framework.ClaimProvisionTimeout, func() (bool, error) {
 				events, err := c.CoreV1().Events(claim.Namespace).List(metav1.ListOptions{})
-				framework.ExpectNoError(err)
+				if err != nil {
+					return false, fmt.Errorf("could not list PVC events in %s: %v", claim.Namespace, err)
+				}
 				for _, event := range events.Items {
 					if strings.Contains(event.Message, "failed to create encrypted volume: the volume disappeared after creation, most likely due to inaccessible KMS encryption key") {
 						return true, nil
@@ -843,7 +837,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				framework.Logf("The test missed event about failed provisioning, but checked that no volume was provisioned for %v", framework.ClaimProvisionTimeout)
 				err = nil
 			}
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "Error waiting for PVC to fail provisioning: %v", err)
 		})
 	})
 })
@@ -1033,7 +1027,10 @@ func waitForProvisionedVolumesDeleted(c clientset.Interface, scName string) ([]*
 		}
 		return true, nil // No PVs remain
 	})
-	return remainingPVs, err
+	if err != nil {
+		return remainingPVs, fmt.Errorf("Error waiting for PVs to be deleted: %v", err)
+	}
+	return nil, nil
 }
 
 // deleteStorageClass deletes the passed in StorageClass and catches errors other than "Not Found"
@@ -1046,6 +1043,10 @@ func deleteStorageClass(c clientset.Interface, className string) {
 
 // deleteProvisionedVolumes [gce||gke only]  iteratively deletes persistent volumes and attached GCE PDs.
 func deleteProvisionedVolumesAndDisks(c clientset.Interface, pvs []*v1.PersistentVolume) {
+	framework.Logf("Remaining PersistentVolumes:")
+	for i, pv := range pvs {
+		framework.Logf("\t%d) %s", i+1, pv.Name)
+	}
 	for _, pv := range pvs {
 		framework.ExpectNoError(e2epv.DeletePDWithRetry(pv.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName))
 		framework.ExpectNoError(e2epv.DeletePersistentVolume(c, pv.Name))

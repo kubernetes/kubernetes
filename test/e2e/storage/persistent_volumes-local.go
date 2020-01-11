@@ -570,7 +570,8 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			}()
 
 			ginkgo.By("Waiting for all pods to complete successfully")
-			err := wait.PollImmediate(time.Second, 5*time.Minute, func() (done bool, err error) {
+			const completeTimeout = 5 * time.Minute
+			waitErr := wait.PollImmediate(time.Second, completeTimeout, func() (done bool, err error) {
 				podsList, err := config.client.CoreV1().Pods(config.ns).List(metav1.ListOptions{})
 				if err != nil {
 					return false, err
@@ -589,15 +590,15 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 						delete(pods, pod.Name)
 						numFinished++
 						framework.Logf("%v/%v pods finished", numFinished, totalPods)
-					case v1.PodFailed:
 					case v1.PodUnknown:
 						return false, fmt.Errorf("pod %v is in %v phase", pod.Name, pod.Status.Phase)
+					case v1.PodFailed:
 					}
 				}
 
 				return numFinished == totalPods, nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(waitErr, "some pods failed to complete within %v", completeTimeout)
 		})
 	})
 
@@ -648,7 +649,8 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				pods[pod.Name] = pod
 			}
 			ginkgo.By("Wait for all pods are running")
-			err = wait.PollImmediate(time.Second, 5*time.Minute, func() (done bool, err error) {
+			const runningTimeout = 5 * time.Minute
+			waitErr := wait.PollImmediate(time.Second, runningTimeout, func() (done bool, err error) {
 				podsList, err := config.client.CoreV1().Pods(config.ns).List(metav1.ListOptions{})
 				if err != nil {
 					return false, err
@@ -662,7 +664,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				}
 				return runningPods == count, nil
 			})
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(waitErr, "Some pods are not running within %v", runningTimeout)
 		})
 	})
 })
@@ -918,17 +920,26 @@ func createLocalPVCsPVs(config *localTestConfig, volumes []*localTestVolume, mod
 			verifyLocalVolume(config, volume)
 		}
 	} else {
-		// Verify PVCs are not bound
+		// Verify PVCs are not bound by waiting for phase==bound with a timeout and asserting that we hit the timeout.
 		// There isn't really a great way to verify this without making the test be slow...
-		err = wait.PollImmediate(time.Second, 10*time.Second, func() (done bool, err error) {
+		const bindTimeout = 10 * time.Second
+		waitErr := wait.PollImmediate(time.Second, bindTimeout, func() (done bool, err error) {
 			for _, volume := range volumes {
 				pvc, err := config.client.CoreV1().PersistentVolumeClaims(volume.pvc.Namespace).Get(volume.pvc.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
-				framework.ExpectEqual(pvc.Status.Phase, v1.ClaimPending)
+				if err != nil {
+					return false, fmt.Errorf("failed to get PVC %s/%s: %v", volume.pvc.Namespace, volume.pvc.Name, err)
+				}
+				if pvc.Status.Phase != v1.ClaimPending {
+					return true, nil
+				}
 			}
 			return false, nil
 		})
-		framework.ExpectError(err)
+		if waitErr == wait.ErrWaitTimeout {
+			framework.Logf("PVCs were not bound within %v (that's good)", bindTimeout)
+			waitErr = nil
+		}
+		framework.ExpectNoError(waitErr, "Error making sure PVCs are not bound")
 	}
 }
 

@@ -147,20 +147,18 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 // Wait until the pod failed over to a different node, or time out after 3 minutes
 func waitForPodToFailover(client clientset.Interface, deployment *appsv1.Deployment, oldNode string) (string, error) {
 	var (
-		err      error
-		newNode  string
 		timeout  = 3 * time.Minute
 		pollTime = 10 * time.Second
 	)
 
-	err = wait.Poll(pollTime, timeout, func() (bool, error) {
-		newNode, err = getNodeForDeployment(client, deployment)
+	waitErr := wait.Poll(pollTime, timeout, func() (bool, error) {
+		currentNode, err := getNodeForDeployment(client, deployment)
 		if err != nil {
 			return true, err
 		}
 
-		if newNode != oldNode {
-			framework.Logf("The pod has been failed over from %q to %q", oldNode, newNode)
+		if currentNode != oldNode {
+			framework.Logf("The pod has been failed over from %q to %q", oldNode, currentNode)
 			return true, nil
 		}
 
@@ -168,12 +166,11 @@ func waitForPodToFailover(client clientset.Interface, deployment *appsv1.Deploym
 		return false, nil
 	})
 
-	if err != nil {
-		if err == wait.ErrWaitTimeout {
-			framework.Logf("Time out after waiting for %v", timeout)
+	if waitErr != nil {
+		if waitErr == wait.ErrWaitTimeout {
+			return "", fmt.Errorf("pod has not failed over after %v: %v", timeout, waitErr)
 		}
-		framework.Logf("Pod did not fail over from %q with error: %v", oldNode, err)
-		return "", err
+		return "", fmt.Errorf("pod did not fail over from %q: %v", oldNode, waitErr)
 	}
 
 	return getNodeForDeployment(client, deployment)
