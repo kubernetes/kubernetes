@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utilpath "k8s.io/utils/path"
@@ -166,8 +167,11 @@ func (kl *Kubelet) GetPods() []*v1.Pod {
 	// a kubelet running without apiserver requires an additional
 	// update of the static pod status. See #57106
 	for _, p := range pods {
-		if status, ok := kl.statusManager.GetPodStatus(p.UID); ok {
-			p.Status = status
+		if kubelettypes.IsStaticPod(p) {
+			if status, ok := kl.statusManager.GetPodStatus(p.UID); ok {
+				klog.V(2).Infof("status for pod %v updated to %v", p.Name, status)
+				p.Status = status
+			}
 		}
 	}
 	return pods
