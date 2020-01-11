@@ -181,6 +181,8 @@ const (
 	PatchNodeTimeout = 2 * time.Minute
 	// TLSBootstrapTimeout specifies how long kubeadm should wait for the kubelet to perform the TLS Bootstrap
 	TLSBootstrapTimeout = 2 * time.Minute
+	// PullImageRetry specifies how many times ContainerRuntime retries when pulling image failed
+	PullImageRetry = 5
 	// PrepullImagesInParallelTimeout specifies how long kubeadm should wait for prepulling images in parallel before timing out
 	PrepullImagesInParallelTimeout = 10 * time.Second
 
