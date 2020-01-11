@@ -35,9 +35,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-// ServiceStartTimeout is how long to wait for a service endpoint to be resolvable.
-const ServiceStartTimeout = 3 * time.Minute
-
 // PortsByPodName is a map that maps pod name to container ports.
 type PortsByPodName map[string][]int
 
@@ -98,9 +95,9 @@ func validatePorts(ep PortsByPodUID, expectedEndpoints PortsByPodUID) error {
 
 // ValidateEndpointsPorts validates that the given service exists and is served by the given expectedEndpoints.
 func ValidateEndpointsPorts(c clientset.Interface, namespace, serviceName string, expectedEndpoints PortsByPodName) error {
-	ginkgo.By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to expose endpoints %v", ServiceStartTimeout, serviceName, namespace, expectedEndpoints))
+	ginkgo.By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to expose endpoints %v", framework.ServiceStartTimeout, serviceName, namespace, expectedEndpoints))
 	i := 1
-	for start := time.Now(); time.Since(start) < ServiceStartTimeout; time.Sleep(1 * time.Second) {
+	for start := time.Now(); time.Since(start) < framework.ServiceStartTimeout; time.Sleep(1 * time.Second) {
 		ep, err := c.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Get endpoints failed (%v elapsed, ignoring for 5s): %v", time.Since(start), err)
@@ -132,5 +129,5 @@ func ValidateEndpointsPorts(c clientset.Interface, namespace, serviceName string
 	} else {
 		framework.Logf("Can't list pod debug info: %v", err)
 	}
-	return fmt.Errorf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, ServiceStartTimeout)
+	return fmt.Errorf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, framework.ServiceStartTimeout)
 }
