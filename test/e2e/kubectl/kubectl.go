@@ -74,6 +74,7 @@ import (
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	"k8s.io/kubernetes/test/integration/etcd"
@@ -234,7 +235,7 @@ var _ = SIGDescribe("Kubectl alpha client", func() {
 		})
 
 		ginkgo.It("should create a CronJob", func() {
-			framework.SkipIfMissingResource(f.DynamicClient, cronJobGroupVersionResourceAlpha, f.Namespace.Name)
+			e2eskipper.SkipIfMissingResource(f.DynamicClient, cronJobGroupVersionResourceAlpha, f.Namespace.Name)
 
 			schedule := "*/5 * * * ?"
 			framework.RunKubectlOrDie(ns, "run", cjName, "--restart=OnFailure", "--generator=cronjob/v2alpha1",
@@ -1832,7 +1833,7 @@ metadata:
 		})
 
 		ginkgo.It("should create a CronJob", func() {
-			framework.SkipIfMissingResource(f.DynamicClient, cronJobGroupVersionResourceBeta, f.Namespace.Name)
+			e2eskipper.SkipIfMissingResource(f.DynamicClient, cronJobGroupVersionResourceBeta, f.Namespace.Name)
 
 			schedule := "*/5 * * * ?"
 			framework.RunKubectlOrDie(ns, "run", cjName, "--restart=OnFailure", "--generator=cronjob/v1beta1",
