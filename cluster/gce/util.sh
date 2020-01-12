@@ -2826,7 +2826,7 @@ function replicate-master() {
   fi
 }
 
-# Detaches old and ataches new external IP to a VM.
+# Detaches old and attaches new external IP to a VM.
 #
 # Arguments:
 #   $1 - VM name
