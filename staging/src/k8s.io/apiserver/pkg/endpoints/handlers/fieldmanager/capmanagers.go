@@ -58,8 +58,8 @@ func (f *capManagersManager) Update(liveObj, newObj runtime.Object, managed Mana
 }
 
 // Apply implements Manager.
-func (f *capManagersManager) Apply(liveObj runtime.Object, patch []byte, managed Managed, fieldManager string, force bool) (runtime.Object, Managed, error) {
-	return f.fieldManager.Apply(liveObj, patch, managed, fieldManager, force)
+func (f *capManagersManager) Apply(liveObj, appliedObj runtime.Object, managed Managed, fieldManager string, force bool) (runtime.Object, Managed, error) {
+	return f.fieldManager.Apply(liveObj, appliedObj, managed, fieldManager, force)
 }
 
 // capUpdateManagers merges a number of the oldest update entries into versioned buckets,
