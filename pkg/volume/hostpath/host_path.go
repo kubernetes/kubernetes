@@ -19,6 +19,7 @@ package hostpath
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 
 	"k8s.io/utils/mount"
@@ -482,9 +483,16 @@ func makeDir(pathname string) error {
 	return nil
 }
 
-// makeFile creates an empty file.
+// makeFile creates an empty file, also creating parent directories if necessary.
 // If pathname already exists, whether a file or directory, no error is returned.
 func makeFile(pathname string) error {
+	path, _ := filepath.Split(pathname)
+	if _, statErr := os.Stat(path); os.IsNotExist(statErr) {
+		err := makeDir(path)
+		if err != nil {
+			return err
+		}
+	}
 	f, err := os.OpenFile(pathname, os.O_CREATE, os.FileMode(0644))
 	if f != nil {
 		f.Close()
