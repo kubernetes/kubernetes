@@ -537,3 +537,66 @@ func TestShuffleStrings(t *testing.T) {
 		}
 	}
 }
+
+func TestFilterIncorrectIPVersion(t *testing.T) {
+	testCases := []struct {
+		desc            string
+		ipString        []string
+		wantIPv6        bool
+		expectCorrect   []string
+		expectIncorrect []string
+	}{
+		{
+			desc:            "want IPv6 and receive IPv4 and IPv6",
+			ipString:        []string{"192.168.200.2", "192.1.34.23", "fd00:20::1", "2001:db9::3"},
+			wantIPv6:        true,
+			expectCorrect:   []string{"fd00:20::1", "2001:db9::3"},
+			expectIncorrect: []string{"192.168.200.2", "192.1.34.23"},
+		},
+		{
+			desc:            "want IPv4 and receive IPv4 and IPv6",
+			ipString:        []string{"192.168.200.2", "192.1.34.23", "fd00:20::1", "2001:db9::3"},
+			wantIPv6:        false,
+			expectCorrect:   []string{"192.168.200.2", "192.1.34.23"},
+			expectIncorrect: []string{"fd00:20::1", "2001:db9::3"},
+		},
+		{
+			desc:            "want IPv4 and receive IPv4 only",
+			ipString:        []string{"192.168.200.2", "192.1.34.23"},
+			wantIPv6:        false,
+			expectCorrect:   []string{"192.168.200.2", "192.1.34.23"},
+			expectIncorrect: nil,
+		},
+		{
+			desc:            "want IPv6 and receive IPv4 only",
+			ipString:        []string{"192.168.200.2", "192.1.34.23"},
+			wantIPv6:        true,
+			expectCorrect:   nil,
+			expectIncorrect: []string{"192.168.200.2", "192.1.34.23"},
+		},
+		{
+			desc:            "want IPv4 and receive IPv6 only",
+			ipString:        []string{"fd00:20::1", "2001:db9::3"},
+			wantIPv6:        false,
+			expectCorrect:   nil,
+			expectIncorrect: []string{"fd00:20::1", "2001:db9::3"},
+		},
+		{
+			desc:            "want IPv6 and receive IPv6 only",
+			ipString:        []string{"fd00:20::1", "2001:db9::3"},
+			wantIPv6:        true,
+			expectCorrect:   []string{"fd00:20::1", "2001:db9::3"},
+			expectIncorrect: nil,
+		},
+	}
+
+	for i := range testCases {
+		correct, incorrect := FilterIncorrectIPVersion(testCases[i].ipString, testCases[i].wantIPv6)
+		if !reflect.DeepEqual(testCases[i].expectCorrect, correct) {
+			t.Errorf("Test %v failed: expected %v, got %v", testCases[i].desc, testCases[i].expectCorrect, correct)
+		}
+		if !reflect.DeepEqual(testCases[i].expectIncorrect, incorrect) {
+			t.Errorf("Test %v failed: expected %v, got %v", testCases[i].desc, testCases[i].expectIncorrect, incorrect)
+		}
+	}
+}
