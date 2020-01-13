@@ -172,7 +172,6 @@ type emptyDir struct {
 	mounter       mount.Interface
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
-	desiredSize   int64
 	volume.MetricsProvider
 }
 
