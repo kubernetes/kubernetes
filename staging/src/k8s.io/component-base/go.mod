@@ -8,7 +8,7 @@ require (
 	github.com/blang/semver v3.5.0+incompatible
 	github.com/google/go-cmp v0.3.0
 	github.com/prometheus/client_golang v1.0.0
-	github.com/prometheus/client_model v0.1.0
+	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4
 	github.com/prometheus/common v0.4.1
 	github.com/prometheus/procfs v0.0.2
 	github.com/spf13/pflag v1.0.5
