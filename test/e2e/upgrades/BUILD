@@ -41,6 +41,7 @@ go_library(
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/security:go_default_library",
         "//test/e2e/framework/service:go_default_library",
+        "//test/e2e/framework/skipper:go_default_library",
         "//test/e2e/framework/statefulset:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/e2e/scheduling:go_default_library",
