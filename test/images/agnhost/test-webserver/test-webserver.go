@@ -14,23 +14,35 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// A tiny web server that serves a static file.
-package main
+// Package testwebserver offers a tiny web server that serves a static file.
+package testwebserver
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/spf13/cobra"
 )
+
+// CmdTestWebserver is used by agnhost Cobra.
+var CmdTestWebserver = &cobra.Command{
+	Use:   "test-webserver",
+	Short: "Starts a simple HTTP fileserver",
+	Long:  "Starts a simple HTTP fileserver on the given --port, which serves any file specified in the URL path, if it exists.",
+	Args:  cobra.MaximumNArgs(0),
+	Run:   main,
+}
 
 var (
-	port = flag.Int("port", 80, "Port number.")
+	port int
 )
 
-func main() {
-	flag.Parse()
+func init() {
+	CmdTestWebserver.Flags().IntVar(&port, "port", 80, "Port number.")
+}
 
+func main(cmd *cobra.Command, args []string) {
 	fs := http.StripPrefix("/", http.FileServer(http.Dir("/")))
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +57,7 @@ func main() {
 		fs.ServeHTTP(w, r)
 	})
 
-	go log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
+	go log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
 
 	select {}
 }
