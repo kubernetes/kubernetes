@@ -130,12 +130,10 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 	}
 	info := &BaseServiceInfo{
-		clusterIP: net.ParseIP(service.Spec.ClusterIP),
-		port:      int(port.Port),
-		protocol:  port.Protocol,
-		nodePort:  int(port.NodePort),
-		// Deep-copy in case the service instance changes
-		loadBalancerStatus:     *service.Status.LoadBalancer.DeepCopy(),
+		clusterIP:              net.ParseIP(service.Spec.ClusterIP),
+		port:                   int(port.Port),
+		protocol:               port.Protocol,
+		nodePort:               int(port.NodePort),
 		sessionAffinityType:    service.Spec.SessionAffinity,
 		stickyMaxAgeSeconds:    stickyMaxAgeSeconds,
 		onlyNodeLocalEndpoints: onlyNodeLocalEndpoints,
@@ -146,9 +144,11 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		info.loadBalancerSourceRanges = make([]string, len(service.Spec.LoadBalancerSourceRanges))
 		copy(info.loadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges)
 		copy(info.externalIPs, service.Spec.ExternalIPs)
+		// Deep-copy in case the service instance changes
+		info.loadBalancerStatus = *service.Status.LoadBalancer.DeepCopy()
 	} else {
 		// Filter out the incorrect IP version case.
-		// If ExternalIPs and LoadBalancerSourceRanges on service contains incorrect IP versions,
+		// If ExternalIPs, LoadBalancerSourceRanges and LoadBalancerStatus Ingress on service contains incorrect IP versions,
 		// only filter out the incorrect ones.
 		var incorrectIPs []string
 		info.externalIPs, incorrectIPs = utilproxy.FilterIncorrectIPVersion(service.Spec.ExternalIPs, *sct.isIPv6Mode)
@@ -158,6 +158,22 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		info.loadBalancerSourceRanges, incorrectIPs = utilproxy.FilterIncorrectCIDRVersion(service.Spec.LoadBalancerSourceRanges, *sct.isIPv6Mode)
 		if len(incorrectIPs) > 0 {
 			utilproxy.LogAndEmitIncorrectIPVersionEvent(sct.recorder, "loadBalancerSourceRanges", strings.Join(incorrectIPs, ","), service.Namespace, service.Name, service.UID)
+		}
+		// Obtain Load Balancer Ingress IPs
+		var ips []string
+		for _, ing := range service.Status.LoadBalancer.Ingress {
+			ips = append(ips, ing.IP)
+		}
+		if len(ips) > 0 {
+			correctIPs, incorrectIPs := utilproxy.FilterIncorrectIPVersion(ips, *sct.isIPv6Mode)
+			if len(incorrectIPs) > 0 {
+				utilproxy.LogAndEmitIncorrectIPVersionEvent(sct.recorder, "Load Balancer ingress IPs", strings.Join(incorrectIPs, ","), service.Namespace, service.Name, service.UID)
+			}
+			// Create the LoadBalancerStatus with the filtererd IPs
+			for _, ip := range correctIPs {
+				info.loadBalancerStatus.Ingress = append(info.loadBalancerStatus.Ingress, v1.LoadBalancerIngress{IP: ip})
+
+			}
 		}
 	}
 
