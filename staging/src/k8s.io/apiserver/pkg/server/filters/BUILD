@@ -36,7 +36,7 @@ go_library(
         "doc.go",
         "longrunning.go",
         "maxinflight.go",
-        "reqmgmt.go",
+        "priority-and-fairness.go",
         "timeout.go",
         "waitgroup.go",
         "wrap.go",
