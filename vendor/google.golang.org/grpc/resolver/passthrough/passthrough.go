@@ -18,40 +18,9 @@
 
 // Package passthrough implements a pass-through resolver. It sends the target
 // name without scheme back to gRPC as resolved address.
+//
+// Deprecated: this package is imported by grpc and should not need to be
+// imported directly by users.
 package passthrough
 
-import "google.golang.org/grpc/resolver"
-
-const scheme = "passthrough"
-
-type passthroughBuilder struct{}
-
-func (*passthroughBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOption) (resolver.Resolver, error) {
-	r := &passthroughResolver{
-		target: target,
-		cc:     cc,
-	}
-	r.start()
-	return r, nil
-}
-
-func (*passthroughBuilder) Scheme() string {
-	return scheme
-}
-
-type passthroughResolver struct {
-	target resolver.Target
-	cc     resolver.ClientConn
-}
-
-func (r *passthroughResolver) start() {
-	r.cc.UpdateState(resolver.State{Addresses: []resolver.Address{{Addr: r.target.Endpoint}}})
-}
-
-func (*passthroughResolver) ResolveNow(o resolver.ResolveNowOption) {}
-
-func (*passthroughResolver) Close() {}
-
-func init() {
-	resolver.Register(&passthroughBuilder{})
-}
+import _ "google.golang.org/grpc/internal/resolver/passthrough" // import for side effects after package was moved
