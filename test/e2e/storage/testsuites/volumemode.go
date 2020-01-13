@@ -36,6 +36,7 @@ import (
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -144,7 +145,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 			if pDriver, ok := driver.(PreprovisionedPVTestDriver); ok {
 				pvSource, volumeNodeAffinity = pDriver.GetPersistentVolumeSource(false, fsType, l.Volume)
 				if pvSource == nil {
-					framework.Skipf("Driver %q does not define PersistentVolumeSource - skipping", dInfo.Name)
+					e2eskipper.Skipf("Driver %q does not define PersistentVolumeSource - skipping", dInfo.Name)
 				}
 
 				storageClass, pvConfig, pvcConfig := generateConfigsForPreprovisionedPVTest(scName, volBindMode, pattern.VolMode, *pvSource, volumeNodeAffinity)
@@ -156,7 +157,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 			if dDriver, ok := driver.(DynamicPVTestDriver); ok {
 				l.Sc = dDriver.GetDynamicProvisionStorageClass(l.config, fsType)
 				if l.Sc == nil {
-					framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", dInfo.Name)
+					e2eskipper.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", dInfo.Name)
 				}
 				l.Sc.VolumeBindingMode = &volBindMode
 				testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange

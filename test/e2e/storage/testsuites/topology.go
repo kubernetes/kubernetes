@@ -32,6 +32,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -88,11 +89,11 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		ok := false
 		dDriver, ok = driver.(DynamicPVTestDriver)
 		if !ok {
-			framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
+			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
 		}
 
 		if !dInfo.Capabilities[CapTopology] {
-			framework.Skipf("Driver %q does not support topology - skipping", dInfo.Name)
+			e2eskipper.Skipf("Driver %q does not support topology - skipping", dInfo.Name)
 		}
 
 	})
@@ -119,7 +120,7 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		cs = f.ClientSet
 		keys := dInfo.TopologyKeys
 		if len(keys) == 0 {
-			framework.Skipf("Driver didn't provide topology keys -- skipping")
+			e2eskipper.Skipf("Driver didn't provide topology keys -- skipping")
 		}
 		if dInfo.NumAllowedTopologies == 0 {
 			// Any plugin that supports topology defaults to 1 topology
@@ -130,7 +131,7 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		l.allTopologies, err = t.getCurrentTopologies(cs, keys, dInfo.NumAllowedTopologies+1)
 		framework.ExpectNoError(err, "failed to get current driver topologies")
 		if len(l.allTopologies) < dInfo.NumAllowedTopologies {
-			framework.Skipf("Not enough topologies in cluster -- skipping")
+			e2eskipper.Skipf("Not enough topologies in cluster -- skipping")
 		}
 
 		l.resource.Sc = dDriver.GetDynamicProvisionStorageClass(l.config, pattern.FsType)
@@ -194,7 +195,7 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		}()
 
 		if len(l.allTopologies) < dInfo.NumAllowedTopologies+1 {
-			framework.Skipf("Not enough topologies in cluster -- skipping")
+			e2eskipper.Skipf("Not enough topologies in cluster -- skipping")
 		}
 
 		// Exclude one topology

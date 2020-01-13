@@ -57,6 +57,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
@@ -260,7 +261,7 @@ func (g *glusterFSDriver) GetDriverInfo() *testsuites.DriverInfo {
 }
 
 func (g *glusterFSDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-	framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu", "custom")
+	e2eskipper.SkipUnlessNodeOSDistroIs("gci", "ubuntu", "custom")
 }
 
 func (g *glusterFSDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
@@ -1076,7 +1077,7 @@ func (c *cinderDriver) GetDriverInfo() *testsuites.DriverInfo {
 }
 
 func (c *cinderDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-	framework.SkipUnlessProviderIs("openstack")
+	e2eskipper.SkipUnlessProviderIs("openstack")
 }
 
 func (c *cinderDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
@@ -1251,9 +1252,9 @@ func (g *gcePdDriver) GetDriverInfo() *testsuites.DriverInfo {
 }
 
 func (g *gcePdDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-	framework.SkipUnlessProviderIs("gce", "gke")
+	e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	if pattern.FeatureTag == "[sig-windows]" {
-		framework.SkipUnlessNodeOSDistroIs("windows")
+		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	}
 }
 
@@ -1379,7 +1380,7 @@ func (v *vSphereDriver) GetDriverInfo() *testsuites.DriverInfo {
 }
 
 func (v *vSphereDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-	framework.SkipUnlessProviderIs("vsphere")
+	e2eskipper.SkipUnlessProviderIs("vsphere")
 }
 
 func (v *vSphereDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
@@ -1508,7 +1509,7 @@ func (a *azureDiskDriver) GetDriverInfo() *testsuites.DriverInfo {
 }
 
 func (a *azureDiskDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-	framework.SkipUnlessProviderIs("azure")
+	e2eskipper.SkipUnlessProviderIs("azure")
 }
 
 func (a *azureDiskDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
@@ -1641,7 +1642,7 @@ func (a *awsDriver) GetDriverInfo() *testsuites.DriverInfo {
 }
 
 func (a *awsDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
-	framework.SkipUnlessProviderIs("aws")
+	e2eskipper.SkipUnlessProviderIs("aws")
 }
 
 func (a *awsDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
@@ -1837,7 +1838,7 @@ func (l *localDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestCo
 		num, err := strconv.Atoi(strings.TrimSpace(res))
 		framework.ExpectNoError(err)
 		if num < 1 {
-			framework.Skipf("Requires at least 1 %s %s localSSD ", ssdInterface, filesystemType)
+			e2eskipper.Skipf("Requires at least 1 %s %s localSSD ", ssdInterface, filesystemType)
 		}
 	}
 

@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/framework/podlogs"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
@@ -126,7 +127,7 @@ func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 			isSupported = false
 		}
 		if !isSupported {
-			framework.Skipf("Driver %s doesn't support snapshot type %v -- skipping", dInfo.Name, pattern.SnapshotType)
+			e2eskipper.Skipf("Driver %s doesn't support snapshot type %v -- skipping", dInfo.Name, pattern.SnapshotType)
 		}
 	} else {
 		// 2. Check if Whether volType is supported by driver from its interface
@@ -144,18 +145,18 @@ func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 		}
 
 		if !isSupported {
-			framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
+			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
 		}
 
 		// 3. Check if fsType is supported
 		if !dInfo.SupportedFsType.Has(pattern.FsType) {
-			framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.FsType)
+			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.FsType)
 		}
 		if pattern.FsType == "xfs" && framework.NodeOSDistroIs("gci", "cos", "windows") {
-			framework.Skipf("Distro doesn't support xfs -- skipping")
+			e2eskipper.Skipf("Distro doesn't support xfs -- skipping")
 		}
 		if pattern.FsType == "ntfs" && !framework.NodeOSDistroIs("windows") {
-			framework.Skipf("Distro %s doesn't support ntfs -- skipping", framework.TestContext.NodeOSDistro)
+			e2eskipper.Skipf("Distro %s doesn't support ntfs -- skipping", framework.TestContext.NodeOSDistro)
 		}
 	}
 
@@ -251,7 +252,7 @@ func CreateVolumeResource(driver TestDriver, config *PerTestConfig, pattern test
 	}
 
 	if r.VolSource == nil {
-		framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
+		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
 	}
 
 	return &r
@@ -684,7 +685,7 @@ func validateMigrationVolumeOpCounts(cs clientset.Interface, pluginName string, 
 func skipVolTypePatterns(pattern testpatterns.TestPattern, driver TestDriver, skipVolTypes map[testpatterns.TestVolType]bool) {
 	_, supportsProvisioning := driver.(DynamicPVTestDriver)
 	if supportsProvisioning && skipVolTypes[pattern.VolType] {
-		framework.Skipf("Driver supports dynamic provisioning, skipping %s pattern", pattern.VolType)
+		e2eskipper.Skipf("Driver supports dynamic provisioning, skipping %s pattern", pattern.VolType)
 	}
 }
 

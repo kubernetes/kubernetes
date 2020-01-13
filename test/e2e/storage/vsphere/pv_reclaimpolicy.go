@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -50,7 +51,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 
 	utils.SIGDescribe("persistentvolumereclaim:vsphere", func() {
 		ginkgo.BeforeEach(func() {
-			framework.SkipUnlessProviderIs("vsphere")
+			e2eskipper.SkipUnlessProviderIs("vsphere")
 			Bootstrap(f)
 			nodeInfo = GetReadySchedulableRandomNodeInfo()
 			pv = nil
