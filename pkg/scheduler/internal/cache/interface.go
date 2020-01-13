@@ -20,7 +20,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 // Cache collects pods' information and provides node-level aggregated information.
@@ -97,10 +96,10 @@ type Cache interface {
 	// RemoveNode removes overall information about node.
 	RemoveNode(node *v1.Node) error
 
-	// UpdateNodeInfoSnapshot updates the passed infoSnapshot to the current contents of Cache.
+	// UpdateSnapshot updates the passed infoSnapshot to the current contents of Cache.
 	// The node info contains aggregated information of pods scheduled (including assumed to be)
 	// on this node.
-	UpdateNodeInfoSnapshot(nodeSnapshot *nodeinfosnapshot.Snapshot) error
+	UpdateSnapshot(nodeSnapshot *Snapshot) error
 
 	// Dump produces a dump of the current cache.
 	Dump() *Dump

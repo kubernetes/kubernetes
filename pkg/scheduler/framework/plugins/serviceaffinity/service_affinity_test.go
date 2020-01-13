@@ -25,9 +25,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 func TestServiceAffinity(t *testing.T) {
@@ -160,7 +160,7 @@ func TestServiceAffinity(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := []*v1.Node{&node1, &node2, &node3, &node4, &node5}
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
+			snapshot := cache.NewSnapshot(test.pods, nodes)
 
 			p := &ServiceAffinity{
 				sharedLister:  snapshot,
@@ -383,7 +383,7 @@ func TestServiceAffinityScore(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeLabeledNodeList(test.nodes)
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
+			snapshot := cache.NewSnapshot(test.pods, nodes)
 			serviceLister := fakelisters.ServiceLister(test.services)
 
 			p := &ServiceAffinity{
@@ -494,8 +494,8 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// getMeta creates predicate meta data given the list of pods.
-			getState := func(pods []*v1.Pod) (*ServiceAffinity, *framework.CycleState, *preFilterState, *nodeinfosnapshot.Snapshot) {
-				snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(pods, test.nodes))
+			getState := func(pods []*v1.Pod) (*ServiceAffinity, *framework.CycleState, *preFilterState, *cache.Snapshot) {
+				snapshot := cache.NewSnapshot(pods, test.nodes)
 
 				p := &ServiceAffinity{
 					sharedLister:  snapshot,
@@ -591,7 +591,7 @@ func sortNodeScoreList(out framework.NodeScoreList) {
 	})
 }
 
-func mustGetNodeInfo(t *testing.T, snapshot *nodeinfosnapshot.Snapshot, name string) *nodeinfo.NodeInfo {
+func mustGetNodeInfo(t *testing.T, snapshot *cache.Snapshot, name string) *nodeinfo.NodeInfo {
 	t.Helper()
 	nodeInfo, err := snapshot.NodeInfos().Get(name)
 	if err != nil {

@@ -55,7 +55,6 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
@@ -686,7 +685,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 	algo := core.NewGenericScheduler(
 		scache,
 		internalqueue.NewSchedulingQueue(nil),
-		nodeinfosnapshot.NewEmptySnapshot(),
+		internalcache.NewEmptySnapshot(),
 		fwk,
 		[]algorithm.SchedulerExtender{},
 		nil,
@@ -745,7 +744,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 	algo := core.NewGenericScheduler(
 		scache,
 		queue,
-		nodeinfosnapshot.NewEmptySnapshot(),
+		internalcache.NewEmptySnapshot(),
 		fwk,
 		[]algorithm.SchedulerExtender{},
 		nil,

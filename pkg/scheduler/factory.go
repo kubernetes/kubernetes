@@ -50,7 +50,6 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
@@ -107,7 +106,7 @@ type Configurator struct {
 	registry         framework.Registry
 	plugins          *schedulerapi.Plugins
 	pluginConfig     []schedulerapi.PluginConfig
-	nodeInfoSnapshot *nodeinfosnapshot.Snapshot
+	nodeInfoSnapshot *internalcache.Snapshot
 }
 
 // create a scheduler from a set of registered plugins.
