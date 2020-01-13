@@ -311,6 +311,21 @@ func (c *Client) GetResource(ctx context.Context, resourceID, expand string) (*h
 	return c.Send(ctx, request)
 }
 
+// GetResourceWithDecorators get a resource with decorators by resource ID
+func (c *Client) GetResourceWithDecorators(ctx context.Context, resourceID string, decorators []autorest.PrepareDecorator) (*http.Response, *retry.Error) {
+	getDecorators := []autorest.PrepareDecorator{
+		autorest.WithPathParameters("{resourceID}", map[string]interface{}{"resourceID": resourceID}),
+	}
+	getDecorators = append(getDecorators, decorators...)
+	request, err := c.PrepareGetRequest(ctx, getDecorators...)
+	if err != nil {
+		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "get.prepare", resourceID, err)
+		return nil, retry.NewError(false, err)
+	}
+
+	return c.Send(ctx, request)
+}
+
 // PutResource puts a resource by resource ID
 func (c *Client) PutResource(ctx context.Context, resourceID string, parameters interface{}) (*http.Response, *retry.Error) {
 	putDecorators := []autorest.PrepareDecorator{

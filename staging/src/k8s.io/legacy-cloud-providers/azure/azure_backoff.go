@@ -86,46 +86,18 @@ func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName, crt cacheReadTy
 	return machine, err
 }
 
-// ListVirtualMachinesWithRetry invokes az.VirtualMachinesClient.List with exponential backoff retry
-func (az *Cloud) ListVirtualMachinesWithRetry(resourceGroup string) ([]compute.VirtualMachine, error) {
-	allNodes := []compute.VirtualMachine{}
-	err := wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
-		var retryErr *retry.Error
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
-		allNodes, retryErr = az.VirtualMachinesClient.List(ctx, resourceGroup)
-		if retryErr != nil {
-			klog.Errorf("VirtualMachinesClient.List(%v) - backoff: failure, will retry,err=%v",
-				resourceGroup,
-				retryErr)
-			return false, retryErr.Error()
-		}
-		klog.V(2).Infof("VirtualMachinesClient.List(%v) - backoff: success", resourceGroup)
-		return true, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return allNodes, nil
-}
-
 // ListVirtualMachines invokes az.VirtualMachinesClient.List with exponential backoff retry
 func (az *Cloud) ListVirtualMachines(resourceGroup string) ([]compute.VirtualMachine, error) {
-	if az.Config.shouldOmitCloudProviderBackoff() {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
 
-		allNodes, rerr := az.VirtualMachinesClient.List(ctx, resourceGroup)
-		if rerr != nil {
-			klog.Errorf("VirtualMachinesClient.List(%v) failure with err=%v", resourceGroup, rerr)
-			return nil, rerr.Error()
-		}
-		klog.V(2).Infof("VirtualMachinesClient.List(%v) success", resourceGroup)
-		return allNodes, nil
+	allNodes, rerr := az.VirtualMachinesClient.List(ctx, resourceGroup)
+	if rerr != nil {
+		klog.Errorf("VirtualMachinesClient.List(%v) failure with err=%v", resourceGroup, rerr)
+		return nil, rerr.Error()
 	}
-
-	return az.ListVirtualMachinesWithRetry(resourceGroup)
+	klog.V(2).Infof("VirtualMachinesClient.List(%v) success", resourceGroup)
+	return allNodes, nil
 }
 
 // getPrivateIPsForMachine is wrapper for optional backoff getting private ips
@@ -183,514 +155,220 @@ func (az *Cloud) GetIPForMachineWithRetry(name types.NodeName) (string, string, 
 
 // CreateOrUpdateSecurityGroup invokes az.SecurityGroupsClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateSecurityGroup(service *v1.Service, sg network.SecurityGroup) error {
-	if az.Config.shouldOmitCloudProviderBackoff() {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
 
-		rerr := az.SecurityGroupsClient.CreateOrUpdate(ctx, az.SecurityGroupResourceGroup, *sg.Name, sg, to.String(sg.Etag))
-		klog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%s): end", *sg.Name)
-		if rerr == nil {
-			// Invalidate the cache right after updating
-			az.nsgCache.Delete(*sg.Name)
-			return nil
-		}
-
-		// Invalidate the cache because ETAG precondition mismatch.
-		if rerr.HTTPStatusCode == http.StatusPreconditionFailed {
-			az.nsgCache.Delete(*sg.Name)
-		}
-
-		// Invalidate the cache because another new operation has canceled the current request.
-		if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
-			az.nsgCache.Delete(*sg.Name)
-		}
-
-		return rerr.Error()
+	rerr := az.SecurityGroupsClient.CreateOrUpdate(ctx, az.SecurityGroupResourceGroup, *sg.Name, sg, to.String(sg.Etag))
+	klog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%s): end", *sg.Name)
+	if rerr == nil {
+		// Invalidate the cache right after updating
+		az.nsgCache.Delete(*sg.Name)
+		return nil
 	}
 
-	return az.CreateOrUpdateSGWithRetry(service, sg)
-}
+	// Invalidate the cache because ETAG precondition mismatch.
+	if rerr.HTTPStatusCode == http.StatusPreconditionFailed {
+		klog.V(3).Infof("SecurityGroup cache for %s is cleanup because of http.StatusPreconditionFailed", *sg.Name)
+		az.nsgCache.Delete(*sg.Name)
+	}
 
-// CreateOrUpdateSGWithRetry invokes az.SecurityGroupsClient.CreateOrUpdate with exponential backoff retry
-func (az *Cloud) CreateOrUpdateSGWithRetry(service *v1.Service, sg network.SecurityGroup) error {
-	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
+	// Invalidate the cache because another new operation has canceled the current request.
+	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
+		klog.V(3).Infof("SecurityGroup cache for %s is cleanup because CreateOrUpdateSecurityGroup is canceld by another operation", *sg.Name)
+		az.nsgCache.Delete(*sg.Name)
+	}
 
-		rerr := az.SecurityGroupsClient.CreateOrUpdate(ctx, az.SecurityGroupResourceGroup, *sg.Name, sg, to.String(sg.Etag))
-		klog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%s): end", *sg.Name)
-		if rerr == nil {
-			// Invalidate the cache right after updating
-			az.nsgCache.Delete(*sg.Name)
-			return true, nil
-		}
-
-		// Invalidate the cache and abort backoff because ETAG precondition mismatch.
-		if rerr.HTTPStatusCode == http.StatusPreconditionFailed {
-			az.nsgCache.Delete(*sg.Name)
-			return true, rerr.Error()
-		}
-
-		// Invalidate the cache and abort backoff because another new operation has canceled the current request.
-		if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
-			az.nsgCache.Delete(*sg.Name)
-			return true, rerr.Error()
-		}
-
-		return !rerr.Retriable, rerr.Error()
-	})
+	return rerr.Error()
 }
 
 // CreateOrUpdateLB invokes az.LoadBalancerClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateLB(service *v1.Service, lb network.LoadBalancer) error {
-	if az.Config.shouldOmitCloudProviderBackoff() {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
 
-		rgName := az.getLoadBalancerResourceGroup()
-		rerr := az.LoadBalancerClient.CreateOrUpdate(ctx, rgName, *lb.Name, lb, to.String(lb.Etag))
-		klog.V(10).Infof("LoadBalancerClient.CreateOrUpdate(%s): end", *lb.Name)
-		if rerr == nil {
-			// Invalidate the cache right after updating
-			az.lbCache.Delete(*lb.Name)
-			return nil
-		}
-
-		// Invalidate the cache because ETAG precondition mismatch.
-		if rerr.HTTPStatusCode == http.StatusPreconditionFailed {
-			az.lbCache.Delete(*lb.Name)
-		}
-		// Invalidate the cache because another new operation has canceled the current request.
-		if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
-			az.lbCache.Delete(*lb.Name)
-		}
-		return rerr.Error()
+	rgName := az.getLoadBalancerResourceGroup()
+	rerr := az.LoadBalancerClient.CreateOrUpdate(ctx, rgName, *lb.Name, lb, to.String(lb.Etag))
+	klog.V(10).Infof("LoadBalancerClient.CreateOrUpdate(%s): end", *lb.Name)
+	if rerr == nil {
+		// Invalidate the cache right after updating
+		az.lbCache.Delete(*lb.Name)
+		return nil
 	}
 
-	return az.createOrUpdateLBWithRetry(service, lb)
-}
+	// Invalidate the cache because ETAG precondition mismatch.
+	if rerr.HTTPStatusCode == http.StatusPreconditionFailed {
+		klog.V(3).Infof("LoadBalancer cache for %s is cleanup because of http.StatusPreconditionFailed", *lb.Name)
+		az.lbCache.Delete(*lb.Name)
+	}
+	// Invalidate the cache because another new operation has canceled the current request.
+	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
+		klog.V(3).Infof("LoadBalancer cache for %s is cleanup because CreateOrUpdate is canceled by another operation", *lb.Name)
+		az.lbCache.Delete(*lb.Name)
+	}
 
-// createOrUpdateLBWithRetry invokes az.LoadBalancerClient.CreateOrUpdate with exponential backoff retry
-func (az *Cloud) createOrUpdateLBWithRetry(service *v1.Service, lb network.LoadBalancer) error {
-	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
-
-		rgName := az.getLoadBalancerResourceGroup()
-		rerr := az.LoadBalancerClient.CreateOrUpdate(ctx, rgName, *lb.Name, lb, to.String(lb.Etag))
-		klog.V(10).Infof("LoadBalancerClient.CreateOrUpdate(%s): end", *lb.Name)
-		if rerr == nil {
-			// Invalidate the cache right after updating
-			az.lbCache.Delete(*lb.Name)
-			return true, nil
-		}
-
-		// Invalidate the cache and abort backoff because ETAG precondition mismatch.
-		if rerr.HTTPStatusCode == http.StatusPreconditionFailed {
-			az.lbCache.Delete(*lb.Name)
-			return true, rerr.Error()
-		}
-		// Invalidate the cache and abort backoff because another new operation has canceled the current request.
-		if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
-			az.lbCache.Delete(*lb.Name)
-			return true, rerr.Error()
-		}
-		return !rerr.Retriable, rerr.Error()
-	})
+	return rerr.Error()
 }
 
 // ListLB invokes az.LoadBalancerClient.List with exponential backoff retry
 func (az *Cloud) ListLB(service *v1.Service) ([]network.LoadBalancer, error) {
-	if az.Config.shouldOmitCloudProviderBackoff() {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
 
-		rgName := az.getLoadBalancerResourceGroup()
-		allLBs, rerr := az.LoadBalancerClient.List(ctx, rgName)
-		if rerr != nil {
-			az.Event(service, v1.EventTypeWarning, "ListLoadBalancers", rerr.Error().Error())
-			klog.Errorf("LoadBalancerClient.List(%v) failure with err=%v", rgName, rerr)
-			return nil, rerr.Error()
-		}
-		klog.V(2).Infof("LoadBalancerClient.List(%v) success", rgName)
-		return allLBs, nil
+	rgName := az.getLoadBalancerResourceGroup()
+	allLBs, rerr := az.LoadBalancerClient.List(ctx, rgName)
+	if rerr != nil {
+		az.Event(service, v1.EventTypeWarning, "ListLoadBalancers", rerr.Error().Error())
+		klog.Errorf("LoadBalancerClient.List(%v) failure with err=%v", rgName, rerr)
+		return nil, rerr.Error()
 	}
-
-	return az.listLBWithRetry(service)
-}
-
-// listLBWithRetry invokes az.LoadBalancerClient.List with exponential backoff retry
-func (az *Cloud) listLBWithRetry(service *v1.Service) ([]network.LoadBalancer, error) {
-	var retryErr *retry.Error
-	var allLBs []network.LoadBalancer
-
-	err := wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
-
-		rgName := az.getLoadBalancerResourceGroup()
-		allLBs, retryErr = az.LoadBalancerClient.List(ctx, rgName)
-		if retryErr != nil {
-			az.Event(service, v1.EventTypeWarning, "ListLoadBalancers", retryErr.Error().Error())
-			klog.Errorf("LoadBalancerClient.List(%v) - backoff: failure, will retry,err=%v",
-				rgName,
-				retryErr)
-			return false, retryErr.Error()
-		}
-		klog.V(2).Infof("LoadBalancerClient.List(%v) - backoff: success", az.ResourceGroup)
-		return true, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
+	klog.V(2).Infof("LoadBalancerClient.List(%v) success", rgName)
 	return allLBs, nil
 }
 
 // ListPIP list the PIP resources in the given resource group
 func (az *Cloud) ListPIP(service *v1.Service, pipResourceGroup string) ([]network.PublicIPAddress, error) {
-	if az.Config.shouldOmitCloudProviderBackoff() {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
 
-		allPIPs, rerr := az.PublicIPAddressesClient.List(ctx, pipResourceGroup)
-		if rerr != nil {
-			az.Event(service, v1.EventTypeWarning, "ListPublicIPs", rerr.Error().Error())
-			klog.Errorf("PublicIPAddressesClient.List(%v) failure with err=%v", pipResourceGroup, rerr)
-			return nil, rerr.Error()
-		}
-		klog.V(2).Infof("PublicIPAddressesClient.List(%v) success", pipResourceGroup)
-		return allPIPs, nil
+	allPIPs, rerr := az.PublicIPAddressesClient.List(ctx, pipResourceGroup)
+	if rerr != nil {
+		az.Event(service, v1.EventTypeWarning, "ListPublicIPs", rerr.Error().Error())
+		klog.Errorf("PublicIPAddressesClient.List(%v) failure with err=%v", pipResourceGroup, rerr)
+		return nil, rerr.Error()
 	}
 
-	return az.listPIPWithRetry(service, pipResourceGroup)
-}
-
-// listPIPWithRetry list the PIP resources in the given resource group
-func (az *Cloud) listPIPWithRetry(service *v1.Service, pipResourceGroup string) ([]network.PublicIPAddress, error) {
-	var allPIPs []network.PublicIPAddress
-
-	err := wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
-
-		var retryErr *retry.Error
-		allPIPs, retryErr = az.PublicIPAddressesClient.List(ctx, pipResourceGroup)
-		if retryErr != nil {
-			az.Event(service, v1.EventTypeWarning, "ListPublicIPs", retryErr.Error().Error())
-			klog.Errorf("PublicIPAddressesClient.List(%v) - backoff: failure, will retry,err=%v",
-				pipResourceGroup,
-				retryErr)
-			return false, retryErr.Error()
-		}
-		klog.V(2).Infof("PublicIPAddressesClient.List(%v) - backoff: success", pipResourceGroup)
-		return true, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
+	klog.V(2).Infof("PublicIPAddressesClient.List(%v) success", pipResourceGroup)
 	return allPIPs, nil
 }
 
 // CreateOrUpdatePIP invokes az.PublicIPAddressesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdatePIP(service *v1.Service, pipResourceGroup string, pip network.PublicIPAddress) error {
-	if az.Config.shouldOmitCloudProviderBackoff() {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
 
-		rerr := az.PublicIPAddressesClient.CreateOrUpdate(ctx, pipResourceGroup, *pip.Name, pip)
-		klog.V(10).Infof("PublicIPAddressesClient.CreateOrUpdate(%s, %s): end", pipResourceGroup, *pip.Name)
-		if rerr != nil {
-			klog.Errorf("PublicIPAddressesClient.CreateOrUpdate(%s, %s) failed: %s", pipResourceGroup, *pip.Name, rerr.Error().Error())
-			az.Event(service, v1.EventTypeWarning, "CreateOrUpdatePublicIPAddress", rerr.Error().Error())
-			return rerr.Error()
-		}
-
-		return nil
+	rerr := az.PublicIPAddressesClient.CreateOrUpdate(ctx, pipResourceGroup, *pip.Name, pip)
+	klog.V(10).Infof("PublicIPAddressesClient.CreateOrUpdate(%s, %s): end", pipResourceGroup, *pip.Name)
+	if rerr != nil {
+		klog.Errorf("PublicIPAddressesClient.CreateOrUpdate(%s, %s) failed: %s", pipResourceGroup, *pip.Name, rerr.Error().Error())
+		az.Event(service, v1.EventTypeWarning, "CreateOrUpdatePublicIPAddress", rerr.Error().Error())
+		return rerr.Error()
 	}
 
-	return az.createOrUpdatePIPWithRetry(service, pipResourceGroup, pip)
-}
-
-// createOrUpdatePIPWithRetry invokes az.PublicIPAddressesClient.CreateOrUpdate with exponential backoff retry
-func (az *Cloud) createOrUpdatePIPWithRetry(service *v1.Service, pipResourceGroup string, pip network.PublicIPAddress) error {
-	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
-
-		rerr := az.PublicIPAddressesClient.CreateOrUpdate(ctx, pipResourceGroup, *pip.Name, pip)
-		klog.V(10).Infof("PublicIPAddressesClient.CreateOrUpdate(%s, %s): end", pipResourceGroup, *pip.Name)
-		if rerr != nil {
-			klog.Errorf("PublicIPAddressesClient.CreateOrUpdate(%s, %s) failed: %s", pipResourceGroup, *pip.Name, rerr.Error().Error())
-			az.Event(service, v1.EventTypeWarning, "CreateOrUpdatePublicIPAddress", rerr.Error().Error())
-			return !rerr.Retriable, rerr.Error()
-		}
-
-		return true, nil
-	})
+	return nil
 }
 
 // CreateOrUpdateInterface invokes az.PublicIPAddressesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateInterface(service *v1.Service, nic network.Interface) error {
-	if az.Config.shouldOmitCloudProviderBackoff() {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
 
-		rerr := az.InterfacesClient.CreateOrUpdate(ctx, az.ResourceGroup, *nic.Name, nic)
-		klog.V(10).Infof("InterfacesClient.CreateOrUpdate(%s): end", *nic.Name)
-		if rerr != nil {
-			klog.Errorf("InterfacesClient.CreateOrUpdate(%s) failed: %s", *nic.Name, rerr.Error().Error())
-			az.Event(service, v1.EventTypeWarning, "CreateOrUpdateInterface", rerr.Error().Error())
-			return rerr.Error()
-		}
-
-		return nil
+	rerr := az.InterfacesClient.CreateOrUpdate(ctx, az.ResourceGroup, *nic.Name, nic)
+	klog.V(10).Infof("InterfacesClient.CreateOrUpdate(%s): end", *nic.Name)
+	if rerr != nil {
+		klog.Errorf("InterfacesClient.CreateOrUpdate(%s) failed: %s", *nic.Name, rerr.Error().Error())
+		az.Event(service, v1.EventTypeWarning, "CreateOrUpdateInterface", rerr.Error().Error())
+		return rerr.Error()
 	}
 
-	return az.createOrUpdateInterfaceWithRetry(service, nic)
-}
-
-// createOrUpdateInterfaceWithRetry invokes az.PublicIPAddressesClient.CreateOrUpdate with exponential backoff retry
-func (az *Cloud) createOrUpdateInterfaceWithRetry(service *v1.Service, nic network.Interface) error {
-	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
-
-		rerr := az.InterfacesClient.CreateOrUpdate(ctx, az.ResourceGroup, *nic.Name, nic)
-		klog.V(10).Infof("InterfacesClient.CreateOrUpdate(%s): end", *nic.Name)
-		if rerr != nil {
-			klog.Errorf("InterfacesClient.CreateOrUpdate(%s) faild: %s", *nic.Name, rerr.Error().Error())
-			az.Event(service, v1.EventTypeWarning, "CreateOrUpdateInterface", rerr.Error().Error())
-			return !rerr.Retriable, rerr.Error()
-		}
-
-		return true, nil
-	})
+	return nil
 }
 
 // DeletePublicIP invokes az.PublicIPAddressesClient.Delete with exponential backoff retry
 func (az *Cloud) DeletePublicIP(service *v1.Service, pipResourceGroup string, pipName string) error {
-	if az.Config.shouldOmitCloudProviderBackoff() {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
 
-		rerr := az.PublicIPAddressesClient.Delete(ctx, pipResourceGroup, pipName)
-		if rerr != nil {
-			klog.Errorf("PublicIPAddressesClient.Delete(%s) failed: %s", pipName, rerr.Error().Error())
-			az.Event(service, v1.EventTypeWarning, "DeletePublicIPAddress", rerr.Error().Error())
-			return rerr.Error()
-		}
-
-		return nil
+	rerr := az.PublicIPAddressesClient.Delete(ctx, pipResourceGroup, pipName)
+	if rerr != nil {
+		klog.Errorf("PublicIPAddressesClient.Delete(%s) failed: %s", pipName, rerr.Error().Error())
+		az.Event(service, v1.EventTypeWarning, "DeletePublicIPAddress", rerr.Error().Error())
+		return rerr.Error()
 	}
 
-	return az.deletePublicIPWithRetry(service, pipResourceGroup, pipName)
-}
-
-// deletePublicIPWithRetry invokes az.PublicIPAddressesClient.Delete with exponential backoff retry
-func (az *Cloud) deletePublicIPWithRetry(service *v1.Service, pipResourceGroup string, pipName string) error {
-	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
-
-		rerr := az.PublicIPAddressesClient.Delete(ctx, pipResourceGroup, pipName)
-		if rerr != nil {
-			klog.Errorf("PublicIPAddressesClient.Delete(%s) failed: %s", pipName, rerr.Error().Error())
-			az.Event(service, v1.EventTypeWarning, "DeletePublicIPAddress", rerr.Error().Error())
-			return !rerr.Retriable, rerr.Error()
-		}
-
-		return true, nil
-	})
+	return nil
 }
 
 // DeleteLB invokes az.LoadBalancerClient.Delete with exponential backoff retry
 func (az *Cloud) DeleteLB(service *v1.Service, lbName string) error {
-	if az.Config.shouldOmitCloudProviderBackoff() {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
 
-		rgName := az.getLoadBalancerResourceGroup()
-		rerr := az.LoadBalancerClient.Delete(ctx, rgName, lbName)
-		if rerr == nil {
-			// Invalidate the cache right after updating
-			az.lbCache.Delete(lbName)
-			return nil
-		}
-
-		klog.Errorf("LoadBalancerClient.Delete(%s) failed: %s", lbName, rerr.Error().Error())
-		az.Event(service, v1.EventTypeWarning, "DeleteLoadBalancer", rerr.Error().Error())
-		return rerr.Error()
+	rgName := az.getLoadBalancerResourceGroup()
+	rerr := az.LoadBalancerClient.Delete(ctx, rgName, lbName)
+	if rerr == nil {
+		// Invalidate the cache right after updating
+		az.lbCache.Delete(lbName)
+		return nil
 	}
 
-	return az.deleteLBWithRetry(service, lbName)
-}
-
-// deleteLBWithRetry invokes az.LoadBalancerClient.Delete with exponential backoff retry
-func (az *Cloud) deleteLBWithRetry(service *v1.Service, lbName string) error {
-	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
-
-		rgName := az.getLoadBalancerResourceGroup()
-		rerr := az.LoadBalancerClient.Delete(ctx, rgName, lbName)
-		if rerr == nil {
-			// Invalidate the cache right after deleting
-			az.lbCache.Delete(lbName)
-			return true, nil
-		}
-
-		klog.Errorf("LoadBalancerClient.Delete(%s) failed: %s", lbName, rerr.Error().Error())
-		az.Event(service, v1.EventTypeWarning, "CreateOrUpdateInterface", rerr.Error().Error())
-		return !rerr.Retriable, rerr.Error()
-	})
+	klog.Errorf("LoadBalancerClient.Delete(%s) failed: %s", lbName, rerr.Error().Error())
+	az.Event(service, v1.EventTypeWarning, "DeleteLoadBalancer", rerr.Error().Error())
+	return rerr.Error()
 }
 
 // CreateOrUpdateRouteTable invokes az.RouteTablesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateRouteTable(routeTable network.RouteTable) error {
-	if az.Config.shouldOmitCloudProviderBackoff() {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
 
-		rerr := az.RouteTablesClient.CreateOrUpdate(ctx, az.RouteTableResourceGroup, az.RouteTableName, routeTable, to.String(routeTable.Etag))
-		if rerr == nil {
-			// Invalidate the cache right after updating
-			az.rtCache.Delete(*routeTable.Name)
-			return nil
-		}
-
-		// Invalidate the cache because etag mismatch.
-		if rerr.HTTPStatusCode == http.StatusPreconditionFailed {
-			az.rtCache.Delete(*routeTable.Name)
-		}
-		// Invalidate the cache because another new operation has canceled the current request.
-		if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
-			az.rtCache.Delete(*routeTable.Name)
-		}
-		klog.Errorf("RouteTablesClient.CreateOrUpdate(%s) failed: %v", az.RouteTableName, rerr.Error())
-		return rerr.Error()
+	rerr := az.RouteTablesClient.CreateOrUpdate(ctx, az.RouteTableResourceGroup, az.RouteTableName, routeTable, to.String(routeTable.Etag))
+	if rerr == nil {
+		// Invalidate the cache right after updating
+		az.rtCache.Delete(*routeTable.Name)
+		return nil
 	}
 
-	return az.createOrUpdateRouteTableWithRetry(routeTable)
-}
-
-// createOrUpdateRouteTableWithRetry invokes az.RouteTablesClient.CreateOrUpdate with exponential backoff retry
-func (az *Cloud) createOrUpdateRouteTableWithRetry(routeTable network.RouteTable) error {
-	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
-
-		rerr := az.RouteTablesClient.CreateOrUpdate(ctx, az.RouteTableResourceGroup, az.RouteTableName, routeTable, to.String(routeTable.Etag))
-		if rerr == nil {
-			az.rtCache.Delete(*routeTable.Name)
-			return true, nil
-		}
-
-		// Invalidate the cache and abort backoff because ETAG precondition mismatch.
-		if rerr.HTTPStatusCode == http.StatusPreconditionFailed {
-			az.rtCache.Delete(*routeTable.Name)
-			return true, rerr.Error()
-		}
-		// Invalidate the cache and abort backoff because another new operation has canceled the current request.
-		if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
-			az.rtCache.Delete(*routeTable.Name)
-			return true, rerr.Error()
-		}
-		klog.Errorf("RouteTablesClient.CreateOrUpdate(%s) failed: %v", az.RouteTableName, rerr.Error())
-		return !rerr.Retriable, rerr.Error()
-	})
+	// Invalidate the cache because etag mismatch.
+	if rerr.HTTPStatusCode == http.StatusPreconditionFailed {
+		klog.V(3).Infof("Route table cache for %s is cleanup because of http.StatusPreconditionFailed", *routeTable.Name)
+		az.rtCache.Delete(*routeTable.Name)
+	}
+	// Invalidate the cache because another new operation has canceled the current request.
+	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
+		klog.V(3).Infof("Route table cache for %s is cleanup because CreateOrUpdateRouteTable is canceld by another operation", *routeTable.Name)
+		az.rtCache.Delete(*routeTable.Name)
+	}
+	klog.Errorf("RouteTablesClient.CreateOrUpdate(%s) failed: %v", az.RouteTableName, rerr.Error())
+	return rerr.Error()
 }
 
 // CreateOrUpdateRoute invokes az.RoutesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateRoute(route network.Route) error {
-	if az.Config.shouldOmitCloudProviderBackoff() {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
 
-		rerr := az.RoutesClient.CreateOrUpdate(ctx, az.RouteTableResourceGroup, az.RouteTableName, *route.Name, route, to.String(route.Etag))
-		klog.V(10).Infof("RoutesClient.CreateOrUpdate(%s): end", *route.Name)
-		if rerr == nil {
-			az.rtCache.Delete(az.RouteTableName)
-			return nil
-		}
-
-		if rerr.HTTPStatusCode == http.StatusPreconditionFailed {
-			az.rtCache.Delete(az.RouteTableName)
-		}
-		// Invalidate the cache because another new operation has canceled the current request.
-		if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
-			az.rtCache.Delete(az.RouteTableName)
-		}
-		return rerr.Error()
+	rerr := az.RoutesClient.CreateOrUpdate(ctx, az.RouteTableResourceGroup, az.RouteTableName, *route.Name, route, to.String(route.Etag))
+	klog.V(10).Infof("RoutesClient.CreateOrUpdate(%s): end", *route.Name)
+	if rerr == nil {
+		az.rtCache.Delete(az.RouteTableName)
+		return nil
 	}
 
-	return az.createOrUpdateRouteWithRetry(route)
-}
-
-// createOrUpdateRouteWithRetry invokes az.RoutesClient.CreateOrUpdate with exponential backoff retry
-func (az *Cloud) createOrUpdateRouteWithRetry(route network.Route) error {
-	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
-
-		rerr := az.RoutesClient.CreateOrUpdate(ctx, az.RouteTableResourceGroup, az.RouteTableName, *route.Name, route, to.String(route.Etag))
-		klog.V(10).Infof("RoutesClient.CreateOrUpdate(%s): end", *route.Name)
-		if rerr == nil {
-			az.rtCache.Delete(az.RouteTableName)
-			return true, nil
-		}
-
-		// Invalidate the cache and abort backoff because ETAG precondition mismatch.
-		if rerr.HTTPStatusCode == http.StatusPreconditionFailed {
-			az.rtCache.Delete(az.RouteTableName)
-			return true, rerr.Error()
-		}
-
-		// Invalidate the cache and abort backoff because another new operation has canceled the current request.
-		if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
-			az.rtCache.Delete(az.RouteTableName)
-			return true, rerr.Error()
-		}
-
-		return !rerr.Retriable, rerr.Error()
-	})
+	if rerr.HTTPStatusCode == http.StatusPreconditionFailed {
+		klog.V(3).Infof("Route cache for %s is cleanup because of http.StatusPreconditionFailed", *route.Name)
+		az.rtCache.Delete(az.RouteTableName)
+	}
+	// Invalidate the cache because another new operation has canceled the current request.
+	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
+		klog.V(3).Infof("Route cache for %s is cleanup because CreateOrUpdateRouteTable is canceld by another operation", *route.Name)
+		az.rtCache.Delete(az.RouteTableName)
+	}
+	return rerr.Error()
 }
 
 // DeleteRouteWithName invokes az.RoutesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) DeleteRouteWithName(routeName string) error {
-	if az.Config.shouldOmitCloudProviderBackoff() {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
 
-		rerr := az.RoutesClient.Delete(ctx, az.RouteTableResourceGroup, az.RouteTableName, routeName)
-		klog.V(10).Infof("RoutesClient.Delete(%s,%s): end", az.RouteTableName, routeName)
-		if rerr == nil {
-			return nil
-		}
-
-		klog.Errorf("RoutesClient.Delete(%s, %s) failed: %v", az.RouteTableName, routeName, rerr.Error())
-		return rerr.Error()
+	rerr := az.RoutesClient.Delete(ctx, az.RouteTableResourceGroup, az.RouteTableName, routeName)
+	klog.V(10).Infof("RoutesClient.Delete(%s,%s): end", az.RouteTableName, routeName)
+	if rerr == nil {
+		return nil
 	}
 
-	return az.deleteRouteWithRetry(routeName)
-}
-
-// deleteRouteWithRetry invokes az.RoutesClient.Delete with exponential backoff retry
-func (az *Cloud) deleteRouteWithRetry(routeName string) error {
-	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
-
-		rerr := az.RoutesClient.Delete(ctx, az.RouteTableResourceGroup, az.RouteTableName, routeName)
-		klog.V(10).Infof("RoutesClient.Delete(%s,%s): end", az.RouteTableName, routeName)
-		if rerr == nil {
-			return true, nil
-		}
-
-		klog.Errorf("RoutesClient.Delete(%s, %s) failed: %v", az.RouteTableName, routeName, rerr.Error())
-		return !rerr.Retriable, rerr.Error()
-	})
+	klog.Errorf("RoutesClient.Delete(%s, %s) failed: %v", az.RouteTableName, routeName, rerr.Error())
+	return rerr.Error()
 }
 
 // CreateOrUpdateVMSS invokes az.VirtualMachineScaleSetsClient.Update().
