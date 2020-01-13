@@ -258,6 +258,9 @@ type Proxier struct {
 	gracefuldeleteManager *GracefulTerminationManager
 }
 
+// Proxier implements proxy.Provider
+var _ proxy.Provider = &Proxier{}
+
 // IPGetter helps get node network interface IP
 type IPGetter interface {
 	NodeIPs() ([]net.IP, error)
@@ -296,8 +299,7 @@ func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
 	return ips, nil
 }
 
-// Proxier implements proxy.Provider
-var _ proxy.Provider = &Proxier{}
+var _ IPGetter = &realIPGetter{}
 
 // parseExcludedCIDRs parses the input strings and returns net.IPNet
 // The validation has been done earlier so the error condition will never happen under normal conditions
@@ -631,6 +633,8 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 
 	return append(mods, bmods...), nil
 }
+
+var _ KernelHandler = &LinuxKernelHandler{}
 
 // getFirstColumn reads all the content from r into memory and return a
 // slice which consists of the first word from each line.

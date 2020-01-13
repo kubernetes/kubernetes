@@ -192,3 +192,5 @@ func (h *netlinkHandle) GetLocalAddresses(dev, filterDev string) (sets.String, e
 	}
 	return res, nil
 }
+
+var _ NetLinkHandle = &netlinkHandle{}

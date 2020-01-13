@@ -80,6 +80,9 @@ type IPSetVersioner interface {
 	GetVersion() (string, error)
 }
 
+// utilipset.Interface implements IPSetVersioner
+var _ IPSetVersioner = utilipset.Interface(nil)
+
 // IPSet wraps util/ipset which is used by IPVS proxier.
 type IPSet struct {
 	utilipset.IPSet
