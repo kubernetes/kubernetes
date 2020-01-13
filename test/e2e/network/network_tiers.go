@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 
 	"github.com/onsi/ginkgo"
@@ -44,7 +45,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// This test suite requires the GCE environment.
-		framework.SkipUnlessProviderIs("gce")
+		e2eskipper.SkipUnlessProviderIs("gce")
 		cs = f.ClientSet
 	})
 

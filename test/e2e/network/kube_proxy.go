@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/images/agnhost/net/nat"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -54,7 +55,7 @@ var _ = SIGDescribe("Network", func() {
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(fr.ClientSet, 2)
 		framework.ExpectNoError(err)
 		if len(nodes.Items) < 2 {
-			framework.Skipf(
+			e2eskipper.Skipf(
 				"Test requires >= 2 Ready nodes, but there are only %v nodes",
 				len(nodes.Items))
 		}
@@ -87,7 +88,7 @@ var _ = SIGDescribe("Network", func() {
 			framework.TestContext.Provider,
 			clientNodeInfo.node)
 		if err != nil && strings.Contains(err.Error(), "No such file or directory") {
-			framework.Skipf("The node %s does not support /proc/net/nf_conntrack", clientNodeInfo.name)
+			e2eskipper.Skipf("The node %s does not support /proc/net/nf_conntrack", clientNodeInfo.name)
 		}
 		framework.ExpectNoError(err)
 
