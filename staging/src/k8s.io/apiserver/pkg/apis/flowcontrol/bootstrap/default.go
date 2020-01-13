@@ -59,6 +59,8 @@ var (
 		// "workload-low" is used by those workloads with lower priority which availability only has a
 		// minor impact on the cluster.
 		SuggestedPriorityLevelConfigurationWorkloadLow,
+		// "global-default" serves the rest traffic not handled by the other suggested flow-schemas above.
+		SuggestedPriorityLevelConfigurationGlobalDefault,
 	}
 	SuggestedFlowSchemas = []*flowcontrol.FlowSchema{
 		SuggestedFlowSchemaSystemNodes,               // references "system" priority-level
@@ -68,6 +70,7 @@ var (
 		SuggestedFlowSchemaKubeScheduler,             // references "workload-high" priority-level
 		SuggestedFlowSchemaKubeSystemServiceAccounts, // references "workload-high" priority-level
 		SuggestedFlowSchemaServiceAccounts,           // references "workload-low" priority-level
+		SuggestedFlowSchemaGlobalDefault,             // references "global-default" priority-level
 	}
 )
 
@@ -84,14 +87,9 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: 100,
+				AssuredConcurrencyShares: 1,
 				LimitResponse: flowcontrol.LimitResponse{
-					Type: flowcontrol.LimitResponseTypeQueue,
-					Queuing: &flowcontrol.QueuingConfiguration{
-						Queues:           128,
-						HandSize:         6,
-						QueueLengthLimit: 100,
-					},
+					Type: flowcontrol.LimitResponseTypeReject,
 				},
 			},
 		})
@@ -99,7 +97,8 @@ var (
 
 // Mandatory FlowSchema objects
 var (
-	// exempt priority-level
+	// "exempt" priority-level is used for preventing priority inversion and ensuring that sysadmin
+	// requests are always possible.
 	MandatoryFlowSchemaExempt = newFlowSchema(
 		"exempt",
 		flowcontrol.PriorityLevelConfigurationNameExempt,
@@ -124,7 +123,8 @@ var (
 			},
 		},
 	)
-	// catch-all priority-level
+	// "catch-all" priority-level only gets a minimal positive share of concurrency and won't be reaching
+	// ideally unless you intentionally deleted the suggested "global-default".
 	MandatoryFlowSchemaCatchAll = newFlowSchema(
 		"catch-all",
 		"catch-all",
@@ -165,7 +165,7 @@ var (
 					Queuing: &flowcontrol.QueuingConfiguration{
 						Queues:           64,
 						HandSize:         6,
-						QueueLengthLimit: 1000,
+						QueueLengthLimit: 50,
 					},
 				},
 			},
@@ -182,7 +182,7 @@ var (
 					Queuing: &flowcontrol.QueuingConfiguration{
 						Queues:           16,
 						HandSize:         4,
-						QueueLengthLimit: 100,
+						QueueLengthLimit: 50,
 					},
 				},
 			},
@@ -199,7 +199,7 @@ var (
 					Queuing: &flowcontrol.QueuingConfiguration{
 						Queues:           128,
 						HandSize:         6,
-						QueueLengthLimit: 100,
+						QueueLengthLimit: 50,
 					},
 				},
 			},
@@ -216,7 +216,24 @@ var (
 					Queuing: &flowcontrol.QueuingConfiguration{
 						Queues:           128,
 						HandSize:         6,
-						QueueLengthLimit: 100,
+						QueueLengthLimit: 50,
+					},
+				},
+			},
+		})
+	// global-default priority-level
+	SuggestedPriorityLevelConfigurationGlobalDefault = newPriorityLevelConfiguration(
+		"global-default",
+		flowcontrol.PriorityLevelConfigurationSpec{
+			Type: flowcontrol.PriorityLevelEnablementLimited,
+			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+				AssuredConcurrencyShares: 100,
+				LimitResponse: flowcontrol.LimitResponse{
+					Type: flowcontrol.LimitResponseTypeQueue,
+					Queuing: &flowcontrol.QueuingConfiguration{
+						Queues:           128,
+						HandSize:         6,
+						QueueLengthLimit: 50,
 					},
 				},
 			},
@@ -343,6 +360,24 @@ var (
 	)
 	SuggestedFlowSchemaServiceAccounts = newFlowSchema(
 		"service-accounts", "workload-low", 9000,
+		flowcontrol.FlowDistinguisherMethodByUserType,
+		flowcontrol.PolicyRulesWithSubjects{
+			Subjects: groups(serviceaccount.AllServiceAccountsGroup),
+			ResourceRules: []flowcontrol.ResourcePolicyRule{resourceRule(
+				[]string{flowcontrol.VerbAll},
+				[]string{flowcontrol.APIGroupAll},
+				[]string{flowcontrol.ResourceAll},
+				[]string{flowcontrol.NamespaceEvery},
+				true)},
+			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
+				nonResourceRule(
+					[]string{flowcontrol.VerbAll},
+					[]string{flowcontrol.NonResourceAll}),
+			},
+		},
+	)
+	SuggestedFlowSchemaGlobalDefault = newFlowSchema(
+		"global-default", "global-default", 9900,
 		flowcontrol.FlowDistinguisherMethodByUserType,
 		flowcontrol.PolicyRulesWithSubjects{
 			Subjects: groups(serviceaccount.AllServiceAccountsGroup),
