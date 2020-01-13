@@ -248,7 +248,7 @@ github.com/docker/spdystream
 github.com/docker/spdystream/spdy
 # github.com/dustin/go-humanize v1.0.0 => github.com/dustin/go-humanize v1.0.0
 github.com/dustin/go-humanize
-# github.com/elazarl/goproxy v0.0.0-20170405201442-c4fc26588b6e => github.com/elazarl/goproxy v0.0.0-20170405201442-c4fc26588b6e
+# github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153 => github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
 github.com/elazarl/goproxy
 # github.com/emicklei/go-restful v2.9.5+incompatible => github.com/emicklei/go-restful v2.9.5+incompatible
 github.com/emicklei/go-restful
