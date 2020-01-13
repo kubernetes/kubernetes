@@ -89,8 +89,8 @@ func (c *Cache) FilteredList(filter schedulerlisters.PodFilter, selector labels.
 }
 
 // Snapshot is a fake method for testing
-func (c *Cache) Snapshot() *internalcache.Snapshot {
-	return &internalcache.Snapshot{}
+func (c *Cache) Dump() *internalcache.Dump {
+	return &internalcache.Dump{}
 }
 
 // GetNodeInfo is a fake method for testing.
