@@ -150,7 +150,7 @@ github.com/chai2010/gettext-go/gettext
 github.com/chai2010/gettext-go/gettext/mo
 github.com/chai2010/gettext-go/gettext/plural
 github.com/chai2010/gettext-go/gettext/po
-# github.com/checkpoint-restore/go-criu v0.0.0-20190109184317-bdb7599cd87b => github.com/checkpoint-restore/go-criu v0.0.0-20190109184317-bdb7599cd87b
+# github.com/checkpoint-restore/go-criu v0.0.0-20181120144056-17b0214f6c48 => github.com/checkpoint-restore/go-criu v0.0.0-20181120144056-17b0214f6c48
 github.com/checkpoint-restore/go-criu/rpc
 # github.com/client9/misspell v0.3.4 => github.com/client9/misspell v0.3.4
 github.com/client9/misspell
