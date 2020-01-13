@@ -26,21 +26,6 @@ import (
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 )
 
-// GetContainerPorts returns the used host ports of Pods: if 'port' was used, a 'port:true' pair
-// will be in the result; but it does not resolve port conflict.
-func GetContainerPorts(pods ...*v1.Pod) []*v1.ContainerPort {
-	var ports []*v1.ContainerPort
-	for _, pod := range pods {
-		for j := range pod.Spec.Containers {
-			container := &pod.Spec.Containers[j]
-			for k := range container.Ports {
-				ports = append(ports, &container.Ports[k])
-			}
-		}
-	}
-	return ports
-}
-
 // GetPodFullName returns a name that uniquely identifies a pod.
 func GetPodFullName(pod *v1.Pod) string {
 	// Use underscore as the delimiter because it is not allowed in pod name

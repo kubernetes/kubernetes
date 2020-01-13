@@ -10,7 +10,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/features:go_default_library",
-        "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultpodtopologyspread:go_default_library",
         "//pkg/scheduler/framework/plugins/imagelocality:go_default_library",
@@ -54,7 +53,6 @@ filegroup(
         "//pkg/scheduler/framework/plugins/helper:all-srcs",
         "//pkg/scheduler/framework/plugins/imagelocality:all-srcs",
         "//pkg/scheduler/framework/plugins/interpodaffinity:all-srcs",
-        "//pkg/scheduler/framework/plugins/migration:all-srcs",
         "//pkg/scheduler/framework/plugins/nodeaffinity:all-srcs",
         "//pkg/scheduler/framework/plugins/nodelabel:all-srcs",
         "//pkg/scheduler/framework/plugins/nodename:all-srcs",
