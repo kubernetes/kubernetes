@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -50,7 +51,7 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		vsp                *VSphere
 	)
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("vsphere")
+		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		c = f.ClientSet
 		ns = f.Namespace.Name
@@ -338,7 +339,7 @@ func testSetupVolumePlacement(client clientset.Interface, namespace string) (nod
 	nodes, err := e2enode.GetBoundedReadySchedulableNodes(client, 2)
 	framework.ExpectNoError(err)
 	if len(nodes.Items) < 2 {
-		framework.Skipf("Requires at least %d nodes (not %d)", 2, len(nodes.Items))
+		e2eskipper.Skipf("Requires at least %d nodes (not %d)", 2, len(nodes.Items))
 	}
 	node1Name = nodes.Items[0].Name
 	node2Name = nodes.Items[1].Name

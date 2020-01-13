@@ -45,6 +45,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -71,11 +72,11 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 	f := framework.NewDefaultFramework("pod-disks")
 
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessNodeCountIsAtLeast(minNodes)
+		e2eskipper.SkipUnlessNodeCountIsAtLeast(minNodes)
 		cs = f.ClientSet
 		ns = f.Namespace.Name
 
-		framework.SkipIfMultizone(cs)
+		e2eskipper.SkipIfMultizone(cs)
 
 		podClient = cs.CoreV1().Pods(ns)
 		nodeClient = cs.CoreV1().Nodes()
@@ -130,9 +131,9 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 			readOnlyTxt := readOnlyMap[readOnly]
 
 			ginkgo.It(fmt.Sprintf("for %s PD with pod delete grace period of %q", readOnlyTxt, t.descr), func() {
-				framework.SkipUnlessProviderIs("gce", "gke", "aws")
+				e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 				if readOnly {
-					framework.SkipIfProviderIs("aws")
+					e2eskipper.SkipIfProviderIs("aws")
 				}
 
 				ginkgo.By("creating PD")
@@ -249,7 +250,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 			numContainers := t.numContainers
 
 			ginkgo.It(fmt.Sprintf("using %d containers and %d PDs", numContainers, numPDs), func() {
-				framework.SkipUnlessProviderIs("gce", "gke", "aws")
+				e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 				var host0Pod *v1.Pod
 				var err error
 				fileAndContentToVerify := make(map[string]string)
@@ -343,7 +344,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 		for _, t := range tests {
 			disruptOp := t.disruptOp
 			ginkgo.It(fmt.Sprintf("when %s", t.descr), func() {
-				framework.SkipUnlessProviderIs("gce")
+				e2eskipper.SkipUnlessProviderIs("gce")
 				origNodeCnt := len(nodes.Items) // healhy nodes running kubelet
 
 				ginkgo.By("creating a pd")
@@ -444,7 +445,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 	})
 
 	ginkgo.It("should be able to delete a non-existent PD without error", func() {
-		framework.SkipUnlessProviderIs("gce")
+		e2eskipper.SkipUnlessProviderIs("gce")
 
 		ginkgo.By("delete a PD")
 		framework.ExpectNoError(e2epv.DeletePDWithRetry("non-exist"))

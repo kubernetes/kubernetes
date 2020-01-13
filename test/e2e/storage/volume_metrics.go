@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -56,7 +57,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		var err error
-		framework.SkipUnlessProviderIs("gce", "gke", "aws")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 		defaultScName, err = e2epv.GetDefaultStorageClassName(c)
 		if err != nil {
 			framework.Failf(err.Error())
@@ -101,7 +102,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		var err error
 
 		if !metricsGrabber.HasRegisteredMaster() {
-			framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
+			e2eskipper.Skipf("Environment does not support getting controller-manager metrics - skipping")
 		}
 
 		ginkgo.By("Getting plugin name")
@@ -147,7 +148,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		var err error
 
 		if !metricsGrabber.HasRegisteredMaster() {
-			framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
+			e2eskipper.Skipf("Environment does not support getting controller-manager metrics - skipping")
 		}
 
 		ginkgo.By("Geting default storageclass")
@@ -276,7 +277,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 
 		controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
 		if err != nil {
-			framework.Skipf("Could not get controller-manager metrics - skipping")
+			e2eskipper.Skipf("Could not get controller-manager metrics - skipping")
 		}
 
 		metricKey := "volume_operation_total_seconds_count"
@@ -330,7 +331,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		// Get metrics
 		controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
 		if err != nil {
-			framework.Skipf("Could not get controller-manager metrics - skipping")
+			e2eskipper.Skipf("Could not get controller-manager metrics - skipping")
 		}
 
 		// Create pod
@@ -344,7 +345,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		// Get updated metrics
 		updatedControllerMetrics, err := metricsGrabber.GrabFromControllerManager()
 		if err != nil {
-			framework.Skipf("Could not get controller-manager metrics - skipping")
+			e2eskipper.Skipf("Could not get controller-manager metrics - skipping")
 		}
 
 		// Forced detach metric should be present
@@ -447,7 +448,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 
 		ginkgo.BeforeEach(func() {
 			if !metricsGrabber.HasRegisteredMaster() {
-				framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
+				e2eskipper.Skipf("Environment does not support getting controller-manager metrics - skipping")
 			}
 
 			pv = e2epv.MakePersistentVolume(pvConfig)
@@ -772,7 +773,7 @@ func waitForADControllerStatesMetrics(metricsGrabber *metrics.Grabber, metricNam
 	verifyMetricFunc := func() (bool, error) {
 		updatedMetrics, err := metricsGrabber.GrabFromControllerManager()
 		if err != nil {
-			framework.Skipf("Could not get controller-manager metrics - skipping")
+			e2eskipper.Skipf("Could not get controller-manager metrics - skipping")
 			return false, err
 		}
 		if !hasValidMetrics(testutil.Metrics(updatedMetrics), metricName, dimensions...) {

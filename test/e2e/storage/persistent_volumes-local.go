@@ -42,6 +42,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -254,7 +255,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			ginkgo.Context("Set fsGroup for local volume", func() {
 				ginkgo.BeforeEach(func() {
 					if testVolType == BlockLocalVolumeType {
-						framework.Skipf("We don't set fsGroup on block device, skipped.")
+						e2eskipper.Skipf("We don't set fsGroup on block device, skipped.")
 					}
 				})
 
@@ -278,7 +279,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				})
 
 				ginkgo.It("should set different fsGroup for second pod if first pod is deleted", func() {
-					framework.Skipf("Disabled temporarily, reopen after #73168 is fixed")
+					e2eskipper.Skipf("Disabled temporarily, reopen after #73168 is fixed")
 					fsGroup1, fsGroup2 := int64(1234), int64(4321)
 					ginkgo.By("Create first pod and check fsGroup is set")
 					pod1 := createPodWithFsGroupTest(config, testVol, fsGroup1, fsGroup1)
@@ -317,7 +318,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 		ginkgo.It("should fail due to wrong node", func() {
 			if len(config.nodes) < 2 {
-				framework.Skipf("Runs only when number of nodes >= 2")
+				e2eskipper.Skipf("Runs only when number of nodes >= 2")
 			}
 
 			testVols := setupLocalVolumesPVCsPVs(config, DirectoryLocalVolumeType, config.node0, 1, immediateMode)
@@ -342,7 +343,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 		ginkgo.BeforeEach(func() {
 			if len(config.nodes) < 2 {
-				framework.Skipf("Runs only when number of nodes >= 2")
+				e2eskipper.Skipf("Runs only when number of nodes >= 2")
 			}
 
 			volumeType = DirectoryLocalVolumeType
@@ -393,7 +394,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 		ginkgo.It("should use volumes spread across nodes when pod has anti-affinity", func() {
 			if len(config.nodes) < ssReplicas {
-				framework.Skipf("Runs only when number of nodes >= %v", ssReplicas)
+				e2eskipper.Skipf("Runs only when number of nodes >= %v", ssReplicas)
 			}
 			ginkgo.By("Creating a StatefulSet with pod anti-affinity on nodes")
 			ss := createStatefulSet(config, ssReplicas, volsPerNode, true, false)
@@ -408,7 +409,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 		ginkgo.It("should use volumes spread across nodes when pod management is parallel and pod has anti-affinity", func() {
 			if len(config.nodes) < ssReplicas {
-				framework.Skipf("Runs only when number of nodes >= %v", ssReplicas)
+				e2eskipper.Skipf("Runs only when number of nodes >= %v", ssReplicas)
 			}
 			ginkgo.By("Creating a StatefulSet with pod anti-affinity on nodes")
 			ss := createStatefulSet(config, ssReplicas, 1, true, true)
@@ -1188,6 +1189,6 @@ func SkipUnlessLocalSSDExists(config *localTestConfig, ssdInterface, filesystemT
 	num, err := strconv.Atoi(strings.TrimSpace(res.Stdout))
 	framework.ExpectNoError(err)
 	if num < 1 {
-		framework.Skipf("Requires at least 1 %s %s localSSD ", ssdInterface, filesystemType)
+		e2eskipper.Skipf("Requires at least 1 %s %s localSSD ", ssdInterface, filesystemType)
 	}
 }

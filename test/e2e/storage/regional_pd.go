@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -65,8 +66,8 @@ var _ = utils.SIGDescribe("Regional PD", func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 
-		framework.SkipUnlessProviderIs("gce", "gke")
-		framework.SkipUnlessMultizone(c)
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessMultizone(c)
 	})
 
 	ginkgo.Describe("RegionalPD", func() {

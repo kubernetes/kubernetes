@@ -15,6 +15,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/config:go_default_library",
+        "//test/e2e/framework/skipper:go_default_library",
         "//test/e2e/framework/volume:go_default_library",
         "//test/e2e/storage/testpatterns:go_default_library",
         "//test/e2e/storage/testsuites:go_default_library",
