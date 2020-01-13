@@ -227,6 +227,36 @@ func (mr *MockInterfaceMockRecorder) PutResource(ctx, resourceID, parameters int
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutResource", reflect.TypeOf((*MockInterface)(nil).PutResource), ctx, resourceID, parameters)
 }
 
+// PutResourceWithDecorators mocks base method
+func (m *MockInterface) PutResourceWithDecorators(ctx context.Context, resourceID string, parameters interface{}, decorators []autorest.PrepareDecorator) (*http.Response, *retry.Error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutResourceWithDecorators", ctx, resourceID, parameters, decorators)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(*retry.Error)
+	return ret0, ret1
+}
+
+// PutResourceWithDecorators indicates an expected call of PutResourceWithDecorators
+func (mr *MockInterfaceMockRecorder) PutResourceWithDecorators(ctx, resourceID, parameters, decorators interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutResourceWithDecorators", reflect.TypeOf((*MockInterface)(nil).PutResourceWithDecorators), ctx, resourceID, parameters, decorators)
+}
+
+// PatchResource mocks base method
+func (m *MockInterface) PatchResource(ctx context.Context, resourceID string, parameters interface{}) (*http.Response, *retry.Error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PatchResource", ctx, resourceID, parameters)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(*retry.Error)
+	return ret0, ret1
+}
+
+// PatchResource indicates an expected call of PatchResource
+func (mr *MockInterfaceMockRecorder) PatchResource(ctx, resourceID, parameters interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchResource", reflect.TypeOf((*MockInterface)(nil).PatchResource), ctx, resourceID, parameters)
+}
+
 // PutResourceAsync mocks base method
 func (m *MockInterface) PutResourceAsync(ctx context.Context, resourceID string, parameters interface{}) (*azure.Future, *retry.Error) {
 	m.ctrl.T.Helper()
