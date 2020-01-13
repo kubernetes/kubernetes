@@ -198,8 +198,8 @@ func (reqMgr *requestManager) digestConfigObjects(newPLs []*rmtypesv1a1.Priority
 		if plState.config.Limited == nil && !haveExemptPL || plName == rmtypesv1a1.PriorityLevelConfigurationNameCatchAll && !haveCatchAllPL {
 			klog.V(3).Infof("Retaining old priority level %q with Type=%v because of lack of replacement", plName, plState.config.Type)
 		} else {
-			if plState.queues == nil { // should never happen; but if it does:
-				klog.V(3).Infof("Immediately removing undesired priority level %q, Type=%v", plName, plState.config.Type)
+			if plState.queues == nil {
+				klog.V(3).Infof("Removing undesired priority level %q, Type=%v", plName, plState.config.Type)
 				continue
 			}
 			if plState.emptyHandler == nil {

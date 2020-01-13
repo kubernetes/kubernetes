@@ -3,8 +3,8 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "reqmgmt.go",
-        "reqmgmt-config.go",
+        "filter.go",
+        "filter-config.go",
         "rule.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/util/flowcontrol",
@@ -20,7 +20,6 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/apihelpers:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/bootstrap:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/counter:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset:go_default_library",
@@ -47,7 +46,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/bootstrap:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/counter:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/metrics:all-srcs",
