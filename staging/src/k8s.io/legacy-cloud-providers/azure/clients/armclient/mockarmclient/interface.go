@@ -302,6 +302,21 @@ func (mr *MockInterfaceMockRecorder) GetResource(ctx, resourceID, expand interfa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResource", reflect.TypeOf((*MockInterface)(nil).GetResource), ctx, resourceID, expand)
 }
 
+// GetResourceWithDecorators mocks base method
+func (m *MockInterface) GetResourceWithDecorators(ctx context.Context, resourceID string, decorators []autorest.PrepareDecorator) (*http.Response, *retry.Error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetResourceWithDecorators", ctx, resourceID, decorators)
+	ret0, _ := ret[0].(*http.Response)
+	ret1, _ := ret[1].(*retry.Error)
+	return ret0, ret1
+}
+
+// GetResourceWithDecorators indicates an expected call of GetResourceWithDecorators
+func (mr *MockInterfaceMockRecorder) GetResourceWithDecorators(ctx, resourceID, decorators interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResourceWithDecorators", reflect.TypeOf((*MockInterface)(nil).GetResourceWithDecorators), ctx, resourceID, decorators)
+}
+
 // PostResource mocks base method
 func (m *MockInterface) PostResource(ctx context.Context, resourceID, action string, parameters interface{}) (*http.Response, *retry.Error) {
 	m.ctrl.T.Helper()
