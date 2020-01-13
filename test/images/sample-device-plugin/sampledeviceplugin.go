@@ -92,7 +92,9 @@ func main() {
 
 	}
 	dp1.SetAllocFunc(stubAllocFunc)
-	if err := dp1.Register(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
+	kubeletSocket := dm.GetSocketPath("/var/lib/kubelet")
+	devicePluginPath, _ := filepath.Split(kubeletSocket)
+	if err := dp1.Register(kubeletSocket, resourceName, devicePluginPath); err != nil {
 		panic(err)
 	}
 	select {}

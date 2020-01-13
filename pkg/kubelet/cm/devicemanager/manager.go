@@ -117,9 +117,15 @@ type sourcesReadyStub struct{}
 func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
+// GetSocketPath return the socket path of device manager plugin
+func GetSocketPath(rootDir string) string {
+	return filepath.Join(rootDir, pluginapi.DevicePluginPath, pluginapi.KubeletSocket)
+}
+
 // NewManagerImpl creates a new manager.
-func NewManagerImpl(numaNodeInfo cputopology.NUMANodeInfo, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
-	return newManagerImpl(pluginapi.KubeletSocket, numaNodeInfo, topologyAffinityStore)
+func NewManagerImpl(numaNodeInfo cputopology.NUMANodeInfo, topologyAffinityStore topologymanager.Store, rootDir string) (*ManagerImpl, error) {
+	socketPath := GetSocketPath(rootDir)
+	return newManagerImpl(socketPath, numaNodeInfo, topologyAffinityStore)
 }
 
 func newManagerImpl(socketPath string, numaNodeInfo cputopology.NUMANodeInfo, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
