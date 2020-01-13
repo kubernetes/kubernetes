@@ -432,7 +432,7 @@ func iptablesCommand(protocol Protocol) string {
 }
 
 func (runner *runner) run(op operation, args []string) ([]byte, error) {
-	return runner.runContext(nil, op, args)
+	return runner.runContext(context.TODO(), op, args)
 }
 
 func (runner *runner) runContext(ctx context.Context, op operation, args []string) ([]byte, error) {
