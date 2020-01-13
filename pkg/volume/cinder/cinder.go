@@ -362,15 +362,11 @@ type cinderVolume struct {
 	pdName string
 	// Filesystem type, optional.
 	fsType string
-	// Specifies whether the disk will be attached as read-only.
-	readOnly bool
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager cdManager
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
 	mounter mount.Interface
-	// diskMounter provides the interface that is used to mount the actual block device.
-	blockDeviceMounter mount.Interface
-	plugin             *cinderPlugin
+	plugin  *cinderPlugin
 	volume.MetricsProvider
 }
 
