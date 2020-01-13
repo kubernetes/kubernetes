@@ -38,7 +38,7 @@ import (
 //
 // On exit,
 //
-//  U^T*A*Q = D1*[ 0 R ], V^T*B*Q = D2*[ 0 R ],
+//  Uᵀ*A*Q = D1*[ 0 R ], Vᵀ*B*Q = D2*[ 0 R ],
 //
 // where U, V and Q are orthogonal matrices.
 // R is a non-singular upper triangular matrix, and D1 and D2 are
@@ -103,7 +103,7 @@ import (
 // min(l,m-k)×l triangular or trapezoidal matrix A23 and l×l
 // matrix B13 to the form:
 //
-//  U1^T*A13*Q1 = C1*R1; V1^T*B13*Q1 = S1*R1,
+//  U1ᵀ*A13*Q1 = C1*R1; V1ᵀ*B13*Q1 = S1*R1,
 //
 // where U1, V1 and Q1 are orthogonal matrices. C1 and S1 are diagonal
 // matrices satisfying
@@ -263,12 +263,12 @@ func (impl Implementation) Dtgsja(jobU, jobV, jobQ lapack.GSVDJob, m, p, n, k, l
 
 				csu, snu, csv, snv, csq, snq := impl.Dlags2(upper, a1, a2, a3, b1, b2, b3)
 
-				// Update (k+i)-th and (k+j)-th rows of matrix A: U^T*A.
+				// Update (k+i)-th and (k+j)-th rows of matrix A: Uᵀ*A.
 				if k+j < m {
 					bi.Drot(l, a[(k+j)*lda+n-l:], 1, a[(k+i)*lda+n-l:], 1, csu, snu)
 				}
 
-				// Update i-th and j-th rows of matrix B: V^T*B.
+				// Update i-th and j-th rows of matrix B: Vᵀ*B.
 				bi.Drot(l, b[j*ldb+n-l:], 1, b[i*ldb+n-l:], 1, csv, snv)
 
 				// Update (n-l+i)-th and (n-l+j)-th columns of matrices

@@ -941,7 +941,7 @@ golang.org/x/tools/internal/gopathwalk
 golang.org/x/tools/internal/imports
 golang.org/x/tools/internal/module
 golang.org/x/tools/internal/semver
-# gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485 => gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485
+# gonum.org/v1/gonum v0.6.2 => gonum.org/v1/gonum v0.6.2
 gonum.org/v1/gonum/blas
 gonum.org/v1/gonum/blas/blas64
 gonum.org/v1/gonum/blas/cblas128
