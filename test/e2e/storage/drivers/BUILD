@@ -28,6 +28,7 @@ go_library(
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/pv:go_default_library",
+        "//test/e2e/framework/skipper:go_default_library",
         "//test/e2e/framework/volume:go_default_library",
         "//test/e2e/storage/testpatterns:go_default_library",
         "//test/e2e/storage/testsuites:go_default_library",

@@ -33,6 +33,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -88,8 +89,8 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// To protect the NFS volume pod from the kubelet restart, we isolate it on its own node.
-		framework.SkipUnlessNodeCountIsAtLeast(minNodes)
-		framework.SkipIfProviderIs("local")
+		e2eskipper.SkipUnlessNodeCountIsAtLeast(minNodes)
+		e2eskipper.SkipIfProviderIs("local")
 
 		c = f.ClientSet
 		ns = f.Namespace.Name
@@ -146,8 +147,8 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		)
 
 		ginkgo.BeforeEach(func() {
-			framework.SkipUnlessProviderIs("gce")
-			framework.SkipUnlessSSHKeyPresent()
+			e2eskipper.SkipUnlessProviderIs("gce")
+			e2eskipper.SkipUnlessSSHKeyPresent()
 
 			ginkgo.By("Initializing first PD with PVPVC binding")
 			pvSource1, diskName1 = createGCEVolume()
@@ -204,7 +205,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		})
 
 		ginkgo.It("should delete a bound PVC from a clientPod, restart the kube-control-manager, and ensure the kube-controller-manager does not crash", func() {
-			framework.SkipUnlessSSHKeyPresent()
+			e2eskipper.SkipUnlessSSHKeyPresent()
 
 			ginkgo.By("Deleting PVC for volume 2")
 			err = e2epv.DeletePersistentVolumeClaim(c, pvc2.Name, ns)

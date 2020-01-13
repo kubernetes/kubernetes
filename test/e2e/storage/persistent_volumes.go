@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -318,7 +319,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 			ginkgo.It("should be reschedulable [Slow]", func() {
 				// Only run on providers with default storageclass
-				framework.SkipUnlessProviderIs("openstack", "gce", "gke", "vsphere", "azure")
+				e2eskipper.SkipUnlessProviderIs("openstack", "gce", "gke", "vsphere", "azure")
 
 				numVols := 4
 

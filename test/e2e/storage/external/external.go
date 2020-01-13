@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
@@ -239,7 +240,7 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern testpatterns.TestPattern)
 		supported = len(d.InlineVolumes) != 0
 	}
 	if !supported {
-		framework.Skipf("Driver %q does not support volume type %q - skipping", d.DriverInfo.Name, pattern.VolType)
+		e2eskipper.Skipf("Driver %q does not support volume type %q - skipping", d.DriverInfo.Name, pattern.VolType)
 	}
 
 	supported = false
@@ -252,7 +253,7 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern testpatterns.TestPattern)
 		}
 	}
 	if !supported {
-		framework.Skipf("Driver %q does not support snapshot type %q - skipping", d.DriverInfo.Name, pattern.SnapshotType)
+		e2eskipper.Skipf("Driver %q does not support snapshot type %q - skipping", d.DriverInfo.Name, pattern.SnapshotType)
 	}
 }
 
@@ -294,7 +295,7 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(config *testsuites.Pe
 
 func (d *driverDefinition) GetSnapshotClass(config *testsuites.PerTestConfig) *unstructured.Unstructured {
 	if !d.SnapshotClass.FromName {
-		framework.Skipf("Driver %q does not support snapshotting - skipping", d.DriverInfo.Name)
+		e2eskipper.Skipf("Driver %q does not support snapshotting - skipping", d.DriverInfo.Name)
 	}
 
 	snapshotter := d.DriverInfo.Name
@@ -307,7 +308,7 @@ func (d *driverDefinition) GetSnapshotClass(config *testsuites.PerTestConfig) *u
 
 func (d *driverDefinition) GetVolume(config *testsuites.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {
 	if len(d.InlineVolumes) == 0 {
-		framework.Skipf("%s does not have any InlineVolumeAttributes defined", d.DriverInfo.Name)
+		e2eskipper.Skipf("%s does not have any InlineVolumeAttributes defined", d.DriverInfo.Name)
 	}
 	volume := d.InlineVolumes[volumeNumber%len(d.InlineVolumes)]
 	return volume.Attributes, volume.Shared, volume.ReadOnly

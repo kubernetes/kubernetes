@@ -29,6 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
@@ -165,10 +166,10 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 	var suffix string
 
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "local")
-		framework.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci", "custom")
-		framework.SkipUnlessNodeOSDistroIs("debian", "ubuntu", "gci", "custom")
-		framework.SkipUnlessSSHKeyPresent()
+		e2eskipper.SkipUnlessProviderIs("gce", "local")
+		e2eskipper.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci", "custom")
+		e2eskipper.SkipUnlessNodeOSDistroIs("debian", "ubuntu", "gci", "custom")
+		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		cs = f.ClientSet
 		ns = f.Namespace

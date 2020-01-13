@@ -28,6 +28,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -79,7 +80,7 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 		volLabel = labels.Set{e2epv.VolumeSelectorKey: ns}
 		selector = metav1.SetAsLabelSelector(volLabel)
 
-		framework.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		ginkgo.By("Initializing Test Spec")
 		diskName, err = e2epv.CreatePDWithRetry()
 		framework.ExpectNoError(err)

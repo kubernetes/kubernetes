@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -37,8 +38,8 @@ var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// Skip tests unless number of nodes is 2
-		framework.SkipUnlessNodeCountIsAtLeast(2)
-		framework.SkipIfProviderIs("local")
+		e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
+		e2eskipper.SkipIfProviderIs("local")
 		c = f.ClientSet
 		ns = f.Namespace.Name
 	})

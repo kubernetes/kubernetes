@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
@@ -80,7 +81,7 @@ func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns
 		ok := false
 		eDriver, ok = driver.(EphemeralTestDriver)
 		if !ok {
-			framework.Skipf("Driver %s doesn't support ephemeral inline volumes -- skipping", dInfo.Name)
+			e2eskipper.Skipf("Driver %s doesn't support ephemeral inline volumes -- skipping", dInfo.Name)
 		}
 	})
 
@@ -246,7 +247,7 @@ func (t EphemeralTest) TestEphemeral() {
 			VolumeAttributes: attributes,
 		}
 		if readOnly && !t.ReadOnly {
-			framework.Skipf("inline ephemeral volume #%d is read-only, but the test needs a read/write volume", i)
+			e2eskipper.Skipf("inline ephemeral volume #%d is read-only, but the test needs a read/write volume", i)
 		}
 		csiVolumes = append(csiVolumes, csi)
 	}

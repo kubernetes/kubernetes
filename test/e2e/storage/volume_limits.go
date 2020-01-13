@@ -23,6 +23,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -32,7 +33,7 @@ var _ = utils.SIGDescribe("Volume limits", func() {
 	)
 	f := framework.NewDefaultFramework("volume-limits-on-node")
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("aws", "gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("aws", "gce", "gke")
 		c = f.ClientSet
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 	})

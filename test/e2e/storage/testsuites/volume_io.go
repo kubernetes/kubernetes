@@ -37,6 +37,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -119,7 +120,7 @@ func (t *volumeIOTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
 		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 		if l.resource.VolSource == nil {
-			framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
+			e2eskipper.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 		}
 
 	}
