@@ -102,12 +102,12 @@ type Cache interface {
 	// on this node.
 	UpdateNodeInfoSnapshot(nodeSnapshot *nodeinfosnapshot.Snapshot) error
 
-	// Snapshot takes a snapshot on current cache
-	Snapshot() *Snapshot
+	// Dump produces a dump of the current cache.
+	Dump() *Dump
 }
 
-// Snapshot is a snapshot of cache state
-type Snapshot struct {
+// Dump is a dump of the cache state.
+type Dump struct {
 	AssumedPods map[string]bool
 	Nodes       map[string]*schedulernodeinfo.NodeInfo
 }

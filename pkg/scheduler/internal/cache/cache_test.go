@@ -398,7 +398,7 @@ func TestSnapshot(t *testing.T) {
 			}
 		}
 
-		snapshot := cache.Snapshot()
+		snapshot := cache.Dump()
 		if len(snapshot.Nodes) != len(cache.nodes) {
 			t.Errorf("Unequal number of nodes in the cache and its snapshot. expected: %v, got: %v", len(cache.nodes), len(snapshot.Nodes))
 		}

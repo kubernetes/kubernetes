@@ -177,7 +177,7 @@ func (cache *schedulerCache) removeNodeInfoFromList(name string) {
 // debugging purposes only and shouldn't be confused with UpdateNodeInfoSnapshot
 // function.
 // This method is expensive, and should be only used in non-critical path.
-func (cache *schedulerCache) Snapshot() *Snapshot {
+func (cache *schedulerCache) Dump() *Dump {
 	cache.mu.RLock()
 	defer cache.mu.RUnlock()
 
@@ -191,7 +191,7 @@ func (cache *schedulerCache) Snapshot() *Snapshot {
 		assumedPods[k] = v
 	}
 
-	return &Snapshot{
+	return &Dump{
 		Nodes:       nodes,
 		AssumedPods: assumedPods,
 	}
