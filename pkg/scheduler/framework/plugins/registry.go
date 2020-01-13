@@ -18,6 +18,7 @@ package plugins
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
@@ -78,4 +79,14 @@ func NewInTreeRegistry(args *RegistryArgs) framework.Registry {
 		nodelabel.Name:                 nodelabel.New,
 		serviceaffinity.Name:           serviceaffinity.New,
 	}
+}
+
+// MandatoryPlugins returns mandatory plugins.
+var MandatoryPlugins = schedulerapi.Plugins{
+	Filter: &schedulerapi.PluginSet{
+		Enabled: []schedulerapi.Plugin{
+			{Name: nodeunschedulable.Name},
+			{Name: tainttoleration.Name},
+		},
+	},
 }

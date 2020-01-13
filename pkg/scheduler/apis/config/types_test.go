@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -196,6 +197,98 @@ func TestPluginsApply(t *testing.T) {
 			test.defaultPlugins.Apply(test.customPlugins)
 			if d := cmp.Diff(test.expectedPlugins, test.defaultPlugins); d != "" {
 				t.Fatalf("plugins mismatch (-want +got):\n%s", d)
+			}
+		})
+	}
+}
+
+func TestPluginsContains(t *testing.T) {
+	tests := []struct {
+		leftPlugins    *Plugins
+		rightPlugins   *Plugins
+		expectedResult bool
+	}{
+		{
+			leftPlugins: &Plugins{
+				Filter: &PluginSet{
+					Enabled: []Plugin{
+						{Name: "LeftPlugin"},
+					},
+				},
+			},
+			rightPlugins: &Plugins{
+				Filter: &PluginSet{
+					Enabled: []Plugin{
+						{Name: "DefaultPlugin1"},
+						{Name: "DefaultPlugin2"},
+					},
+				},
+			},
+			expectedResult: false,
+		},
+		{
+			leftPlugins: &Plugins{
+				Filter: &PluginSet{
+					Enabled: []Plugin{
+						{Name: "LeftPlugin"},
+						{Name: "DefaultPlugin2"},
+					},
+				},
+			},
+			rightPlugins: &Plugins{
+				Filter: &PluginSet{
+					Enabled: []Plugin{
+						{Name: "DefaultPlugin2"},
+					},
+				},
+			},
+			expectedResult: true,
+		},
+		{
+			leftPlugins: &Plugins{
+				Filter: &PluginSet{
+					Enabled: []Plugin{
+						{Name: "LeftPlugin"},
+						{Name: "DefaultPlugin1"},
+						{Name: "DefaultPlugin2"},
+					},
+				},
+			},
+			rightPlugins: &Plugins{
+				Filter: &PluginSet{
+					Enabled: []Plugin{
+						{Name: "DefaultPlugin1"},
+						{Name: "DefaultPlugin2"},
+					},
+				},
+			},
+			expectedResult: true,
+		},
+		{
+			leftPlugins: &Plugins{
+				Filter: &PluginSet{
+					Enabled: []Plugin{
+						{Name: "DefaultPlugin2"},
+						{Name: "DefaultPlugin1"},
+					},
+				},
+			},
+			rightPlugins: &Plugins{
+				Filter: &PluginSet{
+					Enabled: []Plugin{
+						{Name: "DefaultPlugin1"},
+						{Name: "DefaultPlugin2"},
+					},
+				},
+			},
+			expectedResult: true,
+		},
+	}
+
+	for i, test := range tests {
+		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			if test.expectedResult != test.leftPlugins.Contains(test.rightPlugins) {
+				t.Fatalf("expected: %v, actual: %v", test.expectedResult, !test.expectedResult)
 			}
 		})
 	}

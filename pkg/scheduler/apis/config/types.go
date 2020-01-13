@@ -291,6 +291,39 @@ func (p *Plugins) Apply(customPlugins *Plugins) {
 	p.Unreserve = mergePluginSets(p.Unreserve, customPlugins.Unreserve)
 }
 
+// Contains returns true if and only if plugin contains another.
+func (p *Plugins) Contains(plugins *Plugins) bool {
+	return containsPluginSet(p.QueueSort, plugins.QueueSort) &&
+		containsPluginSet(p.PreFilter, plugins.PreFilter) &&
+		containsPluginSet(p.Filter, plugins.Filter) &&
+		containsPluginSet(p.PostFilter, plugins.PostFilter) &&
+		containsPluginSet(p.Score, plugins.Score) &&
+		containsPluginSet(p.Reserve, plugins.Reserve) &&
+		containsPluginSet(p.Permit, plugins.Permit) &&
+		containsPluginSet(p.PreBind, plugins.PreBind) &&
+		containsPluginSet(p.Bind, plugins.Bind) &&
+		containsPluginSet(p.PostBind, plugins.PostBind) &&
+		containsPluginSet(p.Unreserve, plugins.Unreserve)
+}
+
+func containsPluginSet(left, right *PluginSet) bool {
+	if right == nil {
+		return true
+	}
+
+	leftEnabledPlugins := sets.NewString()
+	for _, p := range left.Enabled {
+		leftEnabledPlugins.Insert(p.Name)
+	}
+
+	rightEnabledPlugins := sets.NewString()
+	for _, p := range right.Enabled {
+		rightEnabledPlugins.Insert(p.Name)
+	}
+
+	return leftEnabledPlugins.IsSuperset(rightEnabledPlugins)
+}
+
 func mergePluginSets(defaultPluginSet, customPluginSet *PluginSet) *PluginSet {
 	if customPluginSet == nil {
 		customPluginSet = &PluginSet{}

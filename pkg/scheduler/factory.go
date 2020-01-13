@@ -112,6 +112,10 @@ type Configurator struct {
 
 // create a scheduler from a set of registered plugins.
 func (c *Configurator) create(extenders []algorithm.SchedulerExtender) (*Scheduler, error) {
+	if !c.plugins.Contains(&frameworkplugins.MandatoryPlugins) {
+		return nil, fmt.Errorf("mandatory plugins can't be disabled")
+	}
+
 	framework, err := framework.NewFramework(
 		c.registry,
 		c.plugins,
