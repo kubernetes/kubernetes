@@ -470,28 +470,46 @@ func checkTypeInternal(ftc hostPathTypeChecker, pathType *v1.HostPathType) error
 }
 
 // makeDir creates a new directory.
-// If pathname already exists as a directory, no error is returned.
+// If pathname already exists as a directory and with proper permissions, no error is returned.
 // If pathname already exists as a file, an error is returned.
 func makeDir(pathname string) error {
-	err := os.MkdirAll(pathname, os.FileMode(0755))
+	// TODO make "mode" a parameter for the function
+	const mode = os.FileMode(0755)
+	err := os.MkdirAll(pathname, mode)
 	if err != nil {
 		if !os.IsExist(err) {
 			return err
+		}
+		// check if directory that exists have the required persmissions
+		if dir, _ := os.Stat(pathname); dir.Mode() != mode {
+			return fmt.Errorf("%s exists and has wrong persmission, wanted %d", pathname, mode)
 		}
 	}
 	return nil
 }
 
 // makeFile creates an empty file.
-// If pathname already exists, whether a file or directory, no error is returned.
+// If pathname already exists, and is a file no error is returned.
+// If pathname already exists, and is a directory, error is returned.
 func makeFile(pathname string) error {
-	f, err := os.OpenFile(pathname, os.O_CREATE, os.FileMode(0644))
+	fStat, err := os.Stat(pathname)
+	// check if the path exists but as a directory
+	if fStat.Mode().IsDir() {
+		return fmt.Errorf("%s exisits and is a directory", pathname)
+	}
+	// TODO make "mode" a parameter for the function
+	const mode = os.FileMode(0644)
+	f, err := os.OpenFile(pathname, os.O_CREATE, mode)
 	if f != nil {
 		f.Close()
 	}
 	if err != nil {
 		if !os.IsExist(err) {
 			return err
+		}
+		// check if file that exists have the required permissions
+		if fStat.Mode() != mode {
+			return fmt.Errorf("%s exists and has wrong persmission, wanted %d", pathname, mode)
 		}
 	}
 	return nil
