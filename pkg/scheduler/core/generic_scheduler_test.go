@@ -37,12 +37,13 @@ import (
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	algorithmpredicates "k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
@@ -1852,8 +1853,8 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 		{
 			name: "No node should be attempted",
 			nodesStatuses: framework.NodeToStatusMap{
-				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrNodeSelectorNotMatch.GetReason()),
-				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrPodNotMatchHostName.GetReason()),
+				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeaffinity.ErrReason),
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, tainttoleration.ErrReasonNotMatch),
 				"machine4": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodelabel.ErrReasonPresenceViolated),
 			},
@@ -1863,7 +1864,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			name: "ErrReasonAffinityNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod affinity or anti-affinity",
 			nodesStatuses: framework.NodeToStatusMap{
 				"machine1": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAffinityNotMatch),
-				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrPodNotMatchHostName.GetReason()),
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 				"machine3": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnschedulable),
 			},
 			expected: map[string]bool{"machine1": true, "machine4": true},
@@ -1872,7 +1873,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			name: "pod with both pod affinity and anti-affinity should be tried",
 			nodesStatuses: framework.NodeToStatusMap{
 				"machine1": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAffinityNotMatch),
-				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrPodNotMatchHostName.GetReason()),
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 			},
 			expected: map[string]bool{"machine1": true, "machine3": true, "machine4": true},
 		},
@@ -1888,7 +1889,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			name: "Mix of failed predicates works fine",
 			nodesStatuses: framework.NodeToStatusMap{
 				"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumerestrictions.ErrReasonDiskConflict),
-				"machine2": framework.NewStatus(framework.Unschedulable, algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400).GetReason()),
+				"machine2": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Insufficient %v", v1.ResourceMemory)),
 			},
 			expected: map[string]bool{"machine2": true, "machine3": true, "machine4": true},
 		},
@@ -1912,7 +1913,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			name: "ErrTopologySpreadConstraintsNotMatch should be tried as it indicates that the pod is unschedulable due to topology spread constraints",
 			nodesStatuses: framework.NodeToStatusMap{
 				"machine1": framework.NewStatus(framework.Unschedulable, podtopologyspread.ErrReasonConstraintsNotMatch),
-				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, algorithmpredicates.ErrPodNotMatchHostName.GetReason()),
+				"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 				"machine3": framework.NewStatus(framework.Unschedulable, podtopologyspread.ErrReasonConstraintsNotMatch),
 			},
 			expected: map[string]bool{"machine1": true, "machine3": true, "machine4": true},
@@ -1955,9 +1956,9 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 
 func TestPreempt(t *testing.T) {
 	defaultFailedNodeToStatusMap := framework.NodeToStatusMap{
-		"machine1": framework.NewStatus(framework.Unschedulable, algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300).GetReason()),
+		"machine1": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Insufficient %v", v1.ResourceMemory)),
 		"machine2": framework.NewStatus(framework.Unschedulable, volumerestrictions.ErrReasonDiskConflict),
-		"machine3": framework.NewStatus(framework.Unschedulable, algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 600, 400).GetReason()),
+		"machine3": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Insufficient %v", v1.ResourceMemory)),
 	}
 	// Prepare 3 node names.
 	var defaultNodeNames []string

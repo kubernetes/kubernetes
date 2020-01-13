@@ -21,8 +21,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -32,8 +30,13 @@ type NodeName struct{}
 
 var _ framework.FilterPlugin = &NodeName{}
 
-// Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "NodeName"
+const (
+	// Name is the name of the plugin used in the plugin registry and configurations.
+	Name = "NodeName"
+
+	// ErrReason returned when node name doesn't match.
+	ErrReason = "node(s) didn't match the requested hostname"
+)
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodeName) Name() string {
@@ -42,8 +45,18 @@ func (pl *NodeName) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *NodeName) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
-	_, reasons, err := predicates.PodFitsHost(pod, nil, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
+	if nodeInfo.Node() == nil {
+		return framework.NewStatus(framework.Error, "node not found")
+	}
+	if !Fits(pod, nodeInfo) {
+		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason)
+	}
+	return nil
+}
+
+// Fits actually checks if the pod fits the node.
+func Fits(pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) bool {
+	return len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName == nodeInfo.Node().Name
 }
 
 // New initializes a new plugin and returns it.

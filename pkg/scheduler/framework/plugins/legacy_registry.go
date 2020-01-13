@@ -25,7 +25,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
@@ -86,6 +85,66 @@ const (
 	EvenPodsSpreadPriority = "EvenPodsSpreadPriority"
 )
 
+const (
+	// MatchInterPodAffinityPred defines the name of predicate MatchInterPodAffinity.
+	MatchInterPodAffinityPred = "MatchInterPodAffinity"
+	// CheckVolumeBindingPred defines the name of predicate CheckVolumeBinding.
+	CheckVolumeBindingPred = "CheckVolumeBinding"
+	// GeneralPred defines the name of predicate GeneralPredicates.
+	GeneralPred = "GeneralPredicates"
+	// HostNamePred defines the name of predicate HostName.
+	HostNamePred = "HostName"
+	// PodFitsHostPortsPred defines the name of predicate PodFitsHostPorts.
+	PodFitsHostPortsPred = "PodFitsHostPorts"
+	// MatchNodeSelectorPred defines the name of predicate MatchNodeSelector.
+	MatchNodeSelectorPred = "MatchNodeSelector"
+	// PodFitsResourcesPred defines the name of predicate PodFitsResources.
+	PodFitsResourcesPred = "PodFitsResources"
+	// NoDiskConflictPred defines the name of predicate NoDiskConflict.
+	NoDiskConflictPred = "NoDiskConflict"
+	// PodToleratesNodeTaintsPred defines the name of predicate PodToleratesNodeTaints.
+	PodToleratesNodeTaintsPred = "PodToleratesNodeTaints"
+	// CheckNodeUnschedulablePred defines the name of predicate CheckNodeUnschedulablePredicate.
+	CheckNodeUnschedulablePred = "CheckNodeUnschedulable"
+	// CheckNodeLabelPresencePred defines the name of predicate CheckNodeLabelPresence.
+	CheckNodeLabelPresencePred = "CheckNodeLabelPresence"
+	// CheckServiceAffinityPred defines the name of predicate checkServiceAffinity.
+	CheckServiceAffinityPred = "CheckServiceAffinity"
+	// MaxEBSVolumeCountPred defines the name of predicate MaxEBSVolumeCount.
+	// DEPRECATED
+	// All cloudprovider specific predicates are deprecated in favour of MaxCSIVolumeCountPred.
+	MaxEBSVolumeCountPred = "MaxEBSVolumeCount"
+	// MaxGCEPDVolumeCountPred defines the name of predicate MaxGCEPDVolumeCount.
+	// DEPRECATED
+	// All cloudprovider specific predicates are deprecated in favour of MaxCSIVolumeCountPred.
+	MaxGCEPDVolumeCountPred = "MaxGCEPDVolumeCount"
+	// MaxAzureDiskVolumeCountPred defines the name of predicate MaxAzureDiskVolumeCount.
+	// DEPRECATED
+	// All cloudprovider specific predicates are deprecated in favour of MaxCSIVolumeCountPred.
+	MaxAzureDiskVolumeCountPred = "MaxAzureDiskVolumeCount"
+	// MaxCinderVolumeCountPred defines the name of predicate MaxCinderDiskVolumeCount.
+	// DEPRECATED
+	// All cloudprovider specific predicates are deprecated in favour of MaxCSIVolumeCountPred.
+	MaxCinderVolumeCountPred = "MaxCinderVolumeCount"
+	// MaxCSIVolumeCountPred defines the predicate that decides how many CSI volumes should be attached.
+	MaxCSIVolumeCountPred = "MaxCSIVolumeCountPred"
+	// NoVolumeZoneConflictPred defines the name of predicate NoVolumeZoneConflict.
+	NoVolumeZoneConflictPred = "NoVolumeZoneConflict"
+	// EvenPodsSpreadPred defines the name of predicate EvenPodsSpread.
+	EvenPodsSpreadPred = "EvenPodsSpread"
+)
+
+// PredicateOrdering returns the ordering of predicate execution.
+func PredicateOrdering() []string {
+	return []string{CheckNodeUnschedulablePred,
+		GeneralPred, HostNamePred, PodFitsHostPortsPred,
+		MatchNodeSelectorPred, PodFitsResourcesPred, NoDiskConflictPred,
+		PodToleratesNodeTaintsPred, CheckNodeLabelPresencePred,
+		CheckServiceAffinityPred, MaxEBSVolumeCountPred, MaxGCEPDVolumeCountPred, MaxCSIVolumeCountPred,
+		MaxAzureDiskVolumeCountPred, MaxCinderVolumeCountPred, CheckVolumeBindingPred, NoVolumeZoneConflictPred,
+		EvenPodsSpreadPred, MatchInterPodAffinityPred}
+}
+
 // LegacyRegistry is used to store current state of registered predicates and priorities.
 type LegacyRegistry struct {
 	// maps that associate predicates/priorities with framework plugin configurations.
@@ -127,23 +186,23 @@ func NewLegacyRegistry() *LegacyRegistry {
 		// MandatoryPredicates the set of keys for predicates that the scheduler will
 		// be configured with all the time.
 		MandatoryPredicates: sets.NewString(
-			predicates.PodToleratesNodeTaintsPred,
-			predicates.CheckNodeUnschedulablePred,
+			PodToleratesNodeTaintsPred,
+			CheckNodeUnschedulablePred,
 		),
 
 		// Used as the default set of predicates if Policy was specified, but predicates was nil.
 		DefaultPredicates: sets.NewString(
-			predicates.NoVolumeZoneConflictPred,
-			predicates.MaxEBSVolumeCountPred,
-			predicates.MaxGCEPDVolumeCountPred,
-			predicates.MaxAzureDiskVolumeCountPred,
-			predicates.MaxCSIVolumeCountPred,
-			predicates.MatchInterPodAffinityPred,
-			predicates.NoDiskConflictPred,
-			predicates.GeneralPred,
-			predicates.PodToleratesNodeTaintsPred,
-			predicates.CheckVolumeBindingPred,
-			predicates.CheckNodeUnschedulablePred,
+			NoVolumeZoneConflictPred,
+			MaxEBSVolumeCountPred,
+			MaxGCEPDVolumeCountPred,
+			MaxAzureDiskVolumeCountPred,
+			MaxCSIVolumeCountPred,
+			MatchInterPodAffinityPred,
+			NoDiskConflictPred,
+			GeneralPred,
+			PodToleratesNodeTaintsPred,
+			CheckVolumeBindingPred,
+			CheckNodeUnschedulablePred,
 		),
 
 		// Used as the default set of predicates if Policy was specified, but priorities was nil.
@@ -162,7 +221,7 @@ func NewLegacyRegistry() *LegacyRegistry {
 		PriorityToConfigProducer:  make(map[string]ConfigProducer),
 	}
 
-	registry.registerPredicateConfigProducer(predicates.GeneralPred,
+	registry.registerPredicateConfigProducer(GeneralPred,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			// GeneralPredicate is a combination of predicates.
 			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.FitName, nil)
@@ -174,92 +233,92 @@ func NewLegacyRegistry() *LegacyRegistry {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodeaffinity.Name, nil)
 			return
 		})
-	registry.registerPredicateConfigProducer(predicates.PodToleratesNodeTaintsPred,
+	registry.registerPredicateConfigProducer(PodToleratesNodeTaintsPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, tainttoleration.Name, nil)
 			return
 		})
-	registry.registerPredicateConfigProducer(predicates.PodFitsResourcesPred,
+	registry.registerPredicateConfigProducer(PodFitsResourcesPred,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.FitName, nil)
 			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, noderesources.FitName, nil)
 			pluginConfig = append(pluginConfig, makePluginConfig(noderesources.FitName, args.NodeResourcesFitArgs))
 			return
 		})
-	registry.registerPredicateConfigProducer(predicates.HostNamePred,
+	registry.registerPredicateConfigProducer(HostNamePred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodename.Name, nil)
 			return
 		})
-	registry.registerPredicateConfigProducer(predicates.PodFitsHostPortsPred,
+	registry.registerPredicateConfigProducer(PodFitsHostPortsPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodeports.Name, nil)
 			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, nodeports.Name, nil)
 			return
 		})
-	registry.registerPredicateConfigProducer(predicates.MatchNodeSelectorPred,
+	registry.registerPredicateConfigProducer(MatchNodeSelectorPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodeaffinity.Name, nil)
 			return
 		})
-	registry.registerPredicateConfigProducer(predicates.CheckNodeUnschedulablePred,
+	registry.registerPredicateConfigProducer(CheckNodeUnschedulablePred,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodeunschedulable.Name, nil)
 			return
 		})
-	registry.registerPredicateConfigProducer(predicates.CheckVolumeBindingPred,
+	registry.registerPredicateConfigProducer(CheckVolumeBindingPred,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, volumebinding.Name, nil)
 			return
 		})
-	registry.registerPredicateConfigProducer(predicates.NoDiskConflictPred,
+	registry.registerPredicateConfigProducer(NoDiskConflictPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, volumerestrictions.Name, nil)
 			return
 		})
-	registry.registerPredicateConfigProducer(predicates.NoVolumeZoneConflictPred,
+	registry.registerPredicateConfigProducer(NoVolumeZoneConflictPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, volumezone.Name, nil)
 			return
 		})
-	registry.registerPredicateConfigProducer(predicates.MaxCSIVolumeCountPred,
+	registry.registerPredicateConfigProducer(MaxCSIVolumeCountPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodevolumelimits.CSIName, nil)
 			return
 		})
-	registry.registerPredicateConfigProducer(predicates.MaxEBSVolumeCountPred,
+	registry.registerPredicateConfigProducer(MaxEBSVolumeCountPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodevolumelimits.EBSName, nil)
 			return
 		})
-	registry.registerPredicateConfigProducer(predicates.MaxGCEPDVolumeCountPred,
+	registry.registerPredicateConfigProducer(MaxGCEPDVolumeCountPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodevolumelimits.GCEPDName, nil)
 			return
 		})
-	registry.registerPredicateConfigProducer(predicates.MaxAzureDiskVolumeCountPred,
+	registry.registerPredicateConfigProducer(MaxAzureDiskVolumeCountPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodevolumelimits.AzureDiskName, nil)
 			return
 		})
-	registry.registerPredicateConfigProducer(predicates.MaxCinderVolumeCountPred,
+	registry.registerPredicateConfigProducer(MaxCinderVolumeCountPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodevolumelimits.CinderName, nil)
 			return
 		})
-	registry.registerPredicateConfigProducer(predicates.MatchInterPodAffinityPred,
+	registry.registerPredicateConfigProducer(MatchInterPodAffinityPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, interpodaffinity.Name, nil)
 			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, interpodaffinity.Name, nil)
 			return
 		})
-	registry.registerPredicateConfigProducer(predicates.CheckNodeLabelPresencePred,
+	registry.registerPredicateConfigProducer(CheckNodeLabelPresencePred,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodelabel.Name, nil)
 			pluginConfig = append(pluginConfig, makePluginConfig(nodelabel.Name, args.NodeLabelArgs))
 			return
 		})
-	registry.registerPredicateConfigProducer(predicates.CheckServiceAffinityPred,
+	registry.registerPredicateConfigProducer(CheckServiceAffinityPred,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, serviceaffinity.Name, nil)
 			pluginConfig = append(pluginConfig, makePluginConfig(serviceaffinity.Name, args.ServiceAffinityArgs))
@@ -351,13 +410,13 @@ func NewLegacyRegistry() *LegacyRegistry {
 	if utilfeature.DefaultFeatureGate.Enabled(features.EvenPodsSpread) {
 		klog.Infof("Registering EvenPodsSpread predicate and priority function")
 
-		registry.registerPredicateConfigProducer(predicates.EvenPodsSpreadPred,
+		registry.registerPredicateConfigProducer(EvenPodsSpreadPred,
 			func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 				plugins.PreFilter = appendToPluginSet(plugins.PreFilter, podtopologyspread.Name, nil)
 				plugins.Filter = appendToPluginSet(plugins.Filter, podtopologyspread.Name, nil)
 				return
 			})
-		registry.DefaultPredicates.Insert(predicates.EvenPodsSpreadPred)
+		registry.DefaultPredicates.Insert(EvenPodsSpreadPred)
 
 		registry.registerPriorityConfigProducer(EvenPodsSpreadPriority,
 			func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
@@ -433,7 +492,7 @@ func (lr *LegacyRegistry) ProcessPredicatePolicy(policy config.PredicatePolicy, 
 	predicateName := policy.Name
 	if policy.Name == "PodFitsPorts" {
 		// For compatibility reasons, "PodFitsPorts" as a key is still supported.
-		predicateName = predicates.PodFitsHostPortsPred
+		predicateName = PodFitsHostPortsPred
 	}
 
 	if _, ok := lr.PredicateToConfigProducer[predicateName]; ok {
@@ -458,7 +517,7 @@ func (lr *LegacyRegistry) ProcessPredicatePolicy(policy config.PredicatePolicy, 
 		// We use the ServiceAffinity predicate name for all ServiceAffinity custom predicates.
 		// It may get called multiple times but we essentially only register one instance of ServiceAffinity predicate.
 		// This name is then used to find the registered plugin and run the plugin instead of the predicate.
-		predicateName = predicates.CheckServiceAffinityPred
+		predicateName = CheckServiceAffinityPred
 	}
 
 	if policy.Argument.LabelsPresence != nil {
@@ -475,7 +534,7 @@ func (lr *LegacyRegistry) ProcessPredicatePolicy(policy config.PredicatePolicy, 
 		// We use the CheckNodeLabelPresencePred predicate name for all kNodeLabel custom predicates.
 		// It may get called multiple times but we essentially only register one instance of NodeLabel predicate.
 		// This name is then used to find the registered plugin and run the plugin instead of the predicate.
-		predicateName = predicates.CheckNodeLabelPresencePred
+		predicateName = CheckNodeLabelPresencePred
 
 	}
 	return predicateName

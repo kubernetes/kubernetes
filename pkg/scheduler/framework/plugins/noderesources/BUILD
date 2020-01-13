@@ -17,9 +17,7 @@ go_library(
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
-        "//pkg/scheduler/framework/plugins/migration:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/scheduler/util:go_default_library",
@@ -61,7 +59,6 @@ go_test(
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/scheduler/nodeinfo/snapshot:go_default_library",
