@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -87,7 +88,7 @@ func (t *SysctlUpgradeTest) verifySafeSysctlWork(f *framework.Framework) *v1.Pod
 	ev, err := f.PodClient().WaitForErrorEventOrSuccess(t.validPod)
 	framework.ExpectNoError(err)
 	if ev != nil && ev.Reason == sysctl.UnsupportedReason {
-		framework.Skipf("No sysctl support in Docker <1.12")
+		e2eskipper.Skipf("No sysctl support in Docker <1.12")
 	}
 	f.TestContainerOutput("pod with safe sysctl launched", t.validPod, 0, []string{fmt.Sprintf("%s = %s", safeSysctl, safeSysctlValue)})
 
@@ -105,7 +106,7 @@ func (t *SysctlUpgradeTest) verifyUnsafeSysctlsAreRejected(f *framework.Framewor
 	ev, err := f.PodClient().WaitForErrorEventOrSuccess(invalidPod)
 	framework.ExpectNoError(err)
 	if ev != nil && ev.Reason == sysctl.UnsupportedReason {
-		framework.Skipf("No sysctl support in Docker <1.12")
+		e2eskipper.Skipf("No sysctl support in Docker <1.12")
 	}
 	framework.ExpectEqual(ev.Reason, sysctl.ForbiddenReason)
 
