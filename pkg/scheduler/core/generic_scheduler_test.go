@@ -58,7 +58,6 @@ import (
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -293,7 +292,7 @@ func (pl *falseMapPlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
-var emptySnapshot = nodeinfosnapshot.NewEmptySnapshot()
+var emptySnapshot = internalcache.NewEmptySnapshot()
 
 func makeNodeList(nodeNames []string) []*v1.Node {
 	result := make([]*v1.Node, 0, len(nodeNames))
@@ -796,7 +795,7 @@ func TestGenericScheduler(t *testing.T) {
 			for _, f := range test.registerPlugins {
 				f(&registry, plugins, pluginConfigs)
 			}
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
+			snapshot := internalcache.NewSnapshot(test.pods, nodes)
 			fwk, _ := framework.NewFramework(registry, plugins, pluginConfigs, framework.WithSnapshotSharedLister(snapshot))
 
 			var pvcs []v1.PersistentVolumeClaim
@@ -855,7 +854,7 @@ func makeScheduler(nodes []*v1.Node, fns ...st.RegisterPluginFunc) *genericSched
 		fwk,
 		nil, nil, nil, nil, false,
 		schedulerapi.DefaultPercentageOfNodesToScore, false)
-	cache.UpdateNodeInfoSnapshot(s.(*genericScheduler).nodeInfoSnapshot)
+	cache.UpdateSnapshot(s.(*genericScheduler).nodeInfoSnapshot)
 	return s.(*genericScheduler)
 
 }
@@ -984,7 +983,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			fwk,
 			nil, nil, nil, nil, false,
 			schedulerapi.DefaultPercentageOfNodesToScore, false).(*genericScheduler)
-		cache.UpdateNodeInfoSnapshot(scheduler.nodeInfoSnapshot)
+		cache.UpdateSnapshot(scheduler.nodeInfoSnapshot)
 		queue.UpdateNominatedPodForNode(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("nominated")}, Spec: v1.PodSpec{Priority: &midPriority}}, "1")
 
 		_, _, err := scheduler.findNodesThatFitPod(context.Background(), framework.NewCycleState(), test.pod)
@@ -1115,7 +1114,7 @@ func TestZeroRequest(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, test.nodes))
+			snapshot := internalcache.NewSnapshot(test.pods, test.nodes)
 
 			registry := framework.Registry{}
 			// TODO: instantiate the plugins dynamically.
@@ -1604,7 +1603,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				f(&registry, plugins, pluginConfigs)
 			}
 			// Use a real snapshot since it's needed in some Filter Plugin (e.g., PodAffinity)
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
+			snapshot := internalcache.NewSnapshot(test.pods, nodes)
 			fwk, _ := framework.NewFramework(registry, plugins, pluginConfigs, framework.WithSnapshotSharedLister(snapshot))
 
 			scheduler := NewGenericScheduler(
@@ -1880,7 +1879,7 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			for _, n := range test.nodes {
 				nodes = append(nodes, makeNode(n, schedutil.DefaultMilliCPURequest*5, schedutil.DefaultMemoryRequest*5))
 			}
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
+			snapshot := internalcache.NewSnapshot(test.pods, nodes)
 			registry := framework.Registry{}
 			// TODO: instantiate the plugins dynamically.
 			plugins := &schedulerapi.Plugins{
@@ -2393,7 +2392,7 @@ func TestPreempt(t *testing.T) {
 			for _, f := range test.registerPlugins {
 				f(&registry, plugins, pluginConfigs)
 			}
-			snapshot := nodeinfosnapshot.NewSnapshot(nodeinfosnapshot.CreateNodeInfoMap(test.pods, nodes))
+			snapshot := internalcache.NewSnapshot(test.pods, nodes)
 			fwk, _ := framework.NewFramework(registry, plugins, pluginConfigs, framework.WithSnapshotSharedLister(snapshot))
 
 			scheduler := NewGenericScheduler(
@@ -2555,7 +2554,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 	}
 }
 
-func nodesToNodeInfos(nodes []*v1.Node, snapshot *nodeinfosnapshot.Snapshot) ([]*schedulernodeinfo.NodeInfo, error) {
+func nodesToNodeInfos(nodes []*v1.Node, snapshot *internalcache.Snapshot) ([]*schedulernodeinfo.NodeInfo, error) {
 	var nodeInfos []*schedulernodeinfo.NodeInfo
 	for _, n := range nodes {
 		nodeInfo, err := snapshot.NodeInfos().Get(n.Name)

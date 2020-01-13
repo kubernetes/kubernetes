@@ -36,8 +36,8 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
-	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -174,7 +174,7 @@ func newDefaultFramework() framework.Framework {
 		pls,
 		framework.WithClientSet(fakeClient),
 		framework.WithInformerFactory(informers.NewSharedInformerFactory(fakeClient, 0)),
-		framework.WithSnapshotSharedLister(nodeinfosnapshot.NewEmptySnapshot()),
+		framework.WithSnapshotSharedLister(cache.NewEmptySnapshot()),
 	)
 	if err != nil {
 		panic(err)
