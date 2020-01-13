@@ -42,3 +42,15 @@ func AddToScheme(scheme *runtime.Scheme) {
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(scheme.SetVersionPriority(v1alpha1.SchemeGroupVersion))
 }
+
+func NewSchemeAndCodecs(mutators ...serializer.CodecFactoryOptionsMutator) (*runtime.Scheme, *serializer.CodecFactory, error) {
+	scheme := runtime.NewScheme()
+	if err := config.AddToScheme(scheme); err != nil {
+		return nil, nil, err
+	}
+	if err := v1alpha1.AddToScheme(scheme); err != nil {
+		return nil, nil, err
+	}
+	codecs := serializer.NewCodecFactory(scheme, mutators...)
+	return scheme, &codecs, nil
+}
