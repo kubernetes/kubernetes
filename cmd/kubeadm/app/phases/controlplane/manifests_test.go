@@ -51,7 +51,10 @@ func TestGetStaticPodSpecs(t *testing.T) {
 	}
 
 	// Executes GetStaticPodSpecs
-	specs := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{})
+	specs, err := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{})
+	if err != nil {
+		t.Errorf("unable to get static pod specs")
+	}
 
 	var tests = []struct {
 		name          string

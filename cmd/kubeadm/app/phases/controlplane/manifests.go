@@ -44,9 +44,12 @@ func CreateInitStaticPodManifestFiles(manifestDir, kustomizeDir string, cfg *kub
 
 // GetStaticPodSpecs returns all staticPodSpecs actualized to the context of the current configuration
 // NB. this methods holds the information about how kubeadm creates static pod manifests.
-func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint) map[string]v1.Pod {
+func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint) (map[string]v1.Pod, error) {
 	// Get the required hostpath mounts
-	mounts := getHostPathVolumesForTheControlPlane(cfg)
+	mounts, err := getHostPathVolumesForTheControlPlane(cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	// Prepare static pod specs
 	staticPodSpecs := map[string]v1.Pod{
@@ -81,14 +84,17 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			Env:             kubeadmutil.GetProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeScheduler)),
 	}
-	return staticPodSpecs
+	return staticPodSpecs, nil
 }
 
 // CreateStaticPodFiles creates all the requested static pod files.
 func CreateStaticPodFiles(manifestDir, kustomizeDir string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, componentNames ...string) error {
 	// gets the StaticPodSpecs, actualized for the current ClusterConfiguration
 	klog.V(1).Infoln("[control-plane] getting StaticPodSpecs")
-	specs := GetStaticPodSpecs(cfg, endpoint)
+	specs, err := GetStaticPodSpecs(cfg, endpoint)
+	if err != nil {
+		return err
+	}
 
 	// creates required static pod specs
 	for _, componentName := range componentNames {

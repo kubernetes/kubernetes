@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -42,7 +43,7 @@ const (
 var caCertsExtraVolumePaths = []string{"/etc/pki", "/usr/share/ca-certificates", "/usr/local/share/ca-certificates", "/etc/ca-certificates"}
 
 // getHostPathVolumesForTheControlPlane gets the required hostPath volumes and mounts for the control plane
-func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.ClusterConfiguration) controlPlaneHostPathMounts {
+func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.ClusterConfiguration) (controlPlaneHostPathMounts, error) {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
 	hostPathFileOrCreate := v1.HostPathFileOrCreate
 	mounts := newControlPlaneHostPathMounts()
@@ -75,6 +76,11 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.ClusterConfiguration) 
 	if !ok {
 		flexvolumeDirVolumePath = defaultFlexvolumeDirVolumePath
 	}
+
+	// The flex volume dir mount needs to be write-able by the controller manager
+	if err := os.MkdirAll(flexvolumeDirVolumeName, 0o755); err != nil {
+		return mounts, errors.Wrapf(err, "unable to create necessary flex volume dir mount")
+	}
 	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, flexvolumeDirVolumeName, flexvolumeDirVolumePath, flexvolumeDirVolumePath, false, &hostPathDirectoryOrCreate)
 
 	// HostPath volumes for the scheduler
@@ -98,7 +104,7 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.ClusterConfiguration) 
 	mounts.AddExtraHostPathMounts(kubeadmconstants.KubeControllerManager, cfg.ControllerManager.ExtraVolumes)
 	mounts.AddExtraHostPathMounts(kubeadmconstants.KubeScheduler, cfg.Scheduler.ExtraVolumes)
 
-	return mounts
+	return mounts, nil
 }
 
 // controlPlaneHostPathMounts is a helper struct for handling all the control plane's hostPath mounts in an easy way

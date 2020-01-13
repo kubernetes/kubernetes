@@ -518,7 +518,10 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			mounts := getHostPathVolumesForTheControlPlane(rt.cfg)
+			mounts, err := getHostPathVolumesForTheControlPlane(rt.cfg)
+			if err != nil {
+				t.Fatalf("Couldn't get host path volumes for the control plane")
+			}
 
 			// Avoid unit test errors when the flexvolume is mounted
 			delete(mounts.volumes[kubeadmconstants.KubeControllerManager], flexvolumeDirVolumeName)
