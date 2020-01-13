@@ -27,8 +27,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
+	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/apiserver/pkg/util/apihelpers"
-	fcboot "k8s.io/apiserver/pkg/util/flowcontrol/bootstrap"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	"k8s.io/apiserver/pkg/util/shufflesharding"
@@ -218,16 +218,16 @@ func (reqMgr *requestManager) digestConfigObjects(newPLs []*rmtypesv1a1.Priority
 	}
 
 	if !haveExemptPL {
-		newRMState.imaginePL(0, reqMgr.requestWaitLimit, &shareSum)
+		newRMState.imaginePL(fcboot.MandatoryPriorityLevelConfigurationExempt, reqMgr.requestWaitLimit, &shareSum)
 	}
 	if !haveCatchAllPL {
-		newRMState.imaginePL(1, reqMgr.requestWaitLimit, &shareSum)
+		newRMState.imaginePL(fcboot.MandatoryPriorityLevelConfigurationCatchAll, reqMgr.requestWaitLimit, &shareSum)
 	}
 	if !haveExemptFS {
-		fsSeq = append(apihelpers.FlowSchemaSequence{fcboot.NewFSAllGroups(rmtypesv1a1.FlowSchemaNameExempt, rmtypesv1a1.PriorityLevelConfigurationNameExempt, 0, "", user.SystemPrivilegedGroup)}, fsSeq...)
+		fsSeq = append(apihelpers.FlowSchemaSequence{fcboot.NewFSAllGroups(rmtypesv1a1.FlowSchemaNameExempt, rmtypesv1a1.PriorityLevelConfigurationNameExempt, 1, "", user.SystemPrivilegedGroup)}, fsSeq...)
 	}
 	if !haveCatchAllFS {
-		fsSeq = append(fsSeq, fcboot.NewFSAllGroups(rmtypesv1a1.FlowSchemaNameCatchAll, rmtypesv1a1.PriorityLevelConfigurationNameCatchAll, math.MaxInt32, rmtypesv1a1.FlowDistinguisherMethodByUserType, user.AllAuthenticated, user.AllUnauthenticated))
+		fsSeq = append(fsSeq, fcboot.NewFSAllGroups(rmtypesv1a1.FlowSchemaNameCatchAll, rmtypesv1a1.PriorityLevelConfigurationNameCatchAll, rmtypesv1a1.FlowSchemaMaxMatchingPrecedence, rmtypesv1a1.FlowDistinguisherMethodByUserType, user.AllUnauthenticated, user.AllAuthenticated))
 	}
 
 	newRMState.flowSchemas = fsSeq
@@ -308,8 +308,7 @@ func (reqMgr *requestManager) syncFlowSchemaStatus(fs *rmtypesv1a1.FlowSchema, i
 	}
 }
 
-func (newRMState *requestManagerState) imaginePL(protoIdx int, requestWaitLimit time.Duration, shareSum *float64) {
-	proto := fcboot.InitialPriorityLevelConfigurations[protoIdx]
+func (newRMState *requestManagerState) imaginePL(proto *rmtypesv1a1.PriorityLevelConfiguration, requestWaitLimit time.Duration, shareSum *float64) {
 	klog.Warningf("No %s PriorityLevelConfiguration found, imagining one", proto.Name)
 	qsConfig, err := qscOfPL(proto, requestWaitLimit)
 	if err != nil {

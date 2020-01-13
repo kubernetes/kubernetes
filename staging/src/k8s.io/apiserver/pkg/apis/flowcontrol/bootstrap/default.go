@@ -100,54 +100,21 @@ var (
 // Mandatory FlowSchema objects
 var (
 	// exempt priority-level
-	MandatoryFlowSchemaExempt = newFlowSchema(
+	MandatoryFlowSchemaExempt = NewFSAllGroups(
 		"exempt",
 		flowcontrol.PriorityLevelConfigurationNameExempt,
-		1,  // matchingPrecedence
-		"", // distinguisherMethodType
-		flowcontrol.PolicyRulesWithSubjects{
-			Subjects: groups(user.SystemPrivilegedGroup),
-			ResourceRules: []flowcontrol.ResourcePolicyRule{
-				resourceRule(
-					[]string{flowcontrol.VerbAll},
-					[]string{flowcontrol.APIGroupAll},
-					[]string{flowcontrol.ResourceAll},
-					[]string{flowcontrol.NamespaceEvery},
-					true,
-				),
-			},
-			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
-				nonResourceRule(
-					[]string{flowcontrol.VerbAll},
-					[]string{flowcontrol.NonResourceAll},
-				),
-			},
-		},
+		1,                          // matchingPrecedence
+		"",                         // distinguisherMethodType
+		user.SystemPrivilegedGroup, // group name
 	)
 	// catch-all priority-level
-	MandatoryFlowSchemaCatchAll = newFlowSchema(
+	MandatoryFlowSchemaCatchAll = NewFSAllGroups(
 		"catch-all",
 		"catch-all",
 		10000, // matchingPrecedence
 		flowcontrol.FlowDistinguisherMethodByUserType, // distinguisherMethodType
-		flowcontrol.PolicyRulesWithSubjects{
-			Subjects: groups(user.AllUnauthenticated, user.AllAuthenticated),
-			ResourceRules: []flowcontrol.ResourcePolicyRule{
-				resourceRule(
-					[]string{flowcontrol.VerbAll},
-					[]string{flowcontrol.APIGroupAll},
-					[]string{flowcontrol.ResourceAll},
-					[]string{flowcontrol.NamespaceEvery},
-					true,
-				),
-			},
-			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
-				nonResourceRule(
-					[]string{flowcontrol.VerbAll},
-					[]string{flowcontrol.NonResourceAll},
-				),
-			},
-		},
+		user.AllUnauthenticated,                       // group name
+		user.AllAuthenticated,                         // group name
 	)
 )
 
@@ -225,23 +192,10 @@ var (
 
 // Suggested FlowSchema objects
 var (
-	SuggestedFlowSchemaSystemNodes = newFlowSchema(
+	SuggestedFlowSchemaSystemNodes = NewFSAllGroups(
 		"system-nodes", "system", 500,
 		flowcontrol.FlowDistinguisherMethodByUserType,
-		flowcontrol.PolicyRulesWithSubjects{
-			Subjects: groups(user.NodesGroup), // the nodes group
-			ResourceRules: []flowcontrol.ResourcePolicyRule{resourceRule(
-				[]string{flowcontrol.VerbAll},
-				[]string{flowcontrol.APIGroupAll},
-				[]string{flowcontrol.ResourceAll},
-				[]string{flowcontrol.NamespaceEvery},
-				true)},
-			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
-				nonResourceRule(
-					[]string{flowcontrol.VerbAll},
-					[]string{flowcontrol.NonResourceAll}),
-			},
-		},
+		user.NodesGroup, // the nodes group
 	)
 	SuggestedFlowSchemaSystemLeaderElection = newFlowSchema(
 		"system-leader-election", "leader-election", 100,
@@ -287,79 +241,49 @@ var (
 			},
 		},
 	)
-	SuggestedFlowSchemaKubeControllerManager = newFlowSchema(
+	SuggestedFlowSchemaKubeControllerManager = NewFSAllUsers(
 		"kube-controller-manager", "workload-high", 800,
 		flowcontrol.FlowDistinguisherMethodByNamespaceType,
-		flowcontrol.PolicyRulesWithSubjects{
-			Subjects: users(user.KubeControllerManager),
-			ResourceRules: []flowcontrol.ResourcePolicyRule{resourceRule(
-				[]string{flowcontrol.VerbAll},
-				[]string{flowcontrol.APIGroupAll},
-				[]string{flowcontrol.ResourceAll},
-				[]string{flowcontrol.NamespaceEvery},
-				true)},
-			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
-				nonResourceRule(
-					[]string{flowcontrol.VerbAll},
-					[]string{flowcontrol.NonResourceAll}),
-			},
-		},
+		user.KubeControllerManager, // username
 	)
-	SuggestedFlowSchemaKubeScheduler = newFlowSchema(
+	SuggestedFlowSchemaKubeScheduler = NewFSAllUsers(
 		"kube-scheduler", "workload-high", 800,
 		flowcontrol.FlowDistinguisherMethodByNamespaceType,
-		flowcontrol.PolicyRulesWithSubjects{
-			Subjects: users(user.KubeScheduler),
-			ResourceRules: []flowcontrol.ResourcePolicyRule{resourceRule(
-				[]string{flowcontrol.VerbAll},
-				[]string{flowcontrol.APIGroupAll},
-				[]string{flowcontrol.ResourceAll},
-				[]string{flowcontrol.NamespaceEvery},
-				true)},
-			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
-				nonResourceRule(
-					[]string{flowcontrol.VerbAll},
-					[]string{flowcontrol.NonResourceAll}),
-			},
-		},
+		user.KubeScheduler, // username
 	)
-	SuggestedFlowSchemaKubeSystemServiceAccounts = newFlowSchema(
+	SuggestedFlowSchemaKubeSystemServiceAccounts = NewFSAll(
 		"kube-system-service-accounts", "workload-high", 900,
 		flowcontrol.FlowDistinguisherMethodByNamespaceType,
-		flowcontrol.PolicyRulesWithSubjects{
-			Subjects: kubeSystemServiceAccount(flowcontrol.NameAll),
-			ResourceRules: []flowcontrol.ResourcePolicyRule{resourceRule(
-				[]string{flowcontrol.VerbAll},
-				[]string{flowcontrol.APIGroupAll},
-				[]string{flowcontrol.ResourceAll},
-				[]string{flowcontrol.NamespaceEvery},
-				true)},
-			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
-				nonResourceRule(
-					[]string{flowcontrol.VerbAll},
-					[]string{flowcontrol.NonResourceAll}),
-			},
-		},
+		kubeSystemServiceAccount(flowcontrol.NameAll)...,
 	)
-	SuggestedFlowSchemaServiceAccounts = newFlowSchema(
+	SuggestedFlowSchemaServiceAccounts = NewFSAllGroups(
 		"service-accounts", "workload-low", 9000,
 		flowcontrol.FlowDistinguisherMethodByUserType,
-		flowcontrol.PolicyRulesWithSubjects{
-			Subjects: groups(serviceaccount.AllServiceAccountsGroup),
-			ResourceRules: []flowcontrol.ResourcePolicyRule{resourceRule(
-				[]string{flowcontrol.VerbAll},
-				[]string{flowcontrol.APIGroupAll},
-				[]string{flowcontrol.ResourceAll},
-				[]string{flowcontrol.NamespaceEvery},
-				true)},
-			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
-				nonResourceRule(
-					[]string{flowcontrol.VerbAll},
-					[]string{flowcontrol.NonResourceAll}),
-			},
-		},
+		serviceaccount.AllServiceAccountsGroup, // group name
 	)
 )
+
+// NewFSAllUsers constructs a FlowSchema that matches the given subjects regardless of verb and target.
+// The subjects are usernames.
+func NewFSAllUsers(name, plName string, matchingPrecedence int32, dmType flowcontrol.FlowDistinguisherMethodType, userNames ...string) *flowcontrol.FlowSchema {
+	return NewFSAll(name, plName, matchingPrecedence, dmType, users(userNames...)...)
+}
+
+// NewFSAllGroups constructs a FlowSchema that matches the given subjects regardless of verb and target.
+// The subjects are user group names.
+func NewFSAllGroups(name, plName string, matchingPrecedence int32, dmType flowcontrol.FlowDistinguisherMethodType, groupNames ...string) *flowcontrol.FlowSchema {
+	return NewFSAll(name, plName, matchingPrecedence, dmType, groups(groupNames...)...)
+}
+
+// NewFSAll constructs a FlowSchema that matches the given subjects regardless of verb and target object
+func NewFSAll(name, plName string, matchingPrecedence int32, dmType flowcontrol.FlowDistinguisherMethodType, subjects ...flowcontrol.Subject) *flowcontrol.FlowSchema {
+	return newFlowSchema(name, plName, matchingPrecedence, dmType,
+		flowcontrol.PolicyRulesWithSubjects{
+			Subjects:         subjects,
+			ResourceRules:    ruleRscAll,
+			NonResourceRules: ruleNonRscAll},
+	)
+}
 
 func newPriorityLevelConfiguration(name string, spec flowcontrol.PriorityLevelConfigurationSpec) *flowcontrol.PriorityLevelConfiguration {
 	return &flowcontrol.PriorityLevelConfiguration{
