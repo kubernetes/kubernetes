@@ -358,7 +358,3 @@ func resourceRule(verbs []string, groups []string, resources []string, namespace
 		ClusterScope: clusterScoped,
 	}
 }
-
-func nonResourceRule(verbs []string, nonResourceURLs []string) flowcontrol.NonResourcePolicyRule {
-	return flowcontrol.NonResourcePolicyRule{Verbs: verbs, NonResourceURLs: nonResourceURLs}
-}

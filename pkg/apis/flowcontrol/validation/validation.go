@@ -32,6 +32,38 @@ import (
 	"k8s.io/kubernetes/pkg/apis/flowcontrol/internalbootstrap"
 )
 
+var mandatoryFlowSchemas = make(map[string]*flowcontrol.FlowSchemaSpec)
+var mandatoryPriorityLevels = make(map[string]*flowcontrol.PriorityLevelConfigurationSpec)
+
+func init() {
+	converter := install.GetTheScheme().Converter()
+	specPath := field.NewPath("spec")
+	for _, fsTyped := range bootstrap.MandatoryFlowSchemas {
+		var specUntyped flowcontrol.FlowSchemaSpec
+		err := converter.Convert(&fsTyped.Spec, &specUntyped, 0, &conversion.Meta{})
+		if err != nil {
+			panic(err)
+		}
+		errs := ValidateFlowSchemaSpec(fsTyped.Name, &specUntyped, specPath)
+		if len(errs) != 0 {
+			panic(errs)
+		}
+		mandatoryFlowSchemas[fsTyped.Name] = &specUntyped
+	}
+	for _, plTyped := range bootstrap.MandatoryPriorityLevelConfigurations {
+		var specUntyped flowcontrol.PriorityLevelConfigurationSpec
+		err := converter.Convert(&plTyped.Spec, &specUntyped, 0, &conversion.Meta{})
+		if err != nil {
+			panic(err)
+		}
+		errs := ValidatePriorityLevelConfigurationSpec(&specUntyped, plTyped.Name, specPath)
+		if len(errs) != 0 {
+			panic(errs)
+		}
+		mandatoryPriorityLevels[plTyped.Name] = &specUntyped
+	}
+}
+
 // ValidateFlowSchemaName validates name for flow-schema.
 var ValidateFlowSchemaName = apimachineryvalidation.NameIsDNSSubdomain
 
@@ -76,6 +108,7 @@ var supportedLimitResponseType = sets.NewString(
 // ValidateFlowSchema validates the content of flow-schema
 func ValidateFlowSchema(fs *flowcontrol.FlowSchema) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&fs.ObjectMeta, false, ValidateFlowSchemaName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateFlowSchemaStatus(&fs.Status, field.NewPath("status"))...)
 	specPath := field.NewPath("spec")
 	allErrs = append(allErrs, ValidateFlowSchemaSpec(fs.Name, &fs.Spec, specPath)...)
 	if mand, ok := internalbootstrap.MandatoryFlowSchemas[fs.Name]; ok {
@@ -87,7 +120,7 @@ func ValidateFlowSchema(fs *flowcontrol.FlowSchema) field.ErrorList {
 			allErrs = append(allErrs, field.Invalid(specPath, fs.Spec, fmt.Sprintf("spec of '%s' must equal the fixed value", fs.Name)))
 		}
 	}
-	allErrs = append(allErrs, ValidateFlowSchemaStatus(&fs.Status, field.NewPath("status"))...)
+	allErrs = append(allErrs, ValidateFlowSchemaSpec(fs.Name, &fs.Spec, specPath)...)
 	return allErrs
 }
 
@@ -344,6 +377,7 @@ func ValidateFlowSchemaCondition(condition *flowcontrol.FlowSchemaCondition, fld
 // ValidatePriorityLevelConfiguration validates priority-level-configuration.
 func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfiguration) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&pl.ObjectMeta, false, ValidatePriorityLevelConfigurationName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidatePriorityLevelConfigurationStatus(&pl.Status, field.NewPath("status"))...)
 	specPath := field.NewPath("spec")
 	allErrs = append(allErrs, ValidatePriorityLevelConfigurationSpec(&pl.Spec, pl.Name, specPath)...)
 	if mand, ok := internalbootstrap.MandatoryPriorityLevelConfigurations[pl.Name]; ok {
@@ -355,7 +389,7 @@ func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfigurati
 			allErrs = append(allErrs, field.Invalid(specPath, pl.Spec, fmt.Sprintf("spec of '%s' must equal the fixed value", pl.Name)))
 		}
 	}
-	allErrs = append(allErrs, ValidatePriorityLevelConfigurationStatus(&pl.Status, field.NewPath("status"))...)
+	allErrs = append(allErrs, ValidatePriorityLevelConfigurationSpec(&pl.Spec, pl.Name, specPath)...)
 	return allErrs
 }
 
