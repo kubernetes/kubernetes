@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	"github.com/onsi/ginkgo"
@@ -46,7 +47,7 @@ const (
 func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 
 	var err error
-	framework.SkipUnlessProviderIs("gce", "gke", "openstack", "aws", "vsphere", "azure")
+	e2eskipper.SkipUnlessProviderIs("gce", "gke", "openstack", "aws", "vsphere", "azure")
 
 	ns := f.Namespace.Name
 
