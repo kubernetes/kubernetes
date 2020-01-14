@@ -49,6 +49,11 @@ func (h *ManagerStub) Allocate(node *schedulernodeinfo.NodeInfo, attrs *lifecycl
 	return nil
 }
 
+// Release simply returns nil.
+func (h *ManagerStub) Release(pod *v1.Pod) error {
+	return nil
+}
+
 // GetDeviceRunContainerOptions simply returns nil.
 func (h *ManagerStub) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) (*DeviceRunContainerOptions, error) {
 	return nil, nil

@@ -2107,6 +2107,7 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
+		kl.containerManager.DeletePluginResources(pod)
 		kl.podManager.DeletePod(pod)
 		if kubetypes.IsMirrorPod(pod) {
 			kl.handleMirrorPod(pod, start)

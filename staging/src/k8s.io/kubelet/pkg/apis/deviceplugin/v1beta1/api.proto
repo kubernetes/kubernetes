@@ -60,6 +60,10 @@ service DevicePlugin {
 	// of the steps to make the Device available in the container
 	rpc Allocate(AllocateRequest) returns (AllocateResponse) {}
 
+	// Release is called after pod deleted so that the Device
+	// Plugin can know the Device latest status.
+	rpc Release(ReleaseRequest) returns (ReleaseResponse) {}
+
         // PreStartContainer is called, if indicated by Device Plugin during registeration phase,
         // before each container start. Device plugin can run device specific operations
         // such as reseting the device before making devices available to the container
@@ -110,6 +114,16 @@ message PreStartContainerRequest {
 
 // PreStartContainerResponse will be send by plugin in response to PreStartContainerRequest
 message PreStartContainerResponse {
+}
+
+// - Release is expected to be called when pod deleted
+// - Release allows kubelet to return free devices to Device Plugin
+message ReleaseRequest {
+	repeated string devicesIDs = 1;
+}
+
+// ReleaseResponse will be send by plugin in response to ReleaseRequest
+message ReleaseResponse {
 }
 
 // - Allocate is expected to be called during pod creation since allocation

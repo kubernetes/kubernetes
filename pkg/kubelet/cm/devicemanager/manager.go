@@ -389,6 +389,26 @@ func (m *ManagerImpl) Allocate(node *schedulernodeinfo.NodeInfo, attrs *lifecycl
 	return nil
 }
 
+// Release called when delete pods.
+func (m *ManagerImpl) Release(pod *v1.Pod) error {
+	for _, resourceToBeRemoved := range m.podDevices[string(pod.UID)] {
+		for resource, devices := range resourceToBeRemoved {
+			eI, ok := m.endpoints[resource]
+			if !ok {
+				klog.Warningf("endpoint not found in cache for a registered resource: %s", resource)
+				continue
+			}
+			devs := devices.deviceIds.UnsortedList()
+			_, err := eI.e.release(devs)
+			if err != nil {
+				klog.Warningf("Failed to release device plugin resource for pod %s: %v", string(pod.UID), err)
+				continue
+			}
+		}
+	}
+	return nil
+}
+
 // Register registers a device plugin.
 func (m *ManagerImpl) Register(ctx context.Context, r *pluginapi.RegisterRequest) (*pluginapi.Empty, error) {
 	klog.Infof("Got registration request from device plugin with resource name %q", r.ResourceName)

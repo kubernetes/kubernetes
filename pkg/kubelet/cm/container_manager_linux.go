@@ -672,6 +672,10 @@ func (cm *containerManagerImpl) UpdatePluginResources(node *schedulernodeinfo.No
 	return cm.deviceManager.Allocate(node, attrs)
 }
 
+func (cm *containerManagerImpl) DeletePluginResources(pod *v1.Pod) error {
+	return cm.deviceManager.Release(pod)
+}
+
 func (cm *containerManagerImpl) GetTopologyPodAdmitHandler() topologymanager.Manager {
 	return cm.topologyManager
 }

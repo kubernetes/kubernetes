@@ -94,6 +94,9 @@ type ContainerManager interface {
 	// any registered device plugin resource
 	UpdatePluginResources(*schedulernodeinfo.NodeInfo, *lifecycle.PodAdmitAttributes) error
 
+	// DeletePluginResources release devices that device plugin allcated.
+	DeletePluginResources(pod *v1.Pod) error
+
 	InternalContainerLifecycle() InternalContainerLifecycle
 
 	// GetPodCgroupRoot returns the cgroup which contains all pods.

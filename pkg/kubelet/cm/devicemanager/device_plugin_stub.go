@@ -229,6 +229,12 @@ func (m *Stub) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*plu
 	return m.allocFunc(r, devs)
 }
 
+// Release devices
+func (m *Stub) Release(ctx context.Context, r *pluginapi.ReleaseRequest) (*pluginapi.ReleaseResponse, error) {
+	log.Printf("Release, %+v", r)
+	return &pluginapi.ReleaseResponse{}, nil
+}
+
 func (m *Stub) cleanup() error {
 	if err := os.Remove(m.socket); err != nil && !os.IsNotExist(err) {
 		return err

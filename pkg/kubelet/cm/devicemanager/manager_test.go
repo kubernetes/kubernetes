@@ -386,11 +386,13 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	as.NotContains(testManager.endpoints, resourceName1)
 	as.Equal(1, len(testManager.endpoints))
 
-	// Stops resourceName2 endpoint. Verifies its stopTime is set, allocate and
+	// Stops resourceName2 endpoint. Verifies its stopTime is set, allocate, release and
 	// preStartContainer calls return errors.
 	e2.stop()
 	as.False(e2.stopTime.IsZero())
 	_, err = e2.allocate([]string{"Device1"})
+	reflect.DeepEqual(err, fmt.Errorf(errEndpointStopped, e2))
+	_, err = e2.release([]string{"Device1"})
 	reflect.DeepEqual(err, fmt.Errorf(errEndpointStopped, e2))
 	_, err = e2.preStartContainer([]string{"Device1"})
 	reflect.DeepEqual(err, fmt.Errorf(errEndpointStopped, e2))
@@ -567,6 +569,10 @@ func (m *MockEndpoint) allocate(devs []string) (*pluginapi.AllocateResponse, err
 		return m.allocateFunc(devs)
 	}
 	return nil, nil
+}
+
+func (m *MockEndpoint) release(devs []string) (*pluginapi.ReleaseResponse, error) {
+	return &pluginapi.ReleaseResponse{}, nil
 }
 
 func (m *MockEndpoint) isStopped() bool { return false }

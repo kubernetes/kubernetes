@@ -36,6 +36,7 @@ type endpoint interface {
 	run()
 	stop()
 	allocate(devs []string) (*pluginapi.AllocateResponse, error)
+	release(devs []string) (*pluginapi.ReleaseResponse, error)
 	preStartContainer(devs []string) (*pluginapi.PreStartContainerResponse, error)
 	callback(resourceName string, devices []pluginapi.Device)
 	isStopped() bool
@@ -147,6 +148,15 @@ func (e *endpointImpl) allocate(devs []string) (*pluginapi.AllocateResponse, err
 		ContainerRequests: []*pluginapi.ContainerAllocateRequest{
 			{DevicesIDs: devs},
 		},
+	})
+}
+
+func (e *endpointImpl) release(devs []string) (*pluginapi.ReleaseResponse, error) {
+	if e.isStopped() {
+		return nil, fmt.Errorf(errEndpointStopped, e)
+	}
+	return e.client.Release(context.Background(), &pluginapi.ReleaseRequest{
+		DevicesIDs: devs,
 	})
 }
 
