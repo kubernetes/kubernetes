@@ -20,14 +20,16 @@ set -o pipefail
 
 usage="The script automatically cherrypicks a kubernetes patch for an anthos version.
 
-Usage: $(basename $0) [-cdehkrv] COMMIT_ID master|ANTHOS_MAJOR_MINOR_VERSION|[K8S_MAJOR_MINOR_PATCH_VERSION]...
+Usage: $(basename $0) [-cdehkmrv] [-g <git remote>] COMMIT_ID master|ANTHOS_MAJOR_MINOR_VERSION|[K8S_MAJOR_MINOR_PATCH_VERSION]...
 
 Options:
   -c  List of emails to CC (comma separated).
   -d  Dry run without actual change pushed.
   -e  Do not skip empty cherrypicks. By default empty cherrypicks are skipped.
+  -g  Git remote to push changes to (default: origin).
   -h  Print help message.
   -k  Use Kubernetes major minor patch version instead.
+  -m  Only cherry-pick to branches with the same Kubernetes minor versions specified.
   -r  List of reviewer emails (comma separated).
   -v  Print verbose output.
 
@@ -43,18 +45,27 @@ Branches to cherrypick:
     release-1.16.4-gke
     ..."
 
-while getopts 'c:dhkr:ev' o; do
+git_remote="origin"
+
+while getopts 'c:dg:hkmr:ev' o; do
+
   case "$o" in
     c) cc="$OPTARG"
       ;;
     d) echo "Dry run mode, no actual change pushed"
       dryrun="true"
       ;;
+    g) git_remote="$OPTARG"
+      echo "Use git remote $git_remote"
+      ;;
     h) echo "$usage"
       exit
       ;;
     k) echo "Use Kubernetes version"
       use_k8s_version="true"
+      ;;
+    m) echo "Cherry pick to only matching Kubernetes minor versions"
+      match_k8s_minor_version="true"
       ;;
     r) reviewers="$OPTARG"
       ;;
@@ -96,6 +107,12 @@ compare_versions() {
     return 0
   fi
   return 1
+}
+
+# get_minor_version outputs the minor Kubernetes version given
+# $1: branch name
+get_minor_version() {
+  echo "$(echo "$1" | sed -e 's/\([0-9]*\)\.\([0-9]*\).*/\1\.\2/')"
 }
 
 # run_git runs git and generates git output based on verbose mode and exit code.
@@ -189,8 +206,8 @@ else
   printf "\t%s\n" "${output[@]}"
 fi
 
-oss_branches=($(git branch -r | grep -oP "(?<=origin/)${oss_branch_pattern}$"))
-gke_branches=($(git branch -r | grep -oP "(?<=origin/)${gke_branch_pattern}$"))
+oss_branches=($(git branch -r | grep -oP "(?<=${git_remote}/)${oss_branch_pattern}$"))
+gke_branches=($(git branch -r | grep -oP "(?<=${git_remote}/)${gke_branch_pattern}$"))
 oss_branch_suffix=".9999999"
 # Add a big suffix to oss branches, so that it will be greater than gke branches
 # for sorting.
@@ -261,6 +278,33 @@ for t in "${target_branches[@]}"; do
   branches=( "${new_branches[@]}" )
 done
 
+# Remove branches on a different minor versions than target branches.
+# (The order is based on `sort -V` version sort result)
+# Example:
+# * Target branch: release-1.16.2-gke release-1.17.1-gke
+# * Original branches:
+#     release-1.16.2-gke
+#     release-1.17.1-gke
+#     release-1.17.2-gke
+#     release-1.18.0-gke
+# * New branches:
+#     release-1.16.2-gke
+#     release-1.17.1-gke
+#     release-1.17.2-gke
+if [[ "${match_k8s_minor_version:-false}" == "true" ]]; then
+  new_branches=()
+  for t in "${target_branches[@]}"; do
+    t_minor="$(get_minor_version "$t")"
+    for b in "${branches[@]}"; do
+      b_minor="$(get_minor_version "$b")"
+      if [[ "$t_minor" == "$b_minor" ]]; then
+          new_branches+=("$b")
+      fi
+    done
+  done
+  branches=( "${new_branches[@]}" )
+fi
+
 # Remove suffix from oss branches.
 for i in "${!branches[@]}"; do
   branches[i]="${branches[$i]%"${oss_branch_suffix}"}"
@@ -293,9 +337,9 @@ fi
 push_options+="-o topic=cherrypick-$(git rev-parse --short $commit)"
 
 # Do actual cherrypick.
-run_git fetch origin
+run_git fetch "${git_remote}"
 for b in "${branches[@]}"; do
-  remote_branch=origin/$b
+  remote_branch="${git_remote}/$b"
   echo "Cherrypicking $commit to branch $remote_branch..."
   run_git checkout "$remote_branch"
   if ! run_git cherry-pick "$commit"; then
@@ -326,7 +370,7 @@ for b in "${branches[@]}"; do
     echo "Pushing to branch $remote_branch..."
     # Amend the commit to make sure it has a change ID.
     run_git commit --amend --no-edit
-    run_git push origin "HEAD:refs/for/$b" ${push_options}
+    run_git push "${git_remote}" "HEAD:refs/for/$b" ${push_options}
   else
     echo "Push skipped in dry run mode"
   fi
