@@ -23,7 +23,6 @@ pkg/util/coverage
 pkg/util/netsh
 pkg/volume
 pkg/volume/awsebs
-pkg/volume/azure_dd
 pkg/volume/azure_file
 pkg/volume/cinder
 pkg/volume/csi

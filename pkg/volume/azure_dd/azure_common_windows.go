@@ -30,6 +30,8 @@ import (
 	"k8s.io/utils/mount"
 )
 
+var winDiskNumFormat = "/dev/disk%d" //lint:ignore U1000 used in pkg/volume/azure_dd/azure_common_windows.go
+
 func scsiHostRescan(io ioHandler, exec utilexec.Interface) {
 	cmd := "Update-HostStorageCache"
 	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
