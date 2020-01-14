@@ -41,6 +41,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -158,7 +159,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 
 	ginkgo.It("Pod should be scheduled to node that don't match the PodAntiAffinity terms", func() {
 
-		framework.SkipUnlessNodeCountIsAtLeast(2)
+		e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 
 		ginkgo.By("Trying to launch a pod with a label to get a node which can launch it.")
 		pod := runPausePod(f, pausePodConfig{

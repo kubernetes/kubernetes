@@ -34,6 +34,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	k8utilnet "k8s.io/utils/net"
@@ -120,7 +121,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	// It is so because we need to have precise control on what's running in the cluster.
 	ginkgo.It("validates local ephemeral storage resource limits of pods that are allowed to run [Feature:LocalStorageCapacityIsolation]", func() {
 
-		framework.SkipUnlessServerVersionGTE(localStorageVersion, f.ClientSet.Discovery())
+		e2eskipper.SkipUnlessServerVersionGTE(localStorageVersion, f.ClientSet.Discovery())
 
 		nodeMaxAllocatable := int64(0)
 
