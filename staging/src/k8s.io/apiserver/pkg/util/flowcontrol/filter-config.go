@@ -39,8 +39,15 @@ import (
 
 	rmtypesv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/authentication/user"
 )
+
+// This file contains a simple local (to the apiserver) controller
+// that digests API Priority and Fairness config objects (FlowSchema
+// and PriorityLevelConfiguration) into the data structure that the
+// filter uses.  At this first level of development this controller
+// takes the simplest possible approach: whenever notified of any
+// change to any config object, all them are read and processed as a
+// whole.
 
 // initializeConfigController sets up the controller that processes
 // config API objects.
@@ -224,10 +231,10 @@ func (reqMgr *requestManager) digestConfigObjects(newPLs []*rmtypesv1a1.Priority
 		newRMState.imaginePL(fcboot.MandatoryPriorityLevelConfigurationCatchAll, reqMgr.requestWaitLimit, &shareSum)
 	}
 	if !haveExemptFS {
-		fsSeq = append(apihelpers.FlowSchemaSequence{fcboot.NewFSAllGroups(rmtypesv1a1.FlowSchemaNameExempt, rmtypesv1a1.PriorityLevelConfigurationNameExempt, 1, "", user.SystemPrivilegedGroup)}, fsSeq...)
+		fsSeq = append(apihelpers.FlowSchemaSequence{fcboot.MandatoryFlowSchemaExempt}, fsSeq...)
 	}
 	if !haveCatchAllFS {
-		fsSeq = append(fsSeq, fcboot.NewFSAllGroups(rmtypesv1a1.FlowSchemaNameCatchAll, rmtypesv1a1.PriorityLevelConfigurationNameCatchAll, rmtypesv1a1.FlowSchemaMaxMatchingPrecedence, rmtypesv1a1.FlowDistinguisherMethodByUserType, user.AllUnauthenticated, user.AllAuthenticated))
+		fsSeq = append(fsSeq, fcboot.MandatoryFlowSchemaCatchAll)
 	}
 
 	newRMState.flowSchemas = fsSeq
@@ -259,6 +266,11 @@ func (reqMgr *requestManager) digestConfigObjects(newPLs []*rmtypesv1a1.Priority
 	// that if Wait returns `tryAnother==true` then a fresh load from
 	// curState will yield an requestManagerState that is at least
 	// as up-to-date as the data here.
+	//
+	// Put another way: doing the Quiesce calls after Store(X) ensures
+	// that if any call to qs.Quiesce causes a call to qs.Wait to
+	// return with `tryAnother==true` then a following call to Load
+	// will return X or an even more recently stored value.
 	for _, plState := range newlyQuiescent {
 		plState.queues.Quiesce(plState.emptyHandler)
 	}

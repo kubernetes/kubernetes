@@ -18,6 +18,7 @@ package queueset
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -413,7 +414,7 @@ func (qs *queueSet) chooseQueueIndexLocked(hashValue uint64, descr1, descr2 inte
 		})
 	}
 	if bestQueueIdx < 0 {
-		klog.V(6).Infof("QS(%s): dealer dealt no valid cards", qs.config.Name)
+		panic(fmt.Sprintf("dealer dealt no valid cards; config=%#+v", qs.config))
 		bestQueueIdx = 0
 	}
 	klog.V(6).Infof("QS(%s): For request %#+v %#+v chose queue %d, had %d waiting & %d executing", qs.config.Name, descr1, descr2, bestQueueIdx, bestQueueLen, qs.queues[bestQueueIdx].requestsExecuting)

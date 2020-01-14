@@ -86,8 +86,8 @@ type QueueSetConfig struct {
 	// request, the Dealer is called to deal a random "hand" of queue
 	// indices and the request is put in one of the dealt queues with
 	// minimum length.  The Dealer should deal valid queue indices.
-	// If the Dealer is nil or it deals no valid queue indices then a
-	// queue is chosen by a really awful method.
+	// If the Dealer is nil or it deals no valid queue indices then
+	// QueueSet::Wait will crash.
 	Dealer *shufflesharding.Dealer
 
 	// RequestWaitLimit is the maximum amount of time that a request may wait in a queue.

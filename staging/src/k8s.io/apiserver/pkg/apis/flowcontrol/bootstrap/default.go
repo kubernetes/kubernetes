@@ -100,7 +100,7 @@ var (
 // Mandatory FlowSchema objects
 var (
 	// exempt priority-level
-	MandatoryFlowSchemaExempt = NewFSAllGroups(
+	MandatoryFlowSchemaExempt = fsAllForGroups(
 		"exempt",
 		flowcontrol.PriorityLevelConfigurationNameExempt,
 		1,                          // matchingPrecedence
@@ -108,7 +108,7 @@ var (
 		user.SystemPrivilegedGroup, // group name
 	)
 	// catch-all priority-level
-	MandatoryFlowSchemaCatchAll = NewFSAllGroups(
+	MandatoryFlowSchemaCatchAll = fsAllForGroups(
 		"catch-all",
 		"catch-all",
 		10000, // matchingPrecedence
@@ -192,7 +192,7 @@ var (
 
 // Suggested FlowSchema objects
 var (
-	SuggestedFlowSchemaSystemNodes = NewFSAllGroups(
+	SuggestedFlowSchemaSystemNodes = fsAllForGroups(
 		"system-nodes", "system", 500,
 		flowcontrol.FlowDistinguisherMethodByUserType,
 		user.NodesGroup, // the nodes group
@@ -241,47 +241,50 @@ var (
 			},
 		},
 	)
-	SuggestedFlowSchemaKubeControllerManager = NewFSAllUsers(
+	SuggestedFlowSchemaKubeControllerManager = fsAllForUsers(
 		"kube-controller-manager", "workload-high", 800,
 		flowcontrol.FlowDistinguisherMethodByNamespaceType,
 		user.KubeControllerManager, // username
 	)
-	SuggestedFlowSchemaKubeScheduler = NewFSAllUsers(
+	SuggestedFlowSchemaKubeScheduler = fsAllForUsers(
 		"kube-scheduler", "workload-high", 800,
 		flowcontrol.FlowDistinguisherMethodByNamespaceType,
 		user.KubeScheduler, // username
 	)
-	SuggestedFlowSchemaKubeSystemServiceAccounts = NewFSAll(
+	SuggestedFlowSchemaKubeSystemServiceAccounts = fsAllForSubjects(
 		"kube-system-service-accounts", "workload-high", 900,
 		flowcontrol.FlowDistinguisherMethodByNamespaceType,
 		kubeSystemServiceAccount(flowcontrol.NameAll)...,
 	)
-	SuggestedFlowSchemaServiceAccounts = NewFSAllGroups(
+	SuggestedFlowSchemaServiceAccounts = fsAllForGroups(
 		"service-accounts", "workload-low", 9000,
 		flowcontrol.FlowDistinguisherMethodByUserType,
 		serviceaccount.AllServiceAccountsGroup, // group name
 	)
 )
 
-// NewFSAllUsers constructs a FlowSchema that matches the given subjects regardless of verb and target.
-// The subjects are usernames.
-func NewFSAllUsers(name, plName string, matchingPrecedence int32, dmType flowcontrol.FlowDistinguisherMethodType, userNames ...string) *flowcontrol.FlowSchema {
-	return NewFSAll(name, plName, matchingPrecedence, dmType, users(userNames...)...)
+// fsAllForUsers constructs a FlowSchema that matches the given
+// subjects regardless of verb and target.  The subjects are
+// usernames.
+func fsAllForUsers(name, plName string, matchingPrecedence int32, dmType flowcontrol.FlowDistinguisherMethodType, userNames ...string) *flowcontrol.FlowSchema {
+	return fsAllForSubjects(name, plName, matchingPrecedence, dmType, users(userNames...)...)
 }
 
-// NewFSAllGroups constructs a FlowSchema that matches the given subjects regardless of verb and target.
-// The subjects are user group names.
-func NewFSAllGroups(name, plName string, matchingPrecedence int32, dmType flowcontrol.FlowDistinguisherMethodType, groupNames ...string) *flowcontrol.FlowSchema {
-	return NewFSAll(name, plName, matchingPrecedence, dmType, groups(groupNames...)...)
+// fsAllForGroups constructs a FlowSchema that matches the given
+// subjects regardless of verb and target.  The subjects are user
+// group names.
+func fsAllForGroups(name, plName string, matchingPrecedence int32, dmType flowcontrol.FlowDistinguisherMethodType, groupNames ...string) *flowcontrol.FlowSchema {
+	return fsAllForSubjects(name, plName, matchingPrecedence, dmType, groups(groupNames...)...)
 }
 
-// NewFSAll constructs a FlowSchema that matches the given subjects regardless of verb and target object
-func NewFSAll(name, plName string, matchingPrecedence int32, dmType flowcontrol.FlowDistinguisherMethodType, subjects ...flowcontrol.Subject) *flowcontrol.FlowSchema {
+// fsAllForSubjects constructs a FlowSchema that matches the given
+// subjects regardless of verb and target object
+func fsAllForSubjects(name, plName string, matchingPrecedence int32, dmType flowcontrol.FlowDistinguisherMethodType, subjects ...flowcontrol.Subject) *flowcontrol.FlowSchema {
 	return newFlowSchema(name, plName, matchingPrecedence, dmType,
 		flowcontrol.PolicyRulesWithSubjects{
 			Subjects:         subjects,
-			ResourceRules:    ruleRscAll,
-			NonResourceRules: ruleNonRscAll},
+			ResourceRules:    ruleResourceAll,
+			NonResourceRules: ruleNonResourceAll},
 	)
 }
 

@@ -66,21 +66,21 @@ func WithPriorityAndFairness(
 		}
 
 		execute, afterExecute := fcIfc.Wait(ctx, requestDigest)
-		if execute {
-			timedOut := ctx.Done()
-			finished := make(chan struct{})
-			go func() {
-				handler.ServeHTTP(w, r)
-				close(finished)
-			}()
-			select {
-			case <-timedOut:
-				klog.V(6).Infof("Timed out waiting for RequestInfo=%#+v, user.Info=%#+v to finish\n", requestInfo, user)
-			case <-finished:
-			}
-			afterExecute()
-		} else {
+		if !execute {
 			tooManyRequests(r, w)
+			return
+		}
+		defer afterExecute()
+		timedOut := ctx.Done()
+		finished := make(chan struct{})
+		go func() {
+			handler.ServeHTTP(w, r)
+			close(finished)
+		}()
+		select {
+		case <-timedOut:
+			klog.V(6).Infof("Timed out waiting for RequestInfo=%#+v, user.Info=%#+v to finish\n", requestInfo, user)
+		case <-finished:
 		}
 		return
 	})
