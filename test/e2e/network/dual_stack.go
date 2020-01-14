@@ -19,6 +19,7 @@ package network
 import (
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -26,6 +27,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
@@ -240,11 +242,16 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		validateServiceAndClusterIPFamily(svc, defaultIPFamily)
 
 		// ensure endpoint belong to same ipfamily as service
-		endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
-		if err != nil {
+		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
+			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, nil
+			}
+			validateEndpointsBelongToIPFamily(svc, endpoint, defaultIPFamily)
+			return true, nil
+		}); err != nil {
 			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
 		}
-		validateEndpointsBelongToIPFamily(svc, endpoint, defaultIPFamily)
 	})
 
 	ginkgo.It("should create service with ipv4 cluster ip [Feature:IPv6DualStackAlphaFeature:Phase2]", func() {
@@ -277,11 +284,16 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		validateServiceAndClusterIPFamily(svc, ipv4)
 
 		// ensure endpoints belong to same ipfamily as service
-		endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
-		if err != nil {
+		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
+			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, nil
+			}
+			validateEndpointsBelongToIPFamily(svc, endpoint, ipv4)
+			return true, nil
+		}); err != nil {
 			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
 		}
-		validateEndpointsBelongToIPFamily(svc, endpoint, ipv4)
 	})
 
 	ginkgo.It("should create service with ipv6 cluster ip [Feature:IPv6DualStackAlphaFeature:Phase2]", func() {
@@ -314,11 +326,16 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		validateServiceAndClusterIPFamily(svc, ipv6)
 
 		// ensure endpoints belong to same ipfamily as service
-		endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
-		if err != nil {
+		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
+			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, nil
+			}
+			validateEndpointsBelongToIPFamily(svc, endpoint, ipv6)
+			return true, nil
+		}); err != nil {
 			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
 		}
-		validateEndpointsBelongToIPFamily(svc, endpoint, ipv6)
 	})
 })
 
