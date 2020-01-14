@@ -22,6 +22,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	nodev1beta1 "k8s.io/api/node/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -61,6 +62,7 @@ type pausePodConfig struct {
 	Affinity                          *v1.Affinity
 	Annotations, Labels, NodeSelector map[string]string
 	Resources                         *v1.ResourceRequirements
+	RuntimeClassHandler               *string
 	Tolerations                       []v1.Toleration
 	NodeName                          string
 	Ports                             []v1.ContainerPort
@@ -194,6 +196,116 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		}
 		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), ns, podName, false)
 		verifyResult(cs, podsNeededForSaturation, 1, ns)
+	})
+
+	// This test verifies we don't allow scheduling of pods in a way that sum of limits +
+	// associated overhead is greater than machine's capacity.
+	// It assumes that cluster add-on pods stay stable and cannot be run in parallel
+	// with any other test that touches Nodes or Pods.
+	// Because of this we need to have precise control on what's running in the cluster.
+	// Test scenario:
+	// 1. Find the first ready node on the system, and add a fake resource for test
+	// 2. Create one with affinity to the particular node that uses 70% of the fake resource.
+	// 3. Wait for the pod to be scheduled.
+	// 4. Create another pod with affinity to the particular node that needs 20% of the fake resource and
+	//    an overhead set as 25% of the fake resource.
+	// 5. Make sure this additional pod is not scheduled.
+
+	ginkgo.Context("validates pod overhead is considered along with resource limits of pods that are allowed to run", func() {
+		var testNodeName string
+		var handler string
+		var beardsecond v1.ResourceName = "example.com/beardsecond"
+
+		ginkgo.BeforeEach(func() {
+			WaitForStableCluster(cs, masterNodes)
+			ginkgo.By("Add RuntimeClass and fake resource")
+
+			// find a node which can run a pod:
+			testNodeName = GetNodeThatCanRunPod(f)
+
+			// Get node object:
+			node, err := cs.CoreV1().Nodes().Get(context.TODO(), testNodeName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "unable to get node object for node %v", testNodeName)
+
+			// update Node API object with a fake resource
+			nodeCopy := node.DeepCopy()
+			nodeCopy.ResourceVersion = "0"
+
+			nodeCopy.Status.Capacity[beardsecond] = resource.MustParse("1000")
+			_, err = cs.CoreV1().Nodes().UpdateStatus(context.TODO(), nodeCopy, metav1.UpdateOptions{})
+			framework.ExpectNoError(err, "unable to apply fake resource to %v", testNodeName)
+
+			// Register a runtimeClass with overhead set as 25% of the available beard-seconds
+			handler = e2enode.PreconfiguredRuntimeClassHandler(framework.TestContext.ContainerRuntime)
+
+			rc := &nodev1beta1.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{Name: handler},
+				Handler:    handler,
+				Overhead: &nodev1beta1.Overhead{
+					PodFixed: v1.ResourceList{
+						beardsecond: resource.MustParse("250"),
+					},
+				},
+			}
+			_, err = cs.NodeV1beta1().RuntimeClasses().Create(context.TODO(), rc, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "failed to create RuntimeClass resource")
+		})
+
+		ginkgo.AfterEach(func() {
+			ginkgo.By("Remove fake resource and RuntimeClass")
+			// remove fake resource:
+			if testNodeName != "" {
+				// Get node object:
+				node, err := cs.CoreV1().Nodes().Get(context.TODO(), testNodeName, metav1.GetOptions{})
+				framework.ExpectNoError(err, "unable to get node object for node %v", testNodeName)
+
+				nodeCopy := node.DeepCopy()
+				// force it to update
+				nodeCopy.ResourceVersion = "0"
+				delete(nodeCopy.Status.Capacity, beardsecond)
+				_, err = cs.CoreV1().Nodes().UpdateStatus(context.TODO(), nodeCopy, metav1.UpdateOptions{})
+				framework.ExpectNoError(err, "unable to update node %v", testNodeName)
+			}
+
+			// remove RuntimeClass
+			cs.NodeV1beta1().RuntimeClasses().Delete(context.TODO(), e2enode.PreconfiguredRuntimeClassHandler(framework.TestContext.ContainerRuntime), nil)
+		})
+
+		ginkgo.It("verify pod overhead is accounted for", func() {
+			framework.ExpectEqual(testNodeName != "", true)
+
+			ginkgo.By("Starting Pod to consume most of the node's resource.")
+
+			// Create pod which requires 70% of the available beard-seconds.
+			fillerPod := createPausePod(f, pausePodConfig{
+				Name: "filler-pod-" + string(uuid.NewUUID()),
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{beardsecond: resource.MustParse("700")},
+					Limits:   v1.ResourceList{beardsecond: resource.MustParse("700")},
+				},
+			})
+
+			// Wait for filler pod to schedule.
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, fillerPod))
+
+			ginkgo.By("Creating another pod that requires unavailable amount of resources.")
+			// Create another pod that requires 20% of available beard-seconds, but utilizes the RuntimeClass
+			// which defines a pod overhead that requires an additional 25%.
+			// This pod should remain pending as at least 70% of beard-second in
+			// the node are already consumed.
+			podName := "additional-pod" + string(uuid.NewUUID())
+			conf := pausePodConfig{
+				RuntimeClassHandler: &handler,
+				Name:                podName,
+				Labels:              map[string]string{"name": "additional"},
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{beardsecond: resource.MustParse("200")},
+				},
+			}
+
+			WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), ns, podName, false)
+			verifyResult(cs, 1, 1, ns)
+		})
 	})
 
 	// This test verifies we don't allow scheduling of pods in a way that sum of
@@ -715,6 +827,7 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 			NodeSelector:              conf.NodeSelector,
 			Affinity:                  conf.Affinity,
 			TopologySpreadConstraints: conf.TopologySpreadConstraints,
+			RuntimeClassName:          conf.RuntimeClassHandler,
 			Containers: []v1.Container{
 				{
 					Name:  conf.Name,
