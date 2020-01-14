@@ -69,6 +69,9 @@ func TestDynamicClient(t *testing.T) {
 		t.Fatalf("unexpected error when creating pod: %v", err)
 	}
 
+	// TODO: remove this when #82042 is resolved
+	actual.ObjectMeta.ManagedFields = nil
+
 	// check dynamic list
 	unstructuredList, err := dynamicClient.Resource(resource).Namespace("default").List(metav1.ListOptions{})
 	if err != nil {
@@ -211,6 +214,9 @@ func unstructuredToPod(obj *unstructured.Unstructured) (*v1.Pod, error) {
 	err = runtime.DecodeInto(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), json, pod)
 	pod.Kind = ""
 	pod.APIVersion = ""
+
+	// TODO: remove this when #82042 is resolved
+	pod.ObjectMeta.ManagedFields = nil
 	return pod, err
 }
 
