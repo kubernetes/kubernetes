@@ -52,7 +52,7 @@ ifeq ($(ARCH),s390x)
 	QEMUARCH=s390x
 endif
 ifeq ($(ARCH),mips64le)
-        BASEIMAGE?=inspurcloud/debian-debootstrap:mips64el-stretch
+        BASEIMAGE?=multiarch/debian-debootstrap:mips64el-stretch
         QEMUARCH=mips64el
 endif
 
