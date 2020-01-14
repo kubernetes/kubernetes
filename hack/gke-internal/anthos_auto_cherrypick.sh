@@ -194,8 +194,11 @@ else
       continue
     fi
     run_git checkout "origin/$b"
-    # TODO(random-liu): Update this after upgrade simplification.
-    k8s_version=$(cat on_prem_bundle/bundles/gkeonprem/bundler.yaml | grep -oP "(?<=KubeAPIServerImageTag: \"v)${major_minor_patch_pattern}(?=-gke\.[0-9]+\")")
+    k8s_version=$(cat on_prem_bundle/bundles/gkeonprem/bundler.yaml | grep -oP "(?<=KubernetesVersion: \"v)${major_minor_patch_pattern}(?=-gke\.[0-9]+\")" || true)
+    if [[ -z "$k8s_version" ]]; then
+      # Anthos 1.2 and before don't have the `KubernetesVersion` build option.
+      k8s_version=$(cat on_prem_bundle/bundles/gkeonprem/bundler.yaml | grep -oP "(?<=KubeAPIServerImageTag: \"v)${major_minor_patch_pattern}(?=-gke\.[0-9]+\")")
+    fi
     target_branches+=("release-${k8s_version}-gke")
     output+=("$b: release-${k8s_version}-gke")
   done
