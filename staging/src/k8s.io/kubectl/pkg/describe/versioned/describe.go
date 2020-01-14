@@ -86,6 +86,7 @@ const (
 	LEVEL_1
 	LEVEL_2
 	LEVEL_3
+	LEVEL_4
 )
 
 // DescriberFn gives a way to easily override the function for unit testing if needed
@@ -188,6 +189,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]describe.Desc
 		{Group: appsv1.GroupName, Kind: "ReplicaSet"}:                             &ReplicaSetDescriber{c},
 		{Group: certificatesv1beta1.GroupName, Kind: "CertificateSigningRequest"}: &CertificateSigningRequestDescriber{c},
 		{Group: storagev1.GroupName, Kind: "StorageClass"}:                        &StorageClassDescriber{c},
+		{Group: storagev1.GroupName, Kind: "CSINode"}:                             &CSINodeDescriber{c},
 		{Group: policyv1beta1.GroupName, Kind: "PodDisruptionBudget"}:             &PodDisruptionBudgetDescriber{c},
 		{Group: rbacv1.GroupName, Kind: "Role"}:                                   &RoleDescriber{c},
 		{Group: rbacv1.GroupName, Kind: "ClusterRole"}:                            &ClusterRoleDescriber{c},
@@ -3936,6 +3938,49 @@ func describeStorageClass(sc *storagev1.StorageClass, events *corev1.EventList) 
 			DescribeEvents(events, w)
 		}
 
+		return nil
+	})
+}
+
+type CSINodeDescriber struct {
+	clientset.Interface
+}
+
+func (c *CSINodeDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+	csi, err := c.StorageV1().CSINodes().Get(name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	var events *corev1.EventList
+	if describerSettings.ShowEvents {
+		events, _ = c.CoreV1().Events(namespace).Search(scheme.Scheme, csi)
+	}
+
+	return describeCSINode(csi, events)
+}
+
+func describeCSINode(csi *storagev1.CSINode, events *corev1.EventList) (output string, err error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%s\n", csi.GetName())
+		printLabelsMultiline(w, "Labels", csi.GetLabels())
+		printAnnotationsMultiline(w, "Annotations", csi.GetAnnotations())
+		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", csi.CreationTimestamp.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_0, "Spec:\n")
+		if csi.Spec.Drivers != nil {
+			w.Write(LEVEL_1, "Drivers:\n")
+			for _, driver := range csi.Spec.Drivers {
+				w.Write(LEVEL_2, "%s:\n", driver.Name)
+				w.Write(LEVEL_3, "Allocatables:\n")
+				w.Write(LEVEL_4, "Count:\t%d\n", *driver.Allocatable.Count)
+				w.Write(LEVEL_3, "Node ID:\t%s\n", driver.NodeID)
+				w.Write(LEVEL_3, "Topology Keys:\t%s\n", driver.TopologyKeys)
+			}
+		}
+		if events != nil {
+			DescribeEvents(events, w)
+		}
 		return nil
 	})
 }
