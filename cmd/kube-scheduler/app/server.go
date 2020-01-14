@@ -67,9 +67,11 @@ import (
 // Option configures a framework.Registry.
 type Option func(framework.Registry) error
 
+var beginInitTime time.Time
+
 // NewSchedulerCommand creates a *cobra.Command object with default parameters and registryOptions
 func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
-	metrics.BeginInitTime = time.Now()
+	beginInitTime = time.Now()
 
 	opts, err := options.NewOptions()
 	if err != nil {
@@ -254,21 +256,18 @@ func Run(ctx context.Context, cc schedulerserverconfig.CompletedConfig, outOfTre
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		klog.Warning("Some metrics for scheduler are abandoned\n")
+		klog.Warning("failed to get hostname for metrics\n")
 	}
-	metrics.CurrentHostName = hostname
-	if metrics.CurrentHostName != "" {
-		metrics.InitLatency.With(map[string]string{"hostname": metrics.CurrentHostName}).Set(metrics.SinceInMicroseconds(metrics.BeginInitTime))
-	}
+
+	metrics.CacheInitLatency.With(map[string]string{"hostname": hostname}).Set(metrics.SinceInSeconds(beginInitTime))
+
 	// If leader election is enabled, runCommand via LeaderElector until done and exit.
 	if cc.LeaderElection != nil {
 		cc.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
 			OnStartedLeading: sched.Run,
 			OnStoppedLeading: func() {
 				klog.Fatalf("leaderelection lost")
-				if metrics.CurrentHostName != "" {
-					metrics.HasLeader.With(map[string]string{"hostname": metrics.CurrentHostName}).Set(0)
-				}
+				metrics.HasLeader.With(map[string]string{"hostname": hostname}).Set(0)
 			},
 		}
 		leaderElector, err := leaderelection.NewLeaderElector(*cc.LeaderElection)

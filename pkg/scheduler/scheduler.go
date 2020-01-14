@@ -419,20 +419,22 @@ func initPolicyFromConfigMap(client clientset.Interface, policyRef *schedulerapi
 
 // Run begins watching and scheduling. It waits for cache to be synced, then starts scheduling and blocked until the context is done.
 func (sched *Scheduler) Run(ctx context.Context) {
-	if metrics.CurrentHostName != "" {
-		metrics.HasLeader.With(map[string]string{"hostname": metrics.CurrentHostName}).Set(1)
+	hostname, err := os.Hostname()
+	if err != nil {
+		klog.Warning("failed to get hostname for metrics\n")
 	}
-	metrics.BeginRunTime = time.Now()
+
+	metrics.HasLeader.With(map[string]string{"hostname": hostname}).Set(1)
+
+	beginRunTime := time.Now()
 
 	if !cache.WaitForCacheSync(ctx.Done(), sched.scheduledPodsHasSynced) {
 		return
 	}
 	sched.SchedulingQueue.Run()
 
-	if metrics.CurrentHostName != "" {
-		metrics.ReadyTime.With(map[string]string{"hostname": metrics.CurrentHostName}).SetToCurrentTime()
-		metrics.StartLatency.With(map[string]string{"hostname": metrics.CurrentHostName}).Set(metrics.SinceInMicroseconds(metrics.BeginRunTime))
-	}
+	metrics.LeaderReadyTime.With(map[string]string{"hostname": hostname}).SetToCurrentTime()
+	metrics.LeaderReadyLatency.With(map[string]string{"hostname": hostname}).Set(metrics.SinceInSeconds(beginRunTime))
 
 	wait.UntilWithContext(ctx, sched.scheduleOne, 0)
 	sched.SchedulingQueue.Close()

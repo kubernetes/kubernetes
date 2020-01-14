@@ -48,13 +48,6 @@ const (
 	// E2eScheduling - e2e scheduling operation label value
 )
 
-// Variables used by some metrics
-var (
-	CurrentHostName string
-	BeginRunTime    time.Time
-	BeginInitTime   time.Time
-)
-
 // All the histogram based metrics have 1ms as size for the smallest bucket.
 var (
 	scheduleAttempts = metrics.NewCounterVec(
@@ -308,27 +301,27 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"type"})
 
-	ReadyTime = metrics.NewGaugeVec(
+	LeaderReadyTime = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem: SchedulerSubsystem,
-			Name:      "ready_time",
+			Name:      "leader_ready_time",
 			Help:      "Ready time for leader-scheduler to work.",
 		}, []string{"hostname"},
 	)
 
-	StartLatency = metrics.NewGaugeVec(
+	LeaderReadyLatency = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem: SchedulerSubsystem,
-			Name:      "start_latency",
-			Help:      "Latency in microseconds for leader-scheduler to be ready after init.",
+			Name:      "leader_ready_latency_seconds",
+			Help:      "Latency in seconds for leader-scheduler to be ready after init.",
 		}, []string{"hostname"},
 	)
 
-	InitLatency = metrics.NewGaugeVec(
+	CacheInitLatency = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem: SchedulerSubsystem,
-			Name:      "init_latency",
-			Help:      "Latency in microseconds for scheduler to be pod cache populated.",
+			Name:      "cache_init_latency_seconds",
+			Help:      "Latency in seconds for scheduler to be pod cache populated.",
 		}, []string{"hostname"},
 	)
 
@@ -367,10 +360,10 @@ var (
 		SchedulerGoroutines,
 		PermitWaitDuration,
 		CacheSize,
-		StartLatency,
-		InitLatency,
+		LeaderReadyLatency,
+		CacheInitLatency,
 		HasLeader,
-		ReadyTime,
+		LeaderReadyTime,
 	}
 )
 
