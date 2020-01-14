@@ -90,7 +90,7 @@ var (
 //       "cmd-path": "/usr/bin/gcloud",
 //
 //       # Arguments to pass to command to execute for access token.
-//       "cmd-args": "config config-helper --output=json"
+//       "cmd-args": "config config-helper --format=json"
 //
 //       # JSONPath to the string field that represents the access token in
 //       # command output. If omitted, defaults to "{.access_token}".
@@ -99,7 +99,7 @@ var (
 //       # JSONPath to the string field that represents expiration timestamp
 //       # of the access token in the command output. If omitted, defaults to
 //       # "{.token_expiry}"
-//       "expiry-key": ""{.credential.token_expiry}",
+//       "expiry-key": "{.credential.token_expiry}",
 //
 //       # golang reference time in the format that the expiration timestamp uses.
 //       # If omitted, defaults to time.RFC3339Nano
