@@ -60,7 +60,7 @@ func NewPrometheusResourceMetricCollector(provider SummaryProvider, config Resou
 			nil,
 			nil,
 			metrics.ALPHA,
-			""),
+			"1.18.0"),
 	}
 }
 

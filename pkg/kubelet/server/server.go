@@ -38,6 +38,7 @@ import (
 	"github.com/google/cadvisor/metrics"
 	"google.golang.org/grpc"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,13 +75,13 @@ import (
 )
 
 const (
-	metricsPath               = "/metrics"
-	cadvisorMetricsPath       = "/metrics/cadvisor"
-	resourceMetricsPathPrefix = "/metrics/resource"
-	proberMetricsPath         = "/metrics/probes"
-	specPath                  = "/spec/"
-	statsPath                 = "/stats/"
-	logsPath                  = "/logs/"
+	metricsPath         = "/metrics"
+	cadvisorMetricsPath = "/metrics/cadvisor"
+	resourceMetricsPath = "/metrics/resource"
+	proberMetricsPath   = "/metrics/probes"
+	specPath            = "/spec/"
+	statsPath           = "/stats/"
+	logsPath            = "/logs/"
 )
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
@@ -319,10 +320,17 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
 
+	// deprecated endpoint which will be removed in release 1.20.0+.
 	v1alpha1ResourceRegistry := compbasemetrics.NewKubeRegistry()
 	v1alpha1ResourceRegistry.CustomMustRegister(stats.NewPrometheusResourceMetricCollector(s.resourceAnalyzer, v1alpha1.Config()))
-	s.restfulCont.Handle(path.Join(resourceMetricsPathPrefix, v1alpha1.Version),
+	s.restfulCont.Handle(path.Join(resourceMetricsPath, v1alpha1.Version),
 		compbasemetrics.HandlerFor(v1alpha1ResourceRegistry, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
+	)
+
+	resourceRegistry := compbasemetrics.NewKubeRegistry()
+	resourceRegistry.CustomMustRegister(collectors.NewResourceMetricsCollector(s.resourceAnalyzer))
+	s.restfulCont.Handle(resourceMetricsPath,
+		compbasemetrics.HandlerFor(resourceRegistry, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
 
 	// prober metrics are exposed under a different endpoint
