@@ -74,15 +74,6 @@ var (
 		// should be all lowercase and separated by underscores.
 		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component", "client", "contentType", "code"},
 	)
-	deprecatedRequestCounter = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Name:              "apiserver_request_count",
-			Help:              "Counter of apiserver requests broken out for each verb, group, version, resource, scope, component, client, and HTTP response contentType and code.",
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
-		},
-		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component", "client", "contentType", "code"},
-	)
 	longRunningRequestGauge = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Name:           "apiserver_longrunning_gauge",
@@ -104,29 +95,6 @@ var (
 		},
 		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component"},
 	)
-	deprecatedRequestLatencies = compbasemetrics.NewHistogramVec(
-		&compbasemetrics.HistogramOpts{
-			Name: "apiserver_request_latencies",
-			Help: "Response latency distribution in microseconds for each verb, group, version, resource, subresource, scope and component.",
-			// Use buckets ranging from 125 ms to 8 seconds.
-			Buckets:           compbasemetrics.ExponentialBuckets(125000, 2.0, 7),
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
-		},
-		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
-	)
-	deprecatedRequestLatenciesSummary = compbasemetrics.NewSummaryVec(
-		&compbasemetrics.SummaryOpts{
-			Name: "apiserver_request_latencies_summary",
-			Help: "Response latency summary in microseconds for each verb, group, version, resource, subresource, scope and component.",
-			// Make the sliding window of 5h.
-			// TODO: The value for this should be based on our SLI definition (medium term).
-			MaxAge:            5 * time.Hour,
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
-		},
-		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
-	)
 	responseSizes = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Name: "apiserver_response_sizes",
@@ -143,15 +111,6 @@ var (
 			Name:           "apiserver_dropped_requests_total",
 			Help:           "Number of requests dropped with 'Try again later' response",
 			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"requestKind"},
-	)
-	DeprecatedDroppedRequests = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Name:              "apiserver_dropped_requests",
-			Help:              "Number of requests dropped with 'Try again later' response",
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.14.0",
 		},
 		[]string{"requestKind"},
 	)
@@ -204,14 +163,10 @@ var (
 
 	metrics = []resettableCollector{
 		requestCounter,
-		deprecatedRequestCounter,
 		longRunningRequestGauge,
 		requestLatencies,
-		deprecatedRequestLatencies,
-		deprecatedRequestLatenciesSummary,
 		responseSizes,
 		DroppedRequests,
-		DeprecatedDroppedRequests,
 		RegisteredWatchers,
 		WatchEvents,
 		WatchEventsSizes,
@@ -302,13 +257,9 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 	reportedVerb := cleanVerb(verb, req)
 	dryRun := cleanDryRun(req.URL)
 	client := cleanUserAgent(utilnet.GetHTTPClient(req))
-	elapsedMicroseconds := float64(elapsed / time.Microsecond)
 	elapsedSeconds := elapsed.Seconds()
 	requestCounter.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, client, contentType, codeToString(httpCode)).Inc()
-	deprecatedRequestCounter.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component, client, contentType, codeToString(httpCode)).Inc()
 	requestLatencies.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
-	deprecatedRequestLatencies.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(elapsedMicroseconds)
-	deprecatedRequestLatenciesSummary.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(elapsedMicroseconds)
 	// We are only interested in response sizes of read requests.
 	if verb == "GET" || verb == "LIST" {
 		responseSizes.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(float64(respSize))

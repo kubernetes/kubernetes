@@ -192,13 +192,11 @@ func (g *GenericPLEG) relist() {
 
 	if lastRelistTime := g.getRelistTime(); !lastRelistTime.IsZero() {
 		metrics.PLEGRelistInterval.Observe(metrics.SinceInSeconds(lastRelistTime))
-		metrics.DeprecatedPLEGRelistInterval.Observe(metrics.SinceInMicroseconds(lastRelistTime))
 	}
 
 	timestamp := g.clock.Now()
 	defer func() {
 		metrics.PLEGRelistDuration.Observe(metrics.SinceInSeconds(timestamp))
-		metrics.DeprecatedPLEGRelistLatency.Observe(metrics.SinceInMicroseconds(timestamp))
 	}()
 
 	// Get all the pods.
