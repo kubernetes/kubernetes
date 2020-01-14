@@ -14,6 +14,7 @@ go_library(
         "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
@@ -27,6 +28,7 @@ go_test(
         "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
     ],
 )
