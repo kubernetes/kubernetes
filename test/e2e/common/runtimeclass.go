@@ -30,9 +30,8 @@ import (
 	runtimeclasstest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	imageutils "k8s.io/kubernetes/test/utils/image"
-	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
 )
@@ -42,23 +41,23 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 
 	ginkgo.It("should reject a Pod requesting a non-existent RuntimeClass", func() {
 		rcName := f.Namespace.Name + "-nonexistent"
-		expectPodRejection(f, newRuntimeClassPod(rcName))
+		expectPodRejection(f, e2enode.NewRuntimeClassPod(rcName))
 	})
 
 	ginkgo.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler", func() {
 		handler := f.Namespace.Name + "-handler"
 		rcName := createRuntimeClass(f, "unconfigured-handler", handler)
-		pod := f.PodClient().Create(newRuntimeClassPod(rcName))
+		pod := f.PodClient().Create(e2enode.NewRuntimeClassPod(rcName))
 		expectSandboxFailureEvent(f, pod, handler)
 	})
 
 	// This test requires that the PreconfiguredRuntimeHandler has already been set up on nodes.
 	ginkgo.It("should run a Pod requesting a RuntimeClass with a configured handler [NodeFeature:RuntimeHandler]", func() {
 		// The built-in docker runtime does not support configuring runtime handlers.
-		handler := framework.PreconfiguredRuntimeClassHandler()
+		handler := e2enode.PreconfiguredRuntimeClassHandler(framework.TestContext.ContainerRuntime)
 
 		rcName := createRuntimeClass(f, "preconfigured-handler", handler)
-		pod := f.PodClient().Create(newRuntimeClassPod(rcName))
+		pod := f.PodClient().Create(e2enode.NewRuntimeClassPod(rcName))
 		expectPodSuccess(f, pod)
 	})
 
@@ -83,7 +82,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 			}))
 		})
 
-		expectPodRejection(f, newRuntimeClassPod(rcName))
+		expectPodRejection(f, e2enode.NewRuntimeClassPod(rcName))
 	})
 })
 
@@ -95,25 +94,6 @@ func createRuntimeClass(f *framework.Framework, name, handler string) string {
 	rc, err := f.ClientSet.NodeV1beta1().RuntimeClasses().Create(context.TODO(), rc, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 	return rc.GetName()
-}
-
-// newRuntimeClassPod generates a test pod with the given runtimeClassName.
-func newRuntimeClassPod(runtimeClassName string) *v1.Pod {
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: fmt.Sprintf("test-runtimeclass-%s-", runtimeClassName),
-		},
-		Spec: v1.PodSpec{
-			RuntimeClassName: &runtimeClassName,
-			Containers: []v1.Container{{
-				Name:    "test",
-				Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-				Command: []string{"true"},
-			}},
-			RestartPolicy:                v1.RestartPolicyNever,
-			AutomountServiceAccountToken: utilpointer.BoolPtr(false),
-		},
-	}
 }
 
 func expectPodRejection(f *framework.Framework, pod *v1.Pod) {
