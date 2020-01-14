@@ -62,23 +62,27 @@ kind: EgressSelectorConfiguration
 egressSelections:
 - name: "cluster"
   connection:
-    type: "http-connect"
-    httpConnect:
-      url: "https://127.0.0.1:8131"
-      caBundle: "/etc/srv/kubernetes/pki/konnectivity-server/ca.crt"
-      clientKey: "/etc/srv/kubernetes/pki/konnectivity-server/client.key"
-      clientCert: "/etc/srv/kubernetes/pki/konnectivity-server/client.crt"
+    proxyProtocol: "HTTPConnect"
+    transport:
+      tcp:
+        url: "https://127.0.0.1:8131"
+        tlsConfig:
+          caBundle: "/etc/srv/kubernetes/pki/konnectivity-server/ca.crt"
+          clientKey: "/etc/srv/kubernetes/pki/konnectivity-server/client.key"
+          clientCert: "/etc/srv/kubernetes/pki/konnectivity-server/client.crt"
 - name: "master"
   connection:
-    type: "http-connect"
-    httpConnect:
-      url: "https://127.0.0.1:8132"
-      caBundle: "/etc/srv/kubernetes/pki/konnectivity-server-master/ca.crt"
-      clientKey: "/etc/srv/kubernetes/pki/konnectivity-server-master/client.key"
-      clientCert: "/etc/srv/kubernetes/pki/konnectivity-server-master/client.crt"
+    proxyProtocol: "HTTPConnect"
+    transport:
+      tcp:
+        url: "https://127.0.0.1:8132"
+        tlsConfig:
+          caBundle: "/etc/srv/kubernetes/pki/konnectivity-server-master/ca.crt"
+          clientKey: "/etc/srv/kubernetes/pki/konnectivity-server-master/client.key"
+          clientCert: "/etc/srv/kubernetes/pki/konnectivity-server-master/client.crt"
 - name: "etcd"
   connection:
-    type: "direct"
+    proxyProtocol: "Direct"
 `,
 			expectedResult: &apiserver.EgressSelectorConfiguration{
 				TypeMeta: metav1.TypeMeta{
@@ -89,31 +93,40 @@ egressSelections:
 					{
 						Name: "cluster",
 						Connection: apiserver.Connection{
-							Type: "http-connect",
-							HTTPConnect: &apiserver.HTTPConnectConfig{
-								URL:        "https://127.0.0.1:8131",
-								CABundle:   "/etc/srv/kubernetes/pki/konnectivity-server/ca.crt",
-								ClientKey:  "/etc/srv/kubernetes/pki/konnectivity-server/client.key",
-								ClientCert: "/etc/srv/kubernetes/pki/konnectivity-server/client.crt",
+							ProxyProtocol: "HTTPConnect",
+							Transport: &apiserver.Transport{
+								TCP: &apiserver.TCPTransport{
+									URL: "https://127.0.0.1:8131",
+
+									TLSConfig: &apiserver.TLSConfig{
+										CABundle:   "/etc/srv/kubernetes/pki/konnectivity-server/ca.crt",
+										ClientKey:  "/etc/srv/kubernetes/pki/konnectivity-server/client.key",
+										ClientCert: "/etc/srv/kubernetes/pki/konnectivity-server/client.crt",
+									},
+								},
 							},
 						},
 					},
 					{
 						Name: "master",
 						Connection: apiserver.Connection{
-							Type: "http-connect",
-							HTTPConnect: &apiserver.HTTPConnectConfig{
-								URL:        "https://127.0.0.1:8132",
-								CABundle:   "/etc/srv/kubernetes/pki/konnectivity-server-master/ca.crt",
-								ClientKey:  "/etc/srv/kubernetes/pki/konnectivity-server-master/client.key",
-								ClientCert: "/etc/srv/kubernetes/pki/konnectivity-server-master/client.crt",
+							ProxyProtocol: "HTTPConnect",
+							Transport: &apiserver.Transport{
+								TCP: &apiserver.TCPTransport{
+									URL: "https://127.0.0.1:8132",
+									TLSConfig: &apiserver.TLSConfig{
+										CABundle:   "/etc/srv/kubernetes/pki/konnectivity-server-master/ca.crt",
+										ClientKey:  "/etc/srv/kubernetes/pki/konnectivity-server-master/client.key",
+										ClientCert: "/etc/srv/kubernetes/pki/konnectivity-server-master/client.crt",
+									},
+								},
 							},
 						},
 					},
 					{
 						Name: "etcd",
 						Connection: apiserver.Connection{
-							Type: "direct",
+							ProxyProtocol: "Direct",
 						},
 					},
 				},
