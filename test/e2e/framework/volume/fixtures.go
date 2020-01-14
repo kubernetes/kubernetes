@@ -543,38 +543,13 @@ func GenerateScriptCmd(command string) []string {
 	return commands
 }
 
-// generateWriteBlockCmd generates the corresponding command lines to write to a block device the given content.
-// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
-func generateWriteBlockCmd(content, fullPath string) []string {
+// generateWriteCmd is used by generateWriteBlockCmd and generateWriteFileCmd
+func generateWriteCmd(content, path string) []string {
 	var commands []string
 	if !framework.NodeOSDistroIs("windows") {
-		commands = []string{"/bin/sh", "-c", "echo '" + content + "' > " + fullPath}
+		commands = []string{"/bin/sh", "-c", "echo '" + content + "' > " + path}
 	} else {
-		commands = []string{"powershell", "/c", "echo '" + content + "' > " + fullPath}
-	}
-	return commands
-}
-
-// generateWriteFileCmd generates the corresponding command lines to write a file with the given content and file path.
-// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
-func generateWriteFileCmd(content, fullPath string) []string {
-	var commands []string
-	if !framework.NodeOSDistroIs("windows") {
-		commands = []string{"/bin/sh", "-c", "echo '" + content + "' > " + fullPath}
-	} else {
-		commands = []string{"powershell", "/c", "echo '" + content + "' > " + fullPath}
-	}
-	return commands
-}
-
-// generateReadFileCmd generates the corresponding command lines to read from a file with the given file path.
-// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
-func generateReadFileCmd(fullPath string) []string {
-	var commands []string
-	if !framework.NodeOSDistroIs("windows") {
-		commands = []string{"cat", fullPath}
-	} else {
-		commands = []string{"powershell", "/c", "type " + fullPath}
+		commands = []string{"powershell", "/c", "echo '" + content + "' > " + path}
 	}
 	return commands
 }
@@ -590,6 +565,30 @@ func generateReadBlockCmd(fullPath string, numberOfCharacters int) []string {
 		commands = []string{"powershell", "/c", "type " + fullPath}
 	}
 	return commands
+}
+
+// generateWriteBlockCmd generates the corresponding command lines to write to a block device the given content.
+// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
+func generateWriteBlockCmd(content, fullPath string) []string {
+	return generateWriteCmd(content, fullPath)
+}
+
+// generateReadFileCmd generates the corresponding command lines to read from a file with the given file path.
+// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
+func generateReadFileCmd(fullPath string) []string {
+	var commands []string
+	if !framework.NodeOSDistroIs("windows") {
+		commands = []string{"cat", fullPath}
+	} else {
+		commands = []string{"powershell", "/c", "type " + fullPath}
+	}
+	return commands
+}
+
+// generateWriteFileCmd generates the corresponding command lines to write a file with the given content and file path.
+// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
+func generateWriteFileCmd(content, fullPath string) []string {
+	return generateWriteCmd(content, fullPath)
 }
 
 // GenerateSecurityContext generates the corresponding container security context with the given inputs
