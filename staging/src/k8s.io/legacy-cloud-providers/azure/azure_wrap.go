@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
@@ -45,8 +44,6 @@ var (
 	azureResourceGroupNameRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/(?:.*)`)
 )
 
-const vmListCacheKey = "vmListCacheKey"
-
 // checkExistsFromError inspects an error and returns a true if err is nil,
 // false if error is an autorest.Error with StatusCode=404 and will return the
 // error back if error is another status code or another type of error.
@@ -65,44 +62,18 @@ func checkResourceExistsFromError(err *retry.Error) (bool, *retry.Error) {
 /// getVirtualMachine calls 'VirtualMachinesClient.Get' with a timed cache
 /// The service side has throttling control that delays responses if there're multiple requests onto certain vm
 /// resource request in short period.
-func (az *Cloud) getVirtualMachine(nodeName types.NodeName, crt cacheReadType) (compute.VirtualMachine, error) {
+func (az *Cloud) getVirtualMachine(nodeName types.NodeName, crt cacheReadType) (vm compute.VirtualMachine, err error) {
 	vmName := string(nodeName)
-	getter := func(vmName string) (*compute.VirtualMachine, error) {
-		cachedVM, err := az.vmCache.Get(vmListCacheKey, crt)
-		if err != nil {
-			return nil, err
-		}
-
-		virtualMachines := cachedVM.(*sync.Map)
-		if vm, ok := virtualMachines.Load(vmName); ok {
-			result := vm.(*vmEntry)
-			return result.vm, nil
-		}
-
-		return nil, nil
-	}
-
-	vm, err := getter(vmName)
+	cachedVM, err := az.vmCache.Get(vmName, crt)
 	if err != nil {
-		return compute.VirtualMachine{}, err
+		return vm, err
 	}
 
-	if vm != nil {
-		return *vm, nil
+	if cachedVM == nil {
+		return vm, cloudprovider.InstanceNotFound
 	}
 
-	klog.V(2).Infof("Couldn't find VM with name %s, refreshing the cache", vmName)
-	az.vmCache.Delete(vmListCacheKey)
-
-	vm, err = getter(vmName)
-	if err != nil {
-		return compute.VirtualMachine{}, err
-	}
-
-	if vm == nil {
-		return compute.VirtualMachine{}, cloudprovider.InstanceNotFound
-	}
-	return *vm, nil
+	return *(cachedVM.(*compute.VirtualMachine)), nil
 }
 
 func (az *Cloud) getRouteTable(crt cacheReadType) (routeTable network.RouteTable, exists bool, err error) {
@@ -195,11 +166,6 @@ func (az *Cloud) getSecurityGroup(crt cacheReadType) (network.SecurityGroup, err
 	return *(securityGroup.(*network.SecurityGroup)), nil
 }
 
-type vmEntry struct {
-	vm         *compute.VirtualMachine
-	lastUpdate time.Time
-}
-
 func (az *Cloud) newVMCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
 		// Currently InstanceView request are used by azure_zones, while the calls come after non-InstanceView
@@ -216,30 +182,18 @@ func (az *Cloud) newVMCache() (*timedCache, error) {
 			return nil, err
 		}
 
-		vmList, verr := az.VirtualMachinesClient.List(ctx, resourceGroup)
+		vm, verr := az.VirtualMachinesClient.Get(ctx, resourceGroup, key, compute.InstanceView)
 		exists, rerr := checkResourceExistsFromError(verr)
 		if rerr != nil {
 			return nil, rerr.Error()
 		}
 
 		if !exists {
-			klog.V(2).Infof("Virtual machine under resource group %q not found", resourceGroup)
+			klog.V(2).Infof("Virtual machine %q not found", key)
 			return nil, nil
 		}
 
-		localCache := &sync.Map{}
-		for _, vm := range vmList {
-			if vm.Name == nil || *vm.Name == "" {
-				klog.Warning("failed to get the name of VM")
-				continue
-			}
-			localCache.Store(*vm.Name, &vmEntry{
-				vm:         &vm,
-				lastUpdate: time.Now().UTC(),
-			})
-		}
-
-		return localCache, nil
+		return &vm, nil
 	}
 
 	if az.VMCacheTTLInSeconds == 0 {
