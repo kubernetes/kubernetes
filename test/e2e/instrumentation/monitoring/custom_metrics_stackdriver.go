@@ -20,24 +20,24 @@ import (
 	"context"
 	"time"
 
-	"golang.org/x/oauth2/google"
-	clientset "k8s.io/client-go/kubernetes"
-
-	"github.com/onsi/ginkgo"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
-
 	gcm "google.golang.org/api/monitoring/v3"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	customclient "k8s.io/metrics/pkg/client/custom_metrics"
 	externalclient "k8s.io/metrics/pkg/client/external_metrics"
+
+	"github.com/onsi/ginkgo"
+	"golang.org/x/oauth2/google"
 )
 
 const (
@@ -48,7 +48,7 @@ const (
 
 var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	})
 
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
