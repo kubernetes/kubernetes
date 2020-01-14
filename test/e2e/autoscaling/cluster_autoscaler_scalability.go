@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -67,12 +68,12 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 	var sum int
 
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke", "kubemark")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke", "kubemark")
 
 		// Check if Cloud Autoscaler is enabled by trying to get its ConfigMap.
 		_, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Get("cluster-autoscaler-status", metav1.GetOptions{})
 		if err != nil {
-			framework.Skipf("test expects Cluster Autoscaler to be enabled")
+			e2eskipper.Skipf("test expects Cluster Autoscaler to be enabled")
 		}
 
 		c = f.ClientSet

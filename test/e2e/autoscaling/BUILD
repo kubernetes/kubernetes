@@ -45,6 +45,7 @@ go_library(
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/pv:go_default_library",
         "//test/e2e/framework/rc:go_default_library",
+        "//test/e2e/framework/skipper:go_default_library",
         "//test/e2e/instrumentation/monitoring:go_default_library",
         "//test/e2e/scheduling:go_default_library",
         "//test/utils:go_default_library",
