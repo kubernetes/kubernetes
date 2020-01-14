@@ -20,7 +20,7 @@ set -o pipefail
 
 usage="The script automatically cherrypicks a kubernetes patch for an anthos version.
 
-Usage: $(basename $0) [-cdehkmrv] [-g <git remote>] COMMIT_ID master|ANTHOS_MAJOR_MINOR_VERSION|[K8S_MAJOR_MINOR_PATCH_VERSION]...
+Usage: $(basename $0) [-dehkmv] [-c <email1>,<email2>...] [-g <git remote>] [-r <email1>,<email2>...] COMMIT_ID master|ANTHOS_MAJOR_MINOR_VERSION|[K8S_MAJOR_MINOR_PATCH_VERSION]...
 
 Options:
   -c  List of emails to CC (comma separated).
@@ -47,13 +47,15 @@ Branches to cherrypick:
 
 git_remote="origin"
 
-while getopts 'c:dg:hkmr:ev' o; do
-
+while getopts 'c:edg:hkmr:v' o; do
   case "$o" in
     c) cc="$OPTARG"
       ;;
     d) echo "Dry run mode, no actual change pushed"
       dryrun="true"
+      ;;
+    e) echo "Do not skip empty cherrypicks"
+      skip_empty="false"
       ;;
     g) git_remote="$OPTARG"
       echo "Use git remote $git_remote"
@@ -68,9 +70,6 @@ while getopts 'c:dg:hkmr:ev' o; do
       match_k8s_minor_version="true"
       ;;
     r) reviewers="$OPTARG"
-      ;;
-    e) echo "Do not skip empty cherrypicks"
-      skip_empty="false"
       ;;
     v) echo "Verbose output mode"
       set -o xtrace
