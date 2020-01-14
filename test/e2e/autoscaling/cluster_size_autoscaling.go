@@ -48,6 +48,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -98,7 +99,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
-		framework.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 
 		originalSizes = make(map[string]int)
 		sum := 0
@@ -138,7 +139,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		ginkgo.By(fmt.Sprintf("Restoring initial size of the cluster"))
 		setMigSizes(originalSizes)
 		expectedNodes := 0
@@ -210,7 +211,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	gpuType := os.Getenv("TESTED_GPU_TYPE")
 
 	ginkgo.It(fmt.Sprintf("Should scale up GPU pool from 0 [GpuType:%s] [Feature:ClusterSizeAutoscalingGpu]", gpuType), func() {
-		framework.SkipUnlessProviderIs("gke")
+		e2eskipper.SkipUnlessProviderIs("gke")
 		if gpuType == "" {
 			framework.Failf("TEST_GPU_TYPE not defined")
 			return
@@ -237,7 +238,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	ginkgo.It(fmt.Sprintf("Should scale up GPU pool from 1 [GpuType:%s] [Feature:ClusterSizeAutoscalingGpu]", gpuType), func() {
-		framework.SkipUnlessProviderIs("gke")
+		e2eskipper.SkipUnlessProviderIs("gke")
 		if gpuType == "" {
 			framework.Failf("TEST_GPU_TYPE not defined")
 			return
@@ -267,7 +268,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	ginkgo.It(fmt.Sprintf("Should not scale GPU pool up if pod does not require GPUs [GpuType:%s] [Feature:ClusterSizeAutoscalingGpu]", gpuType), func() {
-		framework.SkipUnlessProviderIs("gke")
+		e2eskipper.SkipUnlessProviderIs("gke")
 		if gpuType == "" {
 			framework.Failf("TEST_GPU_TYPE not defined")
 			return
@@ -296,7 +297,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	ginkgo.It(fmt.Sprintf("Should scale down GPU pool from 1 [GpuType:%s] [Feature:ClusterSizeAutoscalingGpu]", gpuType), func() {
-		framework.SkipUnlessProviderIs("gke")
+		e2eskipper.SkipUnlessProviderIs("gke")
 		if gpuType == "" {
 			framework.Failf("TEST_GPU_TYPE not defined")
 			return
@@ -371,7 +372,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	ginkgo.It("should increase cluster size if pending pods are small and there is another node pool that is not autoscaled [Feature:ClusterSizeAutoscalingScaleUp]", func() {
-		framework.SkipUnlessProviderIs("gke")
+		e2eskipper.SkipUnlessProviderIs("gke")
 
 		ginkgo.By("Creating new node-pool with n1-standard-4 machines")
 		const extraPoolName = "extra-pool"
@@ -405,7 +406,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	ginkgo.It("should disable node pool autoscaling [Feature:ClusterSizeAutoscalingScaleUp]", func() {
-		framework.SkipUnlessProviderIs("gke")
+		e2eskipper.SkipUnlessProviderIs("gke")
 
 		ginkgo.By("Creating new node-pool with n1-standard-4 machines")
 		const extraPoolName = "extra-pool"
@@ -467,7 +468,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	ginkgo.It("should increase cluster size if pod requesting volume is pending [Feature:ClusterSizeAutoscalingScaleUp]", func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 
 		volumeLabels := labels.Set{
 			e2epv.VolumeSelectorKey: f.Namespace.Name,
@@ -639,7 +640,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	ginkgo.It("should scale up correct target pool [Feature:ClusterSizeAutoscalingScaleUp]", func() {
-		framework.SkipUnlessProviderIs("gke")
+		e2eskipper.SkipUnlessProviderIs("gke")
 
 		ginkgo.By("Creating new node-pool with n1-standard-4 machines")
 		const extraPoolName = "extra-pool"
@@ -689,12 +690,12 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 	ginkgo.It("should correctly scale down after a node is not needed and one node is broken [Feature:ClusterSizeAutoscalingScaleDown]",
 		func() {
-			framework.SkipUnlessSSHKeyPresent()
+			e2eskipper.SkipUnlessSSHKeyPresent()
 			e2enetwork.TestUnderTemporaryNetworkFailure(c, "default", getAnyNode(c), func() { simpleScaleDownTest(1) })
 		})
 
 	ginkgo.It("should correctly scale down after a node is not needed when there is non autoscaled pool[Feature:ClusterSizeAutoscalingScaleDown]", func() {
-		framework.SkipUnlessProviderIs("gke")
+		e2eskipper.SkipUnlessProviderIs("gke")
 
 		increasedSize := manuallyIncreaseClusterSize(f, originalSizes)
 
@@ -761,7 +762,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			defer disableAutoscaler(extraPoolName, 0, 1)
 		} else {
 			// on GCE, run only if there are already at least 2 node groups
-			framework.SkipUnlessAtLeast(len(originalSizes), 2, "At least 2 node groups are needed for scale-to-0 tests")
+			e2eskipper.SkipUnlessAtLeast(len(originalSizes), 2, "At least 2 node groups are needed for scale-to-0 tests")
 
 			ginkgo.By("Manually scale smallest node group to 0")
 			minMig := ""
@@ -877,12 +878,12 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		} else if len(originalSizes) >= 2 {
 			gceScaleToZero()
 		} else {
-			framework.Skipf("At least 2 node groups are needed for scale-to-0 tests")
+			e2eskipper.Skipf("At least 2 node groups are needed for scale-to-0 tests")
 		}
 	})
 
 	ginkgo.It("Shouldn't perform scale up operation and should list unhealthy status if most of the cluster is broken[Feature:ClusterSizeAutoscalingScaleUp]", func() {
-		framework.SkipUnlessSSHKeyPresent()
+		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		clusterSize := nodeCount
 		for clusterSize < unhealthyClusterThreshold+1 {
