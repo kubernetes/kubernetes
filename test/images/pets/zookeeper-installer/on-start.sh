@@ -57,13 +57,13 @@ i=0
 LEADER=$HOSTNAME
 for peer in "${PEERS[@]}"; do
     (( i=i+1 ))
-    if [[ "${peer}" == *"${HOSTNAME}"* ]]; then
+    if [[ "${peer}" = *"${HOSTNAME}"* ]]; then
       MY_ID=$i
       MY_NAME=${peer}
       echo $i > "${MY_ID_FILE}"
       echo "server.${i}=${peer}:2888:3888:observer;2181" >> "${CFG_BAK}"
     else
-      if [[ $(echo srvr | /opt/nc "${peer}" 2181 | grep Mode) = "Mode: leader" ]]; then
+      if [ "$(echo srvr | /opt/nc "${peer}" 2181 | grep Mode)" = 'Mode: leader' ]; then
         LEADER="${peer}"
       fi
       echo "server.${i}=${peer}:2888:3888:participant;2181" >> "${CFG_BAK}"

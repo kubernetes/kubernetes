@@ -68,11 +68,11 @@ esac
 function get_bin() {
   bin="${1:-}"
   srcdir="${2:-}"
-  if [[ "${bin}" == "" ]]; then
+  if [ -z "${bin}" ]; then
     echo "Binary name is required"
     exit 1
   fi
-  if [[ "${srcdir}" == "" ]]; then
+  if [ -z "${srcdir}" ]; then
     echo "Source directory path is required"
     exit 1
   fi
@@ -91,7 +91,7 @@ function get_bin() {
     locations+=( "${line}" )
   done < <(find "${KUBE_ROOT}/bazel-bin/${srcdir}" -type f -executable \
     -path "*/${host_os}_${host_arch}*/${bin}" 2>/dev/null || true)
-  
+
   (ls -t "${locations[@]}" 2>/dev/null || true) | head -1
 }
 

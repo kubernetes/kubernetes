@@ -202,7 +202,7 @@ EOF
   sed -i'' -e "s/{{EVENTER_MEM}}/${eventer_mem}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
 
   # Cluster Autoscaler.
-  if [[ "${ENABLE_KUBEMARK_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
+  if [ "${ENABLE_KUBEMARK_CLUSTER_AUTOSCALER:-}" = 'true' ]; then
     echo "Setting up Cluster Autoscaler"
     KUBEMARK_AUTOSCALER_MIG_NAME="${KUBEMARK_AUTOSCALER_MIG_NAME:-${NODE_INSTANCE_PREFIX}-group}"
     KUBEMARK_AUTOSCALER_MIN_NODES="${KUBEMARK_AUTOSCALER_MIN_NODES:-0}"
@@ -217,7 +217,7 @@ EOF
   fi
 
   # Kube DNS.
-  if [[ "${ENABLE_KUBEMARK_KUBE_DNS:-}" == "true" ]]; then
+  if [ "${ENABLE_KUBEMARK_KUBE_DNS:-}" = 'true' ]; then
     echo "Setting up kube-dns"
     sed "s/{{dns_domain}}/${KUBE_DNS_DOMAIN}/g" "${RESOURCE_DIRECTORY}/kube_dns_template.yaml" > "${RESOURCE_DIRECTORY}/addons/kube_dns.yaml"
   fi
@@ -260,7 +260,7 @@ function wait-for-hollow-nodes-to-run-or-timeout {
   # IKS uses a real cluster for hollow master, so need to exclude the real worker nodes
   nodes=$("${KUBECTL}" --kubeconfig="${KUBECONFIG}" get node | grep hollow-node 2> /dev/null) || true
   ready=$(($(echo "${nodes}" | grep -vc "NotReady") - 1))
-  until [[ "${ready}" -ge "${NUM_REPLICAS}" ]]; do
+  until [ "${ready}" -ge "${NUM_REPLICAS}" ]; do
     echo -n "."
     sleep 1
     now=$(date +%s)

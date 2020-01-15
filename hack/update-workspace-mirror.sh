@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [[ $# -ne 1 ]]; then
+if [ $# -ne 1 ]; then
     echo 'use "bazel run //hack:update-mirror"'
     echo "(usage: $0 <file with list of URLs to mirror>)"
     exit 1

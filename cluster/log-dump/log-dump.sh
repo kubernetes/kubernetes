@@ -31,7 +31,7 @@ readonly logexporter_namespace="${3:-logexporter}"
 # defined, we assume the function can me called with one argument, the
 # role, which is either "master" or "node".
 echo "Checking for custom logdump instances, if any"
-if [[ $(type -t log_dump_custom_get_instances) == "function" ]]; then
+if [ $(type -t log_dump_custom_get_instances) = 'function' ]; then
   readonly use_custom_instance_list=yes
 else
   readonly use_custom_instance_list=
@@ -64,23 +64,23 @@ readonly max_dump_processes=25
 # TODO: Get rid of all the sourcing of bash dependencies eventually.
 function setup() {
   KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
-  if [[ -z "${use_custom_instance_list}" ]]; then
+  if [ -z "${use_custom_instance_list}" ]; then
     : ${KUBE_CONFIG_FILE:="config-test.sh"}
     echo "Sourcing kube-util.sh"
     source "${KUBE_ROOT}/cluster/kube-util.sh"
     echo "Detecting project"
     detect-project 2>&1
-  elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+  elif [ "${KUBERNETES_PROVIDER}" = 'gke' ]; then
     echo "Using 'use_custom_instance_list' with gke, skipping check for LOG_DUMP_SSH_KEY and LOG_DUMP_SSH_USER"
     # Source the below script for the ssh-to-node utility function.
     # Hack to save and restore the value of the ZONE env as the script overwrites it.
     local gke_zone="${ZONE:-}"
     source "${KUBE_ROOT}/cluster/gce/util.sh"
     ZONE="${gke_zone}"
-  elif [[ -z "${LOG_DUMP_SSH_KEY:-}" ]]; then
+  elif [ -z "${LOG_DUMP_SSH_KEY:-}" ]; then
     echo "LOG_DUMP_SSH_KEY not set, but required when using log_dump_custom_get_instances"
     exit 1
-  elif [[ -z "${LOG_DUMP_SSH_USER:-}" ]]; then
+  elif [ -z "${LOG_DUMP_SSH_USER:-}" ]; then
     echo "LOG_DUMP_SSH_USER not set, but required when using log_dump_custom_get_instances"
     exit 1
   fi
@@ -118,10 +118,10 @@ function copy-logs-from-node() {
       # get-serial-port-output lets you ask for ports 1-4, but currently (11/21/2016) only port 1 contains useful information
       gcloud compute instances get-serial-port-output --project "${PROJECT}" --zone "${ZONE}" --port 1 "${node}" > "${dir}/serial-1.log" || true
       gcloud compute scp --recurse --project "${PROJECT}" --zone "${ZONE}" "${node}:${scp_files}" "${dir}" > /dev/null || true
-    elif  [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
+    elif [ "${KUBERNETES_PROVIDER}" = 'aws' ]; then
       local ip=$(get_ssh_hostname "${node}")
       scp -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${ip}:${scp_files}" "${dir}" > /dev/null || true
-    elif  [[ -n "${use_custom_instance_list}" ]]; then
+    elif  [ -n "${use_custom_instance_list}" ]; then
       scp -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${LOG_DUMP_SSH_KEY}" "${LOG_DUMP_SSH_USER}@${node}:${scp_files}" "${dir}" > /dev/null || true
     else
       echo "Unknown cloud-provider '${KUBERNETES_PROVIDER}' and use_custom_instance_list is unset too - skipping logdump for '${node}'"
@@ -140,8 +140,8 @@ function save-logs() {
     local opt_systemd_services="${4:-""}"
     local on_master="${5:-"false"}"
 
-    if [[ -n "${use_custom_instance_list}" ]]; then
-      if [[ -n "${LOG_DUMP_SAVE_LOGS:-}" ]]; then
+    if [ -n "${use_custom_instance_list}" ]; then
+      if [ -n "${LOG_DUMP_SAVE_LOGS:-}" ]; then
         files="${files} ${LOG_DUMP_SAVE_LOGS:-}"
       fi
     else
@@ -157,7 +157,7 @@ function save-logs() {
     local -r services=( ${systemd_services} ${opt_systemd_services} ${LOG_DUMP_SAVE_SERVICES:-} )
 
     if log-dump-ssh "${node_name}" "command -v journalctl" &> /dev/null; then
-        if [[ "${on_master}" == "true" ]]; then
+        if [ "${on_master}" = 'true' ]; then
           log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-master-installation.service" > "${dir}/kube-master-installation.log" || true
           log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-master-configuration.service" > "${dir}/kube-master-configuration.log" || true
         else
@@ -170,7 +170,7 @@ function save-logs() {
             log-dump-ssh "${node_name}" "sudo journalctl --output=cat -u ${svc}.service" > "${dir}/${svc}.log" || true
         done
 
-        if [[ "$dump_systemd_journal" == "true" ]]; then
+        if [ "$dump_systemd_journal" = 'true' ]; then
           log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise" > "${dir}/systemd.log" || true
         fi
     else
@@ -180,7 +180,7 @@ function save-logs() {
     # Try dumping coverage profiles, if it looks like coverage is enabled in the first place.
     if log-dump-ssh "${node_name}" "stat /var/log/kubelet.cov" &> /dev/null; then
       if log-dump-ssh "${node_name}" "command -v docker" &> /dev/null; then
-        if [[ "${on_master}" == "true" ]]; then
+        if [ "${on_master}" = 'true' ]; then
           run-in-docker-container "${node_name}" "kube-apiserver" "cat /tmp/k8s-kube-apiserver.cov" > "${dir}/kube-apiserver.cov" || true
           run-in-docker-container "${node_name}" "kube-scheduler" "cat /tmp/k8s-kube-scheduler.cov" > "${dir}/kube-scheduler.cov" || true
           run-in-docker-container "${node_name}" "kube-controller-manager" "cat /tmp/k8s-kube-controller-manager.cov" > "${dir}/kube-controller-manager.cov" || true
@@ -222,7 +222,7 @@ function export-windows-docker-event-log() {
 function save-windows-logs-via-diagnostics-tool() {
     local node="${1}"
     local dest_dir="${2}"
-    
+
     gcloud compute instances add-metadata ${node} --metadata enable-diagnostics=true --project=${PROJECT} --zone=${ZONE}
     local logs_archive_in_gcs=$(gcloud alpha compute diagnose export-logs ${node} --zone=${ZONE} --project=${PROJECT} | tail -n 1)
     local temp_local_path="${node}.zip"
@@ -235,7 +235,7 @@ function save-windows-logs-via-diagnostics-tool() {
       fi
     done
 
-    if [[ -f "${temp_local_path}" ]]; then
+    if [ -f "${temp_local_path}" ]; then
       unzip ${temp_local_path} -d "${dest_dir}" > /dev/null
       rm -f ${temp_local_path}
     fi
@@ -283,7 +283,7 @@ function save-logs-windows() {
       return
     fi
 
-    if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+    if [ "${KUBERNETES_PROVIDER}" = 'gke' ]; then
       save-windows-logs-via-diagnostics-tool "${node}" "${dest_dir}"
     else
       save-windows-logs-via-ssh "${node}" "${dest_dir}"
@@ -305,12 +305,12 @@ function run-in-docker-container() {
 
 function dump_masters() {
   local master_names
-  if [[ -n "${use_custom_instance_list}" ]]; then
+  if [ -n "${use_custom_instance_list}" ]; then
     master_names=( $(log_dump_custom_get_instances master) )
   elif [[ ! "${master_ssh_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
     echo "Master SSH not supported for ${KUBERNETES_PROVIDER}"
     return
-  elif [[ -n "${KUBEMARK_MASTER_NAME:-}" ]]; then
+  elif [ -n "${KUBEMARK_MASTER_NAME:-}" ]; then
     master_names=( "${KUBEMARK_MASTER_NAME}" )
   else
     if ! (detect-master); then
@@ -320,7 +320,7 @@ function dump_masters() {
     master_names=( "${MASTER_NAME}" )
   fi
 
-  if [[ "${#master_names[@]}" == 0 ]]; then
+  if [ "${#master_names[@]}" -eq 0 ]; then
     echo "No masters found?"
     return
   fi
@@ -335,7 +335,7 @@ function dump_masters() {
     # wait once we hit that many nodes. This isn't ideal, since one might
     # take much longer than the others, but it should help.
     proc=$((proc - 1))
-    if [[ proc -eq 0 ]]; then
+    if [ $proc -eq 0 ]; then
       proc=${max_dump_processes}
       wait
     fi
@@ -353,10 +353,10 @@ function dump_masters() {
 function dump_nodes() {
   local node_names=()
   local windows_node_names=()
-  if [[ -n "${1:-}" ]]; then
+  if [ -n "${1:-}" ]; then
     echo "Dumping logs for nodes provided as args to dump_nodes() function"
     node_names=( "$@" )
-  elif [[ -n "${use_custom_instance_list}" ]]; then
+  elif [ -n "${use_custom_instance_list}" ]; then
     echo "Dumping logs for nodes provided by log_dump_custom_get_instances() function"
     node_names=( $(log_dump_custom_get_instances node) )
   elif [[ ! "${node_ssh_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
@@ -365,28 +365,28 @@ function dump_nodes() {
   else
     echo "Detecting nodes in the cluster"
     detect-node-names &> /dev/null
-    if [[ -n "${NODE_NAMES:-}" ]]; then
+    if [ -n "${NODE_NAMES:-}" ]; then
       node_names=( "${NODE_NAMES[@]}" )
     fi
-    if [[ -n "${WINDOWS_NODE_NAMES:-}" ]]; then
+    if [ -n "${WINDOWS_NODE_NAMES:-}" ]; then
       windows_node_names=( "${WINDOWS_NODE_NAMES[@]}" )
     fi
   fi
 
-  if [[ "${#node_names[@]}" == 0 && "${#windows_node_names[@]}" == 0 ]]; then
+  if [[ "${#node_names[@]}" -eq 0 && "${#windows_node_names[@]}" -eq 0 ]]; then
     echo "No nodes found!"
     return
   fi
 
   node_logfiles_all="${node_logfiles}"
-  if [[ "${ENABLE_HOLLOW_NODE_LOGS:-}" == "true" ]]; then
+  if [ "${ENABLE_HOLLOW_NODE_LOGS:-}" = 'true' ]; then
     node_logfiles_all="${node_logfiles_all} ${hollow_node_logfiles}"
   fi
 
   linux_nodes_selected_for_logs=()
-  if [[ -n "${LOGDUMP_ONLY_N_RANDOM_NODES:-}" ]]; then
+  if [ -n "${LOGDUMP_ONLY_N_RANDOM_NODES:-}" ]; then
     # We randomly choose 'LOGDUMP_ONLY_N_RANDOM_NODES' many nodes for fetching logs.
-    for index in `shuf -i 0-$(( ${#node_names[*]} - 1 )) -n ${LOGDUMP_ONLY_N_RANDOM_NODES}`
+    for index in $(shuf -i 0-$(( ${#node_names[*]} - 1 )) -n ${LOGDUMP_ONLY_N_RANDOM_NODES})
     do
       linux_nodes_selected_for_logs+=("${node_names[$index]}")
     done
@@ -401,7 +401,7 @@ function dump_nodes() {
     node_name="${all_selected_nodes[$i]}"
     node_dir="${report_dir}/${node_name}"
     mkdir -p "${node_dir}"
-    if [[ "${i}" -lt "${#linux_nodes_selected_for_logs[@]}" ]]; then
+    if [ "${i}" -lt "${#linux_nodes_selected_for_logs[@]}" ]; then
       # Save logs in the background. This speeds up things when there are
       # many nodes.
       save-logs "${node_name}" "${node_dir}" "${node_logfiles_all}" "${node_systemd_services}" &
@@ -413,7 +413,7 @@ function dump_nodes() {
     # wait once we hit that many nodes. This isn't ideal, since one might
     # take much longer than the others, but it should help.
     proc=$((proc - 1))
-    if [[ proc -eq 0 ]]; then
+    if [ proc -eq 0 ]; then
       proc=${max_dump_processes}
       wait
     fi
@@ -448,7 +448,7 @@ function find_non_logexported_nodes() {
 # This function examines NODE_NAMES but not WINDOWS_NODE_NAMES since logexporter
 # does not run on Windows nodes.
 function dump_nodes_with_logexporter() {
-  if [[ -n "${use_custom_instance_list}" ]]; then
+  if [ -n "${use_custom_instance_list}" ]; then
     echo "Dumping logs for nodes provided by log_dump_custom_get_instances() function"
     NODE_NAMES=( $(log_dump_custom_get_instances node) )
   else
@@ -456,7 +456,7 @@ function dump_nodes_with_logexporter() {
     detect-node-names &> /dev/null
   fi
 
-  if [[ -z "${NODE_NAMES:-}" ]]; then
+  if [ -z "${NODE_NAMES:-}" ]; then
     echo "No nodes found!"
     return
   fi
@@ -489,12 +489,12 @@ function dump_nodes_with_logexporter() {
   start="$(date +%s)"
   while true; do
     now="$(date +%s)"
-    if [[ $((now - start)) -gt ${logexport_sleep_seconds} ]]; then
+    if [ $((now - start)) -gt ${logexport_sleep_seconds} ]; then
       echo "Waiting for all nodes to be logexported timed out."
       break
     fi
     if find_non_logexported_nodes; then
-      if [[ -z "${NON_LOGEXPORTED_NODES:-}" ]]; then
+      if [ -z "${NON_LOGEXPORTED_NODES:-}" ]; then
         break
       fi
     fi
@@ -513,7 +513,7 @@ function dump_nodes_with_logexporter() {
     # wait once we hit that many nodes. This isn't ideal, since one might
     # take much longer than the others, but it should help.
     proc=$((proc - 1))
-    if [[ proc -eq 0 ]]; then
+    if [ proc -eq 0 ]; then
       proc=${max_dump_processes}
       wait
     fi
@@ -527,7 +527,7 @@ function dump_nodes_with_logexporter() {
       break
     else
       echo "Attempt ${retry} failed to list marker files for successful nodes"
-      if [[ "${retry}" == 10 ]]; then
+      if [ "${retry}" -eq 10 ]; then
         echo "Final attempt to list marker files failed.. falling back to logdump through SSH"
         "${KUBECTL}" delete namespace "${logexporter_namespace}" || true
         dump_nodes "${NODE_NAMES[@]}"
@@ -540,7 +540,7 @@ function dump_nodes_with_logexporter() {
   failed_nodes=()
   # The following if is needed, because defaulting for empty arrays
   # seems to treat them as non-empty with single empty string.
-  if [[ -n "${NON_LOGEXPORTED_NODES:-}" ]]; then
+  if [ -n "${NON_LOGEXPORTED_NODES:-}" ]; then
     for node in "${NON_LOGEXPORTED_NODES[@]:-}"; do
       echo "Logexporter didn't succeed on node ${node}. Queuing it for logdump through SSH."
       failed_nodes+=("${node}")
@@ -550,7 +550,7 @@ function dump_nodes_with_logexporter() {
   # Delete the logexporter resources and dump logs for the failed nodes (if any) through SSH.
   "${KUBECTL}" get pods --namespace "${logexporter_namespace}" || true
   "${KUBECTL}" delete namespace "${logexporter_namespace}" || true
-  if [[ "${#failed_nodes[@]}" != 0 ]]; then
+  if [ "${#failed_nodes[@]}" -ne 0 ]; then
     echo -e "Dumping logs through SSH for the following nodes:\n${failed_nodes[@]}"
     dump_nodes "${failed_nodes[@]}"
   fi
@@ -562,7 +562,7 @@ function detect_node_failures() {
   fi
 
   detect-node-names
-  if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
+  if [ "${KUBERNETES_PROVIDER}" = 'gce' ]; then
     local all_instance_groups=(${INSTANCE_GROUPS[@]} ${WINDOWS_INSTANCE_GROUPS[@]})
   else
     local all_instance_groups=(${INSTANCE_GROUPS[@]})
@@ -594,13 +594,13 @@ function main() {
   # Copy master logs to artifacts dir locally (through SSH).
   echo "Dumping logs from master locally to '${report_dir}'"
   dump_masters
-  if [[ "${DUMP_ONLY_MASTER_LOGS:-}" == "true" ]]; then
+  if [ "${DUMP_ONLY_MASTER_LOGS:-}" = 'true' ]; then
     echo "Skipping dumping of node logs"
     return
   fi
 
   # Copy logs from nodes to GCS directly or to artifacts dir locally (through SSH).
-  if [[ -n "${gcs_artifacts_dir}" ]]; then
+  if [ -n "${gcs_artifacts_dir}" ]; then
     echo "Dumping logs from nodes to GCS directly at '${gcs_artifacts_dir}' using logexporter"
     dump_nodes_with_logexporter
   else

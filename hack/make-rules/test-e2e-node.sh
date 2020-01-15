@@ -46,19 +46,19 @@ extra_envs=${EXTRA_ENVS:-}
 
 # Parse the flags to pass to ginkgo
 ginkgoflags=""
-if [[ ${parallelism} -gt 1 ]]; then  
+if [ "${parallelism}" -gt 1 ]; then
   ginkgoflags="${ginkgoflags} -nodes=${parallelism} "
 fi
 
-if [[ ${focus} != "" ]]; then
+if [ -n "${focus}" ]; then
   ginkgoflags="${ginkgoflags} -focus=\"${focus}\" "
 fi
 
-if [[ ${skip} != "" ]]; then
+if [ -n "${skip}" ]; then
   ginkgoflags="${ginkgoflags} -skip=\"${skip}\" "
 fi
 
-if [[ ${run_until_failure} != "" ]]; then
+if [ -n "${run_until_failure}" ]; then
   ginkgoflags="${ginkgoflags} -untilItFails=${run_until_failure} "
 fi
 
@@ -69,11 +69,11 @@ if [ ! -d "${artifacts}" ]; then
 fi
 echo "Test artifacts will be written to ${artifacts}"
 
-if [[ ${runtime} == "remote" ]] ; then
-  if [[ -n ${container_runtime_endpoint} ]] ; then
+if [ "${runtime}" = 'remote' ] ; then
+  if [ -n "${container_runtime_endpoint}" ] ; then
     test_args="--container-runtime-endpoint=${container_runtime_endpoint} ${test_args}"
   fi
-  if [[ -n ${image_service_endpoint} ]] ; then
+  if [ -n "${image_service_endpoint}" ] ; then
     test_args="--image-service-endpoint=${image_service_endpoint} ${test_args}"
   fi
 fi
@@ -86,13 +86,13 @@ if [ "${remote}" = true ] ; then
   image_project=${IMAGE_PROJECT:-"kubernetes-node-e2e-images"}
   metadata=${INSTANCE_METADATA:-""}
   list_images=${LIST_IMAGES:-false}
-  if  [[ ${list_images} == "true" ]]; then
+  if  [ "${list_images}" = 'true' ]; then
     gcloud compute images list --project="${image_project}" | grep "e2e-node"
     exit 0
   fi
   gubernator=${GUBERNATOR:-"false"}
   image_config_file=${IMAGE_CONFIG_FILE:-""}
-  if [[ ${hosts} == "" && ${images} == "" && ${image_config_file} == "" ]]; then
+  if [[ -z ${hosts} && -z ${images} && -z ${image_config_file} ]]; then
     image_project="${IMAGE_PROJECT:-"cos-cloud"}"
     gci_image=$(gcloud compute images list --project "${image_project}" \
     --no-standard-images --filter="name ~ 'cos-beta.*'" --format="table[no-heading](name)")
@@ -107,32 +107,32 @@ if [ "${remote}" = true ] ; then
 
   # Get the compute zone
   zone=${ZONE:-"$(gcloud info --format='value(config.properties.compute.zone)')"}
-  if [[ ${zone} == "" ]]; then
+  if [ -z "${zone}" ]; then
     echo "Could not find gcloud compute/zone when running: \`gcloud info --format='value(config.properties.compute.zone)'\`"
     exit 1
   fi
 
   # Get the compute project
   project=$(gcloud info --format='value(config.project)')
-  if [[ ${project} == "" ]]; then
+  if [ -z "${project}" ]; then
     echo "Could not find gcloud project when running: \`gcloud info --format='value(config.project)'\`"
     exit 1
   fi
 
   # Check if any of the images specified already have running instances.  If so reuse those instances
   # by moving the IMAGE to a HOST
-  if [[ ${images} != "" ]]; then
+  if [ -n "${images}" ]; then
   IFS=',' read -ra IM <<< "${images}"
        images=""
        for i in "${IM[@]}"; do
          if gcloud compute instances list --project="${project}" --filter="name:'${instance_prefix}-${i}' AND zone:'${zone}'" | grep "${i}"; then
-           if [[ "${hosts}" != "" ]]; then
+           if [ -n "${hosts}" ]; then
              hosts="${hosts},"
            fi
            echo "Reusing host ${instance_prefix}-${i}"
            hosts="${hosts}${instance_prefix}-${i}"
          else
-           if [[ "${images}" != "" ]]; then
+           if [ -n "${images}" ]; then
              images="${images},"
            fi
            images="${images}${i}"

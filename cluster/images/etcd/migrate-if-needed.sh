@@ -86,7 +86,7 @@ ETCD_DATA_PREFIX="${ETCD_DATA_PREFIX:-/registry}"
 ETCD_CREDS="${ETCD_CREDS:-}"
 
 # Correctly support upgrade and rollback to non-default version.
-if [ "${DO_NOT_MOVE_BINARIES:-}" != "true" ]; then
+if [ "${DO_NOT_MOVE_BINARIES:-}" != 'true' ]; then
   cp "/usr/local/bin/etcd-${TARGET_VERSION}" "/usr/local/bin/etcd"
   cp "/usr/local/bin/etcdctl-${TARGET_VERSION}" "/usr/local/bin/etcdctl"
 fi

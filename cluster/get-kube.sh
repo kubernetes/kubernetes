@@ -97,7 +97,7 @@ function set_binary_version() {
 function download_kube_binaries {
   (
     cd kubernetes
-    if [[ -x ./cluster/get-kube-binaries.sh ]]; then
+    if [ -x ./cluster/get-kube-binaries.sh ]; then
       # Make sure to use the same download URL in get-kube-binaries.sh
       KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL}" \
         ./cluster/get-kube-binaries.sh
@@ -106,7 +106,7 @@ function download_kube_binaries {
 }
 
 function create_cluster {
-  if [[ -n "${KUBERNETES_SKIP_CREATE_CLUSTER-}" ]]; then
+  if [ -n "${KUBERNETES_SKIP_CREATE_CLUSTER-}" ]; then
     exit 0
   fi
   echo "Creating a kubernetes on ${KUBERNETES_PROVIDER:-gce}..."
@@ -133,13 +133,13 @@ function valid-storage-scope {
   curl "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" -H "Metadata-Flavor: Google" -s | grep -E "auth/devstorage|auth/cloud-platform"
 }
 
-if [[ -n "${KUBERNETES_SKIP_DOWNLOAD-}" ]]; then
+if [ -n "${KUBERNETES_SKIP_DOWNLOAD-}" ]; then
   create_cluster
   exit 0
 fi
 
-if [[ -d "./kubernetes" ]]; then
-  if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
+if [ -d "./kubernetes" ]; then
+  if [ -z "${KUBERNETES_SKIP_CONFIRM-}" ]; then
     echo "'kubernetes' directory already exist. Should we skip download step and start to create cluster based on it? [Y]/n"
     read -r confirm
     if [[ ! "${confirm}" =~ ^[nN]$ ]]; then
@@ -189,7 +189,7 @@ release=${KUBERNETES_RELEASE:-"release/stable"}
 # Validate Kubernetes release version.
 # Translate a published version <bucket>/<version> (e.g. "release/stable") to version number.
 set_binary_version "${release}"
-if [[ -z "${KUBERNETES_SKIP_RELEASE_VALIDATION-}" ]]; then
+if [ -z "${KUBERNETES_SKIP_RELEASE_VALIDATION-}" ]; then
   if [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
     # Override KUBERNETES_RELEASE_URL to point to the CI bucket;
     # this will be used by get-kube-binaries.sh.
@@ -202,10 +202,10 @@ fi
 kubernetes_tar_url="${KUBERNETES_RELEASE_URL}/${KUBE_VERSION}/${file}"
 
 need_download=true
-if [[ -r "${PWD}/${file}" ]]; then
+if [ -r "${PWD}/${file}" ]; then
   downloaded_version=$(tar -xzOf "${PWD}/${file}" kubernetes/version 2>/dev/null || true)
   echo "Found preexisting ${file}, release ${downloaded_version}"
-  if [[ "${downloaded_version}" == "${KUBE_VERSION}" ]]; then
+  if [ "${downloaded_version}" = "${KUBE_VERSION}" ]; then
     echo "Using preexisting kubernetes.tar.gz"
     need_download=false
   fi
@@ -217,10 +217,10 @@ if "${need_download}"; then
   echo "  to ${PWD}/${file}"
 fi
 
-if [[ -e "${PWD}/kubernetes" ]]; then
+if [ -e "${PWD}/kubernetes" ]; then
   # Let's try not to accidentally nuke something that isn't a kubernetes
   # release dir.
-  if [[ ! -f "${PWD}/kubernetes/version" ]]; then
+  if [ ! -f "${PWD}/kubernetes/version" ]; then
     echo "${PWD}/kubernetes exists but does not look like a Kubernetes release."
     echo "Aborting!"
     exit 5
@@ -228,7 +228,7 @@ if [[ -e "${PWD}/kubernetes" ]]; then
   echo "Will also delete preexisting 'kubernetes' directory."
 fi
 
-if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
+if [ -z "${KUBERNETES_SKIP_CONFIRM-}" ]; then
   echo "Is this ok? [Y]/n"
   read -r confirm
   if [[ "${confirm}" =~ ^[nN]$ ]]; then
@@ -241,7 +241,7 @@ if "${need_download}"; then
   if [[ $(which curl) ]]; then
     # if the url belongs to GCS API we should use oauth2_token in the headers
     curl_headers=""
-    if { [[ "${KUBERNETES_PROVIDER:-gce}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]] ; } &&
+    if { [ "${KUBERNETES_PROVIDER:-gce}" = 'gce' ] || [ "${KUBERNETES_PROVIDER}" = 'gke' ] ; } &&
        [[ "$kubernetes_tar_url" =~ ^https://storage.googleapis.com.* ]] && valid-storage-scope ; then
       curl_headers="Authorization: Bearer $(get-credentials)"
     fi

@@ -42,7 +42,7 @@ SECRETS="${CONFDIR}/rsyncd.secrets"
 
 mkdir -p "${CONFDIR}"
 
-if [[ -f "${PIDFILE}" ]]; then
+if [ -f "${PIDFILE}" ]; then
   PID=$(cat "${PIDFILE}")
   echo "Cleaning up old PID file: ${PIDFILE}"
   kill "${PID}" &> /dev/null || true
@@ -57,7 +57,7 @@ EOF
 chmod go= "${SECRETS}"
 
 USER_CONFIG=
-if [[ "$(id -u)" == "0" ]]; then
+if [ "$(id -u)" -eq 0 ]; then
   USER_CONFIG="  uid = 0"$'\n'"  gid = 0"
 fi
 

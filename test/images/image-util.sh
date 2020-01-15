@@ -45,7 +45,7 @@ getBaseImage() {
 # arm64, ppc64le, s390x
 build() {
   image=$1
-  if [[ -f ${image}/BASEIMAGE ]]; then
+  if [ -f "${image}/BASEIMAGE" ]; then
     archs=$(listArchs "$image")
   else
     archs=${!QEMUARCHS[*]}
@@ -63,7 +63,7 @@ build() {
     kube::util::trap_add "rm -rf ${temp_dir}" EXIT
 
     cp -r "${image}"/* "${temp_dir}"
-    if [[ -f ${image}/Makefile ]]; then
+    if [ -f "${image}/Makefile" ]; then
       # make bin will take care of all the prerequisites needed
       # for building the docker image
       make -C "${image}" bin ARCH="${arch}" TARGET="${temp_dir}"
@@ -72,7 +72,7 @@ build() {
     # image tag
     TAG=$(<VERSION)
 
-    if [[ -f BASEIMAGE ]]; then
+    if [ -f BASEIMAGE ]; then
       BASEIMAGE=$(getBaseImage "${arch}")
       ${SED} -i "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
       ${SED} -i "s|BASEARCH|${arch}|g" Dockerfile
@@ -80,14 +80,14 @@ build() {
 
     # copy the qemu-*-static binary to docker image to build the multi architecture image on x86 platform
     if grep -q "CROSS_BUILD_" Dockerfile; then
-      if [[ "${arch}" == "amd64" ]]; then
+      if [ "${arch}" = 'amd64' ]; then
         ${SED} -i "/CROSS_BUILD_/d" Dockerfile
       else
         ${SED} -i "s|QEMUARCH|${QEMUARCHS[$arch]}|g" Dockerfile
         # Register qemu-*-static for all supported processors except the current one
         echo "Registering qemu-*-static binaries in the kernel"
         local sudo=""
-        if [[ $(id -u) != 0 ]]; then
+        if [ "$(id -u)" -ne 0 ]; then
           sudo=sudo
         fi
         ${sudo} "${KUBE_ROOT}/third_party/multiarch/qemu-user-static/register/register.sh" --reset
@@ -119,7 +119,7 @@ push() {
   image=$1
   docker_version_check
   TAG=$(<"${image}"/VERSION)
-  if [[ -f ${image}/BASEIMAGE ]]; then
+  if [ -f "${image}/BASEIMAGE" ]; then
     archs=$(listArchs "$image")
   else
     archs=${!QEMUARCHS[*]}
@@ -144,7 +144,7 @@ push() {
 # This function is for building the go code
 bin() {
   local arch_prefix=""
-  if [[ "${ARCH:-}" == "arm" ]]; then
+  if [ "${ARCH:-}" = 'arm' ]; then
     arch_prefix="GOARM=${GOARM:-7}"
   fi
   for SRC in "$@";
@@ -159,7 +159,7 @@ bin() {
 
 shift
 
-if [[ "${WHAT}" == "all-conformance" ]]; then
+if [ "${WHAT}" = 'all-conformance' ]; then
   # NOTE(claudiub): Building *ALL* the images under the kubernetes/test/images folder takes an extremely
   # long time (especially some images), and some images are rarely used and rarely updated, so there's
   # no point in rebuilding all of them every time. This will only build the Conformance-related images.

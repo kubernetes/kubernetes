@@ -66,7 +66,7 @@ done < <( hack/make-rules/helpers/cache_go_dirs.sh "${KUBE_ROOT}/_tmp/all_go_dir
             grep -vE "$ignore_pattern" )
 
 failing_packages=()
-if [[ -z $FOCUS ]]; then # Ignore failing_packages in FOCUS mode
+if [ -z "$FOCUS" ]; then # Ignore failing_packages in FOCUS mode
   while IFS='' read -r line; do failing_packages+=("$line"); done < <(cat "$failure_file")
 fi
 errors=()
@@ -83,9 +83,9 @@ while read -r error; do
   file="${error%%:*}"
   pkg="$(dirname "$file")"
   kube::util::array_contains "$pkg" "${failing_packages[@]}" && in_failing=$? || in_failing=$?
-  if [[ "${in_failing}" -ne "0" ]]; then
+  if [ "${in_failing}" -ne 0 ]; then
     errors+=( "${error}" )
-  elif [[ "${in_failing}" -eq "0" ]]; then
+  elif [ "${in_failing}" -eq 0 ]; then
     really_failing+=( "$pkg" )
   fi
 done < <(staticcheck -checks "${checks}" "${all_packages[@]}" 2>/dev/null || true)
@@ -126,7 +126,7 @@ else
   exit 1
 fi
 
-if [[ ${#not_failing[@]} -gt 0 ]]; then
+if [ ${#not_failing[@]} -gt 0 ]; then
   {
     echo "Some packages in hack/.staticcheck_failures are passing staticcheck. Please remove them."
     echo
@@ -138,7 +138,7 @@ if [[ ${#not_failing[@]} -gt 0 ]]; then
   exit 1
 fi
 
-if [[ ${#gone[@]} -gt 0 ]]; then
+if [ ${#gone[@]} -gt 0 ]; then
   {
     echo "Some packages in hack/.staticcheck_failures do not exist anymore. Please remove them."
     echo

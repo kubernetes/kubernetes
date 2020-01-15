@@ -68,16 +68,16 @@ MASTER_OS_DISTRIBUTION=${KUBE_MASTER_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gc
 NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
 WINDOWS_NODE_OS_DISTRIBUTION=${WINDOWS_NODE_OS_DISTRIBUTION:-win1809}
 
-if [[ "${MASTER_OS_DISTRIBUTION}" == "cos" ]]; then
+if [ "${MASTER_OS_DISTRIBUTION}" = 'cos' ]; then
     MASTER_OS_DISTRIBUTION="gci"
 fi
 
-if [[ "${NODE_OS_DISTRIBUTION}" == "cos" ]]; then
+if [ "${NODE_OS_DISTRIBUTION}" = 'cos' ]; then
     NODE_OS_DISTRIBUTION="gci"
 fi
 
 # GPUs supported in GCE do not have compatible drivers in Debian 7.
-if [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
+if [ "${NODE_OS_DISTRIBUTION}" = 'debian' ]; then
     NODE_ACCELERATORS=""
 fi
 
@@ -102,7 +102,7 @@ CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-}
 CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-}
 LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-}
 GCI_DOCKER_VERSION=${KUBE_GCI_DOCKER_VERSION:-}
-if [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
+if [ "${CONTAINER_RUNTIME}" = 'containerd' ]; then
   CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-containerd}
   LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
 fi
@@ -113,7 +113,7 @@ MASTER_EXTRA_METADATA=${KUBE_MASTER_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
 NODE_EXTRA_METADATA=${KUBE_NODE_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
 
 NETWORK=${KUBE_GCE_NETWORK:-e2e-test-${USER}}
-if [[ "${CREATE_CUSTOM_NETWORK}" == true ]]; then
+if [ "${CREATE_CUSTOM_NETWORK}" = 'true' ]; then
   SUBNETWORK="${SUBNETWORK:-${NETWORK}-custom-subnet}"
 fi
 INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-e2e-test-${USER}}"
@@ -132,12 +132,12 @@ NODE_IP_RANGE="$(get-node-ip-range)"
 
 RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
-if [[ "${KUBE_FEATURE_GATES:-}" == "AllAlpha=true" ]]; then
+if [ "${KUBE_FEATURE_GATES:-}" = 'AllAlpha=true' ]; then
   RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-api/all=true}"
 fi
 
 # If feature gates includes AllAlpha or EndpointSlice, and EndpointSlice has not been disabled, add EndpointSlice controller to list of controllers to run.
-if [[ (( "${KUBE_FEATURE_GATES:-}" == *"AllAlpha=true"* ) || ( "${KUBE_FEATURE_GATES:-}" == *"EndpointSlice=true"* )) && "${KUBE_FEATURE_GATES:-}" != *"EndpointSlice=false"* ]]; then
+if [[ (( "${KUBE_FEATURE_GATES:-}" = *"AllAlpha=true"* ) || ( "${KUBE_FEATURE_GATES:-}" = *"EndpointSlice=true"* )) && "${KUBE_FEATURE_GATES:-}" != *"EndpointSlice=false"* ]]; then
   RUN_CONTROLLERS="${RUN_CONTROLLERS:-*,endpointslice}"
 fi
 
@@ -210,10 +210,10 @@ TEST_CLUSTER_RESYNC_PERIOD="${TEST_CLUSTER_RESYNC_PERIOD:---min-resync-period=3m
 TEST_CLUSTER_API_CONTENT_TYPE="${TEST_CLUSTER_API_CONTENT_TYPE:-}"
 
 KUBELET_TEST_ARGS="${KUBELET_TEST_ARGS:-} --serialize-image-pulls=false ${TEST_CLUSTER_API_CONTENT_TYPE}"
-if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]] || [[ "${NODE_OS_DISTRIBUTION}" == "ubuntu" ]] || [[ "${NODE_OS_DISTRIBUTION}" == "custom" ]]; then
+if [ "${NODE_OS_DISTRIBUTION}" = 'gci' ] || [ "${NODE_OS_DISTRIBUTION}" = 'ubuntu' ] || [ "${NODE_OS_DISTRIBUTION}" = 'custom' ]; then
   NODE_KUBELET_TEST_ARGS="${NODE_KUBELET_TEST_ARGS:-} --experimental-kernel-memcg-notification=true"
 fi
-if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]] || [[ "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]]; then
+if [ "${MASTER_OS_DISTRIBUTION}" = 'gci' ] || [ "${MASTER_OS_DISTRIBUTION}" = 'ubuntu' ]; then
   MASTER_KUBELET_TEST_ARGS="${MASTER_KUBELET_TEST_ARGS:-} --experimental-kernel-memcg-notification=true"
 fi
 APISERVER_TEST_ARGS="${APISERVER_TEST_ARGS:-} --runtime-config=extensions/v1beta1,scheduling.k8s.io/v1alpha1,settings.k8s.io/v1alpha1 ${TEST_CLUSTER_DELETE_COLLECTION_WORKERS} ${TEST_CLUSTER_MAX_REQUESTS_INFLIGHT}"
@@ -226,10 +226,10 @@ MASTER_NODE_LABELS="${KUBE_MASTER_NODE_LABELS:-}"
 NON_MASTER_NODE_LABELS="${KUBE_NON_MASTER_NODE_LABELS:-}"
 WINDOWS_NON_MASTER_NODE_LABELS="${WINDOWS_NON_MASTER_NODE_LABELS:-}"
 
-if [[ "${PREEMPTIBLE_MASTER}" == "true" ]]; then
+if [ "${PREEMPTIBLE_MASTER}" = 'true' ]; then
     NODE_LABELS="${NODE_LABELS},cloud.google.com/gke-preemptible=true"
     WINDOWS_NODE_LABELS="${WINDOWS_NODE_LABELS},cloud.google.com/gke-preemptible=true"
-elif [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
+elif [ "${PREEMPTIBLE_NODE}" = 'true' ]; then
     NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS},cloud.google.com/gke-preemptible=true"
     WINDOWS_NON_MASTER_NODE_LABELS="${WINDOWS_NON_MASTER_NODE_LABELS},cloud.google.com/gke-preemptible=true"
 fi
@@ -243,7 +243,7 @@ CUSTOM_TYPHA_DEPLOYMENT_YAML="${KUBE_CUSTOM_TYPHA_DEPLOYMENT_YAML:-}"
 # To avoid running netd on a node that is not configured appropriately,
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.
 # Windows nodes do not support netd.
-if [[ ${ENABLE_NETD:-} == "true" ]]; then
+if [ "${ENABLE_NETD:-}" = 'true' ]; then
 	NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}cloud.google.com/gke-netd-ready=true"
 fi
 
@@ -252,7 +252,7 @@ ENABLE_NODELOCAL_DNS="${KUBE_ENABLE_NODELOCAL_DNS:-false}"
 # To avoid running Calico on a node that is not configured appropriately,
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.
 # Windows nodes do not support Calico.
-if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
+if [ ${NETWORK_POLICY_PROVIDER:-} = 'calico' ]; then
 	NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}projectcalico.org/ds-ready=true"
 fi
 
@@ -260,7 +260,7 @@ fi
 # and run a proxy daemonset on nodes.
 ENABLE_METADATA_CONCEALMENT="${ENABLE_METADATA_CONCEALMENT:-true}" # true, false
 METADATA_CONCEALMENT_NO_FIREWALL="${METADATA_CONCEALMENT_NO_FIREWALL:-false}" # true, false
-if [[ ${ENABLE_METADATA_CONCEALMENT:-} == "true" ]]; then
+if [ ${ENABLE_METADATA_CONCEALMENT:-} = 'true' ]; then
   # Put the necessary label on the node so the daemonset gets scheduled.
   NODE_LABELS="${NODE_LABELS},cloud.google.com/metadata-proxy-ready=true"
   # Add to the provider custom variables.
@@ -276,12 +276,12 @@ ENABLE_CLUSTER_LOGGING="${KUBE_ENABLE_CLUSTER_LOGGING:-true}"
 ELASTICSEARCH_LOGGING_REPLICAS=1
 
 # Optional: Don't require https for registries in our local RFC1918 network
-if [[ ${KUBE_ENABLE_INSECURE_REGISTRY:-false} == "true" ]]; then
+if [ "${KUBE_ENABLE_INSECURE_REGISTRY:-false}" = 'true' ]; then
   EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS} --insecure-registry 10.0.0.0/8"
 fi
 
-if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
-    if [[ -z "${FEATURE_GATES:-}" ]]; then
+if [ -n "${NODE_ACCELERATORS}" ]; then
+    if [ -z "${FEATURE_GATES:-}" ]; then
         FEATURE_GATES="DevicePlugins=true"
     else
         FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
@@ -310,7 +310,7 @@ ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 #   none           - Not run node problem detector.
 #   daemonset      - Run node problem detector as daemonset.
 #   standalone     - Run node problem detector as standalone system daemon.
-if [[ "${NODE_OS_DISTRIBUTION}" == "gci" ]]; then
+if [ "${NODE_OS_DISTRIBUTION}" = 'gci' ]; then
   # Enable standalone mode by default for gci.
   ENABLE_NODE_PROBLEM_DETECTOR="${KUBE_ENABLE_NODE_PROBLEM_DETECTOR:-standalone}"
 else
@@ -327,7 +327,7 @@ CNI_SHA1="${CNI_SHA1:-}"
 
 # Optional: Create autoscaler for cluster's nodes.
 ENABLE_CLUSTER_AUTOSCALER="${KUBE_ENABLE_CLUSTER_AUTOSCALER:-false}"
-if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
+if [ "${ENABLE_CLUSTER_AUTOSCALER}" = 'true' ]; then
   AUTOSCALER_MIN_NODES="${KUBE_AUTOSCALER_MIN_NODES:-}"
   AUTOSCALER_MAX_NODES="${KUBE_AUTOSCALER_MAX_NODES:-}"
   AUTOSCALER_ENABLE_SCALE_DOWN="${KUBE_AUTOSCALER_ENABLE_SCALE_DOWN:-false}"
@@ -343,7 +343,7 @@ fi
 #   new subnetwork will be created for the cluster.
 ENABLE_IP_ALIASES=${KUBE_GCE_ENABLE_IP_ALIASES:-false}
 NODE_IPAM_MODE=${KUBE_GCE_NODE_IPAM_MODE:-RangeAllocator}
-if [ ${ENABLE_IP_ALIASES} = true ]; then
+if [ ${ENABLE_IP_ALIASES} = 'true' ]; then
   # Number of Pods that can run on this node.
   MAX_PODS_PER_NODE=${MAX_PODS_PER_NODE:-110}
   # Size of ranges allocated to each node.
@@ -351,7 +351,7 @@ if [ ${ENABLE_IP_ALIASES} = true ]; then
   IP_ALIAS_SUBNETWORK=${KUBE_GCE_IP_ALIAS_SUBNETWORK:-${INSTANCE_PREFIX}-subnet-default}
   # If we're using custom network, use the subnet we already create for it as the one for ip-alias.
   # Note that this means SUBNETWORK would override KUBE_GCE_IP_ALIAS_SUBNETWORK in case of custom network.
-  if [[ "${CREATE_CUSTOM_NETWORK}" == true ]]; then
+  if [ "${CREATE_CUSTOM_NETWORK}" = 'true' ]; then
     IP_ALIAS_SUBNETWORK="${SUBNETWORK}"
   fi
   # Reserve the services IP space to avoid being allocated for other GCP resources.
@@ -362,31 +362,31 @@ if [ ${ENABLE_IP_ALIASES} = true ]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_IP_ALIASES"
   PROVIDER_VARS="${PROVIDER_VARS:-} NODE_IPAM_MODE"
   PROVIDER_VARS="${PROVIDER_VARS:-} SECONDARY_RANGE_NAME"
-elif [[ -n "${MAX_PODS_PER_NODE:-}" ]]; then
+elif [ -n "${MAX_PODS_PER_NODE:-}" ]; then
   # Should not have MAX_PODS_PER_NODE set for route-based clusters.
   echo -e "${color_red}Cannot set MAX_PODS_PER_NODE for route-based projects for ${PROJECT}." >&2
   exit 1
 fi
 
 # Enable GCE Alpha features.
-if [[ -n "${GCE_ALPHA_FEATURES:-}" ]]; then
+if [ -n "${GCE_ALPHA_FEATURES:-}" ]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} GCE_ALPHA_FEATURES"
 fi
 
 # Disable Docker live-restore.
-if [[ -n "${DISABLE_DOCKER_LIVE_RESTORE:-}" ]]; then
+if [ -n "${DISABLE_DOCKER_LIVE_RESTORE:-}" ]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} DISABLE_DOCKER_LIVE_RESTORE"
 fi
 
 # Override default GLBC image
-if [[ -n "${GCE_GLBC_IMAGE:-}" ]]; then
+if [ -n "${GCE_GLBC_IMAGE:-}" ]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} GCE_GLBC_IMAGE"
 fi
 CUSTOM_INGRESS_YAML="${CUSTOM_INGRESS_YAML:-}"
 
-if [[ -z "${KUBE_ADMISSION_CONTROL:-}" ]]; then
+if [ -z "${KUBE_ADMISSION_CONTROL:-}" ]; then
   ADMISSION_CONTROL="NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection,PersistentVolumeClaimResize,RuntimeClass"
-  if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
+  if [ "${ENABLE_POD_SECURITY_POLICY:-}" = 'true' ]; then
     ADMISSION_CONTROL="${ADMISSION_CONTROL},PodSecurityPolicy"
   fi
   # ResourceQuota must come last, or a creation is recorded, but the pod may be forbidden.
@@ -447,18 +447,18 @@ ADVANCED_AUDIT_LOG_MODE="${ADVANCED_AUDIT_LOG_MODE:-batch}" # batch, blocking
 
 ENABLE_BIG_CLUSTER_SUBNETS="${ENABLE_BIG_CLUSTER_SUBNETS:-false}"
 
-if [[ -n "${LOGROTATE_FILES_MAX_COUNT:-}" ]]; then
+if [ -n "${LOGROTATE_FILES_MAX_COUNT:-}" ]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_FILES_MAX_COUNT"
 fi
-if [[ -n "${LOGROTATE_MAX_SIZE:-}" ]]; then
+if [ -n "${LOGROTATE_MAX_SIZE:-}" ]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_MAX_SIZE"
 fi
 
-if [[ -n "${POD_LOG_MAX_FILE:-}" ]]; then
+if [ -n "${POD_LOG_MAX_FILE:-}" ]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} POD_LOG_MAX_FILE"
 fi
 
-if [[ -n "${POD_LOG_MAX_SIZE:-}" ]]; then
+if [ -n "${POD_LOG_MAX_SIZE:-}" ]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} POD_LOG_MAX_SIZE"
 fi
 
@@ -516,7 +516,7 @@ SERVICEACCOUNT_ISSUER="https://kubernetes.io/${CLUSTER_NAME}"
 # https://github.com/GoogleCloudPlatform/k8s-node-termination-handler
 ENABLE_NODE_TERMINATION_HANDLER="${ENABLE_NODE_TERMINATION_HANDLER:-false}"
 # Override default Node Termination Handler Image
-if [[ "${NODE_TERMINATION_HANDLER_IMAGE:-}" ]]; then
+if [ "${NODE_TERMINATION_HANDLER_IMAGE:-}" ]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} NODE_TERMINATION_HANDLER_IMAGE"
 fi
 

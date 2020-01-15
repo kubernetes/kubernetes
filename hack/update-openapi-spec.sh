@@ -32,7 +32,7 @@ make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
 
 function cleanup()
 {
-    if [[ -n ${APISERVER_PID-} ]]; then
+    if [ -n "${APISERVER_PID-}" ]; then
       kill "${APISERVER_PID}" 1>&2 2>/dev/null
       wait "${APISERVER_PID}" || true
     fi

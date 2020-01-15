@@ -35,13 +35,13 @@ if [[ $# -eq 0 || ! $1 =~ ^[Yy]$ ]]; then
 fi
 
 # Check that user has gsutil
-if [[ $(which gsutil) == "" ]]; then
+if [ -z "$(which gsutil)" ]; then
   echo "Could not find gsutil when running \`which gsutil\`"
   exit 1
 fi
 
 # Check that user has gcloud
-if [[ $(which gcloud) == "" ]]; then
+if [ -z "$(which gcloud)" ]; then
   echo "Could not find gcloud when running: \`which gcloud\`"
   exit 1
 fi
@@ -73,7 +73,7 @@ GCS_JOBS_PATH="gs://${bucket_name}/logs/e2e-node"
 ARTIFACTS=${ARTIFACTS:-"/tmp/_artifacts"}
 BUILD_LOG_PATH="${ARTIFACTS}/build-log.txt"
 
-if [[ ! -e $BUILD_LOG_PATH ]]; then
+if [ ! -e "$BUILD_LOG_PATH" ]; then
   echo "Could not find build-log.txt at ${BUILD_LOG_PATH}"
   exit 1
 fi
@@ -110,7 +110,7 @@ if gsutil ls "${GCS_JOBS_PATH}" | grep -q "${BUILD_STAMP}"; then
 fi
 
 while IFS= read -r result; do
-  if [[ $result != "" && $result != "${ARTIFACTS}/results" && $result != "${ARTIFACTS}" ]]; then
+  if [[ -n "$result" && "$result" != "${ARTIFACTS}/results" && "$result" != "${ARTIFACTS}" ]]; then
     mv "${result}/"* "${ARTIFACTS}"
   fi
 done < <(find "${ARTIFACTS}" -type d -name "results")
@@ -125,7 +125,7 @@ for upload_attempt in $(seq 3); do
   break
 done
 for upload_attempt in $(seq 3); do
-  if [[ -e "${BUILD_LOG_PATH}" ]]; then
+  if [ -e "${BUILD_LOG_PATH}" ]; then
     V=2 kube::log::status "Uploading build log"
     gsutil -q cp -Z -a "${gcs_acl}" "${BUILD_LOG_PATH}" "${GCS_LOGS_PATH}" || continue
   fi
@@ -135,14 +135,14 @@ done
 
 # Find the k8s version for started.json
 version=""
-if [[ -e "version" ]]; then
+if [ -e 'version' ]; then
   version=$(cat "version")
-elif [[ -e "hack/lib/version.sh" ]]; then
-  source "hack/lib/version.sh"
+elif [ -e 'hack/lib/version.sh' ]; then
+  source 'hack/lib/version.sh'
   kube::version::get_version_vars
   version="${KUBE_GIT_VERSION-}"
 fi
-if [[ -n "${version}" ]]; then
+if [ -n "${version}" ]; then
   V=2 kube::log::status "Found Kubernetes version: ${version}"
 else
   V=2 kube::log::status "Could not find Kubernetes version"
@@ -158,11 +158,11 @@ fi
 
 V=4 kube::log::status "Build result is ${build_result}"
 
-if [[ -e "${ARTIFACTS}/started.json" ]]; then
+if [ -e "${ARTIFACTS}/started.json" ]; then
   rm "${ARTIFACTS}/started.json"
 fi
 
-if [[ -e "${ARTIFACTS}/finished.json" ]]; then
+if [ -e "${ARTIFACTS}/finished.json" ]; then
   rm "${ARTIFACTS}/finished.json"
 fi
 

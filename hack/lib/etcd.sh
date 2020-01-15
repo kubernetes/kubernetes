@@ -47,12 +47,12 @@ kube::etcd::validate() {
 
   # validate installed version is at least equal to minimum
   version=$(etcd --version | grep Version | tail -n +1 | head -n 1 | cut -d " " -f 3)
-  if [[ $(kube::etcd::version "${ETCD_VERSION}") -gt $(kube::etcd::version "${version}") ]]; then
+  if [ "$(kube::etcd::version "${ETCD_VERSION}")" -gt "$(kube::etcd::version "${version}")" ]; then
    export PATH=${KUBE_ROOT}/third_party/etcd:${PATH}
    hash etcd
    echo "${PATH}"
    version=$(etcd --version | head -n 1 | cut -d " " -f 3)
-   if [[ $(kube::etcd::version "${ETCD_VERSION}") -gt $(kube::etcd::version "${version}") ]]; then
+   if [ "$(kube::etcd::version "${ETCD_VERSION}")" -gt "$(kube::etcd::version "${version}")" ]; then
     kube::log::usage "etcd version ${ETCD_VERSION} or greater required."
     kube::log::info "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
     exit 1
@@ -70,7 +70,7 @@ kube::etcd::start() {
 
   # Start etcd
   ETCD_DIR=${ETCD_DIR:-$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)}
-  if [[ -d "${ARTIFACTS:-}" ]]; then
+  if [ -d "${ARTIFACTS:-}" ]; then
     ETCD_LOGFILE="${ARTIFACTS}/etcd.$(uname -n).$(id -un).log.DEBUG.$(date +%Y%m%d-%H%M%S).$$"
   else
     ETCD_LOGFILE=${ETCD_LOGFILE:-"/dev/null"}
@@ -85,14 +85,14 @@ kube::etcd::start() {
 }
 
 kube::etcd::stop() {
-  if [[ -n "${ETCD_PID-}" ]]; then
+  if [ -n "${ETCD_PID-}" ]; then
     kill "${ETCD_PID}" &>/dev/null || :
     wait "${ETCD_PID}" &>/dev/null || :
   fi
 }
 
 kube::etcd::clean_etcd_dir() {
-  if [[ -n "${ETCD_DIR-}" ]]; then
+  if [ -n "${ETCD_DIR-}" ]; then
     rm -rf "${ETCD_DIR}"
   fi
 }
@@ -111,13 +111,13 @@ kube::etcd::install() {
     arch=$(kube::util::host_arch)
 
     cd "${KUBE_ROOT}/third_party" || return 1
-    if [[ $(readlink etcd) == etcd-v${ETCD_VERSION}-${os}-* ]]; then
+    if [[ "$(readlink etcd)" = etcd-v${ETCD_VERSION}-${os}-* ]]; then
       kube::log::info "etcd v${ETCD_VERSION} already installed. To use:"
       kube::log::info "export PATH=\"$(pwd)/etcd:\${PATH}\""
       return  #already installed
     fi
 
-    if [[ ${os} == "darwin" ]]; then
+    if [ "${os}" = 'darwin' ]; then
       download_file="etcd-v${ETCD_VERSION}-darwin-amd64.zip"
       url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/${download_file}"
       kube::util::download_file "${url}" "${download_file}"

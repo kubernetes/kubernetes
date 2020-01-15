@@ -37,7 +37,7 @@ run_kubectl_config_set_tests() {
   kubectl config set clusters.test-cluster.certificate-authority-data "$encoded"
   e_written=$(kubectl config view --raw -o jsonpath='{.clusters[?(@.name == "test-cluster")].cluster.certificate-authority-data}')
 
-  test "$e_written" == "$r_written"
+  test "$e_written" = "$r_written"
 
   set +o nounset
   set +o errexit

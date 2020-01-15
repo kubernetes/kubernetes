@@ -57,7 +57,7 @@ kube::log::install_errexit() {
 kube::log::stack() {
   local stack_skip=${1:-0}
   stack_skip=$((stack_skip + 1))
-  if [[ ${#FUNCNAME[@]} -gt ${stack_skip} ]]; then
+  if [ ${#FUNCNAME[@]} -gt ${stack_skip} ]; then
     echo "Call stack:" >&2
     local i
     for ((i=1 ; i <= ${#FUNCNAME[@]} - stack_skip ; i++))
@@ -82,11 +82,11 @@ kube::log::error_exit() {
   local stack_skip="${3:-0}"
   stack_skip=$((stack_skip + 1))
 
-  if [[ ${KUBE_VERBOSE} -ge 4 ]]; then
+  if [ "${KUBE_VERBOSE}" -ge 4 ]; then
     local source_file=${BASH_SOURCE[${stack_skip}]}
     local source_line=${BASH_LINENO[$((stack_skip - 1))]}
     echo "!!! Error in ${source_file}:${source_line}" >&2
-    [[ -z ${1-} ]] || {
+    [ -z "${1-}" ] || {
       echo "  ${1}" >&2
     }
 
@@ -130,7 +130,7 @@ kube::log::usage_from_stdin() {
 # Print out some info that isn't a top level status line
 kube::log::info() {
   local V="${V:-0}"
-  if [[ ${KUBE_VERBOSE} < ${V} ]]; then
+  if [ "${KUBE_VERBOSE}" -lt "${V}" ]; then
     return
   fi
 
@@ -158,7 +158,7 @@ kube::log::info_from_stdin() {
 # Print a status line.  Formatted to show up in a stream of output.
 kube::log::status() {
   local V="${V:-0}"
-  if [[ ${KUBE_VERBOSE} < ${V} ]]; then
+  if [ "${KUBE_VERBOSE}" -lt "${V}" ]; then
     return
   fi
 

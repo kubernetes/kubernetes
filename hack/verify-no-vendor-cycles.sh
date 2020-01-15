@@ -45,6 +45,6 @@ while IFS= read -r dir; do
   fi
 done < <(find ./vendor -type d)
 
-if [[ "${failed}" == "true" ]]; then
+if [ "${failed}" = 'true' ]; then
   exit 1
 fi

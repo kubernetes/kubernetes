@@ -23,7 +23,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # If called directly, exit.
-if [[ "${CALLED_FROM_MAIN_MAKEFILE:-""}" == "" ]]; then
+if [ -z "${CALLED_FROM_MAIN_MAKEFILE:-""}" ]; then
     echo "ERROR: $0 should not be run directly." >&2
     echo >&2
     echo "Please run this command using \"make update\""

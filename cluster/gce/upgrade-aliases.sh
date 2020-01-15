@@ -21,7 +21,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [[ "${KUBERNETES_PROVIDER:-gce}" != "gce" ]]; then
+if [ "${KUBERNETES_PROVIDER:-gce}" != 'gce' ]; then
   echo "ERR: KUBERNETES_PROVIDER must be gce" >&2
   exit 1
 fi
@@ -55,7 +55,7 @@ function detect-k8s-subnetwork() {
   subnetwork_url=$(gcloud compute instances describe \
     "${KUBE_MASTER}" --project="${PROJECT}" --zone="${ZONE}" \
     --format='value(networkInterfaces[0].subnetwork)')
-  if [[ -n ${subnetwork_url} ]]; then
+  if [ -n "${subnetwork_url}" ]; then
     IP_ALIAS_SUBNETWORK=${subnetwork_url##*/}
   fi
 }
@@ -147,7 +147,7 @@ detect-project
 detect-master
 
 k8s_node_routes_count=$(get-k8s-node-routes-count)
-if [[ "${k8s_node_routes_count}" -eq 0 ]]; then
+if [ "${k8s_node_routes_count}" -eq 0 ]; then
   echo "No k8s node routes found and IP alias should already be enabled. Exiting..."
   exit 0
 fi

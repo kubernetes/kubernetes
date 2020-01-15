@@ -64,7 +64,7 @@ function juLog() {
 
   # parse arguments
   ya=""; icase=""
-  while [[ -z "$ya" ]]; do
+  while [ -z "$ya" ]; do
     case "$1" in
       -name=*)   name="$(echo "$1" | ${SED} -e 's/-name=//')";   shift;;
       -class=*)  class="$(echo "$1" | ${SED} -e 's/-class=//')";   shift;;
@@ -78,21 +78,21 @@ function juLog() {
   # create output directory
   mkdir -p "${juDIR}" || exit
   # use first arg as name if it was not given
-  if [[ -z "${name}" ]]; then
+  if [ -z "${name}" ]; then
     name="${asserts}-$1"
     shift
   fi
 
-  if [[ "${class}" = "" ]]; then
+  if [ -z "${class}" ]; then
     class="default"
   fi
 
   suite=${class}
 
   # calculate command to eval
-  [[ -z "$1" ]] && return
+  [ -z "$1" ] && return
   cmd="$1"; shift
-  while [[ -n "${1:-}" ]]
+  while [ -n "${1:-}" ]
   do
      cmd="${cmd} \"$1\""
      shift
@@ -116,13 +116,13 @@ function juLog() {
   echo "+++ exit code: ${evErr}"        | tee -a ${outf}
 
   # set the appropriate error, based in the exit code and the regex
-  [[ ${evErr} != 0 ]] && err=1 || err=0
+  [ "${evErr}" -ne 0 ] && err=1 || err=0
   out="$(${SED} -e 's/^\([^+]\)/| \1/g' "$outf")"
   if [ ${err} = 0 ] && [ -n "${ereg:-}" ]; then
       H=$(echo "${out}" | grep -E ${icase} "${ereg}")
-      [[ -n "${H}" ]] && err=1
+      [ -n "${H}" ] && err=1
   fi
-  [[ ${err} != 0 ]] && echo "+++ error: ${err}"         | tee -a ${outf}
+  [ ${err} -ne 0 ] && echo "+++ error: ${err}"         | tee -a ${outf}
   rm -f ${outf}
 
   errMsg=$(cat ${errf})
@@ -135,7 +135,7 @@ function juLog() {
 
   # write the junit xml report
   ## failure tag
-  [[ ${err} = 0 ]] && failure="" || failure="
+  [ ${err} -eq 0 ] && failure="" || failure="
       <failure type=\"ScriptError\" message=\"Script Error\"><![CDATA[${errMsg}]]></failure>
   "
   ## testcase tag
@@ -147,7 +147,7 @@ function juLog() {
   "
   ## testsuite block
 
-  if [[ -e "${juDIR}/junit_${suite}.xml" ]]; then
+  if [ -e "${juDIR}/junit_${suite}.xml" ]; then
     # file exists. first update the failures count
     failCount=$(${SED} -n "s/.*testsuite.*failures=\"\([0-9]*\)\".*/\1/p" "${juDIR}/junit_${suite}.xml")
     errors=$((failCount+errors))

@@ -32,7 +32,7 @@ export GO111MODULE=on
 # Explicitly clear GOFLAGS, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
 export GOFLAGS=
 # Detect problematic GOPROXY settings that prevent lookup of dependencies
-if [[ "${GOPROXY:-}" == "off" ]]; then
+if [ "${GOPROXY:-}" = 'off' ]; then
   kube::log::error "Cannot run with \$GOPROXY=off"
   exit 1
 fi
@@ -68,7 +68,7 @@ go get -d "${dep}@${sha}"
 rev=$(go mod edit -json | jq -r ".Require[] | select(.Path == \"${dep}\") | .Version")
 
 # No entry in go.mod, we must be using the natural version indirectly
-if [[ -z "${rev}" ]]; then
+if [ -z "${rev}" ]; then
   # backup the go.mod file, since go list modifies it
   cp go.mod "${_tmp}/go.mod.bak"
   # find the revision
@@ -78,7 +78,7 @@ if [[ -z "${rev}" ]]; then
 fi
 
 # No entry found
-if [[ -z "${rev}" ]]; then
+if [ -z "${rev}" ]; then
   echo "Could not resolve ${sha}"
   exit 1
 fi

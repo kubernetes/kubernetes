@@ -48,7 +48,7 @@ for gv in "${GROUP_VERSIONS[@]}"; do
 
 
   # skip groups that aren't being served, clients for these don't matter
-  if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${gv} "* ]]; then
+  if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " = *" ${gv} "* ]]; then
     continue
   fi
 

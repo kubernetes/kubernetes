@@ -32,7 +32,7 @@ kube::util::array_contains() {
   local element
   shift
   for element; do
-    if [[ "${element}" == "${search}" ]]; then
+    if [ "${element}" = "${search}" ]; then
       return 0
      fi
   done
@@ -96,7 +96,7 @@ kube::util::trap_add() {
     # Grab the currently defined trap commands for this trap
     existing_cmd=$(trap -p "${trap_add_name}" |  awk -F"'" '{print $2}')
 
-    if [[ -z "${existing_cmd}" ]]; then
+    if [ -z "${existing_cmd}" ]; then
       new_cmd="${trap_add_cmd}"
     else
       new_cmd="${trap_add_cmd};${existing_cmd}"
@@ -121,7 +121,7 @@ kube::util::cleanup-temp-dir() {
 # Vars set:
 #   KUBE_TEMP
 kube::util::ensure-temp-dir() {
-  if [[ -z ${KUBE_TEMP-} ]]; then
+  if [ -z "${KUBE_TEMP-}" ]; then
     KUBE_TEMP=$(mktemp -d 2>/dev/null || mktemp -d -t kubernetes.XXXXXX)
     kube::util::trap_add kube::util::cleanup-temp-dir EXIT
   fi
@@ -298,7 +298,7 @@ kube::util::group-version-to-pkg-path() {
   done < <(cd "${KUBE_ROOT}/staging/src/k8s.io/api" && find . -name types.go -exec dirname {} \; | sed "s|\./||g" | sort)
 
   # "v1" is the API GroupVersion
-  if [[ "${group_version}" == "v1" ]]; then
+  if [ "${group_version}" = 'v1' ]; then
     echo "vendor/k8s.io/api/core/v1"
     return
   fi
@@ -374,7 +374,7 @@ kube::util::ensure_clean_working_dir() {
 kube::util::base_ref() {
   local -r git_branch=$1
 
-  if [[ -n ${PULL_BASE_SHA:-} ]]; then
+  if [ -n "${PULL_BASE_SHA:-}" ]; then
     echo "${PULL_BASE_SHA}"
     return
   fi
@@ -632,7 +632,7 @@ function kube::util::ensure-cfssl {
 
   host_arch=$(kube::util::host_arch)
 
-  if [[ "${host_arch}" != "amd64" ]]; then
+  if [ "${host_arch}" != 'amd64' ]; then
     echo "Cannot download cfssl on non-amd64 hosts and cfssl does not appear to be installed."
     echo "Please install cfssl and cfssljson and verify they are in \$PATH."
     echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go get -u github.com/cloudflare/cfssl/cmd/..."
@@ -641,7 +641,7 @@ function kube::util::ensure-cfssl {
 
   # Create a temp dir for cfssl if no directory was given
   local cfssldir=${1:-}
-  if [[ -z "${cfssldir}" ]]; then
+  if [ -z "${cfssldir}" ]; then
     kube::util::ensure-temp-dir
     cfssldir="${KUBE_TEMP}/cfssl"
   fi
@@ -683,7 +683,7 @@ function kube::util::ensure-cfssl {
 # Confirms that the script is being run inside a kube-build image
 #
 function kube::util::ensure_dockerized {
-  if [[ -f /kube-build-image ]]; then
+  if [ -f /kube-build-image ]; then
     return 0
   else
     echo "ERROR: This script is designed to be run inside a kube-build container"
@@ -762,7 +762,7 @@ function kube::util::read-array {
 }
 
 # Some useful colors.
-if [[ -z "${color_start-}" ]]; then
+if [ -z "${color_start-}" ]; then
   declare -r color_start="\033["
   declare -r color_red="${color_start}0;31m"
   declare -r color_yellow="${color_start}0;33m"

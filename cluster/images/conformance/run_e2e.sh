@@ -37,8 +37,8 @@ saveResults() {
 }
 
 # Optional Golang runner alternative to the bash script.
-# Entry provided via env var to simplify invocation. 
-if [[ -n ${E2E_USE_GO_RUNNER:-} ]]; then
+# Entry provided via env var to simplify invocation.
+if [ -n "${E2E_USE_GO_RUNNER:-}" ]; then
     set -x
     /gorunner && ret=0 || ret=$?
     exit ${ret}
@@ -48,7 +48,7 @@ fi
 trap shutdown TERM
 
 ginkgo_args=()
-if [[ -n ${E2E_DRYRUN:-} ]]; then
+if [ -n "${E2E_DRYRUN:-}" ]; then
     ginkgo_args+=("--dryRun=true")
 fi
 

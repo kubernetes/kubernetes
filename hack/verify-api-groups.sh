@@ -52,7 +52,7 @@ for register_file in "${register_files[@]}"; do
 
 	# does the dirname doesn't have a slash, then it's the internal package.
 	# if does have one, then its an external
-	if [[ "${group_dirname#*'/'}" == "${group_dirname}" ]]; then
+	if [ "${group_dirname#*'/'}" = "${group_dirname}" ]; then
 		group_dirnames+=("${group_dirname}")
 		expected_install_packages+=("${package}")
 	else
@@ -77,11 +77,11 @@ for group_dirname in "${group_dirnames[@]}"; do
 	if ! grep -q "${group_dirname}/" "${client_gen_file}" ; then
 		found=0
 		for group_without_codegen in "${groups_without_codegen[@]}"; do
-			if [[ "${group_without_codegen}" == "${group_dirname}" ]]; then
+			if [ "${group_without_codegen}" = "${group_dirname}" ]; then
 				found=1
 			fi
 		done
-		if [[ "${found}" -ne "1" && -f "${group_dirname}/types.go" ]] ; then
+		if [[ "${found}" -ne 1 && -f "${group_dirname}/types.go" ]] ; then
 			echo "need to add ${group_dirname}/ to ${client_gen_file}"
 			exit 1
 		fi
@@ -102,11 +102,11 @@ known_version_files=(
 for expected_install_package in "${expected_install_packages[@]}"; do
 	found=0
 	for package_without_install in "${packages_without_install[@]}"; do
-		if [ "${package_without_install}" == "${expected_install_package}" ]; then
+		if [ "${package_without_install}" = "${expected_install_package}" ]; then
 			found=1
 		fi
 	done
-	if [[ "${found}" -eq "1" ]] ; then
+	if [ "${found}" -eq 1 ] ; then
 		continue
 	fi
 

@@ -32,7 +32,7 @@ INSTANCE_PREFIX=${KUBE_GCE_INSTANCE_PREFIX:-${CLUSTER_NAME:-}}
 NETWORK=${KUBE_GCE_NETWORK:-${KUBE_GKE_NETWORK:-}}
 
 # In GKE the instance prefix starts with "gke-".
-if [[ "${KUBERNETES_PROVIDER:-}" == "gke" ]]; then
+if [ "${KUBERNETES_PROVIDER:-}" = 'gke' ]; then
   INSTANCE_PREFIX="gke-${CLUSTER_NAME}"
   # Truncate to 26 characters for route prefix matching.
   INSTANCE_PREFIX="${INSTANCE_PREFIX:0:26}"
@@ -50,7 +50,7 @@ function gcloud-list() {
   local result=""
   while true; do
     if result=$(gcloud "${group}" "${resource}" list --project="${PROJECT}" ${filter:+--filter="$filter"} "${@:4}"); then
-      if [[ -n "${GREP_REGEX:-}" ]]; then
+      if [ -n "${GREP_REGEX:-}" ]; then
         result=$(echo "${result}" | grep "${GREP_REGEX}" || true)
       fi
       echo "${result}"
@@ -58,7 +58,7 @@ function gcloud-list() {
     fi
     echo -e "Attempt ${attempt} failed to list ${resource}. Retrying." >&2
     attempt=$((attempt + 1))
-    if [[ ${attempt} -gt 5 ]]; then
+    if [ ${attempt} -gt 5 ]; then
       echo -e "List ${resource} failed!" >&2
       exit 2
     fi

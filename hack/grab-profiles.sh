@@ -65,7 +65,7 @@ output_dir="."
 tunnel_port="${tunnel_port:-1234}"
 
 args=$(getopt -o s:mho:k:c -l server:,master,heapster,output:,kubelet:,scheduler,controller-manager,help,inuse-space,inuse-objects,alloc-space,alloc-objects,cpu,kubelet-binary:,master-binary:,scheduler-binary:,controller-manager-binary:,scheduler-port:,controller-manager-port: -- "$@")
-if [[ $? ]]; then
+if [ $? ]; then
   >&2 echo "Error in getopt"
   exit 1
 fi
@@ -225,17 +225,17 @@ while true; do
   esac
 done
 
-if [[ -z "${server_addr}" ]]; then
+if [ -z "${server_addr}" ]; then
   >&2 echo "Server flag is required"
   exit 1
 fi
 
-if [[ -z "${profile_components}" ]]; then
+if [ -z "${profile_components}" ]; then
   >&2 echo "Choose at least one component to profile"
   exit 1
 fi
 
-if [[ -z "${requested_profiles}" ]]; then
+if [ -z "${requested_profiles}" ]; then
   >&2 echo "Choose at least one profiling option"
   exit 1
 fi
@@ -282,7 +282,7 @@ for component in ${profile_components}; do
       ;;
     kubelet)
       path="${KUBELET_PPROF_PATH_PREFIX}"
-      if [[ -z "${kubelet_binary}" ]]; then
+      if [ -z "${kubelet_binary}" ]; then
         binary="${KUBE_ROOT}/_output/local/bin/linux/amd64/kubelet"
       else
         binary=${kubelet_binary}
@@ -290,7 +290,7 @@ for component in ${profile_components}; do
       ;;
   esac
 
-  if [[ "${component}" == "kubelet" ]]; then
+  if [ "${component}" = 'kubelet' ]; then
     for node in ${kubelet_addresses//[,;]/' '}; do
       grab_profiles_from_component "${requested_profiles}" "${mem_pprof_flags}" "${binary}" "${tunnel_port}" "${path}/${node}/proxy" "${output_dir}/${component}" "${timestamp}"
     done

@@ -63,7 +63,7 @@ if ! which msgfmt > /dev/null; then
   exit 1
 fi
 
-if [[ "${generate_pot}" == "true" ]]; then
+if [ "${generate_pot}" = 'true' ]; then
   echo "Extracting strings to POT"
   go-xgettext -k=i18n.T "${KUBECTL_FILES}" > tmp.pot
   perl -pi -e 's/CHARSET/UTF-8/' tmp.pot
@@ -79,7 +79,7 @@ if [[ "${generate_pot}" == "true" ]]; then
   fi
 fi
 
-if [[ "${generate_mo}" == "true" ]]; then
+if [ "${generate_mo}" = 'true' ]; then
   echo "Generating .po and .mo files"
   for x in translations/*/*/*/*.po; do
     msgcat -s "${x}" > tmp.po

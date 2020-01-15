@@ -67,7 +67,7 @@ function create-clusters {
 
 # Builds and pushes image to registry
 function push-image {
-	if [[ "${ISBUILD}" = "y" ]]; then
+	if [ "${ISBUILD}" = 'y' ]; then
 		if ! ibmcloud cr namespaces | grep -Fq "${KUBE_NAMESPACE}"; then
 			echo "Creating registry namespace"
 			ibmcloud cr namespace-add "${KUBE_NAMESPACE}"
@@ -87,13 +87,13 @@ function push-image {
 function choose-clusters {
 	echo -n -e "Do you want to use custom clusters? [y/N]${color_cyan}>${color_norm} "
 	read -r USE_EXISTING
-	if [[ "${USE_EXISTING}" = "y" ]]; then
+	if [ "${USE_EXISTING}" = 'y' ]; then
 		echo -e "${color_yellow}Enter path for desired hollow-node spawning cluster kubeconfig file:${color_norm}"
 		read -r CUSTOM_SPAWN_CONFIG
 		echo -e "${color_yellow}Enter path for desired hollow-node hosting cluster kubeconfig file:${color_norm}"
 		read -r CUSTOM_MASTER_CONFIG
 		push-image
-	elif [[ "${USE_EXISTING}" = "N" ]]; then
+	elif [ "${USE_EXISTING}" = 'n' ]; then
 		create-clusters
 	else
 		# shellcheck disable=SC2154 # Color defined in sourced script
@@ -124,7 +124,7 @@ function set-hollow-master {
 # Exported variables:
 #   KUBECONFIG - Overrides default kube config for the purpose of setting up the Kubemark master components.
 function master-config {
-	if [[ "${USE_EXISTING}" = "y" ]]; then
+	if [ "${USE_EXISTING}" = 'y' ]; then
 		export KUBECONFIG=${CUSTOM_MASTER_CONFIG}
 	else
 		eval "$(ibmcloud ks cluster-config kubeMasterTester --admin | grep export)"
@@ -135,7 +135,7 @@ function master-config {
 # Exported variables:
 #    KUBECONFIG - Overrides default kube config for the purpose of setting up the hollow-node cluster.
 function spawn-config {
-	if [[ "${USE_EXISTING}" = "y" ]]; then
+	if [ "${USE_EXISTING}" = 'y' ]; then
 		export KUBECONFIG=${CUSTOM_SPAWN_CONFIG}
 	else
 		eval "$(ibmcloud ks cluster-config kubeSpawnTester --admin | grep export)"
@@ -163,9 +163,9 @@ function complete-login {
 	echo -e "${color_yellow}LOGGING INTO CLOUD SERVICES${color_norm}"
 	echo -n -e "Do you have a federated IBM cloud login? [y/N]${color_cyan}>${color_norm} "
 	read -r ISFED
-	if [[ "${ISFED}" = "y" ]]; then
+	if [ "${ISFED}" = 'y' ]; then
 		ibmcloud login --sso -a "${REGISTRY_LOGIN_URL}"
-	elif [[ "${ISFED}" = "N" ]]; then
+	elif [ "${ISFED}" = 'N' ]; then
 		ibmcloud login -a "${REGISTRY_LOGIN_URL}"
 	else
 		echo -e "${color_red}Invalid response, please try again:${color_norm}"
@@ -198,11 +198,11 @@ function generate-values {
 function build-kubemark-image {
 	echo -n -e "Do you want to build the kubemark image? [y/N]${color_cyan}>${color_norm} "
 	read -r ISBUILD
-	if [[ "${ISBUILD}" = "y" ]]; then
+	if [ "${ISBUILD}" = 'y' ]; then
 		echo -e "${color_yellow}BUILDING IMAGE${color_norm}"
 		"${KUBE_ROOT}/build/run.sh" make kubemark
 		cp "${KUBE_ROOT}/_output/dockerized/bin/linux/amd64/kubemark" "${KUBEMARK_IMAGE_LOCATION}"
-	elif [[ "${ISBUILD}" = "N" ]]; then
+	elif [ "${ISBUILD}" = 'N' ]; then
 		echo -n ""
 	else
 		echo -e "${color_red}Invalid response, please try again:${color_norm}"
@@ -214,11 +214,11 @@ function build-kubemark-image {
 function clean-repo {
 	echo -n -e "Do you want to remove build output and binary? [y/N]${color_cyan}>${color_norm} "
 	read -r ISCLEAN
-	if [[ "${ISCLEAN}" = "y" ]]; then
+	if [ "${ISCLEAN}" = 'y' ]; then
 		echo -e "${color_yellow}CLEANING REPO${color_norm}"
 		rm -rf "${KUBE_ROOT}/_output"
 		rm -f "${KUBEMARK_IMAGE_LOCATION}/kubemark"
-	elif [[ "${ISCLEAN}" = "N" ]]; then
+	elif [ "${ISCLEAN}" = 'N' ]; then
 		echo -n ""
 	else
 		echo -e "${color_red}Invalid response, please try again:${color_norm}"

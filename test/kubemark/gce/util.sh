@@ -74,7 +74,7 @@ function create-kubemark-master {
 
     "${KUBE_ROOT}/hack/e2e-internal/e2e-up.sh"
 
-    if [[ "${KUBEMARK_HA_MASTER:-}" == "true" && -n "${KUBEMARK_MASTER_ADDITIONAL_ZONES:-}" ]]; then
+    if [[ "${KUBEMARK_HA_MASTER:-}" = 'true' && -n "${KUBEMARK_MASTER_ADDITIONAL_ZONES:-}" ]]; then
         for KUBE_GCE_ZONE in ${KUBEMARK_MASTER_ADDITIONAL_ZONES}; do
           KUBE_GCE_ZONE="${KUBE_GCE_ZONE}" KUBE_REPLICATE_EXISTING_MASTER=true \
             "${KUBE_ROOT}/hack/e2e-internal/e2e-grow-cluster.sh"
@@ -88,7 +88,7 @@ function create-kubemark-master {
     REGION=$(grep -o "^[a-z]*-[a-z0-9]*" "${KUBE_TEMP}"/cluster-location.txt)
     MASTER_NAME="${KUBE_GCE_INSTANCE_PREFIX}"-master
 
-    if [[ ${GCE_PRIVATE_CLUSTER:-} == "true" ]]; then
+    if [ "${GCE_PRIVATE_CLUSTER:-}" = 'true' ]; then
       MASTER_INTERNAL_IP=$(gcloud compute addresses describe "${MASTER_NAME}-internal-ip" \
           --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
     fi
@@ -104,7 +104,7 @@ function create-kubemark-master {
     # Note that hollow nodes might use either of these kubeconfigs, but
     # using internal one is better from performance and cost perspective, since
     # traffic does not need to go through Cloud NAT.
-    if [[ -n "${MASTER_INTERNAL_IP:-}" ]]; then
+    if [ -n "${MASTER_INTERNAL_IP:-}" ]; then
       echo "Writing internal kubeconfig to '${KUBECONFIG_INTERNAL}'"
       ip_regexp=${MASTER_IP//./\\.} # escape ".", so that sed won't treat it as "any char"
       sed "s/${ip_regexp}/${MASTER_INTERNAL_IP}/g" "${KUBECONFIG}" > "${KUBECONFIG_INTERNAL}"
@@ -121,7 +121,7 @@ function delete-kubemark-master {
 
     export KUBE_DELETE_NETWORK=false
 
-    if [[ "${KUBEMARK_HA_MASTER:-}" == "true" && -n "${KUBEMARK_MASTER_ADDITIONAL_ZONES:-}" ]]; then
+    if [[ "${KUBEMARK_HA_MASTER:-}" = 'true' && -n "${KUBEMARK_MASTER_ADDITIONAL_ZONES:-}" ]]; then
       for KUBE_GCE_ZONE in ${KUBEMARK_MASTER_ADDITIONAL_ZONES}; do
         KUBE_GCE_ZONE="${KUBE_GCE_ZONE}" KUBE_REPLICATE_EXISTING_MASTER=true \
           "${KUBE_ROOT}/hack/e2e-internal/e2e-shrink-cluster.sh"

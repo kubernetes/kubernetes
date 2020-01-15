@@ -165,7 +165,7 @@ kube::test::describe_object_events_assert() {
     local object=$2
     local showevents=${3:-"true"}
 
-    if [[ -z "${3:-}" ]]; then
+    if [ -z "${3:-}" ]; then
         result=$(eval kubectl describe "${kube_flags[@]}" "${resource}" "${object}")
     else
         result=$(eval kubectl describe "${kube_flags[@]}" "--show-events=${showevents}" "${resource}" "${object}")
@@ -176,7 +176,7 @@ kube::test::describe_object_events_assert() {
     else
         local has_events="false"
     fi
-    if [[ "${showevents}" == "${has_events}" ]]; then
+    if [ "${showevents}" = "${has_events}" ]; then
         echo -n "${green}"
         echo "$(kube::test::get_caller): Successful describe"
         echo "${result}"
@@ -185,7 +185,7 @@ kube::test::describe_object_events_assert() {
     else
         echo "${bold}${red}"
         echo "$(kube::test::get_caller): FAIL"
-        if [[ "${showevents}" == "false" ]]; then
+        if [ "${showevents}" = 'false' ]; then
             echo "  Events information should not be described in:"
         else
             echo "  Events information not found in:"
@@ -239,7 +239,7 @@ kube::test::describe_resource_events_assert() {
     else
         local has_events="false"
     fi
-    if [[ "${showevents}" == "${has_events}" ]]; then
+    if [ "${showevents}" = "${has_events}" ]; then
         echo -n "${green}"
         echo "Successful describe"
         echo "${result}"
@@ -248,7 +248,7 @@ kube::test::describe_resource_events_assert() {
     else
         echo "${bold}${red}"
         echo "FAIL"
-        if [[ "${showevents}" == "false" ]]; then
+        if [ "${showevents}" = 'false' ]; then
             echo "  Events information should not be described in:"
         else
             echo "  Events information not found in:"
@@ -326,7 +326,7 @@ kube::test::if_supports_resource() {
   REQUIRED_RESOURCE=${1:-""}
 
   for r in "${SUPPORTED_RESOURCES[@]}"; do
-    if [[ "${r}" == "*" || "${r}" == "${REQUIRED_RESOURCE}" ]]; then
+    if [[ "${r}" = "*" || "${r}" = "${REQUIRED_RESOURCE}" ]]; then
       return 0
     fi
   done
@@ -398,8 +398,8 @@ kube::test::version::diff_assert() {
   sort "${original}" > "${original}.sorted"
   sort "${latest}" > "${latest}.sorted"
 
-  if [ "${comparator}" == "eq" ]; then
-    if [ "$(diff -iwB "${original}".sorted "${latest}".sorted)" == "" ] ; then
+  if [ "${comparator}" = 'eq' ]; then
+    if [ -z "$(diff -iwB "${original}".sorted "${latest}".sorted)" ] ; then
         echo -n "${green}"
         echo "Successful: ${diff_msg}"
         echo -n "${reset}"

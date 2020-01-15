@@ -24,7 +24,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 # For help output
 ARGHELP=""
-if [[ "$#" -gt 0 ]]; then
+if [ "$#" -gt 0 ]; then
     ARGHELP="WHAT='$*'"
 fi
 

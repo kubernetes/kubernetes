@@ -86,7 +86,7 @@ IFS=" " read -r -a TARGET_LIST <<< "${WHAT:-}"
 
 function is-excluded {
   for e in "${EXCLUDED_CHECKS[@]}"; do
-    if [[ $1 -ef "${e}" ]]; then
+    if [ "$1" -ef "${e}" ]; then
       return
     fi
   done
@@ -95,7 +95,7 @@ function is-excluded {
 
 function is-quick {
   for e in "${QUICK_CHECKS[@]}"; do
-    if [[ $1 -ef "${e}" ]]; then
+    if [ "$1" -ef "${e}" ]; then
       return
     fi
   done
@@ -107,7 +107,7 @@ function is-explicitly-chosen {
   name="${name%.*}"
   index=0
   for e in "${TARGET_LIST[@]}"; do
-    if [[ "${e}" == "${name}" ]]; then
+    if [ "${e}" = "${name}" ]; then
       TARGET_LIST[${index}]=""
       return
     fi
@@ -153,7 +153,7 @@ function run-checks {
   do
     local check_name
     check_name="$(basename "${t}")"
-    if [[ -n ${WHAT:-} ]]; then
+    if [ -n "${WHAT:-}" ]; then
       if ! is-explicitly-chosen "${check_name}"; then
         continue
       fi
@@ -172,7 +172,7 @@ function run-checks {
     start=$(date +%s)
     run-cmd "${runner}" "${t}" && tr=$? || tr=$?
     local elapsed=$(($(date +%s) - start))
-    if [[ ${tr} -eq 0 ]]; then
+    if [ ${tr} -eq 0 ]; then
       echo -e "${color_green:?}SUCCESS${color_norm}  ${check_name}\t${elapsed}s"
     else
       echo -e "${color_red}FAILED${color_norm}   ${check_name}\t${elapsed}s"
@@ -185,11 +185,11 @@ function run-checks {
 # Check invalid targets specified in "WHAT" and mark them as failure cases
 function missing-target-checks {
   # In case WHAT is not specified
-  [[ ${#TARGET_LIST[@]} -eq 0 ]] && return
+  [ ${#TARGET_LIST[@]} -eq 0 ] && return
 
   for v in "${TARGET_LIST[@]}"
   do
-    [[ -z "${v}" ]] && continue
+    [ -z "${v}" ] && continue
 
     FAILED_TESTS+=("${v}")
     ret=1
@@ -212,7 +212,7 @@ run-checks "${KUBE_ROOT}/hack/verify-*.sh" bash
 run-checks "${KUBE_ROOT}/hack/verify-*.py" python
 missing-target-checks
 
-if [[ ${ret} -eq 1 ]]; then
+if [ ${ret} -eq 1 ]; then
     print-failed-tests
 fi
 exit ${ret}

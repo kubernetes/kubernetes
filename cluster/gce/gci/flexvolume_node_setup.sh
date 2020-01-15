@@ -57,9 +57,9 @@ umount_silent() {
 kubelet_wait() {
   timeout=60
   kubelet_readonly_port=10255
-  until [[ $timeout -eq 0 ]]; do
+  until [ $timeout -eq 0 ]; do
     printf "."
-    if [[ $( curl -s http://localhost:${kubelet_readonly_port}/healthz ) == "ok" ]]; then
+    if [ "$( curl -s http://localhost:${kubelet_readonly_port}/healthz )" = 'ok' ]; then
       return 0
     fi
     sleep 1
@@ -81,10 +81,10 @@ flex_clean() {
   umount_silent ${MOUNTER_PATH}
   rm -rf ${MOUNTER_PATH}
 
-  if [[ -n ${IMAGE_URL:-} ]]; then
+  if [ -n "${IMAGE_URL:-}" ]; then
     docker rmi -f "${IMAGE_URL}" &> /dev/null || /bin/true
   fi
-  if [[ -n ${MOUNTER_DEFAULT_NAME:-} ]]; then
+  if [ -n "${MOUNTER_DEFAULT_NAME:-}" ]; then
     docker rm -f "${MOUNTER_DEFAULT_NAME}" &> /dev/null || /bin/true
   fi
 }

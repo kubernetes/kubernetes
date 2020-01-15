@@ -45,7 +45,7 @@ function calculate-node-labels {
 }
 
 # Common colors used throughout the kubemark scripts
-if [[ -z "${color_start-}" ]]; then
+if [ -z "${color_start-}" ]; then
   declare -r color_start="\033["
   # shellcheck disable=SC2034
   declare -r color_red="${color_start}0;31m"

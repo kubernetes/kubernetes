@@ -106,7 +106,7 @@ job="jobs"
 
 # include shell2junit library
 sh2ju="${KUBE_ROOT}/third_party/forked/shell2junit/sh2ju.sh"
-if [[ -f "${sh2ju}" ]]; then
+if [ -f "${sh2ju}" ]; then
   source "${sh2ju}"
 else
   echo "failed to find third_party/forked/shell2junit/sh2ju.sh"
@@ -130,13 +130,13 @@ function record_command() {
     echo "Running command: $*"
     juLog -output="${output}" -class="test-cmd" -name="${name}" "$@"
     local exitCode=$?
-    if [[ ${exitCode} -ne 0 ]]; then
+    if [ ${exitCode} -ne 0 ]; then
       # Record failures for any non-canary commands
-      if [ "${name}" != "record_command_canary" ]; then
+      if [ "${name}" != 'record_command_canary' ]; then
         echo "Error when running ${name}"
         foundError="${foundError}""${name}"", "
       fi
-    elif [ "${name}" == "record_command_canary" ]; then
+    elif [ "${name}" = 'record_command_canary' ]; then
       # If the canary command passed, fail
       echo "record_command_canary succeeded unexpectedly"
       foundError="${foundError}""${name}"", "
@@ -157,7 +157,7 @@ function record_command_canary()
   set +o errexit
 }
 KUBE_JUNIT_REPORT_DIR=$(mktemp -d /tmp/record_command_canary.XXXXX) record_command record_command_canary
-if [[ -n "${foundError}" ]]; then
+if [ -n "${foundError}" ]; then
   echo "FAILED TESTS: record_command_canary"
   exit 1
 fi
@@ -165,9 +165,9 @@ fi
 # Stops the running kubectl proxy, if there is one.
 function stop-proxy()
 {
-  [[ -n "${PROXY_PORT-}" ]] && kube::log::status "Stopping proxy on port ${PROXY_PORT}"
-  [[ -n "${PROXY_PID-}" ]] && kill "${PROXY_PID}" 1>&2 2>/dev/null
-  [[ -n "${PROXY_PORT_FILE-}" ]] && rm -f "${PROXY_PORT_FILE}"
+  [ -n "${PROXY_PORT-}" ] && kube::log::status "Stopping proxy on port ${PROXY_PORT}"
+  [ -n "${PROXY_PID-}" ] && kill "${PROXY_PID}" 1>&2 2>/dev/null
+  [ -n "${PROXY_PORT_FILE-}" ] && rm -f "${PROXY_PORT_FILE}"
   PROXY_PID=
   PROXY_PORT=
   PROXY_PORT_FILE=
@@ -191,8 +191,8 @@ function start-proxy()
   PROXY_PORT=
 
   local attempts=0
-  while [[ -z ${PROXY_PORT} ]]; do
-    if (( attempts > 9 )); then
+  while [ -z ${PROXY_PORT} ]; do
+    if [ $attempts -gt 9 ]; then
       kill "${PROXY_PID}"
       kube::log::error_exit "Couldn't start proxy. Failed to read port after ${attempts} tries. Got: $(cat "${PROXY_PORT_FILE}")"
     fi
@@ -215,9 +215,9 @@ function start-proxy()
 
 function cleanup()
 {
-  [[ -n "${APISERVER_PID-}" ]] && kill "${APISERVER_PID}" 1>&2 2>/dev/null
-  [[ -n "${CTLRMGR_PID-}" ]] && kill "${CTLRMGR_PID}" 1>&2 2>/dev/null
-  [[ -n "${KUBELET_PID-}" ]] && kill "${KUBELET_PID}" 1>&2 2>/dev/null
+  [ -n "${APISERVER_PID-}" ] && kill "${APISERVER_PID}" 1>&2 2>/dev/null
+  [ -n "${CTLRMGR_PID-}" ] && kill "${CTLRMGR_PID}" 1>&2 2>/dev/null
+  [ -n "${KUBELET_PID-}" ] && kill "${KUBELET_PID}" 1>&2 2>/dev/null
   stop-proxy
 
   kube::etcd::cleanup
@@ -238,7 +238,7 @@ function check-curl-proxy-code()
   local -r desired=$2
   local -r full_address="${PROXY_HOST}:${PROXY_PORT}${address}"
   status=$(curl -w "%{http_code}" --silent --output /dev/null "${full_address}")
-  if [ "${status}" == "${desired}" ]; then
+  if [ "${status}" = "${desired}" ]; then
     return 0
   fi
   echo "For address ${full_address}, got ${status} but wanted ${desired}"
@@ -257,7 +257,7 @@ function kubectl-with-retry()
       rm "${ERROR_FILE}"
       sleep $((2**count))
     else
-      if [ "$preserve_err_file" != true ] ; then
+      if [ "$preserve_err_file" != 'true' ] ; then
         rm "${ERROR_FILE}"
       fi
       break
@@ -276,7 +276,7 @@ function wait-for-pods-with-label()
   local i
   for i in $(seq 1 10); do
     kubeout=$(kubectl get po -l "$1" --output=go-template --template='{{range.items}}{{.metadata.name}}{{end}}' --sort-by metadata.name "${kube_flags[@]}")
-    if [[ $kubeout = "$2" ]]; then
+    if [ "$kubeout" = "$2" ]; then
         return
     fi
     echo Waiting for pods: "$2", found "$kubeout"
@@ -347,12 +347,12 @@ runTests() {
     '-s' "https://127.0.0.1:${SECURE_API_PORT}" '--token=admin-token' '--insecure-skip-tls-verify=true'
   )
 
-  if [[ -z "${ALLOW_SKEW:-}" ]]; then
+  if [ -z "${ALLOW_SKEW:-}" ]; then
     kube_flags+=('--match-server-version')
     kube_flags_with_token+=('--match-server-version')
   fi
   if kube::test::if_supports_resource "${nodes}" ; then
-    [ "$(kubectl get nodes -o go-template='{{ .apiVersion }}' "${kube_flags[@]}")" == "v1" ]
+    [ "$(kubectl get nodes -o go-template='{{ .apiVersion }}' "${kube_flags[@]}")" = 'v1' ]
   fi
 
   # Define helper variables for fields to prevent typos.
@@ -410,17 +410,17 @@ runTests() {
 
   cleanup_tests(){
     kube::test::clear_all
-    if [[ -n "${foundError}" ]]; then
+    if [ -n "${foundError}" ]; then
       echo "FAILED TESTS: ""${foundError}"
       exit 1
     fi
   }
 
-   if [[ -n "${WHAT-}" ]]; then
+   if [ -n "${WHAT-}" ]; then
     for pkg in ${WHAT}
     do
       # running of kubeadm is captured in hack/make-targets/test-cmd.sh
-      if [[ "${pkg}" != "kubeadm" ]]; then
+      if [ "${pkg}" != 'kubeadm' ]; then
         record_command "run_${pkg}_tests"
       fi
     done

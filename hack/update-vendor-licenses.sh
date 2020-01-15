@@ -99,7 +99,7 @@ process_content () {
   local_files=()
   IFS=" " read -r -a local_files <<< "$(
     for dir_root in ${package} ${package_root}; do
-      [[ -d ${DEPS_DIR}/${dir_root} ]] || continue
+      [ -d "${DEPS_DIR}/${dir_root}" ] || continue
 
       # One (set) of these is fine
       find "${DEPS_DIR}/${dir_root}" \
@@ -110,9 +110,9 @@ process_content () {
   local index
   local f
   index="${package}-${type}"
-  if [[ -z "${CONTENT[${index}]-}" ]]; then
+  if [ -z "${CONTENT[${index}]-}" ]; then
     for f in "${local_files[@]-}"; do
-      if [[ -z "$f" ]]; then
+      if [ -z "$f" ]; then
         # Set the default value and then check it to prevent
         # accessing potentially empty array
         continue
@@ -136,11 +136,11 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 export GO111MODULE=on
 
 # Check bash version
-if (( BASH_VERSINFO[0] < 4 )); then
+if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
   echo
   echo "ERROR: Bash v4+ required."
   # Extra help for OSX
-  if [[ "$(uname -s)" == "Darwin" ]]; then
+  if [ "$(uname -s)" = 'Darwin' ]; then
     echo
     echo "Ensure you are up to date on the following packages:"
     echo "$ brew install md5sha1sum bash jq"
@@ -171,11 +171,11 @@ echo "==========================================================================
 
 # Loop through every vendored package
 for PACKAGE in $(go list -m -json all | jq -r .Path | sort -f); do
-  if [[ -e "staging/src/${PACKAGE}" ]]; then
+  if [ -e "staging/src/${PACKAGE}" ]; then
     echo "$PACKAGE is a staging package, skipping" > /dev/stderr
     continue
   fi
-  if [[ ! -e "${DEPS_DIR}/${PACKAGE}" ]]; then
+  if [ ! -e "${DEPS_DIR}/${PACKAGE}" ]; then
     echo "$PACKAGE doesn't exist in vendor, skipping" > /dev/stderr
     continue
   fi
@@ -191,14 +191,14 @@ for PACKAGE in $(go list -m -json all | jq -r .Path | sort -f); do
   echo
 
   file=""
-  if [[ -n "${CONTENT[${PACKAGE}-LICENSE]-}" ]]; then
+  if [ -n "${CONTENT[${PACKAGE}-LICENSE]-}" ]; then
       file="${CONTENT[${PACKAGE}-LICENSE]-}"
-  elif [[ -n "${CONTENT[${PACKAGE}-COPYRIGHT]-}" ]]; then
+  elif [ -n "${CONTENT[${PACKAGE}-COPYRIGHT]-}" ]; then
       file="${CONTENT[${PACKAGE}-COPYRIGHT]-}"
-  elif [[ -n "${CONTENT[${PACKAGE}-COPYING]-}" ]]; then
+  elif [ -n "${CONTENT[${PACKAGE}-COPYING]-}" ]; then
       file="${CONTENT[${PACKAGE}-COPYING]-}"
   fi
-  if [[ -z "${file}" ]]; then
+  if [ -z "${file}" ]; then
       cat > /dev/stderr << __EOF__
 No license could be found for ${PACKAGE} - aborting.
 

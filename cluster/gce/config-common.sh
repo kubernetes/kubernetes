@@ -28,22 +28,22 @@ function get-num-nodes {
 #   NUM_WINDOWS_NODES
 function get-master-size {
   local suggested_master_size=1
-  if [[ "$(get-num-nodes)" -gt "5" ]]; then
+  if [ "$(get-num-nodes)" -gt 5 ]; then
     suggested_master_size=2
   fi
-  if [[ "$(get-num-nodes)" -gt "10" ]]; then
+  if [ "$(get-num-nodes)" -gt 10 ]; then
     suggested_master_size=4
   fi
-  if [[ "$(get-num-nodes)" -gt "100" ]]; then
+  if [ "$(get-num-nodes)" -gt 100 ]; then
     suggested_master_size=8
   fi
-  if [[ "$(get-num-nodes)" -gt "250" ]]; then
+  if [ "$(get-num-nodes)" -gt 250 ]; then
     suggested_master_size=16
   fi
-  if [[ "$(get-num-nodes)" -gt "500" ]]; then
+  if [ "$(get-num-nodes)" -gt 500 ]; then
     suggested_master_size=32
   fi
-  if [[ "$(get-num-nodes)" -gt "3000" ]]; then
+  if [ "$(get-num-nodes)" -gt 3000 ]; then
     suggested_master_size=64
   fi
   echo "${suggested_master_size}"
@@ -54,10 +54,10 @@ function get-master-size {
 #   NUM_WINDOWS_NODES
 function get-master-root-disk-size() {
   local suggested_master_root_disk_size="20GB"
-  if [[ "$(get-num-nodes)" -gt "500" ]]; then
+  if [ "$(get-num-nodes)" -gt 500 ]; then
     suggested_master_root_disk_size="100GB"
   fi
-  if [[ "$(get-num-nodes)" -gt "3000" ]]; then
+  if [ "$(get-num-nodes)" -gt 3000 ]; then
     suggested_master_root_disk_size="500GB"
   fi
   echo "${suggested_master_root_disk_size}"
@@ -68,29 +68,29 @@ function get-master-root-disk-size() {
 #   NUM_WINDOWS_NODES
 function get-master-disk-size() {
   local suggested_master_disk_size="20GB"
-  if [[ "$(get-num-nodes)" -gt "500" ]]; then
+  if [ "$(get-num-nodes)" -gt 500 ]; then
     suggested_master_disk_size="100GB"
   fi
-  if [[ "$(get-num-nodes)" -gt "3000" ]]; then
+  if [ "$(get-num-nodes)" -gt 3000 ]; then
     suggested_master_disk_size="200GB"
   fi
   echo "${suggested_master_disk_size}"
 }
 
 function get-node-ip-range {
-  if [[ -n "${NODE_IP_RANGE:-}" ]]; then
+  if [ -n "${NODE_IP_RANGE:-}" ]; then
     >&2 echo "Using user provided NODE_IP_RANGE: ${NODE_IP_RANGE}"
     echo "${NODE_IP_RANGE}"
     return
   fi
   local suggested_range="10.40.0.0/22"
-  if [[ "$(get-num-nodes)" -gt 1000 ]]; then
+  if [ "$(get-num-nodes)" -gt 1000 ]; then
     suggested_range="10.40.0.0/21"
   fi
-  if [[ "$(get-num-nodes)" -gt 2000 ]]; then
+  if [ "$(get-num-nodes)" -gt 2000 ]; then
     suggested_range="10.40.0.0/20"
   fi
-  if [[ "$(get-num-nodes)" -gt 4000 ]]; then
+  if [ "$(get-num-nodes)" -gt 4000 ]; then
     suggested_range="10.40.0.0/19"
   fi
   echo "${suggested_range}"
@@ -98,13 +98,13 @@ function get-node-ip-range {
 
 function get-cluster-ip-range {
   local suggested_range="10.64.0.0/14"
-  if [[ "$(get-num-nodes)" -gt 1000 ]]; then
+  if [ "$(get-num-nodes)" -gt 1000 ]; then
     suggested_range="10.64.0.0/13"
   fi
-  if [[ "$(get-num-nodes)" -gt 2000 ]]; then
+  if [ "$(get-num-nodes)" -gt 2000 ]; then
     suggested_range="10.64.0.0/12"
   fi
-  if [[ "$(get-num-nodes)" -gt 4000 ]]; then
+  if [ "$(get-num-nodes)" -gt 4000 ]; then
     suggested_range="10.64.0.0/11"
   fi
   echo "${suggested_range}"

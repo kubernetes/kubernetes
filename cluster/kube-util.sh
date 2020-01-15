@@ -22,8 +22,8 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 source "${KUBE_ROOT}/cluster/skeleton/util.sh"
 
-if [[ "${KUBERNETES_PROVIDER:-}" != "kubernetes-anywhere" ]]; then
-    if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
+if [ "${KUBERNETES_PROVIDER:-}" != 'kubernetes-anywhere' ]; then
+    if [ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]; then
         KUBERNETES_PROVIDER=""
     else
         KUBERNETES_PROVIDER="${KUBERNETES_PROVIDER:-gce}"

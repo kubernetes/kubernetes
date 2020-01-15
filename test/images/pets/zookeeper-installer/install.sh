@@ -64,7 +64,7 @@ fi
 # TODO: This is a hack, netcat is convenient to have in the zookeeper container
 # I want to avoid using a custom zookeeper image just for this. So copy it.
 NC=$(which nc)
-if [ "${NC}" != "" ]; then
+if [ -n "${NC}" ]; then
     echo copying nc into "${INSTALL_VOLUME}"
     cp "${NC}" "${INSTALL_VOLUME}"
 fi

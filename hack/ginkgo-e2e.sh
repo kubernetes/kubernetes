@@ -50,7 +50,7 @@ function detect-master-from-kubeconfig() {
 
     local cc
     cc=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.current-context}")
-    if [[ -n "${KUBE_CONTEXT:-}" ]]; then
+    if [ -n "${KUBE_CONTEXT:-}" ]; then
       cc="${KUBE_CONTEXT}"
     fi
     local cluster
@@ -59,7 +59,7 @@ function detect-master-from-kubeconfig() {
 }
 
 # ---- Do cloud-provider-specific setup
-if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
+if [ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]; then
     echo "Conformance test: not doing test setup."
     KUBERNETES_PROVIDER=${KUBERNETES_CONFORMANCE_PROVIDER:-"skeleton"}
 
@@ -85,15 +85,15 @@ else
     )
 fi
 
-if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
+if [ -n "${NODE_INSTANCE_PREFIX:-}" ]; then
   NODE_INSTANCE_GROUP="${NODE_INSTANCE_PREFIX}-group"
 fi
 
-if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
+if [ "${KUBERNETES_PROVIDER}" = 'gce' ]; then
   set_num_migs
   NODE_INSTANCE_GROUP=""
   for ((i=1; i<=NUM_MIGS; i++)); do
-    if [[ ${i} == "${NUM_MIGS}" ]]; then
+    if [ ${i} -eq "${NUM_MIGS}" ]; then
       # We are assigning the same mig names as create-nodes function from cluster/gce/util.sh.
       NODE_INSTANCE_GROUP="${NODE_INSTANCE_GROUP}${NODE_INSTANCE_PREFIX}-group"
     else
@@ -105,46 +105,46 @@ fi
 # TODO(kubernetes/test-infra#3330): Allow NODE_INSTANCE_GROUP to be
 # set before we get here, which eliminates any cluster/gke use if
 # KUBERNETES_CONFORMANCE_PROVIDER is set to "gke".
-if [[ -z "${NODE_INSTANCE_GROUP:-}" ]] && [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+if [ -z "${NODE_INSTANCE_GROUP:-}" ] && [ "${KUBERNETES_PROVIDER}" = 'gke' ]; then
   detect-node-instance-groups
   NODE_INSTANCE_GROUP=$(kube::util::join , "${NODE_INSTANCE_GROUP[@]}")
 fi
 
-if [[ "${KUBERNETES_PROVIDER}" == "azure" ]]; then
-    if [[ ${CLOUD_CONFIG} == "" ]]; then
+if [ "${KUBERNETES_PROVIDER}" = 'azure' ]; then
+    if [ -z "${CLOUD_CONFIG}" ]; then
         echo "Missing azure cloud config"
         exit 1
     fi
 fi
 
 ginkgo_args=()
-if [[ -n "${CONFORMANCE_TEST_SKIP_REGEX:-}" ]]; then
+if [ -n "${CONFORMANCE_TEST_SKIP_REGEX:-}" ]; then
   ginkgo_args+=("--skip=${CONFORMANCE_TEST_SKIP_REGEX}")
   ginkgo_args+=("--seed=1436380640")
 fi
-if [[ -n "${GINKGO_PARALLEL_NODES:-}" ]]; then
+if [ -n "${GINKGO_PARALLEL_NODES:-}" ]; then
   ginkgo_args+=("--nodes=${GINKGO_PARALLEL_NODES}")
 elif [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
   ginkgo_args+=("--nodes=25")
 fi
 
-if [[ "${GINKGO_UNTIL_IT_FAILS:-}" == true ]]; then
+if [ "${GINKGO_UNTIL_IT_FAILS:-}" = 'true' ]; then
   ginkgo_args+=("--untilItFails=true")
 fi
 
 FLAKE_ATTEMPTS=1
-if [[ "${GINKGO_TOLERATE_FLAKES}" == "y" ]]; then
+if [ "${GINKGO_TOLERATE_FLAKES}" = 'y' ]; then
   FLAKE_ATTEMPTS=2
 fi
 
-if [[ "${GINKGO_NO_COLOR}" == "y" ]]; then
+if [ "${GINKGO_NO_COLOR}" = 'y' ]; then
   ginkgo_args+=("--noColor")
 fi
 
 # The --host setting is used only when providing --auth_config
 # If --kubeconfig is used, the host to use is retrieved from the .kubeconfig
 # file and the one provided with --host is ignored.
-# Add path for things like running kubectl binary. 
+# Add path for things like running kubectl binary.
 PATH=$(dirname "${e2e_test}"):"${PATH}"
 export PATH
 "${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \

@@ -104,7 +104,7 @@ while getopts "hp:i:" opt ; do
       ;;
     p)
       PARALLEL="${OPTARG}"
-      if ! isnum "${PARALLEL}" || [[ "${PARALLEL}" -le 0 ]]; then
+      if ! isnum "${PARALLEL}" || [ "${PARALLEL}" -le 0 ]; then
         kube::log::usage "'$0': argument to -p must be numeric and greater than 0"
         kube::test::usage
         exit 1
@@ -137,37 +137,37 @@ go_test_grep_pattern=".*"
 
 # The junit report tool needs full test case information to produce a
 # meaningful report.
-if [[ -n "${KUBE_JUNIT_REPORT_DIR}" ]] ; then
+if [ -n "${KUBE_JUNIT_REPORT_DIR}" ] ; then
   goflags+=(-v)
   goflags+=(-json)
   # Show only summary lines by matching lines like "status package/test"
   go_test_grep_pattern="^[^[:space:]]\+[[:space:]]\+[^[:space:]]\+/[^[[:space:]]\+"
 fi
 
-if [[ -n "${FULL_LOG:-}" ]] ; then
+if [ -n "${FULL_LOG:-}" ] ; then
   go_test_grep_pattern=".*"
 fi
 
 # Filter out arguments that start with "-" and move them to goflags.
 testcases=()
 for arg; do
-  if [[ "${arg}" == -* ]]; then
+  if [[ "${arg}" = -* ]]; then
     goflags+=("${arg}")
   else
     testcases+=("${arg}")
   fi
 done
-if [[ ${#testcases[@]} -eq 0 ]]; then
+if [ ${#testcases[@]} -eq 0 ]; then
   while IFS='' read -r line; do testcases+=("$line"); done < <(kube::test::find_dirs)
 fi
 set -- "${testcases[@]+${testcases[@]}}"
 
-if [[ -n "${KUBE_RACE}" ]] ; then
+if [ -n "${KUBE_RACE}" ] ; then
   goflags+=("${KUBE_RACE}")
 fi
 
 junitFilenamePrefix() {
-  if [[ -z "${KUBE_JUNIT_REPORT_DIR}" ]]; then
+  if [ -z "${KUBE_JUNIT_REPORT_DIR}" ]; then
     echo ""
     return
   fi
@@ -207,7 +207,7 @@ verifyPathsToPackagesUnderTest() {
     local local_package_path="${package_path}"
     local go_package_path="${GOPATH}/src/${package_path}"
 
-    if [[ "${package_path:0:2}" == "./" ]] ; then
+    if [ "${package_path:0:2}" = './' ] ; then
       verifyAndSuggestPackagePath "${local_package_path}" "${go_package_path}" "${package_path}" "${package_path:2}"
     else
       verifyAndSuggestPackagePath "${go_package_path}" "${local_package_path}" "${package_path}" "./${package_path}"
@@ -217,7 +217,7 @@ verifyPathsToPackagesUnderTest() {
 
 produceJUnitXMLReport() {
   local -r junit_filename_prefix=$1
-  if [[ -z "${junit_filename_prefix}" ]]; then
+  if [ -z "${junit_filename_prefix}" ]; then
     return
   fi
 
@@ -257,7 +257,7 @@ runTests() {
   fi
 
   # Create coverage report directories.
-  if [[ -z "${KUBE_COVER_REPORT_DIR}" ]]; then
+  if [ -z "${KUBE_COVER_REPORT_DIR}" ]; then
     cover_report_dir="/tmp/k8s_coverage/$(kube::util::sortable_date)"
   else
     cover_report_dir="${KUBE_COVER_REPORT_DIR}"
@@ -340,7 +340,7 @@ checkFDs() {
   # due to the low default files limit on OS X.  Warn about low limit.
   local fileslimit
   fileslimit="$(ulimit -n)"
-  if [[ ${fileslimit} -lt 1000 ]]; then
+  if [ "${fileslimit}" -lt 1000 ]; then
     echo "WARNING: ulimit -n (files) should be at least 1000, is ${fileslimit}, may cause test failure";
   fi
 }

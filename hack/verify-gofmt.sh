@@ -27,7 +27,7 @@ cd "${KUBE_ROOT}"
 
 # Prefer bazel's gofmt.
 gofmt="external/io_bazel_rules_go_toolchain/bin/gofmt"
-if [[ ! -x "${gofmt}" ]]; then
+if [ ! -x "${gofmt}" ]; then
   gofmt=$(which gofmt)
   kube::golang::verify_go_version
 fi
@@ -54,7 +54,7 @@ find_files() {
 # would have led to no useful error message from gofmt, because the script would
 # have failed before getting to the "echo" in the block below.
 diff=$(find_files | xargs "${gofmt}" -d -s 2>&1) || true
-if [[ -n "${diff}" ]]; then
+if [ -n "${diff}" ]; then
   echo "${diff}" >&2
   echo >&2
   echo "Run ./hack/update-gofmt.sh" >&2

@@ -215,8 +215,8 @@ function is_leader() {
   # be empty. Since it's better to have multiple addon managers than no addon
   # managers at all, we're going to assume that we're the leader in such case.
   log INFO "Leader is $KUBE_CONTROLLER_MANAGER_LEADER"
-  [[ "$KUBE_CONTROLLER_MANAGER_LEADER" == "" ||
-     "$HOSTNAME" == "$KUBE_CONTROLLER_MANAGER_LEADER" ]]
+  [[ -z "$KUBE_CONTROLLER_MANAGER_LEADER" ||
+     "$HOSTNAME" = "$KUBE_CONTROLLER_MANAGER_LEADER" ]]
 }
 
 # The business logic for whether a given object should be created
@@ -261,7 +261,7 @@ while true; do
   end_sec=$(date +"%s")
   len_sec=$((end_sec-start_sec))
   # subtract the time passed from the sleep time
-  if [[ ${len_sec} -lt ${ADDON_CHECK_INTERVAL_SEC} ]]; then
+  if [ "${len_sec}" -lt "${ADDON_CHECK_INTERVAL_SEC}" ]; then
     sleep_time=$((ADDON_CHECK_INTERVAL_SEC-len_sec))
     sleep ${sleep_time}
   fi

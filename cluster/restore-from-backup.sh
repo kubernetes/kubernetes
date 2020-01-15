@@ -79,7 +79,7 @@ wait_for_etcd_up() {
   for _ in $(seq 120); do
     # TODO: Is it enough to look into /health endpoint?
     health=$(curl --silent "http://127.0.0.1:${port}/health")
-    if [ "${health}" == "${health_ok}" ]; then
+    if [ "${health}" = "${health_ok}" ]; then
       return 0
     fi
     sleep 1
@@ -109,7 +109,7 @@ wait_for_etcd_and_apiserver_down() {
     # TODO: Theoretically it is possible, that apiserver and or etcd
     # are currently down, but Kubelet is now restarting them and they
     # will reappear again. We should avoid it.
-    if [ "${etcd}" -eq "0" ] && [ "${apiserver}" -eq "0" ]; then
+    if [ "${etcd}" -eq 0 ] && [ "${apiserver}" -eq 0 ]; then
       return 0
     fi
     sleep 1
@@ -143,7 +143,7 @@ read -rsp $'Press enter when all etcd instances are down...\n'
 # If this directory already exists, remove it.
 BACKUP_DIR="/var/tmp/backup"
 rm -rf "${BACKUP_DIR}"
-if [ "${ETCD_API}" == "etcd2" ]; then
+if [ "${ETCD_API}" = 'etcd2' ]; then
   echo "Preparing etcd backup data for restore"
   # In v2 mode, we simply copy both snap and wal files to a newly created
   # directory. After that, we start etcd with --force-new-cluster option
@@ -175,12 +175,12 @@ if [ "${ETCD_API}" == "etcd2" ]; then
   # Kill that etcd instance.
   echo "Etcd healthy - killing ${image} container"
   docker kill "${image}"
-elif [ "${ETCD_API}" == "etcd3" ]; then
+elif [ "${ETCD_API}" = 'etcd3' ]; then
   echo "Preparing etcd snapshot for restore"
   mkdir -p "${BACKUP_DIR}"
   echo "Copying data to ${BACKUP_DIR} and restoring there"
   number_files=$(find . -maxdepth 1 -type f -name "*.db" | wc -l)
-  if [ "${number_files}" -ne "1" ]; then
+  if [ "${number_files}" -ne 1 ]; then
     echo "Incorrect number of *.db files - expected 1"
     exit 1
   fi
@@ -213,7 +213,7 @@ mv /var/etcd/data "${MNT_DISK}/var/etcd-corrupted"
 echo "Copying restored data to /var/etcd/data"
 mv "${BACKUP_DIR}" /var/etcd/data
 
-if [ "${RESET_EVENT_ETCD:-}" == "true" ]; then
+if [ "${RESET_EVENT_ETCD:-}" = 'true' ]; then
   echo "Removing event-etcd corrupted data"
   EVENTS_CORRUPTED_DIR="${MNT_DISK}/var/etcd-events-corrupted"
   # Save the corrupted data (clean directory if it is already non-empty).

@@ -38,7 +38,7 @@ function kubectl_retry() {
   tries=3
   while ! "${KUBE_ROOT}/cluster/kubectl.sh" "$@"; do
     tries=$((tries-1))
-    if [[ ${tries} -le 0 ]]; then
+    if [ ${tries} -le 0 ]; then
       echo "('kubectl $*' failed, giving up)" >&2
       return 1
     fi
@@ -50,15 +50,15 @@ function kubectl_retry() {
 ALLOWED_NOTREADY_NODES="${ALLOWED_NOTREADY_NODES:-0}"
 CLUSTER_READY_ADDITIONAL_TIME_SECONDS="${CLUSTER_READY_ADDITIONAL_TIME_SECONDS:-30}"
 
-if [[ "${KUBERNETES_PROVIDER:-}" == "gce" ]]; then
-  if [[ "${KUBE_CREATE_NODES}" == "true" ]]; then
+if [ "${KUBERNETES_PROVIDER:-}" = 'gce' ]; then
+  if [ "${KUBE_CREATE_NODES}" = 'true' ]; then
     EXPECTED_NUM_NODES="$(get-num-nodes)"
   else
     EXPECTED_NUM_NODES="0"
   fi
   echo "Validating gce cluster, MULTIZONE=${MULTIZONE:-}"
   # In multizone mode we need to add instances for all nodes in the region.
-  if [[ "${MULTIZONE:-}" == "true" ]]; then
+  if [ "${MULTIZONE:-}" = 'true' ]; then
     EXPECTED_NUM_NODES=$(gcloud -q compute instances list --project="${PROJECT}" --format="[no-heading]" \
       --filter="(name ~ '${NODE_INSTANCE_PREFIX}.*' OR name ~ '${WINDOWS_NODE_INSTANCE_PREFIX}.*') AND zone:($(gcloud -q compute zones list --project="${PROJECT}" --filter=region="${REGION}" --format="csv[no-heading](name)" | tr "\n" "," | sed  "s/,$//"))" | wc -l)
     echo "Computing number of nodes, NODE_INSTANCE_PREFIX=${NODE_INSTANCE_PREFIX}, REGION=${REGION}, EXPECTED_NUM_NODES=${EXPECTED_NUM_NODES}"
@@ -67,8 +67,8 @@ else
   EXPECTED_NUM_NODES="${NUM_NODES}"
 fi
 
-if [[ "${REGISTER_MASTER_KUBELET:-}" == "true" ]]; then
-  if [[ "${KUBERNETES_PROVIDER:-}" == "gce" ]]; then
+if [ "${REGISTER_MASTER_KUBELET:-}" = 'true' ]; then
+  if [ "${KUBERNETES_PROVIDER:-}" = 'gce' ]; then
     NUM_MASTERS=$(get-master-replicas-count)
   else
     NUM_MASTERS=1
@@ -86,7 +86,7 @@ MAX_ATTEMPTS=100
 ADDITIONAL_ITERATIONS=$(((CLUSTER_READY_ADDITIONAL_TIME_SECONDS + PAUSE_BETWEEN_ITERATIONS_SECONDS - 1)/PAUSE_BETWEEN_ITERATIONS_SECONDS))
 while true; do
   # Pause between iterations of this large outer loop.
-  if [[ ${attempt} -gt 0 ]]; then
+  if [ ${attempt} -gt 0 ]; then
     sleep 15
   fi
   attempt=$((attempt+1))
@@ -110,8 +110,8 @@ while true; do
   # newline truncation.
   node=$(kubectl_retry get nodes --no-headers; ret=$?; echo .; exit "$ret") && res="$?" || res="$?"
   node="${node%.}"
-  if [ "${res}" -ne "0" ]; then
-    if [[ "${attempt}" -gt "${last_run:-$MAX_ATTEMPTS}" ]]; then
+  if [ "${res}" -ne 0 ]; then
+    if [ "${attempt}" -gt "${last_run:-$MAX_ATTEMPTS}" ]; then
       echo -e "${color_red:-} Failed to get nodes.${color_norm:-}"
       exit 1
     else
@@ -122,25 +122,25 @@ while true; do
   # Use grep || true so that empty result doesn't return nonzero exit code.
   ready=$(echo -n "${node}" | grep -c -v "NotReady" || true)
 
-  if (( "${found}" == "${EXPECTED_NUM_NODES}" )) && (( "${ready}" == "${EXPECTED_NUM_NODES}")); then
+  if [ "${found}" -eq "${EXPECTED_NUM_NODES}" ] && [ "${ready}" -eq "${EXPECTED_NUM_NODES}" ]; then
     break
-  elif (( "${found}" > "${EXPECTED_NUM_NODES}" )); then
-    if [[ "${KUBE_USE_EXISTING_MASTER:-}" != "true" ]]; then
+  elif [ "${found}" -gt "${EXPECTED_NUM_NODES}" ]; then
+    if [ "${KUBE_USE_EXISTING_MASTER:-}" != 'true' ]; then
       echo -e "${color_red}Found ${found} nodes, but expected ${EXPECTED_NUM_NODES}. Your cluster may not behave correctly.${color_norm}"
     fi
     break
-  elif (( "${ready}" > "${EXPECTED_NUM_NODES}")); then
+  elif [ "${ready}" -gt "${EXPECTED_NUM_NODES}" ]; then
     echo -e "${color_red}Found ${ready} ready nodes, but expected ${EXPECTED_NUM_NODES}. Your cluster may not behave correctly.${color_norm}"
     break
   else
-    if [[ "${REQUIRED_NUM_NODES}" -le "${ready}" ]]; then
+    if [ "${REQUIRED_NUM_NODES}" -le "${ready}" ]; then
       echo -e "${color_green:-}Found ${REQUIRED_NUM_NODES} Nodes, allowing additional ${ADDITIONAL_ITERATIONS} iterations for other Nodes to join.${color_norm}"
       last_run="${last_run:-$((attempt + ADDITIONAL_ITERATIONS - 1))}"
     fi
-    if [[ "${attempt}" -gt "${last_run:-$MAX_ATTEMPTS}" ]]; then
+    if [ "${attempt}" -gt "${last_run:-$MAX_ATTEMPTS}" ]; then
       echo -e "${color_yellow:-}Detected ${ready} ready nodes, found ${found} nodes out of expected ${EXPECTED_NUM_NODES}. Your cluster may not be fully functional.${color_norm}"
       kubectl_retry get nodes
-      if [[ "${REQUIRED_NUM_NODES}" -gt "${ready}" ]]; then
+      if [ "${REQUIRED_NUM_NODES}" -gt "${ready}" ]; then
         exit 1
       else
         return_value=2
@@ -165,8 +165,8 @@ while true; do
   componentstatuses=$(echo "${cs_status}" | grep -c 'Healthy:') || true
   healthy=$(echo "${cs_status}" | grep -c 'Healthy:True') || true
 
-  if ((componentstatuses > healthy)) || ((componentstatuses == 0)); then
-    if ((attempt < 5)); then
+  if [ "$componentstatuses" -gt "$healthy" ] || [ "$componentstatuses" -eq 0 ]; then
+    if [ "$attempt" -lt 5 ]; then
       echo -e "${color_yellow}Cluster not working yet.${color_norm}"
       attempt=$((attempt+1))
       sleep 30
@@ -183,7 +183,7 @@ done
 
 echo "Validate output:"
 kubectl_retry get cs || true
-if [ "${return_value}" == "0" ]; then
+if [ "${return_value}" -eq 0 ]; then
   echo -e "${color_green}Cluster validation succeeded${color_norm}"
 else
   echo -e "${color_yellow}Cluster validation encountered some problems, but cluster should be in working order${color_norm}"

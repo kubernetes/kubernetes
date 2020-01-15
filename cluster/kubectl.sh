@@ -36,14 +36,14 @@ source "${KUBE_ROOT}/cluster/clientbin.sh"
 
 # If KUBECTL_PATH isn't set, gather up the list of likely places and use ls
 # to find the latest one.
-if [[ -z "${KUBECTL_PATH:-}" ]]; then
+if [ -z "${KUBECTL_PATH:-}" ]; then
   kubectl=$( get_bin "kubectl" "cmd/kubectl" )
 
-  if [[ ! -x "$kubectl" ]]; then
+  if [ ! -x "$kubectl" ]; then
     print_error "kubectl"
     exit 1
   fi
-elif [[ ! -x "${KUBECTL_PATH}" ]]; then
+elif [ ! -x "${KUBECTL_PATH}" ]; then
   {
     echo "KUBECTL_PATH environment variable set to '${KUBECTL_PATH}', but "
     echo "this doesn't seem to be a valid executable."
@@ -52,9 +52,9 @@ elif [[ ! -x "${KUBECTL_PATH}" ]]; then
 fi
 kubectl="${KUBECTL_PATH:-${kubectl}}"
 
-if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
+if [ "$KUBERNETES_PROVIDER" = 'gke' ]; then
   detect-project &> /dev/null
-elif [[ "$KUBERNETES_PROVIDER" == "ubuntu" ]]; then
+elif [ "$KUBERNETES_PROVIDER" = 'ubuntu' ]; then
   detect-master > /dev/null
   config=(
     "--server=http://${KUBE_MASTER_IP}:8080"

@@ -26,7 +26,7 @@ export GO111MODULE=on
 # Explicitly clear GOFLAGS, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
 export GOFLAGS=
 # Detect problematic GOPROXY settings that prevent lookup of dependencies
-if [[ "${GOPROXY:-}" == "off" ]]; then
+if [ "${GOPROXY:-}" = 'off' ]; then
   kube::log::error "Cannot run with \$GOPROXY=off"
   exit 1
 fi
@@ -55,8 +55,8 @@ case "${1:-}" in
 esac
 
 outdated=$(go list -m -json all | jq -r "
-  select(.Replace.Version != null) | 
-  select(.Version != .Replace.Version) | 
+  select(.Replace.Version != null) |
+  select(.Version != .Replace.Version) |
   ${filter}
   select(.Path) |
   \"\(.Path)
@@ -64,7 +64,7 @@ outdated=$(go list -m -json all | jq -r "
     preferred: \(.Version)
     hack/pin-dependency.sh \(.Path) \(.Version)\"
 ")
-if [[ -n "${outdated}" ]]; then
+if [ -n "${outdated}" ]; then
   echo "These modules are pinned to versions different than the minimal preferred version."
   echo "That means that without replace directives, a different version would be selected,"
   echo "which breaks consumers of our published modules."
@@ -78,13 +78,13 @@ fi
 unused=$(comm -23 \
   <(go mod edit -json | jq -r '.Replace[] | select(.New.Version != null) | .Old.Path' | sort) \
   <(go list -m -json all | jq -r .Path | sort))
-if [[ -n "${unused}" ]]; then
+if [ -n "${unused}" ]; then
   echo ""
   echo "Use the given commands to remove pinned module versions that aren't actually used:"
   echo "${unused}" | xargs -L 1 echo 'GO111MODULE=on go mod edit -dropreplace'
 fi
 
-if [[ -n "${unused}${outdated}" ]]; then
+if [ -n "${unused}${outdated}" ]; then
   exit 1
 fi
 

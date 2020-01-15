@@ -33,7 +33,7 @@ POD_MANIFEST_PATH=${POD_MANIFEST_PATH:-"/var/run/kubernetes/static-pods"}
 KUBELET_FLAGS=${KUBELET_FLAGS:-""}
 KUBELET_IMAGE=${KUBELET_IMAGE:-""}
 # many dev environments run with swap on, so we don't fail in this env
-FAIL_SWAP_ON=${FAIL_SWAP_ON:-"false"}
+FAIL_SWAP_ON=${FAIL_SWAP_ON:-'false'}
 # Name of the network plugin, eg: "kubenet"
 NET_PLUGIN=${NET_PLUGIN:-""}
 # Place the config files and binaries required by NET_PLUGIN in these directory,
@@ -123,8 +123,8 @@ KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
 AUDIT_POLICY_FILE=${AUDIT_POLICY_FILE:-""}
 
 # sanity check for OpenStack provider
-if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
-    if [ "${CLOUD_CONFIG}" == "" ]; then
+if [ "${CLOUD_PROVIDER}" = 'openstack' ]; then
+    if [ -z "${CLOUD_CONFIG}" ]; then
         echo "Missing CLOUD_CONFIG env for OpenStack provider!"
         exit 1
     fi
@@ -134,7 +134,7 @@ if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
     fi
 fi
 
-if [ "$(id -u)" != "0" ]; then
+if [ "$(id -u)" -ne 0 ]; then
     echo "WARNING : This script MAY be run as root for docker socket / iptables functionality; if failures occur, retry as root." 2>&1
 fi
 
@@ -157,7 +157,7 @@ function usage {
 function guess_built_binary_path {
   local apiserver_path
   apiserver_path=$(kube::util::find-binary "kube-apiserver")
-  if [[ -z "${apiserver_path}" ]]; then
+  if [ -z "${apiserver_path}" ]; then
     return
   fi
   echo -n "$(dirname "${apiserver_path}")"
@@ -175,7 +175,7 @@ do
             ;;
         O)
             GO_OUT=$(guess_built_binary_path)
-            if [ "${GO_OUT}" == "" ]; then
+            if [ -z "${GO_OUT}" ]; then
                 echo "Could not guess the correct output directory to use."
                 exit 1
             fi
@@ -191,7 +191,7 @@ do
     esac
 done
 
-if [ "x${GO_OUT}" == "x" ]; then
+if [ "x${GO_OUT}" = 'x' ]; then
     make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/kube-apiserver cmd/kube-controller-manager cmd/cloud-controller-manager cmd/kubelet cmd/kube-proxy cmd/kube-scheduler"
 else
     echo "skipped the build."
@@ -225,9 +225,9 @@ RUNTIME_REQUEST_TIMEOUT=${RUNTIME_REQUEST_TIMEOUT:-"2m"}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
-ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
+ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-'false'}
 CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s default
-ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # current default
+ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-'true'} # current default
 # This is the default dir and filename where the apiserver will generate a self-signed cert
 # which should be able to be used as the CA to verify itself
 CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
@@ -240,9 +240,9 @@ CLUSTER_SIGNING_KEY_FILE=${CLUSTER_SIGNING_KEY_FILE:-"${ROOT_CA_KEY}"}
 REUSE_CERTS=${REUSE_CERTS:-false}
 
 # name of the cgroup driver, i.e. cgroupfs or systemd
-if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
+if [ "${CONTAINER_RUNTIME}" = 'docker' ]; then
   # default cgroup driver to match what is reported by docker to simplify local development
-  if [[ -z ${CGROUP_DRIVER} ]]; then
+  if [ -z "${CGROUP_DRIVER}" ]; then
     # match driver with docker runtime reported value (they must match)
     CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" |  sed -e 's/^[[:space:]]*//'|cut -f3- -d' ')
     echo "Kubelet cgroup driver defaulted to use: ${CGROUP_DRIVER}"
@@ -261,7 +261,7 @@ CONTROLPLANE_SUDO=$(test -w "${CERT_DIR}" || echo "sudo -E")
 function test_apiserver_off {
     # For the common local scenario, fail fast if server is already running.
     # this can happen if you run local-up-cluster.sh twice and kill etcd in between.
-    if [[ "${API_PORT}" -gt "0" ]]; then
+    if [ "${API_PORT}" -gt 0 ]; then
         if ! curl --silent -g "${API_HOST}:${API_PORT}" ; then
             echo "API SERVER insecure port is free, proceeding..."
         else
@@ -334,7 +334,7 @@ cleanup()
 {
   echo "Cleaning up..."
   # delete running images
-  # if [[ "${ENABLE_CLUSTER_DNS}" == true ]]; then
+  # if [ "${ENABLE_CLUSTER_DNS}" = true ]; then
   # Still need to figure why this commands throw an error: Error from server: client: etcd cluster is unavailable or misconfigured
   #     ${KUBECTL} --namespace=kube-system delete service kube-dns
   # And this one hang forever:
@@ -342,33 +342,33 @@ cleanup()
   # fi
 
   # Check if the API server is still running
-  [[ -n "${APISERVER_PID-}" ]] && kube::util::read-array APISERVER_PIDS < <(pgrep -P "${APISERVER_PID}" ; ps -o pid= -p "${APISERVER_PID}")
-  [[ -n "${APISERVER_PIDS-}" ]] && sudo kill "${APISERVER_PIDS[@]}" 2>/dev/null
+  [ -n "${APISERVER_PID-}" ] && kube::util::read-array APISERVER_PIDS < <(pgrep -P "${APISERVER_PID}" ; ps -o pid= -p "${APISERVER_PID}")
+  [ -n "${APISERVER_PIDS-}" ] && sudo kill "${APISERVER_PIDS[@]}" 2>/dev/null
 
   # Check if the controller-manager is still running
-  [[ -n "${CTLRMGR_PID-}" ]] && kube::util::read-array CTLRMGR_PIDS < <(pgrep -P "${CTLRMGR_PID}" ; ps -o pid= -p "${CTLRMGR_PID}")
-  [[ -n "${CTLRMGR_PIDS-}" ]] && sudo kill "${CTLRMGR_PIDS[@]}" 2>/dev/null
+  [ -n "${CTLRMGR_PID-}" ] && kube::util::read-array CTLRMGR_PIDS < <(pgrep -P "${CTLRMGR_PID}" ; ps -o pid= -p "${CTLRMGR_PID}")
+  [ -n "${CTLRMGR_PIDS-}" ] && sudo kill "${CTLRMGR_PIDS[@]}" 2>/dev/null
 
   # Check if the cloud-controller-manager is still running
   [[ -n "${CLOUD_CTLRMGR_PID-}" ]] && kube::util::read-array CLOUD_CTLRMGR_PIDS < <(pgrep -P "${CLOUD_CTLRMGR_PID}" ; ps -o pid= -p "${CLOUD_CTLRMGR_PID}")
   [[ -n "${CLOUD_CTLRMGR_PIDS-}" ]] && sudo kill "${CLOUD_CTLRMGR_PIDS[@]}" 2>/dev/null
 
   # Check if the kubelet is still running
-  [[ -n "${KUBELET_PID-}" ]] && kube::util::read-array KUBELET_PIDS < <(pgrep -P "${KUBELET_PID}" ; ps -o pid= -p "${KUBELET_PID}")
-  [[ -n "${KUBELET_PIDS-}" ]] && sudo kill "${KUBELET_PIDS[@]}" 2>/dev/null
+  [ -n "${KUBELET_PID-}" ] && kube::util::read-array KUBELET_PIDS < <(pgrep -P "${KUBELET_PID}" ; ps -o pid= -p "${KUBELET_PID}")
+  [ -n "${KUBELET_PIDS-}" ] && sudo kill "${KUBELET_PIDS[@]}" 2>/dev/null
 
   # Check if the proxy is still running
-  [[ -n "${PROXY_PID-}" ]] && kube::util::read-array PROXY_PIDS < <(pgrep -P "${PROXY_PID}" ; ps -o pid= -p "${PROXY_PID}")
-  [[ -n "${PROXY_PIDS-}" ]] && sudo kill "${PROXY_PIDS[@]}" 2>/dev/null
+  [ -n "${PROXY_PID-}" ] && kube::util::read-array PROXY_PIDS < <(pgrep -P "${PROXY_PID}" ; ps -o pid= -p "${PROXY_PID}")
+  [ -n "${PROXY_PIDS-}" ] && sudo kill "${PROXY_PIDS[@]}" 2>/dev/null
 
   # Check if the scheduler is still running
-  [[ -n "${SCHEDULER_PID-}" ]] && kube::util::read-array SCHEDULER_PIDS < <(pgrep -P "${SCHEDULER_PID}" ; ps -o pid= -p "${SCHEDULER_PID}")
-  [[ -n "${SCHEDULER_PIDS-}" ]] && sudo kill "${SCHEDULER_PIDS[@]}" 2>/dev/null
+  [ -n "${SCHEDULER_PID-}" ] && kube::util::read-array SCHEDULER_PIDS < <(pgrep -P "${SCHEDULER_PID}" ; ps -o pid= -p "${SCHEDULER_PID}")
+  [ -n "${SCHEDULER_PIDS-}" ] && sudo kill "${SCHEDULER_PIDS[@]}" 2>/dev/null
 
   # Check if the etcd is still running
-  [[ -n "${ETCD_PID-}" ]] && kube::etcd::stop
-  if [[ "${PRESERVE_ETCD}" == "false" ]]; then
-    [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
+  [ -n "${ETCD_PID-}" ] && kube::etcd::stop
+  if [ "${PRESERVE_ETCD}" = 'false' ]; then
+    [ -n "${ETCD_DIR-}" ] && kube::etcd::clean_etcd_dir
   fi
   exit 0
 }
@@ -376,32 +376,32 @@ cleanup()
 # Check if all processes are still running. Prints a warning once each time
 # a process dies unexpectedly.
 function healthcheck {
-  if [[ -n "${APISERVER_PID-}" ]] && ! sudo kill -0 "${APISERVER_PID}" 2>/dev/null; then
+  if [ -n "${APISERVER_PID-}" ] && ! sudo kill -0 "${APISERVER_PID}" 2>/dev/null; then
     warning_log "API server terminated unexpectedly, see ${APISERVER_LOG}"
     APISERVER_PID=
   fi
 
-  if [[ -n "${CTLRMGR_PID-}" ]] && ! sudo kill -0 "${CTLRMGR_PID}" 2>/dev/null; then
+  if [ -n "${CTLRMGR_PID-}" ] && ! sudo kill -0 "${CTLRMGR_PID}" 2>/dev/null; then
     warning_log "kube-controller-manager terminated unexpectedly, see ${CTLRMGR_LOG}"
     CTLRMGR_PID=
   fi
 
-  if [[ -n "${KUBELET_PID-}" ]] && ! sudo kill -0 "${KUBELET_PID}" 2>/dev/null; then
+  if [ -n "${KUBELET_PID-}" ] && ! sudo kill -0 "${KUBELET_PID}" 2>/dev/null; then
     warning_log "kubelet terminated unexpectedly, see ${KUBELET_LOG}"
     KUBELET_PID=
   fi
 
-  if [[ -n "${PROXY_PID-}" ]] && ! sudo kill -0 "${PROXY_PID}" 2>/dev/null; then
+  if [ -n "${PROXY_PID-}" ] && ! sudo kill -0 "${PROXY_PID}" 2>/dev/null; then
     warning_log "kube-proxy terminated unexpectedly, see ${PROXY_LOG}"
     PROXY_PID=
   fi
 
-  if [[ -n "${SCHEDULER_PID-}" ]] && ! sudo kill -0 "${SCHEDULER_PID}" 2>/dev/null; then
+  if [ -n "${SCHEDULER_PID-}" ] && ! sudo kill -0 "${SCHEDULER_PID}" 2>/dev/null; then
     warning_log "scheduler terminated unexpectedly, see ${SCHEDULER_LOG}"
     SCHEDULER_PID=
   fi
 
-  if [[ -n "${ETCD_PID-}" ]] && ! sudo kill -0 "${ETCD_PID}" 2>/dev/null; then
+  if [ -n "${ETCD_PID-}" ] && ! sudo kill -0 "${ETCD_PID}" 2>/dev/null; then
     warning_log "etcd terminated unexpectedly"
     ETCD_PID=
   fi
@@ -430,7 +430,7 @@ function set_service_accounts {
     SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-true}
     SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-/tmp/kube-serviceaccount.key}
     # Generate ServiceAccount key if needed
-    if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
+    if [ ! -f "${SERVICE_ACCOUNT_KEY}" ]; then
       mkdir -p "$(dirname "${SERVICE_ACCOUNT_KEY}")"
       openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
     fi
@@ -438,7 +438,7 @@ function set_service_accounts {
 
 function generate_certs {
     # Create CA signers
-    if [[ "${ENABLE_SINGLE_CA_SIGNER:-}" = true ]]; then
+    if [ "${ENABLE_SINGLE_CA_SIGNER:-}" = 'true' ]; then
         kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" server '"client auth","server auth"'
         sudo cp "${CERT_DIR}/server-ca.key" "${CERT_DIR}/client-ca.key"
         sudo cp "${CERT_DIR}/server-ca.crt" "${CERT_DIR}/client-ca.crt"
@@ -481,13 +481,13 @@ function generate_kubelet_certs {
 
 function start_apiserver {
     security_admission=""
-    if [[ -n "${DENY_SECURITY_CONTEXT_ADMISSION}" ]]; then
+    if [ -n "${DENY_SECURITY_CONTEXT_ADMISSION}" ]; then
       security_admission=",SecurityContextDeny"
     fi
-    if [[ -n "${PSP_ADMISSION}" ]]; then
+    if [ -n "${PSP_ADMISSION}" ]; then
       security_admission=",PodSecurityPolicy"
     fi
-    if [[ -n "${NODE_ADMISSION}" ]]; then
+    if [ -n "${NODE_ADMISSION}" ]; then
       security_admission=",NodeRestriction"
     fi
 
@@ -495,44 +495,44 @@ function start_apiserver {
     ENABLE_ADMISSION_PLUGINS="${ENABLE_ADMISSION_PLUGINS}${security_admission}"
 
     authorizer_arg=""
-    if [[ -n "${AUTHORIZATION_MODE}" ]]; then
+    if [ -n "${AUTHORIZATION_MODE}" ]; then
       authorizer_arg="--authorization-mode=${AUTHORIZATION_MODE}"
     fi
     priv_arg=""
-    if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
+    if [ -n "${ALLOW_PRIVILEGED}" ]; then
       priv_arg="--allow-privileged=${ALLOW_PRIVILEGED}"
     fi
 
     runtime_config=""
-    if [[ -n "${RUNTIME_CONFIG}" ]]; then
+    if [ -n "${RUNTIME_CONFIG}" ]; then
       runtime_config="--runtime-config=${RUNTIME_CONFIG}"
     fi
 
     # Let the API server pick a default address when API_HOST_IP
     # is set to 127.0.0.1
     advertise_address=""
-    if [[ "${API_HOST_IP}" != "127.0.0.1" ]]; then
+    if [ "${API_HOST_IP}" != '127.0.0.1' ]; then
         advertise_address="--advertise-address=${API_HOST_IP}"
     fi
-    if [[ "${ADVERTISE_ADDRESS}" != "" ]] ; then
+    if [ -n "${ADVERTISE_ADDRESS}" ] ; then
         advertise_address="--advertise-address=${ADVERTISE_ADDRESS}"
     fi
     node_port_range=""
-    if [[ "${NODE_PORT_RANGE}" != "" ]] ; then
+    if [ -n "${NODE_PORT_RANGE}" ] ; then
         node_port_range="--service-node-port-range=${NODE_PORT_RANGE}"
     fi
 
-    if [[ "${REUSE_CERTS}" != true ]]; then
+    if [ "${REUSE_CERTS}" != 'true' ]; then
       # Create Certs
       generate_certs
     fi
 
     cloud_config_arg="--cloud-provider=${CLOUD_PROVIDER} --cloud-config=${CLOUD_CONFIG}"
-    if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
+    if [ "${EXTERNAL_CLOUD_PROVIDER:-}" = 'true' ]; then
       cloud_config_arg="--cloud-provider=external"
     fi
 
-    if [[ -z "${AUDIT_POLICY_FILE}" ]]; then
+    if [ -z "${AUDIT_POLICY_FILE}" ]; then
       cat <<EOF > /tmp/kube-audit-policy-file
 # Log all requests at the Metadata level.
 apiVersion: audit.k8s.io/v1
@@ -597,7 +597,7 @@ EOF
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" controller
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" scheduler
 
-    if [[ -z "${AUTH_ARGS}" ]]; then
+    if [ -z "${AUTH_ARGS}" ]; then
         AUTH_ARGS="--client-key=${CERT_DIR}/client-admin.key --client-certificate=${CERT_DIR}/client-admin.crt"
     fi
 
@@ -613,12 +613,12 @@ EOF
 
 function start_controller_manager {
     node_cidr_args=()
-    if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
+    if [ "${NET_PLUGIN}" = 'kubenet' ]; then
       node_cidr_args=("--allocate-node-cidrs=true" "--cluster-cidr=10.1.0.0/16")
     fi
 
     cloud_config_arg=("--cloud-provider=${CLOUD_PROVIDER}" "--cloud-config=${CLOUD_CONFIG}")
-    if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
+    if [ "${EXTERNAL_CLOUD_PROVIDER:-}" = 'true' ]; then
       cloud_config_arg=("--cloud-provider=external")
       cloud_config_arg+=("--external-cloud-volume-plugin=${EXTERNAL_CLOUD_VOLUME_PLUGIN}")
       cloud_config_arg+=("--cloud-config=${CLOUD_CONFIG}")
@@ -657,7 +657,7 @@ function start_cloud_controller_manager {
     fi
 
     node_cidr_args=()
-    if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
+    if [ "${NET_PLUGIN}" = 'kubenet' ]; then
       node_cidr_args=("--allocate-node-cidrs=true" "--cluster-cidr=10.1.0.0/16")
     fi
 
@@ -683,7 +683,7 @@ function wait_node_ready(){
   local system_node_wait_time=30
   local interval_time=2
   kube::util::wait_for_success "$system_node_wait_time" "$interval_time" "$nodes_stats | grep $node_name"
-  if [ $? == "1" ]; then
+  if [ $? -eq 1 ]; then
     echo "time out on waiting $node_name info"
     exit 1
   fi
@@ -694,9 +694,9 @@ function start_kubelet {
     mkdir -p "${POD_MANIFEST_PATH}" &>/dev/null || sudo mkdir -p "${POD_MANIFEST_PATH}"
 
     cloud_config_arg=("--cloud-provider=${CLOUD_PROVIDER}" "--cloud-config=${CLOUD_CONFIG}")
-    if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
+    if [ "${EXTERNAL_CLOUD_PROVIDER:-}" = 'true' ]; then
        cloud_config_arg=("--cloud-provider=external")
-       if [[ "${CLOUD_PROVIDER:-}" == "aws" ]]; then
+       if [ "${CLOUD_PROVIDER:-}" = 'aws' ]; then
          cloud_config_arg+=("--provider-id=$(curl http://169.254.169.254/latest/meta-data/instance-id)")
        else
          cloud_config_arg+=("--provider-id=$(hostname)")
@@ -705,8 +705,8 @@ function start_kubelet {
 
     mkdir -p "/var/lib/kubelet" &>/dev/null || sudo mkdir -p "/var/lib/kubelet"
     # Enable dns
-    if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
-      if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
+    if [ "${ENABLE_CLUSTER_DNS}" = 'true' ]; then
+      if [ "${ENABLE_NODELOCAL_DNS:-}" = 'true' ]; then
         dns_args=("--cluster-dns=${LOCAL_DNS_IP}" "--cluster-domain=${DNS_DOMAIN}")
       else
         dns_args=("--cluster-dns=${DNS_SERVER_IP}" "--cluster-domain=${DNS_DOMAIN}")
@@ -718,40 +718,40 @@ function start_kubelet {
       dns_args=("--cluster-dns=8.8.8.8")
     fi
     net_plugin_args=()
-    if [[ -n "${NET_PLUGIN}" ]]; then
+    if [ -n "${NET_PLUGIN}" ]; then
       net_plugin_args=("--network-plugin=${NET_PLUGIN}")
     fi
 
     auth_args=()
-    if [[ "${KUBELET_AUTHORIZATION_WEBHOOK:-}" != "false" ]]; then
+    if [ "${KUBELET_AUTHORIZATION_WEBHOOK:-}" != 'false' ]; then
       auth_args+=("--authorization-mode=Webhook")
     fi
-    if [[ "${KUBELET_AUTHENTICATION_WEBHOOK:-}" != "false" ]]; then
+    if [ "${KUBELET_AUTHENTICATION_WEBHOOK:-}" != 'false' ]; then
       auth_args+=("--authentication-token-webhook")
     fi
-    if [[ -n "${CLIENT_CA_FILE:-}" ]]; then
+    if [ -n "${CLIENT_CA_FILE:-}" ]; then
       auth_args+=("--client-ca-file=${CLIENT_CA_FILE}")
     else
       auth_args+=("--client-ca-file=${CERT_DIR}/client-ca.crt")
     fi
 
     cni_conf_dir_args=()
-    if [[ -n "${CNI_CONF_DIR}" ]]; then
+    if [ -n "${CNI_CONF_DIR}" ]; then
       cni_conf_dir_args=("--cni-conf-dir=${CNI_CONF_DIR}")
     fi
 
     cni_bin_dir_args=()
-    if [[ -n "${CNI_BIN_DIR}" ]]; then
+    if [ -n "${CNI_BIN_DIR}" ]; then
       cni_bin_dir_args=("--cni-bin-dir=${CNI_BIN_DIR}")
     fi
 
     container_runtime_endpoint_args=()
-    if [[ -n "${CONTAINER_RUNTIME_ENDPOINT}" ]]; then
+    if [ -n "${CONTAINER_RUNTIME_ENDPOINT}" ]; then
       container_runtime_endpoint_args=("--container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}")
     fi
 
     image_service_endpoint_args=()
-    if [[ -n "${IMAGE_SERVICE_ENDPOINT}" ]]; then
+    if [ -n "${IMAGE_SERVICE_ENDPOINT}" ]; then
       image_service_endpoint_args=("--image-service-endpoint=${IMAGE_SERVICE_ENDPOINT}")
     fi
 
@@ -789,11 +789,11 @@ function start_kubelet {
     )
 
     # warn if users are running with swap allowed
-    if [ "${FAIL_SWAP_ON}" == "false" ]; then
+    if [ "${FAIL_SWAP_ON}" = 'false' ]; then
         echo "WARNING : The kubelet is configured to not fail even if swap is enabled; production deployments should disable swap."
     fi
-    
-    if [[ "${REUSE_CERTS}" != true ]]; then
+
+    if [ "${REUSE_CERTS}" != 'true' ]; then
         generate_kubelet_certs
     fi
 
@@ -824,7 +824,7 @@ clientConnection:
 hostnameOverride: ${HOSTNAME_OVERRIDE}
 mode: ${KUBE_PROXY_MODE}
 EOF
-    if [[ -n ${FEATURE_GATES} ]]; then
+    if [ -n "${FEATURE_GATES}" ]; then
       echo "featureGates:"
       # Convert from foo=true,bar=false to
       #   foo: true
@@ -834,7 +834,7 @@ EOF
       done
     fi >>/tmp/kube-proxy.yaml
 
-    if [[ "${REUSE_CERTS}" != true ]]; then
+    if [ "${REUSE_CERTS}" != 'true' ]; then
         generate_kubeproxy_certs
     fi
 
@@ -859,7 +859,7 @@ function start_kubescheduler {
 }
 
 function start_kubedns {
-    if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
+    if [ "${ENABLE_CLUSTER_DNS}" = 'true' ]; then
         cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns/kube-dns.yaml.in" kube-dns.yaml
         ${SED} -i -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" kube-dns.yaml
         ${SED} -i -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" kube-dns.yaml
@@ -884,7 +884,7 @@ function start_nodelocaldns {
 }
 
 function start_kubedashboard {
-    if [[ "${ENABLE_CLUSTER_DASHBOARD}" = true ]]; then
+    if [ "${ENABLE_CLUSTER_DASHBOARD}" = true ]; then
         echo "Creating kubernetes-dashboard"
         # use kubectl to create the dashboard
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-secret.yaml"
@@ -919,8 +919,8 @@ function create_storage_class {
 }
 
 function print_success {
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
-  if [[ "${ENABLE_DAEMON}" = false ]]; then
+if [ "${START_MODE}" != 'kubeletonly' ]; then
+  if [ "${ENABLE_DAEMON}" = 'false' ]; then
     echo "Local Kubernetes cluster is running. Press Ctrl-C to shut it down."
   else
     echo "Local Kubernetes cluster is running."
@@ -936,17 +936,17 @@ Logs:
 EOF
 fi
 
-if [[ "${START_MODE}" == "all" ]]; then
+if [ "${START_MODE}" = 'all' ]; then
   echo "  ${KUBELET_LOG}"
-elif [[ "${START_MODE}" == "nokubelet" ]]; then
+elif [ "${START_MODE}" = 'nokubelet' ]; then
   echo
   echo "No kubelet was started because you set START_MODE=nokubelet"
   echo "Run this script again with START_MODE=kubeletonly to run a kubelet"
 fi
 
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
+if [ "${START_MODE}" != 'kubeletonly' ]; then
   echo
-  if [[ "${ENABLE_DAEMON}" = false ]]; then
+  if [ "${ENABLE_DAEMON}" = 'false' ]; then
     echo "To start using your cluster, you can open up another terminal/tab and run:"
   else
     echo "To start using your cluster, run:"
@@ -977,7 +977,7 @@ fi
 }
 
 # If we are running in the CI, we need a few more things before we can start
-if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
+if [ "${KUBETEST_IN_DOCKER:-}" = 'true' ]; then
   echo "Preparing to test ..."
   "${KUBE_ROOT}"/hack/install-etcd.sh
   export PATH="${KUBE_ROOT}/third_party/etcd:${PATH}"
@@ -994,15 +994,15 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
 fi
 
 # validate that etcd is: not running, in path, and has minimum required version.
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
+if [ "${START_MODE}" != 'kubeletonly' ]; then
   kube::etcd::validate
 fi
 
-if [ "${CONTAINER_RUNTIME}" == "docker" ] && ! kube::util::ensure_docker_daemon_connectivity; then
+if [ "${CONTAINER_RUNTIME}" = 'docker' ] && ! kube::util::ensure_docker_daemon_connectivity; then
   exit 1
 fi
 
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
+if [ "${START_MODE}" != 'kubeletonly' ]; then
   test_apiserver_off
 fi
 
@@ -1010,34 +1010,34 @@ kube::util::test_openssl_installed
 kube::util::ensure-cfssl
 
 ### IF the user didn't supply an output/ for the build... Then we detect.
-if [ "${GO_OUT}" == "" ]; then
+if [ -z "${GO_OUT}" ]; then
   detect_binary
 fi
 echo "Detected host and ready to start services.  Doing some housekeeping first..."
 echo "Using GO_OUT ${GO_OUT}"
 export KUBELET_CIDFILE=/tmp/kubelet.cid
-if [[ "${ENABLE_DAEMON}" = false ]]; then
+if [ "${ENABLE_DAEMON}" = 'false' ]; then
   trap cleanup EXIT
 fi
 
 echo "Starting services now!"
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
+if [ "${START_MODE}" != 'kubeletonly' ]; then
   start_etcd
   set_service_accounts
   start_apiserver
   start_controller_manager
-  if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
+  if [ "${EXTERNAL_CLOUD_PROVIDER:-}" = 'true' ]; then
     start_cloud_controller_manager
   fi
   start_kubescheduler
   start_kubedns
-  if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
+  if [ "${ENABLE_NODELOCAL_DNS:-}" = 'true' ]; then
     start_nodelocaldns
   fi
   start_kubedashboard
 fi
 
-if [[ "${START_MODE}" != "nokubelet" ]]; then
+if [ "${START_MODE}" != "nokubelet" ]; then
   ## TODO remove this check if/when kubelet is supported on darwin
   # Detect the OS name/arch and display appropriate error.
     case "$(uname -s)" in
@@ -1054,8 +1054,8 @@ if [[ "${START_MODE}" != "nokubelet" ]]; then
     esac
 fi
 
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
-  if [[ "${START_MODE}" != "nokubeproxy" ]]; then
+if [ "${START_MODE}" != 'kubeletonly' ]; then
+  if [ "${START_MODE}" != 'nokubeproxy' ]; then
     start_kubeproxy
   fi
 fi
@@ -1063,17 +1063,17 @@ if [[ -n "${PSP_ADMISSION}" && "${AUTHORIZATION_MODE}" = *RBAC* ]]; then
   create_psp_policy
 fi
 
-if [[ "${DEFAULT_STORAGE_CLASS}" = "true" ]]; then
+if [ "${DEFAULT_STORAGE_CLASS}" = 'true' ]; then
   create_storage_class
 fi
 
 print_success
 
-if [[ "${ENABLE_DAEMON}" = false ]]; then
+if [ "${ENABLE_DAEMON}" = 'false' ]; then
   while true; do sleep 1; healthcheck; done
 fi
 
-if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
+if [ "${KUBETEST_IN_DOCKER:-}" = 'true' ]; then
   cluster/kubectl.sh config set-cluster local --server=https://localhost:6443 --certificate-authority=/var/run/kubernetes/server-ca.crt
   cluster/kubectl.sh config set-credentials myself --client-key=/var/run/kubernetes/client-admin.key --client-certificate=/var/run/kubernetes/client-admin.crt
   cluster/kubectl.sh config set-context local --cluster=local --user=myself

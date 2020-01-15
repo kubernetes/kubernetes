@@ -279,7 +279,7 @@ qemu_set_binfmts() {
         mask=$(eval echo \$${cpu}_mask)
         family=$(eval echo \$${cpu}_family)
 
-        if [ "$magic" = "" ] || [ "$mask" = "" ] || [ "$family" = "" ] ; then
+        if [ -z "$magic" ] || [ -z "$mask" ] || [ -z "$family" ] ; then
             echo "INTERNAL ERROR: unknown cpu $cpu" 1>&2
             continue
         fi
@@ -320,7 +320,7 @@ while true ; do
         EXPORTDIR=${EXPORTDIR:-$SYSTEMDDIR}
         shift
         # check given cpu is in the supported CPU list
-        if [ "$1" != "ALL" ] ; then
+        if [ "$1" != 'ALL' ] ; then
             for cpu in ${qemu_target_list} ; do
                 if [ "$cpu" = "$1" ] ; then
                     break

@@ -39,7 +39,7 @@ FORK_REMOTE=${FORK_REMOTE:-origin}
 MAIN_REPO_ORG=${MAIN_REPO_ORG:-$(git remote get-url "$UPSTREAM_REMOTE" | awk '{gsub(/http[s]:\/\/|git@/,"")}1' | awk -F'[@:./]' 'NR==1{print $3}')}
 MAIN_REPO_NAME=${MAIN_REPO_NAME:-$(git remote get-url "$UPSTREAM_REMOTE" | awk '{gsub(/http[s]:\/\/|git@/,"")}1' | awk -F'[@:./]' 'NR==1{print $4}')}
 
-if [[ -z ${GITHUB_USER:-} ]]; then
+if [ -z "${GITHUB_USER:-}" ]; then
   echo "Please export GITHUB_USER=<your-user> (or GH organization, if that's where your fork lives)"
   exit 1
 fi
@@ -49,7 +49,7 @@ if ! which hub > /dev/null; then
   exit 1
 fi
 
-if [[ "$#" -lt 2 ]]; then
+if [ "$#" -lt 2 ]; then
   echo "${0} <remote branch> <pr-number>...: cherry pick one or more <pr> onto <remote branch> and leave instructions for proposing pull request"
   echo
   echo "  Checks out <remote branch> and handles the cherry-pick of <pr> (possibly multiple) for you."
@@ -71,12 +71,12 @@ if [[ "$#" -lt 2 ]]; then
   exit 2
 fi
 
-if git_status=$(git status --porcelain --untracked=no 2>/dev/null) && [[ -n "${git_status}" ]]; then
+if git_status=$(git status --porcelain --untracked=no 2>/dev/null) && [ -n "${git_status}" ]; then
   echo "!!! Dirty tree. Clean up and try again."
   exit 1
 fi
 
-if [[ -e "${REBASEMAGIC}" ]]; then
+if [ -e "${REBASEMAGIC}" ]; then
   echo "!!! 'git rebase' or 'git am' in progress. Clean up and try again."
   exit 1
 fi
@@ -112,21 +112,21 @@ cleanbranch=""
 prtext=""
 gitamcleanup=false
 function return_to_kansas {
-  if [[ "${gitamcleanup}" == "true" ]]; then
+  if [ "${gitamcleanup}" = 'true' ]; then
     echo
     echo "+++ Aborting in-progress git am."
     git am --abort >/dev/null 2>&1 || true
   fi
 
   # return to the starting branch and delete the PR text file
-  if [[ -z "${DRY_RUN}" ]]; then
+  if [ -z "${DRY_RUN}" ]; then
     echo
     echo "+++ Returning you to the ${STARTINGBRANCH} branch and cleaning up."
     git checkout -f "${STARTINGBRANCH}" >/dev/null 2>&1 || true
-    if [[ -n "${cleanbranch}" ]]; then
+    if [ -n "${cleanbranch}" ]; then
       git branch -D "${cleanbranch}" >/dev/null 2>&1 || true
     fi
-    if [[ -n "${prtext}" ]]; then
+    if [ -n "${prtext}" ]; then
       rm "${prtext}"
     fi
   fi
@@ -174,8 +174,8 @@ for pull in "${PULLS[@]}"; do
   echo
   git am -3 "/tmp/${pull}.patch" || {
     conflicts=false
-    while unmerged=$(git status --porcelain | grep ^U) && [[ -n ${unmerged} ]] \
-      || [[ -e "${REBASEMAGIC}" ]]; do
+    while unmerged=$(git status --porcelain | grep ^U) && [ -n "${unmerged}" ] \
+      || [ -e "${REBASEMAGIC}" ]; do
       conflicts=true # <-- We should have detected conflicts once
       echo
       echo "+++ Conflicts detected:"
@@ -191,7 +191,7 @@ for pull in "${PULLS[@]}"; do
       fi
     done
 
-    if [[ "${conflicts}" != "true" ]]; then
+    if [ "${conflicts}" != 'true' ]; then
       echo "!!! git am failed, likely because of an in-progress 'git am' or 'git rebase'"
       exit 1
     fi
@@ -207,7 +207,7 @@ done
 gitamcleanup=false
 
 # Re-generate docs (if needed)
-if [[ -n "${REGENERATE_DOCS}" ]]; then
+if [ -n "${REGENERATE_DOCS}" ]; then
   echo
   echo "Regenerating docs..."
   if ! hack/generate-docs.sh; then
@@ -217,7 +217,7 @@ if [[ -n "${REGENERATE_DOCS}" ]]; then
   fi
 fi
 
-if [[ -n "${DRY_RUN}" ]]; then
+if [ -n "${DRY_RUN}" ]; then
   echo "!!! Skipping git push and PR creation because you set DRY_RUN."
   echo "To return to the branch you were in when you invoked this script:"
   echo

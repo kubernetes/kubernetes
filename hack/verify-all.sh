@@ -24,7 +24,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 # For help output
 ARGHELP=""
-if [[ -n "${KUBE_VERIFY_GIT_BRANCH:-}" ]]; then
+if [ -n "${KUBE_VERIFY_GIT_BRANCH:-}" ]; then
     ARGHELP="BRANCH=${KUBE_VERIFY_GIT_BRANCH}"
 fi
 

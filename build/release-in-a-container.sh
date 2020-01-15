@@ -21,7 +21,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 # Check and error if not "in-a-container"
-if [[ ! -f /.dockerenv ]]; then
+if [ ! -f /.dockerenv ]; then
   echo
   echo "'make release-in-a-container' can only be used from a docker container."
   echo

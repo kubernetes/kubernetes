@@ -48,7 +48,7 @@ function check_windows_nodes_are_ready {
   statuses=$(${kubectl} get nodes -l beta.kubernetes.io/os=windows \
     -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}')
   for status in $statuses; do
-    if [[ $status == "False" ]]; then
+    if [ "$status" = 'False' ]; then
       echo "ERROR: some Windows node has status != Ready"
       echo "kubectl get nodes -l beta.kubernetes.io/os=windows"
       ${kubectl} get nodes -l beta.kubernetes.io/os=windows
@@ -70,7 +70,7 @@ function untaint_windows_nodes {
 function check_no_system_pods_on_windows_nodes {
   windows_system_pods=$(${kubectl} get pods --namespace kube-system \
     -o wide | grep -E "Pending|windows" | wc -w)
-  if [[ $windows_system_pods -ne 0 ]]; then
+  if [ "$windows_system_pods" -ne 0 ]; then
     echo "ERROR: there are kube-system pods trying to run on Windows nodes"
     echo "kubectl get pods --namespace kube-system -o wide"
     ${kubectl} get pods --namespace kube-system -o wide
@@ -115,12 +115,12 @@ EOF
   fi
 
   timeout=$linux_deployment_timeout
-  while [[ $timeout -gt 0 ]]; do
+  while [ $timeout -gt 0 ]; do
     echo "Waiting for $linux_webserver_replicas Linux $linux_webserver_pod_label pods to become Ready"
     statuses=$(${kubectl} get pods -l app=$linux_webserver_pod_label \
       -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' \
       | grep "True" | wc -w)
-    if [[ $statuses -eq $linux_webserver_replicas ]]; then
+    if [ "$statuses" -eq "$linux_webserver_replicas" ]; then
       break
     else
       sleep 10
@@ -128,7 +128,7 @@ EOF
     fi
   done
 
-  if [[ $timeout -gt 0 ]]; then
+  if [ $timeout -gt 0 ]; then
     echo "All $linux_webserver_pod_label pods became Ready"
   else
     echo "ERROR: Not all $linux_webserver_pod_label pods became Ready"
@@ -192,12 +192,12 @@ EOF
   fi
 
   timeout=$linux_deployment_timeout
-  while [[ $timeout -gt 0 ]]; do
+  while [ $timeout -gt 0 ]; do
     echo "Waiting for $linux_command_replicas Linux $linux_command_pod_label pods to become Ready"
     statuses=$(${kubectl} get pods -l app=$linux_command_pod_label \
       -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' \
       | grep "True" | wc -w)
-    if [[ $statuses -eq $linux_command_replicas ]]; then
+    if [ "$statuses" -eq "$linux_command_replicas" ]; then
       break
     else
       sleep 10
@@ -205,7 +205,7 @@ EOF
     fi
   done
 
-  if [[ $timeout -gt 0 ]]; then
+  if [ $timeout -gt 0 ]; then
     echo "All $linux_command_pod_label pods became Ready"
   else
     echo "ERROR: Not all $linux_command_pod_label pods became Ready"
@@ -290,12 +290,12 @@ EOF
   fi
 
   timeout=$windows_deployment_timeout
-  while [[ $timeout -gt 0 ]]; do
+  while [ $timeout -gt 0 ]; do
     echo "Waiting for $windows_webserver_replicas Windows $windows_webserver_pod_label pods to become Ready"
     statuses=$(${kubectl} get pods -l app=$windows_webserver_pod_label \
       -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' \
       | grep "True" | wc -w)
-    if [[ $statuses -eq $windows_webserver_replicas ]]; then
+    if [ "$statuses" -eq "$windows_webserver_replicas" ]; then
       break
     else
       sleep 10
@@ -303,7 +303,7 @@ EOF
     fi
   done
 
-  if [[ $timeout -gt 0 ]]; then
+  if [ $timeout -gt 0 ]; then
     echo "All $windows_webserver_pod_label pods became Ready"
   else
     echo "ERROR: Not all $windows_webserver_pod_label pods became Ready"
@@ -369,12 +369,12 @@ EOF
   fi
 
   timeout=$windows_deployment_timeout
-  while [[ $timeout -gt 0 ]]; do
+  while [ $timeout -gt 0 ]; do
     echo "Waiting for $windows_command_replicas Windows $windows_command_pod_label pods to become Ready"
     statuses=$(${kubectl} get pods -l app=$windows_command_pod_label \
       -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' \
       | grep "True" | wc -w)
-    if [[ $statuses -eq $windows_command_replicas ]]; then
+    if [ "$statuses" -eq "$windows_command_replicas" ]; then
       break
     else
       sleep 10
@@ -382,7 +382,7 @@ EOF
     fi
   done
 
-  if [[ $timeout -gt 0 ]]; then
+  if [ $timeout -gt 0 ]; then
     echo "All $windows_command_pod_label pods became Ready"
   else
     echo "ERROR: Not all $windows_command_pod_label pods became Ready"

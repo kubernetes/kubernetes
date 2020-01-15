@@ -149,14 +149,14 @@ export KUBE_NONSERVER_GROUP_VERSIONS
 function kube::readlinkdashf {
   # run in a subshell for simpler 'cd'
   (
-    if [[ -d "${1}" ]]; then # This also catch symlinks to dirs.
+    if [ -d "${1}" ]; then # This also catch symlinks to dirs.
       cd "${1}"
       pwd -P
     else
       cd "$(dirname "${1}")"
       local f
       f=$(basename "${1}")
-      if [[ -L "${f}" ]]; then
+      if [ -L "${f}" ]; then
         readlink "${f}"
       else
         echo "$(pwd -P)/${f}"
@@ -193,7 +193,7 @@ function kube::readlinkdashf {
 # testone $T/linkdir/linkfile
 # testone $T/linkdir/linkdir
 kube::realpath() {
-  if [[ ! -e "${1}" ]]; then
+  if [ ! -e "${1}" ]; then
     echo "${1}: No such file or directory" >&2
     return 1
   fi

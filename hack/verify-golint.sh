@@ -69,10 +69,10 @@ for p in "${all_packages[@]}"; do
   # Ref: https://github.com/golang/lint/issues/68
   failedLint=$(find "$p"/*.go | grep -vE "(zz_generated.*.go|generated.pb.go|generated.proto|types_swagger_doc_generated.go)" | xargs -L1 golint 2>/dev/null)
   kube::util::array_contains "$p" "${failing_packages[@]}" && in_failing=$? || in_failing=$?
-  if [[ -n "${failedLint}" ]] && [[ "${in_failing}" -ne "0" ]]; then
+  if [ -n "${failedLint}" ] && [ "${in_failing}" -ne 0 ]; then
     errors+=( "${failedLint}" )
   fi
-  if [[ -z "${failedLint}" ]] && [[ "${in_failing}" -eq "0" ]]; then
+  if [ -z "${failedLint}" ] && [ "${in_failing}" -eq 0 ]; then
     not_failing+=( "$p" )
   fi
 done
@@ -101,7 +101,7 @@ else
   exit 1
 fi
 
-if [[ ${#not_failing[@]} -gt 0 ]]; then
+if [ ${#not_failing[@]} -gt 0 ]; then
   {
     echo "Some packages in hack/.golint_failures are passing golint. Please remove them."
     echo
@@ -113,7 +113,7 @@ if [[ ${#not_failing[@]} -gt 0 ]]; then
   exit 1
 fi
 
-if [[ ${#gone[@]} -gt 0 ]]; then
+if [ ${#gone[@]} -gt 0 ]; then
   {
     echo "Some packages in hack/.golint_failures do not exist anymore. Please remove them."
     echo

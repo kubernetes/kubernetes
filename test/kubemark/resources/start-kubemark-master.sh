@@ -59,16 +59,16 @@ function setup-kubelet-dir {
 
 # Remove any default etcd config dirs/files.
 function delete-default-etcd-configs {
-	if [[ -d /etc/etcd ]]; then
+	if [ -d /etc/etcd ]; then
 		rm -rf /etc/etcd
 	fi
-	if [[ -e /etc/default/etcd ]]; then
+	if [ -e /etc/default/etcd ]; then
 		rm -f /etc/default/etcd
 	fi
-	if [[ -e /etc/systemd/system/etcd.service ]]; then
+	if [ -e /etc/systemd/system/etcd.service ]; then
 		rm -f /etc/systemd/system/etcd.service
 	fi
-	if [[ -e /etc/init.d/etcd ]]; then
+	if [ -e /etc/init.d/etcd ]; then
 		rm -f /etc/init.d/etcd
 	fi
 }
@@ -77,7 +77,7 @@ function delete-default-etcd-configs {
 function compute-etcd-variables {
 	ETCD_IMAGE="${ETCD_IMAGE:-}"
 	ETCD_QUOTA_BYTES=""
-	if [ "${ETCD_VERSION:0:2}" == "3." ]; then
+	if [ "${ETCD_VERSION:0:2}" = '3.' ]; then
 		# TODO: Set larger quota to see if that helps with
 		# 'mvcc: database space exceeded' errors. If so, pipe
 		# though our setup scripts.
@@ -104,7 +104,7 @@ function safe-format-and-mount() {
 # Finds a PD device with name '$1' attached to the master.
 function find-attached-pd() {
 	local -r pd_name=$1
-	if [[ ! -e /dev/disk/by-id/${pd_name} ]]; then
+	if [ ! -e "/dev/disk/by-id/${pd_name}" ]; then
 		echo ""
 	fi
 	device_info=$(ls -l "/dev/disk/by-id/${pd_name}")
@@ -119,7 +119,7 @@ function mount-pd() {
 	local -r pd_name=$1
 	local -r mount_point=$2
 
-	if [[ -z "${find-attached-pd ${pd_name}}" ]]; then
+	if [ -z "${find-attached-pd ${pd_name}}" ]; then
 		echo "Can't find ${pd_name}. Skipping mount."
 		return
 	fi
@@ -232,7 +232,7 @@ function try-load-docker-image {
 	local -r max_attempts=5
 	local -i attempt_num=1
 	until timeout 30 docker load -i "${img}"; do
-		if [[ "${attempt_num}" == "${max_attempts}" ]]; then
+		if [ "${attempt_num}" -eq "${max_attempts}" ]; then
 			echo "Fail to load docker image file ${img} after ${max_attempts} retries. Exit!!"
 			exit 1
 		else
@@ -260,7 +260,7 @@ function compute-kubelet-params {
 	params+=" --cgroup-root=/"
 	params+=" --cloud-provider=gce"
 	params+=" --pod-manifest-path=/etc/kubernetes/manifests"
-	if [[ -n "${KUBELET_PORT:-}" ]]; then
+	if [ -n "${KUBELET_PORT:-}" ]; then
 		params+=" --port=${KUBELET_PORT}"
 	fi
 	params+=" --enable-debugging-handlers=false"
@@ -325,13 +325,13 @@ function setup-addon-manifests {
   local -r src_dir="${KUBE_ROOT}/$2"
   local -r dst_dir="/etc/kubernetes/$1/$2"
 
-  if [[ ! -d "${dst_dir}" ]]; then
+  if [ ! -d "${dst_dir}" ]; then
     mkdir -p "${dst_dir}"
   fi
 
   local files
   files=$(find "${src_dir}" -maxdepth 1 -name "*.yaml")
-  if [[ -n "${files}" ]]; then
+  if [ -n "${files}" ]; then
     cp "${src_dir}/"*.yaml "${dst_dir}"
   fi
   chown -R root:root "${dst_dir}"
@@ -346,7 +346,7 @@ function create-master-audit-policy {
   local -r path="${1}"
   local -r policy="${2:-}"
 
-  if [[ -n "${policy}" ]]; then
+  if [ -n "${policy}" ]; then
     echo "${policy}" > "${path}"
     return
   fi
@@ -524,9 +524,9 @@ function compute-etcd-events-params {
 function compute-kube-apiserver-params {
 	local params="--insecure-bind-address=0.0.0.0"
 	params+=" --etcd-servers=${ETCD_SERVERS:-http://127.0.0.1:2379}"
-	if [[ -z "${ETCD_SERVERS:-}" ]]; then
+	if [ -z "${ETCD_SERVERS:-}" ]; then
 		params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-/events#${EVENT_STORE_URL}}"
-	elif [[ -n "${ETCD_SERVERS_OVERRIDES:-}" ]]; then
+	elif [ -n "${ETCD_SERVERS_OVERRIDES:-}" ]; then
 		params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-}"
 	fi
 	# Enable apiserver->etcd auth.
@@ -553,30 +553,30 @@ function compute-kube-apiserver-params {
 	params+=" --admission-control=${CUSTOM_ADMISSION_PLUGINS}"
 	params+=" --authorization-mode=Node,RBAC"
 	params+=" --allow-privileged=true"
-	if [[ -n "${STORAGE_BACKEND:-}" ]]; then
+	if [ -n "${STORAGE_BACKEND:-}" ]; then
 		params+=" --storage-backend=${STORAGE_BACKEND}"
 	fi
-	if [[ -n "${STORAGE_MEDIA_TYPE:-}" ]]; then
+	if [ -n "${STORAGE_MEDIA_TYPE:-}" ]; then
 		params+=" --storage-media-type=${STORAGE_MEDIA_TYPE}"
 	fi
-  if [[ -n "${ETCD_COMPACTION_INTERVAL_SEC:-}" ]]; then
+  if [ -n "${ETCD_COMPACTION_INTERVAL_SEC:-}" ]; then
     params+=" --etcd-compaction-interval=${ETCD_COMPACTION_INTERVAL_SEC}s"
   fi
-	if [[ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]]; then
+	if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]; then
 		params+=" --min-request-timeout=${KUBE_APISERVER_REQUEST_TIMEOUT}"
 	fi
-	if [[ "${NUM_NODES}" -ge 3000 ]]; then
+	if [ "${NUM_NODES}" -ge 3000 ]; then
 		params+=" --max-requests-inflight=3000 --max-mutating-requests-inflight=1000"
-	elif [[ "${NUM_NODES}" -ge 1000 ]]; then
+	elif [ "${NUM_NODES}" -ge 1000 ]; then
 		params+=" --max-requests-inflight=1500 --max-mutating-requests-inflight=500"
 	fi
-	if [[ -n "${RUNTIME_CONFIG:-}" ]]; then
+	if [ -n "${RUNTIME_CONFIG:-}" ]; then
 		params+=" --runtime-config=${RUNTIME_CONFIG}"
 	fi
-	if [[ -n "${FEATURE_GATES:-}" ]]; then
+	if [ -n "${FEATURE_GATES:-}" ]; then
 		params+=" --feature-gates=${FEATURE_GATES}"
 	fi
-	if [[ "${ENABLE_APISERVER_ADVANCED_AUDIT:-}" == "true" ]]; then
+	if [ "${ENABLE_APISERVER_ADVANCED_AUDIT:-}" = 'true' ]; then
 		# Create the audit policy file, and mount it into the apiserver pod.
 		create-master-audit-policy "${audit_policy_file}" "${ADVANCED_AUDIT_POLICY:-}"
 
@@ -644,17 +644,17 @@ function start-kubemaster-component() {
 	sed -i -e "s@{{params}}@${params}@g" "${src_file}"
 	sed -i -e "s@{{kube_docker_registry}}@${DOCKER_REGISTRY}@g" "${src_file}"
 	sed -i -e "s@{{instance_prefix}}@${INSTANCE_PREFIX}@g" "${src_file}"
-	if [ "${component:0:4}" == "etcd" ]; then
+	if [ "${component:0:4}" = 'etcd' ]; then
 		sed -i -e "s@{{etcd_image}}@${ETCD_IMAGE}@g" "${src_file}"
-	elif [ "${component}" == "kube-addon-manager" ]; then
+	elif [ "${component}" = 'kube-addon-manager' ]; then
 		setup-addon-manifests "addons" "kubemark-rbac-bindings"
 	else
 		local -r component_docker_tag=$(cat "${KUBE_BINDIR}/${component}.docker_tag")
 		sed -i -e "s@{{${component}_docker_tag}}@${component_docker_tag}@g" "${src_file}"
-		if [ "${component}" == "kube-apiserver" ]; then
+		if [ "${component}" = 'kube-apiserver' ]; then
 			local audit_policy_config_mount=""
 			local audit_policy_config_volume=""
-			if [[ "${ENABLE_APISERVER_ADVANCED_AUDIT:-}" == "true" ]]; then
+			if [ "${ENABLE_APISERVER_ADVANCED_AUDIT:-}" = 'true' ]; then
 				read -r -d '' audit_policy_config_mount << EOF
 - name: auditpolicyconfigmount
   mountPath: ${audit_policy_file}
@@ -679,7 +679,7 @@ echo "Start to configure master instance for kubemark"
 
 # Extract files from the server tar and setup master env variables.
 cd "${KUBE_ROOT}"
-if [[ ! -d "${KUBE_ROOT}/kubernetes" ]]; then
+if [ ! -d "${KUBE_ROOT}/kubernetes" ]; then
 	tar xzf kubernetes-server-linux-amd64.tar.gz
 fi
 source "${KUBE_ROOT}/kubemark-master-env.sh"
@@ -693,12 +693,12 @@ compute-etcd-variables
 
 # Setup authentication tokens and kubeconfigs for kube-controller-manager and kube-scheduler,
 # only if their kubeconfigs don't already exist as this script could be running on reboot.
-if [[ ! -f "${KUBE_ROOT}/k8s_auth_data/kube-controller-manager/kubeconfig" ]]; then
+if [ ! -f "${KUBE_ROOT}/k8s_auth_data/kube-controller-manager/kubeconfig" ]; then
 	KUBE_CONTROLLER_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 	echo "${KUBE_CONTROLLER_MANAGER_TOKEN},system:kube-controller-manager,uid:system:kube-controller-manager" >> "${KUBE_ROOT}/k8s_auth_data/known_tokens.csv"
 	create-kubecontrollermanager-kubeconfig
 fi
-if [[ ! -f "${KUBE_ROOT}/k8s_auth_data/kube-scheduler/kubeconfig" ]]; then
+if [ ! -f "${KUBE_ROOT}/k8s_auth_data/kube-scheduler/kubeconfig" ]; then
 	KUBE_SCHEDULER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 	echo "${KUBE_SCHEDULER_TOKEN},system:kube-scheduler,uid:system:kube-scheduler" >> "${KUBE_ROOT}/k8s_auth_data/known_tokens.csv"
 	create-kubescheduler-kubeconfig
@@ -721,7 +721,7 @@ create-addonmanager-kubeconfig
 	mkdir -p "${main_etcd_mount_point}/srv/kubernetes"
 	ln -s -f "${main_etcd_mount_point}/srv/kubernetes" /etc/srv/kubernetes
 	# Copy the files to the PD only if they don't exist (so we do it only the first time).
-	if [[ "$(ls -A ${main_etcd_mount_point}/srv/kubernetes/)" == "" ]]; then
+	if [ -z "$(ls -A ${main_etcd_mount_point}/srv/kubernetes/)" ]; then
 		cp -r "${KUBE_ROOT}"/k8s_auth_data/* "${main_etcd_mount_point}/srv/kubernetes/"
 	fi
 	# Directory for kube-apiserver to store SSH key (if necessary).
@@ -733,7 +733,7 @@ create-addonmanager-kubeconfig
 {
 	EVENT_STORE_IP="${EVENT_STORE_IP:-127.0.0.1}"
 	EVENT_STORE_URL="${EVENT_STORE_URL:-http://${EVENT_STORE_IP}:4002}"
-	if [ "${EVENT_PD:-}" == "true" ]; then
+	if [ "${EVENT_PD:-}" = 'true' ]; then
 		event_etcd_mount_point="/mnt/disks/master-event-pd"
 		mount-pd "google-master-event-pd" "${event_etcd_mount_point}"
 		# Contains all the data stored in event etcd.
@@ -752,9 +752,9 @@ readonly audit_policy_file="/etc/audit_policy.config"
 
 # Start kubelet as a supervisord process and master components as pods.
 start-kubelet
-if [[ -z "${ETCD_SERVERS:-}" ]]; then
+if [ -z "${ETCD_SERVERS:-}" ]; then
 	start-kubemaster-component "etcd"
-	if [ "${EVENT_STORE_IP:-}" == "127.0.0.1" ]; then
+	if [ "${EVENT_STORE_IP:-}" = '127.0.0.1' ]; then
 		start-kubemaster-component "etcd-events"
 	fi
 fi
@@ -766,7 +766,7 @@ start-kubemaster-component "kube-addon-manager"
 # Wait till apiserver is working fine or timeout.
 echo -n "Waiting for apiserver to be healthy"
 start=$(date +%s)
-until [ "$(curl 127.0.0.1:8080/healthz 2> /dev/null)" == "ok" ]; do
+until [ "$(curl 127.0.0.1:8080/healthz 2> /dev/null)" = 'ok' ]; do
 	echo -n "."
 	sleep 1
 	now=$(date +%s)

@@ -32,7 +32,7 @@
 # If KUBE_GIT_VERSION_FILE, this function will load from that file instead of
 # querying git.
 kube::version::get_version_vars() {
-  if [[ -n ${KUBE_GIT_VERSION_FILE-} ]]; then
+  if [ -n "${KUBE_GIT_VERSION_FILE-}" ]; then
     kube::version::load_version_vars "${KUBE_GIT_VERSION_FILE}"
     return
   fi
@@ -42,7 +42,7 @@ kube::version::get_version_vars() {
   # shellcheck disable=SC2016,SC2050
   # Disabled as we're not expanding these at runtime, but rather expecting
   # that another tool may have expanded these and rewritten the source (!)
-  if [[ '$Format:%%$' == "%" ]]; then
+  if [ '$Format:%%$' = "%" ]; then
     KUBE_GIT_COMMIT='$Format:%H$'
     KUBE_GIT_TREE_STATE="archive"
     # When a 'git archive' is exported, the '$Format:%D$' below will look
@@ -55,10 +55,10 @@ kube::version::get_version_vars() {
 
   local git=(git --work-tree "${KUBE_ROOT}")
 
-  if [[ -n ${KUBE_GIT_COMMIT-} ]] || KUBE_GIT_COMMIT=$("${git[@]}" rev-parse "HEAD^{commit}" 2>/dev/null); then
-    if [[ -z ${KUBE_GIT_TREE_STATE-} ]]; then
+  if [ -n "${KUBE_GIT_COMMIT-}" ] || KUBE_GIT_COMMIT=$("${git[@]}" rev-parse "HEAD^{commit}" 2>/dev/null); then
+    if [ -z ${KUBE_GIT_TREE_STATE-} ]; then
       # Check if the tree is dirty.  default to dirty
-      if git_status=$("${git[@]}" status --porcelain 2>/dev/null) && [[ -z ${git_status} ]]; then
+      if git_status=$("${git[@]}" status --porcelain 2>/dev/null) && [ -z "${git_status}" ]; then
         KUBE_GIT_TREE_STATE="clean"
       else
         KUBE_GIT_TREE_STATE="dirty"
@@ -66,7 +66,7 @@ kube::version::get_version_vars() {
     fi
 
     # Use git describe to find the version based on tags.
-    if [[ -n ${KUBE_GIT_VERSION-} ]] || KUBE_GIT_VERSION=$("${git[@]}" describe --tags --match='v*' --abbrev=14 "${KUBE_GIT_COMMIT}^{commit}" 2>/dev/null); then
+    if [ -n "${KUBE_GIT_VERSION-}" ] || KUBE_GIT_VERSION=$("${git[@]}" describe --tags --match='v*' --abbrev=14 "${KUBE_GIT_COMMIT}^{commit}" 2>/dev/null); then
       # This translates the "git describe" to an actual semver.org
       # compatible semantic version that looks something like this:
       #   v1.1.0-alpha.0.6+84c76d1142ea4d
@@ -78,16 +78,16 @@ kube::version::get_version_vars() {
       # We don't want to do them in pure shell, so disable SC2001
       # shellcheck disable=SC2001
       DASHES_IN_VERSION=$(echo "${KUBE_GIT_VERSION}" | sed "s/[^-]//g")
-      if [[ "${DASHES_IN_VERSION}" == "---" ]] ; then
+      if [ "${DASHES_IN_VERSION}" = '---' ] ; then
         # shellcheck disable=SC2001
         # We have distance to subversion (v1.1.0-subversion-1-gCommitHash)
         KUBE_GIT_VERSION=$(echo "${KUBE_GIT_VERSION}" | sed "s/-\([0-9]\{1,\}\)-g\([0-9a-f]\{14\}\)$/.\1\+\2/")
-      elif [[ "${DASHES_IN_VERSION}" == "--" ]] ; then
+      elif [ "${DASHES_IN_VERSION}" = '--' ] ; then
         # shellcheck disable=SC2001
         # We have distance to base tag (v1.1.0-1-gCommitHash)
         KUBE_GIT_VERSION=$(echo "${KUBE_GIT_VERSION}" | sed "s/-g\([0-9a-f]\{14\}\)$/+\1/")
       fi
-      if [[ "${KUBE_GIT_TREE_STATE}" == "dirty" ]]; then
+      if [ "${KUBE_GIT_TREE_STATE}" = 'dirty' ]; then
         # git describe --dirty only considers changes to existing files, but
         # that is problematic since new untracked .go files affect the build,
         # so use our idea of "dirty" from git status instead.
@@ -101,7 +101,7 @@ kube::version::get_version_vars() {
       if [[ "${KUBE_GIT_VERSION}" =~ ^v([0-9]+)\.([0-9]+)(\.[0-9]+)?([-].*)?([+].*)?$ ]]; then
         KUBE_GIT_MAJOR=${BASH_REMATCH[1]}
         KUBE_GIT_MINOR=${BASH_REMATCH[2]}
-        if [[ -n "${BASH_REMATCH[4]}" ]]; then
+        if [ -n "${BASH_REMATCH[4]}" ]; then
           KUBE_GIT_MINOR+="+"
         fi
       fi
@@ -119,7 +119,7 @@ kube::version::get_version_vars() {
 # Saves the environment flags to $1
 kube::version::save_version_vars() {
   local version_file=${1-}
-  [[ -n ${version_file} ]] || {
+  [ -n "${version_file}" ] || {
     echo "!!! Internal error.  No file specified in kube::version::save_version_vars"
     return 1
   }
@@ -136,7 +136,7 @@ EOF
 # Loads up the version variables from file $1
 kube::version::load_version_vars() {
   local version_file=${1-}
-  [[ -n ${version_file} ]] || {
+  [ -n "${version_file}" ] || {
     echo "!!! Internal error.  No file specified in kube::version::load_version_vars"
     return 1
   }
@@ -163,12 +163,12 @@ kube::version::ldflags() {
   }
 
   add_ldflag "buildDate" "$(date ${SOURCE_DATE_EPOCH:+"--date=@${SOURCE_DATE_EPOCH}"} -u +'%Y-%m-%dT%H:%M:%SZ')"
-  if [[ -n ${KUBE_GIT_COMMIT-} ]]; then
+  if [ -n "${KUBE_GIT_COMMIT-}" ]; then
     add_ldflag "gitCommit" "${KUBE_GIT_COMMIT}"
     add_ldflag "gitTreeState" "${KUBE_GIT_TREE_STATE}"
   fi
 
-  if [[ -n ${KUBE_GIT_VERSION-} ]]; then
+  if [ -n "${KUBE_GIT_VERSION-}" ]; then
     add_ldflag "gitVersion" "${KUBE_GIT_VERSION}"
   fi
 

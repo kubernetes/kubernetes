@@ -32,9 +32,9 @@ source "${KUBE_ROOT}/cluster/gce/gci/helper.sh"
 #   get-bearer-token
 function create-master-instance {
   local address=""
-  [[ -n ${1:-} ]] && address="${1}"
+  [ -n ${1:-} ] && address="${1}"
   local internal_address=""
-  [[ -n ${2:-} ]] && internal_address="${2}"
+  [ -n ${2:-} ] && internal_address="${2}"
 
   write-master-env
   ensure-gci-metadata-files
@@ -120,7 +120,7 @@ function create-master-instance-internal() {
   local gcloud="gcloud"
   local retries=5
   local sleep_sec=10
-  if [[ "${MASTER_SIZE##*-}" -ge 64 ]]; then  # remove everything up to last dash (inclusive)
+  if [ "${MASTER_SIZE##*-}" -ge 64 ]; then  # remove everything up to last dash (inclusive)
     # Workaround for #55777
     retries=30
     sleep_sec=60
@@ -131,12 +131,12 @@ function create-master-instance-internal() {
   local -r internal_address="${3:-}"
 
   local preemptible_master=""
-  if [[ "${PREEMPTIBLE_MASTER:-}" == "true" ]]; then
+  if [ "${PREEMPTIBLE_MASTER:-}" = 'true' ]; then
     preemptible_master="--preemptible --maintenance-policy TERMINATE"
   fi
 
   local enable_ip_aliases
-  if [[ "${NODE_IPAM_MODE:-}" == "CloudAllocator" ]]; then
+  if [ "${NODE_IPAM_MODE:-}" = 'CloudAllocator' ]; then
     enable_ip_aliases=true
   else
     enable_ip_aliases=false
@@ -182,7 +182,7 @@ function create-master-instance-internal() {
       ${network} 2>&1); then
       echo "${result}" >&2
 
-      if [[ -n "${internal_address:-}" ]]; then
+      if [ -n "${internal_address:-}" ]; then
         attach-internal-master-ip "${master_name}" "${ZONE}" "${internal_address}"
       fi
       return 0

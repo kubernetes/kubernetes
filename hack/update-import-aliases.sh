@@ -31,7 +31,7 @@ cd "${KUBE_ROOT}"
 
 ret=0
 go run cmd/preferredimports/preferredimports.go --confirm "$@" || ret=$?
-if [[ $ret -ne 0 ]]; then
+if [ $ret -ne 0 ]; then
   echo "!!! Unable to fix imports programmatically. Please see errors above." >&2
   exit 1
 fi

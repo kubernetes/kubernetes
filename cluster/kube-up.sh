@@ -56,13 +56,13 @@ echo "... calling validate-cluster" >&2
 # - 1: fatal error - cluster won't be working correctly
 # - 2: weak error - something went wrong, but cluster probably will be working correctly
 # We just print an error message in case 2).
-if [[ "${validate_result}" == "1" ]]; then
+if [ "${validate_result}" -eq 1 ]; then
 	exit 1
-elif [[ "${validate_result}" == "2" ]]; then
+elif [ "${validate_result}" -eq 2 ]; then
 	echo "...ignoring non-fatal errors in validate-cluster" >&2
 fi
 
-if [[ "${ENABLE_PROXY:-}" == "true" ]]; then
+if [ "${ENABLE_PROXY:-}" = 'true' ]; then
   # shellcheck disable=SC1091
   . /tmp/kube-proxy-env
   echo ""

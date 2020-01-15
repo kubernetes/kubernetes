@@ -141,7 +141,7 @@ function kube::build::verify_prereqs() {
     fi
     kube::util::ensure_docker_daemon_connectivity || return 1
 
-    if (( KUBE_VERBOSE > 6 )); then
+    if [ "$KUBE_VERBOSE" -gt 6 ]; then
       kube::log::status "Docker Version:"
       "${DOCKER[@]}" version | kube::log::info_from_stdin
     fi
@@ -169,18 +169,18 @@ function kube::build::verify_prereqs() {
 # Utility functions
 
 function kube::build::docker_available_on_osx() {
-  if [[ -z "${DOCKER_HOST}" ]]; then
-    if [[ -S "/var/run/docker.sock" ]]; then
+  if [ -z "${DOCKER_HOST}" ]; then
+    if [ -S "/var/run/docker.sock" ]; then
       kube::log::status "Using Docker for MacOS"
       return 0
     fi
 
     kube::log::status "No docker host is set. Checking options for setting one..."
-    if [[ -z "$(which docker-machine)" ]]; then
+    if [ -z "$(which docker-machine)" ]; then
       kube::log::status "It looks like you're running Mac OS X, yet neither Docker for Mac nor docker-machine can be found."
       kube::log::status "See: https://docs.docker.com/engine/installation/mac/ for installation instructions."
       return 1
-    elif [[ -n "$(which docker-machine)" ]]; then
+    elif [ -n "$(which docker-machine)" ]; then
       kube::build::prepare_docker_machine
     fi
   fi
@@ -231,15 +231,15 @@ function kube::build::prepare_docker_machine() {
 }
 
 function kube::build::is_osx() {
-  [[ "$(uname)" == "Darwin" ]]
+  [ "$(uname)" = 'Darwin' ]
 }
 
 function kube::build::is_gnu_sed() {
-  [[ $(sed --version 2>&1) == *GNU* ]]
+  [[ $(sed --version 2>&1) = *GNU* ]]
 }
 
 function kube::build::ensure_rsync() {
-  if [[ -z "$(which rsync)" ]]; then
+  if [ -z "$(which rsync)" ]; then
     kube::log::error "Can't find 'rsync' in PATH, please fix and retry."
     return 1
   fi
@@ -255,19 +255,19 @@ function kube::build::update_dockerfile() {
 }
 
 function  kube::build::set_proxy() {
-  if [[ -n "${KUBERNETES_HTTPS_PROXY:-}" ]]; then
+  if [ -n "${KUBERNETES_HTTPS_PROXY:-}" ]; then
     echo "ENV https_proxy $KUBERNETES_HTTPS_PROXY" >> "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
   fi
-  if [[ -n "${KUBERNETES_HTTP_PROXY:-}" ]]; then
+  if [ -n "${KUBERNETES_HTTP_PROXY:-}" ]; then
     echo "ENV http_proxy $KUBERNETES_HTTP_PROXY" >> "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
   fi
-  if [[ -n "${KUBERNETES_NO_PROXY:-}" ]]; then
+  if [ -n "${KUBERNETES_NO_PROXY:-}" ]; then
     echo "ENV no_proxy $KUBERNETES_NO_PROXY" >> "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
   fi
 }
 
 function kube::build::ensure_docker_in_path() {
-  if [[ -z "$(which docker)" ]]; then
+  if [ -z "$(which docker)" ]; then
     kube::log::error "Can't find 'docker' in PATH, please fix and retry."
     kube::log::error "See https://docs.docker.com/installation/#installation for installation instructions."
     return 1
@@ -275,7 +275,7 @@ function kube::build::ensure_docker_in_path() {
 }
 
 function kube::build::ensure_tar() {
-  if [[ -n "${TAR:-}" ]]; then
+  if [ -n "${TAR:-}" ]; then
     return
   fi
 
@@ -362,7 +362,7 @@ function kube::build::docker_delete_old_containers() {
 
 # Takes $1 and computes a short has for it. Useful for unique tag generation
 function kube::build::short_hash() {
-  [[ $# -eq 1 ]] || {
+  [ $# -eq 1 ] || {
     kube::log::error "Internal error.  No data based to short_hash."
     exit 2
   }
@@ -407,7 +407,7 @@ function kube::build::clean() {
     "${DOCKER[@]}" rmi "$("${DOCKER[@]}" images -q --filter 'dangling=true')" 2> /dev/null || true
   fi
 
-  if [[ -d "${LOCAL_OUTPUT_ROOT}" ]]; then
+  if [ -d "${LOCAL_OUTPUT_ROOT}" ]; then
     kube::log::status "Removing _output directory"
     rm -rf "${LOCAL_OUTPUT_ROOT}"
   fi
@@ -476,11 +476,11 @@ function kube::build::ensure_data_container() {
   code=$(docker inspect \
       -f '{{.State.ExitCode}}' \
       "${KUBE_DATA_CONTAINER_NAME}" 2>/dev/null) || ret=$?
-  if [[ "${ret}" == 0 && "${code}" != 0 ]]; then
+  if [[ "${ret}" -eq 0 && "${code}" -ne 0 ]]; then
     kube::build::destroy_container "${KUBE_DATA_CONTAINER_NAME}"
     ret=1
   fi
-  if [[ "${ret}" != 0 ]]; then
+  if [ "${ret}" -ne 0 ]; then
     kube::log::status "Creating data container ${KUBE_DATA_CONTAINER_NAME}"
     # We have to ensure the directory exists, or else the docker run will
     # create it as root.
@@ -529,7 +529,7 @@ function kube::build::run_build_command() {
 # Arguments are in the form of
 #  <container name> <extra docker args> -- <command>
 function kube::build::run_build_command_ex() {
-  [[ $# != 0 ]] || { echo "Invalid input - please specify a container name." >&2; return 4; }
+  [ $# -ne 0 ] || { echo "Invalid input - please specify a container name." >&2; return 4; }
   local container_name="${1}"
   shift
 
@@ -542,22 +542,22 @@ function kube::build::run_build_command_ex() {
 
   local detach=false
 
-  [[ $# != 0 ]] || { echo "Invalid input - please specify docker arguments followed by --." >&2; return 4; }
+  [ $# -ne 0 ] || { echo "Invalid input - please specify docker arguments followed by --." >&2; return 4; }
   # Everything before "--" is an arg to docker
   until [ -z "${1-}" ] ; do
-    if [[ "$1" == "--" ]]; then
+    if [ "$1" = '--' ]; then
       shift
       break
     fi
     docker_run_opts+=("$1")
-    if [[ "$1" == "-d" || "$1" == "--detach" ]] ; then
+    if [[ "$1" = '-d' || "$1" = '--detach' ]] ; then
       detach=true
     fi
     shift
   done
 
   # Everything after "--" is the command to run
-  [[ $# != 0 ]] || { echo "Invalid input - please specify a command to run." >&2; return 4; }
+  [ $# -ne 0 ] || { echo "Invalid input - please specify a command to run." >&2; return 4; }
   local -a cmd=()
   until [ -z "${1-}" ] ; do
     cmd+=("$1")
@@ -575,7 +575,7 @@ function kube::build::run_build_command_ex() {
     --env "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-}"
   )
 
-  if [[ -n "${DOCKER_CGROUP_PARENT:-}" ]]; then
+  if [ -n "${DOCKER_CGROUP_PARENT:-}" ]; then
     kube::log::status "Using ${DOCKER_CGROUP_PARENT} as container cgroup parent"
     docker_run_opts+=(--cgroup-parent "${DOCKER_CGROUP_PARENT}")
   fi
@@ -584,9 +584,9 @@ function kube::build::run_build_command_ex() {
   # to work.  However, if we run this way and don't have stdin, then it ends up
   # running in a daemon-ish mode.  So if we don't have a stdin, we explicitly
   # attach stderr/stdout but don't bother asking for a tty.
-  if [[ -t 0 ]]; then
+  if [ -t 0 ]; then
     docker_run_opts+=(--interactive --tty)
-  elif [[ "${detach}" == false ]]; then
+  elif [ "${detach}" = false ]; then
     docker_run_opts+=("--attach=stdout" "--attach=stderr")
   fi
 
@@ -596,7 +596,7 @@ function kube::build::run_build_command_ex() {
   # Clean up container from any previous run
   kube::build::destroy_container "${container_name}"
   "${docker_cmd[@]}" "${cmd[@]}"
-  if [[ "${detach}" == false ]]; then
+  if [ "${detach}" = false ]; then
     kube::build::destroy_container "${container_name}"
   fi
 }
@@ -671,10 +671,10 @@ function kube::build::rsync {
     --archive
     "--password-file=${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
   )
-  if (( KUBE_VERBOSE >= 6 )); then
+  if [ "$KUBE_VERBOSE" -ge 6 ]; then
     rsync_opts+=("-iv")
   fi
-  if (( KUBE_RSYNC_COMPRESS > 0 )); then
+  if [ "$KUBE_RSYNC_COMPRESS" -gt 0 ]; then
      rsync_opts+=("--compress-level=${KUBE_RSYNC_COMPRESS}")
   fi
   V=3 kube::log::status "Running rsync"

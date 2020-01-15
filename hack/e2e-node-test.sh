@@ -24,10 +24,10 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 # For help output
 ARGHELP=""
-if [[ -n "${FOCUS:-}" ]]; then
+if [ -n "${FOCUS:-}" ]; then
     ARGHELP="FOCUS='${FOCUS}' "
 fi
-if [[ -n "${SKIP:-}" ]]; then
+if [ -n "${SKIP:-}" ]; then
     ARGHELP="${ARGHELP}SKIP='${SKIP}'"
 fi
 

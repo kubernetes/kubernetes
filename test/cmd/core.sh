@@ -657,7 +657,7 @@ __EOF__
   # Post-Condition: pod "test-pod" has configuration annotation, and it's updated (different from the annotation when it's applied)
   grep -q kubectl.kubernetes.io/last-applied-configuration <<< "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" )"
   kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration > "${KUBE_TEMP}"/annotation-configuration-replaced
-  ! [[ $(diff -q "${KUBE_TEMP}"/annotation-configuration "${KUBE_TEMP}"/annotation-configuration-replaced > /dev/null) ]] || exit 1
+  ! [ "$(diff -q "${KUBE_TEMP}"/annotation-configuration "${KUBE_TEMP}"/annotation-configuration-replaced > /dev/null)" ] || exit 1
   # Clean up
   rm "${KUBE_TEMP}"/test-pod-replace.yaml "${KUBE_TEMP}"/annotation-configuration "${KUBE_TEMP}"/annotation-configuration-replaced
   kubectl delete pods test-pod "${kube_flags[@]}"
@@ -741,7 +741,7 @@ run_secrets_test() {
   kubectl delete secret test-secret --namespace=test-secrets
 
   ### Create a docker-registry secret in a specific namespace
-  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+  if [ "${WAIT_FOR_DELETION:-}" = 'true' ]; then
     kube::test::wait_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
   fi
   # Pre-condition: no SECRET exists
@@ -756,7 +756,7 @@ run_secrets_test() {
   kubectl delete secret test-secret --namespace=test-secrets
 
   ### Create a tls secret
-  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+  if [ "${WAIT_FOR_DELETION:-}" = 'true' ]; then
     kube::test::wait_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
   fi
   # Pre-condition: no SECRET exists
@@ -800,7 +800,7 @@ __EOF__
   kubectl delete secret secret-string-data --namespace=test-secrets
 
   ### Create a secret using output flags
-  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+  if [ "${WAIT_FOR_DELETION:-}" = 'true' ]; then
     kube::test::wait_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" ''
   fi
   # Pre-condition: no secret exists
@@ -911,7 +911,7 @@ run_service_tests() {
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:redis-master:'
   # Command
   kubectl delete service redis-master "${kube_flags[@]}"
-  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+  if [ "${WAIT_FOR_DELETION:-}" = 'true' ]; then
     kube::test::wait_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   fi
   # Post-condition: Only the default kubernetes services exist
@@ -959,7 +959,7 @@ __EOF__
   # Command
   kubectl delete service redis-master "${kube_flags[@]}"
   kubectl delete service "service-v1-test" "${kube_flags[@]}"
-  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+  if [ "${WAIT_FOR_DELETION:-}" = 'true' ]; then
     kube::test::wait_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   fi
   # Post-condition: Only the default kubernetes services exist
@@ -985,7 +985,7 @@ __EOF__
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:redis-master:redis-slave:'
   # Command
   kubectl delete services redis-master redis-slave "${kube_flags[@]}" # delete multiple services at once
-  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+  if [ "${WAIT_FOR_DELETION:-}" = 'true' ]; then
     kube::test::wait_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   fi
   # Post-condition: Only the default kubernetes services exist
@@ -1004,7 +1004,7 @@ __EOF__
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'beep-boop:kubernetes:'
   # Command
   kubectl delete service beep-boop "${kube_flags[@]}"
-  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+  if [ "${WAIT_FOR_DELETION:-}" = 'true' ]; then
     kube::test::wait_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   fi
   # Post-condition: Only the default kubernetes services exist
@@ -1028,11 +1028,11 @@ __EOF__
   # Clean-Up
   # Command
   kubectl delete service exposemetadata testmetadata "${kube_flags[@]}"
-  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+  if [ "${WAIT_FOR_DELETION:-}" = 'true' ]; then
     kube::test::wait_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   fi
   kubectl delete deployment testmetadata "${kube_flags[@]}"
-  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+  if [ "${WAIT_FOR_DELETION:-}" = 'true' ]; then
     kube::test::wait_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   fi
 

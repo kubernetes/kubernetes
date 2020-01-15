@@ -29,11 +29,11 @@ set -o pipefail
 KUBE_ROOT="$(dirname "${BASH_SOURCE[0]}")/.."
 source "${KUBE_ROOT}/build/common.sh"
 
-if [[ -z "${REGISTRY:-}" ]]; then
+if [ -z "${REGISTRY:-}" ]; then
 	echo "REGISTRY must be set"
 	exit 1
 fi
-if [[ -z "${VERSION:-}" ]]; then
+if [ -z "${VERSION:-}" ]; then
 	echo "VERSION must be set"
 	exit 1
 fi

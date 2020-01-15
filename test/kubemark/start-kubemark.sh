@@ -28,7 +28,7 @@ source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
 source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/util.sh"
 source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
 
-if [[ -f "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/startup.sh" ]] ; then
+if [ -f "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/startup.sh" ] ; then
   source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/startup.sh"
 fi
 
@@ -58,7 +58,7 @@ function create-and-upload-hollow-node-image {
     build_cmd=("make" "${KUBEMARK_IMAGE_MAKE_TARGET}")
     MAKE_DIR="${KUBE_ROOT}/cluster/images/kubemark"
     KUBEMARK_BIN="$(kube::util::find-binary-for-platform kubemark linux/amd64)"
-    if [[ -z "${KUBEMARK_BIN}" ]]; then
+    if [ -z "${KUBEMARK_BIN}" ]; then
       echo 'Cannot find cmd/kubemark binary'
       exit 1
     fi
@@ -72,7 +72,7 @@ function create-and-upload-hollow-node-image {
   fi
   echo "Created and uploaded the kubemark hollow-node image to docker registry."
   # Cleanup the kubemark image after the script exits.
-  if [[ "${CLEANUP_KUBEMARK_IMAGE:-}" == "true" ]]; then
+  if [ "${CLEANUP_KUBEMARK_IMAGE:-}" = 'true' ]; then
     trap delete-kubemark-image EXIT
   fi
 }
@@ -120,7 +120,7 @@ function create-kube-hollow-node-resources {
   sed -i'' -e "s@{{EVENTER_MEM}}@${eventer_mem}@g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
 
   # Cluster Autoscaler.
-  if [[ "${ENABLE_KUBEMARK_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
+  if [ "${ENABLE_KUBEMARK_CLUSTER_AUTOSCALER:-}" = 'true' ]; then
     echo "Setting up Cluster Autoscaler"
     KUBEMARK_AUTOSCALER_MIG_NAME="${KUBEMARK_AUTOSCALER_MIG_NAME:-${NODE_INSTANCE_PREFIX}-group}"
     KUBEMARK_AUTOSCALER_MIN_NODES="${KUBEMARK_AUTOSCALER_MIN_NODES:-0}"
@@ -135,7 +135,7 @@ function create-kube-hollow-node-resources {
   fi
 
   # Kube DNS.
-  if [[ "${ENABLE_KUBEMARK_KUBE_DNS:-}" == "true" ]]; then
+  if [ "${ENABLE_KUBEMARK_KUBE_DNS:-}" = 'true' ]; then
     echo "Setting up kube-dns"
     sed "s@{{dns_domain}}@${KUBE_DNS_DOMAIN}@g" "${RESOURCE_DIRECTORY}/kube_dns_template.yaml" > "${RESOURCE_DIRECTORY}/addons/kube_dns.yaml"
   fi
@@ -184,7 +184,7 @@ function wait-for-hollow-nodes-to-run-or-timeout {
   nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node 2> /dev/null) || true
   ready=$(($(echo "${nodes}" | grep -vc "NotReady") - 1))
 
-  until [[ "${ready}" -ge "${NUM_REPLICAS}" ]]; do
+  until [ "${ready}" -ge "${NUM_REPLICAS}" ]; do
     echo -n "."
     sleep 1
     now=$(date +%s)

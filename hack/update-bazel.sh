@@ -63,7 +63,7 @@ done
 
 # Run gazelle to update Go rules in BUILD files.
 # filter out known pkg-config error (see buildozer workaround below)
-# NOTE: the `|| exit "${PIPESTATUS[0]}"` is to ignore grep errors 
+# NOTE: the `|| exit "${PIPESTATUS[0]}"` is to ignore grep errors
 # while preserving the exit code of gazelle
 gazelle fix \
     -external=vendored \
@@ -80,27 +80,27 @@ kazel
 # buildozer exits 3 when no changes are made ¯\_(ツ)_/¯
 # https://github.com/bazelbuild/buildtools/tree/master/buildozer#error-code
 buildozer -quiet 'add tags manual' '//vendor/...:%go_binary' '//vendor/...:%go_test' && ret=$? || ret=$?
-if [[ $ret != 0 && $ret != 3 ]]; then
+if [[ $ret -ne 0 && $ret -ne 3 ]]; then
   exit 1
 fi
 
 # mark all ./test/integration/* targets as integration
 # see comment above re: buildozer exit codes
 buildozer -quiet 'add tags integration' '//test/integration/...:%go_test' && ret=$? || ret=$?
-if [[ $ret != 0 && $ret != 3 ]]; then
+if [[ $ret -ne 0 && $ret -ne 3 ]]; then
   exit 1
 fi
 
 # restrict ./vendor/github.com/prometheus/* targets visibility
 # see comment above re: buildozer exit codes
 buildozer -quiet 'set visibility //staging/src/k8s.io/component-base/metrics:prometheus_import_allow_list' '//vendor/github.com/prometheus/...:go_default_library' && ret=$? || ret=$?
-if [[ $ret != 0 && $ret != 3 ]]; then
+if [[ $ret -ne 0 && $ret -ne 3 ]]; then
   exit 1
 fi
 
 # we need to set this because gazelle doesn't support pkg-config, which would set this link option
 # see comment above re: buildozer exit codes
 buildozer -quiet 'set clinkopts select({"@io_bazel_rules_go//go/platform:linux":["-lseccomp",],"//conditions:default":[],})' //vendor/github.com/seccomp/libseccomp-golang:go_default_library && ret=$? || ret=$?
-if [[ $ret != 0 && $ret != 3 ]]; then
+if [[ $ret -ne 0 && $ret -ne 3 ]]; then
   exit 1
 fi

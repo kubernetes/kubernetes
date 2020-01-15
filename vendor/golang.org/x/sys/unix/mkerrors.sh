@@ -17,19 +17,19 @@ if test -z "$GOARCH" -o -z "$GOOS"; then
 fi
 
 # Check that we are using the new build system if we should
-if [[ "$GOOS" = "linux" ]] && [[ "$GOLANG_SYS_BUILD" != "docker" ]]; then
+if [ "$GOOS" = 'linux' ] && [ "$GOLANG_SYS_BUILD" != 'docker' ]; then
 	echo 1>&2 "In the Docker based build system, mkerrors should not be called directly."
 	echo 1>&2 "See README.md"
 	exit 1
 fi
 
-if [[ "$GOOS" = "aix" ]]; then
+if [ "$GOOS" = 'aix' ]; then
 	CC=${CC:-gcc}
 else
 	CC=${CC:-cc}
 fi
 
-if [[ "$GOOS" = "solaris" ]]; then
+if [ "$GOOS" = 'solaris' ]; then
 	# Assumes GNU versions of utilities in PATH.
 	export PATH=/usr/gnu/bin:$PATH
 fi

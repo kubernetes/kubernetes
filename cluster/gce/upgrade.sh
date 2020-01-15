@@ -22,7 +22,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [[ "${KUBERNETES_PROVIDER:-gce}" != "gce" ]]; then
+if [ "${KUBERNETES_PROVIDER:-gce}" != 'gce' ]; then
   echo "!!! ${1} only works on GCE" >&2
   exit 1
 fi
@@ -79,7 +79,7 @@ function print-node-version-info() {
 function upgrade-master() {
   local num_masters
   num_masters=$(get-master-replicas-count)
-  if [[ "${num_masters}" -gt 1 ]]; then
+  if [ "${num_masters}" -gt 1 ]; then
     echo "Upgrade of master not supported if more than one master replica present. The current number of master replicas: ${num_masters}"
     exit 1
   fi
@@ -116,7 +116,7 @@ function upgrade-master-env() {
   echo "== Upgrading master environment variables. =="
   # Generate the node problem detector token if it isn't present on the original
   # master.
- if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" && "${NODE_PROBLEM_DETECTOR_TOKEN:-}" == "" ]]; then
+ if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" = 'standalone' && -z "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
     NODE_PROBLEM_DETECTOR_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   fi
 }
@@ -125,9 +125,9 @@ function wait-for-master() {
   echo "== Waiting for new master to respond to API requests =="
 
   local curl_auth_arg
-  if [[ -n ${KUBE_BEARER_TOKEN:-} ]]; then
+  if [ -n "${KUBE_BEARER_TOKEN:-}" ]; then
     curl_auth_arg=(-H "Authorization: Bearer ${KUBE_BEARER_TOKEN}")
-  elif [[ -n ${KUBE_PASSWORD:-} ]]; then
+  elif [ -n ${KUBE_PASSWORD:-} ]; then
     curl_auth_arg=(--user "${KUBE_USER}:${KUBE_PASSWORD}")
   else
     echo "can't get auth credentials for the current master"
@@ -204,11 +204,11 @@ function upgrade-nodes() {
 }
 
 function setup-base-image() {
-  if [[ "${env_os_distro}" == "false" ]]; then
+  if [ "${env_os_distro}" = 'false' ]; then
     echo "== Ensuring that new Node base OS image matched the existing Node base OS image"
     NODE_OS_DISTRIBUTION=$(get-node-os "${NODE_NAMES[0]}")
 
-    if [[ "${NODE_OS_DISTRIBUTION}" == "cos" ]]; then
+    if [ "${NODE_OS_DISTRIBUTION}" = 'cos' ]; then
         NODE_OS_DISTRIBUTION="gci"
     fi
 
@@ -279,7 +279,7 @@ function upgrade-node-env() {
   echo "== Upgrading node environment variables. =="
   # Get the node problem detector token from master if it isn't present on
   # the original node.
-  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" && "${NODE_PROBLEM_DETECTOR_TOKEN:-}" == "" ]]; then
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" = 'standalone' && -z "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
     detect-master
     local master_env=$(get-master-env)
     NODE_PROBLEM_DETECTOR_TOKEN=$(get-env-val "${master_env}" "NODE_PROBLEM_DETECTOR_TOKEN")
@@ -294,7 +294,7 @@ function do-single-node-upgrade() {
   local -r instance="$1"
   local kubectl_rc
   local boot_id=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output=jsonpath='{.status.nodeInfo.bootID}' 2>&1) && kubectl_rc=$? || kubectl_rc=$?
-  if [[ "${kubectl_rc}" != 0 ]]; then
+  if [ "${kubectl_rc}" -ne 0 ]; then
     echo "== FAILED to get bootID ${instance} =="
     echo "${boot_id}"
     return ${kubectl_rc}
@@ -305,7 +305,7 @@ function do-single-node-upgrade() {
   local drain_rc
   "${KUBE_ROOT}/cluster/kubectl.sh" drain --delete-local-data --force --ignore-daemonsets "${instance}" \
     && drain_rc=$? || drain_rc=$?
-  if [[ "${drain_rc}" != 0 ]]; then
+  if [ "${drain_rc}" -ne 0 ]; then
     echo "== FAILED to drain ${instance} =="
     return ${drain_rc}
   fi
@@ -317,7 +317,7 @@ function do-single-node-upgrade() {
     --project="${PROJECT}" \
     --zone="${ZONE}" \
     --instances="${instance}" 2>&1) && recreate_rc=$? || recreate_rc=$?
-  if [[ "${recreate_rc}" != 0 ]]; then
+  if [ "${recreate_rc}" -ne 0 ]; then
     echo "== FAILED to recreate ${instance} =="
     echo "${recreate}"
     return ${recreate_rc}
@@ -330,11 +330,11 @@ function do-single-node-upgrade() {
   echo "== Waiting for new node to be added to k8s.  ==" >&2
   while true; do
     local new_boot_id=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output=jsonpath='{.status.nodeInfo.bootID}' 2>&1) && kubectl_rc=$? || kubectl_rc=$?
-    if [[ "${kubectl_rc}" != 0 ]]; then
+    if [ "${kubectl_rc}" -ne 0 ]; then
       echo "== FAILED to get node ${instance} =="
       echo "${boot_id}"
       echo "  (Will retry.)"
-    elif [[ "${boot_id}" != "${new_boot_id}" ]]; then
+    elif [ "${boot_id}" != "${new_boot_id}" ]; then
       echo "Node ${instance} recreated."
       break
     else
@@ -347,7 +347,7 @@ function do-single-node-upgrade() {
   echo "== Waiting for ${instance} to become ready. ==" >&2
   while true; do
     local ready=$("${KUBE_ROOT}/cluster/kubectl.sh" get node "${instance}" --output='jsonpath={.status.conditions[?(@.type == "Ready")].status}')
-    if [[ "${ready}" != 'True' ]]; then
+    if [ "${ready}" != 'True' ]; then
       echo "Node ${instance} is still not ready: Ready=${ready}"
     else
       echo "Node ${instance} Ready=${ready}"
@@ -361,7 +361,7 @@ function do-single-node-upgrade() {
   local uncordon_rc
   "${KUBE_ROOT}/cluster/kubectl.sh" uncordon "${instance}" \
     && uncordon_rc=$? || uncordon_rc=$?
-  if [[ "${uncordon_rc}" != 0 ]]; then
+  if [ "${uncordon_rc}" -ne 0 ]; then
     echo "== FAILED to uncordon ${instance} =="
     return ${uncordon_rc}
   fi
@@ -386,7 +386,7 @@ function do-node-upgrade() {
       --template="${template_name}" \
       --project="${PROJECT}" \
       --zone="${ZONE}" 2>&1) && set_instance_template_rc=$? || set_instance_template_rc=$?
-    if [[ "${set_instance_template_rc}" != 0 ]]; then
+    if [ "${set_instance_template_rc}" -ne 0 ]; then
       echo "== FAILED to set-instance-template for ${group} to ${template_name} =="
       echo "${set_instance_template_out}"
       return ${set_instance_template_rc}
@@ -396,7 +396,7 @@ function do-node-upgrade() {
         --format='value(instance)' \
         --project="${PROJECT}" \
         --zone="${ZONE}" 2>&1)) && list_instances_rc=$? || list_instances_rc=$?
-    if [[ "${list_instances_rc}" != 0 ]]; then
+    if [ "${list_instances_rc}" -ne 0 ]; then
       echo "== FAILED to list instances in group ${group} =="
       echo "${instances}"
       return ${list_instances_rc}
@@ -412,14 +412,14 @@ function do-node-upgrade() {
       # so wait once we hit that many nodes. This isn't ideal, since one might take much
       # longer than the others, but it should help.
       process_count_left=$((process_count_left - 1))
-      if [[ process_count_left -eq 0 || "${instance}" == "${instances[-1]}" ]]; then
+      if [[ process_count_left -eq 0 || "${instance}" = "${instances[-1]}" ]]; then
         # Wait for each of the parallel node upgrades to finish.
         for pid in "${pids[@]}"; do
           wait $pid
           ret_code_sum=$(( ret_code_sum + $? ))
         done
         # Return even if at least one of the node upgrades failed.
-        if [[ ${ret_code_sum} != 0 ]]; then
+        if [ "${ret_code_sum}" -ne 0 ]; then
           echo "== Some of the ${node_upgrade_parallelism} parallel node upgrades failed. =="
           return ${ret_code_sum}
         fi
@@ -505,7 +505,7 @@ function update-coredns-config() {
   wget -P ${download_dir} "https://github.com/coredns/corefile-migration/releases/download/v1.0.4/corefile-tool-${host_arch}" >/dev/null 2>&1
 
   local -r checkSHA=$(sha256sum ${download_dir}/corefile-tool-${host_arch} | cut -d " " -f 1)
-  if [[ "${checkSHA}" != "${corefile_tool_SHA}" ]]; then
+  if [ "${checkSHA}" != "${corefile_tool_SHA}" ]; then
     echo "!!! CheckSum for the CoreDNS migration tool did not match !!!" >&2
     exit 1
   fi
@@ -574,24 +574,24 @@ while getopts ":MNPlcho" opt; do
 done
 shift $((OPTIND-1))
 
-if [[ $# -gt 1 ]]; then
+if [ $# -gt 1 ]; then
   echo "Error: Only one parameter (<version number or publication>) may be passed after the set of flags!" >&2
   usage
   exit 1
 fi
 
-if [[ $# -lt 1 ]] && [[ "${local_binaries}" == "false" ]]; then
+if [ $# -lt 1 ] && [ "${local_binaries}" = 'false' ]; then
   usage
   exit 1
 fi
 
-if [[ "${master_upgrade}" == "false" ]] && [[ "${node_upgrade}" == "false" ]]; then
+if [ "${master_upgrade}" = 'false' ] && [ "${node_upgrade}" = 'false' ]; then
   echo "Can't specify both -M and -N" >&2
   exit 1
 fi
 
 # prompt if etcd storage media type isn't set unless using etcd2 when doing master upgrade
-if [[ -z "${STORAGE_MEDIA_TYPE:-}" ]] && [[ "${STORAGE_BACKEND:-}" != "etcd2" ]] && [[ "${master_upgrade}" == "true" ]]; then
+if [ -z "${STORAGE_MEDIA_TYPE:-}" ] && [ "${STORAGE_BACKEND:-}" != 'etcd2' ] && [ "${master_upgrade}" = 'true' ]; then
   echo "The default etcd storage media type in 1.6 has changed from application/json to application/vnd.kubernetes.protobuf."
   echo "Documentation about the change can be found at https://kubernetes.io/docs/admin/etcd_upgrade."
   echo ""
@@ -604,7 +604,7 @@ if [[ -z "${STORAGE_MEDIA_TYPE:-}" ]] && [[ "${STORAGE_BACKEND:-}" != "etcd2" ]]
   echo ""
   if [ -t 0 ] && [ -t 1 ]; then
     read -p "Would you like to continue with the new default, and lose the ability to downgrade to etcd2? [y/N] " confirm
-    if [[ "${confirm}" != "y" ]]; then
+    if [ "${confirm}" != 'y' ]; then
       exit 1
     fi
   else
@@ -620,7 +620,7 @@ fi
 # In e2e tests, we use TEST_ALLOW_IMPLICIT_ETCD_UPGRADE=true to skip this
 # prompt, simulating the behavior when the user confirms interactively.
 # All other automated use of this script should explicitly specify a version.
-if [[ "${master_upgrade}" == "true" ]]; then
+if [ "${master_upgrade}" = 'true' ]; then
   if [[ -z "${ETCD_IMAGE:-}" && -z "${TEST_ETCD_IMAGE:-}" ]] || [[ -z "${ETCD_VERSION:-}" && -z "${TEST_ETCD_VERSION:-}" ]]; then
     echo
     echo "***WARNING***"
@@ -639,10 +639,10 @@ if [[ "${master_upgrade}" == "true" ]]; then
     echo
     if [ -t 0 ] && [ -t 1 ]; then
       read -p "Continue with default etcd version, which might upgrade etcd? [y/N] " confirm
-      if [[ "${confirm}" != "y" ]]; then
+      if [ "${confirm}" != 'y' ]; then
         exit 1
       fi
-    elif [[ "${TEST_ALLOW_IMPLICIT_ETCD_UPGRADE:-}" != "true" ]]; then
+    elif [ "${TEST_ALLOW_IMPLICIT_ETCD_UPGRADE:-}" != 'true' ]; then
       echo "ETCD_IMAGE and ETCD_VERSION must be specified when run non-interactively." >&2
       exit 1
     fi
@@ -651,23 +651,23 @@ fi
 
 print-node-version-info "Pre-Upgrade"
 
-if [[ "${local_binaries}" == "false" ]]; then
+if [ "${local_binaries}" = 'false' ]; then
   set_binary_version ${1}
 fi
 
 prepare-upgrade
 
-if [[ "${node_prereqs}" == "true" ]]; then
+if [ "${node_prereqs}" = 'true' ]; then
   prepare-node-upgrade
   exit 0
 fi
 
-if [[ "${master_upgrade}" == "true" ]]; then
+if [ "${master_upgrade}" = 'true' ]; then
   upgrade-master
 fi
 
-if [[ "${node_upgrade}" == "true" ]]; then
-  if [[ "${local_binaries}" == "true" ]]; then
+if [ "${node_upgrade}" = 'true' ]; then
+  if [ "${local_binaries}" = 'true' ]; then
     echo "Upgrading nodes to local binaries is not yet supported." >&2
     exit 1
   else
@@ -675,7 +675,7 @@ if [[ "${node_upgrade}" == "true" ]]; then
   fi
 fi
 
-if [[ "${CLUSTER_DNS_CORE_DNS:-}" == "true" ]]; then
+if [ "${CLUSTER_DNS_CORE_DNS:-}" = 'true' ]; then
   update-coredns-config
 fi
 

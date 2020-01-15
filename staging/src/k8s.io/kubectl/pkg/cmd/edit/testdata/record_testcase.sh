@@ -18,14 +18,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [[ -z "${1-}" ]]; then
+if [ -z "${1-}" ]; then
     echo "Usage: record_testcase.sh testcase-name"
     exit 1
 fi
 
 # Clean up the test server
 function cleanup {
-    if [[ -n "${pid-}" ]]; then
+    if [ -n "${pid-}" ]; then
         echo "Stopping recording server (${pid})"
         # kill the process `go run` launched
         pkill -P "${pid}"

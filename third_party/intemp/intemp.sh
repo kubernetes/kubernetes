@@ -11,7 +11,7 @@ set -o pipefail
 opt_flag=${1:-}
 [ -z "${opt_flag}" ] && echo "No command supplied" >&2 && exit 1
 
-if [ "${opt_flag}" == "-t" ]; then
+if [ "${opt_flag}" = '-t' ]; then
   shift
   prefix=${1:-}
   [ -z "${prefix}" ] && echo "No prefix supplied" >&2 && exit 1

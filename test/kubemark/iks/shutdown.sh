@@ -35,7 +35,7 @@ rm -rf "${RESOURCE_DIRECTORY}/addons"
 
 # Remove clusters, namespaces, and deployments
 delete-clusters
-if [[ -f "${RESOURCE_DIRECTORY}/iks-namespacelist.sh" ]] ; then
+if [ -f "${RESOURCE_DIRECTORY}/iks-namespacelist.sh" ] ; then
   bash "${RESOURCE_DIRECTORY}/iks-namespacelist.sh"
   rm -f "${RESOURCE_DIRECTORY}/iks-namespacelist.sh"
 fi

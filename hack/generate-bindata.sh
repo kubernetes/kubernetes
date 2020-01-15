@@ -23,7 +23,7 @@ export KUBE_ROOT
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/logging.sh"
 
-if [[ ! -d "${KUBE_ROOT}/pkg" ]]; then
+if [ ! -d "${KUBE_ROOT}/pkg" ]; then
 	echo "${KUBE_ROOT}/pkg not detected.  This script should be run from a location where the source dirs are available."
 	exit 1
 fi

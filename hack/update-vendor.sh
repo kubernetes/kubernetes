@@ -29,7 +29,7 @@ export GOFLAGS=
 export LANG=C
 export LC_ALL=C
 # Detect problematic GOPROXY settings that prevent lookup of dependencies
-if [[ "${GOPROXY:-}" == "off" ]]; then
+if [ "${GOPROXY:-}" = 'off' ]; then
   kube::log::error "Cannot run hack/update-vendor.sh with \$GOPROXY=off"
   exit 1
 fi
@@ -99,10 +99,10 @@ function group_replace_directives() {
      /^replace [(]/      { inreplace=1; next                   }
      inreplace && /^[)]/ { inreplace=0; next                   }
      inreplace           { print > \"${go_mod_replace}\"; next }
-     
+
      # print ungrouped replace directives with the replace directive trimmed
      /^replace [^(]/ { sub(/^replace /,\"\"); print > \"${go_mod_replace}\"; next }
-     
+
      # otherwise print to the noreplace file
      { print > \"${go_mod_noreplace}\" }
   " < go.mod
@@ -136,7 +136,7 @@ function add_generated_comments() {
     echo ""
     cat "${go_mod_nocomments}"
    } > go.mod
-  
+
   # Format
   go mod edit -fmt
 }
@@ -146,7 +146,7 @@ function add_generated_comments() {
 
 for repo in $(kube::util::list_staging_repos); do
   pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
-    if [[ ! -f go.mod ]]; then
+    if [ ! -f go.mod ]; then
       kube::log::status "go.mod: initialize ${repo}"
       rm -f Godeps/Godeps.json # remove before initializing, staging Godeps are not authoritative
       go mod init "k8s.io/${repo}"
@@ -155,7 +155,7 @@ for repo in $(kube::util::list_staging_repos); do
   popd >/dev/null 2>&1
 done
 
-if [[ ! -f go.mod ]]; then
+if [ ! -f go.mod ]; then
   kube::log::status "go.mod: initialize k8s.io/kubernetes"
   go mod init "k8s.io/kubernetes"
   rm -f Godeps/Godeps.json # remove after initializing
@@ -232,7 +232,7 @@ while IFS= read -r repo; do
       go list -tags=tools all
     } >> "${LOG_FILE}" 2>&1
 
-    # capture module dependencies 
+    # capture module dependencies
     go list -m -f '{{if not .Main}}{{.Path}}{{end}}' all > "${tmp_go_deps}"
 
     # restore the original go.mod file
@@ -255,13 +255,13 @@ for repo in $(tsort "${TMP_DIR}/tidy_deps.txt"); do
 
     # prune replace directives that pin to the naturally selected version.
     # do this before tidying, since tidy removes unused modules that
-    # don't provide any relevant packages, which forgets which version of the 
+    # don't provide any relevant packages, which forgets which version of the
     # unused transitive dependency we had a require directive for,
     # and prevents pruning the matching replace directive after tidying.
     go list -m -json all |
-      jq -r 'select(.Replace != null) | 
-             select(.Path == .Replace.Path) | 
-             select(.Version == .Replace.Version) | 
+      jq -r 'select(.Replace != null) |
+             select(.Path == .Replace.Path) |
+             select(.Version == .Replace.Version) |
              "-dropreplace \(.Replace.Path)"' |
     xargs -L 100 go mod edit -fmt
 
@@ -285,9 +285,9 @@ $(go mod why "${loopback_deps[@]}")"
 
     # prune replace directives that pin to the naturally selected version
     go list -m -json all |
-      jq -r 'select(.Replace != null) | 
-             select(.Path == .Replace.Path) | 
-             select(.Version == .Replace.Version) | 
+      jq -r 'select(.Replace != null) |
+             select(.Path == .Replace.Path) |
+             select(.Version == .Replace.Version) |
              "-dropreplace \(.Replace.Path)"' |
     xargs -L 100 go mod edit -fmt
 

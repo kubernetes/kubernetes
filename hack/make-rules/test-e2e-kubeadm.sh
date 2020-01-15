@@ -30,32 +30,32 @@ build=${BUILD:-"true"}
 
 # Parse the flags to pass to ginkgo
 ginkgoflags=""
-if [[ ${parallelism} != "" ]]; then
+if [ -n "${parallelism}" ]; then
   ginkgoflags="${ginkgoflags} -nodes=${parallelism} "
 else
   ginkgoflags="${ginkgoflags} -p "
 fi
 
-if [[ ${focus} != "" ]]; then
+if [ -n "${focus}" ]; then
   ginkgoflags="${ginkgoflags} -focus=\"${focus}\" "
 fi
 
-if [[ ${skip} != "" ]]; then
+if [ -n "${skip}" ]; then
   ginkgoflags="${ginkgoflags} -skip=\"${skip}\" "
 fi
 
-if [[ ${run_until_failure} != "false" ]]; then
+if [ "${run_until_failure}" != 'false' ]; then
   ginkgoflags="${ginkgoflags} -untilItFails=${run_until_failure} "
 fi
 
 # Setup the directory to copy test artifacts (logs, junit.xml, etc) from remote host to local host
-if [[ ! -d "${artifacts}" ]]; then
+if [ ! -d "${artifacts}" ]; then
   echo "Creating artifacts directory at ${artifacts}"
   mkdir -p "${artifacts}"
 fi
 echo "Test artifacts will be written to ${artifacts}"
 
-# Test 
+# Test
 kube::golang::verify_go_version
 
 go run test/e2e_kubeadm/runner/local/run_local.go \

@@ -27,14 +27,14 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 mkdir -p "${KUBE_ROOT}/_tmp"
 _tmpdir="$(mktemp -d "${KUBE_ROOT}/_tmp/kube-vendor.XXXXXX")"
 
-if [[ -z ${KEEP_TMP:-} ]]; then
+if [ -z "${KEEP_TMP:-}" ]; then
     KEEP_TMP=false
 fi
 
 function cleanup {
   # make go module dirs writeable
   chmod -R +w "${_tmpdir}"
-  if [ "${KEEP_TMP}" == "true" ]; then
+  if [ "${KEEP_TMP}" = 'true' ]; then
     echo "Leaving ${_tmpdir} for you to examine or copy. Please delete it manually when finished. (rm -rf ${_tmpdir})"
   else
     echo "Removing ${_tmpdir}"
@@ -88,7 +88,7 @@ pushd "${KUBE_ROOT}" > /dev/null 2>&1
   hack/lint-dependencies.sh >&2
 popd > /dev/null 2>&1
 
-if [[ ${ret} -gt 0 ]]; then
+if [ ${ret} -gt 0 ]; then
   exit ${ret}
 fi
 

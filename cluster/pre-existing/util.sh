@@ -24,17 +24,17 @@ source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 function detect-project() {
-  if [[ -z "${MASTER_IP:-}" ]]; then
+  if [ -z "${MASTER_IP:-}" ]; then
     echo "Set 'MASTER_IP' to the instance assigned to be the Kubernetes master" 1>&2
     exit 1
   fi
 
-  if [[ -z "${PROJECT:-}" ]]; then
+  if [ -z "${PROJECT:-}" ]; then
     echo "Set 'PROJECT' to the name of the container project: $CONTAINER_REGISTRY/$PROJECT/kubemark" >&2
     exit 1
   fi
 
-  if [[ -z "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
+  if [ -z "${SERVICE_CLUSTER_IP_RANGE:-}" ]; then
     cluster_range=$(echo "${MASTER_IP}" | awk -F '.' '{printf("%d.%d.%d.0", $1, $2, $3)}')
     SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-$cluster_range/16}"
   fi

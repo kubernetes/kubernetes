@@ -4,7 +4,7 @@ set -e
 set -o pipefail
 
 # set the path to the present working directory
-export GOPATH=`pwd`
+export GOPATH=$(pwd)
 
 function git_clone() {
   path=$1
@@ -51,7 +51,7 @@ go test github.com/pelletier/go-toml/cmd/tomljson
 go test github.com/pelletier/go-toml/query
 
 # run the entire BurntSushi test suite
-if [[ $# -eq 0 ]] ; then
+if [ $# -eq 0 ] ; then
   echo "Running all BurntSushi tests"
   ./toml-test ./test_program_bin | tee test_out
 else

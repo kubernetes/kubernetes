@@ -41,7 +41,7 @@ make generated_files
 
 changed_files=$(git status --porcelain)
 
-if [[ -n "${changed_files}" ]]; then
+if [ -n "${changed_files}" ]; then
   echo "!!! Generated code is out of date:" >&2
   echo "${changed_files}" >&2
   echo >&2

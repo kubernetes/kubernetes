@@ -23,9 +23,9 @@ function run-cmd-with-retries {
     # We don't use 'local' to declare result as then ret_val always gets value 0.
     # We use tee to output to &5 (redirected to stdout) while also storing it in the variable.
     result=$("$@" 2>&1 | tee >(cat - >&5)) || ret_val="$?"
-    if [[ "${ret_val:-0}" -ne "0" ]]; then
-      if [[ $(echo "${result}" | grep -c "already exists") -gt 0 ]]; then
-        if [[ "${attempt}" == 1 ]]; then
+    if [ "${ret_val:-0}" -ne 0 ]; then
+      if [ "$(echo "${result}" | grep -c "already exists")" -gt 0 ]; then
+        if [ "${attempt}" -eq 1 ]; then
           # shellcheck disable=SC2154 # Color defined in sourced script
           echo -e "${color_red}Failed to $1 $2 ${3:-} as the resource hasn't been deleted from a previous run.${color_norm}" >& 2
           exit 1

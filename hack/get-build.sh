@@ -61,14 +61,14 @@ while getopts ":vh" opt; do
 done
 shift $((OPTIND-1))
 
-if [[ $# -ne 1 ]]; then
+if [ $# -ne 1 ]; then
     usage
     exit 1
 fi
 
 set_binary_version "${1}"
 
-if [[ "${print_version}" == "true" ]]; then
+if [ "${print_version}" = 'true' ]; then
   echo "${KUBE_VERSION}"
 else
   echo "Using version at ${1}: ${KUBE_VERSION}" >&2

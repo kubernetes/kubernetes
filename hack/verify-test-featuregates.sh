@@ -27,7 +27,7 @@ rc=0
 
 # find test files accessing the mutable global feature gate or interface
 direct_sets=$(find -L . -name '*_test.go' -exec grep -Hn 'MutableFeatureGate' {} \; 2>/dev/null) || true
-if [[ -n "${direct_sets}" ]]; then
+if [ -n "${direct_sets}" ]; then
   echo "Test files may not access mutable global feature gates directly:" >&2
   echo "${direct_sets}" >&2
   echo >&2
@@ -39,7 +39,7 @@ fi
 
 # find test files calling SetFeatureGateDuringTest and not calling the result
 missing_defers=$(find -L . -name '*_test.go' -exec grep -Hn 'SetFeatureGateDuringTest' {} \; 2>/dev/null | grep -E -v "defer .*\\)\\(\\)$") || true
-if [[ -n "${missing_defers}" ]]; then
+if [ -n "${missing_defers}" ]; then
   echo "Invalid invocations of featuregatetesting.SetFeatureGateDuringTest():" >&2
   echo "${missing_defers}" >&2
   echo >&2

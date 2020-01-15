@@ -51,7 +51,7 @@ kube::test::find_integration_test_dirs() {
 
 CLEANUP_REQUIRED=
 cleanup() {
-  if [[ -z "${CLEANUP_REQUIRED}" ]]; then
+  if [ -z "${CLEANUP_REQUIRED}" ]; then
     return
   fi
   kube::log::status "Cleaning up etcd"

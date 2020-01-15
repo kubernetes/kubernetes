@@ -65,7 +65,7 @@ function create-kubeconfig() {
   SECONDARY_KUBECONFIG=${SECONDARY_KUBECONFIG:-}
   OVERRIDE_CONTEXT=${OVERRIDE_CONTEXT:-}
 
-  if [[ "$OVERRIDE_CONTEXT" != "" ]];then
+  if [ -n "$OVERRIDE_CONTEXT" ];then
       CONTEXT=$OVERRIDE_CONTEXT
   fi
 
@@ -73,7 +73,7 @@ function create-kubeconfig() {
   OLD_IFS=$IFS
   IFS=':'
   for cfg in ${KUBECONFIG} ; do
-    if [[ ! -e "${cfg}" ]]; then
+    if [ ! -e "${cfg}" ]; then
       mkdir -p "$(dirname "${cfg}")"
       touch "${cfg}"
     fi
@@ -83,7 +83,7 @@ function create-kubeconfig() {
   local cluster_args=(
       "--server=${KUBE_SERVER:-https://${KUBE_MASTER_IP}}"
   )
-  if [[ -z "${CA_CERT:-}" ]]; then
+  if [ -z "${CA_CERT:-}" ]; then
     cluster_args+=("--insecure-skip-tls-verify=true")
   else
     cluster_args+=(
@@ -93,17 +93,17 @@ function create-kubeconfig() {
   fi
 
   local user_args=()
-  if [[ ! -z "${KUBE_BEARER_TOKEN:-}" ]]; then
+  if [ -n "${KUBE_BEARER_TOKEN:-}" ]; then
     user_args+=(
      "--token=${KUBE_BEARER_TOKEN}"
     )
-  elif [[ ! -z "${KUBE_USER:-}" && ! -z "${KUBE_PASSWORD:-}" ]]; then
+  elif [[ -n "${KUBE_USER:-}" && -n "${KUBE_PASSWORD:-}" ]]; then
     user_args+=(
      "--username=${KUBE_USER}"
      "--password=${KUBE_PASSWORD}"
     )
   fi
-  if [[ ! -z "${KUBE_CERT:-}" && ! -z "${KUBE_KEY:-}" ]]; then
+  if [[ -n "${KUBE_CERT:-}" && -n "${KUBE_KEY:-}" ]]; then
     user_args+=(
      "--client-certificate=${KUBE_CERT}"
      "--client-key=${KUBE_KEY}"
@@ -117,14 +117,14 @@ function create-kubeconfig() {
   fi
   KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-context "${CONTEXT}" --cluster="${CONTEXT}" --user="${CONTEXT}"
 
-  if [[ "${SECONDARY_KUBECONFIG}" != "true" ]];then
+  if [ "${SECONDARY_KUBECONFIG}" != 'true' ];then
       KUBECONFIG="${KUBECONFIG}" "${kubectl}" config use-context "${CONTEXT}"  --cluster="${CONTEXT}"
   fi
 
   # If we have a bearer token, also create a credential entry with basic auth
   # so that it is easy to discover the basic auth password for your cluster
   # to use in a web browser.
-  if [[ ! -z "${KUBE_BEARER_TOKEN:-}" && ! -z "${KUBE_USER:-}" && ! -z "${KUBE_PASSWORD:-}" ]]; then
+  if [[ -n "${KUBE_BEARER_TOKEN:-}" && -n "${KUBE_USER:-}" && -n "${KUBE_PASSWORD:-}" ]]; then
     KUBECONFIG="${KUBECONFIG}" "${kubectl}" config set-credentials "${CONTEXT}-basic-auth" "--username=${KUBE_USER}" "--password=${KUBE_PASSWORD}"
   fi
 
@@ -141,14 +141,14 @@ function clear-kubeconfig() {
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
   OVERRIDE_CONTEXT=${OVERRIDE_CONTEXT:-}
 
-  if [[ "$OVERRIDE_CONTEXT" != "" ]];then
+  if [ -n "$OVERRIDE_CONTEXT" ];then
       CONTEXT=$OVERRIDE_CONTEXT
   fi
 
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
   # Unset the current-context before we delete it, as otherwise kubectl errors.
   local cc=$("${kubectl}" config view -o jsonpath='{.current-context}')
-  if [[ "${cc}" == "${CONTEXT}" ]]; then
+  if [ "${cc}" = "${CONTEXT}" ]; then
     "${kubectl}" config unset current-context
   fi
   "${kubectl}" config unset "clusters.${CONTEXT}"
@@ -174,7 +174,7 @@ function get-kubeconfig-basicauth() {
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
 
   local cc=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.current-context}")
-  if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
+  if [ -n "${KUBE_CONTEXT:-}" ]; then
     cc="${KUBE_CONTEXT}"
   fi
   local user=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.user}")
@@ -229,7 +229,7 @@ function get-kubeconfig-bearertoken() {
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
 
   local cc=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.current-context}")
-  if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
+  if [ -n "${KUBE_CONTEXT:-}" ]; then
     cc="${KUBE_CONTEXT}"
   fi
   local user=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.user}")
@@ -245,7 +245,7 @@ function gen-kube-bearertoken() {
 }
 
 function load-or-gen-kube-basicauth() {
-  if [[ ! -z "${KUBE_CONTEXT:-}" ]]; then
+  if [ -n "${KUBE_CONTEXT:-}" ]; then
     get-kubeconfig-basicauth
   fi
 
@@ -278,7 +278,7 @@ function load-or-gen-kube-basicauth() {
 function set_binary_version() {
   if [[ "${1}" =~ "/" ]]; then
     IFS='/' read -a path <<< "${1}"
-    if [[ "${path[0]}" == "release" ]]; then
+    if [ "${path[0]}" = 'release' ]; then
       KUBE_VERSION=$(gsutil cat "gs://kubernetes-release/${1}.txt")
     else
       KUBE_VERSION=$(gsutil cat "gs://kubernetes-release-dev/${1}.txt")
@@ -306,7 +306,7 @@ function find-tar() {
   )
   location=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
 
-  if [[ ! -f "${location}" ]]; then
+  if [ ! -f "${location}" ]; then
     echo "!!! Cannot find ${tarball}" >&2
     exit 1
   fi
@@ -323,17 +323,17 @@ function find-tar() {
 #   KUBE_MANIFESTS_TAR
 function find-release-tars() {
   SERVER_BINARY_TAR=$(find-tar kubernetes-server-linux-amd64.tar.gz)
-  if [[ -z "${SERVER_BINARY_TAR}" ]]; then
+  if [ -z "${SERVER_BINARY_TAR}" ]; then
 	  exit 1
   fi
-  if [[ "${NUM_WINDOWS_NODES}" -gt "0" ]]; then
+  if [ "${NUM_WINDOWS_NODES}" -gt 0 ]; then
     NODE_BINARY_TAR=$(find-tar kubernetes-node-windows-amd64.tar.gz)
   fi
 
   # This tarball is used by GCI, Ubuntu Trusty, and Container Linux.
   KUBE_MANIFESTS_TAR=
-  if [[ "${MASTER_OS_DISTRIBUTION:-}" == "trusty" || "${MASTER_OS_DISTRIBUTION:-}" == "gci" || "${MASTER_OS_DISTRIBUTION:-}" == "ubuntu" ]] || \
-     [[ "${NODE_OS_DISTRIBUTION:-}" == "trusty" || "${NODE_OS_DISTRIBUTION:-}" == "gci" || "${NODE_OS_DISTRIBUTION:-}" == "ubuntu" || "${NODE_OS_DISTRIBUTION:-}" == "custom" ]] ; then
+  if [[ "${MASTER_OS_DISTRIBUTION:-}" = 'trusty' || "${MASTER_OS_DISTRIBUTION:-}" = 'gci' || "${MASTER_OS_DISTRIBUTION:-}" = 'ubuntu' ]] || \
+     [[ "${NODE_OS_DISTRIBUTION:-}" = 'trusty' || "${NODE_OS_DISTRIBUTION:-}" = 'gci' || "${NODE_OS_DISTRIBUTION:-}" = 'ubuntu' || "${NODE_OS_DISTRIBUTION:-}" = 'custom' ]] ; then
     KUBE_MANIFESTS_TAR=$(find-tar kubernetes-manifests.tar.gz)
   fi
 }
@@ -430,7 +430,7 @@ EOF
     echo "${ca_key}" | base64 --decode > ca-key.pem
   fi
 
-  if [[ ! -r "ca.pem" || ! -r "ca-key.pem" ]]; then
+  if [[ ! -r 'ca.pem' || ! -r 'ca-key.pem' ]]; then
     ${CFSSL_BIN} gencert -initca ca-csr.json | ${CFSSLJSON_BIN} -bare ca -
   fi
 

@@ -99,7 +99,7 @@ done < <(cat "${failure_file}")
 HAVE_SHELLCHECK=false
 if which shellcheck &>/dev/null; then
   detected_version="$(shellcheck --version | grep 'version: .*')"
-  if [[ "${detected_version}" = "version: ${SHELLCHECK_VERSION}" ]]; then
+  if [ "${detected_version}" = "version: ${SHELLCHECK_VERSION}" ]; then
     HAVE_SHELLCHECK=true
   fi
 fi
@@ -126,7 +126,7 @@ fi
 # if KUBE_JUNIT_REPORT_DIR is set, disable colorized output.
 # Colorized output causes malformed XML in the JUNIT report.
 SHELLCHECK_COLORIZED_OUTPUT="auto"
-if [[ -n "${KUBE_JUNIT_REPORT_DIR:-}" ]]; then
+if [ -n "${KUBE_JUNIT_REPORT_DIR:-}" ]; then
   SHELLCHECK_COLORIZED_OUTPUT="never"
 fi
 
@@ -155,10 +155,10 @@ for f in "${all_shell_scripts[@]}"; do
   fi
   set -o errexit
   kube::util::array_contains "${f}" "${failing_files[@]}" && in_failing=$? || in_failing=$?
-  if [[ -n "${failedLint}" ]] && [[ "${in_failing}" -ne "0" ]]; then
+  if [ -n "${failedLint}" ] && [ "${in_failing}" -ne 0 ]; then
     errors+=( "${failedLint}" )
   fi
-  if [[ -z "${failedLint}" ]] && [[ "${in_failing}" -eq "0" ]]; then
+  if [ -z "${failedLint}" ] && [ "${in_failing}" -eq 0 ]; then
     not_failing+=( "${f}" )
   fi
 done
@@ -181,7 +181,7 @@ else
   exit 1
 fi
 
-if [[ ${#not_failing[@]} -gt 0 ]]; then
+if [ ${#not_failing[@]} -gt 0 ]; then
   {
     echo "Some files in hack/.shellcheck_failures are passing shellcheck. Please remove them."
     echo
@@ -199,7 +199,7 @@ for f in "${failing_files[@]}"; do
   kube::util::array_contains "$f" "${all_shell_scripts[@]}" || gone+=( "$f" )
 done
 
-if [[ ${#gone[@]} -gt 0 ]]; then
+if [ ${#gone[@]} -gt 0 ]; then
   {
     echo "Some files in hack/.shellcheck_failures do not exist anymore. Please remove them."
     echo

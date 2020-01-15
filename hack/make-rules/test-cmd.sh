@@ -76,7 +76,7 @@ function run_kube_apiserver() {
 }
 
 # Runs run_kube_controller_manager
-# 
+#
 # Exports:
 #   CTLRMGR_PID
 function run_kube_controller_manager() {
@@ -96,7 +96,7 @@ function run_kube_controller_manager() {
 
 # Creates a node object with name 127.0.0.1. This is required because we do not
 # run kubelet.
-# 
+#
 # Exports:
 #   SUPPORTED_RESOURCES(Array of all resources supported by the apiserver).
 function create_node() {
@@ -120,11 +120,11 @@ __EOF__
 # 1) $WHAT is empty
 # 2) $WHAT is not empty and kubeadm is part of $WHAT
 WHAT=${WHAT:-}
-if [[ ${WHAT} == "" || ${WHAT} =~ .*kubeadm.* ]] ; then
-  kube::log::status "Running kubeadm tests"  
+if [[ -z ${WHAT} || ${WHAT} =~ .*kubeadm.* ]] ; then
+  kube::log::status "Running kubeadm tests"
   run_kubeadm_tests
   # if we ONLY want to run kubeadm, then exit here.
-  if [[ ${WHAT} == "kubeadm" ]]; then
+  if [ "${WHAT}" = 'kubeadm' ]; then
     kube::log::status "TESTS PASSED"
     exit 0
   fi

@@ -86,7 +86,7 @@ function download-kubelet-config {
         http://metadata.google.internal/computeMetadata/v1/instance/attributes/kubelet-config; then
       # only write to the final location if curl succeeds
       mv "${tmp_kubelet_config}" "${dest}"
-    elif [[ "${REQUIRE_METADATA_KUBELET_CONFIG_FILE:-false}" == "true" ]]; then
+    elif [ "${REQUIRE_METADATA_KUBELET_CONFIG_FILE:-false}" = 'true' ]; then
       echo "== Failed to download required Kubelet config file from metadata server =="
       exit 1
     fi
@@ -117,7 +117,7 @@ function validate-hash {
   local -r expected="$2"
 
   actual=$(sha1sum ${file} | awk '{ print $1 }') || true
-  if [[ "${actual}" != "${expected}" ]]; then
+  if [ "${actual}" != "${expected}" ]; then
     echo "== ${file} corrupted, sha1 ${actual} doesn't match expected ${expected} =="
     return 1
   fi
@@ -154,10 +154,10 @@ function download-or-bust {
       fi
       if ! curl ${curl_headers:+-H "${curl_headers}"} -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 ${CURL_RETRY_CONNREFUSED} "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
-      elif [[ -n "${hash}" ]] && ! validate-hash "${file}" "${hash}"; then
+      elif [ -n "${hash}" ] && ! validate-hash "${file}" "${hash}"; then
         echo "== Hash validation of ${url} failed. Retrying. =="
       else
-        if [[ -n "${hash}" ]]; then
+        if [ -n "${hash}" ]; then
           echo "== Downloaded ${url} (SHA1 = ${hash}) =="
         else
           echo "== Downloaded ${url} =="
@@ -208,7 +208,7 @@ function install-gci-mounter-tools {
 
 # Install node problem detector binary.
 function install-node-problem-detector {
-  if [[ -n "${NODE_PROBLEM_DETECTOR_VERSION:-}" ]]; then
+  if [ -n "${NODE_PROBLEM_DETECTOR_VERSION:-}" ]; then
       local -r npd_version="${NODE_PROBLEM_DETECTOR_VERSION}"
       local -r npd_sha1="${NODE_PROBLEM_DETECTOR_TAR_HASH}"
   else
@@ -235,7 +235,7 @@ function install-node-problem-detector {
 }
 
 function install-cni-binaries {
-  if [[ -n "${CNI_VERSION:-}" ]]; then
+  if [ -n "${CNI_VERSION:-}" ]; then
       local -r cni_tar="cni-plugins-amd64-${CNI_VERSION}.tgz"
       local -r cni_sha1="${CNI_SHA1}"
   else
@@ -259,7 +259,7 @@ function install-cni-binaries {
 
 # Install crictl binary.
 function install-crictl {
-  if [[ -n "${CRICTL_VERSION:-}" ]]; then
+  if [ -n "${CRICTL_VERSION:-}" ]; then
     local -r crictl_version="${CRICTL_VERSION}"
     local -r crictl_sha1="${CRICTL_TAR_HASH}"
   else
@@ -329,7 +329,7 @@ function install-kube-manifests {
   download-or-bust "${manifests_tar_hash}" "${manifests_tar_urls[@]}"
   tar xzf "${KUBE_HOME}/${manifests_tar}" -C "${dst_dir}" --overwrite
   local -r kube_addon_registry="${KUBE_ADDON_REGISTRY:-k8s.gcr.io}"
-  if [[ "${kube_addon_registry}" != "k8s.gcr.io" ]]; then
+  if [ "${kube_addon_registry}" != 'k8s.gcr.io' ]; then
     find "${dst_dir}" -name \*.yaml -or -name \*.yaml.in | \
       xargs sed -ri "s@(image:\s.*)k8s.gcr.io@\1${kube_addon_registry}@"
     find "${dst_dir}" -name \*.manifest -or -name \*.json | \
@@ -337,7 +337,7 @@ function install-kube-manifests {
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_BIN}/configure-helper.sh"
   cp "${dst_dir}/kubernetes/gci-trusty/configure-kubeapiserver.sh" "${KUBE_BIN}/configure-kubeapiserver.sh"
-  if [[ -e "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure-helper.sh" ]]; then
+  if [ -e "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure-helper.sh" ]; then
     cp "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure-helper.sh" "${KUBE_BIN}/"
   fi
 
@@ -358,7 +358,7 @@ function try-load-docker-image {
   local -r max_attempts=5
   local -i attempt_num=1
   until timeout 30 ${LOAD_IMAGE_COMMAND:-docker load -i} "${img}"; do
-    if [[ "${attempt_num}" == "${max_attempts}" ]]; then
+    if [ "${attempt_num}" -eq "${max_attempts}" ]; then
       echo "Fail to load docker image file ${img} after ${max_attempts} retries. Exit!!"
       exit 1
     else
@@ -375,7 +375,7 @@ function try-load-docker-image {
 function load-docker-images {
   echo "Start loading kube-system docker images"
   local -r img_dir="${KUBE_HOME}/kube-docker-files"
-  if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
+  if [ "${KUBERNETES_MASTER:-}" = 'true' ]; then
     try-load-docker-image "${img_dir}/kube-apiserver.tar"
     try-load-docker-image "${img_dir}/kube-controller-manager.tar"
     try-load-docker-image "${img_dir}/kube-scheduler.tar"
@@ -390,7 +390,7 @@ function install-kube-binary-config {
   cd "${KUBE_HOME}"
   local -r server_binary_tar_urls=( $(split-commas "${SERVER_BINARY_TAR_URL}") )
   local -r server_binary_tar="${server_binary_tar_urls[0]##*/}"
-  if [[ -n "${SERVER_BINARY_TAR_HASH:-}" ]]; then
+  if [ -n "${SERVER_BINARY_TAR_HASH:-}" ]; then
     local -r server_binary_tar_hash="${SERVER_BINARY_TAR_HASH}"
   else
     echo "Downloading binary release sha1 (not found in env)"
@@ -409,7 +409,7 @@ function install-kube-binary-config {
     local dst_dir="${KUBE_HOME}/kube-docker-files"
     mkdir -p "${dst_dir}"
     cp "${src_dir}/"*.docker_tag "${dst_dir}"
-    if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
+    if [ "${KUBERNETES_MASTER:-}" = 'false' ]; then
       cp "${src_dir}/kube-proxy.tar" "${dst_dir}"
     else
       cp "${src_dir}/kube-apiserver.tar" "${dst_dir}"
@@ -425,13 +425,13 @@ function install-kube-binary-config {
     mv "${KUBE_HOME}/kubernetes/kubernetes-src.tar.gz" "${KUBE_HOME}"
   fi
 
-  if [[ "${KUBERNETES_MASTER:-}" == "false" ]] && \
-     [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
+  if [ "${KUBERNETES_MASTER:-}" = 'false' ] && \
+     [ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" = 'standalone' ]; then
     install-node-problem-detector
   fi
 
-  if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]] || \
-     [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
+  if [ "${NETWORK_PROVIDER:-}" = 'kubenet' ] || \
+     [ "${NETWORK_PROVIDER:-}" = 'cni' ]; then
     install-cni-binaries
   fi
 
@@ -443,7 +443,7 @@ function install-kube-binary-config {
   install-gci-mounter-tools
 
   # Remount the Flexvolume directory with the "exec" option, if needed.
-  if [[ "${REMOUNT_VOLUME_PLUGIN_DIR:-}" == "true" && -n "${VOLUME_PLUGIN_DIR:-}" ]]; then
+  if [[ "${REMOUNT_VOLUME_PLUGIN_DIR:-}" = 'true' && -n "${VOLUME_PLUGIN_DIR:-}" ]]; then
     remount-flexvolume-directory "${VOLUME_PLUGIN_DIR}"
   fi
 
@@ -474,7 +474,7 @@ source "${KUBE_HOME}/kube-env"
 download-kubelet-config "${KUBE_HOME}/kubelet-config.yaml"
 
 # master certs
-if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
+if [ "${KUBERNETES_MASTER:-}" = 'true' ]; then
   download-kube-master-certs
 fi
 

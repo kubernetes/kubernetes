@@ -59,11 +59,11 @@ KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL:-https://dl.k8s.io}"
 
 function detect_kube_release() {
-  if [[ -n "${KUBE_VERSION:-}" ]]; then
+  if [ -n "${KUBE_VERSION:-}" ]; then
     return 0  # Allow caller to explicitly set version
   fi
 
-  if [[ ! -e "${KUBE_ROOT}/version" ]]; then
+  if [ ! -e "${KUBE_ROOT}/version" ]; then
     echo "Can't determine Kubernetes release." >&2
     echo "${BASH_SOURCE[0]} should only be run from a prebuilt Kubernetes release." >&2
     echo "Did you mean to use get-kube.sh instead?" >&2
@@ -158,21 +158,21 @@ function download_tarball() {
   local -r download_path="$1"
   local -r file="$2"
   local trace_on="off"
-  if [[ -o xtrace ]]; then 
+  if [ -o xtrace ]; then
     trace_on="on"
     set +x
   fi
   url="${DOWNLOAD_URL_PREFIX}/${file}"
   mkdir -p "${download_path}"
-  if [[ $(which curl) ]]; then
+  if [ "$(which curl)" ]; then
     # if the url belongs to GCS API we should use oauth2_token in the headers
     curl_headers=""
-    if { [[ "${KUBERNETES_PROVIDER:-gce}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]] ; } &&
+    if { [ "${KUBERNETES_PROVIDER:-gce}" = 'gce' ] || [ "${KUBERNETES_PROVIDER}" = 'gke' ] ; } &&
        [[ "$url" =~ ^https://storage.googleapis.com.* ]] && valid-storage-scope ; then
       curl_headers="Authorization: Bearer $(get-credentials)"
     fi
     curl ${curl_headers:+-H "${curl_headers}"} -fL --retry 3 --keepalive-time 2 "${url}" -o "${download_path}/${file}"
-  elif [[ $(which wget) ]]; then
+  elif [ "$(which wget)" ]; then
     wget "${url}" -O "${download_path}/${file}"
   else
     echo "Couldn't find curl or wget.  Bailing out." >&2
@@ -186,7 +186,7 @@ function download_tarball() {
   echo "sha1sum(${file})=${sha1sum}"
   echo
   # TODO: add actual verification
-  if [[ "${trace_on}" == "on" ]]; then
+  if [ "${trace_on}" = 'on' ]; then
     set -x
   fi
 }
@@ -231,18 +231,18 @@ echo "Will download ${SERVER_TAR} from ${DOWNLOAD_URL_PREFIX}"
 echo "Will download and extract ${CLIENT_TAR} from ${DOWNLOAD_URL_PREFIX}"
 
 DOWNLOAD_NODE_TAR=false
-if [[ -n "${NODE_TAR:-}" ]]; then
+if [ -n "${NODE_TAR:-}" ]; then
   DOWNLOAD_NODE_TAR=true
   echo "Will download and extract ${NODE_TAR} from ${DOWNLOAD_URL_PREFIX}"
 fi
 
 DOWNLOAD_TESTS_TAR=false
-if [[ -n "${KUBERNETES_DOWNLOAD_TESTS-}" ]]; then
+if [ -n "${KUBERNETES_DOWNLOAD_TESTS-}" ]; then
   DOWNLOAD_TESTS_TAR=true
   echo "Will download and extract kubernetes-test tarball(s) from ${DOWNLOAD_URL_PREFIX}"
 fi
 
-if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
+if [ -z "${KUBERNETES_SKIP_CONFIRM-}" ]; then
   echo "Is this ok? [Y]/n"
   read -r confirm
   if [[ "${confirm}" =~ ^[nN]$ ]]; then
@@ -265,7 +265,7 @@ echo "Add '${KUBE_ROOT}/client/bin' to your PATH to use newly-installed binaries
 if "${DOWNLOAD_TESTS_TAR}"; then
   TESTS_PORTABLE_TAR="kubernetes-test-portable.tar.gz"
   download_tarball "${KUBE_ROOT}/test" "${TESTS_PORTABLE_TAR}" || true
-  if [[ -f "${KUBE_ROOT}/test/${TESTS_PORTABLE_TAR}" ]]; then
+  if [ -f "${KUBE_ROOT}/test/${TESTS_PORTABLE_TAR}" ]; then
     echo "Extracting ${TESTS_PORTABLE_TAR} into ${KUBE_ROOT}"
     # Strip leading "kubernetes/"
     tar -xzf "${KUBE_ROOT}/test/${TESTS_PORTABLE_TAR}" --strip-components 1 -C "${KUBE_ROOT}"

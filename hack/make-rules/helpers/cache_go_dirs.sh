@@ -22,7 +22,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [[ -z "${1:-}" ]]; then
+if [ -z "${1:-}" ]; then
     echo "usage: $0 <cache-file>"
     exit 1
 fi
@@ -58,9 +58,9 @@ function kfind() {
 NEED_FIND=true
 # It's *significantly* faster to check whether any directories are newer than
 # the cache than to blindly rebuild it.
-if [[ -f "${CACHE}" ]]; then
+if [ -f "${CACHE}" ]; then
     N=$(kfind -type d -newer "${CACHE}" -print -quit | wc -l)
-    [[ "${N}" == 0 ]] && NEED_FIND=false
+    [ "${N}" -eq 0 ] && NEED_FIND=false
 fi
 mkdir -p "$(dirname "${CACHE}")"
 if ${NEED_FIND}; then
