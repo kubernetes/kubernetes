@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -96,6 +97,7 @@ func TestTopPod(t *testing.T) {
 		args            []string
 		expectedPath    string
 		expectedQuery   string
+		expectedPods    []string
 		namespaces      []string
 		containers      bool
 		listsNamespaces bool
@@ -140,6 +142,20 @@ func TestTopPod(t *testing.T) {
 			expectedPath: topPathPrefix + "/namespaces/" + testNS + "/pods/pod1",
 			namespaces:   []string{testNS},
 			containers:   true,
+		},
+		{
+			name:         "pod with label sort by cpu",
+			flags:        map[string]string{"sort-by": "cpu"},
+			expectedPath: topPathPrefix + "/namespaces/" + testNS + "/pods",
+			expectedPods: []string{"pod2", "pod3", "pod1"},
+			namespaces:   []string{testNS, testNS, testNS},
+		},
+		{
+			name:         "pod with label sort by memory",
+			flags:        map[string]string{"sort-by": "memory"},
+			expectedPath: topPathPrefix + "/namespaces/" + testNS + "/pods",
+			expectedPods: []string{"pod2", "pod3", "pod1"},
+			namespaces:   []string{testNS, testNS, testNS},
 		},
 	}
 	cmdtesting.InitTestErrorHandler(t)
@@ -210,6 +226,7 @@ func TestTopPod(t *testing.T) {
 
 			// Check the presence of pod names&namespaces/container names in the output.
 			result := buf.String()
+
 			if testCase.containers {
 				for _, containerName := range expectedContainerNames {
 					if !strings.Contains(result, containerName) {
@@ -233,6 +250,19 @@ func TestTopPod(t *testing.T) {
 			if cmdutil.GetFlagBool(cmd, "no-headers") && strings.Contains(result, "MEMORY") {
 				t.Errorf("%s: unexpected headers with no-headers option set: \n%s", testCase.name, result)
 			}
+			if cmdutil.GetFlagString(cmd, "sort-by") == "cpu" || cmdutil.GetFlagString(cmd, "sort-by") == "memory" {
+				resultLines := strings.Split(result, "\n")
+				resultPods := make([]string, len(resultLines)-2) // don't process first (header) and last (empty) line
+
+				for i, line := range resultLines[1 : len(resultLines)-1] { // don't process first (header) and last (empty) line
+					lineFirstColumn := strings.Split(line, " ")[0]
+					resultPods[i] = lineFirstColumn
+				}
+
+				if !reflect.DeepEqual(testCase.expectedPods, resultPods) {
+					t.Errorf("kinds not matching:\n\texpectedKinds: %v\n\tgotKinds: %v\n", testCase.expectedPods, resultPods)
+				}
+			}
 		})
 	}
 }
@@ -246,6 +276,7 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 		args            []string
 		expectedPath    string
 		expectedQuery   string
+		expectedPods    []string
 		namespaces      []string
 		containers      bool
 		listsNamespaces bool
@@ -282,6 +313,20 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 			expectedPath: topMetricsAPIPathPrefix + "/namespaces/" + testNS + "/pods/pod1",
 			namespaces:   []string{testNS},
 			containers:   true,
+		},
+		{
+			name:         "pod with label sort by cpu",
+			options:      &TopPodOptions{SortBy: "cpu"},
+			expectedPath: topPathPrefix + "/namespaces/" + testNS + "/pods",
+			expectedPods: []string{"pod2", "pod3", "pod1"},
+			namespaces:   []string{testNS, testNS, testNS},
+		},
+		{
+			name:         "pod with label sort by memory",
+			options:      &TopPodOptions{SortBy: "memory"},
+			expectedPath: topPathPrefix + "/namespaces/" + testNS + "/pods",
+			expectedPods: []string{"pod2", "pod3", "pod1"},
+			namespaces:   []string{testNS, testNS, testNS},
 		},
 	}
 	cmdtesting.InitTestErrorHandler(t)
@@ -387,6 +432,19 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 					t.Errorf("unexpected metrics for %s: \n%s", name, result)
 				}
 			}
+			if cmdutil.GetFlagString(cmd, "sort-by") == "cpu" || cmdutil.GetFlagString(cmd, "sort-by") == "memory" {
+				resultLines := strings.Split(result, "\n")
+				resultPods := make([]string, len(resultLines)-2) // don't process first (header) and last (empty) line
+
+				for i, line := range resultLines[1 : len(resultLines)-1] { // don't process first (header) and last (empty) line
+					lineFirstColumn := strings.Split(line, " ")[0]
+					resultPods[i] = lineFirstColumn
+				}
+
+				if !reflect.DeepEqual(testCase.expectedPods, resultPods) {
+					t.Errorf("kinds not matching:\n\texpectedKinds: %v\n\tgotKinds: %v\n", testCase.expectedPods, resultPods)
+				}
+			}
 		})
 	}
 }
@@ -455,6 +513,7 @@ func TestTopPodCustomDefaults(t *testing.T) {
 		args            []string
 		expectedPath    string
 		expectedQuery   string
+		expectedPods    []string
 		namespaces      []string
 		containers      bool
 		listsNamespaces bool
@@ -491,6 +550,20 @@ func TestTopPodCustomDefaults(t *testing.T) {
 			expectedPath: customTopPathPrefix + "/namespaces/" + testNS + "/pods/pod1",
 			namespaces:   []string{testNS},
 			containers:   true,
+		},
+		{
+			name:         "pod with label sort by cpu",
+			flags:        map[string]string{"sort-by": "cpu"},
+			expectedPath: customTopPathPrefix + "/namespaces/" + testNS + "/pods",
+			expectedPods: []string{"pod2", "pod3", "pod1"},
+			namespaces:   []string{testNS, testNS, testNS},
+		},
+		{
+			name:         "pod with label sort by memory",
+			flags:        map[string]string{"sort-by": "memory"},
+			expectedPath: customTopPathPrefix + "/namespaces/" + testNS + "/pods",
+			expectedPods: []string{"pod2", "pod3", "pod1"},
+			namespaces:   []string{testNS, testNS, testNS},
 		},
 	}
 	cmdtesting.InitTestErrorHandler(t)
@@ -588,6 +661,19 @@ func TestTopPodCustomDefaults(t *testing.T) {
 			for _, name := range nonExpectedMetricsNames {
 				if strings.Contains(result, name) {
 					t.Errorf("%s: unexpected metrics for %s: \n%s", testCase.name, name, result)
+				}
+			}
+			if cmdutil.GetFlagString(cmd, "sort-by") == "cpu" || cmdutil.GetFlagString(cmd, "sort-by") == "memory" {
+				resultLines := strings.Split(result, "\n")
+				resultPods := make([]string, len(resultLines)-2) // don't process first (header) and last (empty) line
+
+				for i, line := range resultLines[1 : len(resultLines)-1] { // don't process first (header) and last (empty) line
+					lineFirstColumn := strings.Split(line, " ")[0]
+					resultPods[i] = lineFirstColumn
+				}
+
+				if !reflect.DeepEqual(testCase.expectedPods, resultPods) {
+					t.Errorf("kinds not matching:\n\texpectedKinds: %v\n\tgotKinds: %v\n", testCase.expectedPods, resultPods)
 				}
 			}
 		})
