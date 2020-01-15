@@ -132,15 +132,9 @@ func (s *Snapshot) NodeInfos() schedulerlisters.NodeInfoLister {
 	return &nodeInfoLister{snapshot: s}
 }
 
-// ListNodes returns the list of nodes in the snapshot.
-func (s *Snapshot) ListNodes() []*v1.Node {
-	nodes := make([]*v1.Node, 0, len(s.NodeInfoList))
-	for _, n := range s.NodeInfoList {
-		if n.Node() != nil {
-			nodes = append(nodes, n.Node())
-		}
-	}
-	return nodes
+// NumNodes returns the number of nodes in the snapshot.
+func (s *Snapshot) NumNodes() int {
+	return len(s.NodeInfoList)
 }
 
 type podLister struct {
