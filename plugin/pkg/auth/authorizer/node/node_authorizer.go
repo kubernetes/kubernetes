@@ -167,10 +167,14 @@ func (r *NodeAuthorizer) authorizeGet(nodeName string, startingType vertexType, 
 // authorizeReadNamespacedObject authorizes "get", "list" and "watch" requests to single objects of a
 // specified types if they are related to the specified node.
 func (r *NodeAuthorizer) authorizeReadNamespacedObject(nodeName string, startingType vertexType, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
-	if attrs.GetVerb() != "get" && attrs.GetVerb() != "list" && attrs.GetVerb() != "watch" {
+	switch attrs.GetVerb() {
+	case "get", "list", "watch":
+		//ok
+	default:
 		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only read resources of this type", nil
 	}
+
 	if len(attrs.GetSubresource()) > 0 {
 		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "cannot read subresource", nil
@@ -229,11 +233,10 @@ func (r *NodeAuthorizer) authorizeCreateToken(nodeName string, startingType vert
 func (r *NodeAuthorizer) authorizeLease(nodeName string, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	// allowed verbs: get, create, update, patch, delete
 	verb := attrs.GetVerb()
-	if verb != "get" &&
-		verb != "create" &&
-		verb != "update" &&
-		verb != "patch" &&
-		verb != "delete" {
+	switch verb {
+	case "get", "create", "update", "patch", "delete":
+		//ok
+	default:
 		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a node lease", nil
 	}
@@ -259,11 +262,10 @@ func (r *NodeAuthorizer) authorizeLease(nodeName string, attrs authorizer.Attrib
 func (r *NodeAuthorizer) authorizeCSINode(nodeName string, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	// allowed verbs: get, create, update, patch, delete
 	verb := attrs.GetVerb()
-	if verb != "get" &&
-		verb != "create" &&
-		verb != "update" &&
-		verb != "patch" &&
-		verb != "delete" {
+	switch verb {
+	case "get", "create", "update", "patch", "delete":
+		//ok
+	default:
 		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a CSINode", nil
 	}
