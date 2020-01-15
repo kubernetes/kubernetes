@@ -46,6 +46,14 @@ import (
 	"k8s.io/klog"
 	"k8s.io/legacy-cloud-providers/azure/auth"
 	azclients "k8s.io/legacy-cloud-providers/azure/clients"
+	"k8s.io/legacy-cloud-providers/azure/clients/interfaceclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/loadbalancerclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/publicipclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/routeclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/routetableclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/securitygroupclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/subnetclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/vmclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/vmssclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
@@ -476,23 +484,26 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 			Jitter:   config.CloudProviderBackoffJitter,
 		}
 	}
-	az.DisksClient = newAzDisksClient(azClientConfig.WithRateLimiter(config.DiskRateLimit))
-	az.SnapshotsClient = newSnapshotsClient(azClientConfig.WithRateLimiter(config.SnapshotRateLimit))
-	az.RoutesClient = newAzRoutesClient(azClientConfig.WithRateLimiter(config.RouteRateLimit))
-	az.SubnetsClient = newAzSubnetsClient(azClientConfig.WithRateLimiter(config.SubnetsRateLimit))
-	az.InterfacesClient = newAzInterfacesClient(azClientConfig.WithRateLimiter(config.InterfaceRateLimit))
-	az.RouteTablesClient = newAzRouteTablesClient(azClientConfig.WithRateLimiter(config.RouteTableRateLimit))
-	az.LoadBalancerClient = newAzLoadBalancersClient(azClientConfig.WithRateLimiter(config.LoadBalancerRateLimit))
-	az.SecurityGroupsClient = newAzSecurityGroupsClient(azClientConfig.WithRateLimiter(config.SecurityGroupRateLimit))
-	az.StorageAccountClient = newAzStorageAccountClient(azClientConfig.WithRateLimiter(config.StorageAccountRateLimit))
-	az.VirtualMachinesClient = newAzVirtualMachinesClient(azClientConfig.WithRateLimiter(config.VirtualMachineRateLimit))
-	az.PublicIPAddressesClient = newAzPublicIPAddressesClient(azClientConfig.WithRateLimiter(config.PublicIPAddressRateLimit))
-	az.VirtualMachineSizesClient = newAzVirtualMachineSizesClient(azClientConfig.WithRateLimiter(config.VirtualMachineSizeRateLimit))
-
+	az.RoutesClient = routeclient.New(azClientConfig.WithRateLimiter(config.RouteRateLimit))
+	az.SubnetsClient = subnetclient.New(azClientConfig.WithRateLimiter(config.SubnetsRateLimit))
+	az.InterfacesClient = interfaceclient.New(azClientConfig.WithRateLimiter(config.InterfaceRateLimit))
+	az.RouteTablesClient = routetableclient.New(azClientConfig.WithRateLimiter(config.RouteTableRateLimit))
+	az.LoadBalancerClient = loadbalancerclient.New(azClientConfig.WithRateLimiter(config.LoadBalancerRateLimit))
+	az.SecurityGroupsClient = securitygroupclient.New(azClientConfig.WithRateLimiter(config.SecurityGroupRateLimit))
+	az.VirtualMachinesClient = vmclient.New(azClientConfig.WithRateLimiter(config.VirtualMachineRateLimit))
+	az.PublicIPAddressesClient = publicipclient.New(azClientConfig.WithRateLimiter(config.PublicIPAddressRateLimit))
 	az.VirtualMachineScaleSetsClient = vmssclient.New(azClientConfig.WithRateLimiter(config.VirtualMachineScaleSetRateLimit))
+
+	// Error "not an active Virtual Machine Scale Set VM" is not retriable for VMSS VM.
 	vmssVMClientConfig := azClientConfig.WithRateLimiter(config.VirtualMachineScaleSetRateLimit)
 	vmssVMClientConfig.Backoff = vmssVMClientConfig.Backoff.WithNonRetriableErrors([]string{vmssVMNotActiveErrorMessage})
 	az.VirtualMachineScaleSetVMsClient = vmssvmclient.New(vmssVMClientConfig)
+
+	// TODO(feiskyer): refactor the following clients to use armclient
+	az.DisksClient = newAzDisksClient(azClientConfig.WithRateLimiter(config.DiskRateLimit))
+	az.SnapshotsClient = newSnapshotsClient(azClientConfig.WithRateLimiter(config.SnapshotRateLimit))
+	az.StorageAccountClient = newAzStorageAccountClient(azClientConfig.WithRateLimiter(config.StorageAccountRateLimit))
+	az.VirtualMachineSizesClient = newAzVirtualMachineSizesClient(azClientConfig.WithRateLimiter(config.VirtualMachineSizeRateLimit))
 
 	// TODO(feiskyer): refactor azureFileClient to Interface.
 	az.FileClient = &azureFileClient{env: *env}
