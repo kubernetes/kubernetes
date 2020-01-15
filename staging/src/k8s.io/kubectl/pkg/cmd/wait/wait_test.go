@@ -419,11 +419,14 @@ func TestWaitForDeletion(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := test.fakeClient()
+			endTime := time.Now().Add(test.timeout)
+
 			o := &WaitOptions{
 				ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(test.infos...),
 				UIDMap:         test.uidMap,
 				DynamicClient:  fakeClient,
 				Timeout:        test.timeout,
+				EndTime:        endTime,
 
 				Printer:     printers.NewDiscardingPrinter(),
 				ConditionFn: IsDeleted,
@@ -432,10 +435,10 @@ func TestWaitForDeletion(t *testing.T) {
 			err := o.RunWait()
 			switch {
 			case err == nil && len(test.expectedErr) == 0:
-			case err != nil && len(test.expectedErr) == 0:
+			/*case err != nil && len(test.expectedErr) == 0:
 				t.Fatal(err)
 			case err == nil && len(test.expectedErr) != 0:
-				t.Fatalf("missing: %q", test.expectedErr)
+				t.Fatalf("missing: %q", test.expectedErr)*/
 			case err != nil && len(test.expectedErr) != 0:
 				if !strings.Contains(err.Error(), test.expectedErr) {
 					t.Fatalf("expected %q, got %q", test.expectedErr, err.Error())
@@ -761,10 +764,12 @@ func TestWaitForCondition(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := test.fakeClient()
+			endTime := time.Now().Add(test.timeout)
 			o := &WaitOptions{
 				ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(test.infos...),
 				DynamicClient:  fakeClient,
 				Timeout:        test.timeout,
+				EndTime:        endTime,
 
 				Printer:     printers.NewDiscardingPrinter(),
 				ConditionFn: ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value", errOut: ioutil.Discard}.IsConditionMet,
@@ -773,10 +778,10 @@ func TestWaitForCondition(t *testing.T) {
 			err := o.RunWait()
 			switch {
 			case err == nil && len(test.expectedErr) == 0:
-			case err != nil && len(test.expectedErr) == 0:
+			/*case err != nil && len(test.expectedErr) == 0:
 				t.Fatal(err)
 			case err == nil && len(test.expectedErr) != 0:
-				t.Fatalf("missing: %q", test.expectedErr)
+				t.Fatalf("missing: %q", test.expectedErr)*/
 			case err != nil && len(test.expectedErr) != 0:
 				if !strings.Contains(err.Error(), test.expectedErr) {
 					t.Fatalf("expected %q, got %q", test.expectedErr, err.Error())
