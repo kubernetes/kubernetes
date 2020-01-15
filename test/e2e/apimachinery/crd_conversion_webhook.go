@@ -114,7 +114,7 @@ var alternativeAPIVersions = []apiextensionsv1.CustomResourceDefinitionVersion{
 }
 
 var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]", func() {
-	var context *certContext
+	var certCtx *certContext
 	f := framework.NewDefaultFramework("crd-webhook")
 	servicePort := int32(9443)
 	containerPort := int32(9444)
@@ -127,10 +127,10 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 		namespaceName = f.Namespace.Name
 
 		ginkgo.By("Setting up server cert")
-		context = setupServerCert(f.Namespace.Name, serviceCRDName)
+		certCtx = setupServerCert(f.Namespace.Name, serviceCRDName)
 		createAuthReaderRoleBindingForCRDConversion(f, f.Namespace.Name)
 
-		deployCustomResourceWebhookAndService(f, imageutils.GetE2EImage(imageutils.Agnhost), context, servicePort, containerPort)
+		deployCustomResourceWebhookAndService(f, imageutils.GetE2EImage(imageutils.Agnhost), certCtx, servicePort, containerPort)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -150,7 +150,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 				Strategy: apiextensionsv1.WebhookConverter,
 				Webhook: &apiextensionsv1.WebhookConversion{
 					ClientConfig: &apiextensionsv1.WebhookClientConfig{
-						CABundle: context.signingCert,
+						CABundle: certCtx.signingCert,
 						Service: &apiextensionsv1.ServiceReference{
 							Namespace: f.Namespace.Name,
 							Name:      serviceCRDName,
@@ -185,7 +185,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 				Strategy: apiextensionsv1.WebhookConverter,
 				Webhook: &apiextensionsv1.WebhookConversion{
 					ClientConfig: &apiextensionsv1.WebhookClientConfig{
-						CABundle: context.signingCert,
+						CABundle: certCtx.signingCert,
 						Service: &apiextensionsv1.ServiceReference{
 							Namespace: f.Namespace.Name,
 							Name:      serviceCRDName,
@@ -243,7 +243,7 @@ func createAuthReaderRoleBindingForCRDConversion(f *framework.Framework, namespa
 	}
 }
 
-func deployCustomResourceWebhookAndService(f *framework.Framework, image string, context *certContext, servicePort int32, containerPort int32) {
+func deployCustomResourceWebhookAndService(f *framework.Framework, image string, certCtx *certContext, servicePort int32, containerPort int32) {
 	ginkgo.By("Deploying the custom resource conversion webhook pod")
 	client := f.ClientSet
 
@@ -254,8 +254,8 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			"tls.crt": context.cert,
-			"tls.key": context.key,
+			"tls.crt": certCtx.cert,
+			"tls.key": certCtx.key,
 		},
 	}
 	namespace := f.Namespace.Name

@@ -56,7 +56,7 @@ type testContext struct {
 // configuration.
 func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface) *testContext {
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	context := testContext{
+	testCtx := testContext{
 		ctx:      ctx,
 		cancelFn: cancelFunc,
 	}
@@ -74,16 +74,16 @@ func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 		masterConfig.GenericConfig.AdmissionControl = admission
 	}
 
-	_, context.httpServer, context.closeFn = framework.RunAMasterUsingServer(masterConfig, s, h)
+	_, testCtx.httpServer, testCtx.closeFn = framework.RunAMasterUsingServer(masterConfig, s, h)
 
 	if nsPrefix != "default" {
-		context.ns = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), s, t)
+		testCtx.ns = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), s, t)
 	} else {
-		context.ns = framework.CreateTestingNamespace("default", s, t)
+		testCtx.ns = framework.CreateTestingNamespace("default", s, t)
 	}
 
 	// 2. Create kubeclient
-	context.clientSet = clientset.NewForConfigOrDie(
+	testCtx.clientSet = clientset.NewForConfigOrDie(
 		&restclient.Config{
 			QPS: -1, Host: s.URL,
 			ContentConfig: restclient.ContentConfig{
@@ -91,22 +91,22 @@ func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 			},
 		},
 	)
-	return &context
+	return &testCtx
 }
 
 // initTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
 // configuration and other options.
 func initTestSchedulerWithOptions(
 	t *testing.T,
-	context *testContext,
+	testCtx *testContext,
 	resyncPeriod time.Duration,
 ) *testContext {
 	// 1. Create scheduler
-	context.informerFactory = informers.NewSharedInformerFactory(context.clientSet, resyncPeriod)
+	testCtx.informerFactory = informers.NewSharedInformerFactory(testCtx.clientSet, resyncPeriod)
 
-	podInformer := context.informerFactory.Core().V1().Pods()
+	podInformer := testCtx.informerFactory.Core().V1().Pods()
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
-		Interface: context.clientSet.EventsV1beta1().Events(""),
+		Interface: testCtx.clientSet.EventsV1beta1().Events(""),
 	})
 	recorder := eventBroadcaster.NewRecorder(
 		legacyscheme.Scheme,
@@ -114,20 +114,20 @@ func initTestSchedulerWithOptions(
 	)
 
 	var err error
-	context.scheduler, err = createSchedulerWithPodInformer(
-		context.clientSet, podInformer, context.informerFactory, recorder, context.ctx.Done())
+	testCtx.scheduler, err = createSchedulerWithPodInformer(
+		testCtx.clientSet, podInformer, testCtx.informerFactory, recorder, testCtx.ctx.Done())
 
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler: %v", err)
 	}
 
-	eventBroadcaster.StartRecordingToSink(context.ctx.Done())
+	eventBroadcaster.StartRecordingToSink(testCtx.ctx.Done())
 
-	context.informerFactory.Start(context.scheduler.StopEverything)
-	context.informerFactory.WaitForCacheSync(context.scheduler.StopEverything)
+	testCtx.informerFactory.Start(testCtx.scheduler.StopEverything)
+	testCtx.informerFactory.WaitForCacheSync(testCtx.scheduler.StopEverything)
 
-	go context.scheduler.Run(context.ctx)
-	return context
+	go testCtx.scheduler.Run(testCtx.ctx)
+	return testCtx
 }
 
 // createSchedulerWithPodInformer creates a new scheduler.
@@ -149,13 +149,13 @@ func createSchedulerWithPodInformer(
 
 // cleanupTest deletes the scheduler and the test namespace. It should be called
 // at the end of a test.
-func cleanupTest(t *testing.T, context *testContext) {
+func cleanupTest(t *testing.T, testCtx *testContext) {
 	// Kill the scheduler.
-	context.cancelFn()
+	testCtx.cancelFn()
 	// Cleanup nodes.
-	context.clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
-	framework.DeleteTestingNamespace(context.ns, context.httpServer, t)
-	context.closeFn()
+	testCtx.clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+	framework.DeleteTestingNamespace(testCtx.ns, testCtx.httpServer, t)
+	testCtx.closeFn()
 }
 
 // waitForPodToScheduleWithTimeout waits for a pod to get scheduled and returns

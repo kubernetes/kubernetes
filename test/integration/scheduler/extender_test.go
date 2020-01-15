@@ -278,8 +278,8 @@ func machine3Prioritizer(pod *v1.Pod, nodes *v1.NodeList) (*extenderv1.HostPrior
 }
 
 func TestSchedulerExtender(t *testing.T) {
-	context := initTestMaster(t, "scheduler-extender", nil)
-	clientSet := context.clientSet
+	testCtx := initTestMaster(t, "scheduler-extender", nil)
+	clientSet := testCtx.clientSet
 
 	extender1 := &Extender{
 		name:         "extender1",
@@ -348,10 +348,10 @@ func TestSchedulerExtender(t *testing.T) {
 	}
 	policy.APIVersion = "v1"
 
-	context = initTestScheduler(t, context, false, &policy)
-	defer cleanupTest(t, context)
+	testCtx = initTestScheduler(t, testCtx, false, &policy)
+	defer cleanupTest(t, testCtx)
 
-	DoTestPodScheduling(context.ns, t, clientSet)
+	DoTestPodScheduling(testCtx.ns, t, clientSet)
 }
 
 func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface) {
