@@ -17,10 +17,12 @@ limitations under the License.
 package testutil
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/component-base/metrics"
 )
 
@@ -47,4 +49,22 @@ func CustomCollectAndCompare(c metrics.StableCollector, expected io.Reader, metr
 	registry.CustomMustRegister(c)
 
 	return GatherAndCompare(registry, expected, metricNames...)
+}
+
+// NewFakeKubeRegistry creates a fake `KubeRegistry` that takes the input version as `build in version`.
+// It should only be used in testing scenario especially for the deprecated metrics.
+// The input version format should be `major.minor.patch`, e.g. '1.18.0'.
+func NewFakeKubeRegistry(ver string) metrics.KubeRegistry {
+	backup := metrics.BuildVersion
+	defer func() {
+		metrics.BuildVersion = backup
+	}()
+
+	metrics.BuildVersion = func() apimachineryversion.Info {
+		return apimachineryversion.Info{
+			GitVersion: fmt.Sprintf("v%s-alpha+1.12345", ver),
+		}
+	}
+
+	return metrics.NewKubeRegistry()
 }
