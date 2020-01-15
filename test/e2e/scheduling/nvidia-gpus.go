@@ -32,6 +32,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -309,7 +310,7 @@ func podNames(pods []v1.Pod) []string {
 
 var _ = SIGDescribe("GPUDevicePluginAcrossRecreate [Feature:Recreate]", func() {
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	})
 	f := framework.NewDefaultFramework("device-plugin-gpus-recreate")
 	ginkgo.It("run Nvidia GPU Device Plugin tests with a recreation", func() {

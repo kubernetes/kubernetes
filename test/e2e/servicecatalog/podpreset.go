@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -41,7 +42,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 	ginkgo.BeforeEach(func() {
 		// only run on gce for the time being til we find an easier way to update
 		// the admission controllers used on the others
-		framework.SkipUnlessProviderIs("gce")
+		e2eskipper.SkipUnlessProviderIs("gce")
 		podClient = f.PodClient()
 	})
 
@@ -74,7 +75,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 
 		_, err := createPodPreset(f.ClientSet, f.Namespace.Name, pip)
 		if apierrors.IsNotFound(err) {
-			framework.Skipf("podpresets requires k8s.io/api/settings/v1alpha1 to be enabled")
+			e2eskipper.Skipf("podpresets requires k8s.io/api/settings/v1alpha1 to be enabled")
 		}
 		framework.ExpectNoError(err)
 
@@ -192,7 +193,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 
 		_, err := createPodPreset(f.ClientSet, f.Namespace.Name, pip)
 		if apierrors.IsNotFound(err) {
-			framework.Skipf("podpresets requires k8s.io/api/settings/v1alpha1 to be enabled")
+			e2eskipper.Skipf("podpresets requires k8s.io/api/settings/v1alpha1 to be enabled")
 		}
 		framework.ExpectNoError(err)
 
