@@ -73,11 +73,11 @@ func PodExec(f *framework.Framework, pod *v1.Pod, shExec string) (string, error)
 func VerifyExecInPodSucceed(f *framework.Framework, pod *v1.Pod, shExec string) {
 	_, err := PodExec(f, pod, shExec)
 	if err != nil {
-		if err, ok := err.(uexec.CodeExitError); ok {
-			exitCode := err.ExitStatus()
+		if exiterr, ok := err.(uexec.CodeExitError); ok {
+			exitCode := exiterr.ExitStatus()
 			framework.ExpectNoError(err,
 				"%q should succeed, but failed with exit code %d and error message %q",
-				shExec, exitCode, err)
+				shExec, exitCode, exiterr)
 		} else {
 			framework.ExpectNoError(err,
 				"%q should succeed, but failed with error message %q",
@@ -90,11 +90,11 @@ func VerifyExecInPodSucceed(f *framework.Framework, pod *v1.Pod, shExec string) 
 func VerifyExecInPodFail(f *framework.Framework, pod *v1.Pod, shExec string, exitCode int) {
 	_, err := PodExec(f, pod, shExec)
 	if err != nil {
-		if err, ok := err.(clientexec.ExitError); ok {
-			actualExitCode := err.ExitStatus()
+		if exiterr, ok := err.(clientexec.ExitError); ok {
+			actualExitCode := exiterr.ExitStatus()
 			framework.ExpectEqual(actualExitCode, exitCode,
 				"%q should fail with exit code %d, but failed with exit code %d and error message %q",
-				shExec, exitCode, actualExitCode, err)
+				shExec, exitCode, actualExitCode, exiterr)
 		} else {
 			framework.ExpectNoError(err,
 				"%q should fail with exit code %d, but failed with error message %q",
