@@ -2640,9 +2640,9 @@ var _ = SIGDescribe("Services", func() {
 	})
 
 	/*
-          Release : v1.18
-          Testname: Find Kubernetes Service in default Namespace
-          Description: List all Services in all Namespaces, response MUST include a Service named Kubernetes with the Namespace of default.
+	   Release : v1.18
+	   Testname: Find Kubernetes Service in default Namespace
+	   Description: List all Services in all Namespaces, response MUST include a Service named Kubernetes with the Namespace of default.
 	*/
 	framework.ConformanceIt("should find a service from listing all namespaces", func() {
 		ginkgo.By("fetching services")
