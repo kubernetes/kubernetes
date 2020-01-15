@@ -81,6 +81,7 @@ func main() {
 		"k8s.io/kubernetes/pkg/...",
 		"k8s.io/kubernetes/cmd/...",
 		"k8s.io/kubernetes/plugin/...",
+		"k8s.io/kubernetes/test/e2e/framework/...",
 	}
 	pflag.CommandLine.BoolVar(&arguments.IncludeTestFiles, "include-test-files", false, "If true, include *_test.go files.")
 
