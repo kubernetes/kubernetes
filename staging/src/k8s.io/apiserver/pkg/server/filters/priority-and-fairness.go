@@ -19,6 +19,7 @@ package filters
 import (
 	"fmt"
 	"net/http"
+	"runtime"
 
 	// TODO: decide whether to use the existing metrics, which
 	// categorize according to mutating vs readonly, or make new
@@ -27,6 +28,7 @@ import (
 
 	// "k8s.io/apiserver/pkg/endpoints/metrics"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/klog"
@@ -71,16 +73,51 @@ func WithPriorityAndFairness(
 			return
 		}
 		defer afterExecute()
+		
+		// Serve the request, but asynchronously, and return from here
+		// as soon as either the request is finished or the context is
+		// canceled.  The logic here is heavily cribbed from the
+		// timeout filter.
 		timedOut := ctx.Done()
-		finished := make(chan struct{})
-		go func() {
+		
+		// gets sent to exactly once, with the result of recover() for serving the request
+		resultCh := make(chan interface{})
+		
+		go func() { // serve the request, with recovery from panics
+			defer func() {
+				err := recover()
+				if err != nil && err != http.ErrAbortHandler {
+					// Same as stdlib http server code. Manually allocate stack
+					// trace buffer size to prevent excessively large logs
+					const size = 64 << 10
+					buf := make([]byte, size)
+					buf = buf[:runtime.Stack(buf, false)]
+					err = fmt.Sprintf("%v\n%s", err, buf)
+				}
+				resultCh <- err
+			}()
 			handler.ServeHTTP(w, r)
-			close(finished)
 		}()
+		
 		select {
+		case err := <-resultCh:
+			if err != nil {
+				panic(err)
+			}
 		case <-timedOut:
+			// Satisfy the need for a receive from resultCh
+			go func() {
+				err := <-resultCh
+				if err != nil {
+					switch t := err.(type) {
+					case error:
+						utilruntime.HandleError(t)
+					default:
+						utilruntime.HandleError(fmt.Errorf("%v", err))
+					}
+				}
+			}()
 			klog.V(6).Infof("Timed out waiting for RequestInfo=%#+v, user.Info=%#+v to finish\n", requestInfo, user)
-		case <-finished:
 		}
 		return
 	})

@@ -309,7 +309,6 @@ func newFlowSchema(name, plName string, matchingPrecedence int32, dmType flowcon
 			DistinguisherMethod: dm,
 			Rules:               rules},
 	}
-
 }
 
 func groups(names ...string) []flowcontrol.Subject {

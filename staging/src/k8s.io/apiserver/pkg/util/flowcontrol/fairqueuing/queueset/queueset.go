@@ -120,8 +120,8 @@ func createQueues(n, baseIndex int) []*queue {
 	return fqqueues
 }
 
-// SetConfiguration is used to set the configuration for a queueSet
-// update handling for when fields are updated is handled here as well -
+// SetConfiguration is used to set the configuration for a queueSet.
+// Update handling for when fields are updated is handled here as well -
 // eg: if DesiredNum is increased, SetConfiguration reconciles by
 // adding more queues.
 func (qs *queueSet) SetConfiguration(config fq.QueueSetConfig) {

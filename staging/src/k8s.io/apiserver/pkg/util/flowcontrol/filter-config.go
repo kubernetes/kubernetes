@@ -138,14 +138,28 @@ func (reqMgr *requestManager) syncOne() bool {
 	return true
 }
 
+// digestConfigObjects is given all the API objects that configure
+// reqMgr and writes its consequent new requestManagerState.  This
+// function has three loops over priority levels: one to digest the
+// given objects, one to handle old objects, and one to divide up the
+// server's total concurrency limit among the surviving priority
+// levels.
 func (reqMgr *requestManager) digestConfigObjects(newPLs []*rmtypesv1a1.PriorityLevelConfiguration, newFSs []*rmtypesv1a1.FlowSchema) {
 	oldRMState := reqMgr.curState.Load().(*requestManagerState)
-	var shareSum float64
+	var shareSum float64 // accumulated in first two loops over priority levels
 	newRMState := &requestManagerState{
 		priorityLevelStates: make(map[string]*priorityLevelState),
 	}
+
+	// Buffer of priority levels that need a call to QueueSet::Quiesce.
+	// See the explanation later for why these calls are held until the end.
 	newlyQuiescent := make([]*priorityLevelState, 0)
+
+	// Keep track of which mandatory objects have been digested.
 	var haveExemptPL, haveCatchAllPL, haveExemptFS, haveCatchAllFS bool
+
+	// Digest each given PriorityLevelConfiguration.
+	// Pretend broken ones do not exist.
 	for _, pl := range newPLs {
 		state := oldRMState.priorityLevelStates[pl.Name]
 		if state == nil {
@@ -170,25 +184,62 @@ func (reqMgr *requestManager) digestConfigObjects(newPLs []*rmtypesv1a1.Priority
 				continue
 			}
 			state.qsConfig = qsConfig
-		} else {
-			haveExemptPL = true
 		}
+		haveExemptPL = haveExemptPL || pl.Name == rmtypesv1a1.PriorityLevelConfigurationNameExempt
 		haveCatchAllPL = haveCatchAllPL || pl.Name == rmtypesv1a1.PriorityLevelConfigurationNameCatchAll
 		newRMState.priorityLevelStates[pl.Name] = state
 	}
 
+	// Digest the given FlowSchema objects.  Ones that reference a
+	// missing or broken priority level are not to be passed on to the
+	// filter for use.  We do this before holding over old priority
+	// levels so that requests stop going to those levels and
+	// FlowSchemaStatus values reflect this.
 	fsSeq := make(apihelpers.FlowSchemaSequence, 0, len(newFSs))
 	for i, fs := range newFSs {
-		_, flowSchemaExists := newRMState.priorityLevelStates[fs.Spec.PriorityLevelConfiguration.Name]
-		reqMgr.syncFlowSchemaStatus(fs, !flowSchemaExists)
-		if flowSchemaExists {
-			fsSeq = append(fsSeq, newFSs[i])
-			haveExemptFS = haveExemptFS || fs.Name == rmtypesv1a1.FlowSchemaNameExempt
-			haveCatchAllFS = haveCatchAllFS || fs.Name == rmtypesv1a1.FlowSchemaNameCatchAll
+		_, goodPriorityRef := newRMState.priorityLevelStates[fs.Spec.PriorityLevelConfiguration.Name]
+
+		// Ensure the object's status reflects whether its priority
+		// level reference is broken.
+		//
+		// TODO: consider
+		// k8s.io/apimachinery/pkg/util/errors.NewAggregate
+		// errors from all of these and return it at the end.
+		//
+		// TODO: consider not even trying if server is not handling
+		// requests yet.
+		reqMgr.syncFlowSchemaStatus(fs, !goodPriorityRef)
+
+		if !goodPriorityRef {
+			continue
 		}
+		fsSeq = append(fsSeq, newFSs[i])
+		haveExemptFS = haveExemptFS || fs.Name == rmtypesv1a1.FlowSchemaNameExempt
+		haveCatchAllFS = haveCatchAllFS || fs.Name == rmtypesv1a1.FlowSchemaNameCatchAll
 	}
+	// sort into the order to be used for matching
 	sort.Sort(fsSeq)
 
+	// Supply missing mandatory FlowSchemas, in correct position
+	if !haveExemptFS {
+		fsSeq = append(apihelpers.FlowSchemaSequence{fcboot.MandatoryFlowSchemaExempt}, fsSeq...)
+	}
+	if !haveCatchAllFS {
+		fsSeq = append(fsSeq, fcboot.MandatoryFlowSchemaCatchAll)
+	}
+
+	newRMState.flowSchemas = fsSeq
+	if klog.V(5) {
+		for _, fs := range fsSeq {
+			klog.Infof("Using FlowSchema %s: %#+v", fs.Name, fs.Spec)
+		}
+	}
+
+	// Consider all the priority levels in the previous configuration.
+	// Keep the ones that are in the new config, supply mandatory
+	// behavior, or still have non-empty queues; for the rest: drop it
+	// if it has no queues, otherwise start the quiescing process if
+	// that has not already been started.
 	for plName, plState := range oldRMState.priorityLevelStates {
 		if newRMState.priorityLevelStates[plName] != nil {
 			// Still desired and already updated
@@ -202,7 +253,7 @@ func (reqMgr *requestManager) digestConfigObjects(newPLs []*rmtypesv1a1.Priority
 			plState.emptyHandler = nil
 			klog.V(3).Infof("Retired queues for undesired quiescing priority level %q", plName)
 		}
-		if plState.config.Limited == nil && !haveExemptPL || plName == rmtypesv1a1.PriorityLevelConfigurationNameCatchAll && !haveCatchAllPL {
+		if plName == rmtypesv1a1.PriorityLevelConfigurationNameExempt && !haveExemptPL || plName == rmtypesv1a1.PriorityLevelConfigurationNameCatchAll && !haveCatchAllPL {
 			klog.V(3).Infof("Retaining old priority level %q with Type=%v because of lack of replacement", plName, plState.config.Type)
 		} else {
 			if plState.queues == nil {
@@ -217,32 +268,23 @@ func (reqMgr *requestManager) digestConfigObjects(newPLs []*rmtypesv1a1.Priority
 		}
 		if plState.config.Limited != nil {
 			shareSum += float64(plState.config.Limited.AssuredConcurrencyShares)
-		} else {
-			haveExemptPL = true
 		}
+		haveExemptPL = haveExemptPL || plName == rmtypesv1a1.PriorityLevelConfigurationNameExempt
 		haveCatchAllPL = haveCatchAllPL || plName == rmtypesv1a1.PriorityLevelConfigurationNameCatchAll
 		newRMState.priorityLevelStates[plName] = plState
 	}
 
+	// Supply missing mandatory objects
 	if !haveExemptPL {
 		newRMState.imaginePL(fcboot.MandatoryPriorityLevelConfigurationExempt, reqMgr.requestWaitLimit, &shareSum)
 	}
 	if !haveCatchAllPL {
 		newRMState.imaginePL(fcboot.MandatoryPriorityLevelConfigurationCatchAll, reqMgr.requestWaitLimit, &shareSum)
 	}
-	if !haveExemptFS {
-		fsSeq = append(apihelpers.FlowSchemaSequence{fcboot.MandatoryFlowSchemaExempt}, fsSeq...)
-	}
-	if !haveCatchAllFS {
-		fsSeq = append(fsSeq, fcboot.MandatoryFlowSchemaCatchAll)
-	}
 
-	newRMState.flowSchemas = fsSeq
-	if klog.V(5) {
-		for _, fs := range fsSeq {
-			klog.Infof("Using FlowSchema %s: %#+v", fs.Name, fs.Spec)
-		}
-	}
+	// For all the priority levels of the new config, divide up the
+	// server's total concurrency limit among them and create/update
+	// their QueueSets.
 	for plName, plState := range newRMState.priorityLevelStates {
 		if plState.config.Limited == nil {
 			klog.V(5).Infof("Using exempt priority level %q: quiescent=%v", plName, plState.emptyHandler != nil)
@@ -257,20 +299,41 @@ func (reqMgr *requestManager) digestConfigObjects(newPLs []*rmtypesv1a1.Priority
 			plState.queues = reqMgr.queueSetFactory.NewQueueSet(plState.qsConfig)
 		} else {
 			klog.V(5).Infof("Retaining queues for priority level %q: config=%#+v, concurrencyLimit=%d, quiescent=%v (shares=%v, shareSum=%v)", plName, plState.config, plState.qsConfig.ConcurrencyLimit, plState.emptyHandler != nil, plState.config.Limited.AssuredConcurrencyShares, shareSum)
-			plState.queues.SetConfiguration(plState.qsConfig) // TODO: make sure that retains other config if zero desired queues
+			plState.queues.SetConfiguration(plState.qsConfig)
 		}
 	}
+
+	// The new config has been constructed, pass to filter for use.
 	reqMgr.curState.Store(newRMState)
 	klog.V(5).Infof("Switched to new RequestManagementState")
-	// We do the following only after updating curState to guarantee
-	// that if Wait returns `tryAnother==true` then a fresh load from
-	// curState will yield an requestManagerState that is at least
-	// as up-to-date as the data here.
+
+	// We delay the calls to QueueSet::Quiesce so that the following
+	// proof works.
 	//
-	// Put another way: doing the Quiesce calls after Store(X) ensures
-	// that if any call to qs.Quiesce causes a call to qs.Wait to
-	// return with `tryAnother==true` then a following call to Load
-	// will return X or an even more recently stored value.
+	// 1. For any QueueSet S: if a call S.Wait() returns with
+	//    tryAnother==true then a call to S.Quiesce with a non-nil
+	//    handler happened before that return.  This is from the
+	//    contract of QueueSet.
+	//
+	// 2. Every S.Quiesce call with a non-nil handler happens after a
+	//    call to `reqMgr.curState.Store(X)` for which S is in
+	//    newlyQuiescent and S's priority level is not referenced from
+	//    any FlowSchema in X.  This is established by the text of
+	//    this function and the immutability of each FlowSchemaSpec
+	//    and of each plState after completion of the loop iteration
+	//    that constructs it.
+	//
+	// 3. If a call to S.Wait that returns with tryAnother==true
+	//    happens before a call to `curState.Load()` that returns a
+	//    value Y then either (3a) Y sends no traffic to S or (3b) Y
+	//    is a value stored after X.  This is the contract of the
+	//    `curState` field.  Chaining together the "happens before"
+	//    relationships of (2), (1), and (3) implies that
+	//    `curState.Store(X)` happens before `curState.Load()` returns
+	//    Y.  The fact that this function stores a fresh pointer in
+	//    curState each time, together with the contract of
+	//    `atomic.Value`, implies that either Y is X (which, in turn,
+	//    implies 3a) or Y is a value stored later (which is 3b).
 	for _, plState := range newlyQuiescent {
 		plState.queues.Quiesce(plState.emptyHandler)
 	}

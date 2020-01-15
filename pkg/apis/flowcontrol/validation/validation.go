@@ -91,9 +91,6 @@ func ValidateFlowSchema(fs *flowcontrol.FlowSchema) field.ErrorList {
 
 // ValidateFlowSchemaUpdate validates the update of flow-schema
 func ValidateFlowSchemaUpdate(old, fs *flowcontrol.FlowSchema) field.ErrorList {
-	if (fs.Name == flowcontrol.FlowSchemaNameExempt || fs.Name == flowcontrol.FlowSchemaNameCatchAll) && !apiequality.Semantic.DeepEqual(old.Spec, fs.Spec) {
-		return []*field.Error{field.Invalid(field.NewPath("spec"), fs.Spec, "spec of a fixed object may not be updated")}
-	}
 	return ValidateFlowSchema(fs)
 }
 
@@ -359,9 +356,6 @@ func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfigurati
 
 // ValidatePriorityLevelConfigurationUpdate validates the update of priority-level-configuration.
 func ValidatePriorityLevelConfigurationUpdate(old, pl *flowcontrol.PriorityLevelConfiguration) field.ErrorList {
-	if (pl.Name == flowcontrol.PriorityLevelConfigurationNameExempt || pl.Name == flowcontrol.PriorityLevelConfigurationNameCatchAll) && !apiequality.Semantic.DeepEqual(old.Spec, pl.Spec) {
-		return []*field.Error{field.Invalid(field.NewPath("spec"), pl.Spec, "spec of a fixed object may not be updated")}
-	}
 	return ValidatePriorityLevelConfiguration(pl)
 }
 

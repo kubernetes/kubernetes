@@ -110,7 +110,7 @@ type Config struct {
 	AdmissionControl      admission.Interface
 	CorsAllowedOriginList []string
 
-	// FlowControl gives priority and fairness to request handling
+	// FlowControl, if not nil, gives priority and fairness to request handling
 	FlowControl utilflowcontrol.Interface
 
 	EnableIndex     bool

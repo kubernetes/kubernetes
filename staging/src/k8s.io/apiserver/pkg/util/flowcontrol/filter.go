@@ -132,10 +132,20 @@ type requestManager struct {
 	// That is, `Load()` produces a `*requestManagerState`.  When a
 	// config work queue worker processes a configuration change, it
 	// stores a new pointer here --- it does NOT side-effect the old
-	// `requestManagerState` value.  The new
-	// `requestManagerState` has a freshly constructed slice of
-	// FlowSchema pointers and a freshly constructed map of priority
-	// level states.
+	// `requestManagerState` value.  The new `requestManagerState` has
+	// a freshly constructed slice of FlowSchema pointers and a
+	// freshly constructed map of priority level states.
+	//
+	// When: (1) `curState.Load()` returns a `*requestManagerState`
+	// value X, (2) this happens before a call to
+	// `plState.queues.Wait` (for a plState P in X) that returns with
+	// tryAnother==true, and (3) that Wait return happens before
+	// another call to `curState.Load()` it is guaranteed that the
+	// later `curState.Load()` will return a value that either sends
+	// no requests to P or reflects a later configuration revision
+	// that restores the desirability of P.  The
+	// requestManagerState::Wait method relies on this property to
+	// guarantee progress through its outer loop.
 	curState atomic.Value
 }
 
