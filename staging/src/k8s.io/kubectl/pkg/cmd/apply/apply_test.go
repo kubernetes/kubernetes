@@ -562,6 +562,55 @@ func TestApplyObject(t *testing.T) {
 	}
 }
 
+func TestApplyPruneObjects(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)
+	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
+
+	for _, fn := range testingOpenAPISchemaFns {
+		t.Run("test apply returns correct output", func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+
+			tf.UnstructuredClient = &fake.RESTClient{
+				NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == pathRC && m == "GET":
+						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+					case p == pathRC && m == "PATCH":
+						validatePatchApplication(t, req)
+						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+					default:
+						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+			tf.OpenAPISchemaFunc = fn
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdApply("kubectl", tf, ioStreams)
+			cmd.Flags().Set("filename", filenameRC)
+			cmd.Flags().Set("prune", "true")
+			cmd.Flags().Set("namespace", "test")
+			cmd.Flags().Set("output", "yaml")
+			cmd.Flags().Set("all", "true")
+			cmd.Run(cmd, []string{})
+
+			if !strings.Contains(buf.String(), "test-rc") {
+				t.Fatalf("unexpected output: %s\nexpected to contain: %s", buf.String(), "test-rc")
+			}
+			if errBuf.String() != "" {
+				t.Fatalf("unexpected error output: %s", errBuf.String())
+			}
+		})
+	}
+}
+
 func TestApplyObjectOutput(t *testing.T) {
 	cmdtesting.InitTestErrorHandler(t)
 	nameRC, currentRC := readAndAnnotateReplicationController(t, filenameRC)
