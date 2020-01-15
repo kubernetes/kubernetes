@@ -74,6 +74,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeAffinity"},
 					{Name: "TaintToleration"},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 		},
 		// This is a special test for the case where a policy is specified without specifying any filters.
@@ -93,6 +94,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeUnschedulable"},
 					{Name: "TaintToleration"},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
@@ -140,6 +142,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "ServiceAffinity", Weight: 3},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 		},
 
@@ -195,6 +198,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "ServiceAffinity", Weight: 6}, // Weight is the 3 * number of custom ServiceAntiAffinity priorities
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
@@ -259,6 +263,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "ServiceAffinity", Weight: 3},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 		},
 
@@ -332,6 +337,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 		},
 
@@ -409,6 +415,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
@@ -495,6 +502,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
@@ -592,6 +600,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
@@ -691,6 +700,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
@@ -793,6 +803,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
@@ -908,6 +919,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
@@ -1025,6 +1037,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
@@ -1142,6 +1155,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
@@ -1263,6 +1277,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
@@ -1309,6 +1324,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ScorePlugin": {
 					{Name: "PodTopologySpread", Weight: 2},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 		},
 		{
@@ -1336,6 +1352,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ScorePlugin": {
 					{Name: "NodeResourceLimits", Weight: 2},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 		},
 	}
@@ -1438,6 +1455,7 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 			{Name: "DefaultPodTopologySpread", Weight: 1},
 			{Name: "TaintToleration", Weight: 1},
 		},
+		"BindPlugin": {{Name: "DefaultBinder"}},
 	}
 
 	testcases := []struct {
@@ -1497,6 +1515,7 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 					{Name: "DefaultPodTopologySpread", Weight: 1},
 					{Name: "TaintToleration", Weight: 1},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 		},
 	}

@@ -21,13 +21,13 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
@@ -96,6 +97,11 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 					{Name: nodepreferavoidpods.Name, Weight: 10000},
 					{Name: defaultpodtopologyspread.Name, Weight: 1},
 					{Name: tainttoleration.Name, Weight: 1},
+				},
+			},
+			Bind: &schedulerapi.PluginSet{
+				Enabled: []schedulerapi.Plugin{
+					{Name: defaultbinder.Name},
 				},
 			},
 		},
@@ -175,6 +181,11 @@ func TestApplyFeatureGates(t *testing.T) {
 							{Name: tainttoleration.Name, Weight: 1},
 						},
 					},
+					Bind: &schedulerapi.PluginSet{
+						Enabled: []schedulerapi.Plugin{
+							{Name: defaultbinder.Name},
+						},
+					},
 				},
 				FrameworkPluginConfig: []schedulerapi.PluginConfig{
 					{
@@ -242,6 +253,11 @@ func TestApplyFeatureGates(t *testing.T) {
 							{Name: tainttoleration.Name, Weight: 1},
 							{Name: podtopologyspread.Name, Weight: 1},
 							{Name: noderesources.ResourceLimitsName, Weight: 1},
+						},
+					},
+					Bind: &schedulerapi.PluginSet{
+						Enabled: []schedulerapi.Plugin{
+							{Name: defaultbinder.Name},
 						},
 					},
 				},

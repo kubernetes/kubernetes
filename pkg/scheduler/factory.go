@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
@@ -121,7 +122,7 @@ func (c *Configurator) create(extenders []core.SchedulerExtender) (*Scheduler, e
 		framework.WithVolumeBinder(c.volumeBinder),
 	)
 	if err != nil {
-		klog.Fatalf("error initializing the scheduling framework: %v", err)
+		return nil, fmt.Errorf("initializing the scheduling framework: %v", err)
 	}
 
 	podQueue := internalqueue.NewSchedulingQueue(
@@ -287,10 +288,14 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	// Combine all framework configurations. If this results in any duplication, framework
 	// instantiation should fail.
 	var defaultPlugins schedulerapi.Plugins
-	// "PrioritySort" is neither a predicate nor priority before. We make it as the default QueueSort plugin.
+	// "PrioritySort" and "DefaultBinder" were neither predicates nor priorities
+	// before. We add them by default.
 	defaultPlugins.Append(&schedulerapi.Plugins{
 		QueueSort: &schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{{Name: queuesort.Name}},
+		},
+		Bind: &schedulerapi.PluginSet{
+			Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}},
 		},
 	})
 	defaultPlugins.Append(pluginsForPredicates)

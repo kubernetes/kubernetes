@@ -26,6 +26,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
@@ -131,6 +132,11 @@ func getDefaultConfig(hardPodAffinityWeight int64) *Config {
 					{Name: nodepreferavoidpods.Name, Weight: 10000},
 					{Name: defaultpodtopologyspread.Name, Weight: 1},
 					{Name: tainttoleration.Name, Weight: 1},
+				},
+			},
+			Bind: &schedulerapi.PluginSet{
+				Enabled: []schedulerapi.Plugin{
+					{Name: defaultbinder.Name},
 				},
 			},
 		},
