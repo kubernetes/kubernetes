@@ -38,6 +38,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/option"
 )
 
 const (
@@ -99,8 +100,9 @@ func testCustomMetrics(f *framework.Framework, kubeClient clientset.Interface, c
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
+	framework.ExpectNoError(err)
 
-	gcmService, err := gcm.New(client)
+	gcmService, err := gcm.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		framework.Failf("Failed to create gcm service, %v", err)
 	}
@@ -145,8 +147,9 @@ func testExternalMetrics(f *framework.Framework, kubeClient clientset.Interface,
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
+	framework.ExpectNoError(err)
 
-	gcmService, err := gcm.New(client)
+	gcmService, err := gcm.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		framework.Failf("Failed to create gcm service, %v", err)
 	}
