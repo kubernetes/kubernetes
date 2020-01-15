@@ -74,16 +74,16 @@ func WithPriorityAndFairness(
 			return
 		}
 		defer afterExecute()
-		
+
 		// Serve the request, but asynchronously, and return from here
 		// as soon as either the request is finished or the context is
 		// canceled.  The logic here is heavily cribbed from the
 		// timeout filter.
 		timedOut := ctx.Done()
-		
+
 		// gets sent to exactly once, with the result of recover() for serving the request
 		resultCh := make(chan interface{})
-		
+
 		go func() { // serve the request, with recovery from panics
 			defer func() {
 				err := recover()
@@ -99,7 +99,7 @@ func WithPriorityAndFairness(
 			}()
 			handler.ServeHTTP(w, r)
 		}()
-		
+
 		select {
 		case err := <-resultCh:
 			if err != nil {

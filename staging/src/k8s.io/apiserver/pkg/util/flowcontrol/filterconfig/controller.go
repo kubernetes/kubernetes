@@ -61,6 +61,9 @@ import (
 // configure API Priority and Fairness, and provides a procedural
 // interface to the configured behavior.
 type Controller interface {
+	// Run runs the controller, returning after it is stopped
+	Run(stopCh <-chan struct{}) error
+
 	// GetCurrentState returns the current configuration, as a
 	// procedural interface value
 	GetCurrentState() State

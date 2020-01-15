@@ -93,7 +93,7 @@ func NewTestable(
 }
 
 func (impl *implementation) Run(stopCh <-chan struct{}) error {
-	return impl.Run(stopCh)
+	return impl.ctl.Run(stopCh)
 }
 
 func (impl *implementation) Wait(ctx context.Context, requestDigest fcfc.RequestDigest) (bool, func()) {
