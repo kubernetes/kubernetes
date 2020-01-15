@@ -576,6 +576,25 @@ func TestSourceIPs(t *testing.T) {
 		forwardedFor: "1.2.3.4",
 		remoteAddr:   "1.2.3.4",
 		expected:     []string{"1.2.3.4"},
+	}, {
+		name:         "full ipv6",
+		realIP:       "abcd:ef01:2345:6789:abcd:ef01:2345:6789",
+		forwardedFor: "aaaa:bbbb:cccc:dddd:eeee:ffff:0:1111,0:1111:2222:3333:4444:5555:6666:7777",
+		remoteAddr:   "aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa",
+		expected: []string{
+			"aaaa:bbbb:cccc:dddd:eeee:ffff:0:1111",
+			"0:1111:2222:3333:4444:5555:6666:7777",
+			"abcd:ef01:2345:6789:abcd:ef01:2345:6789",
+			"aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa",
+		},
+	}, {
+		name:         "mixed ipv4 ipv6",
+		forwardedFor: "aaaa:bbbb:cccc:dddd:eeee:ffff:0:1111,1.2.3.4",
+		remoteAddr:   "0:0:0:0:0:ffff:102:304", // ipv6 equivalent to 1.2.3.4
+		expected: []string{
+			"aaaa:bbbb:cccc:dddd:eeee:ffff:0:1111",
+			"1.2.3.4",
+		},
 	}}
 
 	for _, test := range tests {
