@@ -2639,7 +2639,12 @@ var _ = SIGDescribe("Services", func() {
 		e2eservice.WaitForServiceUpdatedWithFinalizer(cs, svc.Namespace, svc.Name, true)
 	})
 
-	ginkgo.It("should find a service from listing all namespaces", func() {
+	/*
+          Release : v1.18
+          Testname: Find Kubernetes Service in default Namespace
+          Description: List all Services in all Namespaces, response MUST include a Service named Kubernetes with the Namespace of default.
+	*/
+	framework.ConformanceIt("should find a service from listing all namespaces", func() {
 		ginkgo.By("fetching services")
 		svcs, _ := f.ClientSet.CoreV1().Services("").List(metav1.ListOptions{})
 
