@@ -49,6 +49,7 @@ import (
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -355,8 +356,11 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 	client := clientsetfake.NewSimpleClientset(&node)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-	f := st.RegisterPluginAsExtensions(nodeports.Name, 1, nodeports.New, "Filter", "PreFilter")
-	scheduler, bindingChan, _ := setupTestSchedulerWithOnePodOnNode(t, queuedPodStore, scache, informerFactory, stop, f, pod, &node)
+	fns := []st.RegisterPluginFunc{
+		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		st.RegisterPluginAsExtensions(nodeports.Name, 1, nodeports.New, "Filter", "PreFilter"),
+	}
+	scheduler, bindingChan, _ := setupTestSchedulerWithOnePodOnNode(t, queuedPodStore, scache, informerFactory, stop, pod, &node, fns...)
 
 	waitPodExpireChan := make(chan struct{})
 	timeout := make(chan struct{})
@@ -418,8 +422,11 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	scache.AddNode(&node)
 	client := clientsetfake.NewSimpleClientset(&node)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	f := st.RegisterPluginAsExtensions(nodeports.Name, 1, nodeports.New, "Filter", "PreFilter")
-	scheduler, bindingChan, errChan := setupTestSchedulerWithOnePodOnNode(t, queuedPodStore, scache, informerFactory, stop, f, firstPod, &node)
+	fns := []st.RegisterPluginFunc{
+		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		st.RegisterPluginAsExtensions(nodeports.Name, 1, nodeports.New, "Filter", "PreFilter"),
+	}
+	scheduler, bindingChan, errChan := setupTestSchedulerWithOnePodOnNode(t, queuedPodStore, scache, informerFactory, stop, firstPod, &node, fns...)
 
 	// We use conflicted pod ports to incur fit predicate failure.
 	secondPod := podWithPort("bar", "", 8080)
@@ -512,10 +519,13 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 
 			client := clientsetfake.NewSimpleClientset(&node)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			f := st.RegisterPluginAsExtensions(nodeports.Name, 1, nodeports.New, "Filter", "PreFilter")
+			fns := []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterPluginAsExtensions(nodeports.Name, 1, nodeports.New, "Filter", "PreFilter"),
+			}
 
 			scheduler, bindingChan := setupTestSchedulerLongBindingWithRetry(
-				queuedPodStore, scache, informerFactory, f, stop, test.BindingDuration)
+				queuedPodStore, scache, informerFactory, stop, test.BindingDuration, fns...)
 
 			informerFactory.Start(stop)
 			informerFactory.WaitForCacheSync(stop)
@@ -547,9 +557,9 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 // queuedPodStore: pods queued before processing.
 // cache: scheduler cache that might contain assumed pods.
 func setupTestSchedulerWithOnePodOnNode(t *testing.T, queuedPodStore *clientcache.FIFO, scache internalcache.Cache,
-	informerFactory informers.SharedInformerFactory, stop chan struct{}, f st.RegisterPluginFunc, pod *v1.Pod, node *v1.Node) (*Scheduler, chan *v1.Binding, chan error) {
+	informerFactory informers.SharedInformerFactory, stop chan struct{}, pod *v1.Pod, node *v1.Node, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error) {
 
-	scheduler, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, f, nil)
+	scheduler, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, nil, fns...)
 
 	informerFactory.Start(stop)
 	informerFactory.WaitForCacheSync(stop)
@@ -629,8 +639,11 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 			fmt.Sprintf("Insufficient %v", v1.ResourceMemory),
 		)
 	}
-	f := st.RegisterFilterPlugin("PodFitsResources", noderesources.NewFit)
-	scheduler, _, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, f, nil)
+	fns := []st.RegisterPluginFunc{
+		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		st.RegisterFilterPlugin("PodFitsResources", noderesources.NewFit),
+	}
+	scheduler, _, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, nil, fns...)
 
 	informerFactory.Start(stop)
 	informerFactory.WaitForCacheSync(stop)
@@ -657,14 +670,18 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 
 // queuedPodStore: pods queued before processing.
 // scache: scheduler cache that might contain assumed pods.
-func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, f st.RegisterPluginFunc, recorder events.EventRecorder) (*Scheduler, chan *v1.Binding, chan error) {
+func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, recorder events.EventRecorder, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error) {
 	registry := framework.Registry{}
+	// TODO: instantiate the plugins dynamically.
 	plugins := &schedulerapi.Plugins{
+		QueueSort: &schedulerapi.PluginSet{},
 		PreFilter: &schedulerapi.PluginSet{},
 		Filter:    &schedulerapi.PluginSet{},
 	}
 	var pluginConfigs []schedulerapi.PluginConfig
-	f(&registry, plugins, pluginConfigs)
+	for _, f := range fns {
+		f(&registry, plugins, pluginConfigs)
+	}
 	fwk, _ := framework.NewFramework(registry, plugins, pluginConfigs)
 	algo := core.NewGenericScheduler(
 		scache,
@@ -711,14 +728,18 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 	return sched, bindingChan, errChan
 }
 
-func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, f st.RegisterPluginFunc, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
+func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, stop chan struct{}, bindingTime time.Duration, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding) {
 	registry := framework.Registry{}
+	// TODO: instantiate the plugins dynamically.
 	plugins := &schedulerapi.Plugins{
+		QueueSort: &schedulerapi.PluginSet{},
 		PreFilter: &schedulerapi.PluginSet{},
 		Filter:    &schedulerapi.PluginSet{},
 	}
 	var pluginConfigs []schedulerapi.PluginConfig
-	f(&registry, plugins, pluginConfigs)
+	for _, f := range fns {
+		f(&registry, plugins, pluginConfigs)
+	}
 	fwk, _ := framework.NewFramework(registry, plugins, pluginConfigs)
 	queue := internalqueue.NewSchedulingQueue(nil)
 	algo := core.NewGenericScheduler(
@@ -785,8 +806,11 @@ func setupTestSchedulerWithVolumeBinding(fakeVolumeBinder *volumebinder.VolumeBi
 	volumeBindingNewFunc := func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 		return volumebinding.NewFromVolumeBinder(fakeVolumeBinder), nil
 	}
-	f := st.RegisterFilterPlugin(volumebinding.Name, volumeBindingNewFunc)
-	s, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, f, recorder)
+	fns := []st.RegisterPluginFunc{
+		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		st.RegisterFilterPlugin(volumebinding.Name, volumeBindingNewFunc),
+	}
+	s, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, recorder, fns...)
 	informerFactory.Start(stop)
 	informerFactory.WaitForCacheSync(stop)
 	s.VolumeBinder = fakeVolumeBinder

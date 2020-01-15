@@ -61,6 +61,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
                   ]
 		}`,
 			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodeResourcesFit"},
 					{Name: "NodePorts"},
@@ -87,6 +88,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				]
 			}`,
 			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "TaintToleration"},
@@ -115,6 +117,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
   ]
 }`,
 			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
@@ -167,6 +170,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  ]
 		}`,
 			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
@@ -224,6 +228,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  ]
 		}`,
 			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
@@ -290,6 +295,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  ]
 		}`,
 			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
@@ -364,6 +370,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  ]
 		}`,
 			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
@@ -449,6 +456,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
@@ -545,6 +553,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
@@ -642,6 +651,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
@@ -743,6 +753,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
@@ -856,6 +867,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
@@ -971,6 +983,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
@@ -1086,6 +1099,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
@@ -1206,6 +1220,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
@@ -1279,6 +1294,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				features.EvenPodsSpread: true,
 			},
 			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "PodTopologySpread"},
 				},
@@ -1309,6 +1325,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				features.ResourceLimitsPriorityFunction: true,
 			},
 			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PostFilterPlugin": {
 					{Name: "NodeResourceLimits"},
 				},
@@ -1382,6 +1399,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 func TestAlgorithmProviderCompatibility(t *testing.T) {
 	// Add serialized versions of scheduler config that exercise available options to ensure compatibility between releases
 	defaultPlugins := map[string][]config.Plugin{
+		"QueueSortPlugin": {
+			{Name: "PrioritySort"},
+		},
 		"PreFilterPlugin": {
 			{Name: "NodeResourcesFit"},
 			{Name: "NodePorts"},
@@ -1438,6 +1458,9 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 			name:     "ClusterAutoscalerProvider",
 			provider: algorithmprovider.ClusterAutoscalerProvider,
 			wantPlugins: map[string][]config.Plugin{
+				"QueueSortPlugin": {
+					{Name: "PrioritySort"},
+				},
 				"PreFilterPlugin": {
 					{Name: "NodeResourcesFit"},
 					{Name: "NodePorts"},

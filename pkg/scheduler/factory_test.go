@@ -44,6 +44,7 @@ import (
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -109,6 +110,10 @@ func TestCreateFromConfig(t *testing.T) {
 	hpa := factory.hardPodAffinitySymmetricWeight
 	if hpa != v1.DefaultHardPodAffinitySymmetricWeight {
 		t.Errorf("Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", v1.DefaultHardPodAffinitySymmetricWeight, hpa)
+	}
+	queueSortPls := sched.Framework.ListPlugins()["QueueSortPlugin"]
+	if len(queueSortPls) == 0 || queueSortPls[0].Name != queuesort.Name {
+		t.Errorf("QueueSort plugin %q not registered.", queuesort.Name)
 	}
 
 	// Verify that node label predicate/priority are converted to framework plugins.

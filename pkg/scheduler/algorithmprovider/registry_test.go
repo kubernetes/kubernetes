@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -48,6 +49,11 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 	hardPodAffinityWeight := int64(1)
 	wantConfig := &Config{
 		FrameworkPlugins: &schedulerapi.Plugins{
+			QueueSort: &schedulerapi.PluginSet{
+				Enabled: []schedulerapi.Plugin{
+					{Name: queuesort.Name},
+				},
+			},
 			PreFilter: &schedulerapi.PluginSet{
 				Enabled: []schedulerapi.Plugin{
 					{Name: noderesources.FitName},
@@ -120,6 +126,11 @@ func TestApplyFeatureGates(t *testing.T) {
 			featuresEnabled: false,
 			wantConfig: &Config{
 				FrameworkPlugins: &schedulerapi.Plugins{
+					QueueSort: &schedulerapi.PluginSet{
+						Enabled: []schedulerapi.Plugin{
+							{Name: queuesort.Name},
+						},
+					},
 					PreFilter: &schedulerapi.PluginSet{
 						Enabled: []schedulerapi.Plugin{
 							{Name: noderesources.FitName},
@@ -178,6 +189,11 @@ func TestApplyFeatureGates(t *testing.T) {
 			featuresEnabled: true,
 			wantConfig: &Config{
 				FrameworkPlugins: &schedulerapi.Plugins{
+					QueueSort: &schedulerapi.PluginSet{
+						Enabled: []schedulerapi.Plugin{
+							{Name: queuesort.Name},
+						},
+					},
 					PreFilter: &schedulerapi.PluginSet{
 						Enabled: []schedulerapi.Plugin{
 							{Name: noderesources.FitName},

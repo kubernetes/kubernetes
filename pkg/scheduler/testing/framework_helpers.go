@@ -25,6 +25,11 @@ import (
 // to register a Filter Plugin to a given registry.
 type RegisterPluginFunc func(reg *framework.Registry, plugins *schedulerapi.Plugins, pluginConfigs []schedulerapi.PluginConfig)
 
+// RegisterQueueSortPlugin returns a function to register a QueueSort Plugin to a given registry.
+func RegisterQueueSortPlugin(pluginName string, pluginNewFunc framework.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, 1, pluginNewFunc, "QueueSort")
+}
+
 // RegisterFilterPlugin returns a function to register a Filter Plugin to a given registry.
 func RegisterFilterPlugin(pluginName string, pluginNewFunc framework.PluginFactory) RegisterPluginFunc {
 	return RegisterPluginAsExtensions(pluginName, 1, pluginNewFunc, "Filter")
@@ -59,6 +64,8 @@ func RegisterPluginAsExtensions(pluginName string, weight int32, pluginNewFunc f
 
 func getPluginSetByExtension(plugins *schedulerapi.Plugins, extension string) *schedulerapi.PluginSet {
 	switch extension {
+	case "QueueSort":
+		return plugins.QueueSort
 	case "Filter":
 		return plugins.Filter
 	case "PreFilter":

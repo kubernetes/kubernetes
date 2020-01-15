@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
@@ -83,6 +84,11 @@ func ListAlgorithmProviders() string {
 func getDefaultConfig(hardPodAffinityWeight int64) *Config {
 	return &Config{
 		FrameworkPlugins: &schedulerapi.Plugins{
+			QueueSort: &schedulerapi.PluginSet{
+				Enabled: []schedulerapi.Plugin{
+					{Name: queuesort.Name},
+				},
+			},
 			PreFilter: &schedulerapi.PluginSet{
 				Enabled: []schedulerapi.Plugin{
 					{Name: noderesources.FitName},
