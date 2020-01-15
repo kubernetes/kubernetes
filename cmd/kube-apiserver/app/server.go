@@ -561,12 +561,11 @@ func BuildAuthorizer(s *options.ServerRunOptions, versionedInformers clientgoinf
 
 // BuildRequestManager constructs the request manager
 func BuildRequestManager(s *options.ServerRunOptions, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) utilflowcontrol.Interface {
-	return utilflowcontrol.NewRequestManager(
+	return utilflowcontrol.New(
 		versionedInformer,
 		extclient.FlowcontrolV1alpha1(),
 		s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
 		s.GenericServerRunOptions.RequestTimeout/4,
-		true,
 	)
 }
 

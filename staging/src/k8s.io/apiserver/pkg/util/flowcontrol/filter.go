@@ -20,7 +20,6 @@ import (
 	"context"
 	"hash/crc64"
 	"strconv"
-	"sync/atomic"
 	"time"
 
 	// TODO: decide whether to use the existing metrics, which
@@ -31,21 +30,16 @@ import (
 	// "k8s.io/apiserver/pkg/endpoints/metrics"
 
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/util/apihelpers"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	fqs "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"
+	fcfc "k8s.io/apiserver/pkg/util/flowcontrol/filterconfig"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	kubeinformers "k8s.io/client-go/informers"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 
-	rmtypesv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
-	rmclientv1alpha1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
-	rmlistersv1alpha1 "k8s.io/client-go/listers/flowcontrol/v1alpha1"
+	fctypesv1a1 "k8s.io/api/flowcontrol/v1alpha1"
+	fcclientv1a1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
 )
 
 // Interface defines how the request-management filter interacts with the underlying system.
@@ -55,7 +49,7 @@ type Interface interface {
 	// dequeued before returning.  If `execute == false` then the request
 	// is being rejected.  If `execute == true` then the caller should
 	// handle the request and then call `afterExecute()`.
-	Wait(ctx context.Context, requestDigest RequestDigest) (execute bool, afterExecute func())
+	Wait(ctx context.Context, requestDigest fcfc.RequestDigest) (execute bool, afterExecute func())
 
 	// Run monitors config objects from the main apiservers and causes
 	// any needed changes to local behavior
@@ -64,212 +58,99 @@ type Interface interface {
 
 // This request filter implements https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190228-priority-and-fairness.md
 
-// requestManagerState is the variable state that this filter is
-// working with at a given point in time.
-type requestManagerState struct {
-	// flowSchemas holds the flow schema objects, sorted by increasing
-	// numerical (decreasing logical) matching precedence.  Every
-	// FlowSchema in this slice is immutable.
-	flowSchemas apihelpers.FlowSchemaSequence
-
-	// priorityLevelStates maps the PriorityLevelConfiguration object
-	// name to the state for that level.  Every field of every
-	// priorityLevelState in here is immutable.  Every name referenced
-	// from a member of `flowSchemas` has an entry here.
-	priorityLevelStates map[string]*priorityLevelState
+type implementation struct {
+	ctl fcfc.Controller
 }
 
-// priorityLevelState holds the state specific to a priority level.
-type priorityLevelState struct {
-	// config holds the configuration after defaulting logic has been applied.
-	// Exempt may be true while there are queues, in the case of a priority
-	// level that recently switched from being non-exempt to exempt and whose
-	// queues are still draining.
-	// If there are queues then their parameters are here.
-	config rmtypesv1alpha1.PriorityLevelConfigurationSpec
-
-	// qsConfig holds the QueueSetConfig derived from `config` if
-	// config is not exempt, garbage otherwise
-	qsConfig fq.QueueSetConfig
-
-	queues fq.QueueSet
-
-	// Non-nil while waiting for queues to drain.
-	// May be non-nil only if queues is non-nil.
-	// May be non-nil while exempt.
-	emptyHandler *emptyRelay
-}
-
-// requestManager holds all the state and infrastructure of
-// this filter
-type requestManager struct {
-	// wg is kept informed of when goroutines start or stop or begin or end waiting
-	wg counter.GoRoutineCounter
-
-	queueSetFactory fq.QueueSetFactory
-
-	// configQueue holds TypedConfigObjectReference values, identifying
-	// config objects that need to be processed
-	configQueue workqueue.RateLimitingInterface
-
-	plLister         rmlistersv1alpha1.PriorityLevelConfigurationLister
-	plInformerSynced cache.InformerSynced
-
-	fsInformerSynced cache.InformerSynced
-	fsLister         rmlistersv1alpha1.FlowSchemaLister
-
-	flowcontrolClient rmclientv1alpha1.FlowcontrolV1alpha1Interface
-
-	// serverConcurrencyLimit is the limit on the server's total
-	// number of non-exempt requests being served at once.  This comes
-	// from server configuration.
-	serverConcurrencyLimit int
-
-	// requestWaitLimit comes from server configuration.
-	requestWaitLimit time.Duration
-
-	// curState holds a pointer to the current requestManagerState.
-	// That is, `Load()` produces a `*requestManagerState`.  When a
-	// config work queue worker processes a configuration change, it
-	// stores a new pointer here --- it does NOT side-effect the old
-	// `requestManagerState` value.  The new `requestManagerState` has
-	// a freshly constructed slice of FlowSchema pointers and a
-	// freshly constructed map of priority level states.
-	//
-	// When: (1) `curState.Load()` returns a `*requestManagerState`
-	// value X, (2) this happens before a call to
-	// `plState.queues.Wait` (for a plState P in X) that returns with
-	// tryAnother==true, and (3) that Wait return happens before
-	// another call to `curState.Load()` it is guaranteed that the
-	// later `curState.Load()` will return a value that either sends
-	// no requests to P or reflects a later configuration revision
-	// that restores the desirability of P.  The
-	// requestManagerState::Wait method relies on this property to
-	// guarantee progress through its outer loop.
-	curState atomic.Value
-}
-
-// NewRequestManager creates a new instance to implement API priority and fairness
-func NewRequestManager(
+// New creates a new instance to implement API priority and fairness
+func New(
 	informerFactory kubeinformers.SharedInformerFactory,
-	flowcontrolClient rmclientv1alpha1.FlowcontrolV1alpha1Interface,
+	flowcontrolClient fcclientv1a1.FlowcontrolV1alpha1Interface,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
-	waitForAllPredefined bool,
 ) Interface {
-	wg := counter.NoOp{}
-	return NewRequestManagerTestable(
+	grc := counter.NoOp{}
+	return NewTestable(
 		informerFactory,
 		flowcontrolClient,
 		serverConcurrencyLimit,
 		requestWaitLimit,
-		waitForAllPredefined,
-		wg,
-		fqs.NewQueueSetFactory(&clock.RealClock{}, wg),
+		grc,
+		fqs.NewQueueSetFactory(&clock.RealClock{}, grc),
 	)
 }
 
-// NewRequestManagerTestable is extra flexible to facilitate testing
-func NewRequestManagerTestable(
+// NewTestable is extra flexible to facilitate testing
+func NewTestable(
 	informerFactory kubeinformers.SharedInformerFactory,
-	flowcontrolClient rmclientv1alpha1.FlowcontrolV1alpha1Interface,
+	flowcontrolClient fcclientv1a1.FlowcontrolV1alpha1Interface,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
-	waitForAllPredefined bool,
-	wg counter.GoRoutineCounter,
+	grc counter.GoRoutineCounter,
 	queueSetFactory fq.QueueSetFactory,
 ) Interface {
-	reqMgr := &requestManager{
-		wg:                     wg,
-		queueSetFactory:        queueSetFactory,
-		serverConcurrencyLimit: serverConcurrencyLimit,
-		requestWaitLimit:       requestWaitLimit,
-		flowcontrolClient:      flowcontrolClient,
-	}
-	klog.V(2).Infof("NewRequestManagementSystem with serverConcurrencyLimit=%d, requestWaitLimit=%s", serverConcurrencyLimit, requestWaitLimit)
-	reqMgr.initializeConfigController(informerFactory)
-	emptyRMState := &requestManagerState{
-		priorityLevelStates: make(map[string]*priorityLevelState),
-	}
-	reqMgr.curState.Store(emptyRMState)
-	reqMgr.digestConfigObjects(nil, nil)
-	return reqMgr
+	return &implementation{ctl: fcfc.NewTestableController(informerFactory, flowcontrolClient, serverConcurrencyLimit, requestWaitLimit, grc, queueSetFactory)}
 }
 
-// RequestDigest holds necessary info from request for flow-control
-type RequestDigest struct {
-	RequestInfo *request.RequestInfo
-	User        user.Info
+func (impl *implementation) Run(stopCh <-chan struct{}) error {
+	return impl.Run(stopCh)
 }
 
-func (reqMgr *requestManager) Wait(ctx context.Context, requestDigest RequestDigest) (bool, func()) {
+func (impl *implementation) Wait(ctx context.Context, requestDigest fcfc.RequestDigest) (bool, func()) {
 	startWaitingTime := time.Now()
-	for {
-		rmState := reqMgr.curState.Load().(*requestManagerState)
+	for { // loop until QueueSet::Wait does not return tryAnother==true
+		cfgState := impl.ctl.GetCurrentState()
 
-		// 1. figure out which flow schema applies
-		fs := rmState.pickFlowSchema(requestDigest)
-		if fs == nil { // reject
-			metrics.AddReject("<none>", "non-match")
-			klog.V(7).Infof("Rejecting requestInfo=%#+v, userInfo=%#+v because no FlowSchema matched", requestDigest.RequestInfo, requestDigest.User)
-			return false, func() {}
-		}
-		plName := fs.Spec.PriorityLevelConfiguration.Name
+		// 1. classify the request
+		fsName, distinguisherMethod, plName, plEnablement, queues := cfgState.Match(requestDigest)
 
 		// 2. early out for exempt
-		ps := rmState.priorityLevelStates[plName]
-		if ps.config.Type == rmtypesv1alpha1.PriorityLevelEnablementExempt {
-			klog.V(7).Infof("Serving requestInfo=%#+v, userInfo=%#+v, fs=%s, pl=%s without delay", requestDigest.RequestInfo, requestDigest.User, fs.Name, plName)
+		if plEnablement == fctypesv1a1.PriorityLevelEnablementExempt {
+			klog.V(7).Infof("Serving requestInfo=%#+v, userInfo=%#+v, fs=%s, pl=%s without delay", requestDigest.RequestInfo, requestDigest.User, fsName, plName)
 			startExecutionTime := time.Now()
 			return true, func() {
-				metrics.ObserveExecutionDuration(plName, fs.Name, time.Now().Sub(startExecutionTime))
+				metrics.ObserveExecutionDuration(plName, fsName, time.Now().Sub(startExecutionTime))
 			}
 		}
 
 		// 3. computing hash
-		flowDistinguisher := requestDigest.ComputeFlowDistinguisher(fs.Spec.DistinguisherMethod)
-		hashValue := hashFlowID(fs.Name, flowDistinguisher)
+		flowDistinguisher := computeFlowDistinguisher(requestDigest, distinguisherMethod)
+		hashValue := hashFlowID(fsName, flowDistinguisher)
 
 		// 4. queuing
-		tryAnother, execute, afterExecute := ps.queues.Wait(ctx, hashValue, requestDigest.RequestInfo, requestDigest.User)
+		tryAnother, execute, afterExecute := queues.Wait(ctx, hashValue, requestDigest.RequestInfo, requestDigest.User)
 		if tryAnother {
-			klog.V(5).Infof("Request requestInfo=%#+v, userInfo=%#+v, fs=%s, pl=%s landed in timing splinter, re-classifying", requestDigest.RequestInfo, requestDigest.User, fs.Name, plName)
+			klog.V(5).Infof("Request requestInfo=%#+v, userInfo=%#+v, fs=%s, pl=%s landed in timing splinter, re-classifying", requestDigest.RequestInfo, requestDigest.User, fsName, plName)
+			// Controller promises us that a following
+			// GetCurrentState() will produce something more evolved
+			// than last time
 			continue
 		}
 
 		// 5. execute or reject
-		metrics.ObserveWaitingDuration(plName, fs.Name, strconv.FormatBool(execute), time.Now().Sub(startWaitingTime))
+		metrics.ObserveWaitingDuration(plName, fsName, strconv.FormatBool(execute), time.Now().Sub(startWaitingTime))
 		if !execute {
-			klog.V(7).Infof("Rejecting requestInfo=%#+v, userInfo=%#+v, fs=%s, pl=%s after fair queuing", requestDigest.RequestInfo, requestDigest.User, fs.Name, plName)
+			klog.V(7).Infof("Rejecting requestInfo=%#+v, userInfo=%#+v, fs=%s, pl=%s after fair queuing", requestDigest.RequestInfo, requestDigest.User, fsName, plName)
 			return false, func() {}
 		}
-		klog.V(7).Infof("Serving requestInfo=%#+v, userInfo=%#+v, fs=%s, pl=%s after fair queuing", requestDigest.RequestInfo, requestDigest.User, fs.Name, plName)
+		klog.V(7).Infof("Serving requestInfo=%#+v, userInfo=%#+v, fs=%s, pl=%s after fair queuing", requestDigest.RequestInfo, requestDigest.User, fsName, plName)
 		startExecutionTime := time.Now()
 		return execute, func() {
-			metrics.ObserveExecutionDuration(plName, fs.Name, time.Now().Sub(startExecutionTime))
+			metrics.ObserveExecutionDuration(plName, fsName, time.Now().Sub(startExecutionTime))
 			afterExecute()
 		}
 	}
 }
 
-func (rmState *requestManagerState) pickFlowSchema(rd RequestDigest) *rmtypesv1alpha1.FlowSchema {
-	for _, flowSchema := range rmState.flowSchemas {
-		if matchesFlowSchema(rd, flowSchema) {
-			return flowSchema
-		}
-	}
-	return nil
-}
-
-// ComputeFlowDistinguisher extracts the flow distinguisher according to the given method
-func (rd RequestDigest) ComputeFlowDistinguisher(method *rmtypesv1alpha1.FlowDistinguisherMethod) string {
+// computeFlowDistinguisher extracts the flow distinguisher according to the given method
+func computeFlowDistinguisher(rd fcfc.RequestDigest, method *fctypesv1a1.FlowDistinguisherMethod) string {
 	if method == nil {
 		return ""
 	}
 	switch method.Type {
-	case rmtypesv1alpha1.FlowDistinguisherMethodByUserType:
+	case fctypesv1a1.FlowDistinguisherMethodByUserType:
 		return rd.User.GetName()
-	case rmtypesv1alpha1.FlowDistinguisherMethodByNamespaceType:
+	case fctypesv1a1.FlowDistinguisherMethodByNamespaceType:
 		return rd.RequestInfo.Namespace
 	default:
 		// this line shall never reach
@@ -277,7 +158,7 @@ func (rd RequestDigest) ComputeFlowDistinguisher(method *rmtypesv1alpha1.FlowDis
 	}
 }
 
-// HashFlowID hashes the inputs into 64-bits
+// hashFlowID hashes the inputs into 64-bits
 func hashFlowID(fsName, fDistinguisher string) uint64 {
 	return crc64.Checksum([]byte(fsName+fDistinguisher), crc64.MakeTable(crc64.ECMA))
 }

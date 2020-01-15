@@ -31,6 +31,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
+	utilfilterconfig "k8s.io/apiserver/pkg/util/flowcontrol/filterconfig"
 	"k8s.io/klog"
 )
 
@@ -58,7 +59,7 @@ func WithPriorityAndFairness(
 			handleError(w, r, fmt.Errorf("no User found in context"))
 			return
 		}
-		requestDigest := utilflowcontrol.RequestDigest{requestInfo, user}
+		requestDigest := utilfilterconfig.RequestDigest{requestInfo, user}
 
 		// Skip tracking long running requests.
 		if longRunningRequestCheck != nil && longRunningRequestCheck(r, requestInfo) {

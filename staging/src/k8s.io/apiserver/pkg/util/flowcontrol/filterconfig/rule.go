@@ -14,16 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package flowcontrol
+package filterconfig
 
 import (
 	"strings"
 
-	rmtypesv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	fctypesv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 )
 
-func matchesFlowSchema(digest RequestDigest, flowSchema *rmtypesv1alpha1.FlowSchema) bool {
+// Tests whether a given request and FlowSchema match.  Nobody mutates
+// either input.
+func matchesFlowSchema(digest RequestDigest, flowSchema *fctypesv1a1.FlowSchema) bool {
 	for _, policyRule := range flowSchema.Spec.Rules {
 		subjectMatches := false
 		for _, subject := range policyRule.Subjects {
@@ -50,15 +52,15 @@ func matchesFlowSchema(digest RequestDigest, flowSchema *rmtypesv1alpha1.FlowSch
 	return false
 }
 
-func matchesSubject(digest RequestDigest, subject rmtypesv1alpha1.Subject) bool {
+func matchesSubject(digest RequestDigest, subject fctypesv1a1.Subject) bool {
 	user := digest.User
 	switch subject.Kind {
-	case rmtypesv1alpha1.SubjectKindUser:
-		return subject.User.Name == rmtypesv1alpha1.NameAll || subject.User.Name == user.GetName()
-	case rmtypesv1alpha1.SubjectKindGroup:
-		return containsString(subject.Group.Name, user.GetGroups(), rmtypesv1alpha1.NameAll)
-	case rmtypesv1alpha1.SubjectKindServiceAccount:
-		if subject.ServiceAccount.Name == rmtypesv1alpha1.NameAll {
+	case fctypesv1a1.SubjectKindUser:
+		return subject.User.Name == fctypesv1a1.NameAll || subject.User.Name == user.GetName()
+	case fctypesv1a1.SubjectKindGroup:
+		return containsString(subject.Group.Name, user.GetGroups(), fctypesv1a1.NameAll)
+	case fctypesv1a1.SubjectKindServiceAccount:
+		if subject.ServiceAccount.Name == fctypesv1a1.NameAll {
 			return serviceAccountMatchesNamespace(subject.ServiceAccount.Namespace, user.GetName())
 		}
 		return serviceaccount.MatchesUsername(subject.ServiceAccount.Namespace, subject.ServiceAccount.Name, user.GetName())
@@ -88,7 +90,7 @@ func serviceAccountMatchesNamespace(namespace string, username string) bool {
 	return strings.HasPrefix(username, ServiceAccountUsernameSeparator)
 }
 
-func matchesResourcePolicyRule(digest RequestDigest, policyRule rmtypesv1alpha1.ResourcePolicyRule) bool {
+func matchesResourcePolicyRule(digest RequestDigest, policyRule fctypesv1a1.ResourcePolicyRule) bool {
 	if !matchPolicyRuleVerb(policyRule.Verbs, digest.RequestInfo.Verb) {
 		return false
 	}
@@ -104,10 +106,10 @@ func matchesResourcePolicyRule(digest RequestDigest, policyRule rmtypesv1alpha1.
 	if len(digest.RequestInfo.Namespace) == 0 {
 		return policyRule.ClusterScope
 	}
-	return containsString(digest.RequestInfo.Namespace, policyRule.Namespaces, rmtypesv1alpha1.NamespaceEvery)
+	return containsString(digest.RequestInfo.Namespace, policyRule.Namespaces, fctypesv1a1.NamespaceEvery)
 }
 
-func matchesNonResourcePolicyRule(digest RequestDigest, policyRule rmtypesv1alpha1.NonResourcePolicyRule) bool {
+func matchesNonResourcePolicyRule(digest RequestDigest, policyRule fctypesv1a1.NonResourcePolicyRule) bool {
 	if !matchPolicyRuleVerb(policyRule.Verbs, digest.RequestInfo.Verb) {
 		return false
 	}
@@ -118,19 +120,19 @@ func matchesNonResourcePolicyRule(digest RequestDigest, policyRule rmtypesv1alph
 }
 
 func matchPolicyRuleVerb(policyRuleVerbs []string, requestVerb string) bool {
-	return containsString(requestVerb, policyRuleVerbs, rmtypesv1alpha1.VerbAll)
+	return containsString(requestVerb, policyRuleVerbs, fctypesv1a1.VerbAll)
 }
 
 func matchPolicyRuleNonResourceURL(policyRuleRequestURLs []string, requestPath string) bool {
-	return containsString(requestPath, policyRuleRequestURLs, rmtypesv1alpha1.NonResourceAll)
+	return containsString(requestPath, policyRuleRequestURLs, fctypesv1a1.NonResourceAll)
 }
 
 func matchPolicyRuleAPIGroup(policyRuleAPIGroups []string, requestAPIGroup string) bool {
-	return containsString(requestAPIGroup, policyRuleAPIGroups, rmtypesv1alpha1.APIGroupAll)
+	return containsString(requestAPIGroup, policyRuleAPIGroups, fctypesv1a1.APIGroupAll)
 }
 
 func matchPolicyRuleResource(policyRuleRequestResources []string, requestResource string) bool {
-	return containsString(requestResource, policyRuleRequestResources, rmtypesv1alpha1.ResourceAll)
+	return containsString(requestResource, policyRuleRequestResources, fctypesv1a1.ResourceAll)
 }
 
 func containsString(x string, list []string, wildcard string) bool {
