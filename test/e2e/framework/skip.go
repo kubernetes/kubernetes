@@ -163,10 +163,7 @@ func SkipUnlessSSHKeyPresent() {
 	}
 }
 
-// serverVersionGTE returns true if v is greater than or equal to the server
-// version.
-//
-// TODO(18726): This should be incorporated into client.VersionInterface.
+// serverVersionGTE returns true if v is greater than or equal to the server version.
 func serverVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface) (bool, error) {
 	serverVersion, err := c.ServerVersion()
 	if err != nil {
