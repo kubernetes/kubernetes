@@ -498,7 +498,6 @@ func checkPodsCondition(c clientset.Interface, ns string, podNames []string, tim
 }
 
 // GetPodLogs returns the logs of the specified container (namespace/pod/container).
-// TODO(random-liu): Change this to be a member function of the framework.
 func GetPodLogs(c clientset.Interface, namespace, podName, containerName string) (string, error) {
 	return getPodLogsInternal(c, namespace, podName, containerName, false)
 }
