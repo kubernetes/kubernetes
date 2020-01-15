@@ -365,17 +365,6 @@ func (g *GenericPLEG) getPodIPs(pid types.UID, status *kubecontainer.PodStatus) 
 		}
 	}
 
-	if len(status.SandboxStatuses) == 0 {
-		// Without sandboxes (which built-in runtimes like rkt don't report)
-		// look at all the container statuses, and if any containers are
-		// running then use the new pod IP
-		for _, containerStatus := range status.ContainerStatuses {
-			if containerStatus.State == kubecontainer.ContainerStateCreated || containerStatus.State == kubecontainer.ContainerStateRunning {
-				return status.IPs
-			}
-		}
-	}
-
 	// For pods with no ready containers or sandboxes (like exited pods)
 	// use the old status' pod IP
 	return oldStatus.IPs
