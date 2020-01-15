@@ -79,6 +79,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				]
 			}`,
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodeResourcesFit"},
 				},
@@ -98,6 +99,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"apiVersion" : "v1"
 			}`,
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodeResourcesFit"},
 					{Name: "NodePorts"},
@@ -144,6 +146,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"priorities" : []
 			}`,
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "TaintToleration"},
@@ -160,6 +163,7 @@ priorities:
   weight: 1
 `,
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodeResourcesFit"},
 				},
@@ -178,6 +182,7 @@ priorities:
 kind: Policy
 `,
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodeResourcesFit"},
 					{Name: "NodePorts"},
@@ -223,6 +228,7 @@ predicates: []
 priorities: []
 `,
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "TaintToleration"},

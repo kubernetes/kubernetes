@@ -45,6 +45,7 @@ import (
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
@@ -289,6 +290,12 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	// Combine all framework configurations. If this results in any duplication, framework
 	// instantiation should fail.
 	var defaultPlugins schedulerapi.Plugins
+	// "PrioritySort" is neither a predicate nor priority before. We make it as the default QueueSort plugin.
+	defaultPlugins.Append(&schedulerapi.Plugins{
+		QueueSort: &schedulerapi.PluginSet{
+			Enabled: []schedulerapi.Plugin{{Name: queuesort.Name}},
+		},
+	})
 	defaultPlugins.Append(pluginsForPredicates)
 	defaultPlugins.Append(pluginsForPriorities)
 	defaultPlugins.Apply(c.plugins)
