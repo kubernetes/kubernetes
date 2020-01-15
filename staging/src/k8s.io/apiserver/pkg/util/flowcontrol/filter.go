@@ -156,12 +156,13 @@ func computeFlowDistinguisher(rd fcfc.RequestDigest, method *fctypesv1a1.FlowDis
 	}
 }
 
+var crcHashTable = crc64.MakeTable(crc64.ECMA)
+
 // hashFlowID hashes the inputs into 64-bits
 func hashFlowID(fsName, fDistinguisher string) uint64 {
-	table := crc64.MakeTable(crc64.ECMA)
-	hash := crc64.New(table)
-	hash.Write([]byte(fsName))
-	hash.Write([]byte{1})
-	hash.Write([]byte(fDistinguisher))
-	return hash.Sum64()
+	var hash uint64
+	hash = crc64.Update(hash, crcHashTable, []byte(fsName))
+	hash = crc64.Update(hash, crcHashTable, []byte{1})
+	hash = crc64.Update(hash, crcHashTable, []byte(fDistinguisher))
+	return hash
 }
