@@ -250,12 +250,12 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 		func() { extinguish(f, 100, 0, 150) })
 
 	/*
-          Release : v1.18
-          Testname: Namespace patching
-          Description: A Namespace is created.
-          The Namespace is patched.
-          The Namespace and MUST now include the new Label.
-        */
+	   Release : v1.18
+	   Testname: Namespace patching
+	   Description: A Namespace is created.
+	   The Namespace is patched.
+	   The Namespace and MUST now include the new Label.
+	*/
 	framework.ConformanceIt("should patch a Namespace", func() {
 		ginkgo.By("creating a Namespace")
 		namespaceName := "nspatchtest-" + string(uuid.NewUUID())
