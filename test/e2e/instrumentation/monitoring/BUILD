@@ -48,6 +48,7 @@ go_library(
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/golang.org/x/oauth2/google:go_default_library",
         "//vendor/google.golang.org/api/monitoring/v3:go_default_library",
+        "//vendor/google.golang.org/api/option:go_default_library",
     ],
 )
 

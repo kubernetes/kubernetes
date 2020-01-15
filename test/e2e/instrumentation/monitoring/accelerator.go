@@ -35,6 +35,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"golang.org/x/oauth2/google"
 	gcm "google.golang.org/api/monitoring/v3"
+	"google.golang.org/api/option"
 )
 
 // Stackdriver container accelerator metrics, as described here:
@@ -63,8 +64,9 @@ func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
+	framework.ExpectNoError(err)
 
-	gcmService, err := gcm.New(client)
+	gcmService, err := gcm.NewService(ctx, option.WithHTTPClient(client))
 
 	framework.ExpectNoError(err)
 
