@@ -26,6 +26,7 @@ go_library(
         "networking.go",
         "node_lease.go",
         "pods.go",
+        "podtemplates.go",
         "privileged.go",
         "projected_combined.go",
         "projected_configmap.go",
