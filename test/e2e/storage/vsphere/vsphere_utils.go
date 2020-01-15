@@ -69,12 +69,10 @@ const (
 // Wait until vsphere volumes are detached from the list of nodes or time out after 5 minutes
 func waitForVSphereDisksToDetach(nodeVolumes map[string][]string) error {
 	var (
-		err            error
-		disksAttached  = true
 		detachTimeout  = 5 * time.Minute
 		detachPollTime = 10 * time.Second
 	)
-	err = wait.Poll(detachPollTime, detachTimeout, func() (bool, error) {
+	waitErr := wait.Poll(detachPollTime, detachTimeout, func() (bool, error) {
 		attachedResult, err := disksAreAttached(nodeVolumes)
 		if err != nil {
 			return false, err
@@ -82,20 +80,19 @@ func waitForVSphereDisksToDetach(nodeVolumes map[string][]string) error {
 		for nodeName, nodeVolumes := range attachedResult {
 			for volumePath, attached := range nodeVolumes {
 				if attached {
-					framework.Logf("Waiting for volumes %q to detach from %q.", volumePath, string(nodeName))
+					framework.Logf("Volume %q is still attached to %q.", volumePath, string(nodeName))
 					return false, nil
 				}
 			}
 		}
-		disksAttached = false
 		framework.Logf("Volume are successfully detached from all the nodes: %+v", nodeVolumes)
 		return true, nil
 	})
-	if err != nil {
-		return err
-	}
-	if disksAttached {
-		return fmt.Errorf("Gave up waiting for volumes to detach after %v", detachTimeout)
+	if waitErr != nil {
+		if waitErr == wait.ErrWaitTimeout {
+			return fmt.Errorf("volumes have not detached after %v: %v", detachTimeout, waitErr)
+		}
+		return fmt.Errorf("error waiting for volumes to detach: %v", waitErr)
 	}
 	return nil
 }
@@ -103,8 +100,6 @@ func waitForVSphereDisksToDetach(nodeVolumes map[string][]string) error {
 // Wait until vsphere vmdk moves to expected state on the given node, or time out after 6 minutes
 func waitForVSphereDiskStatus(volumePath string, nodeName string, expectedState volumeState) error {
 	var (
-		err          error
-		diskAttached bool
 		currentState volumeState
 		timeout      = 6 * time.Minute
 		pollTime     = 10 * time.Second
@@ -120,8 +115,8 @@ func waitForVSphereDiskStatus(volumePath string, nodeName string, expectedState 
 		volumeStateDetached: "detached from",
 	}
 
-	err = wait.Poll(pollTime, timeout, func() (bool, error) {
-		diskAttached, err = diskIsAttached(volumePath, nodeName)
+	waitErr := wait.Poll(pollTime, timeout, func() (bool, error) {
+		diskAttached, err := diskIsAttached(volumePath, nodeName)
 		if err != nil {
 			return true, err
 		}
@@ -134,14 +129,13 @@ func waitForVSphereDiskStatus(volumePath string, nodeName string, expectedState 
 		framework.Logf("Waiting for Volume %q to be %s %q.", volumePath, attachedStateMsg[expectedState], nodeName)
 		return false, nil
 	})
-	if err != nil {
-		return err
+	if waitErr != nil {
+		if waitErr == wait.ErrWaitTimeout {
+			return fmt.Errorf("volume %q is not %s %q after %v: %v", volumePath, attachedStateMsg[expectedState], nodeName, timeout, waitErr)
+		}
+		return fmt.Errorf("error waiting for volume %q to be %s %q: %v", volumePath, attachedStateMsg[expectedState], nodeName, waitErr)
 	}
-
-	if currentState != expectedState {
-		err = fmt.Errorf("Gave up waiting for Volume %q to be %s %q after %v", volumePath, attachedStateMsg[expectedState], nodeName, timeout)
-	}
-	return err
+	return nil
 }
 
 // Wait until vsphere vmdk is attached from the given node or time out after 6 minutes
