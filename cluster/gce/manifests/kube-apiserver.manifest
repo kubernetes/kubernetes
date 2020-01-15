@@ -49,7 +49,7 @@
         "scheme": "HTTPS",
         "host": "{{healthcheck_ip}}",
         "port": {{secure_port}},
-        "path": "/readyz?exclude=kms-provider-0&exclude=kms-provider-1"
+        "path": "/readyz"
       },
       "periodSeconds": 1,
       "timeoutSeconds": 15
