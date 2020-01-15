@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -38,8 +37,13 @@ type NodeAffinity struct {
 var _ framework.FilterPlugin = &NodeAffinity{}
 var _ framework.ScorePlugin = &NodeAffinity{}
 
-// Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "NodeAffinity"
+const (
+	// Name is the name of the plugin used in the plugin registry and configurations.
+	Name = "NodeAffinity"
+
+	// ErrReason for node affinity/selector not matching.
+	ErrReason = "node(s) didn't match node selector"
+)
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodeAffinity) Name() string {
@@ -53,7 +57,7 @@ func (pl *NodeAffinity) Filter(ctx context.Context, state *framework.CycleState,
 		return framework.NewStatus(framework.Error, "node not found")
 	}
 	if !pluginhelper.PodMatchesNodeSelectorAndAffinityTerms(pod, node) {
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, predicates.ErrNodeSelectorNotMatch.GetReason())
+		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason)
 	}
 	return nil
 }

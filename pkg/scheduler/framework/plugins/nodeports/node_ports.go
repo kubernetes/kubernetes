@@ -22,13 +22,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog"
-
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // NodePorts is a plugin that checks if a node has free ports for the requested pod ports.
@@ -43,6 +38,9 @@ const (
 	// preFilterStateKey is the key in CycleState to NodePorts pre-computed data.
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.
 	preFilterStateKey = "PreFilter" + Name
+
+	// ErrReason when node ports aren't available.
+	ErrReason = "node(s) didn't have free ports for the requested pod ports"
 )
 
 type preFilterState []*v1.ContainerPort
@@ -58,9 +56,24 @@ func (pl *NodePorts) Name() string {
 	return Name
 }
 
+// getContainerPorts returns the used host ports of Pods: if 'port' was used, a 'port:true' pair
+// will be in the result; but it does not resolve port conflict.
+func getContainerPorts(pods ...*v1.Pod) []*v1.ContainerPort {
+	ports := []*v1.ContainerPort{}
+	for _, pod := range pods {
+		for j := range pod.Spec.Containers {
+			container := &pod.Spec.Containers[j]
+			for k := range container.Ports {
+				ports = append(ports, &container.Ports[k])
+			}
+		}
+	}
+	return ports
+}
+
 // PreFilter invoked at the prefilter extension point.
 func (pl *NodePorts) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
-	s := schedutil.GetContainerPorts(pod)
+	s := getContainerPorts(pod)
 	cycleState.Write(preFilterStateKey, preFilterState(s))
 	return nil
 }
@@ -71,15 +84,10 @@ func (pl *NodePorts) PreFilterExtensions() framework.PreFilterExtensions {
 }
 
 func getPreFilterState(cycleState *framework.CycleState) (preFilterState, error) {
-	if cycleState == nil {
-		return nil, fmt.Errorf("invalid nil CycleState")
-	}
-
 	c, err := cycleState.Read(preFilterStateKey)
 	if err != nil {
-		// The metadata wasn't pre-computed in prefilter. We ignore the error for now since
+		// preFilterState state doesn't exist. We ignore the error for now since
 		// Filter is able to handle that by computing it again.
-		klog.V(5).Infof("Error reading %q from cycleState: %v", preFilterStateKey, err)
 		return nil, nil
 	}
 
@@ -92,12 +100,38 @@ func getPreFilterState(cycleState *framework.CycleState) (preFilterState, error)
 
 // Filter invoked at the filter extension point.
 func (pl *NodePorts) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
-	state, err := getPreFilterState(cycleState)
+	wantPorts, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
 	}
-	_, reasons, err := predicates.PodFitsHostPortsPredicate(pod, state, nodeInfo)
-	return migration.PredicateResultToFrameworkStatus(reasons, err)
+
+	var fits bool
+	if wantPorts != nil {
+		fits = fitsPorts(wantPorts, nodeInfo)
+	} else {
+		fits = Fits(pod, nodeInfo)
+	}
+	if !fits {
+		return framework.NewStatus(framework.Unschedulable, ErrReason)
+	}
+
+	return nil
+}
+
+// Fits checks if the pod fits the node.
+func Fits(pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) bool {
+	return fitsPorts(getContainerPorts(pod), nodeInfo)
+}
+
+func fitsPorts(wantPorts []*v1.ContainerPort, nodeInfo *nodeinfo.NodeInfo) bool {
+	// try to see whether existingPorts and wantPorts will conflict or not
+	existingPorts := nodeInfo.UsedPorts()
+	for _, cp := range wantPorts {
+		if existingPorts.CheckConflict(cp.HostIP, string(cp.Protocol), cp.HostPort) {
+			return false
+		}
+	}
+	return true
 }
 
 // New initializes a new plugin and returns it.

@@ -39,12 +39,11 @@ import (
 	"k8s.io/klog"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/core"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
+	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -194,8 +193,8 @@ func (c *Configurator) createFromProvider(providerName string) (*Scheduler, erro
 
 // CreateFromConfig creates a scheduler from the configuration file
 func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler, error) {
-	lr := plugins.NewLegacyRegistry()
-	args := &plugins.ConfigProducerArgs{}
+	lr := frameworkplugins.NewLegacyRegistry()
+	args := &frameworkplugins.ConfigProducerArgs{}
 
 	klog.V(2).Infof("Creating scheduler from configuration: %v", policy)
 
@@ -221,7 +220,7 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 		priorityKeys = lr.DefaultPriorities
 	} else {
 		for _, priority := range policy.Priorities {
-			if priority.Name == plugins.EqualPriority {
+			if priority.Name == frameworkplugins.EqualPriority {
 				klog.V(2).Infof("Skip registering priority: %s", priority.Name)
 				continue
 			}
@@ -309,7 +308,7 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 // getPriorityConfigs returns priorities configuration: ones that will run as priorities and ones that will run
 // as framework plugins. Specifically, a priority will run as a framework plugin if a plugin config producer was
 // registered for that priority.
-func getPriorityConfigs(keys map[string]int64, lr *plugins.LegacyRegistry, args *plugins.ConfigProducerArgs) (*schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
+func getPriorityConfigs(keys map[string]int64, lr *frameworkplugins.LegacyRegistry, args *frameworkplugins.ConfigProducerArgs) (*schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
 	var plugins schedulerapi.Plugins
 	var pluginConfig []schedulerapi.PluginConfig
 
@@ -340,7 +339,7 @@ func getPriorityConfigs(keys map[string]int64, lr *plugins.LegacyRegistry, args 
 // registered for that predicate.
 // Note that the framework executes plugins according to their order in the Plugins list, and so predicates run as plugins
 // are added to the Plugins list according to the order specified in predicates.Ordering().
-func getPredicateConfigs(keys sets.String, lr *plugins.LegacyRegistry, args *plugins.ConfigProducerArgs) (*schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
+func getPredicateConfigs(keys sets.String, lr *frameworkplugins.LegacyRegistry, args *frameworkplugins.ConfigProducerArgs) (*schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
 	allPredicates := keys.Union(lr.MandatoryPredicates)
 
 	// Create the framework plugin configurations, and place them in the order
@@ -348,7 +347,7 @@ func getPredicateConfigs(keys sets.String, lr *plugins.LegacyRegistry, args *plu
 	var plugins schedulerapi.Plugins
 	var pluginConfig []schedulerapi.PluginConfig
 
-	for _, predicateKey := range predicates.Ordering() {
+	for _, predicateKey := range frameworkplugins.PredicateOrdering() {
 		if allPredicates.Has(predicateKey) {
 			producer, exist := lr.PredicateToConfigProducer[predicateKey]
 			if !exist {

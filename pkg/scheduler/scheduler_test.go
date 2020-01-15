@@ -44,7 +44,6 @@ import (
 	"k8s.io/client-go/tools/events"
 	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
@@ -148,10 +147,6 @@ type mockScheduler struct {
 
 func (es mockScheduler) Schedule(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (core.ScheduleResult, error) {
 	return es.result, es.err
-}
-
-func (es mockScheduler) Predicates() map[string]predicates.FitPredicate {
-	return nil
 }
 
 func (es mockScheduler) Extenders() []algorithm.SchedulerExtender {
@@ -360,7 +355,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 	client := clientsetfake.NewSimpleClientset(&node)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-	f := st.RegisterFilterPlugin("PodFitsHostPorts", nodeports.New)
+	f := st.RegisterPluginAsExtensions(nodeports.Name, 1, nodeports.New, "Filter", "PreFilter")
 	scheduler, bindingChan, _ := setupTestSchedulerWithOnePodOnNode(t, queuedPodStore, scache, informerFactory, stop, f, pod, &node)
 
 	waitPodExpireChan := make(chan struct{})
@@ -423,7 +418,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	scache.AddNode(&node)
 	client := clientsetfake.NewSimpleClientset(&node)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	f := st.RegisterFilterPlugin(nodeports.Name, nodeports.New)
+	f := st.RegisterPluginAsExtensions(nodeports.Name, 1, nodeports.New, "Filter", "PreFilter")
 	scheduler, bindingChan, errChan := setupTestSchedulerWithOnePodOnNode(t, queuedPodStore, scache, informerFactory, stop, f, firstPod, &node)
 
 	// We use conflicted pod ports to incur fit predicate failure.
@@ -441,7 +436,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 			FilteredNodesStatuses: framework.NodeToStatusMap{
 				node.Name: framework.NewStatus(
 					framework.Unschedulable,
-					predicates.ErrPodNotFitsHostPorts.GetReason(),
+					nodeports.ErrReason,
 				),
 			},
 		}
@@ -517,7 +512,7 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 
 			client := clientsetfake.NewSimpleClientset(&node)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			f := st.RegisterFilterPlugin(nodeports.Name, nodeports.New)
+			f := st.RegisterPluginAsExtensions(nodeports.Name, 1, nodeports.New, "Filter", "PreFilter")
 
 			scheduler, bindingChan := setupTestSchedulerLongBindingWithRetry(
 				queuedPodStore, scache, informerFactory, f, stop, test.BindingDuration)
@@ -630,8 +625,8 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	for _, node := range nodes {
 		failedNodeStatues[node.Name] = framework.NewStatus(
 			framework.Unschedulable,
-			predicates.NewInsufficientResourceError(v1.ResourceCPU, 4000, 0, 2000).GetReason(),
-			predicates.NewInsufficientResourceError(v1.ResourceMemory, 500, 0, 100).GetReason(),
+			fmt.Sprintf("Insufficient %v", v1.ResourceCPU),
+			fmt.Sprintf("Insufficient %v", v1.ResourceMemory),
 		)
 	}
 	f := st.RegisterFilterPlugin("PodFitsResources", noderesources.NewFit)
@@ -665,7 +660,8 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, f st.RegisterPluginFunc, recorder events.EventRecorder) (*Scheduler, chan *v1.Binding, chan error) {
 	registry := framework.Registry{}
 	plugins := &schedulerapi.Plugins{
-		Filter: &schedulerapi.PluginSet{},
+		PreFilter: &schedulerapi.PluginSet{},
+		Filter:    &schedulerapi.PluginSet{},
 	}
 	var pluginConfigs []schedulerapi.PluginConfig
 	f(&registry, plugins, pluginConfigs)
@@ -718,7 +714,8 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, f st.RegisterPluginFunc, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
 	registry := framework.Registry{}
 	plugins := &schedulerapi.Plugins{
-		Filter: &schedulerapi.PluginSet{},
+		PreFilter: &schedulerapi.PluginSet{},
+		Filter:    &schedulerapi.PluginSet{},
 	}
 	var pluginConfigs []schedulerapi.PluginConfig
 	f(&registry, plugins, pluginConfigs)
