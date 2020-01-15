@@ -306,6 +306,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 	mounts, devices := util.GetPodVolumeNames(pod)
 
 	expandInUsePV := utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes)
+	allVolumesAddedPreviously := true
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
 		if !mounts.Has(podVolume.Name) && !devices.Has(podVolume.Name) {
@@ -326,10 +327,16 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 			allVolumesAdded = false
 			continue
 		}
+		uniqueVolumeName, err := dswp.desiredStateOfWorld.GetUniqueVolumeName(uniquePodName, volumeSpec)
+		if err != nil || !dswp.desiredStateOfWorld.PodExistsInVolume(uniquePodName, uniqueVolumeName) {
+			allVolumesAddedPreviously = false
+		}
 
-		// Add volume to desired state of world
-		_, err = dswp.desiredStateOfWorld.AddPodToVolume(
-			uniquePodName, pod, volumeSpec, podVolume.Name, volumeGidValue)
+		if err == nil {
+			// Add volume to desired state of world
+			_, err = dswp.desiredStateOfWorld.AddPodToVolume(
+				uniquePodName, pod, uniqueVolumeName, volumeSpec, podVolume.Name, volumeGidValue)
+		}
 		if err != nil {
 			klog.Errorf(
 				"Failed to add volume %s (specName: %s) for pod %q to desiredStateOfWorld: %v",
@@ -353,8 +360,9 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 		}
 	}
 
-	// some of the volume additions may have failed, should not mark this pod as fully processed
-	if allVolumesAdded {
+	// If some volume is added, mark this pod as fully processed.
+	// This handles the scenario where the pod was successfully processed once, and errors on a reprocessing.
+	if allVolumesAddedPreviously || allVolumesAdded {
 		dswp.markPodProcessed(uniquePodName)
 		// New pod has been synced. Re-mount all volumes that need it
 		// (e.g. DownwardAPI)

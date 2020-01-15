@@ -27,6 +27,15 @@ import (
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
+func getUniqueVolumeName(t *testing.T, dsw DesiredStateOfWorld, podName volumetypes.UniquePodName, volumeSpec *volume.Spec) v1.UniqueVolumeName {
+	uniqueVolumeName, err := dsw.GetUniqueVolumeName(podName, volumeSpec)
+	// Assert
+	if err != nil {
+		t.Fatalf("getUniqueVolumeName failed. Expected: <no error> Actual: <%v>", err)
+	}
+	return uniqueVolumeName
+}
+
 // Calls AddPodToVolume() to add new pod to new volume
 // Verifies newly added pod/volume exists via
 // PodExistsInVolume() VolumeExists() and GetVolumesToMount()
@@ -58,7 +67,7 @@ func Test_AddPodToVolume_Positive_NewPodNewVolume(t *testing.T) {
 
 	// Act
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod, getUniqueVolumeName(t, dsw, podName, volumeSpec), volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 
 	// Assert
 	if err != nil {
@@ -103,7 +112,7 @@ func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 
 	// Act
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod, getUniqueVolumeName(t, dsw, podName, volumeSpec), volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 
 	// Assert
 	if err != nil {
@@ -258,8 +267,8 @@ func Test_AddPodToVolume_Positive_NamesForDifferentPodsAndDifferentVolumes(t *te
 	for name, v := range testcases {
 		volumeSpec1 := &volume.Spec{Volume: &v.pod1.Spec.Volumes[0]}
 		volumeSpec2 := &volume.Spec{Volume: &v.pod2.Spec.Volumes[0]}
-		generatedVolumeName1, err1 := dsw.AddPodToVolume(util.GetUniquePodName(v.pod1), v.pod1, volumeSpec1, volumeSpec1.Name(), "")
-		generatedVolumeName2, err2 := dsw.AddPodToVolume(util.GetUniquePodName(v.pod2), v.pod2, volumeSpec2, volumeSpec2.Name(), "")
+		generatedVolumeName1, err1 := dsw.AddPodToVolume(util.GetUniquePodName(v.pod1), v.pod1, getUniqueVolumeName(t, dsw, util.GetUniquePodName(v.pod1), volumeSpec1), volumeSpec1, volumeSpec1.Name(), "")
+		generatedVolumeName2, err2 := dsw.AddPodToVolume(util.GetUniquePodName(v.pod2), v.pod2, getUniqueVolumeName(t, dsw, util.GetUniquePodName(v.pod2), volumeSpec2), volumeSpec2, volumeSpec2.Name(), "")
 		if err1 != nil {
 			t.Fatalf("test %q: AddPodToVolume failed. Expected: <no error> Actual: <%v>", name, err1)
 		}
@@ -308,7 +317,7 @@ func Test_DeletePodFromVolume_Positive_PodExistsVolumeExists(t *testing.T) {
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod, getUniqueVolumeName(t, dsw, podName, volumeSpec), volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -406,19 +415,19 @@ func Test_MarkVolumesReportedInUse_Positive_NewPodNewVolume(t *testing.T) {
 	pod3Name := util.GetUniquePodName(pod3)
 
 	generatedVolume1Name, err := dsw.AddPodToVolume(
-		pod1Name, pod1, volume1Spec, volume1Spec.Name(), "" /* volumeGidValue */)
+		pod1Name, pod1, getUniqueVolumeName(t, dsw, pod1Name, volume1Spec), volume1Spec, volume1Spec.Name(), "" /* volumeGidValue */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	generatedVolume2Name, err := dsw.AddPodToVolume(
-		pod2Name, pod2, volume2Spec, volume2Spec.Name(), "" /* volumeGidValue */)
+		pod2Name, pod2, getUniqueVolumeName(t, dsw, pod2Name, volume2Spec), volume2Spec, volume2Spec.Name(), "" /* volumeGidValue */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
 
 	generatedVolume3Name, err := dsw.AddPodToVolume(
-		pod3Name, pod3, volume3Spec, volume3Spec.Name(), "" /* volumeGidValue */)
+		pod3Name, pod3, getUniqueVolumeName(t, dsw, pod3Name, volume3Spec), volume3Spec, volume3Spec.Name(), "" /* volumeGidValue */)
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}

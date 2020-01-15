@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 const (
@@ -104,6 +105,15 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 	assert.NoError(t, volumetesting.VerifyZeroDetachCallCount(fakePlugin))
 }
 
+func getUniqueVolumeName(t *testing.T, dsw cache.DesiredStateOfWorld, podName volumetypes.UniquePodName, volumeSpec *volume.Spec) v1.UniqueVolumeName {
+	uniqueVolumeName, err := dsw.GetUniqueVolumeName(podName, volumeSpec)
+	// Assert
+	if err != nil {
+		t.Fatalf("getUniqueVolumeName failed. Expected: <no error> Actual: <%v>", err)
+	}
+	return uniqueVolumeName
+}
+
 // Populates desiredStateOfWorld cache with one volume/pod.
 // Calls Run()
 // Verifies there is are attach/mount/etc calls and no detach/unmount calls.
@@ -157,7 +167,7 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod, getUniqueVolumeName(t, dsw, podName, volumeSpec), volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 
 	// Assert
 	if err != nil {
@@ -235,7 +245,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod, getUniqueVolumeName(t, dsw, podName, volumeSpec), volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 	dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
 
 	// Assert
@@ -314,7 +324,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod, getUniqueVolumeName(t, dsw, podName, volumeSpec), volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 
 	// Assert
 	if err != nil {
@@ -404,7 +414,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod, getUniqueVolumeName(t, dsw, podName, volumeSpec), volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 
 	// Assert
 	if err != nil {
@@ -515,7 +525,7 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 	}
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod, getUniqueVolumeName(t, dsw, podName, volumeSpec), volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 
 	// Assert
 	if err != nil {
@@ -618,7 +628,7 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod, getUniqueVolumeName(t, dsw, podName, volumeSpec), volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 	dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
 
 	// Assert
@@ -719,7 +729,7 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod, getUniqueVolumeName(t, dsw, podName, volumeSpec), volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 
 	// Assert
 	if err != nil {
@@ -833,7 +843,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod, getUniqueVolumeName(t, dsw, podName, volumeSpec), volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 
 	// Assert
 	if err != nil {
@@ -1107,7 +1117,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			volumeSpec := &volume.Spec{PersistentVolume: pv}
 			podName := util.GetUniquePodName(pod)
 			volumeName, err := dsw.AddPodToVolume(
-				podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+				podName, pod, getUniqueVolumeName(t, dsw, podName, volumeSpec), volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 			// Assert
 			if err != nil {
 				t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -1266,7 +1276,7 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 			volumeSpec := &volume.Spec{PersistentVolume: pv}
 			podName := util.GetUniquePodName(pod)
 			volumeName, err := dsw.AddPodToVolume(
-				podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+				podName, pod, getUniqueVolumeName(t, dsw, podName, volumeSpec), volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 			// Assert
 			if err != nil {
 				t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -1434,7 +1444,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 			volumeSpec := &volume.Spec{PersistentVolume: pv}
 			podName := util.GetUniquePodName(pod)
 			volumeName, err := dsw.AddPodToVolume(
-				podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+				podName, pod, getUniqueVolumeName(t, dsw, podName, volumeSpec), volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 			// Assert
 			if err != nil {
 				t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -1696,7 +1706,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 	podName := util.GetUniquePodName(pod)
 	generatedVolumeName, err := dsw.AddPodToVolume(
-		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+		podName, pod, getUniqueVolumeName(t, dsw, podName, volumeSpec), volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 	dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
 
 	if err != nil {
@@ -1719,7 +1729,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 		// 3. While a volume is being unmounted, add it back to the desired state of world
 		klog.Infof("UnmountDevice called")
 		generatedVolumeName, err = dsw.AddPodToVolume(
-			podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+			podName, pod, getUniqueVolumeName(t, dsw, podName, volumeSpec), volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 		dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
 		return nil
 	}

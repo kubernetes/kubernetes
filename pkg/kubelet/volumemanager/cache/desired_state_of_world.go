@@ -54,7 +54,10 @@ type DesiredStateOfWorld interface {
 	// added.
 	// If a pod with the same unique name already exists under the specified
 	// volume, this is a no-op.
-	AddPodToVolume(podName types.UniquePodName, pod *v1.Pod, volumeSpec *volume.Spec, outerVolumeSpecName string, volumeGidValue string) (v1.UniqueVolumeName, error)
+	AddPodToVolume(podName types.UniquePodName, pod *v1.Pod, volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, outerVolumeSpecName string, volumeGidValue string) (v1.UniqueVolumeName, error)
+
+	// GetUniqueVolumeName retrieves the unique volume name
+	GetUniqueVolumeName(podName types.UniquePodName, volumeSpec *volume.Spec) (v1.UniqueVolumeName, error)
 
 	// MarkVolumesReportedInUse sets the ReportedInUse value to true for the
 	// reportedVolumes. For volumes not in the reportedVolumes list, the
@@ -212,15 +215,10 @@ const (
 	maxPodErrors = 10
 )
 
-func (dsw *desiredStateOfWorld) AddPodToVolume(
+func (dsw *desiredStateOfWorld) GetUniqueVolumeName(
 	podName types.UniquePodName,
-	pod *v1.Pod,
-	volumeSpec *volume.Spec,
-	outerVolumeSpecName string,
-	volumeGidValue string) (v1.UniqueVolumeName, error) {
-	dsw.Lock()
-	defer dsw.Unlock()
-
+	volumeSpec *volume.Spec) (v1.UniqueVolumeName, error) {
+	var err error
 	volumePlugin, err := dsw.volumePluginMgr.FindPluginBySpec(volumeSpec)
 	if err != nil || volumePlugin == nil {
 		return "", fmt.Errorf(
@@ -228,7 +226,6 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 			volumeSpec.Name(),
 			err)
 	}
-
 	var volumeName v1.UniqueVolumeName
 
 	// The unique volume name used depends on whether the volume is attachable/device-mountable
@@ -252,6 +249,18 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		// namespace and name and the name of the volume within the pod.
 		volumeName = util.GetUniqueVolumeNameFromSpecWithPod(podName, volumePlugin, volumeSpec)
 	}
+	return volumeName, err
+}
+
+func (dsw *desiredStateOfWorld) AddPodToVolume(
+	podName types.UniquePodName,
+	pod *v1.Pod,
+	volumeName v1.UniqueVolumeName,
+	volumeSpec *volume.Spec,
+	outerVolumeSpecName string,
+	volumeGidValue string) (v1.UniqueVolumeName, error) {
+	dsw.Lock()
+	defer dsw.Unlock()
 
 	if _, volumeExists := dsw.volumesToMount[volumeName]; !volumeExists {
 		var sizeLimit *resource.Quantity
@@ -271,8 +280,8 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		dsw.volumesToMount[volumeName] = volumeToMount{
 			volumeName:              volumeName,
 			podsToMount:             make(map[types.UniquePodName]podToMount),
-			pluginIsAttachable:      attachable,
-			pluginIsDeviceMountable: deviceMountable,
+			pluginIsAttachable:      dsw.isAttachableVolume(volumeSpec),
+			pluginIsDeviceMountable: dsw.isDeviceMountableVolume(volumeSpec),
 			volumeGidValue:          volumeGidValue,
 			reportedInUse:           false,
 			desiredSizeLimit:        sizeLimit,
