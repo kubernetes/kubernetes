@@ -36,9 +36,12 @@ func init() {
 	mutationDetectionEnabled, _ = strconv.ParseBool(os.Getenv("KUBE_CACHE_MUTATION_DETECTOR"))
 }
 
-// MutationDetector is able to monitor if the object be modified outside.
+// MutationDetector is able to monitor objects for mutation within a limited window of time
 type MutationDetector interface {
+	// AddObject adds the given object to the set being monitored for a while from now
 	AddObject(obj interface{})
+
+	// Run starts the monitoring and does not return until the monitoring is stopped.
 	Run(stopCh <-chan struct{})
 }
 
