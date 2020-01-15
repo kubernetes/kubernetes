@@ -138,7 +138,16 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 		framework.ExpectError(err, "created secret %q with empty key in namespace %q", secret.Name, f.Namespace.Name)
 	})
 
-	ginkgo.It("should patch a secret", func() {
+	/*
+	   Release : v1.18
+	   Testname: Secret patching
+	   Description: A Secret is created.
+           Listing all Secrets MUST return an empty list.
+           Given the patching and fetching of the Secret, the fields MUST equal the new values.
+           The Secret is deleted by it's static Label.
+           Secrets are listed finally, the list MUST NOT include the originally created Secret.
+	*/
+	framework.ConformanceIt("should patch a secret", func() {
 		ginkgo.By("creating a secret")
 
 		secretTestName := "test-secret-" + string(uuid.NewUUID())
