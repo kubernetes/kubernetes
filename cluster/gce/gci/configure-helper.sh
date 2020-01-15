@@ -93,6 +93,8 @@ function config-ip-firewall {
   # Flush iptables nat table
   iptables -w -t nat -F || true
 
+  # Hello world! Do not submit.
+
   if [[ "${NON_MASQUERADE_CIDR:-}" == "0.0.0.0/0" ]]; then
     echo "Add rules for ip masquerade"
     iptables -w -t nat -N IP-MASQ
