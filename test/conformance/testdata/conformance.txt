@@ -25,6 +25,7 @@ test/e2e/apimachinery/garbage_collector.go: "should not delete dependents that h
 test/e2e/apimachinery/garbage_collector.go: "should not be blocked by dependency circle"
 test/e2e/apimachinery/namespace.go: "should ensure that all pods are removed when a namespace is deleted"
 test/e2e/apimachinery/namespace.go: "should ensure that all services are removed when a namespace is deleted"
+test/e2e/apimachinery/namespace.go: "should patch a Namespace"
 test/e2e/apimachinery/resource_quota.go: "should create a ResourceQuota and ensure its status is promptly calculated."
 test/e2e/apimachinery/resource_quota.go: "should create a ResourceQuota and capture the life of a service."
 test/e2e/apimachinery/resource_quota.go: "should create a ResourceQuota and capture the life of a secret."
