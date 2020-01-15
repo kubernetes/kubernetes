@@ -893,6 +893,7 @@ func getTestCloud() (az *Cloud) {
 			ResourceGroup:                "rg",
 			VnetResourceGroup:            "rg",
 			RouteTableResourceGroup:      "rg",
+			SecurityGroupResourceGroup:   "rg",
 			Location:                     "westus",
 			VnetName:                     "vnet",
 			SubnetName:                   "subnet",
@@ -1149,7 +1150,7 @@ func getTestSecurityGroup(az *Cloud, services ...v1.Service) *network.SecurityGr
 	defer cancel()
 	az.SecurityGroupsClient.CreateOrUpdate(
 		ctx,
-		az.ResourceGroup,
+		az.SecurityGroupResourceGroup,
 		az.SecurityGroupName,
 		sg,
 		"")
@@ -1492,6 +1493,7 @@ func TestNewCloudFromJSON(t *testing.T) {
 		"aadClientCertPassword": "--aad-client-cert-password--",
 		"resourceGroup": "--resource-group--",
 		"routeTableResourceGroup": "--route-table-resource-group--",
+		"securityGroupResourceGroup": "--security-group-resource-group--",
 		"location": "--location--",
 		"subnetName": "--subnet-name--",
 		"securityGroupName": "--security-group-name--",
@@ -1544,6 +1546,7 @@ aadClientCertPath: --aad-client-cert-path--
 aadClientCertPassword: --aad-client-cert-password--
 resourceGroup: --resource-group--
 routeTableResourceGroup: --route-table-resource-group--
+securityGroupResourceGroup: --security-group-resource-group--
 location: --location--
 subnetName: --subnet-name--
 securityGroupName: --security-group-name--
@@ -1595,6 +1598,9 @@ func validateConfig(t *testing.T, config string) {
 	}
 	if azureCloud.RouteTableResourceGroup != "--route-table-resource-group--" {
 		t.Errorf("got incorrect value for RouteTableResourceGroup")
+	}
+	if azureCloud.SecurityGroupResourceGroup != "--security-group-resource-group--" {
+		t.Errorf("got incorrect value for SecurityGroupResourceGroup")
 	}
 	if azureCloud.Location != "--location--" {
 		t.Errorf("got incorrect value for Location")

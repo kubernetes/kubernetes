@@ -118,6 +118,8 @@ type Config struct {
 	SubnetName string `json:"subnetName,omitempty" yaml:"subnetName,omitempty"`
 	// The name of the security group attached to the cluster's subnet
 	SecurityGroupName string `json:"securityGroupName,omitempty" yaml:"securityGroupName,omitempty"`
+	// The name of the resource group that the security group is deployed in
+	SecurityGroupResourceGroup string `json:"securityGroupResourceGroup,omitempty" yaml:"securityGroupResourceGroup,omitempty"`
 	// (Optional in 1.6) The name of the route table attached to the subnet that the cluster is deployed in
 	RouteTableName string `json:"routeTableName,omitempty" yaml:"routeTableName,omitempty"`
 	// The name of the resource group that the RouteTable is deployed in
@@ -330,6 +332,10 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 
 	if config.RouteTableResourceGroup == "" {
 		config.RouteTableResourceGroup = config.ResourceGroup
+	}
+
+	if config.SecurityGroupResourceGroup == "" {
+		config.SecurityGroupResourceGroup = config.ResourceGroup
 	}
 
 	if config.VMType == "" {

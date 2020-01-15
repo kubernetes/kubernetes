@@ -318,6 +318,7 @@ func getTestCloudForVMCache(vmList []string) (az *Cloud) {
 			ResourceGroup:                "rg",
 			VnetResourceGroup:            "rg",
 			RouteTableResourceGroup:      "rg",
+			SecurityGroupResourceGroup:   "rg",
 			Location:                     "westus",
 			VnetName:                     "vnet",
 			SubnetName:                   "subnet",
