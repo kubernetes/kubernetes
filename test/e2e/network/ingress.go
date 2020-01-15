@@ -228,7 +228,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				framework.Failf("unexpected backend service, expected none, got: %v", gceController.ListGlobalBackendServices())
 			}
 			// Controller does not have a list command for firewall rule. We use get instead.
-			if fw, err := gceController.GetFirewallRuleOrError(); err == nil {
+			if fw, err := gceController.GetFirewallRule(); err == nil {
 				framework.Failf("unexpected nil error in getting firewall rule, expected firewall NotFound, got firewall: %v", fw)
 			}
 
