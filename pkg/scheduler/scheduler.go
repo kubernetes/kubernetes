@@ -118,9 +118,6 @@ type Scheduler struct {
 	SchedulingQueue internalqueue.SchedulingQueue
 
 	scheduledPodsHasSynced func() bool
-
-	// TODO(#87157): Remove this when the DefaultBinding Plugin is introduced.
-	client clientset.Interface
 }
 
 // Cache returns the cache in scheduler for test to check the data in scheduler.
@@ -333,7 +330,6 @@ func New(client clientset.Interface,
 	sched.podConditionUpdater = &podConditionUpdaterImpl{client}
 	sched.podPreemptor = &podPreemptorImpl{client}
 	sched.scheduledPodsHasSynced = podInformer.Informer().HasSynced
-	sched.client = client
 
 	AddAllEventHandlers(sched, options.schedulerName, informerFactory, podInformer)
 	return sched, nil
@@ -507,7 +503,7 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 }
 
 // bind binds a pod to a given node defined in a binding object.
-// The precedence for binding is: (1) extenders, (2) plugins and (3) default binding.
+// The precedence for binding is: (1) extenders and (2) framework plugins.
 // We expect this to run asynchronously, so we handle binding metrics internally.
 func (sched *Scheduler) bind(ctx context.Context, assumed *v1.Pod, targetNode string, state *framework.CycleState) (err error) {
 	start := time.Now()
@@ -515,18 +511,7 @@ func (sched *Scheduler) bind(ctx context.Context, assumed *v1.Pod, targetNode st
 		sched.finishBinding(assumed, targetNode, start, err)
 	}()
 
-	binding := &v1.Binding{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: assumed.Namespace,
-			Name:      assumed.Name,
-			UID:       assumed.UID,
-		},
-		Target: v1.ObjectReference{
-			Kind: "Node",
-			Name: targetNode,
-		},
-	}
-	bound, err := sched.extendersBinding(assumed, binding)
+	bound, err := sched.extendersBinding(assumed, targetNode)
 	if bound {
 		return err
 	}
@@ -534,30 +519,24 @@ func (sched *Scheduler) bind(ctx context.Context, assumed *v1.Pod, targetNode st
 	if bindStatus.IsSuccess() {
 		return nil
 	}
-	if bindStatus.Code() != framework.Skip {
-		return fmt.Errorf("bind failure, code: %d: %v", bindStatus.Code(), bindStatus.Message())
+	if bindStatus.Code() == framework.Error {
+		return bindStatus.AsError()
 	}
-	// All bind plugins chose to skip binding of this pod, call original binding
-	// function. If binding succeeds then PodScheduled condition will be updated
-	// in apiserver so that it's atomic with setting host.
-	return sched.defaultBinding(binding)
+	return fmt.Errorf("bind status: %s, %v", bindStatus.Code().String(), bindStatus.Message())
 }
 
 // TODO(#87159): Move this to a Plugin.
-func (sched *Scheduler) extendersBinding(assumed *v1.Pod, binding *v1.Binding) (bool, error) {
+func (sched *Scheduler) extendersBinding(pod *v1.Pod, node string) (bool, error) {
 	for _, extender := range sched.Algorithm.Extenders() {
-		if !extender.IsBinder() || !extender.IsInterested(assumed) {
+		if !extender.IsBinder() || !extender.IsInterested(pod) {
 			continue
 		}
-		return true, extender.Bind(binding)
+		return true, extender.Bind(&v1.Binding{
+			ObjectMeta: metav1.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name, UID: pod.UID},
+			Target:     v1.ObjectReference{Kind: "Node", Name: node},
+		})
 	}
 	return false, nil
-}
-
-// TODO(#87157): Move this to a Plugin.
-func (sched *Scheduler) defaultBinding(binding *v1.Binding) error {
-	klog.V(3).Infof("Attempting to bind %v/%v to %v", binding.Namespace, binding.Name, binding.Target.Name)
-	return sched.client.CoreV1().Pods(binding.Namespace).Bind(binding)
 }
 
 func (sched *Scheduler) finishBinding(assumed *v1.Pod, targetNode string, start time.Time, err error) {

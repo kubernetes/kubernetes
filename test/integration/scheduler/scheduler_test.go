@@ -91,6 +91,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 1},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 		},
 		{
@@ -136,6 +137,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 					{Name: "DefaultPodTopologySpread", Weight: 1},
 					{Name: "TaintToleration", Weight: 1},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 		},
 		{
@@ -151,6 +153,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 					{Name: "NodeUnschedulable"},
 					{Name: "TaintToleration"},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 		},
 		{
@@ -175,6 +178,7 @@ priorities:
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 1},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 		},
 		{
@@ -219,6 +223,7 @@ kind: Policy
 					{Name: "DefaultPodTopologySpread", Weight: 1},
 					{Name: "TaintToleration", Weight: 1},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 		},
 		{
@@ -233,6 +238,7 @@ priorities: []
 					{Name: "NodeUnschedulable"},
 					{Name: "TaintToleration"},
 				},
+				"BindPlugin": {{Name: "DefaultBinder"}},
 			},
 		},
 	} {

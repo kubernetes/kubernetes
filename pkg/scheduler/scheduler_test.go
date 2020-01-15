@@ -47,6 +47,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
@@ -57,13 +58,6 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
-)
-
-var (
-	emptyPluginRegistry = framework.Registry{}
-	// emptyFramework is an empty framework used in tests.
-	// Note: If the test runs in goroutine, please don't use this variable to avoid a race condition.
-	emptyFramework, _ = framework.NewFramework(emptyPluginRegistry, nil, nil)
 )
 
 type fakePodConditionUpdater struct{}
@@ -205,7 +199,7 @@ func TestSchedulerCreation(t *testing.T) {
 	}
 }
 
-func TestScheduler(t *testing.T) {
+func TestSchedulerScheduleOne(t *testing.T) {
 	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}}
 	client := clientsetfake.NewSimpleClientset(&testNode)
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")})
@@ -247,7 +241,7 @@ func TestScheduler(t *testing.T) {
 			expectBind:       &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}},
 			expectAssumedPod: podWithID("foo", testNode.Name),
 			injectBindError:  errB,
-			expectError:      errB,
+			expectError:      errors.New("plugin \"DefaultBinder\" failed to bind pod \"/foo\": binder"),
 			expectErrorPod:   podWithID("foo", testNode.Name),
 			expectForgetPod:  podWithID("foo", testNode.Name),
 			eventReason:      "FailedScheduling",
@@ -295,6 +289,13 @@ func TestScheduler(t *testing.T) {
 				gotBinding = action.(clienttesting.CreateAction).GetObject().(*v1.Binding)
 				return true, gotBinding, item.injectBindError
 			})
+			fwk, err := st.NewFramework([]st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}, framework.WithClientSet(client))
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			s := &Scheduler{
 				SchedulerCache:      sCache,
@@ -307,10 +308,9 @@ func TestScheduler(t *testing.T) {
 				NextPod: func() *framework.PodInfo {
 					return &framework.PodInfo{Pod: item.sendPod}
 				},
-				Framework:    emptyFramework,
+				Framework:    fwk,
 				Recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
 				VolumeBinder: volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
-				client:       client,
 			}
 			called := make(chan struct{})
 			stopFunc := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
@@ -355,6 +355,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 
 	fns := []st.RegisterPluginFunc{
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		st.RegisterPluginAsExtensions(nodeports.Name, 1, nodeports.New, "Filter", "PreFilter"),
 	}
 	scheduler, bindingChan, _ := setupTestSchedulerWithOnePodOnNode(t, queuedPodStore, scache, informerFactory, stop, pod, &node, fns...)
@@ -421,6 +422,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	fns := []st.RegisterPluginFunc{
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		st.RegisterPluginAsExtensions(nodeports.Name, 1, nodeports.New, "Filter", "PreFilter"),
 	}
 	scheduler, bindingChan, errChan := setupTestSchedulerWithOnePodOnNode(t, queuedPodStore, scache, informerFactory, stop, firstPod, &node, fns...)
@@ -566,6 +568,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	}
 	fns := []st.RegisterPluginFunc{
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		st.RegisterFilterPlugin("PodFitsResources", noderesources.NewFit),
 	}
 	scheduler, _, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, nil, nil, fns...)
@@ -596,22 +599,22 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 // queuedPodStore: pods queued before processing.
 // scache: scheduler cache that might contain assumed pods.
 func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, recorder events.EventRecorder, fakeVolumeBinder *volumebinder.VolumeBinder, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error) {
-	registry := framework.Registry{}
 	if fakeVolumeBinder == nil {
 		// Create default volume binder if it didn't set.
 		fakeVolumeBinder = volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true})
 	}
-	// TODO: instantiate the plugins dynamically.
-	plugins := &schedulerapi.Plugins{
-		QueueSort: &schedulerapi.PluginSet{},
-		PreFilter: &schedulerapi.PluginSet{},
-		Filter:    &schedulerapi.PluginSet{},
-	}
-	var pluginConfigs []schedulerapi.PluginConfig
-	for _, f := range fns {
-		f(&registry, plugins, pluginConfigs)
-	}
-	fwk, _ := framework.NewFramework(registry, plugins, pluginConfigs, framework.WithVolumeBinder(fakeVolumeBinder))
+	bindingChan := make(chan *v1.Binding, 1)
+	client := clientsetfake.NewSimpleClientset()
+	client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		var b *v1.Binding
+		if action.GetSubresource() == "binding" {
+			b := action.(clienttesting.CreateAction).GetObject().(*v1.Binding)
+			bindingChan <- b
+		}
+		return true, b, nil
+	})
+
+	fwk, _ := st.NewFramework(fns, framework.WithClientSet(client), framework.WithVolumeBinder(fakeVolumeBinder))
 	algo := core.NewGenericScheduler(
 		scache,
 		internalqueue.NewSchedulingQueue(nil),
@@ -625,19 +628,8 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		schedulerapi.DefaultPercentageOfNodesToScore,
 		false,
 	)
-	bindingChan := make(chan *v1.Binding, 1)
+
 	errChan := make(chan error, 1)
-
-	client := clientsetfake.NewSimpleClientset()
-	client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
-		var b *v1.Binding
-		if action.GetSubresource() == "binding" {
-			b := action.(clienttesting.CreateAction).GetObject().(*v1.Binding)
-			bindingChan <- b
-		}
-		return true, b, nil
-	})
-
 	sched := &Scheduler{
 		SchedulerCache: scache,
 		Algorithm:      algo,
@@ -652,7 +644,6 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		podPreemptor:        fakePodPreemptor{},
 		Framework:           fwk,
 		VolumeBinder:        fakeVolumeBinder,
-		client:              client,
 	}
 
 	if recorder != nil {
@@ -679,6 +670,7 @@ func setupTestSchedulerWithVolumeBinding(fakeVolumeBinder *volumebinder.VolumeBi
 	recorder := broadcaster.NewRecorder(scheme.Scheme, "scheduler")
 	fns := []st.RegisterPluginFunc{
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		st.RegisterFilterPlugin(volumebinding.Name, volumebinding.New),
 	}
 	s, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, recorder, fakeVolumeBinder, fns...)
@@ -988,7 +980,10 @@ func TestSchedulerBinding(t *testing.T) {
 				}
 				return false, nil, nil
 			})
-			fwk, err := framework.NewFramework(framework.Registry{}, nil, nil)
+			fwk, err := st.NewFramework([]st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}, framework.WithClientSet(client))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1013,7 +1008,6 @@ func TestSchedulerBinding(t *testing.T) {
 				Framework:      fwk,
 				Recorder:       &events.FakeRecorder{},
 				SchedulerCache: scache,
-				client:         client,
 			}
 			err = sched.bind(context.Background(), pod, "node", nil)
 			if err != nil {
