@@ -133,6 +133,7 @@ aliases:
     - childsb
 
   sig-scheduling-maintainers:
+    - alculquicondor
     - bsalamat
     - k82cn
     - wojtek-t
