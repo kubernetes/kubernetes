@@ -1964,7 +1964,6 @@ var _ = SIGDescribe("Services", func() {
 					Port:       int32(port),
 					TargetPort: intstr.FromInt(port),
 				}},
-				PublishNotReadyAddresses: true,
 			},
 		}
 		rcSpec := e2erc.ByNameContainer(t.Name, 1, t.Image, t.Labels, v1.Container{
