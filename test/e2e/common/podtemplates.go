@@ -18,13 +18,12 @@ package common
 
 import (
 	"encoding/json"
-	//"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/onsi/ginkgo"
 )
@@ -39,7 +38,7 @@ var _ = ginkgo.Describe("[sig-architecture] PodTemplates", func() {
 		// get a list of PodTemplates (in all namespaces to hit endpoint)
 		podTemplateList, err := f.ClientSet.CoreV1().PodTemplates("").List(metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list all PodTemplates")
-		framework.ExpectEqual(len(podTemplateList.Items) == 0, true, "unable to find templates")
+		framework.ExpectEqual(len(podTemplateList.Items), 0, "unable to find templates")
 
 		// create a PodTemplate
 		_, err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Create(&v1.PodTemplate{
@@ -90,6 +89,6 @@ var _ = ginkgo.Describe("[sig-architecture] PodTemplates", func() {
 			LabelSelector: "podtemplate-static=true",
 		})
 		framework.ExpectNoError(err, "failed to list PodTemplate")
-		framework.ExpectEqual(len(podTemplateListWithLabel.Items) == 0, true, "PodTemplate list returned items, failed to delete PodTemplate")
+		framework.ExpectEqual(len(podTemplateListWithLabel.Items), 0, "PodTemplate list returned items, failed to delete PodTemplate")
 	})
 })
