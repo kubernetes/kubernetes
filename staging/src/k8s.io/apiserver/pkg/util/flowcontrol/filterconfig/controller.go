@@ -94,9 +94,6 @@ type RequestDigest struct {
 
 // `*configController` implements Controller
 type configController struct {
-	// grc is kept informed of when goroutines start or stop or begin or end waiting
-	grc counter.GoRoutineCounter
-
 	queueSetFactory fq.QueueSetFactory
 
 	// configQueue holds TypedConfigObjectReference values, identifying
@@ -153,8 +150,8 @@ type priorityLevelState struct {
 	config fctypesv1a1.PriorityLevelConfigurationSpec
 
 	// qsConfig holds the QueueSetConfig derived from `config` if
-	// config is not exempt, garbage otherwise
-	qsConfig fq.QueueSetConfig
+	// config is not exempt, nil otherwise
+	qsConfig *fq.QueueSetConfig
 
 	queues fq.QueueSet
 
@@ -180,7 +177,6 @@ func NewController(
 		flowcontrolClient,
 		serverConcurrencyLimit,
 		requestWaitLimit,
-		grc,
 		fqs.NewQueueSetFactory(&clock.RealClock{}, grc),
 	)
 }
@@ -191,11 +187,9 @@ func NewTestableController(
 	flowcontrolClient fcclientv1a1.FlowcontrolV1alpha1Interface,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
-	grc counter.GoRoutineCounter,
 	queueSetFactory fq.QueueSetFactory,
 ) Controller {
 	cfgCtl := &configController{
-		grc:                    grc,
 		queueSetFactory:        queueSetFactory,
 		serverConcurrencyLimit: serverConcurrencyLimit,
 		requestWaitLimit:       requestWaitLimit,
@@ -344,12 +338,12 @@ func (cfgCtl *configController) digestConfigObjects(newPLs []*fctypesv1a1.Priori
 		}
 		if state.config.Limited != nil {
 			shareSum += float64(state.config.Limited.AssuredConcurrencyShares)
-			qsConfig, err := qscOfPL(pl, cfgCtl.requestWaitLimit)
+			var err error
+			state.qsConfig, err = qscOfPL(pl, cfgCtl.requestWaitLimit)
 			if err != nil {
 				klog.Warningf(err.Error())
 				continue
 			}
-			state.qsConfig = qsConfig
 		}
 		haveExemptPL = haveExemptPL || pl.Name == fctypesv1a1.PriorityLevelConfigurationNameExempt
 		haveCatchAllPL = haveCatchAllPL || pl.Name == fctypesv1a1.PriorityLevelConfigurationNameCatchAll
@@ -462,10 +456,10 @@ func (cfgCtl *configController) digestConfigObjects(newPLs []*fctypesv1a1.Priori
 
 		if plState.queues == nil {
 			klog.V(5).Infof("Introducing queues for priority level %q: config=%#+v, concurrencyLimit=%d, quiescent=%v (shares=%v, shareSum=%v)", plName, plState.config, plState.qsConfig.ConcurrencyLimit, plState.emptyHandler != nil, plState.config.Limited.AssuredConcurrencyShares, shareSum)
-			plState.queues = cfgCtl.queueSetFactory.NewQueueSet(plState.qsConfig)
+			plState.queues = cfgCtl.queueSetFactory.NewQueueSet(*plState.qsConfig)
 		} else {
 			klog.V(5).Infof("Retaining queues for priority level %q: config=%#+v, concurrencyLimit=%d, quiescent=%v (shares=%v, shareSum=%v)", plName, plState.config, plState.qsConfig.ConcurrencyLimit, plState.emptyHandler != nil, plState.config.Limited.AssuredConcurrencyShares, shareSum)
-			plState.queues.SetConfiguration(plState.qsConfig)
+			plState.queues.SetConfiguration(*plState.qsConfig)
 		}
 	}
 
@@ -486,12 +480,11 @@ func (cfgCtl *configController) digestConfigObjects(newPLs []*fctypesv1a1.Priori
 	//    newlyQuiescent and S's priority level is not referenced from
 	//    any FlowSchema in X.  This is established by the text of
 	//    this function and the immutability of each FlowSchemaSpec
-	//    and of each plState after completion of the loop iteration
-	//    that constructs it.  The fact that the FlowSchema and
-	//    PriorityLevelConfiguration objects are not exposed from this
-	//    package means that immutability can be checked locally ---
-	//    all that matters is this file and the promise of
-	//    matchesFlowSchema.
+	//    and each plState in X after X is stored.  The fact that the
+	//    FlowSchema and PriorityLevelConfiguration objects are not
+	//    exposed from this package means that immutability can be
+	//    checked locally --- all that matters is this file and the
+	//    promise of matchesFlowSchema.
 	//
 	// 3. If a call to S.Wait that returns with tryAnother==true
 	//    happens before a call to `curState.Load()` that returns a
@@ -509,20 +502,24 @@ func (cfgCtl *configController) digestConfigObjects(newPLs []*fctypesv1a1.Priori
 	}
 }
 
-func qscOfPL(pl *fctypesv1a1.PriorityLevelConfiguration, requestWaitLimit time.Duration) (fq.QueueSetConfig, error) {
-	qsConfig := fq.QueueSetConfig{Name: pl.Name,
-		RequestWaitLimit: requestWaitLimit}
-	var err error
-	if qc := pl.Spec.Limited.LimitResponse.Queuing; qc != nil {
-		dealer, e1 := shufflesharding.NewDealer(int(qc.Queues), int(qc.HandSize))
-		if e1 != nil {
-			err = errors.Wrap(e1, fmt.Sprintf("priority level %q has QueuingConfiguration %#+v, which caused shufflesharding.NewDealer to fail", pl.Name, *qc))
-		}
-		qsConfig.DesiredNumQueues = int(qc.Queues)
-		qsConfig.QueueLengthLimit = int(qc.QueueLengthLimit)
-		qsConfig.Dealer = dealer
+// qscOfPL returns a pointer to an appropriate QueueSetConfig or nil
+// if no queuing is called for.
+func qscOfPL(pl *fctypesv1a1.PriorityLevelConfiguration, requestWaitLimit time.Duration) (*fq.QueueSetConfig, error) {
+	if pl.Spec.Limited == nil || pl.Spec.Limited.LimitResponse.Queuing == nil {
+		return nil, nil
 	}
-	return qsConfig, err
+	qc := pl.Spec.Limited.LimitResponse.Queuing
+	var err error
+	dealer, e1 := shufflesharding.NewDealer(int(qc.Queues), int(qc.HandSize))
+	if e1 != nil {
+		err = errors.Wrap(e1, fmt.Sprintf("priority level %q has QueuingConfiguration %#+v, which caused shufflesharding.NewDealer to fail", pl.Name, *qc))
+	}
+	return &fq.QueueSetConfig{Name: pl.Name,
+		DesiredNumQueues: int(qc.Queues),
+		QueueLengthLimit: int(qc.QueueLengthLimit),
+		Dealer:           dealer,
+		RequestWaitLimit: requestWaitLimit,
+	}, err
 }
 
 func (cfgCtl *configController) syncFlowSchemaStatus(fs *fctypesv1a1.FlowSchema, isDangling bool) {
@@ -557,7 +554,7 @@ func (cfgState *configState) imaginePL(proto *fctypesv1a1.PriorityLevelConfigura
 	klog.Warningf("No %s PriorityLevelConfiguration found, imagining one", proto.Name)
 	qsConfig, err := qscOfPL(proto, requestWaitLimit)
 	if err != nil {
-		klog.Errorf(err.Error())
+		panic(err)
 	}
 	cfgState.priorityLevelStates[proto.Name] = &priorityLevelState{
 		config:   proto.Spec,
@@ -593,16 +590,15 @@ var _ fq.EmptyHandler = &emptyRelay{}
 
 func (er *emptyRelay) HandleEmpty() {
 	er.Lock()
+	defer er.Unlock()
 	er.empty = true
 	// TODO: to support testing of the config controller, extend
 	// goroutine tracking to the config queue and worker
 	er.cfgCtl.configQueue.Add(0)
-	er.Unlock()
-	er.cfgCtl.grc.Add(-1)
 }
 
 func (er *emptyRelay) IsEmpty() bool {
 	er.RLock()
-	defer func() { er.RUnlock() }()
+	defer er.RUnlock()
 	return er.empty
 }

@@ -75,7 +75,6 @@ func New(
 		flowcontrolClient,
 		serverConcurrencyLimit,
 		requestWaitLimit,
-		grc,
 		fqs.NewQueueSetFactory(&clock.RealClock{}, grc),
 	)
 }
@@ -86,10 +85,9 @@ func NewTestable(
 	flowcontrolClient fcclientv1a1.FlowcontrolV1alpha1Interface,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
-	grc counter.GoRoutineCounter,
 	queueSetFactory fq.QueueSetFactory,
 ) Interface {
-	return &implementation{ctl: fcfc.NewTestableController(informerFactory, flowcontrolClient, serverConcurrencyLimit, requestWaitLimit, grc, queueSetFactory)}
+	return &implementation{ctl: fcfc.NewTestableController(informerFactory, flowcontrolClient, serverConcurrencyLimit, requestWaitLimit, queueSetFactory)}
 }
 
 func (impl *implementation) Run(stopCh <-chan struct{}) error {
@@ -160,5 +158,10 @@ func computeFlowDistinguisher(rd fcfc.RequestDigest, method *fctypesv1a1.FlowDis
 
 // hashFlowID hashes the inputs into 64-bits
 func hashFlowID(fsName, fDistinguisher string) uint64 {
-	return crc64.Checksum([]byte(fsName+fDistinguisher), crc64.MakeTable(crc64.ECMA))
+	table := crc64.MakeTable(crc64.ECMA)
+	hash := crc64.New(table)
+	hash.Write([]byte(fsName))
+	hash.Write([]byte{1})
+	hash.Write([]byte(fDistinguisher))
+	return hash.Sum64()
 }

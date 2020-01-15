@@ -37,15 +37,17 @@ func matchesFlowSchema(digest RequestDigest, flowSchema *fctypesv1a1.FlowSchema)
 		if !subjectMatches {
 			continue
 		}
-
-		for _, rr := range policyRule.ResourceRules {
-			if matchesResourcePolicyRule(digest, rr) {
-				return true
+		if digest.RequestInfo.IsResourceRequest {
+			for _, rr := range policyRule.ResourceRules {
+				if matchesResourcePolicyRule(digest, rr) {
+					return true
+				}
 			}
-		}
-		for _, rr := range policyRule.NonResourceRules {
-			if matchesNonResourcePolicyRule(digest, rr) {
-				return true
+		} else {
+			for _, rr := range policyRule.NonResourceRules {
+				if matchesNonResourcePolicyRule(digest, rr) {
+					return true
+				}
 			}
 		}
 	}
@@ -94,9 +96,6 @@ func matchesResourcePolicyRule(digest RequestDigest, policyRule fctypesv1a1.Reso
 	if !matchPolicyRuleVerb(policyRule.Verbs, digest.RequestInfo.Verb) {
 		return false
 	}
-	if !digest.RequestInfo.IsResourceRequest {
-		return false
-	}
 	if !matchPolicyRuleResource(policyRule.Resources, digest.RequestInfo.Resource) {
 		return false
 	}
@@ -111,9 +110,6 @@ func matchesResourcePolicyRule(digest RequestDigest, policyRule fctypesv1a1.Reso
 
 func matchesNonResourcePolicyRule(digest RequestDigest, policyRule fctypesv1a1.NonResourcePolicyRule) bool {
 	if !matchPolicyRuleVerb(policyRule.Verbs, digest.RequestInfo.Verb) {
-		return false
-	}
-	if digest.RequestInfo.IsResourceRequest {
 		return false
 	}
 	return matchPolicyRuleNonResourceURL(policyRule.NonResourceURLs, digest.RequestInfo.Path)
@@ -135,6 +131,12 @@ func matchPolicyRuleResource(policyRuleRequestResources []string, requestResourc
 	return containsString(requestResource, policyRuleRequestResources, fctypesv1a1.ResourceAll)
 }
 
+// containsString returns true if either `x` or `wildcard` is in
+// `list`.  The wildcard is not a pattern to match against `x`; rather
+// the presence of the wildcard in the list is the caller's way of
+// saying that all values of `x` should match the list.  This function
+// assumes that if `wildcard` is in `list` then it is the only member
+// of the list, which is enforced by validation.
 func containsString(x string, list []string, wildcard string) bool {
 	if len(list) == 1 && list[0] == wildcard {
 		return true
