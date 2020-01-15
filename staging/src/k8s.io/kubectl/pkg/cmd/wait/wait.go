@@ -161,10 +161,13 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 		effectiveTimeout = 168 * time.Hour
 	}
 
+	endTime := time.Now().Add(effectiveTimeout)
+
 	o := &WaitOptions{
 		ResourceFinder: builder,
 		DynamicClient:  dynamicClient,
 		Timeout:        effectiveTimeout,
+		EndTime:        endTime,
 
 		Printer:     printer,
 		ConditionFn: conditionFn,
@@ -214,7 +217,10 @@ type WaitOptions struct {
 	// more reliable.  For instance, delete can look for UID consistency during delegated calls.
 	UIDMap        UIDMap
 	DynamicClient dynamic.Interface
+	WaitContext   context.Context
+	WaitCancel    context.CancelFunc
 	Timeout       time.Duration
+	EndTime       time.Time
 
 	Printer     printers.ResourcePrinter
 	ConditionFn ConditionFunc
@@ -226,42 +232,48 @@ type ConditionFunc func(info *resource.Info, o *WaitOptions) (finalObject runtim
 
 // RunWait runs the waiting logic
 func (o *WaitOptions) RunWait() error {
-	visitCount := 0
-	err := o.ResourceFinder.Do().Visit(func(info *resource.Info, err error) error {
-		if err != nil {
-			return err
-		}
+	//visitCount := 0
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
+	o.WaitContext = ctx
+	o.WaitCancel = cancel
+	for {
+		err := o.ResourceFinder.Do().Visit(func(info *resource.Info, err error) error {
+			if err != nil {
+				return err
+			}
 
-		visitCount++
-		finalObject, success, err := o.ConditionFn(info, o)
-		if success {
-			o.Printer.PrintObj(finalObject, o.Out)
-			return nil
+			finalObject, success, err := o.ConditionFn(info, o)
+			if success {
+				o.Printer.PrintObj(finalObject, o.Out)
+				return nil
+			}
+			if err == nil {
+				return fmt.Errorf("%v unsatisified for unknown reason", finalObject)
+			}
+			return err
+		})
+		if apierrors.IsNotFound(err) {
+			timeout := o.EndTime.Sub(time.Now())
+			if timeout < 0 {
+				// we're out of time
+				return errNoMatchingResources
+			}
+			time.Sleep(1 * time.Second)
+			continue
 		}
-		if err == nil {
-			return fmt.Errorf("%v unsatisified for unknown reason", finalObject)
-		}
-		return err
-	})
-	if err != nil {
+		o.WaitCancel()
 		return err
 	}
-	if visitCount == 0 {
-		return errNoMatchingResources
-	}
-	return err
 }
 
 // IsDeleted is a condition func for waiting for something to be deleted
 func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
-	endTime := time.Now().Add(o.Timeout)
 	for {
 		if len(info.Name) == 0 {
 			return info.Object, false, fmt.Errorf("resource name must be provided")
 		}
 
 		nameSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
-
 		// List with a name field selector to get the current resourceVersion to watch from (not the object's resourceVersion)
 		gottenObjList, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(metav1.ListOptions{FieldSelector: nameSelector})
 		if apierrors.IsNotFound(err) {
@@ -294,16 +306,15 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 			return gottenObj, false, err
 		}
 
-		timeout := endTime.Sub(time.Now())
+		timeout := o.EndTime.Sub(time.Now())
 		errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrWaitTimeout, info)
 		if timeout < 0 {
 			// we're out of time
 			return gottenObj, false, errWaitTimeoutWithName
 		}
 
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
-		watchEvent, err := watchtools.UntilWithoutRetry(ctx, objWatch, Wait{errOut: o.ErrOut}.IsDeleted)
-		cancel()
+		watchEvent, err := watchtools.UntilWithoutRetry(o.WaitContext, objWatch, Wait{errOut: o.ErrOut}.IsDeleted)
+		o.WaitCancel()
 		switch {
 		case err == nil:
 			return watchEvent.Object, true, nil
@@ -326,6 +337,7 @@ type Wait struct {
 }
 
 // IsDeleted returns true if the object is deleted. It prints any errors it encounters.
+// TODO: It doesn't make sense here, there's an error that is always returned as nil
 func (w Wait) IsDeleted(event watch.Event) (bool, error) {
 	switch event.Type {
 	case watch.Error:
@@ -351,7 +363,6 @@ type ConditionalWait struct {
 
 // IsConditionMet is a conditionfunc for waiting on an API condition to be met
 func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
-	endTime := time.Now().Add(o.Timeout)
 	for {
 		if len(info.Name) == 0 {
 			return info.Object, false, fmt.Errorf("resource name must be provided")
@@ -389,16 +400,15 @@ func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (ru
 			return gottenObj, false, err
 		}
 
-		timeout := endTime.Sub(time.Now())
+		timeout := o.EndTime.Sub(time.Now())
 		errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrWaitTimeout, info)
 		if timeout < 0 {
 			// we're out of time
 			return gottenObj, false, errWaitTimeoutWithName
 		}
 
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
-		watchEvent, err := watchtools.UntilWithoutRetry(ctx, objWatch, w.isConditionMet)
-		cancel()
+		watchEvent, err := watchtools.UntilWithoutRetry(o.WaitContext, objWatch, w.isConditionMet)
+		o.WaitCancel()
 		switch {
 		case err == nil:
 			return watchEvent.Object, true, nil
