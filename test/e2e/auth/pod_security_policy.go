@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
 
@@ -52,10 +53,10 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 	var ns string // Test namespace, for convenience
 	ginkgo.BeforeEach(func() {
 		if !framework.IsPodSecurityPolicyEnabled(f.ClientSet) {
-			framework.Skipf("PodSecurityPolicy not enabled")
+			e2eskipper.Skipf("PodSecurityPolicy not enabled")
 		}
 		if !auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
-			framework.Skipf("RBAC not enabled")
+			e2eskipper.Skipf("RBAC not enabled")
 		}
 		ns = f.Namespace.Name
 
@@ -373,5 +374,5 @@ func boolPtr(b bool) *bool {
 
 // isAppArmorSupported checks whether the AppArmor is supported by the node OS distro.
 func isAppArmorSupported() bool {
-	return framework.NodeOSDistroIs(framework.AppArmorDistros...)
+	return framework.NodeOSDistroIs(e2eskipper.AppArmorDistros...)
 }
