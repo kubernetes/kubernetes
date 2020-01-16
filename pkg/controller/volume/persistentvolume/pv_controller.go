@@ -244,6 +244,16 @@ type PersistentVolumeController struct {
 func (ctrl *PersistentVolumeController) syncClaim(claim *v1.PersistentVolumeClaim) error {
 	klog.V(4).Infof("synchronizing PersistentVolumeClaim[%s]: %s", claimToClaimKey(claim), getClaimStatusForLogging(claim))
 
+	// Set correct "migrated-to" annotations on PVC and update in API server if
+	// necessary
+	newClaim, err := ctrl.updateClaimMigrationAnnotations(claim)
+	if err != nil {
+		// Nothing was saved; we will fall back into the same
+		// condition in the next call to this method
+		return err
+	}
+	claim = newClaim
+
 	if !metav1.HasAnnotation(claim.ObjectMeta, pvutil.AnnBindCompleted) {
 		return ctrl.syncUnboundClaim(claim)
 	} else {
@@ -491,6 +501,16 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *v1.PersistentVolum
 // these events.
 func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) error {
 	klog.V(4).Infof("synchronizing PersistentVolume[%s]: %s", volume.Name, getVolumeStatusForLogging(volume))
+
+	// Set correct "migrated-to" annotations on PV and update in API server if
+	// necessary
+	newVolume, err := ctrl.updateVolumeMigrationAnnotations(volume)
+	if err != nil {
+		// Nothing was saved; we will fall back into the same
+		// condition in the next call to this method
+		return err
+	}
+	volume = newVolume
 
 	// [Unit test set 4]
 	if volume.Spec.ClaimRef == nil {
@@ -1010,6 +1030,11 @@ func (ctrl *PersistentVolumeController) unbindVolume(volume *v1.PersistentVolume
 // reclaimVolume implements volume.Spec.PersistentVolumeReclaimPolicy and
 // starts appropriate reclaim action.
 func (ctrl *PersistentVolumeController) reclaimVolume(volume *v1.PersistentVolume) error {
+	if migrated := volume.Annotations[pvutil.AnnMigratedTo]; len(migrated) > 0 {
+		// PV is Migrated. The PV controller should stand down and the external
+		// provisioner will handle this PV
+		return nil
+	}
 	switch volume.Spec.PersistentVolumeReclaimPolicy {
 	case v1.PersistentVolumeReclaimRetain:
 		klog.V(4).Infof("reclaimVolume[%s]: policy is Retain, nothing to do", volume.Name)
