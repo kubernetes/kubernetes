@@ -2349,8 +2349,11 @@ func (i *IngressDescriber) Describe(namespace, name string, describerSettings de
 }
 
 func (i *IngressDescriber) describeBackend(ns string, backend *networkingv1beta1.IngressBackend) string {
-	endpoints, _ := i.CoreV1().Endpoints(ns).Get(backend.ServiceName, metav1.GetOptions{})
-	service, _ := i.CoreV1().Services(ns).Get(backend.ServiceName, metav1.GetOptions{})
+	endpoints, errEndpoints := i.CoreV1().Endpoints(ns).Get(backend.ServiceName, metav1.GetOptions{})
+	service, errService := i.CoreV1().Services(ns).Get(backend.ServiceName, metav1.GetOptions{})
+	if errEndpoints != nil || errService != nil {
+		return "<none>"
+	}
 	spName := ""
 	for i := range service.Spec.Ports {
 		sp := &service.Spec.Ports[i]
@@ -2409,7 +2412,9 @@ func (i *IngressDescriber) describeIngress(ing *networkingv1beta1.Ingress, descr
 		if count == 0 {
 			w.Write(LEVEL_1, "%s\t%s \t%s (%s)\n", "*", "*", backendStringer(def), i.describeBackend(ns, def))
 		}
-		describeIngressAnnotations(w, ing.Annotations)
+
+		// TODO: Move from annotations into Ingress status.
+		printAnnotationsMultiline(w, "Annotations", ing.Annotations)
 
 		if describerSettings.ShowEvents {
 			events, _ := i.CoreV1().Events(ing.Namespace).Search(scheme.Scheme, ing)
@@ -2429,14 +2434,6 @@ func describeIngressTLS(w PrefixWriter, ingTLS []networkingv1beta1.IngressTLS) {
 		} else {
 			w.Write(LEVEL_1, "%v terminates %v\n", t.SecretName, strings.Join(t.Hosts, ","))
 		}
-	}
-}
-
-// TODO: Move from annotations into Ingress status.
-func describeIngressAnnotations(w PrefixWriter, annotations map[string]string) {
-	w.Write(LEVEL_0, "Annotations:\n")
-	for k, v := range annotations {
-		w.Write(LEVEL_1, "%v:\t%s\n", k, v)
 	}
 }
 

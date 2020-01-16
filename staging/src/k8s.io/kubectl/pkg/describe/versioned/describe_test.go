@@ -32,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -1673,6 +1674,23 @@ func TestDescribeDeployment(t *testing.T) {
 	}
 }
 
+func TestDescribeIngress(t *testing.T) {
+	fakeClient := fake.NewSimpleClientset(&networkingv1beta1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+	})
+	i := IngressDescriber{fakeClient}
+	out, err := i.Describe("foo", "bar", describe.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "bar") || !strings.Contains(out, "foo") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
 func TestDescribeStorageClass(t *testing.T) {
 	reclaimPolicy := corev1.PersistentVolumeReclaimRetain
 	bindingMode := storagev1.VolumeBindingMode("bindingmode")
@@ -2660,8 +2678,15 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		// TODO(jchaloup): add tests for:
-		// - IngressDescriber
 		// - JobDescriber
+		"IngressDescriber": &IngressDescriber{
+			fake.NewSimpleClientset(&networkingv1beta1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+			}, events),
+		},
 		"NodeDescriber": &NodeDescriber{
 			fake.NewSimpleClientset(&corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
