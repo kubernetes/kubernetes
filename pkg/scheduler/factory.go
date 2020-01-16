@@ -157,7 +157,6 @@ func (c *Configurator) create(extenders []algorithm.SchedulerExtender) (*Schedul
 	return &Scheduler{
 		SchedulerCache:  c.schedulerCache,
 		Algorithm:       algo,
-		GetBinder:       getBinderFunc(c.client, extenders),
 		Framework:       framework,
 		NextPod:         internalqueue.MakeNextPodFunc(podQueue),
 		Error:           MakeDefaultErrorFunc(c.client, podQueue, c.schedulerCache),
@@ -378,19 +377,6 @@ func getPredicateConfigs(keys sets.String, lr *frameworkplugins.LegacyRegistry, 
 	return &plugins, pluginConfig, nil
 }
 
-// getBinderFunc returns a func which returns an extender that supports bind or a default binder based on the given pod.
-func getBinderFunc(client clientset.Interface, extenders []algorithm.SchedulerExtender) func(pod *v1.Pod) Binder {
-	defaultBinder := &binder{client}
-	return func(pod *v1.Pod) Binder {
-		for _, extender := range extenders {
-			if extender.IsBinder() && extender.IsInterested(pod) {
-				return extender
-			}
-		}
-		return defaultBinder
-	}
-}
-
 type podInformer struct {
 	informer cache.SharedIndexInformer
 }
@@ -480,19 +466,6 @@ func MakeDefaultErrorFunc(client clientset.Interface, podQueue internalqueue.Sch
 			}
 		}()
 	}
-}
-
-type binder struct {
-	Client clientset.Interface
-}
-
-// Implement Binder interface
-var _ Binder = &binder{}
-
-// Bind just does a POST binding RPC.
-func (b *binder) Bind(binding *v1.Binding) error {
-	klog.V(3).Infof("Attempting to bind %v to %v", binding.Name, binding.Target.Name)
-	return b.Client.CoreV1().Pods(binding.Namespace).Bind(binding)
 }
 
 // GetPodDisruptionBudgetLister returns pdb lister from the given informer factory. Returns nil if PodDisruptionBudget feature is disabled.
