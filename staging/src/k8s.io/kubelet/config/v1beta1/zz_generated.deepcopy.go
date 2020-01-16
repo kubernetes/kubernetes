@@ -296,6 +296,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		copy(*out, *in)
 	}
 	out.Logging = in.Logging
+	if in.EnableSystemLogHandler != nil {
+		in, out := &in.EnableSystemLogHandler, &out.EnableSystemLogHandler
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

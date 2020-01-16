@@ -301,6 +301,11 @@ func newServerTest() *serverTestFramework {
 }
 
 func newServerTestWithDebug(enableDebugging, redirectContainerStreaming bool, streamingServer streaming.Server) *serverTestFramework {
+	return newServerTestWithDebuggingHandlers(enableDebugging, enableDebugging, redirectContainerStreaming, streamingServer)
+}
+
+func newServerTestWithDebuggingHandlers(enableDebugging, enableSystemLogHandler, redirectContainerStreaming bool,
+	streamingServer streaming.Server) *serverTestFramework {
 	fw := &serverTestFramework{}
 	fw.fakeKubelet = &fakeKubelet{
 		hostnameFunc: func() string {
@@ -340,6 +345,7 @@ func newServerTestWithDebug(enableDebugging, redirectContainerStreaming bool, st
 		enableDebugging,
 		false,
 		redirectContainerStreaming,
+		enableSystemLogHandler,
 		fw.criHandler)
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
@@ -1544,7 +1550,9 @@ func TestMetricMethodBuckets(t *testing.T) {
 }
 
 func TestDebuggingDisabledHandlers(t *testing.T) {
-	fw := newServerTestWithDebug(false, false, nil)
+	// for backward compatibility even if enablesystemLogHandler is set but not enableDebuggingHandler then /logs
+	//shouldn't be served.
+	fw := newServerTestWithDebuggingHandlers(false, true, false, nil)
 	defer fw.testHTTPServer.Close()
 
 	paths := []string{
@@ -1554,19 +1562,7 @@ func TestDebuggingDisabledHandlers(t *testing.T) {
 	}
 
 	for _, p := range paths {
-		resp, err := http.Get(fw.testHTTPServer.URL + p)
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
-		body, err := ioutil.ReadAll(resp.Body)
-		require.NoError(t, err)
-		assert.Equal(t, "Debug endpoints are disabled.\n", string(body))
-
-		resp, err = http.Post(fw.testHTTPServer.URL+p, "", nil)
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
-		body, err = ioutil.ReadAll(resp.Body)
-		require.NoError(t, err)
-		assert.Equal(t, "Debug endpoints are disabled.\n", string(body))
+		verifyEndpointResponse(t, fw, p, "Debug endpoints are disabled.\n")
 	}
 
 	// test some other paths, make sure they're working
@@ -1599,6 +1595,14 @@ func TestDebuggingDisabledHandlers(t *testing.T) {
 
 }
 
+func TestDisablingSystemLogHandler(t *testing.T) {
+	fw := newServerTestWithDebuggingHandlers(true, false, false, nil)
+	defer fw.testHTTPServer.Close()
+
+	// verify logs endpoint is disabled
+	verifyEndpointResponse(t, fw, "/logs/kubelet.log", "logs endpoint is disabled.\n")
+}
+
 func TestFailedParseParamsSummaryHandler(t *testing.T) {
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
@@ -1610,7 +1614,22 @@ func TestFailedParseParamsSummaryHandler(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 	assert.Contains(t, string(v), "parse form failed")
+}
 
+func verifyEndpointResponse(t *testing.T, fw *serverTestFramework, path string, expectedResponse string) {
+	resp, err := http.Get(fw.testHTTPServer.URL + path)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+	body, err := ioutil.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, expectedResponse, string(body))
+
+	resp, err = http.Post(fw.testHTTPServer.URL+path, "", nil)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+	body, err = ioutil.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, expectedResponse, string(body))
 }
 
 func TestTrimURLPath(t *testing.T) {
