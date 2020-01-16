@@ -336,14 +336,14 @@ func (cfgCtl *configController) digestConfigObjects(newPLs []*fctypesv1a1.Priori
 				state.queues.Quiesce(nil)
 			}
 		}
+		var err error
+		state.qsConfig, err = qscOfPL(pl, cfgCtl.requestWaitLimit)
+		if err != nil {
+			klog.Warningf(err.Error())
+			continue
+		}
 		if state.config.Limited != nil {
 			shareSum += float64(state.config.Limited.AssuredConcurrencyShares)
-			var err error
-			state.qsConfig, err = qscOfPL(pl, cfgCtl.requestWaitLimit)
-			if err != nil {
-				klog.Warningf(err.Error())
-				continue
-			}
 		}
 		haveExemptPL = haveExemptPL || pl.Name == fctypesv1a1.PriorityLevelConfigurationNameExempt
 		haveCatchAllPL = haveCatchAllPL || pl.Name == fctypesv1a1.PriorityLevelConfigurationNameCatchAll
@@ -503,12 +503,22 @@ func (cfgCtl *configController) digestConfigObjects(newPLs []*fctypesv1a1.Priori
 }
 
 // qscOfPL returns a pointer to an appropriate QueueSetConfig or nil
-// if no queuing is called for.
+// if no queuing is called for.  Returns nil and an error if the given
+// object is malformed in a way that is a problem for this package.
 func qscOfPL(pl *fctypesv1a1.PriorityLevelConfiguration, requestWaitLimit time.Duration) (*fq.QueueSetConfig, error) {
-	if pl.Spec.Limited == nil || pl.Spec.Limited.LimitResponse.Queuing == nil {
+	if (pl.Spec.Type == fctypesv1a1.PriorityLevelEnablementExempt) != (pl.Spec.Limited == nil) {
+		return nil, errors.New("broken union structure at the top")
+	}
+	if pl.Spec.Limited == nil {
 		return nil, nil
 	}
+	if (pl.Spec.Limited.LimitResponse.Type == fctypesv1a1.LimitResponseTypeReject) != (pl.Spec.Limited.LimitResponse.Queuing == nil) {
+		return nil, errors.New("broken union structure for limit response")
+	}
 	qc := pl.Spec.Limited.LimitResponse.Queuing
+	if qc == nil {
+		return nil, nil
+	}
 	var err error
 	dealer, e1 := shufflesharding.NewDealer(int(qc.Queues), int(qc.HandSize))
 	if e1 != nil {

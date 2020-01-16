@@ -27,27 +27,34 @@ import (
 // either input.
 func matchesFlowSchema(digest RequestDigest, flowSchema *fctypesv1a1.FlowSchema) bool {
 	for _, policyRule := range flowSchema.Spec.Rules {
-		subjectMatches := false
-		for _, subject := range policyRule.Subjects {
-			if matchesSubject(digest, subject) {
-				subjectMatches = true
-				break
+		if matchesPolicyRule(digest, &policyRule) {
+			return true
+		}
+	}
+	return false
+}
+
+func matchesPolicyRule(digest RequestDigest, policyRule *fctypesv1a1.PolicyRulesWithSubjects) bool {
+	subjectMatches := false
+	for _, subject := range policyRule.Subjects {
+		if matchesSubject(digest, subject) {
+			subjectMatches = true
+			break
+		}
+	}
+	if !subjectMatches {
+		return false
+	}
+	if digest.RequestInfo.IsResourceRequest {
+		for _, rr := range policyRule.ResourceRules {
+			if matchesResourcePolicyRule(digest, rr) {
+				return true
 			}
 		}
-		if !subjectMatches {
-			continue
-		}
-		if digest.RequestInfo.IsResourceRequest {
-			for _, rr := range policyRule.ResourceRules {
-				if matchesResourcePolicyRule(digest, rr) {
-					return true
-				}
-			}
-		} else {
-			for _, rr := range policyRule.NonResourceRules {
-				if matchesNonResourcePolicyRule(digest, rr) {
-					return true
-				}
+	} else {
+		for _, rr := range policyRule.NonResourceRules {
+			if matchesNonResourcePolicyRule(digest, rr) {
+				return true
 			}
 		}
 	}
@@ -58,10 +65,13 @@ func matchesSubject(digest RequestDigest, subject fctypesv1a1.Subject) bool {
 	user := digest.User
 	switch subject.Kind {
 	case fctypesv1a1.SubjectKindUser:
-		return subject.User.Name == fctypesv1a1.NameAll || subject.User.Name == user.GetName()
+		return subject.User != nil && (subject.User.Name == fctypesv1a1.NameAll || subject.User.Name == user.GetName())
 	case fctypesv1a1.SubjectKindGroup:
-		return containsString(subject.Group.Name, user.GetGroups(), fctypesv1a1.NameAll)
+		return subject.Group != nil && (containsString(subject.Group.Name, user.GetGroups(), fctypesv1a1.NameAll))
 	case fctypesv1a1.SubjectKindServiceAccount:
+		if subject.ServiceAccount == nil {
+			return false
+		}
 		if subject.ServiceAccount.Name == fctypesv1a1.NameAll {
 			return serviceAccountMatchesNamespace(subject.ServiceAccount.Namespace, user.GetName())
 		}
