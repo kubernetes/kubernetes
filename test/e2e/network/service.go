@@ -1966,7 +1966,7 @@ var _ = SIGDescribe("Services", func() {
 				PublishNotReadyAddresses: true,
 			},
 		}
-		rcSpec := e2erc.ByNameContainer(t.Name, 1, t.Image, t.Labels, v1.Container{
+		rcSpec := e2erc.ByNameContainer(t.Name, 1, t.Labels, v1.Container{
 			Args:  []string{"netexec", fmt.Sprintf("--http-port=%d", port)},
 			Name:  t.Name,
 			Image: t.Image,
