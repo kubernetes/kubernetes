@@ -28,6 +28,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
+	utilexec "k8s.io/utils/exec"
 )
 
 // ExecHandler knows how to execute a command in a running Docker container.
@@ -58,6 +59,10 @@ func (d *dockerExitError) ExitStatus() int {
 // NativeExecHandler executes commands in Docker containers using Docker's exec API.
 type NativeExecHandler struct{}
 
+// ExecInContainer executes a command in a Docker container. It may leave a
+// goroutine running the process in the container after the function returns
+// because of a timeout. However, the goroutine does not leak, it terminates
+// when the process exits.
 func (*NativeExecHandler) ExecInContainer(client libdocker.Interface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	done := make(chan struct{})
 	defer close(done)
@@ -74,62 +79,93 @@ func (*NativeExecHandler) ExecInContainer(client libdocker.Interface, container 
 		return fmt.Errorf("failed to exec in container - Exec setup failed - %v", err)
 	}
 
-	// Have to start this before the call to client.StartExec because client.StartExec is a blocking
-	// call :-( Otherwise, resize events don't get processed and the terminal never resizes.
-	//
-	// We also have to delay attempting to send a terminal resize request to docker until after the
-	// exec has started; otherwise, the initial resize request will fail.
-	execStarted := make(chan struct{})
-	go func() {
-		select {
-		case <-execStarted:
-			// client.StartExec has started the exec, so we can start resizing
-		case <-done:
-			// ExecInContainer has returned, so short-circuit
-			return
+	startExec := func() error {
+		// Have to start this before the call to client.StartExec because client.StartExec is a blocking
+		// call :-( Otherwise, resize events don't get processed and the terminal never resizes.
+		//
+		// We also have to delay attempting to send a terminal resize request to docker until after the
+		// exec has started; otherwise, the initial resize request will fail.
+		execStarted := make(chan struct{})
+		go func() {
+			select {
+			case <-execStarted:
+				// client.StartExec has started the exec, so we can start resizing
+			case <-done:
+				// ExecInContainer has returned, so short-circuit
+				return
+			}
+
+			kubecontainer.HandleResizing(resize, func(size remotecommand.TerminalSize) {
+				client.ResizeExecTTY(execObj.ID, uint(size.Height), uint(size.Width))
+			})
+		}()
+
+		startOpts := dockertypes.ExecStartCheck{Detach: false, Tty: tty}
+		streamOpts := libdocker.StreamOptions{
+			InputStream:  stdin,
+			OutputStream: stdout,
+			ErrorStream:  stderr,
+			RawTerminal:  tty,
+			ExecStarted:  execStarted,
+		}
+		err = client.StartExec(execObj.ID, startOpts, streamOpts)
+		if err != nil {
+			return err
 		}
 
-		kubecontainer.HandleResizing(resize, func(size remotecommand.TerminalSize) {
-			client.ResizeExecTTY(execObj.ID, uint(size.Height), uint(size.Width))
-		})
-	}()
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+		count := 0
+		for {
+			inspect, err2 := client.InspectExec(execObj.ID)
+			if err2 != nil {
+				return err2
+			}
+			if !inspect.Running {
+				if inspect.ExitCode != 0 {
+					err = &dockerExitError{inspect}
+				}
+				break
+			}
 
-	startOpts := dockertypes.ExecStartCheck{Detach: false, Tty: tty}
-	streamOpts := libdocker.StreamOptions{
-		InputStream:  stdin,
-		OutputStream: stdout,
-		ErrorStream:  stderr,
-		RawTerminal:  tty,
-		ExecStarted:  execStarted,
-	}
-	err = client.StartExec(execObj.ID, startOpts, streamOpts)
-	if err != nil {
+			count++
+			if count == 5 {
+				klog.Errorf("Exec session %s in container %s terminated but process still running!", execObj.ID, container.ID)
+				break
+			}
+
+			<-ticker.C
+		}
 		return err
 	}
-
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-	count := 0
-	for {
-		inspect, err2 := client.InspectExec(execObj.ID)
-		if err2 != nil {
-			return err2
-		}
-		if !inspect.Running {
-			if inspect.ExitCode != 0 {
-				err = &dockerExitError{inspect}
-			}
-			break
-		}
-
-		count++
-		if count == 5 {
-			klog.Errorf("Exec session %s in container %s terminated but process still running!", execObj.ID, container.ID)
-			break
-		}
-
-		<-ticker.C
+	// No timeout, block until startExec is finished.
+	if timeout <= 0 {
+		return startExec()
 	}
+	// Otherwise, run startExec in a new goroutine and wait for completion
+	// or timeout, whatever happens first.
+	ch := make(chan error, 1)
+	go func() {
+		ch <- startExec()
+	}()
+	select {
+	case err := <-ch:
+		return err
+	case <-time.After(timeout):
+		// FIXME: we should kill the process in the container, but the
+		// Docker API doesn't support it. See
+		// https://github.com/docker/docker/issues/9098.
+		// For liveness probes this is probably okay, since the
+		// container will be restarted. For readiness probes it means
+		// that probe processes could start piling up.
+		klog.Errorf("Exec session %s in container %s timed out, but process is still running!", execObj.ID, container.ID)
 
-	return err
+		// Return an utilexec.ExitError with code != 0, so that the
+		// probe result will be probe.Failure, not probe.Unknown as for
+		// errors that don't implement that interface.
+		return utilexec.CodeExitError{
+			Err:  fmt.Errorf("exec session timed out"),
+			Code: 1,
+		}
+	}
 }
