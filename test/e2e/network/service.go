@@ -103,6 +103,9 @@ var (
 	}
 )
 
+// portsByPodName is a map that maps pod name to container ports.
+type portsByPodName map[string][]int
+
 // CheckAffinity function tests whether the service affinity works as expected.
 // If affinity is expected, the test will return true once affinityConfirmCount
 // number of same response observed in a row. If affinity is not expected, the
@@ -731,7 +734,7 @@ var _ = SIGDescribe("Services", func() {
 		_, err := jig.CreateTCPServiceWithPort(nil, 80)
 		framework.ExpectNoError(err)
 
-		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{})
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		names := map[string]bool{}
@@ -747,22 +750,22 @@ var _ = SIGDescribe("Services", func() {
 
 		createPodOrFail(cs, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: 80}})
 		names[name1] = true
-		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{name1: {80}})
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{name1: {80}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		createPodOrFail(cs, ns, name2, jig.Labels, []v1.ContainerPort{{ContainerPort: 80}})
 		names[name2] = true
-		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{name1: {80}, name2: {80}})
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{name1: {80}, name2: {80}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		e2epod.DeletePodOrFail(cs, ns, name1)
 		delete(names, name1)
-		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{name2: {80}})
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{name2: {80}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		e2epod.DeletePodOrFail(cs, ns, name2)
 		delete(names, name2)
-		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{})
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 	})
 
@@ -804,7 +807,7 @@ var _ = SIGDescribe("Services", func() {
 
 		port1 := 100
 		port2 := 101
-		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{})
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		names := map[string]bool{}
@@ -833,22 +836,22 @@ var _ = SIGDescribe("Services", func() {
 
 		createPodOrFail(cs, ns, podname1, jig.Labels, containerPorts1)
 		names[podname1] = true
-		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{podname1: {port1}})
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{podname1: {port1}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		createPodOrFail(cs, ns, podname2, jig.Labels, containerPorts2)
 		names[podname2] = true
-		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{podname1: {port1}, podname2: {port2}})
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{podname1: {port1}, podname2: {port2}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		e2epod.DeletePodOrFail(cs, ns, podname1)
 		delete(names, podname1)
-		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{podname2: {port2}})
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{podname2: {port2}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		e2epod.DeletePodOrFail(cs, ns, podname2)
 		delete(names, podname2)
-		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{})
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 	})
 
@@ -904,7 +907,7 @@ var _ = SIGDescribe("Services", func() {
 		}()
 
 		// Waiting for service to expose endpoint.
-		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{serverPodName: {servicePort}})
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{serverPodName: {servicePort}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		ginkgo.By("Creating pause pod deployment")
@@ -957,7 +960,7 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(f.WaitForPodReady(pod.Name))
 
 		ginkgo.By("waiting for the service to expose an endpoint")
-		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{serverPodName: {servicePort}})
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{serverPodName: {servicePort}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		ginkgo.By("Checking if the pod can reach itself")
@@ -3264,4 +3267,78 @@ func proxyMode(f *framework.Framework) (string, error) {
 // setting for the supported cloud providers (currently GCE/GKE and Azure) and empty functions for others.
 func enableAndDisableInternalLB() (enable func(svc *v1.Service), disable func(svc *v1.Service)) {
 	return framework.TestContext.CloudConfig.Provider.EnableAndDisableInternalLB()
+}
+
+func validatePorts(ep e2eendpoints.PortsByPodUID, expectedEndpoints e2eendpoints.PortsByPodUID) error {
+	if len(ep) != len(expectedEndpoints) {
+		// should not happen because we check this condition before
+		return fmt.Errorf("invalid number of endpoints got %v, expected %v", ep, expectedEndpoints)
+	}
+	for podUID := range expectedEndpoints {
+		if _, ok := ep[podUID]; !ok {
+			return fmt.Errorf("endpoint %v not found", podUID)
+		}
+		if len(ep[podUID]) != len(expectedEndpoints[podUID]) {
+			return fmt.Errorf("invalid list of ports for uid %v. Got %v, expected %v", podUID, ep[podUID], expectedEndpoints[podUID])
+		}
+		sort.Ints(ep[podUID])
+		sort.Ints(expectedEndpoints[podUID])
+		for index := range ep[podUID] {
+			if ep[podUID][index] != expectedEndpoints[podUID][index] {
+				return fmt.Errorf("invalid list of ports for uid %v. Got %v, expected %v", podUID, ep[podUID], expectedEndpoints[podUID])
+			}
+		}
+	}
+	return nil
+}
+
+func translatePodNameToUID(c clientset.Interface, ns string, expectedEndpoints portsByPodName) (e2eendpoints.PortsByPodUID, error) {
+	portsByUID := make(e2eendpoints.PortsByPodUID)
+	for name, portList := range expectedEndpoints {
+		pod, err := c.CoreV1().Pods(ns).Get(name, metav1.GetOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to get pod %s, that's pretty weird. validation failed: %s", name, err)
+		}
+		portsByUID[pod.ObjectMeta.UID] = portList
+	}
+	return portsByUID, nil
+}
+
+// validateEndpointsPorts validates that the given service exists and is served by the given expectedEndpoints.
+func validateEndpointsPorts(c clientset.Interface, namespace, serviceName string, expectedEndpoints portsByPodName) error {
+	ginkgo.By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to expose endpoints %v", framework.ServiceStartTimeout, serviceName, namespace, expectedEndpoints))
+	i := 1
+	for start := time.Now(); time.Since(start) < framework.ServiceStartTimeout; time.Sleep(1 * time.Second) {
+		ep, err := c.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
+		if err != nil {
+			framework.Logf("Get endpoints failed (%v elapsed, ignoring for 5s): %v", time.Since(start), err)
+			continue
+		}
+		portsByPodUID := e2eendpoints.GetContainerPortsByPodUID(ep)
+		expectedPortsByPodUID, err := translatePodNameToUID(c, namespace, expectedEndpoints)
+		if err != nil {
+			return err
+		}
+		if len(portsByPodUID) == len(expectedEndpoints) {
+			err := validatePorts(portsByPodUID, expectedPortsByPodUID)
+			if err != nil {
+				return err
+			}
+			framework.Logf("successfully validated that service %s in namespace %s exposes endpoints %v (%v elapsed)",
+				serviceName, namespace, expectedEndpoints, time.Since(start))
+			return nil
+		}
+		if i%5 == 0 {
+			framework.Logf("Unexpected endpoints: found %v, expected %v (%v elapsed, will retry)", portsByPodUID, expectedEndpoints, time.Since(start))
+		}
+		i++
+	}
+	if pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{}); err == nil {
+		for _, pod := range pods.Items {
+			framework.Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
+		}
+	} else {
+		framework.Logf("Can't list pod debug info: %v", err)
+	}
+	return fmt.Errorf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, framework.ServiceStartTimeout)
 }
