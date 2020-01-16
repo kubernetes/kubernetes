@@ -16,6 +16,9 @@
 
 # This script is a vestigial redirection.  Please do not add "real" logic.
 # The "true" target of this makerule is `hack/make-rules/update.sh`.
+# We should run `hack/update-all.sh` if anything fails after 
+# running `hack/verify-all.sh`. It is equivalent to `make update`. 
+# Usage: `hack/update-all.sh` or `make update`.
 
 set -o errexit
 set -o nounset
