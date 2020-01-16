@@ -27,7 +27,7 @@ require (
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/caddyserver/caddy v1.0.3
 	github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c
-	github.com/checkpoint-restore/go-criu v0.0.0-20190109184317-bdb7599cd87b // indirect
+	github.com/checkpoint-restore/go-criu v0.0.0-20181120144056-17b0214f6c48 // indirect
 	github.com/client9/misspell v0.3.4
 	github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 	github.com/codegangsta/negroni v1.0.0 // indirect
@@ -47,7 +47,7 @@ require (
 	github.com/docker/go-connections v0.3.0
 	github.com/docker/go-units v0.4.0
 	github.com/docker/libnetwork v0.8.0-dev.2.0.20190624125649-f0e46a78ea34
-	github.com/elazarl/goproxy v0.0.0-20170405201442-c4fc26588b6e
+	github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/euank/go-kmsg-parser v2.0.0+incompatible // indirect
 	github.com/evanphx/json-patch v4.2.0+incompatible
@@ -218,7 +218,7 @@ replace (
 	github.com/cenkalti/backoff => github.com/cenkalti/backoff v2.1.1+incompatible
 	github.com/cespare/prettybench => github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c
 	github.com/chai2010/gettext-go => github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
-	github.com/checkpoint-restore/go-criu => github.com/checkpoint-restore/go-criu v0.0.0-20190109184317-bdb7599cd87b
+	github.com/checkpoint-restore/go-criu => github.com/checkpoint-restore/go-criu v0.0.0-20181120144056-17b0214f6c48 // 17b0214f6c48 is the SHA for git tag 3.11
 	github.com/cheekybits/genny => github.com/cheekybits/genny v0.0.0-20170328200008-9127e812e1e9
 	github.com/client9/misspell => github.com/client9/misspell v0.3.4
 	github.com/clusterhq/flocker-go => github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
@@ -235,7 +235,7 @@ replace (
 	github.com/coreos/go-oidc => github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/coreos/go-semver => github.com/coreos/go-semver v0.3.0
 	github.com/coreos/go-systemd => github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
-	github.com/coreos/pkg => github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea
+	github.com/coreos/pkg => github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea // 97fdf19511ea is the SHA for git tag v4
 	github.com/cpuguy83/go-md2man => github.com/cpuguy83/go-md2man v1.0.10
 	github.com/creack/pty => github.com/creack/pty v1.1.7
 	github.com/cyphar/filepath-securejoin => github.com/cyphar/filepath-securejoin v0.2.2
@@ -250,7 +250,7 @@ replace (
 	github.com/docker/libnetwork => github.com/docker/libnetwork v0.8.0-dev.2.0.20190624125649-f0e46a78ea34
 	github.com/docker/spdystream => github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
 	github.com/dustin/go-humanize => github.com/dustin/go-humanize v1.0.0
-	github.com/elazarl/goproxy => github.com/elazarl/goproxy v0.0.0-20170405201442-c4fc26588b6e
+	github.com/elazarl/goproxy => github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153 // 947c36da3153 is the SHA for git tag v1.11
 	github.com/emicklei/go-restful => github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/euank/go-kmsg-parser => github.com/euank/go-kmsg-parser v2.0.0+incompatible
 	github.com/evanphx/json-patch => github.com/evanphx/json-patch v4.2.0+incompatible

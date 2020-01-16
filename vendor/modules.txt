@@ -150,7 +150,7 @@ github.com/chai2010/gettext-go/gettext
 github.com/chai2010/gettext-go/gettext/mo
 github.com/chai2010/gettext-go/gettext/plural
 github.com/chai2010/gettext-go/gettext/po
-# github.com/checkpoint-restore/go-criu v0.0.0-20190109184317-bdb7599cd87b => github.com/checkpoint-restore/go-criu v0.0.0-20190109184317-bdb7599cd87b
+# github.com/checkpoint-restore/go-criu v0.0.0-20181120144056-17b0214f6c48 => github.com/checkpoint-restore/go-criu v0.0.0-20181120144056-17b0214f6c48
 github.com/checkpoint-restore/go-criu/rpc
 # github.com/client9/misspell v0.3.4 => github.com/client9/misspell v0.3.4
 github.com/client9/misspell
@@ -248,7 +248,7 @@ github.com/docker/spdystream
 github.com/docker/spdystream/spdy
 # github.com/dustin/go-humanize v1.0.0 => github.com/dustin/go-humanize v1.0.0
 github.com/dustin/go-humanize
-# github.com/elazarl/goproxy v0.0.0-20170405201442-c4fc26588b6e => github.com/elazarl/goproxy v0.0.0-20170405201442-c4fc26588b6e
+# github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153 => github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
 github.com/elazarl/goproxy
 # github.com/emicklei/go-restful v2.9.5+incompatible => github.com/emicklei/go-restful v2.9.5+incompatible
 github.com/emicklei/go-restful
