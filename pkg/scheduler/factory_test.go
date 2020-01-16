@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -38,7 +37,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
@@ -373,49 +371,32 @@ func testClientGetPodRequest(client *fake.Clientset, t *testing.T, podNs string,
 	}
 }
 
-func TestBind(t *testing.T) {
-	table := []struct {
-		name    string
-		binding *v1.Binding
-	}{
-		{
-			name: "binding can bind and validate request",
-			binding: &v1.Binding{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: metav1.NamespaceDefault,
-					Name:      "foo",
-				},
-				Target: v1.ObjectReference{
-					Name: "foohost.kubernetes.mydomain.com",
-				},
-			},
+// TODO(#87157): Move to DefaultBinding Plugin tests when it is introduced.
+func TestDefaultBinding(t *testing.T) {
+	binding := &v1.Binding{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: metav1.NamespaceDefault,
+			Name:      "foo",
+		},
+		Target: v1.ObjectReference{
+			Name: "foohost.kubernetes.mydomain.com",
 		},
 	}
 
-	for _, test := range table {
-		t.Run(test.name, func(t *testing.T) {
-			testBind(test.binding, t)
-		})
-	}
-}
-
-func testBind(binding *v1.Binding, t *testing.T) {
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: binding.GetName(), Namespace: metav1.NamespaceDefault},
 		Spec:       apitesting.V1DeepEqualSafePodSpec(),
 	}
 	client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
 
-	b := binder{client}
-
-	if err := b.Bind(binding); err != nil {
+	sched := Scheduler{client: client}
+	if err := sched.defaultBinding(binding); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return
 	}
 
-	pod := client.CoreV1().Pods(metav1.NamespaceDefault).(*fakeV1.FakePods)
-
-	actualBinding, err := pod.GetBinding(binding.GetName())
+	pods := client.CoreV1().Pods(metav1.NamespaceDefault).(*fakeV1.FakePods)
+	actualBinding, err := pods.GetBinding(binding.GetName())
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 		return
@@ -461,6 +442,7 @@ type fakeExtender struct {
 	isBinder          bool
 	interestedPodName string
 	ignorable         bool
+	gotBind           bool
 }
 
 func (f *fakeExtender) Name() string {
@@ -496,6 +478,7 @@ func (f *fakeExtender) Prioritize(
 
 func (f *fakeExtender) Bind(binding *v1.Binding) error {
 	if f.isBinder {
+		f.gotBind = true
 		return nil
 	}
 	return errors.New("not a binder")
@@ -507,65 +490,6 @@ func (f *fakeExtender) IsBinder() bool {
 
 func (f *fakeExtender) IsInterested(pod *v1.Pod) bool {
 	return pod != nil && pod.Name == f.interestedPodName
-}
-
-func TestGetBinderFunc(t *testing.T) {
-	table := []struct {
-		podName            string
-		extenders          []algorithm.SchedulerExtender
-		expectedBinderType string
-		name               string
-	}{
-		{
-			name:    "the extender is not a binder",
-			podName: "pod0",
-			extenders: []algorithm.SchedulerExtender{
-				&fakeExtender{isBinder: false, interestedPodName: "pod0"},
-			},
-			expectedBinderType: "*scheduler.binder",
-		},
-		{
-			name:    "one of the extenders is a binder and interested in pod",
-			podName: "pod0",
-			extenders: []algorithm.SchedulerExtender{
-				&fakeExtender{isBinder: false, interestedPodName: "pod0"},
-				&fakeExtender{isBinder: true, interestedPodName: "pod0"},
-			},
-			expectedBinderType: "*scheduler.fakeExtender",
-		},
-		{
-			name:    "one of the extenders is a binder, but not interested in pod",
-			podName: "pod1",
-			extenders: []algorithm.SchedulerExtender{
-				&fakeExtender{isBinder: false, interestedPodName: "pod1"},
-				&fakeExtender{isBinder: true, interestedPodName: "pod0"},
-			},
-			expectedBinderType: "*scheduler.binder",
-		},
-	}
-
-	for _, test := range table {
-		t.Run(test.name, func(t *testing.T) {
-			testGetBinderFunc(test.expectedBinderType, test.podName, test.extenders, t)
-		})
-	}
-}
-
-func testGetBinderFunc(expectedBinderType, podName string, extenders []algorithm.SchedulerExtender, t *testing.T) {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: podName,
-		},
-	}
-
-	f := &Configurator{}
-	binderFunc := getBinderFunc(f.client, extenders)
-	binder := binderFunc(pod)
-
-	binderType := fmt.Sprintf("%s", reflect.TypeOf(binder))
-	if binderType != expectedBinderType {
-		t.Errorf("Expected binder %q but got %q", expectedBinderType, binderType)
-	}
 }
 
 type TestPlugin struct {
