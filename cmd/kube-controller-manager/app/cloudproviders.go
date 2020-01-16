@@ -32,7 +32,7 @@ func createCloudProvider(cloudProvider string, externalCloudVolumePlugin string,
 	var cloud cloudprovider.Interface
 	var loopMode ControllerLoopMode
 	var err error
-	if cloudprovider.IsExternal(cloudProvider) {
+	if cloudprovider.IsExternal(cloudProvider) || len(cloudProvider) == 0 {
 		loopMode = ExternalLoops
 		if externalCloudVolumePlugin == "" {
 			// externalCloudVolumePlugin is temporary until we split all cloud providers out.
