@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# locate all API groups by their packages and versions
-
+# This scripts locates all API groups by their packages and versions
+# Usage: `hack/verify-api-groups.sh`.
 
 set -o errexit
 set -o nounset

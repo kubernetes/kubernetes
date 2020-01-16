@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script checks boilerplate header for all files.
+# Usage: `hack/verify-boilerplate.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
