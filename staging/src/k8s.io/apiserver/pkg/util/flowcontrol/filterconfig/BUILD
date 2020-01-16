@@ -54,7 +54,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "gen_test.go",
-        "rule_test.go",
+        "match_test.go",
     ],
     embed = [":go_default_library"],
     deps = [

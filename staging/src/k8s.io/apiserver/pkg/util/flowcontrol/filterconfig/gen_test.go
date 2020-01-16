@@ -20,52 +20,13 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
-	"time"
 
-	// corev1 "k8s.io/api/core/v1"
 	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
-
-// genPL creates a PriorityLevelConfiguration with the given name and
-// randomly generated spec.  The spec is relatively likely to be valid
-// but might be not be valid.  The returned boolean indicates whether
-// the returned object is acceptable to this package; this may be a
-// more liberal test than the official validation test.
-func genPL(rng *rand.Rand, name string) (*fcv1a1.PriorityLevelConfiguration, bool) {
-	plc := &fcv1a1.PriorityLevelConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec: fcv1a1.PriorityLevelConfigurationSpec{
-			Type: fcv1a1.PriorityLevelEnablementExempt}}
-	// 83% chance of Type being Limited
-	if rng.Intn(6) != 1 {
-		plc.Spec.Type = fcv1a1.PriorityLevelEnablementLimited
-	}
-	// independent 83% chance of a non-nil limit configuration
-	if rng.Intn(6) != 1 {
-		plc.Spec.Limited = &fcv1a1.LimitedPriorityLevelConfiguration{
-			AssuredConcurrencyShares: rng.Int31n(100) + 1,
-			LimitResponse: fcv1a1.LimitResponse{
-				Type: fcv1a1.LimitResponseTypeReject}}
-		// 83% change of response being queuing
-		if rng.Intn(6) != 1 {
-			plc.Spec.Limited.LimitResponse.Type = fcv1a1.LimitResponseTypeQueue
-		}
-		// independent 83% chance of non-nil queuing config
-		if rng.Intn(6) != 1 {
-			qc := &fcv1a1.QueuingConfiguration{
-				Queues:           rng.Int31n(256) - 25,
-				HandSize:         rng.Int31n(96) - 16,
-				QueueLengthLimit: rng.Int31n(20) - 2}
-			plc.Spec.Limited.LimitResponse.Queuing = qc
-		}
-	}
-	_, err := qscOfPL(plc, time.Minute)
-	return plc, err == nil
-}
 
 // genFS creates a FlowSchema with the given name and randomly
 // generated spec, along with example matching and non-matching
@@ -220,7 +181,7 @@ func genPolicyRuleWithSubjects(t *testing.T, rng *rand.Rand, someMatchesAllResou
 		skippingReqs = append(skippingReqs, nsrs...)
 	}
 	rule := fcv1a1.PolicyRulesWithSubjects{subjects, resourceRules, nonResourceRules}
-	t.Logf("For someMatchesAllResourceRequests=%v, someMatchesAllNonResourceRequests=%v: generated prws=%s, valid=%v, marr=%v, manrr=%v, mu=%s, su=%s, mr=%s, sr=%s", someMatchesAllResourceRequests, someMatchesAllNonResourceRequests, FmtPolicyRule(rule), valid, matchAllResourceRequests, matchAllNonResourceRequests, FmtUsers(matchingUsers), FmtUsers(skippingUsers), fmtRequests(matchingReqs), fmtRequests(skippingReqs))
+	t.Logf("For someMatchesAllResourceRequests=%v, someMatchesAllNonResourceRequests=%v: generated prws=%s, valid=%v, marr=%v, manrr=%v, mu=%s, su=%s, mr=%s, sr=%s", someMatchesAllResourceRequests, someMatchesAllNonResourceRequests, FmtPolicyRule(rule), valid, matchAllResourceRequests, matchAllNonResourceRequests, FmtUsers(matchingUsers), FmtUsers(skippingUsers), FmtRequests(matchingReqs), FmtRequests(skippingReqs))
 	var matchingDigests, skippingDigests []RequestDigest
 	sgnMatchingUsers := sgn(len(matchingUsers))
 	sgnMatchingReqs := sgn(len(matchingReqs))

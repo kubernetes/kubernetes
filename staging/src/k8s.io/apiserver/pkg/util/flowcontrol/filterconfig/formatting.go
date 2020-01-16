@@ -27,20 +27,18 @@ import (
 
 var _ fmt.GoStringer = RequestDigest{}
 
+// GoString produces a golang source expression of the value.
 func (rd RequestDigest) GoString() string {
 	return fmt.Sprintf("RequestDigest{RequestInfo: %#+v, User: %#+v}", rd.RequestInfo, rd.User)
 }
 
+// FmtFlowSchema produces a golang source expression of the value.
 func FmtFlowSchema(fs *fcv1a1.FlowSchema) string {
 	if fs == nil {
 		return "nil"
 	}
-	return "&v1alpha1.FlowSchema" + FmtFlowSchemaSlim(fs)
-}
-
-func FmtFlowSchemaSlim(fs *fcv1a1.FlowSchema) string {
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("{ObjectMeta: %#+v, Spec: v1alpha1.FlowSchemaSpec{PriorityLevelConfiguration: %#+v, MatchingPrecedence: %d, DistinguisherMethod: ",
+	buf.WriteString(fmt.Sprintf("&v1alpha1.FlowSchema{ObjectMeta: %#+v, Spec: v1alpha1.FlowSchemaSpec{PriorityLevelConfiguration: %#+v, MatchingPrecedence: %d, DistinguisherMethod: ",
 		fs.ObjectMeta, fs.Spec.PriorityLevelConfiguration,
 		fs.Spec.MatchingPrecedence))
 	if fs.Spec.DistinguisherMethod == nil {
@@ -59,10 +57,14 @@ func FmtFlowSchemaSlim(fs *fcv1a1.FlowSchema) string {
 	return buf.String()
 }
 
+// FmtPolicyRule produces a golang source expression of the value.
 func FmtPolicyRule(rule fcv1a1.PolicyRulesWithSubjects) string {
 	return "v1alpha1.PolicyRulesWithSubjects" + FmtPolicyRuleSlim(rule)
 }
 
+// FmtPolicyRuleSlim produces a golang source expression of the value
+// but without the leading type name.  See above for an example
+// context where this is useful.
 func FmtPolicyRuleSlim(rule fcv1a1.PolicyRulesWithSubjects) string {
 	var buf bytes.Buffer
 	buf.WriteString("{Subjects: []v1alpha1.Subject{")
@@ -86,9 +88,10 @@ func FmtPolicyRuleSlim(rule fcv1a1.PolicyRulesWithSubjects) string {
 	return buf.String()
 }
 
+// FmtUsers produces a golang source expression of the value.
 func FmtUsers(list []user.Info) string {
 	var buf bytes.Buffer
-	buf.WriteString("users{")
+	buf.WriteString("[]user.Info{")
 	for idx, member := range list {
 		if idx > 0 {
 			buf.WriteString(", ")
@@ -99,9 +102,10 @@ func FmtUsers(list []user.Info) string {
 	return buf.String()
 }
 
-func fmtRequests(list []*request.RequestInfo) string {
+// FmtRequests produces a golang source expression of the value.
+func FmtRequests(list []*request.RequestInfo) string {
 	var buf bytes.Buffer
-	buf.WriteString("reqs{")
+	buf.WriteString("[]*request.RequestInfo{")
 	for idx, member := range list {
 		if idx > 0 {
 			buf.WriteString(", ")
