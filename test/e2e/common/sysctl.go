@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -33,7 +34,7 @@ var _ = framework.KubeDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func
 
 	ginkgo.BeforeEach(func() {
 		// sysctl is not supported on Windows.
-		framework.SkipIfNodeOSDistroIs("windows")
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
 	})
 
 	f := framework.NewDefaultFramework("sysctl")
@@ -86,7 +87,7 @@ var _ = framework.KubeDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func
 		ev, err := f.PodClient().WaitForErrorEventOrSuccess(pod)
 		framework.ExpectNoError(err)
 		if ev != nil && ev.Reason == sysctl.UnsupportedReason {
-			framework.Skipf("No sysctl support in Docker <1.12")
+			e2eskipper.Skipf("No sysctl support in Docker <1.12")
 		}
 		gomega.Expect(ev).To(gomega.BeNil())
 
@@ -129,7 +130,7 @@ var _ = framework.KubeDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func
 		ev, err := f.PodClient().WaitForErrorEventOrSuccess(pod)
 		framework.ExpectNoError(err)
 		if ev != nil && ev.Reason == sysctl.UnsupportedReason {
-			framework.Skipf("No sysctl support in Docker <1.12")
+			e2eskipper.Skipf("No sysctl support in Docker <1.12")
 		}
 		gomega.Expect(ev).To(gomega.BeNil())
 
@@ -206,7 +207,7 @@ var _ = framework.KubeDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func
 		ev, err := f.PodClient().WaitForErrorEventOrSuccess(pod)
 		framework.ExpectNoError(err)
 		if ev != nil && ev.Reason == sysctl.UnsupportedReason {
-			framework.Skipf("No sysctl support in Docker <1.12")
+			e2eskipper.Skipf("No sysctl support in Docker <1.12")
 		}
 
 		ginkgo.By("Checking that the pod was rejected")
