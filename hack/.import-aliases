@@ -51,5 +51,10 @@
   "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1": "kubeletstatsv1alpha1",
   "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1": "proxyconfigv1alpha1",
   "k8s.io/kubernetes/pkg/scheduler/apis/config/v1alpha1": "schedulerconfigv1alpha1",
-  "k8s.io/kubernetes/test/e2e/framework/service": "e2eservice"
+  "k8s.io/kubernetes/test/e2e/framework/kubectl": "e2ekubectl",
+  "k8s.io/kubernetes/test/e2e/framework/node": "e2enode",
+  "k8s.io/kubernetes/test/e2e/framework/pod": "e2epod",
+  "k8s.io/kubernetes/test/e2e/framework/resource": "e2eresource",
+  "k8s.io/kubernetes/test/e2e/framework/service": "e2eservice",
+  "k8s.io/kubernetes/test/e2e/framework/ssh": "e2essh"
 }
