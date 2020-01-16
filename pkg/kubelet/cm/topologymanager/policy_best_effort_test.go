@@ -49,7 +49,7 @@ func TestPolicyBestEffortCanAdmitPodResult(t *testing.T) {
 	}
 }
 
-func TestBestEffortPolicyMerge(t *testing.T) {
+func TestPolicyBestEffortMerge(t *testing.T) {
 	numaNodes := []int{0, 1}
 	policy := NewBestEffortPolicy(numaNodes)
 
