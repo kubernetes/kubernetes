@@ -77,7 +77,9 @@ func TestPolicySingleNumaNodeFilterHints(t *testing.T) {
 			},
 			expectedResources: [][]TopologyHint{
 				[]TopologyHint(nil),
-				[]TopologyHint(nil),
+				{
+					{NUMANodeAffinity: nil, Preferred: true},
+				},
 			},
 		},
 		{
@@ -98,6 +100,7 @@ func TestPolicySingleNumaNodeFilterHints(t *testing.T) {
 				},
 				{
 					{NUMANodeAffinity: NewTestBitMask(1), Preferred: true},
+					{NUMANodeAffinity: nil, Preferred: true},
 				},
 			},
 		},
