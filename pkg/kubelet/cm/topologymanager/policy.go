@@ -36,8 +36,8 @@ type Policy interface {
 func mergePermutation(numaNodes []int, permutation []TopologyHint) TopologyHint {
 	// Get the NUMANodeAffinity from each hint in the permutation and see if any
 	// of them encode unpreferred allocations.
-	defaultAffinity, _ := bitmask.NewBitMask(numaNodes...)
 	preferred := true
+	defaultAffinity, _ := bitmask.NewBitMask(numaNodes...)
 	var numaAffinities []bitmask.BitMask
 	for _, hint := range permutation {
 		// Only consider hints that have an actual NUMANodeAffinity set.
@@ -53,8 +53,7 @@ func mergePermutation(numaNodes []int, permutation []TopologyHint) TopologyHint 
 	}
 
 	// Merge the affinities using a bitwise-and operation.
-	mergedAffinity, _ := bitmask.NewBitMask(numaNodes...)
-	mergedAffinity.And(numaAffinities...)
+	mergedAffinity := bitmask.And(defaultAffinity, numaAffinities...)
 	// Build a mergedHint from the merged affinity mask, indicating if an
 	// preferred allocation was used to generate the affinity mask or not.
 	return TopologyHint{mergedAffinity, preferred}
