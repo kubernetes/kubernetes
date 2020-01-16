@@ -36,7 +36,9 @@ var _ = ginkgo.Describe("[sig-architecture] PodTemplates", func() {
 		podTemplateName := "nginx-pod-template-" + string(uuid.NewUUID())
 
 		// get a list of PodTemplates (in all namespaces to hit endpoint)
-		podTemplateList, err := f.ClientSet.CoreV1().PodTemplates("").List(metav1.ListOptions{})
+		podTemplateList, err := f.ClientSet.CoreV1().PodTemplates("").List(metav1.ListOptions{
+			LabelSelector: "podtemplate-static=true",
+		})
 		framework.ExpectNoError(err, "failed to list all PodTemplates")
 		framework.ExpectEqual(len(podTemplateList.Items), 0, "unable to find templates")
 
@@ -85,10 +87,10 @@ var _ = ginkgo.Describe("[sig-architecture] PodTemplates", func() {
 		framework.ExpectNoError(err, "failed to delete PodTemplate")
 
 		// list the PodTemplates
-		podTemplateListWithLabel, err := f.ClientSet.CoreV1().PodTemplates("").List(metav1.ListOptions{
+		podTemplateList, err = f.ClientSet.CoreV1().PodTemplates("").List(metav1.ListOptions{
 			LabelSelector: "podtemplate-static=true",
 		})
 		framework.ExpectNoError(err, "failed to list PodTemplate")
-		framework.ExpectEqual(len(podTemplateListWithLabel.Items), 0, "PodTemplate list returned items, failed to delete PodTemplate")
+		framework.ExpectEqual(len(podTemplateList.Items), 0, "PodTemplate list returned items, failed to delete PodTemplate")
 	})
 })
