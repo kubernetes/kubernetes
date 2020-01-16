@@ -8,7 +8,6 @@ go_library(
         "expect.go",
         "flake_reporting_util.go",
         "framework.go",
-        "get-kubemark-resource-usage.go",
         "google_compute.go",
         "log.go",
         "log_size_monitoring.go",
