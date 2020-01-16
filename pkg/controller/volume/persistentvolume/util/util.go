@@ -64,6 +64,13 @@ const (
 	// recognize dynamically provisioned PVs in its decisions).
 	AnnDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
 
+	// AnnMigratedTo annotation is added to a PVC and PV that is supposed to be
+	// dynamically provisioned/deleted by by its corresponding CSI driver
+	// through the CSIMigration feature flags. When this annotation is set the
+	// Kubernetes components will "stand-down" and the external-provisioner will
+	// act on the objects
+	AnnMigratedTo = "pv.kubernetes.io/migrated-to"
+
 	// AnnStorageProvisioner annotation is added to a PVC that is supposed to be dynamically
 	// provisioned. Its value is name of volume plugin that is supposed to provision
 	// a volume for this PVC.
