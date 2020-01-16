@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
 
@@ -122,7 +123,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 
 		ginkgo.It("should run with an explicit non-root user ID [LinuxOnly]", func() {
 			// creates a pod with RunAsUser, which is not supported on Windows.
-			framework.SkipIfNodeOSDistroIs("windows")
+			e2eskipper.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-nonroot-uid"
 			pod := makeNonRootPod(name, rootImage, pointer.Int64Ptr(nonRootTestUserID))
 			podClient.Create(pod)
@@ -132,7 +133,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		})
 		ginkgo.It("should not run with an explicit root user ID [LinuxOnly]", func() {
 			// creates a pod with RunAsUser, which is not supported on Windows.
-			framework.SkipIfNodeOSDistroIs("windows")
+			e2eskipper.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-root-uid"
 			pod := makeNonRootPod(name, nonRootImage, pointer.Int64Ptr(0))
 			pod = podClient.Create(pod)

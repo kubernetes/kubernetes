@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -44,7 +45,7 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 
 		ginkgo.BeforeEach(func() {
 			// Windows does not support the FSGroup SecurityContext option.
-			framework.SkipIfNodeOSDistroIs("windows")
+			e2eskipper.SkipIfNodeOSDistroIs("windows")
 		})
 
 		ginkgo.It("new files should be created with FSGroup ownership when container is root", func() {
