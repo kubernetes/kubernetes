@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [[ $(uname -a) = *"Darwin"* ]]; then
+if [[ `uname -a` = *"Darwin"* ]]; then
   echo "It seems you are running on Mac. This script does not work on Mac. See https://github.com/grpc/grpc-go/issues/2047"
   exit 1
 fi
@@ -28,7 +28,7 @@ trap cleanup EXIT
 
 PATH="${GOPATH}/bin:${GOROOT}/bin:${PATH}"
 
-if [ "$1" = "-install" ]; then
+if [[ "$1" = "-install" ]]; then
   # Check for module support
   if go help mod >& /dev/null; then
     go install \
@@ -48,8 +48,8 @@ if [ "$1" = "-install" ]; then
       github.com/client9/misspell/cmd/misspell \
       github.com/golang/protobuf/protoc-gen-go
   fi
-  if [ -z "${VET_SKIP_PROTO}" ]; then
-    if [ "${TRAVIS}" = 'true' ]; then
+  if [[ -z "${VET_SKIP_PROTO}" ]]; then
+    if [[ "${TRAVIS}" = "true" ]]; then
       PROTOBUF_VERSION=3.3.0
       PROTOC_FILENAME=protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
       pushd /home/travis
@@ -62,7 +62,7 @@ if [ "$1" = "-install" ]; then
     fi
   fi
   exit 0
-elif [ "$#" -ne 0 ]; then
+elif [[ "$#" -ne 0 ]]; then
   die "Unknown argument(s): $*"
 fi
 
@@ -91,7 +91,7 @@ golint ./... 2>&1 | (! grep -vE "(_mock|\.pb)\.go:")
 go vet -all .
 
 # - Check that generated proto files are up to date.
-if [ -z "${VET_SKIP_PROTO}" ]; then
+if [[ -z "${VET_SKIP_PROTO}" ]]; then
   PATH="/home/travis/bin:${PATH}" make proto && \
     git status --porcelain 2>&1 | fail_on_output || \
     (git status; git --no-pager diff; exit 1)

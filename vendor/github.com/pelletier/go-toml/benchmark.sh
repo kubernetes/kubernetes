@@ -5,16 +5,16 @@ set -e
 reference_ref=${1:-master}
 reference_git=${2:-.}
 
-if ! $(hash benchstat 2>/dev/null); then
+if ! `hash benchstat 2>/dev/null`; then
     echo "Installing benchstat"
     go get golang.org/x/perf/cmd/benchstat
     go install golang.org/x/perf/cmd/benchstat
 fi
 
-tempdir=$(mktemp -d /tmp/go-toml-benchmark-XXXXXX)
+tempdir=`mktemp -d /tmp/go-toml-benchmark-XXXXXX`
 ref_tempdir="${tempdir}/ref"
-ref_benchmark="${ref_tempdir}/benchmark-$(echo -n ${reference_ref}|tr -s '/' '-').txt"
-local_benchmark="$(pwd)/benchmark-local.txt"
+ref_benchmark="${ref_tempdir}/benchmark-`echo -n ${reference_ref}|tr -s '/' '-'`.txt"
+local_benchmark="`pwd`/benchmark-local.txt"
 
 echo "=== ${reference_ref} (${ref_tempdir})"
 git clone ${reference_git} ${ref_tempdir} >/dev/null 2>/dev/null

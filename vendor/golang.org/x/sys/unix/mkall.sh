@@ -46,7 +46,7 @@ case "$#" in
 	exit 2
 esac
 
-if [ "$GOOS" = 'linux' ]; then
+if [[ "$GOOS" = "linux" ]]; then
 	# Use the Docker-based build system
 	# Files generated through docker (use $cmd so you can Ctl-C the build or run)
 	$cmd docker build --tag generate:$GOOS $GOOS
@@ -207,10 +207,10 @@ esac
 			;;
 		esac
 		if [ -n "$mksyscall" ]; then
-			if [ "$GOOSARCH" = 'aix_ppc64' ]; then
+			if [ "$GOOSARCH" == "aix_ppc64" ]; then
 				# aix/ppc64 script generates files instead of writing to stdin.
 				echo "$mksyscall -tags $GOOS,$GOARCH $syscall_goos $GOOSARCH_in && gofmt -w zsyscall_$GOOSARCH.go && gofmt -w zsyscall_"$GOOSARCH"_gccgo.go && gofmt -w zsyscall_"$GOOSARCH"_gc.go " ;
-			elif [ "$GOOS" = 'darwin' ]; then
+			elif [ "$GOOS" == "darwin" ]; then
 			        # pre-1.12, direct syscalls
 			        echo "$mksyscall -tags $GOOS,$GOARCH,!go1.12 $syscall_goos $GOOSARCH_in |gofmt >zsyscall_$GOOSARCH.1_11.go";
 			        # 1.12 and later, syscalls via libSystem

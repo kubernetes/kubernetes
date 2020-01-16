@@ -145,7 +145,7 @@ __%[1]s_handle_reply()
 
     # If there is only 1 completion and it is a flag with an = it will be completed
     # but we don't want a space after the =
-    if [[ "${#COMPREPLY[@]}" -eq 1 ]] && [[ $(type -t compopt) = "builtin" ]] && [[ "${COMPREPLY[0]}" == --*= ]]; then
+    if [[ "${#COMPREPLY[@]}" -eq "1" ]] && [[ $(type -t compopt) = "builtin" ]] && [[ "${COMPREPLY[0]}" == --*= ]]; then
        compopt -o nospace
     fi
 }
