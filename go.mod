@@ -62,7 +62,7 @@ require (
 	github.com/godbus/dbus v0.0.0-20181101234600-2ff6f7ffd60f // indirect
 	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
 	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
-	github.com/golang/mock v1.2.0
+	github.com/golang/mock v1.3.1
 	github.com/google/cadvisor v0.35.0
 	github.com/google/go-cmp v0.3.0
 	github.com/google/gofuzz v1.0.0
@@ -297,7 +297,7 @@ replace (
 	github.com/golang/freetype => github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/golang/glog => github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
-	github.com/golang/mock => github.com/golang/mock v1.2.0
+	github.com/golang/mock => github.com/golang/mock v1.3.1
 	github.com/golang/protobuf => github.com/golang/protobuf v1.3.2
 	github.com/golangci/check => github.com/golangci/check v0.0.0-20180506172741-cfe4005ccda2
 	github.com/golangci/dupl => github.com/golangci/dupl v0.0.0-20180902072040-3e9179ac440a
