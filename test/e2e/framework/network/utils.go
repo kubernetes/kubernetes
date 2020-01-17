@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -619,7 +620,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	framework.ExpectNoError(err)
 	config.ExternalAddr = e2enode.FirstAddress(nodeList, v1.NodeExternalIP)
 
-	framework.SkipUnlessNodeCountIsAtLeast(2)
+	e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 	config.Nodes = nodeList.Items
 
 	ginkgo.By("Creating the service on top of the pods in kubernetes")
