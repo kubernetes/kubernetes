@@ -52,6 +52,8 @@ func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceCIDR net.IPNet,
 		DeleteStrategy: strategy,
 		ExportStrategy: strategy,
 
+		Decorator: strategy.DecorateForREST,
+
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}

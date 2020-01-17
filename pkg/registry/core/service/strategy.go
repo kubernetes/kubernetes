@@ -36,6 +36,12 @@ import (
 type Strategy interface {
 	rest.RESTCreateUpdateStrategy
 	rest.RESTExportStrategy
+
+	// DecorateForREST defaults the IPFamily of an object read from storage
+	// from the currently configured value to minimize the impact of migration
+	// when IPFamily is enabled via the DualStack flag. This method sets the
+	// value of IPFamily the same may BeforeCreate will set.
+	DecorateForREST(obj runtime.Object) error
 }
 
 // svcStrategy implements behavior for Services
@@ -121,6 +127,30 @@ func (strategy svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 	}
 
 	dropServiceDisabledFields(newService, oldService)
+}
+
+// DecorateForREST performs the same defaulting that PrepareForCreate performs on the IPFamily field.
+// It does not drop the value if already set.
+func (strategy svcStrategy) DecorateForREST(obj runtime.Object) error {
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		switch t := obj.(type) {
+		case *api.Service:
+			if t.Spec.IPFamily == nil {
+				family := strategy.ipFamilies[0]
+				t.Spec.IPFamily = &family
+			}
+		case *api.ServiceList:
+			for i := range t.Items {
+				if t.Items[i].Spec.IPFamily == nil {
+					family := strategy.ipFamilies[0]
+					t.Items[i].Spec.IPFamily = &family
+				}
+			}
+		default:
+			return fmt.Errorf("object is not an api.Service: %T", obj)
+		}
+	}
+	return nil
 }
 
 // Validate validates a new service.
