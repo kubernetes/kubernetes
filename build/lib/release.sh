@@ -458,10 +458,7 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${src_dir}/kube-addon-manager.yaml" "${dst_dir}"
   cp "${src_dir}/glbc.manifest" "${dst_dir}"
   cp "${src_dir}/etcd-empty-dir-cleanup.yaml" "${dst_dir}/"
-  local internal_manifest
-  for internal_manifest in "${src_dir}/internal-"*; do
-    cp "${internal_manifest}" "${dst_dir}"
-  done
+  find "${src_dir}" -name 'internal-*' -exec cp {} "${dst_dir}" \;
   cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
   cp "${KUBE_ROOT}/cluster/gce/gci/configure-kubeapiserver.sh" "${dst_dir}/configure-kubeapiserver.sh"
   if [ -e "${KUBE_ROOT}/cluster/gce/gci/gke-internal-configure-helper.sh" ]; then
