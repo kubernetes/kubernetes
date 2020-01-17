@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/secret"
 )
 
+// REST defines the RESTStorage object that will work against secrets.
 type REST struct {
 	*genericregistry.Store
 }

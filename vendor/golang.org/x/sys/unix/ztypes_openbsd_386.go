@@ -436,6 +436,7 @@ type Winsize struct {
 
 const (
 	AT_FDCWD            = -0x64
+	AT_SYMLINK_FOLLOW   = 0x4
 	AT_SYMLINK_NOFOLLOW = 0x2
 )
 
@@ -557,4 +558,14 @@ type Uvmexp struct {
 	Pdrevtext          int32
 	Fpswtch            int32
 	Kmapent            int32
+}
+
+const SizeofClockinfo = 0x14
+
+type Clockinfo struct {
+	Hz      int32
+	Tick    int32
+	Tickadj int32
+	Stathz  int32
+	Profhz  int32
 }

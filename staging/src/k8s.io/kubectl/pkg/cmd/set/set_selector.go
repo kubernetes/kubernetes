@@ -22,7 +22,8 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -46,8 +47,9 @@ type SetSelectorOptions struct {
 	dryrun               bool
 
 	// set by args
-	resources []string
-	selector  *metav1.LabelSelector
+	resources       []string
+	selector        *metav1.LabelSelector
+	resourceVersion string
 
 	// computed
 	WriteToServer  bool
@@ -111,7 +113,7 @@ func NewCmdSelector(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	o.PrintFlags.AddFlags(cmd)
 	o.RecordFlags.AddFlags(cmd)
 
-	cmd.Flags().String("resource-version", "", "If non-empty, the selectors update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
+	cmd.Flags().StringVarP(&o.resourceVersion, "resource-version", "", o.resourceVersion, "If non-empty, the selectors update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
 	cmdutil.AddDryRunFlag(cmd)
 
 	return cmd
@@ -163,7 +165,26 @@ func (o *SetSelectorOptions) RunSelector() error {
 
 	return r.Visit(func(info *resource.Info, err error) error {
 		patch := &Patch{Info: info}
+
+		if len(o.resourceVersion) != 0 {
+			// ensure resourceVersion is always sent in the patch by clearing it from the starting JSON
+			accessor, err := meta.Accessor(info.Object)
+			if err != nil {
+				return err
+			}
+			accessor.SetResourceVersion("")
+		}
+
 		CalculatePatch(patch, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {
+
+			if len(o.resourceVersion) != 0 {
+				accessor, err := meta.Accessor(info.Object)
+				if err != nil {
+					return nil, err
+				}
+				accessor.SetResourceVersion(o.resourceVersion)
+			}
+
 			selectErr := updateSelectorForObject(info.Object, *o.selector)
 			if selectErr != nil {
 				return nil, selectErr

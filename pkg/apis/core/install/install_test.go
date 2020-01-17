@@ -51,8 +51,6 @@ func TestResourceVersioner(t *testing.T) {
 
 func TestCodec(t *testing.T) {
 	pod := internal.Pod{}
-	// We do want to use package registered rather than testapi here, because we
-	// want to test if the package install and package registered work as expected.
 	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Group: "", Version: "v1"}), &pod)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

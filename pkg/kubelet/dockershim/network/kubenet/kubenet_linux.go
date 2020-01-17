@@ -104,19 +104,20 @@ type kubenetNetworkPlugin struct {
 	// kubenet can use either hostportSyncer and hostportManager to implement hostports
 	// Currently, if network host supports legacy features, hostportSyncer will be used,
 	// otherwise, hostportManager will be used.
-	hostportSyncer  hostport.HostportSyncer
-	hostportManager hostport.HostPortManager
-	iptables        utiliptables.Interface
-	iptablesv6      utiliptables.Interface
-	sysctl          utilsysctl.Interface
-	ebtables        utilebtables.Interface
+	hostportSyncer    hostport.HostportSyncer
+	hostportSyncerv6  hostport.HostportSyncer
+	hostportManager   hostport.HostPortManager
+	hostportManagerv6 hostport.HostPortManager
+	iptables          utiliptables.Interface
+	iptablesv6        utiliptables.Interface
+	sysctl            utilsysctl.Interface
+	ebtables          utilebtables.Interface
 	// binDirs is passed by kubelet cni-bin-dir parameter.
 	// kubenet will search for CNI binaries in DefaultCNIDir first, then continue to binDirs.
 	binDirs           []string
 	nonMasqueradeCIDR string
 	cacheDir          string
 	podCIDRs          []*net.IPNet
-	podGateways       []net.IP
 }
 
 func NewPlugin(networkPluginDirs []string, cacheDir string) network.NetworkPlugin {
@@ -131,11 +132,12 @@ func NewPlugin(networkPluginDirs []string, cacheDir string) network.NetworkPlugi
 		sysctl:            utilsysctl.New(),
 		binDirs:           append([]string{DefaultCNIDir}, networkPluginDirs...),
 		hostportSyncer:    hostport.NewHostportSyncer(iptInterface),
+		hostportSyncerv6:  hostport.NewHostportSyncer(iptInterfacev6),
 		hostportManager:   hostport.NewHostportManager(iptInterface),
+		hostportManagerv6: hostport.NewHostportManager(iptInterfacev6),
 		nonMasqueradeCIDR: "10.0.0.0/8",
 		cacheDir:          cacheDir,
 		podCIDRs:          make([]*net.IPNet, 0),
-		podGateways:       make([]net.IP, 0),
 	}
 }
 
@@ -266,13 +268,11 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 	for idx, currentPodCIDR := range podCIDRs {
 		_, cidr, err := net.ParseCIDR(currentPodCIDR)
 		if nil != err {
-			klog.Warningf("Failed to generate CNI network config with cidr %s at indx:%v: %v", currentPodCIDR, idx, err)
+			klog.Warningf("Failed to generate CNI network config with cidr %s at index:%v: %v", currentPodCIDR, idx, err)
 			return
 		}
-		// create list of ips and gateways
-		cidr.IP[len(cidr.IP)-1] += 1 // Set bridge address to first address in IPNet
+		// create list of ips
 		plugin.podCIDRs = append(plugin.podCIDRs, cidr)
-		plugin.podGateways = append(plugin.podGateways, cidr.IP)
 	}
 
 	//setup hairpinMode
@@ -332,6 +332,9 @@ func (plugin *kubenetNetworkPlugin) Capabilities() utilsets.Int {
 // setup sets up networking through CNI using the given ns/name and sandbox ID.
 func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kubecontainer.ContainerID, annotations map[string]string) error {
 	var ipv4, ipv6 net.IP
+	var podGateways []net.IP
+	var podCIDRs []net.IPNet
+
 	// Disable DAD so we skip the kernel delay on bringing up new interfaces.
 	if err := plugin.disableContainerDAD(id); err != nil {
 		klog.V(3).Infof("Failed to disable DAD in container: %v", err)
@@ -356,10 +359,14 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 	// that we get multiple IP addresses in the returned Result structure
 	if res.IP4 != nil {
 		ipv4 = res.IP4.IP.IP.To4()
+		podGateways = append(podGateways, res.IP4.Gateway)
+		podCIDRs = append(podCIDRs, net.IPNet{IP: ipv4.Mask(res.IP4.IP.Mask), Mask: res.IP4.IP.Mask})
 	}
 
 	if res.IP6 != nil {
 		ipv6 = res.IP6.IP.IP
+		podGateways = append(podGateways, res.IP6.Gateway)
+		podCIDRs = append(podCIDRs, net.IPNet{IP: ipv6.Mask(res.IP6.IP.Mask), Mask: res.IP6.IP.Mask})
 	}
 
 	if ipv4 == nil && ipv6 == nil {
@@ -381,7 +388,7 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 		}
 
 		// configure the ebtables rules to eliminate duplicate packets by best effort
-		plugin.syncEbtablesDedupRules(link.Attrs().HardwareAddr)
+		plugin.syncEbtablesDedupRules(link.Attrs().HardwareAddr, podCIDRs, podGateways)
 	}
 
 	// add the ip to tracked ips
@@ -454,8 +461,14 @@ func (plugin *kubenetNetworkPlugin) addPortMapping(id kubecontainer.ContainerID,
 			IP:           net.ParseIP(ip),
 			HostNetwork:  false,
 		}
-		if err := plugin.hostportManager.Add(id.ID, pm, BridgeName); err != nil {
-			return err
+		if netutils.IsIPv6(pm.IP) {
+			if err := plugin.hostportManagerv6.Add(id.ID, pm, BridgeName); err != nil {
+				return err
+			}
+		} else {
+			if err := plugin.hostportManager.Add(id.ID, pm, BridgeName); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -497,37 +510,57 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 	// Loopback network deletion failure should not be fatal on teardown
 	if err := plugin.delContainerFromNetwork(plugin.loConfig, "lo", namespace, name, id); err != nil {
 		klog.Warningf("Failed to delete loopback network: %v", err)
+		errList = append(errList, err)
+
 	}
 
 	// no ip dependent actions
 	if err := plugin.delContainerFromNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id); err != nil {
+		klog.Warningf("Failed to delete %q network: %v", network.DefaultInterfaceName, err)
 		errList = append(errList, err)
 	}
 
-	portMappings, err := plugin.host.GetPodPortMappings(id.ID)
-	if err != nil {
-		errList = append(errList, err)
-	} else if len(portMappings) > 0 {
-		if err = plugin.hostportManager.Remove(id.ID, &hostport.PodPortMapping{
-			Namespace:    namespace,
-			Name:         name,
-			PortMappings: portMappings,
-			HostNetwork:  false,
-		}); err != nil {
-			errList = append(errList, err)
-		}
-	}
-
+	// If there are no IPs registered we can't teardown pod's IP dependencies
 	iplist, exists := plugin.getCachedPodIPs(id)
 	if !exists || len(iplist) == 0 {
 		klog.V(5).Infof("container %s (%s/%s) does not have recorded. ignoring teardown call", id, name, namespace)
 		return nil
 	}
 
+	// get the list of port mappings
+	portMappings, err := plugin.host.GetPodPortMappings(id.ID)
+	if err != nil {
+		errList = append(errList, err)
+	}
+
+	// process each pod IP
 	for _, ip := range iplist {
+		isV6 := netutils.IsIPv6String(ip)
+		klog.V(5).Infof("Removing pod port mappings from IP %s", ip)
+		if portMappings != nil && len(portMappings) > 0 {
+			if isV6 {
+				if err = plugin.hostportManagerv6.Remove(id.ID, &hostport.PodPortMapping{
+					Namespace:    namespace,
+					Name:         name,
+					PortMappings: portMappings,
+					HostNetwork:  false,
+				}); err != nil {
+					errList = append(errList, err)
+				}
+			} else {
+				if err = plugin.hostportManager.Remove(id.ID, &hostport.PodPortMapping{
+					Namespace:    namespace,
+					Name:         name,
+					PortMappings: portMappings,
+					HostNetwork:  false,
+				}); err != nil {
+					errList = append(errList, err)
+				}
+			}
+		}
+
 		klog.V(5).Infof("Removing pod IP %s from shaper for (%s/%s)", ip, name, namespace)
 		// shaper uses a cidr, but we are using a single IP.
-		isV6 := netutils.IsIPv6String(ip)
 		mask := "32"
 		if isV6 {
 			mask = "128"
@@ -731,7 +764,7 @@ func (plugin *kubenetNetworkPlugin) shaper() bandwidth.Shaper {
 }
 
 //TODO: make this into a goroutine and rectify the dedup rules periodically
-func (plugin *kubenetNetworkPlugin) syncEbtablesDedupRules(macAddr net.HardwareAddr) {
+func (plugin *kubenetNetworkPlugin) syncEbtablesDedupRules(macAddr net.HardwareAddr, podCIDRs []net.IPNet, podGateways []net.IP) {
 	if plugin.ebtables == nil {
 		plugin.ebtables = utilebtables.New(plugin.execer)
 		klog.V(3).Infof("Flushing dedup chain")
@@ -760,8 +793,8 @@ func (plugin *kubenetNetworkPlugin) syncEbtablesDedupRules(macAddr net.HardwareA
 	}
 
 	// per gateway rule
-	for idx, gw := range plugin.podGateways {
-		klog.V(3).Infof("Filtering packets with ebtables on mac address: %v, gateway: %v, pod CIDR: %v", macAddr.String(), gw.String(), plugin.podCIDRs[idx].String())
+	for idx, gw := range podGateways {
+		klog.V(3).Infof("Filtering packets with ebtables on mac address: %v, gateway: %v, pod CIDR: %v", macAddr.String(), gw.String(), podCIDRs[idx].String())
 
 		bIsV6 := netutils.IsIPv6(gw)
 		IPFamily := "IPv4"
@@ -777,9 +810,9 @@ func (plugin *kubenetNetworkPlugin) syncEbtablesDedupRules(macAddr net.HardwareA
 			return
 
 		}
-		_, err = plugin.ebtables.EnsureRule(utilebtables.Append, utilebtables.TableFilter, dedupChain, append(commonArgs, ipSrc, plugin.podCIDRs[idx].String(), "-j", "DROP")...)
+		_, err = plugin.ebtables.EnsureRule(utilebtables.Append, utilebtables.TableFilter, dedupChain, append(commonArgs, ipSrc, podCIDRs[idx].String(), "-j", "DROP")...)
 		if err != nil {
-			klog.Errorf("Failed to ensure packets from podCidr[%v] but has mac address of cbr0 to get dropped. err:%v", plugin.podCIDRs[idx].String(), err)
+			klog.Errorf("Failed to ensure packets from podCidr[%v] but has mac address of cbr0 to get dropped. err:%v", podCIDRs[idx].String(), err)
 			return
 		}
 	}
@@ -831,10 +864,9 @@ func (plugin *kubenetNetworkPlugin) getRangesConfig() string {
 	createRange := func(thisNet *net.IPNet) string {
 		template := `
 [{
-"subnet": "%s",
-"gateway": "%s"
+"subnet": "%s"
 }]`
-		return fmt.Sprintf(template, thisNet.String(), thisNet.IP.String())
+		return fmt.Sprintf(template, thisNet.String())
 	}
 
 	ranges := make([]string, len(plugin.podCIDRs))
@@ -842,7 +874,7 @@ func (plugin *kubenetNetworkPlugin) getRangesConfig() string {
 		ranges[idx] = createRange(thisCIDR)
 	}
 	//[{range}], [{range}]
-	// each range is a subnet and a gateway
+	// each range contains a subnet. gateway will be fetched from cni result
 	return strings.Join(ranges[:], ",")
 }
 

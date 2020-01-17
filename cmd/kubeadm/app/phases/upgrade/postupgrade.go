@@ -18,7 +18,6 @@ package upgrade
 
 import (
 	"os"
-	"path/filepath"
 
 	"github.com/pkg/errors"
 
@@ -53,7 +52,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 
 	// Create the new, version-branched kubelet ComponentConfig ConfigMap
-	if err := kubeletphase.CreateConfigMap(cfg.ClusterConfiguration.ComponentConfigs.Kubelet, cfg.KubernetesVersion, client); err != nil {
+	if err := kubeletphase.CreateConfigMap(&cfg.ClusterConfiguration, client); err != nil {
 		errs = append(errs, errors.Wrap(err, "error creating kubelet configuration ConfigMap"))
 	}
 
@@ -159,20 +158,6 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 
 	if dryRun { // Print what contents would be written
 		dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
-	}
-
-	envFilePath := filepath.Join(kubeadmconstants.KubeletRunDirectory, kubeadmconstants.KubeletEnvFileName)
-	if _, err := os.Stat(envFilePath); os.IsNotExist(err) {
-		// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the control-plane,
-		// as we handle that ourselves in the mark-control-plane phase
-		// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the mark-control-plane phase?
-		if err := kubeletphase.WriteKubeletDynamicEnvFile(&cfg.ClusterConfiguration, &cfg.NodeRegistration, false, kubeletDir); err != nil {
-			errs = append(errs, errors.Wrap(err, "error writing a dynamic environment file for the kubelet"))
-		}
-
-		if dryRun { // Print what contents would be written
-			dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletEnvFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
-		}
 	}
 	return errorsutil.NewAggregate(errs)
 }

@@ -47,6 +47,11 @@ func (r *Mock) Type() string {
 	return args.Get(0).(string)
 }
 
+func (r *Mock) SupportsSingleFileMapping() bool {
+	args := r.Called()
+	return args.Get(0).(bool)
+}
+
 func (r *Mock) Version() (kubecontainer.Version, error) {
 	args := r.Called()
 	return args.Get(0).(kubecontainer.Version), args.Error(1)

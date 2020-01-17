@@ -210,37 +210,6 @@ func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Ob
 	return object, resourceVersion, nil
 }
 
-func setCachingObjects(event *watchCacheEvent, versioner storage.Versioner) {
-	switch event.Type {
-	case watch.Added, watch.Modified:
-		if object, err := newCachingObject(event.Object); err == nil {
-			event.Object = object
-		} else {
-			klog.Errorf("couldn't create cachingObject from: %#v", event.Object)
-		}
-		// Don't wrap PrevObject for update event (for create events it is nil).
-		// We only encode those to deliver DELETE watch events, so if
-		// event.Object is not nil it can be used only for watchers for which
-		// selector was satisfied for its previous version and is no longer
-		// satisfied for the current version.
-		// This is rare enough that it doesn't justify making deep-copy of the
-		// object (done by newCachingObject) every time.
-	case watch.Deleted:
-		// Don't wrap Object for delete events - these are not to deliver any
-		// events. Only wrap PrevObject.
-		if object, err := newCachingObject(event.PrevObject); err == nil {
-			// Update resource version of the underlying object.
-			// event.PrevObject is used to deliver DELETE watch events and
-			// for them, we set resourceVersion to <current> instead of
-			// the resourceVersion of the last modification of the object.
-			updateResourceVersionIfNeeded(object.object, versioner, event.ResourceVersion)
-			event.PrevObject = object
-		} else {
-			klog.Errorf("couldn't create cachingObject from: %#v", event.Object)
-		}
-	}
-}
-
 // processEvent is safe as long as there is at most one call to it in flight
 // at any point in time.
 func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(*storeElement) error) error {
@@ -295,18 +264,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	// This is safe as long as there is at most one call to processEvent in flight
 	// at any point in time.
 	if w.eventHandler != nil {
-		// Set up caching of object serializations only for dispatching this event.
-		//
-		// Storing serializations in memory would result in increased memory usage,
-		// but it would help for caching encodings for watches started from old
-		// versions. However, we still don't have a convincing data that the gain
-		// from it justifies increased memory usage, so for now we drop the cached
-		// serializations after dispatching this event.
-
-		// Make a shallow copy to allow overwriting Object and PrevObject.
-		wce := *wcEvent
-		setCachingObjects(&wce, w.versioner)
-		w.eventHandler(&wce)
+		w.eventHandler(wcEvent)
 	}
 	return nil
 }
@@ -510,7 +468,7 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*w
 		return result, nil
 	}
 	if resourceVersion < oldest-1 {
-		return nil, errors.NewGone(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest-1))
+		return nil, errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest-1))
 	}
 
 	// Binary search the smallest index at which resourceVersion is greater than the given one.

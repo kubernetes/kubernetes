@@ -19,6 +19,7 @@ package renewal
 import (
 	"crypto"
 	"crypto/x509"
+	"os"
 	"path/filepath"
 
 	"github.com/pkg/errors"
@@ -33,6 +34,9 @@ import (
 // certificateReadWriter defines the behavior of a component that
 // read or write a certificate stored/embedded in a file
 type certificateReadWriter interface {
+	//Exists return true if the certificate exists
+	Exists() bool
+
 	// Read a certificate stored/embedded in a file
 	Read() (*x509.Certificate, error)
 
@@ -53,6 +57,20 @@ func newPKICertificateReadWriter(certificateDir string, baseName string) *pkiCer
 		baseName:       baseName,
 		certificateDir: certificateDir,
 	}
+}
+
+// Exists checks if a certificate exist
+func (rw *pkiCertificateReadWriter) Exists() bool {
+	certificatePath, _ := pkiutil.PathsForCertAndKey(rw.certificateDir, rw.baseName)
+	return fileExists(certificatePath)
+}
+
+func fileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
 }
 
 // Read a certificate from a file the K8s pki managed by kubeadm
@@ -95,6 +113,11 @@ func newKubeconfigReadWriter(kubernetesDir string, kubeConfigFileName string) *k
 		kubeConfigFileName: kubeConfigFileName,
 		kubeConfigFilePath: filepath.Join(kubernetesDir, kubeConfigFileName),
 	}
+}
+
+// Exists checks if a certificate embedded in kubeConfig file exists
+func (rw *kubeConfigReadWriter) Exists() bool {
+	return fileExists(rw.kubeConfigFilePath)
 }
 
 // Read a certificate embedded in kubeConfig file managed by kubeadm.

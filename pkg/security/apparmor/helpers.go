@@ -50,7 +50,7 @@ func isRequired(pod *v1.Pod) bool {
 	return false
 }
 
-// Returns the name of the profile to use with the container.
+// GetProfileName returns the name of the profile to use with the container.
 func GetProfileName(pod *v1.Pod, containerName string) string {
 	return GetProfileNameFromPodAnnotations(pod.Annotations, containerName)
 }
@@ -61,7 +61,7 @@ func GetProfileNameFromPodAnnotations(annotations map[string]string, containerNa
 	return annotations[ContainerAnnotationKeyPrefix+containerName]
 }
 
-// Sets the name of the profile to use with the container.
+// SetProfileName sets the name of the profile to use with the container.
 func SetProfileName(pod *v1.Pod, containerName, profileName string) error {
 	if pod.Annotations == nil {
 		pod.Annotations = map[string]string{}
@@ -70,7 +70,7 @@ func SetProfileName(pod *v1.Pod, containerName, profileName string) error {
 	return nil
 }
 
-// Sets the name of the profile to use with the container.
+// SetProfileNameFromPodAnnotations sets the name of the profile to use with the container.
 func SetProfileNameFromPodAnnotations(annotations map[string]string, containerName, profileName string) error {
 	if annotations == nil {
 		return nil

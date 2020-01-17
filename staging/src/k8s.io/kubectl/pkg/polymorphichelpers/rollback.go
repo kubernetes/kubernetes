@@ -392,16 +392,16 @@ var appsCodec = scheme.Codecs.LegacyCodec(appsv1.SchemeGroupVersion)
 // applyRevision returns a new StatefulSet constructed by restoring the state in revision to set. If the returned error
 // is nil, the returned StatefulSet is valid.
 func applyRevision(set *appsv1.StatefulSet, revision *appsv1.ControllerRevision) (*appsv1.StatefulSet, error) {
-	clone := set.DeepCopy()
-	patched, err := strategicpatch.StrategicMergePatch([]byte(runtime.EncodeOrDie(appsCodec, clone)), revision.Data.Raw, clone)
+	patched, err := strategicpatch.StrategicMergePatch([]byte(runtime.EncodeOrDie(appsCodec, set)), revision.Data.Raw, set)
 	if err != nil {
 		return nil, err
 	}
-	err = json.Unmarshal(patched, clone)
+	result := &appsv1.StatefulSet{}
+	err = json.Unmarshal(patched, result)
 	if err != nil {
 		return nil, err
 	}
-	return clone, nil
+	return result, nil
 }
 
 // statefulsetMatch check if the given StatefulSet's template matches the template stored in the given history.

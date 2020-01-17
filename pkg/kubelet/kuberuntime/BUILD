@@ -53,6 +53,7 @@ go_library(
         "//pkg/util/parsers:go_default_library",
         "//pkg/util/selinux:go_default_library",
         "//pkg/util/tail:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
@@ -71,6 +72,9 @@ go_library(
         "//vendor/google.golang.org/grpc/status:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//pkg/kubelet/qos:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/kubelet/qos:go_default_library",
         ],
@@ -107,6 +111,7 @@ go_test(
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
+        "//pkg/kubelet/prober/results:go_default_library",
         "//pkg/kubelet/runtimeclass:go_default_library",
         "//pkg/kubelet/runtimeclass/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

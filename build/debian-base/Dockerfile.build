@@ -41,28 +41,14 @@ RUN apt-mark hold apt gnupg adduser passwd libsemanage1 libcap2
 # Several utilities (e.g. ping) were kept for usefulness, but may be removed in later versions.
 RUN echo "Yes, do as I say!" | apt-get purge \
     bash \
-    debconf-i18n \
-    e2fslibs \
     e2fsprogs \
-    init \
-    initscripts \
     libcap2-bin \
-    libkmod2 \
     libmount1 \
     libsmartcols1 \
-    libudev1 \
     libblkid1 \
-    libncursesw5 \
-    libprocps6 \
-    libslang2 \
     libss2 \
-    libsystemd0 \
-    libtext-charwidth-perl libtext-iconv-perl libtext-wrapi18n-perl \
     ncurses-base \
     ncurses-bin \
-    systemd \
-    systemd-sysv \
-    sysv-rc \
     tzdata
 
 # No-op stubs replace some unnecessary binaries that may be depended on in the install process (in

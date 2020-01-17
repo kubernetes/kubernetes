@@ -40,7 +40,7 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -439,8 +439,7 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 		// turn off admission plugins that add finalizers
 		"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection",
 		// force enable all resources so we can check storage.
-		// TODO: drop these once we stop allowing them to be served.
-		"--runtime-config=api/all=true,extensions/v1beta1/deployments=true,extensions/v1beta1/daemonsets=true,extensions/v1beta1/replicasets=true,extensions/v1beta1/podsecuritypolicies=true,extensions/v1beta1/networkpolicies=true",
+		"--runtime-config=api/all=true",
 	}, etcdConfig)
 	defer server.TearDownFn()
 
@@ -566,6 +565,9 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 	// Allow the webhook to establish
 	time.Sleep(time.Second)
 
+	start := time.Now()
+	count := 0
+
 	// Test admission on all resources, subresources, and verbs
 	for _, gvr := range gvrsToTest {
 		resource := resourcesByGVR[gvr]
@@ -573,6 +575,7 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 			for _, verb := range []string{"create", "update", "patch", "connect", "delete", "deletecollection"} {
 				if shouldTestResourceVerb(gvr, resource, verb) {
 					t.Run(verb, func(t *testing.T) {
+						count++
 						holder.reset(t)
 						testFunc := getTestFunc(gvr, verb)
 						testFunc(&testContext{
@@ -590,6 +593,12 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 				}
 			}
 		})
+	}
+
+	duration := time.Since(start)
+	perResourceDuration := time.Duration(int(duration) / count)
+	if perResourceDuration >= 150*time.Millisecond {
+		t.Errorf("expected resources to process in < 150ms, average was %v", perResourceDuration)
 	}
 }
 
@@ -669,7 +678,7 @@ func testResourceDelete(c *testContext) {
 	// wait for the item to be gone
 	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
 		obj, err := c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Get(obj.GetName(), metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		if err == nil {
@@ -726,6 +735,10 @@ func testResourceDelete(c *testContext) {
 		}
 		return true, nil
 	})
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
 
 	// remove the finalizer
 	_, err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Patch(
@@ -740,7 +753,7 @@ func testResourceDelete(c *testContext) {
 	// wait for the item to be gone
 	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
 		obj, err := c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Get(obj.GetName(), metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		if err == nil {
@@ -788,7 +801,7 @@ func testResourceDeletecollection(c *testContext) {
 	// wait for the item to be gone
 	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
 		obj, err := c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Get(obj.GetName(), metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
 		if err == nil {
@@ -930,7 +943,7 @@ func testNamespaceDelete(c *testContext) {
 	}
 	// verify namespace is gone
 	obj, err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Get(obj.GetName(), metav1.GetOptions{})
-	if err == nil || !errors.IsNotFound(err) {
+	if err == nil || !apierrors.IsNotFound(err) {
 		c.t.Errorf("expected namespace to be gone, got %#v, %v", obj, err)
 	}
 }
@@ -1035,7 +1048,7 @@ func testPodBindingEviction(c *testContext) {
 	forceDelete := &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background}
 	defer func() {
 		err := c.clientset.CoreV1().Pods(pod.GetNamespace()).Delete(pod.GetName(), forceDelete)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			c.t.Error(err)
 			return
 		}
@@ -1390,9 +1403,6 @@ func getStubObj(gvr schema.GroupVersionResource, resource metav1.APIResource) (*
 
 func createOrGetResource(client dynamic.Interface, gvr schema.GroupVersionResource, resource metav1.APIResource) (*unstructured.Unstructured, error) {
 	stubObj, err := getStubObj(gvr, resource)
-	if gvr.Group == "discovery.k8s.io" {
-		fmt.Printf("stubObj =====> %v\n", stubObj)
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -1404,7 +1414,7 @@ func createOrGetResource(client dynamic.Interface, gvr schema.GroupVersionResour
 	if err == nil {
 		return obj, nil
 	}
-	if !errors.IsNotFound(err) {
+	if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 	return client.Resource(gvr).Namespace(ns).Create(stubObj, metav1.CreateOptions{})
@@ -1424,17 +1434,11 @@ var (
 )
 
 func shouldTestResource(gvr schema.GroupVersionResource, resource metav1.APIResource) bool {
-	if !sets.NewString(resource.Verbs...).HasAny("create", "update", "patch", "connect", "delete", "deletecollection") {
-		return false
-	}
-	return true
+	return sets.NewString(resource.Verbs...).HasAny("create", "update", "patch", "connect", "delete", "deletecollection")
 }
 
 func shouldTestResourceVerb(gvr schema.GroupVersionResource, resource metav1.APIResource, verb string) bool {
-	if !sets.NewString(resource.Verbs...).Has(verb) {
-		return false
-	}
-	return true
+	return sets.NewString(resource.Verbs...).Has(verb)
 }
 
 //

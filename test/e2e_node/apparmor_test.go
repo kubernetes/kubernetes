@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"bytes"
@@ -28,7 +28,7 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
@@ -159,7 +159,7 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 		_, err = watchtools.UntilWithoutRetry(ctx, w, func(e watch.Event) (bool, error) {
 			switch e.Type {
 			case watch.Deleted:
-				return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, pod.Name)
+				return false, apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, pod.Name)
 			}
 			switch t := e.Object.(type) {
 			case *v1.Pod:

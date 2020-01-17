@@ -45,6 +45,7 @@ filegroup(
         "//staging/src/k8s.io/kubectl/pkg/cmd/exec:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/explain:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/expose:all-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/get:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/help:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/kustomize:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/label:all-srcs",

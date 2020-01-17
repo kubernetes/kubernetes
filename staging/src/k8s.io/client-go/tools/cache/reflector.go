@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -55,7 +55,10 @@ type Reflector struct {
 	// stringification of expectedType otherwise. It is for display
 	// only, and should not be used for parsing or comparison.
 	expectedTypeName string
-	// The type of object we expect to place in the store.
+	// An example object of the type we expect to place in the store.
+	// Only the type needs to be right, except that when that is
+	// `unstructured.Unstructured` the object's `"apiVersion"` and
+	// `"kind"` must also be right.
 	expectedType reflect.Type
 	// The GVK of the object we expect to place in the store if unstructured.
 	expectedGVK *schema.GroupVersionKind
@@ -63,10 +66,12 @@ type Reflector struct {
 	store Store
 	// listerWatcher is used to perform lists and watches.
 	listerWatcher ListerWatcher
-	// period controls timing between one watch ending and
-	// the beginning of the next one.
-	period       time.Duration
+	// period controls timing between an unsuccessful watch ending and
+	// the beginning of the next list.
+	period time.Duration
+	// The period at which ShouldResync is invoked
 	resyncPeriod time.Duration
+	// ShouldResync is invoked periodically and whenever it returns `true` the Store's Resync operation is invoked
 	ShouldResync func() bool
 	// clock allows tests to manipulate time
 	clock clock.Clock
@@ -74,6 +79,9 @@ type Reflector struct {
 	// observed when doing a sync with the underlying store
 	// it is thread safe, but not synchronized with the underlying store
 	lastSyncResourceVersion string
+	// isLastSyncResourceVersionGone is true if the previous list or watch request with lastSyncResourceVersion
+	// failed with an HTTP 410 (Gone) status code.
+	isLastSyncResourceVersionGone bool
 	// lastSyncResourceVersionMutex guards read/write access to lastSyncResourceVersion
 	lastSyncResourceVersionMutex sync.RWMutex
 	// WatchListPageSize is the requested chunk size of initial and resync watch lists.
@@ -95,12 +103,16 @@ func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interfa
 	return indexer, reflector
 }
 
-// NewReflector creates a new Reflector object which will keep the given store up to
-// date with the server's contents for the given resource. Reflector promises to
-// only put things in the store that have the type of expectedType, unless expectedType
-// is nil. If resyncPeriod is non-zero, then lists will be executed after every
-// resyncPeriod, so that you can use reflectors to periodically process everything as
-// well as incrementally processing the things that change.
+// NewReflector creates a new Reflector object which will keep the
+// given store up to date with the server's contents for the given
+// resource. Reflector promises to only put things in the store that
+// have the type of expectedType, unless expectedType is nil. If
+// resyncPeriod is non-zero, then the reflector will periodically
+// consult its ShouldResync function to determine whether to invoke
+// the Store's Resync operation; `ShouldResync==nil` means always
+// "yes".  This enables you to use reflectors to periodically process
+// everything as well as incrementally processing the things that
+// change.
 func NewReflector(lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
 	return NewNamedReflector(naming.GetNameFromCallsite(internalPackages...), lw, expectedType, store, resyncPeriod)
 }
@@ -144,7 +156,8 @@ func (r *Reflector) setExpectedType(expectedType interface{}) {
 // call chains to NewReflector, so they'd be low entropy names for reflectors
 var internalPackages = []string{"client-go/tools/cache/"}
 
-// Run starts a watch and handles watch events. Will restart the watch if it is closed.
+// Run repeatedly uses the reflector's ListAndWatch to fetch all the
+// objects and subsequent deltas.
 // Run will exit when stopCh is closed.
 func (r *Reflector) Run(stopCh <-chan struct{}) {
 	klog.V(3).Infof("Starting reflector %v (%s) from %s", r.expectedTypeName, r.resyncPeriod, r.name)
@@ -185,10 +198,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	klog.V(3).Infof("Listing and watching %v from %s", r.expectedTypeName, r.name)
 	var resourceVersion string
 
-	// Explicitly set "0" as resource version - it's fine for the List()
-	// to be served from cache and potentially be delayed relative to
-	// etcd contents. Reflector framework will catch up via Watch() eventually.
-	options := metav1.ListOptions{ResourceVersion: "0"}
+	options := metav1.ListOptions{ResourceVersion: r.relistResourceVersion()}
 
 	if err := func() error {
 		initTrace := trace.New("Reflector ListAndWatch", trace.Field{"name", r.name})
@@ -211,8 +221,17 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			if r.WatchListPageSize != 0 {
 				pager.PageSize = r.WatchListPageSize
 			}
-			// Pager falls back to full list if paginated list calls fail due to an "Expired" error.
+
 			list, err = pager.List(context.Background(), options)
+			if isExpiredError(err) {
+				r.setIsLastSyncResourceVersionExpired(true)
+				// Retry immediately if the resource version used to list is expired.
+				// The pager already falls back to full list if paginated list calls fail due to an "Expired" error on
+				// continuation pages, but the pager might not be enabled, or the full list might fail because the
+				// resource version it is listing at is expired, so we need to fallback to resourceVersion="" in all
+				// to recover and ensure the reflector makes forward progress.
+				list, err = pager.List(context.Background(), metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
+			}
 			close(listCh)
 		}()
 		select {
@@ -225,6 +244,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 		if err != nil {
 			return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedTypeName, err)
 		}
+		r.setIsLastSyncResourceVersionExpired(false) // list was successful
 		initTrace.Step("Objects listed")
 		listMetaInterface, err := meta.ListAccessor(list)
 		if err != nil {
@@ -298,10 +318,13 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 
 		w, err := r.listerWatcher.Watch(options)
 		if err != nil {
-			switch err {
-			case io.EOF:
+			switch {
+			case isExpiredError(err):
+				r.setIsLastSyncResourceVersionExpired(true)
+				klog.V(4).Infof("%s: watch of %v closed with: %v", r.name, r.expectedTypeName, err)
+			case err == io.EOF:
 				// watch closed normally
-			case io.ErrUnexpectedEOF:
+			case err == io.ErrUnexpectedEOF:
 				klog.V(1).Infof("%s: Watch for %v closed with unexpected EOF: %v", r.name, r.expectedTypeName, err)
 			default:
 				utilruntime.HandleError(fmt.Errorf("%s: Failed to watch %v: %v", r.name, r.expectedTypeName, err))
@@ -320,7 +343,8 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 		if err := r.watchHandler(w, &resourceVersion, resyncerrc, stopCh); err != nil {
 			if err != errorStopRequested {
 				switch {
-				case apierrs.IsResourceExpired(err):
+				case isExpiredError(err):
+					r.setIsLastSyncResourceVersionExpired(true)
 					klog.V(4).Infof("%s: watch of %v ended with: %v", r.name, r.expectedTypeName, err)
 				default:
 					klog.Warningf("%s: watch of %v ended with: %v", r.name, r.expectedTypeName, err)
@@ -361,7 +385,7 @@ loop:
 				break loop
 			}
 			if event.Type == watch.Error {
-				return apierrs.FromObject(event.Object)
+				return apierrors.FromObject(event.Object)
 			}
 			if r.expectedType != nil {
 				if e, a := r.expectedType, reflect.TypeOf(event.Object); e != a {
@@ -431,4 +455,43 @@ func (r *Reflector) setLastSyncResourceVersion(v string) {
 	r.lastSyncResourceVersionMutex.Lock()
 	defer r.lastSyncResourceVersionMutex.Unlock()
 	r.lastSyncResourceVersion = v
+}
+
+// relistResourceVersion determines the resource version the reflector should list or relist from.
+// Returns either the lastSyncResourceVersion so that this reflector will relist with a resource
+// versions no older than has already been observed in relist results or watch events, or, if the last relist resulted
+// in an HTTP 410 (Gone) status code, returns "" so that the relist will use the latest resource version available in
+// etcd via a quorum read.
+func (r *Reflector) relistResourceVersion() string {
+	r.lastSyncResourceVersionMutex.RLock()
+	defer r.lastSyncResourceVersionMutex.RUnlock()
+
+	if r.isLastSyncResourceVersionGone {
+		// Since this reflector makes paginated list requests, and all paginated list requests skip the watch cache
+		// if the lastSyncResourceVersion is expired, we set ResourceVersion="" and list again to re-establish reflector
+		// to the latest available ResourceVersion, using a consistent read from etcd.
+		return ""
+	}
+	if r.lastSyncResourceVersion == "" {
+		// For performance reasons, initial list performed by reflector uses "0" as resource version to allow it to
+		// be served from the watch cache if it is enabled.
+		return "0"
+	}
+	return r.lastSyncResourceVersion
+}
+
+// setIsLastSyncResourceVersionExpired sets if the last list or watch request with lastSyncResourceVersion returned a
+// expired error: HTTP 410 (Gone) Status Code.
+func (r *Reflector) setIsLastSyncResourceVersionExpired(isExpired bool) {
+	r.lastSyncResourceVersionMutex.Lock()
+	defer r.lastSyncResourceVersionMutex.Unlock()
+	r.isLastSyncResourceVersionGone = isExpired
+}
+
+func isExpiredError(err error) bool {
+	// In Kubernetes 1.17 and earlier, the api server returns both apierrors.StatusReasonExpired and
+	// apierrors.StatusReasonGone for HTTP 410 (Gone) status code responses. In 1.18 the kube server is more consistent
+	// and always returns apierrors.StatusReasonExpired. For backward compatibility we can only remove the apierrors.IsGone
+	// check when we fully drop support for Kubernetes 1.17 servers from reflectors.
+	return apierrors.IsResourceExpired(err) || apierrors.IsGone(err)
 }

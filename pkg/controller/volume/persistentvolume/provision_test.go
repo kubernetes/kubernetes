@@ -22,7 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -423,7 +423,7 @@ func TestProvisionSync(t *testing.T) {
 				// Inject errors to simulate crashed API server during
 				// kubeclient.PersistentVolumes.Create()
 				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error1")},
-				{Verb: "create", Resource: "persistentvolumes", Error: apierrs.NewAlreadyExists(api.Resource("persistentvolumes"), "")},
+				{Verb: "create", Resource: "persistentvolumes", Error: apierrors.NewAlreadyExists(api.Resource("persistentvolumes"), "")},
 			},
 			wrapTestWithPluginCalls(
 				nil, // recycle calls

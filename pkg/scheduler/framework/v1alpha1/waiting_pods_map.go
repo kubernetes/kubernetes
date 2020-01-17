@@ -17,7 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
 	"sync"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -69,16 +71,34 @@ func (m *waitingPodsMap) iterate(callback func(WaitingPod)) {
 
 // waitingPod represents a pod waiting in the permit phase.
 type waitingPod struct {
-	pod *v1.Pod
-	s   chan *Status
+	pod            *v1.Pod
+	pendingPlugins map[string]*time.Timer
+	s              chan *Status
+	mu             sync.RWMutex
 }
 
 // newWaitingPod returns a new waitingPod instance.
-func newWaitingPod(pod *v1.Pod) *waitingPod {
-	return &waitingPod{
+func newWaitingPod(pod *v1.Pod, pluginsMaxWaitTime map[string]time.Duration) *waitingPod {
+	wp := &waitingPod{
 		pod: pod,
 		s:   make(chan *Status),
 	}
+
+	wp.pendingPlugins = make(map[string]*time.Timer, len(pluginsMaxWaitTime))
+	// The time.AfterFunc calls wp.Reject which iterates through pendingPlugins map. Acquire the
+	// lock here so that time.AfterFunc can only execute after newWaitingPod finishes.
+	wp.mu.Lock()
+	defer wp.mu.Unlock()
+	for k, v := range pluginsMaxWaitTime {
+		plugin, waitTime := k, v
+		wp.pendingPlugins[plugin] = time.AfterFunc(waitTime, func() {
+			msg := fmt.Sprintf("rejected due to timeout after waiting %v at plugin %v",
+				waitTime, plugin)
+			wp.Reject(msg)
+		})
+	}
+
+	return wp
 }
 
 // GetPod returns a reference to the waiting pod.
@@ -86,9 +106,35 @@ func (w *waitingPod) GetPod() *v1.Pod {
 	return w.pod
 }
 
-// Allow the waiting pod to be scheduled. Returns true if the allow signal was
-// successfully delivered, false otherwise.
-func (w *waitingPod) Allow() bool {
+// GetPendingPlugins returns a list of pending permit plugin's name.
+func (w *waitingPod) GetPendingPlugins() []string {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	plugins := make([]string, 0, len(w.pendingPlugins))
+	for p := range w.pendingPlugins {
+		plugins = append(plugins, p)
+	}
+
+	return plugins
+}
+
+// Allow declares the waiting pod is allowed to be scheduled by plugin pluginName.
+// If this is the last remaining plugin to allow, then a success signal is delivered
+// to unblock the pod.
+// Returns true if the allow signal was successfully dealt with, false otherwise.
+func (w *waitingPod) Allow(pluginName string) bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if timer, exist := w.pendingPlugins[pluginName]; exist {
+		timer.Stop()
+		delete(w.pendingPlugins, pluginName)
+	}
+
+	// Only signal success status after all plugins have allowed
+	if len(w.pendingPlugins) != 0 {
+		return true
+	}
+
 	select {
 	case w.s <- NewStatus(Success, ""):
 		return true
@@ -97,9 +143,15 @@ func (w *waitingPod) Allow() bool {
 	}
 }
 
-// Reject declares the waiting pod unschedulable. Returns true if the allow signal
+// Reject declares the waiting pod unschedulable. Returns true if the reject signal
 // was successfully delivered, false otherwise.
 func (w *waitingPod) Reject(msg string) bool {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	for _, timer := range w.pendingPlugins {
+		timer.Stop()
+	}
+
 	select {
 	case w.s <- NewStatus(Unschedulable, msg):
 		return true

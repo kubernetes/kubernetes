@@ -9,7 +9,7 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/google.golang.org/api/internal",
     importpath = "google.golang.org/api/internal",
-    visibility = ["//visibility:public"],
+    visibility = ["//vendor/google.golang.org/api:__subpackages__"],
     deps = [
         "//vendor/golang.org/x/oauth2:go_default_library",
         "//vendor/golang.org/x/oauth2/google:go_default_library",

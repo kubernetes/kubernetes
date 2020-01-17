@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -34,7 +34,7 @@ const (
 
 // Define container for all the test specification aimed at verifying
 // that kubeadm configures the nodes and system:nodes group as expected
-var _ = KubeadmDescribe("nodes", func() {
+var _ = Describe("nodes", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("nodes")

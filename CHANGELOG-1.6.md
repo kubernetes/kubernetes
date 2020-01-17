@@ -756,14 +756,14 @@ filename | sha256 hash
 
 ## Known Issues for v1.6.5
 
-* If you use the [GLBC Ingress Controller](https://github.com/kubernetes/ingress/tree/master/controllers/gce),
+* If you use the [GLBC Ingress Controller](https://github.com/kubernetes/ingress-nginx/tree/0.9.0-beta.1/controllers/gce),
   upgrading an existing pre-v1.6.4 cluster to Kubernetes v1.6.5 will cause an unintentional
   [overwrite of manual edits to GCP Health Checks](https://github.com/kubernetes/ingress/issues/842)
   managed by the GLBC Ingress Controller. This can cause the health checks to start failing,
   requiring you to reapply the manual edits.
   * This issue does not affect clusters that were already running Kubernetes v1.6.4 or higher.
   * This issue does not affect Health Checks that were left in the configuration
-    [originally set by the GLBC Ingress Controller](https://github.com/kubernetes/ingress/tree/master/controllers/gce#health-checks).
+    [originally set by the GLBC Ingress Controller](https://github.com/kubernetes/ingress-nginx/tree/0.9.0-beta.1/controllers/gce#health-checks).
 
 ## Downloads for v1.6.5
 
@@ -852,14 +852,14 @@ filename | sha256 hash
 
 ## Known Issues for v1.6.4
 
-* If you use the [GLBC Ingress Controller](https://github.com/kubernetes/ingress/tree/master/controllers/gce),
+* If you use the [GLBC Ingress Controller](https://github.com/kubernetes/ingress-nginx/tree/0.9.0-beta.1/controllers/gce),
   upgrading an existing cluster to Kubernetes v1.6.4 will cause an unintentional
   [overwrite of manual edits to GCP Health Checks](https://github.com/kubernetes/ingress/issues/842)
   managed by the GLBC Ingress Controller. This can cause the health checks to start failing,
   requiring you to reapply the manual edits.
   * This issue does not affect clusters that start out with Kubernetes v1.6.4 or higher.
   * This issue does not affect Health Checks that were left in the configuration
-    [originally set by the GLBC Ingress Controller](https://github.com/kubernetes/ingress/tree/master/controllers/gce#health-checks).
+    [originally set by the GLBC Ingress Controller](https://github.com/kubernetes/ingress-nginx/tree/0.9.0-beta.1/controllers/gce#health-checks).
 
 ## Downloads for v1.6.4
 
@@ -1364,7 +1364,7 @@ Features for this release were tracked via the use of the [kubernetes/features](
 * Kubelet Container Runtime Interface (CRI) support
   - **[beta]** The Docker-CRI implementation is enabled by default in kubelet.
     You can disable it by --enable-cri=false. See
-    [notes on the new implementation](https://github.com/kubernetes/community/blob/master/contributors/devel/container-runtime-interface.md#kubernetes-v16-release-docker-cri-integration-beta)
+    [notes on the new implementation](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/container-runtime-interface.md#kubernetes-v16-release-docker-cri-integration-beta)
     for more details.
   - **[alpha]** Alpha support for other runtimes:
     [cri-o](https://github.com/kubernetes-incubator/cri-o/releases/tag/v0.1), [frakti](https://github.com/kubernetes/frakti/releases/tag/v0.1), [rkt](https://github.com/coreos/rkt/issues?q=is%3Aopen+is%3Aissue+label%3Aarea%2Fcri).
@@ -1405,7 +1405,7 @@ Features for this release were tracked via the use of the [kubernetes/features](
 
 ### RBAC
 * **[beta]** RBAC API is promoted to v1beta1 (rbac.authorization.k8s.io/v1beta1), and defines default roles for control plane, node, and controller components.
-* **[beta]** The Docker-CRI implementation is Beta and is enabled by default in kubelet.  You can disable it by `--enable-cri=false`. See [notes on the new implementation]( https://github.com/kubernetes/community/blob/master/contributors/devel/container-runtime-interface.md#kubernetes-v16-release-docker-cri-integration-beta) for more details.
+* **[beta]** The Docker-CRI implementation is Beta and is enabled by default in kubelet.  You can disable it by `--enable-cri=false`. See [notes on the new implementation]( https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/container-runtime-interface.md#kubernetes-v16-release-docker-cri-integration-beta) for more details.
 
 ### Scheduling
 - **[beta]** The [multiple schedulers](https://kubernetes.io/docs/tutorials/clusters/multiple-schedulers/). This feature allows you to run multiple schedulers in parallel, each responsible for different sets of pods. When using multiple schedulers, the scheduler name is now specified in a new-in-1.6 `schedulerName` field of the PodSpec rather than using the `scheduler.alpha.kubernetes.io/name` annotation on the Pod. When you upgrade to 1.6, the Kubernetes default scheduler will start using the `schedulerName` field of the PodSpec and will ignore the annotation.

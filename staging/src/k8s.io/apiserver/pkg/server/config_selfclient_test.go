@@ -19,6 +19,8 @@ package server
 import (
 	"net"
 	"testing"
+
+	netutils "k8s.io/utils/net"
 )
 
 func TestLoopbackHostPortIPv4(t *testing.T) {
@@ -95,7 +97,7 @@ func isIPv6LoopbackSupported() (ipv6 bool, ipv6only bool, err error) {
 		if !ok || !ipnet.IP.IsLoopback() {
 			continue
 		}
-		if ipnet.IP.To4() == nil {
+		if netutils.IsIPv6(ipnet.IP) {
 			ipv6 = true
 			continue
 		}

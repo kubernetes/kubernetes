@@ -2,6 +2,7 @@
 
 approvers:
 - kawych
+- serathius
 - sig-instrumentation-approvers
 reviewers:
 - sig-instrumentation-reviewers

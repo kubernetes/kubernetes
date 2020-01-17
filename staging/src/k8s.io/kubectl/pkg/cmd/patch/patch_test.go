@@ -48,7 +48,7 @@ func TestPatchObject(t *testing.T) {
 				if m == "PATCH" {
 					obj.Spec.Type = "NodePort"
 				}
-				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &obj)}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &obj)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -82,7 +82,7 @@ func TestPatchObjectFromFile(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services/frontend" && (m == "PATCH" || m == "GET"):
-				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -95,7 +95,7 @@ func TestPatchObjectFromFile(t *testing.T) {
 	cmd.Flags().Set("namespace", "test")
 	cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
 	cmd.Flags().Set("output", "name")
-	cmd.Flags().Set("filename", "../../../test/data/frontend-service.yaml")
+	cmd.Flags().Set("filename", "../../../testdata/frontend-service.yaml")
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the response
@@ -119,9 +119,9 @@ func TestPatchNoop(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services/frontend" && m == "PATCH":
-				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, patchObject)}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, patchObject)}, nil
 			case p == "/namespaces/test/services/frontend" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, getObject)}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, getObject)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -166,9 +166,9 @@ func TestPatchObjectFromFileOutput(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services/frontend" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &svc.Items[0])}, nil
 			case p == "/namespaces/test/services/frontend" && m == "PATCH":
-				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, svcCopy)}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, svcCopy)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -181,7 +181,7 @@ func TestPatchObjectFromFileOutput(t *testing.T) {
 	cmd.Flags().Set("namespace", "test")
 	cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
 	cmd.Flags().Set("output", "yaml")
-	cmd.Flags().Set("filename", "../../../test/data/frontend-service.yaml")
+	cmd.Flags().Set("filename", "../../../testdata/frontend-service.yaml")
 	cmd.Run(cmd, []string{})
 
 	t.Log(buf.String())

@@ -287,7 +287,7 @@ func (ts *azureTokenSource) refreshToken(token *azureToken) (*azureToken, error)
 		return nil, err
 	}
 
-	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, token.tenantID)
+	oauthConfig, err := adal.NewOAuthConfigWithAPIVersion(env.ActiveDirectoryEndpoint, token.tenantID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("building the OAuth configuration for token refresh: %v", err)
 	}
@@ -344,7 +344,7 @@ func newAzureTokenSourceDeviceCode(environment azure.Environment, clientID strin
 }
 
 func (ts *azureTokenSourceDeviceCode) Token() (*azureToken, error) {
-	oauthConfig, err := adal.NewOAuthConfig(ts.environment.ActiveDirectoryEndpoint, ts.tenantID)
+	oauthConfig, err := adal.NewOAuthConfigWithAPIVersion(ts.environment.ActiveDirectoryEndpoint, ts.tenantID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("building the OAuth configuration for device code authentication: %v", err)
 	}

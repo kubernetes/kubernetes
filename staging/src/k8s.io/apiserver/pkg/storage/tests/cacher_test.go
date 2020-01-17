@@ -444,8 +444,8 @@ func TestWatch(t *testing.T) {
 	}
 	defer tooOldWatcher.Stop()
 	// Ensure we get a "Gone" error
-	expectedGoneError := errors.NewGone("").ErrStatus
-	verifyWatchEvent(t, tooOldWatcher, watch.Error, &expectedGoneError)
+	expectedResourceExpiredError := errors.NewResourceExpired("").ErrStatus
+	verifyWatchEvent(t, tooOldWatcher, watch.Error, &expectedResourceExpiredError)
 
 	initialWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, storage.Everything)
 	if err != nil {
@@ -668,8 +668,8 @@ func TestEmptyWatchEventCache(t *testing.T) {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 		defer watcher.Stop()
-		expectedGoneError := errors.NewGone("").ErrStatus
-		verifyWatchEvent(t, watcher, watch.Error, &expectedGoneError)
+		expectedResourceExpiredError := errors.NewResourceExpired("").ErrStatus
+		verifyWatchEvent(t, watcher, watch.Error, &expectedResourceExpiredError)
 	}
 
 	{

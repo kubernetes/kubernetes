@@ -17,12 +17,14 @@ limitations under the License.
 package annotate
 
 import (
+	"bytes"
+	"io/ioutil"
 	"net/http"
 	"reflect"
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -465,7 +467,7 @@ func TestAnnotateObject(t *testing.T) {
 			case "GET":
 				switch req.URL.Path {
 				case "/namespaces/test/pods/foo":
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -473,7 +475,7 @@ func TestAnnotateObject(t *testing.T) {
 			case "PATCH":
 				switch req.URL.Path {
 				case "/namespaces/test/pods/foo":
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -502,13 +504,9 @@ func TestAnnotateObject(t *testing.T) {
 	}
 }
 
-func TestAnnotateObjectFromFile(t *testing.T) {
-	pods, _, _ := cmdtesting.TestData()
-
+func TestAnnotateResourceVersion(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
-
-	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
@@ -517,16 +515,33 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 			switch req.Method {
 			case "GET":
 				switch req.URL.Path {
-				case "/namespaces/test/replicationcontrollers/cassandra":
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
+				case "/namespaces/test/pods/foo":
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Header:     cmdtesting.DefaultHeader(),
+						Body: ioutil.NopCloser(bytes.NewBufferString(
+							`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","resourceVersion":"10"}}`,
+						))}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
 				}
 			case "PATCH":
 				switch req.URL.Path {
-				case "/namespaces/test/replicationcontrollers/cassandra":
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
+				case "/namespaces/test/pods/foo":
+					body, err := ioutil.ReadAll(req.Body)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if !bytes.Equal(body, []byte(`{"metadata":{"annotations":{"a":"b"},"resourceVersion":"10"}}`)) {
+						t.Fatalf("expected patch with resourceVersion set, got %s", string(body))
+					}
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Header:     cmdtesting.DefaultHeader(),
+						Body: ioutil.NopCloser(bytes.NewBufferString(
+							`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","resourceVersion":"11"}}`,
+						))}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -543,7 +558,61 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOutput(bufOut)
 	options := NewAnnotateOptions(iostreams)
-	options.Filenames = []string{"../../../test/data/controller.yaml"}
+	options.resourceVersion = "10"
+	args := []string{"pods/foo", "a=b"}
+	if err := options.Complete(tf, cmd, args); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := options.Validate(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := options.RunAnnotate(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestAnnotateObjectFromFile(t *testing.T) {
+	pods, _, _ := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch req.Method {
+			case "GET":
+				switch req.URL.Path {
+				case "/namespaces/test/replicationcontrollers/cassandra":
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			case "PATCH":
+				switch req.URL.Path {
+				case "/namespaces/test/replicationcontrollers/cassandra":
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			default:
+				t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
+	cmd.SetOutput(bufOut)
+	options := NewAnnotateOptions(iostreams)
+	options.Filenames = []string{"../../../testdata/controller.yaml"}
 	args := []string{"a=b", "c-"}
 	if err := options.Complete(tf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -574,7 +643,7 @@ func TestAnnotateLocal(t *testing.T) {
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	options := NewAnnotateOptions(iostreams)
 	options.local = true
-	options.Filenames = []string{"../../../test/data/controller.yaml"}
+	options.Filenames = []string{"../../../testdata/controller.yaml"}
 	args := []string{"a=b"}
 	if err := options.Complete(tf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -602,7 +671,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 			case "GET":
 				switch req.URL.Path {
 				case "/namespaces/test/pods":
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -610,9 +679,9 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 			case "PATCH":
 				switch req.URL.Path {
 				case "/namespaces/test/pods/foo":
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
 				case "/namespaces/test/pods/bar":
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[1])}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[1])}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil

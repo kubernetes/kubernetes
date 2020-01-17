@@ -11,8 +11,9 @@ go_library(
         "//vendor/github.com/golang/protobuf/protoc-gen-go/descriptor:go_default_library",
         "//vendor/github.com/golang/protobuf/ptypes/timestamp:go_default_library",
         "//vendor/github.com/golang/protobuf/ptypes/wrappers:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
+        "//vendor/google.golang.org/grpc/codes:go_default_library",
+        "//vendor/google.golang.org/grpc/status:go_default_library",
     ],
 )
 

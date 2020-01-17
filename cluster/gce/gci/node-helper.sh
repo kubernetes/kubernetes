@@ -17,9 +17,11 @@
 # A library of helper functions and constant for GCI distro
 source "${KUBE_ROOT}/cluster/gce/gci/helper.sh"
 
+# shellcheck disable=SC2120
 function get-node-instance-metadata-from-file {
+  local kube_env=${1:-node-kube-env} # optional
   local metadata=""
-  metadata+="kube-env=${KUBE_TEMP}/node-kube-env.yaml,"
+  metadata+="kube-env=${KUBE_TEMP}/${kube_env}.yaml,"
   metadata+="kubelet-config=${KUBE_TEMP}/node-kubelet-config.yaml,"
   metadata+="user-data=${KUBE_ROOT}/cluster/gce/gci/node.yaml,"
   metadata+="configure-sh=${KUBE_ROOT}/cluster/gce/gci/configure.sh,"

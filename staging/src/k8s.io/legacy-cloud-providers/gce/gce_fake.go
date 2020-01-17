@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	compute "google.golang.org/api/compute/v1"
+	option "google.golang.org/api/option"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -62,7 +63,10 @@ func fakeClusterID(clusterID string) ClusterID {
 
 // NewFakeGCECloud constructs a fake GCE Cloud from the cluster values.
 func NewFakeGCECloud(vals TestClusterValues) *Cloud {
-	service, _ := compute.NewService(context.Background())
+	service, err := compute.NewService(context.Background(), option.WithoutAuthentication())
+	if err != nil {
+		panic(err)
+	}
 	gce := &Cloud{
 		region:           vals.Region,
 		service:          service,

@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -85,6 +86,15 @@ func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity)
 
 // configureHugePages attempts to allocate 10Mi of 2Mi hugepages for testing purposes
 func configureHugePages() error {
+	// Compact memory to make bigger contiguous blocks of memory available
+	// before allocating huge pages.
+	// https://www.kernel.org/doc/Documentation/sysctl/vm.txt
+	if _, err := os.Stat("/proc/sys/vm/compact_memory"); err == nil {
+		err := exec.Command("/bin/sh", "-c", "echo 1 > /proc/sys/vm/compact_memory").Run()
+		if err != nil {
+			return err
+		}
+	}
 	err := exec.Command("/bin/sh", "-c", "echo 5 > /proc/sys/vm/nr_hugepages").Run()
 	if err != nil {
 		return err

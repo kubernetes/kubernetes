@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 	imageutil "k8s.io/kubernetes/test/utils/image"
@@ -31,7 +32,7 @@ var _ = SIGDescribe("Metadata Concealment", func() {
 	f := framework.NewDefaultFramework("metadata-concealment")
 
 	ginkgo.It("should run a check-metadata-concealment job to completion", func() {
-		framework.SkipUnlessProviderIs("gce")
+		e2eskipper.SkipUnlessProviderIs("gce")
 		ginkgo.By("Creating a job")
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{

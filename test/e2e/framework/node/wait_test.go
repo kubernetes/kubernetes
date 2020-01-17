@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -31,7 +31,7 @@ import (
 // TestCheckReadyForTests specifically is concerned about the multi-node logic
 // since single node checks are in TestReadyForTests.
 func TestCheckReadyForTests(t *testing.T) {
-	// This is a duplicate definition of the constant in pkg/controller/service/service_controller.go
+	// This is a duplicate definition of the constant in pkg/controller/service/controller.go
 	labelNodeRoleMaster := "node-role.kubernetes.io/master"
 
 	fromVanillaNode := func(f func(*v1.Node)) v1.Node {
@@ -157,7 +157,7 @@ func TestCheckReadyForTests(t *testing.T) {
 			expectedErr: "Forced error",
 		}, {
 			desc:        "Retryable errors from node list are reported but still return false",
-			nodeListErr: apierrs.NewTimeoutError("Retryable error", 10),
+			nodeListErr: apierrors.NewTimeoutError("Retryable error", 10),
 			expected:    false,
 		},
 	}

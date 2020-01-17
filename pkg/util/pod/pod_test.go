@@ -17,18 +17,21 @@ limitations under the License.
 package pod
 
 import (
+	"fmt"
 	"testing"
 
-	"fmt"
-	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/fake"
 	"reflect"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestPatchPodStatus(t *testing.T) {
 	ns := "ns"
 	name := "name"
+	uid := types.UID("myuid")
 	client := &fake.Clientset{}
 	client.CoreV1().Pods(ns).Create(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -45,7 +48,7 @@ func TestPatchPodStatus(t *testing.T) {
 		{
 			"no change",
 			func(input v1.PodStatus) v1.PodStatus { return input },
-			[]byte(fmt.Sprintf(`{}`)),
+			[]byte(fmt.Sprintf(`{"metadata":{"uid":"myuid"}}`)),
 		},
 		{
 			"message change",
@@ -53,7 +56,7 @@ func TestPatchPodStatus(t *testing.T) {
 				input.Message = "random message"
 				return input
 			},
-			[]byte(fmt.Sprintf(`{"status":{"message":"random message"}}`)),
+			[]byte(fmt.Sprintf(`{"metadata":{"uid":"myuid"},"status":{"message":"random message"}}`)),
 		},
 		{
 			"pod condition change",
@@ -61,7 +64,7 @@ func TestPatchPodStatus(t *testing.T) {
 				input.Conditions[0].Status = v1.ConditionFalse
 				return input
 			},
-			[]byte(fmt.Sprintf(`{"status":{"$setElementOrder/conditions":[{"type":"Ready"},{"type":"PodScheduled"}],"conditions":[{"status":"False","type":"Ready"}]}}`)),
+			[]byte(fmt.Sprintf(`{"metadata":{"uid":"myuid"},"status":{"$setElementOrder/conditions":[{"type":"Ready"},{"type":"PodScheduled"}],"conditions":[{"status":"False","type":"Ready"}]}}`)),
 		},
 		{
 			"additional init container condition",
@@ -74,11 +77,11 @@ func TestPatchPodStatus(t *testing.T) {
 				}
 				return input
 			},
-			[]byte(fmt.Sprintf(`{"status":{"initContainerStatuses":[{"image":"","imageID":"","lastState":{},"name":"init-container","ready":true,"restartCount":0,"state":{}}]}}`)),
+			[]byte(fmt.Sprintf(`{"metadata":{"uid":"myuid"},"status":{"initContainerStatuses":[{"image":"","imageID":"","lastState":{},"name":"init-container","ready":true,"restartCount":0,"state":{}}]}}`)),
 		},
 	}
 	for _, tc := range testCases {
-		_, patchBytes, err := PatchPodStatus(client, ns, name, getPodStatus(), tc.mutate(getPodStatus()))
+		_, patchBytes, err := PatchPodStatus(client, ns, name, uid, getPodStatus(), tc.mutate(getPodStatus()))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

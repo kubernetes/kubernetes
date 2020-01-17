@@ -57,7 +57,7 @@ var _ = ginkgo.Describe("log", func() {
 		}()
 	})
 	ginkgo.It("asserts", func() {
-		gomega.Expect(false).To(gomega.Equal(true), "false is never true")
+		framework.ExpectEqual(false, true, "false is never true")
 	})
 	ginkgo.It("error", func() {
 		err := errors.New("an error with a long, useless description")
@@ -68,7 +68,7 @@ var _ = ginkgo.Describe("log", func() {
 	})
 	ginkgo.AfterEach(func() {
 		framework.Logf("after")
-		gomega.Expect(true).To(gomega.Equal(false), "true is never false either")
+		framework.ExpectEqual(true, false, "true is never false either")
 	})
 })
 
@@ -83,7 +83,6 @@ func TestFailureOutput(t *testing.T) {
 	runTests(fakeT, reporter)
 
 	// Now check the output.
-	g := gomega.NewGomegaWithT(t)
 	actual := normalizeReport(*reporter)
 
 	// output from AfterEach
@@ -117,16 +116,16 @@ func TestFailureOutput(t *testing.T) {
 		},
 	}
 	// Compare individual fields. Comparing the slices leads to unreadable error output when there is any mismatch.
-	g.Expect(len(actual)).To(gomega.Equal(len(expected)), "%d entries in %v", len(expected), actual)
+	framework.ExpectEqual(len(actual), len(expected), "%d entries in %v", len(expected), actual)
 	for i, a := range actual {
 		b := expected[i]
-		g.Expect(a.name).To(gomega.Equal(b.name), "name in %d", i)
-		g.Expect(a.output).To(gomega.Equal(b.output), "output in %d", i)
-		g.Expect(a.failure).To(gomega.Equal(b.failure), "failure in %d", i)
+		framework.ExpectEqual(a.name, b.name, "name in %d", i)
+		framework.ExpectEqual(a.output, b.output, "output in %d", i)
+		framework.ExpectEqual(a.failure, b.failure, "failure in %d", i)
 		// There may be additional stack entries from the "testing" package at the
 		// end. We ignore those in the comparison because the line number in them
 		// varies.
-		g.Expect(a.stack).To(gomega.Equal(b.stack), "stack in %d: %s", i, a.stack)
+		framework.ExpectEqual(a.stack, b.stack, "stack in %d: %s", i, a.stack)
 	}
 }
 

@@ -4,13 +4,13 @@ approvers:
 - pmorie
 - saad-ali
 - thockin
-- matchstick
 - SandeepPissay
 - divyenpatel
 - BaluDontu
 - abrarshivani
+emeritus_approvers:
+- matchstick
 reviewers:
-- abithap
 - abrarshivani
 - saad-ali
 - justinsb

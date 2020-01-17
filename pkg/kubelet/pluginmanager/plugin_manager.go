@@ -53,7 +53,6 @@ const (
 // PluginManager interface.
 func NewPluginManager(
 	sockDir string,
-	deprecatedSockDir string,
 	recorder record.EventRecorder) PluginManager {
 	asw := cache.NewActualStateOfWorld()
 	dsw := cache.NewDesiredStateOfWorld()
@@ -71,7 +70,6 @@ func NewPluginManager(
 	pm := &pluginManager{
 		desiredStateOfWorldPopulator: pluginwatcher.NewWatcher(
 			sockDir,
-			deprecatedSockDir,
 			dsw,
 		),
 		reconciler:          reconciler,

@@ -10,38 +10,42 @@ go_library(
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:android": [
-            "//pkg/util/mount:go_default_library",
+            "//vendor/k8s.io/klog:go_default_library",
+            "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
-            "//pkg/util/mount:go_default_library",
+            "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:dragonfly": [
-            "//pkg/util/mount:go_default_library",
+            "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
-            "//pkg/util/mount:go_default_library",
+            "//vendor/k8s.io/utils/mount:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
-            "//pkg/util/mount:go_default_library",
             "//vendor/k8s.io/klog:go_default_library",
+            "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
-            "//pkg/util/mount:go_default_library",
+            "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:netbsd": [
-            "//pkg/util/mount:go_default_library",
+            "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:openbsd": [
-            "//pkg/util/mount:go_default_library",
+            "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:plan9": [
-            "//pkg/util/mount:go_default_library",
+            "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:solaris": [
-            "//pkg/util/mount:go_default_library",
+            "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
-            "//pkg/util/mount:go_default_library",
+            "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "//conditions:default": [],
     }),

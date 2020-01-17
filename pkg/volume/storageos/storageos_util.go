@@ -23,11 +23,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/util/mount"
-
 	storageosapi "github.com/storageos/go-api"
 	storageostypes "github.com/storageos/go-api/types"
 	"k8s.io/klog"
+	utilexec "k8s.io/utils/exec"
 )
 
 const (
@@ -331,7 +330,7 @@ func pathDeviceType(path string) (deviceType, error) {
 
 // attachFileDevice takes a path to a regular file and makes it available as an
 // attached block device.
-func attachFileDevice(path string, exec mount.Exec) (string, error) {
+func attachFileDevice(path string, exec utilexec.Interface) (string, error) {
 	blockDevicePath, err := getLoopDevice(path, exec)
 	if err != nil && err.Error() != ErrDeviceNotFound {
 		return "", err
@@ -349,7 +348,7 @@ func attachFileDevice(path string, exec mount.Exec) (string, error) {
 }
 
 // Returns the full path to the loop device associated with the given path.
-func getLoopDevice(path string, exec mount.Exec) (string, error) {
+func getLoopDevice(path string, exec utilexec.Interface) (string, error) {
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		return "", errors.New(ErrNotAvailable)
@@ -359,7 +358,7 @@ func getLoopDevice(path string, exec mount.Exec) (string, error) {
 	}
 
 	args := []string{"-j", path}
-	out, err := exec.Run(losetupPath, args...)
+	out, err := exec.Command(losetupPath, args...).CombinedOutput()
 	if err != nil {
 		klog.V(2).Infof("Failed device discover command for path %s: %v", path, err)
 		return "", err
@@ -367,9 +366,9 @@ func getLoopDevice(path string, exec mount.Exec) (string, error) {
 	return parseLosetupOutputForDevice(out)
 }
 
-func makeLoopDevice(path string, exec mount.Exec) (string, error) {
+func makeLoopDevice(path string, exec utilexec.Interface) (string, error) {
 	args := []string{"-f", "-P", "--show", path}
-	out, err := exec.Run(losetupPath, args...)
+	out, err := exec.Command(losetupPath, args...).CombinedOutput()
 	if err != nil {
 		klog.V(2).Infof("Failed device create command for path %s: %v", path, err)
 		return "", err
@@ -377,9 +376,9 @@ func makeLoopDevice(path string, exec mount.Exec) (string, error) {
 	return parseLosetupOutputForDevice(out)
 }
 
-func removeLoopDevice(device string, exec mount.Exec) error {
+func removeLoopDevice(device string, exec utilexec.Interface) error {
 	args := []string{"-d", device}
-	out, err := exec.Run(losetupPath, args...)
+	out, err := exec.Command(losetupPath, args...).CombinedOutput()
 	if err != nil {
 		if !strings.Contains(string(out), "No such device or address") {
 			return err

@@ -28,9 +28,8 @@ import (
 // Verifies PluginExistsWithCorrectTimestamp returns true for the plugin
 func Test_ASW_AddPlugin_Positive_NewPlugin(t *testing.T) {
 	pluginInfo := PluginInfo{
-		SocketPath:           "/var/lib/kubelet/device-plugins/test-plugin.sock",
-		FoundInDeprecatedDir: false,
-		Timestamp:            time.Now(),
+		SocketPath: "/var/lib/kubelet/device-plugins/test-plugin.sock",
+		Timestamp:  time.Now(),
 	}
 	asw := NewActualStateOfWorld()
 	err := asw.AddPlugin(pluginInfo)
@@ -60,9 +59,8 @@ func Test_ASW_AddPlugin_Positive_NewPlugin(t *testing.T) {
 func Test_ASW_AddPlugin_Negative_EmptySocketPath(t *testing.T) {
 	asw := NewActualStateOfWorld()
 	pluginInfo := PluginInfo{
-		SocketPath:           "",
-		FoundInDeprecatedDir: false,
-		Timestamp:            time.Now(),
+		SocketPath: "",
+		Timestamp:  time.Now(),
 	}
 	err := asw.AddPlugin(pluginInfo)
 	require.EqualError(t, err, "socket path is empty")
@@ -86,9 +84,8 @@ func Test_ASW_RemovePlugin_Positive(t *testing.T) {
 	// First, add a plugin
 	asw := NewActualStateOfWorld()
 	pluginInfo := PluginInfo{
-		SocketPath:           "/var/lib/kubelet/device-plugins/test-plugin.sock",
-		FoundInDeprecatedDir: false,
-		Timestamp:            time.Now(),
+		SocketPath: "/var/lib/kubelet/device-plugins/test-plugin.sock",
+		Timestamp:  time.Now(),
 	}
 	err := asw.AddPlugin(pluginInfo)
 	// Assert
@@ -117,9 +114,8 @@ func Test_ASW_PluginExistsWithCorrectTimestamp_Negative_WrongTimestamp(t *testin
 	// First, add a plugin
 	asw := NewActualStateOfWorld()
 	pluginInfo := PluginInfo{
-		SocketPath:           "/var/lib/kubelet/device-plugins/test-plugin.sock",
-		FoundInDeprecatedDir: false,
-		Timestamp:            time.Now(),
+		SocketPath: "/var/lib/kubelet/device-plugins/test-plugin.sock",
+		Timestamp:  time.Now(),
 	}
 	err := asw.AddPlugin(pluginInfo)
 	// Assert
@@ -128,9 +124,8 @@ func Test_ASW_PluginExistsWithCorrectTimestamp_Negative_WrongTimestamp(t *testin
 	}
 
 	newerPlugin := PluginInfo{
-		SocketPath:           "/var/lib/kubelet/device-plugins/test-plugin.sock",
-		FoundInDeprecatedDir: false,
-		Timestamp:            time.Now(),
+		SocketPath: "/var/lib/kubelet/device-plugins/test-plugin.sock",
+		Timestamp:  time.Now(),
 	}
 	// Check PluginExistsWithCorrectTimestamp returns false
 	if asw.PluginExistsWithCorrectTimestamp(newerPlugin) {

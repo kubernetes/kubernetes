@@ -67,7 +67,7 @@ kube::log::status "Starting kube-apiserver"
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
-  --runtime-config="api/all=true,extensions/v1beta1/daemonsets=true,extensions/v1beta1/deployments=true,extensions/v1beta1/replicasets=true,extensions/v1beta1/networkpolicies=true,extensions/v1beta1/podsecuritypolicies=true,extensions/v1beta1/replicationcontrollers=true" \
+  --runtime-config="api/all=true" \
   --token-auth-file="${TMP_DIR}/tokenauth.csv" \
   --service-account-issuer="https://kubernetes.devault.svc/" \
   --service-account-signing-key-file="${KUBE_ROOT}/staging/src/k8s.io/client-go/util/cert/testdata/dontUseThisKey.pem" \
@@ -79,14 +79,14 @@ APISERVER_PID=$!
 if ! kube::util::wait_for_url "${API_HOST}:${API_PORT}/healthz" "apiserver: "; then
   kube::log::error "Here are the last 10 lines from kube-apiserver (${API_LOGFILE})"
   kube::log::error "=== BEGIN OF LOG ==="
-  tail -10 "${API_LOGFILE}" || :
+  tail -10 "${API_LOGFILE}" >&2 || :
   kube::log::error "=== END OF LOG ==="
   exit 1
 fi
 
 kube::log::status "Updating " "${OPENAPI_ROOT_DIR}"
 
-curl -w "\n" -fs "${API_HOST}:${API_PORT}/openapi/v2" | jq -S . > "${OPENAPI_ROOT_DIR}/swagger.json"
+curl -w "\n" -fs "${API_HOST}:${API_PORT}/openapi/v2" | jq -S '.info.version="unversioned"' > "${OPENAPI_ROOT_DIR}/swagger.json"
 
 kube::log::status "SUCCESS"
 

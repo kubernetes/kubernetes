@@ -72,6 +72,7 @@ func main(cmd *cobra.Command, args []string) {
 
 	c := kubernetes.NewForConfigOrDie(cfg).RESTClient()
 
+	//lint:ignore SA1015 noisy positive, `time.Tick` is used in a main function which is fine
 	t := time.Tick(time.Duration(pollInterval) * time.Second)
 	for {
 		<-t

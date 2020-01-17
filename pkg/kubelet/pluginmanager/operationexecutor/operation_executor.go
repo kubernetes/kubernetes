@@ -45,7 +45,7 @@ import (
 type OperationExecutor interface {
 	// RegisterPlugin registers the given plugin using the a handler in the plugin handler map.
 	// It then updates the actual state of the world to reflect that.
-	RegisterPlugin(socketPath string, foundInDeprecatedDir bool, timestamp time.Time, pluginHandlers map[string]cache.PluginHandler, actualStateOfWorld ActualStateOfWorldUpdater) error
+	RegisterPlugin(socketPath string, timestamp time.Time, pluginHandlers map[string]cache.PluginHandler, actualStateOfWorld ActualStateOfWorldUpdater) error
 
 	// UnregisterPlugin deregisters the given plugin using a handler in the given plugin handler map.
 	// It then updates the actual state of the world to reflect that.
@@ -63,7 +63,7 @@ func NewOperationExecutor(
 }
 
 // ActualStateOfWorldUpdater defines a set of operations updating the actual
-// state of the world cache after successful registeration/deregistration.
+// state of the world cache after successful registration/deregistration.
 type ActualStateOfWorldUpdater interface {
 	// AddPlugin add the given plugin in the cache if no existing plugin
 	// in the cache has the same socket path.
@@ -94,12 +94,11 @@ func (oe *operationExecutor) IsOperationPending(socketPath string) bool {
 
 func (oe *operationExecutor) RegisterPlugin(
 	socketPath string,
-	foundInDeprecatedDir bool,
 	timestamp time.Time,
 	pluginHandlers map[string]cache.PluginHandler,
 	actualStateOfWorld ActualStateOfWorldUpdater) error {
 	generatedOperation :=
-		oe.operationGenerator.GenerateRegisterPluginFunc(socketPath, foundInDeprecatedDir, timestamp, pluginHandlers, actualStateOfWorld)
+		oe.operationGenerator.GenerateRegisterPluginFunc(socketPath, timestamp, pluginHandlers, actualStateOfWorld)
 
 	return oe.pendingOperations.Run(
 		socketPath, generatedOperation)

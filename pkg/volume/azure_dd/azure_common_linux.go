@@ -26,20 +26,23 @@ import (
 	libstrings "strings"
 
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
+	utilexec "k8s.io/utils/exec"
 )
 
-// exclude those used by azure as resource and OS root in /dev/disk/azure
+// exclude those used by azure as resource and OS root in /dev/disk/azure, /dev/disk/azure/scsi0
+// "/dev/disk/azure/scsi0" dir is populated in Standard_DC4s/DC2s on Ubuntu 18.04
 func listAzureDiskPath(io ioHandler) []string {
-	azureDiskPath := "/dev/disk/azure/"
 	var azureDiskList []string
-	if dirs, err := io.ReadDir(azureDiskPath); err == nil {
-		for _, f := range dirs {
-			name := f.Name()
-			diskPath := azureDiskPath + name
-			if link, linkErr := io.Readlink(diskPath); linkErr == nil {
-				sd := link[(libstrings.LastIndex(link, "/") + 1):]
-				azureDiskList = append(azureDiskList, sd)
+	azureResourcePaths := []string{"/dev/disk/azure/", "/dev/disk/azure/scsi0/"}
+	for _, azureDiskPath := range azureResourcePaths {
+		if dirs, err := io.ReadDir(azureDiskPath); err == nil {
+			for _, f := range dirs {
+				name := f.Name()
+				diskPath := filepath.Join(azureDiskPath, name)
+				if link, linkErr := io.Readlink(diskPath); linkErr == nil {
+					sd := link[(libstrings.LastIndex(link, "/") + 1):]
+					azureDiskList = append(azureDiskList, sd)
+				}
 			}
 		}
 	}
@@ -69,7 +72,7 @@ func getDiskLinkByDevName(io ioHandler, devLinkPath, devName string) (string, er
 	return "", fmt.Errorf("read %s error: %v", devLinkPath, err)
 }
 
-func scsiHostRescan(io ioHandler, exec mount.Exec) {
+func scsiHostRescan(io ioHandler, exec utilexec.Interface) {
 	scsi_path := "/sys/class/scsi_host/"
 	if dirs, err := io.ReadDir(scsi_path); err == nil {
 		for _, f := range dirs {
@@ -84,7 +87,7 @@ func scsiHostRescan(io ioHandler, exec mount.Exec) {
 	}
 }
 
-func findDiskByLun(lun int, io ioHandler, exec mount.Exec) (string, error) {
+func findDiskByLun(lun int, io ioHandler, exec utilexec.Interface) (string, error) {
 	azureDisks := listAzureDiskPath(io)
 	return findDiskByLunWithConstraint(lun, io, azureDisks)
 }

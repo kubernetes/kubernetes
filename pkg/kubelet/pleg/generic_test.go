@@ -21,14 +21,16 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
-	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/component-base/metrics/testutil"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -672,22 +674,39 @@ func TestRunningPodAndContainerCount(t *testing.T) {
 
 	pleg.relist()
 
-	// assert for container count with label "running"
-	actualMetricRunningContainerCount := &dto.Metric{}
-	expectedMetricRunningContainerCount := float64(1)
-	metrics.RunningContainerCount.WithLabelValues(string(kubecontainer.ContainerStateRunning)).Write(actualMetricRunningContainerCount)
-	assert.Equal(t, expectedMetricRunningContainerCount, actualMetricRunningContainerCount.GetGauge().GetValue())
+	tests := []struct {
+		name        string
+		metricsName string
+		wants       string
+	}{
+		{
+			name:        "test container count",
+			metricsName: "kubelet_running_container_count",
+			wants: `
+# HELP kubelet_running_container_count [ALPHA] Number of containers currently running
+# TYPE kubelet_running_container_count gauge
+kubelet_running_container_count{container_state="exited"} 1
+kubelet_running_container_count{container_state="running"} 1
+kubelet_running_container_count{container_state="unknown"} 2
+`,
+		},
+		{
+			name:        "test pod count",
+			metricsName: "kubelet_running_pod_count",
+			wants: `
+# HELP kubelet_running_pod_count [ALPHA] Number of pods currently running
+# TYPE kubelet_running_pod_count gauge
+kubelet_running_pod_count 2
+`,
+		},
+	}
 
-	// assert for container count with label "unknown"
-	actualMetricUnknownContainerCount := &dto.Metric{}
-	expectedMetricUnknownContainerCount := float64(2)
-	metrics.RunningContainerCount.WithLabelValues(string(kubecontainer.ContainerStateUnknown)).Write(actualMetricUnknownContainerCount)
-	assert.Equal(t, expectedMetricUnknownContainerCount, actualMetricUnknownContainerCount.GetGauge().GetValue())
-
-	// assert for running pod count
-	actualMetricRunningPodCount := &dto.Metric{}
-	metrics.RunningPodCount.Write(actualMetricRunningPodCount)
-	expectedMetricRunningPodCount := float64(2)
-	assert.Equal(t, expectedMetricRunningPodCount, actualMetricRunningPodCount.GetGauge().GetValue())
-
+	for _, test := range tests {
+		tc := test
+		t.Run(tc.name, func(t *testing.T) {
+			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(tc.wants), tc.metricsName); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
 }

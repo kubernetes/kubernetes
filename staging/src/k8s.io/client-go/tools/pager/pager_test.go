@@ -72,6 +72,10 @@ func (p *testPager) PagedList(ctx context.Context, options metav1.ListOptions) (
 		p.t.Errorf("invariant violated, expected limit %d and continue %s, got %#v", p.expectPage, expectedContinue, options)
 		return nil, fmt.Errorf("invariant violated")
 	}
+	if options.Continue != "" && options.ResourceVersion != "" {
+		p.t.Errorf("invariant violated, specifying resource version (%s) is not allowed when using continue (%s).", options.ResourceVersion, options.Continue)
+		return nil, fmt.Errorf("invariant violated")
+	}
 	var list metainternalversion.List
 	total := options.Limit
 	if total == 0 {
@@ -180,6 +184,12 @@ func TestListPager_List(t *testing.T) {
 			},
 			args: args{},
 			want: list(21, "rv:20"),
+		},
+		{
+			name:   "two pages with resourceVersion",
+			fields: fields{PageSize: 10, PageFn: (&testPager{t: t, expectPage: 10, remaining: 11, rv: "rv:20"}).PagedList},
+			args:   args{options: metav1.ListOptions{ResourceVersion: "rv:10"}},
+			want:   list(11, "rv:20"),
 		},
 	}
 	for _, tt := range tests {

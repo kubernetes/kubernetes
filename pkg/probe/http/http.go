@@ -89,9 +89,9 @@ type GetHTTPInterface interface {
 }
 
 // DoHTTPProbe checks if a GET request to the url succeeds.
-// When HTTPProbePlus not enable, If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Success.
+// When HTTPProbePlus not enabled, If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Success.
 // If the HTTP response code is unsuccessful or HTTP communication fails(200 > code >= 400), it returns Failure.
-// When HTTPProbePlus is enable, if both response code in expectHTTPCodes and response content match expectHTTPContent, it return Success.
+// When HTTPProbePlus is enabled, if both response code in expectHTTPCodes and response content match expectHTTPContent, it return Success.
 // This is exported because some other packages may want to do direct HTTP probes.
 func DoHTTPProbe(url *url.URL, headers http.Header, expectHTTPCodes []int, expectHTTPContent string, client GetHTTPInterface) (probe.Result, string, error) {
 	req, err := http.NewRequest("GET", url.String(), nil)
@@ -134,27 +134,7 @@ func DoHTTPProbe(url *url.URL, headers http.Header, expectHTTPCodes []int, expec
 	return result, body, err
 }
 
-<<<<<<< HEAD
-func statusCodeChecker(res *http.Response, url *url.URL, successCodes []int) (probe.Result, error) {
-	if len(successCodes) != 0 {
-		for _, code := range successCodes {
-			if code == res.StatusCode {
-				klog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
-				return probe.Success, nil
-			}
-		}
-	} else if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
-		if res.StatusCode >= http.StatusMultipleChoices { // Redirect
-			klog.V(4).Infof("Probe terminated redirects for %s, Response: %v", url.String(), *res)
-			return probe.Warning, nil
-		}
-		klog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
-		return probe.Success, nil
-	}
-
-	return probe.Failure, nil
-=======
-// If  HTTPProbePlus not enable run default statusCodechecker, else run contentChecker
+// If  HTTPProbePlus not enabled run default statusCodechecker, else run contentChecker
 // and statusCodeCheckerPlus
 func hTTPCheckerPlus(res *http.Response, url *url.URL, expectHTTPCodes []int, expectHTTPContent, body string) (probe.Result, error, string) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.HTTPProbePlus) || (len(expectHTTPCodes) == 0 && expectHTTPContent == "") {
@@ -167,8 +147,8 @@ func hTTPCheckerPlus(res *http.Response, url *url.URL, expectHTTPCodes []int, ex
 	return statusCodeCheckerPlus(res, url, expectHTTPCodes)
 }
 
-// If expectHTTPContent is not set.It return Success
-// If repsonse body match expectHTTPContent pattern, it return Success, else Failure
+// If expectHTTPContent is not set. It returns Success
+// If response body match expectHTTPContent pattern, it returns Success, else Failure
 func contentChecker(res *http.Response, url *url.URL, expectHTTPContent, body string) (probe.Result, error, string) {
 	// if expectHTTPContent is empty, return Success directly
 	if expectHTTPContent == "" {
@@ -188,8 +168,8 @@ func contentChecker(res *http.Response, url *url.URL, expectHTTPContent, body st
 	return probe.Failure, nil, fmt.Sprintf("HTTP probe failed with content: %s not match expectHTTPContent: %s", body, expectHTTPContent)
 }
 
-// If expectHTTPCodes is not set, it return  Success.
-// if repsonse code in  expectHTTPCodes, it return Success, else Failure
+// If expectHTTPCodes is not set, it returns Success.
+// if response code in  expectHTTPCodes, it returns Success, else Failure
 func statusCodeCheckerPlus(res *http.Response, url *url.URL, expectHTTPCodes []int) (probe.Result, error, string) {
 	if len(expectHTTPCodes) == 0 {
 		//if expectHTTPCodes is empty return success directly

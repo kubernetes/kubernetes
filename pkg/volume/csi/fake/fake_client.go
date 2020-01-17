@@ -21,9 +21,17 @@ import (
 	"errors"
 	"strings"
 
-	"google.golang.org/grpc"
-
 	csipb "github.com/container-storage-interface/spec/lib/go/csi"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+const (
+	// NodePublishTimeout_VolumeID is volume id that will result in NodePublish operation to timeout
+	NodePublishTimeOut_VolumeID = "node-publish-timeout"
+	// NodeStageTimeOut_VolumeID is a volume id that will result in NodeStage operation to timeout
+	NodeStageTimeOut_VolumeID = "node-stage-timeout"
 )
 
 // IdentityClient is a CSI identity client used for testing
@@ -120,11 +128,20 @@ func (f *NodeClient) GetNodePublishedVolumes() map[string]CSIVolume {
 	return f.nodePublishedVolumes
 }
 
+// AddNodePublishedVolume adds specified volume to nodePublishedVolumes
+func (f *NodeClient) AddNodePublishedVolume(volID, deviceMountPath string, volumeContext map[string]string) {
+	f.nodePublishedVolumes[volID] = CSIVolume{
+		Path:          deviceMountPath,
+		VolumeContext: volumeContext,
+	}
+}
+
 // GetNodeStagedVolumes returns node staged volumes
 func (f *NodeClient) GetNodeStagedVolumes() map[string]CSIVolume {
 	return f.nodeStagedVolumes
 }
 
+// AddNodeStagedVolume adds specified volume to nodeStagedVolumes
 func (f *NodeClient) AddNodeStagedVolume(volID, deviceMountPath string, volumeContext map[string]string) {
 	f.nodeStagedVolumes[volID] = CSIVolume{
 		Path:          deviceMountPath,
@@ -149,6 +166,12 @@ func (f *NodeClient) NodePublishVolume(ctx context.Context, req *csipb.NodePubli
 	if !strings.Contains(fsTypes, fsType) {
 		return nil, errors.New("invalid fstype")
 	}
+
+	if req.GetVolumeId() == NodePublishTimeOut_VolumeID {
+		timeoutErr := status.Errorf(codes.DeadlineExceeded, "timeout exceeded")
+		return nil, timeoutErr
+	}
+
 	f.nodePublishedVolumes[req.GetVolumeId()] = CSIVolume{
 		VolumeHandle:    req.GetVolumeId(),
 		Path:            req.GetTargetPath(),
@@ -203,6 +226,11 @@ func (f *NodeClient) NodeStageVolume(ctx context.Context, req *csipb.NodeStageVo
 	}
 	if !strings.Contains(fsTypes, fsType) {
 		return nil, errors.New("invalid fstype")
+	}
+
+	if req.GetVolumeId() == NodeStageTimeOut_VolumeID {
+		timeoutErr := status.Errorf(codes.DeadlineExceeded, "timeout exceeded")
+		return nil, timeoutErr
 	}
 
 	f.nodeStagedVolumes[req.GetVolumeId()] = csiVol

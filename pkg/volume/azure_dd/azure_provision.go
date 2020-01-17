@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-04-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -131,8 +131,9 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		availabilityZones        sets.String
 		selectedAvailabilityZone string
 
-		diskIopsReadWrite string
-		diskMbpsReadWrite string
+		diskIopsReadWrite   string
+		diskMbpsReadWrite   string
+		diskEncryptionSetID string
 	)
 	// maxLength = 79 - (4 for ".vhd") = 75
 	name := util.GenerateVolumeName(p.options.ClusterName, p.options.PVName, 75)
@@ -175,6 +176,8 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			diskIopsReadWrite = v
 		case "diskmbpsreadwrite":
 			diskMbpsReadWrite = v
+		case "diskencryptionsetid":
+			diskEncryptionSetID = v
 		default:
 			return nil, fmt.Errorf("AzureDisk - invalid option %s in storage class", k)
 		}
@@ -244,15 +247,16 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		}
 
 		volumeOptions := &azure.ManagedDiskOptions{
-			DiskName:           name,
-			StorageAccountType: skuName,
-			ResourceGroup:      resourceGroup,
-			PVCName:            p.options.PVC.Name,
-			SizeGB:             requestGiB,
-			Tags:               tags,
-			AvailabilityZone:   selectedAvailabilityZone,
-			DiskIOPSReadWrite:  diskIopsReadWrite,
-			DiskMBpsReadWrite:  diskMbpsReadWrite,
+			DiskName:            name,
+			StorageAccountType:  skuName,
+			ResourceGroup:       resourceGroup,
+			PVCName:             p.options.PVC.Name,
+			SizeGB:              requestGiB,
+			Tags:                tags,
+			AvailabilityZone:    selectedAvailabilityZone,
+			DiskIOPSReadWrite:   diskIopsReadWrite,
+			DiskMBpsReadWrite:   diskMbpsReadWrite,
+			DiskEncryptionSetID: diskEncryptionSetID,
 		}
 		diskURI, err = diskController.CreateManagedDisk(volumeOptions)
 		if err != nil {

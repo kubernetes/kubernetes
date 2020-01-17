@@ -45,7 +45,7 @@ type fsLoader struct {
 
 // NewFsLoader returns a Loader that loads a KubeletConfiguration from the `kubeletFile`
 func NewFsLoader(fs utilfs.Filesystem, kubeletFile string) (Loader, error) {
-	_, kubeletCodecs, err := kubeletscheme.NewSchemeAndCodecs()
+	_, kubeletCodecs, err := kubeletscheme.NewSchemeAndCodecs(serializer.EnableStrict)
 	if err != nil {
 		return nil, err
 	}

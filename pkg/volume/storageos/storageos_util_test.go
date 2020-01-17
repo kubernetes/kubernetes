@@ -19,15 +19,15 @@ package storageos
 import (
 	"fmt"
 	"os"
+	"testing"
 
 	storageostypes "github.com/storageos/go-api/types"
-	"k8s.io/api/core/v1"
+	"k8s.io/utils/mount"
+
+	v1 "k8s.io/api/core/v1"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-
-	"testing"
 )
 
 var testVolName = "storageos-test-vol"
@@ -119,7 +119,7 @@ func TestCreateVolume(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 	plug, _ := plugMgr.FindPluginByName("kubernetes.io/storageos")
 
 	// Use real util with stubbed api
@@ -209,7 +209,7 @@ func TestAttachVolume(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 	plug, _ := plugMgr.FindPluginByName("kubernetes.io/storageos")
 
 	// Use real util with stubbed api
@@ -221,7 +221,7 @@ func TestAttachVolume(t *testing.T) {
 			volName:      testVolName,
 			volNamespace: testNamespace,
 			manager:      util,
-			mounter:      &mount.FakeMounter{},
+			mounter:      mount.NewFakeMounter(nil),
 			plugin:       plug.(*storageosPlugin),
 		},
 		deviceDir: tmpDir,

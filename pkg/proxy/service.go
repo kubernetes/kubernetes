@@ -51,6 +51,7 @@ type BaseServiceInfo struct {
 	loadBalancerSourceRanges []string
 	healthCheckNodePort      int
 	onlyNodeLocalEndpoints   bool
+	topologyKeys             []string
 }
 
 var _ ServicePort = &BaseServiceInfo{}
@@ -119,6 +120,11 @@ func (info *BaseServiceInfo) OnlyNodeLocalEndpoints() bool {
 	return info.onlyNodeLocalEndpoints
 }
 
+// TopologyKeys is part of ServicePort interface.
+func (info *BaseServiceInfo) TopologyKeys() []string {
+	return info.topologyKeys
+}
+
 func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, service *v1.Service) *BaseServiceInfo {
 	onlyNodeLocalEndpoints := false
 	if apiservice.RequestsOnlyLocalTraffic(service) {
@@ -139,6 +145,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		sessionAffinityType:    service.Spec.SessionAffinity,
 		stickyMaxAgeSeconds:    stickyMaxAgeSeconds,
 		onlyNodeLocalEndpoints: onlyNodeLocalEndpoints,
+		topologyKeys:           service.Spec.TopologyKeys,
 	}
 
 	if sct.isIPv6Mode == nil {
@@ -325,7 +332,6 @@ func (sm *ServiceMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP set
 	// clear changes after applying them to ServiceMap.
 	changes.items = make(map[types.NamespacedName]*serviceChange)
 	metrics.ServiceChangesPending.Set(0)
-	return
 }
 
 // merge adds other ServiceMap's elements to current ServiceMap.

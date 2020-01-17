@@ -45,16 +45,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.PodGCControllerConfiguration)(nil), (*config.PodGCControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_PodGCControllerConfiguration_To_config_PodGCControllerConfiguration(a.(*v1alpha1.PodGCControllerConfiguration), b.(*config.PodGCControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.PodGCControllerConfiguration)(nil), (*v1alpha1.PodGCControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_PodGCControllerConfiguration_To_v1alpha1_PodGCControllerConfiguration(a.(*config.PodGCControllerConfiguration), b.(*v1alpha1.PodGCControllerConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*config.PodGCControllerConfiguration)(nil), (*v1alpha1.PodGCControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_PodGCControllerConfiguration_To_v1alpha1_PodGCControllerConfiguration(a.(*config.PodGCControllerConfiguration), b.(*v1alpha1.PodGCControllerConfiguration), scope)
 	}); err != nil {

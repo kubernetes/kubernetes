@@ -116,10 +116,7 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 			}
 			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.TokenRequest), nil
 		case leaseResource:
-			if r.features.Enabled(features.NodeLease) {
-				return r.authorizeLease(nodeName, attrs)
-			}
-			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.NodeLease), nil
+			return r.authorizeLease(nodeName, attrs)
 		case csiNodeResource:
 			if r.features.Enabled(features.CSINodeInfo) {
 				return r.authorizeCSINode(nodeName, attrs)

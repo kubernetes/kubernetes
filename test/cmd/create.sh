@@ -50,7 +50,7 @@ run_kubectl_create_error_tests() {
   kube::log::status "Testing kubectl create with error"
 
   # Passing no arguments to create is an error
-  ! kubectl create
+  ! kubectl create || exit 1
 
   ## kubectl create should not panic on empty string lists in a template
   ERROR_FILE="${KUBE_TEMP}/validation-error"

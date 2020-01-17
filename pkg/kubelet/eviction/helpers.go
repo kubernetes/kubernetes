@@ -329,7 +329,7 @@ func memoryUsage(memStats *statsapi.MemoryStats) *resource.Quantity {
 }
 
 // localVolumeNames returns the set of volumes for the pod that are local
-// TODO: sumamry API should report what volumes consume local storage rather than hard-code here.
+// TODO: summary API should report what volumes consume local storage rather than hard-code here.
 func localVolumeNames(pod *v1.Pod) []string {
 	result := []string{}
 	for _, volume := range pod.Spec.Volumes {

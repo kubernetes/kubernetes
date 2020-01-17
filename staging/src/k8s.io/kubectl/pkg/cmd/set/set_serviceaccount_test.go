@@ -57,11 +57,11 @@ func TestSetServiceAccountLocal(t *testing.T) {
 		yaml     string
 		apiGroup string
 	}{
-		{yaml: "../../../test/data/set/replication.yaml", apiGroup: ""},
-		{yaml: "../../../test/data/set/daemon.yaml", apiGroup: "extensions"},
-		{yaml: "../../../test/data/set/redis-slave.yaml", apiGroup: "extensions"},
-		{yaml: "../../../test/data/set/job.yaml", apiGroup: "batch"},
-		{yaml: "../../../test/data/set/deployment.yaml", apiGroup: "extensions"},
+		{yaml: "../../../testdata/set/replication.yaml", apiGroup: ""},
+		{yaml: "../../../testdata/set/daemon.yaml", apiGroup: "extensions"},
+		{yaml: "../../../testdata/set/redis-slave.yaml", apiGroup: "extensions"},
+		{yaml: "../../../testdata/set/job.yaml", apiGroup: "batch"},
+		{yaml: "../../../testdata/set/deployment.yaml", apiGroup: "extensions"},
 	}
 
 	for i, input := range inputs {
@@ -122,7 +122,7 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 	opts := SetServiceAccountOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		fileNameOptions: resource.FilenameOptions{
-			Filenames: []string{"../../../test/data/set/multi-resource-yaml.yaml"}},
+			Filenames: []string{"../../../testdata/set/multi-resource-yaml.yaml"}},
 		local:     true,
 		IOStreams: streams,
 	}

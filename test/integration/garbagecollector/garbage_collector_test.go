@@ -28,7 +28,7 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionstestserver "k8s.io/apiextensions-apiserver/test/integration/fixtures"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -698,7 +698,7 @@ func TestSolidOwnerDoesNotBlockWaitingOwner(t *testing.T) {
 	if err := wait.PollImmediate(1*time.Second, 30*time.Second, func() (bool, error) {
 		_, err := rcClient.Get(toBeDeletedRC.Name, metav1.GetOptions{})
 		if err != nil {
-			if errors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
 			return false, err
@@ -766,7 +766,7 @@ func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
 	if err := wait.PollImmediate(1*time.Second, 30*time.Second, func() (bool, error) {
 		_, err := rcClient.Get(toBeDeletedRC.Name, metav1.GetOptions{})
 		if err != nil {
-			if errors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
 			return false, err
@@ -843,7 +843,7 @@ func TestDoubleDeletionWithFinalizer(t *testing.T) {
 	}
 	if err := wait.Poll(1*time.Second, 10*time.Second, func() (bool, error) {
 		_, err := podClient.Get(pod.Name, metav1.GetOptions{})
-		return errors.IsNotFound(err), nil
+		return apierrors.IsNotFound(err), nil
 	}); err != nil {
 		t.Fatalf("Failed waiting for pod %q to be deleted", pod.Name)
 	}
@@ -950,7 +950,7 @@ func TestCustomResourceCascadingDeletion(t *testing.T) {
 	// Ensure the owner is deleted.
 	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 		_, err := resourceClient.Get(owner.GetName(), metav1.GetOptions{})
-		return errors.IsNotFound(err), nil
+		return apierrors.IsNotFound(err), nil
 	}); err != nil {
 		t.Fatalf("failed waiting for owner resource %q to be deleted", owner.GetName())
 	}
@@ -960,7 +960,7 @@ func TestCustomResourceCascadingDeletion(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected dependent %q to be deleted", dependent.GetName())
 	} else {
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			t.Fatalf("unexpected error getting dependent %q: %v", dependent.GetName(), err)
 		}
 	}
@@ -1028,7 +1028,7 @@ func TestMixedRelationships(t *testing.T) {
 	// Ensure the owner is deleted.
 	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 		_, err := resourceClient.Get(customOwner.GetName(), metav1.GetOptions{})
-		return errors.IsNotFound(err), nil
+		return apierrors.IsNotFound(err), nil
 	}); err != nil {
 		t.Fatalf("failed waiting for owner resource %q to be deleted", customOwner.GetName())
 	}
@@ -1038,7 +1038,7 @@ func TestMixedRelationships(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected dependent %q to be deleted", coreDependent.GetName())
 	} else {
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			t.Fatalf("unexpected error getting dependent %q: %v", coreDependent.GetName(), err)
 		}
 	}
@@ -1052,7 +1052,7 @@ func TestMixedRelationships(t *testing.T) {
 	// Ensure the owner is deleted.
 	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 		_, err := configMapClient.Get(coreOwner.GetName(), metav1.GetOptions{})
-		return errors.IsNotFound(err), nil
+		return apierrors.IsNotFound(err), nil
 	}); err != nil {
 		t.Fatalf("failed waiting for owner resource %q to be deleted", coreOwner.GetName())
 	}
@@ -1062,7 +1062,7 @@ func TestMixedRelationships(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected dependent %q to be deleted", customDependent.GetName())
 	} else {
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			t.Fatalf("unexpected error getting dependent %q: %v", customDependent.GetName(), err)
 		}
 	}
@@ -1123,7 +1123,7 @@ func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definitio
 	// Ensure the owner is deleted.
 	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 		_, err := resourceClient.Get(owner.GetName(), metav1.GetOptions{})
-		return errors.IsNotFound(err), nil
+		return apierrors.IsNotFound(err), nil
 	}); err != nil {
 		t.Fatalf("failed waiting for owner %q to be deleted", owner.GetName())
 	}
@@ -1131,7 +1131,7 @@ func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definitio
 	// Ensure the dependent is deleted.
 	if err := wait.Poll(1*time.Second, 60*time.Second, func() (bool, error) {
 		_, err := configMapClient.Get(dependent.GetName(), metav1.GetOptions{})
-		return errors.IsNotFound(err), nil
+		return apierrors.IsNotFound(err), nil
 	}); err != nil {
 		t.Fatalf("failed waiting for dependent %q (owned by %q) to be deleted", dependent.GetName(), owner.GetName())
 	}

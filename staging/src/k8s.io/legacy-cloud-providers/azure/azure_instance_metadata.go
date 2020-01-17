@@ -125,7 +125,7 @@ func (ims *InstanceMetadataService) getInstanceMetadata(key string) (interface{}
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failure of getting instance metadata with response %q", resp.Status)
 	}
 
@@ -144,8 +144,9 @@ func (ims *InstanceMetadataService) getInstanceMetadata(key string) (interface{}
 }
 
 // GetMetadata gets instance metadata from cache.
-func (ims *InstanceMetadataService) GetMetadata() (*InstanceMetadata, error) {
-	cache, err := ims.imsCache.Get(metadataCacheKey)
+// crt determines if we can get data from stalled cache/need fresh if cache expired.
+func (ims *InstanceMetadataService) GetMetadata(crt cacheReadType) (*InstanceMetadata, error) {
+	cache, err := ims.imsCache.Get(metadataCacheKey, crt)
 	if err != nil {
 		return nil, err
 	}

@@ -325,9 +325,17 @@ func (r *Registry) Register(c Collector) error {
 		return nil
 	}
 	if existing, exists := r.collectorsByID[collectorID]; exists {
-		return AlreadyRegisteredError{
-			ExistingCollector: existing,
-			NewCollector:      c,
+		switch e := existing.(type) {
+		case *wrappingCollector:
+			return AlreadyRegisteredError{
+				ExistingCollector: e.unwrapRecursively(),
+				NewCollector:      c,
+			}
+		default:
+			return AlreadyRegisteredError{
+				ExistingCollector: e,
+				NewCollector:      c,
+			}
 		}
 	}
 	// If the collectorID is new, but at least one of the descs existed

@@ -826,10 +826,10 @@ func TestHasUID(t *testing.T) {
 }
 
 func TestParseTimeout(t *testing.T) {
-	if d := parseTimeout(""); d != 30*time.Second {
+	if d := parseTimeout(""); d != 34*time.Second {
 		t.Errorf("blank timeout produces %v", d)
 	}
-	if d := parseTimeout("not a timeout"); d != 30*time.Second {
+	if d := parseTimeout("not a timeout"); d != 34*time.Second {
 		t.Errorf("bad timeout produces %v", d)
 	}
 	if d := parseTimeout("10s"); d != 10*time.Second {

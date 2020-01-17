@@ -21,20 +21,19 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	runtimeclasstest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
@@ -73,7 +72,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 			ginkgo.By("Waiting for the RuntimeClass to disappear")
 			framework.ExpectNoError(wait.PollImmediate(framework.Poll, time.Minute, func() (bool, error) {
 				_, err := rcClient.Get(rcName, metav1.GetOptions{})
-				if errors.IsNotFound(err) {
+				if apierrors.IsNotFound(err) {
 					return true, nil // done
 				}
 				if err != nil {
@@ -125,7 +124,7 @@ func expectPodRejection(f *framework.Framework, pod *v1.Pod) {
 	} else {
 		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		framework.ExpectError(err, "should be forbidden")
-		gomega.Expect(apierrs.IsForbidden(err)).To(gomega.BeTrue(), "should be forbidden error")
+		framework.ExpectEqual(apierrors.IsForbidden(err), true, "should be forbidden error")
 	}
 }
 
@@ -144,6 +143,6 @@ func expectSandboxFailureEvent(f *framework.Framework, pod *v1.Pod, msg string) 
 		"involvedObject.namespace": f.Namespace.Name,
 		"reason":                   events.FailedCreatePodSandBox,
 	}.AsSelector().String()
-	framework.ExpectNoError(WaitTimeoutForEvent(
+	framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(
 		f.ClientSet, f.Namespace.Name, eventSelector, msg, framework.PodEventTimeout))
 }

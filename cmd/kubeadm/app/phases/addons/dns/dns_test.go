@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -91,6 +91,7 @@ func TestCreateServiceAccount(t *testing.T) {
 }
 
 func TestCompileManifests(t *testing.T) {
+	replicas := int32(coreDNSReplicas)
 	var tests = []struct {
 		name     string
 		manifest string
@@ -99,7 +100,10 @@ func TestCompileManifests(t *testing.T) {
 		{
 			name:     "KubeDNSDeployment manifest",
 			manifest: KubeDNSDeployment,
-			data: struct{ DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, ControlPlaneTaintKey string }{
+			data: struct {
+				DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, ControlPlaneTaintKey string
+				Replicas                                                                                                             *int32
+			}{
 				DeploymentName:       "foo",
 				KubeDNSImage:         "foo",
 				DNSMasqImage:         "foo",
@@ -108,6 +112,7 @@ func TestCompileManifests(t *testing.T) {
 				DNSProbeAddr:         "foo",
 				DNSDomain:            "foo",
 				ControlPlaneTaintKey: "foo",
+				Replicas:             &replicas,
 			},
 		},
 		{
@@ -120,10 +125,14 @@ func TestCompileManifests(t *testing.T) {
 		{
 			name:     "CoreDNSDeployment manifest",
 			manifest: CoreDNSDeployment,
-			data: struct{ DeploymentName, Image, ControlPlaneTaintKey string }{
+			data: struct {
+				DeploymentName, Image, ControlPlaneTaintKey string
+				Replicas                                    *int32
+			}{
 				DeploymentName:       "foo",
 				Image:                "foo",
 				ControlPlaneTaintKey: "foo",
+				Replicas:             &replicas,
 			},
 		},
 		{
@@ -561,6 +570,7 @@ func TestTranslateFederationKubeDNSToCoreDNS(t *testing.T) {
 }
 
 func TestDeploymentsHaveSystemClusterCriticalPriorityClassName(t *testing.T) {
+	replicas := int32(coreDNSReplicas)
 	testCases := []struct {
 		name     string
 		manifest string
@@ -569,7 +579,10 @@ func TestDeploymentsHaveSystemClusterCriticalPriorityClassName(t *testing.T) {
 		{
 			name:     "KubeDNSDeployment",
 			manifest: KubeDNSDeployment,
-			data: struct{ DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, ControlPlaneTaintKey string }{
+			data: struct {
+				DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, ControlPlaneTaintKey string
+				Replicas                                                                                                             *int32
+			}{
 				DeploymentName:       "foo",
 				KubeDNSImage:         "foo",
 				DNSMasqImage:         "foo",
@@ -578,16 +591,21 @@ func TestDeploymentsHaveSystemClusterCriticalPriorityClassName(t *testing.T) {
 				DNSProbeAddr:         "foo",
 				DNSDomain:            "foo",
 				ControlPlaneTaintKey: "foo",
+				Replicas:             &replicas,
 			},
 		},
 		{
 			name:     "CoreDNSDeployment",
 			manifest: CoreDNSDeployment,
-			data: struct{ DeploymentName, Image, ControlPlaneTaintKey, CoreDNSConfigMapName string }{
+			data: struct {
+				DeploymentName, Image, ControlPlaneTaintKey, CoreDNSConfigMapName string
+				Replicas                                                          *int32
+			}{
 				DeploymentName:       "foo",
 				Image:                "foo",
 				ControlPlaneTaintKey: "foo",
 				CoreDNSConfigMapName: "foo",
+				Replicas:             &replicas,
 			},
 		},
 	}
@@ -632,7 +650,9 @@ func TestCreateCoreDNSConfigMap(t *testing.T) {
     }`,
 			expectedCorefileData: `.:53 {
     errors
-    health
+    health {
+        lameduck 5s
+    }
     kubernetes cluster.local in-addr.arpa ip6.arpa {
         pods insecure
         fallthrough in-addr.arpa ip6.arpa
@@ -669,7 +689,9 @@ func TestCreateCoreDNSConfigMap(t *testing.T) {
     }`,
 			expectedCorefileData: `.:53 {
     errors
-    health
+    health {
+        lameduck 5s
+    }
     kubernetes cluster.local in-addr.arpa ip6.arpa {
         pods insecure
         fallthrough in-addr.arpa ip6.arpa

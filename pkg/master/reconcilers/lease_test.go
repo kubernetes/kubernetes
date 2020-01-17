@@ -617,6 +617,19 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 				}},
 			},
 		},
+		{
+			testName:      "endpoint with no subset",
+			serviceName:   "foo",
+			ip:            "5.6.7.8",
+			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
+			endpoints: &corev1.EndpointsList{
+				Items: []corev1.Endpoints{{
+					ObjectMeta: om("foo"),
+					Subsets:    nil,
+				}},
+			},
+		},
 	}
 	for _, test := range stopTests {
 		t.Run(test.testName, func(t *testing.T) {

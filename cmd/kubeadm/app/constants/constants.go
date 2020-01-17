@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -182,6 +181,8 @@ const (
 	PatchNodeTimeout = 2 * time.Minute
 	// TLSBootstrapTimeout specifies how long kubeadm should wait for the kubelet to perform the TLS Bootstrap
 	TLSBootstrapTimeout = 2 * time.Minute
+	// PullImageRetry specifies how many times ContainerRuntime retries when pulling image failed
+	PullImageRetry = 5
 	// PrepullImagesInParallelTimeout specifies how long kubeadm should wait for prepulling images in parallel before timing out
 	PrepullImagesInParallelTimeout = 10 * time.Second
 
@@ -204,7 +205,7 @@ const (
 	CertificateKeySize = 32
 
 	// LabelNodeRoleMaster specifies that a node is a control-plane
-	// This is a duplicate definition of the constant in pkg/controller/service/service_controller.go
+	// This is a duplicate definition of the constant in pkg/controller/service/controller.go
 	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
 
 	// AnnotationKubeadmCRISocket specifies the annotation kubeadm uses to preserve the crisocket information given to kubeadm at
@@ -262,7 +263,7 @@ const (
 	MinExternalEtcdVersion = "3.2.18"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.3.15-0"
+	DefaultEtcdVersion = "3.4.3-0"
 
 	// PauseVersion indicates the default pause image version for kubeadm
 	PauseVersion = "3.1"
@@ -335,7 +336,7 @@ const (
 	KubeDNSVersion = "1.14.13"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "1.6.2"
+	CoreDNSVersion = "1.6.5"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -362,14 +363,12 @@ const (
 	// KubeletPort is the default port for the kubelet server on each host machine.
 	// May be overridden by a flag at startup.
 	KubeletPort = 10250
-	// InsecureSchedulerPort is the default port for the scheduler status server.
+	// KubeSchedulerPort is the default port for the scheduler status server.
 	// May be overridden by a flag at startup.
-	// Deprecated: use the secure KubeSchedulerPort instead.
-	InsecureSchedulerPort = 10251
-	// InsecureKubeControllerManagerPort is the default port for the controller manager status server.
+	KubeSchedulerPort = 10259
+	// KubeControllerManagerPort is the default port for the controller manager status server.
 	// May be overridden by a flag at startup.
-	// Deprecated: use the secure KubeControllerManagerPort instead.
-	InsecureKubeControllerManagerPort = 10252
+	KubeControllerManagerPort = 10257
 
 	// Mode* constants were copied from pkg/kubeapiserver/authorizer/modes
 	// to avoid kubeadm dependency on the internal module
@@ -425,9 +424,9 @@ var (
 		13: "3.2.24",
 		14: "3.3.10",
 		15: "3.3.10",
-		16: "3.3.15-0",
-		17: "3.3.15-0",
-		18: "3.3.15-0",
+		16: "3.3.17-0",
+		17: "3.4.3-0",
+		18: "3.4.3-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
@@ -532,7 +531,7 @@ func GetDNSIP(svcSubnetList string, isDualStack bool) (net.IP, error) {
 	}
 
 	// Selects the 10th IP in service subnet CIDR range as dnsIP
-	dnsIP, err := ipallocator.GetIndexedIP(svcSubnetCIDR, 10)
+	dnsIP, err := utilnet.GetIndexedIP(svcSubnetCIDR, 10)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get internal Kubernetes Service IP from the given service CIDR")
 	}
@@ -569,7 +568,7 @@ func GetAPIServerVirtualIP(svcSubnetList string, isDualStack bool) (net.IP, erro
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get internal Kubernetes Service IP from the given service CIDR")
 	}
-	internalAPIServerVirtualIP, err := ipallocator.GetIndexedIP(svcSubnet, 1)
+	internalAPIServerVirtualIP, err := utilnet.GetIndexedIP(svcSubnet, 1)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to get the first IP address from the given CIDR: %s", svcSubnet.String())
 	}

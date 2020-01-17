@@ -60,6 +60,10 @@ var (
 	specialVerbs = map[string][]schema.GroupResource{
 		"use": {
 			{
+				Group:    "policy",
+				Resource: "podsecuritypolicies",
+			},
+			{
 				Group:    "extensions",
 				Resource: "podsecuritypolicies",
 			},

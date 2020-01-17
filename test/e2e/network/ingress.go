@@ -28,7 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/ingress"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 )
@@ -85,7 +86,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		// Platform specific setup
 		ginkgo.BeforeEach(func() {
-			framework.SkipUnlessProviderIs("gce", "gke")
+			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 			ginkgo.By("Initializing gce controller")
 			gceController = &gce.IngressController{
 				Ns:     ns,
@@ -181,7 +182,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				return true, nil
 			})
 			if pollErr != nil {
-				framework.ExpectNoError(fmt.Errorf("Timed out waiting for ingress %s to get %s annotation", name, instanceGroupAnnotation))
+				framework.ExpectNoError(fmt.Errorf("timed out waiting for ingress %s to get %s annotation", name, instanceGroupAnnotation))
 			}
 
 			// Verify that the ingress does not get other annotations like url-map, target-proxy, backends, etc.
@@ -227,7 +228,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				framework.Failf("unexpected backend service, expected none, got: %v", gceController.ListGlobalBackendServices())
 			}
 			// Controller does not have a list command for firewall rule. We use get instead.
-			if fw, err := gceController.GetFirewallRuleOrError(); err == nil {
+			if fw, err := gceController.GetFirewallRule(); err == nil {
 				framework.Failf("unexpected nil error in getting firewall rule, expected firewall NotFound, got firewall: %v", fw)
 			}
 
@@ -242,7 +243,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		// Platform specific setup
 		ginkgo.BeforeEach(func() {
-			framework.SkipUnlessProviderIs("gce", "gke")
+			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 			ginkgo.By("Initializing gce controller")
 			gceController = &gce.IngressController{
 				Ns:     ns,
@@ -350,6 +351,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				scale, err := f.ClientSet.AppsV1().Deployments(ns).GetScale(name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				if scale.Spec.Replicas != int32(num) {
+					scale.ResourceVersion = "" // indicate the scale update should be unconditional
 					scale.Spec.Replicas = int32(num)
 					_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(name, scale)
 					framework.ExpectNoError(err)
@@ -400,6 +402,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			ginkgo.By(fmt.Sprintf("Scale backend replicas to %d", replicas))
 			scale, err := f.ClientSet.AppsV1().Deployments(ns).GetScale(name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
+			scale.ResourceVersion = "" // indicate the scale update should be unconditional
 			scale.Spec.Replicas = int32(replicas)
 			_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(name, scale)
 			framework.ExpectNoError(err)
@@ -448,6 +451,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				scale, err := f.ClientSet.AppsV1().Deployments(ns).GetScale(name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				if scale.Spec.Replicas != int32(num) {
+					scale.ResourceVersion = "" // indicate the scale update should be unconditional
 					scale.Spec.Replicas = int32(num)
 					_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(name, scale)
 					framework.ExpectNoError(err)
@@ -585,7 +589,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		// Platform specific setup
 		ginkgo.BeforeEach(func() {
-			framework.SkipUnlessProviderIs("gce", "gke")
+			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 			jig.Class = ingress.MulticlusterIngressClassValue
 			jig.PollInterval = 5 * time.Second
 			ginkgo.By("Initializing gce controller")
@@ -713,7 +717,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		var nginxController *ingress.NginxIngressController
 
 		ginkgo.BeforeEach(func() {
-			framework.SkipUnlessProviderIs("gce", "gke")
+			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 			ginkgo.By("Initializing nginx controller")
 			jig.Class = "nginx"
 			nginxController = &ingress.NginxIngressController{Ns: ns, Client: jig.Client}
@@ -789,7 +793,7 @@ func executePresharedCertTest(f *framework.Framework, jig *ingress.TestJig, stat
 		}
 		ginkgo.By(fmt.Sprintf("Deleting ssl certificate %q on GCE", preSharedCertName))
 		err := wait.Poll(e2eservice.LoadBalancerPollInterval, e2eservice.LoadBalancerCleanupTimeout, func() (bool, error) {
-			if err := gceCloud.DeleteSslCertificate(preSharedCertName); err != nil && !errors.IsNotFound(err) {
+			if err := gceCloud.DeleteSslCertificate(preSharedCertName); err != nil && !apierrors.IsNotFound(err) {
 				framework.Logf("ginkgo.Failed to delete ssl certificate %q: %v. Retrying...", preSharedCertName, err)
 				return false, nil
 			}
@@ -831,10 +835,10 @@ func executeStaticIPHttpsOnlyTest(f *framework.Framework, jig *ingress.TestJig, 
 
 	ginkgo.By("waiting for Ingress to come up with ip: " + ip)
 	httpClient := ingress.BuildInsecureClient(ingress.IngressReqTimeout)
-	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%s/", ip), "", e2eservice.LoadBalancerPollTimeout, jig.PollInterval, httpClient, false))
+	framework.ExpectNoError(ingress.PollURL(fmt.Sprintf("https://%s/", ip), "", e2eservice.LoadBalancerPollTimeout, jig.PollInterval, httpClient, false))
 
 	ginkgo.By("should reject HTTP traffic")
-	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("http://%s/", ip), "", e2eservice.LoadBalancerPollTimeout, jig.PollInterval, httpClient, true))
+	framework.ExpectNoError(ingress.PollURL(fmt.Sprintf("http://%s/", ip), "", e2eservice.LoadBalancerPollTimeout, jig.PollInterval, httpClient, true))
 }
 
 func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *ingress.TestJig, staticIPName string) {
@@ -855,7 +859,7 @@ func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *ingress.TestJ
 	ginkgo.By(fmt.Sprintf("Polling on address %s and verify the backend is serving HTTPS", ingIP))
 	timeoutClient := &http.Client{Timeout: ingress.IngressReqTimeout}
 	err = wait.PollImmediate(e2eservice.LoadBalancerPollInterval, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
-		resp, err := framework.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", ingIP), "")
+		resp, err := ingress.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", ingIP), "")
 		if err != nil {
 			framework.Logf("SimpleGET failed: %v", err)
 			return false, nil

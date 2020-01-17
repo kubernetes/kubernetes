@@ -112,7 +112,7 @@ func NewCmdScale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd := &cobra.Command{
 		Use:                   "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT (-f FILENAME | TYPE NAME)",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"),
+		Short:                 i18n.T("Set a new size for a Deployment, ReplicaSet or Replication Controller"),
 		Long:                  scaleLong,
 		Example:               scaleExample,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -128,15 +128,39 @@ function record_command() {
     local output="${KUBE_JUNIT_REPORT_DIR:-/tmp/junit-results}"
     echo "Recording: ${name}"
     echo "Running command: $*"
-    if ! juLog -output="${output}" -class="test-cmd" -name="${name}" "$@"
-    then
-      echo "Error when running ${name}"
+    juLog -output="${output}" -class="test-cmd" -name="${name}" "$@"
+    local exitCode=$?
+    if [[ ${exitCode} -ne 0 ]]; then
+      # Record failures for any non-canary commands
+      if [ "${name}" != "record_command_canary" ]; then
+        echo "Error when running ${name}"
+        foundError="${foundError}""${name}"", "
+      fi
+    elif [ "${name}" == "record_command_canary" ]; then
+      # If the canary command passed, fail
+      echo "record_command_canary succeeded unexpectedly"
       foundError="${foundError}""${name}"", "
     fi
 
     set -o nounset
     set -o errexit
 }
+
+# Ensure our record_command stack correctly propagates and detects errexit failures in invoked commands - see https://issue.k8s.io/84871
+foundError=""
+function record_command_canary()
+{
+  set -o nounset
+  set -o errexit
+  bogus-expected-to-fail
+  set +o nounset
+  set +o errexit
+}
+KUBE_JUNIT_REPORT_DIR=$(mktemp -d /tmp/record_command_canary.XXXXX) record_command record_command_canary
+if [[ -n "${foundError}" ]]; then
+  echo "FAILED TESTS: record_command_canary"
+  exit 1
+fi
 
 # Stops the running kubectl proxy, if there is one.
 function stop-proxy()

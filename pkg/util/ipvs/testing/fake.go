@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"time"
 
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 )
@@ -202,6 +203,11 @@ func (f *FakeIPVS) UpdateRealServer(serv *utilipvs.VirtualServer, dest *utilipvs
 		return err
 	}
 	return f.AddRealServer(serv, dest)
+}
+
+// ConfigureTimeouts is not supported for fake IPVS
+func (f *FakeIPVS) ConfigureTimeouts(time.Duration, time.Duration, time.Duration) error {
+	return fmt.Errorf("not supported in fake IPVS")
 }
 
 var _ = utilipvs.Interface(&FakeIPVS{})

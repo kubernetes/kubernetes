@@ -25,9 +25,11 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -47,32 +49,23 @@ import (
 
 var (
 	trEnabledFeature           = featuregate.NewFeatureGate()
-	trDisabledFeature          = featuregate.NewFeatureGate()
-	leaseEnabledFeature        = featuregate.NewFeatureGate()
-	leaseDisabledFeature       = featuregate.NewFeatureGate()
 	csiNodeInfoEnabledFeature  = featuregate.NewFeatureGate()
 	csiNodeInfoDisabledFeature = featuregate.NewFeatureGate()
 )
 
 func init() {
-	if err := trEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.TokenRequest: {Default: true}}); err != nil {
-		panic(err)
+	// all features need to be set on all featuregates for the tests.  We set everything and then then the if's below override it.
+	relevantFeatures := map[featuregate.Feature]featuregate.FeatureSpec{
+		features.TokenRequest:            {Default: false},
+		features.CSINodeInfo:             {Default: false},
+		features.ExpandPersistentVolumes: {Default: false},
 	}
-	if err := trDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.TokenRequest: {Default: false}}); err != nil {
-		panic(err)
-	}
-	if err := leaseEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.NodeLease: {Default: true}}); err != nil {
-		panic(err)
-	}
-	if err := leaseDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.NodeLease: {Default: false}}); err != nil {
-		panic(err)
-	}
-	if err := csiNodeInfoEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSINodeInfo: {Default: true}}); err != nil {
-		panic(err)
-	}
-	if err := csiNodeInfoDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSINodeInfo: {Default: false}}); err != nil {
-		panic(err)
-	}
+	utilruntime.Must(trEnabledFeature.Add(relevantFeatures))
+	utilruntime.Must(csiNodeInfoEnabledFeature.Add(relevantFeatures))
+	utilruntime.Must(csiNodeInfoDisabledFeature.Add(relevantFeatures))
+
+	utilruntime.Must(trEnabledFeature.SetFromMap(map[string]bool{string(features.TokenRequest): true}))
+	utilruntime.Must(csiNodeInfoEnabledFeature.SetFromMap(map[string]bool{string(features.CSINodeInfo): true}))
 }
 
 func makeTestPod(namespace, name, node string, mirror bool) (*api.Pod, *corev1.Pod) {
@@ -89,8 +82,34 @@ func makeTestPod(namespace, name, node string, mirror bool) (*api.Pod, *corev1.P
 	if mirror {
 		corePod.Annotations = map[string]string{api.MirrorPodAnnotationKey: "true"}
 		v1Pod.Annotations = map[string]string{api.MirrorPodAnnotationKey: "true"}
+
+		// Insert a valid owner reference by default.
+		controller := true
+		owner := metav1.OwnerReference{
+			APIVersion: "v1",
+			Kind:       "Node",
+			Name:       node,
+			UID:        types.UID(node + "-uid"),
+			Controller: &controller,
+		}
+		corePod.OwnerReferences = []metav1.OwnerReference{owner}
+		v1Pod.OwnerReferences = []metav1.OwnerReference{owner}
 	}
 	return corePod, v1Pod
+}
+
+func withLabels(pod *api.Pod, labels map[string]string) *api.Pod {
+	labeledPod := pod.DeepCopy()
+	if labels == nil {
+		labeledPod.Labels = nil
+		return labeledPod
+	}
+	// Clone.
+	labeledPod.Labels = map[string]string{}
+	for key, value := range labels {
+		labeledPod.Labels[key] = value
+	}
+	return labeledPod
 }
 
 func makeTestPodEviction(name string) *policy.Eviction {
@@ -149,12 +168,12 @@ func setAllowedUpdateLabels(node *api.Node, value string) *api.Node {
 	node.Labels["kubernetes.io/hostname"] = value
 	node.Labels["failure-domain.beta.kubernetes.io/zone"] = value
 	node.Labels["failure-domain.beta.kubernetes.io/region"] = value
+	node.Labels["topology.kubernetes.io/zone"] = value
+	node.Labels["topology.kubernetes.io/region"] = value
 	node.Labels["beta.kubernetes.io/instance-type"] = value
+	node.Labels["node.kubernetes.io/instance-type"] = value
 	node.Labels["beta.kubernetes.io/os"] = value
 	node.Labels["beta.kubernetes.io/arch"] = value
-	node.Labels["failure-domain.kubernetes.io/zone"] = value
-	node.Labels["failure-domain.kubernetes.io/region"] = value
-	node.Labels["kubernetes.io/instance-type"] = value
 	node.Labels["kubernetes.io/os"] = value
 	node.Labels["kubernetes.io/arch"] = value
 
@@ -210,12 +229,40 @@ func setForbiddenUpdateLabels(node *api.Node, value string) *api.Node {
 	return node
 }
 
+type admitTestCase struct {
+	name        string
+	podsGetter  corev1lister.PodLister
+	nodesGetter corev1lister.NodeLister
+	attributes  admission.Attributes
+	features    featuregate.FeatureGate
+	err         string
+}
+
+func (a *admitTestCase) run(t *testing.T) {
+	t.Run(a.name, func(t *testing.T) {
+		c := NewPlugin(nodeidentifier.NewDefaultNodeIdentifier())
+		if a.features != nil {
+			c.InspectFeatureGates(a.features)
+		}
+		c.podsGetter = a.podsGetter
+		c.nodesGetter = a.nodesGetter
+		err := c.Admit(context.TODO(), a.attributes, nil)
+		if (err == nil) != (len(a.err) == 0) {
+			t.Errorf("nodePlugin.Admit() error = %v, expected %v", err, a.err)
+			return
+		}
+		if len(a.err) > 0 && !strings.Contains(err.Error(), a.err) {
+			t.Errorf("nodePlugin.Admit() error = %v, expected %v", err, a.err)
+		}
+	})
+}
+
 func Test_nodePlugin_Admit(t *testing.T) {
 	var (
 		mynode = &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
 		bob    = &user.DefaultInfo{Name: "bob"}
 
-		mynodeObjMeta    = metav1.ObjectMeta{Name: "mynode"}
+		mynodeObjMeta    = metav1.ObjectMeta{Name: "mynode", UID: "mynode-uid"}
 		mynodeObj        = &api.Node{ObjectMeta: mynodeObjMeta}
 		mynodeObjConfigA = &api.Node{ObjectMeta: mynodeObjMeta, Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{
 			ConfigMap: &api.ConfigMapNodeConfigSource{
@@ -301,8 +348,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			},
 		}
 
-		csiNodeResource = storage.Resource("csinodes").WithVersion("v1beta1")
-		csiNodeKind     = schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1beta1", Kind: "CSINode"}
+		csiNodeResource = storage.Resource("csinodes").WithVersion("v1")
+		csiNodeKind     = schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1", Kind: "CSINode"}
 		nodeInfo        = &storage.CSINode{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "mynode",
@@ -332,11 +379,24 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			},
 		}
 
+		existingNodesIndex = cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+		existingNodes      = corev1lister.NewNodeLister(existingNodesIndex)
+
 		noExistingPodsIndex = cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
 		noExistingPods      = corev1lister.NewPodLister(noExistingPodsIndex)
 
 		existingPodsIndex = cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
 		existingPods      = corev1lister.NewPodLister(existingPodsIndex)
+
+		labelsA = map[string]string{
+			"label-a": "value-a",
+		}
+		labelsAB = map[string]string{
+			"label-a": "value-a",
+			"label-b": "value-b",
+		}
+		aLabeledPod  = withLabels(coremypod, labelsA)
+		abLabeledPod = withLabels(coremypod, labelsAB)
 	)
 
 	existingPodsIndex.Add(v1mymirrorpod)
@@ -345,6 +405,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	existingPodsIndex.Add(v1mypod)
 	existingPodsIndex.Add(v1otherpod)
 	existingPodsIndex.Add(v1unboundpod)
+
+	existingNodesIndex.Add(&v1.Node{ObjectMeta: mynodeObjMeta})
 
 	sapod, _ := makeTestPod("ns", "mysapod", "mynode", true)
 	sapod.Spec.ServiceAccountName = "foo"
@@ -358,13 +420,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	pvcpod, _ := makeTestPod("ns", "mypvcpod", "mynode", true)
 	pvcpod.Spec.Volumes = []api.Volume{{VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{ClaimName: "foo"}}}}
 
-	tests := []struct {
-		name       string
-		podsGetter corev1lister.PodLister
-		attributes admission.Attributes
-		features   featuregate.FeatureGate
-		err        string
-	}{
+	tests := []admitTestCase{
 		// Mirror pods bound to us
 		{
 			name:       "allow creating a mirror pod bound to self",
@@ -587,6 +643,30 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(nil, nil, podKind, coremypod.Namespace, coremypod.Name, podResource, "status", admission.Delete, &metav1.DeleteOptions{}, false, mynode),
 			err:        "forbidden: unexpected operation",
+		},
+		{
+			name:       "forbid addition of pod status preexisting labels",
+			podsGetter: noExistingPods,
+			attributes: admission.NewAttributesRecord(abLabeledPod, aLabeledPod, podKind, coremypod.Namespace, coremypod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			err:        "cannot update labels through pod status",
+		},
+		{
+			name:       "forbid deletion of pod status preexisting labels",
+			podsGetter: noExistingPods,
+			attributes: admission.NewAttributesRecord(aLabeledPod, abLabeledPod, podKind, coremypod.Namespace, coremypod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			err:        "cannot update labels through pod status",
+		},
+		{
+			name:       "forbid deletion of all pod status preexisting labels",
+			podsGetter: noExistingPods,
+			attributes: admission.NewAttributesRecord(aLabeledPod, coremypod, podKind, coremypod.Namespace, coremypod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			err:        "cannot update labels through pod status",
+		},
+		{
+			name:       "forbid addition of pod status labels",
+			podsGetter: noExistingPods,
+			attributes: admission.NewAttributesRecord(coremypod, aLabeledPod, podKind, coremypod.Namespace, coremypod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			err:        "cannot update labels through pod status",
 		},
 		{
 			name:       "forbid update of eviction for normal pod bound to self",
@@ -1101,63 +1181,48 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		},
 		// Node leases
 		{
-			name:       "disallowed create lease - feature disabled",
-			attributes: admission.NewAttributesRecord(lease, nil, leaseKind, lease.Namespace, lease.Name, leaseResource, "", admission.Create, &metav1.DeleteOptions{}, false, mynode),
-			features:   leaseDisabledFeature,
-			err:        "forbidden: disabled by feature gate NodeLease",
-		},
-		{
 			name:       "disallowed create lease in namespace other than kube-node-lease - feature enabled",
 			attributes: admission.NewAttributesRecord(leaseWrongNS, nil, leaseKind, leaseWrongNS.Namespace, leaseWrongNS.Name, leaseResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
-			features:   leaseEnabledFeature,
 			err:        "forbidden: ",
 		},
 		{
 			name:       "disallowed update lease in namespace other than kube-node-lease - feature enabled",
 			attributes: admission.NewAttributesRecord(leaseWrongNS, leaseWrongNS, leaseKind, leaseWrongNS.Namespace, leaseWrongNS.Name, leaseResource, "", admission.Update, &metav1.UpdateOptions{}, false, mynode),
-			features:   leaseEnabledFeature,
 			err:        "forbidden: ",
 		},
 		{
 			name:       "disallowed delete lease in namespace other than kube-node-lease - feature enabled",
 			attributes: admission.NewAttributesRecord(nil, nil, leaseKind, leaseWrongNS.Namespace, leaseWrongNS.Name, leaseResource, "", admission.Delete, &metav1.DeleteOptions{}, false, mynode),
-			features:   leaseEnabledFeature,
 			err:        "forbidden: ",
 		},
 		{
 			name:       "disallowed create another node's lease - feature enabled",
 			attributes: admission.NewAttributesRecord(leaseWrongName, nil, leaseKind, leaseWrongName.Namespace, leaseWrongName.Name, leaseResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
-			features:   leaseEnabledFeature,
 			err:        "forbidden: ",
 		},
 		{
 			name:       "disallowed update another node's lease - feature enabled",
 			attributes: admission.NewAttributesRecord(leaseWrongName, leaseWrongName, leaseKind, leaseWrongName.Namespace, leaseWrongName.Name, leaseResource, "", admission.Update, &metav1.UpdateOptions{}, false, mynode),
-			features:   leaseEnabledFeature,
 			err:        "forbidden: ",
 		},
 		{
 			name:       "disallowed delete another node's lease - feature enabled",
 			attributes: admission.NewAttributesRecord(nil, nil, leaseKind, leaseWrongName.Namespace, leaseWrongName.Name, leaseResource, "", admission.Delete, &metav1.DeleteOptions{}, false, mynode),
-			features:   leaseEnabledFeature,
 			err:        "forbidden: ",
 		},
 		{
 			name:       "allowed create node lease - feature enabled",
 			attributes: admission.NewAttributesRecord(lease, nil, leaseKind, lease.Namespace, lease.Name, leaseResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
-			features:   leaseEnabledFeature,
 			err:        "",
 		},
 		{
 			name:       "allowed update node lease - feature enabled",
 			attributes: admission.NewAttributesRecord(lease, lease, leaseKind, lease.Namespace, lease.Name, leaseResource, "", admission.Update, &metav1.UpdateOptions{}, false, mynode),
-			features:   leaseEnabledFeature,
 			err:        "",
 		},
 		{
 			name:       "allowed delete node lease - feature enabled",
 			attributes: admission.NewAttributesRecord(nil, nil, leaseKind, lease.Namespace, lease.Name, leaseResource, "", admission.Delete, &metav1.DeleteOptions{}, false, mynode),
-			features:   leaseEnabledFeature,
 			err:        "",
 		},
 		// CSINode
@@ -1205,21 +1270,125 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c := NewPlugin(nodeidentifier.NewDefaultNodeIdentifier())
-			if tt.features != nil {
-				c.features = tt.features
-			}
-			c.podsGetter = tt.podsGetter
-			err := c.Admit(context.TODO(), tt.attributes, nil)
-			if (err == nil) != (len(tt.err) == 0) {
-				t.Errorf("nodePlugin.Admit() error = %v, expected %v", err, tt.err)
-				return
-			}
-			if len(tt.err) > 0 && !strings.Contains(err.Error(), tt.err) {
-				t.Errorf("nodePlugin.Admit() error = %v, expected %v", err, tt.err)
-			}
-		})
+		tt.nodesGetter = existingNodes
+		tt.run(t)
+	}
+}
+
+func Test_nodePlugin_Admit_OwnerReference(t *testing.T) {
+	expectedNodeIndex := cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+	expectedNodeIndex.Add(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "mynode", UID: "mynode-uid"}})
+	expectedNode := corev1lister.NewNodeLister(expectedNodeIndex)
+
+	unexpectedNodeIndex := cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+	unexpectedNodeIndex.Add(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "mynode", UID: "mynode-unexpected-uid"}})
+	unexpectedNode := corev1lister.NewNodeLister(unexpectedNodeIndex)
+
+	noNodesIndex := cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+	noNodes := corev1lister.NewNodeLister(noNodesIndex)
+
+	noExistingPodsIndex := cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
+	noExistingPods := corev1lister.NewPodLister(noExistingPodsIndex)
+
+	mynode := &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
+	validOwner := metav1.OwnerReference{
+		APIVersion: "v1",
+		Kind:       "Node",
+		Name:       "mynode",
+		UID:        "mynode-uid",
+		Controller: pointer.BoolPtr(true),
+	}
+	invalidName := validOwner
+	invalidName.Name = "other"
+	invalidKind := validOwner
+	invalidKind.Kind = "Pod"
+	invalidAPI := validOwner
+	invalidAPI.APIVersion = "v2"
+	invalidControllerNil := validOwner
+	invalidControllerNil.Controller = nil
+	invalidControllerFalse := validOwner
+	invalidControllerFalse.Controller = pointer.BoolPtr(false)
+	invalidBlockDeletion := validOwner
+	invalidBlockDeletion.BlockOwnerDeletion = pointer.BoolPtr(true)
+
+	tests := []struct {
+		name        string
+		owners      []metav1.OwnerReference
+		nodesGetter corev1lister.NodeLister
+		expectErr   string
+	}{
+		{
+			name:   "no owner",
+			owners: nil,
+		},
+		{
+			name:   "valid owner",
+			owners: []metav1.OwnerReference{validOwner},
+		},
+		{
+			name:      "duplicate owner",
+			owners:    []metav1.OwnerReference{validOwner, validOwner},
+			expectErr: "can only create pods with a single owner reference set to itself",
+		},
+		{
+			name:      "invalid name",
+			owners:    []metav1.OwnerReference{invalidName},
+			expectErr: "can only create pods with an owner reference set to itself",
+		},
+		{
+			name:        "invalid UID",
+			owners:      []metav1.OwnerReference{validOwner},
+			nodesGetter: unexpectedNode,
+			expectErr:   "UID mismatch",
+		},
+		{
+			name:        "node not found",
+			owners:      []metav1.OwnerReference{validOwner},
+			nodesGetter: noNodes,
+			expectErr:   "not found",
+		},
+		{
+			name:      "invalid API version",
+			owners:    []metav1.OwnerReference{invalidAPI},
+			expectErr: "can only create pods with an owner reference set to itself",
+		},
+		{
+			name:      "invalid kind",
+			owners:    []metav1.OwnerReference{invalidKind},
+			expectErr: "can only create pods with an owner reference set to itself",
+		},
+		{
+			name:      "nil controller",
+			owners:    []metav1.OwnerReference{invalidControllerNil},
+			expectErr: "can only create pods with a controller owner reference set to itself",
+		},
+		{
+			name:      "false controller",
+			owners:    []metav1.OwnerReference{invalidControllerFalse},
+			expectErr: "can only create pods with a controller owner reference set to itself",
+		},
+		{
+			name:      "invalid blockOwnerDeletion",
+			owners:    []metav1.OwnerReference{invalidBlockDeletion},
+			expectErr: "must not set blockOwnerDeletion on an owner reference",
+		},
+	}
+
+	for _, test := range tests {
+		if test.nodesGetter == nil {
+			test.nodesGetter = expectedNode
+		}
+
+		pod, _ := makeTestPod("ns", "test", "mynode", true)
+		pod.OwnerReferences = test.owners
+		a := &admitTestCase{
+			name:        test.name,
+			podsGetter:  noExistingPods,
+			nodesGetter: test.nodesGetter,
+			attributes:  createPodAttributes(pod, mynode),
+			err:         test.expectErr,
+		}
+		a.run(t)
 	}
 }
 
@@ -1298,4 +1467,10 @@ func Test_getModifiedLabels(t *testing.T) {
 			}
 		})
 	}
+}
+
+func createPodAttributes(pod *api.Pod, user user.Info) admission.Attributes {
+	podResource := api.Resource("pods").WithVersion("v1")
+	podKind := api.Kind("Pod").WithVersion("v1")
+	return admission.NewAttributesRecord(pod, nil, podKind, pod.Namespace, pod.Name, podResource, "", admission.Create, &metav1.CreateOptions{}, false, user)
 }

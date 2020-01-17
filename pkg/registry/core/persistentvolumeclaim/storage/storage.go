@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/persistentvolumeclaim"
 )
 
+// REST implements a RESTStorage for persistent volume claims.
 type REST struct {
 	*genericregistry.Store
 }
@@ -74,6 +75,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new PersistentVolumeClaim object.
 func (r *StatusREST) New() runtime.Object {
 	return &api.PersistentVolumeClaim{}
 }

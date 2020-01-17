@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gcp_credentials
+package gcp
 
 import (
 	"encoding/base64"
@@ -42,7 +42,7 @@ func createProductNameFile() (string, error) {
 }
 
 func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
-	registryUrl := "hello.kubernetes.io"
+	registryURL := "hello.kubernetes.io"
 	email := "foo@bar.baz"
 	username := "foo"
 	password := "bar"
@@ -52,7 +52,7 @@ func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
      "email": %q,
      "auth": %q
    }
-}`, registryUrl, email, auth)
+}`, registryURL, email, auth)
 
 	var err error
 	gceProductNameFile, err = createProductNameFile()
@@ -93,9 +93,9 @@ func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
 
 	keyring.Add(provider.Provide(""))
 
-	creds, ok := keyring.Lookup(registryUrl)
+	creds, ok := keyring.Lookup(registryURL)
 	if !ok {
-		t.Errorf("Didn't find expected URL: %s", registryUrl)
+		t.Errorf("Didn't find expected URL: %s", registryURL)
 		return
 	}
 	if len(creds) > 1 {
@@ -115,7 +115,7 @@ func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
 }
 
 func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
-	registryUrl := "hello.kubernetes.io"
+	registryURL := "hello.kubernetes.io"
 	email := "foo@bar.baz"
 	username := "foo"
 	password := "bar"
@@ -125,7 +125,7 @@ func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
      "email": %q,
      "auth": %q
    }
-}`, registryUrl, email, auth)
+}`, registryURL, email, auth)
 
 	var err error
 	gceProductNameFile, err = createProductNameFile()
@@ -143,7 +143,7 @@ func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			w.Header().Set("Content-Type", "application/json")
 			fmt.Fprintln(w, sampleDockerConfig)
-		} else if strings.HasSuffix(dockerConfigUrlKey, r.URL.Path) {
+		} else if strings.HasSuffix(dockerConfigURLKey, r.URL.Path) {
 			w.WriteHeader(http.StatusOK)
 			w.Header().Set("Content-Type", "application/text")
 			fmt.Fprint(w, "http://foo.bar.com"+valueEndpoint)
@@ -161,7 +161,7 @@ func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
 	})
 
 	keyring := &credentialprovider.BasicDockerKeyring{}
-	provider := &dockerConfigUrlKeyProvider{
+	provider := &dockerConfigURLKeyProvider{
 		metadataProvider{Client: &http.Client{Transport: transport}},
 	}
 
@@ -171,9 +171,9 @@ func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
 
 	keyring.Add(provider.Provide(""))
 
-	creds, ok := keyring.Lookup(registryUrl)
+	creds, ok := keyring.Lookup(registryURL)
 	if !ok {
-		t.Errorf("Didn't find expected URL: %s", registryUrl)
+		t.Errorf("Didn't find expected URL: %s", registryURL)
 		return
 	}
 	if len(creds) > 1 {
@@ -193,7 +193,7 @@ func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
 }
 
 func TestContainerRegistryBasics(t *testing.T) {
-	registryUrl := "container.cloud.google.com"
+	registryURL := "container.cloud.google.com"
 	email := "1234@project.gserviceaccount.com"
 	token := &tokenBlob{AccessToken: "ya26.lots-of-indiscernible-garbage"}
 
@@ -255,9 +255,9 @@ func TestContainerRegistryBasics(t *testing.T) {
 
 	keyring.Add(provider.Provide(""))
 
-	creds, ok := keyring.Lookup(registryUrl)
+	creds, ok := keyring.Lookup(registryURL)
 	if !ok {
-		t.Errorf("Didn't find expected URL: %s", registryUrl)
+		t.Errorf("Didn't find expected URL: %s", registryURL)
 		return
 	}
 	if len(creds) > 1 {
@@ -265,7 +265,7 @@ func TestContainerRegistryBasics(t *testing.T) {
 	}
 	val := creds[0]
 
-	if "_token" != val.Username {
+	if val.Username != "_token" {
 		t.Errorf("Unexpected username value, want: %s, got: %s", "_token", val.Username)
 	}
 	if token.AccessToken != val.Password {
@@ -425,7 +425,7 @@ func TestAllProvidersNoMetadata(t *testing.T) {
 		&dockerConfigKeyProvider{
 			metadataProvider{Client: &http.Client{Transport: transport}},
 		},
-		&dockerConfigUrlKeyProvider{
+		&dockerConfigURLKeyProvider{
 			metadataProvider{Client: &http.Client{Transport: transport}},
 		},
 		&containerRegistryProvider{

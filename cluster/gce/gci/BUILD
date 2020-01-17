@@ -5,12 +5,14 @@ load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
 go_test(
     name = "go_default_test",
     srcs = [
-        "apiserver_manifest_test.go",
+        "apiserver_etcd_test.go",
+        "apiserver_kms_test.go",
         "audit_policy_test.go",
         "configure_helper_test.go",
     ],
     data = [
         ":scripts-test-data",
+        ":testdata",
         "//cluster/gce/manifests",
     ],
     deps = [
@@ -50,6 +52,7 @@ pkg_tar(
         "//cluster/gce/gci/mounter": "gci-mounter",
         "configure-helper.sh": "gci-configure-helper.sh",
         "health-monitor.sh": "health-monitor.sh",
+        "configure-kubeapiserver.sh": "configure-kubeapiserver.sh",
     },
     mode = "0755",
     strip_prefix = ".",
@@ -77,5 +80,11 @@ filegroup(
     name = "scripts-test-data",
     srcs = [
         "configure-helper.sh",
+        "configure-kubeapiserver.sh",
     ],
+)
+
+filegroup(
+    name = "testdata",
+    srcs = glob(["testdata/**"]),
 )

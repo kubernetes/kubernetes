@@ -50,8 +50,8 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext RunAsUserName", func() {
 
 		podInvalid, _ = f.PodClient().Get(podInvalid.Name, metav1.GetOptions{})
 		podTerminatedReason := testutils.TerminatedContainers(podInvalid)[runAsUserNameContainerName]
-		if "ContainerCannotRun" != podTerminatedReason {
-			framework.Failf("The container terminated reason was supposed to be: 'ContainerCannotRun', not: '%q'", podTerminatedReason)
+		if podTerminatedReason != "ContainerCannotRun" && podTerminatedReason != "StartError" {
+			framework.Failf("The container terminated reason was supposed to be: 'ContainerCannotRun' or 'StartError', not: '%q'", podTerminatedReason)
 		}
 	})
 

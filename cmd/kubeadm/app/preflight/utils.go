@@ -31,7 +31,7 @@ func GetKubeletVersion(execer utilsexec.Interface) (*version.Version, error) {
 	kubeletVersionRegex := regexp.MustCompile(`^\s*Kubernetes v((0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-0-9a-zA-Z_\.+]*)?)\s*$`)
 
 	command := execer.Command("kubelet", "--version")
-	out, err := command.CombinedOutput()
+	out, err := command.Output()
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot execute 'kubelet --version'")
 	}

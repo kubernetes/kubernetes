@@ -571,19 +571,8 @@ func (cont *IngressController) GetFirewallRuleName() string {
 }
 
 // GetFirewallRule returns the firewall used by the IngressController.
-// Causes a fatal error incase of an error.
-// TODO: Rename this to GetFirewallRuleOrDie and similarly rename all other
-// methods here to be consistent with rest of the code in this repo.
-func (cont *IngressController) GetFirewallRule() *compute.Firewall {
-	fw, err := cont.GetFirewallRuleOrError()
-	framework.ExpectNoError(err)
-	return fw
-}
-
-// GetFirewallRuleOrError returns the firewall used by the IngressController.
 // Returns an error if that fails.
-// TODO: Rename this to GetFirewallRule when the above method with that name is renamed.
-func (cont *IngressController) GetFirewallRuleOrError() (*compute.Firewall, error) {
+func (cont *IngressController) GetFirewallRule() (*compute.Firewall, error) {
 	gceCloud := cont.Cloud.Provider.(*Provider).gceCloud
 	fwName := cont.GetFirewallRuleName()
 	return gceCloud.GetFirewall(fwName)

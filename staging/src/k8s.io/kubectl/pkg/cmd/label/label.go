@@ -253,6 +253,16 @@ func (o *LabelOptions) RunLabel() error {
 		var outputObj runtime.Object
 		var dataChangeMsg string
 		obj := info.Object
+
+		if len(o.resourceVersion) != 0 {
+			// ensure resourceVersion is always sent in the patch by clearing it from the starting JSON
+			accessor, err := meta.Accessor(obj)
+			if err != nil {
+				return err
+			}
+			accessor.SetResourceVersion("")
+		}
+
 		oldData, err := json.Marshal(obj)
 		if err != nil {
 			return err

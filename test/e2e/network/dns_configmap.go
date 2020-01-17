@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 )
@@ -520,7 +521,7 @@ var _ = SIGDescribe("DNS configMap nameserver [Feature:Networking-IPv6] [LinuxOn
 
 	ginkgo.BeforeEach(func() {
 		// IPv6 is not supported on Windows.
-		framework.SkipIfNodeOSDistroIs("windows")
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
 	})
 
 	ginkgo.Context("Change stubDomain", func() {

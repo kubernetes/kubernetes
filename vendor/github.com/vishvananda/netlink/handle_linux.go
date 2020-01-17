@@ -2,11 +2,11 @@ package netlink
 
 import (
 	"fmt"
-	"syscall"
 	"time"
 
 	"github.com/vishvananda/netlink/nl"
 	"github.com/vishvananda/netns"
+	"golang.org/x/sys/unix"
 )
 
 // Empty handle used by the netlink package methods
@@ -43,7 +43,7 @@ func (h *Handle) SetSocketTimeout(to time.Duration) error {
 	if to < time.Microsecond {
 		return fmt.Errorf("invalid timeout, minimul value is %s", time.Microsecond)
 	}
-	tv := syscall.NsecToTimeval(to.Nanoseconds())
+	tv := unix.NsecToTimeval(to.Nanoseconds())
 	for _, sh := range h.sockets {
 		if err := sh.Socket.SetSendTimeout(&tv); err != nil {
 			return err
@@ -59,13 +59,13 @@ func (h *Handle) SetSocketTimeout(to time.Duration) error {
 // socket in the netlink handle. The maximum value is capped by
 // /proc/sys/net/core/rmem_max.
 func (h *Handle) SetSocketReceiveBufferSize(size int, force bool) error {
-	opt := syscall.SO_RCVBUF
+	opt := unix.SO_RCVBUF
 	if force {
-		opt = syscall.SO_RCVBUFFORCE
+		opt = unix.SO_RCVBUFFORCE
 	}
 	for _, sh := range h.sockets {
 		fd := sh.Socket.GetFd()
-		err := syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, opt, size)
+		err := unix.SetsockoptInt(fd, unix.SOL_SOCKET, opt, size)
 		if err != nil {
 			return err
 		}
@@ -81,7 +81,7 @@ func (h *Handle) GetSocketReceiveBufferSize() ([]int, error) {
 	i := 0
 	for _, sh := range h.sockets {
 		fd := sh.Socket.GetFd()
-		size, err := syscall.GetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_RCVBUF)
+		size, err := unix.GetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_RCVBUF)
 		if err != nil {
 			return nil, err
 		}
@@ -134,10 +134,10 @@ func (h *Handle) newNetlinkRequest(proto, flags int) *nl.NetlinkRequest {
 		return nl.NewNetlinkRequest(proto, flags)
 	}
 	return &nl.NetlinkRequest{
-		NlMsghdr: syscall.NlMsghdr{
-			Len:   uint32(syscall.SizeofNlMsghdr),
+		NlMsghdr: unix.NlMsghdr{
+			Len:   uint32(unix.SizeofNlMsghdr),
 			Type:  uint16(proto),
-			Flags: syscall.NLM_F_REQUEST | uint16(flags),
+			Flags: unix.NLM_F_REQUEST | uint16(flags),
 		},
 		Sockets: h.sockets,
 	}

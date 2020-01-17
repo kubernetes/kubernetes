@@ -112,7 +112,7 @@ func GetNodeHostIP(node *v1.Node) (net.IP, error) {
 func GetNodeIP(client clientset.Interface, hostname string) net.IP {
 	var nodeIP net.IP
 	backoff := wait.Backoff{
-		Steps:    5,
+		Steps:    6,
 		Duration: 1 * time.Second,
 		Factor:   2.0,
 		Jitter:   0.2,
@@ -139,23 +139,37 @@ func GetNodeIP(client clientset.Interface, hostname string) net.IP {
 
 // GetZoneKey is a helper function that builds a string identifier that is unique per failure-zone;
 // it returns empty-string for no zone.
+// Since there are currently two separate zone keys:
+//   * "failure-domain.beta.kubernetes.io/zone"
+//   * "topology.kubernetes.io/zone"
+// GetZoneKey will first check failure-domain.beta.kubernetes.io/zone and if not exists, will then check
+// topology.kubernetes.io/zone
 func GetZoneKey(node *v1.Node) string {
 	labels := node.Labels
 	if labels == nil {
 		return ""
 	}
 
-	region, _ := labels[v1.LabelZoneRegion]
-	failureDomain, _ := labels[v1.LabelZoneFailureDomain]
+	// TODO: prefer stable labels for zone in v1.18
+	zone, ok := labels[v1.LabelZoneFailureDomain]
+	if !ok {
+		zone, _ = labels[v1.LabelZoneFailureDomainStable]
+	}
 
-	if region == "" && failureDomain == "" {
+	// TODO: prefer stable labels for region in v1.18
+	region, ok := labels[v1.LabelZoneRegion]
+	if !ok {
+		region, _ = labels[v1.LabelZoneRegionStable]
+	}
+
+	if region == "" && zone == "" {
 		return ""
 	}
 
 	// We include the null character just in case region or failureDomain has a colon
 	// (We do assume there's no null characters in a region or failureDomain)
 	// As a nice side-benefit, the null character is not printed by fmt.Print or glog
-	return region + ":\x00:" + failureDomain
+	return region + ":\x00:" + zone
 }
 
 type nodeForConditionPatch struct {

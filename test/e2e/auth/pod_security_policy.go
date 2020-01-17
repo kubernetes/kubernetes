@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -31,16 +31,14 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2epsp "k8s.io/kubernetes/test/e2e/framework/psp"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const nobodyUser = int64(65534)
@@ -54,11 +52,11 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 	var c clientset.Interface
 	var ns string // Test namespace, for convenience
 	ginkgo.BeforeEach(func() {
-		if !e2epsp.IsPodSecurityPolicyEnabled(f.ClientSet) {
-			framework.Skipf("PodSecurityPolicy not enabled")
+		if !framework.IsPodSecurityPolicyEnabled(f.ClientSet) {
+			e2eskipper.Skipf("PodSecurityPolicy not enabled")
 		}
 		if !auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
-			framework.Skipf("RBAC not enabled")
+			e2eskipper.Skipf("RBAC not enabled")
 		}
 		ns = f.Namespace.Name
 
@@ -117,7 +115,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 			p, err = c.CoreV1().Pods(ns).Get(p.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			validated, found := p.Annotations[psputil.ValidatedPSPAnnotation]
-			gomega.Expect(found).To(gomega.BeTrue(), "PSP annotation not found")
+			framework.ExpectEqual(found, true, "PSP annotation not found")
 			framework.ExpectEqual(validated, expectedPSP.Name, "Unexpected validated PSP")
 		})
 	})
@@ -125,7 +123,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 
 func expectForbidden(err error) {
 	framework.ExpectError(err, "should be forbidden")
-	gomega.Expect(apierrs.IsForbidden(err)).To(gomega.BeTrue(), "should be forbidden error")
+	framework.ExpectEqual(apierrors.IsForbidden(err), true, "should be forbidden error")
 }
 
 func testPrivilegedPods(tester func(pod *v1.Pod)) {
@@ -169,7 +167,7 @@ func testPrivilegedPods(tester func(pod *v1.Pod)) {
 		tester(hostipc)
 	})
 
-	if common.IsAppArmorSupported() {
+	if isAppArmorSupported() {
 		ginkgo.By("Running a custom AppArmor profile pod", func() {
 			aa := restrictedPod("apparmor")
 			// Every node is expected to have the docker-default profile.
@@ -372,4 +370,9 @@ func restrictedPSP(name string) *policyv1beta1.PodSecurityPolicy {
 
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+// isAppArmorSupported checks whether the AppArmor is supported by the node OS distro.
+func isAppArmorSupported() bool {
+	return framework.NodeOSDistroIs(e2eskipper.AppArmorDistros...)
 }

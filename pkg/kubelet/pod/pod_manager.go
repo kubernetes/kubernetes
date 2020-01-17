@@ -59,7 +59,7 @@ type Manager interface {
 	// whether the pod is found.
 	GetPodByUID(types.UID) (*v1.Pod, bool)
 	// GetPodByMirrorPod returns the static pod for the given mirror pod and
-	// whether it was known to the pod manger.
+	// whether it was known to the pod manager.
 	GetPodByMirrorPod(*v1.Pod) (*v1.Pod, bool)
 	// GetMirrorPodByPod returns the mirror pod for the given static pod and
 	// whether it was known to the pod manager.

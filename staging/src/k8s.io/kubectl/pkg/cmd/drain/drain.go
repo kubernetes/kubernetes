@@ -192,6 +192,8 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().DurationVar(&o.drainer.Timeout, "timeout", o.drainer.Timeout, "The length of time to wait before giving up, zero means infinite")
 	cmd.Flags().StringVarP(&o.drainer.Selector, "selector", "l", o.drainer.Selector, "Selector (label query) to filter on")
 	cmd.Flags().StringVarP(&o.drainer.PodSelector, "pod-selector", "", o.drainer.PodSelector, "Label selector to filter pods on the node")
+	cmd.Flags().BoolVar(&o.drainer.DisableEviction, "disable-eviction", o.drainer.DisableEviction, "Force drain to use delete, even if eviction is supported. This will bypass checking PodDisruptionBudgets, use with caution.")
+	cmd.Flags().IntVar(&o.drainer.SkipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", o.drainer.SkipWaitForDeleteTimeoutSeconds, "If pod DeletionTimestamp older than N seconds, skip waiting for the pod.  Seconds must be greater than 0 to skip.")
 
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
@@ -288,11 +290,7 @@ func (o *DrainCmdOptions) RunDrain() error {
 	var fatal error
 
 	for _, info := range o.nodeInfos {
-		var err error
-		if !o.drainer.DryRun {
-			err = o.deleteOrEvictPodsSimple(info)
-		}
-		if err == nil || o.drainer.DryRun {
+		if err := o.deleteOrEvictPodsSimple(info); err == nil {
 			drainedNodes.Insert(info.Name)
 			printObj(info.Object, o.Out)
 		} else {
@@ -327,16 +325,26 @@ func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error
 	if warnings := list.Warnings(); warnings != "" {
 		fmt.Fprintf(o.ErrOut, "WARNING: %s\n", warnings)
 	}
+	if o.drainer.DryRun {
+		for _, pod := range list.Pods() {
+			fmt.Fprintf(o.Out, "evicting pod %s/%s (dry run)\n", pod.Namespace, pod.Name)
+		}
+		return nil
+	}
 
 	if err := o.drainer.DeleteOrEvictPods(list.Pods()); err != nil {
 		pendingList, newErrs := o.drainer.GetPodsForDeletion(nodeInfo.Name)
-
-		fmt.Fprintf(o.ErrOut, "There are pending pods in node %q when an error occurred: %v\n", nodeInfo.Name, err)
-		for _, pendingPod := range pendingList.Pods() {
-			fmt.Fprintf(o.ErrOut, "%s/%s\n", "pod", pendingPod.Name)
+		if pendingList != nil {
+			pods := pendingList.Pods()
+			if len(pods) != 0 {
+				fmt.Fprintf(o.ErrOut, "There are pending pods in node %q when an error occurred: %v\n", nodeInfo.Name, err)
+				for _, pendingPod := range pods {
+					fmt.Fprintf(o.ErrOut, "%s/%s\n", "pod", pendingPod.Name)
+				}
+			}
 		}
 		if newErrs != nil {
-			fmt.Fprintf(o.ErrOut, "following errors also occurred:\n%s", utilerrors.NewAggregate(newErrs))
+			fmt.Fprintf(o.ErrOut, "Following errors occurred while getting the list of pods to delete:\n%s", utilerrors.NewAggregate(newErrs))
 		}
 		return err
 	}

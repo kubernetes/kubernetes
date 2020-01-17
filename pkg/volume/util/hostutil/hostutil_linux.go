@@ -27,11 +27,9 @@ import (
 	"syscall"
 
 	"golang.org/x/sys/unix"
-
 	"k8s.io/klog"
+	"k8s.io/utils/mount"
 	utilpath "k8s.io/utils/path"
-
-	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 const (

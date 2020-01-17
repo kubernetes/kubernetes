@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -60,7 +59,7 @@ func (EtcdUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 
 func kubectlCreate(ns, file string) {
 	input := string(testfiles.ReadOrDie(filepath.Join(manifestPath, file)))
-	framework.RunKubectlOrDieInput(input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
+	framework.RunKubectlOrDieInput(ns, input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
 }
 
 // Setup creates etcd statefulset and then verifies that the etcd is writable.
@@ -188,19 +187,19 @@ func (t *EtcdUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upg
 	}, 10*time.Millisecond, done)
 	framework.Logf("got %d users; want >=%d", lastUserCount, t.successfulWrites)
 
-	gomega.Expect(lastUserCount >= t.successfulWrites).To(gomega.BeTrue())
+	framework.ExpectEqual(lastUserCount >= t.successfulWrites, true)
 	ratio := float64(success) / float64(success+failures)
 	framework.Logf("Successful gets %d/%d=%v", success, success+failures, ratio)
 	ratio = float64(t.successfulWrites) / float64(writeAttempts)
 	framework.Logf("Successful writes %d/%d=%v", t.successfulWrites, writeAttempts, ratio)
 	framework.Logf("Errors: %v", errors)
 	// TODO(maisem): tweak this value once we have a few test runs.
-	gomega.Expect(ratio > 0.75).To(gomega.BeTrue())
+	framework.ExpectEqual(ratio > 0.75, true)
 }
 
 // Teardown does one final check of the data's availability.
 func (t *EtcdUpgradeTest) Teardown(f *framework.Framework) {
 	users, err := t.listUsers()
 	framework.ExpectNoError(err)
-	gomega.Expect(len(users) >= t.successfulWrites).To(gomega.BeTrue())
+	framework.ExpectEqual(len(users) >= t.successfulWrites, true)
 }

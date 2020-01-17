@@ -225,7 +225,7 @@ func (f *defaultFormats) DelByName(name string) bool {
 	return false
 }
 
-// DelByType removes the specified format, returns true when an item was actually removed
+// DelByFormat removes the specified format, returns true when an item was actually removed
 func (f *defaultFormats) DelByFormat(strfmt Format) bool {
 	f.Lock()
 	defer f.Unlock()

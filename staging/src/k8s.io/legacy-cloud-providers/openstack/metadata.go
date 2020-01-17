@@ -30,8 +30,8 @@ import (
 	"strings"
 
 	"k8s.io/klog"
-	osmount "k8s.io/legacy-cloud-providers/openstack/util/mount"
 	"k8s.io/utils/exec"
+	"k8s.io/utils/mount"
 )
 
 const (
@@ -125,7 +125,7 @@ func getMetadataFromConfigDrive(metadataVersion string) (*Metadata, error) {
 
 	klog.V(4).Infof("Attempting to mount configdrive %s on %s", dev, mntdir)
 
-	mounter := osmount.New("" /* default mount path */)
+	mounter := mount.New("" /* default mount path */)
 	err = mounter.Mount(dev, mntdir, "iso9660", []string{"ro"})
 	if err != nil {
 		err = mounter.Mount(dev, mntdir, "vfat", []string{"ro"})

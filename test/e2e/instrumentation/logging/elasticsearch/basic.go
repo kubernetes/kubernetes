@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	"k8s.io/kubernetes/test/e2e/instrumentation/logging/utils"
 
@@ -33,7 +34,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging using Elasticsearch [
 		// TODO: For now assume we are only testing cluster logging with Elasticsearch
 		// on GCE. Once we are sure that Elasticsearch cluster level logging
 		// works for other providers we should widen this scope of this test.
-		framework.SkipUnlessProviderIs("gce")
+		e2eskipper.SkipUnlessProviderIs("gce")
 	})
 
 	ginkgo.It("should check that logs from containers are ingested into Elasticsearch", func() {

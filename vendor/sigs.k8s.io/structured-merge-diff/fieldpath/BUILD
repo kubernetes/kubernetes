@@ -8,6 +8,7 @@ go_library(
         "fromvalue.go",
         "managers.go",
         "path.go",
+        "pathelementmap.go",
         "serialize.go",
         "serialize-pe.go",
         "set.go",

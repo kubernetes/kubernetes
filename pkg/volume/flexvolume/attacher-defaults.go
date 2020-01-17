@@ -20,9 +20,9 @@ import (
 	"time"
 
 	"k8s.io/klog"
+	"k8s.io/utils/mount"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 )
 

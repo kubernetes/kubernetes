@@ -28,7 +28,7 @@ import (
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 var (
@@ -357,30 +357,6 @@ func (n *NodeInfo) SetTaints(newTaints []v1.Taint) {
 	n.taints = newTaints
 }
 
-// MemoryPressureCondition returns the memory pressure condition status on this node.
-func (n *NodeInfo) MemoryPressureCondition() v1.ConditionStatus {
-	if n == nil {
-		return v1.ConditionUnknown
-	}
-	return n.memoryPressureCondition
-}
-
-// DiskPressureCondition returns the disk pressure condition status on this node.
-func (n *NodeInfo) DiskPressureCondition() v1.ConditionStatus {
-	if n == nil {
-		return v1.ConditionUnknown
-	}
-	return n.diskPressureCondition
-}
-
-// PIDPressureCondition returns the pid pressure condition status on this node.
-func (n *NodeInfo) PIDPressureCondition() v1.ConditionStatus {
-	if n == nil {
-		return v1.ConditionUnknown
-	}
-	return n.pidPressureCondition
-}
-
 // RequestedResource returns aggregated resource request of pods on this node.
 func (n *NodeInfo) RequestedResource() Resource {
 	if n == nil {
@@ -572,11 +548,21 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			n.UpdateUsedPorts(pod, false)
 
 			n.generation = nextGeneration()
-
+			n.resetSlicesIfEmpty()
 			return nil
 		}
 	}
 	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
+}
+
+// resets the slices to nil so that we can do DeepEqual in unit tests.
+func (n *NodeInfo) resetSlicesIfEmpty() {
+	if len(n.podsWithAffinity) == 0 {
+		n.podsWithAffinity = nil
+	}
+	if len(n.pods) == 0 {
+		n.pods = nil
+	}
 }
 
 func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64) {
@@ -584,7 +570,7 @@ func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64)
 	for _, c := range pod.Spec.Containers {
 		resPtr.Add(c.Resources.Requests)
 
-		non0CPUReq, non0MemReq := priorityutil.GetNonzeroRequests(&c.Resources.Requests)
+		non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&c.Resources.Requests)
 		non0CPU += non0CPUReq
 		non0Mem += non0MemReq
 		// No non-zero resources for GPUs or opaque resources.
@@ -642,23 +628,6 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 		}
 	}
 	n.TransientInfo = NewTransientSchedulerInfo()
-	n.generation = nextGeneration()
-	return nil
-}
-
-// RemoveNode removes the overall information about the node.
-func (n *NodeInfo) RemoveNode(node *v1.Node) error {
-	// We don't remove NodeInfo for because there can still be some pods on this node -
-	// this is because notifications about pods are delivered in a different watch,
-	// and thus can potentially be observed later, even though they happened before
-	// node removal. This is handled correctly in cache.go file.
-	n.node = nil
-	n.allocatableResource = &Resource{}
-	n.taints, n.taintsErr = nil, nil
-	n.memoryPressureCondition = v1.ConditionUnknown
-	n.diskPressureCondition = v1.ConditionUnknown
-	n.pidPressureCondition = v1.ConditionUnknown
-	n.imageStates = make(map[string]*ImageStateSummary)
 	n.generation = nextGeneration()
 	return nil
 }

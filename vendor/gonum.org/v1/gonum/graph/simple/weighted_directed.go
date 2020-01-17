@@ -57,8 +57,6 @@ func (g *WeightedDirectedGraph) AddNode(n graph.Node) {
 		panic(fmt.Sprintf("simple: node ID collision: %d", n.ID()))
 	}
 	g.nodes[n.ID()] = n
-	g.from[n.ID()] = make(map[int64]graph.WeightedEdge)
-	g.to[n.ID()] = make(map[int64]graph.WeightedEdge)
 	g.nodeIDs.Use(n.ID())
 }
 
@@ -143,7 +141,7 @@ func (g *WeightedDirectedGraph) Node(id int64) graph.Node {
 
 // Nodes returns all the nodes in the graph.
 func (g *WeightedDirectedGraph) Nodes() graph.Nodes {
-	if len(g.from) == 0 {
+	if len(g.nodes) == 0 {
 		return graph.Empty
 	}
 	nodes := make([]graph.Node, len(g.nodes))
@@ -216,13 +214,21 @@ func (g *WeightedDirectedGraph) SetWeightedEdge(e graph.WeightedEdge) {
 		g.nodes[tid] = to
 	}
 
-	g.from[fid][tid] = e
-	g.to[tid][fid] = e
+	if fm, ok := g.from[fid]; ok {
+		fm[tid] = e
+	} else {
+		g.from[fid] = map[int64]graph.WeightedEdge{tid: e}
+	}
+	if tm, ok := g.to[tid]; ok {
+		tm[fid] = e
+	} else {
+		g.to[tid] = map[int64]graph.WeightedEdge{fid: e}
+	}
 }
 
 // To returns all nodes in g that can reach directly to n.
 func (g *WeightedDirectedGraph) To(id int64) graph.Nodes {
-	if _, ok := g.from[id]; !ok {
+	if _, ok := g.to[id]; !ok {
 		return graph.Empty
 	}
 

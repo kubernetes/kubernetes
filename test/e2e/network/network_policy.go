@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"fmt"
@@ -49,7 +50,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// Windows does not support network policies.
-		framework.SkipIfNodeOSDistroIs("windows")
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
 	})
 
 	ginkgo.Context("NetworkPolicy between server and client", func() {
@@ -1415,7 +1416,7 @@ func checkConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1.P
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
 	if err != nil {
 		// Collect pod logs when we see a failure.
-		logs, logErr := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podClient.Name, fmt.Sprintf("%s-container", podClient.Name))
+		logs, logErr := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podClient.Name, "client")
 		if logErr != nil {
 			framework.Failf("Error getting container logs: %s", logErr)
 		}
@@ -1452,7 +1453,7 @@ func checkNoConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1
 	// Dump debug information if the error was nil.
 	if err == nil {
 		// Collect pod logs when we see a failure.
-		logs, logErr := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podClient.Name, fmt.Sprintf("%s-container", podClient.Name))
+		logs, logErr := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podClient.Name, "client")
 		if logErr != nil {
 			framework.Failf("Error getting container logs: %s", logErr)
 		}
@@ -1589,7 +1590,7 @@ func createNetworkClientPod(f *framework.Framework, namespace *v1.Namespace, pod
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{
-					Name:  fmt.Sprintf("%s-container", podName),
+					Name:  "client",
 					Image: imageutils.GetE2EImage(imageutils.BusyBox),
 					Args: []string{
 						"/bin/sh",

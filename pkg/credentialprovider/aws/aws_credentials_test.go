@@ -196,7 +196,7 @@ func TestECRProvide(t *testing.T) {
 	// Verify that we get an error for other images.
 	for _, otherRegistry := range otherRegistries {
 		image = path.Join(otherRegistry, "foo/bar")
-		creds, ok = keyring.Lookup(image)
+		_, ok = keyring.Lookup(image)
 		if ok {
 			t.Errorf("Unexpectedly found image: %s", image)
 			return
@@ -293,7 +293,7 @@ func TestChinaECRProvide(t *testing.T) {
 	// Verify that we get an error for other images.
 	for _, otherRegistry := range otherRegistries {
 		image = path.Join(otherRegistry, image)
-		creds, ok = keyring.Lookup(image)
+		_, ok = keyring.Lookup(image)
 		if ok {
 			t.Errorf("Unexpectedly found image: %s", image)
 			return

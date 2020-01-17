@@ -88,11 +88,11 @@ func MakePath(parts ...interface{}) (Path, error) {
 			fp = append(fp, PathElement{Index: &t})
 		case string:
 			fp = append(fp, PathElement{FieldName: &t})
-		case []value.Field:
-			if len(t) == 0 {
+		case *value.FieldList:
+			if len(*t) == 0 {
 				return nil, fmt.Errorf("associative list key type path elements must have at least one key (got zero)")
 			}
-			fp = append(fp, PathElement{Key: &value.Map{Items: t}})
+			fp = append(fp, PathElement{Key: t})
 		case value.Value:
 			// TODO: understand schema and verify that this is a set type
 			// TODO: make a copy of t

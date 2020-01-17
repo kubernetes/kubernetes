@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -106,8 +107,9 @@ func NewRemoteConfigSource(source *apiv1.NodeConfigSource) (RemoteConfigSource, 
 // DecodeRemoteConfigSource is a helper for using the apimachinery to decode serialized RemoteConfigSources;
 // e.g. the metadata stored by checkpoint/store/fsstore.go
 func DecodeRemoteConfigSource(data []byte) (RemoteConfigSource, error) {
-	// decode the remote config source
-	_, codecs, err := scheme.NewSchemeAndCodecs()
+	// Decode the remote config source. We want this to be non-strict
+	// so we don't error out on newer API keys.
+	_, codecs, err := scheme.NewSchemeAndCodecs(serializer.DisableStrict)
 	if err != nil {
 		return nil, err
 	}

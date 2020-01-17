@@ -180,7 +180,7 @@ func fakeScaleClient(t *testing.T) (ScalesGetter, []schema.GroupResource) {
 			if err != nil {
 				return nil, err
 			}
-			return &http.Response{StatusCode: 200, Header: defaultHeaders(), Body: bytesBody(res)}, nil
+			return &http.Response{StatusCode: http.StatusOK, Header: defaultHeaders(), Body: bytesBody(res)}, nil
 		case "PUT":
 			decoder := codecs.UniversalDeserializer()
 			body, err := ioutil.ReadAll(req.Body)
@@ -198,7 +198,7 @@ func fakeScaleClient(t *testing.T) (ScalesGetter, []schema.GroupResource) {
 			if err != nil {
 				return nil, err
 			}
-			return &http.Response{StatusCode: 200, Header: defaultHeaders(), Body: bytesBody(res)}, nil
+			return &http.Response{StatusCode: http.StatusOK, Header: defaultHeaders(), Body: bytesBody(res)}, nil
 		case "PATCH":
 			body, err := ioutil.ReadAll(req.Body)
 			if err != nil {
@@ -229,7 +229,7 @@ func fakeScaleClient(t *testing.T) (ScalesGetter, []schema.GroupResource) {
 			default:
 				return nil, fmt.Errorf("invalid patch type")
 			}
-			return &http.Response{StatusCode: 200, Header: defaultHeaders(), Body: bytesBody(res)}, nil
+			return &http.Response{StatusCode: http.StatusOK, Header: defaultHeaders(), Body: bytesBody(res)}, nil
 		default:
 			return nil, fmt.Errorf("unexpected request for URL %q with method %q", req.URL.String(), req.Method)
 		}

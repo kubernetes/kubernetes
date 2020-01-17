@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"fmt"
@@ -124,7 +124,7 @@ func waitForContainerRemoval(containerName, podName, podNS string) {
 
 func waitForStateFileCleanedUp() {
 	gomega.Eventually(func() bool {
-		restoredState, err := cpumanagerstate.NewCheckpointState("/var/lib/kubelet", "cpu_manager_state", "static")
+		restoredState, err := cpumanagerstate.NewCheckpointState("/var/lib/kubelet", "cpu_manager_state", "static", nil)
 		framework.ExpectNoError(err, "failed to create testing cpumanager state instance")
 		assignments := restoredState.GetCPUAssignments()
 		if len(assignments) == 0 {

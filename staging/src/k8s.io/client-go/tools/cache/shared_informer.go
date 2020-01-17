@@ -70,7 +70,7 @@ import (
 // The local cache starts out empty, and gets populated and updated
 // during `Run()`.
 //
-// As a simple example, if a collection of objects is henceforeth
+// As a simple example, if a collection of objects is henceforth
 // unchanging, a SharedInformer is created that links to that
 // collection, and that SharedInformer is `Run()` then that
 // SharedInformer's cache eventually holds an exact copy of that
@@ -106,7 +106,16 @@ import (
 // and index updates happen before such a prescribed notification.
 // For a given SharedInformer and client, the notifications are
 // delivered sequentially.  For a given SharedInformer, client, and
-// object ID, the notifications are delivered in order.
+// object ID, the notifications are delivered in order.  Because
+// `ObjectMeta.UID` has no role in identifying objects, it is possible
+// that when (1) object O1 with ID (e.g. namespace and name) X and
+// `ObjectMeta.UID` U1 in the SharedInformer's local cache is deleted
+// and later (2) another object O2 with ID X and ObjectMeta.UID U2 is
+// created the informer's clients are not notified of (1) and (2) but
+// rather are notified only of an update from O1 to O2. Clients that
+// need to detect such cases might do so by comparing the `ObjectMeta.UID`
+// field of the old and the new object in the code that handles update
+// notifications (i.e. `OnUpdate` method of ResourceEventHandler).
 //
 // A client must process each notification promptly; a SharedInformer
 // is not engineered to deal well with a large backlog of
@@ -129,13 +138,13 @@ type SharedInformer interface {
 	AddEventHandler(handler ResourceEventHandler)
 	// AddEventHandlerWithResyncPeriod adds an event handler to the
 	// shared informer using the specified resync period.  The resync
-	// operation consists of delivering to the handler a create
+	// operation consists of delivering to the handler an update
 	// notification for every object in the informer's local cache; it
 	// does not add any interactions with the authoritative storage.
 	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration)
 	// GetStore returns the informer's local cache as a Store.
 	GetStore() Store
-	// GetController gives back a synthetic interface that "votes" to start the informer
+	// GetController is deprecated, it does nothing useful
 	GetController() Controller
 	// Run starts and runs the shared informer, returning after it stops.
 	// The informer will be stopped when stopCh is closed.
@@ -159,21 +168,21 @@ type SharedIndexInformer interface {
 }
 
 // NewSharedInformer creates a new instance for the listwatcher.
-func NewSharedInformer(lw ListerWatcher, objType runtime.Object, resyncPeriod time.Duration) SharedInformer {
-	return NewSharedIndexInformer(lw, objType, resyncPeriod, Indexers{})
+func NewSharedInformer(lw ListerWatcher, exampleObject runtime.Object, resyncPeriod time.Duration) SharedInformer {
+	return NewSharedIndexInformer(lw, exampleObject, resyncPeriod, Indexers{})
 }
 
 // NewSharedIndexInformer creates a new instance for the listwatcher.
-func NewSharedIndexInformer(lw ListerWatcher, objType runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers Indexers) SharedIndexInformer {
+func NewSharedIndexInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers Indexers) SharedIndexInformer {
 	realClock := &clock.RealClock{}
 	sharedIndexInformer := &sharedIndexInformer{
 		processor:                       &sharedProcessor{clock: realClock},
 		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
 		listerWatcher:                   lw,
-		objectType:                      objType,
+		objectType:                      exampleObject,
 		resyncCheckPeriod:               defaultEventHandlerResyncPeriod,
 		defaultEventHandlerResyncPeriod: defaultEventHandlerResyncPeriod,
-		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", objType)),
+		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", exampleObject)),
 		clock:                           realClock,
 	}
 	return sharedIndexInformer
@@ -228,6 +237,19 @@ func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool
 	return true
 }
 
+// `*sharedIndexInformer` implements SharedIndexInformer and has three
+// main components.  One is an indexed local cache, `indexer Indexer`.
+// The second main component is a Controller that pulls
+// objects/notifications using the ListerWatcher and pushes them into
+// a DeltaFIFO --- whose knownObjects is the informer's local cache
+// --- while concurrently Popping Deltas values from that fifo and
+// processing them with `sharedIndexInformer::HandleDeltas`.  Each
+// invocation of HandleDeltas, which is done with the fifo's lock
+// held, processes each Delta in turn.  For each Delta this both
+// updates the local cache and stuffs the relevant notification into
+// the sharedProcessor.  The third main component is that
+// sharedProcessor, which is responsible for relaying those
+// notifications to each of the informer's clients.
 type sharedIndexInformer struct {
 	indexer    Indexer
 	controller Controller
@@ -235,9 +257,13 @@ type sharedIndexInformer struct {
 	processor             *sharedProcessor
 	cacheMutationDetector MutationDetector
 
-	// This block is tracked to handle late initialization of the controller
 	listerWatcher ListerWatcher
-	objectType    runtime.Object
+
+	// objectType is an example object of the type this informer is
+	// expected to handle.  Only the type needs to be right, except
+	// that when that is `unstructured.Unstructured` the object's
+	// `"apiVersion"` and `"kind"` must also be right.
+	objectType runtime.Object
 
 	// resyncCheckPeriod is how often we want the reflector's resync timer to fire so it can call
 	// shouldResync to check if any of our listeners need a resync.
@@ -476,6 +502,12 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 	return nil
 }
 
+// sharedProcessor has a collection of processorListener and can
+// distribute a notification object to its listeners.  There are two
+// kinds of distribute operations.  The sync distributions go to a
+// subset of the listeners that (a) is recomputed in the occasional
+// calls to shouldResync and (b) every listener is initially put in.
+// The non-sync distributions go to every listener.
 type sharedProcessor struct {
 	listenersStarted bool
 	listenersLock    sync.RWMutex
@@ -567,6 +599,17 @@ func (p *sharedProcessor) resyncCheckPeriodChanged(resyncCheckPeriod time.Durati
 	}
 }
 
+// processorListener relays notifications from a sharedProcessor to
+// one ResourceEventHandler --- using two goroutines, two unbuffered
+// channels, and an unbounded ring buffer.  The `add(notification)`
+// function sends the given notification to `addCh`.  One goroutine
+// runs `pop()`, which pumps notifications from `addCh` to `nextCh`
+// using storage in the ring buffer while `nextCh` is not keeping up.
+// Another goroutine runs `run()`, which receives notifications from
+// `nextCh` and synchronously invokes the appropriate handler method.
+//
+// processorListener also keeps track of the adjusted requested resync
+// period of the listener.
 type processorListener struct {
 	nextCh chan interface{}
 	addCh  chan interface{}
@@ -580,11 +623,22 @@ type processorListener struct {
 	// we should try to do something better.
 	pendingNotifications buffer.RingGrowing
 
-	// requestedResyncPeriod is how frequently the listener wants a full resync from the shared informer
+	// requestedResyncPeriod is how frequently the listener wants a
+	// full resync from the shared informer, but modified by two
+	// adjustments.  One is imposing a lower bound,
+	// `minimumResyncPeriod`.  The other is another lower bound, the
+	// sharedProcessor's `resyncCheckPeriod`, that is imposed (a) only
+	// in AddEventHandlerWithResyncPeriod invocations made after the
+	// sharedProcessor starts and (b) only if the informer does
+	// resyncs at all.
 	requestedResyncPeriod time.Duration
-	// resyncPeriod is how frequently the listener wants a full resync from the shared informer. This
-	// value may differ from requestedResyncPeriod if the shared informer adjusts it to align with the
-	// informer's overall resync check period.
+	// resyncPeriod is the threshold that will be used in the logic
+	// for this listener.  This value differs from
+	// requestedResyncPeriod only when the sharedIndexInformer does
+	// not do resyncs, in which case the value here is zero.  The
+	// actual time between resyncs depends on when the
+	// sharedProcessor's `shouldResync` function is invoked and when
+	// the sharedIndexInformer processes `Sync` type Delta objects.
 	resyncPeriod time.Duration
 	// nextResync is the earliest time the listener should get a full resync
 	nextResync time.Time
@@ -643,7 +697,7 @@ func (p *processorListener) pop() {
 
 func (p *processorListener) run() {
 	// this call blocks until the channel is closed.  When a panic happens during the notification
-	// we will catch it, **the offending item will be skipped!**, and after a short delay (one second)
+	// we will catch it, **the offending item will be skipped!**, and after a short delay (one minute)
 	// the next notification will be attempted.  This is usually better than the alternative of never
 	// delivering again.
 	stopCh := make(chan struct{})

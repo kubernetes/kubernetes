@@ -41,6 +41,5 @@ reviewers:
 - soltysh
 - piosz
 - jsafrane
-- jbeda
 labels:
 - sig/apps

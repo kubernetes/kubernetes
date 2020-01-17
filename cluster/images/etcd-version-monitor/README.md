@@ -18,7 +18,7 @@ latency metrics (`etcd_grpc_unary_requests_duration_seconds`) to be exposed.
 
 To run this tool as a docker container:
 - make build
-- docker run --net=host -i -t k8s.gcr.io/etcd-version-monitor:test /etcd-version-monitor --logtostderr
+- docker run --net=host -i -t staging-k8s.gcr.io/etcd-version-monitor:0.1.3 /etcd-version-monitor
 
 To run this as a pod on the kubernetes cluster:
 - Place the 'etcd-version-monitor.yaml' in the manifests directory of

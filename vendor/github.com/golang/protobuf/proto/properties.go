@@ -38,7 +38,6 @@ package proto
 import (
 	"fmt"
 	"log"
-	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -194,7 +193,7 @@ func (p *Properties) Parse(s string) {
 	// "bytes,49,opt,name=foo,def=hello!"
 	fields := strings.Split(s, ",") // breaks def=, but handled below.
 	if len(fields) < 2 {
-		fmt.Fprintf(os.Stderr, "proto: tag has too few fields: %q\n", s)
+		log.Printf("proto: tag has too few fields: %q", s)
 		return
 	}
 
@@ -214,7 +213,7 @@ func (p *Properties) Parse(s string) {
 		p.WireType = WireBytes
 		// no numeric converter for non-numeric types
 	default:
-		fmt.Fprintf(os.Stderr, "proto: tag has unknown wire type: %q\n", s)
+		log.Printf("proto: tag has unknown wire type: %q", s)
 		return
 	}
 

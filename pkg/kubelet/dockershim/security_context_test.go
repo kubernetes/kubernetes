@@ -21,7 +21,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/blang/semver"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
 
@@ -401,56 +400,6 @@ func TestModifyContainerNamespaceOptions(t *testing.T) {
 		dockerCfg := &dockercontainer.HostConfig{}
 		modifyContainerNamespaceOptions(tc.nsOpt, sandboxID, dockerCfg)
 		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
-	}
-}
-
-func TestModifyContainerNamespacePIDOverride(t *testing.T) {
-	cases := []struct {
-		name            string
-		version         *semver.Version
-		input, expected dockercontainer.PidMode
-	}{
-		{
-			name:     "mode:CONTAINER docker:NEW",
-			version:  &semver.Version{Major: 1, Minor: 26},
-			input:    "",
-			expected: "",
-		},
-		{
-			name:     "mode:CONTAINER docker:OLD",
-			version:  &semver.Version{Major: 1, Minor: 25},
-			input:    "",
-			expected: "",
-		},
-		{
-			name:     "mode:HOST docker:NEW",
-			version:  &semver.Version{Major: 1, Minor: 26},
-			input:    "host",
-			expected: "host",
-		},
-		{
-			name:     "mode:HOST docker:OLD",
-			version:  &semver.Version{Major: 1, Minor: 25},
-			input:    "host",
-			expected: "host",
-		},
-		{
-			name:     "mode:POD docker:NEW",
-			version:  &semver.Version{Major: 1, Minor: 26},
-			input:    "container:sandbox",
-			expected: "container:sandbox",
-		},
-		{
-			name:     "mode:POD docker:OLD",
-			version:  &semver.Version{Major: 1, Minor: 25},
-			input:    "container:sandbox",
-			expected: "",
-		},
-	}
-	for _, tc := range cases {
-		dockerCfg := &dockercontainer.HostConfig{PidMode: tc.input}
-		modifyContainerPIDNamespaceOverrides(tc.version, dockerCfg, "sandbox")
-		assert.Equal(t, tc.expected, dockerCfg.PidMode, "[Test case %q]", tc.name)
 	}
 }
 

@@ -27,8 +27,6 @@ import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	auditregistrationv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
@@ -44,9 +42,10 @@ import (
 	coordinationapiv1 "k8s.io/api/coordination/v1"
 	coordinationapiv1beta1 "k8s.io/api/coordination/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
-	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
+	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	networkingapiv1 "k8s.io/api/networking/v1"
 	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
@@ -64,27 +63,30 @@ import (
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/healthz"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1"
+	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
+	"k8s.io/kubernetes/pkg/master/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/klog"
 
 	// RESTStorage installers
@@ -101,6 +103,7 @@ import (
 	discoveryrest "k8s.io/kubernetes/pkg/registry/discovery/rest"
 	eventsrest "k8s.io/kubernetes/pkg/registry/events/rest"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
+	flowcontrolrest "k8s.io/kubernetes/pkg/registry/flowcontrol/rest"
 	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
 	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
@@ -120,7 +123,7 @@ const (
 
 // ExtraConfig defines extra configuration for the master
 type ExtraConfig struct {
-	ClientCARegistrationHook ClientCARegistrationHook
+	ClusterAuthenticationInfo clusterauthenticationtrust.ClusterAuthenticationInfo
 
 	APIResourceConfigSource  serverstorage.APIResourceConfigSource
 	StorageFactory           serverstorage.StorageFactory
@@ -217,7 +220,7 @@ type EndpointReconcilerConfig struct {
 type Master struct {
 	GenericAPIServer *genericapiserver.GenericAPIServer
 
-	ClientCARegistrationHook ClientCARegistrationHook
+	ClusterAuthenticationInfo clusterauthenticationtrust.ClusterAuthenticationInfo
 }
 
 func (c *Config) createMasterCountReconciler() reconcilers.EndpointReconciler {
@@ -339,7 +342,8 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	m := &Master{
-		GenericAPIServer: s,
+		GenericAPIServer:          s,
+		ClusterAuthenticationInfo: c.ExtraConfig.ClusterAuthenticationInfo,
 	}
 
 	// install legacy rest storage
@@ -386,6 +390,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		schedulingrest.RESTStorageProvider{},
 		settingsrest.RESTStorageProvider{},
 		storagerest.RESTStorageProvider{},
+		flowcontrolrest.RESTStorageProvider{},
 		// keep apps after extensions so legacy clients resolve the extensions versions of shared resource names.
 		// See https://github.com/kubernetes/kubernetes/issues/42392
 		appsrest.RESTStorageProvider{},
@@ -400,7 +405,42 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		m.installTunneler(c.ExtraConfig.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
 	}
 
-	m.GenericAPIServer.AddPostStartHookOrDie("ca-registration", c.ExtraConfig.ClientCARegistrationHook.PostStartHook)
+	m.GenericAPIServer.AddPostStartHookOrDie("start-cluster-authentication-info-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+		kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
+		if err != nil {
+			return err
+		}
+		controller := clusterauthenticationtrust.NewClusterAuthenticationTrustController(m.ClusterAuthenticationInfo, kubeClient)
+
+		// prime values and start listeners
+		if m.ClusterAuthenticationInfo.ClientCA != nil {
+			if notifier, ok := m.ClusterAuthenticationInfo.ClientCA.(dynamiccertificates.Notifier); ok {
+				notifier.AddListener(controller)
+			}
+			if controller, ok := m.ClusterAuthenticationInfo.ClientCA.(dynamiccertificates.ControllerRunner); ok {
+				// runonce to be sure that we have a value.
+				if err := controller.RunOnce(); err != nil {
+					runtime.HandleError(err)
+				}
+				go controller.Run(1, hookContext.StopCh)
+			}
+		}
+		if m.ClusterAuthenticationInfo.RequestHeaderCA != nil {
+			if notifier, ok := m.ClusterAuthenticationInfo.RequestHeaderCA.(dynamiccertificates.Notifier); ok {
+				notifier.AddListener(controller)
+			}
+			if controller, ok := m.ClusterAuthenticationInfo.RequestHeaderCA.(dynamiccertificates.ControllerRunner); ok {
+				// runonce to be sure that we have a value.
+				if err := controller.RunOnce(); err != nil {
+					runtime.HandleError(err)
+				}
+				go controller.Run(1, hookContext.StopCh)
+			}
+		}
+
+		go controller.Run(1, hookContext.StopCh)
+		return nil
+	})
 
 	return m, nil
 }
@@ -409,7 +449,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) error {
 	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
 	if err != nil {
-		return fmt.Errorf("Error building core storage: %v", err)
+		return fmt.Errorf("error building core storage: %v", err)
 	}
 
 	controllerName := "bootstrap-controller"
@@ -419,22 +459,17 @@ func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.
 	m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)
 
 	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
-		return fmt.Errorf("Error in registering group versions: %v", err)
+		return fmt.Errorf("error in registering group versions: %v", err)
 	}
 	return nil
 }
 
 func (m *Master) installTunneler(nodeTunneler tunneler.Tunneler, nodeClient corev1client.NodeInterface) {
 	nodeTunneler.Run(nodeAddressProvider{nodeClient}.externalAddresses)
-	m.GenericAPIServer.AddHealthChecks(healthz.NamedCheck("SSH Tunnel Check", tunneler.TunnelSyncHealthChecker(nodeTunneler)))
-	prometheus.NewGaugeFunc(prometheus.GaugeOpts{
-		Name: "apiserver_proxy_tunnel_sync_duration_seconds",
-		Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
-	}, func() float64 { return float64(nodeTunneler.SecondsSinceSync()) })
-	prometheus.NewGaugeFunc(prometheus.GaugeOpts{
-		Name: "apiserver_proxy_tunnel_sync_latency_secs",
-		Help: "(Deprecated) The time since the last successful synchronization of the SSH tunnels for proxy requests.",
-	}, func() float64 { return float64(nodeTunneler.SecondsSinceSync()) })
+	err := m.GenericAPIServer.AddHealthChecks(healthz.NamedCheck("SSH Tunnel Check", tunneler.TunnelSyncHealthChecker(nodeTunneler)))
+	if err != nil {
+		klog.Errorf("Failed adding ssh tunnel health check %v\n", err)
+	}
 }
 
 // RESTStorageProvider is a factory type for REST storage.
@@ -475,7 +510,7 @@ func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceCo
 	}
 
 	if err := m.GenericAPIServer.InstallAPIGroups(apiGroupsInfo...); err != nil {
-		return fmt.Errorf("Error in registering group versions: %v", err)
+		return fmt.Errorf("error in registering group versions: %v", err)
 	}
 	return nil
 }
@@ -536,6 +571,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		certificatesapiv1beta1.SchemeGroupVersion,
 		coordinationapiv1.SchemeGroupVersion,
 		coordinationapiv1beta1.SchemeGroupVersion,
+		discoveryv1beta1.SchemeGroupVersion,
 		eventsv1beta1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,
 		networkingapiv1.SchemeGroupVersion,
@@ -553,30 +589,16 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret.EnableResources(
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"),
 	)
-	// disable deprecated beta resources in extensions/v1beta1 explicitly so we have a full list of what's possible to serve
-	ret.DisableResources(
-		extensionsapiv1beta1.SchemeGroupVersion.WithResource("daemonsets"),
-		extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"),
-		extensionsapiv1beta1.SchemeGroupVersion.WithResource("networkpolicies"),
-		extensionsapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"),
-		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
-		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicationcontrollers"),
-	)
-	// disable deprecated beta versions explicitly so we have a full list of what's possible to serve
-	ret.DisableVersions(
-		appsv1beta1.SchemeGroupVersion,
-		appsv1beta2.SchemeGroupVersion,
-	)
 	// disable alpha versions explicitly so we have a full list of what's possible to serve
 	ret.DisableVersions(
 		auditregistrationv1alpha1.SchemeGroupVersion,
 		batchapiv2alpha1.SchemeGroupVersion,
-		discoveryv1alpha1.SchemeGroupVersion,
 		nodev1alpha1.SchemeGroupVersion,
 		rbacv1alpha1.SchemeGroupVersion,
 		schedulingv1alpha1.SchemeGroupVersion,
 		settingsv1alpha1.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
+		flowcontrolv1alpha1.SchemeGroupVersion,
 	)
 
 	return ret

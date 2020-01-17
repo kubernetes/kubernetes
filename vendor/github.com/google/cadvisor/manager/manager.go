@@ -918,13 +918,15 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 	if err != nil {
 		return err
 	}
-	devicesCgroupPath, err := handler.GetCgroupPath("devices")
-	if err != nil {
-		klog.Warningf("Error getting devices cgroup path: %v", err)
-	} else {
-		cont.nvidiaCollector, err = m.nvidiaManager.GetCollector(devicesCgroupPath)
+	if !cgroups.IsCgroup2UnifiedMode() {
+		devicesCgroupPath, err := handler.GetCgroupPath("devices")
 		if err != nil {
-			klog.V(4).Infof("GPU metrics may be unavailable/incomplete for container %q: %v", cont.info.Name, err)
+			klog.Warningf("Error getting devices cgroup path: %v", err)
+		} else {
+			cont.nvidiaCollector, err = m.nvidiaManager.GetCollector(devicesCgroupPath)
+			if err != nil {
+				klog.V(4).Infof("GPU metrics may be unavailable/incomplete for container %q: %v", cont.info.Name, err)
+			}
 		}
 	}
 
@@ -1119,9 +1121,6 @@ func (self *manager) watchForNewContainers(quit chan error) error {
 				switch {
 				case event.EventType == watcher.ContainerAdd:
 					switch event.WatchSource {
-					// the Rkt and Raw watchers can race, and if Raw wins, we want Rkt to override and create a new handler for Rkt containers
-					case watcher.Rkt:
-						err = self.overrideContainer(event.Name, event.WatchSource)
 					default:
 						err = self.createContainer(event.Name, event.WatchSource)
 					}

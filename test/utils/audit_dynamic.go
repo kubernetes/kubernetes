@@ -95,8 +95,6 @@ func (a *AuditTestServer) WaitForEvents(expected []AuditEvent) ([]AuditEvent, er
 	var missing []AuditEvent
 	err := wait.PollImmediate(50*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
 		var err error
-		a.LockedEventList.RLock()
-		defer a.LockedEventList.RUnlock()
 		el := a.GetEventList()
 		if len(el.Items) < 1 {
 			return false, nil

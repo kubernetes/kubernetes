@@ -9,7 +9,7 @@ import (
 	"gonum.org/v1/gonum/blas/blas64"
 )
 
-// Dtrtrs solves a triangular system of the form A * X = B or A^T * X = B. Dtrtrs
+// Dtrtrs solves a triangular system of the form A * X = B or Aᵀ * X = B. Dtrtrs
 // returns whether the solve completed successfully. If A is singular, no solve is performed.
 func (impl Implementation) Dtrtrs(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag, n, nrhs int, a []float64, lda int, b []float64, ldb int) (ok bool) {
 	switch {

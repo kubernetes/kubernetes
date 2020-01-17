@@ -21,11 +21,12 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -59,7 +60,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		client    clientset.Interface
 	)
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessProviderIs("vsphere")
+		e2eskipper.SkipUnlessProviderIs("vsphere")
 		namespace = f.Namespace.Name
 		client = f.ClientSet
 		Bootstrap(f)
@@ -87,7 +88,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		framework.ExpectNoError(e2esset.CheckMount(client, statefulset, mountPath))
 		ssPodsBeforeScaleDown := e2esset.GetPodList(client, statefulset)
 		gomega.Expect(ssPodsBeforeScaleDown.Items).NotTo(gomega.BeEmpty(), fmt.Sprintf("Unable to get list of Pods from the Statefulset: %v", statefulset.Name))
-		gomega.Expect(len(ssPodsBeforeScaleDown.Items) == int(replicas)).To(gomega.BeTrue(), "Number of Pods in the statefulset should match with number of replicas")
+		framework.ExpectEqual(len(ssPodsBeforeScaleDown.Items), int(replicas), "Number of Pods in the statefulset should match with number of replicas")
 
 		// Get the list of Volumes attached to Pods before scale down
 		volumesBeforeScaleDown := make(map[string]string)
@@ -112,7 +113,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		for _, sspod := range ssPodsBeforeScaleDown.Items {
 			_, err := client.CoreV1().Pods(namespace).Get(sspod.Name, metav1.GetOptions{})
 			if err != nil {
-				gomega.Expect(apierrs.IsNotFound(err), gomega.BeTrue())
+				framework.ExpectEqual(apierrors.IsNotFound(err), true)
 				for _, volumespec := range sspod.Spec.Volumes {
 					if volumespec.PersistentVolumeClaim != nil {
 						vSpherediskPath := getvSphereVolumePathFromClaim(client, statefulset.Namespace, volumespec.PersistentVolumeClaim.ClaimName)
@@ -131,7 +132,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 
 		ssPodsAfterScaleUp := e2esset.GetPodList(client, statefulset)
 		gomega.Expect(ssPodsAfterScaleUp.Items).NotTo(gomega.BeEmpty(), fmt.Sprintf("Unable to get list of Pods from the Statefulset: %v", statefulset.Name))
-		gomega.Expect(len(ssPodsAfterScaleUp.Items) == int(replicas)).To(gomega.BeTrue(), "Number of Pods in the statefulset should match with number of replicas")
+		framework.ExpectEqual(len(ssPodsAfterScaleUp.Items), int(replicas), "Number of Pods in the statefulset should match with number of replicas")
 
 		// After scale up, verify all vsphere volumes are attached to node VMs.
 		ginkgo.By("Verify all volumes are attached to Nodes after Statefulsets is scaled up")
@@ -145,9 +146,9 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 					vSpherediskPath := getvSphereVolumePathFromClaim(client, statefulset.Namespace, volumespec.PersistentVolumeClaim.ClaimName)
 					framework.Logf("Verify Volume: %q is attached to the Node: %q", vSpherediskPath, sspod.Spec.NodeName)
 					// Verify scale up has re-attached the same volumes and not introduced new volume
-					gomega.Expect(volumesBeforeScaleDown[vSpherediskPath] == "").To(gomega.BeFalse())
+					framework.ExpectEqual(volumesBeforeScaleDown[vSpherediskPath] == "", false)
 					isVolumeAttached, verifyDiskAttachedError := diskIsAttached(vSpherediskPath, sspod.Spec.NodeName)
-					gomega.Expect(isVolumeAttached).To(gomega.BeTrue())
+					framework.ExpectEqual(isVolumeAttached, true)
 					framework.ExpectNoError(verifyDiskAttachedError)
 				}
 			}

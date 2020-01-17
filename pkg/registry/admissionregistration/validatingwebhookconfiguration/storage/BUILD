@@ -11,6 +11,9 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/admissionregistration/validatingwebhookconfiguration/storage",
     deps = [
         "//pkg/apis/admissionregistration:go_default_library",
+        "//pkg/printers:go_default_library",
+        "//pkg/printers/internalversion:go_default_library",
+        "//pkg/printers/storage:go_default_library",
         "//pkg/registry/admissionregistration/validatingwebhookconfiguration:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",

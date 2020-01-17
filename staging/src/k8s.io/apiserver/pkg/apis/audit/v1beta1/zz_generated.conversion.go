@@ -38,16 +38,6 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*Event)(nil), (*audit.Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_Event_To_audit_Event(a.(*Event), b.(*audit.Event), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*audit.Event)(nil), (*Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_audit_Event_To_v1beta1_Event(a.(*audit.Event), b.(*Event), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*EventList)(nil), (*audit.EventList)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_EventList_To_audit_EventList(a.(*EventList), b.(*audit.EventList), scope)
 	}); err != nil {

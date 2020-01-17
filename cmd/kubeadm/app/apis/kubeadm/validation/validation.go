@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -64,7 +63,7 @@ func ValidateClusterConfiguration(c *kubeadm.ClusterConfiguration) field.ErrorLi
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("featureGates"))...)
 	allErrs = append(allErrs, ValidateHostPort(c.ControlPlaneEndpoint, field.NewPath("controlPlaneEndpoint"))...)
 	allErrs = append(allErrs, ValidateEtcd(&c.Etcd, field.NewPath("etcd"))...)
-	allErrs = append(allErrs, componentconfigs.Known.Validate(c)...)
+	allErrs = append(allErrs, componentconfigs.Validate(c)...)
 	return allErrs
 }
 
@@ -385,7 +384,7 @@ func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool,
 				allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "expected at least one IP from each family (v4 or v6) for dual-stack networking"))
 			}
 			for _, s := range subnets {
-				numAddresses := ipallocator.RangeSize(s)
+				numAddresses := utilnet.RangeSize(s)
 				if numAddresses < minAddrs {
 					allErrs = append(allErrs, field.Invalid(fldPath, s, "subnet is too small"))
 				}
@@ -397,7 +396,7 @@ func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool,
 			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "couldn't parse subnet"))
 			return allErrs
 		}
-		numAddresses := ipallocator.RangeSize(svcSubnet)
+		numAddresses := utilnet.RangeSize(svcSubnet)
 		if numAddresses < minAddrs {
 			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "subnet is too small"))
 		}

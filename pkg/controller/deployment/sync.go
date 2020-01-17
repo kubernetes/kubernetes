@@ -256,6 +256,9 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 			klog.V(2).Infof("Found a hash collision for deployment %q - bumping collisionCount (%d->%d) to resolve it", d.Name, preCollisionCount, *d.Status.CollisionCount)
 		}
 		return nil, err
+	case errors.HasStatusCause(err, v1.NamespaceTerminatingCause):
+		// if the namespace is terminating, all subsequent creates will fail and we can safely do nothing
+		return nil, err
 	case err != nil:
 		msg := fmt.Sprintf("Failed to create new replica set %q: %v", newRS.Name, err)
 		if deploymentutil.HasProgressDeadline(d) {

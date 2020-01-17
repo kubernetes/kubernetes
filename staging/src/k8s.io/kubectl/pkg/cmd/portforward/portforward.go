@@ -184,10 +184,10 @@ func translateServicePortToTargetPort(ports []string, svc corev1.Service, pod co
 			return nil, err
 		}
 
-		if int32(portnum) != containerPort {
+		if int32(portnum) != containerPort || localPort == "" {
 			translated = append(translated, fmt.Sprintf("%s:%d", localPort, containerPort))
 		} else {
-			translated = append(translated, port)
+			translated = append(translated, fmt.Sprintf("%d", containerPort))
 		}
 	}
 	return translated, nil

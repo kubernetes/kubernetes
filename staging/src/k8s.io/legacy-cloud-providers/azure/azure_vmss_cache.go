@@ -19,7 +19,7 @@ limitations under the License.
 package azure
 
 import (
-	"fmt"
+	"context"
 	"strings"
 	"sync"
 	"time"
@@ -32,14 +32,15 @@ import (
 )
 
 var (
-	vmssNameSeparator  = "_"
-	vmssCacheSeparator = "#"
+	vmssNameSeparator = "_"
 
+	vmssKey                 = "k8svmssKey"
 	vmssVirtualMachinesKey  = "k8svmssVirtualMachinesKey"
 	availabilitySetNodesKey = "k8sAvailabilitySetNodesKey"
 
-	availabilitySetNodesCacheTTL = 15 * time.Minute
-	vmssVirtualMachinesTTL       = 10 * time.Minute
+	availabilitySetNodesCacheTTLDefaultInSeconds = 900
+	vmssCacheTTLDefaultInSeconds                 = 600
+	vmssVirtualMachinesCacheTTLDefaultInSeconds  = 600
 )
 
 type vmssVirtualMachinesEntry struct {
@@ -47,10 +48,49 @@ type vmssVirtualMachinesEntry struct {
 	vmssName       string
 	instanceID     string
 	virtualMachine *compute.VirtualMachineScaleSetVM
+	lastUpdate     time.Time
 }
 
-func (ss *scaleSet) makeVmssVMName(scaleSetName, instanceID string) string {
-	return fmt.Sprintf("%s%s%s", scaleSetName, vmssNameSeparator, instanceID)
+type vmssEntry struct {
+	vmss       *compute.VirtualMachineScaleSet
+	lastUpdate time.Time
+}
+
+func (ss *scaleSet) newVMSSCache() (*timedCache, error) {
+	getter := func(key string) (interface{}, error) {
+		localCache := &sync.Map{} // [vmssName]*vmssEntry
+
+		allResourceGroups, err := ss.GetResourceGroups()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, resourceGroup := range allResourceGroups.List() {
+			allScaleSets, rerr := ss.VirtualMachineScaleSetsClient.List(context.Background(), resourceGroup)
+			if rerr != nil {
+				klog.Errorf("VirtualMachineScaleSetsClient.List failed: %v", rerr)
+				return nil, rerr.Error()
+			}
+
+			for _, scaleSet := range allScaleSets {
+				if scaleSet.Name == nil || *scaleSet.Name == "" {
+					klog.Warning("failed to get the name of VMSS")
+					continue
+				}
+				localCache.Store(*scaleSet.Name, &vmssEntry{
+					vmss:       &scaleSet,
+					lastUpdate: time.Now().UTC(),
+				})
+			}
+		}
+
+		return localCache, nil
+	}
+
+	if ss.Config.VmssCacheTTLInSeconds == 0 {
+		ss.Config.VmssCacheTTLInSeconds = vmssCacheTTLDefaultInSeconds
+	}
+	return newTimedcache(time.Duration(ss.Config.VmssCacheTTLInSeconds)*time.Second, getter)
 }
 
 func extractVmssVMName(name string) (string, string, error) {
@@ -101,6 +141,7 @@ func (ss *scaleSet) newVMSSVirtualMachinesCache() (*timedCache, error) {
 						vmssName:       ssName,
 						instanceID:     to.String(vm.InstanceID),
 						virtualMachine: &vm,
+						lastUpdate:     time.Now().UTC(),
 					})
 				}
 			}
@@ -109,12 +150,16 @@ func (ss *scaleSet) newVMSSVirtualMachinesCache() (*timedCache, error) {
 		return localCache, nil
 	}
 
-	return newTimedcache(vmssVirtualMachinesTTL, getter)
+	if ss.Config.VmssVirtualMachinesCacheTTLInSeconds == 0 {
+		ss.Config.VmssVirtualMachinesCacheTTLInSeconds = vmssVirtualMachinesCacheTTLDefaultInSeconds
+	}
+	return newTimedcache(time.Duration(ss.Config.VmssVirtualMachinesCacheTTLInSeconds)*time.Second, getter)
 }
 
 func (ss *scaleSet) deleteCacheForNode(nodeName string) error {
-	cached, err := ss.vmssVMCache.Get(vmssVirtualMachinesKey)
+	cached, err := ss.vmssVMCache.Get(vmssVirtualMachinesKey, cacheReadTypeUnsafe)
 	if err != nil {
+		klog.Errorf("deleteCacheForNode(%s) failed with error: %v", nodeName, err)
 		return err
 	}
 
@@ -147,11 +192,14 @@ func (ss *scaleSet) newAvailabilitySetNodesCache() (*timedCache, error) {
 		return localCache, nil
 	}
 
-	return newTimedcache(availabilitySetNodesCacheTTL, getter)
+	if ss.Config.AvailabilitySetNodesCacheTTLInSeconds == 0 {
+		ss.Config.AvailabilitySetNodesCacheTTLInSeconds = availabilitySetNodesCacheTTLDefaultInSeconds
+	}
+	return newTimedcache(time.Duration(ss.Config.AvailabilitySetNodesCacheTTLInSeconds)*time.Second, getter)
 }
 
-func (ss *scaleSet) isNodeManagedByAvailabilitySet(nodeName string) (bool, error) {
-	cached, err := ss.availabilitySetNodesCache.Get(availabilitySetNodesKey)
+func (ss *scaleSet) isNodeManagedByAvailabilitySet(nodeName string, crt cacheReadType) (bool, error) {
+	cached, err := ss.availabilitySetNodesCache.Get(availabilitySetNodesKey, crt)
 	if err != nil {
 		return false, err
 	}

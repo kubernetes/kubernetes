@@ -25,20 +25,21 @@ import (
 	"path"
 	"path/filepath"
 
+	"k8s.io/klog"
+	"k8s.io/utils/keymutex"
+	"k8s.io/utils/mount"
+	utilstrings "k8s.io/utils/strings"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/legacy-cloud-providers/openstack"
-	"k8s.io/utils/keymutex"
-	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -109,11 +110,6 @@ func (plugin *cinderPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 
 func (plugin *cinderPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.Cinder != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Cinder != nil)
-}
-
-func (plugin *cinderPlugin) IsMigratedToCSI() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationOpenStack)
 }
 
 func (plugin *cinderPlugin) RequiresRemount() bool {

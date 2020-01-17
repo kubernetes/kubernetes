@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
@@ -111,6 +112,11 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 			// In future syncPod loops, the kubelet will retry the pod deletion steps that it was stuck on.
 			continue
 		}
+		if len(insufficientResources) > 0 {
+			metrics.Preemptions.WithLabelValues(insufficientResources[0].resourceName.String()).Inc()
+		} else {
+			metrics.Preemptions.WithLabelValues("").Inc()
+		}
 		klog.Infof("preemption: pod %s evicted successfully", format.Pod(pod))
 	}
 	return nil
@@ -126,21 +132,21 @@ func getPodsToPreempt(pod *v1.Pod, pods []*v1.Pod, requirements admissionRequire
 		return nil, fmt.Errorf("no set of running pods found to reclaim resources: %v", unableToMeetRequirements.toString())
 	}
 	// find the guaranteed pods we would need to evict if we already evicted ALL burstable and besteffort pods.
-	guarateedToEvict, err := getPodsToPreemptByDistance(guaranteedPods, requirements.subtract(append(bestEffortPods, burstablePods...)...))
+	guaranteedToEvict, err := getPodsToPreemptByDistance(guaranteedPods, requirements.subtract(append(bestEffortPods, burstablePods...)...))
 	if err != nil {
 		return nil, err
 	}
 	// Find the burstable pods we would need to evict if we already evicted ALL besteffort pods, and the required guaranteed pods.
-	burstableToEvict, err := getPodsToPreemptByDistance(burstablePods, requirements.subtract(append(bestEffortPods, guarateedToEvict...)...))
+	burstableToEvict, err := getPodsToPreemptByDistance(burstablePods, requirements.subtract(append(bestEffortPods, guaranteedToEvict...)...))
 	if err != nil {
 		return nil, err
 	}
 	// Find the besteffort pods we would need to evict if we already evicted the required guaranteed and burstable pods.
-	bestEffortToEvict, err := getPodsToPreemptByDistance(bestEffortPods, requirements.subtract(append(burstableToEvict, guarateedToEvict...)...))
+	bestEffortToEvict, err := getPodsToPreemptByDistance(bestEffortPods, requirements.subtract(append(burstableToEvict, guaranteedToEvict...)...))
 	if err != nil {
 		return nil, err
 	}
-	return append(append(bestEffortToEvict, burstableToEvict...), guarateedToEvict...), nil
+	return append(append(bestEffortToEvict, burstableToEvict...), guaranteedToEvict...), nil
 }
 
 // getPodsToPreemptByDistance finds the pods that have pod requests >= admission requirements.

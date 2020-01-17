@@ -23,18 +23,16 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 )
 
-const dnsTestPodHostName = "dns-querier-1"
-const dnsTestServiceName = "dns-test-service"
-
 var _ = SIGDescribe("DNS", func() {
 
 	ginkgo.BeforeEach(func() {
-		framework.SkipUnlessNodeOSDistroIs("windows")
+		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})
 
 	f := framework.NewDefaultFramework("dns")
@@ -76,6 +74,7 @@ var _ = SIGDescribe("DNS", func() {
 
 		framework.Logf("ipconfig /all:\n%s", stdout)
 		dnsRegex, err := regexp.Compile(`DNS Servers[\s*.]*:(\s*[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})+`)
+		framework.ExpectNoError(err)
 
 		if dnsRegex.MatchString(stdout) {
 			match := dnsRegex.FindString(stdout)

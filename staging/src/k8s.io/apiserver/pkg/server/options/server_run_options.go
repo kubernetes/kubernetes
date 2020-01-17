@@ -117,9 +117,9 @@ func (s *ServerRunOptions) Validate() []error {
 	}
 
 	if s.EnableInflightQuotaHandler {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.RequestManagement) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) {
 			errors = append(errors, fmt.Errorf("--enable-inflight-quota-handler can not be set if feature "+
-				"gate RequestManagement is disabled"))
+				"gate APIPriorityAndFairness is disabled"))
 		}
 		if s.MaxMutatingRequestsInFlight != 0 {
 			errors = append(errors, fmt.Errorf("--max-mutating-requests-inflight=%v "+
@@ -184,7 +184,7 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 
 	deprecatedMasterServiceNamespace := metav1.NamespaceDefault
 	fs.StringVar(&deprecatedMasterServiceNamespace, "master-service-namespace", deprecatedMasterServiceNamespace, ""+
-		"DEPRECATED: the namespace from which the kubernetes master services should be injected into pods.")
+		"DEPRECATED: the namespace from which the Kubernetes master services should be injected into pods.")
 
 	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", s.MaxRequestsInFlight, ""+
 		"The maximum number of non-mutating requests in flight at a given time. When the server exceeds this, "+

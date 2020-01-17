@@ -34,9 +34,9 @@ type FakeFlunders struct {
 	ns   string
 }
 
-var flundersResource = schema.GroupVersionResource{Group: "wardle.k8s.io", Version: "v1beta1", Resource: "flunders"}
+var flundersResource = schema.GroupVersionResource{Group: "wardle.example.com", Version: "v1beta1", Resource: "flunders"}
 
-var flundersKind = schema.GroupVersionKind{Group: "wardle.k8s.io", Version: "v1beta1", Kind: "Flunder"}
+var flundersKind = schema.GroupVersionKind{Group: "wardle.example.com", Version: "v1beta1", Kind: "Flunder"}
 
 // Get takes name of the flunder, and returns the corresponding flunder object, and an error if there is any.
 func (c *FakeFlunders) Get(name string, options v1.GetOptions) (result *v1beta1.Flunder, err error) {

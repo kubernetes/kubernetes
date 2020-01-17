@@ -18,7 +18,7 @@ limitations under the License.
 
 // To run tests in this suite
 // NOTE: This test suite requires password-less sudo capabilities to run the kubelet and kube-apiserver.
-package e2e_node
+package e2enode
 
 import (
 	"bytes"
@@ -34,17 +34,18 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/system"
+	cliflag "k8s.io/component-base/cli/flag"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/generated"
 	"k8s.io/kubernetes/test/e2e_node/services"
+	system "k8s.io/system-validators/validators"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
@@ -62,19 +63,25 @@ var runKubeletMode = flag.Bool("run-kubelet-mode", false, "If true, only start k
 var systemValidateMode = flag.Bool("system-validate-mode", false, "If true, only run system validation in current process, and not run test.")
 var systemSpecFile = flag.String("system-spec-file", "", "The name of the system spec file that will be used for node conformance test. If it's unspecified or empty, the default system spec (system.DefaultSysSpec) will be used.")
 
-func init() {
-	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
-	framework.RegisterCommonFlags(flag.CommandLine)
-	framework.RegisterNodeFlags(flag.CommandLine)
-	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
-	// Mark the run-services-mode flag as hidden to prevent user from using it.
-	pflag.CommandLine.MarkHidden("run-services-mode")
-	// It's weird that if I directly use pflag in TestContext, it will report error.
-	// It seems that someone is using flag.Parse() after init() and TestMain().
-	// TODO(random-liu): Find who is using flag.Parse() and cause errors and move the following logic
-	// into TestContext.
-	// TODO(pohly): remove RegisterNodeFlags from test_context.go enable Viper config support here?
+// registerNodeFlags registers flags specific to the node e2e test suite.
+func registerNodeFlags(flags *flag.FlagSet) {
+	// Mark the test as node e2e when node flags are api.Registry.
+	framework.TestContext.NodeE2E = true
+	flags.StringVar(&framework.TestContext.NodeName, "node-name", "", "Name of the node to run tests on.")
+	// TODO(random-liu): Move kubelet start logic out of the test.
+	// TODO(random-liu): Move log fetch logic out of the test.
+	// There are different ways to start kubelet (systemd, initd, docker, manually started etc.)
+	// and manage logs (journald, upstart etc.).
+	// For different situation we need to mount different things into the container, run different commands.
+	// It is hard and unnecessary to deal with the complexity inside the test suite.
+	flags.BoolVar(&framework.TestContext.NodeConformance, "conformance", false, "If true, the test suite will not start kubelet, and fetch system log (kernel, docker, kubelet log etc.) to the report directory.")
+	flags.BoolVar(&framework.TestContext.PrepullImages, "prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
+	flags.StringVar(&framework.TestContext.ImageDescription, "image-description", "", "The description of the image which the test will be running on.")
+	flags.StringVar(&framework.TestContext.SystemSpecName, "system-spec-name", "", "The name of the system spec (e.g., gke) that's used in the node e2e test. The system specs are in test/e2e_node/system/specs/. This is used by the test framework to determine which tests to run for validating the system requirements.")
+	flags.Var(cliflag.NewMapStringString(&framework.TestContext.ExtraEnvs), "extra-envs", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
+}
 
+func init() {
 	// Enable bindata file lookup as fallback.
 	testfiles.AddFileSource(testfiles.BindataFileSource{
 		Asset:      generated.Asset,
@@ -84,6 +91,19 @@ func init() {
 }
 
 func TestMain(m *testing.M) {
+	// Copy go flags in TestMain, to ensure go test flags are registered (no longer available in init() as of go1.13)
+	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
+	framework.RegisterCommonFlags(flag.CommandLine)
+	registerNodeFlags(flag.CommandLine)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	// Mark the run-services-mode flag as hidden to prevent user from using it.
+	pflag.CommandLine.MarkHidden("run-services-mode")
+	// It's weird that if I directly use pflag in TestContext, it will report error.
+	// It seems that someone is using flag.Parse() after init() and TestMain().
+	// TODO(random-liu): Find who is using flag.Parse() and cause errors and move the following logic
+	// into TestContext.
+	// TODO(pohly): remove RegisterNodeFlags from test_context.go enable Viper config support here?
+
 	rand.Seed(time.Now().UnixNano())
 	pflag.Parse()
 	framework.AfterReadingAllFlags(&framework.TestContext)
@@ -285,9 +305,9 @@ func getNode(c *clientset.Clientset) (*v1.Node, error) {
 	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "should be able to list nodes.")
 	if nodes == nil {
-		return nil, fmt.Errorf("the node list is nil.")
+		return nil, fmt.Errorf("the node list is nil")
 	}
-	gomega.Expect(len(nodes.Items) > 1).NotTo(gomega.BeTrue(), "the number of nodes is more than 1.")
+	framework.ExpectEqual(len(nodes.Items) > 1, false, "the number of nodes is more than 1.")
 	if len(nodes.Items) == 0 {
 		return nil, fmt.Errorf("empty node list: %+v", nodes)
 	}

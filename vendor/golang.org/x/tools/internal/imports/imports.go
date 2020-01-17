@@ -13,12 +13,14 @@ import (
 	"bytes"
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/format"
 	"go/parser"
 	"go/printer"
 	"go/token"
 	"io"
 	"io/ioutil"
+	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -41,13 +43,10 @@ type Options struct {
 }
 
 // Process implements golang.org/x/tools/imports.Process with explicit context in env.
-func Process(filename string, src []byte, opt *Options) ([]byte, error) {
-	if src == nil {
-		b, err := ioutil.ReadFile(filename)
-		if err != nil {
-			return nil, err
-		}
-		src = b
+func Process(filename string, src []byte, opt *Options) (formatted []byte, err error) {
+	src, opt, err = initialize(filename, src, opt)
+	if err != nil {
+		return nil, err
 	}
 
 	fileSet := token.NewFileSet()
@@ -61,7 +60,93 @@ func Process(filename string, src []byte, opt *Options) ([]byte, error) {
 			return nil, err
 		}
 	}
+	return formatFile(fileSet, file, src, adjust, opt)
+}
 
+// FixImports returns a list of fixes to the imports that, when applied,
+// will leave the imports in the same state as Process.
+//
+// Note that filename's directory influences which imports can be chosen,
+// so it is important that filename be accurate.
+func FixImports(filename string, src []byte, opt *Options) (fixes []*ImportFix, err error) {
+	src, opt, err = initialize(filename, src, opt)
+	if err != nil {
+		return nil, err
+	}
+
+	fileSet := token.NewFileSet()
+	file, _, err := parse(fileSet, filename, src, opt)
+	if err != nil {
+		return nil, err
+	}
+
+	return getFixes(fileSet, file, filename, opt.Env)
+}
+
+// ApplyFix will apply all of the fixes to the file and format it.
+func ApplyFixes(fixes []*ImportFix, filename string, src []byte, opt *Options) (formatted []byte, err error) {
+	src, opt, err = initialize(filename, src, opt)
+	if err != nil {
+		return nil, err
+	}
+
+	fileSet := token.NewFileSet()
+	file, adjust, err := parse(fileSet, filename, src, opt)
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply the fixes to the file.
+	apply(fileSet, file, fixes)
+
+	return formatFile(fileSet, file, src, adjust, opt)
+}
+
+// GetAllCandidates gets all of the standard library candidate packages to import in
+// sorted order on import path.
+func GetAllCandidates(filename string, opt *Options) (pkgs []ImportFix, err error) {
+	_, opt, err = initialize(filename, []byte{}, opt)
+	if err != nil {
+		return nil, err
+	}
+	return getAllCandidates(filename, opt.Env)
+}
+
+// initialize sets the values for opt and src.
+// If they are provided, they are not changed. Otherwise opt is set to the
+// default values and src is read from the file system.
+func initialize(filename string, src []byte, opt *Options) ([]byte, *Options, error) {
+	// Use defaults if opt is nil.
+	if opt == nil {
+		opt = &Options{Comments: true, TabIndent: true, TabWidth: 8}
+	}
+
+	// Set the env if the user has not provided it.
+	if opt.Env == nil {
+		opt.Env = &ProcessEnv{
+			GOPATH: build.Default.GOPATH,
+			GOROOT: build.Default.GOROOT,
+		}
+	}
+
+	// Set the logger if the user has not provided it.
+	if opt.Env.Logf == nil {
+		opt.Env.Logf = log.Printf
+	}
+
+	if src == nil {
+		b, err := ioutil.ReadFile(filename)
+		if err != nil {
+			return nil, nil, err
+		}
+		src = b
+	}
+
+	return src, opt, nil
+}
+
+func formatFile(fileSet *token.FileSet, file *ast.File, src []byte, adjust func(orig []byte, src []byte) []byte, opt *Options) ([]byte, error) {
+	mergeImports(opt.Env, fileSet, file)
 	sortImports(opt.Env, fileSet, file)
 	imps := astutil.Imports(fileSet, file)
 	var spacesBefore []string // import paths we need spaces before
@@ -89,7 +174,7 @@ func Process(filename string, src []byte, opt *Options) ([]byte, error) {
 	printConfig := &printer.Config{Mode: printerMode, Tabwidth: opt.TabWidth}
 
 	var buf bytes.Buffer
-	err = printConfig.Fprint(&buf, fileSet, file)
+	err := printConfig.Fprint(&buf, fileSet, file)
 	if err != nil {
 		return nil, err
 	}

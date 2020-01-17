@@ -38,17 +38,6 @@ var (
 		},
 	)
 
-	// DeprecatedSyncProxyRulesLatency is the latency of one round of kube-proxy syncing proxy rules.
-	DeprecatedSyncProxyRulesLatency = metrics.NewHistogram(
-		&metrics.HistogramOpts{
-			Subsystem:      kubeProxySubsystem,
-			Name:           "sync_proxy_rules_latency_microseconds",
-			Help:           "(Deprecated) SyncProxyRules latency in microseconds",
-			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
-			StabilityLevel: metrics.ALPHA,
-		},
-	)
-
 	// SyncProxyRulesLastTimestamp is the timestamp proxy rules were last
 	// successfully synced.
 	SyncProxyRulesLastTimestamp = metrics.NewGauge(
@@ -144,7 +133,6 @@ var registerMetricsOnce sync.Once
 func RegisterMetrics() {
 	registerMetricsOnce.Do(func() {
 		legacyregistry.MustRegister(SyncProxyRulesLatency)
-		legacyregistry.MustRegister(DeprecatedSyncProxyRulesLatency)
 		legacyregistry.MustRegister(SyncProxyRulesLastTimestamp)
 		legacyregistry.MustRegister(NetworkProgrammingLatency)
 		legacyregistry.MustRegister(EndpointChangesPending)
@@ -153,11 +141,6 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(ServiceChangesTotal)
 		legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
 	})
-}
-
-// SinceInMicroseconds gets the time since the specified start in microseconds.
-func SinceInMicroseconds(start time.Time) float64 {
-	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
 }
 
 // SinceInSeconds gets the time since the specified start in seconds.

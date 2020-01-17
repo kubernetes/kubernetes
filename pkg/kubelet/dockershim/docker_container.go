@@ -347,7 +347,10 @@ func (ds *dockerService) ContainerStatus(_ context.Context, req *runtimeapi.Cont
 	// Convert the image id to a pullable id.
 	ir, err := ds.client.InspectImageByID(r.Image)
 	if err != nil {
-		return nil, fmt.Errorf("unable to inspect docker image %q while inspecting docker container %q: %v", r.Image, containerID, err)
+		if !libdocker.IsImageNotFoundError(err) {
+			return nil, fmt.Errorf("unable to inspect docker image %q while inspecting docker container %q: %v", r.Image, containerID, err)
+		}
+		klog.Warningf("ignore error image %q not found while inspecting docker container %q: %v", r.Image, containerID, err)
 	}
 	imageID := toPullableImageID(r.Image, ir)
 

@@ -82,7 +82,7 @@ var stackCreator = regexp.MustCompile(`(?m)^created by (.*)\n\s+(.*):(\d+) \+0x[
 func extractStackCreator() (string, int, bool) {
 	stack := debug.Stack()
 	matches := stackCreator.FindStringSubmatch(string(stack))
-	if matches == nil || len(matches) != 4 {
+	if len(matches) != 4 {
 		return "", 0, false
 	}
 	line, err := strconv.Atoi(matches[3])

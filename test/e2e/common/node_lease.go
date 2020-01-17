@@ -84,6 +84,30 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 				time.Duration(*lease.Spec.LeaseDurationSeconds/4)*time.Second)
 		})
 
+		ginkgo.It("should have OwnerReferences set", func() {
+			leaseClient := f.ClientSet.CoordinationV1().Leases(v1.NamespaceNodeLease)
+			var (
+				err       error
+				leaseList *coordinationv1.LeaseList
+			)
+			gomega.Eventually(func() error {
+				leaseList, err = leaseClient.List(metav1.ListOptions{})
+				if err != nil {
+					return err
+				}
+				return nil
+			}, 5*time.Minute, 5*time.Second).Should(gomega.BeNil())
+			// All the leases should have OwnerReferences set to their corresponding
+			// Node object.
+			for i := range leaseList.Items {
+				lease := &leaseList.Items[i]
+				ownerRefs := lease.ObjectMeta.OwnerReferences
+				framework.ExpectEqual(len(ownerRefs), 1)
+				framework.ExpectEqual(ownerRefs[0].Kind, v1.SchemeGroupVersion.WithKind("Node").Kind)
+				framework.ExpectEqual(ownerRefs[0].APIVersion, v1.SchemeGroupVersion.WithKind("Node").Version)
+			}
+		})
+
 		ginkgo.It("the kubelet should report node status infrequently", func() {
 			ginkgo.By("wait until node is ready")
 			e2enode.WaitForNodeToBeReady(f.ClientSet, nodeName, 5*time.Minute)

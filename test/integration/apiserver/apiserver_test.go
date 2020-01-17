@@ -403,11 +403,9 @@ func TestNameInFieldSelector(t *testing.T) {
 	defer closeFn()
 
 	numNamespaces := 3
-	namespaces := make([]*v1.Namespace, 0, numNamespaces)
 	for i := 0; i < 3; i++ {
 		ns := framework.CreateTestingNamespace(fmt.Sprintf("ns%d", i), s, t)
 		defer framework.DeleteTestingNamespace(ns, s, t)
-		namespaces = append(namespaces, ns)
 
 		_, err := clientSet.CoreV1().Secrets(ns.Name).Create(makeSecret("foo"))
 		if err != nil {

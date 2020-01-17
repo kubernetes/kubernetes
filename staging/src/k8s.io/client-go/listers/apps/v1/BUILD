@@ -7,7 +7,6 @@ go_library(
         "daemonset.go",
         "daemonset_expansion.go",
         "deployment.go",
-        "deployment_expansion.go",
         "expansion_generated.go",
         "replicaset.go",
         "replicaset_expansion.go",

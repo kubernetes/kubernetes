@@ -19,7 +19,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/features:go_default_library",
-        "//pkg/util/mount:go_default_library",
         "//pkg/volume/util/fs:go_default_library",
         "//pkg/volume/util/hostutil:go_default_library",
         "//pkg/volume/util/recyclerclient:go_default_library",
@@ -34,11 +33,14 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/listers/storage/v1:go_default_library",
         "//staging/src/k8s.io/client-go/listers/storage/v1beta1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/k8s.io/utils/mount:go_default_library",
     ],
 )
 
@@ -58,6 +60,9 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
@@ -83,6 +88,7 @@ filegroup(
         "//pkg/volume/cinder:all-srcs",
         "//pkg/volume/configmap:all-srcs",
         "//pkg/volume/csi:all-srcs",
+        "//pkg/volume/csimigration:all-srcs",
         "//pkg/volume/downwardapi:all-srcs",
         "//pkg/volume/emptydir:all-srcs",
         "//pkg/volume/fc:all-srcs",

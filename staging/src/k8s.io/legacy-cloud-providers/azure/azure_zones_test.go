@@ -117,7 +117,7 @@ func TestGetZone(t *testing.T) {
 
 		mux := http.NewServeMux()
 		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, fmt.Sprintf(`{"compute":{"zone":"%s", "platformFaultDomain":"%s", "location":"eastus"}}`, test.zone, test.faultDomain))
+			fmt.Fprint(w, fmt.Sprintf(`{"compute":{"zone":"%s", "platformFaultDomain":"%s", "location":"eastus"}}`, test.zone, test.faultDomain))
 		}))
 		go func() {
 			http.Serve(listener, mux)

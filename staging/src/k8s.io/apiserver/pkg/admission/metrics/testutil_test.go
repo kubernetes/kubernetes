@@ -19,8 +19,8 @@ package metrics
 import (
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus"
 	ptype "github.com/prometheus/client_model/go"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 func labelsMatch(metric *ptype.Metric, labelFilter map[string]string) bool {
@@ -34,7 +34,7 @@ func labelsMatch(metric *ptype.Metric, labelFilter map[string]string) bool {
 
 // expectFindMetric find a metric with the given name nad labels or reports a fatal test error.
 func expectFindMetric(t *testing.T, name string, expectedLabels map[string]string) *ptype.Metric {
-	metrics, err := prometheus.DefaultGatherer.Gather()
+	metrics, err := legacyregistry.DefaultGatherer.Gather()
 	if err != nil {
 		t.Fatalf("Failed to gather metrics: %s", err)
 	}
@@ -61,7 +61,7 @@ func expectFindMetric(t *testing.T, name string, expectedLabels map[string]strin
 // expectHistogramCountTotal ensures that the sum of counts of metrics matching the labelFilter is as
 // expected.
 func expectHistogramCountTotal(t *testing.T, name string, labelFilter map[string]string, wantCount int) {
-	metrics, err := prometheus.DefaultGatherer.Gather()
+	metrics, err := legacyregistry.DefaultGatherer.Gather()
 	if err != nil {
 		t.Fatalf("Failed to gather metrics: %s", err)
 	}
@@ -93,7 +93,7 @@ func expectHistogramCountTotal(t *testing.T, name string, labelFilter map[string
 // expectCounterValue ensures that the counts of metrics matching the labelFilter is as
 // expected.
 func expectCounterValue(t *testing.T, name string, labelFilter map[string]string, wantCount int) {
-	metrics, err := prometheus.DefaultGatherer.Gather()
+	metrics, err := legacyregistry.DefaultGatherer.Gather()
 	if err != nil {
 		t.Fatalf("Failed to gather metrics: %s", err)
 	}
